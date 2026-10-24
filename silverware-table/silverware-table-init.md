@@ -473,20 +473,29 @@ if js and js.window then
       silverwareTableJs.removeAllMetadata()
     end,
   }
-  -- Completion in a formula given to silverware.table.evaluate (the line before the caret ends in one,
-  -- in either quotes), as a cell's editor offers it: the whole formula given, the caret's place in it,
-  -- so a name the caret is in the middle of is not completed again
+  -- Whether a call's function is silverware.table.evaluate, by its name or one evaluateAlias gave it
+  local function evaluates(callee)
+    if callee == "silverware.table.evaluate" then return true end
+    for _, name in ipairs(silverware.table._evaluateAliases or {}) do
+      if callee == name then return true end
+    end
+    return false
+  end
+  -- Completion in a formula given to silverware.table.evaluate or an alias of it (the line before the caret
+  -- ends in one, in either quotes), as a cell's editor offers it: the whole formula given, the caret's place
+  -- in it, so a name the caret is in the middle of is not completed again. The call's whole name before its
+  -- "(", so an alias te is not found in paste(
   event.listen {
     name = "editor:complete",
     run = function(e)
       local at = e.data
       local quote = '"'
-      local before = string.match(at.linePrefix, 'silverware%.table%.evaluate%(%s*"([^"]*)$')
-      if not before then
+      local callee, before = string.match(at.linePrefix, '([%w_%.]+)%(%s*"([^"]*)$')
+      if not callee then
         quote = "'"
-        before = string.match(at.linePrefix, "silverware%.table%.evaluate%(%s*'([^']*)$")
+        callee, before = string.match(at.linePrefix, "([%w_%.]+)%(%s*'([^']*)$")
       end
-      if not before then return end
+      if not callee or not evaluates(callee) then return end
       local text = editor.getText()
       -- The rest of the formula: after the caret, up to its closing quote
       local after = string.match(string.sub(text, at.pos + 1), "^([^" .. quote .. "\n]*)") or ""

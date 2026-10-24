@@ -3,14 +3,14 @@ tags: meta
 ---
 # Silverware Table API
 
-The Space Lua API of [[Library/damesene/silverware-table|Silverware Table]]: `silverware.table.defineFunctions`, `defineTypes` and `defineSeries` (your own functions, column types and AutoFill series) and `silverware.table.evaluate` (a formula calculated from Space Lua). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [[Library/damesene/silverware-table-init]] for what starts Silverware Table.
+The Space Lua API of [[Library/damesene/silverware-table|Silverware Table]]: `silverware.table.defineFunctions`, `defineTypes` and `defineSeries` (your own functions, column types and AutoFill series) and `silverware.table.evaluate` (a formula calculated from Space Lua), with `silverware.table.evaluateAlias` giving it a shorter name. It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [[Library/damesene/silverware-table-init]] for what starts Silverware Table.
 
 ```space-lua
 -- priority: 50
 -- Silverware Table's Space Lua API, loaded before your scripts (they have priority 0
 -- unless they say otherwise): silverware.table.defineFunctions, silverware.table.defineTypes and
 -- silverware.table.defineSeries, see "Custom functions", "Custom column types" and "Custom series";
--- silverware.table.evaluate, see "Formulas from Space Lua"
+-- silverware.table.evaluate and silverware.table.evaluateAlias, see "Formulas from Space Lua"
 silverware = silverware or {}
 silverware.table = silverware.table or {}
 if js and js.window then
@@ -88,11 +88,37 @@ if js and js.window then
     end
     return result.value
   end
+  -- The names evaluateAlias gave silverware.table.evaluate, for completion in a formula given to one (the init
+  -- page's listener reads them); made anew each time Space Lua loads, as the scripts calling it run again
+  silverware.table._evaluateAliases = {}
+  -- The functions evaluateAlias made, by name, kept across loads: a name that holds one of them is made again,
+  -- a name that holds anything else is refused
+  local made = silverware.table._madeAliases or {}
+  silverware.table._madeAliases = made
+  -- A function of that name doing what silverware.table.evaluate does: ${te("=beans!vat")}
+  function silverware.table.evaluateAlias(name)
+    if type(name) ~= "string" or not string.match(name, "^[%a_][%w_]*$") then
+      shown('Silverware Table: evaluateAlias needs a name a Lua function can have, not "' .. tostring(name) .. '".', "evaluateAlias")
+      return
+    end
+    local existing = _G[name]
+    if existing ~= nil and existing ~= made[name] then
+      shown("Silverware Table: evaluateAlias did not make " .. name .. ": that name is taken by something else.", "evaluateAlias")
+      return
+    end
+    local alias = function(formula)
+      return silverware.table.evaluate(formula)
+    end
+    made[name] = alias
+    _G[name] = alias
+    table.insert(silverware.table._evaluateAliases, name)
+  end
 else
   -- Space Lua without a window (no tables to show): nothing to define
   function silverware.table.defineFunctions() end
   function silverware.table.defineTypes() end
   function silverware.table.defineSeries() end
   function silverware.table.evaluate() return "#N/A" end
+  function silverware.table.evaluateAlias() end
 end
 ```

@@ -533,6 +533,20 @@ Total: ${silverware.table.evaluate("=SUM(fruit![qty] * fruit![price])")}
 * While you type the formula, names complete as in a cell: the functions (with their syntax and what they do), the page's named tables, and after `table!` that table's named cells.
 * It needs the formulas module (else `#N/A`), and `[[Page]]` references the pageLinks module (else they are not read).
 
+A shorter name: `silverware.table.evaluateAlias("te")` in a `space-lua` block of yours makes a function `te` that does the same, completion included:
+
+```lua
+silverware.table.evaluateAlias("te")
+```
+
+```
+VAT: ${te("=fruit!vat")}
+```
+
+* Call it once for each name you want; it takes effect when Space Lua loads (as your scripts do).
+* A name a Lua function cannot have, or one already taken by something else (`print`, a function of yours), is refused with a notification that says where it was called.
+* Remove the line and the name no longer completes; the function itself goes once the page is loaded again.
+
 ### Errors
 
 | Shows | Because |

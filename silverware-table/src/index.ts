@@ -46,13 +46,21 @@ export function removeAllMetadata(): void {
  * `=[[Other]]prices!B2`). One value as its text, as a cell shows it; several
  * (a range) as a JSON list of their texts, `["a","b"]`; an error by its code
  * (#N/A while Silverware Table has not started or the formulas module is off).
+ * `text`: the page's, as the library page's Lua reads it (editor.getText, so
+ * SilverBullet shows the `${…}` anew when the page changes); `pages`: the
+ * other pages it read, which the Lua reads through SilverBullet too, for the same.
  */
-export async function evaluate(formula: string): Promise<string> {
+export async function evaluated(formula: string, text?: string): Promise<{ readonly value: string; readonly pages: readonly string[] }> {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
   const formulas = controller?.offered<FormulasOffer>("formulas");
-  if (!controller || !formulas) return "#N/A";
-  const value = await formulas.evaluate(String(formula), await controller.bridge.getText());
-  return isRange(value) && value.length !== 1 ? JSON.stringify(value.map(scalarText)) : scalarText(single(value));
+  if (!controller || !formulas) return { value: "#N/A", pages: [] };
+  const { value, pages } = await formulas.evaluate(String(formula), text ?? (await controller.bridge.getText()));
+  return { value: isRange(value) && value.length !== 1 ? JSON.stringify(value.map(scalarText)) : scalarText(single(value)), pages };
+}
+
+/** As `evaluated`, its value only */
+export async function evaluate(formula: string): Promise<string> {
+  return (await evaluated(formula)).value;
 }
 
 /**

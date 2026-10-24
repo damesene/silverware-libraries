@@ -527,6 +527,7 @@ Total: ${silverware.table.evaluate("=SUM(fruit![qty] * fruit![price])")}
 * It is not in a table, so it names what it reads by a table's name: `fruit!B2`, `fruit![qty]`, `fruit!vat`, `fruit!pear[price]`, `[[Prices]]fruit!B2` for a table on another page. `A1` or `[qty]` alone find no table: `#REF!`. The `=` is optional.
 * One value comes back as its text, as a cell would show it: `21`. Several (a range, a column, an operator over one) come back as a list of their texts: `["Pear","Fig"]`. An error comes back as its code: `#REF!`.
 * It reads the page as it is now, and calculates the formulas it reaches anew; your own functions work too. Nothing is written.
+* A `${…}` showing it follows the tables: SilverBullet shows it anew when the page is edited (a cell changed in a table too) or another page it reads changes.
 * It needs the formulas module (else `#N/A`), and `[[Page]]` references the pageLinks module (else they are not read).
 
 ### Errors
@@ -989,9 +990,14 @@ if js and js.window then
   function silverware.table.defineSeries(definitions)
     shown(silverwareTableJs.defineSeries(definitions), "defineSeries")
   end
-  -- A formula calculated on the page shown: one value as its text, several as ["a","b"]
+  -- A formula calculated on the page shown: one value as its text, several as ["a","b"]. The page and
+  -- the other pages it reads are read through SilverBullet, so a ${…} showing it is shown anew as they change
   function silverware.table.evaluate(formula)
-    return silverwareTableJs.evaluate(formula)
+    local result = silverwareTableJs.evaluated(formula, editor.getText())
+    for _, page in ipairs(result.pages) do
+      space.pageExists(page)
+    end
+    return result.value
   end
 else
   -- Space Lua without a window (no tables to show): nothing to define

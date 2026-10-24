@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { evaluate } from "./index.ts";
+import { evaluate, evaluated } from "./index.ts";
 import { controller, setup, useTablePage } from "./testing/page.ts";
 
 describe("silverware.table.evaluate: a formula calculated on the page shown", () => {
@@ -41,11 +41,19 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
     expect(await evaluate("=SUM(")).toMatch(/^#/);
   });
 
-  it("reads another page's tables it refers to", async () => {
+  it("reads another page's tables it refers to, and says which pages it read", async () => {
     const OTHER = `| Name | Cost |\n|---|---|\n| Fig | 7 |\n| <meta core.table core.name='prices'> |\n`;
     await setup(PAGE, {}, { readPage: () => OTHER });
     started();
     expect(await evaluate("=[[Prices]]prices!B1 + fruit!B1")).toBe("10");
+    expect(await evaluated("=[[Prices]]prices!B1")).toEqual({ value: "7", pages: ["Prices"] });
+    expect(await evaluated("=fruit!B1")).toEqual({ value: "3", pages: [] });
+  });
+
+  it("calculates on the text it is given (the page as the library page's Lua reads it)", async () => {
+    await setup(PAGE);
+    started();
+    expect((await evaluated("=fruit!B1", PAGE.replace("| 3 |", "| 30 |"))).value).toBe("30");
   });
 
   it("is #N/A before Silverware Table starts, or with the formulas module off", async () => {

@@ -22,15 +22,16 @@ export { type CellNameAt, cellsByName, type FormulaCells, formulaCount, forFormu
 
 /**
  * What the formulas module offers other modules (ModelHost.offered("formulas")): its cells as the formulas read them;
- * `evaluate`: a formula calculated in no table, on the page's text (the Space Lua API's), a range as its values
+ * `evaluate`: a formula calculated in no table, on the page's text (the Space Lua API's), a range as its values,
+ * and the other pages it read
  */
 export type FormulasOffer = {
   readonly cells: import("./cell.ts").FormulaCells;
-  readonly evaluate: (formula: string, text: string) => Promise<import("./values.ts").Value>;
+  readonly evaluate: (formula: string, text: string) => Promise<{ readonly value: import("./values.ts").Value; readonly pages: readonly string[] }>;
 };
 
-/** What the pageLinks module offers: the other pages these formulas and tables refer to (and theirs, in turn) read anew */
-export type PageLinksOffer = { readonly readFor: (formulas: readonly string[], tables: readonly import("../markdown.ts").Table[]) => Promise<void> };
+/** What the pageLinks module offers: the other pages these formulas and tables refer to (and theirs, in turn) read anew; which they are */
+export type PageLinksOffer = { readonly readFor: (formulas: readonly string[], tables: readonly import("../markdown.ts").Table[]) => Promise<readonly string[]> };
 export { type Area, areaText, callsCustomFunctions, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredTableNames, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";
 export { type Calculation, evaluateFormula, formulaErrors, type NamedCell, recalculate, scalarText, type TableSource, totalRows } from "./evaluate.ts";

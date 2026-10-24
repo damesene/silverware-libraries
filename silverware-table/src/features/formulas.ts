@@ -208,13 +208,14 @@ export class Formulas implements Feature {
    * A formula calculated in no table, on the page's `text` (the Space Lua
    * API's): the other pages it and the page's tables refer to read first (the
    * pageLinks module's, when on), then the page's tables by name, as a cell's
-   * formula finds them
+   * formula finds them; the other pages read, which the caller may watch
    */
-  private async evaluate(formula: string, text: string): Promise<Value> {
+  private async evaluate(formula: string, text: string): Promise<{ readonly value: Value; readonly pages: readonly string[] }> {
     const tables = pageTablesOf(text);
-    await this.host.offered<PageLinksOffer>("pageLinks")?.readFor([formula], tables.map((t) => t.table));
+    const pages = (await this.host.offered<PageLinksOffer>("pageLinks")?.readFor([formula], tables.map((t) => t.table))) ?? [];
     const source = pageTables(this.cells, () => this.named(tables), this.host.currentPage, undefined, this.namedOthers(this.host.otherPages()));
-    return evaluateFormula(formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`, { cells: this.cells, tables: source });
+    const value = evaluateFormula(formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`, { cells: this.cells, tables: source });
+    return { value, pages };
   }
 
   /** A table's name, by which formulas refer to it */

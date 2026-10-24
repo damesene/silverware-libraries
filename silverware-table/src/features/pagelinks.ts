@@ -26,8 +26,10 @@ export class PageLinks implements Feature {
   }
 
   /** The pages these formulas and tables refer to (and theirs, in turn), read anew: a formula calculated in no table */
-  private async readFor(formulas: readonly string[], tables: readonly Table[]): Promise<void> {
-    await this.load(tables, true, formulas.flatMap(formulaPages));
+  private async readFor(formulas: readonly string[], tables: readonly Table[]): Promise<readonly string[]> {
+    const visited = new Set<string>();
+    await this.load(tables, true, formulas.flatMap(formulaPages), visited);
+    return [...visited];
   }
 
   otherPages(): OtherPages {
@@ -85,7 +87,7 @@ export class PageLinks implements Feature {
    * pages those pages' tables refer to; `fresh`: also those read before.
    * Whether a page was read.
    */
-  private async load(tables: Iterable<Table>, fresh: boolean | ReadonlySet<string>, pages: readonly string[] = []): Promise<boolean> {
+  private async load(tables: Iterable<Table>, fresh: boolean | ReadonlySet<string>, pages: readonly string[] = [], visited?: Set<string>): Promise<boolean> {
     // Read for formulas only
     const cells = this.cells();
     if (!this.host.bridge.readPage || !cells) return false;
@@ -97,6 +99,7 @@ export class PageLinks implements Feature {
       if (done.size >= MAX_OTHER_PAGES) break;
       done.add(page);
       if (page === this.host.currentPage) continue;
+      visited?.add(page);
       if (fresh === true || (fresh && fresh.has(page)) || !this.pages.has(page)) {
         await this.read(page);
         read = true;

@@ -793,7 +793,7 @@ Setting a part replaces what an earlier `config.set` of the same part set: set e
 
 ### Tables
 
-* **Store table metadata** (`silverware.table.metadata`), default `false`
+* **Store table metadata** (`silverware.table.metadata`), default `true`
   * `true`: table settings (the sorting and pinned rows and columns) can be stored in any table, see [[#Table metadata]], rows and columns can be pinned, see [[#Pinning]], and formulas can be added, see [[#Formulas]].
   * `false`: tables without metadata get none: sorting is a view only, and a formula typed into a cell is saved as text. Tables that already have metadata keep using it: their sorting is still stored, rows and columns can be unpinned and their formulas keep working, but nothing new can be pinned and no new formula added.
 * **Maximum table height (px)** (`silverware.table.maxHeight`), default `0`
@@ -1006,7 +1006,7 @@ config.define("silverware.table", {
   properties = {
     metadata = {
       type = "boolean",
-      default = false,
+      default = true,
       description = "Allow storing table settings (sorting, filters, pinned rows and columns, names) in a hidden last row <meta …> of tables, and pinning. Off: nothing new is stored (sorting and filters are a view only), what a table has may change or go: its sorting, a column's filter or width, its theme, name and pins at an edge that has them. Formulas are stored in cells (<meta formulas.f>) and need it too: off, a typed formula is saved as text; existing formulas keep working, calculated columns too.",
       ui = { category = "Silverware Table", label = "Store table metadata", priority = 6 },
     },

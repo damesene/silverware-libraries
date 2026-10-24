@@ -89,9 +89,10 @@ export function renderPage(page: string, into: HTMLElement, moves: number[]): vo
 }
 
 // Most tests check the markdown byte for byte as written, so formatting is off
-// unless a test turns it on
+// unless a test turns it on; so is storing metadata (on by default): what a
+// test stores it says so, and a view (a sort, a width) writes nothing
 export async function setup(page: string, settings: Record<string, unknown> = {}, bridgeExtras: Partial<Bridge> = {}): Promise<void> {
-  const config: Record<string, unknown> = { "silverware.table.autoFormat": false, ...settings };
+  const config: Record<string, unknown> = { "silverware.table.autoFormat": false, "silverware.table.metadata": false, ...settings };
   // A test setting up twice, or without useTablePage: the controller before goes (else it watched the next pages too)
   controller?.stop();
   text = page;

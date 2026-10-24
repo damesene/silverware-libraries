@@ -209,7 +209,7 @@ export const SETTINGS = {
     path: "silverware.table.metadata",
     label: "Store table metadata",
     hint: "Tables keep their sorting, filters, column widths, pins, names and formulas in a hidden last row; pinning and new formulas need it. Off, nothing new is stored (sorting and filters are only a view); what a table has may change or go",
-    default: false,
+    default: true,
     parse: (v) => (typeof v === "boolean" ? v : undefined),
   } satisfies Setting<boolean>,
   // A click, Enter, Tab and Ctrl+arrows open a cell with its text selected (Shift+Enter does not); off: the reverse

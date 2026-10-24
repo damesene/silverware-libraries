@@ -2515,9 +2515,18 @@ export class Controller implements TableHost {
         }
         others.set(also.from, { range: also, table: changed.change(others.get(also.from)?.table ?? parseTable(also.text)) });
       }
-      const updates: { readonly range: TableRange; readonly markdown: string }[] = [{ range, markdown }];
+      const updates: { readonly range: { readonly from: number; readonly to: number }; readonly markdown: string }[] = [{ range, markdown }];
       for (const other of others.values()) {
         updates.push({ range: other.range, markdown: serialize(this.withoutNewTags(parseTable(other.range.text), other.table, {}, taken)) });
+      }
+      // Places of the text outside the tables written that the features change with them (formulas written there)
+      const tablesWritten = updates.length;
+      for (const feature of this.features) {
+        for (const place of feature.otherTextWritten?.(before, changed, { ...edit, page: pageNow }) ?? []) {
+          const overlaps = updates.some((u) => place.from < u.range.to && place.to > u.range.from);
+          if (overlaps || place.from < 0 || place.to > text.length || place.to < place.from) continue;
+          updates.push({ range: { from: place.from, to: place.to }, markdown: place.text });
+        }
       }
       if (columnMap) {
         this.views.set(info.key, remapColumns(this.viewOf(info), columnMap));
@@ -2535,9 +2544,13 @@ export class Controller implements TableHost {
       }
       const replace = minimalEdit(text, written);
       // The edit spans all the tables written: features see that span, so what
-      // they place after it (the history marker) is outside every one of them
-      const spanFrom = Math.min(...updates.map((update) => update.range.from));
-      const spanTo = Math.max(...updates.map((update) => update.range.to));
+      // they place after it (the history marker) is outside every one of them.
+      // Not the places of text written with them: right after one is inside what
+      // holds it (a formula in a Space Lua call, which then shows its source);
+      // the edit reaching past the tables, the marker goes where it does not
+      const tableSpan = updates.slice(0, tablesWritten);
+      const spanFrom = Math.min(...tableSpan.map((update) => update.range.from));
+      const spanTo = Math.max(...tableSpan.map((update) => update.range.to));
       const after: ((editFrom: number, lengthChange: number) => void)[] = [];
       for (const feature of this.features) {
         const then = await feature.beforeWrite?.(text, spanFrom, spanTo, replace);

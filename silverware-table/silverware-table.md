@@ -531,6 +531,7 @@ Total: ${silverware.table.evaluate("=SUM(fruit![qty] * fruit![price])")}
 * It reads the page as it is now, and calculates the formulas it reaches anew; your own functions work too. Nothing is written.
 * A `${…}` showing it follows the tables: SilverBullet shows it anew when the page is edited (a cell changed in a table too) or another page it reads changes.
 * While you type the formula, names complete as in a cell: the functions (with their syntax and what they do), the page's named tables, and after `table!` that table's named cells.
+* Its references follow the tables as a cell's do: rename a column or the table, insert, move or delete rows and columns with Silverware Table, and the formula in the page's text is written anew with them, in the same edit (one Ctrl+Z undoes both). That holds for a formula written whole in one string, in quotes or apostrophes, without escapes (`\"`): one put together in Lua (`"=SUM(" .. name .. ")"`) is left as it is. Edits made in the markdown are not followed, as for tables.
 * It needs the formulas module (else `#N/A`), and `[[Page]]` references the pageLinks module (else they are not read).
 
 A shorter name: `silverware.table.evaluateAlias("te")` in a `space-lua` block of yours makes a function `te` that does the same, completion included:

@@ -137,6 +137,8 @@ if js and js.window then
     made[name] = alias
     _G[name] = alias
     table.insert(internal.evaluateAliases, name)
+    -- Its formulas' references follow the tables' edits too (the init page's, once it has run)
+    if internal.formulaCallsChanged then internal.formulaCallsChanged() end
   end
 else
   -- Space Lua without a window (no tables to show): nothing to define

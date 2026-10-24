@@ -473,6 +473,20 @@ if js and js.window then
       silverwareTableJs.removeAllMetadata()
     end,
   }
+  -- Formulas written in a page's text, in a call of silverware.table.evaluate or an alias of it: their places
+  -- found by the finder made for those names (the JS's Lua side, host/lua.ts), so their references follow the
+  -- edits of tables made with Silverware Table, in the same edit. Made again when an alias is added (the API
+  -- page's evaluateAlias, which may run before or after this block)
+  silverware_internal = silverware_internal or {}
+  silverware_internal.table = silverware_internal.table or {}
+  function silverware_internal.table.formulaCallsChanged()
+    local names = { "silverware.table.evaluate" }
+    for _, name in ipairs(silverware_internal.table.evaluateAliases or {}) do
+      names[#names + 1] = name
+    end
+    silverwareTableJs.defineFormulaPlaces(silverwareTableJs.luaCallPlaces(table.unpack(names)))
+  end
+  silverware_internal.table.formulaCallsChanged()
   -- Whether a call's function is silverware.table.evaluate, by its name or one evaluateAlias gave it
   local function evaluates(callee)
     if callee == "silverware.table.evaluate" then return true end

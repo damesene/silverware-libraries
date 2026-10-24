@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { completions, evaluate, evaluated } from "./index.ts";
-import { controller, setup, useTablePage } from "./testing/page.ts";
+import { completions, defineFormulaPlaces, evaluate, evaluated, luaCallPlaces } from "./index.ts";
+import { buttonLabel, cell, clickOn, controller, editor, edits, flush, key, menuButtons, nameInMenu, setup, text, toolbarName, useTablePage } from "./testing/page.ts";
 
 describe("silverware.table.evaluate: a formula calculated on the page shown", () => {
   useTablePage();
@@ -93,6 +93,54 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       await setup(PAGE, { "silverware.table.modules.formulas.enabled": false });
       started();
       expect(at("=SU")).toBeUndefined();
+    });
+  });
+
+  describe("formulas written in the page's text, where the host's finder says: their references follow the tables' edits", () => {
+    // (paste( is no call the finder is given: its formula stays as written)
+    const LINES = (name: string, column: string, row: string) => `Total: \${te("=SUM(${name}![${column}])")}, the first: \${te('=${name}!B${row}')}, not this: \${paste("=prices!B1")}\n`;
+    const TABLE = `| Name | Price |\n|---|---|\n| Pear | 12 |\n| Fig | 3 |\n| <meta core.table core.name='prices'> |\n\n`;
+    afterEach(() => defineFormulaPlaces(undefined));
+
+    it("follows a row inserted, a column renamed and the table renamed, each in the same edit as the table", async () => {
+      await setup(TABLE + LINES("prices", "price", "1"), { "silverware.table.metadata": true });
+      defineFormulaPlaces(luaCallPlaces("te"));
+      // A row inserted above Pear, from its row menu: B1 is B2 now
+      cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      document.querySelector(".swt-grip:not(.swt-grip-column)")!.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }));
+      window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0 }));
+      const writes = edits;
+      menuButtons().find((b) => buttonLabel(b) === "Insert row above")!.click();
+      await flush();
+      expect(edits).toBe(writes + 1);
+      expect(text.endsWith(LINES("prices", "price", "2"))).toBe(true);
+      // The column renamed in its header
+      await controller.scan();
+      clickOn(cell(0, 1));
+      const field = editor.querySelector<HTMLInputElement>(".swt-cell-editor")!;
+      field.value = "Cost";
+      key(field, "Enter");
+      await flush();
+      expect(text.endsWith(LINES("prices", "cost", "2"))).toBe(true);
+      // The table renamed by its name in the toolbar
+      await controller.scan();
+      toolbarName("table");
+      expect(await nameInMenu("costs")).toBeUndefined();
+      expect(text.endsWith(LINES("costs", "cost", "2"))).toBe(true);
+    });
+
+    it("leaves them as written without a finder, and where the finder gives places that are none", async () => {
+      await setup(TABLE + LINES("prices", "price", "1"), { "silverware.table.metadata": true });
+      toolbarName("table");
+      expect(await nameInMenu("costs")).toBeUndefined();
+      expect(text.endsWith(LINES("prices", "price", "1"))).toBe(true);
+      // Places out of the text, or overlapping: left out, the table still written
+      defineFormulaPlaces(() => [{ from: -1, to: 3 }, { from: 0, to: 10 }, { from: 5, to: 4 }, { from: 2, to: 99999 }]);
+      await controller.scan();
+      toolbarName("table");
+      expect(await nameInMenu("again")).toBeUndefined();
+      expect(text).toContain("core.name='again'");
+      expect(text.endsWith(LINES("prices", "price", "1"))).toBe(true);
     });
   });
 

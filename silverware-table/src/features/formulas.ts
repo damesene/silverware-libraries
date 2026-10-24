@@ -24,6 +24,7 @@ import type {
   TableLooks,
   ToolbarButton,
   TableInfo,
+  TextWritten,
   WriteEdit,
 } from "../core/feature.ts";
 import {
@@ -43,6 +44,7 @@ import {
   type Fixed,
   type FormulasOffer,
   formulasAfterEdit,
+  followFormula,
   followTable,
   choiceText,
   formulaChoices,
@@ -72,6 +74,7 @@ import {
   writtenArea,
 } from "../formulas/index.ts";
 import { addAffected, affectedBy, isAffected, type NamedOtherPages, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
+import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
 import { FunctionDialog } from "./functiondialog.ts";
 import { el } from "../elements.ts";
@@ -303,6 +306,26 @@ export class Formulas implements Feature {
       }
     }
     return written;
+  }
+
+  /**
+   * Formulas written in the page's text outside its tables (where the host's
+   * finder says, formulas/places.ts): their references to the table follow its
+   * edit, as other tables' formulas do: moved rows and columns, renamed columns,
+   * its new name. Only for the first table of its name, which they read.
+   */
+  otherTextWritten(before: Table, after: Table, edit: WriteEdit): readonly TextWritten[] {
+    const { page } = edit;
+    const oldName = this.nameOf(before)?.toLowerCase();
+    if (!oldName || page.tables.find((t) => this.nameOf(t.table)?.toLowerCase() === oldName)?.range.from !== page.from) return [];
+    const following = { cells: this.cells, rowMap: edit.rowMap, columnMap: edit.columnMap, names: { before: this.nameOf(before), after: this.nameOf(after) } };
+    return formulaPlacesIn(page.text).flatMap((place): TextWritten[] => {
+      const written = page.text.slice(place.from, place.to);
+      // Its "=" may be left out: read and written back as written
+      const lead = written.trimStart().startsWith("=") ? "" : "=";
+      const followed = followFormula(lead + written, before, after, following).slice(lead.length);
+      return followed === written ? [] : [{ from: place.from, to: place.to, text: followed }];
+    });
   }
 
   /** Deleting a named table: the formulas of the page's tables that refer to it show #REF! */

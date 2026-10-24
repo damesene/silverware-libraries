@@ -42,7 +42,7 @@ export { parseDate, toUnit, type Unit } from "./dates.ts";
 export { ERROR_CODES, FormulaError, parseClock, type Scalar, type Value } from "./values.ts";
 export { withAreasWritten, type WrittenArea, writtenArea } from "./frame.ts";
 export { REF_ERROR } from "./tokens.ts";
-export { calculatedFormula, filledFormula, followTable, type Following, formulasAfterEdit, shiftReferences, withCalculatedCells, withoutFormulas } from "./edits.ts";
+export { calculatedFormula, filledFormula, followFormula, followTable, type Following, formulasAfterEdit, shiftReferences, withCalculatedCells, withoutFormulas } from "./edits.ts";
 export { argumentSpan, type FormulaChoice, type FormulaChoices, choiceText, cycleFixed, findFunctions, type FormulaHelp, formulaChoices, formulaHelp, nameTyped, needsOperator, type PointedSpan, REFERENCE_HELP, referenceSlot } from "./help.ts";
 export { FUNCTION_CATEGORIES, type FormulaFunction, type FunctionCategory } from "./function.ts";
 export { functionNamed, isCustomFunction } from "./registry.ts";

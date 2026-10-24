@@ -7,6 +7,7 @@ import { customTypes } from "./columntypes/custom.ts";
 import { customTypesAnew, defineCustomTypes } from "./columntypes/registry.ts";
 import { customFunctions } from "./formulas/custom.ts";
 import { choiceText, type FormulasOffer, functionNamed, scalarText } from "./formulas/index.ts";
+import { defineFormulaPlaces as defineFormulaPlacesIn, type FormulaPlaces } from "./formulas/places.ts";
 import { isRange, single } from "./formulas/values.ts";
 import { customFunctionsAnew, defineCustomFunctions } from "./formulas/registry.ts";
 
@@ -89,6 +90,20 @@ export function completions(formula: string, text: string, caret?: number): { re
   });
   return { typed: at - found.from, choices };
 }
+
+/**
+ * Where formulas are written in a page's text outside its tables: a finder
+ * of their places (text → [{ from, to }]), whose formulas' references then
+ * follow the edits of the tables they name, in the same edit. A later one
+ * replaces it; anything but a function takes it away.
+ */
+export function defineFormulaPlaces(finder: unknown): void {
+  defineFormulaPlacesIn(typeof finder === "function" ? (finder as FormulaPlaces) : undefined);
+}
+
+// The finder of formulas given to Space Lua calls (silverware.table.evaluate and its aliases), which the
+// library's init page registers: host/lua.ts, apart from the rest, which knows nothing of Lua
+export { luaCallPlaces } from "./host/lua.ts";
 
 /** As `evaluated`, its value only */
 export async function evaluate(formula: string): Promise<string> {

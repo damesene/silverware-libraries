@@ -261,9 +261,19 @@ function renameIn(formula: string, own: string | undefined, renamed: string | un
 export function followTable(table: Table, before: Table, after: Table, following: Following): Table {
   const name = following.names?.before?.trim();
   if (!name || !hasFormulas(following.cells, table)) return table;
+  return withFormulas(following.cells, table, (formula) => followFormula(formula, before, after, following));
+}
+
+/**
+ * A formula with its references to the edited table (named so before the
+ * edit) following the edit, as followTable's: a formula of another table, or
+ * one written in the page's text outside its tables
+ */
+export function followFormula(formula: string, before: Table, after: Table, following: Following): string {
+  const name = following.names?.before?.trim();
+  if (!name) return formula;
   const edit: TableEdit = { ...following, before, after };
-  const renamed = newName(edit);
-  return withFormulas(following.cells, table, (formula) => renameIn(rewriteReferences(formula, (ref) => isTo(ref, name), edit), name, renamed));
+  return renameIn(rewriteReferences(formula, (ref) => isTo(ref, name), edit), name, newName(edit));
 }
 
 /**

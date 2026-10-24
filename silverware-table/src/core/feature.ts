@@ -438,6 +438,9 @@ export type WritePage = { readonly text: string; readonly tables: readonly PageT
 /** An edit as features' write steps see it: how rows and columns moved, and the page */
 export type WriteEdit = WriteOptions & { readonly page: WritePage };
 
+/** A place of the page's text written anew with a table, in the same edit: its range in the text read and what goes there */
+export type TextWritten = { readonly from: number; readonly to: number; readonly text: string };
+
 /**
  * The places in the toolbar's row of names, in their order, by what they name:
  * what holds the table (a sheet), then the table itself. A module picks one by
@@ -1040,6 +1043,12 @@ export interface Feature {
    * before it changed. `after` undefined: the table is deleted (Delete table)
    */
   otherTablesWritten?(before: Table, after: Table | undefined, edit: WriteEdit): readonly PageTable[];
+  /**
+   * Other places of the page's text, outside its tables, the write changes
+   * too, in the same edit (formulas written in the text, referring to the
+   * edited table); one overlapping a table written is left out
+   */
+  otherTextWritten?(before: Table, after: Table, edit: WriteEdit): readonly TextWritten[];
   /** Other pages read for formulas (the pageLinks module) */
   otherPages?(): OtherPages;
   /** SilverBullet indexed a page (it changed) */

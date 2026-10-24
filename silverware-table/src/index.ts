@@ -66,26 +66,28 @@ export type FormulaCompletion = {
 };
 
 /**
- * What the name typed at the end of `formula` (as far as it is typed; its
- * `=` optional) may be, on the page's `text`, as a cell's editor offers it:
- * functions, the page's named tables, after `table!` that table's named
- * cells. `typed`: how many characters at the end of `formula` the name is, the
- * ones a completion replaces. Undefined when nothing completes there.
+ * What the name typed before `caret` (its place in `formula`, else its end;
+ * the `=` optional) may be, on the page's `text`, as a cell's editor offers
+ * it: functions, the page's named tables, after `table!` that table's named
+ * cells; none in the middle of a name. `typed`: how many characters before
+ * the caret the name is, the ones a completion replaces. Undefined when
+ * nothing completes there.
  */
-export function completions(formula: string, text: string): { readonly typed: number; readonly choices: readonly FormulaCompletion[] } | undefined {
+export function completions(formula: string, text: string, caret?: number): { readonly typed: number; readonly choices: readonly FormulaCompletion[] } | undefined {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
   const formulas = controller?.offered<FormulasOffer>("formulas");
   if (!formulas) return undefined;
   const written = String(formula);
   // A formula without its "=" read as one with it
-  const full = written.trimStart().startsWith("=") ? written : `=${written}`;
-  const found = formulas.complete(full, String(text));
+  const lead = written.trimStart().startsWith("=") ? "" : "=";
+  const at = lead.length + Math.max(0, Math.min(written.length, caret ?? written.length));
+  const found = formulas.complete(lead + written, at, String(text));
   if (!found || found.choices.length === 0) return undefined;
   const choices = found.choices.map((choice): FormulaCompletion => {
     const fn = choice.kind === "function" ? functionNamed(choice.name) : undefined;
     return { text: choiceText(choice), kind: choice.kind, ...(fn ? { syntax: fn.syntax, description: fn.description } : {}) };
   });
-  return { typed: full.length - found.from, choices };
+  return { typed: at - found.from, choices };
 }
 
 /** As `evaluated`, its value only */

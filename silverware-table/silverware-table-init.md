@@ -474,15 +474,23 @@ if js and js.window then
     end,
   }
   -- Completion in a formula given to silverware.table.evaluate (the line before the caret ends in one,
-  -- in either quotes), as a cell's editor offers it
+  -- in either quotes), as a cell's editor offers it: the whole formula given, the caret's place in it,
+  -- so a name the caret is in the middle of is not completed again
   event.listen {
     name = "editor:complete",
     run = function(e)
       local at = e.data
-      local formula = string.match(at.linePrefix, 'silverware%.table%.evaluate%(%s*"([^"]*)$')
-        or string.match(at.linePrefix, "silverware%.table%.evaluate%(%s*'([^']*)$")
-      if not formula then return end
-      local found = silverwareTableJs.completions(formula, editor.getText())
+      local quote = '"'
+      local before = string.match(at.linePrefix, 'silverware%.table%.evaluate%(%s*"([^"]*)$')
+      if not before then
+        quote = "'"
+        before = string.match(at.linePrefix, "silverware%.table%.evaluate%(%s*'([^']*)$")
+      end
+      if not before then return end
+      local text = editor.getText()
+      -- The rest of the formula: after the caret, up to its closing quote
+      local after = string.match(string.sub(text, at.pos + 1), "^([^" .. quote .. "\n]*)") or ""
+      local found = silverwareTableJs.completions(before .. after, text, #before)
       if not found then return end
       local options = {}
       for _, choice in ipairs(found.choices) do

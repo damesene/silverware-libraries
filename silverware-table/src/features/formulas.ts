@@ -204,7 +204,7 @@ export class Formulas implements Feature {
     host.offer({
       cells: this.cells,
       evaluate: (formula, text, page) => this.evaluate(formula, text, page),
-      complete: (formula, text) => formulaChoices(formula, formula.length, formula.length, pageNameChoices(this.cells, this.named(pageTablesOf(text)))),
+      complete: (formula, caret, text) => formulaChoices(formula, caret, caret, pageNameChoices(this.cells, this.named(pageTablesOf(text)))),
     } satisfies FormulasOffer);
   }
 

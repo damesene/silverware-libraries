@@ -77,6 +77,14 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       expect(at("=fruit!v")).toEqual({ typed: 1, choices: [{ text: "vat", kind: "cell" }] });
     });
 
+    it("completes the name before the caret, given in the middle of the formula; none in the middle of a name", async () => {
+      await setup(PAGE);
+      started();
+      expect(completions("=SUM(fruit!B1) + AVE)", PAGE, "=SUM(fruit!B1) + AVE".length)).toMatchObject({ typed: 3, choices: [{ text: "AVERAGE(" }, { text: "AVERAGEIFS(" }] });
+      expect(completions("=SUM(fruit!B1)", PAGE, 3)).toBeUndefined();
+      expect(completions("SUM(fru)", PAGE, 7)).toEqual({ typed: 3, choices: [{ text: "fruit!", kind: "table" }] });
+    });
+
     it("offers nothing in a text in quotes, with nothing that starts so, or with the formulas module off", async () => {
       await setup(PAGE);
       started();

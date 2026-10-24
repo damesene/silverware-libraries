@@ -13,6 +13,11 @@ The Space Lua API of [[Library/damesene/silverware-table|Silverware Table]]: `si
 -- silverware.table.evaluate and silverware.table.evaluateAlias, see "Formulas from Space Lua"
 silverware = silverware or {}
 silverware.table = silverware.table or {}
+-- What Silverware Table's Lua shares between its blocks (this page's and the init page's) and keeps across
+-- loads of Space Lua, apart from the API: silverware_internal.<plugin>, as the API is silverware.<plugin>
+silverware_internal = silverware_internal or {}
+silverware_internal.table = silverware_internal.table or {}
+local internal = silverware_internal.table
 if js and js.window then
   local silverwareTableJs = js.importFromSpace("Library/damesene/silverware-table.js")
   -- Space Lua is loaded (again): the scripts' definitions replace those of before (kept until then)
@@ -62,21 +67,38 @@ if js and js.window then
       editor.flashNotification(problem, "error", { timeout = 0, actions = actions })
     end
   end
+  --- Your own functions for formulas, written in JavaScript in your space; they replace those defined before.
+  --- A mistake in one is shown in a notification, the others are defined.
+  --- @param definitions table a JS module's functions, e.g. js.importFromSpace("Library/me/functions.js")
+  --- @see Library/damesene/silverware-table#Custom functions
   function silverware.table.defineFunctions(definitions)
     shown(silverwareTableJs.defineFunctions(definitions), "defineFunctions")
   end
+  --- Your own column types (a header's hashtag), written in JavaScript in your space; they replace those
+  --- defined before. A mistake in one is shown in a notification, the others are defined.
+  --- @param definitions table a JS module's types, e.g. js.importFromSpace("Library/me/types.js")
+  --- @see Library/damesene/silverware-table#Custom column types
   function silverware.table.defineTypes(definitions)
     shown(silverwareTableJs.defineTypes(definitions), "defineTypes")
   end
+  --- Your own AutoFill series (words to go round, or a JS series), written in JavaScript in your space; they
+  --- replace those defined before. A mistake in one is shown in a notification, the others are defined.
+  --- @param definitions table a JS module's series, e.g. js.importFromSpace("Library/me/series.js")
+  --- @see Library/damesene/silverware-table#Custom series
   function silverware.table.defineSeries(definitions)
     shown(silverwareTableJs.defineSeries(definitions), "defineSeries")
   end
-  -- A formula calculated on the page it is on (a ${…}'s, else the page shown): one value as its text, several
-  -- as ["a","b"]. The page and the other pages it reads are read through SilverBullet, so a ${…} showing it is
-  -- shown anew as they change. The editor's text only while it holds that page: a ${…} of a page being opened
-  -- is evaluated before the editor has its text (the page's name already the new one), so the text must hold
-  -- the formula itself, else the page is read (as saved)
+  --- A table formula calculated on the page, outside any table: what it reads it names by a table's name
+  --- (beans!B2, beans![price], beans!vat, [[Prices]]beans!B2). A ${…} showing it follows the tables.
+  --- @param formula string the formula, its = optional, e.g. "=SUM(beans![price])"
+  --- @return string one value as its text, several as a list ["a","b"], an error as its code (#REF!)
+  --- @see Library/damesene/silverware-table#Formulas from Space Lua
   function silverware.table.evaluate(formula)
+    -- On the page it is on (a ${…}'s, else the page shown). The page and the other pages it reads are read
+    -- through SilverBullet, so a ${…} showing it is shown anew as they change. The editor's text only while
+    -- it holds that page: a ${…} of a page being opened is evaluated before the editor has its text (the
+    -- page's name already the new one), so the text must hold the formula itself, else the page is read
+    -- (as saved)
     local page = _CTX and _CTX.currentPage and _CTX.currentPage.name
     local text = editor.getText()
     if page and (page ~= editor.getCurrentPage() or not string.find(text, formula, 1, true)) then
@@ -90,12 +112,15 @@ if js and js.window then
   end
   -- The names evaluateAlias gave silverware.table.evaluate, for completion in a formula given to one (the init
   -- page's listener reads them); made anew each time Space Lua loads, as the scripts calling it run again
-  silverware.table._evaluateAliases = {}
+  internal.evaluateAliases = {}
   -- The functions evaluateAlias made, by name, kept across loads: a name that holds one of them is made again,
   -- a name that holds anything else is refused
-  local made = silverware.table._madeAliases or {}
-  silverware.table._madeAliases = made
-  -- A function of that name doing what silverware.table.evaluate does: ${te("=beans!vat")}
+  internal.madeAliases = internal.madeAliases or {}
+  local made = internal.madeAliases
+  --- A shorter name for silverware.table.evaluate: a function of that name doing the same, completion
+  --- included, e.g. after evaluateAlias("te"), ${te("=beans!vat")}. A name already taken is refused.
+  --- @param name string the function's name, e.g. "te"
+  --- @see Library/damesene/silverware-table#Formulas from Space Lua
   function silverware.table.evaluateAlias(name)
     if type(name) ~= "string" or not string.match(name, "^[%a_][%w_]*$") then
       shown('Silverware Table: evaluateAlias needs a name a Lua function can have, not "' .. tostring(name) .. '".', "evaluateAlias")
@@ -111,7 +136,7 @@ if js and js.window then
     end
     made[name] = alias
     _G[name] = alias
-    table.insert(silverware.table._evaluateAliases, name)
+    table.insert(internal.evaluateAliases, name)
   end
 else
   -- Space Lua without a window (no tables to show): nothing to define

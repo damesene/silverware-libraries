@@ -476,7 +476,8 @@ if js and js.window then
   -- Whether a call's function is silverware.table.evaluate, by its name or one evaluateAlias gave it
   local function evaluates(callee)
     if callee == "silverware.table.evaluate" then return true end
-    for _, name in ipairs(silverware.table._evaluateAliases or {}) do
+    local internal = silverware_internal and silverware_internal.table or {}
+    for _, name in ipairs(internal.evaluateAliases or {}) do
       if callee == name then return true end
     end
     return false

@@ -40,15 +40,13 @@ export function removeAllMetadata(): void {
 }
 
 /**
- * `silverware.table.evaluate` (the library page's Space Lua): a formula
- * calculated on the page shown, in none of its tables, so what it reads it
- * names by a table's name (`=prices!vat`, `=SUM(prices![qty])`,
+ * A formula calculated on the page shown, in none of its tables, so what it
+ * reads it names by a table's name (`=prices!vat`, `=SUM(prices![qty])`,
  * `=[[Other]]prices!B2`). One value as its text, as a cell shows it; several
  * (a range) as a JSON list of their texts, `["a","b"]`; an error by its code
  * (#N/A while Silverware Table has not started or the formulas module is off).
- * `text`: the page's, as the library page's Lua reads it (editor.getText, so
- * SilverBullet shows the `${…}` anew when the page changes); `pages`: the
- * other pages it read, which the Lua reads through SilverBullet too, for the same.
+ * `text`: the page's text to calculate on (else the editor's, as it is now);
+ * `pages`: the other pages it read, for a caller that follows their changes.
  */
 export async function evaluated(formula: string, text?: string): Promise<{ readonly value: string; readonly pages: readonly string[] }> {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
@@ -58,37 +56,35 @@ export async function evaluated(formula: string, text?: string): Promise<{ reado
   return { value: isRange(value) && value.length !== 1 ? JSON.stringify(value.map(scalarText)) : scalarText(single(value)), pages };
 }
 
-// A call of silverware.table.evaluate before the caret, its formula's text typed so far (in either quotes)
-const EVALUATE_CALL_RE = /silverware\.table\.evaluate\(\s*(["'])((?:(?!\1).)*)$/;
-
-/** A completion SilverBullet offers (a CodeMirror completion: what shows, what it inserts) */
-export type Completion = { readonly label: string; readonly apply: string; readonly detail?: string; readonly info?: string; readonly type: string };
+/** A name a formula typed so far may go on with: the text it inserts, what it is, and for a function its syntax and description */
+export type FormulaCompletion = {
+  readonly text: string;
+  readonly kind: "function" | "cell" | "row" | "table";
+  readonly syntax?: string;
+  readonly description?: string;
+};
 
 /**
- * The library page's `editor:complete` listener: in a formula given to
- * silverware.table.evaluate (`linePrefix`, the line before the caret at
- * `pos`), what the name typed may be, as a cell's editor offers it (functions,
- * the page's named tables, after `table!` its named cells); undefined elsewhere
+ * What the name typed at the end of `formula` (as far as it is typed; its
+ * `=` optional) may be, on the page's `text`, as a cell's editor offers it:
+ * functions, the page's named tables, after `table!` that table's named
+ * cells. `typed`: how many characters at the end of `formula` the name is, the
+ * ones a completion replaces. Undefined when nothing completes there.
  */
-export function completion(linePrefix: string, pos: number, text: string): { readonly from: number; readonly options: readonly Completion[] } | undefined {
+export function completions(formula: string, text: string): { readonly typed: number; readonly choices: readonly FormulaCompletion[] } | undefined {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
   const formulas = controller?.offered<FormulasOffer>("formulas");
-  const typed = EVALUATE_CALL_RE.exec(String(linePrefix))?.[2];
-  if (!formulas || typed === undefined) return undefined;
-  // A formula without its "=" (it is optional) read as one with it
-  const lead = typed.trimStart().startsWith("=") ? "" : "=";
-  const found = formulas.complete(lead + typed, String(text));
+  if (!formulas) return undefined;
+  const written = String(formula);
+  // A formula without its "=" read as one with it
+  const full = written.trimStart().startsWith("=") ? written : `=${written}`;
+  const found = formulas.complete(full, String(text));
   if (!found || found.choices.length === 0) return undefined;
-  const options = found.choices.map((choice): Completion => {
+  const choices = found.choices.map((choice): FormulaCompletion => {
     const fn = choice.kind === "function" ? functionNamed(choice.name) : undefined;
-    return {
-      label: choiceText(choice),
-      apply: choiceText(choice),
-      type: choice.kind === "function" ? "function" : choice.kind === "table" ? "class" : "variable",
-      ...(fn ? { detail: fn.syntax, info: fn.description } : { detail: choice.kind }),
-    };
+    return { text: choiceText(choice), kind: choice.kind, ...(fn ? { syntax: fn.syntax, description: fn.description } : {}) };
   });
-  return { from: pos - (lead.length + typed.length - found.from), options };
+  return { typed: full.length - found.from, choices };
 }
 
 /** As `evaluated`, its value only */

@@ -1000,13 +1000,28 @@ if js and js.window then
     end
     return result.value
   end
-  -- Completion in a formula given to silverware.table.evaluate, as a cell's editor offers it
+  -- Completion in a formula given to silverware.table.evaluate (the line before the caret ends in one,
+  -- in either quotes), as a cell's editor offers it
   event.listen {
     name = "editor:complete",
     run = function(e)
       local at = e.data
-      if not string.find(at.linePrefix, "silverware.table.evaluate(", 1, true) then return end
-      return silverwareTableJs.completion(at.linePrefix, at.pos, editor.getText())
+      local formula = string.match(at.linePrefix, 'silverware%.table%.evaluate%(%s*"([^"]*)$')
+        or string.match(at.linePrefix, "silverware%.table%.evaluate%(%s*'([^']*)$")
+      if not formula then return end
+      local found = silverwareTableJs.completions(formula, editor.getText())
+      if not found then return end
+      local options = {}
+      for _, choice in ipairs(found.choices) do
+        options[#options + 1] = {
+          label = choice.text,
+          apply = choice.text,
+          detail = choice.syntax or choice.kind,
+          info = choice.description,
+          type = choice.kind == "function" and "function" or choice.kind == "table" and "class" or "variable",
+        }
+      end
+      return { from = at.pos - found.typed, options = options }
     end,
   }
 else

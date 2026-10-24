@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { completion, evaluate, evaluated } from "./index.ts";
+import { completions, evaluate, evaluated } from "./index.ts";
 import { controller, setup, useTablePage } from "./testing/page.ts";
 
 describe("silverware.table.evaluate: a formula calculated on the page shown", () => {
@@ -56,36 +56,35 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
     expect((await evaluated("=fruit!B1", PAGE.replace("| 3 |", "| 30 |"))).value).toBe("30");
   });
 
-  describe("completion in a formula given to it, as SilverBullet's editor:complete asks", () => {
-    const at = (line: string) => completion(line, 100 + line.length, PAGE);
+  describe("completions of the name typed at the end of a formula", () => {
+    const at = (formula: string) => completions(formula, PAGE);
 
-    it("offers the functions a name typed may be, with their syntax, from where the name starts", async () => {
+    it("offers the functions a name typed may be, with their syntax and description, and how long the name is", async () => {
       await setup(PAGE);
       started();
-      const line = 'x ${silverware.table.evaluate("=SUM(XLOO';
-      const found = at(line)!;
-      expect(found.from).toBe(100 + line.length - 4);
-      expect(found.options.map((o) => o.label)).toEqual(["XLOOKUP("]);
-      expect(found.options[0]).toMatchObject({ apply: "XLOOKUP(", type: "function" });
-      expect(found.options[0]!.detail).toContain("XLOOKUP(");
+      const found = at("=SUM(XLOO")!;
+      expect(found.typed).toBe(4);
+      expect(found.choices.map((c) => c.text)).toEqual(["XLOOKUP("]);
+      expect(found.choices[0]).toMatchObject({ kind: "function" });
+      expect(found.choices[0]!.syntax).toContain("XLOOKUP(");
+      expect(found.choices[0]!.description).toBeTruthy();
     });
 
-    it("offers the page's named tables, after one and ! its named cells; without the = and in apostrophes too", async () => {
+    it("offers the page's named tables, after one and ! its named cells; without the = too", async () => {
       await setup(PAGE);
       started();
-      expect(at('${silverware.table.evaluate("fru')!.options.map((o) => o.label)).toEqual(["fruit!"]);
-      const cells = at("${silverware.table.evaluate('=fruit!v")!;
-      expect(cells.options.map((o) => o.label)).toEqual(["vat"]);
-      expect(cells.options[0]).toMatchObject({ type: "variable", detail: "cell" });
+      expect(at("fru")).toEqual({ typed: 3, choices: [{ text: "fruit!", kind: "table" }] });
+      expect(at("=fruit!v")).toEqual({ typed: 1, choices: [{ text: "vat", kind: "cell" }] });
     });
 
-    it("offers nothing outside such a formula, in a text in quotes, or with nothing that starts so", async () => {
+    it("offers nothing in a text in quotes, with nothing that starts so, or with the formulas module off", async () => {
       await setup(PAGE);
       started();
-      expect(at("=SUM")).toBeUndefined();
-      expect(at('${silverware.table.evaluate("=fruit!A1 & ')).toBeUndefined();
-      expect(at('${silverware.table.evaluate("=zzqq')).toBeUndefined();
-      expect(at('${silverware.table.evaluate("=SUM(1)") .. x')).toBeUndefined();
+      expect(at('=fruit!A1 & "SU')).toBeUndefined();
+      expect(at("=zzqq")).toBeUndefined();
+      await setup(PAGE, { "silverware.table.modules.formulas.enabled": false });
+      started();
+      expect(at("=SU")).toBeUndefined();
     });
   });
 

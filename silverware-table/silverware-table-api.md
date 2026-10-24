@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Table API
 
-The Space Lua API of [[Library/damesene/silverware-table|Silverware Table]]: `silverware.table.defineFunctions`, `defineTypes` and `defineSeries` (your own functions, column types and AutoFill series), `silverware.table.evaluate` (a formula calculated from Space Lua), and completion in a formula given to it. It is installed with the library; see its page for how each is used.
+The Space Lua API of [[Library/damesene/silverware-table|Silverware Table]]: `silverware.table.defineFunctions`, `defineTypes` and `defineSeries` (your own functions, column types and AutoFill series) and `silverware.table.evaluate` (a formula calculated from Space Lua). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [[Library/damesene/silverware-table-init]] for what starts Silverware Table.
 
 ```space-lua
 -- priority: 50
@@ -88,30 +88,6 @@ if js and js.window then
     end
     return result.value
   end
-  -- Completion in a formula given to silverware.table.evaluate (the line before the caret ends in one,
-  -- in either quotes), as a cell's editor offers it
-  event.listen {
-    name = "editor:complete",
-    run = function(e)
-      local at = e.data
-      local formula = string.match(at.linePrefix, 'silverware%.table%.evaluate%(%s*"([^"]*)$')
-        or string.match(at.linePrefix, "silverware%.table%.evaluate%(%s*'([^']*)$")
-      if not formula then return end
-      local found = silverwareTableJs.completions(formula, editor.getText())
-      if not found then return end
-      local options = {}
-      for _, choice in ipairs(found.choices) do
-        options[#options + 1] = {
-          label = choice.text,
-          apply = choice.text,
-          detail = choice.syntax or choice.kind,
-          info = choice.description,
-          type = choice.kind == "function" and "function" or choice.kind == "table" and "class" or "variable",
-        }
-      end
-      return { from = at.pos - found.typed, options = options }
-    end,
-  }
 else
   -- Space Lua without a window (no tables to show): nothing to define
   function silverware.table.defineFunctions() end

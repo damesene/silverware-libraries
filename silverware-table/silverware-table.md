@@ -528,6 +528,7 @@ Total: ${silverware.table.evaluate("=SUM(fruit![qty] * fruit![price])")}
 * One value comes back as its text, as a cell would show it: `21`. Several (a range, a column, an operator over one) come back as a list of their texts: `["Pear","Fig"]`. An error comes back as its code: `#REF!`.
 * It reads the page as it is now, and calculates the formulas it reaches anew; your own functions work too. Nothing is written.
 * A `${…}` showing it follows the tables: SilverBullet shows it anew when the page is edited (a cell changed in a table too) or another page it reads changes.
+* While you type the formula, names complete as in a cell: the functions (with their syntax and what they do), the page's named tables, and after `table!` that table's named cells.
 * It needs the formulas module (else `#N/A`), and `[[Page]]` references the pageLinks module (else they are not read).
 
 ### Errors
@@ -999,6 +1000,15 @@ if js and js.window then
     end
     return result.value
   end
+  -- Completion in a formula given to silverware.table.evaluate, as a cell's editor offers it
+  event.listen {
+    name = "editor:complete",
+    run = function(e)
+      local at = e.data
+      if not string.find(at.linePrefix, "silverware.table.evaluate(", 1, true) then return end
+      return silverwareTableJs.completion(at.linePrefix, at.pos, editor.getText())
+    end,
+  }
 else
   -- Space Lua without a window (no tables to show): nothing to define
   function silverware.table.defineFunctions() end

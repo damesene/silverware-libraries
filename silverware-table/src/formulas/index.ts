@@ -28,6 +28,8 @@ export { type CellNameAt, cellsByName, type FormulaCells, formulaCount, forFormu
 export type FormulasOffer = {
   readonly cells: import("./cell.ts").FormulaCells;
   readonly evaluate: (formula: string, text: string) => Promise<{ readonly value: import("./values.ts").Value; readonly pages: readonly string[] }>;
+  /** What the name typed at the end of `formula` may be, on the page's `text` (the Space Lua API's completion): its place in `formula` and the choices */
+  readonly complete: (formula: string, text: string) => import("./help.ts").FormulaChoices | undefined;
 };
 
 /** What the pageLinks module offers: the other pages these formulas and tables refer to (and theirs, in turn) read anew; which they are */

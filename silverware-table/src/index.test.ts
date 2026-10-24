@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { evaluate, evaluated } from "./index.ts";
+import { completion, evaluate, evaluated } from "./index.ts";
 import { controller, setup, useTablePage } from "./testing/page.ts";
 
 describe("silverware.table.evaluate: a formula calculated on the page shown", () => {
@@ -54,6 +54,39 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
     await setup(PAGE);
     started();
     expect((await evaluated("=fruit!B1", PAGE.replace("| 3 |", "| 30 |"))).value).toBe("30");
+  });
+
+  describe("completion in a formula given to it, as SilverBullet's editor:complete asks", () => {
+    const at = (line: string) => completion(line, 100 + line.length, PAGE);
+
+    it("offers the functions a name typed may be, with their syntax, from where the name starts", async () => {
+      await setup(PAGE);
+      started();
+      const line = 'x ${silverware.table.evaluate("=SUM(XLOO';
+      const found = at(line)!;
+      expect(found.from).toBe(100 + line.length - 4);
+      expect(found.options.map((o) => o.label)).toEqual(["XLOOKUP("]);
+      expect(found.options[0]).toMatchObject({ apply: "XLOOKUP(", type: "function" });
+      expect(found.options[0]!.detail).toContain("XLOOKUP(");
+    });
+
+    it("offers the page's named tables, after one and ! its named cells; without the = and in apostrophes too", async () => {
+      await setup(PAGE);
+      started();
+      expect(at('${silverware.table.evaluate("fru')!.options.map((o) => o.label)).toEqual(["fruit!"]);
+      const cells = at("${silverware.table.evaluate('=fruit!v")!;
+      expect(cells.options.map((o) => o.label)).toEqual(["vat"]);
+      expect(cells.options[0]).toMatchObject({ type: "variable", detail: "cell" });
+    });
+
+    it("offers nothing outside such a formula, in a text in quotes, or with nothing that starts so", async () => {
+      await setup(PAGE);
+      started();
+      expect(at("=SUM")).toBeUndefined();
+      expect(at('${silverware.table.evaluate("=fruit!A1 & ')).toBeUndefined();
+      expect(at('${silverware.table.evaluate("=zzqq')).toBeUndefined();
+      expect(at('${silverware.table.evaluate("=SUM(1)") .. x')).toBeUndefined();
+    });
   });
 
   it("is #N/A before Silverware Table starts, or with the formulas module off", async () => {

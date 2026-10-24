@@ -201,7 +201,11 @@ export class Formulas implements Feature {
       { get: (cell, key) => host.getCellTag(cell, key), with: (cell, key, value) => host.withCellTag(cell, key, value) },
       { rowNames: (table) => host.rowNames(table), cellNames: (table) => host.cellNames(table) },
     );
-    host.offer({ cells: this.cells, evaluate: (formula, text) => this.evaluate(formula, text) } satisfies FormulasOffer);
+    host.offer({
+      cells: this.cells,
+      evaluate: (formula, text) => this.evaluate(formula, text),
+      complete: (formula, text) => formulaChoices(formula, formula.length, formula.length, pageNameChoices(this.cells, this.named(pageTablesOf(text)))),
+    } satisfies FormulasOffer);
   }
 
   /**

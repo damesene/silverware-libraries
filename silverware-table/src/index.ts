@@ -6,7 +6,7 @@ import { Controller } from "./controller.ts";
 import { customTypes } from "./columntypes/custom.ts";
 import { customTypesAnew, defineCustomTypes } from "./columntypes/registry.ts";
 import { customFunctions } from "./formulas/custom.ts";
-import { type FormulasOffer, scalarText } from "./formulas/index.ts";
+import { choiceText, type FormulasOffer, functionNamed, scalarText } from "./formulas/index.ts";
 import { isRange, single } from "./formulas/values.ts";
 import { customFunctionsAnew, defineCustomFunctions } from "./formulas/registry.ts";
 
@@ -56,6 +56,39 @@ export async function evaluated(formula: string, text?: string): Promise<{ reado
   if (!controller || !formulas) return { value: "#N/A", pages: [] };
   const { value, pages } = await formulas.evaluate(String(formula), text ?? (await controller.bridge.getText()));
   return { value: isRange(value) && value.length !== 1 ? JSON.stringify(value.map(scalarText)) : scalarText(single(value)), pages };
+}
+
+// A call of silverware.table.evaluate before the caret, its formula's text typed so far (in either quotes)
+const EVALUATE_CALL_RE = /silverware\.table\.evaluate\(\s*(["'])((?:(?!\1).)*)$/;
+
+/** A completion SilverBullet offers (a CodeMirror completion: what shows, what it inserts) */
+export type Completion = { readonly label: string; readonly apply: string; readonly detail?: string; readonly info?: string; readonly type: string };
+
+/**
+ * The library page's `editor:complete` listener: in a formula given to
+ * silverware.table.evaluate (`linePrefix`, the line before the caret at
+ * `pos`), what the name typed may be, as a cell's editor offers it (functions,
+ * the page's named tables, after `table!` its named cells); undefined elsewhere
+ */
+export function completion(linePrefix: string, pos: number, text: string): { readonly from: number; readonly options: readonly Completion[] } | undefined {
+  const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
+  const formulas = controller?.offered<FormulasOffer>("formulas");
+  const typed = EVALUATE_CALL_RE.exec(String(linePrefix))?.[2];
+  if (!formulas || typed === undefined) return undefined;
+  // A formula without its "=" (it is optional) read as one with it
+  const lead = typed.trimStart().startsWith("=") ? "" : "=";
+  const found = formulas.complete(lead + typed, String(text));
+  if (!found || found.choices.length === 0) return undefined;
+  const options = found.choices.map((choice): Completion => {
+    const fn = choice.kind === "function" ? functionNamed(choice.name) : undefined;
+    return {
+      label: choiceText(choice),
+      apply: choiceText(choice),
+      type: choice.kind === "function" ? "function" : choice.kind === "table" ? "class" : "variable",
+      ...(fn ? { detail: fn.syntax, info: fn.description } : { detail: choice.kind }),
+    };
+  });
+  return { from: pos - (lead.length + typed.length - found.from), options };
 }
 
 /** As `evaluated`, its value only */

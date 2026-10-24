@@ -71,12 +71,20 @@ if js and js.window then
   function silverware.table.defineSeries(definitions)
     shown(silverwareTableJs.defineSeries(definitions), "defineSeries")
   end
-  -- A formula calculated on the page shown: one value as its text, several as ["a","b"]. The page and
-  -- the other pages it reads are read through SilverBullet, so a ${…} showing it is shown anew as they change
+  -- A formula calculated on the page it is on (a ${…}'s, else the page shown): one value as its text, several
+  -- as ["a","b"]. The page and the other pages it reads are read through SilverBullet, so a ${…} showing it is
+  -- shown anew as they change. The editor's text only while it holds that page: a ${…} of a page being opened
+  -- is evaluated before the editor has its text (the page's name already the new one), so the text must hold
+  -- the formula itself, else the page is read (as saved)
   function silverware.table.evaluate(formula)
-    local result = silverwareTableJs.evaluated(formula, editor.getText())
-    for _, page in ipairs(result.pages) do
-      space.pageExists(page)
+    local page = _CTX and _CTX.currentPage and _CTX.currentPage.name
+    local text = editor.getText()
+    if page and (page ~= editor.getCurrentPage() or not string.find(text, formula, 1, true)) then
+      text = space.readPage(page)
+    end
+    local result = silverwareTableJs.evaluated(formula, text, page)
+    for _, other in ipairs(result.pages) do
+      space.pageExists(other)
     end
     return result.value
   end

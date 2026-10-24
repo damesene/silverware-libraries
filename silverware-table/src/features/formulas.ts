@@ -203,21 +203,21 @@ export class Formulas implements Feature {
     );
     host.offer({
       cells: this.cells,
-      evaluate: (formula, text) => this.evaluate(formula, text),
+      evaluate: (formula, text, page) => this.evaluate(formula, text, page),
       complete: (formula, text) => formulaChoices(formula, formula.length, formula.length, pageNameChoices(this.cells, this.named(pageTablesOf(text)))),
     } satisfies FormulasOffer);
   }
 
   /**
-   * A formula calculated in no table, on the page's `text` (the Space Lua
-   * API's): the other pages it and the page's tables refer to read first (the
+   * A formula calculated in no table, on the `text` of `page` (else the page
+   * shown): the other pages it and the page's tables refer to read first (the
    * pageLinks module's, when on), then the page's tables by name, as a cell's
    * formula finds them; the other pages read, which the caller may watch
    */
-  private async evaluate(formula: string, text: string): Promise<{ readonly value: Value; readonly pages: readonly string[] }> {
+  private async evaluate(formula: string, text: string, page = this.host.currentPage): Promise<{ readonly value: Value; readonly pages: readonly string[] }> {
     const tables = pageTablesOf(text);
     const pages = (await this.host.offered<PageLinksOffer>("pageLinks")?.readFor([formula], tables.map((t) => t.table))) ?? [];
-    const source = pageTables(this.cells, () => this.named(tables), this.host.currentPage, undefined, this.namedOthers(this.host.otherPages()));
+    const source = pageTables(this.cells, () => this.named(tables), page, undefined, this.namedOthers(this.host.otherPages()));
     const value = evaluateFormula(formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`, { cells: this.cells, tables: source });
     return { value, pages };
   }

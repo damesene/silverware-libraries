@@ -515,6 +515,20 @@ Then `=VAT([@price])` works in every table, and typing it shows its syntax and d
 * Functions are defined again whenever SilverBullet loads Space Lua again: a change of the file shows after reloading the page (the browser keeps a module it loaded). A formula calling a function that is not defined (its file missing, or not loaded) keeps the result written, and *Recalculate* in the toolbar is highlighted: an edit of that table writes `#NAME?` there.
 * A mistake in a definition (no `call`, a name formulas cannot write) is shown in a notification until you close it, with the pages whose `space-lua` blocks call `silverware.table.defineFunctions` and a button opening each; the other functions are defined.
 
+### Formulas from Space Lua
+
+`silverware.table.evaluate(formula)` calculates a formula on the page shown, outside any table, so a page's text or a script can use what its tables hold:
+
+```
+VAT: ${silverware.table.evaluate("=fruit!vat")}
+Total: ${silverware.table.evaluate("=SUM(fruit![qty] * fruit![price])")}
+```
+
+* It is not in a table, so it names what it reads by a table's name: `fruit!B2`, `fruit![qty]`, `fruit!vat`, `fruit!pear[price]`, `[[Prices]]fruit!B2` for a table on another page. `A1` or `[qty]` alone find no table: `#REF!`. The `=` is optional.
+* One value comes back as its text, as a cell would show it: `21`. Several (a range, a column, an operator over one) come back as a list of their texts: `["Pear","Fig"]`. An error comes back as its code: `#REF!`.
+* It reads the page as it is now, and calculates the formulas it reaches anew; your own functions work too. Nothing is written.
+* It needs the formulas module (else `#N/A`), and `[[Page]]` references the pageLinks module (else they are not read).
+
 ### Errors
 
 | Shows | Because |
@@ -913,7 +927,8 @@ With the *Store table metadata* setting on, Silverware Table stores a table's se
 -- priority: 50
 -- Silverware Table's Space Lua API, loaded before your scripts (they have priority 0
 -- unless they say otherwise): silverware.table.defineFunctions, silverware.table.defineTypes and
--- silverware.table.defineSeries, see "Custom functions", "Custom column types" and "Custom series"
+-- silverware.table.defineSeries, see "Custom functions", "Custom column types" and "Custom series";
+-- silverware.table.evaluate, see "Formulas from Space Lua"
 silverware = silverware or {}
 silverware.table = silverware.table or {}
 if js and js.window then
@@ -974,11 +989,16 @@ if js and js.window then
   function silverware.table.defineSeries(definitions)
     shown(silverwareTableJs.defineSeries(definitions), "defineSeries")
   end
+  -- A formula calculated on the page shown: one value as its text, several as ["a","b"]
+  function silverware.table.evaluate(formula)
+    return silverwareTableJs.evaluate(formula)
+  end
 else
   -- Space Lua without a window (no tables to show): nothing to define
   function silverware.table.defineFunctions() end
   function silverware.table.defineTypes() end
   function silverware.table.defineSeries() end
+  function silverware.table.evaluate() return "#N/A" end
 end
 ```
 

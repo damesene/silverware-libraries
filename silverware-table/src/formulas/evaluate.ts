@@ -217,6 +217,12 @@ class Sheet {
     return result;
   }
 
+  /** A formula's value in none of the table's cells (evaluateFormula): a range stays one, no cell's result being one value */
+  standalone(formula: string): Value {
+    const tree = parse(formula);
+    return isError(tree) ? tree : this.evaluate(tree, 0, 0);
+  }
+
   /** The text a formula cell shows for its result */
   text(row: number, column: number, formula: string): string {
     const result = this.result(row, column, formula);
@@ -502,6 +508,25 @@ export function recalculate(table: Table, { cells, tables, name }: Calculation):
     });
   });
   return result;
+}
+
+// The table a formula calculated in none is in: no rows, no columns
+const NO_TABLE: Table = { indent: "", align: [], rows: [{ cells: [] }], padded: false };
+
+/**
+ * A formula calculated in no table (the Space Lua API's): its value, a range
+ * as its values. What it refers to by a table's name (`prices!B2`,
+ * `prices![qty]`, `prices!vat`, `[[Page]]prices!B2`) is found as from a cell;
+ * a table of its own it has none, so A1, [qty] or [@qty] alone are #REF!
+ */
+export function evaluateFormula(formula: string, { cells, tables }: Calculation): Value {
+  return new Sheet(NO_TABLE, new Book(cells, tables)).standalone(formula);
+}
+
+/** A value as a cell shows it: an error by its code */
+export function scalarText(value: Scalar): string {
+  if (isError(value)) return value.code;
+  return toText(value) as string;
 }
 
 /** Why formula cells show errors: "row,column" (rows of the markdown, header 0) → code and detail */

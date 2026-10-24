@@ -34,6 +34,7 @@ import {
   columnRangeText,
   columnRefText,
   cycleFixed,
+  evaluateFormula,
   filledFormula,
   type FormulaCells,
   formulaCount,
@@ -52,6 +53,7 @@ import {
   type FormulaHelp,
   isErrorText,
   isFormulaInput,
+  type PageLinksOffer,
   type PointedSpan,
   qualifyCellNames,
   recalculate,
@@ -64,6 +66,7 @@ import {
   rowsByName,
   REF_ERROR,
   type TableSource,
+  type Value,
   withAreasWritten,
   withColumnKeys,
   writtenArea,
@@ -198,7 +201,20 @@ export class Formulas implements Feature {
       { get: (cell, key) => host.getCellTag(cell, key), with: (cell, key, value) => host.withCellTag(cell, key, value) },
       { rowNames: (table) => host.rowNames(table), cellNames: (table) => host.cellNames(table) },
     );
-    host.offer({ cells: this.cells } satisfies FormulasOffer);
+    host.offer({ cells: this.cells, evaluate: (formula, text) => this.evaluate(formula, text) } satisfies FormulasOffer);
+  }
+
+  /**
+   * A formula calculated in no table, on the page's `text` (the Space Lua
+   * API's): the other pages it and the page's tables refer to read first (the
+   * pageLinks module's, when on), then the page's tables by name, as a cell's
+   * formula finds them
+   */
+  private async evaluate(formula: string, text: string): Promise<Value> {
+    const tables = pageTablesOf(text);
+    await this.host.offered<PageLinksOffer>("pageLinks")?.readFor([formula], tables.map((t) => t.table));
+    const source = pageTables(this.cells, () => this.named(tables), this.host.currentPage, undefined, this.namedOthers(this.host.otherPages()));
+    return evaluateFormula(formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`, { cells: this.cells, tables: source });
   }
 
   /** A table's name, by which formulas refer to it */

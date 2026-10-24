@@ -7,7 +7,8 @@
 // Turned off, no page is read, and formulas referring to one keep their
 // results (formula/page.ts: pages not read are `unread`).
 import type { Feature, ModelHost, TableTarget, TableInfo, WritePage } from "../core/feature.ts";
-import { type FormulaCells, type FormulasOffer, referredPages } from "../formulas/index.ts";
+import { type FormulaCells, type FormulasOffer, type PageLinksOffer, referredPages } from "../formulas/index.ts";
+import { formulaPages } from "../formulas/references.ts";
 import { tablesWritten } from "../formulas/page.ts";
 import { type OtherPages, type PageTable, pageTablesOf, parseTable, type Table } from "../markdown.ts";
 
@@ -20,7 +21,14 @@ export class PageLinks implements Feature {
   // Counts the pages read, so what formulas computed from them is computed anew
   private version = 0;
 
-  constructor(private readonly host: ModelHost) {}
+  constructor(private readonly host: ModelHost) {
+    host.offer({ readFor: (formulas, tables) => this.readFor(formulas, tables) } satisfies PageLinksOffer);
+  }
+
+  /** The pages these formulas and tables refer to (and theirs, in turn), read anew: a formula calculated in no table */
+  private async readFor(formulas: readonly string[], tables: readonly Table[]): Promise<void> {
+    await this.load(tables, true, formulas.flatMap(formulaPages));
+  }
 
   otherPages(): OtherPages {
     return { tables: (page) => this.pages.get(page), version: this.version };
@@ -77,11 +85,11 @@ export class PageLinks implements Feature {
    * pages those pages' tables refer to; `fresh`: also those read before.
    * Whether a page was read.
    */
-  private async load(tables: Iterable<Table>, fresh: boolean | ReadonlySet<string>): Promise<boolean> {
+  private async load(tables: Iterable<Table>, fresh: boolean | ReadonlySet<string>, pages: readonly string[] = []): Promise<boolean> {
     // Read for formulas only
     const cells = this.cells();
     if (!this.host.bridge.readPage || !cells) return false;
-    const queue = new Set<string>();
+    const queue = new Set<string>(pages);
     for (const table of tables) for (const page of referredPages(cells, table)) queue.add(page);
     const done = new Set<string>();
     let read = false;

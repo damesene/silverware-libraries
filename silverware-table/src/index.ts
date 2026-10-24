@@ -6,6 +6,8 @@ import { Controller } from "./controller.ts";
 import { customTypes } from "./columntypes/custom.ts";
 import { customTypesAnew, defineCustomTypes } from "./columntypes/registry.ts";
 import { customFunctions } from "./formulas/custom.ts";
+import { type FormulasOffer, scalarText } from "./formulas/index.ts";
+import { isRange, single } from "./formulas/values.ts";
 import { customFunctionsAnew, defineCustomFunctions } from "./formulas/registry.ts";
 
 export const version = "0.1.0";
@@ -35,6 +37,22 @@ export function openSettings(): void {
 export function removeAllMetadata(): void {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
   void controller?.removeAllMetadata();
+}
+
+/**
+ * `silverware.table.evaluate` (the library page's Space Lua): a formula
+ * calculated on the page shown, in none of its tables, so what it reads it
+ * names by a table's name (`=prices!vat`, `=SUM(prices![qty])`,
+ * `=[[Other]]prices!B2`). One value as its text, as a cell shows it; several
+ * (a range) as a JSON list of their texts, `["a","b"]`; an error by its code
+ * (#N/A while Silverware Table has not started or the formulas module is off).
+ */
+export async function evaluate(formula: string): Promise<string> {
+  const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
+  const formulas = controller?.offered<FormulasOffer>("formulas");
+  if (!controller || !formulas) return "#N/A";
+  const value = await formulas.evaluate(String(formula), await controller.bridge.getText());
+  return isRange(value) && value.length !== 1 ? JSON.stringify(value.map(scalarText)) : scalarText(single(value));
 }
 
 /**

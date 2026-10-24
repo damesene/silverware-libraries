@@ -20,14 +20,23 @@
 // can call), custom functions in custom.ts, which exist in registry.ts.
 export { type CellNameAt, cellsByName, type FormulaCells, formulaCount, forFormulas, hasFormulas, isErrorText, isFormulaInput, type RowName, rowsByName, type StoredFormula } from "./cell.ts";
 
-/** What the formulas module offers other modules (ModelHost.offered("formulas")): its cells as the formulas read them */
-export type FormulasOffer = { readonly cells: import("./cell.ts").FormulaCells };
+/**
+ * What the formulas module offers other modules (ModelHost.offered("formulas")): its cells as the formulas read them;
+ * `evaluate`: a formula calculated in no table, on the page's text (the Space Lua API's), a range as its values
+ */
+export type FormulasOffer = {
+  readonly cells: import("./cell.ts").FormulaCells;
+  readonly evaluate: (formula: string, text: string) => Promise<import("./values.ts").Value>;
+};
+
+/** What the pageLinks module offers: the other pages these formulas and tables refer to (and theirs, in turn) read anew */
+export type PageLinksOffer = { readonly readFor: (formulas: readonly string[], tables: readonly import("../markdown.ts").Table[]) => Promise<void> };
 export { type Area, areaText, callsCustomFunctions, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredTableNames, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";
-export { type Calculation, formulaErrors, type NamedCell, recalculate, type TableSource, totalRows } from "./evaluate.ts";
+export { type Calculation, evaluateFormula, formulaErrors, type NamedCell, recalculate, scalarText, type TableSource, totalRows } from "./evaluate.ts";
 export { type Node as FormulaNode, parse as parseFormula } from "./parser.ts";
 export { parseDate, toUnit, type Unit } from "./dates.ts";
-export { ERROR_CODES, FormulaError, parseClock, type Scalar } from "./values.ts";
+export { ERROR_CODES, FormulaError, parseClock, type Scalar, type Value } from "./values.ts";
 export { withAreasWritten, type WrittenArea, writtenArea } from "./frame.ts";
 export { REF_ERROR } from "./tokens.ts";
 export { calculatedFormula, filledFormula, followTable, type Following, formulasAfterEdit, shiftReferences, withCalculatedCells, withoutFormulas } from "./edits.ts";

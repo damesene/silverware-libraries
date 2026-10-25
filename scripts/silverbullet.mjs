@@ -4,8 +4,10 @@
 //   SB_IMAGE  another image (default ghcr.io/silverbulletmd/silverbullet:latest-slim),
 //             e.g. a version: ghcr.io/silverbulletmd/silverbullet:2.12.1-slim
 //   SB_BIN    a silverbullet binary to run instead of Docker
-//   SW_SB_SPACE, PORT  the space folder and the port (set by playwright.config.ts)
-//   SW_SB_LOG  a file the server's output is written to as well
+//   SW_SB_SPACE, PORT  the space folder and the port (set by playwright.config.ts, one
+//              server per worker: scripts/silverbullet-servers.ts)
+//   SW_SB_LOG  a file the server's output is written to as well (playwright.config.ts
+//              sets one per server in the folder SW_SB_LOGS)
 // Stopped (Ctrl+C, or Playwright when the tests end), it stops SilverBullet
 // and removes the space.
 import { execFileSync, spawn } from "node:child_process";

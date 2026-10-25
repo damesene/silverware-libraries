@@ -43,7 +43,7 @@ jobs:
     env:
       SW_TARGET: ${{ github.event_name == 'schedule' && 'silverbullet' || inputs.target || 'playground' }}
       SB_IMAGE: ${{ inputs.image || 'ghcr.io/silverbulletmd/silverbullet:latest-slim' }}
-      SW_SB_LOG: ${{ github.workspace }}/silverbullet-log/server.log
+      SW_SB_LOGS: ${{ github.workspace }}/silverbullet-log
     steps:
       - uses: actions/checkout@v7
 

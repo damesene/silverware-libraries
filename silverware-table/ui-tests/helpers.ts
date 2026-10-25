@@ -9,8 +9,8 @@
 //   browser context starts from the sample page.
 // - silverbullet (npm run test:ui:sb): a real SilverBullet with the committed
 //   silverware-table.js deployed (scripts/silverbullet.mjs). Each test gets a
-//   page of its own in the space, the sample page written into it; the tests
-//   run one at a time, as settings are the whole space's.
+//   page of its own in its worker's space, the sample page written into it:
+//   each worker has a server of its own, as settings are a space's.
 // The tests do not know which: what differs is here (opening the page, writing
 // and reading its markdown, settings, loading the page anew). A test that only
 // makes sense in the playground is tagged @playground, and skipped against
@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { LONG_PRESS_MS } from "../src/core/press.ts";
 
 export { expect };
@@ -29,8 +30,8 @@ export const target: Target = process.env.SW_TARGET === "silverbullet" ? "silver
 
 const sample = readFileSync(join(import.meta.dirname, "../../playground/sample.md"), "utf8");
 
-/** The space SilverBullet serves (scripts/silverbullet.mjs makes it) */
-const space = process.env.SW_SB_SPACE ?? "";
+/** The SilverBullet server of the test running: its worker's (scripts/silverbullet.mjs makes its space) */
+const server = () => silverbulletServer(test.info().parallelIndex, process.env.SW_SB_SPACE ?? "");
 
 /** Where the test pages are in the space, each a page of its own */
 const TEST_FOLDER = "UiTests";
@@ -67,6 +68,10 @@ type Client = {
  * gets what the browser's console said, attached to its report.
  */
 export const test = base.extend({
+  // Against SilverBullet, its worker's server
+  baseURL: async ({ baseURL }, use) => {
+    await use(target === "silverbullet" ? `http://127.0.0.1:${server().port}/` : baseURL);
+  },
   page: async ({ page }, use, testInfo) => {
     const errors: string[] = [];
     const log: string[] = [];
@@ -105,8 +110,8 @@ export const test = base.extend({
       if (target === "silverbullet") {
         // Closed first, so the page saves nothing after it is gone
         await page.close();
-        await rm(join(space, `${name}.md`), { force: true });
-        await rm(join(space, `${SETTINGS_PAGE}.md`), { force: true });
+        await rm(join(server().space, `${name}.md`), { force: true });
+        await rm(join(server().space, `${SETTINGS_PAGE}.md`), { force: true });
       }
     }
   },
@@ -114,7 +119,7 @@ export const test = base.extend({
 
 /** Writes a page into SilverBullet's space, as an edit outside SilverBullet would */
 async function writePage(name: string, text: string): Promise<void> {
-  const path = join(space, `${name}.md`);
+  const path = join(server().space, `${name}.md`);
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, text);
 }

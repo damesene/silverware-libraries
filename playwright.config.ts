@@ -14,10 +14,15 @@
 //   with a space of its own, as settings are a space's (scripts/silverbullet-servers.ts;
 //   SW_SB_WORKERS how many, else up to 4 by the machine's cores). Tests tagged
 //   @playground are skipped.
+import { existsSync } from "node:fs";
 import { availableParallelism, tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig, devices, type ReporterDescription } from "@playwright/test";
 import { silverbulletServer } from "./scripts/silverbullet-servers.ts";
+
+// This machine's settings of the tests (SW_SB_WORKERS, SB_IMAGE, SB_BIN…), not committed:
+// .env.local, KEY=value lines; a variable already set (CI, the command line) is kept
+if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 
 const target = process.env.SW_TARGET ?? "playground";
 if (target !== "playground" && target !== "silverbullet") throw new Error(`SW_TARGET is "${target}": playground or silverbullet`);

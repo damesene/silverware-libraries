@@ -51,5 +51,14 @@ npm run deploy -- <space folder>   # copy the plugins into a local space's Libra
 npm run playground     # try Silverware Table without SilverBullet, on mock data: http://localhost:8000/
 ```
 
+`npm run test:ui:sb` runs one SilverBullet per worker, up to 4 by the machine's cores. This machine's own
+settings go into `.env.local` (not committed; a variable set in the shell wins):
+
+```sh
+SW_SB_WORKERS=8                                           # how many workers, each with its own SilverBullet
+SB_IMAGE=ghcr.io/silverbulletmd/silverbullet:2.12.1-slim  # another image than the latest release
+SB_BIN=/path/to/silverbullet                              # a silverbullet binary instead of Docker
+```
+
 After deploying, reload the SilverBullet page so the new `.js` module is loaded. How Silverware Table is built
 (its core, features and the decisions behind them) is in [CLAUDE.md](CLAUDE.md).

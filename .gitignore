@@ -5,3 +5,4 @@ Thumbs.db
 test-results/
 playwright-report/
 silverbullet-log/
+.env.local

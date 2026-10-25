@@ -1,6 +1,6 @@
 // The sheets' tabs at the sheet view's bottom: going to another sheet, a new one, renaming and removing one
 import type { Page } from "@playwright/test";
-import { cell, expect, hoverCell, markdown, table, tableIcon, test } from "./playground.ts";
+import { cell, expect, hoverCell, markdown, setPage, table, tableIcon, test } from "./helpers.ts";
 
 const PAGE =
   "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1' sheet.width.A='120'> |\n\n" +
@@ -10,8 +10,7 @@ const drawn = (page: Page) => page.locator(".sb-table-widget.swt-drawn.swt-sheet
 const tab = (page: Page, name: string) => page.locator(".swt-sheet-tabs .swt-sheet-tab", { hasText: new RegExp(`^${name}$`) });
 
 async function openPlan(page: Page): Promise<void> {
-  await page.locator("#source").fill(PAGE);
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await setPage(page, PAGE);
   await expect(table(page, 2).locator("tr[data-swt-row]")).toHaveCount(1);
   await hoverCell(page, cell(page, 1, 0));
   await (await tableIcon(page, "Sheet view")).click();
@@ -79,8 +78,7 @@ test.describe("The sheets' tabs", () => {
   });
 
   test("a table alone's board: its table's tab first, there to go back to from the page's sheets", async ({ page }) => {
-    await page.locator("#source").fill("# Test\n\n| Item |\n|---|\n| Pear |\n\n| Code |\n|---|\n| X1 |\n| <meta core.table core.name='c' sheet.name='Q3' sheet.at='B2'> |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item |\n|---|\n| Pear |\n\n| Code |\n|---|\n| X1 |\n| <meta core.table core.name='c' sheet.name='Q3' sheet.at='B2'> |\n");
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await hoverCell(page, cell(page, 1, 0));
     await (await tableIcon(page, "Sheet view")).click();

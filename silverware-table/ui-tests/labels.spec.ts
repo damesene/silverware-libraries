@@ -1,6 +1,6 @@
 // A named table's tab with its name at its top right corner (the tableLabels module), in the page and on the sheet
 import type { Locator, Page } from "@playwright/test";
-import { cell, expect, hoverCell, table, tableIcon, test } from "./playground.ts";
+import { cell, expect, hoverCell, setPage, table, tableIcon, test } from "./helpers.ts";
 
 const filler = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}.`).join("\n\n");
 const PAGE =
@@ -20,8 +20,7 @@ async function onCorner(tab: Locator, of: Locator): Promise<{ x: boolean; y: boo
 const ON = { x: true, y: true, inside: false };
 
 async function open(page: Page): Promise<void> {
-  await page.locator("#source").fill(PAGE);
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await setPage(page, PAGE);
   await expect(table(page, 2).locator("tr[data-swt-row]")).toHaveCount(1);
   await page.mouse.move(2, 2);
 }
@@ -29,8 +28,7 @@ async function open(page: Page): Promise<void> {
 test.describe("Table labels", () => {
   test("a long table scrolled: the tab goes along with its header held at the view's top, above it", async ({ page }) => {
     const rows = Array.from({ length: 30 }, (_, i) => `| R${i} | ${i} |`).join("\n");
-    await page.locator("#source").fill(`# T\n\nText.\n\n| Name | Qty |\n|---|---|\n${rows}\n| <meta core.table core.name='long'> |\n\nMore.\n`);
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, `# T\n\nText.\n\n| Name | Qty |\n|---|---|\n${rows}\n| <meta core.table core.name='long'> |\n\nMore.\n`);
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(30);
     await page.mouse.move(2, 2);
     for (const top of [0, 80, 200, 500]) {

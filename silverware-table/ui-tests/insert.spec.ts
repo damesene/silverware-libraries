@@ -1,4 +1,4 @@
-import { bodyRows, cell, expect, hoverCell, markdown, rendersAnew, test } from "./playground.ts";
+import { bodyRows, cell, expect, hoverCell, markdown, rendersAnew, test } from "./helpers.ts";
 
 test.describe("Inserting rows with a +", () => {
   test("the + left of the table inserts a row at the border nearest the pointer", async ({ page }) => {

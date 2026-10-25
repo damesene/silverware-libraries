@@ -1,4 +1,4 @@
-import { cell, expect, markdown, rendersAnew, test } from "./playground.ts";
+import { cell, expect, markdown, rendersAnew, test } from "./helpers.ts";
 
 test.describe("A table rendered anew after a write", () => {
   test("keeps its toolbar and grips at the cell the pointer is on", async ({ page }) => {

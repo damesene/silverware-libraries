@@ -1,12 +1,11 @@
 // Filters: the filter row's fields and the bubble under the one typed in, a column's filter on its own under its header
 import type { Page } from "@playwright/test";
-import { bodyRows, expect, header, hoverCell, menu, test } from "./playground.ts";
+import { bodyRows, expect, header, hoverCell, menu, setPage, test } from "./helpers.ts";
 
 const PAGE = ["| Item | Status |", "|---|---|", "| Pear | open |", "| Fig | done |", "| Kiwi | open |", "| Plum | blocked |", ""].join("\n");
 
 async function load(page: Page): Promise<void> {
-  await page.locator("#source").fill(PAGE);
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await setPage(page, PAGE);
   await expect(bodyRows(page)).toHaveCount(4);
 }
 

@@ -1,5 +1,5 @@
 // Column widths: the handle on a header's right edge dragged, double-clicked
-import { cell, expect, header, hoverCell, table, tableIcon, test } from "./playground.ts";
+import { cell, expect, header, hoverCell, table, tableIcon, test } from "./helpers.ts";
 
 test.describe("Column widths", () => {
   test("a header's handle dragged widens its column by as much; a double click makes it automatic again", async ({ page }) => {

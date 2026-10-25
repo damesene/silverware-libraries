@@ -1,4 +1,4 @@
-import { cell, expect, header, markdown, rendersAnew, test } from "./playground.ts";
+import { cell, expect, header, markdown, reload, rendersAnew, test } from "./helpers.ts";
 
 test.describe("Formulas", () => {
   test("a formula with a comparison and texts shows its result and is written as typed", async ({ page }) => {
@@ -15,7 +15,7 @@ test.describe("Formulas", () => {
     // Its quotes as typed (the value in apostrophes), its > as &gt; (SilverBullet ends a tag at its first >)
     expect(await markdown(page)).toContain(`few <meta formulas.f='=IF([@qty]&gt;5, "many", "few")'>`);
     // Rendered again from the page as stored: the tag hides whole, no part of the formula shows
-    await page.reload();
+    await reload(page);
     await expect(cell(page, 1, 3)).toHaveText("few");
   });
 

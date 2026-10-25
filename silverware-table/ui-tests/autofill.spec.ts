@@ -1,4 +1,4 @@
-import { cell, columnCells, drag, expect, markdown, markTable, rendersAnew, settled, test } from "./playground.ts";
+import { cell, columnCells, drag, expect, markdown, markTable, rendersAnew, settled, test } from "./helpers.ts";
 
 test.describe("AutoFill", () => {
   test("the fill handle dragged down outlines what it fills, and fills it as it is let go", async ({ page }) => {

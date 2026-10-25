@@ -1,5 +1,5 @@
 // On a touch screen (the "touch" project: a phone's viewport, touch events)
-import { cell, expect, longPress, markdown, menu, menuTitle, table, tableIcon, tap, test } from "./playground.ts";
+import { cell, expect, longPress, markdown, menu, menuTitle, setPage, table, tableIcon, tap, test } from "./helpers.ts";
 
 test.describe("Touch", () => {
   test("a long press on a cell opens its menu", async ({ page }) => {
@@ -63,14 +63,7 @@ test.describe("Touch", () => {
 
 test.describe("Touch: moving a table on the sheet", () => {
   test("a tap on a table's cell shows its move handle; Move table… in the cell's menu, then a tap, moves it", async ({ page }) => {
-    // The markdown's pane, hidden on a phone: shown to write the page, then hidden again
-    const pane = page.getByRole("button", { name: "M↓" });
-    await pane.click();
-    await page
-      .locator("#source")
-      .fill("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| City |\n|---|\n| Brno |\n| <meta core.table core.name='b' sheet.name='Plan' sheet.at='D1'> |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-    await pane.click();
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| City |\n|---|\n| Brno |\n| <meta core.table core.name='b' sheet.name='Plan' sheet.at='D1'> |\n");
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await tap(page, cell(page, 1, 0));
     await (await tableIcon(page, "Sheet view")).click();
@@ -89,11 +82,7 @@ test.describe("Touch: moving a table on the sheet", () => {
   });
 
   test("a long press on an empty cell of the sheet opens its menu: Add table here", async ({ page }) => {
-    const pane = page.getByRole("button", { name: "M↓" });
-    await pane.click();
-    await page.locator("#source").fill("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| Code |\n|---|\n| X1 |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-    await pane.click();
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| Code |\n|---|\n| X1 |\n");
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await tap(page, cell(page, 1, 0));
     await (await tableIcon(page, "Sheet view")).click();

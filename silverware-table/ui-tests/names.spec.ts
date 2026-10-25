@@ -1,22 +1,16 @@
 // The toolbar's row of names: what holds the table (its sheet) and the table, each after its icon button
-import { cell, expect, hoverCell, markdown, table, tableIcon, test } from "./playground.ts";
+import { cell, expect, hoverCell, markdown, menu, notification, setPage, setSettings, table, tableIcon, test } from "./helpers.ts";
 
 const name = (page: import("@playwright/test").Page, slot: "container" | "table") => page.locator(`.swt-bar.swt-visible .swt-bar-name-${slot} .swt-bar-name`);
 
-/** The toolbarNames setting on (the playground's store, as its settings dialog keeps it), the page loaded anew */
+/** The toolbarNames setting on, the page loaded anew */
 async function namesInToolbar(page: import("@playwright/test").Page): Promise<void> {
-  await page.evaluate(() => {
-    const store = JSON.parse(localStorage.getItem("silverwarePlayground.settings") ?? "{}");
-    // (Metadata on, as the playground starts with it)
-    localStorage.setItem("silverwarePlayground.settings", JSON.stringify({ "silverware.table.metadata": true, ...store, "silverware.table.toolbarNames": "always" }));
-  });
-  await page.reload();
+  await setSettings(page, { "silverware.table.toolbarNames": "always" });
 }
 
 test.describe("Names in the ⋯ menu", () => {
   test("the ⋯ menu: the table's name its title, centered as every menu's; its views as items, its sheet in a row as a column's type", async ({ page }) => {
-    await page.locator("#source").fill("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
     await hoverCell(page, cell(page, 1, 0));
     // Not in the toolbar (the setting's default), nor their icons: the menu has them
@@ -45,7 +39,7 @@ test.describe("Names in the ⋯ menu", () => {
   });
 });
 
-test("by default the toolbar shows the names while Shift alone is held; the setting offers never, always and Shift", async ({ page }) => {
+test("by default the toolbar shows the names while Shift alone is held", async ({ page }) => {
   await hoverCell(page, cell(page, 1, 0));
   const names = page.locator(".swt-bar.swt-visible .swt-bar-names");
   await expect(names).toHaveCount(0);
@@ -54,8 +48,12 @@ test("by default the toolbar shows the names while Shift alone is held; the sett
   await expect(page.locator('.swt-bar.swt-visible .swt-bar-name-container button[aria-label="Sheet view"]')).toBeVisible();
   await page.keyboard.up("Shift");
   await expect(names).toHaveCount(0);
-  // The setting in its (styled) dialog: a choice of three, Shift chosen
-  await page.getByRole("button", { name: "Settings" }).click();
+});
+
+test("the setting in the (styled) settings dialog, from a table's ⋯ menu, offers never, always and Shift, Shift chosen", async ({ page }) => {
+  await hoverCell(page, cell(page, 1, 0));
+  await page.locator(".swt-bar.swt-visible .swt-bar-more").click();
+  await menu(page).locator(".swt-menu-item", { hasText: "Silverware Table settings…" }).click();
   const backdrop = page.locator(".swt-settings-backdrop");
   expect(await backdrop.evaluate((b) => getComputedStyle(b).position)).toBe("fixed");
   const select = page.locator(".swt-settings-row", { hasText: "Names in the toolbar" }).locator("select");
@@ -64,8 +62,7 @@ test("by default the toolbar shows the names while Shift alone is held; the sett
 });
 
 test("Shift pressed over a table with a long name: the names beside the icons, the toolbar where it is without them", async ({ page }) => {
-  await page.locator("#source").fill("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='averyveryverylongtablenameindeed'> |\n");
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='averyveryverylongtablenameindeed'> |\n");
   await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
   await hoverCell(page, cell(page, 1, 0));
   const bar = page.locator(".swt-bar.swt-visible");
@@ -82,8 +79,7 @@ test("Shift pressed over a table with a long name: the names beside the icons, t
 });
 
 test("long names in the ⋯ menu are cut, whole in their tooltips, the table's in the title", async ({ page }) => {
-  await page.locator("#source").fill("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='asdasdasdasdasdasdasdasdasda' sheet.name='Sheet1withaverylongnameindeed' sheet.at='A1'> |\n");
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='asdasdasdasdasdasdasdasdasda' sheet.name='Sheet1withaverylongnameindeed' sheet.at='A1'> |\n");
   await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
   await hoverCell(page, cell(page, 1, 0));
   await page.locator(".swt-bar.swt-visible .swt-bar-more").click();
@@ -102,8 +98,7 @@ test.describe("Names in the toolbar", () => {
   test.beforeEach(async ({ page }) => namesInToolbar(page));
 
   test("a table without a name nor a sheet shows both muted; typed into their fields, it is named and put on a sheet", async ({ page }) => {
-    await page.locator("#source").fill("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
     await hoverCell(page, cell(page, 1, 0));
     await expect(name(page, "table")).toHaveText("Table");
@@ -137,8 +132,7 @@ test.describe("Names in the toolbar", () => {
   });
 
   test("over a table narrower than the toolbar on the sheet: no name wraps, nothing is cut off, the names above", async ({ page }) => {
-    await page.locator("#source").fill("# Test\n\n| Name | Qty |\n|---|--:|\n| Apple | 10 |\n| Plum | 6 |\n| Pear | 3 |\n| Total | 19 |\n| <meta core.table core.pin-bottom='1'> |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Name | Qty |\n|---|--:|\n| Apple | 10 |\n| Plum | 6 |\n| Pear | 3 |\n| Total | 19 |\n| <meta core.table core.pin-bottom='1'> |\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(4);
     await hoverCell(page, cell(page, 1, 0));
     await (await tableIcon(page, "Sheet view")).click();
@@ -174,12 +168,7 @@ test.describe("Names in the toolbar", () => {
   });
 
   test("a table of a sheet view moved to another sheet by its name: the view shows that sheet", async ({ page }) => {
-    await page
-      .locator("#source")
-      .fill(
-        "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| City |\n|---|\n| Brno |\n| <meta core.table core.name='b' sheet.name='Plan' sheet.at='D1'> |\n",
-      );
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| City |\n|---|\n| Brno |\n| <meta core.table core.name='b' sheet.name='Plan' sheet.at='D1'> |\n");
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await hoverCell(page, cell(page, 1, 0));
     await (await tableIcon(page, "Sheet view")).click();
@@ -199,9 +188,8 @@ test.describe("Names in the toolbar", () => {
 test.describe("A table name two tables of the page have", () => {
   test("shows in red in the toolbar of each, the setting aside; said at the top until closed", async ({ page }) => {
     const prices = "| Item | Price |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='prices'> |\n";
-    await page.locator("#source").fill(`# Test\n\n${prices}\n${prices}`);
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-    const note = page.locator("#flash > div", { hasText: "2 tables on this page are named prices" });
+    await setPage(page, `# Test\n\n${prices}\n${prices}`);
+    const note = notification(page, "2 tables on this page are named prices");
     await expect(note).toBeVisible();
     // Under the top bar, and still there after the time another notification goes
     expect((await note.boundingBox())!.y).toBeLessThan(200);
@@ -219,8 +207,7 @@ test.describe("A table name two tables of the page have", () => {
 
 test.describe("Removing a name", () => {
   test("Remove from sheet under the sheet's name field; none under the table's (an empty name removes it)", async ({ page }) => {
-    await page.locator("#source").fill("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
     await hoverCell(page, cell(page, 1, 0));
     await page.locator(".swt-bar.swt-visible .swt-bar-more").click();
@@ -237,8 +224,7 @@ test.describe("Removing a name", () => {
 
 test.describe("The sheet's × in the ⋯ menu", () => {
   test("the × in the sheet's row takes the table off it; disabled on none", async ({ page }) => {
-    await page.locator("#source").fill("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
     await hoverCell(page, cell(page, 1, 0));
     await page.locator(".swt-bar.swt-visible .swt-bar-more").click();

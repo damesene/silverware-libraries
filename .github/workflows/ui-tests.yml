@@ -1,0 +1,89 @@
+# The interaction tests (playwright.config.ts) and the checks of npm run verify.
+# - On a push to main and on a pull request: against the playground, after verify.
+# - Every night, and when run by hand (Actions > Interaction tests > Run workflow):
+#   against a real SilverBullet, its latest release, so a release that breaks
+#   Silverware shows the next morning without a change here. Run by hand, the
+#   target and the image can be chosen (a version: ghcr.io/silverbulletmd/silverbullet:2.12.1-slim).
+# Each run's job summary has the counts and the tests that failed; the HTML report
+# (each test's error, screenshot, trace and browser console) and SilverBullet's
+# log are artifacts of the run. GitHub turns off a scheduled workflow after 60
+# days without activity in a public repository.
+name: Interaction tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # 01:17 UTC (off the full hour, when GitHub's schedules are busiest)
+    - cron: "17 1 * * *"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: What the tests run against
+        type: choice
+        options: [silverbullet, playground]
+        default: silverbullet
+      image:
+        description: The SilverBullet image (target silverbullet)
+        default: ghcr.io/silverbulletmd/silverbullet:latest-slim
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-tests-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests (${{ github.event_name == 'schedule' && 'silverbullet' || inputs.target || 'playground' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SW_TARGET: ${{ github.event_name == 'schedule' && 'silverbullet' || inputs.target || 'playground' }}
+      SB_IMAGE: ${{ inputs.image || 'ghcr.io/silverbulletmd/silverbullet:latest-slim' }}
+      SW_SB_LOG: ${{ github.workspace }}/silverbullet-log/server.log
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Types, unit tests, bundles match their sources
+        if: env.SW_TARGET == 'playground'
+        run: npm run verify
+
+      - name: Playwright's Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: SilverBullet image
+        if: env.SW_TARGET == 'silverbullet'
+        run: |
+          docker pull "$SB_IMAGE"
+          version=$(docker run --rm --entrypoint /silverbullet "$SB_IMAGE" --version)
+          echo "Testing against \`$SB_IMAGE\`: $version" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Interaction tests
+        run: node scripts/ui-tests.mjs "$SW_TARGET"
+
+      - name: HTML report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: report-${{ env.SW_TARGET }}
+          path: playwright-report/
+          retention-days: 14
+
+      - name: SilverBullet's log
+        if: ${{ !cancelled() && env.SW_TARGET == 'silverbullet' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: silverbullet-log
+          path: silverbullet-log/
+          retention-days: 14
+          if-no-files-found: ignore

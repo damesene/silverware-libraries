@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { cell, center, columnCells, drag, expect, header, hoverCell, markdown, menu, menuTitle, rendersAnew, table, test } from "./playground.ts";
+import { cell, center, columnCells, drag, expect, header, hoverCell, markdown, menu, menuTitle, rendersAnew, setPage, table, test } from "./helpers.ts";
 
 test("one menu at a time: a column's menu open, the ⋯ menu closes it, and the reverse", async ({ page }) => {
   // The column's menu: a right click on its header
@@ -17,8 +17,7 @@ test("one menu at a time: a column's menu open, the ⋯ menu closes it, and the 
 
 test("Copy as Markdown in the ⋯ menu: the table as plain markdown in the clipboard, no hidden tags", async ({ page }) => {
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.locator("#source").fill("# Test\n\n| Item | Qty |\n|---|--:|\n| **Pear** | 3 <meta formulas.f='=1+2'> |\n| <meta core.table core.name='fruit'> |\n");
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await setPage(page, "# Test\n\n| Item | Qty |\n|---|--:|\n| **Pear** | 3 <meta formulas.f='=1+2'> |\n| <meta core.table core.name='fruit'> |\n");
   await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
   await hoverCell(page, cell(page, 1, 0));
   await page.locator(".swt-bar.swt-visible .swt-bar-more").click();
@@ -108,8 +107,7 @@ test.describe("Grips", () => {
 });
 
 test("Remove metadata in a cell's menu asks, then takes off that cell's hidden tags only", async ({ page }) => {
-  await page.locator("#source").fill("# Test\n\n| Item | Qty |\n|---|---|\n| Pear <meta core.n='pear'> | 3 <meta formulas.f='=1+2'> |\n");
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear <meta core.n='pear'> | 3 <meta formulas.f='=1+2'> |\n");
   await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
   const asked: string[] = [];
   page.once("dialog", (dialog) => {
@@ -128,8 +126,7 @@ test("Remove metadata in a cell's menu asks, then takes off that cell's hidden t
 });
 
 test("Delete table, last in the ⋯ menu, asks and takes the table out of the page; No keeps it", async ({ page }) => {
-  await page.locator("#source").fill("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n\nBetween.\n\n| City |\n|---|\n| Brno |\n");
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n\nBetween.\n\n| City |\n|---|\n| Brno |\n");
   await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
   const asked: string[] = [];
   const answer = (yes: boolean) =>

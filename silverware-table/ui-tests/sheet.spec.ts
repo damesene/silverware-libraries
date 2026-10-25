@@ -1,6 +1,6 @@
 // The sheet view: the table over the window with empty cells past it, which grow it
 import type { Page } from "@playwright/test";
-import { cell, expect, hoverCell, markdown, rendersAnew, table, tableIcon, test } from "./playground.ts";
+import { cell, expect, expectNavigatedTo, hoverCell, markdown, notification, reload, rendersAnew, replaceInPage, setPage, setSettings, table, tableIcon, test } from "./helpers.ts";
 
 /** The table the sheet shows: the one it drew itself (in SilverBullet's form), standing for the page's */
 const sheetTable = (page: Page) => page.locator(".sb-table-widget.swt-table.swt-drawn:not(.swt-stand-in)");
@@ -38,7 +38,7 @@ async function emptyCell(page: Page, at: { right?: number; below?: number; row?:
 test.describe("Ctrl+arrows out of a table on the sheet", () => {
   test("a cell selected at the table's right edge: Ctrl+ArrowRight selects the empty cell past it", async ({ page }) => {
     await page.evaluate(() => localStorage.removeItem("silverware.table.editMode"));
-    await page.reload();
+    await reload(page);
     await openSheet(page);
     const last = sheetTable(page).locator("tr[data-swt-row='1'] > td").last();
     await last.click();
@@ -98,10 +98,7 @@ test.describe("Ctrl+arrows in the sheet's empty cells", () => {
 
 test.describe("A table far down the sheet", () => {
   test("edited, drawn anew: the board stays scrolled where it is (the table placed at once, the next cell focused there)", async ({ page }) => {
-    await page.locator("#source").fill(
-      "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| City | N |\n|---|---|\n| Brno | 1 |\n| Praha | 2 |\n| <meta core.table core.name='b' sheet.name='Plan' sheet.at='B25'> |\n",
-    );
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| City | N |\n|---|---|\n| Brno | 1 |\n| Praha | 2 |\n| <meta core.table core.name='b' sheet.name='Plan' sheet.at='B25'> |\n");
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(2);
     await openSheet(page);
     const board = page.locator(".swt-sheet-board");
@@ -138,14 +135,13 @@ test.describe("A table far down the sheet", () => {
 test.describe("A column's width on the sheet", () => {
   test("no width of its own and a long text: the column as wide as its cells' text, at most 300px", async ({ page }) => {
     const long = "A very long note that goes on and on and would make the column as wide as the window if nothing held it";
-    await page.locator("#source").fill(`# Test
+    await setPage(page, `# Test
 
 | Item | Note |
 |---|---|
 | Pear | ${long} |
 | Fig | short |
 `);
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(2);
     await openSheet(page);
     const note = sheetTable(page).locator("tr[data-swt-row='1'] > td").nth(1);
@@ -157,10 +153,8 @@ test.describe("A column's width on the sheet", () => {
 
 test.describe("Long text on the sheet", () => {
   test("a narrow column: its header and its cells stay within it, cut with an ellipsis", async ({ page }) => {
-    await page.evaluate(() => localStorage.setItem("silverwarePlayground.settings", JSON.stringify({ "silverware.table.metadata": true, "silverware.table.modules.longText.overflow": "ellipsis" })));
-    await page.reload();
-    await page.locator("#source").fill("# Test\n\n| Item with a long header name | Note |\n|---|---|\n| A very long value that does not fit | short |\n| <meta core.table core.name='t' sheet.name='S' sheet.at='A1' sheet.width.A='90'> |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setSettings(page, { "silverware.table.modules.longText.overflow": "ellipsis" });
+    await setPage(page, "# Test\n\n| Item with a long header name | Note |\n|---|---|\n| A very long value that does not fit | short |\n| <meta core.table core.name='t' sheet.name='S' sheet.at='A1' sheet.width.A='90'> |\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
     await openSheet(page);
     const t = sheetTable(page);
@@ -254,7 +248,7 @@ test.describe("Sheet view", () => {
     await page.mouse.click(point.x, point.y);
     await page.keyboard.type("Plum");
     await sheetRendersAnew(page, () => page.keyboard.press("Enter"));
-    await expect(page.locator("#flash > div", { hasText: "on the sheet Sheet1 now" })).toBeVisible();
+    await expect(notification(page, "on the sheet Sheet1 now")).toBeVisible();
     const text = await markdown(page);
     // The table on the sheet Sheet1 at A1, named; the new one at A8 (the table takes rows 1 to 7), in the same edit
     expect(text).toMatch(/\| Šípek .*\|\n\| <meta core.table core.name='table1' sheet.name='Sheet1' sheet.at='A1'> \|/);
@@ -462,10 +456,7 @@ test.describe("Sheet view", () => {
   });
 
   test("stays over the window when a write renders the tables before it anew (a formula there refers to it)", async ({ page }) => {
-    await page
-      .locator("#source")
-      .fill("# Test\n\n| A | B |\n|---|---|\n| 1 | 2 <meta formulas.f='=prices!B1'> |\n\nText\n\n| Item | Price |\n|---|---|\n| Pear | 2 |\n| <meta core.table core.name='prices'> |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| A | B |\n|---|---|\n| 1 | 2 <meta formulas.f='=prices!B1'> |\n\nText\n\n| Item | Price |\n|---|---|\n| Pear | 2 |\n| <meta core.table core.name='prices'> |\n");
     await expect(table(page, 1).locator("table tr")).toHaveCount(3);
     await hoverCell(page, cell(page, 1, 0, 1));
     await (await tableIcon(page, "Full screen")).click();
@@ -481,8 +472,7 @@ test.describe("Sheet view", () => {
   });
 
   test("draws the table itself, its cells rendered as the page's, a link followed by the editor's navigation", async ({ page }) => {
-    await page.locator("#source").fill("# Test\n\n| Item | Note |\n|---|---|\n| Pear | [[Fruit]] **ripe** #fresh |\n| Fig | plain |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Note |\n|---|---|\n| Pear | [[Fruit]] **ripe** #fresh |\n| Fig | plain |\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(2);
     await openSheet(page);
     // Not SilverBullet's table over the window: one of its own, standing for it
@@ -492,21 +482,19 @@ test.describe("Sheet view", () => {
     await expect(note.locator("strong")).toHaveText("ripe");
     await expect(note.locator("a.hashtag")).toHaveText("#fresh");
     await expect(sheetCell(page, 2, 1)).toHaveText("plain");
-    // A link: the editor's navigation (the playground says so), the window not loaded anew
+    // A link: the editor's navigation, the window not loaded anew
     await page.evaluate(() => ((window as unknown as { stillHere: boolean }).stillHere = true));
     await note.locator("a[data-ref='Fruit']").click();
-    await expect(page.locator("#flash > div", { hasText: "would open Fruit" })).toBeVisible();
+    await expectNavigatedTo(page, "Fruit");
     expect(await page.evaluate(() => (window as unknown as { stillHere?: boolean }).stillHere)).toBe(true);
   });
 
   test("ends once the page's table is gone from the markdown (undone, removed)", async ({ page }) => {
     // The page's only table: no other table of the page takes its key (a table's key is its place among them)
-    await page.locator("#source").fill("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
     await openSheet(page);
-    await page.locator("#source").fill("# Test\n\nNo table now.\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\nNo table now.\n");
     // The page's text read again: the board ends
     await expect(sheetTable(page)).toHaveCount(0);
     await expect(page.locator(".swt-sheet-board")).toHaveCount(0);
@@ -515,8 +503,7 @@ test.describe("Sheet view", () => {
   test("drawn anew with the table moved in the page: its place follows", async ({ page }) => {
     await openSheet(page);
     const before = Number(await sheetTable(page).locator("table").getAttribute("data-pos"));
-    await page.locator("#source").fill(`A paragraph before.\n\n${await markdown(page)}`);
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, `A paragraph before.\n\n${await markdown(page)}`);
     await expect(sheetTable(page).locator("table")).toHaveAttribute("data-pos", String(before + "A paragraph before.\n\n".length));
   });
 
@@ -527,11 +514,7 @@ test.describe("Sheet view", () => {
     await expect(field).toBeFocused();
     await page.keyboard.type("typed");
     // Another cell changed in the markdown (another client, a formula elsewhere)
-    await page.evaluate(() => {
-      const source = document.querySelector<HTMLTextAreaElement>("#source")!;
-      source.value = source.value.replace("Šípek", "Šípky");
-      source.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    await replaceInPage(page, "Šípek", "Šípky");
     await page.waitForTimeout(300);
     await expect(field).toBeFocused();
     await expect(field).toHaveValue(/typed$/);
@@ -554,12 +537,7 @@ test.describe("Sheet view", () => {
   });
 
   test("a sheet of two tables shows both at their places; a growth into the other moves it as far as it reaches", async ({ page }) => {
-    await page
-      .locator("#source")
-      .fill(
-        "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table sheet.name='Plan' sheet.at='A1'> |\n\nText between.\n\n| City | Zip |\n|---|---|\n| Brno | 602 |\n| <meta core.table sheet.name='Plan' sheet.at='B4'> |\n",
-      );
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table sheet.name='Plan' sheet.at='A1'> |\n\nText between.\n\n| City | Zip |\n|---|---|\n| Brno | 602 |\n| <meta core.table sheet.name='Plan' sheet.at='B4'> |\n");
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await openSheet(page);
     const drawn = page.locator(".sb-table-widget.swt-drawn.swt-sheet-table:not(.swt-stand-in)");
@@ -593,12 +571,7 @@ test.describe("Sheet view", () => {
   });
 
   test("a row added to a table with Tab moves the tables under it down by one, those beside it stay", async ({ page }) => {
-    await page
-      .locator("#source")
-      .fill(
-        "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| Side |\n|---|\n| 1 |\n| 2 |\n| 3 |\n| <meta core.table core.name='side' sheet.name='Plan' sheet.at='D1'> |\n\n| City |\n|---|\n| Brno |\n| <meta core.table core.name='under' sheet.name='Plan' sheet.at='A4'> |\n",
-      );
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| Side |\n|---|\n| 1 |\n| 2 |\n| 3 |\n| <meta core.table core.name='side' sheet.name='Plan' sheet.at='D1'> |\n\n| City |\n|---|\n| Brno |\n| <meta core.table core.name='under' sheet.name='Plan' sheet.at='A4'> |\n");
     await expect(table(page, 2).locator("tr[data-swt-row]")).toHaveCount(1);
     await openSheet(page);
     await expect(page.locator(".sb-table-widget.swt-drawn.swt-sheet-table:not(.swt-stand-in)")).toHaveCount(3);
@@ -611,12 +584,7 @@ test.describe("Sheet view", () => {
   });
 
   test("a formula reads in the sheet's addresses there and is stored in its table's", async ({ page }) => {
-    await page
-      .locator("#source")
-      .fill(
-        "# Test\n\n| Item | Price |\n|---|---|\n| Pear | 12 |\n| Fig | 25 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n\n| Item | Total |\n|---|---|\n| Pear | 24 <meta formulas.f='=prices!B1*2'> |\n| <meta core.table core.name='totals' sheet.name='Plan' sheet.at='D1'> |\n",
-      );
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Price |\n|---|---|\n| Pear | 12 |\n| Fig | 25 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n\n| Item | Total |\n|---|---|\n| Pear | 24 <meta formulas.f='=prices!B1*2'> |\n| <meta core.table core.name='totals' sheet.name='Plan' sheet.at='D1'> |\n");
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await openSheet(page);
     const totals = page.locator(".sb-table-widget.swt-drawn.swt-sheet-table:not(.swt-stand-in)").nth(1);
@@ -643,13 +611,12 @@ test.describe("Sheet view", () => {
     // A cell no table holds: #REF!, said so
     await totals.locator(".swt-cell-editor").fill("=H9");
     await sheetRendersAnew(page, () => page.keyboard.press("Enter"), 1);
-    await expect(page.locator("#flash > div", { hasText: "H9 is no table's cells here" })).toBeVisible();
+    await expect(notification(page, "H9 is no table's cells here")).toBeVisible();
     await expect.poll(() => markdown(page)).toContain("<meta formulas.f='=#REF!'>");
   });
 
   test("a row typed under a table with a row pinned to the bottom goes above it, Enter goes on under the value", async ({ page }) => {
-    await page.locator("#source").fill("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| Total | 3 |\n| <meta core.table core.pin-bottom='1'> |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| Total | 3 |\n| <meta core.table core.pin-bottom='1'> |\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(2);
     await openSheet(page);
     const point = await emptyCell(page, { below: 0, column: 0 });
@@ -663,8 +630,7 @@ test.describe("Sheet view", () => {
   });
 
   test("a press on the sheet over the band of the page's table under it inserts nothing there", async ({ page }) => {
-    await page.locator("#source").fill("# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 2 |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 2 |\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(2);
     // The page's table, under the board once it opens: its band of the + left of its rows
     const under = (await table(page).locator("table").boundingBox())!;
@@ -680,12 +646,7 @@ test.describe("Sheet view", () => {
   });
 
   test("under one table and right of another: the nearer one grows", async ({ page }) => {
-    await page
-      .locator("#source")
-      .fill(
-        "# Test\n\n| Item | Price |\n|---|---|\n| Pear | 12 |\n| Fig | 25 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n\n| Item | Total |\n|---|---|\n| Pear | 24 |\n| <meta core.table core.name='totals' sheet.name='Plan' sheet.at='D1'> |\n",
-      );
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Price |\n|---|---|\n| Pear | 12 |\n| Fig | 25 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n\n| Item | Total |\n|---|---|\n| Pear | 24 |\n| <meta core.table core.name='totals' sheet.name='Plan' sheet.at='D1'> |\n");
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await openSheet(page);
     const drawn = page.locator(".sb-table-widget.swt-drawn.swt-sheet-table:not(.swt-stand-in)");
@@ -704,8 +665,7 @@ test.describe("Sheet view", () => {
   });
 
   test("sorted on the sheet: a formula's title follows the rows' new places at once", async ({ page }) => {
-    await page.locator("#source").fill("# Test\n\n| Item | Qty | Double |\n|---|--:|--:|\n| Pear | 5 | 10 <meta formulas.f='=B1*2'> |\n| Fig | 3 | 6 <meta formulas.f='=B2*2'> |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty | Double |\n|---|--:|--:|\n| Pear | 5 | 10 <meta formulas.f='=B1*2'> |\n| Fig | 3 | 6 <meta formulas.f='=B2*2'> |\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(2);
     await openSheet(page);
     // The table alone at A1: its header in row 1, Pear's row 2
@@ -719,8 +679,7 @@ test.describe("Sheet view", () => {
   });
 
   test("sorted on the sheet: a range dragged over says why it is not pointed at, a header click gives the column", async ({ page }) => {
-    await page.locator("#source").fill("# Test\n\n| Item | Qty | Double |\n|---|--:|--:|\n| Pear | 5 | 10 |\n| Fig | 3 | 6 |\n| Kiwi | 4 | 8 |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty | Double |\n|---|--:|--:|\n| Pear | 5 | 10 |\n| Fig | 3 | 6 |\n| Kiwi | 4 | 8 |\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(3);
     await openSheet(page);
     await sheetTable(page).locator("thead tr > *").nth(1).hover();
@@ -747,12 +706,7 @@ test.describe("Sheet view", () => {
   });
 
   test("pointing at another table of the sheet: its header gives its column, its cell the sheet's address, stored by its name", async ({ page }) => {
-    await page
-      .locator("#source")
-      .fill(
-        "# Test\n\n| Item | Price |\n|---|---|\n| Pear | 12 |\n| Fig | 25 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n\n| Item | Total |\n|---|---|\n| Pear | 1 |\n| <meta core.table core.name='totals' sheet.name='Plan' sheet.at='D1'> |\n",
-      );
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Price |\n|---|---|\n| Pear | 12 |\n| Fig | 25 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n\n| Item | Total |\n|---|---|\n| Pear | 1 |\n| <meta core.table core.name='totals' sheet.name='Plan' sheet.at='D1'> |\n");
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await openSheet(page);
     const drawn = page.locator(".sb-table-widget.swt-drawn.swt-sheet-table:not(.swt-stand-in)");
@@ -782,12 +736,7 @@ test.describe("Sheet view", () => {
   });
 
   test("a value typed far from the tables makes a table of its own there, a formula as text", async ({ page }) => {
-    await page
-      .locator("#source")
-      .fill(
-        "# Test\n\n| Item | Price |\n|---|---|\n| Pear | 12 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A3'> |\n\nText after.\n",
-      );
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Price |\n|---|---|\n| Pear | 12 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A3'> |\n\nText after.\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
     await openSheet(page);
     const drawn = page.locator(".sb-table-widget.swt-drawn.swt-sheet-table:not(.swt-stand-in)");
@@ -812,7 +761,7 @@ test.describe("Sheet view", () => {
     await page.mouse.click(a.x + a.width / 2, prices.y - 2 * rowHeight + rowHeight / 2);
     await page.keyboard.type("=B4*2");
     await page.keyboard.press("Enter");
-    await expect(page.locator("#flash > div", { hasText: "saved as text" })).toBeVisible();
+    await expect(notification(page, "saved as text")).toBeVisible();
     await expect(drawn).toHaveCount(3);
     text = await markdown(page);
     expect(text).toMatch(/\| Column 1 +\|\n\| -+ \|\n\| =B4\*2 +\|\n\| <meta core.table core.name='table2' sheet.name='Plan' sheet.at='A1'> \|/);
@@ -827,10 +776,7 @@ test.describe("Sheet view", () => {
   });
 
   test("far from the tables: '= is text as elsewhere, and a cell pressed meanwhile is pressed once the table is made", async ({ page }) => {
-    await page
-      .locator("#source")
-      .fill("# Test\n\n| Item | Price |\n|---|---|\n| Pear | 12 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A3'> |\n\n| Other |\n|---|\n| x |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Price |\n|---|---|\n| Pear | 12 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A3'> |\n\n| Other |\n|---|\n| x |\n");
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await openSheet(page);
     const drawn = page.locator(".sb-table-widget.swt-drawn.swt-sheet-table:not(.swt-stand-in)");
@@ -846,23 +792,18 @@ test.describe("Sheet view", () => {
     const text = await markdown(page);
     // Its text =total, without the '; written after the page's last table (Other), no flash about a formula
     expect(text).toMatch(/\| Other \|\n\|---\|\n\| x \|\n\n\| Column 1 +\|\n\| -+ \|\n\| =total +\|\n\| <meta core.table core.name='table1' sheet.name='Plan' sheet.at='D7'> \|/);
-    await expect(page.locator("#flash > div", { hasText: "saved as text" })).toHaveCount(0);
+    await expect(notification(page, "saved as text")).toHaveCount(0);
     await expect(drawn.nth(0).locator("tr[data-swt-row='1'] > td").nth(1)).toHaveClass(/swt-selected/);
   });
 
   test("far from a table on no sheet without the metadata setting: nothing made, said why, the keys reach no page", async ({ page }) => {
-    // The setting off (the playground's settings, as its dialog keeps them)
-    await page.evaluate(() => {
-      const store = JSON.parse(localStorage.getItem("silverwarePlayground.settings") ?? "{}");
-      localStorage.setItem("silverwarePlayground.settings", JSON.stringify({ ...store, "silverware.table.metadata": false }));
-    });
-    await page.reload();
+    await setSettings(page, { "silverware.table.metadata": false });
     await openSheet(page);
     const before = await markdown(page);
     const box = (await sheetTable(page).locator("table").boundingBox())!;
     await page.mouse.click(box.x + box.width + 250, box.y + box.height + 200);
     await page.keyboard.type("lost");
-    await expect(page.locator("#flash > div", { hasText: "Store table metadata" })).toBeVisible();
+    await expect(notification(page, "Store table metadata")).toBeVisible();
     // What is typed goes nowhere: not into the page under the board, which keeps the focus
     await page.waitForTimeout(200);
     expect(await markdown(page)).toBe(before);
@@ -891,8 +832,7 @@ test.describe("Sheet view", () => {
   });
 
   test("AutoFill on the sheet: the fill handle in a cell's corner can be dragged", async ({ page }) => {
-    await page.locator("#source").fill("# Test\n\n| Item | Qty |\n|---|--:|\n| Pear | 1 |\n| Fig | 2 |\n| Kiwi | |\n| Plum | |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|--:|\n| Pear | 1 |\n| Fig | 2 |\n| Kiwi | |\n| Plum | |\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(4);
     await openSheet(page);
     // Pear's and Fig's Qty selected, the handle dragged down to Plum's: 3, 4
@@ -918,12 +858,7 @@ test.describe("Sheet view", () => {
   });
 
   test("a column's width dragged on the sheet is the sheet's column's, for every table in it", async ({ page }) => {
-    await page
-      .locator("#source")
-      .fill(
-        "# Test\n\n| Item | Price |\n|---|---|\n| Pear | 12 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n\n| City | Zip |\n|---|---|\n| Brno | 602 |\n| <meta core.table core.name='cities' sheet.name='Plan' sheet.at='A5'> |\n",
-      );
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Price |\n|---|---|\n| Pear | 12 |\n| <meta core.table core.name='prices' sheet.name='Plan' sheet.at='A1'> |\n\n| City | Zip |\n|---|---|\n| Brno | 602 |\n| <meta core.table core.name='cities' sheet.name='Plan' sheet.at='A5'> |\n");
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await openSheet(page);
     const drawn = page.locator(".sb-table-widget.swt-drawn.swt-sheet-table:not(.swt-stand-in)");
@@ -970,12 +905,7 @@ test.describe("Sheet view", () => {
   });
 
   test("cells pasted into another table of the sheet, and a filter that hides rows of its own table only", async ({ page }) => {
-    await page
-      .locator("#source")
-      .fill(
-        "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 5 |\n| Kiwi | 4 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| City | Zip |\n|---|---|\n| Brno | 602 |\n| Zlín | 760 |\n| <meta core.table core.name='b' sheet.name='Plan' sheet.at='D1'> |\n",
-      );
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 5 |\n| Kiwi | 4 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| City | Zip |\n|---|---|\n| Brno | 602 |\n| Zlín | 760 |\n| <meta core.table core.name='b' sheet.name='Plan' sheet.at='D1'> |\n");
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(2);
     await openSheet(page);
     const drawn = page.locator(".sb-table-widget.swt-drawn.swt-sheet-table:not(.swt-stand-in)");
@@ -1009,8 +939,7 @@ test.describe("Sheet view", () => {
   });
 
   test("a row pinned to the bottom stays last on the sheet, sorted or not", async ({ page }) => {
-    await page.locator("#source").fill("# Test\n\n| Item | Qty |\n|---|--:|\n| Pear | 3 |\n| Fig | 5 |\n| Total | 8 |\n| <meta core.table core.pin-bottom='1'> |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| Item | Qty |\n|---|--:|\n| Pear | 3 |\n| Fig | 5 |\n| Total | 8 |\n| <meta core.table core.pin-bottom='1'> |\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(3);
     await openSheet(page);
     // Rows pinned to the bottom are in the table's foot: every body row, in the order shown
@@ -1056,8 +985,7 @@ test("a write on the sheet lays out the sheet's table only: the page's under the
 });
 
 test("a formula's result on the sheet is marked as in the page: its underline is not cut off", async ({ page }) => {
-  await page.locator("#source").fill("# Test\n\n| Item | Qty | Double |\n|---|---|---|\n| Pear | 3 | 6 <meta formulas.f='=B1*2'> |\n");
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await setPage(page, "# Test\n\n| Item | Qty | Double |\n|---|---|---|\n| Pear | 3 | 6 <meta formulas.f='=B1*2'> |\n");
   await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
   await hoverCell(page, cell(page, 1, 0));
   await (await tableIcon(page, "Sheet view")).click();
@@ -1117,8 +1045,7 @@ test("the controls of the table clicked do not stay over the sheet or the full s
 
 test("the sheet's scrollbars stay as they are through writes that widen a column", async ({ page }) => {
   const rows = Array.from({ length: 60 }, (_, i) => `| item ${i} | ${i} | note ${i} |`).join("\n");
-  await page.locator("#source").fill(`# Test\n\n| Name | A | Note |\n|---|---|---|\n${rows}\n`);
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await setPage(page, `# Test\n\n| Name | A | Note |\n|---|---|---|\n${rows}\n`);
   await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(60);
   await hoverCell(page, cell(page, 1, 0));
   await (await tableIcon(page, "Sheet view")).click();
@@ -1141,12 +1068,7 @@ test("the sheet's scrollbars stay as they are through writes that widen a column
 });
 
 test("editing a table placed lower on the sheet scrolls nothing, its column as wide as before (the cell edited next does not widen it)", async ({ page }) => {
-  await page
-    .locator("#source")
-    .fill(
-      "# Test\n\n| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 2 |\n| <meta core.table sheet.name='Plan' sheet.at='A1' core.name='fruit'> |\n\n| Column 1 | Column 2 |\n|---|---|\n| a | sdf |\n| fdsddda | |\n| <meta core.table sheet.name='Plan' sheet.at='G4' core.name='table1'> |\n",
-    );
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await setPage(page, "# Test\n\n| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 2 |\n| <meta core.table sheet.name='Plan' sheet.at='A1' core.name='fruit'> |\n\n| Column 1 | Column 2 |\n|---|---|\n| a | sdf |\n| fdsddda | |\n| <meta core.table sheet.name='Plan' sheet.at='G4' core.name='table1'> |\n");
   await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(2);
   await hoverCell(page, cell(page, 1, 0));
   await (await tableIcon(page, "Sheet view")).click();
@@ -1203,8 +1125,7 @@ test("Enter in the last row's cell editor on the sheet adds a row under it", asy
 });
 
 test("the + pressed again and again on a sheet's table adds a row each time, with the new row's editor open meanwhile", async ({ page }) => {
-  await page.locator("#source").fill("# Test\n\n| A | B |\n|---|---|\n| 1 |  |\n| 2 |  |\n| <meta core.table sheet.name='Sheet1' sheet.at='A1' core.name='t'> |\n");
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await setPage(page, "# Test\n\n| A | B |\n|---|---|\n| 1 |  |\n| 2 |  |\n| <meta core.table sheet.name='Sheet1' sheet.at='A1' core.name='t'> |\n");
   await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(2);
   await hoverCell(page, cell(page, 1, 0));
   await (await tableIcon(page, "Sheet view")).click();
@@ -1220,7 +1141,7 @@ test("the + pressed again and again on a sheet's table adds a row each time, wit
     // (Its editor opens in the new row: the next press saves it first)
     await expect(drawn.locator("tbody tr[data-swt-row]")).toHaveCount(2 + i);
   }
-  await expect(page.locator("#flash > div", { hasText: "changed in the meantime" })).toHaveCount(0);
+  await expect(notification(page, "changed in the meantime")).toHaveCount(0);
 });
 
 test.describe("Pins on the sheet", () => {
@@ -1229,8 +1150,7 @@ test.describe("Pins on the sheet", () => {
   const PINNED = `# Test\n\n| Name | A | B |\n|---|---|---|\n${rows}\n| Total | 435 | 870 |\n| <meta core.table core.name='t' sheet.name='Plan' sheet.at='B2' core.pin-top='1' core.pin-bottom='1' core.pin-left='1'> |\n`;
 
   const open = async (page: Page, source: string, rows: number) => {
-    await page.locator("#source").fill(source);
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, source);
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(rows);
     await hoverCell(page, cell(page, 1, 0));
     await (await tableIcon(page, "Sheet view")).click();

@@ -1,6 +1,6 @@
 // Moving a table on the sheet: its handle dragged or clicked, Move table…, the whole table selected and dragged by its edge
 import type { Page } from "@playwright/test";
-import { center, cell, drag, expect, hoverCell, markdown, table, tableIcon, test } from "./playground.ts";
+import { cell, center, drag, expect, hoverCell, markdown, notification, setPage, table, tableIcon, test } from "./helpers.ts";
 
 // a at A1 (its header and one row, two columns), b at D1
 const PAGE = "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| City |\n|---|\n| Brno |\n| <meta core.table core.name='b' sheet.name='Plan' sheet.at='D1'> |\n";
@@ -10,8 +10,7 @@ const grab = (page: Page) => page.locator(".swt-sheet-grab.swt-visible");
 const preview = (page: Page) => page.locator(".swt-sheet-move:not([hidden])");
 
 async function openPlan(page: Page, more = ""): Promise<number> {
-  await page.locator("#source").fill(PAGE + more);
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await setPage(page, PAGE + more);
   await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
   await hoverCell(page, cell(page, 1, 0));
   await (await tableIcon(page, "Sheet view")).click();
@@ -52,7 +51,7 @@ test.describe("Moving a table on the sheet", () => {
     // (Its two columns from C or D on: over b either way)
     await expect(preview(page).locator(".swt-sheet-move-tip")).toHaveText(/^[CD]1: b is there$/);
     await page.mouse.up();
-    await expect(page.locator("#flash > div", { hasText: /cannot go to [CD]1: b is there/ })).toBeVisible();
+    await expect(notification(page, /cannot go to [CD]1: b is there/)).toBeVisible();
     expect(await markdown(page)).toContain("<meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'>");
   });
 
@@ -176,8 +175,7 @@ test.describe("Adding a table of the page to the sheet", () => {
   });
 
   test("on a table alone's board, both go on a new sheet in one edit: it at A1, the one added at the cell", async ({ page }) => {
-    await page.locator("#source").fill(`# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n${CODES}`);
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, `# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n${CODES}`);
     await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
     await hoverCell(page, cell(page, 1, 0));
     await (await tableIcon(page, "Sheet view")).click();

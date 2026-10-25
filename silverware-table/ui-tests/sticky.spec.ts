@@ -1,14 +1,13 @@
 // The header held at the top of the page's view as a long table scrolls past
 import type { Page } from "@playwright/test";
-import { expect, table, tableIcon, test } from "./playground.ts";
+import { expect, setPage, table, tableIcon, test } from "./helpers.ts";
 
 test.describe("Rows pinned to the bottom", () => {
   test("a scroller with a bottom padding (as SilverBullet's, to scroll past the end): the row at the table's bottom while it is in view", async ({ page }) => {
     await page.addStyleTag({ content: ".cm-scroller { padding-bottom: 360px !important; }" });
     // Low in the view: within its bottom 360px, which the padding takes from sticky positioning
     const filler = Array.from({ length: 6 }, (_, i) => `Line ${i + 1} of text above the table.`).join("\n\n");
-    await page.locator("#source").fill(`# T\n\n${filler}\n\n| Customer | Bags |\n|---|--:|\n| A | 6 |\n| B | 2 |\n| Total | 8 |\n| <meta core.table core.pin-bottom='1'> |\n\nMore text.\n`);
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, `# T\n\n${filler}\n\n| Customer | Bags |\n|---|--:|\n| A | 6 |\n| B | 2 |\n| Total | 8 |\n| <meta core.table core.pin-bottom='1'> |\n\nMore text.\n`);
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(3);
     const at = await table(page).evaluate((w) => {
       const t = w.querySelector("table")!;
@@ -25,8 +24,7 @@ test.describe("The held header and the rows pinned to the bottom", () => {
   test("the table's end going up past the view's top: the header gives way to the bottom rows, never under them", async ({ page }) => {
     const rows = Array.from({ length: 6 }, (_, i) => `| Row ${i + 1} | ${i} |`).join("\n");
     const filler = Array.from({ length: 30 }, (_, i) => `Line ${i + 1}.`).join("\n\n");
-    await page.locator("#source").fill(`# T\n\n${filler}\n\n| Name | Qty |\n|---|---|\n${rows}\n| Total | 15 |\n| <meta core.table core.pin-bottom='1'> |\n\n${filler}\n`);
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, `# T\n\n${filler}\n\n| Name | Qty |\n|---|---|\n${rows}\n| Total | 15 |\n| <meta core.table core.pin-bottom='1'> |\n\n${filler}\n`);
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(7);
     // The table's top at the view's top, then up by steps until it is gone
     const start = await table(page).evaluate((w) => {
@@ -47,8 +45,7 @@ test.describe("The held header and the rows pinned to the bottom", () => {
 
 test.describe("The held header", () => {
   test("a table near the page's top: its header where the table starts, the page not scrolled, its first row not covered", async ({ page }) => {
-    await page.locator("#source").fill("Intro\n| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 2 |\n\nText under.\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "Intro\n| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 2 |\n\nText under.\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(2);
     const at = await table(page).evaluate((w) => {
       const r = (e: Element) => e.getBoundingClientRect();
@@ -67,8 +64,7 @@ test.describe("The held header", () => {
 
   test("the room above it is covered whole in the page's color: no row shows between the view's top and the header", async ({ page }) => {
     const rows = Array.from({ length: 60 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n");
-    await page.locator("#source").fill(`# Test\n\nText above.\n\n| Name | Qty |\n|---|---|\n${rows}\n\nText below.\n`);
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, `# Test\n\nText above.\n\n| Name | Qty |\n|---|---|\n${rows}\n\nText below.\n`);
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(60);
     await page.evaluate(() => (document.querySelector(".cm-scroller")!.scrollTop = 913));
     await expect(table(page).locator("thead")).toHaveClass(/swt-stuck/);
@@ -78,8 +74,7 @@ test.describe("The held header", () => {
 
   test("full screen, a theme collapsing the table's borders: no row shows above the held header", async ({ page }) => {
     const rows = Array.from({ length: 60 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n");
-    await page.locator("#source").fill(`# Test\n\n| Name | Qty |\n|---|---|\n${rows}\n`);
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, `# Test\n\n| Name | Qty |\n|---|---|\n${rows}\n`);
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(60);
     // (border-collapse: collapse, as a theme of the user's has it: the browser paints no box-shadow of a cell then)
     await page.addStyleTag({ content: ".sb-table-widget table { border-collapse: collapse; }" });

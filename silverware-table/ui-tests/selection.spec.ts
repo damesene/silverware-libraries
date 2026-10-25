@@ -1,4 +1,4 @@
-import { cell, drag, expect, header, markdown, markTable, settled, test } from "./playground.ts";
+import { cell, drag, expect, header, markdown, markTable, setPage, settled, test } from "./helpers.ts";
 
 test.describe("Selecting cells", () => {
   test("a drag selects the cells, with a band on each side of the edge to drag them by", async ({ page }) => {
@@ -88,8 +88,7 @@ test.describe("The selection after deleting", () => {
   const PAGE = "# Test\n\n| A | B |\n|---|---|\n| 1 | x |\n| 2 | y |\n| 3 | z |\n";
 
   test("rows deleted with Delete: the row that came up is selected whole, the keyboard going on from there", async ({ page }) => {
-    await page.locator("#source").fill(PAGE);
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, PAGE);
     await expect(cell(page, 3, 1)).toHaveText("z");
     await drag(page, cell(page, 2, 0), cell(page, 2, 1));
     await page.keyboard.press("Delete");
@@ -108,8 +107,7 @@ test.describe("The selection after deleting", () => {
   });
 
   test("the last row deleted: the row above it, now last, is selected whole", async ({ page }) => {
-    await page.locator("#source").fill(PAGE);
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, PAGE);
     await expect(cell(page, 3, 1)).toHaveText("z");
     await drag(page, cell(page, 3, 0), cell(page, 3, 1));
     await page.keyboard.press("Delete");
@@ -120,8 +118,7 @@ test.describe("The selection after deleting", () => {
   });
 
   test("a column deleted: the column that came left is selected whole", async ({ page }) => {
-    await page.locator("#source").fill("# Test\n\n| A | B | C |\n|---|---|---|\n| 1 | | x |\n| 2 | | y |\n");
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await setPage(page, "# Test\n\n| A | B | C |\n|---|---|---|\n| 1 | | x |\n| 2 | | y |\n");
     await expect(cell(page, 2, 2)).toHaveText("y");
     await drag(page, header(page, 1), cell(page, 2, 1));
     await page.keyboard.press("Delete");

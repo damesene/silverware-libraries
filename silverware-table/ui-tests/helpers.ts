@@ -54,9 +54,10 @@ type Setting = string | number | boolean;
 type Client = {
   editorView: {
     state: { doc: { length: number; toString(): string } };
-    dispatch(spec: { changes: { from: number; to: number; insert: string } }): void;
+    dispatch(spec: { changes: { from: number; to: number; insert: string }; selection?: { anchor: number } }): void;
   };
   ui: { viewState: { unsavedChanges: boolean } };
+  clientSystem: { localSyscall(name: string, args: unknown[]): Promise<unknown> };
   widgetsReady?: Promise<unknown>;
 };
 
@@ -74,7 +75,8 @@ export const test = base.extend({
       log.push(`[pageerror] ${e.message}`);
     });
     page.on("console", (m) => {
-      log.push(`[${m.type()}] ${m.text()}`);
+      // (Where from: a failed load's message names no file)
+      log.push(`[${m.type()}] ${m.text()}${m.location().url ? ` (${m.location().url})` : ""}`);
       if (m.type() !== "error") return;
       if (target === "silverbullet" && SILVERBULLET_CONSOLE_NOISE.some((noise) => noise.test(m.text()))) return;
       errors.push(m.text());
@@ -84,6 +86,8 @@ export const test = base.extend({
     try {
       if (target === "silverbullet") {
         await writePage(name, sample);
+        // There before `setSettings` writes it: SilverBullet reads a page before writing it, a missing one a 404 in the console
+        await writePage(SETTINGS_PAGE, "");
         await page.goto(`/${name}`);
       } else {
         await page.goto("/");
@@ -133,7 +137,8 @@ export async function setPage(page: Page, text: string): Promise<void> {
   if (target === "silverbullet") {
     await page.evaluate((text) => {
       const view = (window as unknown as { client: Client }).client.editorView;
-      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
+      // The cursor at the end: in a table it would show the table's markdown, not the table
+      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, selection: { anchor: text.length } });
     }, text);
   } else {
     await page.evaluate((text) => {
@@ -188,7 +193,19 @@ export async function setSettings(page: Page, values: Record<string, Setting>): 
   settingsOf.set(page, settings);
   if (target === "silverbullet") {
     const lines = Object.entries(settings).map(([key, value]) => `config.set(${JSON.stringify(key)}, ${JSON.stringify(value)})`);
-    await writePage(SETTINGS_PAGE, `\`\`\`space-lua\n${lines.join("\n")}\n\`\`\`\n`);
+    // Written and indexed as SilverBullet's Configuration Manager saves CONFIG, so the page loaded anew has
+    // them (a file written beside SilverBullet is indexed after the page has loaded its Space Lua)
+    await page.evaluate(
+      async ({ name, text }) => {
+        const { client } = window as unknown as { client: Client };
+        const syscall = (call: string, ...args: unknown[]) => client.clientSystem.localSyscall(call, args);
+        // (No sync: without the service worker a write goes to the server)
+        await syscall("space.writePage", name, text);
+        await syscall("mq.send", "indexQueue", `${name}.md`);
+        await syscall("mq.awaitEmptyQueue", "indexQueue");
+      },
+      { name: SETTINGS_PAGE, text: `\`\`\`space-lua\n${lines.join("\n")}\n\`\`\`\n` },
+    );
   } else {
     await page.evaluate((settings) => {
       const store = JSON.parse(localStorage.getItem("silverwarePlayground.settings") ?? "{}");
@@ -224,6 +241,35 @@ export const markdown = (page: Page): Promise<string> =>
 /** A notification shown (SilverBullet's flash notification, or the playground's) with this text */
 export const notification = (page: Page, hasText: string | RegExp): Locator =>
   page.locator(target === "silverbullet" ? ".sb-notifications > div" : "#flash > div", { hasText });
+
+/** Closes a notification that stays until closed: SilverBullet's by its ×, the playground's by a click on it */
+export async function closeNotification(note: Locator): Promise<void> {
+  await (target === "silverbullet" ? note.locator(".sb-notification-dismiss") : note).click();
+}
+
+/**
+ * Runs `action`, which asks a question to confirm, answers it (`yes`: OK) and
+ * gives the question: the browser's confirm in the playground, SilverBullet's
+ * own dialog there (`editor.confirm`, which the browser's dialog event misses)
+ */
+export async function answerConfirm(page: Page, yes: boolean, action: () => Promise<void>): Promise<string> {
+  if (target === "silverbullet") {
+    await action();
+    const prompt = page.locator("dialog.sb-modal-box .sb-prompt");
+    const question = (await prompt.locator("label").textContent()) ?? "";
+    await prompt.locator(".sb-prompt-buttons button", { hasText: yes ? "Ok" : "Cancel" }).click();
+    await expect(prompt).toHaveCount(0);
+    return question;
+  }
+  const asked = new Promise<string>((resolve) =>
+    page.once("dialog", (dialog) => {
+      resolve(dialog.message());
+      void (yes ? dialog.accept() : dialog.dismiss());
+    }),
+  );
+  await action();
+  return asked;
+}
 
 /** Checks that the editor's navigation was asked to open a page (the playground only says it would) */
 export async function expectNavigatedTo(page: Page, name: string): Promise<void> {

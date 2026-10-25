@@ -2,10 +2,12 @@
 import type { Locator, Page } from "@playwright/test";
 import { cell, expect, hoverCell, setPage, table, tableIcon, test } from "./helpers.ts";
 
-const filler = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}.`).join("\n\n");
+const filler = (lines: number) => Array.from({ length: lines }, (_, i) => `Line ${i + 1}.`).join("\n\n");
+// Text above the tables for the page to scroll, not so much that SilverBullet's editor leaves them out of
+// the document (it puts only the blocks within about 1000px of the view in it); room to scroll below them
 const PAGE =
-  `# Test\n\n${filler}\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='fruit' sheet.name='Plan' sheet.at='A1'> |\n\n` +
-  `| City |\n|---|\n| Brno |\n\n| Code |\n|---|\n| X1 |\n| <meta core.table core.name='codes' sheet.name='Plan' sheet.at='A4'> |\n\n${filler}\n`;
+  `# Test\n\n${filler(8)}\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='fruit' sheet.name='Plan' sheet.at='A1'> |\n\n` +
+  `| City |\n|---|\n| Brno |\n\n| Code |\n|---|\n| X1 |\n| <meta core.table core.name='codes' sheet.name='Plan' sheet.at='A4'> |\n\n${filler(20)}\n`;
 
 const label = (page: Page, name: string): Locator => page.locator(".swt-table-label.swt-visible", { hasText: new RegExp(`^${name}$`) });
 const labels = (page: Page): Locator => page.locator(".swt-table-label.swt-visible");

@@ -9,7 +9,7 @@
 // Stopped (Ctrl+C, or Playwright when the tests end), it stops SilverBullet
 // and removes the space.
 import { execFileSync, spawn } from "node:child_process";
-import { createWriteStream, mkdirSync, rmSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const space = process.env.SW_SB_SPACE;
@@ -31,6 +31,8 @@ const out = (chunk) => {
 rmSync(space, { recursive: true, force: true });
 mkdirSync(space, { recursive: true });
 execFileSync(process.execPath, [join(import.meta.dirname, "deploy.mjs"), space], { stdio: "inherit" });
+// SilverBullet loads CONFIG when it boots: missing, it is answered 404, which the page logs as an error
+if (!existsSync(join(space, "CONFIG.md"))) writeFileSync(join(space, "CONFIG.md"), "");
 
 // The service worker off: no sync, every load and save goes straight to the
 // server, so each test's browser starts from the space as it is on disk.

@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { cell, center, columnCells, drag, expect, header, hoverCell, markdown, menu, menuTitle, rendersAnew, setPage, table, test } from "./helpers.ts";
+import { answerConfirm, cell, center, columnCells, drag, expect, header, hoverCell, markdown, menu, menuTitle, rendersAnew, setPage, table, test } from "./helpers.ts";
 
 test("one menu at a time: a column's menu open, the ⋯ menu closes it, and the reverse", async ({ page }) => {
   // The column's menu: a right click on its header
@@ -109,46 +109,33 @@ test.describe("Grips", () => {
 test("Remove metadata in a cell's menu asks, then takes off that cell's hidden tags only", async ({ page }) => {
   await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear <meta core.n='pear'> | 3 <meta formulas.f='=1+2'> |\n");
   await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
-  const asked: string[] = [];
-  page.once("dialog", (dialog) => {
-    asked.push(dialog.message());
-    void dialog.accept();
-  });
   await cell(page, 1, 1).click({ button: "right" });
   const item = menu(page).locator(".swt-menu-item", { hasText: "Remove metadata" });
   // Last, with deleting
   await expect(menu(page).locator(".swt-menu-item").last()).toHaveText("Remove metadata");
-  await item.click();
+  const asked = await answerConfirm(page, true, () => item.click());
   // (The playground's tables are formatted as they are written: autoFormat)
   await expect.poll(() => markdown(page)).not.toContain("formulas.f");
   expect(await markdown(page)).toMatch(/\| Pear <meta core\.n='pear'> \| 3 +\|/);
-  expect(asked[0]).toBe("Remove the metadata of this cell, what Formulas (1 cell) keeps in it? Cells keep their text, a formula's cell its result. Ctrl+Z brings it back.");
+  expect(asked).toBe("Remove the metadata of this cell, what Formulas (1 cell) keeps in it? Cells keep their text, a formula's cell its result. Ctrl+Z brings it back.");
 });
 
 test("Delete table, last in the ⋯ menu, asks and takes the table out of the page; No keeps it", async ({ page }) => {
   await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n\nBetween.\n\n| City |\n|---|\n| Brno |\n");
   await expect(table(page, 1).locator("tr[data-swt-row]")).toHaveCount(1);
-  const asked: string[] = [];
-  const answer = (yes: boolean) =>
-    page.once("dialog", (dialog) => {
-      asked.push(dialog.message());
-      void (yes ? dialog.accept() : dialog.dismiss());
+  const deleteFirst = (yes: boolean) =>
+    answerConfirm(page, yes, async () => {
+      await hoverCell(page, cell(page, 1, 0));
+      await page.locator(".swt-bar.swt-visible .swt-bar-more").click();
+      const items = page.locator(".swt-menu .swt-menu-item");
+      await expect(items.last()).toHaveText("Delete table");
+      await items.last().click();
     });
-  const deleteFirst = async () => {
-    await hoverCell(page, cell(page, 1, 0));
-    await page.locator(".swt-bar.swt-visible .swt-bar-more").click();
-    const items = page.locator(".swt-menu .swt-menu-item");
-    await expect(items.last()).toHaveText("Delete table");
-    await items.last().click();
-  };
-  answer(false);
-  await deleteFirst();
-  await expect.poll(() => asked.length).toBe(1);
+  await deleteFirst(false);
   expect(await markdown(page)).toContain("| Pear | 3 |");
-  answer(true);
-  await deleteFirst();
+  const asked = await deleteFirst(true);
   await expect.poll(() => markdown(page)).toBe("# Test\n\nBetween.\n\n| City |\n|---|\n| Brno |\n");
-  expect(asked[1]).toBe("Delete the table (1 row) from the page? Ctrl+Z brings it back.");
+  expect(asked).toBe("Delete the table (1 row) from the page? Ctrl+Z brings it back.");
   // The toolbar and menu of the table deleted do not stay
   await expect(page.locator(".swt-menu")).toHaveCount(0);
 });

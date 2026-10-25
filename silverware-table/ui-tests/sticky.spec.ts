@@ -23,8 +23,9 @@ test.describe("Rows pinned to the bottom", () => {
 test.describe("The held header and the rows pinned to the bottom", () => {
   test("the table's end going up past the view's top: the header gives way to the bottom rows, never under them", async ({ page }) => {
     const rows = Array.from({ length: 6 }, (_, i) => `| Row ${i + 1} | ${i} |`).join("\n");
-    const filler = Array.from({ length: 30 }, (_, i) => `Line ${i + 1}.`).join("\n\n");
-    await setPage(page, `# T\n\n${filler}\n\n| Name | Qty |\n|---|---|\n${rows}\n| Total | 15 |\n| <meta core.table core.pin-bottom='1'> |\n\n${filler}\n`);
+    const filler = (lines: number) => Array.from({ length: lines }, (_, i) => `Line ${i + 1}.`).join("\n\n");
+    // Little text above (SilverBullet's editor leaves a table far below the view out of the document), room to scroll below
+    await setPage(page, `# T\n\n${filler(6)}\n\n| Name | Qty |\n|---|---|\n${rows}\n| Total | 15 |\n| <meta core.table core.pin-bottom='1'> |\n\n${filler(30)}\n`);
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(7);
     // The table's top at the view's top, then up by steps until it is gone
     const start = await table(page).evaluate((w) => {

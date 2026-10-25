@@ -1,5 +1,5 @@
 // The toolbar's row of names: what holds the table (its sheet) and the table, each after its icon button
-import { cell, expect, hoverCell, markdown, menu, notification, setPage, setSettings, table, tableIcon, test } from "./helpers.ts";
+import { cell, closeNotification, expect, hoverCell, markdown, menu, notification, setPage, setSettings, table, tableIcon, test } from "./helpers.ts";
 
 const name = (page: import("@playwright/test").Page, slot: "container" | "table") => page.locator(`.swt-bar.swt-visible .swt-bar-name-${slot} .swt-bar-name`);
 
@@ -200,7 +200,7 @@ test.describe("A table name two tables of the page have", () => {
       await expect(name(page, "table")).toHaveText("prices");
       await expect(name(page, "table")).toHaveClass(/swt-attention/);
     }
-    await note.click();
+    await closeNotification(note);
     await expect(note).toHaveCount(0);
   });
 });

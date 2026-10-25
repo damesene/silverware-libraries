@@ -211,6 +211,8 @@ export class InsertControls {
     // Over another table (it is hovered next), or over what is laid over the window above this one (the sheet's board)
     if (e.target instanceof Element && e.target.closest(WIDGET_SELECTOR) && e.target.closest(WIDGET_SELECTOR) !== widget) return this.hide();
     if (e.target instanceof Node && coveredAt(widget, e.target)) return this.hide();
+    // Over a dialog laid over the page (the host's own: SilverBullet's confirm), its presses its own
+    if (e.target instanceof Element && e.target.closest("dialog")) return this.hide();
     const shown = host.shownRect(widget, info);
     const header = info.table.rows[0]!.getBoundingClientRect();
     const { clientX: x, clientY: y } = e;

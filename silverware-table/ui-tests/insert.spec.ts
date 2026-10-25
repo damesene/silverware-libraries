@@ -1,4 +1,4 @@
-import { bodyRows, cell, expect, hoverCell, markdown, rendersAnew, test } from "./helpers.ts";
+import { bodyRows, cell, expect, header, hoverCell, markdown, markTable, rendersAnew, settled, test } from "./helpers.ts";
 
 test.describe("Inserting rows with a +", () => {
   test("the + left of the table inserts a row at the border nearest the pointer", async ({ page }) => {
@@ -22,5 +22,29 @@ test.describe("Inserting rows with a +", () => {
     await rendersAnew(page, () => quiet.first().click());
     await expect(bodyRows(page)).toHaveCount(7);
     expect(await markdown(page)).toMatch(/\| Šípek[^\n]*\n\| +\| +\| +\| +\|\n/);
+  });
+
+  test("a dialog over the band above the header takes its own press: no column is inserted", async ({ page }) => {
+    await hoverCell(page, cell(page, 1, 1));
+    const head = (await header(page, 1).boundingBox())!;
+    // A modal dialog over the band, as the host shows its own (SilverBullet's confirm, above the page's top)
+    await page.evaluate(({ x, y }) => {
+      const dialog = document.createElement("dialog");
+      dialog.style.cssText = `position: fixed; inset: auto; margin: 0; padding: 0; left: ${x}px; top: ${y}px; width: 80px; height: 20px`;
+      const ok = document.createElement("button");
+      ok.textContent = "Ok";
+      ok.style.cssText = "width: 100%; height: 100%";
+      ok.onclick = () => dialog.close();
+      dialog.append(ok);
+      document.body.append(dialog);
+      dialog.showModal();
+    }, { x: head.x + head.width - 40, y: head.y - 24 });
+    const before = await markdown(page);
+    await markTable(page);
+    await page.getByRole("button", { name: "Ok" }).click();
+    await expect(page.locator("dialog[open]")).toHaveCount(0);
+    await settled(page);
+    await expect(page.locator("table[data-test-old]")).toHaveCount(1);
+    expect(await markdown(page)).toBe(before);
   });
 });

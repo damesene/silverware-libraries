@@ -136,7 +136,7 @@ test.describe("The toolbar on a phone", () => {
     await selectByTouch(page, "some text");
     await barButton(page, "actions.more").tap();
     await popup(page).locator(".swb-search-field").fill("settings");
-    await popup(page).locator('[data-swb-action="actions.settings"]').tap();
+    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
     const dialog = page.locator(".swb-settings");
     await dialog.locator('[data-swb-tab="favorites"]').tap();
     await dialog.locator('[data-swb-device="click"]').tap();
@@ -157,7 +157,7 @@ test.describe("The toolbar on a phone", () => {
     await selectByTouch(page, "some text");
     await barButton(page, "actions.more").tap();
     await popup(page).locator(".swb-search-field").fill("settings");
-    await popup(page).locator('[data-swb-action="actions.settings"]').tap();
+    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
     const dialog = page.locator(".swb-settings");
     await dialog.locator('[data-swb-tab="favorites"]').tap();
     // Click's first while Touch has none of its own on
@@ -175,7 +175,7 @@ test.describe("The toolbar on a phone", () => {
     // Off: Click's, the own kept
     await barButton(page, "actions.more").tap();
     await popup(page).locator(".swb-search-field").fill("settings");
-    await popup(page).locator('[data-swb-action="actions.settings"]').tap();
+    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
     await dialog.locator('[data-swb-tab="favorites"]').tap();
     // On: Touch's first
     await expect(dialog.locator('[data-swb-device="touch"]')).toHaveAttribute("aria-checked", "true");
@@ -186,7 +186,7 @@ test.describe("The toolbar on a phone", () => {
     await expect(barButton(page, "formats.bold")).toBeVisible();
     await barButton(page, "actions.more").tap();
     await popup(page).locator(".swb-search-field").fill("settings");
-    await popup(page).locator('[data-swb-action="actions.settings"]').tap();
+    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
     await dialog.locator('[data-swb-tab="favorites"]').tap();
     // Off: Click's first
     await expect(dialog.locator('[data-swb-device="click"]')).toHaveAttribute("aria-checked", "true");

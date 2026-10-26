@@ -26,6 +26,8 @@ export type PopupOptions = {
   // Opened at this action's choices (Turn into from a docked toolbar)
   readonly choices?: Action;
   readonly run: (action: Action) => void;
+  // Icons beside the search field (the settings): run as an action is, found by the search too where they are among `actions`
+  readonly tools?: readonly Action[];
   // Closed without running (Esc, a press elsewhere)
   readonly closed: () => void;
   // Presses that do not close it (on the toolbar: its … closes it, its actions run)
@@ -41,6 +43,7 @@ export class Popup {
   readonly element: HTMLElement;
   private readonly input: HTMLInputElement;
   private readonly list: HTMLElement;
+  private readonly tools: HTMLElement;
   private options: PopupOptions | undefined;
   // The actions found and shown, in order, and the current one's index among them
   private found: Entry[] = [];
@@ -68,7 +71,10 @@ export class Popup {
     this.input.setAttribute("aria-controls", "swb-popup-list");
     this.input.autocomplete = "off";
     this.input.spellcheck = false;
-    search.append(this.input);
+    this.tools = el("span", "swb-popup-tools");
+    // A press there keeps the search field's focus
+    this.tools.addEventListener("mousedown", (e) => e.preventDefault());
+    search.append(this.input, this.tools);
     this.list = el("div", "swb-list");
     this.list.id = "swb-popup-list";
     this.list.setAttribute("role", "listbox");
@@ -91,6 +97,23 @@ export class Popup {
     this.options = options;
     this.level = options.choices?.choices ? options.choices : undefined;
     this.input.value = "";
+    this.tools.replaceChildren(
+      ...(options.tools ?? []).map((action) => {
+        const button = this.doc.createElement("button");
+        button.type = "button";
+        button.className = "swb-popup-tool";
+        button.dataset.swbAction = action.id;
+        button.innerHTML = action.icon;
+        button.title = action.label;
+        button.setAttribute("aria-label", action.label);
+        button.addEventListener("click", (e) => {
+          e.preventDefault();
+          this.close(true);
+          options.run(action);
+        });
+        return button;
+      }),
+    );
     if (!this.element.isConnected) this.doc.body.append(this.element);
     this.element.classList.add("swb-visible");
     this.update();

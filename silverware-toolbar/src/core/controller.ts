@@ -38,13 +38,15 @@ export const MORE_ACTION: Action = {
   keywords: ["search", "all", "more", "popup"],
 };
 
-/** The core's own action, last in the popup (a favourite too): the settings dialog */
+/** The core's own action, the popup's icon by its search (found by it too; a favourite too): the settings dialog */
 export const SETTINGS_ACTION: Action = {
   id: "actions.settings",
   label: "Silverware Toolbar settings…",
   icon: ICONS.settings,
   group: "Silverware Toolbar",
   keywords: ["preferences", "favorites", "options", "key"],
+  // In the popup's head as an icon; its search finds it
+  listed: false,
 };
 
 export class Controller {
@@ -139,6 +141,7 @@ export class Controller {
       above: this.bar.docked,
       viewTop: viewTopOf(range?.startContainer ?? this.doc.querySelector(".cm-content")),
       run: (action) => void this.run(action),
+      tools: this.openSettings ? [SETTINGS_ACTION] : [],
       closed: () => this.focusEditor(),
       keeps: (node) => this.bar.owns(node),
       ...(choices ? { choices } : {}),

@@ -13,16 +13,18 @@ async function openSettings(page: Page): Promise<void> {
   await select(page, "some text");
   await barButton(page, "actions.more").click();
   await popup(page).locator(".swb-search-field").fill("settings");
-  await popup(page).locator('[data-swb-action="actions.settings"]').click();
+  await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
   await expect(dialog(page)).toBeVisible();
 }
 
 test.describe("The settings dialog", () => {
-  test("opens from the popup's last item, its tabs General, Favorites, Modules; Esc closes it unchanged", async ({ page }) => {
+  test("opens from the gear by the popup's search (not listed; typed, found), its tabs General, Favorites, Modules; Esc closes it unchanged", async ({ page }) => {
     await select(page, "some text");
     await barButton(page, "actions.more").click();
-    await expect(popup(page).locator(".swb-option").last()).toHaveText("Silverware Toolbar settings…");
-    await popup(page).locator(".swb-option").last().click();
+    await expect(popup(page).locator('.swb-option[data-swb-action="actions.settings"]')).toHaveCount(0);
+    await popup(page).locator(".swb-search-field").fill("silverware toolbar settings");
+    await expect(popup(page).locator('.swb-option[data-swb-action="actions.settings"]')).toHaveCount(1);
+    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
     await expect(dialog(page)).toBeVisible();
     await expect(dialog(page).locator(".swb-settings-tab")).toHaveText(["General", "Favorites", "Modules"]);
     await expect(dialog(page).locator(".swb-settings-key")).toHaveValue("Ctrl-Shift-q");

@@ -84,7 +84,7 @@ test.describe("The gesture button", () => {
     await addGesture(page, "bold", "every action");
     // The default's … taken off: the swipe is the only one
     await barButton(page, "actions.more").click();
-    await popup(page).locator('[data-swb-action="actions.settings"]').click();
+    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
     const dialog = page.locator(".swb-settings");
     await dialog.locator('[data-swb-tab="favorites"]').click();
     await dialog.locator('[data-swb-item="1:7"] .swb-settings-remove').click();

@@ -34,7 +34,7 @@ Select text in a page and a toolbar shows beside it: make it bold, italic or cod
 | Turn into | `actions.turnInto` | The list of the block formats below |
 | Any SilverBullet command | `commands.<its name>`, e.g. `commands.Navigate: Home` | Runs it, as the command palette does. There are many: type a command's name in the **…** list to find it (they are not listed until you type) |
 | Hide the keyboard | `actions.hideKeyboard` | On a phone or tablet: hides the on-screen keyboard, the selection kept as it is, the toolbar staying (to see more of the page while you format it); the next tap in the text brings the keyboard back. Put it in your favourites to have it in the bar at the bottom. (Where the browser cannot hide it alone, Safari on iOS, the text is left: the keyboard and the bar go.) |
-| Silverware Toolbar settings… | `actions.settings` | The settings dialog (see *Settings*), last in the **…** list |
+| Silverware Toolbar settings… | `actions.settings` | The settings dialog (see *Settings*): the gear by the search field of the **…** list, found by typing too |
 | Paragraph | `formats.paragraph` | Plain lines: a list's, a heading's or a quote's marker taken off |
 | Heading 1, 2, 3 | `formats.heading1` … `formats.heading3` | `# `, `## `, `### ` |
 | Bullet list | `formats.bullet` | `- ` (a list's indentation kept) |
@@ -73,7 +73,7 @@ The button shows as pressed when its first action is on for the selection; a swi
 
 ## Settings
 
-*Silverware Toolbar settings…*, the last item of the **…** list (or the command *Silverware Toolbar: Settings*), opens the settings, for every page in the space:
+*Silverware Toolbar settings…*, the gear by the search field of the **…** list (typing `settings` there finds it too; or the command *Silverware Toolbar: Settings*), opens the settings, for every page in the space:
 
 * **General**: the key for every action, as SilverBullet writes keys (`Ctrl-Shift-q`, `Alt-k`), where and when the toolbar shows, and whether a format works on the word at the cursor. On a phone with SilverBullet's keyboard bar on, it offers to turn that bar off (on that device, at once).
 * **Favorites**: *Click* (with a mouse) or *Touch* (by finger, see *Favourites*); the toolbar's rows, one under another. Drag an item within its row or into another, or with the keyboard: focus it (Tab) and press **Alt+←** or **Alt+→** to move it within its row, **Alt+↑** or **Alt+↓** into the row above or below, **Delete** to remove it. The button beside an action's name shows it as its icon or with its name too; **×** removes it. **Add** searches every action (and a separator, and a gesture button, whose two actions it asks for next; click either to change it) to add at the row's end; **Add row** adds a row, the **×** in a row's head removes it with its items. A row left empty is left out. An item no action has is dimmed, named by its id.
@@ -659,6 +659,33 @@ end
   padding: 8px 10px;
   border-bottom: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
   opacity: 0.9;
+}
+/* Icons by the search field (the settings) */
+.swb-popup-tools {
+  display: flex;
+  gap: 2px;
+}
+.swb-popup-tool {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  opacity: 0.7;
+  cursor: pointer;
+}
+.swb-popup-tool:hover {
+  opacity: 1;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+.swb-popup-tool svg {
+  width: 16px;
+  height: 16px;
 }
 .swb-search-field {
   flex: 1;

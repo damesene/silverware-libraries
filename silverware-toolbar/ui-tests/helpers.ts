@@ -171,7 +171,7 @@ export async function addGesture(page: Page, tap: string, up: string | undefined
   await select(page, needle);
   await barButton(page, "actions.more").click();
   await popup(page).locator(".swb-search-field").fill("settings");
-  await popup(page).locator('[data-swb-action="actions.settings"]').click();
+  await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
   const dialog = page.locator(".swb-settings");
   await dialog.locator('[data-swb-tab="favorites"]').click();
   // Click's (by finger the tab opens on Touch's, which show Click's while they have none of their own)

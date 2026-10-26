@@ -470,7 +470,7 @@ end
   justify-content: center;
   gap: 6px;
   min-width: 0;
-  padding-top: 6px;
+  padding-top: 7px;
   box-sizing: border-box;
   transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: transform;
@@ -496,24 +496,35 @@ end
 .swb-button.swb-gesture[aria-disabled="true"] {
   cursor: default;
 }
+/* Quiet; gone as the button rolls (its faces go past it); lit (white on the accent, larger) once
+   letting go would run it */
 .swb-gesture-hint {
   position: absolute;
   top: 1px;
   left: 50%;
   display: flex;
+  padding: 0 3px;
+  border-radius: 4px;
   transform: translateX(-50%);
-  opacity: 0.45;
+  transform-origin: top center;
+  opacity: max(0, 0.45 - var(--swb-roll) * 1.5);
   pointer-events: none;
-  transition: opacity 120ms, color 120ms;
+  transition: opacity 120ms, color 120ms, background-color 120ms, transform 120ms;
 }
 .swb-floating .swb-gesture-hint svg {
   width: 8px;
   height: 8px;
   stroke-width: 3;
 }
+/* Following the pointer: gone at once (its lighting up still eased) */
+.swb-gesture.swb-rolling .swb-gesture-hint {
+  transition: color 120ms, background-color 120ms, transform 120ms;
+}
 .swb-gesture.swb-armed .swb-gesture-hint {
   opacity: 1;
-  color: var(--ui-accent-color, #464cfc);
+  color: #fff;
+  background: var(--ui-accent-color, #464cfc);
+  transform: translateX(-50%) scale(1.15);
 }
 @media (prefers-reduced-motion: reduce) {
   .swb-gesture-face {

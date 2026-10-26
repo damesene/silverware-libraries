@@ -18,7 +18,7 @@ test.describe("The gesture button", () => {
   test("added in the settings: two actions in one, the second's icon small above the first's; a click runs the first", async ({ page }) => {
     await addGesture(page, "bold", "italic");
     // The second's icon small, centred above the first's
-    const hint = (await gestureButton(page).locator(".swb-gesture-hint").boundingBox())!;
+    const hint = (await gestureButton(page).locator(".swb-gesture-hint svg").boundingBox())!;
     const icon = (await gestureButton(page).locator(".swb-gesture-tap svg").boundingBox())!;
     expect(Math.abs(hint.x + hint.width / 2 - (icon.x + icon.width / 2))).toBeLessThan(1);
     expect(hint.y + hint.height).toBeLessThanOrEqual(icon.y + 1);

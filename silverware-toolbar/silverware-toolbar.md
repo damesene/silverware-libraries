@@ -61,7 +61,7 @@ The settings dialog's *Favorites* tab edits them without writing Lua (see *Setti
 
 ### Gesture buttons
 
-A gesture button holds two actions in one place: a click (a tap) runs the first, and swiping it up runs the second. As you drag it up, its icon rolls up and the second action's comes in from below, following your finger or the mouse; let go once it is more than halfway in (or flick it up) and the second action runs; drag back down and nothing happens. A small **2** in its corner tells it from a plain button, and lights up while letting go would run the second action. It is as wide as the wider of its two actions, with their labels too where `show = "label"`. In the settings, *Add* offers *Gesture button*, then asks for its two actions. In Lua:
+A gesture button holds two actions in one place: a click (a tap) runs the first, and swiping it up runs the second. As you drag it up, its icon rolls up and the second action's comes in from below, following your finger or the mouse; let go once it is more than halfway in (or flick it up) and the second action runs; drag back down and nothing happens. The second action's icon, small above the first's, tells it from a plain button and shows what a swipe runs; it lights up while letting go would run it. It is as wide as the wider of its two actions, with their labels too where `show = "label"`. In the settings, *Add* offers *Gesture button*, then asks for its two actions. In Lua:
 
 ```lua
 { type = "gesture", tap = "formats.bold", up = "formats.highlight" }
@@ -445,7 +445,8 @@ end
 }
 /* The gestures module's button: two faces in one cell (as wide as the wider), on a reel rolled by
    --swb-roll (0 the click's face, 1 the swipe's), following the pointer while dragged (swb-rolling: no
-   transition), settling once let go; the 2 in its corner lit while the swipe's action would run */
+   transition), settling once let go; the swipe's action's icon small above the faces (pushed down to
+   make room for it), lit while it would run */
 .swb-button.swb-gesture {
   --swb-roll: 0;
   position: relative;
@@ -469,6 +470,8 @@ end
   justify-content: center;
   gap: 6px;
   min-width: 0;
+  padding-top: 6px;
+  box-sizing: border-box;
   transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: transform;
 }
@@ -493,18 +496,22 @@ end
 .swb-button.swb-gesture[aria-disabled="true"] {
   cursor: default;
 }
-.swb-gesture-count {
+.swb-gesture-hint {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  font-size: 8px;
-  font-weight: 600;
-  line-height: 1;
+  top: 1px;
+  left: 50%;
+  display: flex;
+  transform: translateX(-50%);
   opacity: 0.45;
   pointer-events: none;
   transition: opacity 120ms, color 120ms;
 }
-.swb-gesture.swb-armed .swb-gesture-count {
+.swb-floating .swb-gesture-hint svg {
+  width: 8px;
+  height: 8px;
+  stroke-width: 3;
+}
+.swb-gesture.swb-armed .swb-gesture-hint {
   opacity: 1;
   color: var(--ui-accent-color, #464cfc);
 }

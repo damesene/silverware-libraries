@@ -51,11 +51,11 @@ describe("The gesture button", () => {
     expect(module.itemKinds!().map((k) => [k.type, k.slots.map((s) => s.key)])).toEqual([["gesture", ["tap", "up"]]]);
   });
 
-  it("runs the first action on a click, and shows a 2 in its corner", () => {
+  it("runs the first action on a click, and shows the second's icon small above its own", () => {
     const { button, ran } = gesture();
     button.click();
     expect(ran).toEqual([BOLD.id]);
-    expect(button.querySelector(".swb-gesture-count")!.textContent).toBe("2");
+    expect(button.querySelector(".swb-gesture-hint")!.innerHTML).toBe(ITALIC.icon);
   });
 
   it("dragged up past half its height runs the second action, the click after it none; the reel follows the pointer", () => {

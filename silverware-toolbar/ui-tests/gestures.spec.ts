@@ -15,9 +15,14 @@ async function dragUp(page: Page, dy: number, back = 0): Promise<void> {
 }
 
 test.describe("The gesture button", () => {
-  test("added in the settings: two actions in one, a 2 in its corner; a click runs the first", async ({ page }) => {
+  test("added in the settings: two actions in one, the second's icon small above the first's; a click runs the first", async ({ page }) => {
     await addGesture(page, "bold", "italic");
-    await expect(gestureButton(page).locator(".swb-gesture-count")).toHaveText("2");
+    // The second's icon small, centred above the first's
+    const hint = (await gestureButton(page).locator(".swb-gesture-hint").boundingBox())!;
+    const icon = (await gestureButton(page).locator(".swb-gesture-tap svg").boundingBox())!;
+    expect(Math.abs(hint.x + hint.width / 2 - (icon.x + icon.width / 2))).toBeLessThan(1);
+    expect(hint.y + hint.height).toBeLessThanOrEqual(icon.y + 1);
+    expect(hint.width).toBeLessThan(icon.width / 2);
     await expect(gestureButton(page)).toHaveAttribute("aria-label", "Bold (swipe up: Italic)");
     await gestureButton(page).click();
     await expect.poll(() => text(page)).toContain("Select **some text** in this page");

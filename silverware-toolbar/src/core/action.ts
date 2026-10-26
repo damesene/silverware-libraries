@@ -71,4 +71,6 @@ export type ToolbarModule = {
 export type ModuleHost = {
   readonly listCommands?: () => unknown;
   readonly invokeCommand?: (name: string) => unknown;
+  // A caret touching a word stands for the word, as if selected (the setting wordAtCaret)
+  readonly wordAtCaret?: boolean;
 };

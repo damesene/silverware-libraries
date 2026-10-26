@@ -35,7 +35,7 @@ export type SettingsContext = {
   saved(): void;
 };
 
-type Values = { shortcut: string; placement: Placement; show: Show; favorites: Favorites; modules: Record<ModuleName, boolean> };
+type Values = { shortcut: string; placement: Placement; show: Show; wordAtCaret: boolean; favorites: Favorites; modules: Record<ModuleName, boolean> };
 
 export class SettingsDialog {
   private readonly dialogs: Dialogs;
@@ -67,7 +67,7 @@ export class SettingsDialog {
     const { bridge } = this.context;
     const settings = await readSettings(bridge);
     const modules = Object.fromEntries(MODULE_NAMES.map((name) => [name, settings.modules.has(name)])) as Record<ModuleName, boolean>;
-    this.initial = { shortcut: await readShortcut(bridge), placement: settings.placement, show: settings.show, favorites: settings.favorites, modules };
+    this.initial = { shortcut: await readShortcut(bridge), placement: settings.placement, show: settings.show, wordAtCaret: settings.wordAtCaret, favorites: settings.favorites, modules };
     this.keyboardBar = await this.keyboardBarOn();
     this.values = { ...this.initial, favorites: settings.favorites.map((row) => [...row]), modules: { ...modules } };
     this.render();
@@ -142,7 +142,13 @@ export class SettingsDialog {
     });
     const showRow = settingRow(doc, BASE, "When the toolbar shows", "Always: while you write, with nothing selected too (docked at the bottom, or by the cursor), its buttons the formats around the cursor. Always on a phone: so where it is docked, else after selecting text.", show);
     showRow.dataset.swbSetting = PATHS.show;
-    card.append(keyRow, placementRow, showRow);
+    const word = switchControl(doc, BASE, values.wordAtCaret, (on) => {
+      values.wordAtCaret = on;
+      this.update();
+    });
+    const wordRow = settingRow(doc, BASE, "A word at the cursor as if selected", "With nothing selected, Bold (any inline format) and Clear formatting work on the word the cursor is in or touches: what spaces separate, its punctuation with it. The cursor stays where it was.", word);
+    wordRow.dataset.swbSetting = PATHS.wordAtCaret;
+    card.append(keyRow, placementRow, showRow, wordRow);
     general.append(card);
     if (this.keyboardBar) general.append(this.keyboardBarNote());
 
@@ -445,6 +451,7 @@ export class SettingsDialog {
     if (values.shortcut !== initial.shortcut) changed[PATHS.shortcut] = values.shortcut;
     if (values.placement !== initial.placement) changed[PATHS.placement] = values.placement;
     if (values.show !== initial.show) changed[PATHS.show] = values.show;
+    if (values.wordAtCaret !== initial.wordAtCaret) changed[PATHS.wordAtCaret] = values.wordAtCaret;
     const favorites = savedRows(values.favorites);
     if (!sameRows(favorites, initial.favorites)) changed[PATHS.favorites] = favorites;
     for (const name of MODULE_NAMES) if (values.modules[name] !== initial.modules[name]) changed[PATHS.module(name)] = values.modules[name];
@@ -453,7 +460,7 @@ export class SettingsDialog {
 
   /** Whether saving needs the page loaded anew: a module turned on or off, the key (the command's) */
   private reloads(changed: Readonly<Record<string, unknown>>): boolean {
-    return Object.keys(changed).some((path) => path !== PATHS.favorites && path !== PATHS.placement && path !== PATHS.show);
+    return Object.keys(changed).some((path) => path !== PATHS.favorites && path !== PATHS.placement && path !== PATHS.show && path !== PATHS.wordAtCaret);
   }
 
   private update(): void {

@@ -41,6 +41,8 @@ Select text in a page and a toolbar shows beside it: make it bold, italic or cod
 | Task | `formats.task` | `- [ ] ` (a task done stays done) |
 | Quote | `formats.quote` | `> ` |
 
+With nothing selected, a format (and *Clear formatting*) works on the word the cursor is in or touches, as if you had selected it: what spaces separate, its punctuation with it (`word,` bolded is `**word,**`); the cursor stays where it was. *A word at the cursor as if selected* (a setting) turns this off, so a format at the cursor writes its markers there to type into.
+
 Formats apply line by line: a list's marker or a heading's `#` is left out, and so are the spaces at the selection's ends. Nothing applies inside a fenced code block; tables, rules and code fences are not turned into another block.
 
 ## Favourites
@@ -60,11 +62,11 @@ In the **…** list, the star by an action puts it at the end of the toolbar's l
 
 *Silverware Toolbar settings…*, the last item of the **…** list (or the command *Silverware Toolbar: Settings*), opens the settings, for every page in the space:
 
-* **General**: the key for every action, as SilverBullet writes keys (`Ctrl-Shift-q`, `Alt-k`), where and when the toolbar shows. On a phone with SilverBullet's keyboard bar on, it offers to turn that bar off (on that device, at once).
+* **General**: the key for every action, as SilverBullet writes keys (`Ctrl-Shift-q`, `Alt-k`), where and when the toolbar shows, and whether a format works on the word at the cursor. On a phone with SilverBullet's keyboard bar on, it offers to turn that bar off (on that device, at once).
 * **Favorites**: the toolbar's rows, one under another. Drag an item within its row or into another, or with the keyboard: focus it (Tab) and press **Alt+←** or **Alt+→** to move it within its row, **Alt+↑** or **Alt+↓** into the row above or below, **Delete** to remove it. The button beside an action's name shows it as its icon or with its name too; **×** removes it. **Add** searches every action (and a separator) to add at the row's end; **Add row** adds a row. A row left empty is left out. An item no action has is dimmed, named by its id.
 * **Modules**: each part of the toolbar on or off (its actions with it).
 
-Nothing changes until **Save**. The favourites, where and when the toolbar shows apply at once; a module or the key needs the page loaded again (**Save and reload**). They are saved in your `CONFIG` page: the key and the modules in the block SilverBullet's own settings (*Configuration: Open*) keep, so either shows what the other wrote; the favourites in a block of their own (`-- managed-by: silverware-toolbar`), which SilverBullet's settings leave alone. You can edit both by hand too.
+Nothing changes until **Save**. The favourites, where and when the toolbar shows and the word at the cursor apply at once; a module or the key needs the page loaded again (**Save and reload**). They are saved in your `CONFIG` page: the key and the modules in the block SilverBullet's own settings (*Configuration: Open*) keep, so either shows what the other wrote; the favourites in a block of their own (`-- managed-by: silverware-toolbar`), which SilverBullet's settings leave alone. You can edit both by hand too.
 
 ## Custom formats
 
@@ -216,6 +218,12 @@ config.define("silverware.toolbar", {
       default = "mobile",
       description = "When the toolbar shows: always while you write (docked at the bottom, or by the cursor), always on a phone (docked) and after selecting text elsewhere, or only after selecting text.",
       ui = { category = "Silverware Toolbar", label = "When the toolbar shows", priority = 0.94 },
+    },
+    wordAtCaret = {
+      type = "boolean",
+      default = true,
+      description = "With nothing selected, Bold (any inline format) and Clear formatting work on the word the cursor is in or touches (what spaces separate), the cursor staying where it was.",
+      ui = { category = "Silverware Toolbar", label = "A word at the cursor as if selected", priority = 0.93 },
     },
     modules = {
       type = "object",

@@ -78,6 +78,7 @@ export const PATHS = {
   shortcut: "silverware.toolbar.shortcut",
   placement: "silverware.toolbar.placement",
   show: "silverware.toolbar.show",
+  wordAtCaret: "silverware.toolbar.wordAtCaret",
   module: (name: ModuleName) => `silverware.toolbar.modules.${name}.enabled`,
 } as const;
 
@@ -87,6 +88,8 @@ export type Settings = {
   readonly modules: ReadonlySet<ModuleName>;
   readonly placement: Placement;
   readonly show: Show;
+  // A caret touching a word stands for the word, as if selected (inline formats, Clear formatting)
+  readonly wordAtCaret: boolean;
 };
 
 /**
@@ -121,6 +124,7 @@ export async function readSettings(bridge: Bridge): Promise<Settings> {
     modules,
     placement: PLACEMENTS.includes(placement as Placement) ? (placement as Placement) : "auto",
     show: SHOWS.includes(show as Show) ? (show as Show) : "mobile",
+    wordAtCaret: (await get(PATHS.wordAtCaret, true)) !== false,
   };
 }
 

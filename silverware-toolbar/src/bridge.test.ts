@@ -96,6 +96,11 @@ describe("The library page", () => {
     expect(page).toContain('enum = { "always", "mobile", "selection" },\n      default = "mobile"');
   });
 
+  it("read a word at the caret as if selected: on by default", async () => {
+    expect((await readSettings(bridge({}))).wordAtCaret).toBe(true);
+    expect((await readSettings(bridge({ "silverware.toolbar.wordAtCaret": false }))).wordAtCaret).toBe(false);
+  });
+
   it("read the key as configured; an empty one or not a text is the default", async () => {
     expect(await readShortcut(bridge({ "silverware.toolbar.shortcut": "Alt-k" }))).toBe("Alt-k");
     expect(await readShortcut(bridge({ "silverware.toolbar.shortcut": " " }))).toBe(DEFAULT_SHORTCUT);

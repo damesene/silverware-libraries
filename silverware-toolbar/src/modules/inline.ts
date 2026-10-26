@@ -1,22 +1,29 @@
 // The inline module: an action for each inline format offered (one with a
 // label: bold, italic, …, a link), a toggle (formats/inline.ts). Built-in and
-// custom formats alike, as defined when the actions are asked for.
-import type { Action, ToolbarModule } from "../core/action.ts";
-import { canFormat, type Format, formatsIn, isOn, toggle } from "../formats/index.ts";
+// custom formats alike, as defined when the actions are asked for. With the
+// setting wordAtCaret a caret touching a word works on the word (formats/word.ts),
+// where it is not in the format already.
+import type { Action, Context, ModuleHost, ToolbarModule } from "../core/action.ts";
+import { asWord, canFormat, type Format, formatsIn, isOn, keptCaret, toggle } from "../formats/index.ts";
 
-function formatAction(format: Format): Action {
+function formatAction(format: Format, word: boolean): Action {
+  // The word, where the caret is not in the format already (in a link, the link the caret is in: it may hold spaces)
+  const on = (context: Context) => (word && !isOn(context, format) ? asWord(context) : context);
   return {
     id: format.id,
     label: format.label!,
     icon: format.icon,
     group: format.group ?? "Format",
     keywords: format.keywords,
-    active: (context) => isOn(context, format),
-    enabled: (context) => canFormat(context, format),
-    run: (context) => toggle(context, format),
+    active: (context) => isOn(on(context), format),
+    enabled: (context) => canFormat(on(context), format),
+    run: (context) => {
+      const target = on(context);
+      return target === context ? toggle(context, format) : keptCaret(context, toggle(target, format));
+    },
   };
 }
 
-export function inlineModule(): ToolbarModule {
-  return { actions: () => formatsIn("inline").filter((f) => f.label).map(formatAction) };
+export function inlineModule(host: ModuleHost = {}): ToolbarModule {
+  return { actions: () => formatsIn("inline").filter((f) => f.label).map((format) => formatAction(format, !!host.wordAtCaret)) };
 }

@@ -41,7 +41,7 @@ export async function init(bridge: Bridge): Promise<void> {
   }
   // The one before stopped only now: init may be called again meanwhile (Space Lua loaded twice), each stops the last
   running?.stop();
-  const actions = createActions(settings.modules, { listCommands: bridge.listCommands, invokeCommand: bridge.invokeCommand });
+  const actions = createActions(settings.modules, { listCommands: bridge.listCommands, invokeCommand: bridge.invokeCommand, wordAtCaret: settings.wordAtCaret });
   const controller = new Controller(document, bridge, settings, actions, () => void openSettings(), canSaveIn(bridge) ? (favorites) => saveSettings(current?.bridge ?? bridge, { [PATHS.favorites]: favorites }) : undefined);
   slot[GLOBAL_KEY] = controller;
   current = { bridge, actions };
@@ -60,6 +60,7 @@ function sameSettings(running: Controller, settings: Settings): boolean {
     modules === [...settings.modules].sort().join() &&
     running.settings.placement === settings.placement &&
     running.settings.show === settings.show &&
+    running.settings.wordAtCaret === settings.wordAtCaret &&
     JSON.stringify(running.shownFavorites) === JSON.stringify(settings.favorites)
   );
 }

@@ -192,6 +192,17 @@ test.describe("The toolbar at the caret", () => {
     expect(await text(page)).toContain("- Second item with a link\n");
   });
 
+  test("a format at the caret works on the word it is in, as if selected, the caret staying where it was", async ({ page }) => {
+    await caret(page, "some text", 2);
+    await page.keyboard.press(KEY);
+    await page.keyboard.press("Escape");
+    await expect(barButton(page, "formats.bold")).toHaveAttribute("aria-pressed", "false");
+    await barButton(page, "formats.bold").click();
+    await expect.poll(() => text(page)).toContain("Select **some** text");
+    await page.keyboard.type("X");
+    await expect.poll(() => text(page)).toContain("Select **soXme** text");
+  });
+
   test("goes as text is typed", async ({ page }) => {
     await caret(page, "The end", 3);
     await page.keyboard.press(KEY);

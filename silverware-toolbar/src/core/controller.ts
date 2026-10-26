@@ -15,6 +15,8 @@ import { ICONS } from "../icons.ts";
 import type { Action, ActionEditor, Change, Context } from "./action.ts";
 import { Bar, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
+import { isActionItem, isSeparator } from "./favorites.ts";
+import type { ItemKind } from "./items.ts";
 import { hideKeyboard } from "./keyboard.ts";
 import { marked } from "./cursor.ts";
 import type { Box } from "./place.ts";
@@ -56,6 +58,8 @@ export class Controller {
     readonly settings: Settings,
     // The actions offered, asked for each time they show (definitions made later count)
     private readonly actions: () => readonly Action[],
+    // The kinds of favourites the modules give (core/items.ts)
+    private readonly kinds: () => readonly ItemKind[],
     // The settings dialog opened (none: not offered)
     private readonly openSettings?: () => void,
   ) {
@@ -168,12 +172,21 @@ export class Controller {
   private favorites(context: Context): Shown[][] {
     const actions = this.offered();
     const all = [...actions, ...actions.flatMap((a) => a.choices ?? [])];
+    const kinds = this.kinds();
     return this.settings.favorites
       .map((row) => {
         const items = row.flatMap((item): Shown[] => {
-          if (item.type === "separator") return [{ separator: true }];
-          const action = all.find((a) => a.id === item.id);
-          return action ? [{ action, labeled: item.show === "label", ...this.state(action, context) }] : [];
+          if (isSeparator(item)) return [{ separator: true }];
+          if (isActionItem(item)) {
+            const action = all.find((a) => a.id === item.id);
+            return action ? [{ action, labeled: item.show === "label", ...this.state(action, context) }] : [];
+          }
+          // A kind's: a kind no module on gives, or a slot without an action, left out
+          const kind = kinds.find((k) => k.type === item.type);
+          if (!kind) return [];
+          const slots = kind.slots.map(({ key }) => [key, all.find((a) => a.id === item[key])] as const);
+          if (slots.some(([, action]) => !action)) return [];
+          return [{ item: { kind, actions: Object.fromEntries(slots) as Record<string, Action>, labeled: item.show === "label", item } }];
         });
         return items.filter((item, i) => !("separator" in item) || (i > 0 && i < items.length - 1 && !("separator" in items[i - 1]!)));
       })

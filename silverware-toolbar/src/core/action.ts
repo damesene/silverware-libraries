@@ -4,6 +4,8 @@
 // that gives one change of the page's text, so a module knows nothing of what
 // shows it, nor how the change is written (one edit, one undo step).
 
+import type { ItemKind } from "./items.ts";
+
 /** A line of the page's text: where it is (its end before the line break) and its text */
 export type Line = { readonly from: number; readonly to: number; readonly text: string };
 
@@ -79,6 +81,8 @@ export type Action = {
 /** A module: the actions it offers, asked each time they show (definitions made later count), created once Silverware Toolbar starts (only the modules turned on) */
 export type ToolbarModule = {
   readonly actions: () => readonly Action[];
+  // Kinds of favourites it gives beyond an action and a separator (core/items.ts: the gestures module's button)
+  readonly itemKinds?: () => readonly ItemKind[];
 };
 
 /** What a module may ask of the editor beyond the page's text: SilverBullet's commands (each optional: the library page hands them over) */

@@ -33,15 +33,21 @@ describe("Settings", () => {
     expect((await readSettings(bridge({ "silverware.toolbar.favorites": { a: "formats.code" } }))).favorites).toEqual(DEFAULT_FAVORITES);
   });
 
-  it("leave out an item that is none: not an object, without its id, a show or a type not known, a property more", async () => {
+  it("leave out an item that is none: not an object, without its id, a show not known, an action's or a separator's property more", async () => {
     const settings = await readSettings(
       bridge({
         "silverware.toolbar.favorites": [
-          ["formats.bold", { id: "formats.italic", show: "label" }, { show: "icon" }, { id: "formats.code", show: "big" }, { type: "line" }, { id: "x", shwo: "label" }, { type: "action", id: "formats.link" }],
+          ["formats.bold", { id: "formats.italic", show: "label" }, { show: "icon" }, { id: "formats.code", show: "big" }, { id: "x", shwo: "label" }, { type: "separator", id: "x" }, { type: "action", id: "formats.link" }],
         ],
       }),
     );
     expect(settings.favorites).toEqual([[{ id: "formats.italic", show: "label" }, { id: "formats.link" }]]);
+  });
+
+  it("keep an item of another kind whole, its fields for its kind to read; its show checked", async () => {
+    const gesture = { type: "gesture", tap: "formats.bold", up: "formats.italic", show: "label" };
+    const settings = await readSettings(bridge({ "silverware.toolbar.favorites": [[gesture, { type: "gesture", show: "big" }, { type: "" }]] }));
+    expect(settings.favorites).toEqual([[gesture]]);
   });
 
   it("are the defaults when reading them fails, or without getConfig", async () => {

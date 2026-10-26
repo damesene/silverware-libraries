@@ -1,10 +1,21 @@
 // The toolbar on a phone (the "touch" project: a Pixel 7): text selected by touch docks it at the bottom, over the keyboard
 import type { Page } from "@playwright/test";
-import { bar, barButton, caret, expect, lineBox, popup, select, selected, test, text } from "./helpers.ts";
+import { addGesture, bar, barButton, caret, expect, gestureButton, lineBox, popup, select, selected, test, text } from "./helpers.ts";
+
+/** A finger moved from one point to another and lifted, as Chrome gets it (Playwright's touchscreen only taps) */
+async function swipe(page: Page, x: number, y: number, toX: number, toY: number, steps = 10): Promise<void> {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+  for (let i = 1; i <= steps; i++) {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: x + ((toX - x) * i) / steps, y: y + ((toY - y) * i) / steps }] });
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await cdp.detach();
+}
 
 /** Text selected after a touch in the page, as a phone selects it (a long press, then its handles) */
 async function selectByTouch(page: Page, needle: string): Promise<void> {
-  const line = await lineBox(page, "Select some text");
+  const line = await lineBox(page, "in this page");
   await page.touchscreen.tap(line.x + 4, line.y + line.height / 2);
   await select(page, needle);
 }
@@ -96,6 +107,29 @@ test.describe("The toolbar on a phone", () => {
     const found = (await popup(page).boundingBox())!;
     expect(found.height).toBeLessThan(list.height);
     expect(Math.abs(found.y + found.height - (list.y + list.height))).toBeLessThan(1);
+  });
+
+  test("a gesture button docked: a tap runs its first action, a swipe up its second; a swipe sideways runs nothing", async ({ page }) => {
+    await addGesture(page, "bold", "italic");
+    // (Selected again by touch: the same selection made anew)
+    await select(page, "Plain", 0);
+    await selectByTouch(page, "some text");
+    await expect(bar(page)).toHaveClass(/swb-docked/);
+    await gestureButton(page).scrollIntoViewIfNeeded();
+    const box = (await gestureButton(page).boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await swipe(page, x, y, x, y - box.height);
+    await expect.poll(() => text(page)).toContain("Select _some text_ in this page");
+    await selectByTouch(page, "some text");
+    await gestureButton(page).tap();
+    await expect.poll(() => text(page)).toContain("Select _**some text**_ in this page");
+    const before = await text(page);
+    await selectByTouch(page, "some text");
+    const at = (await gestureButton(page).boundingBox())!;
+    await swipe(page, at.x + at.width / 2, at.y + at.height / 2, at.x + at.width / 2 + 120, at.y + at.height / 2 - 4);
+    await page.waitForTimeout(300);
+    expect(await text(page)).toBe(before);
   });
 
   test("over SilverBullet's keyboard bar where it shows", async ({ page }) => {

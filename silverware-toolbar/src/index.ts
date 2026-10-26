@@ -4,9 +4,10 @@ import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { actionsOf, customActionsAnew, defineCustomActions } from "./actions.ts";
 import { type Bridge, missingBridgeFunctions, PATHS, readSettings, type Settings } from "./bridge.ts";
 import type { Action } from "./core/action.ts";
+import type { ItemKind } from "./core/items.ts";
 import { Controller } from "./core/controller.ts";
 import { customFormatsAnew, defineCustomFormats, formatsOf } from "./formats/index.ts";
-import { createActions } from "./modules.ts";
+import { createModules } from "./modules.ts";
 import { SettingsDialog } from "./settings/dialog.ts";
 
 export const version = "0.1.0";
@@ -21,7 +22,7 @@ const slot = globalThis as unknown as Record<string, Controller | undefined>;
 export const OWN_MARKER = "-- managed-by: silverware-toolbar";
 
 // The bridge and the actions of the toolbar started last, for the settings dialog
-let current: { readonly bridge: Bridge; readonly actions: () => readonly Action[] } | undefined;
+let current: { readonly bridge: Bridge; readonly actions: () => readonly Action[]; readonly kinds: () => readonly ItemKind[] } | undefined;
 let settingsDialog: SettingsDialog | undefined;
 
 export async function init(bridge: Bridge): Promise<void> {
@@ -41,10 +42,10 @@ export async function init(bridge: Bridge): Promise<void> {
   }
   // The one before stopped only now: init may be called again meanwhile (Space Lua loaded twice), each stops the last
   running?.stop();
-  const actions = createActions(settings.modules, { listCommands: bridge.listCommands, invokeCommand: bridge.invokeCommand, wordAtCaret: settings.wordAtCaret, touch: touchScreen() });
-  const controller = new Controller(document, bridge, settings, actions, () => void openSettings());
+  const { actions, kinds } = createModules(settings.modules, { listCommands: bridge.listCommands, invokeCommand: bridge.invokeCommand, wordAtCaret: settings.wordAtCaret, touch: touchScreen() });
+  const controller = new Controller(document, bridge, settings, actions, kinds, () => void openSettings());
   slot[GLOBAL_KEY] = controller;
-  current = { bridge, actions };
+  current = { bridge, actions, kinds };
   controller.start();
 }
 
@@ -78,11 +79,12 @@ export function showActions(): void {
 /** The "Silverware Toolbar: Settings" command (the popup's last item too): the settings dialog */
 export async function openSettings(): Promise<void> {
   if (!current || settingsDialog?.isOpen) return;
-  const { bridge, actions } = current;
+  const { bridge, actions, kinds } = current;
   settingsDialog = new SettingsDialog({
     doc: document,
     bridge,
     actions,
+    kinds,
     canSave: canSaveIn(bridge),
     save: (values) => saveSettings(bridge, values),
     // The toolbar started anew with them (favourites need no reload)

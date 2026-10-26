@@ -10,12 +10,14 @@
 // always in view; a list of choices opens over it.
 import { ICONS } from "../icons.ts";
 import type { Action } from "./action.ts";
+import type { ItemHost, ShownItem } from "./items.ts";
 import { type Box, placeBy } from "./place.ts";
 
-/** An item as the toolbar shows it now: an action (with its label: `labeled`), or a separator */
+/** An item as the toolbar shows it now: an action (with its label: `labeled`), a separator, or an item of a kind a module gives */
 export type Shown =
   | { readonly action: Action; readonly active: boolean; readonly enabled: boolean; readonly labeled: boolean }
-  | { readonly separator: true };
+  | { readonly separator: true }
+  | { readonly item: ShownItem };
 
 export type BarHandlers = {
   readonly run: (action: Action) => void;
@@ -69,7 +71,7 @@ export class Bar {
     const elements = all.map((items, i) => {
       const row = doc.createElement("div");
       row.className = "swb-row";
-      row.append(...items.map((item) => ("separator" in item ? this.divider() : this.item(item))));
+      row.append(...items.flatMap((item) => this.elementOf(item, false)));
       if (i === all.length - 1) row.append(...(items.length ? [this.divider()] : []), more);
       return row;
     });
@@ -86,7 +88,7 @@ export class Bar {
     items.className = "swb-row swb-dock-items";
     rows.forEach((row, i) => {
       if (i > 0 && row.length) items.append(this.divider());
-      items.append(...row.map((item) => ("separator" in item ? this.divider() : this.item(item))));
+      items.append(...row.flatMap((item) => this.elementOf(item, true)));
     });
     this.element.replaceChildren(items, this.more());
     this.element.classList.add("swb-docked");
@@ -114,6 +116,44 @@ export class Bar {
     return more;
   }
 
+  /** An item's element (a kind's that fails to draw: none, logged); `docked`: for the toolbar docked at the bottom */
+  private elementOf(shown: Shown, docked: boolean): HTMLElement[] {
+    if ("separator" in shown) return [this.divider()];
+    if ("action" in shown) return [this.item(shown)];
+    try {
+      return [shown.item.kind.render(shown.item, this.itemHost(docked))];
+    } catch (e) {
+      console.error(`Silverware Toolbar: a favourite of the kind ${shown.item.kind.type} could not be shown:`, e);
+      return [];
+    }
+  }
+
+  /** What a kind of item draws its button with */
+  private itemHost(docked: boolean): ItemHost {
+    return {
+      doc: this.doc,
+      docked,
+      state: (action) => this.handlers.state(action),
+      activate: (action, anchor) => (action.choices ? this.toggleMenu(anchor, action) : this.handlers.run(action)),
+      content: (action, labeled) => {
+        const content = this.doc.createElement("span");
+        content.className = "swb-content";
+        const { icon, label } = this.look(action, this.handlers.state(action).enabled);
+        content.innerHTML = icon + (labeled ? '<span class="swb-label"></span>' : "");
+        if (labeled) content.querySelector(".swb-label")!.textContent = label;
+        return content;
+      },
+      button: () => this.button(),
+    };
+  }
+
+  /** An action's icon and label as shown: one offering choices the choice on for the selection (none: `mixed`, else its own) */
+  private look(action: Action, enabled: boolean): { icon: string; label: string } {
+    const on = action.choices && enabled ? action.choices.find((choice) => this.handlers.state(choice).active) : undefined;
+    const label = action.choices ? (on?.label ?? (enabled ? (action.mixed ?? action.label) : action.label)) : action.label;
+    return { icon: on?.icon ?? action.icon, label };
+  }
+
   private divider(): HTMLElement {
     const divider = this.doc.createElement("span");
     divider.className = "swb-divider";
@@ -129,9 +169,8 @@ export class Bar {
     const button = this.button();
     button.dataset.swbAction = action.id;
     button.disabled = !enabled;
-    const on = action.choices && enabled ? action.choices.find((choice) => this.handlers.state(choice).active) : undefined;
-    const label = action.choices ? (on?.label ?? (enabled ? (action.mixed ?? action.label) : action.label)) : action.label;
-    button.innerHTML = (on?.icon ?? action.icon) + (labeled ? '<span class="swb-label"></span>' : "") + (action.choices ? ICONS.chevronDown : "");
+    const { icon, label } = this.look(action, enabled);
+    button.innerHTML = icon + (labeled ? '<span class="swb-label"></span>' : "") + (action.choices ? ICONS.chevronDown : "");
     if (labeled) {
       button.classList.add("swb-labeled");
       button.querySelector(".swb-label")!.textContent = label;

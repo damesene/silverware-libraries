@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Favorites } from "../core/favorites.ts";
-import { addItem, moveItem, moveRow, removeItem, sameRows, savedRows, stepOf, toggleShow } from "./favorites.ts";
+import { addItem, moveItem, moveRow, removeItem, sameRows, savedRows, setSlot, stepOf, toggleShow } from "./favorites.ts";
 
 const ROWS: Favorites = [[{ id: "actions.turnInto", show: "label" }], [{ id: "formats.bold" }, { type: "separator" }, { id: "formats.link" }]];
 
@@ -44,5 +44,16 @@ describe("The favourites as the settings edit them", () => {
     expect(savedRows([...emptied, []])).toEqual([ROWS[1]]);
     expect(sameRows(ROWS, savedRows(ROWS))).toBe(true);
     expect(sameRows(ROWS, emptied)).toBe(false);
+  });
+
+  it("fills a kind's item's slots and shows it the other way, its other fields kept", () => {
+    const rows = addItem(ROWS, 1, { type: "gesture" });
+    const filled = setSlot(setSlot(rows, { row: 1, index: 3 }, "tap", "formats.bold"), { row: 1, index: 3 }, "up", "formats.italic");
+    expect(filled[1]![3]).toEqual({ type: "gesture", tap: "formats.bold", up: "formats.italic" });
+    const labeled = toggleShow(filled, { row: 1, index: 3 });
+    expect(labeled[1]![3]).toEqual({ type: "gesture", tap: "formats.bold", up: "formats.italic", show: "label" });
+    expect(toggleShow(labeled, { row: 1, index: 3 })[1]![3]).toEqual(filled[1]![3]);
+    // An action's item has no slots
+    expect(setSlot(ROWS, { row: 1, index: 0 }, "tap", "x")).toEqual(ROWS);
   });
 });

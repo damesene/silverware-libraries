@@ -40,17 +40,18 @@ export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
 }
 
 /** The modules: the parts that can be turned off with `silverware.toolbar.modules.<name>.enabled` (default on) */
-export const MODULE_NAMES = ["inline", "blocks", "clear", "commands", "keyboard"] as const;
+export const MODULE_NAMES = ["inline", "blocks", "clear", "commands", "keyboard", "gestures"] as const;
 export type ModuleName = (typeof MODULE_NAMES)[number];
 
 /** A module's name and what it does, as the settings dialog shows them (the library page's config.define says the same) */
-export const MODULE_LABELS: Readonly<Record<ModuleName, string>> = { inline: "Inline formats", blocks: "Turn into", clear: "Clear formatting", commands: "Commands", keyboard: "Hide the keyboard" };
+export const MODULE_LABELS: Readonly<Record<ModuleName, string>> = { inline: "Inline formats", blocks: "Turn into", clear: "Clear formatting", commands: "Commands", keyboard: "Hide the keyboard", gestures: "Gestures" };
 export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
   inline: "Bold, italic, strikethrough, highlight, code, links and wiki links.",
   blocks: "Turn lines into a paragraph, a heading, a list, a task or a quote.",
   clear: "Remove the inline formats of the selection.",
   commands: "Every SilverBullet command, found by typing its name in the list of every action, and as a favourite.",
   keyboard: "On a phone or tablet: an action hiding the on-screen keyboard, the selection kept as it is (to see more of the page while you format it).",
+  gestures: "A gesture button among the favourites: two actions in one, a click runs the first, swiping it up the second.",
 };
 
 // The key of the command showing every action (the library page gives it to the command: SilverBullet handles it)
@@ -151,7 +152,7 @@ export function favoritesOf(value: unknown): Favorites {
   return rows.map((items) => {
     return items!.flatMap((item): FavoriteItem[] => {
       const favorite = favoriteItemOf(item);
-      if (!favorite) console.warn('Silverware Toolbar: a favourite is not { id = …, show = … } nor { type = "separator" }:', item);
+      if (!favorite) console.warn('Silverware Toolbar: a favourite is not { id = …, show = … }, { type = "separator" } nor { type = <a kind>, … }:', item);
       return favorite ? [favorite] : [];
     });
   });

@@ -4,9 +4,11 @@
 import { withCustomActions } from "./actions.ts";
 import type { ModuleName } from "./bridge.ts";
 import type { Action, ModuleHost, ToolbarModule } from "./core/action.ts";
+import type { ItemKind } from "./core/items.ts";
 import { blocksModule } from "./modules/blocks.ts";
 import { clearModule } from "./modules/clear.ts";
 import { commandsModule } from "./modules/commands.ts";
+import { gesturesModule } from "./modules/gestures.ts";
 import { inlineModule } from "./modules/inline.ts";
 import { keyboardModule } from "./modules/keyboard.ts";
 
@@ -16,10 +18,17 @@ const FACTORIES: readonly (readonly [ModuleName, (host: ModuleHost) => ToolbarMo
   ["blocks", blocksModule],
   ["commands", commandsModule],
   ["keyboard", keyboardModule],
+  ["gestures", gesturesModule],
 ];
 
-/** The actions of the modules turned on, in their order, and the custom ones: asked for each time they show */
-export function createActions(on: ReadonlySet<ModuleName>, host: ModuleHost = {}): () => Action[] {
+/**
+ * The modules turned on: their actions, in their order, and the custom ones;
+ * the kinds of favourites they give. Asked for each time they show
+ */
+export function createModules(on: ReadonlySet<ModuleName>, host: ModuleHost = {}): { readonly actions: () => Action[]; readonly kinds: () => ItemKind[] } {
   const modules = FACTORIES.filter(([name]) => on.has(name)).map(([, create]) => create(host));
-  return () => withCustomActions(modules.flatMap((m) => m.actions()));
+  return {
+    actions: () => withCustomActions(modules.flatMap((m) => m.actions())),
+    kinds: () => modules.flatMap((m) => m.itemKinds?.() ?? []),
+  };
 }

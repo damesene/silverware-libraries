@@ -12,11 +12,12 @@ import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
 import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
-import type { FavoriteItem, Favorites } from "../core/favorites.ts";
+import { type FavoriteItem, type Favorites, isKindItem, isSeparator, type KindItem } from "../core/favorites.ts";
+import type { ItemKind, ItemSlot } from "../core/items.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
 import { reorder } from "./drag.ts";
-import { addItem, type At, moveItem, moveRow, removeItem, sameRows, savedRows, stepOf, toggleShow } from "./favorites.ts";
+import { addItem, type At, moveItem, moveRow, removeItem, sameRows, savedRows, setSlot, stepOf, toggleShow } from "./favorites.ts";
 
 const BASE = "swb-settings";
 
@@ -28,6 +29,8 @@ export type SettingsContext = {
   readonly bridge: Bridge;
   // Every action offered now (the modules turned on, the custom ones)
   readonly actions: () => readonly Action[];
+  // The kinds of favourites the modules turned on give (core/items.ts)
+  readonly kinds: () => readonly ItemKind[];
   // Whether the settings can be saved here (else the dialog only shows them)
   readonly canSave: boolean;
   // Saves settings by path (undefined removes one)
@@ -35,6 +38,8 @@ export type SettingsContext = {
   // Saved, nothing to reload for: the toolbar takes the settings now
   saved(): void;
 };
+
+type Picking = { readonly row: number } | { readonly at: At; readonly key: string };
 
 type Values = { shortcut: string; placement: Placement; show: Show; wordAtCaret: boolean; favorites: Favorites; modules: Record<ModuleName, boolean> };
 
@@ -47,8 +52,8 @@ export class SettingsDialog {
   private favoritesPanel: HTMLElement | undefined;
   private saveButton: HTMLButtonElement | undefined;
   private note: HTMLElement | undefined;
-  // The row whose search of actions to add is open
-  private adding: number | undefined;
+  // The search of actions open: to add to a row, or for a slot of a kind's item
+  private picking: Picking | undefined;
   // SilverBullet's keyboard bar on, on a touch screen: the docked toolbar goes over it, its turning off offered
   private keyboardBar = false;
 
@@ -259,19 +264,20 @@ export class SettingsDialog {
       items.dataset.swbItems = String(r);
       row.forEach((item, i) => items.append(this.itemElement(item, { row: r, index: i }, known)));
       if (!row.length) items.append(this.el("span", `${BASE}-empty`, "Empty"));
-      const open = this.adding === r;
-      const add = this.button(`${BASE}-add`, open ? "Close" : "Add", () => this.openAdding(r));
+      const picking = this.picking;
+      const open = !!picking && "row" in picking && picking.row === r;
+      const add = this.button(`${BASE}-add`, open ? "Close" : "Add", () => this.openPicking({ row: r }));
       add.setAttribute("aria-expanded", String(open));
       block.append(items, add);
-      if (open) block.append(this.picker(r));
+      if (picking && ("row" in picking ? picking.row : picking.at.row) === r) block.append(this.picker(picking));
       rows.append(block);
     });
     parts.push(rows);
     parts.push(
       this.button(`${BASE}-add-row`, "Add row", () => {
         values.favorites = [...values.favorites, []];
-        this.adding = values.favorites.length - 1;
-        this.changedFavorites(`[data-swb-row="${this.adding}"] .${BASE}-pick-field`);
+        this.picking = { row: values.favorites.length - 1 };
+        this.changedFavorites(`[data-swb-row="${values.favorites.length - 1}"] .${BASE}-pick-field`);
       }),
     );
     panel.replaceChildren(...parts);
@@ -285,18 +291,30 @@ export class SettingsDialog {
     element.dataset.swbItem = `${at.row}:${at.index}`;
     const icon = this.el("span", `${BASE}-item-icon`);
     const name = this.el("span", `${BASE}-item-name`);
-    if (item.type === "separator") {
+    if (isSeparator(item)) {
       element.classList.add(`${BASE}-separator`);
       name.textContent = "Separator";
       element.append(icon, name);
     } else {
-      const action = known.get(item.id);
-      icon.innerHTML = action?.icon ?? "";
-      name.textContent = action?.label ?? item.id;
-      element.append(icon, name);
-      if (!action) {
-        element.classList.add(`${BASE}-unknown`);
-        element.title = `No action has the id ${item.id} (its module is off, or it is not defined): the toolbar leaves it out`;
+      if (isKindItem(item)) {
+        // A kind's: its slots, each an action picked (the dialog knows nothing of what they are for)
+        const kind = this.context.kinds().find((k) => k.type === item.type);
+        icon.innerHTML = kind?.icon ?? "";
+        name.textContent = kind?.label ?? item.type;
+        element.append(icon, name);
+        if (!kind) {
+          element.classList.add(`${BASE}-unknown`);
+          element.title = `No module turned on gives the kind ${item.type}: the toolbar leaves it out`;
+        } else element.append(...kind.slots.map((slot) => this.slotButton(item, at, slot, known)));
+      } else {
+        const action = known.get(item.id);
+        icon.innerHTML = action?.icon ?? "";
+        name.textContent = action?.label ?? item.id;
+        element.append(icon, name);
+        if (!action) {
+          element.classList.add(`${BASE}-unknown`);
+          element.title = `No action has the id ${item.id} (its module is off, or it is not defined): the toolbar leaves it out`;
+        }
       }
       const labeled = item.show === "label";
       const show = this.button(`${BASE}-show`, labeled ? "Shown with its label: show its icon only" : "Shown as its icon: show its label too", () => this.edit(toggleShow(this.values!.favorites, at), `[data-swb-item="${at.row}:${at.index}"] .${BASE}-show`), labeled ? ICONS.label : ICONS.iconOnly);
@@ -372,18 +390,52 @@ export class SettingsDialog {
     this.update();
   }
 
-  private openAdding(row: number): void {
-    this.adding = this.adding === row ? undefined : row;
-    this.drawFavorites(this.adding === row ? `[data-swb-row="${row}"] .${BASE}-pick-field` : `[data-swb-row="${row}"] .${BASE}-add`);
+  /** A slot of a kind's item: the action picked for it (none yet: Choose…); a click opens the search for it */
+  private slotButton(item: KindItem, at: At, slot: ItemSlot, known: Map<string, Action>): HTMLButtonElement {
+    const id = item[slot.key];
+    const action = typeof id === "string" ? known.get(id) : undefined;
+    const what = action?.label ?? (typeof id === "string" && id ? id : "Choose…");
+    const button = this.button(`${BASE}-slot`, `${slot.label}: ${what}`, () => this.openPicking({ at, key: slot.key }));
+    button.innerHTML = `<span class="${BASE}-slot-name"></span><span class="${BASE}-item-icon">${action?.icon ?? ""}</span><span class="${BASE}-slot-action"></span>`;
+    button.querySelector(`.${BASE}-slot-name`)!.textContent = slot.label;
+    button.querySelector(`.${BASE}-slot-action`)!.textContent = what;
+    button.setAttribute("aria-label", `${slot.label}: ${what}`);
+    button.dataset.swbSlot = slot.key;
+    if (!action) button.classList.add(`${BASE}-unknown`);
+    const picking = this.picking;
+    button.setAttribute("aria-expanded", String(!!picking && "at" in picking && picking.key === slot.key && picking.at.row === at.row && picking.at.index === at.index));
+    return button;
   }
 
-  /** The search of what to add to a row: a separator, and every action and choice, found by words typed */
-  private picker(row: number): HTMLElement {
+  /** The search opened for a row or a slot (open for it already: closed) */
+  private openPicking(target: Picking): void {
+    const open = !!this.picking && JSON.stringify(this.picking) === JSON.stringify(target);
+    this.picking = open ? undefined : target;
+    const row = "row" in target ? target.row : target.at.row;
+    const back = "row" in target ? `[data-swb-row="${row}"] .${BASE}-add` : `[data-swb-item="${target.at.row}:${target.at.index}"] [data-swb-slot="${target.key}"]`;
+    this.drawFavorites(open ? back : `[data-swb-row="${row}"] .${BASE}-pick-field`);
+  }
+
+  /** The kind of the item at a place, where a module turned on gives it */
+  private kindOf(at: At): ItemKind | undefined {
+    const item = this.values?.favorites[at.row]?.[at.index];
+    return item && isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type) : undefined;
+  }
+
+  /**
+   * The search of what to add to a row (a separator, the modules' kinds of
+   * items, every action and choice), or of an action for a kind's slot: found
+   * by words typed
+   */
+  private picker(target: Picking): HTMLElement {
+    const forRow = "row" in target;
+    const row = forRow ? target.row : target.at.row;
+    const slot = forRow ? undefined : this.kindOf(target.at)?.slots.find((s) => s.key === target.key);
     const picker = this.el("div", `${BASE}-picker`);
     const field = this.el("input", `${BASE}-pick-field`);
     field.type = "text";
-    field.placeholder = "Search actions";
-    field.setAttribute("aria-label", "Search actions to add");
+    field.placeholder = slot ? `Search an action for ${slot.label}` : "Search actions";
+    field.setAttribute("aria-label", slot ? `Search an action for ${slot.label}` : "Search actions to add");
     field.spellcheck = false;
     field.autocomplete = "off";
     const list = this.el("div", `${BASE}-pick-list`);
@@ -394,17 +446,36 @@ export class SettingsDialog {
       else entries.push({ action, group: action.group }, ...action.choices.map((choice) => ({ action: choice, group: action.label })));
     }
     const add = (item: FavoriteItem) => {
-      this.adding = undefined;
+      this.picking = undefined;
       this.edit(addItem(this.values!.favorites, row, item), `[data-swb-row="${row}"] .${BASE}-add`);
+    };
+    // A kind's item added: the search goes on for its first slot
+    const addKind = (kind: ItemKind) => {
+      const favorites = addItem(this.values!.favorites, row, { type: kind.type });
+      const at = { row, index: favorites[row]!.length - 1 };
+      this.picking = kind.slots[0] ? { at, key: kind.slots[0].key } : undefined;
+      this.edit(favorites, this.picking ? `[data-swb-row="${row}"] .${BASE}-pick-field` : `[data-swb-item="${at.row}:${at.index}"]`);
+    };
+    // An action for the slot: the search goes on for the next slot without one
+    const fill = (id: string) => {
+      if (forRow) return add({ id });
+      const favorites = setSlot(this.values!.favorites, target.at, target.key, id);
+      const item = favorites[target.at.row]?.[target.at.index];
+      const next = item && isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type)?.slots.find((s) => !item[s.key]) : undefined;
+      this.picking = next ? { at: target.at, key: next.key } : undefined;
+      this.edit(favorites, next ? `[data-swb-row="${row}"] .${BASE}-pick-field` : `[data-swb-item="${target.at.row}:${target.at.index}"] [data-swb-slot="${target.key}"]`);
     };
     let shown: (() => void)[] = [];
     const draw = () => {
       const found = findEntries(entries, field.value);
-      const separator = !field.value.trim() || "separator".startsWith(field.value.trim().toLowerCase());
-      shown = [...(separator ? [() => add({ type: "separator" })] : []), ...found.map((entry) => () => add({ id: entry.action.id }))];
+      const query = field.value.trim().toLowerCase();
+      const separator = forRow && (!query || "separator".startsWith(query));
+      const kinds = forRow ? this.context.kinds().filter((kind) => wordsStart(kind.label, query)) : [];
+      shown = [...(separator ? [() => add({ type: "separator" })] : []), ...kinds.map((kind) => () => addKind(kind)), ...found.map((entry) => () => fill(entry.action.id))];
       const options = [
         ...(separator ? [this.option(`${BASE}-pick-separator`, "", "Separator", "", () => add({ type: "separator" }))] : []),
-        ...found.map((entry) => this.option("", entry.action.icon, entry.action.label, entry.group, () => add({ id: entry.action.id }))),
+        ...kinds.map((kind) => this.option(`${BASE}-pick-kind`, kind.icon, kind.label, "Two actions in one", () => addKind(kind))),
+        ...found.map((entry) => this.option("", entry.action.icon, entry.action.label, entry.group, () => fill(entry.action.id))),
       ];
       list.replaceChildren(...(options.length ? options : [this.el("div", `${BASE}-pick-none`, "No action found")]));
     };
@@ -414,14 +485,14 @@ export class SettingsDialog {
         // The search's, not the dialog's
         e.stopPropagation();
         e.preventDefault();
-        this.openAdding(row);
+        this.openPicking(target);
       } else if (e.key === "Enter") {
         e.preventDefault();
         shown[0]?.();
       }
     });
     draw();
-    const close = this.button(`${BASE}-pick-close`, "Close the search", () => this.openAdding(row), ICONS.close);
+    const close = this.button(`${BASE}-pick-close`, "Close the search", () => this.openPicking(target), ICONS.close);
     const top = this.el("div", `${BASE}-pick-top`);
     top.append(field, close);
     picker.append(top, list);
@@ -505,4 +576,10 @@ export class SettingsDialog {
     }
     this.context.saved();
   }
+}
+
+/** Whether each word typed starts a word of a label, ignoring case (nothing typed: yes) */
+function wordsStart(label: string, query: string): boolean {
+  const words = label.toLowerCase().split(/\s+/);
+  return query.split(/\s+/).filter(Boolean).every((typed) => words.some((word) => word.startsWith(typed)));
 }

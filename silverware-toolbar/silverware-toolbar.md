@@ -48,7 +48,7 @@ Over several lines of one paragraph, a format of markers (bold, italic, striketh
 
 ## Favourites
 
-The toolbar shows your favourites: rows, one under another, each a list of items. An item is an action by its `id` (see *Actions*; its `type` is `"action"`, which can be left out), shown as its icon, or with `show = "label"` as its icon and its name, or a separator (`type = "separator"`). An action that offers a list (*Turn into*) has an arrow, and shows the choice your selection has. Every action stays in the **…** list, at the end of the last row. An id no action has (a module turned off, a custom format not defined) is left out. The default:
+The toolbar shows your favourites: rows, one under another, each a list of items. An item is an action by its `id` (see *Actions*; its `type` is `"action"`, which can be left out), shown as its icon, or with `show = "label"` as its icon and its name, a separator (`type = "separator"`), or a gesture button (`type = "gesture"`, see below). An action that offers a list (*Turn into*) has an arrow, and shows the choice your selection has. Every action stays in the **…** list, at the end of the last row. An id no action has (a module turned off, a custom format not defined) is left out. The default:
 
 ```lua
 config.set("silverware.toolbar.favorites", {
@@ -59,12 +59,22 @@ config.set("silverware.toolbar.favorites", {
 
 The settings dialog's *Favorites* tab edits them without writing Lua (see *Settings*).
 
+### Gesture buttons
+
+A gesture button holds two actions in one place: a click (a tap) runs the first, and swiping it up runs the second. As you drag it up, its icon rolls up and the second action's comes in from below, following your finger or the mouse; let go once it is more than halfway in (or flick it up) and the second action runs; drag back down and nothing happens. A small **2** in its corner tells it from a plain button, and lights up while letting go would run the second action. It is as wide as the wider of its two actions, with their labels too where `show = "label"`. In the settings, *Add* offers *Gesture button*, then asks for its two actions. In Lua:
+
+```lua
+{ type = "gesture", tap = "formats.bold", up = "formats.highlight" }
+```
+
+The button shows as pressed when its first action is on for the selection; a second action not offered there is dimmed and does nothing. Gesture buttons come from the *Gestures* module: with it off they are left out.
+
 ## Settings
 
 *Silverware Toolbar settings…*, the last item of the **…** list (or the command *Silverware Toolbar: Settings*), opens the settings, for every page in the space:
 
 * **General**: the key for every action, as SilverBullet writes keys (`Ctrl-Shift-q`, `Alt-k`), where and when the toolbar shows, and whether a format works on the word at the cursor. On a phone with SilverBullet's keyboard bar on, it offers to turn that bar off (on that device, at once).
-* **Favorites**: the toolbar's rows, one under another. Drag an item within its row or into another, or with the keyboard: focus it (Tab) and press **Alt+←** or **Alt+→** to move it within its row, **Alt+↑** or **Alt+↓** into the row above or below, **Delete** to remove it. The button beside an action's name shows it as its icon or with its name too; **×** removes it. **Add** searches every action (and a separator) to add at the row's end; **Add row** adds a row. A row left empty is left out. An item no action has is dimmed, named by its id.
+* **Favorites**: the toolbar's rows, one under another. Drag an item within its row or into another, or with the keyboard: focus it (Tab) and press **Alt+←** or **Alt+→** to move it within its row, **Alt+↑** or **Alt+↓** into the row above or below, **Delete** to remove it. The button beside an action's name shows it as its icon or with its name too; **×** removes it. **Add** searches every action (and a separator, and a gesture button, whose two actions it asks for next; click either to change it) to add at the row's end; **Add row** adds a row. A row left empty is left out. An item no action has is dimmed, named by its id.
 * **Modules**: each part of the toolbar on or off (its actions with it).
 
 Nothing changes until **Save**. The favourites, where and when the toolbar shows and the word at the cursor apply at once; a module or the key needs the page loaded again (**Save and reload**). They are saved in your `CONFIG` page: the key and the modules in the block SilverBullet's own settings (*Configuration: Open*) keep, so either shows what the other wrote; the favourites in a block of their own (`-- managed-by: silverware-toolbar`), which SilverBullet's settings leave alone. You can edit both by hand too.
@@ -198,9 +208,9 @@ config.define("silverware.toolbar", {
         type = "array",
         items = {
           type = "object",
-          additionalProperties = false,
+          -- An item of a module's kind (the gestures module's button) has fields of its own, which its kind reads
           properties = {
-            type = { type = "string", enum = { "action", "separator" } },
+            type = { type = "string" },
             id = { type = "string" },
             show = { type = "string", enum = { "icon", "label" } },
           },
@@ -210,7 +220,7 @@ config.define("silverware.toolbar", {
         { { id = "actions.turnInto", show = "label" } },
         { { id = "formats.bold" }, { id = "formats.italic" }, { id = "formats.code" }, { type = "separator" }, { id = "formats.link" }, { id = "formats.highlight" } },
       },
-      description = "The toolbar's rows, each a list of items: { id = <its id>, show = \"icon\" or \"label\" }, or { type = \"separator\" } (every action is in the list of the … button).",
+      description = "The toolbar's rows, each a list of items: { id = <its id>, show = \"icon\" or \"label\" }, { type = \"separator\" }, or a module's kind: { type = \"gesture\", tap = <an id>, up = <an id> } (every action is in the list of the … button).",
       ui = { category = "Silverware Toolbar", label = "Favourite actions", priority = 2 },
     },
     shortcut = {
@@ -248,6 +258,7 @@ config.define("silverware.toolbar", {
         clear = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Remove the inline formats of the selection.", ui = { category = "Silverware Toolbar", label = "Clear formatting", priority = 0.6 } } } },
         commands = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Every SilverBullet command, found by typing its name in the list of every action, and as a favourite.", ui = { category = "Silverware Toolbar", label = "Commands", priority = 0.5 } } } },
         keyboard = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "On a phone or tablet: an action hiding the on-screen keyboard, the selection kept as it is (to see more of the page while you format it).", ui = { category = "Silverware Toolbar", label = "Hide the keyboard", priority = 0.4 } } } },
+        gestures = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "A gesture button among the favourites: two actions in one, a click runs the first, swiping it up the second.", ui = { category = "Silverware Toolbar", label = "Gestures", priority = 0.3 } } } },
       },
     },
   },
@@ -431,6 +442,76 @@ end
   width: 14px;
   height: 14px;
   opacity: 0.6;
+}
+/* The gestures module's button: two faces in one cell (as wide as the wider), on a reel rolled by
+   --swb-roll (0 the click's face, 1 the swipe's), following the pointer while dragged (swb-rolling: no
+   transition), settling once let go; the 2 in its corner lit while the swipe's action would run */
+.swb-button.swb-gesture {
+  --swb-roll: 0;
+  position: relative;
+  overflow: hidden;
+  touch-action: pan-x;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.swb-gesture-reel {
+  display: grid;
+  align-items: stretch;
+  justify-items: stretch;
+  height: 100%;
+  min-width: 0;
+}
+.swb-gesture-face {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+.swb-gesture-tap {
+  transform: translateY(calc(var(--swb-roll) * -100%));
+}
+.swb-gesture-up {
+  transform: translateY(calc((1 - var(--swb-roll)) * 100%));
+}
+.swb-gesture.swb-rolling .swb-gesture-face {
+  transition: none;
+}
+.swb-gesture-face.swb-off {
+  opacity: 0.35;
+}
+.swb-gesture-up.swb-on {
+  color: var(--ui-accent-color, #464cfc);
+}
+.swb-button.swb-gesture.swb-armed {
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 14%, transparent);
+}
+.swb-button.swb-gesture[aria-disabled="true"] {
+  cursor: default;
+}
+.swb-gesture-count {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 8px;
+  font-weight: 600;
+  line-height: 1;
+  opacity: 0.45;
+  pointer-events: none;
+  transition: opacity 120ms, color 120ms;
+}
+.swb-gesture.swb-armed .swb-gesture-count {
+  opacity: 1;
+  color: var(--ui-accent-color, #464cfc);
+}
+@media (prefers-reduced-motion: reduce) {
+  .swb-gesture-face {
+    transition-duration: 1ms;
+  }
 }
 .swb-divider {
   width: 1px;
@@ -1014,6 +1095,43 @@ end
 .swb-settings-remove svg {
   width: 16px;
   height: 16px;
+}
+/* A slot of a kind's item (the gesture button's Click, Swipe up): the action picked for it */
+.swb-settings-slot {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+  max-width: 180px;
+  padding: 2px 6px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swb-settings-slot:hover,
+.swb-settings-slot[aria-expanded="true"] {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.swb-settings-slot[aria-expanded="true"] {
+  border-color: var(--ui-accent-color, #464cfc);
+}
+.swb-settings-slot.swb-settings-unknown {
+  border-style: dashed;
+  opacity: 0.7;
+}
+.swb-settings-slot-name {
+  font-size: 11px;
+  opacity: 0.65;
+}
+.swb-settings-slot-action {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.swb-settings-slot .swb-settings-item-icon:empty {
+  display: none;
 }
 .swb-settings-add,
 .swb-settings-add-row {

@@ -84,6 +84,8 @@ usable without a mouse.
 | `links` | link, wiki link `[[…]]`, remove a link (to go: link and wiki link become inline formats, see *Extensions*) |
 | `clear` | remove inline formatting |
 | `commands` (built 2026-10-26) | any SilverBullet command as an action (a favourite too), found by the popup's search, not listed as it opens |
+| `keyboard` (built 2026-10-26) | on a touch screen: the on-screen keyboard hidden, the selection kept |
+| `gestures` (built 2026-10-26) | no actions: a kind of favourite, the gesture button (*Kinds of favourites*) |
 
 ## Steps
 
@@ -314,6 +316,36 @@ config.set("silverware.toolbar.favorites", {
   its Configuration Manager edits no lists ("Configure manually in CONFIG"):
   the settings dialog's Favorites tab is where they are edited.
 
+### Kinds of favourites: the gesture button (decided and built 2026-10-26)
+
+A module may give a kind of favourite beyond an action and a separator
+(`ToolbarModule.itemKinds`, `core/items.ts`): its `type`, a label and icon for
+the settings dialog, its slots (fields holding an action's id, each named),
+and its button in the toolbar (`render`, given the slots' actions and the
+toolbar's host: an action's state, its content as a button has it, running it
+or opening its choices).
+
+- **What every item has** is the core's: `type` (a string, "action" by
+  default) and `show`; the schema allows other properties, which the core keeps
+  and hands to the kind (`favoriteItemOf`). A kind no module turned on gives is
+  unknown: its items are left out of the toolbar (nothing reads them) and shown
+  dimmed in the settings; an item whose slot has no action (empty, or an id no
+  action has) is left out too.
+- **The settings dialog knows slots only as keys and labels**: *Add* offers
+  the kinds after the separator; a kind added, the search goes on for each of
+  its slots in turn; a slot's button opens the search for it again.
+- **The gestures module's `gesture`** (`tap`, `up`; later perhaps down, left,
+  right, hold): a click runs `tap`; dragged up, its two faces roll as a reel
+  under the pointer (1:1, no transition; both faces in one grid cell, so the
+  button is as wide as the wider and never changes), let go past half its
+  height or flicked up runs `up`, dragged back runs nothing, the reel settling
+  in 180 ms. A small "2" in its corner, lit (with the button) while `up` would
+  run. `tap`'s state is the button's (pressed); `up` not offered is dimmed and
+  let go runs nothing. A sideways move is not the gesture: `touch-action: pan-x`
+  leaves it to the browser, which scrolls the docked bar. After `up` ran, the
+  button drawn anew for the same favourite goes on from where the one before
+  was let go, holds `up`'s face a moment and rolls back.
+
 ### Also decided
 
 - **Default favourites** in the core, in a file of their own
@@ -343,7 +375,9 @@ touch, one row of the same favourites, over SilverBullet's keyboard bar where
 it shows, its turning off offered in the settings; when it shows a setting: always
 while writing, always on a phone (the default), or after a selection; checked
 in Chrome's phone emulation, against the playground and SilverBullet, not on a
-phone yet).
+phone yet); kinds of favourites and the gestures module (*Kinds of
+favourites*; mouse and touch checked in the playground and Chrome's phone
+emulation, not on a phone yet).
 
 **Checked in a real SilverBullet** (2026-10-26, its release 2.12.1, by the
 interaction tests, which run against it as against the playground): the

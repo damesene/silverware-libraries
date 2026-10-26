@@ -159,3 +159,33 @@ export async function lineBox(page: Page, hasText: string): Promise<{ x: number;
 export const bar = (page: Page): Locator => page.locator(".swb-bar.swb-visible");
 export const barButton = (page: Page, action: string): Locator => bar(page).locator(`[data-swb-action="${action}"]`);
 export const popup = (page: Page): Locator => page.locator(".swb-popup.swb-visible");
+export const gestureButton = (page: Page): Locator => bar(page).locator(".swb-gesture");
+
+/**
+ * A gesture button added at the end of the second row through the settings
+ * dialog, as a user adds one (Add, Gesture button, its two actions searched),
+ * and saved; the text selected again after
+ */
+export async function addGesture(page: Page, tap: string, up: string, needle = "some text"): Promise<void> {
+  await select(page, needle);
+  await bar(page).locator(".swb-more").click();
+  await popup(page).locator(".swb-search-field").fill("settings");
+  await page.keyboard.press("Enter");
+  const dialog = page.locator(".swb-settings");
+  await dialog.locator('[data-swb-tab="favorites"]').click();
+  await dialog.locator('[data-swb-row="1"] .swb-settings-add').click();
+  const field = dialog.locator(".swb-settings-pick-field");
+  await field.fill("gesture");
+  await page.keyboard.press("Enter");
+  await expect(field).toHaveAttribute("placeholder", "Search an action for Click");
+  await field.fill(tap);
+  await page.keyboard.press("Enter");
+  await expect(field).toHaveAttribute("placeholder", "Search an action for Swipe up");
+  await field.fill(up);
+  await page.keyboard.press("Enter");
+  await expect(field).toHaveCount(0);
+  await dialog.locator(".swb-settings-save").click();
+  await expect(dialog).toHaveCount(0);
+  await select(page, needle);
+  await expect(gestureButton(page)).toBeVisible();
+}

@@ -249,6 +249,10 @@ export class Controller {
     this.hideBar();
     this.focusEditor();
     const { bridge } = this;
+    // The selection set again once the editor has the keyboard back (from the popup's search): a phone did not show
+    // it selected again by itself, which an action done on it (the keyboard hidden) then lost
+    await new Promise((resolve) => this.doc.defaultView!.requestAnimationFrame(resolve));
+    await bridge.setSelection(context.from, context.to);
     const missing = (what: string) => new Error(`the library page did not hand over ${what}`);
     const editor: ActionEditor = {
       invokeCommand: async (name) => {

@@ -1,10 +1,10 @@
-// The toolbar by a selection (or at the caret) and the popup of every action under it, against the toolbar playground
+// The toolbar by a selection (or at the caret) and the popup of every action under it, against the toolbar playground (@playground: SilverBullet in the tests has no toolbar deployed)
 import { bar, barButton, caret, expect, popup, select, selected, test, text } from "./playground.ts";
 
 // The command's key, as the playground binds it (SilverBullet binds the library page's command so)
 const KEY = "Control+Shift+Q";
 
-test.describe("The toolbar", () => {
+test.describe("The toolbar @playground", () => {
   test("shows by a selection made, in rows (Turn into with its label above the icons), and goes when there is none", async ({ page }) => {
     await select(page, "Plain paragraph one");
     await expect(bar(page)).toBeVisible();
@@ -71,7 +71,7 @@ test.describe("The toolbar", () => {
   });
 });
 
-test.describe("The popup of every action", () => {
+test.describe("The popup of every action @playground", () => {
   test("the key opens it under the toolbar, its search focused: typed words find, arrows pick, Enter runs, the editor focused after", async ({ page }) => {
     await select(page, "First item\n- Second item with [a link](https://silverbullet.md)\n- Third item");
     await page.keyboard.press(KEY);
@@ -138,7 +138,7 @@ test.describe("The popup of every action", () => {
   });
 });
 
-test.describe("The toolbar at the caret", () => {
+test.describe("The toolbar at the caret @playground", () => {
   test("the key without a selection shows it at the caret, the popup open; its buttons show the formats around the caret", async ({ page }) => {
     await caret(page, "a link](", -2);
     await page.keyboard.press(KEY);

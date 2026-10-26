@@ -100,6 +100,15 @@ describe("Inline formats", () => {
     expect(run("- «one\nplain»")).toBe("- **«one**\n**plain»**");
   });
 
+  it("over a paragraph's lines are read with the caret in them, and taken off whole; not across a blank line or a list item", () => {
+    expect(on("Plain **paragraph one.\nPlain para‸grap**h two")).toBe(true);
+    expect(on("Plain **paragraph ‸one.\nPlain paragrap**h two")).toBe(true);
+    expect(run("Plain **paragraph one.\nPlain para‸grap**h two")).toBe("Plain paragraph one.\nPlain para‸graph two");
+    expect(on("**one\n\ntw‸o**")).toBe(false);
+    expect(on("- **one\n- tw‸o**")).toBe(false);
+    expect(on("`one\ntw‸o`", "code")).toBe(true);
+  });
+
   it("over lines of blocks apart (list items), toggled twice, are back as they were: the selection after the first holds the markers of the lines it goes past", () => {
     const once = run("- one «item\n- two it»em");
     expect(once).toBe("- one **«item**\n- **two it»**em");

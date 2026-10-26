@@ -13,6 +13,7 @@
 // A literal format (code) is not put inside: another format on its content
 // is not offered, and put on text, it takes the other formats' markers off.
 import type { Change, Context } from "../core/action.ts";
+import { contextOf } from "../core/context.ts";
 import { afterOf } from "./after.ts";
 import type { Format, Found, Side } from "./format.ts";
 import { type TextLine, textLines } from "./lines.ts";
@@ -46,6 +47,36 @@ function joined(text: string, parts: readonly Part[]): Part[] {
   return out;
 }
 
+// How far a paragraph is looked at around a caret, each way
+const PARAGRAPH_LINES = 50;
+
+/** A line with the lines around it of its format that joins, one after another (no blank line between), as one: the paragraph a caret is in */
+function paragraphOf(text: string, line: TextLine): TextLine {
+  let from = line.from;
+  let to = line.to;
+  for (let i = 0; i < PARAGRAPH_LINES && from > 0; i++) {
+    const start = text.lastIndexOf("\n", from - 2) + 1;
+    if (!text.slice(start, from - 1).trim()) break;
+    from = start;
+  }
+  for (let i = 0; i < PARAGRAPH_LINES && to < text.length; i++) {
+    const end = text.indexOf("\n", to + 1);
+    const next = end < 0 ? text.length : end;
+    if (!text.slice(to + 1, next).trim()) break;
+    to = next;
+  }
+  const around = textLines(contextOf(text, from, to));
+  const at = around.findIndex((l) => l.from === line.from);
+  let first = at;
+  let last = at;
+  while (first > 0 && around[first - 1]!.format === line.format) first--;
+  while (last < around.length - 1 && around[last + 1]!.format === line.format) last++;
+  if (at < 0 || (first === at && last === at)) return line;
+  const head = around[first]!;
+  const tail = around[last]!;
+  return { ...line, from: head.from, start: head.start, to: tail.to, text: text.slice(head.from, tail.to), content: text.slice(head.start, tail.to) };
+}
+
 /**
  * The parts of the lines a selection touches that a format applies to: from..to
  * in the page's text (a caret: empty); `join`: those of one paragraph made one
@@ -55,7 +86,9 @@ export function partsOf(context: Context, join = false): Part[] {
   const lines = textLines(context);
   if (context.from === context.to) {
     const line = lines[0]!;
-    return !line.fixed && context.from >= line.start ? [{ from: context.from, to: context.to, line }] : [];
+    if (line.fixed || context.from < line.start) return [];
+    // A caret in a paragraph: its lines are where a pair around the caret may be (bold over them)
+    return [{ from: context.from, to: context.to, line: join && line.format?.joins ? paragraphOf(context.text, line) : line }];
   }
   const parts: Part[] = [];
   for (const line of lines) {
@@ -161,7 +194,8 @@ function closes(text: string, marker: string): boolean {
 }
 
 // A code span: a run of backticks, its text, the same run (`` a`b ``)
-const CODE_SPAN_RE = /(?<![\\`])(`+)(?!`)(.+?)(?<!`)\1(?!`)/g;
+// (Over a line break too: pairs are searched in a line, or a paragraph's lines for a format of markers)
+const CODE_SPAN_RE = /(?<![\\`])(`+)(?!`)([\s\S]+?)(?<!`)\1(?!`)/g;
 const pairs = new Map<string, RegExp>();
 
 /**
@@ -181,7 +215,7 @@ function pairRe(marker: string): RegExp {
     // Each marker a run of its own: not a part of a longer one (italic's * in **x**)
     const open = `(?<!\\\\|${c})${e}(?!${c})`;
     const close = `(?<!\\\\|${c})${e}(?!${c})`;
-    re = new RegExp(`${word}${open}(?=\\S)(.+?)(?<=\\S)${close}${after}`, "gu");
+    re = new RegExp(`${word}${open}(?=\\S)([\\s\\S]+?)(?<=\\S)${close}${after}`, "gu");
     pairs.set(marker, re);
   }
   return re;

@@ -49,6 +49,13 @@ test.describe("The toolbar", () => {
     await expect(barButton(page, "formats.bold")).toHaveAttribute("aria-pressed", "true");
     await barButton(page, "formats.bold").click();
     await expect.poll(() => text(page)).toContain(lines);
+    // Bold over the lines again; the caret on its second line: inside it, shown pressed
+    await select(page, "paragraph one.\nPlain paragrap");
+    await barButton(page, "formats.bold").click();
+    await caret(page, "Plain paragrap**", 4);
+    await page.keyboard.press(KEY);
+    await page.keyboard.press("Escape");
+    await expect(barButton(page, "formats.bold")).toHaveAttribute("aria-pressed", "true");
   });
 
   test("a link made of the selection puts the caret where its url goes", async ({ page }) => {

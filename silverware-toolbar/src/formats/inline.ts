@@ -20,8 +20,38 @@ import { formatsIn } from "./registry.ts";
 
 type Part = { readonly from: number; readonly to: number; readonly line: TextLine };
 
-/** The parts of the lines a selection touches that a format applies to: from..to in the page's text (a caret: empty) */
-export function partsOf(context: Context): Part[] {
+/**
+ * Parts of lines one after another of a block format that joins (a paragraph's)
+ * made one, the selection going on over the line break: a format of markers is
+ * one pair over them. Its line the lines together (pairs are searched in it).
+ */
+function joined(text: string, parts: readonly Part[]): Part[] {
+  const out: Part[] = [];
+  for (const part of parts) {
+    const last = out[out.length - 1];
+    const goesOn =
+      last &&
+      last.line.format?.joins &&
+      part.line.format === last.line.format &&
+      part.line.index === last.line.index + 1 &&
+      text.slice(last.to, last.line.to).trim() === "" &&
+      text.slice(part.line.start, part.from).trim() === "";
+    if (!goesOn) {
+      out.push(part);
+      continue;
+    }
+    const line: TextLine = { ...part.line, from: last.line.from, start: last.line.start, text: text.slice(last.line.from, part.line.to), content: text.slice(last.line.start, part.line.to) };
+    out[out.length - 1] = { from: last.from, to: part.to, line };
+  }
+  return out;
+}
+
+/**
+ * The parts of the lines a selection touches that a format applies to: from..to
+ * in the page's text (a caret: empty); `join`: those of one paragraph made one
+ * (a format of markers)
+ */
+export function partsOf(context: Context, join = false): Part[] {
   const lines = textLines(context);
   if (context.from === context.to) {
     const line = lines[0]!;
@@ -36,7 +66,7 @@ export function partsOf(context: Context): Part[] {
     while (to > from && /\s/.test(context.text[to - 1]!)) to--;
     if (from < to) parts.push({ from, to, line });
   }
-  return parts;
+  return join ? joined(context.text, parts) : parts;
 }
 
 // A format found on a part: the span it takes in the page's text, the plain
@@ -234,13 +264,13 @@ function found(context: Context, format: Format, part: Part): Span | undefined {
 
 /** Whether the format is on for the whole selection (every part has it; a caret: inside it) */
 export function isOn(context: Context, format: Format): boolean {
-  const parts = partsOf(context);
+  const parts = partsOf(context, !!format.markers);
   return parts.length > 0 && parts.every((part) => found(context, format, part));
 }
 
 /** Whether the format can be toggled: the selection has text to format, none of it inside a literal format's content (code) */
 export function canFormat(context: Context, format: Format): boolean {
-  const parts = partsOf(context);
+  const parts = partsOf(context, !!format.markers);
   if (!parts.length) return false;
   const literals = formatsIn("inline").filter((f) => f.literal && f !== format);
   return !parts.some((part) => literals.some((literal) => inside(context, literal, part)));
@@ -260,7 +290,7 @@ function inside(context: Context, format: Format, part: Part): boolean {
  */
 export function toggle(context: Context, format: Format): Change | undefined {
   const { text } = context;
-  const parts = partsOf(context).map((part) => ({ part, span: found(context, format, part) }));
+  const parts = partsOf(context, !!format.markers).map((part) => ({ part, span: found(context, format, part) }));
   if (!parts.length) return undefined;
   const off = parts.every((p) => p.span);
   const change = rewrite(
@@ -355,7 +385,7 @@ export function clear(context: Context): Change | undefined {
     .sort((a, b) => b.length - a.length);
   return rewrite(
     text,
-    partsOf(context).map((p) => {
+    partsOf(context, true).map((p) => {
       let a = p.from;
       let b = p.to;
       // The markers around it, as many as there are (bold and italic: ***x***)

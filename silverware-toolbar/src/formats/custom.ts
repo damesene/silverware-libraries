@@ -42,7 +42,7 @@ export function formatsOf(definitions: unknown): { formats: Format[]; problems: 
 function formatOf(definition: unknown): Format | string {
   if (!isObject(definition)) return "not an object";
   // Checked here, field by field: a definition from JS may be anything
-  const { name, scope, label, icon, group, keywords, marker, multiline, literal } = definition;
+  const { name, scope, label, icon, group, keywords, marker, multiline, literal, joins } = definition;
   if (typeof name !== "string" || !NAME_RE.test(name)) return `its name ${JSON.stringify(name)} is not letters, digits and _ starting with a letter`;
   if (scope !== "block" && scope !== "inline") return `its scope is not "block" or "inline"`;
   if (label !== undefined && typeof label !== "string") return "its label is not text";
@@ -67,6 +67,7 @@ function formatOf(definition: unknown): Format | string {
   if (scope === "block") {
     if (marker !== undefined && (typeof marker !== "string" || !marker)) return "its marker is not text";
     if (multiline !== undefined && typeof multiline !== "boolean") return "multiline is not true or false";
+    if (joins !== undefined && typeof joins !== "boolean") return "joins is not true or false";
     if (marker === undefined && !read) return "it has neither a marker nor read";
     if (multiline && !write) return "it is multiline without write";
     const readOwn = read ?? (markerRead(marker as string) as (...args: unknown[]) => unknown);
@@ -76,6 +77,7 @@ function formatOf(definition: unknown): Format | string {
       markers: undefined,
       literal: false,
       multiline: !!multiline,
+      joins: !!joins,
       readBlock: (text: string, info: BlockInfo) => checked(name, "read", () => readOwn(text, info), isTextOrNone),
       ...(writeLine && !multiline ? { writeLine: (text: string, info: BlockInfo) => checked(name, "write", () => writeLine(text, info), isText) } : {}),
       ...(write && multiline ? { writeLines: (items: readonly BlockItem[]) => checkedLines(name, () => write(items), items.length) } : {}),
@@ -93,6 +95,7 @@ function formatOf(definition: unknown): Format | string {
     markers: markers as string[] | undefined,
     literal: !!literal,
     multiline: false,
+    joins: false,
     ...(read ? { readInline: (text: string, context: ReadContext) => checked(name, "read", () => read(text, context), isFound) } : {}),
     ...(write ? { writeInline: (text: string, info: { readonly index: number }) => checked(name, "write", () => write(text, info), isText) } : {}),
   };

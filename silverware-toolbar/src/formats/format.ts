@@ -48,6 +48,8 @@ type Common = {
 export type LineBlockDefinition = Common & {
   readonly scope: "block";
   readonly marker?: string;
+  // Its lines one after another are one block (a paragraph's): an inline format of markers put on them is one pair, not one a line
+  readonly joins?: boolean;
   readonly read?: (text: string, info: BlockInfo) => string | undefined;
   readonly multiline?: false;
   readonly write?: (text: string, info: BlockInfo) => string;
@@ -57,6 +59,7 @@ export type LineBlockDefinition = Common & {
 export type MultilineBlockDefinition = Common & {
   readonly scope: "block";
   readonly marker?: string;
+  readonly joins?: boolean;
   readonly read?: (text: string, info: BlockInfo) => string | undefined;
   readonly multiline: true;
   readonly write: (items: readonly BlockItem[]) => readonly string[];
@@ -92,6 +95,8 @@ export type Format = {
   readonly markers: readonly string[] | undefined;
   readonly literal: boolean;
   readonly multiline: boolean;
+  // Block: its lines one after another are one block, which an inline format of markers spans with one pair
+  readonly joins: boolean;
   readonly readBlock?: (text: string, info: BlockInfo) => string | undefined;
   readonly readInline?: (text: string, context: ReadContext) => Found | undefined;
   readonly writeLine?: (text: string, info: BlockInfo) => string;

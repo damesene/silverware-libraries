@@ -88,12 +88,23 @@ describe("Inline formats", () => {
     expect(run("- «**one**\n- two»")).toBe("- «**one**\n- **two»**");
   });
 
-  it("over lines, toggled twice, are back as they were: the selection after the first holds the markers of the lines it goes past", () => {
+  it("over a paragraph's lines are one pair, and taken off again", () => {
     const once = run("Plain «paragraph one.\nPlain paragrap»h two");
-    expect(once).toBe("Plain **«paragraph one.**\n**Plain paragrap»**h two");
+    expect(once).toBe("Plain **«paragraph one.\nPlain paragrap»**h two");
     expect(on(once)).toBe(true);
     expect(run(once)).toBe("Plain «paragraph one.\nPlain paragrap»h two");
     expect(run(run(once, ITALIC), ITALIC)).toBe(once);
+    // A blank line between: two paragraphs, a pair each
+    expect(run("«one\n\ntwo»")).toBe("**«one**\n\n**two»**");
+    // A paragraph after a list item: apart
+    expect(run("- «one\nplain»")).toBe("- **«one**\n**plain»**");
+  });
+
+  it("over lines of blocks apart (list items), toggled twice, are back as they were: the selection after the first holds the markers of the lines it goes past", () => {
+    const once = run("- one «item\n- two it»em");
+    expect(once).toBe("- one **«item**\n- **two it»**em");
+    expect(on(once)).toBe(true);
+    expect(run(once)).toBe("- one «item\n- two it»em");
   });
 
   it("tell italic's * from bold's **", () => {

@@ -34,7 +34,9 @@ test.describe("Selecting cells", () => {
 
   test("Ctrl+Enter on a cell selected adds a row under it, edited in the same column, as in a cell editor", async ({ page }) => {
     const rows = page.locator(".sb-table-widget table").first().locator("tbody tr[data-swt-row]");
-    const count = await rows.count();
+    // The sample's rows, waited for (a count read at once may come before they are rendered)
+    const count = 6;
+    await expect(rows).toHaveCount(count);
     await cell(page, 2, 1).click();
     await expect(page.locator(".swt-cell-editor")).toHaveCount(0);
     await page.keyboard.press("Control+Enter");
@@ -46,7 +48,9 @@ test.describe("Selecting cells", () => {
 
   test("Enter in the last row's cell editor adds a row under it, edited in the same column", async ({ page }) => {
     const rows = page.locator(".sb-table-widget table").first().locator("tbody tr[data-swt-row]");
-    const count = await rows.count();
+    // The sample's rows, waited for (a count read at once may come before they are rendered)
+    const count = 6;
+    await expect(rows).toHaveCount(count);
     const lastCell = rows.last().locator("td").nth(1);
     await lastCell.dblclick();
     await expect(page.locator(".swt-cell-editor")).toBeFocused();

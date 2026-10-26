@@ -1116,7 +1116,9 @@ test("Enter in the last row's cell editor on the sheet adds a row under it", asy
   await (await tableIcon(page, "Sheet view")).click();
   const drawn = page.locator(".sb-table-widget.swt-drawn.swt-sheet-table:not(.swt-stand-in)").first();
   const rows = drawn.locator("tbody tr[data-swt-row]");
-  const count = await rows.count();
+  // The sample's rows, waited for (a count read at once may come before the sheet has drawn them)
+  const count = 6;
+  await expect(rows).toHaveCount(count);
   await rows.last().locator("td").first().dblclick();
   await expect(page.locator(".swt-cell-editor")).toBeFocused();
   await sheetRendersAnew(page, () => page.keyboard.press("Enter"));

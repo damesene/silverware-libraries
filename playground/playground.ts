@@ -7,11 +7,11 @@ import { metaTagPattern } from "../silverware-table/src/tags.ts";
 import libraryPage from "../silverware-table/silverware-table.md";
 import { benchmarkPage, FORMULAS, type FormulaKind, ProfileLog, renderLog, TYPE_NAMES } from "./benchmark.ts";
 import { measure, profileSilverwareTable, setProfileSink } from "./profile.ts";
+import { flash, setUpTheme } from "./common.ts";
 import sample from "./sample.md";
 
 const TEXT_KEY = "silverwarePlayground.text";
 const SETTINGS_KEY = "silverwarePlayground.settings";
-const THEME_KEY = "silverwarePlayground.theme";
 const MARKDOWN_KEY = "silverwarePlayground.markdown";
 const BENCH_SHOWN_KEY = "silverwarePlayground.benchShown";
 const BENCH_OPTIONS_KEY = "silverwarePlayground.benchOptions";
@@ -20,7 +20,6 @@ const BEFORE_BENCH_KEY = "silverwarePlayground.beforeBenchmark";
 
 const source = document.querySelector<HTMLTextAreaElement>("#source")!;
 const page = document.querySelector<HTMLElement>("#page")!;
-const flashBox = document.querySelector<HTMLElement>("#flash")!;
 
 function load(key: string): string | null {
   try {
@@ -239,16 +238,6 @@ function settingsChanged(): void {
 
 // --- Chrome -------------------------------------------------------------------
 
-// As SilverBullet's: `timeout` 0 keeps it until it is clicked
-function flash(message: string, type: "info" | "error" = "info", options: { readonly timeout?: number } = {}): void {
-  const note = document.createElement("div");
-  note.textContent = message;
-  if (type === "error") note.className = "error";
-  flashBox.append(note);
-  if (options.timeout === 0) note.addEventListener("click", () => note.remove());
-  else window.setTimeout(() => note.remove(), options.timeout ?? 3000);
-}
-
 document.querySelector("#reset")!.addEventListener("click", () => setText(sample, 0));
 document.querySelector("#swt-settings")!.addEventListener("click", () => openSettings());
 
@@ -278,14 +267,7 @@ paneToggle("#markdown", "no-markdown", MARKDOWN_KEY);
   toggle.addEventListener("click", () => show(!document.body.classList.contains("bench-shown")));
 }
 
-function applyTheme(theme: string): void {
-  document.documentElement.dataset.theme = theme;
-  save(THEME_KEY, theme);
-}
-applyTheme(load(THEME_KEY) ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
-document.querySelector("#theme")!.addEventListener("click", () =>
-  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"),
-);
+setUpTheme();
 
 // --- Benchmark ----------------------------------------------------------------
 

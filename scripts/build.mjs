@@ -3,7 +3,7 @@
 import * as esbuild from "esbuild";
 import { readFile } from "node:fs/promises";
 
-const libraries = ["silverware-table"];
+const libraries = ["silverware-table", "silverware-toolbar"];
 const watch = process.argv.includes("--watch");
 const check = process.argv.includes("--check");
 

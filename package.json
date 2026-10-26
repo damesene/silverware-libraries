@@ -17,6 +17,11 @@
     "playground": "node scripts/playground.mjs"
   },
   "devDependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
     "@playwright/test": "1.64.1",
     "@types/node": "^26.6.5",
     "esbuild": "^0.28.2",

@@ -1,0 +1,148 @@
+/* What every playground shares: stand-ins for SilverBullet's theme variables
+   the plugins use, the header (its buttons, the switch between the
+   playgrounds), the notifications. Each playground lays its page out in its
+   own CSS. */
+:root {
+  --root-color: #1f2328;
+  --root-background-color: #ffffff;
+  --ui-accent-color: #464cfc;
+  --danger-color: #c62828;
+  --button-border-color: #c8c8d0;
+  --editor-table-head-background-color: #e8e8ee;
+  --editor-table-even-background-color: #f4f4f8;
+  --ui-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --editor-font: "Iowan Old Style", Georgia, serif;
+  --panel: #f6f6f8;
+  --border: #dcdce2;
+  /* SilverBullet's defaults (theme.scss) */
+  --editor-width: 800px;
+  --top-background-color: #eee;
+}
+:root[data-theme="dark"] {
+  --root-color: #e6e6ea;
+  --root-background-color: #1e1f24;
+  --ui-accent-color: #8a8eff;
+  --danger-color: #ff6b6b;
+  --button-border-color: #4a4b55;
+  --editor-table-head-background-color: #2e2f38;
+  --editor-table-even-background-color: #26272e;
+  --panel: #18191d;
+  --border: #33343c;
+  --top-background-color: #222;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+body {
+  color: var(--root-color);
+  background: var(--root-background-color);
+  font-family: var(--ui-font);
+}
+header {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+/* What the playground is: cut where the header has no room for it (one line) */
+header .hint {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0.7;
+}
+header > :not(.hint) {
+  flex-shrink: 0;
+}
+.spacer {
+  flex: 1;
+}
+button {
+  font: inherit;
+  font-size: 13px;
+  padding: 3px 10px;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color);
+  border-radius: 4px;
+  cursor: pointer;
+}
+header button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--ui-accent-color, #4a7cc7) 18%, var(--root-background-color));
+}
+header button .icon {
+  display: none;
+}
+
+/* The switch between the playgrounds: the one open marked */
+.playgrounds {
+  display: inline-flex;
+  border: 1px solid var(--button-border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 13px;
+}
+.playgrounds a {
+  padding: 3px 10px;
+  color: inherit;
+  text-decoration: none;
+  background: var(--root-background-color);
+}
+.playgrounds a + a {
+  border-left: 1px solid var(--button-border-color);
+}
+.playgrounds a[aria-current="page"] {
+  font-weight: 600;
+  background: color-mix(in srgb, var(--ui-accent-color, #4a7cc7) 18%, var(--root-background-color));
+}
+
+/* At the top, under the top bar, as SilverBullet's notifications are */
+#flash {
+  position: fixed;
+  right: 16px;
+  top: 60px;
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 100;
+}
+#flash div {
+  padding: 8px 14px;
+  font-size: 14px;
+  color: #fff;
+  background: #333;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+}
+#flash div.error {
+  background: var(--danger-color);
+}
+
+@media (max-width: 800px) {
+  header .hint,
+  header .long,
+  header button .label {
+    display: none;
+  }
+  header button .icon {
+    display: inline;
+  }
+  header {
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 6px 10px;
+  }
+}

@@ -1,75 +1,13 @@
-/* Stand-ins for the SilverBullet theme variables Silverware Table uses */
-:root {
-  --root-color: #1f2328;
-  --root-background-color: #ffffff;
-  --ui-accent-color: #464cfc;
-  --danger-color: #c62828;
-  --button-border-color: #c8c8d0;
-  --editor-table-head-background-color: #e8e8ee;
-  --editor-table-even-background-color: #f4f4f8;
-  --ui-font: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --editor-font: "Iowan Old Style", Georgia, serif;
-  --panel: #f6f6f8;
-  --border: #dcdce2;
-  /* SilverBullet's defaults (theme.scss) */
-  --editor-width: 800px;
-  --top-background-color: #eee;
-}
-:root[data-theme="dark"] {
-  --root-color: #e6e6ea;
-  --root-background-color: #1e1f24;
-  --ui-accent-color: #8a8eff;
-  --danger-color: #ff6b6b;
-  --button-border-color: #4a4b55;
-  --editor-table-head-background-color: #2e2f38;
-  --editor-table-even-background-color: #26272e;
-  --panel: #18191d;
-  --border: #33343c;
-  --top-background-color: #222;
-}
-
-* {
-  box-sizing: border-box;
-}
+/* The table playground's page (common.css: what every playground shares) */
 html,
 body {
   height: 100%;
-  margin: 0;
 }
 body {
   display: grid;
   grid-template-rows: auto auto 1fr;
   /* Never wider than the window: the header and settings wrap instead */
   grid-template-columns: minmax(0, 1fr);
-  color: var(--root-color);
-  background: var(--root-background-color);
-  font-family: var(--ui-font);
-}
-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel);
-}
-header .hint {
-  font-size: 13px;
-  opacity: 0.7;
-}
-.spacer {
-  flex: 1;
-}
-button {
-  font: inherit;
-  font-size: 13px;
-  padding: 3px 10px;
-  color: inherit;
-  background: var(--root-background-color);
-  border: 1px solid var(--button-border-color);
-  border-radius: 4px;
-  cursor: pointer;
 }
 main {
   display: grid;
@@ -244,29 +182,6 @@ main {
   padding: 11px 8px;
 }
 
-/* At the top, under the top bar, as SilverBullet's notifications are */
-#flash {
-  position: fixed;
-  right: 16px;
-  top: 60px;
-  align-items: flex-end;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  z-index: 100;
-}
-#flash div {
-  padding: 8px 14px;
-  font-size: 14px;
-  color: #fff;
-  background: #333;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
-}
-#flash div.error {
-  background: var(--danger-color);
-}
-
 @media (max-width: 800px) {
   main {
     grid-template-columns: 1fr;
@@ -274,16 +189,6 @@ main {
   }
   body.no-markdown main {
     grid-template-rows: 1fr;
-  }
-  header .hint,
-  header .long,
-  header button .label {
-    display: none;
-  }
-  header {
-    flex-wrap: nowrap;
-    gap: 6px;
-    padding: 6px 10px;
   }
 }
 
@@ -293,19 +198,6 @@ body.no-markdown main {
 }
 body.no-markdown .markdown-pane {
   display: none;
-}
-#markdown[aria-pressed="true"],
-#bench-toggle[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--ui-accent-color, #4a7cc7) 18%, var(--root-background-color));
-}
-
-header button .icon {
-  display: none;
-}
-@media (max-width: 800px) {
-  header button .icon {
-    display: inline;
-  }
 }
 /* Each in its row of the body's grid, also while the panels above are hidden: the page keeps the last one */
 header {

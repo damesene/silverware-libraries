@@ -1,0 +1,36 @@
+/* The toolbar playground (common.css: what every playground shares):
+   SilverBullet's layout in short, the header over the editor's scroller,
+   its content as wide as SilverBullet's */
+body {
+  display: flex;
+  flex-direction: column;
+}
+#sb-main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+#sb-editor,
+#sb-editor .cm-editor {
+  height: 100%;
+}
+#sb-editor .cm-editor {
+  font-family: var(--editor-font);
+  font-size: 17px;
+  color: var(--root-color);
+  background: var(--root-background-color);
+}
+/* The page's type, as SilverBullet's (CodeMirror's own is monospace) */
+#sb-editor .cm-scroller {
+  font-family: var(--editor-font);
+  overflow: auto;
+  line-height: 1.6;
+}
+#sb-editor .cm-content {
+  max-width: var(--editor-width);
+  margin: 0 auto;
+  padding: 24px 20px 40vh;
+}
+#sb-editor .cm-focused {
+  outline: none;
+}

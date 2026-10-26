@@ -1,7 +1,7 @@
 // The favourites as the settings dialog edits them: rows of items, each change
 // a new value (the dialog draws it again). An item is at a row and an index.
 
-import { type FavoriteItem, type Favorites, isKindItem, isSeparator, type SeparatorItem } from "../core/favorites.ts";
+import { type FavoriteItem, type Favorites, isKindItem, isSeparator, type KindItem, type SeparatorItem } from "../core/favorites.ts";
 
 export type At = { readonly row: number; readonly index: number };
 
@@ -62,11 +62,13 @@ export function toggleShow(rows: Favorites, at: At): FavoriteItem[][] {
   return next;
 }
 
-/** A kind's item with an action's id in one of its slots */
-export function setSlot(rows: Favorites, at: At, key: string, id: string): FavoriteItem[][] {
+/** A kind's item with an action's id in one of its slots (undefined: none there) */
+export function setSlot(rows: Favorites, at: At, key: string, id: string | undefined): FavoriteItem[][] {
   const next = copy(rows);
   const item = next[at.row]?.[at.index];
-  if (item && isKindItem(item)) next[at.row]![at.index] = { ...item, [key]: id };
+  if (!item || !isKindItem(item)) return next;
+  const { [key]: _, ...rest } = item;
+  next[at.row]![at.index] = (id === undefined ? rest : { ...rest, [key]: id }) as KindItem;
   return next;
 }
 

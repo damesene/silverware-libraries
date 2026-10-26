@@ -15,13 +15,14 @@ async function dragUp(page: Page, dy: number, back = 0): Promise<void> {
 }
 
 test.describe("The gesture button", () => {
-  test("added in the settings: two actions in one, the second's icon small above the first's; a click runs the first", async ({ page }) => {
+  test("added in the settings: two actions in one, the second's icon small in its top right corner; a click runs the first", async ({ page }) => {
     await addGesture(page, "bold", "italic");
-    // The second's icon small, centred above the first's
+    // The second's icon small, in the top right corner
+    const box = (await gestureButton(page).boundingBox())!;
     const hint = (await gestureButton(page).locator(".swb-gesture-hint svg").boundingBox())!;
     const icon = (await gestureButton(page).locator(".swb-gesture-tap svg").boundingBox())!;
-    expect(Math.abs(hint.x + hint.width / 2 - (icon.x + icon.width / 2))).toBeLessThan(1);
-    expect(hint.y + hint.height).toBeLessThanOrEqual(icon.y + 1);
+    expect(box.x + box.width - (hint.x + hint.width)).toBeLessThan(4);
+    expect(hint.y - box.y).toBeLessThan(4);
     expect(hint.width).toBeLessThan(icon.width / 2);
     await expect(gestureButton(page)).toHaveAttribute("aria-label", "Bold (swipe up: Italic)");
     await gestureButton(page).click();
@@ -59,6 +60,24 @@ test.describe("The gesture button", () => {
     await expect(gestureButton(page)).toHaveAttribute("aria-pressed", "false");
     await dragUp(page, (await gestureButton(page).boundingBox())!.height);
     await expect.poll(() => text(page)).toContain("**bold**, italic, ~~struck~~");
+  });
+
+  test("a swipe down too: its icon in the bottom right corner, dragged down past half runs it; a swipe left out in the settings is None", async ({ page }) => {
+    await addGesture(page, "bold", undefined, "italic");
+    await expect(gestureButton(page).locator(".swb-hint-up")).toHaveCount(0);
+    const box = (await gestureButton(page).boundingBox())!;
+    const hint = (await gestureButton(page).locator(".swb-hint-down svg").boundingBox())!;
+    expect(box.x + box.width - (hint.x + hint.width)).toBeLessThan(4);
+    expect(box.y + box.height - (hint.y + hint.height)).toBeLessThan(4);
+    await expect(page.locator('.swb-settings')).toHaveCount(0);
+    await dragUp(page, -(await gestureButton(page).boundingBox())!.height);
+    await expect.poll(() => text(page)).toContain("Select _some text_ in this page");
+    // Up does nothing here
+    const before = await text(page);
+    await select(page, "some text");
+    await dragUp(page, (await gestureButton(page).boundingBox())!.height);
+    await page.waitForTimeout(300);
+    expect(await text(page)).toBe(before);
   });
 
   test("dragged up and back down, or not far enough, runs nothing and rolls back", async ({ page }) => {

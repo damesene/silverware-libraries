@@ -184,9 +184,10 @@ export class Controller {
           // A kind's: a kind no module on gives, or a slot without an action, left out
           const kind = kinds.find((k) => k.type === item.type);
           if (!kind) return [];
-          const slots = kind.slots.map(({ key }) => [key, all.find((a) => a.id === item[key])] as const);
-          if (slots.some(([, action]) => !action)) return [];
-          return [{ item: { kind, actions: Object.fromEntries(slots) as Record<string, Action>, labeled: item.show === "label", item } }];
+          const slots = kind.slots.map(({ key, optional }) => ({ key, optional, action: all.find((a) => a.id === item[key]) }));
+          if (slots.some(({ optional, action }) => !optional && !action)) return [];
+          const found = Object.fromEntries(slots.flatMap(({ key, action }) => (action ? [[key, action]] : [])));
+          return [{ item: { kind, actions: found as Record<string, Action>, labeled: item.show === "label", item } }];
         });
         return items.filter((item, i) => !("separator" in item) || (i > 0 && i < items.length - 1 && !("separator" in items[i - 1]!)));
       })

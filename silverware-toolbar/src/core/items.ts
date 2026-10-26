@@ -6,10 +6,14 @@
 // the kind draws its button in the toolbar and reads any other field it knows.
 import type { Action } from "./action.ts";
 
-/** A slot of a kind of favourite: a field holding an action's id, and what it is for, as the settings dialog names it */
-export type ItemSlot = { readonly key: string; readonly label: string };
+/**
+ * A slot of a kind of favourite: a field holding an action's id, and what it
+ * is for, as the settings dialog names it; `optional`: it may hold none (the
+ * dialog offers None), and one whose action is not there is left out alone
+ */
+export type ItemSlot = { readonly key: string; readonly label: string; readonly optional?: boolean };
 
-/** A favourite of a kind a module gives, as the toolbar shows it now: its kind, its slots' actions (all of them found), its look */
+/** A favourite of a kind a module gives, as the toolbar shows it now: its kind, its slots' actions (every one needed found; an optional one's where it is), its look */
 export type ShownItem = {
   readonly kind: ItemKind;
   readonly actions: Readonly<Record<string, Action>>;
@@ -38,7 +42,7 @@ export type ItemKind = {
   // As the settings dialog offers it (Add) and names it
   readonly label: string;
   readonly icon: string;
-  // Every one needed: a favourite without one of them, or with an id no action has, is left out
+  // Every one not optional needed: a favourite without one of them, or with an id no action has, is left out
   readonly slots: readonly ItemSlot[];
   // Its button in the toolbar
   readonly render: (shown: ShownItem, host: ItemHost) => HTMLButtonElement;

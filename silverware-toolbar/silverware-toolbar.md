@@ -61,13 +61,13 @@ The settings dialog's *Favorites* tab edits them without writing Lua (see *Setti
 
 ### Gesture buttons
 
-A gesture button holds two actions in one place: a click (a tap) runs the first, and swiping it up runs the second. As you drag it up, its icon rolls up and the second action's comes in from below, following your finger or the mouse; let go once it is more than halfway in (or flick it up) and the second action runs; drag back down and nothing happens. The second action's icon, small above the first's, tells it from a plain button and shows what a swipe runs; it is lit where that action is on for the selection, so a swipe turns it off (a swipe for *Bold* on bold text). While you drag, the button is tinted once letting go would run the second action. It is as wide as the wider of its two actions, with their labels too where `show = "label"`. In the settings, *Add* offers *Gesture button*, then asks for its two actions. In Lua:
+A gesture button holds up to three actions in one place: a click (a tap) runs the first, swiping it up runs another, swiping it down a third. As you drag it up, its icon rolls up and the swipe's action comes in from below (dragging down, from above), following your finger or the mouse; let go once it is more than halfway in (or flick it) and that action runs; drag back and nothing happens. Each swipe's icon is shown small, in the button's top right corner for up and its bottom right corner for down: it tells the button from a plain one and shows what a swipe runs, in color where that action is on for the selection, so a swipe turns it off (a swipe for *Bold* on bold text). While you drag, the button is tinted once letting go would run the action. It is as wide as the widest of its actions, with their labels too where `show = "label"`. In the settings, *Add* offers *Gesture button*, then asks for its actions; either swipe may be *None*. In Lua:
 
 ```lua
-{ type = "gesture", tap = "formats.bold", up = "formats.highlight" }
+{ type = "gesture", tap = "formats.bold", up = "formats.highlight", down = "formats.code" }
 ```
 
-The button shows as pressed when its first action is on for the selection; a second action not offered there is dimmed and does nothing. Gesture buttons come from the *Gestures* module: with it off they are left out.
+The button shows as pressed when its first action is on for the selection; a swipe's action not offered there is dimmed and does nothing. Gesture buttons come from the *Gestures* module: with it off they are left out.
 
 ## Settings
 
@@ -220,7 +220,7 @@ config.define("silverware.toolbar", {
         { { id = "actions.turnInto", show = "label" } },
         { { id = "formats.bold" }, { id = "formats.italic" }, { id = "formats.code" }, { type = "separator" }, { id = "formats.link" }, { id = "formats.highlight" } },
       },
-      description = "The toolbar's rows, each a list of items: { id = <its id>, show = \"icon\" or \"label\" }, { type = \"separator\" }, or a module's kind: { type = \"gesture\", tap = <an id>, up = <an id> } (every action is in the list of the … button).",
+      description = "The toolbar's rows, each a list of items: { id = <its id>, show = \"icon\" or \"label\" }, { type = \"separator\" }, or a module's kind: { type = \"gesture\", tap = <an id>, up = <an id>, down = <an id> } (every action is in the list of the … button).",
       ui = { category = "Silverware Toolbar", label = "Favourite actions", priority = 2 },
     },
     shortcut = {
@@ -443,12 +443,14 @@ end
   height: 14px;
   opacity: 0.6;
 }
-/* The gestures module's button: two faces in one cell (as wide as the wider), on a reel rolled by
-   --swb-roll (0 the click's face, 1 the swipe's), following the pointer while dragged (swb-rolling: no
-   transition), settling once let go, the button tinted while letting go would run the swipe's action;
-   that action's icon small above the faces (pushed down to make room for it), showing its state */
+/* The gestures module's button: its faces in one cell (as wide as the widest), on a reel rolled by
+   --swb-roll (0 the click's face, 1 the swipe up's, -1 the swipe down's), following the pointer while
+   dragged (swb-rolling: no transition), settling once let go, the button tinted while letting go would
+   run a swipe's action; each swipe's icon small in its top right corner (up) or its bottom right one
+   (down), showing its action's state */
 .swb-button.swb-gesture {
   --swb-roll: 0;
+  --swb-rolled: 0;
   position: relative;
   overflow: hidden;
   touch-action: pan-x;
@@ -470,7 +472,6 @@ end
   justify-content: center;
   gap: 6px;
   min-width: 0;
-  padding-top: 7px;
   box-sizing: border-box;
   transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: transform;
@@ -481,13 +482,17 @@ end
 .swb-gesture-up {
   transform: translateY(calc((1 - var(--swb-roll)) * 100%));
 }
+.swb-gesture-down {
+  transform: translateY(calc((-1 - var(--swb-roll)) * 100%));
+}
 .swb-gesture.swb-rolling .swb-gesture-face {
   transition: none;
 }
 .swb-gesture-face.swb-off {
   opacity: 0.35;
 }
-.swb-gesture-up.swb-on {
+.swb-gesture-up.swb-on,
+.swb-gesture-down.swb-on {
   color: var(--ui-accent-color, #464cfc);
 }
 .swb-button.swb-gesture.swb-armed {
@@ -496,25 +501,30 @@ end
 .swb-button.swb-gesture[aria-disabled="true"] {
   cursor: default;
 }
-/* Quiet; on (as a pressed button: the accent on a tint) where the swipe's action is on for the
+/* Quiet; on (in the accent, at full strength) where the swipe's action is on for the
    selection, so a swipe turns it off (bold already); gone as the button rolls (its faces go past it) */
 .swb-gesture-hint {
   position: absolute;
-  top: 1px;
-  left: 50%;
+  right: 2px;
   display: flex;
-  padding: 0 3px;
-  border-radius: 4px;
-  transform: translateX(-50%);
   --swb-hint: 0.45;
-  opacity: max(0, var(--swb-hint) - var(--swb-roll) * 3 * var(--swb-hint));
+  opacity: max(0, var(--swb-hint) - var(--swb-rolled) * 3 * var(--swb-hint));
   pointer-events: none;
   transition: opacity 120ms;
+}
+/* In the page's color while off, also in a button pressed (its color the accent) */
+.swb-gesture-hint:not(.swb-on) {
+  color: var(--root-color, #222);
+}
+.swb-gesture-hint.swb-hint-up {
+  top: 2px;
+}
+.swb-gesture-hint.swb-hint-down {
+  bottom: 2px;
 }
 .swb-gesture-hint.swb-on {
   --swb-hint: 1;
   color: var(--ui-accent-color, #464cfc);
-  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 10%, transparent);
 }
 .swb-floating .swb-gesture-hint svg {
   width: 8px;

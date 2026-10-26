@@ -53,6 +53,8 @@ describe("The favourites as the settings edit them", () => {
     const labeled = toggleShow(filled, { row: 1, index: 3 });
     expect(labeled[1]![3]).toEqual({ type: "gesture", tap: "formats.bold", up: "formats.italic", show: "label" });
     expect(toggleShow(labeled, { row: 1, index: 3 })[1]![3]).toEqual(filled[1]![3]);
+    // None in a slot: its field gone
+    expect(setSlot(filled, { row: 1, index: 3 }, "up", undefined)[1]![3]).toEqual({ type: "gesture", tap: "formats.bold" });
     // An action's item has no slots
     expect(setSlot(ROWS, { row: 1, index: 0 }, "tap", "x")).toEqual(ROWS);
   });

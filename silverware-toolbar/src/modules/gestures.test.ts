@@ -7,9 +7,10 @@ import { gesturesModule } from "./gestures.ts";
 const action = (id: string): Action => ({ id, label: id, icon: "<svg></svg>", group: "Format" });
 const BOLD = action("formats.bold");
 const ITALIC = action("formats.italic");
+const CODE = action("formats.code");
 
 /** A gesture button drawn, 30px tall, with what it ran */
-function gesture(enabled: (a: Action) => boolean = () => true, active: (a: Action) => boolean = () => false) {
+function gesture(enabled: (a: Action) => boolean = () => true, active: (a: Action) => boolean = () => false, actions: Record<string, Action> = { tap: BOLD, up: ITALIC }) {
   const [kind] = gesturesModule().itemKinds!();
   const ran: string[] = [];
   const host: ItemHost = {
@@ -20,8 +21,8 @@ function gesture(enabled: (a: Action) => boolean = () => true, active: (a: Actio
     content: (a) => Object.assign(document.createElement("span"), { textContent: a.label }),
     button: () => Object.assign(document.createElement("button"), { type: "button", className: "swb-button" }),
   };
-  const item = { type: "gesture", tap: BOLD.id, up: ITALIC.id };
-  const button = kind!.render({ kind: kind!, actions: { tap: BOLD, up: ITALIC }, labeled: false, item }, host);
+  const item = { type: "gesture", ...Object.fromEntries(Object.entries(actions).map(([key, a]) => [key, a.id])) };
+  const button = kind!.render({ kind: kind!, actions, labeled: false, item }, host);
   document.body.append(button);
   button.querySelector<HTMLElement>(".swb-gesture-reel")!.getBoundingClientRect = () => ({ height: 30 }) as DOMRect;
   button.setPointerCapture = () => undefined;
@@ -45,13 +46,37 @@ function drag(button: Element, ys: readonly number[], click = true): void {
 afterEach(() => document.body.replaceChildren());
 
 describe("The gesture button", () => {
-  it("is a kind of favourite with two slots, giving no actions of its own", () => {
+  it("is a kind of favourite with a click's slot and optional swipes up and down, giving no actions of its own", () => {
     const module = gesturesModule();
     expect(module.actions()).toEqual([]);
-    expect(module.itemKinds!().map((k) => [k.type, k.slots.map((s) => s.key)])).toEqual([["gesture", ["tap", "up"]]]);
+    expect(module.itemKinds!().map((k) => [k.type, k.slots.map((s) => s.key)])).toEqual([["gesture", ["tap", "up", "down"]]]);
+    expect(module.itemKinds!()[0]!.slots.map((s) => !!s.optional)).toEqual([false, true, true]);
   });
 
-  it("runs the first action on a click, and shows the second's icon small above its own", () => {
+  it("dragged down past half its height runs the swipe down's action, its icon in the bottom right corner; up still the swipe up's", () => {
+    const { button, ran } = gesture(undefined, undefined, { tap: BOLD, up: ITALIC, down: CODE });
+    expect(button.querySelector(".swb-hint-down")!.innerHTML).toBe(CODE.icon);
+    pointer(button, "pointerdown", 100);
+    pointer(button, "pointermove", 112, 10, 100);
+    expect(button.style.getPropertyValue("--swb-roll")).toBe(String(-12 / 30));
+    pointer(button, "pointermove", 120, 10, 200);
+    expect(button.classList.contains("swb-armed")).toBe(true);
+    pointer(button, "pointerup", 120, 10, 300);
+    drag(button, [100, 80]);
+    expect(ran).toEqual([CODE.id, ITALIC.id]);
+  });
+
+  it("without a swipe down does not roll down (nor up without a swipe up)", () => {
+    const { button, ran } = gesture();
+    drag(button, [100, 130]);
+    expect(button.style.getPropertyValue("--swb-roll")).toBe("0");
+    const downOnly = gesture(undefined, undefined, { tap: BOLD, down: CODE });
+    expect(downOnly.button.querySelector(".swb-hint-up")).toBeNull();
+    drag(downOnly.button, [100, 70]);
+    expect([...ran, ...downOnly.ran]).toEqual([]);
+  });
+
+  it("runs the first action on a click, and shows the second's icon small in its corner", () => {
     const { button, ran } = gesture();
     button.click();
     expect(ran).toEqual([BOLD.id]);

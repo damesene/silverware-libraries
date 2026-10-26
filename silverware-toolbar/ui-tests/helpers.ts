@@ -163,10 +163,11 @@ export const gestureButton = (page: Page): Locator => bar(page).locator(".swb-ge
 
 /**
  * A gesture button added at the end of the second row through the settings
- * dialog, as a user adds one (Add, Gesture button, its two actions searched),
- * and saved; the text selected again after
+ * dialog, as a user adds one (Add, Gesture button, its actions searched: a
+ * swipe left out takes None, the first offered), and saved; the text selected
+ * again after
  */
-export async function addGesture(page: Page, tap: string, up: string, needle = "some text"): Promise<void> {
+export async function addGesture(page: Page, tap: string, up: string | undefined, down?: string, needle = "some text"): Promise<void> {
   await select(page, needle);
   await bar(page).locator(".swb-more").click();
   await popup(page).locator(".swb-search-field").fill("settings");
@@ -180,9 +181,11 @@ export async function addGesture(page: Page, tap: string, up: string, needle = "
   await expect(field).toHaveAttribute("placeholder", "Search an action for Click");
   await field.fill(tap);
   await page.keyboard.press("Enter");
-  await expect(field).toHaveAttribute("placeholder", "Search an action for Swipe up");
-  await field.fill(up);
-  await page.keyboard.press("Enter");
+  for (const [slot, name] of [["Swipe up", up], ["Swipe down", down]] as const) {
+    await expect(field).toHaveAttribute("placeholder", `Search an action for ${slot}`);
+    await field.fill(name ?? "");
+    await page.keyboard.press("Enter");
+  }
   await expect(field).toHaveCount(0);
   await dialog.locator(".swb-settings-save").click();
   await expect(dialog).toHaveCount(0);

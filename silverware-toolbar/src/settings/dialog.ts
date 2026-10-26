@@ -400,18 +400,20 @@ export class SettingsDialog {
     this.update();
   }
 
-  /** A slot of a kind's item: the action picked for it (none yet: Choose…); a click opens the search for it */
+  /** A slot of a kind's item: the action picked for it (none yet: Choose…, an optional one None); a click opens the search for it */
   private slotButton(item: KindItem, at: At, slot: ItemSlot, known: Map<string, Action>): HTMLButtonElement {
     const id = item[slot.key];
     const action = typeof id === "string" ? known.get(id) : undefined;
-    const what = action?.label ?? (typeof id === "string" && id ? id : "Choose…");
+    const unset = !(typeof id === "string" && id);
+    const what = action?.label ?? (unset ? (slot.optional ? "None" : "Choose…") : (id as string));
     const button = this.button(`${BASE}-slot`, `${slot.label}: ${what}`, () => this.openPicking({ at, key: slot.key }));
     button.innerHTML = `<span class="${BASE}-slot-name"></span><span class="${BASE}-item-icon">${action?.icon ?? ""}</span><span class="${BASE}-slot-action"></span>`;
     button.querySelector(`.${BASE}-slot-name`)!.textContent = slot.label;
     button.querySelector(`.${BASE}-slot-action`)!.textContent = what;
     button.setAttribute("aria-label", `${slot.label}: ${what}`);
     button.dataset.swbSlot = slot.key;
-    if (!action) button.classList.add(`${BASE}-unknown`);
+    if (!action && !(unset && slot.optional)) button.classList.add(`${BASE}-unknown`);
+    if (unset && slot.optional) button.classList.add(`${BASE}-slot-unset`);
     const picking = this.picking;
     button.setAttribute("aria-expanded", String(!!picking && "at" in picking && picking.key === slot.key && picking.at.row === at.row && picking.at.index === at.index));
     return button;
@@ -468,12 +470,14 @@ export class SettingsDialog {
       this.picking = kind.slots[0] ? { at, key: kind.slots[0].key } : undefined;
       this.edit(favorites, this.picking ? `[data-swb-row="${row}"] .${BASE}-pick-field` : `[data-swb-item="${at.row}:${at.index}"]`);
     };
-    // An action for the slot: the search goes on for the next slot without one
-    const fill = (id: string) => {
-      if (forRow) return add({ id });
+    // An action for the slot (an optional one: or none): the search goes on for the next slot after it without one
+    const fill = (id: string | undefined) => {
+      if (forRow) return id === undefined ? undefined : add({ id });
       const favorites = setSlot(this.values!.favorites, target.at, target.key, id);
       const item = favorites[target.at.row]?.[target.at.index];
-      const next = item && isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type)?.slots.find((s) => !item[s.key]) : undefined;
+      const slots = this.kindOf(target.at)?.slots ?? [];
+      const after = slots.slice(slots.findIndex((s) => s.key === target.key) + 1);
+      const next = item && isKindItem(item) ? after.find((s) => !item[s.key]) : undefined;
       this.picking = next ? { at: target.at, key: next.key } : undefined;
       this.edit(favorites, next ? `[data-swb-row="${row}"] .${BASE}-pick-field` : `[data-swb-item="${target.at.row}:${target.at.index}"] [data-swb-slot="${target.key}"]`);
     };
@@ -483,10 +487,13 @@ export class SettingsDialog {
       const query = field.value.trim().toLowerCase();
       const separator = forRow && (!query || "separator".startsWith(query));
       const kinds = forRow ? this.context.kinds().filter((kind) => wordsStart(kind.label, query)) : [];
-      shown = [...(separator ? [() => add({ type: "separator" })] : []), ...kinds.map((kind) => () => addKind(kind)), ...found.map((entry) => () => fill(entry.action.id))];
+      // An optional slot may hold no action
+      const none = !!slot?.optional && (!query || "none".startsWith(query));
+      shown = [...(separator ? [() => add({ type: "separator" })] : []), ...(none ? [() => fill(undefined)] : []), ...kinds.map((kind) => () => addKind(kind)), ...found.map((entry) => () => fill(entry.action.id))];
       const options = [
         ...(separator ? [this.option(`${BASE}-pick-separator`, "", "Separator", "", () => add({ type: "separator" }))] : []),
-        ...kinds.map((kind) => this.option(`${BASE}-pick-kind`, kind.icon, kind.label, "Two actions in one", () => addKind(kind))),
+        ...(none ? [this.option(`${BASE}-pick-unset`, "", "None", `No action for ${slot!.label}`, () => fill(undefined))] : []),
+        ...kinds.map((kind) => this.option(`${BASE}-pick-kind`, kind.icon, kind.label, "Several actions in one", () => addKind(kind))),
         ...found.map((entry) => this.option("", entry.action.icon, entry.action.label, entry.group, () => fill(entry.action.id))),
       ];
       list.replaceChildren(...(options.length ? options : [this.el("div", `${BASE}-pick-none`, "No action found")]));

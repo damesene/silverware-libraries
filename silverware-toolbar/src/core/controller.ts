@@ -10,11 +10,12 @@
 // or text is typed. The modules (modules.ts) give the actions; the core knows
 // none of them. The popup ends with the core's own item, the settings dialog.
 import type { Bridge, Settings } from "../bridge.ts";
-import { keyboardBarTop, pageContentOf, viewTopOf } from "../dom.ts";
+import { CONTENT_SELECTOR, keyboardBarTop, pageContentOf, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
 import type { Action, ActionEditor, Change, Context } from "./action.ts";
 import { Bar, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
+import { hideKeyboard } from "./keyboard.ts";
 import { marked } from "./cursor.ts";
 import type { Box } from "./place.ts";
 import { Popup } from "./popup.ts";
@@ -260,6 +261,7 @@ export class Controller {
       },
       flash: (message, type) => void bridge.flash(message, type),
       select: (from, to) => void bridge.setSelection(from, to),
+      hideKeyboard: () => hideKeyboard(pageContentOf(this.doc.activeElement) ?? this.doc.querySelector<HTMLElement>(CONTENT_SELECTOR)),
     };
     try {
       await action.perform!(context, editor);

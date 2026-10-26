@@ -34,6 +34,7 @@ export const ICONS = {
   chevronDown: svg('<path d="m6 9 6 6 6-6"/>'),
   back: svg('<path d="M19 12H5M11 6l-6 6 6 6"/>'),
   search: svg('<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/>'),
+  keyboardHide: svg('<rect x="3" y="4" width="18" height="10" rx="2"/><path d="M7 8h.01M11 8h.01M15 8h.01M7 11h10M9 18l3 3 3-3"/>'),
   command: svg('<path d="m5 8 4 4-4 4M12 16h7"/>'),
   grip: svg('<circle cx="9" cy="6" r="1" fill="currentColor"/><circle cx="15" cy="6" r="1" fill="currentColor"/><circle cx="9" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="9" cy="18" r="1" fill="currentColor"/><circle cx="15" cy="18" r="1" fill="currentColor"/>'),
   close: svg('<path d="M6 6l12 12M18 6 6 18"/>'),

@@ -65,6 +65,21 @@ test.describe("The toolbar on a phone", () => {
     await expect(bar(page)).toBeVisible();
   });
 
+  test("Hide the keyboard: the keyboard hidden, the selection kept as it is, the toolbar staying; a tap in the text brings it back", async ({ page }) => {
+    await selectByTouch(page, "some text");
+    await bar(page).locator(".swb-more").tap();
+    await popup(page).locator(".swb-search-field").fill("keyboard");
+    await popup(page).locator('[data-swb-action="actions.hideKeyboard"]').tap();
+    const policy = () => page.evaluate(() => (document.querySelector(".cm-content") as HTMLElement & { virtualKeyboardPolicy?: string }).virtualKeyboardPolicy);
+    await expect.poll(policy).toBe("manual");
+    await expect(page.locator(".cm-content")).toBeFocused();
+    expect(await selected(page)).toBe("some text");
+    await expect(bar(page)).toBeVisible();
+    const line = await lineBox(page, "Plain paragraph one");
+    await page.touchscreen.tap(line.x + 20, line.y + line.height / 2);
+    await expect.poll(policy).toBe("auto");
+  });
+
   test("the list of every action opens over it", async ({ page }) => {
     await selectByTouch(page, "some text");
     await bar(page).locator(".swb-more").tap();

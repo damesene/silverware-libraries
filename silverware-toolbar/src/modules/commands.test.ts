@@ -3,7 +3,7 @@ import type { ActionEditor } from "../core/action.ts";
 import { contextOf } from "../core/context.ts";
 import { commandActions, commandsModule } from "./commands.ts";
 
-const EDITOR: ActionEditor = { invokeCommand: async () => {}, navigate: async () => {}, flash: () => {}, select: () => {} };
+const EDITOR: ActionEditor = { invokeCommand: async () => {}, navigate: async () => {}, flash: () => {}, select: () => {}, hideKeyboard: () => {} };
 
 describe("The commands module", () => {
   it("makes an action of each command SilverBullet lists, by name, hidden ones and what is no command left out", () => {

@@ -8,12 +8,14 @@ import { blocksModule } from "./modules/blocks.ts";
 import { clearModule } from "./modules/clear.ts";
 import { commandsModule } from "./modules/commands.ts";
 import { inlineModule } from "./modules/inline.ts";
+import { keyboardModule } from "./modules/keyboard.ts";
 
 const FACTORIES: readonly (readonly [ModuleName, (host: ModuleHost) => ToolbarModule])[] = [
   ["inline", inlineModule],
   ["clear", clearModule],
   ["blocks", blocksModule],
   ["commands", commandsModule],
+  ["keyboard", keyboardModule],
 ];
 
 /** The actions of the modules turned on, in their order, and the custom ones: asked for each time they show */

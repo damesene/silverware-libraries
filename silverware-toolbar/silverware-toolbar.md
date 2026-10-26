@@ -33,6 +33,7 @@ Select text in a page and a toolbar shows beside it: make it bold, italic or cod
 | Clear formatting | `actions.clear` | Takes bold, italic, strikethrough, highlight and code off the selection, its text kept |
 | Turn into | `actions.turnInto` | The list of the block formats below |
 | Any SilverBullet command | `commands.<its name>`, e.g. `commands.Navigate: Home` | Runs it, as the command palette does. There are many: type a command's name in the **…** list to find it (they are not listed until you type) |
+| Hide the keyboard | `actions.hideKeyboard` | On a phone or tablet: hides the on-screen keyboard, the selection kept as it is, the toolbar staying (to see more of the page while you format it); the next tap in the text brings the keyboard back. Put it in your favourites to have it in the bar at the bottom. (Where the browser cannot hide it alone, Safari on iOS, the text is left: the keyboard and the bar go.) |
 | Silverware Toolbar settings… | `actions.settings` | The settings dialog (see *Settings*), last in the **…** list |
 | Paragraph | `formats.paragraph` | Plain lines: a list's, a heading's or a quote's marker taken off |
 | Heading 1, 2, 3 | `formats.heading1` … `formats.heading3` | `# `, `## `, `### ` |
@@ -246,6 +247,7 @@ config.define("silverware.toolbar", {
         blocks = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Turn lines into a paragraph, a heading, a list, a task or a quote.", ui = { category = "Silverware Toolbar", label = "Turn into", priority = 0.8 } } } },
         clear = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Remove the inline formats of the selection.", ui = { category = "Silverware Toolbar", label = "Clear formatting", priority = 0.6 } } } },
         commands = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Every SilverBullet command, found by typing its name in the list of every action, and as a favourite.", ui = { category = "Silverware Toolbar", label = "Commands", priority = 0.5 } } } },
+        keyboard = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "On a phone or tablet: an action hiding the on-screen keyboard, the selection kept as it is (to see more of the page while you format it).", ui = { category = "Silverware Toolbar", label = "Hide the keyboard", priority = 0.4 } } } },
       },
     },
   },

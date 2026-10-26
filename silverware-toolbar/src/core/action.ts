@@ -26,6 +26,8 @@ export type ActionEditor = {
   flash(message: string, type?: "info" | "error"): void;
   // The selection set, positions in the page's text
   select(from: number, to: number): void;
+  // The on-screen keyboard hidden, the selection kept (core/keyboard.ts)
+  hideKeyboard(): void;
 };
 
 /** What an action may do once its change is written: the core's editor, positions in the page's text */
@@ -85,4 +87,6 @@ export type ModuleHost = {
   readonly invokeCommand?: (name: string) => unknown;
   // A caret touching a word stands for the word, as if selected (the setting wordAtCaret)
   readonly wordAtCaret?: boolean;
+  // A touch screen (an on-screen keyboard), as Silverware Toolbar started
+  readonly touch?: boolean;
 };

@@ -41,11 +41,16 @@ export async function init(bridge: Bridge): Promise<void> {
   }
   // The one before stopped only now: init may be called again meanwhile (Space Lua loaded twice), each stops the last
   running?.stop();
-  const actions = createActions(settings.modules, { listCommands: bridge.listCommands, invokeCommand: bridge.invokeCommand, wordAtCaret: settings.wordAtCaret });
+  const actions = createActions(settings.modules, { listCommands: bridge.listCommands, invokeCommand: bridge.invokeCommand, wordAtCaret: settings.wordAtCaret, touch: touchScreen() });
   const controller = new Controller(document, bridge, settings, actions, () => void openSettings());
   slot[GLOBAL_KEY] = controller;
   current = { bridge, actions };
   controller.start();
+}
+
+/** Whether this is a touch screen (an on-screen keyboard to hide), as the toolbar starts */
+function touchScreen(): boolean {
+  return !!globalThis.matchMedia?.("(pointer: coarse)").matches || (globalThis.navigator?.maxTouchPoints ?? 0) > 0;
 }
 
 /** Whether settings can be saved through the bridge (the CONFIG page, or a store of its own) */

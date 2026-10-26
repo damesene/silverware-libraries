@@ -17,6 +17,7 @@ Select text in a page and a toolbar shows beside it: make it bold, italic or cod
 * **Every action**: the **…** button, or **Ctrl-Shift-q**, opens a list of every action under the toolbar, with a search field. Type to find (each word you type starts a word of an action's name: `num` finds *Numbered list*, `h2` *Heading 2*), **↑ ↓** to pick (Tab and Shift-Tab too, PageUp and PageDown by five), **Enter** to apply, **Esc** to close the list (a second **Esc** hides the toolbar). *Turn into* is one item there: **Enter** (or **→**) or a click opens its block formats in its place, and **Esc**, **←** or the arrow at the top goes back; typing finds the block formats straight away. The command *Silverware Toolbar: Show actions* is the same.
 * **Without a selection**, **Ctrl-Shift-q** shows the toolbar at the cursor with the list open. Its icons show the formats around the cursor: in a link, *Link* is pressed, and clicking it takes the link off. Typing or moving the cursor hides it.
 * The key is a setting (*Key for every action*). In Firefox on Windows, **Ctrl-Shift-q** quits the browser: choose another key there.
+* **On a phone** (text selected by touch) the toolbar is docked at the bottom, over the keyboard, as one row you scroll sideways (**…** always at its end): the system's own menu (Cut, Copy, Paste) shows by the selection, where the toolbar would be. *Where the toolbar shows* (a setting) keeps it by the selection, or docked always. SilverBullet's own bar over the keyboard, where it is on, stays under it; the settings offer to turn that one off.
 
 ## Actions
 
@@ -59,11 +60,11 @@ In the **…** list, the star by an action puts it at the end of the toolbar's l
 
 *Silverware Toolbar settings…*, the last item of the **…** list (or the command *Silverware Toolbar: Settings*), opens the settings, for every page in the space:
 
-* **General**: the key for every action, as SilverBullet writes keys (`Ctrl-Shift-q`, `Alt-k`).
+* **General**: the key for every action, as SilverBullet writes keys (`Ctrl-Shift-q`, `Alt-k`), and where the toolbar shows. On a phone with SilverBullet's keyboard bar on, it offers to turn that bar off (on that device, at once).
 * **Favorites**: the toolbar's rows, one under another. Drag an item within its row or into another, or with the keyboard: focus it (Tab) and press **Alt+←** or **Alt+→** to move it within its row, **Alt+↑** or **Alt+↓** into the row above or below, **Delete** to remove it. The button beside an action's name shows it as its icon or with its name too; **×** removes it. **Add** searches every action (and a separator) to add at the row's end; **Add row** adds a row. A row left empty is left out. An item no action has is dimmed, named by its id.
 * **Modules**: each part of the toolbar on or off (its actions with it).
 
-Nothing changes until **Save**. The favourites apply at once; a module or the key needs the page loaded again (**Save and reload**). They are saved in your `CONFIG` page: the key and the modules in the block SilverBullet's own settings (*Configuration: Open*) keep, so either shows what the other wrote; the favourites in a block of their own (`-- managed-by: silverware-toolbar`), which SilverBullet's settings leave alone. You can edit both by hand too.
+Nothing changes until **Save**. The favourites and where the toolbar shows apply at once; a module or the key needs the page loaded again (**Save and reload**). They are saved in your `CONFIG` page: the key and the modules in the block SilverBullet's own settings (*Configuration: Open*) keep, so either shows what the other wrote; the favourites in a block of their own (`-- managed-by: silverware-toolbar`), which SilverBullet's settings leave alone. You can edit both by hand too.
 
 ## Custom formats
 
@@ -202,6 +203,13 @@ config.define("silverware.toolbar", {
       description = "The key that shows every action (with nothing selected, the toolbar at the cursor), as SilverBullet writes keys. Applies after a reload.",
       ui = { category = "Silverware Toolbar", label = "Key for every action", priority = 1 },
     },
+    placement = {
+      type = "string",
+      enum = { "auto", "selection", "bottom" },
+      default = "auto",
+      description = "Where the toolbar shows: auto docks it at the bottom, over the keyboard, when the text was selected by touch (on a phone the system's Cut / Copy / Paste menu is by the selection), else by the selection; selection always by it; bottom always docked.",
+      ui = { category = "Silverware Toolbar", label = "Where the toolbar shows", priority = 0.95 },
+    },
     modules = {
       type = "object",
       additionalProperties = false,
@@ -248,6 +256,8 @@ if js and js.window then
     -- The commands module: SilverBullet's commands, run on the editor's selection
     listCommands = system.listCommands,
     invokeCommand = editor.invokeCommand,
+    -- Whether SilverBullet's keyboard bar is on (the settings offer to turn it off on a phone)
+    getUiOption = editor.getUiOption,
   })
   command.define {
     name = "Silverware Toolbar: Settings",
@@ -329,6 +339,41 @@ end
   display: flex;
   align-items: center;
   gap: 2px;
+}
+/* Docked at the bottom (a phone): one row across the window over the keyboard, scrolled sideways, … at its end */
+.swb-bar.swb-docked {
+  flex-direction: row;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100vw;
+  max-width: none;
+  padding: 4px 4px 4px 6px;
+  border-width: 1px 0 0;
+  border-radius: 0;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.12);
+}
+.swb-bar.swb-docked .swb-dock-items {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+.swb-bar.swb-docked .swb-dock-items::-webkit-scrollbar {
+  display: none;
+}
+.swb-bar.swb-docked .swb-button {
+  flex: none;
+  width: 40px;
+  height: 36px;
+}
+.swb-bar.swb-docked .swb-button.swb-labeled,
+.swb-bar.swb-docked .swb-button.swb-choices {
+  width: auto;
+}
+.swb-bar.swb-docked .swb-more {
+  flex: none;
+  margin-left: 2px;
 }
 /* An action with its label, one offering choices with a chevron (its choice on) */
 .swb-button.swb-labeled,
@@ -977,5 +1022,20 @@ end
 .swb-settings-pick-none {
   padding: 8px;
   opacity: 0.6;
+}
+/* Advice under the settings (SilverBullet's keyboard bar on): its button as the dialog's others */
+.swb-settings-advice {
+  margin-top: 12px;
+  border-color: color-mix(in srgb, var(--ui-accent-color, #464cfc) 45%, var(--swb-settings-line));
+}
+.swb-settings-advice-button {
+  flex: none;
+  padding: 5px 12px;
+  background: none;
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 6px;
+}
+.swb-settings-advice-button:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
 }
 ```

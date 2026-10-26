@@ -26,6 +26,8 @@ export type Bridge = {
   // Optional, for the commands module: SilverBullet's commands (system.listCommands: definitions by name) and running one
   readonly listCommands?: () => unknown;
   readonly invokeCommand?: (name: string) => unknown;
+  // Optional: one of SilverBullet's UI options (editor.getUiOption: `keyboardBar`, its bar over the on-screen keyboard)
+  readonly getUiOption?: (key: string) => unknown;
 };
 
 export type Selection = { readonly from: number; readonly to: number; readonly text: string };
@@ -51,10 +53,21 @@ export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
 // The key of the command showing every action (the library page gives it to the command: SilverBullet handles it)
 export const DEFAULT_SHORTCUT = "Ctrl-Shift-q";
 
+/**
+ * Where the toolbar shows: by the selection, or docked at the bottom of the
+ * window over the on-screen keyboard (on a phone the system's menu of a
+ * selection, Cut / Copy / Paste, is where the toolbar would be); `auto`: docked
+ * when the selection was made by touch, else by it
+ */
+export const PLACEMENTS = ["auto", "selection", "bottom"] as const;
+export type Placement = (typeof PLACEMENTS)[number];
+export const PLACEMENT_LABELS: Readonly<Record<Placement, string>> = { auto: "Docked at the bottom after a touch, else by the selection", selection: "By the selection", bottom: "Docked at the bottom" };
+
 /** Where each setting is in SilverBullet's configuration */
 export const PATHS = {
   favorites: "silverware.toolbar.favorites",
   shortcut: "silverware.toolbar.shortcut",
+  placement: "silverware.toolbar.placement",
   module: (name: ModuleName) => `silverware.toolbar.modules.${name}.enabled`,
 } as const;
 
@@ -62,6 +75,7 @@ export const PATHS = {
 export type Settings = {
   readonly favorites: Favorites;
   readonly modules: ReadonlySet<ModuleName>;
+  readonly placement: Placement;
 };
 
 /**
@@ -89,7 +103,8 @@ export async function readSettings(bridge: Bridge): Promise<Settings> {
   const favorites = await get(PATHS.favorites, DEFAULT_FAVORITES);
   const modules = new Set<ModuleName>();
   for (const name of MODULE_NAMES) if ((await get(PATHS.module(name), true)) !== false) modules.add(name);
-  return { favorites: favoritesOf(favorites), modules };
+  const placement = await get(PATHS.placement, "auto");
+  return { favorites: favoritesOf(favorites), modules, placement: PLACEMENTS.includes(placement as Placement) ? (placement as Placement) : "auto" };
 }
 
 /** The key as configured (the command's: SilverBullet takes it as the library page defines the command) */

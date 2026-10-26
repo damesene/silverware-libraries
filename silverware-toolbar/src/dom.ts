@@ -22,6 +22,17 @@ export function pageContentOf(node: Node | null): HTMLElement | undefined {
 // CodeMirror's scroller: the page's view, below SilverBullet's top bar
 const SCROLLER_SELECTOR = ".cm-scroller";
 
+// SilverBullet's bar over the on-screen keyboard on a phone (client/components/keyboard_bar.tsx, its main
+// since 2026-10, no release yet: shown while its UI option keyboardBar is on and the editor focused)
+const KEYBOARD_BAR_SELECTOR = ".sb-keyboard-bar";
+
+/** The top of SilverBullet's keyboard bar where it shows (the docked toolbar goes over it), else undefined */
+export function keyboardBarTop(doc: Document): number | undefined {
+  const bar = doc.querySelector<HTMLElement>(KEYBOARD_BAR_SELECTOR);
+  const rect = bar?.getBoundingClientRect();
+  return rect && rect.height > 0 ? rect.top : undefined;
+}
+
 /** The top of the page's view around a node (the toolbar goes below it there), else the window's */
 export function viewTopOf(node: Node | null): number {
   const element = node instanceof Element ? node : node?.parentElement;

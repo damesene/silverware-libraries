@@ -10,7 +10,7 @@
 import { settingRow, switchControl } from "../../../shared/controls.ts";
 import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
-import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, readSettings, readShortcut } from "../bridge.ts";
+import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
 import type { FavoriteItem, Favorites } from "../core/favorites.ts";
 import { type Entry, findEntries } from "../core/search.ts";
@@ -18,6 +18,9 @@ import { ICONS } from "../icons.ts";
 import { addItem, type At, moveItem, removeItem, sameRows, savedRows, stepOf, toggleShow } from "./favorites.ts";
 
 const BASE = "swb-settings";
+
+// SilverBullet's command turning its keyboard bar on or off on this device (plugs/editor/editor.plug.yaml)
+const KEYBOARD_BAR_COMMAND = "Editor: Toggle Keyboard Bar";
 
 export type SettingsContext = {
   readonly doc: Document;
@@ -32,7 +35,7 @@ export type SettingsContext = {
   saved(): void;
 };
 
-type Values = { shortcut: string; favorites: Favorites; modules: Record<ModuleName, boolean> };
+type Values = { shortcut: string; placement: Placement; favorites: Favorites; modules: Record<ModuleName, boolean> };
 
 export class SettingsDialog {
   private readonly dialogs: Dialogs;
@@ -45,6 +48,8 @@ export class SettingsDialog {
   private note: HTMLElement | undefined;
   // The row whose search of actions to add is open
   private adding: number | undefined;
+  // SilverBullet's keyboard bar on, on a touch screen: the docked toolbar goes over it, its turning off offered
+  private keyboardBar = false;
   // An item dragged by the pointer: where it is, where it would go
   private drag: { readonly from: At; readonly pointer: number; to: At | undefined; moved: boolean } | undefined;
 
@@ -62,7 +67,8 @@ export class SettingsDialog {
     const { bridge } = this.context;
     const settings = await readSettings(bridge);
     const modules = Object.fromEntries(MODULE_NAMES.map((name) => [name, settings.modules.has(name)])) as Record<ModuleName, boolean>;
-    this.initial = { shortcut: await readShortcut(bridge), favorites: settings.favorites, modules };
+    this.initial = { shortcut: await readShortcut(bridge), placement: settings.placement, favorites: settings.favorites, modules };
+    this.keyboardBar = await this.keyboardBarOn();
     this.values = { ...this.initial, favorites: settings.favorites.map((row) => [...row]), modules: { ...modules } };
     this.render();
   }
@@ -120,8 +126,17 @@ export class SettingsDialog {
     });
     const keyRow = settingRow(doc, BASE, "Key for every action", "As SilverBullet writes keys (Ctrl-Shift-q, Alt-k); with nothing selected it shows the toolbar at the cursor. Applies after a reload.", key);
     keyRow.dataset.swbSetting = PATHS.shortcut;
-    card.append(keyRow);
+    const placement = this.el("select");
+    for (const value of PLACEMENTS) placement.append(new Option(PLACEMENT_LABELS[value], value, false, value === values.placement));
+    placement.addEventListener("change", () => {
+      values.placement = placement.value as Placement;
+      this.update();
+    });
+    const placementRow = settingRow(doc, BASE, "Where the toolbar shows", "On a phone the system's menu of a selection (Cut, Copy, Paste) is where the toolbar would show by it: docked at the bottom, it is one row over the keyboard.", placement);
+    placementRow.dataset.swbSetting = PATHS.placement;
+    card.append(keyRow, placementRow);
     general.append(card);
+    if (this.keyboardBar) general.append(this.keyboardBarNote());
 
     this.favoritesPanel = this.el("div");
     this.drawFavorites();
@@ -163,6 +178,39 @@ export class SettingsDialog {
       dismiss: () => this.dismiss(),
     });
     this.update();
+  }
+
+  /** Whether SilverBullet's keyboard bar is on, on a touch screen (its UI option; a release without it: off) */
+  private async keyboardBarOn(): Promise<boolean> {
+    const { bridge, doc } = this.context;
+    if (!bridge.getUiOption || !doc.defaultView?.matchMedia?.("(pointer: coarse)").matches) return false;
+    try {
+      return (await bridge.getUiOption("keyboardBar")) === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** SilverBullet's keyboard bar is on: one bar over the keyboard is enough, its turning off offered (on this device, at once: its own command) */
+  private keyboardBarNote(): HTMLElement {
+    const { bridge, doc } = this.context;
+    const card = this.el("div", `${BASE}-card ${BASE}-advice`);
+    const hint = "It shows over the keyboard too: the docked toolbar goes over it. Turned off here, on this device, at once (SilverBullet's command Editor: Toggle Keyboard Bar turns it on again).";
+    const control = bridge.invokeCommand
+      ? this.button(`${BASE}-advice-button`, "Turn it off", () => {
+          void (async () => {
+            try {
+              await bridge.invokeCommand!(KEYBOARD_BAR_COMMAND);
+              this.keyboardBar = false;
+              card.remove();
+            } catch (e) {
+              void bridge.flash(`Silverware Toolbar: SilverBullet's keyboard bar could not be turned off (${String(e)})`, "error");
+            }
+          })();
+        })
+      : this.el("span");
+    card.append(settingRow(doc, BASE, "SilverBullet's keyboard bar is on", hint, control));
+    return card;
   }
 
   // ---- Favorites -------------------------------------------------------------
@@ -387,6 +435,7 @@ export class SettingsDialog {
     if (!initial || !values) return {};
     const changed: Record<string, unknown> = {};
     if (values.shortcut !== initial.shortcut) changed[PATHS.shortcut] = values.shortcut;
+    if (values.placement !== initial.placement) changed[PATHS.placement] = values.placement;
     const favorites = savedRows(values.favorites);
     if (!sameRows(favorites, initial.favorites)) changed[PATHS.favorites] = favorites;
     for (const name of MODULE_NAMES) if (values.modules[name] !== initial.modules[name]) changed[PATHS.module(name)] = values.modules[name];
@@ -395,7 +444,7 @@ export class SettingsDialog {
 
   /** Whether saving needs the page loaded anew: a module turned on or off, the key (the command's) */
   private reloads(changed: Readonly<Record<string, unknown>>): boolean {
-    return Object.keys(changed).some((path) => path !== PATHS.favorites);
+    return Object.keys(changed).some((path) => path !== PATHS.favorites && path !== PATHS.placement);
   }
 
   private update(): void {

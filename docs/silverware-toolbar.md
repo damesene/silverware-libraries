@@ -51,6 +51,7 @@ usable without a mouse.
    so. Changed on 2026-10-26, see *Extensions*.
 6. **Desktop first**: on a phone SilverBullet has its own bar over the
    keyboard, and the system's selection menu would cover the toolbar.
+   Since 2026-10-26 the toolbar docks at the bottom there (*Status and next*).
 7. **Default favourites**: *Turn into* with its label in a row of its own,
    under it bold, italic, code, a separator, link, highlight (see
    *Favourites: rows of items*).
@@ -336,7 +337,11 @@ ids `formats.<name>` / `actions.<name>`, the key as the command's, the
 toolbar at the caret, the popup under the toolbar, the page checked
 unchanged before a write); the favourites in rows (*Favourites: rows of
 items*); *Next* 1, `shared/` (the table on it); *Next* 2, the settings dialog;
-step 7's `commands` module and the popup's stars (phones: not yet).
+step 7's `commands` module and the popup's stars; phones (decided with the
+user on 2026-10-26: the toolbar docked at the bottom over the keyboard after a
+touch, one row of the same favourites, over SilverBullet's keyboard bar where
+it shows, its turning off offered in the settings; checked in Chrome's phone
+emulation, against the playground and SilverBullet, not on a phone yet).
 
 **Checked in a real SilverBullet** (2026-10-26, its release 2.12.1, by the
 interaction tests, which run against it as against the playground): the

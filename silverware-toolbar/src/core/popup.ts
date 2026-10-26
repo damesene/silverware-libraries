@@ -23,6 +23,8 @@ export type PopupOptions = {
   // The toolbar's place, the popup under it (undefined: none on screen, the popup at the top of the view)
   readonly rect: Box | undefined;
   readonly viewTop: number;
+  // Over the toolbar, not under it (docked at the bottom: the keyboard under it)
+  readonly above?: boolean;
   readonly run: (action: Action) => void;
   // Closed without running (Esc, a press elsewhere)
   readonly closed: () => void;
@@ -34,6 +36,8 @@ export type PopupOptions = {
 
 // How many actions PageUp / PageDown go by
 const PAGE = 5;
+// Between the popup and the toolbar, and the window's edges
+const GAP = 8;
 
 export class Popup {
   readonly element: HTMLElement;
@@ -92,13 +96,22 @@ export class Popup {
     if (!this.element.isConnected) this.doc.body.append(this.element);
     this.element.classList.add("swb-visible");
     this.update();
-    this.place(options.rect, options.viewTop);
+    this.place(options.rect, options.viewTop, options.above);
     this.doc.defaultView!.addEventListener("mousedown", this.onPress, true);
     this.input.focus({ preventScroll: true });
   }
 
-  place(rect: Box | undefined, viewTop: number): void {
+  place(rect: Box | undefined, viewTop: number, above = false): void {
     const win = this.doc.defaultView!;
+    if (above && rect) {
+      // Over the toolbar, the list as tall as the room above it leaves
+      this.list.style.maxHeight = `${Math.max(120, rect.top - viewTop - 2 * GAP - (this.element.offsetHeight - this.list.offsetHeight))}px`;
+      const left = Math.max(GAP, Math.min(rect.left + GAP, win.innerWidth - this.element.offsetWidth - GAP));
+      this.element.style.left = `${Math.round(left)}px`;
+      this.element.style.top = `${Math.round(Math.max(viewTop + GAP, rect.top - GAP - this.element.offsetHeight))}px`;
+      return;
+    }
+    this.list.style.removeProperty("max-height");
     const size = { width: this.element.offsetWidth, height: this.element.offsetHeight };
     const view = { width: win.innerWidth, height: win.innerHeight, top: viewTop };
     // Without a selection on screen: under the top of the view, in the middle

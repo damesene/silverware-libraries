@@ -53,10 +53,14 @@ function canSaveIn(bridge: Bridge): boolean {
   return !!bridge.saveSettings || (!!bridge.readPage && !!bridge.saveConfigPage);
 }
 
-/** Whether the toolbar running shows the settings read (its favourites as its stars left them, its modules) */
+/** Whether the toolbar running shows the settings read (its favourites as its stars left them, its modules, its placement) */
 function sameSettings(running: Controller, settings: Settings): boolean {
   const modules = [...running.settings.modules].sort().join();
-  return modules === [...settings.modules].sort().join() && JSON.stringify(running.shownFavorites) === JSON.stringify(settings.favorites);
+  return (
+    modules === [...settings.modules].sort().join() &&
+    running.settings.placement === settings.placement &&
+    JSON.stringify(running.shownFavorites) === JSON.stringify(settings.favorites)
+  );
 }
 
 /** The "Silverware Toolbar: Show actions" command (its key too): the popup of every action, under the toolbar by the selection or the caret */

@@ -3,7 +3,11 @@
 // (Turn into) shows the choice on and a chevron, and opens their list under
 // it; separators between; … for the popup of every action at the end of the
 // last row. Pressing it keeps the editor's selection and focus (its mousedown
-// is prevented), so an action works on what is selected.
+// is prevented), so an action works on what is selected. Docked (a phone: the
+// system's menu of a selection is where it would be by it), it is one row
+// across the bottom of the window, over the on-screen keyboard: the rows one
+// after another, a separator between them, scrolled sideways, … at its end
+// always in view; a list of choices opens over it.
 import { ICONS } from "../icons.ts";
 import type { Action } from "./action.ts";
 import { type Box, placeBy } from "./place.ts";
@@ -25,6 +29,8 @@ export class Bar {
   // The list of a button's choices, open under it
   private menu: { readonly element: HTMLElement; readonly button: HTMLButtonElement; readonly action: string } | undefined;
   private at: { rect: Box; viewTop: number } | undefined;
+  // Docked at the bottom: the line it stands on (the keyboard's top, or SilverBullet's bar's)
+  private dockedAt: number | undefined;
 
   constructor(
     private readonly doc: Document,
@@ -46,15 +52,17 @@ export class Bar {
     return this.element.contains(node) || !!this.menu?.element.contains(node);
   }
 
+  get docked(): boolean {
+    return this.dockedAt !== undefined;
+  }
+
   /** Its rows of items, … ending the last one */
   show(rows: readonly (readonly Shown[])[], rect: Box, viewTop: number): void {
     this.closeMenu();
+    this.dockedAt = undefined;
+    this.element.classList.remove("swb-docked");
     const doc = this.doc;
-    const more = this.button();
-    more.innerHTML = ICONS.more;
-    this.name(more, "Every action (search)");
-    more.classList.add("swb-more");
-    more.addEventListener("click", () => this.handlers.more());
+    const more = this.more();
     const all = rows.length ? rows : [[]];
     const elements = all.map((items, i) => {
       const row = doc.createElement("div");
@@ -67,6 +75,39 @@ export class Bar {
     if (!this.element.isConnected) doc.body.append(this.element);
     this.element.classList.add("swb-visible");
     this.place(rect, viewTop);
+  }
+
+  /** Docked: one row across the bottom of the window standing on `bottom`, the rows one after another, … at its end */
+  dock(rows: readonly (readonly Shown[])[], bottom: number): void {
+    this.closeMenu();
+    const items = this.doc.createElement("div");
+    items.className = "swb-row swb-dock-items";
+    rows.forEach((row, i) => {
+      if (i > 0 && row.length) items.append(this.divider());
+      items.append(...row.map((item) => ("separator" in item ? this.divider() : this.item(item))));
+    });
+    this.element.replaceChildren(items, this.more());
+    this.element.classList.add("swb-docked");
+    if (!this.element.isConnected) this.doc.body.append(this.element);
+    this.element.classList.add("swb-visible");
+    this.placeDocked(bottom);
+  }
+
+  /** Docked, placed again on the line it stands on (the keyboard came or went) */
+  placeDocked(bottom: number): void {
+    this.dockedAt = bottom;
+    this.element.style.left = "0px";
+    this.element.style.top = `${Math.round(bottom - this.element.offsetHeight)}px`;
+    if (this.menu) this.placeMenu();
+  }
+
+  private more(): HTMLButtonElement {
+    const more = this.button();
+    more.innerHTML = ICONS.more;
+    this.name(more, "Every action (search)");
+    more.classList.add("swb-more");
+    more.addEventListener("click", () => this.handlers.more());
+    return more;
   }
 
   private divider(): HTMLElement {
@@ -123,6 +164,7 @@ export class Bar {
 
   /** Placed again by the selection (the page scrolled) */
   place(rect: Box, viewTop: number): void {
+    if (this.docked) return;
     this.at = { rect, viewTop };
     const win = this.doc.defaultView!;
     const size = { width: this.element.offsetWidth, height: this.element.offsetHeight };
@@ -136,6 +178,7 @@ export class Bar {
     this.closeMenu();
     this.element.classList.remove("swb-visible");
     this.at = undefined;
+    this.dockedAt = undefined;
   }
 
   remove(): void {
@@ -176,13 +219,13 @@ export class Bar {
   }
 
   private placeMenu(): void {
-    if (!this.menu || !this.at) return;
+    if (!this.menu || (!this.at && !this.docked)) return;
     const { element: menu, button } = this.menu;
     const rect = button.getBoundingClientRect();
     const win = this.doc.defaultView!;
     const left = Math.max(8, Math.min(rect.left, win.innerWidth - menu.offsetWidth - 8));
-    // Under the button, or over it where the window ends
-    const below = rect.bottom + 4 + menu.offsetHeight <= win.innerHeight - 8;
+    // Under the button, or over it where the window ends (docked: always over it, the keyboard under it)
+    const below = !this.docked && rect.bottom + 4 + menu.offsetHeight <= win.innerHeight - 8;
     menu.style.left = `${Math.round(left)}px`;
     menu.style.top = `${Math.round(below ? rect.bottom + 4 : rect.top - 4 - menu.offsetHeight)}px`;
   }

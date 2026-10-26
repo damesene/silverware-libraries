@@ -10,7 +10,7 @@
 // or text is typed. The modules (modules.ts) give the actions; the core knows
 // none of them. The popup ends with the core's own item, the settings dialog.
 import type { Bridge, Settings } from "../bridge.ts";
-import { pageContentOf, viewTopOf } from "../dom.ts";
+import { keyboardBarTop, pageContentOf, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
 import type { Action, Change, Context } from "./action.ts";
 import { Bar, type Shown } from "./bar.ts";
@@ -48,6 +48,8 @@ export class Controller {
   private context: Context | undefined;
   // The favourites as shown: the settings', then as the popup's stars change them
   private favoriteRows: Favorites;
+  // What pressed last (a pointer's type: touch, mouse, pen): a selection made by touch docks the toolbar at the bottom
+  private pointer = "mouse";
 
   constructor(
     readonly doc: Document,
@@ -78,6 +80,10 @@ export class Controller {
     win.addEventListener("mousedown", this.onPress, true);
     win.addEventListener("scroll", this.onScroll, { capture: true, passive: true });
     win.addEventListener("resize", this.onScroll);
+    win.addEventListener("pointerdown", this.onPointer, { capture: true, passive: true });
+    // The on-screen keyboard coming or going: the docked toolbar stays over it
+    win.visualViewport?.addEventListener("resize", this.onScroll);
+    win.visualViewport?.addEventListener("scroll", this.onScroll);
   }
 
   stop(): void {
@@ -88,6 +94,9 @@ export class Controller {
     win.removeEventListener("mousedown", this.onPress, true);
     win.removeEventListener("scroll", this.onScroll, { capture: true });
     win.removeEventListener("resize", this.onScroll);
+    win.removeEventListener("pointerdown", this.onPointer, { capture: true });
+    win.visualViewport?.removeEventListener("resize", this.onScroll);
+    win.visualViewport?.removeEventListener("scroll", this.onScroll);
     this.bar.remove();
     this.popup.remove();
   }
@@ -105,6 +114,7 @@ export class Controller {
       actions,
       state: (action) => this.state(action, context),
       rect: this.bar.shown ? this.bar.rect() : undefined,
+      above: this.bar.docked,
       viewTop: viewTopOf(range?.startContainer ?? this.doc.querySelector(".cm-content")),
       run: (action) => void this.run(action),
       closed: () => this.focusEditor(),
@@ -137,7 +147,7 @@ export class Controller {
         : [[{ id: action.id }]];
     this.favoriteRows = rows;
     this.showBar(context, range);
-    if (this.popup.isOpen && this.bar.shown) this.popup.place(this.bar.rect(), viewTopOf(range?.startContainer ?? null));
+    if (this.popup.isOpen && this.bar.shown) this.popup.place(this.bar.rect(), viewTopOf(range?.startContainer ?? null), this.bar.docked);
     try {
       await this.saveFavorites!(rows);
     } catch (e) {
@@ -207,7 +217,8 @@ export class Controller {
       return;
     }
     this.context = context;
-    this.bar.show(this.favorites(context), rectOf(range), viewTopOf(range.startContainer));
+    if (this.docks()) this.bar.dock(this.favorites(context), this.dockLine());
+    else this.bar.show(this.favorites(context), rectOf(range), viewTopOf(range.startContainer));
   }
 
   /** A selection made in the page's text: the toolbar by it; none: the toolbar goes (unless shown at the caret) */
@@ -321,8 +332,30 @@ export class Controller {
     if (this.atCaret && this.bar.shown && !(e.target instanceof Node && this.owns(e.target))) this.hideBar();
   };
 
-  // The page scrolled or the window resized: the toolbar and the popup under it follow the selection
+  /** Whether the toolbar docks at the bottom (the placement setting; auto: a selection made by touch) */
+  private docks(): boolean {
+    const { placement } = this.settings;
+    return placement === "bottom" || (placement === "auto" && this.pointer === "touch");
+  }
+
+  /** The line the docked toolbar stands on: SilverBullet's keyboard bar's top where it shows, else the visual viewport's bottom (the on-screen keyboard's top) */
+  private dockLine(): number {
+    const win = this.doc.defaultView!;
+    const view = win.visualViewport;
+    return keyboardBarTop(this.doc) ?? (view ? view.offsetTop + view.height : win.innerHeight);
+  }
+
+  private onPointer = (e: PointerEvent): void => {
+    if (!(e.target instanceof Node && this.owns(e.target))) this.pointer = e.pointerType || "mouse";
+  };
+
+  // The page scrolled or the window resized: the toolbar and the popup under it follow the selection (docked: the keyboard)
   private onScroll = (): void => {
+    if (this.bar.shown && this.bar.docked) {
+      this.bar.placeDocked(this.dockLine());
+      if (this.popup.isOpen) this.popup.place(this.bar.rect(), viewTopOf(this.range?.startContainer ?? null), true);
+      return;
+    }
     const range = this.range;
     if (!range || !pageContentOf(range.startContainer) || !this.bar.shown) return;
     const viewTop = viewTopOf(range.startContainer);

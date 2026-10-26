@@ -82,6 +82,13 @@ describe("The library page", () => {
     }
   });
 
+  it("read where the toolbar shows: auto by default and where it is none of the three", async () => {
+    expect((await readSettings(bridge({}))).placement).toBe("auto");
+    expect((await readSettings(bridge({ "silverware.toolbar.placement": "bottom" }))).placement).toBe("bottom");
+    expect((await readSettings(bridge({ "silverware.toolbar.placement": "top" }))).placement).toBe("auto");
+    expect(page).toContain('enum = { "auto", "selection", "bottom" }');
+  });
+
   it("read the key as configured; an empty one or not a text is the default", async () => {
     expect(await readShortcut(bridge({ "silverware.toolbar.shortcut": "Alt-k" }))).toBe("Alt-k");
     expect(await readShortcut(bridge({ "silverware.toolbar.shortcut": " " }))).toBe(DEFAULT_SHORTCUT);

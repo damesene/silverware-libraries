@@ -171,9 +171,11 @@ export async function addGesture(page: Page, tap: string, up: string | undefined
   await select(page, needle);
   await bar(page).locator(".swb-more").click();
   await popup(page).locator(".swb-search-field").fill("settings");
-  await page.keyboard.press("Enter");
+  await popup(page).locator('[data-swb-action="actions.settings"]').click();
   const dialog = page.locator(".swb-settings");
   await dialog.locator('[data-swb-tab="favorites"]').click();
+  // Click's (by finger the tab opens on Touch's, which show Click's while they have none of their own)
+  await dialog.locator('[data-swb-device="click"]').click();
   await dialog.locator('[data-swb-row="1"] .swb-settings-add').click();
   const field = dialog.locator(".swb-settings-pick-field");
   await field.fill("gesture");

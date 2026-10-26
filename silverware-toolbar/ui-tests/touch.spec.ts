@@ -136,9 +136,10 @@ test.describe("The toolbar on a phone", () => {
     await selectByTouch(page, "some text");
     await bar(page).locator(".swb-more").tap();
     await popup(page).locator(".swb-search-field").fill("settings");
-    await page.keyboard.press("Enter");
+    await popup(page).locator('[data-swb-action="actions.settings"]').tap();
     const dialog = page.locator(".swb-settings");
     await dialog.locator('[data-swb-tab="favorites"]').tap();
+    await dialog.locator('[data-swb-device="click"]').tap();
     await dialog.locator('[data-swb-row="1"] .swb-settings-add').tap();
     await expect(dialog.locator(".swb-settings-pick-field")).toBeFocused();
     // The keyboard: the view half as tall (the emulation shows none)
@@ -150,6 +151,42 @@ test.describe("The toolbar on a phone", () => {
       return box.y >= 0 && box.y + Math.min(box.height, 120) <= view.height / 2;
     }).toBe(true);
     await expect.poll(async () => (await dialog.boundingBox())!.height).toBeLessThanOrEqual(view.height / 2 + 1);
+  });
+
+  test("Touch's own favourites show by finger; turned off, Click's, its own kept", async ({ page }) => {
+    await selectByTouch(page, "some text");
+    await bar(page).locator(".swb-more").tap();
+    await popup(page).locator(".swb-search-field").fill("settings");
+    await popup(page).locator('[data-swb-action="actions.settings"]').tap();
+    const dialog = page.locator(".swb-settings");
+    await dialog.locator('[data-swb-tab="favorites"]').tap();
+    // This device's first
+    await expect(dialog.locator('[data-swb-device="touch"]')).toHaveAttribute("aria-checked", "true");
+    const own = dialog.locator(".swb-settings-devices .swb-settings-switch");
+    await own.tap();
+    await dialog.locator('[data-swb-item="1:0"] .swb-settings-remove').tap();
+    await dialog.locator(".swb-settings-save").tap();
+    await expect(dialog).toHaveCount(0);
+    await select(page, "Plain", 0);
+    await selectByTouch(page, "some text");
+    await expect(barButton(page, "formats.italic")).toBeVisible();
+    await expect(barButton(page, "formats.bold")).toHaveCount(0);
+    // Off: Click's, the own kept
+    await bar(page).locator(".swb-more").tap();
+    await popup(page).locator(".swb-search-field").fill("settings");
+    await popup(page).locator('[data-swb-action="actions.settings"]').tap();
+    await dialog.locator('[data-swb-tab="favorites"]').tap();
+    await own.tap();
+    await dialog.locator(".swb-settings-save").tap();
+    await select(page, "Plain", 0);
+    await selectByTouch(page, "some text");
+    await expect(barButton(page, "formats.bold")).toBeVisible();
+    await bar(page).locator(".swb-more").tap();
+    await popup(page).locator(".swb-search-field").fill("settings");
+    await popup(page).locator('[data-swb-action="actions.settings"]').tap();
+    await dialog.locator('[data-swb-tab="favorites"]').tap();
+    await own.tap();
+    await expect(dialog.locator('[data-swb-items="1"] .swb-settings-item-name').first()).toHaveText("Italic");
   });
 
   test("over SilverBullet's keyboard bar where it shows", async ({ page }) => {

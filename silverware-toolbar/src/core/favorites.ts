@@ -17,6 +17,15 @@ export type KindItem = { readonly type: string; readonly show?: Show; readonly [
 export type FavoriteItem = ActionItem | SeparatorItem | KindItem;
 export type Favorites = readonly (readonly FavoriteItem[])[];
 
+/**
+ * Whether this device is worked by a finger (its main pointer coarse: a phone,
+ * a tablet), which shows the favourites for touch where they are set; a
+ * laptop's touch screen is not (its touchpad is its main pointer)
+ */
+export function byTouch(win: Window | null | undefined): boolean {
+  return !!win?.matchMedia?.("(pointer: coarse)").matches;
+}
+
 export const isSeparator = (item: FavoriteItem): item is SeparatorItem => item.type === "separator";
 export const isActionItem = (item: FavoriteItem): item is ActionItem => item.type === undefined || item.type === "action";
 /** An item of a kind a module gives (neither an action nor a separator) */

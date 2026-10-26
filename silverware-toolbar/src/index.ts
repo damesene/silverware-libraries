@@ -67,7 +67,9 @@ function sameSettings(running: Controller, settings: Settings): boolean {
     running.settings.placement === settings.placement &&
     running.settings.show === settings.show &&
     running.settings.wordAtCaret === settings.wordAtCaret &&
-    JSON.stringify(running.settings.favorites) === JSON.stringify(settings.favorites)
+    JSON.stringify(running.settings.favorites) === JSON.stringify(settings.favorites) &&
+    JSON.stringify(running.settings.touchFavorites) === JSON.stringify(settings.touchFavorites) &&
+    running.settings.touchOn === settings.touchOn
   );
 }
 
@@ -104,8 +106,9 @@ async function saveSettings(bridge: Bridge, values: Readonly<Record<string, unkn
     return;
   }
   if (!bridge.readPage || !bridge.saveConfigPage) throw new Error("no configuration page to save to");
-  const { [PATHS.favorites]: favorites, ...scalars } = values;
-  const tables = PATHS.favorites in values ? { [PATHS.favorites]: favorites } : {};
+  // Tables (the favourites, touch's: undefined removes it) in the toolbar's own block
+  const { [PATHS.favorites]: favorites, [PATHS.touchFavorites]: touch, ...scalars } = values;
+  const tables = { ...(PATHS.favorites in values ? { [PATHS.favorites]: favorites } : {}), ...(PATHS.touchFavorites in values ? { [PATHS.touchFavorites]: touch } : {}) };
   await saveConfigPage(
     { readPage: (name) => bridge.readPage!(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) },
     (text) => withConfigSettings(withConfigSettings(text, scalars), tables, OWN_MARKER),

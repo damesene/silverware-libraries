@@ -59,6 +59,8 @@ config.set("silverware.toolbar.favorites", {
 
 The settings dialog's *Favorites* tab edits them without writing Lua (see *Settings*).
 
+Where the screen is worked by finger (a phone, a tablet), the toolbar can show other favourites: `silverware.toolbar.favorites-touch`, written as the favourites are, say with gesture buttons in place of plain ones. Not set, the favourites show there too. A computer with a touch screen counts as one with a mouse (its touchpad is what it is mostly worked with). `silverware.toolbar.favorites-touch-enabled = false` turns them off for a while: the favourites show by finger too, those for touch kept. In the settings, *Favorites* has *Click* and *Touch* at its top: *Own favourites for touch* turns them on (the first time as a copy of *Click*'s to change) and off, and *Copy from Click* / *Copy from Touch* puts the other's over the ones shown.
+
 ### Gesture buttons
 
 A gesture button holds up to three actions in one place: a click (a tap) runs the first, swiping it up runs another, swiping it down a third. As you drag it up, its icon rolls up and the swipe's action comes in from below (dragging down, from above), following your finger or the mouse; let go once it is more than halfway in (or flick it) and that action runs; drag back and nothing happens. Each swipe's icon is shown small, in the button's top right corner for up and its bottom right corner for down: it tells the button from a plain one and shows what a swipe runs, in color where that action is on for the selection, so a swipe turns it off (a swipe for *Bold* on bold text). While you drag, the button is tinted once letting go would run the action. It is as wide as the widest of its actions, with their labels too where `show = "label"`. In the settings, *Add* offers *Gesture button*, then asks for its actions; either swipe may be *None*. In Lua:
@@ -74,7 +76,7 @@ The button shows as pressed when its first action is on for the selection; a swi
 *Silverware Toolbar settings…*, the last item of the **…** list (or the command *Silverware Toolbar: Settings*), opens the settings, for every page in the space:
 
 * **General**: the key for every action, as SilverBullet writes keys (`Ctrl-Shift-q`, `Alt-k`), where and when the toolbar shows, and whether a format works on the word at the cursor. On a phone with SilverBullet's keyboard bar on, it offers to turn that bar off (on that device, at once).
-* **Favorites**: the toolbar's rows, one under another. Drag an item within its row or into another, or with the keyboard: focus it (Tab) and press **Alt+←** or **Alt+→** to move it within its row, **Alt+↑** or **Alt+↓** into the row above or below, **Delete** to remove it. The button beside an action's name shows it as its icon or with its name too; **×** removes it. **Add** searches every action (and a separator, and a gesture button, whose two actions it asks for next; click either to change it) to add at the row's end; **Add row** adds a row. A row left empty is left out. An item no action has is dimmed, named by its id.
+* **Favorites**: *Click* (with a mouse) or *Touch* (by finger, see *Favourites*); the toolbar's rows, one under another. Drag an item within its row or into another, or with the keyboard: focus it (Tab) and press **Alt+←** or **Alt+→** to move it within its row, **Alt+↑** or **Alt+↓** into the row above or below, **Delete** to remove it. The button beside an action's name shows it as its icon or with its name too; **×** removes it. **Add** searches every action (and a separator, and a gesture button, whose two actions it asks for next; click either to change it) to add at the row's end; **Add row** adds a row, the **×** in a row's head removes it with its items. A row left empty is left out. An item no action has is dimmed, named by its id.
 * **Modules**: each part of the toolbar on or off (its actions with it).
 
 Nothing changes until **Save**. The favourites, where and when the toolbar shows and the word at the cursor apply at once; a module or the key needs the page loaded again (**Save and reload**). They are saved in your `CONFIG` page: the key and the modules in the block SilverBullet's own settings (*Configuration: Open*) keep, so either shows what the other wrote; the favourites in a block of their own (`-- managed-by: silverware-toolbar`), which SilverBullet's settings leave alone. You can edit both by hand too.
@@ -222,6 +224,29 @@ config.define("silverware.toolbar", {
       },
       description = "The toolbar's rows, each a list of items: { id = <its id>, show = \"icon\" or \"label\" }, { type = \"separator\" }, or a module's kind: { type = \"gesture\", tap = <an id>, up = <an id>, down = <an id> } (every action is in the list of the … button).",
       ui = { category = "Silverware Toolbar", label = "Favourite actions", priority = 2 },
+    },
+    ["favorites-touch"] = {
+      type = "array",
+      items = {
+        type = "array",
+        items = {
+          type = "object",
+          -- An item of a module's kind (the gestures module's button) has fields of its own, which its kind reads
+          properties = {
+            type = { type = "string" },
+            id = { type = "string" },
+            show = { type = "string", enum = { "icon", "label" } },
+          },
+        },
+      },
+      description = "The toolbar's rows where the screen is worked by finger (a phone, a tablet), as the favourites are written; not set: the favourites there too.",
+      ui = { category = "Silverware Toolbar", label = "Favourite actions for touch", priority = 1.9 },
+    },
+    ["favorites-touch-enabled"] = {
+      type = "boolean",
+      default = true,
+      description = "Whether the favourite actions for touch show where the screen is worked by finger; off, the favourite actions show there, those for touch kept.",
+      ui = { category = "Silverware Toolbar", label = "Own favourites for touch", priority = 1.8 },
     },
     shortcut = {
       type = "string",
@@ -733,6 +758,8 @@ end
 }
 /* One row however many tabs: too wide for the dialog (a phone), it scrolls sideways */
 .swb-settings-tabs {
+  /* Never shrunk by a tall body (it scrolls sideways, so a column's flex would squeeze it: on a phone it slid under the body) */
+  flex: none;
   display: flex;
   flex-wrap: nowrap;
   overflow-x: auto;
@@ -988,6 +1015,30 @@ end
 .swb-settings-favhead > span {
   opacity: 0.7;
 }
+/* A row's ×, at the right end of its head */
+.swb-settings-row-remove {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.swb-settings-row-remove:hover {
+  opacity: 1;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+.swb-settings-row-remove svg {
+  width: 14px;
+  height: 14px;
+}
 /* A row's handle: dragged, the row moves up or down */
 .swb-settings-row-grip {
   display: inline-flex !important;
@@ -1146,6 +1197,56 @@ end
   padding-bottom: 2px;
 }
 /* A slot of a kind's item (the gesture button's Click, Swipe up): the action picked for it */
+/* The favourites for a mouse (Click) or for a finger (Touch): two segments; Touch the same as Click shown dimmed, not edited */
+.swb-settings-devices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 10px;
+}
+.swb-settings-devices-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.swb-settings-copy-from {
+  padding: 4px 10px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swb-settings-copy-from:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.swb-settings-device-tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 2px;
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 7px;
+}
+.swb-settings-device {
+  padding: 4px 14px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.swb-settings-device[aria-checked="true"] {
+  color: #fff;
+  background: var(--ui-accent-color, #464cfc);
+}
+.swb-settings-rows-same {
+  opacity: 0.5;
+}
 .swb-settings-slot {
   display: inline-flex !important;
   flex: 1 1 200px;

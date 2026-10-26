@@ -79,6 +79,10 @@ export const PLACEMENT_LABELS: Readonly<Record<Placement, string>> = { auto: "Au
 /** Where each setting is in SilverBullet's configuration */
 export const PATHS = {
   favorites: "silverware.toolbar.favorites",
+  // For a device worked by a finger (byTouch in core/favorites.ts); not set: the same as the favourites
+  touchFavorites: "silverware.toolbar.favorites-touch",
+  // Off: touch shows the favourites, its own kept for when it is on again
+  touchOn: "silverware.toolbar.favorites-touch-enabled",
   shortcut: "silverware.toolbar.shortcut",
   placement: "silverware.toolbar.placement",
   show: "silverware.toolbar.show",
@@ -89,6 +93,10 @@ export const PATHS = {
 /** Silverware Toolbar's settings, read once it starts (a change applies on reload) */
 export type Settings = {
   readonly favorites: Favorites;
+  // For a device worked by a finger; undefined: the favourites there too
+  readonly touchFavorites: Favorites | undefined;
+  // Whether touch's own show (they are kept while off)
+  readonly touchOn: boolean;
   readonly modules: ReadonlySet<ModuleName>;
   readonly placement: Placement;
   readonly show: Show;
@@ -119,12 +127,15 @@ export async function readSettings(bridge: Bridge): Promise<Settings> {
     }
   };
   const favorites = await get(PATHS.favorites, DEFAULT_FAVORITES);
+  const touch = await get(PATHS.touchFavorites, undefined);
   const modules = new Set<ModuleName>();
   for (const name of MODULE_NAMES) if ((await get(PATHS.module(name), true)) !== false) modules.add(name);
   const placement = await get(PATHS.placement, "auto");
   const show = await get(PATHS.show, "mobile");
   return {
     favorites: favoritesOf(favorites),
+    touchFavorites: touch === undefined || touch === null ? undefined : rowsOf(touch),
+    touchOn: (await get(PATHS.touchOn, true)) !== false,
     modules,
     placement: PLACEMENTS.includes(placement as Placement) ? (placement as Placement) : "auto",
     show: SHOWS.includes(show as Show) ? (show as Show) : "mobile",
@@ -147,8 +158,13 @@ export async function readShortcut(bridge: Bridge): Promise<string> {
  * (logged); not rows at all: the defaults
  */
 export function favoritesOf(value: unknown): Favorites {
+  return rowsOf(value) ?? DEFAULT_FAVORITES;
+}
+
+/** Rows of favourites as configured, an item that is none left out (logged); not rows at all: undefined */
+function rowsOf(value: unknown): Favorites | undefined {
   const rows = listOf(value)?.map(listOf);
-  if (!rows || rows.some((row) => !row)) return DEFAULT_FAVORITES;
+  if (!rows || rows.some((row) => !row)) return undefined;
   return rows.map((items) => {
     return items!.flatMap((item): FavoriteItem[] => {
       const favorite = favoriteItemOf(item);

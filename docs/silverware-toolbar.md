@@ -316,6 +316,23 @@ config.set("silverware.toolbar.favorites", {
   its Configuration Manager edits no lists ("Configure manually in CONFIG"):
   the settings dialog's Favorites tab is where they are edited.
 
+### Favourites for touch (decided and built 2026-10-27)
+
+- Two sets: `silverware.toolbar.favorites` (Click: a mouse, and the
+  default) and `silverware.toolbar.favorites-touch` (Touch), the latter
+  shown where the device is worked by finger: `(pointer: coarse)`, its main
+  pointer (`byTouch` in core/favorites.ts; a laptop's touch screen is Click,
+  its touchpad being its main pointer). By the device, not by where the
+  toolbar shows (docked or not): one device has one set. Gesture buttons work
+  in either; the point is only which a device shows.
+- `silverware.toolbar.favorites-touch-enabled` (default true) turns Touch's
+  off for a while, its own kept: Click's show by finger too. Touch with none
+  of its own shows Click's.
+- Settings: *Click* | *Touch* at the Favorites tab's top (this device's
+  first); *Own favourites for touch* turns them on (the first time a copy of
+  Click's) and off (Click's shown dimmed, not edited); *Copy from Click* /
+  *Copy from Touch* puts the other's over the ones shown.
+
 ### Kinds of favourites: the gesture button (decided and built 2026-10-26)
 
 A module may give a kind of favourite beyond an action and a separator

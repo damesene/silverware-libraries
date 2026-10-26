@@ -12,12 +12,12 @@ import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
 import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
-import { type FavoriteItem, type Favorites, isKindItem, isSeparator, type KindItem } from "../core/favorites.ts";
+import { type FavoriteItem, type Favorites, isKindItem, isSeparator, type KindItem, byTouch } from "../core/favorites.ts";
 import type { ItemKind, ItemSlot } from "../core/items.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
 import { reorder } from "./drag.ts";
-import { addItem, type At, moveItem, moveRow, removeItem, sameRows, savedRows, setSlot, stepOf, toggleShow } from "./favorites.ts";
+import { addItem, type At, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setSlot, stepOf, toggleShow } from "./favorites.ts";
 
 const BASE = "swb-settings";
 
@@ -41,7 +41,21 @@ export type SettingsContext = {
 
 type Picking = { readonly row: number } | { readonly at: At; readonly key: string };
 
-type Values = { shortcut: string; placement: Placement; show: Show; wordAtCaret: boolean; favorites: Favorites; modules: Record<ModuleName, boolean> };
+type Values = {
+  shortcut: string;
+  placement: Placement;
+  show: Show;
+  wordAtCaret: boolean;
+  favorites: Favorites;
+  // Touch's own; undefined: none (Click's show)
+  touchFavorites: Favorites | undefined;
+  // Whether Touch's own show; off, Click's do (its own kept)
+  touchOn: boolean;
+  modules: Record<ModuleName, boolean>;
+};
+
+// Which favourites the Favorites tab edits
+type Device = "click" | "touch";
 
 export class SettingsDialog {
   private readonly dialogs: Dialogs;
@@ -54,6 +68,8 @@ export class SettingsDialog {
   private note: HTMLElement | undefined;
   // The search of actions open: to add to a row, or for a slot of a kind's item
   private picking: Picking | undefined;
+  // The favourites edited: this device's first
+  private device: Device = "click";
   // SilverBullet's keyboard bar on, on a touch screen: the docked toolbar goes over it, its turning off offered
   private keyboardBar = false;
 
@@ -71,9 +87,10 @@ export class SettingsDialog {
     const { bridge } = this.context;
     const settings = await readSettings(bridge);
     const modules = Object.fromEntries(MODULE_NAMES.map((name) => [name, settings.modules.has(name)])) as Record<ModuleName, boolean>;
-    this.initial = { shortcut: await readShortcut(bridge), placement: settings.placement, show: settings.show, wordAtCaret: settings.wordAtCaret, favorites: settings.favorites, modules };
+    this.initial = { shortcut: await readShortcut(bridge), placement: settings.placement, show: settings.show, wordAtCaret: settings.wordAtCaret, favorites: settings.favorites, touchFavorites: settings.touchFavorites, touchOn: settings.touchOn, modules };
+    this.device = byTouch(this.context.doc.defaultView) ? "touch" : "click";
     this.keyboardBar = await this.keyboardBarOn();
-    this.values = { ...this.initial, favorites: settings.favorites.map((row) => [...row]), modules: { ...modules } };
+    this.values = { ...this.initial, favorites: settings.favorites.map((row) => [...row]), touchFavorites: settings.touchFavorites?.map((row) => [...row]), modules: { ...modules } };
     this.render();
   }
 
@@ -243,6 +260,64 @@ export class SettingsDialog {
     return known;
   }
 
+  /** The favourites the tab edits: Click's, or Touch's (its own while on, else Click's, which it shows) */
+  private get rows(): Favorites {
+    const values = this.values!;
+    return (this.device === "touch" && values.touchOn && values.touchFavorites) || values.favorites;
+  }
+
+  /** Whether Touch shows Click's (off, or none of its own) */
+  private get sameForTouch(): boolean {
+    const values = this.values!;
+    return this.device === "touch" && !(values.touchOn && values.touchFavorites);
+  }
+
+  /** The switch between the favourites for a mouse (Click) and for a finger (Touch), and Touch's own or Click's */
+  private deviceBar(): HTMLElement {
+    const bar = this.el("div", `${BASE}-devices`);
+    const tabs = this.el("div", `${BASE}-device-tabs`);
+    tabs.setAttribute("role", "radiogroup");
+    tabs.setAttribute("aria-label", "Favourites of");
+    for (const [device, label] of [["click", "Click"], ["touch", "Touch"]] as const) {
+      const button = this.button(`${BASE}-device`, label, () => {
+        this.device = device;
+        this.picking = undefined;
+        this.drawFavorites(`.${BASE}-device[data-swb-device="${device}"]`);
+      });
+      button.dataset.swbDevice = device;
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-checked", String(this.device === device));
+      tabs.append(button);
+    }
+    const values = this.values!;
+    const copy = (rows: Favorites) => rows.map((row) => [...row]);
+    // The other's copied over this one's (Touch's: on, as it is to be seen)
+    const other = this.device === "click" ? values.touchFavorites : values.favorites;
+    const from = this.device === "click" ? "Touch" : "Click";
+    const copyButton = this.button(`${BASE}-copy-from`, `Copy from ${from}`, () => {
+      if (!other) return;
+      if (this.device === "touch") values.touchOn = true;
+      this.picking = undefined;
+      this.edit(copy(other), `.${BASE}-copy-from`);
+    });
+    // Click from Touch only once Touch has its own
+    copyButton.disabled = !other;
+    const top = this.el("div", `${BASE}-devices-top`);
+    top.append(tabs, copyButton);
+    bar.append(top);
+    if (this.device === "touch") {
+      const own = switchControl(this.context.doc, BASE, values.touchOn && !!values.touchFavorites, (on) => {
+        // On the first time: Click's copied to start from; off: Click's shown, its own kept for when it is on again
+        values.touchOn = on;
+        if (on && !values.touchFavorites) values.touchFavorites = copy(values.favorites);
+        this.picking = undefined;
+        this.changedFavorites(`.${BASE}-devices input`);
+      });
+      bar.append(settingRow(this.context.doc, BASE, "Own favourites for touch", "Where the screen is worked by finger (a phone, a tablet), say gesture buttons there. Off: Click's show; Touch's own are kept for when it is on again.", own));
+    }
+    return bar;
+  }
+
   /** The Favorites tab drawn anew from the values; `focus`: the element to focus after it (a selector) */
   private drawFavorites(focus?: string): void {
     const panel = this.favoritesPanel;
@@ -250,14 +325,28 @@ export class SettingsDialog {
     if (!panel || !values) return;
     const known = this.known();
     const parts: HTMLElement[] = [
+      this.deviceBar(),
       this.el("p", `${BASE}-intro`, "The toolbar's rows, one under another. Drag an item within its row or into another (Alt+arrows with the keyboard), a row by its handle (Alt+↑ ↓ on it); a row left empty is left out."),
     ];
     const rows = this.el("div", `${BASE}-rows`);
-    values.favorites.forEach((row, r) => {
+    // Click's shown for Touch where it has none of its own: not edited here
+    if (this.sameForTouch) {
+      rows.classList.add(`${BASE}-rows-same`);
+      rows.setAttribute("inert", "");
+    }
+    this.rows.forEach((row, r) => {
       const block = this.el("div", `${BASE}-favrow`);
       block.dataset.swbRow = String(r);
       const head = this.el("div", `${BASE}-favhead`);
-      head.append(this.rowGrip(r, block, rows), this.el("span", "", `Row ${r + 1}`));
+      head.append(
+        this.rowGrip(r, block, rows),
+        this.el("span", "", `Row ${r + 1}`),
+        // The row gone, its items with it
+        this.button(`${BASE}-row-remove`, `Remove row ${r + 1}`, () => {
+          this.picking = undefined;
+          this.edit(removeRow(this.rows, r), `.${BASE}-add-row`);
+        }, ICONS.close),
+      );
       block.append(head);
       const items = this.el("div", `${BASE}-items`);
       items.setAttribute("role", "list");
@@ -273,13 +362,14 @@ export class SettingsDialog {
       rows.append(block);
     });
     parts.push(rows);
-    parts.push(
-      this.button(`${BASE}-add-row`, "Add row", () => {
-        values.favorites = [...values.favorites, []];
-        this.picking = { row: values.favorites.length - 1 };
-        this.changedFavorites(`[data-swb-row="${values.favorites.length - 1}"] .${BASE}-pick-field`);
-      }),
-    );
+    if (!this.sameForTouch)
+      parts.push(
+        this.button(`${BASE}-add-row`, "Add row", () => {
+          const rows = [...this.rows, []];
+          this.picking = { row: rows.length - 1 };
+          this.edit(rows, `[data-swb-row="${rows.length - 1}"] .${BASE}-pick-field`);
+        }),
+      );
     panel.replaceChildren(...parts);
     const focused = focus ? panel.querySelector<HTMLElement>(focus) : null;
     focused?.focus({ preventScroll: true });
@@ -326,22 +416,22 @@ export class SettingsDialog {
         }
       }
       const labeled = item.show === "label";
-      const show = this.button(`${BASE}-show`, labeled ? "Shown with its label: show its icon only" : "Shown as its icon: show its label too", () => this.edit(toggleShow(this.values!.favorites, at), `[data-swb-item="${at.row}:${at.index}"] .${BASE}-show`), labeled ? ICONS.label : ICONS.iconOnly);
+      const show = this.button(`${BASE}-show`, labeled ? "Shown with its label: show its icon only" : "Shown as its icon: show its label too", () => this.edit(toggleShow(this.rows, at), `[data-swb-item="${at.row}:${at.index}"] .${BASE}-show`), labeled ? ICONS.label : ICONS.iconOnly);
       show.setAttribute("aria-pressed", String(labeled));
       element.append(show);
     }
     element.setAttribute("aria-label", `${name.textContent}, row ${at.row + 1}, item ${at.index + 1}`);
-    element.append(this.button(`${BASE}-remove`, `Remove ${name.textContent}`, () => this.edit(removeItem(this.values!.favorites, at), `[data-swb-row="${at.row}"] .${BASE}-add`), ICONS.close));
+    element.append(this.button(`${BASE}-remove`, `Remove ${name.textContent}`, () => this.edit(removeItem(this.rows, at), `[data-swb-row="${at.row}"] .${BASE}-add`), ICONS.close));
     if (slots) element.append(slots);
     element.addEventListener("keydown", (e) => {
       if (e.target !== element) return;
       if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown")) {
         e.preventDefault();
-        const to = stepOf(this.values!.favorites, at, e.key);
-        if (to) this.edit(moveItem(this.values!.favorites, at, to), `[data-swb-item="${to.row}:${to.index}"]`);
+        const to = stepOf(this.rows, at, e.key);
+        if (to) this.edit(moveItem(this.rows, at, to), `[data-swb-item="${to.row}:${to.index}"]`);
       } else if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
-        this.edit(removeItem(this.values!.favorites, at), `[data-swb-row="${at.row}"] .${BASE}-add`);
+        this.edit(removeItem(this.rows, at), `[data-swb-row="${at.row}"] .${BASE}-add`);
       }
     });
     element.addEventListener("pointerdown", (e) => {
@@ -355,7 +445,7 @@ export class SettingsDialog {
         containers: () => Array.from(panel.querySelectorAll<HTMLElement>(`.${BASE}-items`)),
         items: (container) => Array.from(container.querySelectorAll<HTMLElement>(`:scope > .${BASE}-item`)),
         done: (to) => {
-          if (to && (to.container !== at.row || to.index !== at.index)) this.edit(moveItem(this.values!.favorites, at, { row: to.container, index: to.index }), `[data-swb-item="${to.container}:${to.index}"]`);
+          if (to && (to.container !== at.row || to.index !== at.index)) this.edit(moveItem(this.rows, at, { row: to.container, index: to.index }), `[data-swb-item="${to.container}:${to.index}"]`);
           else this.drawFavorites();
         },
       });
@@ -376,7 +466,7 @@ export class SettingsDialog {
         containers: () => [rows],
         items: (container) => Array.from(container.querySelectorAll<HTMLElement>(`:scope > .${BASE}-favrow`)),
         done: (to) => {
-          if (to && to.index !== r) this.edit(moveRow(this.values!.favorites, r, to.index), `[data-swb-row="${to.index}"] .${BASE}-row-grip`);
+          if (to && to.index !== r) this.edit(moveRow(this.rows, r, to.index), `[data-swb-row="${to.index}"] .${BASE}-row-grip`);
           else this.drawFavorites();
         },
       });
@@ -385,13 +475,18 @@ export class SettingsDialog {
       if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
       e.preventDefault();
       const to = r + (e.key === "ArrowUp" ? -1 : 1);
-      if (to >= 0 && to < this.values!.favorites.length) this.edit(moveRow(this.values!.favorites, r, to), `[data-swb-row="${to}"] .${BASE}-row-grip`);
+      if (to >= 0 && to < this.rows.length) this.edit(moveRow(this.rows, r, to), `[data-swb-row="${to}"] .${BASE}-row-grip`);
     });
     return grip;
   }
 
+  /** The favourites edited changed (Click's, or Touch's own) */
   private edit(favorites: Favorites, focus?: string): void {
-    this.values!.favorites = favorites;
+    if (this.device === "touch") {
+      this.values!.touchFavorites = favorites;
+      this.values!.touchOn = true;
+    }
+    else this.values!.favorites = favorites;
     this.changedFavorites(focus);
   }
 
@@ -461,11 +556,11 @@ export class SettingsDialog {
     }
     const add = (item: FavoriteItem) => {
       this.picking = undefined;
-      this.edit(addItem(this.values!.favorites, row, item), `[data-swb-row="${row}"] .${BASE}-add`);
+      this.edit(addItem(this.rows, row, item), `[data-swb-row="${row}"] .${BASE}-add`);
     };
     // A kind's item added: the search goes on for its first slot
     const addKind = (kind: ItemKind) => {
-      const favorites = addItem(this.values!.favorites, row, { type: kind.type });
+      const favorites = addItem(this.rows, row, { type: kind.type });
       const at = { row, index: favorites[row]!.length - 1 };
       this.picking = kind.slots[0] ? { at, key: kind.slots[0].key } : undefined;
       this.edit(favorites, this.picking ? `[data-swb-row="${row}"] .${BASE}-pick-field` : `[data-swb-item="${at.row}:${at.index}"]`);
@@ -473,7 +568,7 @@ export class SettingsDialog {
     // An action for the slot (an optional one: or none): the search goes on for the next slot after it without one
     const fill = (id: string | undefined) => {
       if (forRow) return id === undefined ? undefined : add({ id });
-      const favorites = setSlot(this.values!.favorites, target.at, target.key, id);
+      const favorites = setSlot(this.rows, target.at, target.key, id);
       const item = favorites[target.at.row]?.[target.at.index];
       const slots = this.kindOf(target.at)?.slots ?? [];
       const after = slots.slice(slots.findIndex((s) => s.key === target.key) + 1);
@@ -541,13 +636,16 @@ export class SettingsDialog {
     if (values.wordAtCaret !== initial.wordAtCaret) changed[PATHS.wordAtCaret] = values.wordAtCaret;
     const favorites = savedRows(values.favorites);
     if (!sameRows(favorites, initial.favorites)) changed[PATHS.favorites] = favorites;
+    const touch = values.touchFavorites && savedRows(values.touchFavorites);
+    if (JSON.stringify(touch) !== JSON.stringify(initial.touchFavorites)) changed[PATHS.touchFavorites] = touch;
+    if (values.touchOn !== initial.touchOn) changed[PATHS.touchOn] = values.touchOn;
     for (const name of MODULE_NAMES) if (values.modules[name] !== initial.modules[name]) changed[PATHS.module(name)] = values.modules[name];
     return changed;
   }
 
   /** Whether saving needs the page loaded anew: a module turned on or off, the key (the command's) */
   private reloads(changed: Readonly<Record<string, unknown>>): boolean {
-    return Object.keys(changed).some((path) => path !== PATHS.favorites && path !== PATHS.placement && path !== PATHS.show && path !== PATHS.wordAtCaret);
+    return Object.keys(changed).some((path) => path !== PATHS.favorites && path !== PATHS.touchFavorites && path !== PATHS.touchOn && path !== PATHS.placement && path !== PATHS.show && path !== PATHS.wordAtCaret);
   }
 
   private update(): void {

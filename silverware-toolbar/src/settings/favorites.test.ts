@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Favorites } from "../core/favorites.ts";
-import { addItem, moveItem, moveRow, removeItem, sameRows, savedRows, setSlot, stepOf, toggleShow } from "./favorites.ts";
+import { addItem, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setSlot, stepOf, toggleShow } from "./favorites.ts";
 
 const ROWS: Favorites = [[{ id: "actions.turnInto", show: "label" }], [{ id: "formats.bold" }, { type: "separator" }, { id: "formats.link" }]];
 
@@ -44,6 +44,7 @@ describe("The favourites as the settings edit them", () => {
     expect(savedRows([...emptied, []])).toEqual([ROWS[1]]);
     expect(sameRows(ROWS, savedRows(ROWS))).toBe(true);
     expect(sameRows(ROWS, emptied)).toBe(false);
+    expect(removeRow(ROWS, 0)).toEqual([ROWS[1]]);
   });
 
   it("fills a kind's item's slots and shows it the other way, its other fields kept", () => {

@@ -15,7 +15,7 @@ import { ICONS } from "../icons.ts";
 import type { Action, ActionEditor, Change, Context } from "./action.ts";
 import { Bar, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
-import { isActionItem, isSeparator } from "./favorites.ts";
+import { isActionItem, isSeparator, byTouch } from "./favorites.ts";
 import type { ItemKind } from "./items.ts";
 import { hideKeyboard } from "./keyboard.ts";
 import { marked } from "./cursor.ts";
@@ -173,7 +173,10 @@ export class Controller {
     const actions = this.offered();
     const all = [...actions, ...actions.flatMap((a) => a.choices ?? [])];
     const kinds = this.kinds();
-    return this.settings.favorites
+    // Worked by a finger: touch's own where they are set
+    const { touchFavorites, touchOn } = this.settings;
+    const favorites = (byTouch(this.doc.defaultView) && touchOn && touchFavorites) || this.settings.favorites;
+    return favorites
       .map((row) => {
         const items = row.flatMap((item): Shown[] => {
           if (isSeparator(item)) return [{ separator: true }];

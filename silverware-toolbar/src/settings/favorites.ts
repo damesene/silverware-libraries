@@ -81,3 +81,8 @@ export function savedRows(rows: Favorites): FavoriteItem[][] {
 export function sameRows(a: Favorites, b: Favorites): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
+
+/** A row removed, its items with it */
+export function removeRow(rows: Favorites, row: number): FavoriteItem[][] {
+  return copy(rows).filter((_, i) => i !== row);
+}

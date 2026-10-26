@@ -50,6 +50,15 @@ describe("Settings", () => {
     expect(settings.favorites).toEqual([[gesture]]);
   });
 
+  it("read touch's own favourites where set (not valid: none), on unless turned off", async () => {
+    expect((await readSettings(bridge({}))).touchFavorites).toBeUndefined();
+    expect((await readSettings(bridge({}))).touchOn).toBe(true);
+    const settings = await readSettings(bridge({ "silverware.toolbar.favorites-touch": [[{ id: "formats.code" }]], "silverware.toolbar.favorites-touch-enabled": false }));
+    expect(settings.touchFavorites).toEqual([[{ id: "formats.code" }]]);
+    expect(settings.touchOn).toBe(false);
+    expect((await readSettings(bridge({ "silverware.toolbar.favorites-touch": 3 }))).touchFavorites).toBeUndefined();
+  });
+
   it("are the defaults when reading them fails, or without getConfig", async () => {
     const failing = bridge({}, { getConfig: () => Promise.reject(new Error("no config")) });
     expect((await readSettings(failing)).favorites).toEqual(DEFAULT_FAVORITES);

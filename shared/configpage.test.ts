@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { MANAGED_MARKER, withConfigSettings } from "./configpage.ts";
+import { CONFIG_PAGE, MANAGED_MARKER, saveConfigPage, toLua, withConfigSettings } from "./configpage.ts";
 
-describe("Silverware Table's settings in the configuration page", () => {
+describe("A plugin's settings in the configuration page", () => {
   const block = (...lines: string[]) => "```space-lua\n" + [MANAGED_MARKER, ...lines].join("\n") + "\n```";
 
   it("adds the Configuration Manager's block where there is none, after what the page has", () => {
@@ -51,5 +51,36 @@ describe("Silverware Table's settings in the configuration page", () => {
     expect(withConfigSettings(page, { "silverware.table.maxHeight": undefined, "silverware.table.metadata": undefined })).toBe("Intro\n\n\nEnd\n");
     // Nothing to set, no block: the page as it was
     expect(withConfigSettings("Intro\n", { "silverware.table.metadata": undefined })).toBe("Intro\n");
+  });
+
+  it("writes a table as Lua on one line: lists, fields by name, a name that is no Lua name in brackets", () => {
+    expect(toLua([[{ id: "actions.turnInto", show: "label" }], [{ id: "formats.bold" }, { type: "separator" }]])).toBe(
+      '{ { { id = "actions.turnInto", show = "label" } }, { { id = "formats.bold" }, { type = "separator" } } }',
+    );
+    expect(toLua({ "a-b": 1, ok: true, gone: undefined })).toBe('{ ["a-b"] = 1, ok = true }');
+    expect(toLua([])).toBe("{}");
+    expect(toLua('say "hi"\n')).toBe('"say \\"hi\\"\\n"');
+  });
+
+  it("keeps a plugin's own block apart from the Configuration Manager's (which would drop a table it cannot read)", () => {
+    const own = "-- managed-by: silverware-toolbar";
+    const page = `# Configuration\n\n${block('config.set("silverware.toolbar.shortcut", "Ctrl-Shift-q")')}\n`;
+    const favorites = [[{ id: "formats.bold" }]];
+    const next = withConfigSettings(page, { "silverware.toolbar.favorites": favorites }, own);
+    expect(next).toBe(`${page}\n\`\`\`space-lua\n${own}\nconfig.set("silverware.toolbar.favorites", { { { id = "formats.bold" } } })\n\`\`\`\n`);
+    // Its line replaced in place; the Configuration Manager's block untouched
+    expect(withConfigSettings(next, { "silverware.toolbar.favorites": [] }, own)).toBe(next.replace('{ { { id = "formats.bold" } } }', "{}"));
+    expect(withConfigSettings(next, { "silverware.toolbar.favorites": undefined }, own)).toBe(`${page}\n`);
+  });
+
+  it("saves into the page read (none yet: made), writing nothing when it cannot be read or has a sync conflict", async () => {
+    const saved: string[] = [];
+    const access = (read: () => string | undefined) => ({ readPage: (name: string) => (expect(name).toBe(CONFIG_PAGE), read()), saveConfigPage: (text: string) => void saved.push(text) });
+    await saveConfigPage(access(() => "Intro\n"), (text) => `${text}more\n`);
+    await saveConfigPage(access(() => { throw new Error("Not found"); }), (text) => `${text}new\n`);
+    expect(saved).toEqual(["Intro\nmore\n", "new\n"]);
+    await expect(saveConfigPage(access(() => { throw new Error("offline"); }), (t) => t)).rejects.toThrow("offline");
+    await expect(saveConfigPage(access(() => "<<<<<<< SB sha256:1\nx\n"), (t) => t)).rejects.toThrow("sync conflict");
+    expect(saved).toHaveLength(2);
   });
 });

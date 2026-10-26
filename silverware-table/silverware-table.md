@@ -1898,7 +1898,7 @@ body.swt-resizing * {
   font-size: 17px;
   line-height: 1.3;
 }
-.swt-settings-scope {
+.swt-settings-subtitle {
   margin: 2px 0 0;
   font-size: 12px;
   opacity: 0.65;

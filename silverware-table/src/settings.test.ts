@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { FEATURE_NAMES, SETTINGS } from "./bridge.ts";
-import { MANAGED_MARKER } from "./configpage.ts";
+import { MANAGED_MARKER } from "../../shared/configpage.ts";
 import { dialogKeys, moduleTabs } from "./settings.ts";
 import { cell, controller, editor, flashes, flush, key, PAGE, setup, useTablePage } from "./testing/page.ts";
 
@@ -22,7 +22,7 @@ describe("The settings dialog", () => {
     await setup(PAGE);
     await controller.openSettings();
     expect(dialog()!.querySelector(".swt-settings-title")!.textContent).toBe("Silverware Table settings");
-    expect(dialog()!.querySelector(".swt-settings-scope")!.textContent).toContain("every table in the space");
+    expect(dialog()!.querySelector(".swt-settings-subtitle")!.textContent).toContain("every table in the space");
   });
 
   it("shows the settings as configured; saves what changed, each value as it is; Cancel and Esc save nothing", async () => {

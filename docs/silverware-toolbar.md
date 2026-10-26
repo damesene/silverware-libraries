@@ -335,8 +335,7 @@ formats domain, `defineFormats`, `defineActions` with `choices` and `mixed`,
 ids `formats.<name>` / `actions.<name>`, the key as the command's, the
 toolbar at the caret, the popup under the toolbar, the page checked
 unchanged before a write); the favourites in rows (*Favourites: rows of
-items*). Committed: 4896c7f (everything up to the favourites in rows); the
-favourites in rows are in the working copy until committed.
+items*); *Next* 1, `shared/` (the table on it).
 
 **Not checked in a live SilverBullet yet** (step 6, the user): the command's
 key from `config.get`, the toolbar at the caret, the favourites' rows read
@@ -373,9 +372,14 @@ pointer or keys, UI tests (`npm run test:ui`):
      table's settings' markup, so the table's CSS stays.
    - `shared/configpage.ts`: the table's `configpage.ts` moved there
      (`withConfigSettings`, CONFIG_PAGE, MANAGED_MARKER; its test moved too),
-     writing lists and tables as Lua too (`{ { { id = "…", show = "label" } } }`:
-     SilverBullet's Configuration Manager reads them back,
-     `plugs/configuration-manager/lua.ts`); a value on one line, as it does.
+     writing lists and tables as Lua too (`{ { { id = "…", show = "label" } } }`),
+     a value on one line. Built otherwise than first planned: the Configuration
+     Manager reads no table back (`parseLuaLiteral` in its lua.ts) and writes
+     its block anew from what it read on any save (`changes` in
+     ui/use_config_editor.ts), so a table in its block would be lost; tables go
+     in a plugin's own block (`withConfigSettings`' marker), which it leaves
+     alone, and `saveConfigPage` (read, a sync conflict refused, written) is
+     shared too.
    - The table moves onto them: `core/dialog.ts` (Dialogs) over
      `shared/dialog.ts`, `settings.ts` over dialog, tabs and controls,
      `controller.ts` imports `shared/configpage.ts`. Its behaviour and tests

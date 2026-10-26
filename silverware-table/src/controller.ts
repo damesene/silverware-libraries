@@ -20,7 +20,7 @@ import { Panels } from "./core/panel.ts";
 import { type DragContext, followDrag } from "./core/drag.ts";
 import { copyingFromMenu } from "./clipboard.ts";
 import { markTable, renderedMeta, SilverBulletAdapter } from "./core/silverbullet/adapter.ts";
-import { CONFIG_PAGE, withConfigSettings } from "./configpage.ts";
+import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./features/metadata.ts";
 import { featureEntries } from "./modules.ts";
@@ -1637,16 +1637,7 @@ export class Controller implements TableHost {
       return;
     }
     if (!bridge.saveConfigPage || !bridge.readPage) throw new Error("no configuration page to save to");
-    let text = "";
-    try {
-      text = (await bridge.readPage(CONFIG_PAGE)) ?? "";
-    } catch (e) {
-      // No configuration page yet: it is created. Any other failure writes nothing (an empty text would replace the page)
-      if (!/not.?found|does not exist|no such/i.test(String(e))) throw e;
-    }
-    // A sync conflict left in the page (its markers): its Lua is broken, written over it would be worse
-    if (/^(<{7}|={7}|>{7})( |$)/m.test(text)) throw new Error("the CONFIG page has a sync conflict: resolve it there first");
-    await bridge.saveConfigPage(withConfigSettings(text, values));
+    await saveConfigPage({ readPage: (name) => bridge.readPage!(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values));
   }
 
   /** The "Silverware Table: Remove table metadata" command */

@@ -6,9 +6,15 @@
 // where SilverBullet keeps them (the CONFIG page's managed block,
 // configpage.ts) and the configuration is loaded again. Modules are created
 // when Silverware Table starts, so turning one on or off saves and reloads the page.
+import { settingRow, switchControl } from "../../shared/controls.ts";
+import { type Dialog, Dialogs } from "../../shared/dialog.ts";
+import { tabs } from "../../shared/tabs.ts";
 import { type Bridge, FEATURE_NAMES, type FeatureName, MODULE_CATEGORIES, MODULE_CATEGORY, MODULE_DESCRIPTIONS, MODULE_LABELS, type ModuleCategory, moduleOnByDefault, settingChoices, SETTINGS } from "./bridge.ts";
 import { UI_CLASS } from "./dom.ts";
 import { ICONS } from "./icons.ts";
+
+// The classes' base of the dialog and its controls (shared/dialog.ts, tabs.ts, controls.ts)
+const BASE = "swt-settings";
 
 type Key = keyof typeof SETTINGS;
 
@@ -57,23 +63,24 @@ export class SettingsDialog {
   private readonly values = new Map<string, unknown>();
   // Number fields whose text is no valid value: Save waits for them
   private readonly invalid = new Set<string>();
-  private backdrop: HTMLElement | undefined;
+  private readonly dialogs: Dialogs;
+  private dialog: Dialog | undefined;
   private saveButton: HTMLButtonElement | undefined;
   private note: HTMLElement | undefined;
   private readonly moduleSettings = new Map<FeatureName, HTMLElement>();
   private saving = false;
-  // Where the focus was before the dialog took it
-  private returnFocus: Element | null = null;
 
-  constructor(private readonly context: SettingsContext) {}
+  constructor(private readonly context: SettingsContext) {
+    this.dialogs = new Dialogs(context.doc, { base: BASE, backdropClass: UI_CLASS, closeIcon: ICONS.clear });
+  }
 
   get isOpen(): boolean {
-    return !!this.backdrop?.isConnected;
+    return this.dialogs.isOpen;
   }
 
   /** Whether a node is the dialog's (its keys are not the tables') */
   contains(node: Node): boolean {
-    return !!this.backdrop?.contains(node);
+    return this.dialogs.contains(node);
   }
 
   /** Reads the settings as configured now and shows them */
@@ -97,26 +104,21 @@ export class SettingsDialog {
       this.initial.set(enabledPath(name), typeof value === "boolean" ? value : moduleOnByDefault(name));
     }
     for (const [path, value] of this.initial) this.values.set(path, value);
-    this.returnFocus = this.context.doc.activeElement;
     this.render();
   }
 
   close(): void {
-    this.backdrop?.remove();
-    this.backdrop = undefined;
-    if (this.returnFocus instanceof HTMLElement && this.returnFocus.isConnected) this.returnFocus.focus({ preventScroll: true });
+    this.dialog?.close();
+    this.dialog = undefined;
   }
 
-  /** Esc or ×: closed, after asking where changes would be lost */
-  private async dismiss(): Promise<void> {
-    if (this.saving) return;
-    if (this.changed().length > 0) {
-      const { bridge } = this.context;
-      const question = "Close the Silverware Table settings without saving your changes?";
-      const sure = bridge.confirm ? await bridge.confirm(question) : this.context.doc.defaultView!.confirm(question);
-      if (!sure) return;
-    }
-    this.close();
+  /** Esc, × or a press beside it: whether it closes, after asking where changes would be lost */
+  private async dismiss(): Promise<boolean> {
+    if (this.saving) return false;
+    if (this.changed().length === 0) return true;
+    const { bridge } = this.context;
+    const question = "Close the Silverware Table settings without saving your changes?";
+    return bridge.confirm ? await bridge.confirm(question) : this.context.doc.defaultView!.confirm(question);
   }
 
   // ---- the dialog --------------------------------------------------------------
@@ -129,146 +131,76 @@ export class SettingsDialog {
   }
 
   private render(): void {
+    const { doc } = this.context;
     const el = this.el.bind(this);
-    const backdrop = el("div", `${UI_CLASS} swt-settings-backdrop`);
-    const dialog = el("div", "swt-settings");
-    dialog.setAttribute("role", "dialog");
-    dialog.setAttribute("aria-modal", "true");
-    dialog.setAttribute("aria-labelledby", "swt-settings-title");
-
-    const head = el("div", "swt-settings-head");
-    const titles = el("div", "swt-settings-titles");
-    const title = el("h2", "swt-settings-title", "Silverware Table settings");
-    title.id = "swt-settings-title";
-    titles.append(title, el("p", "swt-settings-scope", "For every table in the space: SilverBullet's configuration"));
-    const close = el("button", "swt-settings-close");
-    close.type = "button";
-    close.title = "Close (Esc)";
-    close.setAttribute("aria-label", close.title);
-    close.innerHTML = ICONS.clear;
-    close.addEventListener("click", () => void this.dismiss());
-    head.append(titles, close);
-
     // Tabs: the settings, then the modules by kind
-    const tabs = el("div", "swt-settings-tabs");
-    tabs.setAttribute("role", "tablist");
-    const body = el("div", "swt-settings-body");
-    const panels: HTMLElement[] = [];
-    const tabButtons: HTMLButtonElement[] = [];
-    const addTab = (id: string, name: string, panel: HTMLElement) => {
-      const tab = el("button", "swt-settings-tab", name);
-      tab.type = "button";
-      tab.setAttribute("role", "tab");
-      tab.dataset.swtTab = id;
-      panel.setAttribute("role", "tabpanel");
-      panel.dataset.swtPanel = id;
-      tab.addEventListener("click", () => {
-        tabButtons.forEach((b) => b.setAttribute("aria-selected", String(b === tab)));
-        panels.forEach((p) => (p.hidden = p !== panel));
-        // (The row of tabs scrolled sideways where it is wider than the dialog: the one picked wholly in it)
-        tab.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-      });
-      tabButtons.push(tab);
-      panels.push(panel);
-      tabs.append(tab);
-      body.append(panel);
-    };
+    const list: { id: string; title: string; panel: HTMLElement }[] = [];
     for (const tab of TABS) {
-      const panel = el("div", "swt-settings-panel");
+      const panel = el("div");
       for (const group of tab.groups) {
-        if (group.title) panel.append(el("h3", "swt-settings-group", group.title));
-        const card = el("div", "swt-settings-card");
+        if (group.title) panel.append(el("h3", `${BASE}-group`, group.title));
+        const card = el("div", `${BASE}-card`);
         for (const key of group.keys) card.append(this.row(key));
         panel.append(card);
       }
-      addTab(tab.id, tab.title, panel);
+      list.push({ id: tab.id, title: tab.title, panel });
     }
     for (const tab of moduleTabs()) {
-      const panel = el("div", "swt-settings-panel");
-      const card = el("div", "swt-settings-card");
+      const panel = el("div");
+      const card = el("div", `${BASE}-card`);
       for (const name of tab.modules) card.append(this.moduleRow(name));
       panel.append(card);
-      addTab(tab.id, tab.title, panel);
+      list.push({ id: tab.id, title: tab.title, panel });
     }
-    tabButtons.forEach((b, i) => b.setAttribute("aria-selected", String(i === 0)));
-    panels.forEach((p, i) => (p.hidden = i !== 0));
+    const { bar, panels } = tabs(doc, BASE, "swt", list);
+    const content = doc.createDocumentFragment();
+    content.append(...panels);
 
-    const foot = el("div", "swt-settings-foot");
-    const note = el("div", "swt-settings-note");
+    const footer = doc.createDocumentFragment();
+    const note = el("div", `${BASE}-note`);
     this.note = note;
-    const cancel = el("button", "swt-settings-cancel", "Cancel");
+    const cancel = el("button", `${BASE}-cancel`, "Cancel");
     cancel.type = "button";
     cancel.addEventListener("click", () => {
       if (!this.saving) this.close();
     });
-    const save = el("button", "swt-settings-save", "Save");
+    const save = el("button", `${BASE}-save`, "Save");
     save.type = "button";
     save.addEventListener("click", () => void this.save());
     this.saveButton = save;
-    foot.append(note, cancel, save);
+    footer.append(note, cancel, save);
 
-    dialog.append(head, tabs, body, foot);
-    backdrop.append(dialog);
-    backdrop.addEventListener("keydown", (e) => this.onKeyDown(e, dialog));
-    this.context.doc.body.append(backdrop);
-    this.backdrop = backdrop;
-    this.update();
     // The dialog takes the focus (no control marked), Tab goes on from there
-    dialog.tabIndex = -1;
-    dialog.focus({ preventScroll: true });
-  }
-
-  // Esc closes (asking where changes would be lost); Tab stays in the dialog; no key reaches the page
-  private onKeyDown(e: KeyboardEvent, dialog: HTMLElement): void {
-    e.stopPropagation();
-    if (e.key === "Escape") {
-      e.preventDefault();
-      void this.dismiss();
-      return;
-    }
-    if (e.key !== "Tab") return;
-    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>("button, input, select")).filter(
-      (f) => !(f as HTMLButtonElement).disabled && f.offsetParent !== null,
-    );
-    if (focusable.length === 0) return;
-    const first = focusable[0]!;
-    const last = focusable[focusable.length - 1]!;
-    const active = this.context.doc.activeElement;
-    if (e.shiftKey && active === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && active === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  }
-
-  /** A setting's name, and under it what it does where it says more than its name */
-  private label(name: string, hint?: string): HTMLElement {
-    const text = this.el("span", "swt-settings-label");
-    text.append(this.el("span", "swt-settings-name", name));
-    if (hint) text.append(this.el("span", "swt-settings-hint", hint));
-    return text;
+    this.dialog = this.dialogs.open({
+      title: "Silverware Table settings",
+      subtitle: "For every table in the space: SilverBullet's configuration",
+      bar,
+      content,
+      footer,
+      dismiss: () => this.dismiss(),
+    });
+    this.update();
   }
 
   /** A setting's row: its name left, its control right (a switch, a choice, a number) */
   private row(key: Key): HTMLElement {
     const setting = SETTINGS[key];
-    const value = this.values.get(setting.path);
-    const row = this.el("label", "swt-settings-row");
+    const row = settingRow(this.context.doc, BASE, setting.label, (setting as { hint?: string }).hint, this.control(key));
     row.dataset.swtSetting = setting.path;
-    row.append(this.label(setting.label, (setting as { hint?: string }).hint));
-    if (typeof setting.default === "boolean") {
-      row.append(this.switch(value === true, (on) => this.change(setting.path, on)));
-      return row;
-    }
+    return row;
+  }
+
+  /** A setting's control: a switch, a choice or a number */
+  private control(key: Key): HTMLElement {
+    const setting = SETTINGS[key];
+    const value = this.values.get(setting.path);
+    if (typeof setting.default === "boolean") return switchControl(this.context.doc, BASE, value === true, (on) => this.change(setting.path, on));
     const choices = settingChoices(key, this.context.doc, value);
     if (choices.length) {
       const select = this.el("select");
       for (const choice of choices) select.append(new Option(choice.label, choice.value, false, choice.value === value));
       select.addEventListener("change", () => this.change(setting.path, select.value));
-      row.append(select);
-      return row;
+      return select;
     }
     const input = this.el("input");
     input.type = "number";
@@ -277,7 +209,7 @@ export class SettingsDialog {
     input.value = String(value);
     input.addEventListener("input", () => {
       const parsed = (setting.parse as (v: unknown) => unknown)(input.value.trim() === "" ? undefined : Number(input.value));
-      input.classList.toggle("swt-settings-invalid", parsed === undefined);
+      input.classList.toggle(`${BASE}-invalid`, parsed === undefined);
       if (parsed === undefined) this.invalid.add(setting.path);
       else {
         this.invalid.delete(setting.path);
@@ -285,38 +217,23 @@ export class SettingsDialog {
       }
       this.update();
     });
-    row.append(input);
-    return row;
+    return input;
   }
 
   /** A module's row: its name and what it does, its switch; its own settings under it while it is on */
   private moduleRow(name: FeatureName): HTMLElement {
-    const block = this.el("div", "swt-settings-module");
-    const row = this.el("label", "swt-settings-row");
-    const toggle = this.switch(this.values.get(enabledPath(name)) === true, (on) => this.change(enabledPath(name), on));
+    const block = this.el("div", `${BASE}-module`);
+    const toggle = switchControl(this.context.doc, BASE, this.values.get(enabledPath(name)) === true, (on) => this.change(enabledPath(name), on));
     toggle.querySelector("input")!.dataset.swtModule = name;
-    row.append(this.label(MODULE_LABELS[name], MODULE_DESCRIPTIONS[name]), toggle);
-    block.append(row);
+    block.append(settingRow(this.context.doc, BASE, MODULE_LABELS[name], MODULE_DESCRIPTIONS[name], toggle));
     const keys = (Object.keys(SETTINGS) as Key[]).filter((key) => moduleOf(key) === name);
     if (keys.length > 0) {
-      const own = this.el("div", "swt-settings-module-settings");
+      const own = this.el("div", `${BASE}-module-settings`);
       for (const key of keys) own.append(this.row(key));
       block.append(own);
       this.moduleSettings.set(name, own);
     }
     return block;
-  }
-
-  /** A switch: a checkbox drawn as one */
-  private switch(on: boolean, changed: (on: boolean) => void): HTMLElement {
-    const wrap = this.el("span", "swt-settings-switch");
-    const box = this.el("input");
-    box.type = "checkbox";
-    box.setAttribute("role", "switch");
-    box.checked = on;
-    box.addEventListener("change", () => changed(box.checked));
-    wrap.append(box, this.el("span", "swt-settings-knob"));
-    return wrap;
   }
 
   private change(path: string, value: unknown): void {
@@ -345,7 +262,7 @@ export class SettingsDialog {
     }
     // A module's own settings show while it is on
     for (const [name, own] of this.moduleSettings) own.hidden = this.values.get(enabledPath(name)) !== true;
-    for (const input of Array.from(this.backdrop?.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select") ?? [])) {
+    for (const input of Array.from(this.dialog?.element.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select") ?? [])) {
       input.disabled = this.saving;
     }
   }

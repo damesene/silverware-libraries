@@ -73,6 +73,12 @@ test.describe("The toolbar on a phone", () => {
     const list = (await popup(page).boundingBox())!;
     expect(list.y + list.height).toBeLessThanOrEqual(toolbar.y);
     expect(list.y).toBeGreaterThanOrEqual(0);
+    // What is typed finds fewer: shorter from the top, its bottom staying by the toolbar
+    await page.keyboard.type("bold");
+    await expect.poll(async () => (await popup(page).boundingBox())!.height).toBeLessThan(list.height);
+    const found = (await popup(page).boundingBox())!;
+    expect(found.height).toBeLessThan(list.height);
+    expect(Math.abs(found.y + found.height - (list.y + list.height))).toBeLessThan(1);
   });
 
   test("over SilverBullet's keyboard bar where it shows", async ({ page }) => {

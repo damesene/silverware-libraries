@@ -110,10 +110,13 @@ export class Popup {
       this.list.style.maxHeight = `${Math.max(120, rect.top - viewTop - 2 * GAP - (this.element.offsetHeight - this.list.offsetHeight))}px`;
       const left = Math.max(GAP, Math.min(rect.left + GAP, win.innerWidth - this.element.offsetWidth - GAP));
       this.element.style.left = `${Math.round(left)}px`;
-      this.element.style.top = `${Math.round(Math.max(viewTop + GAP, rect.top - GAP - this.element.offsetHeight))}px`;
+      // Held by its bottom edge over the toolbar: what is typed finds fewer, and it gets shorter from the top
+      this.element.style.top = "auto";
+      this.element.style.bottom = `${Math.round(win.innerHeight - (rect.top - GAP))}px`;
       return;
     }
     this.list.style.removeProperty("max-height");
+    this.element.style.removeProperty("bottom");
     const size = { width: this.element.offsetWidth, height: this.element.offsetHeight };
     const view = { width: win.innerWidth, height: win.innerHeight, top: viewTop };
     // Without a selection on screen: under the top of the view, in the middle

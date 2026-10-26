@@ -74,6 +74,8 @@ test.describe("The toolbar on a phone", () => {
     await expect.poll(policy).toBe("manual");
     await expect(page.locator(".cm-content")).toBeFocused();
     expect(await selected(page)).toBe("some text");
+    // Shown selected too: the page's selection, not only the editor's own
+    await expect.poll(() => page.evaluate(() => document.getSelection()?.toString())).toBe("some text");
     await expect(bar(page)).toBeVisible();
     const line = await lineBox(page, "Plain paragraph one");
     await page.touchscreen.tap(line.x + 20, line.y + line.height / 2);

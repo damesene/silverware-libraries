@@ -52,8 +52,10 @@ test.describe("The toolbar", () => {
     // Bold over the lines again; the caret on its second line: inside it, shown pressed
     await select(page, "paragraph one.\nPlain paragrap");
     await barButton(page, "formats.bold").click();
+    await expect.poll(() => text(page)).toContain("Plain **paragraph one.\nPlain paragrap**h two");
     await caret(page, "Plain paragrap**", 4);
     await page.keyboard.press(KEY);
+    await expect(popup(page)).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(barButton(page, "formats.bold")).toHaveAttribute("aria-pressed", "true");
   });

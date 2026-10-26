@@ -5,12 +5,17 @@
 // made one until its next tap, which shows the keyboard again and gives it
 // back to the browser. Without the API (Safari on iOS) the page's text is left
 // (blurred): the keyboard goes, the editor keeps its selection, the toolbar
-// shown always goes with the focus.
+// shown always goes with the focus. The selection is set again once the
+// keyboard has gone (the view resized, else a moment after): a phone may drop
+// the page's selection as its keyboard goes, which the emulation of one does not.
 
 type VirtualKeyboard = { hide(): void; show(): void };
 type Policied = HTMLElement & { virtualKeyboardPolicy?: string };
 
-export function hideKeyboard(content: HTMLElement | null): void {
+// How long the keyboard is given to go, at most, before the selection is set again
+const GONE_MS = 500;
+
+export function hideKeyboard(content: HTMLElement | null, again: () => void): void {
   if (!content) return;
   const win = content.ownerDocument.defaultView!;
   const keyboard = (win.navigator as Navigator & { virtualKeyboard?: VirtualKeyboard }).virtualKeyboard;
@@ -21,6 +26,16 @@ export function hideKeyboard(content: HTMLElement | null): void {
   }
   element.virtualKeyboardPolicy = "manual";
   keyboard.hide();
+  // Once it has gone: the selection as it was
+  const view = win.visualViewport;
+  let timer = 0;
+  const gone = () => {
+    view?.removeEventListener("resize", gone);
+    win.clearTimeout(timer);
+    again();
+  };
+  view?.addEventListener("resize", gone);
+  timer = win.setTimeout(gone, GONE_MS);
   // The next tap in the text: the keyboard shown again (a tap is the user's activation show needs), the browser's again
   const tapped = (e: PointerEvent) => {
     if (!(e.target instanceof Node) || !element.contains(e.target)) return;

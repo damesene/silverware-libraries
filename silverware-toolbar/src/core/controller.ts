@@ -261,7 +261,8 @@ export class Controller {
       },
       flash: (message, type) => void bridge.flash(message, type),
       select: (from, to) => void bridge.setSelection(from, to),
-      hideKeyboard: () => hideKeyboard(pageContentOf(this.doc.activeElement) ?? this.doc.querySelector<HTMLElement>(CONTENT_SELECTOR)),
+      // (The selection set again once the keyboard has gone: a phone may drop it as it goes)
+      hideKeyboard: () => hideKeyboard(pageContentOf(this.doc.activeElement) ?? this.doc.querySelector<HTMLElement>(CONTENT_SELECTOR), () => void bridge.setSelection(context.from, context.to)),
     };
     try {
       await action.perform!(context, editor);

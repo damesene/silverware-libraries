@@ -1,10 +1,13 @@
 // Silverware Toolbar entry point, loaded by the library page's Space Lua:
 //   js.importFromSpace("Library/damesene/silverware-toolbar.js").init({ ... editor functions ... })
+import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { actionsOf, customActionsAnew, defineCustomActions } from "./actions.ts";
-import { type Bridge, missingBridgeFunctions, readSettings } from "./bridge.ts";
+import { type Bridge, missingBridgeFunctions, PATHS, readSettings } from "./bridge.ts";
+import type { Action } from "./core/action.ts";
 import { Controller } from "./core/controller.ts";
 import { customFormatsAnew, defineCustomFormats, formatsOf } from "./formats/index.ts";
 import { createActions } from "./modules.ts";
+import { SettingsDialog } from "./settings/dialog.ts";
 
 export const version = "0.1.0";
 
@@ -12,6 +15,14 @@ export const version = "0.1.0";
 const GLOBAL_KEY = "__silverwareToolbar";
 
 const slot = globalThis as unknown as Record<string, Controller | undefined>;
+
+// The toolbar's own block of the CONFIG page, for tables (the favourites): the
+// Configuration Manager's block would lose them on its next save (shared/configpage.ts)
+export const OWN_MARKER = "-- managed-by: silverware-toolbar";
+
+// The bridge and the actions of the toolbar started last, for the settings dialog
+let current: { readonly bridge: Bridge; readonly actions: () => readonly Action[] } | undefined;
+let settingsDialog: SettingsDialog | undefined;
 
 export async function init(bridge: Bridge): Promise<void> {
   const missing = missingBridgeFunctions(bridge);
@@ -22,14 +33,51 @@ export async function init(bridge: Bridge): Promise<void> {
   const settings = await readSettings(bridge);
   // The one before stopped only now: init may be called again meanwhile (Space Lua loaded twice), each stops the last
   slot[GLOBAL_KEY]?.stop();
-  const controller = new Controller(document, bridge, settings, createActions(settings.modules));
+  const actions = createActions(settings.modules);
+  const controller = new Controller(document, bridge, settings, actions, () => void openSettings());
   slot[GLOBAL_KEY] = controller;
+  current = { bridge, actions };
   controller.start();
 }
 
 /** The "Silverware Toolbar: Show actions" command (its key too): the popup of every action, under the toolbar by the selection or the caret */
 export function showActions(): void {
   void slot[GLOBAL_KEY]?.showActions();
+}
+
+/** The "Silverware Toolbar: Settings" command (the popup's last item too): the settings dialog */
+export async function openSettings(): Promise<void> {
+  if (!current || settingsDialog?.isOpen) return;
+  const { bridge, actions } = current;
+  settingsDialog = new SettingsDialog({
+    doc: document,
+    bridge,
+    actions,
+    canSave: !!bridge.saveSettings || (!!bridge.readPage && !!bridge.saveConfigPage),
+    save: (values) => saveSettings(bridge, values),
+    // The toolbar started anew with them (favourites need no reload)
+    saved: () => void init(bridge),
+  });
+  await settingsDialog.open();
+}
+
+/**
+ * Settings saved where SilverBullet keeps them: the CONFIG page, values in the
+ * Configuration Manager's block (it shows them, Ctrl-,), the favourites in the
+ * toolbar's own; or the bridge's own store (the playground's)
+ */
+async function saveSettings(bridge: Bridge, values: Readonly<Record<string, unknown>>): Promise<void> {
+  if (bridge.saveSettings) {
+    await bridge.saveSettings(values);
+    return;
+  }
+  if (!bridge.readPage || !bridge.saveConfigPage) throw new Error("no configuration page to save to");
+  const { [PATHS.favorites]: favorites, ...scalars } = values;
+  const tables = PATHS.favorites in values ? { [PATHS.favorites]: favorites } : {};
+  await saveConfigPage(
+    { readPage: (name) => bridge.readPage!(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) },
+    (text) => withConfigSettings(withConfigSettings(text, scalars), tables, OWN_MARKER),
+  );
 }
 
 /**

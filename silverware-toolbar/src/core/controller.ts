@@ -8,9 +8,10 @@
 // command without a selection shows the toolbar at the caret, its popup open:
 // its buttons show the formats around the caret; it goes as the caret moves
 // or text is typed. The modules (modules.ts) give the actions; the core knows
-// none of them.
+// none of them. The popup ends with the core's own item, the settings dialog.
 import type { Bridge, Settings } from "../bridge.ts";
 import { pageContentOf, viewTopOf } from "../dom.ts";
+import { ICONS } from "../icons.ts";
 import type { Action, Change, Context } from "./action.ts";
 import { Bar, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
@@ -20,6 +21,15 @@ import { Popup } from "./popup.ts";
 import { SelectionWatcher } from "./selection.ts";
 
 type State = { readonly active: boolean; readonly enabled: boolean };
+
+/** The core's own action, last in the popup (a favourite too): the settings dialog */
+export const SETTINGS_ACTION: Action = {
+  id: "actions.settings",
+  label: "Silverware Toolbar settings…",
+  icon: ICONS.settings,
+  group: "Silverware Toolbar",
+  keywords: ["preferences", "favorites", "options", "key"],
+};
 
 export class Controller {
   private readonly watcher: SelectionWatcher;
@@ -42,6 +52,8 @@ export class Controller {
     readonly settings: Settings,
     // The actions offered, asked for each time they show (definitions made later count)
     private readonly actions: () => readonly Action[],
+    // The settings dialog opened (none: not offered)
+    private readonly openSettings?: () => void,
   ) {
     this.watcher = new SelectionWatcher(doc, (range) => void this.selected(range), (node) => this.owns(node));
     this.bar = new Bar(doc, {
@@ -81,7 +93,7 @@ export class Controller {
     this.shows++;
     this.atCaret = context.from === context.to;
     this.showBar(context, range);
-    const actions = this.actions();
+    const actions = this.offered();
     this.popup.open({
       actions,
       state: (action) => this.state(action, context),
@@ -91,6 +103,11 @@ export class Controller {
       closed: () => this.focusEditor(),
       keeps: (node) => this.bar.owns(node),
     });
+  }
+
+  /** The modules' actions, and the core's own where it has them */
+  private offered(): readonly Action[] {
+    return this.openSettings ? [...this.actions(), SETTINGS_ACTION] : this.actions();
   }
 
   private owns(node: Node): boolean {
@@ -126,7 +143,7 @@ export class Controller {
    * empty left out
    */
   private favorites(context: Context): Shown[][] {
-    const actions = this.actions();
+    const actions = this.offered();
     const all = [...actions, ...actions.flatMap((a) => a.choices ?? [])];
     return this.settings.favorites
       .map((row) => {
@@ -177,6 +194,11 @@ export class Controller {
   private async run(action: Action): Promise<void> {
     // Run from the toolbar while the popup is open: the popup is done
     this.popup.close(true);
+    if (action === SETTINGS_ACTION) {
+      this.hideBar();
+      this.openSettings?.();
+      return;
+    }
     const context = await this.read();
     if (!context || !this.state(action, context).enabled || !action.run) {
       this.focusEditor();

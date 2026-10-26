@@ -335,7 +335,7 @@ formats domain, `defineFormats`, `defineActions` with `choices` and `mixed`,
 ids `formats.<name>` / `actions.<name>`, the key as the command's, the
 toolbar at the caret, the popup under the toolbar, the page checked
 unchanged before a write); the favourites in rows (*Favourites: rows of
-items*); *Next* 1, `shared/` (the table on it).
+items*); *Next* 1, `shared/` (the table on it); *Next* 2, the settings dialog.
 
 **Not checked in a live SilverBullet yet** (step 6, the user): the command's
 key from `config.get`, the toolbar at the caret, the favourites' rows read

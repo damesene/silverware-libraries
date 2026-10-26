@@ -14,6 +14,15 @@ export type Bridge = {
   readonly focus?: () => unknown;
   // Optional: without it, settings keep their defaults
   readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
+  // Optional, for the settings dialog: asks before closing it with changes (else the browser's confirm)
+  readonly confirm?: (message: string) => boolean | Promise<boolean>;
+  // Optional, for the settings dialog: the CONFIG page read and saved (as SilverBullet's Configuration Manager saves it)
+  readonly readPage?: (name: string) => string | Promise<string>;
+  readonly saveConfigPage?: (text: string) => unknown;
+  // Optional: a store of its own instead of the CONFIG page (the playground's); values by path, undefined removes one
+  readonly saveSettings?: (values: Readonly<Record<string, unknown>>) => unknown;
+  // Optional: the page loaded anew, as a module turned on or off and the key need (else the window reloaded)
+  readonly reloadUI?: () => unknown;
 };
 
 export type Selection = { readonly from: number; readonly to: number; readonly text: string };
@@ -27,8 +36,23 @@ export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
 export const MODULE_NAMES = ["inline", "blocks", "clear"] as const;
 export type ModuleName = (typeof MODULE_NAMES)[number];
 
+/** A module's name and what it does, as the settings dialog shows them (the library page's config.define says the same) */
+export const MODULE_LABELS: Readonly<Record<ModuleName, string>> = { inline: "Inline formats", blocks: "Turn into", clear: "Clear formatting" };
+export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
+  inline: "Bold, italic, strikethrough, highlight, code, links and wiki links.",
+  blocks: "Turn lines into a paragraph, a heading, a list, a task or a quote.",
+  clear: "Remove the inline formats of the selection.",
+};
+
 // The key of the command showing every action (the library page gives it to the command: SilverBullet handles it)
 export const DEFAULT_SHORTCUT = "Ctrl-Shift-q";
+
+/** Where each setting is in SilverBullet's configuration */
+export const PATHS = {
+  favorites: "silverware.toolbar.favorites",
+  shortcut: "silverware.toolbar.shortcut",
+  module: (name: ModuleName) => `silverware.toolbar.modules.${name}.enabled`,
+} as const;
 
 /** Silverware Toolbar's settings, read once it starts (a change applies on reload) */
 export type Settings = {
@@ -58,10 +82,20 @@ export async function readSettings(bridge: Bridge): Promise<Settings> {
       return fallback;
     }
   };
-  const favorites = await get("silverware.toolbar.favorites", DEFAULT_FAVORITES);
+  const favorites = await get(PATHS.favorites, DEFAULT_FAVORITES);
   const modules = new Set<ModuleName>();
-  for (const name of MODULE_NAMES) if ((await get(`silverware.toolbar.modules.${name}.enabled`, true)) !== false) modules.add(name);
+  for (const name of MODULE_NAMES) if ((await get(PATHS.module(name), true)) !== false) modules.add(name);
   return { favorites: favoritesOf(favorites), modules };
+}
+
+/** The key as configured (the command's: SilverBullet takes it as the library page defines the command) */
+export async function readShortcut(bridge: Bridge): Promise<string> {
+  try {
+    const key = await bridge.getConfig?.(PATHS.shortcut, DEFAULT_SHORTCUT);
+    return typeof key === "string" && key.trim() ? key : DEFAULT_SHORTCUT;
+  } catch {
+    return DEFAULT_SHORTCUT;
+  }
 }
 
 /**

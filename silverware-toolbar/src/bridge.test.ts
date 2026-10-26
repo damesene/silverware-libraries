@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Bridge, DEFAULT_SHORTCUT, missingBridgeFunctions, MODULE_NAMES, readSettings } from "./bridge.ts";
+import { type Bridge, DEFAULT_SHORTCUT, missingBridgeFunctions, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, readSettings, readShortcut } from "./bridge.ts";
 import libraryPage from "../silverware-toolbar.md?raw";
 import { DEFAULT_FAVORITES } from "./core/favorites.ts";
 
@@ -72,5 +72,19 @@ describe("The library page", () => {
     expect(/shortcut = \{[\s\S]*?default = "([^"]*)"/.exec(page)?.[1]).toBe(DEFAULT_SHORTCUT);
     expect(page).toContain(`config.get("silverware.toolbar.shortcut", "${DEFAULT_SHORTCUT}")`);
     for (const name of MODULE_NAMES) expect(page).toContain(`${name} = { type = "object"`);
+  });
+
+  it("names and describes each module as the library page's config.define does (the settings dialog shows them)", () => {
+    for (const name of MODULE_NAMES) {
+      const line = page.split("\n").find((l) => l.trimStart().startsWith(`${name} = { type = "object"`)) ?? "";
+      expect(line).toContain(`description = "${MODULE_DESCRIPTIONS[name]}"`);
+      expect(line).toContain(`label = "${MODULE_LABELS[name]}"`);
+    }
+  });
+
+  it("read the key as configured; an empty one or not a text is the default", async () => {
+    expect(await readShortcut(bridge({ "silverware.toolbar.shortcut": "Alt-k" }))).toBe("Alt-k");
+    expect(await readShortcut(bridge({ "silverware.toolbar.shortcut": " " }))).toBe(DEFAULT_SHORTCUT);
+    expect(await readShortcut(bridge({ "silverware.toolbar.shortcut": 3 }))).toBe(DEFAULT_SHORTCUT);
   });
 });

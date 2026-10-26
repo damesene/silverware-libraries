@@ -3,12 +3,14 @@
 // bridge is SilverBullet's editor API in short, over this editor; the
 // library page's space-style block is applied as SilverBullet would, and the
 // command's key bound as SilverBullet binds a command's (a keymap of the editor).
+// Settings are the playground's own store (no CONFIG page here), which the
+// settings dialog writes through `saveSettings`.
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
-import { DEFAULT_SHORTCUT } from "../silverware-toolbar/src/bridge.ts";
-import { init, showActions } from "../silverware-toolbar/src/index.ts";
+import { DEFAULT_SHORTCUT, PATHS } from "../silverware-toolbar/src/bridge.ts";
+import { init, openSettings, showActions } from "../silverware-toolbar/src/index.ts";
 import libraryPage from "../silverware-toolbar/silverware-toolbar.md";
 import { flash, setUpTheme } from "./common.ts";
 import sample from "./toolbar-sample.md";
@@ -20,13 +22,24 @@ style.textContent = /```space-style\r?\n([\s\S]*?)```/.exec(libraryPage)?.[1] ??
 document.head.append(style);
 
 const STORE = "silverware.toolbar.playground.text";
-const stored = (() => {
+const SETTINGS_STORE = "silverware.toolbar.playground.settings";
+const load = (key: string) => {
   try {
-    return localStorage.getItem(STORE);
+    return localStorage.getItem(key);
   } catch {
     return null;
   }
-})();
+};
+const stored = load(STORE);
+
+// The settings by path, as config.get gives them
+let settings: Record<string, unknown> = {};
+try {
+  settings = JSON.parse(load(SETTINGS_STORE) ?? "{}");
+} catch {
+  settings = {};
+}
+const shortcut = typeof settings[PATHS.shortcut] === "string" ? (settings[PATHS.shortcut] as string) : DEFAULT_SHORTCUT;
 
 const view = new EditorView({
   parent: document.getElementById("sb-editor")!,
@@ -36,7 +49,7 @@ const view = new EditorView({
       history(),
       keymap.of([
         {
-          key: DEFAULT_SHORTCUT,
+          key: shortcut,
           run: () => {
             showActions();
             return true;
@@ -70,8 +83,22 @@ void init({
   replaceRange: (from, to, text) => view.dispatch({ changes: { from, to, insert: text } }),
   getText: () => view.state.doc.toString(),
   flash,
-  getConfig: (_path, fallback) => fallback,
+  getConfig: (path, fallback) => (path in settings ? settings[path] : fallback),
+  saveSettings: (values) => {
+    for (const [path, value] of Object.entries(values)) {
+      if (value === undefined) delete settings[path];
+      else settings[path] = value;
+    }
+    try {
+      localStorage.setItem(SETTINGS_STORE, JSON.stringify(settings));
+    } catch {
+      // A private window: they hold until the page is loaded again
+    }
+  },
+  reloadUI: () => location.reload(),
 });
+
+document.getElementById("swb-settings")!.addEventListener("click", () => void openSettings());
 
 document.getElementById("reset")!.addEventListener("click", () => {
   view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: sample } });

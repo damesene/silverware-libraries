@@ -82,6 +82,8 @@ void init({
   setSelection: (from, to) => view.dispatch({ selection: { anchor: from, head: to } }),
   replaceRange: (from, to, text) => view.dispatch({ changes: { from, to, insert: text } }),
   getText: () => view.state.doc.toString(),
+  // As SilverBullet's editor.focus: CodeMirror's own, which shows its selection again
+  focus: () => view.focus(),
   flash,
   getConfig: (path, fallback) => (path in settings ? settings[path] : fallback),
   saveSettings: (values) => {

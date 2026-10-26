@@ -1,5 +1,6 @@
-// Where a floating element goes by the selection: above it, centred on it;
-// below it where there is no room above (under the top of the page's view:
+// Where a floating element goes by the selection: above it, centred on it or
+// (`before`: the toolbar on a computer, out of the way of what is read)
+// ending where it starts; below it where there is no room above (under the top of the page's view:
 // SilverBullet's top bar); always inside the window. Or by another element
 // (the popup by the toolbar): below it, above it where there is no room below.
 
@@ -14,9 +15,10 @@ export function placeBy(
   size: { width: number; height: number },
   view: { width: number; height: number; top: number },
   under = false,
+  before = false,
 ): { left: number; top: number; below: boolean } {
-  const center = (rect.left + rect.right) / 2;
-  const left = Math.max(GAP, Math.min(center - size.width / 2, view.width - size.width - GAP));
+  const wanted = before ? rect.left - GAP - size.width : (rect.left + rect.right) / 2 - size.width / 2;
+  const left = Math.max(GAP, Math.min(wanted, view.width - size.width - GAP));
   const above = rect.top - GAP - size.height;
   const below = under ? rect.bottom + GAP + size.height <= view.height - GAP || above < view.top + GAP : above < view.top + GAP;
   const top = below ? Math.min(rect.bottom + GAP, view.height - size.height - GAP) : above;

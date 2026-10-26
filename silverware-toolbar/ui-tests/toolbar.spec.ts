@@ -10,10 +10,12 @@ test.describe("The toolbar", () => {
     await expect(bar(page)).toBeVisible();
     await expect(bar(page).locator(".swb-row")).toHaveCount(2);
     await expect(bar(page).locator(".swb-row").first().locator(".swb-button")).toHaveText(["Paragraph"]);
-    // Above the selection
+    // Above the selection, ending where it starts (or as far left as the window allows)
     const toolbar = (await bar(page).boundingBox())!;
     const line = await lineBox(page, "Plain paragraph one");
     expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(line.y);
+    const start = await page.evaluate(() => window.getSelection()!.getRangeAt(0).getClientRects()[0]!.left);
+    expect(toolbar.x + toolbar.width <= start || toolbar.x <= 9).toBe(true);
     await select(page, "Plain", 0);
     await expect(bar(page)).toBeHidden();
   });

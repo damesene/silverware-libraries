@@ -85,6 +85,9 @@ describe("Placing by the selection", () => {
     expect(placeBy({ left: 400, right: 600, top: 300, bottom: 320 }, size, view)).toEqual({ left: 400, top: 252, below: false });
     // Near the window's left edge: kept inside
     expect(placeBy({ left: 0, right: 20, top: 300, bottom: 320 }, size, view).left).toBe(8);
+    // Before it: ending where it starts (no room: at the window's left)
+    expect(placeBy({ left: 400, right: 600, top: 300, bottom: 320 }, size, view, false, true)).toEqual({ left: 192, top: 252, below: false });
+    expect(placeBy({ left: 100, right: 300, top: 300, bottom: 320 }, size, view, false, true).left).toBe(8);
   });
 
   it("goes below where there is no room above, under the top of the page's view", () => {

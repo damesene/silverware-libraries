@@ -232,7 +232,8 @@ export class Bar {
     this.element.style.removeProperty("bottom");
     const win = this.doc.defaultView!;
     const size = { width: this.element.offsetWidth, height: this.element.offsetHeight };
-    const { left, top } = placeBy(rect, size, { width: win.innerWidth, height: win.innerHeight, top: viewTop });
+    // Left of the selection, ending where it starts: what is read beside it stays in view
+    const { left, top } = placeBy(rect, size, { width: win.innerWidth, height: win.innerHeight, top: viewTop }, false, true);
     this.element.style.left = `${left}px`;
     this.element.style.top = `${top}px`;
     if (this.menu) this.placeMenu();

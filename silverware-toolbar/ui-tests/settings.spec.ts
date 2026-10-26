@@ -11,7 +11,7 @@ const save = (page: Page): Locator => dialog(page).locator(".swb-settings-save")
 /** The settings opened as a user would: the popup of every action, its last item */
 async function openSettings(page: Page): Promise<void> {
   await select(page, "some text");
-  await bar(page).locator(".swb-more").click();
+  await barButton(page, "actions.more").click();
   await popup(page).locator(".swb-search-field").fill("settings");
   await popup(page).locator('[data-swb-action="actions.settings"]').click();
   await expect(dialog(page)).toBeVisible();
@@ -20,7 +20,7 @@ async function openSettings(page: Page): Promise<void> {
 test.describe("The settings dialog", () => {
   test("opens from the popup's last item, its tabs General, Favorites, Modules; Esc closes it unchanged", async ({ page }) => {
     await select(page, "some text");
-    await bar(page).locator(".swb-more").click();
+    await barButton(page, "actions.more").click();
     await expect(popup(page).locator(".swb-option").last()).toHaveText("Silverware Toolbar settings…");
     await popup(page).locator(".swb-option").last().click();
     await expect(dialog(page)).toBeVisible();
@@ -28,7 +28,7 @@ test.describe("The settings dialog", () => {
     await expect(dialog(page).locator(".swb-settings-key")).toHaveValue("Ctrl-Shift-q");
     await tab(page, "favorites").click();
     await expect(rowItems(page, 0)).toHaveText(["Turn into"]);
-    await expect(rowItems(page, 1)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight"]);
+    await expect(rowItems(page, 1)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
     await expect(save(page)).toBeDisabled();
     await page.keyboard.press("Escape");
     await expect(dialog(page)).toHaveCount(0);
@@ -38,11 +38,11 @@ test.describe("The settings dialog", () => {
     await openSettings(page);
     await tab(page, "favorites").click();
     await item(page, 1, 0).locator(".swb-settings-remove").click();
-    await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight"]);
+    await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
     await dialog(page).locator('[data-swb-row="1"] .swb-settings-add').click();
     await page.keyboard.type("strike");
     await page.keyboard.press("Enter");
-    await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Strikethrough"]);
+    await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action", "Strikethrough"]);
     await expect(save(page)).toHaveText("Save");
     await save(page).click();
     await expect(dialog(page)).toHaveCount(0);
@@ -98,7 +98,7 @@ test.describe("The settings dialog", () => {
     await expect(dialog(page).locator(".swb-settings-placeholder")).toHaveCount(1);
     await page.mouse.up();
     await expect(dialog(page).locator(".swb-settings-ghost")).toHaveCount(0);
-    await expect(rowItems(page, 1)).toHaveText(["Bold", "Link", "Italic", "Code", "Separator", "Highlight"]);
+    await expect(rowItems(page, 1)).toHaveText(["Bold", "Link", "Italic", "Code", "Separator", "Highlight", "Separator", "Every action"]);
   });
 
   test("a row dragged by its handle above another, and back with Alt+↓", async ({ page }) => {
@@ -110,7 +110,7 @@ test.describe("The settings dialog", () => {
     await page.mouse.down();
     await page.mouse.move(grip.x + grip.width / 2, first.y + 4, { steps: 8 });
     await page.mouse.up();
-    await expect(rowItems(page, 0)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight"]);
+    await expect(rowItems(page, 0)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
     await expect(rowItems(page, 1)).toHaveText(["Turn into"]);
     await expect(dialog(page).locator('[data-swb-row="0"] .swb-settings-row-grip')).toBeFocused();
     await page.keyboard.press("Alt+ArrowDown");
@@ -126,12 +126,12 @@ test.describe("The settings dialog", () => {
     await expect(dialog(page).locator(".swb-settings-rows-same")).toBeVisible();
     await dialog(page).locator(".swb-settings-devices .swb-settings-switch").click();
     await expect(dialog(page).locator(".swb-settings-rows-same")).toHaveCount(0);
-    await expect(rowItems(page, 1)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight"]);
+    await expect(rowItems(page, 1)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
     await item(page, 1, 0).locator(".swb-settings-remove").click();
-    await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight"]);
+    await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
     // Click's as they were; then Touch's copied over them, and back from Touch
     await dialog(page).locator('[data-swb-device="click"]').click();
-    await expect(rowItems(page, 1)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight"]);
+    await expect(rowItems(page, 1)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
     await save(page).click();
     await expect(dialog(page)).toHaveCount(0);
     // A mouse: Click's
@@ -140,9 +140,26 @@ test.describe("The settings dialog", () => {
     await openSettings(page);
     await tab(page, "favorites").click();
     await dialog(page).locator(".swb-settings-copy-from").click();
-    await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight"]);
+    await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
     await dialog(page).locator('[data-swb-device="touch"]').click();
-    await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight"]);
+    await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
+  });
+
+  test("Every action removed: the editor says it is required, and the toolbar has it pinned at its end", async ({ page }) => {
+    await openSettings(page);
+    await tab(page, "favorites").click();
+    await expect(dialog(page).locator(".swb-settings-warning")).toHaveCount(0);
+    await item(page, 1, 7).locator(".swb-settings-remove").click();
+    await expect(dialog(page).locator(".swb-settings-warning")).toContainText("is required");
+    await save(page).click();
+    await expect(dialog(page)).toHaveCount(0);
+    await select(page, "some text");
+    // Pinned: the last row's last
+    await expect(bar(page).locator(".swb-row").last().locator(".swb-button").last()).toHaveClass(/swb-more/);
+    await barButton(page, "actions.more").click();
+    await expect(popup(page)).toBeVisible();
+    // Not in the popup itself
+    await expect(popup(page).locator('[data-swb-action="actions.more"]')).toHaveCount(0);
   });
 
   test("a row removed by its ×, its items with it: saved, the toolbar has one row", async ({ page }) => {
@@ -150,7 +167,7 @@ test.describe("The settings dialog", () => {
     await tab(page, "favorites").click();
     await dialog(page).locator('[data-swb-row="0"] .swb-settings-row-remove').click();
     await expect(dialog(page).locator(".swb-settings-favrow")).toHaveCount(1);
-    await expect(rowItems(page, 0)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight"]);
+    await expect(rowItems(page, 0)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
     await save(page).click();
     await expect(dialog(page)).toHaveCount(0);
     await select(page, "some text");
@@ -204,7 +221,7 @@ test.describe("The settings dialog", () => {
     await page.waitForEvent("load");
     await ready(page);
     await select(page, "some text");
-    await bar(page).locator(".swb-more").click();
+    await barButton(page, "actions.more").click();
     await popup(page).locator(".swb-search-field").fill("clear");
     await expect(popup(page).locator(".swb-option")).toHaveCount(0);
   });

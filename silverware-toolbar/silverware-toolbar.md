@@ -48,12 +48,12 @@ Over several lines of one paragraph, a format of markers (bold, italic, striketh
 
 ## Favourites
 
-The toolbar shows your favourites: rows, one under another, each a list of items. An item is an action by its `id` (see *Actions*; its `type` is `"action"`, which can be left out), shown as its icon, or with `show = "label"` as its icon and its name, a separator (`type = "separator"`), or a gesture button (`type = "gesture"`, see below). An action that offers a list (*Turn into*) has an arrow, and shows the choice your selection has. Every action stays in the **…** list, at the end of the last row. An id no action has (a module turned off, a custom format not defined) is left out. The default:
+The toolbar shows your favourites: rows, one under another, each a list of items. An item is an action by its `id` (see *Actions*; its `type` is `"action"`, which can be left out), shown as its icon, or with `show = "label"` as its icon and its name, a separator (`type = "separator"`), or a gesture button (`type = "gesture"`, see below). An action that offers a list (*Turn into*) has an arrow, and shows the choice your selection has. Every action is in the **…** list: *Every action* (`actions.more`), an item as any other, in the default at the end of the last row. You can put it anywhere, or on a gesture button's swipe; favourites without it get it at the end of the toolbar, and the settings say so. An id no action has (a module turned off, a custom format not defined) is left out. The default:
 
 ```lua
 config.set("silverware.toolbar.favorites", {
   { { id = "actions.turnInto", show = "label" } },
-  { { id = "formats.bold" }, { id = "formats.italic" }, { id = "formats.code" }, { type = "separator" }, { id = "formats.link" }, { id = "formats.highlight" } },
+  { { id = "formats.bold" }, { id = "formats.italic" }, { id = "formats.code" }, { type = "separator" }, { id = "formats.link" }, { id = "formats.highlight" }, { type = "separator" }, { id = "actions.more" } },
 })
 ```
 
@@ -220,7 +220,7 @@ config.define("silverware.toolbar", {
       },
       default = {
         { { id = "actions.turnInto", show = "label" } },
-        { { id = "formats.bold" }, { id = "formats.italic" }, { id = "formats.code" }, { type = "separator" }, { id = "formats.link" }, { id = "formats.highlight" } },
+        { { id = "formats.bold" }, { id = "formats.italic" }, { id = "formats.code" }, { type = "separator" }, { id = "formats.link" }, { id = "formats.highlight" }, { type = "separator" }, { id = "actions.more" } },
       },
       description = "The toolbar's rows, each a list of items: { id = <its id>, show = \"icon\" or \"label\" }, { type = \"separator\" }, or a module's kind: { type = \"gesture\", tap = <an id>, up = <an id>, down = <an id> } (every action is in the list of the … button).",
       ui = { category = "Silverware Toolbar", label = "Favourite actions", priority = 2 },
@@ -1271,6 +1271,14 @@ end
 .swb-settings-device[aria-checked="true"] {
   color: #fff;
   background: var(--ui-accent-color, #464cfc);
+}
+/* … not in the favourites: added at the end, said so */
+.swb-settings-warning {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--ui-accent-color, #464cfc);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 8%, transparent);
 }
 .swb-settings-rows-same {
   opacity: 0.5;

@@ -169,7 +169,7 @@ export const gestureButton = (page: Page): Locator => bar(page).locator(".swb-ge
  */
 export async function addGesture(page: Page, tap: string, up: string | undefined, down?: string, needle = "some text"): Promise<void> {
   await select(page, needle);
-  await bar(page).locator(".swb-more").click();
+  await barButton(page, "actions.more").click();
   await popup(page).locator(".swb-search-field").fill("settings");
   await popup(page).locator('[data-swb-action="actions.settings"]').click();
   const dialog = page.locator(".swb-settings");

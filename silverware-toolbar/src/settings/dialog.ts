@@ -12,7 +12,7 @@ import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
 import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
-import { type FavoriteItem, type Favorites, isKindItem, isSeparator, type KindItem, byTouch } from "../core/favorites.ts";
+import { type FavoriteItem, type Favorites, hasAction, isKindItem, isSeparator, type KindItem, byTouch } from "../core/favorites.ts";
 import type { ItemKind, ItemSlot } from "../core/items.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
@@ -327,6 +327,10 @@ export class SettingsDialog {
     const known = this.known();
     const parts: HTMLElement[] = [
       this.deviceBar(),
+      // … is the toolbar's: favourites without it anywhere get it at the end
+      ...(this.sameForTouch || hasAction(this.rows, "actions.more", this.context.kinds())
+        ? []
+        : [this.el("p", `${BASE}-warning`, "Every action (…) is required: these favourites do not have it, so it is added at the end of the toolbar. Add it anywhere (a gesture button's swipe too) to put it there.")]),
       this.el("p", `${BASE}-intro`, "The toolbar's rows, one under another. Drag an item within its row or into another (Alt+arrows with the keyboard), a row by its handle (Alt+↑ ↓ on it); a row left empty is left out."),
     ];
     const rows = this.el("div", `${BASE}-rows`);

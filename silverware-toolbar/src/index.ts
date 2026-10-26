@@ -5,7 +5,7 @@ import { actionsOf, customActionsAnew, defineCustomActions } from "./actions.ts"
 import { type Bridge, missingBridgeFunctions, PATHS, readSettings, type Settings } from "./bridge.ts";
 import type { Action } from "./core/action.ts";
 import type { ItemKind } from "./core/items.ts";
-import { Controller } from "./core/controller.ts";
+import { Controller, MORE_ACTION, SETTINGS_ACTION } from "./core/controller.ts";
 import { customFormatsAnew, defineCustomFormats, formatsOf } from "./formats/index.ts";
 import { createModules } from "./modules.ts";
 import { SettingsDialog } from "./settings/dialog.ts";
@@ -85,7 +85,8 @@ export async function openSettings(): Promise<void> {
   settingsDialog = new SettingsDialog({
     doc: document,
     bridge,
-    actions,
+    // The modules' and the core's own (… and the settings: favourites too)
+    actions: () => [...actions(), MORE_ACTION, SETTINGS_ACTION],
     kinds,
     canSave: canSaveIn(bridge),
     save: (values) => saveSettings(bridge, values),

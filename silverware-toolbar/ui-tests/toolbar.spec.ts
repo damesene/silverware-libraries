@@ -162,11 +162,11 @@ test.describe("The popup of every action", () => {
 
   test("… in the toolbar opens it, and closes it again; a click on an action runs it", async ({ page }) => {
     await select(page, "struck", 6);
-    await bar(page).locator(".swb-more").click();
+    await barButton(page, "actions.more").click();
     await expect(popup(page)).toBeVisible();
-    await bar(page).locator(".swb-more").click();
+    await barButton(page, "actions.more").click();
     await expect(popup(page)).toBeHidden();
-    await bar(page).locator(".swb-more").click();
+    await barButton(page, "actions.more").click();
     await popup(page).locator('[data-swb-action="formats.wikiLink"]').click();
     expect(await text(page)).toContain("~~[[struck]]~~");
   });

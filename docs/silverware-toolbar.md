@@ -316,6 +316,18 @@ config.set("silverware.toolbar.favorites", {
   its Configuration Manager edits no lists ("Configure manually in CONFIG"):
   the settings dialog's Favorites tab is where they are edited.
 
+### … as an item (decided and built 2026-10-27)
+
+- … is the core's action `actions.more` (*Every action*: the popup opened, or
+  closed again), an item of the favourites as any other: anywhere, removed,
+  or in any slot of a kind's item (a gesture button's swipe). The default has
+  it at the end of the last row.
+- Favourites without it anywhere get it pinned at the toolbar's end (the last
+  row's, out of what the docked bar scrolls), as before it was an item; the
+  settings say so (*is required*). Found by `hasAction`: an action's item, or
+  any slot of an item of a kind a module on gives, so the core knows no
+  kind's schema. Not offered in the popup itself.
+
 ### Favourites for touch (decided and built 2026-10-27)
 
 - Two sets: `silverware.toolbar.favorites` (Click: a mouse, and the

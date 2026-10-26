@@ -1,6 +1,6 @@
 // The gestures module's button with a mouse: a click runs its first action, dragged up its second
 import type { Page } from "@playwright/test";
-import { addGesture, expect, gestureButton, select, selected, test, text } from "./helpers.ts";
+import { addGesture, barButton, expect, gestureButton, popup, select, selected, test, text } from "./helpers.ts";
 
 /** The gesture button dragged from its middle up by `dy` px (negative: down), in steps, then let go where `back` says */
 async function dragUp(page: Page, dy: number, back = 0): Promise<void> {
@@ -78,6 +78,22 @@ test.describe("The gesture button", () => {
     await dragUp(page, (await gestureButton(page).boundingBox())!.height);
     await page.waitForTimeout(300);
     expect(await text(page)).toBe(before);
+  });
+
+  test("Every action on a swipe counts as the toolbar's: none pinned, the swipe opens the popup", async ({ page }) => {
+    await addGesture(page, "bold", "every action");
+    // The default's … taken off: the swipe is the only one
+    await barButton(page, "actions.more").click();
+    await popup(page).locator('[data-swb-action="actions.settings"]').click();
+    const dialog = page.locator(".swb-settings");
+    await dialog.locator('[data-swb-tab="favorites"]').click();
+    await dialog.locator('[data-swb-item="1:7"] .swb-settings-remove').click();
+    await expect(dialog.locator(".swb-settings-warning")).toHaveCount(0);
+    await dialog.locator(".swb-settings-save").click();
+    await select(page, "some text");
+    await expect(barButton(page, "actions.more")).toHaveCount(0);
+    await dragUp(page, (await gestureButton(page).boundingBox())!.height);
+    await expect(popup(page)).toBeVisible();
   });
 
   test("dragged up and back down, or not far enough, runs nothing and rolls back", async ({ page }) => {

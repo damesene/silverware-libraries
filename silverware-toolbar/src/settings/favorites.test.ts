@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Favorites } from "../core/favorites.ts";
+import { type Favorites, hasAction } from "../core/favorites.ts";
 import { addItem, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setSlot, stepOf, toggleShow } from "./favorites.ts";
 
 const ROWS: Favorites = [[{ id: "actions.turnInto", show: "label" }], [{ id: "formats.bold" }, { type: "separator" }, { id: "formats.link" }]];
@@ -45,6 +45,14 @@ describe("The favourites as the settings edit them", () => {
     expect(sameRows(ROWS, savedRows(ROWS))).toBe(true);
     expect(sameRows(ROWS, emptied)).toBe(false);
     expect(removeRow(ROWS, 0)).toEqual([ROWS[1]]);
+  });
+
+  it("finds an action in an action's item or any slot of a kind given, not of a kind none gives", () => {
+    const kinds = [{ type: "gesture", slots: [{ key: "tap" }, { key: "up" }] }];
+    expect(hasAction([[{ id: "actions.more" }]], "actions.more", kinds)).toBe(true);
+    expect(hasAction([[{ type: "gesture", tap: "formats.bold", up: "actions.more" }]], "actions.more", kinds)).toBe(true);
+    expect(hasAction([[{ type: "other", tap: "actions.more" }]], "actions.more", kinds)).toBe(false);
+    expect(hasAction(ROWS, "actions.more", kinds)).toBe(false);
   });
 
   it("fills a kind's item's slots and shows it the other way, its other fields kept", () => {

@@ -32,7 +32,7 @@ test.describe("The toolbar on a phone", () => {
     expect(Math.abs(box.y + box.height - view.height)).toBeLessThan(0.5);
     await expect(bar(page).locator(".swb-row")).toHaveCount(1);
     await expect(bar(page).locator(".swb-row [data-swb-action]").first()).toHaveAttribute("data-swb-action", "actions.turnInto");
-    await expect(bar(page).locator(".swb-more")).toBeVisible();
+    await expect(barButton(page, "actions.more")).toBeVisible();
     // A tap applies to the selection
     await barButton(page, "formats.bold").tap();
     await expect.poll(() => text(page)).toContain("Select **some text** in this page");
@@ -78,7 +78,7 @@ test.describe("The toolbar on a phone", () => {
 
   test("Hide the keyboard: the keyboard hidden, the selection kept as it is, the toolbar staying; a tap in the text brings it back", async ({ page }) => {
     await selectByTouch(page, "some text");
-    await bar(page).locator(".swb-more").tap();
+    await barButton(page, "actions.more").tap();
     await popup(page).locator(".swb-search-field").fill("keyboard");
     await popup(page).locator('[data-swb-action="actions.hideKeyboard"]').tap();
     const policy = () => page.evaluate(() => (document.querySelector(".cm-content") as HTMLElement & { virtualKeyboardPolicy?: string }).virtualKeyboardPolicy);
@@ -95,7 +95,7 @@ test.describe("The toolbar on a phone", () => {
 
   test("the list of every action opens over it", async ({ page }) => {
     await selectByTouch(page, "some text");
-    await bar(page).locator(".swb-more").tap();
+    await barButton(page, "actions.more").tap();
     await expect(popup(page)).toBeVisible();
     const toolbar = (await bar(page).boundingBox())!;
     const list = (await popup(page).boundingBox())!;
@@ -134,7 +134,7 @@ test.describe("The toolbar on a phone", () => {
 
   test("the settings' search of actions stays in view with its list as the keyboard takes the window's bottom", async ({ page }) => {
     await selectByTouch(page, "some text");
-    await bar(page).locator(".swb-more").tap();
+    await barButton(page, "actions.more").tap();
     await popup(page).locator(".swb-search-field").fill("settings");
     await popup(page).locator('[data-swb-action="actions.settings"]').tap();
     const dialog = page.locator(".swb-settings");
@@ -155,7 +155,7 @@ test.describe("The toolbar on a phone", () => {
 
   test("Touch's own favourites show by finger; turned off, Click's, its own kept", async ({ page }) => {
     await selectByTouch(page, "some text");
-    await bar(page).locator(".swb-more").tap();
+    await barButton(page, "actions.more").tap();
     await popup(page).locator(".swb-search-field").fill("settings");
     await popup(page).locator('[data-swb-action="actions.settings"]').tap();
     const dialog = page.locator(".swb-settings");
@@ -173,7 +173,7 @@ test.describe("The toolbar on a phone", () => {
     await expect(barButton(page, "formats.italic")).toBeVisible();
     await expect(barButton(page, "formats.bold")).toHaveCount(0);
     // Off: Click's, the own kept
-    await bar(page).locator(".swb-more").tap();
+    await barButton(page, "actions.more").tap();
     await popup(page).locator(".swb-search-field").fill("settings");
     await popup(page).locator('[data-swb-action="actions.settings"]').tap();
     await dialog.locator('[data-swb-tab="favorites"]').tap();
@@ -184,7 +184,7 @@ test.describe("The toolbar on a phone", () => {
     await select(page, "Plain", 0);
     await selectByTouch(page, "some text");
     await expect(barButton(page, "formats.bold")).toBeVisible();
-    await bar(page).locator(".swb-more").tap();
+    await barButton(page, "actions.more").tap();
     await popup(page).locator(".swb-search-field").fill("settings");
     await popup(page).locator('[data-swb-action="actions.settings"]').tap();
     await dialog.locator('[data-swb-tab="favorites"]').tap();

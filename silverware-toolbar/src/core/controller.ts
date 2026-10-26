@@ -25,6 +25,19 @@ import { SelectionWatcher } from "./selection.ts";
 
 type State = { readonly active: boolean; readonly enabled: boolean };
 
+/**
+ * The core's own action: the popup of every action (… in the toolbar), an item
+ * of the favourites as any other; favourites without it anywhere get it pinned
+ * at the toolbar's end. Not in the popup itself
+ */
+export const MORE_ACTION: Action = {
+  id: "actions.more",
+  label: "Every action",
+  icon: ICONS.more,
+  group: "Silverware Toolbar",
+  keywords: ["search", "all", "more", "popup"],
+};
+
 /** The core's own action, last in the popup (a favourite too): the settings dialog */
 export const SETTINGS_ACTION: Action = {
   id: "actions.settings",
@@ -71,7 +84,6 @@ export class Controller {
     );
     this.bar = new Bar(doc, {
       run: (action) => void this.run(action),
-      more: () => (this.popup.isOpen ? this.popup.close() : void this.showActions()),
       state: (action) => (this.context ? this.state(action, this.context) : { active: false, enabled: false }),
       choices: (action) => (this.popup.isOpen ? this.popup.close() : void this.showActions(action)),
     });
@@ -118,7 +130,8 @@ export class Controller {
     this.shows++;
     this.atCaret = context.from === context.to;
     this.showBar(context, range);
-    const actions = this.offered();
+    // (… itself not among them)
+    const actions = this.offered().filter((action) => action !== MORE_ACTION);
     this.popup.open({
       actions,
       state: (action) => this.state(action, context),
@@ -132,9 +145,9 @@ export class Controller {
     });
   }
 
-  /** The modules' actions, and the core's own where it has them */
+  /** The modules' actions, and the core's own (… and, where it has them, the settings) */
   private offered(): readonly Action[] {
-    return this.openSettings ? [...this.actions(), SETTINGS_ACTION] : this.actions();
+    return [...this.actions(), MORE_ACTION, ...(this.openSettings ? [SETTINGS_ACTION] : [])];
   }
 
   private owns(node: Node): boolean {
@@ -205,8 +218,13 @@ export class Controller {
       return;
     }
     this.context = context;
-    if (this.docks()) this.bar.dock(this.favorites(context), this.dockLine());
-    else this.bar.show(this.favorites(context), rectOf(range), viewTopOf(range.startContainer));
+    const rows = this.favorites(context);
+    // Favourites without … anywhere (an item of it, or a slot of a kind's): pinned at the end
+    const more = rows.some((row) => row.some((item) => ("action" in item && item.action === MORE_ACTION) || ("item" in item && Object.values(item.item.actions).includes(MORE_ACTION))))
+      ? undefined
+      : { action: MORE_ACTION, active: false, enabled: true, labeled: false };
+    if (this.docks()) this.bar.dock(rows, this.dockLine(), more);
+    else this.bar.show(rows, rectOf(range), viewTopOf(range.startContainer), more);
   }
 
   /** A selection made in the page's text: the toolbar by it; none: the toolbar goes (unless shown at the caret) */
@@ -234,6 +252,12 @@ export class Controller {
 
   /** An action run on the selection: its change written as one edit, the selection set after it */
   private async run(action: Action): Promise<void> {
+    // …: the popup opened, or closed again
+    if (action === MORE_ACTION) {
+      if (this.popup.isOpen) this.popup.close();
+      else void this.showActions();
+      return;
+    }
     // Run from the toolbar while the popup is open: the popup is done
     this.popup.close(true);
     if (action === SETTINGS_ACTION) {

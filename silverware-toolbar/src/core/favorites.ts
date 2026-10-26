@@ -33,8 +33,25 @@ export const isKindItem = (item: FavoriteItem): item is KindItem => !isSeparator
 
 export const DEFAULT_FAVORITES: Favorites = [
   [{ id: "actions.turnInto", show: "label" }],
-  [{ id: "formats.bold" }, { id: "formats.italic" }, { id: "formats.code" }, { type: "separator" }, { id: "formats.link" }, { id: "formats.highlight" }],
+  [{ id: "formats.bold" }, { id: "formats.italic" }, { id: "formats.code" }, { type: "separator" }, { id: "formats.link" }, { id: "formats.highlight" }, { type: "separator" }, { id: "actions.more" }],
 ];
+
+/**
+ * Whether favourites have an action (`actions.more`, which the toolbar must
+ * have) anywhere: an action's item, or any slot of an item of a kind given
+ * (the kind's slots read, nothing of what they are for; a kind no module on
+ * gives shows nothing, so it counts for nothing)
+ */
+export function hasAction(rows: Favorites, id: string, kinds: readonly { readonly type: string; readonly slots: readonly { readonly key: string }[] }[]): boolean {
+  return rows.some((row) =>
+    row.some((item) => {
+      if (isSeparator(item)) return false;
+      if (isActionItem(item)) return item.id === id;
+      const kind = kinds.find((k) => k.type === item.type);
+      return !!kind && kind.slots.some((slot) => item[slot.key] === id);
+    }),
+  );
+}
 
 /**
  * An item as configured, if it is one (`{ id, show }`, its type "action" by

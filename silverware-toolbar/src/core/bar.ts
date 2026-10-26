@@ -1,8 +1,8 @@
 // The toolbar by the selection: the favourites in rows, one under another,
 // each action its icon, or its icon and label; one that offers choices
 // (Turn into) shows the choice on and a chevron, and opens their list under
-// it; separators between; … for the popup of every action at the end of the
-// last row. Pressing it keeps the editor's selection and focus (its mousedown
+// it; separators between. … (the popup of every action) is an item as any
+// other; favourites without it get it pinned at the end of the last row. Pressing it keeps the editor's selection and focus (its mousedown
 // is prevented), so an action works on what is selected. Docked (a phone: the
 // system's menu of a selection is where it would be by it), it is one row
 // across the bottom of the window, over the on-screen keyboard: the rows one
@@ -21,7 +21,6 @@ export type Shown =
 
 export type BarHandlers = {
   readonly run: (action: Action) => void;
-  readonly more: () => void;
   // A choice's state now (for the list a button opens)
   readonly state: (action: Action) => { readonly active: boolean; readonly enabled: boolean };
   // Docked (a phone): an action's choices in the popup instead of a list under its button; again: the popup closed
@@ -62,19 +61,18 @@ export class Bar {
     return this.dockedAt !== undefined;
   }
 
-  /** Its rows of items, … ending the last one */
-  show(rows: readonly (readonly Shown[])[], rect: Box, viewTop: number): void {
+  /** Its rows of items; `more`: … pinned at the end of the last one (favourites without it) */
+  show(rows: readonly (readonly Shown[])[], rect: Box, viewTop: number, more?: Extract<Shown, { action: Action }>): void {
     this.closeMenu();
     this.dockedAt = undefined;
     this.element.classList.remove("swb-docked");
     const doc = this.doc;
-    const more = this.more();
     const all = rows.length ? rows : [[]];
     const elements = all.map((items, i) => {
       const row = doc.createElement("div");
       row.className = "swb-row";
       row.append(...items.flatMap((item) => this.elementOf(item, false)));
-      if (i === all.length - 1) row.append(...(items.length ? [this.divider()] : []), more);
+      if (i === all.length - 1 && more) row.append(...(items.length ? [this.divider()] : []), this.pinned(more));
       return row;
     });
     this.element.replaceChildren(...elements);
@@ -83,8 +81,8 @@ export class Bar {
     this.place(rect, viewTop);
   }
 
-  /** Docked: one row across the bottom of the window standing on `bottom`, the rows one after another, … at its end */
-  dock(rows: readonly (readonly Shown[])[], bottom: number): void {
+  /** Docked: one row across the bottom of the window standing on `bottom`, the rows one after another; `more`: … pinned at its end, out of what scrolls */
+  dock(rows: readonly (readonly Shown[])[], bottom: number, more?: Extract<Shown, { action: Action }>): void {
     this.closeMenu();
     const items = this.doc.createElement("div");
     items.className = "swb-row swb-dock-items";
@@ -108,7 +106,7 @@ export class Bar {
       scroll.classList.toggle("swb-more-right", more > 1);
     };
     items.addEventListener("scroll", this.shadeScroll, { passive: true });
-    this.element.replaceChildren(scroll, this.more());
+    this.element.replaceChildren(scroll, ...(more ? [this.pinned(more)] : []));
     this.element.classList.add("swb-docked");
     if (!this.element.isConnected) this.doc.body.append(this.element);
     this.element.classList.add("swb-visible");
@@ -127,13 +125,11 @@ export class Bar {
     if (this.menu) this.placeMenu();
   }
 
-  private more(): HTMLButtonElement {
-    const more = this.button();
-    more.innerHTML = ICONS.more;
-    this.name(more, "Every action (search)");
-    more.classList.add("swb-more");
-    more.addEventListener("click", () => this.handlers.more());
-    return more;
+  /** … pinned at the end (favourites without it): an action's button, held there */
+  private pinned(more: Extract<Shown, { action: Action }>): HTMLButtonElement {
+    const button = this.item(more);
+    button.classList.add("swb-more");
+    return button;
   }
 
   /** An item's element (a kind's that fails to draw: none, logged); `docked`: for the toolbar docked at the bottom */

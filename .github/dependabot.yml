@@ -1,0 +1,11 @@
+# A pull request for each new SilverBullet release: the interaction tests run
+# against it (.github/workflows/ui-tests.yml), and it merges by itself once they
+# pass (.github/workflows/dependabot.yml)
+version: 2
+updates:
+  - package-ecosystem: docker
+    directory: /scripts/silverbullet
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: build

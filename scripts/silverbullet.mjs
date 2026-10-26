@@ -1,10 +1,9 @@
 // Serves real SilverBullets for the interaction tests (npm run test:ui:sb),
 // started by playwright.config.ts: one per worker, all at once, each a fresh
-// space with the libraries deployed (npm run deploy), served by SilverBullet's
-// latest release in Docker. Once every one answers, it prints READY, which
-// Playwright waits for.
-//   SB_IMAGE  another image (default ghcr.io/silverbulletmd/silverbullet:latest-slim),
-//             e.g. a version: ghcr.io/silverbulletmd/silverbullet:2.12.1-slim
+// space with the libraries deployed (npm run deploy), served by SilverBullet in
+// Docker, the version scripts/silverbullet/Dockerfile names. Once every one
+// answers, it prints READY, which Playwright waits for.
+//   SB_IMAGE  another image, e.g. ghcr.io/silverbulletmd/silverbullet:latest-slim
 //   SB_BIN    a silverbullet binary to run instead of Docker
 //   SW_SB_SERVERS  the servers, a JSON list of { port, space } (set by playwright.config.ts
 //             from scripts/silverbullet-servers.ts)
@@ -12,7 +11,7 @@
 // Stopped (Ctrl+C, or Playwright when the tests end), it stops them and
 // removes their spaces.
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { createWriteStream, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
@@ -20,7 +19,7 @@ import { promisify } from "node:util";
 const READY = "SilverBullet servers ready";
 
 const servers = JSON.parse(process.env.SW_SB_SERVERS ?? "[]");
-const image = process.env.SB_IMAGE ?? "ghcr.io/silverbulletmd/silverbullet:latest-slim";
+const image = process.env.SB_IMAGE || readFileSync(join(import.meta.dirname, "silverbullet", "Dockerfile"), "utf8").match(/^FROM\s+(\S+)/m)[1];
 const binary = process.env.SB_BIN;
 const logs = process.env.SW_SB_LOGS;
 if (!servers.length) {

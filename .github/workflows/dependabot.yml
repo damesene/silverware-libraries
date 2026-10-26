@@ -1,0 +1,25 @@
+# A Dependabot pull request (a new SilverBullet: .github/dependabot.yml) merges by
+# itself once the checks the main branch requires pass (GitHub's auto-merge); one
+# they fail on stays open, its owner assigned (ui-tests.yml). Needs, in the
+# repository's settings: Allow auto-merge, a rule for main requiring the checks
+# Verify and Tests (silverbullet), and the pull request's title as the default
+# message of a squash merge (a commit's one line, no body).
+name: Dependabot
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Auto-merge
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge once the required checks pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR"

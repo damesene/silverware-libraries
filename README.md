@@ -46,7 +46,7 @@ npm run watch          # rebuild on change
 npm test               # vitest: unit tests and jsdom UI tests
 npm run verify         # before a commit: TypeScript, vitest, and each bundle matches its sources
 npm run test:ui        # interaction tests in Chrome against the playground (test:ui:open: in Playwright's window)
-npm run test:ui:sb     # the same tests against a real SilverBullet in Docker (its latest release, the plugins deployed)
+npm run test:ui:sb     # the same tests against a real SilverBullet in Docker (scripts/silverbullet/Dockerfile's version, the plugins deployed)
 npm run deploy -- <space folder>   # copy the plugins into a local space's Library/damesene/
 npm run playground     # try Silverware Table without SilverBullet, on mock data: http://localhost:8000/
 ```
@@ -56,7 +56,7 @@ settings go into `.env.local` (not committed; a variable set in the shell wins):
 
 ```sh
 SW_SB_WORKERS=8                                           # how many workers, each with its own SilverBullet
-SB_IMAGE=ghcr.io/silverbulletmd/silverbullet:2.12.1-slim  # another image than the latest release
+SB_IMAGE=ghcr.io/silverbulletmd/silverbullet:latest-slim  # another image than scripts/silverbullet/Dockerfile's
 SB_BIN=/path/to/silverbullet                              # a silverbullet binary instead of Docker
 ```
 

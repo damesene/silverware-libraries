@@ -1,22 +1,20 @@
-# The interaction tests (playwright.config.ts) and the checks of npm run verify.
-# - On a push to main and on a pull request: against the playground, after verify.
-# - Every night, and when run by hand (Actions > Interaction tests > Run workflow):
-#   against a real SilverBullet, its latest release, so a release that breaks
-#   Silverware shows the next morning without a change here. Run by hand, the
-#   target and the image can be chosen (a version: ghcr.io/silverbulletmd/silverbullet:2.12.1-slim).
+# The checks of npm run verify and the interaction tests (playwright.config.ts)
+# against a real SilverBullet, the version scripts/silverbullet/Dockerfile names,
+# on a push to main and on a pull request, the two jobs side by side. Dependabot
+# offers each new SilverBullet in a pull request (.github/dependabot.yml), which
+# these tests then run against: green, it merges by itself (dependabot.yml in this
+# folder); red, the repository's owner is assigned to it, which GitHub tells them.
+# Run by hand (Actions > Interaction tests > Run workflow), the target and the
+# image can be chosen (the playground, or another SilverBullet: ghcr.io/silverbulletmd/silverbullet:latest-slim).
 # Each run's job summary has the counts and the tests that failed; the HTML report
 # (each test's error, screenshot, trace and browser console) and SilverBullet's
-# log are artifacts of the run. GitHub turns off a scheduled workflow after 60
-# days without activity in a public repository.
+# log are artifacts of the run.
 name: Interaction tests
 
 on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    # 01:17 UTC (off the full hour, when GitHub's schedules are busiest)
-    - cron: "17 1 * * *"
   workflow_dispatch:
     inputs:
       target:
@@ -25,8 +23,8 @@ on:
         options: [silverbullet, playground]
         default: silverbullet
       image:
-        description: The SilverBullet image (target silverbullet)
-        default: ghcr.io/silverbulletmd/silverbullet:latest-slim
+        description: Another SilverBullet image than scripts/silverbullet/Dockerfile names (target silverbullet)
+        default: ""
 
 permissions:
   contents: read
@@ -36,14 +34,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Tests (${{ github.event_name == 'schedule' && 'silverbullet' || inputs.target || 'playground' }})
+  verify:
+    name: Verify
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      SW_TARGET: ${{ github.event_name == 'schedule' && 'silverbullet' || inputs.target || 'playground' }}
-      SB_IMAGE: ${{ inputs.image || 'ghcr.io/silverbulletmd/silverbullet:latest-slim' }}
-      SW_SB_LOGS: ${{ github.workspace }}/silverbullet-log
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -55,8 +50,30 @@ jobs:
       - run: npm ci
 
       - name: Types, unit tests, bundles match their sources
-        if: env.SW_TARGET == 'playground'
         run: npm run verify
+
+  test:
+    name: Tests (${{ inputs.target || 'silverbullet' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # To assign the owner to a Dependabot pull request the tests fail on
+      issues: write
+      pull-requests: write
+    env:
+      SW_TARGET: ${{ inputs.target || 'silverbullet' }}
+      SB_IMAGE: ${{ inputs.image }}
+      SW_SB_LOGS: ${{ github.workspace }}/silverbullet-log
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
 
       - name: Playwright's Chromium
         run: npx playwright install --with-deps chromium
@@ -64,9 +81,10 @@ jobs:
       - name: SilverBullet image
         if: env.SW_TARGET == 'silverbullet'
         run: |
-          docker pull "$SB_IMAGE"
-          version=$(docker run --rm --entrypoint /silverbullet "$SB_IMAGE" --version)
-          echo "Testing against \`$SB_IMAGE\`: $version" >> "$GITHUB_STEP_SUMMARY"
+          image="${SB_IMAGE:-$(sed -n 's/^FROM \([^ ]*\).*/\1/p' scripts/silverbullet/Dockerfile)}"
+          docker pull "$image"
+          version=$(docker run --rm --entrypoint /silverbullet "$image" --version)
+          echo "Testing against \`$image\`: $version" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Interaction tests
         run: node scripts/ui-tests.mjs "$SW_TARGET"
@@ -87,3 +105,15 @@ jobs:
           path: silverbullet-log/
           retention-days: 14
           if-no-files-found: ignore
+
+      # A new SilverBullet that breaks the tests: its pull request stays open, the owner assigned (GitHub tells them)
+      - name: The owner assigned to the Dependabot pull request
+        if: failure() && github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.html_url }}
+          OWNER: ${{ github.repository_owner }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh pr edit "$PR" --add-assignee "$OWNER"
+          gh pr comment "$PR" --body "The interaction tests fail against this SilverBullet: $RUN (the report and SilverBullet's log are its artifacts)."

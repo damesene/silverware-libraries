@@ -187,7 +187,7 @@ A toolbar by the text selected in a page (as Notion's): favourite actions as ico
 ```
 silverware-toolbar/
   silverware-toolbar.md   library page: user docs (custom formats and actions too), the priority-50 API block (silverware.toolbar.defineFormats / defineActions, resetDefinitions as the table's), config.define (favorites, shortcut, modules), the Space Lua that loads the JS, hands over editor.* (getSelection, setSelection, replaceRange, getText, flash, focus, config.get) and defines the command with the shortcut as its `key` (SilverBullet handles the key: Mod-. is its chord prefix, Cmd-Shift-q logs out on a Mac), the CSS
-  ui-tests/               Playwright against playground/toolbar.html (playground.ts: the page's text, a selection or the caret set by the editor's API, the toolbar, the popup)
+  ui-tests/               Playwright, both targets as the table's (helpers.ts: the playground's toolbar.html, or a SilverBullet page of its own per test with the sample, `client.editorView` for the text and selection, its CONFIG page put back after each test as the settings dialog saves into it; `answerConfirm` for SilverBullet's own confirm dialog; `lineBox` waits for a line before measuring it)
   src/
     index.ts bridge.ts    entry (init, showActions, defineFormats, defineActions, resetDefinitions); the SilverBullet API used, the settings (read once at start: a change applies on reload)
     modules.ts actions.ts the modules in their order, created only when on, their actions asked for each time they show (definitions made later count), the custom actions (`actions.<name>`, checked, a built-in one's name replacing it in place) joined

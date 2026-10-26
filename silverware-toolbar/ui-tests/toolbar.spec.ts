@@ -1,10 +1,10 @@
-// The toolbar by a selection (or at the caret) and the popup of every action under it, against the toolbar playground (@playground: SilverBullet in the tests has no toolbar deployed)
-import { bar, barButton, caret, expect, popup, select, selected, test, text } from "./playground.ts";
+// The toolbar by a selection (or at the caret) and the popup of every action under it
+import { bar, barButton, caret, expect, lineBox, popup, select, selected, test, text } from "./helpers.ts";
 
 // The command's key, as the playground binds it (SilverBullet binds the library page's command so)
 const KEY = "Control+Shift+Q";
 
-test.describe("The toolbar @playground", () => {
+test.describe("The toolbar", () => {
   test("shows by a selection made, in rows (Turn into with its label above the icons), and goes when there is none", async ({ page }) => {
     await select(page, "Plain paragraph one");
     await expect(bar(page)).toBeVisible();
@@ -12,14 +12,14 @@ test.describe("The toolbar @playground", () => {
     await expect(bar(page).locator(".swb-row").first().locator(".swb-button")).toHaveText(["Paragraph"]);
     // Above the selection
     const toolbar = (await bar(page).boundingBox())!;
-    const line = (await page.locator(".cm-line", { hasText: "Plain paragraph one" }).boundingBox())!;
+    const line = await lineBox(page, "Plain paragraph one");
     expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(line.y);
     await select(page, "Plain", 0);
     await expect(bar(page)).toBeHidden();
   });
 
   test("selected by dragging the mouse: shown once it is let go, not while dragging", async ({ page }) => {
-    const line = (await page.locator(".cm-line", { hasText: "Select some text" }).boundingBox())!;
+    const line = await lineBox(page, "Select some text");
     await page.mouse.move(line.x + 2, line.y + line.height / 2);
     await page.mouse.down();
     await page.mouse.move(line.x + 60, line.y + line.height / 2, { steps: 5 });
@@ -71,7 +71,7 @@ test.describe("The toolbar @playground", () => {
   });
 });
 
-test.describe("The popup of every action @playground", () => {
+test.describe("The popup of every action", () => {
   test("the key opens it under the toolbar, its search focused: typed words find, arrows pick, Enter runs, the editor focused after", async ({ page }) => {
     await select(page, "First item\n- Second item with [a link](https://silverbullet.md)\n- Third item");
     await page.keyboard.press(KEY);
@@ -138,7 +138,7 @@ test.describe("The popup of every action @playground", () => {
   });
 });
 
-test.describe("The toolbar at the caret @playground", () => {
+test.describe("The toolbar at the caret", () => {
   test("the key without a selection shows it at the caret, the popup open; its buttons show the formats around the caret", async ({ page }) => {
     await caret(page, "a link](", -2);
     await page.keyboard.press(KEY);

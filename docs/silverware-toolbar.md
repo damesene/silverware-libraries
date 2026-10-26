@@ -337,11 +337,15 @@ toolbar at the caret, the popup under the toolbar, the page checked
 unchanged before a write); the favourites in rows (*Favourites: rows of
 items*); *Next* 1, `shared/` (the table on it); *Next* 2, the settings dialog.
 
-**Not checked in a live SilverBullet yet** (step 6, the user): the command's
-key from `config.get`, the toolbar at the caret, the favourites' rows read
-from a Lua table through `config.get` (an array, or an object of 1, 2, …:
-both are read), `editor.focus`, the toolbar over the top bar and the Tiniri
-theme.
+**Checked in a real SilverBullet** (2026-10-26, its release 2.12.1, by the
+interaction tests, which run against it as against the playground): the
+command's key from `config.get`, the toolbar by a selection and at the caret,
+`editor.focus`, the settings saved into CONFIG (the key and the modules in the
+Configuration Manager's block, the favourites in the toolbar's own) and read
+back from Lua through `config.get` after a reload, `editor.reloadUI`,
+SilverBullet's confirm dialog. **Not checked yet** (step 6, the user): the
+toolbar over the top bar and with the Tiniri theme, by eye; alongside tables in
+daily use.
 
 **Next**, in this order, each with unit tests and, for what is used by
 pointer or keys, UI tests (`npm run test:ui`):

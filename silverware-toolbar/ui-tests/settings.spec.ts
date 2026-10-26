@@ -1,6 +1,6 @@
-// The toolbar's settings dialog, against the toolbar playground (its settings the playground's store; @playground: SilverBullet in the tests has no toolbar deployed)
+// The toolbar's settings dialog (saved in the playground's store, or in SilverBullet's CONFIG page)
 import type { Locator, Page } from "@playwright/test";
-import { bar, barButton, expect, popup, select, test } from "./playground.ts";
+import { answerConfirm, bar, barButton, expect, popup, ready, select, test } from "./helpers.ts";
 
 const dialog = (page: Page): Locator => page.locator(".swb-settings");
 const tab = (page: Page, id: string): Locator => dialog(page).locator(`[data-swb-tab="${id}"]`);
@@ -17,7 +17,7 @@ async function openSettings(page: Page): Promise<void> {
   await expect(dialog(page)).toBeVisible();
 }
 
-test.describe("The settings dialog @playground", () => {
+test.describe("The settings dialog", () => {
   test("opens from the popup's last item, its tabs General, Favorites, Modules; Esc closes it unchanged", async ({ page }) => {
     await select(page, "some text");
     await bar(page).locator(".swb-more").click();
@@ -50,6 +50,7 @@ test.describe("The settings dialog @playground", () => {
     await expect(barButton(page, "formats.strikethrough")).toBeVisible();
     await expect(barButton(page, "formats.bold")).toHaveCount(0);
     await page.reload();
+    await ready(page);
     await select(page, "some text");
     await expect(barButton(page, "formats.strikethrough")).toBeVisible();
     await expect(barButton(page, "formats.bold")).toHaveCount(0);
@@ -89,11 +90,11 @@ test.describe("The settings dialog @playground", () => {
     await dialog(page).locator('[data-swb-module="clear"]').uncheck({ force: true });
     await expect(save(page)).toHaveText("Save and reload");
     // Esc with a change: asked, and kept on No
-    page.once("dialog", (asked) => void asked.dismiss());
-    await page.keyboard.press("Escape");
+    await answerConfirm(page, false, () => page.keyboard.press("Escape"));
     await expect(dialog(page)).toBeVisible();
     await save(page).click();
-    await expect(page.locator(".cm-content")).toBeVisible();
+    await page.waitForEvent("load");
+    await ready(page);
     await select(page, "some text");
     await bar(page).locator(".swb-more").click();
     await popup(page).locator(".swb-search-field").fill("clear");

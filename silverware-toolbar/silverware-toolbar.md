@@ -833,7 +833,12 @@ end
   .swb-settings-row {
     flex-wrap: wrap;
   }
+  /* The name keeps room to be read; a control that does not fit beside it goes under it, the row's width */
+  .swb-settings-label {
+    flex: 1 1 14em;
+  }
   .swb-settings-row select {
+    flex: 1 1 auto;
     max-width: 100%;
   }
   .swb-settings-row select,

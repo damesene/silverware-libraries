@@ -68,9 +68,9 @@ export type Placement = (typeof PLACEMENTS)[number];
  */
 export const SHOWS = ["always", "mobile", "selection"] as const;
 export type Show = (typeof SHOWS)[number];
-export const SHOW_LABELS: Readonly<Record<Show, string>> = { always: "Always while you write", mobile: "Always on a phone, else after selecting text", selection: "After selecting text" };
+export const SHOW_LABELS: Readonly<Record<Show, string>> = { always: "Always", mobile: "Always on a phone", selection: "After selecting text" };
 
-export const PLACEMENT_LABELS: Readonly<Record<Placement, string>> = { auto: "Docked at the bottom after a touch, else by the selection", selection: "By the selection", bottom: "Docked at the bottom" };
+export const PLACEMENT_LABELS: Readonly<Record<Placement, string>> = { auto: "Automatic", selection: "By the selection", bottom: "Docked at the bottom" };
 
 /** Where each setting is in SilverBullet's configuration */
 export const PATHS = {

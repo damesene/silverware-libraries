@@ -132,7 +132,7 @@ export class SettingsDialog {
       values.placement = placement.value as Placement;
       this.update();
     });
-    const placementRow = settingRow(doc, BASE, "Where the toolbar shows", "On a phone the system's menu of a selection (Cut, Copy, Paste) is where the toolbar would show by it: docked at the bottom, it is one row over the keyboard.", placement);
+    const placementRow = settingRow(doc, BASE, "Where the toolbar shows", "Automatic: docked at the bottom, one row over the keyboard, when you select by touch (a phone's own menu of the selection, Cut, Copy, Paste, is by it); else by the selection.", placement);
     placementRow.dataset.swbSetting = PATHS.placement;
     const show = this.el("select");
     for (const value of SHOWS) show.append(new Option(SHOW_LABELS[value], value, false, value === values.show));
@@ -140,7 +140,7 @@ export class SettingsDialog {
       values.show = show.value as Show;
       this.update();
     });
-    const showRow = settingRow(doc, BASE, "When the toolbar shows", "Always: while you write, with nothing selected too (docked at the bottom, or by the cursor), its buttons the formats around the cursor.", show);
+    const showRow = settingRow(doc, BASE, "When the toolbar shows", "Always: while you write, with nothing selected too (docked at the bottom, or by the cursor), its buttons the formats around the cursor. Always on a phone: so where it is docked, else after selecting text.", show);
     showRow.dataset.swbSetting = PATHS.show;
     card.append(keyRow, placementRow, showRow);
     general.append(card);

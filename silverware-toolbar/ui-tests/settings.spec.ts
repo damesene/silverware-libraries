@@ -84,6 +84,55 @@ test.describe("The settings dialog", () => {
     await expect(first.locator('[data-swb-action="formats.italic"]')).toContainText("Italic");
   });
 
+  test("an item let go in the gap between two others goes there; while dragged it holds its place, a copy following the pointer", async ({ page }) => {
+    await openSettings(page);
+    await tab(page, "favorites").click();
+    const link = (await item(page, 1, 4).locator(".swb-settings-item-name").boundingBox())!;
+    const bold = (await item(page, 1, 0).boundingBox())!;
+    const italic = (await item(page, 1, 1).boundingBox())!;
+    await page.mouse.move(link.x + 4, link.y + link.height / 2);
+    await page.mouse.down();
+    // The gap between Bold and Italic: over neither
+    await page.mouse.move((bold.x + bold.width + italic.x) / 2, bold.y + bold.height / 2, { steps: 8 });
+    await expect(dialog(page).locator(".swb-settings-ghost")).toHaveCount(1);
+    await expect(dialog(page).locator(".swb-settings-placeholder")).toHaveCount(1);
+    await page.mouse.up();
+    await expect(dialog(page).locator(".swb-settings-ghost")).toHaveCount(0);
+    await expect(rowItems(page, 1)).toHaveText(["Bold", "Link", "Italic", "Code", "Separator", "Highlight"]);
+  });
+
+  test("a row dragged by its handle above another, and back with Alt+↓", async ({ page }) => {
+    await openSettings(page);
+    await tab(page, "favorites").click();
+    const grip = (await dialog(page).locator('[data-swb-row="1"] .swb-settings-row-grip').boundingBox())!;
+    const first = (await dialog(page).locator('[data-swb-row="0"]').boundingBox())!;
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grip.x + grip.width / 2, first.y + 4, { steps: 8 });
+    await page.mouse.up();
+    await expect(rowItems(page, 0)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight"]);
+    await expect(rowItems(page, 1)).toHaveText(["Turn into"]);
+    await expect(dialog(page).locator('[data-swb-row="0"] .swb-settings-row-grip')).toBeFocused();
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(rowItems(page, 0)).toHaveText(["Turn into"]);
+  });
+
+  test("the search of what to add closes by its × or Close, the row as it was", async ({ page }) => {
+    await openSettings(page);
+    await tab(page, "favorites").click();
+    const add = dialog(page).locator('[data-swb-row="0"] .swb-settings-add');
+    await add.click();
+    await expect(add).toHaveText("Close");
+    await dialog(page).locator(".swb-settings-pick-close").click();
+    await expect(dialog(page).locator(".swb-settings-picker")).toHaveCount(0);
+    await expect(add).toHaveText("Add");
+    await add.click();
+    await add.click();
+    await expect(dialog(page).locator(".swb-settings-picker")).toHaveCount(0);
+    await expect(rowItems(page, 0)).toHaveText(["Turn into"]);
+    await expect(dialog(page)).toBeVisible();
+  });
+
   test("shown always: on a computer by the cursor, with nothing selected, following it as you type", async ({ page }) => {
     await openSettings(page);
     await dialog(page).locator(`[data-swb-setting="silverware.toolbar.show"] select`).selectOption("always");

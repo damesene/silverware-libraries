@@ -880,10 +880,75 @@ end
   border-radius: 8px;
 }
 .swb-settings-favhead {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   margin-bottom: 8px;
   font-size: 12px;
   font-weight: 600;
+}
+.swb-settings-favhead > span {
   opacity: 0.7;
+}
+/* A row's handle: dragged, the row moves up or down */
+.swb-settings-row-grip {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: -4px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  opacity: 0.6;
+  cursor: grab;
+  touch-action: none;
+}
+.swb-settings-row-grip:hover {
+  opacity: 1;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+.swb-settings-row-grip svg {
+  width: 16px;
+  height: 16px;
+}
+/* Dragged (an item or a row): its place held, dimmed, the others sliding aside; a copy following the pointer */
+.swb-settings-placeholder {
+  opacity: 0.3;
+}
+.swb-settings-ghost {
+  position: fixed;
+  z-index: 101;
+  margin: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  cursor: grabbing;
+  opacity: 0.95;
+}
+/* The search of what to add: its field and its close button */
+.swb-settings-pick-top {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.swb-settings-pick-close {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 6px;
+}
+.swb-settings-pick-close svg {
+  width: 16px;
+  height: 16px;
 }
 .swb-settings-items {
   display: flex;
@@ -892,9 +957,6 @@ end
   min-height: 34px;
   padding: 2px;
   border-radius: 6px;
-}
-.swb-settings-items.swb-settings-drop-end {
-  box-shadow: inset 0 0 0 2px var(--ui-accent-color, #464cfc);
 }
 .swb-settings-empty {
   align-self: center;
@@ -917,16 +979,6 @@ end
 .swb-settings-item:focus-visible {
   outline: 2px solid var(--ui-accent-color, #464cfc);
   outline-offset: 1px;
-}
-.swb-settings-item.swb-settings-dragged {
-  opacity: 0.45;
-  cursor: grabbing;
-}
-.swb-settings-item.swb-settings-drop-before {
-  box-shadow: -3px 0 0 var(--ui-accent-color, #464cfc);
-}
-.swb-settings-item.swb-settings-drop-after {
-  box-shadow: 3px 0 0 var(--ui-accent-color, #464cfc);
 }
 .swb-settings-item.swb-settings-unknown {
   opacity: 0.5;

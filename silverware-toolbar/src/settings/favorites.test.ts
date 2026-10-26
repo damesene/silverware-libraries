@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Favorites } from "../core/favorites.ts";
-import { addItem, moveItem, removeItem, sameRows, savedRows, stepOf, toggleShow } from "./favorites.ts";
+import { addItem, moveItem, moveRow, removeItem, sameRows, savedRows, stepOf, toggleShow } from "./favorites.ts";
 
 const ROWS: Favorites = [[{ id: "actions.turnInto", show: "label" }], [{ id: "formats.bold" }, { type: "separator" }, { id: "formats.link" }]];
 
@@ -24,6 +24,12 @@ describe("The favourites as the settings edit them", () => {
     expect(stepOf(ROWS, { row: 1, index: 2 }, "ArrowUp")).toEqual({ row: 0, index: 1 });
     expect(stepOf(ROWS, { row: 0, index: 0 }, "ArrowUp")).toBeUndefined();
     expect(stepOf(ROWS, { row: 0, index: 0 }, "ArrowDown")).toEqual({ row: 1, index: 0 });
+  });
+
+  it("moves a row up or down, its place counted without it; past the ends nowhere", () => {
+    expect(moveRow(ROWS, 1, 0)).toEqual([ROWS[1], ROWS[0]]);
+    expect(moveRow(ROWS, 0, 1)).toEqual([ROWS[1], ROWS[0]]);
+    expect(moveRow(ROWS, 0, 2)).toEqual(ROWS);
   });
 
   it("adds, removes, shows an action as its icon or with its label; saved without empty rows", () => {

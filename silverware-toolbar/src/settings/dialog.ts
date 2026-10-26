@@ -15,7 +15,8 @@ import type { Action } from "../core/action.ts";
 import type { FavoriteItem, Favorites } from "../core/favorites.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
-import { addItem, type At, moveItem, removeItem, sameRows, savedRows, stepOf, toggleShow } from "./favorites.ts";
+import { reorder } from "./drag.ts";
+import { addItem, type At, moveItem, moveRow, removeItem, sameRows, savedRows, stepOf, toggleShow } from "./favorites.ts";
 
 const BASE = "swb-settings";
 
@@ -50,8 +51,6 @@ export class SettingsDialog {
   private adding: number | undefined;
   // SilverBullet's keyboard bar on, on a touch screen: the docked toolbar goes over it, its turning off offered
   private keyboardBar = false;
-  // An item dragged by the pointer: where it is, where it would go
-  private drag: { readonly from: At; readonly pointer: number; to: At | undefined; moved: boolean } | undefined;
 
   constructor(private readonly context: SettingsContext) {
     this.dialogs = new Dialogs(context.doc, { base: BASE, closeIcon: ICONS.close });
@@ -245,20 +244,29 @@ export class SettingsDialog {
     const values = this.values;
     if (!panel || !values) return;
     const known = this.known();
-    const parts: HTMLElement[] = [this.el("p", `${BASE}-intro`, "The toolbar's rows, one under another. Drag an item within its row or into another (Alt+arrows with the keyboard); a row left empty is left out.")];
+    const parts: HTMLElement[] = [
+      this.el("p", `${BASE}-intro`, "The toolbar's rows, one under another. Drag an item within its row or into another (Alt+arrows with the keyboard), a row by its handle (Alt+↑ ↓ on it); a row left empty is left out."),
+    ];
+    const rows = this.el("div", `${BASE}-rows`);
     values.favorites.forEach((row, r) => {
       const block = this.el("div", `${BASE}-favrow`);
       block.dataset.swbRow = String(r);
-      block.append(this.el("div", `${BASE}-favhead`, `Row ${r + 1}`));
+      const head = this.el("div", `${BASE}-favhead`);
+      head.append(this.rowGrip(r, block, rows), this.el("span", "", `Row ${r + 1}`));
+      block.append(head);
       const items = this.el("div", `${BASE}-items`);
       items.setAttribute("role", "list");
       items.dataset.swbItems = String(r);
       row.forEach((item, i) => items.append(this.itemElement(item, { row: r, index: i }, known)));
       if (!row.length) items.append(this.el("span", `${BASE}-empty`, "Empty"));
-      block.append(items, this.button(`${BASE}-add`, "Add", () => this.openAdding(r)));
-      if (this.adding === r) block.append(this.picker(r));
-      parts.push(block);
+      const open = this.adding === r;
+      const add = this.button(`${BASE}-add`, open ? "Close" : "Add", () => this.openAdding(r));
+      add.setAttribute("aria-expanded", String(open));
+      block.append(items, add);
+      if (open) block.append(this.picker(r));
+      rows.append(block);
     });
+    parts.push(rows);
     parts.push(
       this.button(`${BASE}-add-row`, "Add row", () => {
         values.favorites = [...values.favorites, []];
@@ -308,8 +316,50 @@ export class SettingsDialog {
         this.edit(removeItem(this.values!.favorites, at), `[data-swb-row="${at.row}"] .${BASE}-add`);
       }
     });
-    element.addEventListener("pointerdown", (e) => this.dragStart(e, at, element));
+    element.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || (e.target instanceof Element && e.target.closest("button"))) return;
+      const panel = this.favoritesPanel!;
+      reorder(e, {
+        element,
+        base: BASE,
+        layer: this.dialog?.element,
+        flow: "inline",
+        containers: () => Array.from(panel.querySelectorAll<HTMLElement>(`.${BASE}-items`)),
+        items: (container) => Array.from(container.querySelectorAll<HTMLElement>(`:scope > .${BASE}-item`)),
+        done: (to) => {
+          if (to && (to.container !== at.row || to.index !== at.index)) this.edit(moveItem(this.values!.favorites, at, { row: to.container, index: to.index }), `[data-swb-item="${to.container}:${to.index}"]`);
+          else this.drawFavorites();
+        },
+      });
+    });
     return element;
+  }
+
+  /** A row's handle: dragged, the row moves up or down (the others sliding aside); Alt+↑ ↓ on it the same */
+  private rowGrip(r: number, block: HTMLElement, rows: HTMLElement): HTMLElement {
+    const grip = this.button(`${BASE}-row-grip`, `Move row ${r + 1} (drag, or Alt+↑ ↓)`, () => undefined, ICONS.grip);
+    grip.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      reorder(e, {
+        element: block,
+        base: BASE,
+        layer: this.dialog?.element,
+        flow: "block",
+        containers: () => [rows],
+        items: (container) => Array.from(container.querySelectorAll<HTMLElement>(`:scope > .${BASE}-favrow`)),
+        done: (to) => {
+          if (to && to.index !== r) this.edit(moveRow(this.values!.favorites, r, to.index), `[data-swb-row="${to.index}"] .${BASE}-row-grip`);
+          else this.drawFavorites();
+        },
+      });
+    });
+    grip.addEventListener("keydown", (e) => {
+      if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+      e.preventDefault();
+      const to = r + (e.key === "ArrowUp" ? -1 : 1);
+      if (to >= 0 && to < this.values!.favorites.length) this.edit(moveRow(this.values!.favorites, r, to), `[data-swb-row="${to}"] .${BASE}-row-grip`);
+    });
+    return grip;
   }
 
   private edit(favorites: Favorites, focus?: string): void {
@@ -371,7 +421,10 @@ export class SettingsDialog {
       }
     });
     draw();
-    picker.append(field, list);
+    const close = this.button(`${BASE}-pick-close`, "Close the search", () => this.openAdding(row), ICONS.close);
+    const top = this.el("div", `${BASE}-pick-top`);
+    top.append(field, close);
+    picker.append(top, list);
     return picker;
   }
 
@@ -382,62 +435,6 @@ export class SettingsDialog {
     option.querySelector(`.${BASE}-pick-label`)!.textContent = label;
     option.querySelector(`.${BASE}-pick-group`)!.textContent = group;
     return option;
-  }
-
-  // ---- Dragging an item --------------------------------------------------------
-
-  private dragStart(e: PointerEvent, from: At, element: HTMLElement): void {
-    if (e.button !== 0 || (e.target instanceof Element && e.target.closest("button"))) return;
-    this.drag = { from, pointer: e.pointerId, to: undefined, moved: false };
-    element.setPointerCapture?.(e.pointerId);
-    const move = (m: PointerEvent) => this.dragMove(m, element);
-    const end = (u: PointerEvent) => {
-      element.removeEventListener("pointermove", move);
-      element.removeEventListener("pointerup", end);
-      element.removeEventListener("pointercancel", end);
-      this.dragEnd(u.type === "pointerup");
-    };
-    element.addEventListener("pointermove", move);
-    element.addEventListener("pointerup", end);
-    element.addEventListener("pointercancel", end);
-  }
-
-  /** Where the item would go: before or after the item under the pointer (by its middle), else at the end of the row under it */
-  private dragMove(e: PointerEvent, element: HTMLElement): void {
-    const drag = this.drag;
-    const panel = this.favoritesPanel;
-    if (!drag || !panel) return;
-    drag.moved = true;
-    element.classList.add(`${BASE}-dragged`);
-    panel.querySelectorAll(`.${BASE}-drop-before, .${BASE}-drop-after, .${BASE}-drop-end`).forEach((d) => d.classList.remove(`${BASE}-drop-before`, `${BASE}-drop-after`, `${BASE}-drop-end`));
-    const under = this.context.doc.elementsFromPoint?.(e.clientX, e.clientY) ?? [];
-    const item = under.map((u) => u.closest<HTMLElement>(`.${BASE}-item`)).find((u) => u && u !== element);
-    const row = under.map((u) => u.closest<HTMLElement>(`.${BASE}-favrow`)).find(Boolean);
-    drag.to = undefined;
-    if (item) {
-      const [r, i] = item.dataset.swbItem!.split(":").map(Number) as [number, number];
-      const box = item.getBoundingClientRect();
-      const after = e.clientX > box.left + box.width / 2;
-      item.classList.add(after ? `${BASE}-drop-after` : `${BASE}-drop-before`);
-      let index = i + (after ? 1 : 0);
-      // Its place counted without it, in its own row
-      if (r === drag.from.row && index > drag.from.index) index--;
-      drag.to = { row: r, index };
-    } else if (row) {
-      const r = Number(row.dataset.swbRow);
-      row.querySelector(`.${BASE}-items`)?.classList.add(`${BASE}-drop-end`);
-      drag.to = { row: r, index: this.values!.favorites[r]!.length - (r === drag.from.row ? 1 : 0) };
-    }
-  }
-
-  private dragEnd(dropped: boolean): void {
-    const drag = this.drag;
-    this.drag = undefined;
-    if (!drag) return;
-    const to = drag.to;
-    if (dropped && drag.moved && to && (to.row !== drag.from.row || to.index !== drag.from.index)) {
-      this.edit(moveItem(this.values!.favorites, drag.from, to), `[data-swb-item="${to.row}:${to.index}"]`);
-    } else this.drawFavorites(drag.moved ? undefined : `[data-swb-item="${drag.from.row}:${drag.from.index}"]`);
   }
 
   // ---- Saving ------------------------------------------------------------------

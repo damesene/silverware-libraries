@@ -29,6 +29,16 @@ export function stepOf(rows: Favorites, at: At, key: "ArrowLeft" | "ArrowRight" 
   return target ? { row: other, index: Math.min(at.index, target.length) } : undefined;
 }
 
+/** A row moved to `to` (its place counted without it) */
+export function moveRow(rows: Favorites, from: number, to: number): FavoriteItem[][] {
+  const next = copy(rows);
+  const row = next[from];
+  if (!row || to < 0 || to >= next.length) return next;
+  next.splice(from, 1);
+  next.splice(to, 0, row);
+  return next;
+}
+
 /** An item added at a row's end */
 export function addItem(rows: Favorites, row: number, item: FavoriteItem): FavoriteItem[][] {
   const next = copy(rows);

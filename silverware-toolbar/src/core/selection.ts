@@ -73,6 +73,9 @@ export class SelectionWatcher {
   private onChange = (): void => {
     const anchor = this.doc.getSelection()?.anchorNode;
     if (anchor && this.ignores(anchor)) return;
+    // The toolbar's own controls have the keyboard (its list of choices let the page's selection go): the editor keeps its own
+    const active = this.doc.activeElement;
+    if (active && active !== this.doc.body && this.ignores(active)) return;
     // None any more: said at once; made or changed: once the mouse is let go, or the keys pause
     if (!this.current()) {
       clearTimeout(this.timer);

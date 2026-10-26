@@ -22,12 +22,14 @@ export type BarHandlers = {
   readonly more: () => void;
   // A choice's state now (for the list a button opens)
   readonly state: (action: Action) => { readonly active: boolean; readonly enabled: boolean };
+  // The keyboard back to the editor (its selection shown again): a list of choices closed unpicked, which had taken it
+  readonly refocus: () => void;
 };
 
 export class Bar {
   readonly element: HTMLElement;
   // The list of a button's choices, open under it
-  private menu: { readonly element: HTMLElement; readonly button: HTMLButtonElement; readonly action: string } | undefined;
+  private menu: { readonly element: HTMLElement; readonly button: HTMLButtonElement; readonly action: string; readonly focused: boolean } | undefined;
   private at: { rect: Box; viewTop: number } | undefined;
   // Docked at the bottom: the line it stands on (the keyboard's top, or SilverBullet's bar's)
   private dockedAt: number | undefined;
@@ -97,7 +99,9 @@ export class Bar {
   placeDocked(bottom: number): void {
     this.dockedAt = bottom;
     this.element.style.left = "0px";
-    this.element.style.top = `${Math.round(bottom - this.element.offsetHeight)}px`;
+    // Held by its bottom edge: placed by its top, its height and the line rounded apart left a line of the page showing under it
+    this.element.style.top = "auto";
+    this.element.style.bottom = `${Math.max(0, this.doc.defaultView!.innerHeight - bottom)}px`;
     if (this.menu) this.placeMenu();
   }
 
@@ -166,6 +170,7 @@ export class Bar {
   place(rect: Box, viewTop: number): void {
     if (this.docked) return;
     this.at = { rect, viewTop };
+    this.element.style.removeProperty("bottom");
     const win = this.doc.defaultView!;
     const size = { width: this.element.offsetWidth, height: this.element.offsetHeight };
     const { left, top } = placeBy(rect, size, { width: win.innerWidth, height: win.innerHeight, top: viewTop });
@@ -189,7 +194,9 @@ export class Bar {
   /** The list of an action's choices under its button (Turn into), each with its state now */
   private toggleMenu(button: HTMLButtonElement, action: Action): void {
     const open = this.menu?.action === action.id;
+    const hadFocus = !!this.menu?.focused;
     this.closeMenu();
+    if (open && hadFocus) this.handlers.refocus();
     if (open || !action.choices) return;
     const menu = this.doc.createElement("div");
     menu.className = "swb-floating swb-menu swb-visible";
@@ -212,10 +219,19 @@ export class Bar {
       });
       menu.append(item);
     }
-    this.menu = { element: menu, button, action: action.id };
+    // Docked (a phone): the list takes the keyboard and the page's selection is let go, so the system's menu of a
+    // selection (Cut, Copy, Paste) goes away, as it does for the popup's search; the editor keeps its own selection,
+    // which a choice runs on and the editor shows again
+    const focused = this.docked;
+    this.menu = { element: menu, button, action: action.id, focused };
     this.doc.body.append(menu);
     button.setAttribute("aria-expanded", "true");
     this.placeMenu();
+    if (focused) {
+      menu.tabIndex = -1;
+      menu.focus({ preventScroll: true });
+      this.doc.getSelection()?.removeAllRanges();
+    }
   }
 
   private placeMenu(): void {

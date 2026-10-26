@@ -1,6 +1,6 @@
 // The toolbar on a phone (the "touch" project: a Pixel 7): text selected by touch docks it at the bottom, over the keyboard
 import type { Page } from "@playwright/test";
-import { bar, barButton, caret, expect, lineBox, popup, select, test, text } from "./helpers.ts";
+import { bar, barButton, caret, expect, lineBox, popup, select, selected, test, text } from "./helpers.ts";
 
 /** Text selected after a touch in the page, as a phone selects it (a long press, then its handles) */
 async function selectByTouch(page: Page, needle: string): Promise<void> {
@@ -17,7 +17,8 @@ test.describe("The toolbar on a phone", () => {
     const view = page.viewportSize()!;
     expect(Math.round(box.x)).toBe(0);
     expect(Math.round(box.width)).toBe(view.width);
-    expect(Math.abs(box.y + box.height - view.height)).toBeLessThanOrEqual(1);
+    // Right on the window's bottom edge: no line of the page showing under it
+    expect(Math.abs(box.y + box.height - view.height)).toBeLessThan(0.5);
     await expect(bar(page).locator(".swb-row")).toHaveCount(1);
     await expect(bar(page).locator(".swb-row [data-swb-action]").first()).toHaveAttribute("data-swb-action", "actions.turnInto");
     await expect(bar(page).locator(".swb-more")).toBeVisible();
@@ -39,6 +40,30 @@ test.describe("The toolbar on a phone", () => {
     await expect(bar(page)).toBeVisible();
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await expect(bar(page)).toBeHidden();
+  });
+
+  test("Turn into's list over it takes the keyboard, so the system's menu of the selection goes; a choice turns the lines selected", async ({ page }) => {
+    await selectByTouch(page, "First item\n- Second item");
+    await barButton(page, "actions.turnInto").tap();
+    const menu = page.locator(".swb-menu.swb-visible");
+    await expect(menu).toBeVisible();
+    expect(await page.evaluate(() => !!document.activeElement?.closest(".swb-menu"))).toBe(true);
+    // The page's selection let go (the editor keeps its own)
+    expect(await page.evaluate(() => document.getSelection()?.rangeCount ?? 0)).toBe(0);
+    await expect(bar(page)).toBeVisible();
+    await menu.locator('[data-swb-action="formats.numbered"]').tap();
+    await expect.poll(() => text(page)).toContain("1. First item\n2. Second item");
+  });
+
+  test("Turn into's list closed unpicked gives the editor its selection back", async ({ page }) => {
+    await selectByTouch(page, "some text");
+    await barButton(page, "actions.turnInto").tap();
+    await expect(page.locator(".swb-menu.swb-visible")).toBeVisible();
+    await barButton(page, "actions.turnInto").tap();
+    await expect(page.locator(".swb-menu.swb-visible")).toHaveCount(0);
+    await expect(page.locator(".cm-content")).toBeFocused();
+    expect(await selected(page)).toBe("some text");
+    await expect(bar(page)).toBeVisible();
   });
 
   test("the list of every action opens over it", async ({ page }) => {

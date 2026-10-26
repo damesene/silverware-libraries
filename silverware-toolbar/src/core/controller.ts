@@ -74,6 +74,7 @@ export class Controller {
       run: (action) => void this.run(action),
       more: () => (this.popup.isOpen ? this.popup.close() : void this.showActions()),
       state: (action) => (this.context ? this.state(action, this.context) : { active: false, enabled: false }),
+      refocus: () => this.focusEditor(),
     });
     this.popup = new Popup(doc);
   }

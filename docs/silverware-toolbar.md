@@ -328,8 +328,8 @@ config.set("silverware.toolbar.favorites", {
 - `silverware.toolbar.favorites-touch-enabled` (default true) turns Touch's
   off for a while, its own kept: Click's show by finger too. Touch with none
   of its own shows Click's.
-- Settings: *Click* | *Touch* at the Favorites tab's top (this device's
-  first); *Own favourites for touch* turns them on (the first time a copy of
+- Settings: *Click* | *Touch* at the Favorites tab's top (by finger Touch's
+  first where its own are on, else Click's); *Own favourites for touch* turns them on (the first time a copy of
   Click's) and off (Click's shown dimmed, not edited); *Copy from Click* /
   *Copy from Touch* puts the other's over the ones shown.
 

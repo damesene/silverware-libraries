@@ -59,7 +59,7 @@ config.set("silverware.toolbar.favorites", {
 
 The settings dialog's *Favorites* tab edits them without writing Lua (see *Settings*).
 
-Where the screen is worked by finger (a phone, a tablet), the toolbar can show other favourites: `silverware.toolbar.favorites-touch`, written as the favourites are, say with gesture buttons in place of plain ones. Not set, the favourites show there too. A computer with a touch screen counts as one with a mouse (its touchpad is what it is mostly worked with). `silverware.toolbar.favorites-touch-enabled = false` turns them off for a while: the favourites show by finger too, those for touch kept. In the settings, *Favorites* has *Click* and *Touch* at its top: *Own favourites for touch* turns them on (the first time as a copy of *Click*'s to change) and off, and *Copy from Click* / *Copy from Touch* puts the other's over the ones shown.
+Where the screen is worked by finger (a phone, a tablet), the toolbar can show other favourites: `silverware.toolbar.favorites-touch`, written as the favourites are, say with gesture buttons in place of plain ones. Not set, the favourites show there too. A computer with a touch screen counts as one with a mouse (its touchpad is what it is mostly worked with). `silverware.toolbar.favorites-touch-enabled = false` turns them off for a while: the favourites show by finger too, those for touch kept. In the settings, *Favorites* has *Click* and *Touch* at its top (opened by finger on *Touch* where its own are on): *Own favourites for touch* turns them on (the first time as a copy of *Click*'s to change) and off, and *Copy from Click* / *Copy from Touch* puts the other's over the ones shown.
 
 ### Gesture buttons
 

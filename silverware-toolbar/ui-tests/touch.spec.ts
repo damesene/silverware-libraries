@@ -160,8 +160,9 @@ test.describe("The toolbar on a phone", () => {
     await popup(page).locator('[data-swb-action="actions.settings"]').tap();
     const dialog = page.locator(".swb-settings");
     await dialog.locator('[data-swb-tab="favorites"]').tap();
-    // This device's first
-    await expect(dialog.locator('[data-swb-device="touch"]')).toHaveAttribute("aria-checked", "true");
+    // Click's first while Touch has none of its own on
+    await expect(dialog.locator('[data-swb-device="click"]')).toHaveAttribute("aria-checked", "true");
+    await dialog.locator('[data-swb-device="touch"]').tap();
     const own = dialog.locator(".swb-settings-devices .swb-settings-switch");
     await own.tap();
     await dialog.locator('[data-swb-item="1:0"] .swb-settings-remove').tap();
@@ -176,6 +177,8 @@ test.describe("The toolbar on a phone", () => {
     await popup(page).locator(".swb-search-field").fill("settings");
     await popup(page).locator('[data-swb-action="actions.settings"]').tap();
     await dialog.locator('[data-swb-tab="favorites"]').tap();
+    // On: Touch's first
+    await expect(dialog.locator('[data-swb-device="touch"]')).toHaveAttribute("aria-checked", "true");
     await own.tap();
     await dialog.locator(".swb-settings-save").tap();
     await select(page, "Plain", 0);
@@ -185,6 +188,9 @@ test.describe("The toolbar on a phone", () => {
     await popup(page).locator(".swb-search-field").fill("settings");
     await popup(page).locator('[data-swb-action="actions.settings"]').tap();
     await dialog.locator('[data-swb-tab="favorites"]').tap();
+    // Off: Click's first
+    await expect(dialog.locator('[data-swb-device="click"]')).toHaveAttribute("aria-checked", "true");
+    await dialog.locator('[data-swb-device="touch"]').tap();
     await own.tap();
     await expect(dialog.locator('[data-swb-items="1"] .swb-settings-item-name').first()).toHaveText("Italic");
   });

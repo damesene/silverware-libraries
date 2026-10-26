@@ -1,13 +1,17 @@
-// The toolbar by the selection: the favourite actions as icons (one that
-// offers choices opens their list under it: Turn into), and … for the popup
-// of every action. Pressing it keeps the editor's selection and focus (its
-// mousedown is prevented), so an action works on what is selected.
+// The toolbar by the selection: the favourites in rows, one under another,
+// each action its icon, or its icon and label; one that offers choices
+// (Turn into) shows the choice on and a chevron, and opens their list under
+// it; separators between; … for the popup of every action at the end of the
+// last row. Pressing it keeps the editor's selection and focus (its mousedown
+// is prevented), so an action works on what is selected.
 import { ICONS } from "../icons.ts";
 import type { Action } from "./action.ts";
 import { type Box, placeBy } from "./place.ts";
 
-/** An action as the toolbar shows it now */
-export type Shown = { readonly action: Action; readonly active: boolean; readonly enabled: boolean };
+/** An item as the toolbar shows it now: an action (with its label: `labeled`), or a separator */
+export type Shown =
+  | { readonly action: Action; readonly active: boolean; readonly enabled: boolean; readonly labeled: boolean }
+  | { readonly separator: true };
 
 export type BarHandlers = {
   readonly run: (action: Action) => void;
@@ -42,32 +46,74 @@ export class Bar {
     return this.element.contains(node) || !!this.menu?.element.contains(node);
   }
 
-  show(items: readonly Shown[], rect: Box, viewTop: number): void {
+  /** Its rows of items, … ending the last one */
+  show(rows: readonly (readonly Shown[])[], rect: Box, viewTop: number): void {
     this.closeMenu();
     const doc = this.doc;
-    const buttons = items.map(({ action, active, enabled }) => {
-      const button = this.button(action.icon, action.choices ? `${action.label}…` : action.label);
-      button.dataset.swbAction = action.id;
-      button.disabled = !enabled;
-      if (action.choices) {
-        this.showChoice(button, action, enabled);
-        button.setAttribute("aria-haspopup", "menu");
-        button.addEventListener("click", () => this.toggleMenu(button, action));
-      } else {
-        button.setAttribute("aria-pressed", String(active));
-        button.addEventListener("click", () => this.handlers.run(action));
-      }
-      return button;
-    });
-    const divider = doc.createElement("span");
-    divider.className = "swb-divider";
-    const more = this.button(ICONS.more, "Every action (search)");
+    const more = this.button();
+    more.innerHTML = ICONS.more;
+    this.name(more, "Every action (search)");
     more.classList.add("swb-more");
     more.addEventListener("click", () => this.handlers.more());
-    this.element.replaceChildren(...buttons, ...(buttons.length ? [divider] : []), more);
+    const all = rows.length ? rows : [[]];
+    const elements = all.map((items, i) => {
+      const row = doc.createElement("div");
+      row.className = "swb-row";
+      row.append(...items.map((item) => ("separator" in item ? this.divider() : this.item(item))));
+      if (i === all.length - 1) row.append(...(items.length ? [this.divider()] : []), more);
+      return row;
+    });
+    this.element.replaceChildren(...elements);
     if (!this.element.isConnected) doc.body.append(this.element);
     this.element.classList.add("swb-visible");
     this.place(rect, viewTop);
+  }
+
+  private divider(): HTMLElement {
+    const divider = this.doc.createElement("span");
+    divider.className = "swb-divider";
+    return divider;
+  }
+
+  /**
+   * An action's button: its icon, its label too when `labeled`; one offering
+   * choices shows the choice on for the selection (none: `mixed`, else its own
+   * icon and label) and a chevron, and opens their list
+   */
+  private item({ action, active, enabled, labeled }: Extract<Shown, { action: Action }>): HTMLButtonElement {
+    const button = this.button();
+    button.dataset.swbAction = action.id;
+    button.disabled = !enabled;
+    const on = action.choices && enabled ? action.choices.find((choice) => this.handlers.state(choice).active) : undefined;
+    const label = action.choices ? (on?.label ?? (enabled ? (action.mixed ?? action.label) : action.label)) : action.label;
+    button.innerHTML = (on?.icon ?? action.icon) + (labeled ? '<span class="swb-label"></span>' : "") + (action.choices ? ICONS.chevronDown : "");
+    if (labeled) {
+      button.classList.add("swb-labeled");
+      button.querySelector(".swb-label")!.textContent = label;
+    }
+    if (action.choices) {
+      button.classList.add("swb-choices");
+      this.name(button, label === action.label ? `${action.label}…` : `${action.label}: ${label}`);
+      button.setAttribute("aria-haspopup", "menu");
+      button.addEventListener("click", () => this.toggleMenu(button, action));
+    } else {
+      this.name(button, action.label);
+      button.setAttribute("aria-pressed", String(active));
+      button.addEventListener("click", () => this.handlers.run(action));
+    }
+    return button;
+  }
+
+  private button(): HTMLButtonElement {
+    const button = this.doc.createElement("button");
+    button.type = "button";
+    button.className = "swb-button";
+    return button;
+  }
+
+  private name(button: HTMLButtonElement, label: string): void {
+    button.title = label;
+    button.setAttribute("aria-label", label);
   }
 
   /** Where it is on screen (the popup goes under it) */
@@ -95,24 +141,6 @@ export class Bar {
   remove(): void {
     this.hide();
     this.element.remove();
-  }
-
-  /** A list's button: the choice on for the selection, its icon and label (none: `mixed`, else the list's label), a chevron */
-  private showChoice(button: HTMLButtonElement, action: Action, enabled: boolean): void {
-    const on = enabled ? action.choices!.find((choice) => this.handlers.state(choice).active) : undefined;
-    button.classList.add("swb-choice");
-    button.innerHTML = `${on?.icon ?? action.icon}<span class="swb-choice-label"></span>${ICONS.chevronDown}`;
-    button.querySelector(".swb-choice-label")!.textContent = on?.label ?? (enabled ? (action.mixed ?? action.label) : action.label);
-  }
-
-  private button(icon: string, label: string): HTMLButtonElement {
-    const button = this.doc.createElement("button");
-    button.type = "button";
-    button.className = "swb-button";
-    button.innerHTML = icon;
-    button.title = label;
-    button.setAttribute("aria-label", label);
-    return button;
   }
 
   /** The list of an action's choices under its button (Turn into), each with its state now */

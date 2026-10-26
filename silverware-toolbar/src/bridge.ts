@@ -1,7 +1,7 @@
 // The SilverBullet API Silverware Toolbar uses, handed over by the library
 // page's Space Lua (`editor.*` and `config.get`), so no SilverBullet internals
 // are needed.
-import { DEFAULT_FAVORITES } from "./core/favorites.ts";
+import { DEFAULT_FAVORITES, favoriteItemOf, type FavoriteItem, type Favorites } from "./core/favorites.ts";
 
 export type Bridge = {
   // The main selection: where it is in the page's text, and its text
@@ -32,7 +32,7 @@ export const DEFAULT_SHORTCUT = "Ctrl-Shift-q";
 
 /** Silverware Toolbar's settings, read once it starts (a change applies on reload) */
 export type Settings = {
-  readonly favorites: readonly string[];
+  readonly favorites: Favorites;
   readonly modules: ReadonlySet<ModuleName>;
 };
 
@@ -45,7 +45,7 @@ function listOf(value: unknown): unknown[] | undefined {
   if (Array.isArray(value)) return value;
   if (!value || typeof value !== "object") return undefined;
   const entries = Object.entries(value as Record<string, unknown>);
-  if (!entries.length || !entries.every(([key], i) => key === String(i + 1))) return undefined;
+  if (!entries.every(([key], i) => key === String(i + 1))) return undefined;
   return entries.map(([, item]) => item);
 }
 
@@ -61,9 +61,21 @@ export async function readSettings(bridge: Bridge): Promise<Settings> {
   const favorites = await get("silverware.toolbar.favorites", DEFAULT_FAVORITES);
   const modules = new Set<ModuleName>();
   for (const name of MODULE_NAMES) if ((await get(`silverware.toolbar.modules.${name}.enabled`, true)) !== false) modules.add(name);
-  const list = listOf(favorites);
-  return {
-    favorites: list && list.every((f) => typeof f === "string") ? (list as string[]) : DEFAULT_FAVORITES,
-    modules,
-  };
+  return { favorites: favoritesOf(favorites), modules };
+}
+
+/**
+ * The favourites as configured: rows of items, an item that is none left out
+ * (logged); not rows at all: the defaults
+ */
+export function favoritesOf(value: unknown): Favorites {
+  const rows = listOf(value)?.map(listOf);
+  if (!rows || rows.some((row) => !row)) return DEFAULT_FAVORITES;
+  return rows.map((items) => {
+    return items!.flatMap((item): FavoriteItem[] => {
+      const favorite = favoriteItemOf(item);
+      if (!favorite) console.warn('Silverware Toolbar: a favourite is not { id = …, show = … } nor { type = "separator" }:', item);
+      return favorite ? [favorite] : [];
+    });
+  });
 }

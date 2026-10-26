@@ -5,14 +5,16 @@ import { bar, barButton, caret, expect, popup, select, selected, test, text } fr
 const KEY = "Control+Shift+Q";
 
 test.describe("The toolbar", () => {
-  test("shows by a selection made, and goes when there is none", async ({ page }) => {
-    await select(page, "Select some text");
+  test("shows by a selection made, in rows (Turn into with its label above the icons), and goes when there is none", async ({ page }) => {
+    await select(page, "Plain paragraph one");
     await expect(bar(page)).toBeVisible();
+    await expect(bar(page).locator(".swb-row")).toHaveCount(2);
+    await expect(bar(page).locator(".swb-row").first().locator(".swb-button")).toHaveText(["Paragraph"]);
     // Above the selection
     const toolbar = (await bar(page).boundingBox())!;
-    const line = (await page.locator(".cm-line", { hasText: "Select some text" }).boundingBox())!;
+    const line = (await page.locator(".cm-line", { hasText: "Plain paragraph one" }).boundingBox())!;
     expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(line.y);
-    await select(page, "Select", 0);
+    await select(page, "Plain", 0);
     await expect(bar(page)).toBeHidden();
   });
 
@@ -63,7 +65,7 @@ test.describe("The toolbar", () => {
 
   test("a press on it keeps the editor's selection and focus", async ({ page }) => {
     await select(page, "some text");
-    await bar(page).locator(".swb-divider").click();
+    await bar(page).locator(".swb-divider").first().click();
     expect(await selected(page)).toBe("some text");
     await expect(page.locator(".cm-content")).toBeFocused();
   });

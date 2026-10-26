@@ -21,16 +21,27 @@ describe("Settings", () => {
   });
 
   it("take what is configured, a module turned off left out; what is not valid is its default", async () => {
-    const settings = await readSettings(bridge({ "silverware.toolbar.favorites": ["formats.bold"], "silverware.toolbar.modules.clear.enabled": false }));
-    expect(settings.favorites).toEqual(["formats.bold"]);
+    const settings = await readSettings(bridge({ "silverware.toolbar.favorites": [[{ id: "formats.bold" }]], "silverware.toolbar.modules.clear.enabled": false }));
+    expect(settings.favorites).toEqual([[{ id: "formats.bold" }]]);
     expect(settings.modules.has("clear")).toBe(false);
     expect((await readSettings(bridge({ "silverware.toolbar.favorites": [1, 2] }))).favorites).toEqual(DEFAULT_FAVORITES);
   });
 
   it("take a list handed over from Lua as an object of 1, 2, …", async () => {
-    const settings = await readSettings(bridge({ "silverware.toolbar.favorites": { 1: "formats.code", 2: "formats.quote" } }));
-    expect(settings.favorites).toEqual(["formats.code", "formats.quote"]);
+    const settings = await readSettings(bridge({ "silverware.toolbar.favorites": { 1: { 1: { id: "formats.code" }, 2: { type: "separator" } }, 2: {} } }));
+    expect(settings.favorites).toEqual([[{ id: "formats.code" }, { type: "separator" }], []]);
     expect((await readSettings(bridge({ "silverware.toolbar.favorites": { a: "formats.code" } }))).favorites).toEqual(DEFAULT_FAVORITES);
+  });
+
+  it("leave out an item that is none: not an object, without its id, a show or a type not known, a property more", async () => {
+    const settings = await readSettings(
+      bridge({
+        "silverware.toolbar.favorites": [
+          ["formats.bold", { id: "formats.italic", show: "label" }, { show: "icon" }, { id: "formats.code", show: "big" }, { type: "line" }, { id: "x", shwo: "label" }, { type: "action", id: "formats.link" }],
+        ],
+      }),
+    );
+    expect(settings.favorites).toEqual([[{ id: "formats.italic", show: "label" }, { id: "formats.link" }]]);
   });
 
   it("are the defaults when reading them fails, or without getConfig", async () => {
@@ -49,8 +60,15 @@ describe("The library page", () => {
   const page = libraryPage;
 
   it("defines the same default favourites, key and modules as the code", () => {
-    const favorites = /favorites = \{[\s\S]*?default = \{([^}]*)\}/.exec(page)?.[1];
-    expect(favorites?.split(",").map((s) => s.trim().replace(/"/g, ""))).toEqual(DEFAULT_FAVORITES);
+    // The defaults as Lua writes them: rows of items
+    const lua = (value: unknown): string =>
+      Array.isArray(value)
+        ? `{ ${value.map(lua).join(", ")} }`
+        : typeof value === "object" && value
+          ? `{ ${Object.entries(value).map(([k, v]) => `${k} = ${lua(v)}`).join(", ")} }`
+          : JSON.stringify(value);
+    const defaults = /favorites = \{[\s\S]*?default = (\{[\s\S]*?\n {6}\}),/.exec(page)?.[1]?.replace(/\s+/g, " ").replace(/, \}/g, " }");
+    expect(defaults).toBe(lua(DEFAULT_FAVORITES));
     expect(/shortcut = \{[\s\S]*?default = "([^"]*)"/.exec(page)?.[1]).toBe(DEFAULT_SHORTCUT);
     expect(page).toContain(`config.get("silverware.toolbar.shortcut", "${DEFAULT_SHORTCUT}")`);
     for (const name of MODULE_NAMES) expect(page).toContain(`${name} = { type = "object"`);

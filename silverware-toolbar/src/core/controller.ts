@@ -119,10 +119,25 @@ export class Controller {
     }
   }
 
-  /** The favourites by id, in their order: an action, or one of a list's choices; ids no action has left out */
-  private favorites(actions: readonly Action[]): Action[] {
+  /**
+   * The favourites' rows as shown for a context: each action by its id (an
+   * action, or one of a list's choices; ids no action has left out), the
+   * separators between them (none at a row's ends, none twice), rows left
+   * empty left out
+   */
+  private favorites(context: Context): Shown[][] {
+    const actions = this.actions();
     const all = [...actions, ...actions.flatMap((a) => a.choices ?? [])];
-    return this.settings.favorites.flatMap((id) => all.find((a) => a.id === id) ?? []);
+    return this.settings.favorites
+      .map((row) => {
+        const items = row.flatMap((item): Shown[] => {
+          if (item.type === "separator") return [{ separator: true }];
+          const action = all.find((a) => a.id === item.id);
+          return action ? [{ action, labeled: item.show === "label", ...this.state(action, context) }] : [];
+        });
+        return items.filter((item, i) => !("separator" in item) || (i > 0 && i < items.length - 1 && !("separator" in items[i - 1]!)));
+      })
+      .filter((row) => row.some((item) => !("separator" in item)));
   }
 
   /** The toolbar shown for a context, by the selection or the caret */
@@ -133,8 +148,7 @@ export class Controller {
       return;
     }
     this.context = context;
-    const items: Shown[] = this.favorites(this.actions()).map((action) => ({ action, ...this.state(action, context) }));
-    this.bar.show(items, rectOf(range), viewTopOf(range.startContainer));
+    this.bar.show(this.favorites(context), rectOf(range), viewTopOf(range.startContainer));
   }
 
   /** A selection made in the page's text: the toolbar by it; none: the toolbar goes (unless shown at the caret) */

@@ -42,10 +42,13 @@ Formats apply line by line: a list's marker or a heading's `#` is left out, and 
 
 ## Favourites
 
-The icons in the toolbar are your favourites, by their ids, in the order you list them (every action stays in the **…** list). An id no action has (a module turned off, a custom format not defined) is left out:
+The toolbar shows your favourites: rows, one under another, each a list of items. An item is an action by its `id` (see *Actions*; its `type` is `"action"`, which can be left out), shown as its icon, or with `show = "label"` as its icon and its name, or a separator (`type = "separator"`). An action that offers a list (*Turn into*) has an arrow, and shows the choice your selection has. Every action stays in the **…** list, at the end of the last row. An id no action has (a module turned off, a custom format not defined) is left out. The default:
 
 ```lua
-config.set("silverware.toolbar.favorites", { "formats.bold", "formats.italic", "formats.bullet", "actions.turnInto", "formats.wikiLink" })
+config.set("silverware.toolbar.favorites", {
+  { { id = "actions.turnInto", show = "label" } },
+  { { id = "formats.bold" }, { id = "formats.italic" }, { id = "formats.code" }, { type = "separator" }, { id = "formats.link" }, { id = "formats.highlight" } },
+})
 ```
 
 ## Custom formats
@@ -160,9 +163,23 @@ config.define("silverware.toolbar", {
   properties = {
     favorites = {
       type = "array",
-      items = { type = "string" },
-      default = { "formats.bold", "formats.italic", "formats.code", "formats.link", "actions.turnInto", "formats.highlight" },
-      description = "The actions shown as icons in the toolbar, in their order (their ids; every action is in the list of the … button).",
+      items = {
+        type = "array",
+        items = {
+          type = "object",
+          additionalProperties = false,
+          properties = {
+            type = { type = "string", enum = { "action", "separator" } },
+            id = { type = "string" },
+            show = { type = "string", enum = { "icon", "label" } },
+          },
+        },
+      },
+      default = {
+        { { id = "actions.turnInto", show = "label" } },
+        { { id = "formats.bold" }, { id = "formats.italic" }, { id = "formats.code" }, { type = "separator" }, { id = "formats.link" }, { id = "formats.highlight" } },
+      },
+      description = "The toolbar's rows, each a list of items: { id = <its id>, show = \"icon\" or \"label\" }, or { type = \"separator\" } (every action is in the list of the … button).",
       ui = { category = "Silverware Toolbar", label = "Favourite actions", priority = 2 },
     },
     shortcut = {
@@ -234,7 +251,8 @@ end
 }
 /* The toolbar: icons in a row */
 .swb-bar {
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 2px;
   padding: 3px;
 }
@@ -263,20 +281,33 @@ end
   opacity: 0.35;
   cursor: default;
 }
-/* A list's button (Turn into): the choice on, its label, a chevron */
-.swb-button.swb-choice {
+/* A row of the favourites */
+.swb-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+/* An action with its label, one offering choices with a chevron (its choice on) */
+.swb-button.swb-labeled,
+.swb-button.swb-choices {
   width: auto;
-  max-width: 180px;
   gap: 6px;
-  padding: 0 6px 0 8px;
+  padding: 0 6px;
   font: inherit;
 }
-.swb-choice-label {
+.swb-button.swb-labeled {
+  max-width: 200px;
+}
+.swb-button .swb-label {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.swb-button.swb-choice svg:last-child {
+.swb-button.swb-choices:not(.swb-labeled) {
+  gap: 0;
+  padding: 0 2px 0 6px;
+}
+.swb-button.swb-choices svg:last-child {
   width: 14px;
   height: 14px;
   opacity: 0.6;

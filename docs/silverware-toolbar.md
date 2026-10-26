@@ -51,8 +51,9 @@ usable without a mouse.
    so. Changed on 2026-10-26, see *Extensions*.
 6. **Desktop first**: on a phone SilverBullet has its own bar over the
    keyboard, and the system's selection menu would cover the toolbar.
-7. **Default favourites**: bold, italic, code, link, *Turn into* (the block's
-   type to pick), highlight.
+7. **Default favourites**: *Turn into* with its label in a row of its own,
+   under it bold, italic, code, a separator, link, highlight (see
+   *Favourites: rows of items*).
 
 ## Design
 
@@ -282,6 +283,36 @@ its formats and actions out (favourites skip them).
   pressed, a click takes it off). Esc closes the popup, a second Esc the
   toolbar; typing or moving the caret closes it.
 
+### Favourites: rows of items (decided and built 2026-10-26)
+
+The toolbar is a column of rows, each a list of items, as Notion's (its
+block type above the formats):
+
+```lua
+config.set("silverware.toolbar.favorites", {
+  { { id = "actions.turnInto", show = "label" } },
+  { { id = "formats.bold" }, { id = "formats.italic" }, { id = "formats.code" }, { type = "separator" }, { id = "formats.link" }, { id = "formats.highlight" } },
+})
+```
+
+- An item is an object, its optional properties left out: an action
+  (`type = "action"`, the default) by its `id` (`id`, not the item's: within
+  an action's item it is the action's id, as the Actions table calls it),
+  `show = "icon"` (the default) or `"label"` (its icon and name; several in a
+  row may), or `{ type = "separator" }`.
+- An action offering `choices` has a chevron (in both looks), from its
+  registration, not a setting; its icon and label are the choice on for the
+  selection, else its `mixed` text (Turn into: "Multiple types"). Any action
+  may (`defineActions` takes `choices` and `mixed`).
+- Items keep their own width (none stretched); `…` ends the last row; an id
+  no action has is left out, separators at a row's ends or twice left out,
+  rows left empty left out; an item that is none (a property more: `shwo`) is
+  left out and logged.
+- The schema (config.define) describes rows of objects; SilverBullet checks
+  values with JSON Schema draft 7 (`@cfworker/json-schema`, client/config.ts);
+  its Configuration Manager edits no lists ("Configure manually in CONFIG"):
+  the settings dialog's Favorites tab is where they are edited.
+
 ### Also decided
 
 - **Default favourites** in the core, in a file of their own
@@ -290,9 +321,86 @@ its formats and actions out (favourites skip them).
   keeps them equal to the library page's `config.define`.
 - **A shared dialog** (`shared/`): a generic dialog with optional tabs (a
   component of its own), usable outside settings; writing CONFIG a separate
-  function. The table's settings dialog moves onto it.
-- **The toolbar's settings dialog**: tabs General, Favorites (picked and
-  ordered there, saved into CONFIG), Modules.
+  function. The table's settings dialog moves onto it. See *Next* for how.
+- **The toolbar's settings dialog**: tabs General, Favorites, Modules (in
+  this order). See *Next*.
 - **The page unchanged between reading and writing**: an action checks it
   (a snapshot of the text it read), else writes nothing.
 - Not now: a code block format, keys per action, a dialog for links, phones.
+
+## Status and next (2026-10-26)
+
+**Done** (branch `silverware-toolbar`): steps 1 to 5; *Extensions* (the
+formats domain, `defineFormats`, `defineActions` with `choices` and `mixed`,
+ids `formats.<name>` / `actions.<name>`, the key as the command's, the
+toolbar at the caret, the popup under the toolbar, the page checked
+unchanged before a write); the favourites in rows (*Favourites: rows of
+items*). Committed: 4896c7f (everything up to the favourites in rows); the
+favourites in rows are in the working copy until committed.
+
+**Not checked in a live SilverBullet yet** (step 6, the user): the command's
+key from `config.get`, the toolbar at the caret, the favourites' rows read
+from a Lua table through `config.get` (an array, or an object of 1, 2, …:
+both are read), `editor.focus`, the toolbar over the top bar and the Tiniri
+theme.
+
+**Next**, in this order, each with unit tests and, for what is used by
+pointer or keys, UI tests (`npm run test:ui`):
+
+1. **`shared/`** (a folder of the repository, bundled into each plugin; no
+   dependency at run time):
+   - `shared/dialog.ts`: a modal dialog over the page, its look given by a
+     class base (`base`, e.g. `swt-dialog`, `swt-settings`, `swb-dialog`): the
+     backdrop `${base}-backdrop` (plus classes the caller adds: the table's
+     UI_CLASS), the box `${base}`, `${base}-head` with `${base}-titles`
+     (`${base}-title`, `${base}-subtitle`) and `${base}-close` (its icon
+     given), an optional bar under the head (the tabs' bar), `${base}-body`
+     (the content), an optional `${base}-foot`. Its keys are its own (no key
+     reaches the page), Tab stays in it, Esc / × / a press on the backdrop
+     ask `dismiss` first (a promise: the settings ask where changes would be
+     lost), the focus goes back where it was. With the bases the table uses
+     now, its classes stay as they are: `swt-dialog-*` (the core's
+     `Dialogs`, the Functions and Excel dialogs) and `swt-settings-*` (the
+     settings; only its subtitle, today `swt-settings-scope`, becomes
+     `swt-settings-subtitle`, CSS and test changed with it).
+   - `shared/tabs.ts`: tabs as a component of their own: a bar
+     (`${base}-tabs`, buttons `${base}-tab` with `aria-selected`,
+     `data-<prefix>-tab`) and panels (`${base}-panel`, `hidden` but one,
+     `data-<prefix>-panel`), the first selected; the dialog takes the bar
+     and the panels apart.
+   - `shared/controls.ts`: a setting's row (`${base}-row`, `-label`,
+     `-name`, `-hint`) and a switch (`${base}-switch`, `-knob`), the
+     table's settings' markup, so the table's CSS stays.
+   - `shared/configpage.ts`: the table's `configpage.ts` moved there
+     (`withConfigSettings`, CONFIG_PAGE, MANAGED_MARKER; its test moved too),
+     writing lists and tables as Lua too (`{ { { id = "…", show = "label" } } }`:
+     SilverBullet's Configuration Manager reads them back,
+     `plugs/configuration-manager/lua.ts`); a value on one line, as it does.
+   - The table moves onto them: `core/dialog.ts` (Dialogs) over
+     `shared/dialog.ts`, `settings.ts` over dialog, tabs and controls,
+     `controller.ts` imports `shared/configpage.ts`. Its behaviour and tests
+     stay (settings.test.ts, its UI tests); `npm run test:ui` for the whole
+     repository before committing.
+2. **The toolbar's settings dialog** (`src/settings.ts`, the command
+   *Silverware Toolbar: Settings*, and an item at the end of the popup), in
+   the table's look (its CSS copied with the prefix `swb-`), reading the
+   configuration when it opens, writing nothing until Save:
+   - **General**: the key (text, as SilverBullet writes keys; applies after
+     a reload).
+   - **Favorites**: the rows one under another, each its items in order
+     (an action's icon and name; a separator; an id no action has dimmed,
+     named by its id); an item dragged within its row or into another
+     (pointer; with the keyboard: Alt+← → within the row, Alt+↑ ↓ into the
+     row above or below); per item a switch icon / icon and label and a
+     remove button; *Add* in each row opens a search of every action (the
+     popup's search, the choices too) and a separator; *Add row*; a row left
+     empty is left out when saved.
+   - **Modules**: each module's name, description and switch (*Save and
+     reload*, as the table's).
+   - Saved as the table saves: `bridge.saveSettings` (the playground's
+     store) or the CONFIG page's managed block through the library page's
+     Lua `saveConfigPage` (as the table's: writePage, sync, index,
+     `editor.reloadConfigAndCommands`); the library page hands over
+     `readPage`, `saveConfigPage`, `reloadUI`, `confirm`. The playground
+     gets a *Settings* button and a store, as the table's playground has.
+3. Then step 6 (the user, in a live SilverBullet) and step 7.

@@ -141,7 +141,7 @@ export class Popup {
         )
       : query.trim()
         ? findEntries(entriesOf(options.actions), query)
-        : byGroup(options.actions.map((action) => ({ action, group: action.group })));
+        : byGroup(options.actions.filter((action) => action.listed !== false).map((action) => ({ action, group: action.group })));
     const doc = this.doc;
     const rows: HTMLElement[] = [];
     if (level) {

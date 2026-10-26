@@ -84,7 +84,9 @@ test.describe("The popup of every action", () => {
     await expect(search).toBeFocused();
     await page.screenshot({ path: "test-results/toolbar-popup.png" });
     await search.fill("num");
-    await expect(popup(page).locator(".swb-option")).toHaveText(["Numbered list"]);
+    // First, the format (SilverBullet's commands it finds too come after it)
+    await expect(popup(page).locator(".swb-option").first()).toHaveText("Numbered list");
+    await expect(popup(page).locator(".swb-option.swb-current")).toHaveText("Numbered list");
     await page.keyboard.press("Enter");
     await expect(popup(page)).toBeHidden();
     expect(await text(page)).toContain("1. First item\n2. Second item with [a link](https://silverbullet.md)\n3. Third item");
@@ -121,9 +123,20 @@ test.describe("The popup of every action", () => {
     await expect(popup(page).locator(".swb-back")).toHaveCount(0);
     await expect(popup(page).locator(".swb-option.swb-current")).toHaveAttribute("data-swb-action", "actions.turnInto");
     await popup(page).locator(".swb-search-field").fill("quo");
-    await expect(options).toHaveText(["Quote"]);
+    await expect(options.first()).toHaveText("Quote");
+    await expect(popup(page).locator(".swb-option.swb-current")).toHaveText("Quote");
     await page.keyboard.press("Enter");
     expect(await text(page)).toContain("> Plain paragraph one.");
+  });
+
+  test("SilverBullet's commands: not listed as it opens, found by their name typed, run on the selection", async ({ page }) => {
+    await select(page, "some text");
+    await page.keyboard.press(KEY);
+    await expect(popup(page).locator(".swb-group", { hasText: "Commands" })).toHaveCount(0);
+    await popup(page).locator(".swb-search-field").fill("text bold");
+    await expect(popup(page).locator('[data-swb-action="commands.Text: Bold"]')).toBeVisible();
+    await popup(page).locator('[data-swb-action="commands.Text: Bold"]').click();
+    await expect.poll(() => text(page)).toContain("Select **some text** in this page");
   });
 
   test("… in the toolbar opens it, and closes it again; a click on an action runs it", async ({ page }) => {

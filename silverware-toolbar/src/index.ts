@@ -33,7 +33,7 @@ export async function init(bridge: Bridge): Promise<void> {
   const settings = await readSettings(bridge);
   // The one before stopped only now: init may be called again meanwhile (Space Lua loaded twice), each stops the last
   slot[GLOBAL_KEY]?.stop();
-  const actions = createActions(settings.modules);
+  const actions = createActions(settings.modules, { listCommands: bridge.listCommands, invokeCommand: bridge.invokeCommand });
   const controller = new Controller(document, bridge, settings, actions, () => void openSettings());
   slot[GLOBAL_KEY] = controller;
   current = { bridge, actions };

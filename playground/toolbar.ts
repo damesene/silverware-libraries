@@ -96,6 +96,20 @@ void init({
     }
   },
   reloadUI: () => location.reload(),
+  // A few of SilverBullet's commands, as system.listCommands gives them (Text: Bold as its own wraps the selection)
+  listCommands: () => ({
+    "Text: Bold": { name: "Text: Bold" },
+    "Navigate: Home": { name: "Navigate: Home" },
+    "Hidden command": { name: "Hidden command", hide: true },
+  }),
+  invokeCommand: (name) => {
+    if (name !== "Text: Bold") {
+      flash(`Playground: would run ${name}`);
+      return;
+    }
+    const { from, to } = view.state.selection.main;
+    view.dispatch({ changes: { from, to, insert: `**${view.state.sliceDoc(from, to)}**` }, selection: { anchor: from + 2, head: to + 2 } });
+  },
 });
 
 document.getElementById("swb-settings")!.addEventListener("click", () => void openSettings());

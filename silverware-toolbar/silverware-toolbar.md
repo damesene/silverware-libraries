@@ -31,6 +31,8 @@ Select text in a page and a toolbar shows beside it: make it bold, italic or cod
 | Wiki link | `formats.wikiLink` | `[[text]]`, and back (a wiki link with an alias leaves the alias) |
 | Clear formatting | `actions.clear` | Takes bold, italic, strikethrough, highlight and code off the selection, its text kept |
 | Turn into | `actions.turnInto` | The list of the block formats below |
+| Any SilverBullet command | `commands.<its name>`, e.g. `commands.Navigate: Home` | Runs it, as the command palette does. There are many: type a command's name in the **…** list to find it (they are not listed until you type) |
+| Silverware Toolbar settings… | `actions.settings` | The settings dialog (see *Settings*), last in the **…** list |
 | Paragraph | `formats.paragraph` | Plain lines: a list's, a heading's or a quote's marker taken off |
 | Heading 1, 2, 3 | `formats.heading1` … `formats.heading3` | `# `, `## `, `### ` |
 | Bullet list | `formats.bullet` | `- ` (a list's indentation kept) |
@@ -207,6 +209,7 @@ config.define("silverware.toolbar", {
         inline = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Bold, italic, strikethrough, highlight, code, links and wiki links.", ui = { category = "Silverware Toolbar", label = "Inline formats", priority = 0.9 } } } },
         blocks = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Turn lines into a paragraph, a heading, a list, a task or a quote.", ui = { category = "Silverware Toolbar", label = "Turn into", priority = 0.8 } } } },
         clear = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Remove the inline formats of the selection.", ui = { category = "Silverware Toolbar", label = "Clear formatting", priority = 0.6 } } } },
+        commands = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Every SilverBullet command, found by typing its name in the list of every action, and as a favourite.", ui = { category = "Silverware Toolbar", label = "Commands", priority = 0.5 } } } },
       },
     },
   },
@@ -242,6 +245,9 @@ if js and js.window then
       end
     end,
     reloadUI = editor.reloadUI,
+    -- The commands module: SilverBullet's commands, run on the editor's selection
+    listCommands = system.listCommands,
+    invokeCommand = editor.invokeCommand,
   })
   command.define {
     name = "Silverware Toolbar: Settings",

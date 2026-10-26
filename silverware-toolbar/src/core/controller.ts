@@ -200,6 +200,10 @@ export class Controller {
       return;
     }
     const context = await this.read();
+    if (context && action.perform && this.state(action, context).enabled) {
+      await this.perform(action);
+      return;
+    }
     if (!context || !this.state(action, context).enabled || !action.run) {
       this.focusEditor();
       return;
@@ -212,6 +216,18 @@ export class Controller {
     }
     this.focusEditor();
     // The toolbar shows what the change made (a format now on), once the editor has the selection set
+    this.doc.defaultView!.requestAnimationFrame(() => void this.again());
+  }
+
+  /** Something an action does that is no change (a command): the editor focused first, as it is what it acts on; the toolbar shown again after */
+  private async perform(action: Action): Promise<void> {
+    this.hideBar();
+    this.focusEditor();
+    try {
+      await action.perform!();
+    } catch (e) {
+      void this.bridge.flash(`Silverware Toolbar: ${action.label} failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
     this.doc.defaultView!.requestAnimationFrame(() => void this.again());
   }
 

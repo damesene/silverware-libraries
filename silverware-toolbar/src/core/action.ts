@@ -51,6 +51,10 @@ export type Action = {
   readonly enabled?: (context: Context) => boolean;
   // What it changes; undefined: nothing. A throw is shown as the action failing
   readonly run?: (context: Context) => Change | undefined;
+  // Instead of a change: something it does (a SilverBullet command), the editor focused first; a throw or a rejection is shown as it failing
+  readonly perform?: () => unknown;
+  // false: found by the popup's search only, not listed as it opens (there are many: the commands)
+  readonly listed?: boolean;
   // Instead of running: a list to pick from (Turn into: the block formats). The toolbar shows the choice on
   // (its icon and label; none on: `mixed`, else the label), a click opens the list under it
   readonly choices?: readonly Action[];
@@ -61,4 +65,10 @@ export type Action = {
 /** A module: the actions it offers, asked each time they show (definitions made later count), created once Silverware Toolbar starts (only the modules turned on) */
 export type ToolbarModule = {
   readonly actions: () => readonly Action[];
+};
+
+/** What a module may ask of the editor beyond the page's text: SilverBullet's commands (each optional: the library page hands them over) */
+export type ModuleHost = {
+  readonly listCommands?: () => unknown;
+  readonly invokeCommand?: (name: string) => unknown;
 };

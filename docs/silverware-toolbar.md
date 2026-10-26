@@ -82,7 +82,7 @@ usable without a mouse.
 | `blocks` | turn into a paragraph, heading 1–3, bullet list, numbered list, task, quote, and back; over several lines too |
 | `links` | link, wiki link `[[…]]`, remove a link (to go: link and wiki link become inline formats, see *Extensions*) |
 | `clear` | remove inline formatting |
-| `commands` (later) | any SilverBullet command as an action (a favourite too) |
+| `commands` (built 2026-10-26) | any SilverBullet command as an action (a favourite too), found by the popup's search, not listed as it opens |
 
 ## Steps
 

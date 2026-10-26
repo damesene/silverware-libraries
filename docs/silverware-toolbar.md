@@ -337,7 +337,7 @@ ids `formats.<name>` / `actions.<name>`, the key as the command's, the
 toolbar at the caret, the popup under the toolbar, the page checked
 unchanged before a write); the favourites in rows (*Favourites: rows of
 items*); *Next* 1, `shared/` (the table on it); *Next* 2, the settings dialog;
-step 7's `commands` module and the popup's stars; phones (decided with the
+step 7's `commands` module (the popup's stars were built and taken out again on 2026-10-26: the favourites are edited in the settings dialog only, as the user decided); phones (decided with the
 user on 2026-10-26: the toolbar docked at the bottom over the keyboard after a
 touch, one row of the same favourites, over SilverBullet's keyboard bar where
 it shows, its turning off offered in the settings; when it shows a setting: always

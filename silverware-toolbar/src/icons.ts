@@ -34,8 +34,6 @@ export const ICONS = {
   chevronDown: svg('<path d="m6 9 6 6 6-6"/>'),
   back: svg('<path d="M19 12H5M11 6l-6 6 6 6"/>'),
   search: svg('<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/>'),
-  star: svg('<path d="m12 4 2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z"/>'),
-  starOn: svg('<path fill="currentColor" d="m12 4 2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z"/>'),
   command: svg('<path d="m5 8 4 4-4 4M12 16h7"/>'),
   grip: svg('<circle cx="9" cy="6" r="1" fill="currentColor"/><circle cx="15" cy="6" r="1" fill="currentColor"/><circle cx="9" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="9" cy="18" r="1" fill="currentColor"/><circle cx="15" cy="18" r="1" fill="currentColor"/>'),
   close: svg('<path d="M6 6l12 12M18 6 6 18"/>'),

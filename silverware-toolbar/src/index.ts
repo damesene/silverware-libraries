@@ -32,8 +32,8 @@ export async function init(bridge: Bridge): Promise<void> {
   }
   const settings = await readSettings(bridge);
   const running = slot[GLOBAL_KEY];
-  // SilverBullet loads its configuration again (CONFIG saved: a star of the popup) and hands a new bridge over:
-  // with the same settings the toolbar as it is takes it, a popup open staying open
+  // SilverBullet loads its configuration again (CONFIG saved) and hands a new bridge over: with the same settings
+  // the toolbar as it is takes it, a popup open staying open
   if (running && current && sameSettings(running, settings)) {
     running.bridge = bridge;
     current = { ...current, bridge };
@@ -42,7 +42,7 @@ export async function init(bridge: Bridge): Promise<void> {
   // The one before stopped only now: init may be called again meanwhile (Space Lua loaded twice), each stops the last
   running?.stop();
   const actions = createActions(settings.modules, { listCommands: bridge.listCommands, invokeCommand: bridge.invokeCommand, wordAtCaret: settings.wordAtCaret });
-  const controller = new Controller(document, bridge, settings, actions, () => void openSettings(), canSaveIn(bridge) ? (favorites) => saveSettings(current?.bridge ?? bridge, { [PATHS.favorites]: favorites }) : undefined);
+  const controller = new Controller(document, bridge, settings, actions, () => void openSettings());
   slot[GLOBAL_KEY] = controller;
   current = { bridge, actions };
   controller.start();
@@ -53,7 +53,7 @@ function canSaveIn(bridge: Bridge): boolean {
   return !!bridge.saveSettings || (!!bridge.readPage && !!bridge.saveConfigPage);
 }
 
-/** Whether the toolbar running shows the settings read (its favourites as its stars left them, its modules, its placement) */
+/** Whether the toolbar running has the settings read */
 function sameSettings(running: Controller, settings: Settings): boolean {
   const modules = [...running.settings.modules].sort().join();
   return (
@@ -61,7 +61,7 @@ function sameSettings(running: Controller, settings: Settings): boolean {
     running.settings.placement === settings.placement &&
     running.settings.show === settings.show &&
     running.settings.wordAtCaret === settings.wordAtCaret &&
-    JSON.stringify(running.shownFavorites) === JSON.stringify(settings.favorites)
+    JSON.stringify(running.settings.favorites) === JSON.stringify(settings.favorites)
   );
 }
 

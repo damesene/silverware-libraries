@@ -42,25 +42,24 @@ test.describe("The toolbar on a phone", () => {
     await expect(bar(page)).toBeHidden();
   });
 
-  test("Turn into's list over it takes the keyboard, so the system's menu of the selection goes; a choice turns the lines selected", async ({ page }) => {
+  test("Turn into opens its choices in the popup over it, its search focused (the keyboard stays, the system's menu goes); a choice turns the lines", async ({ page }) => {
     await selectByTouch(page, "First item\n- Second item");
     await barButton(page, "actions.turnInto").tap();
-    const menu = page.locator(".swb-menu.swb-visible");
-    await expect(menu).toBeVisible();
-    expect(await page.evaluate(() => !!document.activeElement?.closest(".swb-menu"))).toBe(true);
-    // The page's selection let go (the editor keeps its own)
-    expect(await page.evaluate(() => document.getSelection()?.rangeCount ?? 0)).toBe(0);
-    await expect(bar(page)).toBeVisible();
-    await menu.locator('[data-swb-action="formats.numbered"]').tap();
+    await expect(popup(page)).toBeVisible();
+    await expect(page.locator(".swb-menu.swb-visible")).toHaveCount(0);
+    await expect(popup(page).locator(".swb-back")).toHaveText("Turn into");
+    await expect(popup(page).locator(".swb-search-field")).toBeFocused();
+    expect((await popup(page).boundingBox())!.y + (await popup(page).boundingBox())!.height).toBeLessThanOrEqual((await bar(page).boundingBox())!.y);
+    await popup(page).locator('[data-swb-action="formats.numbered"]').tap();
     await expect.poll(() => text(page)).toContain("1. First item\n2. Second item");
   });
 
-  test("Turn into's list closed unpicked gives the editor its selection back", async ({ page }) => {
+  test("Turn into again closes its choices, the editor its selection back", async ({ page }) => {
     await selectByTouch(page, "some text");
     await barButton(page, "actions.turnInto").tap();
-    await expect(page.locator(".swb-menu.swb-visible")).toBeVisible();
+    await expect(popup(page)).toBeVisible();
     await barButton(page, "actions.turnInto").tap();
-    await expect(page.locator(".swb-menu.swb-visible")).toHaveCount(0);
+    await expect(popup(page)).toBeHidden();
     await expect(page.locator(".cm-content")).toBeFocused();
     expect(await selected(page)).toBe("some text");
     await expect(bar(page)).toBeVisible();

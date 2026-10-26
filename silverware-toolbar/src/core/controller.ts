@@ -74,7 +74,7 @@ export class Controller {
       run: (action) => void this.run(action),
       more: () => (this.popup.isOpen ? this.popup.close() : void this.showActions()),
       state: (action) => (this.context ? this.state(action, this.context) : { active: false, enabled: false }),
-      refocus: () => this.focusEditor(),
+      choices: (action) => (this.popup.isOpen ? this.popup.close() : void this.showActions(action)),
     });
     this.popup = new Popup(doc);
   }
@@ -111,8 +111,8 @@ export class Controller {
     this.popup.remove();
   }
 
-  /** The popup of every action under the toolbar (the toolbar's …, the command): by the selection, else the toolbar at the caret */
-  async showActions(): Promise<void> {
+  /** The popup of every action under the toolbar (the toolbar's …, the command): by the selection, else the toolbar at the caret; `choices`: open at that action's */
+  async showActions(choices?: Action): Promise<void> {
     const context = await this.read();
     if (!context || this.stopped) return;
     const range = this.watcher.current() ?? this.watcher.caret();
@@ -129,6 +129,7 @@ export class Controller {
       run: (action) => void this.run(action),
       closed: () => this.focusEditor(),
       keeps: (node) => this.bar.owns(node),
+      ...(choices ? { choices } : {}),
       ...(this.saveFavorites ? { favorite: { has: (action: Action) => this.isFavorite(action), toggle: (action: Action) => void this.toggleFavorite(action, context, range) } } : {}),
     });
   }

@@ -25,6 +25,8 @@ export type PopupOptions = {
   readonly viewTop: number;
   // Over the toolbar, not under it (docked at the bottom: the keyboard under it)
   readonly above?: boolean;
+  // Opened at this action's choices (Turn into from a docked toolbar)
+  readonly choices?: Action;
   readonly run: (action: Action) => void;
   // Closed without running (Esc, a press elsewhere)
   readonly closed: () => void;
@@ -91,7 +93,7 @@ export class Popup {
 
   open(options: PopupOptions): void {
     this.options = options;
-    this.level = undefined;
+    this.level = options.choices?.choices ? options.choices : undefined;
     this.input.value = "";
     if (!this.element.isConnected) this.doc.body.append(this.element);
     this.element.classList.add("swb-visible");

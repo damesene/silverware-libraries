@@ -17,10 +17,12 @@
   /* SilverBullet's defaults (theme.scss) */
   --editor-width: 800px;
   --top-background-color: #eee;
+  --editor-caret-color: black;
 }
 :root[data-theme="dark"] {
   --root-color: #e6e6ea;
   --root-background-color: #1e1f24;
+  --editor-caret-color: #fff;
   --ui-accent-color: #8a8eff;
   --danger-color: #ff6b6b;
   --button-border-color: #4a4b55;

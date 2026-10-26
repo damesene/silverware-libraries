@@ -34,3 +34,10 @@ body {
 #sb-editor .cm-focused {
   outline: none;
 }
+/* The caret as SilverBullet's (client/styles/colors.scss): CodeMirror's own theme makes it black, unseen on a dark page */
+#sb-editor .cm-content {
+  caret-color: var(--editor-caret-color);
+}
+#sb-editor .cm-cursor {
+  border-left: 1.2px solid var(--editor-caret-color) !important;
+}

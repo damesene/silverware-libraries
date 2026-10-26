@@ -336,8 +336,7 @@ ids `formats.<name>` / `actions.<name>`, the key as the command's, the
 toolbar at the caret, the popup under the toolbar, the page checked
 unchanged before a write); the favourites in rows (*Favourites: rows of
 items*); *Next* 1, `shared/` (the table on it); *Next* 2, the settings dialog;
-step 7's `commands` module and the popup's stars (phones: not yet, see
-*Phones* below).
+step 7's `commands` module and the popup's stars (phones: not yet).
 
 **Checked in a real SilverBullet** (2026-10-26, its release 2.12.1, by the
 interaction tests, which run against it as against the playground): the

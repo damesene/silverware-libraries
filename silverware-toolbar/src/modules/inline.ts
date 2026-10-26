@@ -17,7 +17,7 @@ function formatAction(format: Format, word: boolean): Action {
     keywords: format.keywords,
     active: (context) => isOn(on(context), format),
     enabled: (context) => canFormat(on(context), format),
-    run: (context) => {
+    edit: (context) => {
       const target = on(context);
       return target === context ? toggle(context, format) : keptCaret(context, toggle(target, format));
     },

@@ -125,16 +125,16 @@ export default (helpers) => [
   {
     name: "upper",
     label: "Upper case",
-    run: (context) => ({ from: context.from, to: context.to, text: context.text.slice(context.from, context.to).toUpperCase() }),
+    edit: (context) => ({ from: context.from, to: context.to, text: context.text.slice(context.from, context.to).toUpperCase() }),
   },
 ];
 ```
 
-Each is `actions.<name>` (one of a built-in action's name, `turnInto` or `clear`, replaces it). `run(context)` gets the page's `text`, the selection's `from` and `to`, and the `lines` it touches, and gives `{ from, to, text }`: the text replacing that part of the page (`helpers.cursor()` in it marks the cursor), or nothing. Also `icon`, `group` (else *Custom*), `keywords`, `enabled(context)` and `active(context)` (false: shown dimmed; true: shown pressed), `afterWrite`.
+Each is `actions.<name>` (one of a built-in action's name, `turnInto` or `clear`, replaces it). `edit(context)` gets the page's `text`, the selection's `from` and `to`, and the `lines` it touches, and gives `{ from, to, text }`: the text replacing that part of the page (`helpers.cursor()` in it marks the cursor), or nothing. Also `icon`, `group` (else *Custom*), `keywords`, `enabled(context)` and `active(context)` (false: shown dimmed; true: shown pressed), `afterWrite`.
 
-Instead of `run`, an action may offer `choices`: a list of actions, as *Turn into* does. In the toolbar it shows the choice that is `active` (its icon and label; none: its `mixed` text, else its label), and a click opens the list; in the list of every action it is one item that opens them, and the search finds them too.
+Instead of `edit`, an action may offer `choices`: a list of actions, as *Turn into* does. In the toolbar it shows the choice that is `active` (its icon and label; none: its `mixed` text, else its label), and a click opens the list; in the list of every action it is one item that opens them, and the search finds them too.
 
-Or, instead of `run`, `perform(context, editor)` does something that is no change of the text: the toolbar writes nothing for it. `editor` has `invokeCommand(name)` (runs a SilverBullet command), `navigate(page)` (opens a page), `flash(message, type)` (a notification) and `select(from, to)`; `perform` may be `async`, and a mistake it throws is shown. An action has one of `run`, `perform` and `choices`.
+Or, instead of `edit`, `perform(context, editor)` does something that is no change of the text: the toolbar writes nothing for it. `editor` has `invokeCommand(name)` (runs a SilverBullet command), `navigate(page)` (opens a page), `flash(message, type)` (a notification) and `select(from, to)`; `perform` may be `async`, and a mistake it throws is shown. An action has one of `edit`, `perform` and `choices`.
 
 ```js
 {

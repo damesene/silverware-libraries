@@ -15,7 +15,7 @@ function turnAction(format: Format): Action {
     keywords: ["turn into", "convert", ...format.keywords],
     active: (context) => blockFormatOf(context) === format,
     enabled: canTurn,
-    run: (context) => turnInto(context, format),
+    edit: (context) => turnInto(context, format),
   };
 }
 

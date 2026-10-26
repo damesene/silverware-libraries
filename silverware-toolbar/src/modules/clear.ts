@@ -18,7 +18,7 @@ export function clearModule(host: ModuleHost = {}): ToolbarModule {
         group: "Format",
         keywords: ["remove", "plain", "reset", "vymazat formát"],
         enabled: (context) => canClear(on(context)),
-        run: (context) => (word ? keptCaret(context, clear(asWord(context))) : clear(context)),
+        edit: (context) => (word ? keptCaret(context, clear(asWord(context))) : clear(context)),
       },
     ],
   };

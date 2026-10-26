@@ -2,7 +2,7 @@
 // defined in a JS file of the space and given from Space Lua
 // (silverware.toolbar.defineActions on the library page), as formats are: a
 // definition, a function given HELPERS returning one or a list, or a list.
-// An action gets the selection's context and gives the text replacing a part
+// An action's `edit` gets the selection's context and gives the text replacing a part
 // of the page (`helpers.cursor()` marking the selection after it); what it
 // gives or throws is checked when it runs, a mistake shown, nothing written.
 // Or it does something (`perform`: a command run, a page opened) with the
@@ -24,7 +24,7 @@ export type ActionDefinition = {
   readonly active?: (context: Context) => boolean;
   readonly enabled?: (context: Context) => boolean;
   // What it does; or instead, a list of actions to pick from (`choices`), the one on shown in the toolbar (none: `mixed`)
-  readonly run?: (context: Context) => Edit | undefined;
+  readonly edit?: (context: Context) => Edit | undefined;
   // Instead: something it does, awaited (a promise may be given)
   readonly perform?: (context: Context, editor: ActionEditor) => unknown;
   // false: not listed as the popup opens, found by its search only
@@ -76,12 +76,12 @@ function actionOf(definition: unknown): Action | string {
   if (icon !== undefined && typeof icon !== "string") return "its icon is not text (an SVG)";
   if (group !== undefined && typeof group !== "string") return "its group is not text";
   if (keywords !== undefined && !(Array.isArray(keywords) && keywords.every((k) => typeof k === "string"))) return "its keywords are not a list of texts";
-  for (const fn of ["active", "enabled", "run", "perform", "afterWrite"] as const) if (d[fn] !== undefined && typeof d[fn] !== "function") return `its ${fn} is not a function`;
-  const { active, enabled, run, perform, afterWrite } = d;
+  for (const fn of ["active", "enabled", "edit", "perform", "afterWrite"] as const) if (d[fn] !== undefined && typeof d[fn] !== "function") return `its ${fn} is not a function`;
+  const { active, enabled, edit, perform, afterWrite } = d;
   if (listed !== undefined && typeof listed !== "boolean") return "its listed is not true or false";
-  const kinds = [run, perform, choices].filter((k) => k !== undefined).length;
-  if (kinds > 1) return "it has more than one of run, perform and choices";
-  if (kinds === 0) return "it has none of run, perform and choices";
+  const kinds = [edit, perform, choices].filter((k) => k !== undefined).length;
+  if (kinds > 1) return "it has more than one of edit, perform and choices";
+  if (kinds === 0) return "it has none of edit, perform and choices";
   const shown = listed === false ? { listed: false } : {};
   if (mixed !== undefined && typeof mixed !== "string") return "its mixed is not text";
   if (choices !== undefined) {
@@ -109,17 +109,17 @@ function actionOf(definition: unknown): Action | string {
       },
     };
   }
-  if (!run) return "it has none of run, perform and choices";
+  if (!edit) return "it has none of edit, perform and choices";
   return {
     ...base(name, label, icon, group, keywords, active, enabled),
     ...shown,
-    run: (context) => {
-      const edit = call(name, "run", () => run(context));
-      if (edit === undefined) return undefined;
-      if (!isEdit(edit, context.text.length)) throw new Error(`${name}'s run did not give { from, to, text } within the page`);
-      const change: Change = { from: edit.from, to: edit.to, insert: edit.text };
+    edit: (context) => {
+      const given = call(name, "edit", () => edit(context));
+      if (given === undefined) return undefined;
+      if (!isEdit(given, context.text.length)) throw new Error(`${name}'s edit did not give { from, to, text } within the page`);
+      const change: Change = { from: given.from, to: given.to, insert: given.text };
       if (!afterWrite) return change;
-      return { ...change, after: (editor, text) => call(name, "afterWrite", () => afterWrite({ text }, { select: (a, b) => editor.select(edit.from + a, edit.from + b) })) };
+      return { ...change, after: (editor, text) => call(name, "afterWrite", () => afterWrite({ text }, { select: (a, b) => editor.select(given.from + a, given.from + b) })) };
     },
   };
 }
@@ -133,7 +133,7 @@ function base(
   keywords: readonly string[] | undefined,
   active: ActionDefinition["active"],
   enabled: ActionDefinition["enabled"],
-): Omit<Action, "run" | "perform" | "choices"> {
+): Omit<Action, "edit" | "perform" | "choices"> {
   return {
     id: `actions.${name}`,
     label,

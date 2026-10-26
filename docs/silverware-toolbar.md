@@ -70,7 +70,7 @@ usable without a mouse.
   (`silverware.toolbar.modules.<name>.enabled`) is not loaded.
 - **A module** gives actions: `id`, `label`, `icon`, `keywords` (search),
   `menu` (its group: *Format*, *Turn into*, *Insert*…), `active(context)` (shown
-  as on: bold already), `enabled(context)`, `run(context, host)`. It knows
+  as on: bold already), `enabled(context)`, `edit(context)` (named `run` at first, renamed on 2026-10-26: it gives a change of the text; `perform` does something else). It knows
   nothing of what shows it: the toolbar, the popup, later a palette or a menu.
 - **Favourites**: `silverware.toolbar.favorites`, the ids of the actions shown
   as icons, in their order.
@@ -252,7 +252,7 @@ silverware.toolbar.defineActions(js.importFromSpace("Library/my-actions.js"))
 As the table's `defineFunctions`: the priority-50 API block; each load of
 Space Lua replaces the definitions before; a mistake is a notification.
 `defineActions` takes actions with code that are no format:
-`{ name, label, icon, group, run(context) → change }`, `afterWrite` too.
+`{ name, label, icon, group, edit(context) → change }` (or `perform(context, editor)`, `listed`), `afterWrite` too.
 
 Built as decided, with these details: a block format's `read` is always one
 line (only `write` is `multiline`: a line's format must be told line by

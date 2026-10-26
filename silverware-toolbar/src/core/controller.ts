@@ -228,12 +228,12 @@ export class Controller {
       await this.perform(action, context);
       return;
     }
-    if (!context || !this.state(action, context).enabled || !action.run) {
+    if (!context || !this.state(action, context).enabled || !action.edit) {
       this.focusEditor();
       return;
     }
     try {
-      const change = action.run(context);
+      const change = action.edit(context);
       if (change) await this.write(change, context);
     } catch (e) {
       void this.bridge.flash(`Silverware Toolbar: ${action.label} failed: ${e instanceof Error ? e.message : String(e)}`, "error");

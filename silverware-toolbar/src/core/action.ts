@@ -60,8 +60,8 @@ export type Action = {
   readonly active?: (context: Context) => boolean;
   // Offered (else shown dimmed, not run)
   readonly enabled?: (context: Context) => boolean;
-  // What it changes; undefined: nothing. A throw is shown as the action failing
-  readonly run?: (context: Context) => Change | undefined;
+  // The change it makes of the page's text, which the core writes; undefined: nothing. A throw is shown as the action failing
+  readonly edit?: (context: Context) => Change | undefined;
   // Instead of a change: something it does (a SilverBullet command, a page opened), the editor focused first, with the
   // selection's context and the editor's API; a throw or a rejection is shown as it failing
   readonly perform?: (context: Context, editor: ActionEditor) => unknown;

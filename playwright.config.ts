@@ -8,8 +8,8 @@
 // - playground (npm run test:ui, the default): the page that mocks SilverBullet.
 //   It bundles silverware-table/src, so the tests run the sources, not the
 //   committed silverware-table.js (npm run verify checks that one matches them).
-// - silverbullet (npm run test:ui:sb): a real SilverBullet in Docker, its latest
-//   release (scripts/silverbullet.mjs), the committed silverware-table.js
+// - silverbullet (npm run test:ui:sb): a real SilverBullet in Docker, the version
+//   scripts/silverbullet/Dockerfile names (scripts/silverbullet.mjs), the committed silverware-table.js
 //   deployed into its space, as a user installs it. One server per worker, each
 //   with a space of its own, as settings are a space's (scripts/silverbullet-servers.ts;
 //   SW_SB_WORKERS how many, else up to 4 by the machine's cores). Tests tagged

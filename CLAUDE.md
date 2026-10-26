@@ -14,7 +14,7 @@ npm test             # vitest (unit tests and jsdom UI tests)
 npm run test:ui:install  # once: Playwright's Chromium (the version it pins), which the UI tests run in
 npm run test:ui      # Playwright: interactions in its Chromium against the playground, which it starts on port 8010
 npm run test:ui:open # the same in Playwright's window: tests picked and run one by one, each step's page to look at
-npm run test:ui:sb   # the same tests against a real SilverBullet (Docker, its latest release; SB_IMAGE another), the committed .js deployed; options after -- (--ui, -g)
+npm run test:ui:sb   # the same tests against a real SilverBullet (Docker, the version scripts/silverbullet/Dockerfile names; SB_IMAGE another), the committed .js deployed; options after -- (--ui, -g)
 npm run check        # tsc
 npm run playground   # http://localhost:8000/: Silverware Table without SilverBullet, on mock data
 npm run deploy -- <space folder>   # copy the library into a local space

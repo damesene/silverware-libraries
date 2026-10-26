@@ -26,6 +26,8 @@ export type Bridge = {
   // Optional, for the commands module: SilverBullet's commands (system.listCommands: definitions by name) and running one
   readonly listCommands?: () => unknown;
   readonly invokeCommand?: (name: string) => unknown;
+  // Optional, for actions that open a page: editor.navigate
+  readonly navigate?: (page: string) => unknown;
   // Optional: one of SilverBullet's UI options (editor.getUiOption: `keyboardBar`, its bar over the on-screen keyboard)
   readonly getUiOption?: (key: string) => unknown;
 };

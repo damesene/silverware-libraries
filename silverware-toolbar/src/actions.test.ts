@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { actionsOf, customActionsAnew, defineCustomActions, resetCustomActions, withCustomActions } from "./actions.ts";
-import type { Action } from "./core/action.ts";
+import type { Action, ActionEditor, Context } from "./core/action.ts";
 import { contextOf } from "./core/context.ts";
 
 afterEach(() => resetCustomActions());
@@ -35,10 +35,29 @@ describe("Custom actions", () => {
 
   it("are refused with what is wrong; a run giving the wrong thing or failing fails the action", () => {
     const { actions, problems } = actionsOf([{ name: "x" }, { name: "y", label: "Y" }, { name: "bad", label: "Bad", run: () => ({ from: 0, to: 99, text: "" }) }]);
-    expect(problems).toEqual(["action x: it has no label", "action y: it has neither run nor choices"]);
+    expect(problems).toEqual(["action x: it has no label", "action y: it has none of run, perform and choices"]);
     expect(() => actions[0]!.run!(contextOf("abc", 0, 1))).toThrow("bad's run did not give { from, to, text } within the page");
     const failing = actionsOf({ name: "boom", label: "Boom", run: () => { throw new Error("no"); } }).actions[0]!;
     expect(() => failing.run!(contextOf("abc", 0, 1))).toThrow("boom's run failed: no");
+  });
+
+  it("perform: something done with the context and the editor's API, awaited; its failure named; not with run too", async () => {
+    const done: string[] = [];
+    const editor: ActionEditor = { invokeCommand: async (name) => void done.push(`command ${name}`), navigate: async (page) => void done.push(`open ${page}`), flash: () => {}, select: () => {} };
+    const { actions, problems } = actionsOf([
+      { name: "open", label: "Open selected", listed: false, perform: async (c: Context, e: ActionEditor) => e.navigate(c.text.slice(c.from, c.to)) },
+      { name: "both", label: "Both", run: () => undefined, perform: () => undefined },
+      { name: "shown", label: "Shown", listed: "no", perform: () => undefined },
+      { name: "boom", label: "Boom", perform: async () => { throw new Error("no page"); } },
+    ]);
+    expect(problems).toEqual(["action both: it has more than one of run, perform and choices", "action shown: its listed is not true or false"]);
+    const [open, boom] = actions;
+    expect(open!.listed).toBe(false);
+    expect(open!.run).toBeUndefined();
+    await open!.perform!(contextOf("see Notes here", 4, 9), editor);
+    expect(done).toEqual(["open Notes"]);
+    expect(boom!.listed).toBeUndefined();
+    await expect(boom!.perform!(contextOf("x", 0, 0), editor)).rejects.toThrow("boom's perform failed: no page");
   });
 
   it("offer choices: a list as Turn into is, each choice an action of its own", () => {

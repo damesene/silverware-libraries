@@ -102,6 +102,8 @@ void init({
     "Navigate: Home": { name: "Navigate: Home" },
     "Hidden command": { name: "Hidden command", hide: true },
   }),
+  // No pages to open here: said so
+  navigate: (page) => flash(`Playground: would open ${page}`),
   invokeCommand: (name) => {
     if (name !== "Text: Bold") {
       flash(`Playground: would run ${name}`);

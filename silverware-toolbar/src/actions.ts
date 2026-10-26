@@ -5,7 +5,10 @@
 // An action gets the selection's context and gives the text replacing a part
 // of the page (`helpers.cursor()` marking the selection after it); what it
 // gives or throws is checked when it runs, a mistake shown, nothing written.
-import type { Action, Change, Context } from "./core/action.ts";
+// Or it does something (`perform`: a command run, a page opened) with the
+// editor's API the core gives, nothing written by the core; or it offers
+// choices. `listed: false`: found by the popup's search only.
+import type { Action, ActionEditor, Change, Context } from "./core/action.ts";
 import { HELPERS, message } from "./formats/index.ts";
 import { letters } from "./icons.ts";
 
@@ -22,6 +25,10 @@ export type ActionDefinition = {
   readonly enabled?: (context: Context) => boolean;
   // What it does; or instead, a list of actions to pick from (`choices`), the one on shown in the toolbar (none: `mixed`)
   readonly run?: (context: Context) => Edit | undefined;
+  // Instead: something it does, awaited (a promise may be given)
+  readonly perform?: (context: Context, editor: ActionEditor) => unknown;
+  // false: not listed as the popup opens, found by its search only
+  readonly listed?: boolean;
   readonly choices?: readonly ActionDefinition[];
   readonly mixed?: string;
   readonly afterWrite?: (written: { readonly text: string }, editor: { select(from: number, to: number): void }) => void;
@@ -63,14 +70,19 @@ export function actionsOf(definitions: unknown): { actions: Action[]; problems: 
 function actionOf(definition: unknown): Action | string {
   if (!isObject(definition)) return "not an object";
   const d = definition as Partial<ActionDefinition>;
-  const { name, label, icon, group, keywords, choices, mixed } = d;
+  const { name, label, icon, group, keywords, choices, mixed, listed } = d;
   if (typeof name !== "string" || !NAME_RE.test(name)) return `its name ${JSON.stringify(name)} is not letters, digits and _ starting with a letter`;
   if (typeof label !== "string" || !label) return "it has no label";
   if (icon !== undefined && typeof icon !== "string") return "its icon is not text (an SVG)";
   if (group !== undefined && typeof group !== "string") return "its group is not text";
   if (keywords !== undefined && !(Array.isArray(keywords) && keywords.every((k) => typeof k === "string"))) return "its keywords are not a list of texts";
-  for (const fn of ["active", "enabled", "run", "afterWrite"] as const) if (d[fn] !== undefined && typeof d[fn] !== "function") return `its ${fn} is not a function`;
-  const { active, enabled, run, afterWrite } = d;
+  for (const fn of ["active", "enabled", "run", "perform", "afterWrite"] as const) if (d[fn] !== undefined && typeof d[fn] !== "function") return `its ${fn} is not a function`;
+  const { active, enabled, run, perform, afterWrite } = d;
+  if (listed !== undefined && typeof listed !== "boolean") return "its listed is not true or false";
+  const kinds = [run, perform, choices].filter((k) => k !== undefined).length;
+  if (kinds > 1) return "it has more than one of run, perform and choices";
+  if (kinds === 0) return "it has none of run, perform and choices";
+  const shown = listed === false ? { listed: false } : {};
   if (mixed !== undefined && typeof mixed !== "string") return "its mixed is not text";
   if (choices !== undefined) {
     if (!Array.isArray(choices) || !choices.length) return "its choices are not a list of actions";
@@ -79,13 +91,28 @@ function actionOf(definition: unknown): Action | string {
     if (wrong >= 0) return `its choice ${wrong + 1}: ${own[wrong] as string}`;
     return {
       ...base(name, label, icon, group, keywords, active, enabled),
+      ...shown,
       choices: own as Action[],
       ...(mixed ? { mixed } : {}),
     };
   }
-  if (!run) return "it has neither run nor choices";
+  if (perform) {
+    return {
+      ...base(name, label, icon, group, keywords, active, enabled),
+      ...shown,
+      perform: async (context, editor) => {
+        try {
+          await perform(context, editor);
+        } catch (e) {
+          throw new Error(`${name}'s perform failed: ${message(e)}`);
+        }
+      },
+    };
+  }
+  if (!run) return "it has none of run, perform and choices";
   return {
     ...base(name, label, icon, group, keywords, active, enabled),
+    ...shown,
     run: (context) => {
       const edit = call(name, "run", () => run(context));
       if (edit === undefined) return undefined;
@@ -106,7 +133,7 @@ function base(
   keywords: readonly string[] | undefined,
   active: ActionDefinition["active"],
   enabled: ActionDefinition["enabled"],
-): Omit<Action, "run" | "choices"> {
+): Omit<Action, "run" | "perform" | "choices"> {
   return {
     id: `actions.${name}`,
     label,

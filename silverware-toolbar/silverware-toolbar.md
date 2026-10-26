@@ -134,6 +134,19 @@ Each is `actions.<name>` (one of a built-in action's name, `turnInto` or `clear`
 
 Instead of `run`, an action may offer `choices`: a list of actions, as *Turn into* does. In the toolbar it shows the choice that is `active` (its icon and label; none: its `mixed` text, else its label), and a click opens the list; in the list of every action it is one item that opens them, and the search finds them too.
 
+Or, instead of `run`, `perform(context, editor)` does something that is no change of the text: the toolbar writes nothing for it. `editor` has `invokeCommand(name)` (runs a SilverBullet command), `navigate(page)` (opens a page), `flash(message, type)` (a notification) and `select(from, to)`; `perform` may be `async`, and a mistake it throws is shown. An action has one of `run`, `perform` and `choices`.
+
+```js
+{
+  name: "openSelected",
+  label: "Open the page selected",
+  listed: false,
+  perform: (context, editor) => editor.navigate(context.text.slice(context.from, context.to)),
+}
+```
+
+`listed: false` keeps an action out of the list of every action as it opens: typing in its search finds it (SilverBullet's commands are so). It can be a favourite all the same.
+
 ## Implementation
 
 ```space-lua
@@ -271,6 +284,8 @@ if js and js.window then
     -- The commands module: SilverBullet's commands, run on the editor's selection
     listCommands = system.listCommands,
     invokeCommand = editor.invokeCommand,
+    -- Actions that open a page (custom ones' perform)
+    navigate = editor.navigate,
     -- Whether SilverBullet's keyboard bar is on (the settings offer to turn it off on a phone)
     getUiOption = editor.getUiOption,
   })

@@ -17,6 +17,17 @@ export type Context = {
   readonly lines: readonly Line[];
 };
 
+/** What an action that does something (`perform`) may use of the editor, through the core; each may be awaited */
+export type ActionEditor = {
+  // A SilverBullet command run, by its name
+  invokeCommand(name: string): Promise<void>;
+  // A page opened, by its name (a link's: `Page#heading` too)
+  navigate(page: string): Promise<void>;
+  flash(message: string, type?: "info" | "error"): void;
+  // The selection set, positions in the page's text
+  select(from: number, to: number): void;
+};
+
 /** What an action may do once its change is written: the core's editor, positions in the page's text */
 export type Editor = {
   select(from: number, to: number): void;
@@ -51,8 +62,9 @@ export type Action = {
   readonly enabled?: (context: Context) => boolean;
   // What it changes; undefined: nothing. A throw is shown as the action failing
   readonly run?: (context: Context) => Change | undefined;
-  // Instead of a change: something it does (a SilverBullet command), the editor focused first; a throw or a rejection is shown as it failing
-  readonly perform?: () => unknown;
+  // Instead of a change: something it does (a SilverBullet command, a page opened), the editor focused first, with the
+  // selection's context and the editor's API; a throw or a rejection is shown as it failing
+  readonly perform?: (context: Context, editor: ActionEditor) => unknown;
   // false: found by the popup's search only, not listed as it opens (there are many: the commands)
   readonly listed?: boolean;
   // Instead of running: a list to pick from (Turn into: the block formats). The toolbar shows the choice on

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { ActionEditor } from "../core/action.ts";
+import { contextOf } from "../core/context.ts";
 import { commandActions, commandsModule } from "./commands.ts";
+
+const EDITOR: ActionEditor = { invokeCommand: async () => {}, navigate: async () => {}, flash: () => {}, select: () => {} };
 
 describe("The commands module", () => {
   it("makes an action of each command SilverBullet lists, by name, hidden ones and what is no command left out", () => {
@@ -12,7 +16,7 @@ describe("The commands module", () => {
       ["commands.Navigate: Home", "Navigate: Home", "Commands", false],
       ["commands.Text: Bold", "Text: Bold", "Commands", false],
     ]);
-    actions[1]!.perform!();
+    actions[1]!.perform!(contextOf("", 0, 0), EDITOR);
     expect(run).toEqual(["Text: Bold"]);
     expect(commandActions(undefined, () => undefined)).toEqual([]);
   });

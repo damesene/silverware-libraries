@@ -12,7 +12,7 @@
 import type { Bridge, Settings } from "../bridge.ts";
 import { keyboardBarTop, pageContentOf, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
-import type { Action, Change, Context } from "./action.ts";
+import type { Action, ActionEditor, Change, Context } from "./action.ts";
 import { Bar, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
 import { marked } from "./cursor.ts";
@@ -225,7 +225,7 @@ export class Controller {
     }
     const context = await this.read();
     if (context && action.perform && this.state(action, context).enabled) {
-      await this.perform(action);
+      await this.perform(action, context);
       return;
     }
     if (!context || !this.state(action, context).enabled || !action.run) {
@@ -244,11 +244,25 @@ export class Controller {
   }
 
   /** Something an action does that is no change (a command): the editor focused first, as it is what it acts on; the toolbar shown again after */
-  private async perform(action: Action): Promise<void> {
+  private async perform(action: Action, context: Context): Promise<void> {
     this.hideBar();
     this.focusEditor();
+    const { bridge } = this;
+    const missing = (what: string) => new Error(`the library page did not hand over ${what}`);
+    const editor: ActionEditor = {
+      invokeCommand: async (name) => {
+        if (!bridge.invokeCommand) throw missing("invokeCommand");
+        await bridge.invokeCommand(name);
+      },
+      navigate: async (page) => {
+        if (!bridge.navigate) throw missing("navigate");
+        await bridge.navigate(page);
+      },
+      flash: (message, type) => void bridge.flash(message, type),
+      select: (from, to) => void bridge.setSelection(from, to),
+    };
     try {
-      await action.perform!();
+      await action.perform!(context, editor);
     } catch (e) {
       void this.bridge.flash(`Silverware Toolbar: ${action.label} failed: ${e instanceof Error ? e.message : String(e)}`, "error");
     }

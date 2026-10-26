@@ -88,6 +88,14 @@ describe("Inline formats", () => {
     expect(run("- «**one**\n- two»")).toBe("- «**one**\n- **two»**");
   });
 
+  it("over lines, toggled twice, are back as they were: the selection after the first holds the markers of the lines it goes past", () => {
+    const once = run("Plain «paragraph one.\nPlain paragrap»h two");
+    expect(once).toBe("Plain **«paragraph one.**\n**Plain paragrap»**h two");
+    expect(on(once)).toBe(true);
+    expect(run(once)).toBe("Plain «paragraph one.\nPlain paragrap»h two");
+    expect(run(run(once, ITALIC), ITALIC)).toBe(once);
+  });
+
   it("tell italic's * from bold's **", () => {
     expect(on("a *«x»* b", ITALIC)).toBe(true);
     expect(on("a **«x»** b", ITALIC)).toBe(false);

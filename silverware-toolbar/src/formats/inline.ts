@@ -95,6 +95,18 @@ function wrapping(text: string, from: number, to: number, markers: readonly stri
     }
     const head = groups(text, from, 1, chars)[0];
     const tail = groups(text, to, -1, chars)[0];
+    // One marker outside the part, the other inside its end: a selection over lines formatted before holds the
+    // markers of the lines it goes on past (`one.**` on the first, `**Two` on the next)
+    const outsideBefore = before[0];
+    const outsideAfter = after[0];
+    if (outsideBefore?.ch === ch && tail?.ch === ch && fits(marker, outsideBefore.length) && fits(marker, tail.length) && tail.start > from) {
+      const core = text.slice(from, tail.start);
+      if (core.trim() !== "" && !closes(core, marker)) return { marker, left: outsideBefore.start + outsideBefore.length - n, right: tail.start + tail.length - n };
+    }
+    if (head?.ch === ch && outsideAfter?.ch === ch && fits(marker, head.length) && fits(marker, outsideAfter.length) && head.start + head.length < to) {
+      const core = text.slice(head.start + head.length, to);
+      if (core.trim() !== "" && !closes(core, marker)) return { marker, left: head.start, right: outsideAfter.start };
+    }
     if (!head || !tail || head.ch !== ch || tail.ch !== ch || head.start + head.length > tail.start) continue;
     if (!fits(marker, head.length) || !fits(marker, tail.length)) continue;
     const core = text.slice(head.start + head.length, tail.start);

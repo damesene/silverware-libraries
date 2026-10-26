@@ -45,7 +45,38 @@ export type Dialog = {
   close(): void;
 };
 
-type Shown = { readonly backdrop: HTMLElement; readonly returnFocus: Element | null; readonly options: DialogOptions };
+type Shown = { readonly backdrop: HTMLElement; readonly returnFocus: Element | null; readonly options: DialogOptions; readonly unfollow: () => void };
+
+/**
+ * The part of the window the visual viewport shows (what an on-screen keyboard
+ * leaves) on the backdrop, as `--sw-view-top` and `--sw-view-height`, kept as
+ * it changes: a plugin's CSS fits its dialog in it (a phone's keyboard hid its
+ * bottom, the list of a search under its field too). Focused, a field (with
+ * what holds it marked `data-sw-reveal`) is scrolled into what is left once
+ * the keyboard has come
+ */
+function followView(backdrop: HTMLElement): () => void {
+  const win = backdrop.ownerDocument.defaultView;
+  const view = win?.visualViewport;
+  if (!win || !view) return () => undefined;
+  const place = () => {
+    backdrop.style.setProperty("--sw-view-top", `${view.offsetTop}px`);
+    backdrop.style.setProperty("--sw-view-height", `${view.height}px`);
+    const active = backdrop.ownerDocument.activeElement;
+    if (active instanceof HTMLElement && backdrop.contains(active) && active.matches("input, textarea")) {
+      // With what belongs to it (a search's list), where the caller marks that
+      const shown = active.closest<HTMLElement>("[data-sw-reveal]") ?? active;
+      win.requestAnimationFrame(() => shown.scrollIntoView?.({ block: "nearest" }));
+    }
+  };
+  place();
+  view.addEventListener("resize", place);
+  view.addEventListener("scroll", place);
+  return () => {
+    view.removeEventListener("resize", place);
+    view.removeEventListener("scroll", place);
+  };
+}
 
 export class Dialogs {
   private shown: Shown | undefined;
@@ -110,7 +141,7 @@ export class Dialogs {
         void this.dismiss();
       }
     });
-    const shown: Shown = { backdrop, returnFocus: doc.activeElement, options };
+    const shown: Shown = { backdrop, returnFocus: doc.activeElement, options, unfollow: followView(backdrop) };
     this.shown = shown;
     doc.body.append(backdrop);
     (options.focus ?? dialog).focus({ preventScroll: true });
@@ -135,6 +166,7 @@ export class Dialogs {
     const shown = this.shown;
     if (!shown) return;
     this.shown = undefined;
+    shown.unfollow();
     shown.backdrop.remove();
     if (shown.returnFocus instanceof HTMLElement && shown.returnFocus.isConnected) shown.returnFocus.focus({ preventScroll: true });
     shown.options.closed?.();

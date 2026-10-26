@@ -132,6 +132,26 @@ test.describe("The toolbar on a phone", () => {
     expect(await text(page)).toBe(before);
   });
 
+  test("the settings' search of actions stays in view with its list as the keyboard takes the window's bottom", async ({ page }) => {
+    await selectByTouch(page, "some text");
+    await bar(page).locator(".swb-more").tap();
+    await popup(page).locator(".swb-search-field").fill("settings");
+    await page.keyboard.press("Enter");
+    const dialog = page.locator(".swb-settings");
+    await dialog.locator('[data-swb-tab="favorites"]').tap();
+    await dialog.locator('[data-swb-row="1"] .swb-settings-add').tap();
+    await expect(dialog.locator(".swb-settings-pick-field")).toBeFocused();
+    // The keyboard: the view half as tall (the emulation shows none)
+    const view = page.viewportSize()!;
+    await page.setViewportSize({ width: view.width, height: Math.round(view.height / 2) });
+    const list = dialog.locator(".swb-settings-pick-list");
+    await expect.poll(async () => {
+      const box = (await list.boundingBox())!;
+      return box.y >= 0 && box.y + Math.min(box.height, 120) <= view.height / 2;
+    }).toBe(true);
+    await expect.poll(async () => (await dialog.boundingBox())!.height).toBeLessThanOrEqual(view.height / 2 + 1);
+  });
+
   test("over SilverBullet's keyboard bar where it shows", async ({ page }) => {
     // SilverBullet's bar over the keyboard (its main; client/components/keyboard_bar.tsx), as it is laid out at the window's bottom
     await page.evaluate(() => {

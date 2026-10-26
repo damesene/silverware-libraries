@@ -281,7 +281,10 @@ export class SettingsDialog {
       }),
     );
     panel.replaceChildren(...parts);
-    if (focus) panel.querySelector<HTMLElement>(focus)?.focus({ preventScroll: true });
+    const focused = focus ? panel.querySelector<HTMLElement>(focus) : null;
+    focused?.focus({ preventScroll: true });
+    // A search opened: in view with its list, above an on-screen keyboard already there
+    focused?.closest<HTMLElement>("[data-sw-reveal]")?.scrollIntoView?.({ block: "nearest" });
   }
 
   private itemElement(item: FavoriteItem, at: At, known: Map<string, Action>): HTMLElement {
@@ -291,6 +294,8 @@ export class SettingsDialog {
     element.dataset.swbItem = `${at.row}:${at.index}`;
     const icon = this.el("span", `${BASE}-item-icon`);
     const name = this.el("span", `${BASE}-item-name`);
+    // A kind's slots, on a line of their own under its name (beside it they crowded a phone's width)
+    let slots: HTMLElement | undefined;
     if (isSeparator(item)) {
       element.classList.add(`${BASE}-separator`);
       name.textContent = "Separator";
@@ -302,10 +307,14 @@ export class SettingsDialog {
         icon.innerHTML = kind?.icon ?? "";
         name.textContent = kind?.label ?? item.type;
         element.append(icon, name);
+        element.classList.add(`${BASE}-kind`);
         if (!kind) {
           element.classList.add(`${BASE}-unknown`);
           element.title = `No module turned on gives the kind ${item.type}: the toolbar leaves it out`;
-        } else element.append(...kind.slots.map((slot) => this.slotButton(item, at, slot, known)));
+        } else {
+          slots = this.el("div", `${BASE}-slots`);
+          slots.append(...kind.slots.map((slot) => this.slotButton(item, at, slot, known)));
+        }
       } else {
         const action = known.get(item.id);
         icon.innerHTML = action?.icon ?? "";
@@ -323,6 +332,7 @@ export class SettingsDialog {
     }
     element.setAttribute("aria-label", `${name.textContent}, row ${at.row + 1}, item ${at.index + 1}`);
     element.append(this.button(`${BASE}-remove`, `Remove ${name.textContent}`, () => this.edit(removeItem(this.values!.favorites, at), `[data-swb-row="${at.row}"] .${BASE}-add`), ICONS.close));
+    if (slots) element.append(slots);
     element.addEventListener("keydown", (e) => {
       if (e.target !== element) return;
       if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown")) {
@@ -432,6 +442,8 @@ export class SettingsDialog {
     const row = forRow ? target.row : target.at.row;
     const slot = forRow ? undefined : this.kindOf(target.at)?.slots.find((s) => s.key === target.key);
     const picker = this.el("div", `${BASE}-picker`);
+    // Scrolled into view with its list as its field is focused and the on-screen keyboard comes (shared/dialog.ts)
+    picker.dataset.swReveal = "";
     const field = this.el("input", `${BASE}-pick-field`);
     field.type = "text";
     field.placeholder = slot ? `Search an action for ${slot.label}` : "Search actions";

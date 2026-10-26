@@ -629,9 +629,13 @@ end
 
 /* The settings dialog (Silverware Toolbar settings…, "Silverware Toolbar: Settings"):
    Silverware Table's settings' look, tabs, rows in cards, switches */
+/* Over the part of the window an on-screen keyboard leaves (shared/dialog.ts sets where it is) */
 .swb-settings-backdrop {
   position: fixed;
   inset: 0;
+  top: var(--sw-view-top, 0);
+  bottom: auto;
+  height: var(--sw-view-height, 100%);
   z-index: 100;
   display: flex;
   align-items: center;
@@ -647,7 +651,7 @@ end
   flex-direction: column;
   width: min(600px, calc(100vw - 24px));
   max-height: calc(100vh - 32px);
-  max-height: calc(100dvh - 32px);
+  max-height: calc(var(--sw-view-height, 100dvh) - 32px);
   color: var(--root-color);
   background: var(--root-background-color);
   border: 1px solid var(--swb-settings-line);
@@ -887,7 +891,7 @@ end
   .swb-settings {
     width: 100vw;
     height: 100vh;
-    height: 100dvh;
+    height: var(--sw-view-height, 100dvh);
     max-height: none;
     border: 0;
     border-radius: 0;
@@ -1096,13 +1100,33 @@ end
   width: 16px;
   height: 16px;
 }
+/* A kind's item (the gesture button): its name, look and × on the first line, its slots under them,
+   side by side where they fit, else one under another (a phone) */
+.swb-settings-item.swb-settings-kind {
+  flex-wrap: wrap;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.swb-settings-kind .swb-settings-item-name {
+  flex: 1 1 auto;
+}
+.swb-settings-slots {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  padding-bottom: 2px;
+}
 /* A slot of a kind's item (the gesture button's Click, Swipe up): the action picked for it */
 .swb-settings-slot {
   display: inline-flex !important;
+  flex: 1 1 200px;
   align-items: center;
   gap: 4px;
-  max-width: 180px;
-  padding: 2px 6px;
+  min-width: 0;
+  min-height: 30px;
+  padding: 2px 8px;
   font: inherit;
   color: inherit;
   background: none;
@@ -1122,6 +1146,8 @@ end
   opacity: 0.7;
 }
 .swb-settings-slot-name {
+  flex: none;
+  white-space: nowrap;
   font-size: 11px;
   opacity: 0.65;
 }

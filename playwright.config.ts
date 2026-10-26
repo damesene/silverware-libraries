@@ -62,21 +62,16 @@ export default defineConfig({
     { name: "touch", testMatch: /touch\.spec\.ts/, use: { ...devices["Pixel 7"] } },
   ],
   webServer: silverbullet
-    ? servers.map(({ port, space }) => ({
+    ? {
+        // One command for them all, which starts them at once (Playwright starts its web servers one after another)
         command: "node scripts/silverbullet.mjs",
-        env: {
-          PORT: String(port),
-          SW_SB_SPACE: space,
-          // SW_SB_LOGS: a folder each server's output is written to as well
-          ...(process.env.SW_SB_LOGS ? { SW_SB_LOG: join(process.env.SW_SB_LOGS, `server-${port}.log`) } : {}),
-        },
-        url: `http://127.0.0.1:${port}/.ping`,
+        env: { SW_SB_SERVERS: JSON.stringify(servers) },
+        wait: { stdout: /SilverBullet servers ready/ },
         // Pulling the image the first time takes a while
         timeout: 180_000,
-        reuseExistingServer: false,
-        stdout: "pipe" as const,
-        gracefulShutdown: { signal: "SIGTERM" as const, timeout: 15_000 },
-      }))
+        stdout: "pipe",
+        gracefulShutdown: { signal: "SIGTERM", timeout: 15_000 },
+      }
     : {
         command: "node scripts/playground.mjs",
         env: { PORT: "8010" },

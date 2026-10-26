@@ -10,7 +10,7 @@
 import { settingRow, switchControl } from "../../../shared/controls.ts";
 import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
-import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut } from "../bridge.ts";
+import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
 import type { FavoriteItem, Favorites } from "../core/favorites.ts";
 import { type Entry, findEntries } from "../core/search.ts";
@@ -35,7 +35,7 @@ export type SettingsContext = {
   saved(): void;
 };
 
-type Values = { shortcut: string; placement: Placement; favorites: Favorites; modules: Record<ModuleName, boolean> };
+type Values = { shortcut: string; placement: Placement; show: Show; favorites: Favorites; modules: Record<ModuleName, boolean> };
 
 export class SettingsDialog {
   private readonly dialogs: Dialogs;
@@ -67,7 +67,7 @@ export class SettingsDialog {
     const { bridge } = this.context;
     const settings = await readSettings(bridge);
     const modules = Object.fromEntries(MODULE_NAMES.map((name) => [name, settings.modules.has(name)])) as Record<ModuleName, boolean>;
-    this.initial = { shortcut: await readShortcut(bridge), placement: settings.placement, favorites: settings.favorites, modules };
+    this.initial = { shortcut: await readShortcut(bridge), placement: settings.placement, show: settings.show, favorites: settings.favorites, modules };
     this.keyboardBar = await this.keyboardBarOn();
     this.values = { ...this.initial, favorites: settings.favorites.map((row) => [...row]), modules: { ...modules } };
     this.render();
@@ -134,7 +134,15 @@ export class SettingsDialog {
     });
     const placementRow = settingRow(doc, BASE, "Where the toolbar shows", "On a phone the system's menu of a selection (Cut, Copy, Paste) is where the toolbar would show by it: docked at the bottom, it is one row over the keyboard.", placement);
     placementRow.dataset.swbSetting = PATHS.placement;
-    card.append(keyRow, placementRow);
+    const show = this.el("select");
+    for (const value of SHOWS) show.append(new Option(SHOW_LABELS[value], value, false, value === values.show));
+    show.addEventListener("change", () => {
+      values.show = show.value as Show;
+      this.update();
+    });
+    const showRow = settingRow(doc, BASE, "When the toolbar shows", "Always: while you write, with nothing selected too (docked at the bottom, or by the cursor), its buttons the formats around the cursor.", show);
+    showRow.dataset.swbSetting = PATHS.show;
+    card.append(keyRow, placementRow, showRow);
     general.append(card);
     if (this.keyboardBar) general.append(this.keyboardBarNote());
 
@@ -436,6 +444,7 @@ export class SettingsDialog {
     const changed: Record<string, unknown> = {};
     if (values.shortcut !== initial.shortcut) changed[PATHS.shortcut] = values.shortcut;
     if (values.placement !== initial.placement) changed[PATHS.placement] = values.placement;
+    if (values.show !== initial.show) changed[PATHS.show] = values.show;
     const favorites = savedRows(values.favorites);
     if (!sameRows(favorites, initial.favorites)) changed[PATHS.favorites] = favorites;
     for (const name of MODULE_NAMES) if (values.modules[name] !== initial.modules[name]) changed[PATHS.module(name)] = values.modules[name];
@@ -444,7 +453,7 @@ export class SettingsDialog {
 
   /** Whether saving needs the page loaded anew: a module turned on or off, the key (the command's) */
   private reloads(changed: Readonly<Record<string, unknown>>): boolean {
-    return Object.keys(changed).some((path) => path !== PATHS.favorites && path !== PATHS.placement);
+    return Object.keys(changed).some((path) => path !== PATHS.favorites && path !== PATHS.placement && path !== PATHS.show);
   }
 
   private update(): void {

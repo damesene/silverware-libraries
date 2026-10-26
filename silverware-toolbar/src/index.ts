@@ -59,6 +59,7 @@ function sameSettings(running: Controller, settings: Settings): boolean {
   return (
     modules === [...settings.modules].sort().join() &&
     running.settings.placement === settings.placement &&
+    running.settings.show === settings.show &&
     JSON.stringify(running.shownFavorites) === JSON.stringify(settings.favorites)
   );
 }

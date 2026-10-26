@@ -17,7 +17,7 @@ Select text in a page and a toolbar shows beside it: make it bold, italic or cod
 * **Every action**: the **…** button, or **Ctrl-Shift-q**, opens a list of every action under the toolbar, with a search field. Type to find (each word you type starts a word of an action's name: `num` finds *Numbered list*, `h2` *Heading 2*), **↑ ↓** to pick (Tab and Shift-Tab too, PageUp and PageDown by five), **Enter** to apply, **Esc** to close the list (a second **Esc** hides the toolbar). *Turn into* is one item there: **Enter** (or **→**) or a click opens its block formats in its place, and **Esc**, **←** or the arrow at the top goes back; typing finds the block formats straight away. The command *Silverware Toolbar: Show actions* is the same.
 * **Without a selection**, **Ctrl-Shift-q** shows the toolbar at the cursor with the list open. Its icons show the formats around the cursor: in a link, *Link* is pressed, and clicking it takes the link off. Typing or moving the cursor hides it.
 * The key is a setting (*Key for every action*). In Firefox on Windows, **Ctrl-Shift-q** quits the browser: choose another key there.
-* **On a phone** (text selected by touch) the toolbar is docked at the bottom, over the keyboard, as one row you scroll sideways (**…** always at its end): the system's own menu (Cut, Copy, Paste) shows by the selection, where the toolbar would be. *Where the toolbar shows* (a setting) keeps it by the selection, or docked always. SilverBullet's own bar over the keyboard, where it is on, stays under it; the settings offer to turn that one off.
+* **On a phone** (text selected by touch) the toolbar is docked at the bottom, over the keyboard, as one row you scroll sideways (**…** always at its end): the system's own menu (Cut, Copy, Paste) shows by the selection, where the toolbar would be. *Where the toolbar shows* (a setting) keeps it by the selection, or docked always. On a phone it stays there while you write, with nothing selected too, its buttons showing the formats around the cursor; *When the toolbar shows* makes it always (also by the cursor on a computer) or only after selecting text. SilverBullet's own bar over the keyboard, where it is on, stays under it; the settings offer to turn that one off.
 
 ## Actions
 
@@ -60,11 +60,11 @@ In the **…** list, the star by an action puts it at the end of the toolbar's l
 
 *Silverware Toolbar settings…*, the last item of the **…** list (or the command *Silverware Toolbar: Settings*), opens the settings, for every page in the space:
 
-* **General**: the key for every action, as SilverBullet writes keys (`Ctrl-Shift-q`, `Alt-k`), and where the toolbar shows. On a phone with SilverBullet's keyboard bar on, it offers to turn that bar off (on that device, at once).
+* **General**: the key for every action, as SilverBullet writes keys (`Ctrl-Shift-q`, `Alt-k`), where and when the toolbar shows. On a phone with SilverBullet's keyboard bar on, it offers to turn that bar off (on that device, at once).
 * **Favorites**: the toolbar's rows, one under another. Drag an item within its row or into another, or with the keyboard: focus it (Tab) and press **Alt+←** or **Alt+→** to move it within its row, **Alt+↑** or **Alt+↓** into the row above or below, **Delete** to remove it. The button beside an action's name shows it as its icon or with its name too; **×** removes it. **Add** searches every action (and a separator) to add at the row's end; **Add row** adds a row. A row left empty is left out. An item no action has is dimmed, named by its id.
 * **Modules**: each part of the toolbar on or off (its actions with it).
 
-Nothing changes until **Save**. The favourites and where the toolbar shows apply at once; a module or the key needs the page loaded again (**Save and reload**). They are saved in your `CONFIG` page: the key and the modules in the block SilverBullet's own settings (*Configuration: Open*) keep, so either shows what the other wrote; the favourites in a block of their own (`-- managed-by: silverware-toolbar`), which SilverBullet's settings leave alone. You can edit both by hand too.
+Nothing changes until **Save**. The favourites, where and when the toolbar shows apply at once; a module or the key needs the page loaded again (**Save and reload**). They are saved in your `CONFIG` page: the key and the modules in the block SilverBullet's own settings (*Configuration: Open*) keep, so either shows what the other wrote; the favourites in a block of their own (`-- managed-by: silverware-toolbar`), which SilverBullet's settings leave alone. You can edit both by hand too.
 
 ## Custom formats
 
@@ -209,6 +209,13 @@ config.define("silverware.toolbar", {
       default = "auto",
       description = "Where the toolbar shows: auto docks it at the bottom, over the keyboard, when the text was selected by touch (on a phone the system's Cut / Copy / Paste menu is by the selection), else by the selection; selection always by it; bottom always docked.",
       ui = { category = "Silverware Toolbar", label = "Where the toolbar shows", priority = 0.95 },
+    },
+    show = {
+      type = "string",
+      enum = { "always", "mobile", "selection" },
+      default = "mobile",
+      description = "When the toolbar shows: always while you write (docked at the bottom, or by the cursor), always on a phone (docked) and after selecting text elsewhere, or only after selecting text.",
+      ui = { category = "Silverware Toolbar", label = "When the toolbar shows", priority = 0.94 },
     },
     modules = {
       type = "object",

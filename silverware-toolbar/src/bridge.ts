@@ -61,6 +61,15 @@ export const DEFAULT_SHORTCUT = "Ctrl-Shift-q";
  */
 export const PLACEMENTS = ["auto", "selection", "bottom"] as const;
 export type Placement = (typeof PLACEMENTS)[number];
+/**
+ * When the toolbar shows: always while the page's text is edited (docked, or by
+ * the caret), always where it is docked (a phone) and after a selection elsewhere,
+ * or only after a selection
+ */
+export const SHOWS = ["always", "mobile", "selection"] as const;
+export type Show = (typeof SHOWS)[number];
+export const SHOW_LABELS: Readonly<Record<Show, string>> = { always: "Always while you write", mobile: "Always on a phone, else after selecting text", selection: "After selecting text" };
+
 export const PLACEMENT_LABELS: Readonly<Record<Placement, string>> = { auto: "Docked at the bottom after a touch, else by the selection", selection: "By the selection", bottom: "Docked at the bottom" };
 
 /** Where each setting is in SilverBullet's configuration */
@@ -68,6 +77,7 @@ export const PATHS = {
   favorites: "silverware.toolbar.favorites",
   shortcut: "silverware.toolbar.shortcut",
   placement: "silverware.toolbar.placement",
+  show: "silverware.toolbar.show",
   module: (name: ModuleName) => `silverware.toolbar.modules.${name}.enabled`,
 } as const;
 
@@ -76,6 +86,7 @@ export type Settings = {
   readonly favorites: Favorites;
   readonly modules: ReadonlySet<ModuleName>;
   readonly placement: Placement;
+  readonly show: Show;
 };
 
 /**
@@ -104,7 +115,13 @@ export async function readSettings(bridge: Bridge): Promise<Settings> {
   const modules = new Set<ModuleName>();
   for (const name of MODULE_NAMES) if ((await get(PATHS.module(name), true)) !== false) modules.add(name);
   const placement = await get(PATHS.placement, "auto");
-  return { favorites: favoritesOf(favorites), modules, placement: PLACEMENTS.includes(placement as Placement) ? (placement as Placement) : "auto" };
+  const show = await get(PATHS.show, "mobile");
+  return {
+    favorites: favoritesOf(favorites),
+    modules,
+    placement: PLACEMENTS.includes(placement as Placement) ? (placement as Placement) : "auto",
+    show: SHOWS.includes(show as Show) ? (show as Show) : "mobile",
+  };
 }
 
 /** The key as configured (the command's: SilverBullet takes it as the library page defines the command) */

@@ -64,7 +64,12 @@ export class Controller {
     private readonly saveFavorites?: (favorites: Favorites) => Promise<void>,
   ) {
     this.favoriteRows = settings.favorites;
-    this.watcher = new SelectionWatcher(doc, (range) => void this.selected(range), (node) => this.owns(node));
+    this.watcher = new SelectionWatcher(
+      doc,
+      (range) => void this.selected(range),
+      (node) => this.owns(node),
+      (range) => void this.caretMoved(range),
+    );
     this.bar = new Bar(doc, {
       run: (action) => void this.run(action),
       more: () => (this.popup.isOpen ? this.popup.close() : void this.showActions()),
@@ -81,6 +86,8 @@ export class Controller {
     win.addEventListener("scroll", this.onScroll, { capture: true, passive: true });
     win.addEventListener("resize", this.onScroll);
     win.addEventListener("pointerdown", this.onPointer, { capture: true, passive: true });
+    this.doc.addEventListener("focusin", this.onFocus);
+    this.doc.addEventListener("focusout", this.onBlur);
     // The on-screen keyboard coming or going: the docked toolbar stays over it
     win.visualViewport?.addEventListener("resize", this.onScroll);
     win.visualViewport?.addEventListener("scroll", this.onScroll);
@@ -95,6 +102,8 @@ export class Controller {
     win.removeEventListener("scroll", this.onScroll, { capture: true });
     win.removeEventListener("resize", this.onScroll);
     win.removeEventListener("pointerdown", this.onPointer, { capture: true });
+    this.doc.removeEventListener("focusin", this.onFocus);
+    this.doc.removeEventListener("focusout", this.onBlur);
     win.visualViewport?.removeEventListener("resize", this.onScroll);
     win.visualViewport?.removeEventListener("scroll", this.onScroll);
     this.bar.remove();
@@ -225,7 +234,8 @@ export class Controller {
   private async selected(range: Range | undefined): Promise<void> {
     const show = ++this.shows;
     if (!range) {
-      if (!this.atCaret) {
+      // Shown always while writing: it goes to the caret once it settles (caretMoved)
+      if (!this.atCaret && !(this.persistent() && this.writing())) {
         this.range = undefined;
         this.bar.hide();
       }
@@ -324,12 +334,51 @@ export class Controller {
   private onKey = (e: KeyboardEvent): void => {
     if (this.popup.isOpen || !this.bar.shown) return;
     if (e.key === "Escape") this.hideBar();
-    else if (this.atCaret && !["Shift", "Control", "Alt", "Meta"].includes(e.key)) this.hideBar();
+    else if (this.atCaret && !this.persistent() && !["Shift", "Control", "Alt", "Meta"].includes(e.key)) this.hideBar();
   };
 
   // Shown at the caret, a press elsewhere hides it
   private onPress = (e: MouseEvent): void => {
-    if (this.atCaret && this.bar.shown && !(e.target instanceof Node && this.owns(e.target))) this.hideBar();
+    if (!this.atCaret || !this.bar.shown || (e.target instanceof Node && this.owns(e.target))) return;
+    // Shown always, a press in the page's text moves the caret it follows
+    if (this.persistent() && e.target instanceof Node && pageContentOf(e.target)) return;
+    this.hideBar();
+  };
+
+  /** Whether the toolbar shows always while the page's text is edited (the show setting; mobile: where it docks) */
+  private persistent(): boolean {
+    const { show } = this.settings;
+    return show === "always" || (show === "mobile" && this.docks());
+  }
+
+  /** Whether the page's text has the keyboard (its editor focused) */
+  private writing(): boolean {
+    return !!pageContentOf(this.doc.activeElement);
+  }
+
+  /** The caret moved (or came into the page's text): shown always, the toolbar goes with it, its buttons the formats around it */
+  private async caretMoved(range: Range): Promise<void> {
+    if (!this.persistent() || !this.writing() || this.popup.isOpen) return;
+    const show = ++this.shows;
+    const context = await this.read();
+    if (!context || show !== this.shows || this.stopped || context.from !== context.to) return;
+    this.atCaret = true;
+    this.showBar(context, range);
+  }
+
+  // The page's text focused: shown always, the toolbar at the caret
+  private onFocus = (e: FocusEvent): void => {
+    const caret = this.watcher.caret();
+    if (pageContentOf(e.target instanceof Node ? e.target : null) && caret) void this.caretMoved(caret);
+  };
+
+  // The page's text left (not for the toolbar's own controls): shown always, it goes until the page has the keyboard again
+  private onBlur = (): void => {
+    this.doc.defaultView!.setTimeout(() => {
+      const active = this.doc.activeElement;
+      if (!this.persistent() || this.writing() || this.popup.isOpen || (active && this.owns(active))) return;
+      this.hideBar();
+    });
   };
 
   /** Whether the toolbar docks at the bottom (the placement setting; auto: a selection made by touch) */

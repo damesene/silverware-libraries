@@ -1,6 +1,6 @@
 // The toolbar's settings dialog (saved in the playground's store, or in SilverBullet's CONFIG page)
 import type { Locator, Page } from "@playwright/test";
-import { answerConfirm, bar, barButton, expect, popup, ready, select, test } from "./helpers.ts";
+import { answerConfirm, bar, barButton, caret, expect, lineBox, popup, ready, select, test, text } from "./helpers.ts";
 
 const dialog = (page: Page): Locator => page.locator(".swb-settings");
 const tab = (page: Page, id: string): Locator => dialog(page).locator(`[data-swb-tab="${id}"]`);
@@ -82,6 +82,24 @@ test.describe("The settings dialog", () => {
     const first = bar(page).locator(".swb-row").first();
     await expect(first.locator("[data-swb-action]")).toHaveCount(3);
     await expect(first.locator('[data-swb-action="formats.italic"]')).toContainText("Italic");
+  });
+
+  test("shown always: on a computer by the cursor, with nothing selected, following it as you type", async ({ page }) => {
+    await openSettings(page);
+    await dialog(page).locator(`[data-swb-setting="silverware.toolbar.show"] select`).selectOption("always");
+    await expect(save(page)).toHaveText("Save");
+    await save(page).click();
+    await expect(dialog(page)).toHaveCount(0);
+    await caret(page, "Plain paragraph one", 3);
+    await expect(bar(page)).toBeVisible();
+    await expect(bar(page)).not.toHaveClass(/swb-docked/);
+    await page.keyboard.type("xy");
+    await expect.poll(() => text(page)).toContain("Plaxyin paragraph one");
+    await expect(bar(page)).toBeVisible();
+    // Above the line the cursor is in
+    const toolbar = (await bar(page).boundingBox())!;
+    const line = await lineBox(page, "Plaxyin paragraph one");
+    expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(line.y + 1);
   });
 
   test("a module turned off: Save and reload, its actions gone; closing with changes asks first", async ({ page }) => {

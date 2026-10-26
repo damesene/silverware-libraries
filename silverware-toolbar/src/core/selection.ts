@@ -1,7 +1,8 @@
 // Follows the selection in the page's text (dom.ts: not a widget's, not
 // another editor's): told once one is made, which is once the mouse is let go
 // (not while dragging), or a moment after the keys that made it; told at once
-// when there is none any more.
+// when there is none any more. The caret too, a moment after it moved (the
+// toolbar shown always follows it).
 import { pageContentOf } from "../dom.ts";
 
 // After the last change of a selection made with the keyboard: Shift+arrows pressed again soon go on
@@ -10,6 +11,7 @@ const SETTLE_MS = 200;
 export class SelectionWatcher {
   private pressed = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
+  private caretTimer: ReturnType<typeof setTimeout> | undefined;
   private shown = false;
 
   constructor(
@@ -18,6 +20,8 @@ export class SelectionWatcher {
     private readonly changed: (range: Range | undefined) => void,
     // Nodes whose selection is left alone (the toolbar's own fields: the popup's search)
     private readonly ignores: (node: Node) => boolean,
+    // The caret in the page's text moved (or came there), a moment after
+    private readonly caretMoved: (range: Range) => void = () => undefined,
   ) {}
 
   start(): void {
@@ -36,6 +40,7 @@ export class SelectionWatcher {
     win.removeEventListener("mouseup", this.onUp, true);
     win.removeEventListener("blur", this.onUp);
     clearTimeout(this.timer);
+    clearTimeout(this.caretTimer);
   }
 
   /** The selection in the page's text now, if there is one (not collapsed) */
@@ -72,8 +77,14 @@ export class SelectionWatcher {
     if (!this.current()) {
       clearTimeout(this.timer);
       this.tell(undefined);
+      clearTimeout(this.caretTimer);
+      this.caretTimer = setTimeout(() => {
+        const caret = this.caret();
+        if (caret) this.caretMoved(caret);
+      }, SETTLE_MS);
       return;
     }
+    clearTimeout(this.caretTimer);
     if (!this.pressed) this.settle(SETTLE_MS);
   };
 

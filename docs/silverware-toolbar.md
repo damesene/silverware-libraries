@@ -340,8 +340,10 @@ items*); *Next* 1, `shared/` (the table on it); *Next* 2, the settings dialog;
 step 7's `commands` module and the popup's stars; phones (decided with the
 user on 2026-10-26: the toolbar docked at the bottom over the keyboard after a
 touch, one row of the same favourites, over SilverBullet's keyboard bar where
-it shows, its turning off offered in the settings; checked in Chrome's phone
-emulation, against the playground and SilverBullet, not on a phone yet).
+it shows, its turning off offered in the settings; when it shows a setting: always
+while writing, always on a phone (the default), or after a selection; checked
+in Chrome's phone emulation, against the playground and SilverBullet, not on a
+phone yet).
 
 **Checked in a real SilverBullet** (2026-10-26, its release 2.12.1, by the
 interaction tests, which run against it as against the playground): the

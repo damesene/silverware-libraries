@@ -89,6 +89,13 @@ describe("The library page", () => {
     expect(page).toContain('enum = { "auto", "selection", "bottom" }');
   });
 
+  it("read when the toolbar shows: always on a phone by default, and where it is none of the three", async () => {
+    expect((await readSettings(bridge({}))).show).toBe("mobile");
+    expect((await readSettings(bridge({ "silverware.toolbar.show": "always" }))).show).toBe("always");
+    expect((await readSettings(bridge({ "silverware.toolbar.show": "never" }))).show).toBe("mobile");
+    expect(page).toContain('enum = { "always", "mobile", "selection" },\n      default = "mobile"');
+  });
+
   it("read the key as configured; an empty one or not a text is the default", async () => {
     expect(await readShortcut(bridge({ "silverware.toolbar.shortcut": "Alt-k" }))).toBe("Alt-k");
     expect(await readShortcut(bridge({ "silverware.toolbar.shortcut": " " }))).toBe(DEFAULT_SHORTCUT);

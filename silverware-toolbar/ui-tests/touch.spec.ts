@@ -1,6 +1,6 @@
 // The toolbar on a phone (the "touch" project: a Pixel 7): text selected by touch docks it at the bottom, over the keyboard
 import type { Page } from "@playwright/test";
-import { bar, barButton, expect, lineBox, popup, select, test, text } from "./helpers.ts";
+import { bar, barButton, caret, expect, lineBox, popup, select, test, text } from "./helpers.ts";
 
 /** Text selected after a touch in the page, as a phone selects it (a long press, then its handles) */
 async function selectByTouch(page: Page, needle: string): Promise<void> {
@@ -24,6 +24,21 @@ test.describe("The toolbar on a phone", () => {
     // A tap applies to the selection
     await barButton(page, "formats.bold").tap();
     await expect.poll(() => text(page)).toContain("Select **some text** in this page");
+  });
+
+  test("shown as soon as you write, nothing selected: its buttons the formats around the cursor; it stays as you type, goes as the text is left", async ({ page }) => {
+    const line = await lineBox(page, "Select some text");
+    await page.touchscreen.tap(line.x + 4, line.y + line.height / 2);
+    await caret(page, "bold**", 2);
+    await expect(bar(page)).toHaveClass(/swb-docked/);
+    await expect(barButton(page, "formats.bold")).toHaveAttribute("aria-pressed", "true");
+    await caret(page, "Plain paragraph one", 3);
+    await expect(barButton(page, "formats.bold")).toHaveAttribute("aria-pressed", "false");
+    await page.keyboard.type("x");
+    await expect.poll(() => text(page)).toContain("Plaxin paragraph one");
+    await expect(bar(page)).toBeVisible();
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await expect(bar(page)).toBeHidden();
   });
 
   test("the list of every action opens over it", async ({ page }) => {

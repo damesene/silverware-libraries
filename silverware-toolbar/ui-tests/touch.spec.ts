@@ -195,6 +195,20 @@ test.describe("The toolbar on a phone", () => {
     await expect(dialog.locator('[data-swb-items="1"] .swb-settings-item-name').first()).toHaveText("Italic");
   });
 
+  test("a shade at each end it scrolls further to, gone at its ends", async ({ page }) => {
+    // Enough to scroll: another row of the favourites
+    await page.setViewportSize({ width: 300, height: page.viewportSize()!.height });
+    await selectByTouch(page, "some text");
+    const scroll = bar(page).locator(".swb-dock-scroll");
+    await expect(scroll).toHaveClass(/swb-more-right/);
+    await expect(scroll).not.toHaveClass(/swb-more-left/);
+    await bar(page).locator(".swb-dock-items").evaluate((items) => (items.scrollLeft = 30));
+    await expect(scroll).toHaveClass(/swb-more-left/);
+    await expect(scroll).toHaveClass(/swb-more-right/);
+    await bar(page).locator(".swb-dock-items").evaluate((items) => (items.scrollLeft = items.scrollWidth));
+    await expect(scroll).not.toHaveClass(/swb-more-right/);
+  });
+
   test("over SilverBullet's keyboard bar where it shows", async ({ page }) => {
     // SilverBullet's bar over the keyboard (its main; client/components/keyboard_bar.tsx), as it is laid out at the window's bottom
     await page.evaluate(() => {

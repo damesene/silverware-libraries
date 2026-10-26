@@ -35,6 +35,8 @@ export class Bar {
   private at: { rect: Box; viewTop: number } | undefined;
   // Docked at the bottom: the line it stands on (the keyboard's top, or SilverBullet's bar's)
   private dockedAt: number | undefined;
+  // Docked: its ends shaded where it scrolls further
+  private shadeScroll: (() => void) | undefined;
 
   constructor(
     private readonly doc: Document,
@@ -90,7 +92,23 @@ export class Bar {
       if (i > 0 && row.length) items.append(this.divider());
       items.append(...row.flatMap((item) => this.elementOf(item, true)));
     });
-    this.element.replaceChildren(items, this.more());
+    // A shade at each end it scrolls further to (none at its ends)
+    const scroll = this.doc.createElement("div");
+    scroll.className = "swb-dock-scroll";
+    const shade = (side: string) => {
+      const element = this.doc.createElement("span");
+      element.className = `swb-dock-shade swb-dock-shade-${side}`;
+      element.setAttribute("aria-hidden", "true");
+      return element;
+    };
+    scroll.append(items, shade("left"), shade("right"));
+    this.shadeScroll = () => {
+      const more = items.scrollWidth - items.clientWidth - items.scrollLeft;
+      scroll.classList.toggle("swb-more-left", items.scrollLeft > 1);
+      scroll.classList.toggle("swb-more-right", more > 1);
+    };
+    items.addEventListener("scroll", this.shadeScroll, { passive: true });
+    this.element.replaceChildren(scroll, this.more());
     this.element.classList.add("swb-docked");
     if (!this.element.isConnected) this.doc.body.append(this.element);
     this.element.classList.add("swb-visible");
@@ -104,6 +122,8 @@ export class Bar {
     // Held by its bottom edge: placed by its top, its height and the line rounded apart left a line of the page showing under it
     this.element.style.top = "auto";
     this.element.style.bottom = `${Math.max(0, this.doc.defaultView!.innerHeight - bottom)}px`;
+    // (The window resized: what it scrolls to may be more or less)
+    this.shadeScroll?.();
     if (this.menu) this.placeMenu();
   }
 

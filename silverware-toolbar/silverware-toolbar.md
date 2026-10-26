@@ -17,7 +17,7 @@ Select text in a page and a toolbar shows beside it: make it bold, italic or cod
 * **Every action**: the **…** button, or **Ctrl-Shift-q**, opens a list of every action under the toolbar, with a search field. Type to find (each word you type starts a word of an action's name: `num` finds *Numbered list*, `h2` *Heading 2*), **↑ ↓** to pick (Tab and Shift-Tab too, PageUp and PageDown by five), **Enter** to apply, **Esc** to close the list (a second **Esc** hides the toolbar). *Turn into* is one item there: **Enter** (or **→**) or a click opens its block formats in its place, and **Esc**, **←** or the arrow at the top goes back; typing finds the block formats straight away. The command *Silverware Toolbar: Show actions* is the same.
 * **Without a selection**, **Ctrl-Shift-q** shows the toolbar at the cursor with the list open. Its icons show the formats around the cursor: in a link, *Link* is pressed, and clicking it takes the link off. Typing or moving the cursor hides it.
 * The key is a setting (*Key for every action*). In Firefox on Windows, **Ctrl-Shift-q** quits the browser: choose another key there.
-* **On a phone** (text selected by touch) the toolbar is docked at the bottom, over the keyboard, as one row you scroll sideways (**…** always at its end): the system's own menu (Cut, Copy, Paste) shows by the selection, where the toolbar would be. *Where the toolbar shows* (a setting) keeps it by the selection, or docked always. On a phone it stays there while you write, with nothing selected too, its buttons showing the formats around the cursor; *When the toolbar shows* makes it always (also by the cursor on a computer) or only after selecting text. SilverBullet's own bar over the keyboard, where it is on, stays under it; the settings offer to turn that one off.
+* **On a phone** (text selected by touch) the toolbar is docked at the bottom, over the keyboard, as one row you scroll sideways (a shade at an end there is more to scroll to; **…** always at its end): the system's own menu (Cut, Copy, Paste) shows by the selection, where the toolbar would be. *Where the toolbar shows* (a setting) keeps it by the selection, or docked always. On a phone it stays there while you write, with nothing selected too, its buttons showing the formats around the cursor; *When the toolbar shows* makes it always (also by the cursor on a computer) or only after selecting text. SilverBullet's own bar over the keyboard, where it is on, stays under it; the settings offer to turn that one off.
 
 ## Actions
 
@@ -419,6 +419,34 @@ end
   border-width: 1px 0 0;
   border-radius: 0;
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.12);
+}
+/* Its items in a box shaded at each end it scrolls further to (swb-more-left / -right) */
+.swb-bar.swb-docked .swb-dock-scroll {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.swb-dock-shade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms;
+}
+.swb-dock-shade-left {
+  left: 0;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.14), transparent);
+}
+.swb-dock-shade-right {
+  right: 0;
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.14), transparent);
+}
+.swb-dock-scroll.swb-more-left .swb-dock-shade-left,
+.swb-dock-scroll.swb-more-right .swb-dock-shade-right {
+  opacity: 1;
 }
 .swb-bar.swb-docked .swb-dock-items {
   flex: 1 1 auto;

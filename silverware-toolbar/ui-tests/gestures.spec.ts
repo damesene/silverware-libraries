@@ -1,6 +1,6 @@
 // The gestures module's button with a mouse: a click runs its first action, dragged up its second
 import type { Page } from "@playwright/test";
-import { addGesture, expect, gestureButton, selected, test, text } from "./helpers.ts";
+import { addGesture, expect, gestureButton, select, selected, test, text } from "./helpers.ts";
 
 /** The gesture button dragged from its middle up by `dy` px (negative: down), in steps, then let go where `back` says */
 async function dragUp(page: Page, dy: number, back = 0): Promise<void> {
@@ -48,6 +48,17 @@ test.describe("The gesture button", () => {
     expect(await selected(page)).toBe("some text");
     // Width kept as it rolls
     expect(Math.round((await gestureButton(page).boundingBox())!.width)).toBe(Math.round(box.width));
+  });
+
+  test("its swipe's icon on where the second action is on: on italic text a swipe takes italic off", async ({ page }) => {
+    await addGesture(page, "bold", "italic");
+    const hint = gestureButton(page).locator(".swb-gesture-hint");
+    await expect(hint).not.toHaveClass(/swb-on/);
+    await select(page, "italic");
+    await expect(hint).toHaveClass(/swb-on/);
+    await expect(gestureButton(page)).toHaveAttribute("aria-pressed", "false");
+    await dragUp(page, (await gestureButton(page).boundingBox())!.height);
+    await expect.poll(() => text(page)).toContain("**bold**, italic, ~~struck~~");
   });
 
   test("dragged up and back down, or not far enough, runs nothing and rolls back", async ({ page }) => {

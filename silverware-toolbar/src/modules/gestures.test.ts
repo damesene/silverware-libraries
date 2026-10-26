@@ -9,13 +9,13 @@ const BOLD = action("formats.bold");
 const ITALIC = action("formats.italic");
 
 /** A gesture button drawn, 30px tall, with what it ran */
-function gesture(enabled: (a: Action) => boolean = () => true) {
+function gesture(enabled: (a: Action) => boolean = () => true, active: (a: Action) => boolean = () => false) {
   const [kind] = gesturesModule().itemKinds!();
   const ran: string[] = [];
   const host: ItemHost = {
     doc: document,
     docked: false,
-    state: (a) => ({ active: false, enabled: enabled(a) }),
+    state: (a) => ({ active: active(a), enabled: enabled(a) }),
     activate: (a) => void ran.push(a.id),
     content: (a) => Object.assign(document.createElement("span"), { textContent: a.label }),
     button: () => Object.assign(document.createElement("button"), { type: "button", className: "swb-button" }),
@@ -56,6 +56,14 @@ describe("The gesture button", () => {
     button.click();
     expect(ran).toEqual([BOLD.id]);
     expect(button.querySelector(".swb-gesture-hint")!.innerHTML).toBe(ITALIC.icon);
+  });
+
+  it("shows the second's icon on where the second is on (a swipe turns it off), the button pressed by the first only", () => {
+    const off = gesture().button;
+    expect(off.querySelector(".swb-gesture-hint")!.classList.contains("swb-on")).toBe(false);
+    const on = gesture(undefined, (a) => a === ITALIC).button;
+    expect(on.querySelector(".swb-gesture-hint")!.classList.contains("swb-on")).toBe(true);
+    expect(on.getAttribute("aria-pressed")).toBe("false");
   });
 
   it("dragged up past half its height runs the second action, the click after it none; the reel follows the pointer", () => {

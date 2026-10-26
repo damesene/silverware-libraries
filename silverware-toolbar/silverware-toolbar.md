@@ -61,7 +61,7 @@ The settings dialog's *Favorites* tab edits them without writing Lua (see *Setti
 
 ### Gesture buttons
 
-A gesture button holds two actions in one place: a click (a tap) runs the first, and swiping it up runs the second. As you drag it up, its icon rolls up and the second action's comes in from below, following your finger or the mouse; let go once it is more than halfway in (or flick it up) and the second action runs; drag back down and nothing happens. The second action's icon, small above the first's, tells it from a plain button and shows what a swipe runs; it lights up while letting go would run it. It is as wide as the wider of its two actions, with their labels too where `show = "label"`. In the settings, *Add* offers *Gesture button*, then asks for its two actions. In Lua:
+A gesture button holds two actions in one place: a click (a tap) runs the first, and swiping it up runs the second. As you drag it up, its icon rolls up and the second action's comes in from below, following your finger or the mouse; let go once it is more than halfway in (or flick it up) and the second action runs; drag back down and nothing happens. The second action's icon, small above the first's, tells it from a plain button and shows what a swipe runs; it is lit where that action is on for the selection, so a swipe turns it off (a swipe for *Bold* on bold text). While you drag, the button is tinted once letting go would run the second action. It is as wide as the wider of its two actions, with their labels too where `show = "label"`. In the settings, *Add* offers *Gesture button*, then asks for its two actions. In Lua:
 
 ```lua
 { type = "gesture", tap = "formats.bold", up = "formats.highlight" }
@@ -445,8 +445,8 @@ end
 }
 /* The gestures module's button: two faces in one cell (as wide as the wider), on a reel rolled by
    --swb-roll (0 the click's face, 1 the swipe's), following the pointer while dragged (swb-rolling: no
-   transition), settling once let go; the swipe's action's icon small above the faces (pushed down to
-   make room for it), lit while it would run */
+   transition), settling once let go, the button tinted while letting go would run the swipe's action;
+   that action's icon small above the faces (pushed down to make room for it), showing its state */
 .swb-button.swb-gesture {
   --swb-roll: 0;
   position: relative;
@@ -496,8 +496,8 @@ end
 .swb-button.swb-gesture[aria-disabled="true"] {
   cursor: default;
 }
-/* Quiet; gone as the button rolls (its faces go past it); lit (white on the accent, larger) once
-   letting go would run it */
+/* Quiet; on (as a pressed button: the accent on a tint) where the swipe's action is on for the
+   selection, so a swipe turns it off (bold already); gone as the button rolls (its faces go past it) */
 .swb-gesture-hint {
   position: absolute;
   top: 1px;
@@ -506,25 +506,24 @@ end
   padding: 0 3px;
   border-radius: 4px;
   transform: translateX(-50%);
-  transform-origin: top center;
-  opacity: max(0, 0.45 - var(--swb-roll) * 1.5);
+  --swb-hint: 0.45;
+  opacity: max(0, var(--swb-hint) - var(--swb-roll) * 3 * var(--swb-hint));
   pointer-events: none;
-  transition: opacity 120ms, color 120ms, background-color 120ms, transform 120ms;
+  transition: opacity 120ms;
+}
+.swb-gesture-hint.swb-on {
+  --swb-hint: 1;
+  color: var(--ui-accent-color, #464cfc);
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 22%, transparent);
 }
 .swb-floating .swb-gesture-hint svg {
   width: 8px;
   height: 8px;
   stroke-width: 3;
 }
-/* Following the pointer: gone at once (its lighting up still eased) */
+/* Following the pointer: at once */
 .swb-gesture.swb-rolling .swb-gesture-hint {
-  transition: color 120ms, background-color 120ms, transform 120ms;
-}
-.swb-gesture.swb-armed .swb-gesture-hint {
-  opacity: 1;
-  color: #fff;
-  background: var(--ui-accent-color, #464cfc);
-  transform: translateX(-50%) scale(1.15);
+  transition: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .swb-gesture-face {

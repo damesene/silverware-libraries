@@ -3,7 +3,8 @@
 // actions in one. A click (a tap) runs `tap`; dragged up, its content rolls up
 // as a reel under the pointer, `up`'s coming from below, and let go past half
 // of it (or flicked up) runs `up`; dragged back, nothing runs. `up`'s icon, small
-// above the button's, says what a swipe runs, lit while it would. Both faces share one
+// above the button's, says what a swipe runs, lit where `up` is on (a swipe
+// turns it off); the button is tinted while letting go would run it. Both faces share one
 // cell, so the button is as wide as the wider and never changes as it rolls.
 // Mouse, pen and touch alike (pointer events); a sideways move is not the
 // gesture's: the toolbar docked at the bottom scrolls (touch-action: pan-x
@@ -72,9 +73,10 @@ function render(shown: ShownItem, host: ItemHost): HTMLButtonElement {
     element.classList.toggle("swb-on", state.active);
     return element;
   };
-  // What a swipe up runs, small above the icon
+  // What a swipe up runs, small above the icon, on where it is on for the selection (a swipe turns it off)
   const hint = doc.createElement("span");
   hint.className = "swb-gesture-hint";
+  hint.classList.toggle("swb-on", upState.active);
   hint.innerHTML = up.icon;
   hint.setAttribute("aria-hidden", "true");
   reel.append(face(tap, "swb-gesture-tap", tapState), face(up, "swb-gesture-up", upState));

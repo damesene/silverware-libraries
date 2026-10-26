@@ -339,8 +339,9 @@ or opening its choices).
   under the pointer (1:1, no transition; both faces in one grid cell, so the
   button is as wide as the wider and never changes), let go past half its
   height or flicked up runs `up`, dragged back runs nothing, the reel settling
-  in 180 ms. `up`'s icon small above the button's (centred), lit (with the button)
-  while `up` would run. `tap`'s state is the button's (pressed); `up` not offered is dimmed and
+  in 180 ms. `up`'s icon small above the button's (centred), shown on where `up` is on
+  for the selection (a swipe turns it off: bold already); the button tinted
+  while letting go would run `up`. `tap`'s state is the button's (pressed); `up` not offered is dimmed and
   let go runs nothing. A sideways move is not the gesture: `touch-action: pan-x`
   leaves it to the browser, which scrolls the docked bar. After `up` ran, the
   button drawn anew for the same favourite goes on from where the one before

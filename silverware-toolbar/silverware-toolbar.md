@@ -53,7 +53,7 @@ config.set("silverware.toolbar.favorites", {
 })
 ```
 
-The settings dialog's *Favorites* tab edits them without writing Lua (see *Settings*).
+In the **…** list, the star by an action puts it at the end of the toolbar's last row, or takes it out (**Alt+Enter** does it for the action picked); it is saved at once. The settings dialog's *Favorites* tab edits them without writing Lua (see *Settings*).
 
 ## Settings
 
@@ -408,6 +408,37 @@ end
 }
 .swb-check:empty {
   width: 18px;
+}
+/* An action's star (in the toolbar or not): shown on the action under the pointer or current, and always while it is a favourite */
+.swb-star {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  opacity: 0;
+  cursor: pointer;
+}
+.swb-option:hover .swb-star,
+.swb-option.swb-current .swb-star {
+  opacity: 0.55;
+}
+.swb-star[aria-pressed="true"] {
+  opacity: 1 !important;
+  color: var(--ui-accent-color, #464cfc);
+}
+.swb-star:hover {
+  opacity: 1 !important;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+.swb-star svg {
+  width: 16px;
+  height: 16px;
 }
 /* The popup: a search field over the actions found */
 .swb-popup {

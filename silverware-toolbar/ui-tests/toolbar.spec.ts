@@ -1,5 +1,5 @@
 // The toolbar by a selection (or at the caret) and the popup of every action under it
-import { bar, barButton, caret, expect, lineBox, popup, select, selected, test, text } from "./helpers.ts";
+import { bar, barButton, caret, expect, lineBox, popup, ready, select, selected, test, text } from "./helpers.ts";
 
 // The command's key, as the playground binds it (SilverBullet binds the library page's command so)
 const KEY = "Control+Shift+Q";
@@ -137,6 +137,32 @@ test.describe("The popup of every action", () => {
     await expect(popup(page).locator('[data-swb-action="commands.Text: Bold"]')).toBeVisible();
     await popup(page).locator('[data-swb-action="commands.Text: Bold"]').click();
     await expect.poll(() => text(page)).toContain("Select **some text** in this page");
+  });
+
+  test("a star puts an action in the toolbar at once and takes it out again, the popup open; kept after a reload", async ({ page }) => {
+    await select(page, "some text");
+    await page.keyboard.press(KEY);
+    const strike = popup(page).locator('[data-swb-action="formats.strikethrough"]');
+    await expect(strike.locator(".swb-star")).toHaveAttribute("aria-pressed", "false");
+    await expect(popup(page).locator('[data-swb-action="formats.bold"] .swb-star')).toHaveAttribute("aria-pressed", "true");
+    await strike.locator(".swb-star").click();
+    await expect(strike.locator(".swb-star")).toHaveAttribute("aria-pressed", "true");
+    await expect(barButton(page, "formats.strikethrough")).toBeVisible();
+    // Under the toolbar still, nothing run
+    await expect(popup(page)).toBeVisible();
+    expect((await popup(page).boundingBox())!.y).toBeGreaterThanOrEqual((await bar(page).boundingBox())!.y);
+    expect(await text(page)).toContain("Select some text in this page");
+    await page.keyboard.press("Escape");
+    await page.reload();
+    await ready(page);
+    await select(page, "some text");
+    await expect(barButton(page, "formats.strikethrough")).toBeVisible();
+    // Alt+Enter on the current one takes it out
+    await page.keyboard.press(KEY);
+    await popup(page).locator(".swb-search-field").fill("strike");
+    await page.keyboard.press("Alt+Enter");
+    await expect(barButton(page, "formats.strikethrough")).toHaveCount(0);
+    await expect(popup(page)).toBeVisible();
   });
 
   test("… in the toolbar opens it, and closes it again; a click on an action runs it", async ({ page }) => {

@@ -14,6 +14,7 @@ import { pageContentOf, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
 import type { Action, Change, Context } from "./action.ts";
 import { Bar, type Shown } from "./bar.ts";
+import type { Favorites } from "./favorites.ts";
 import { contextOf } from "./context.ts";
 import { marked } from "./cursor.ts";
 import type { Box } from "./place.ts";
@@ -45,16 +46,22 @@ export class Controller {
   private stopped = false;
   // The context the toolbar was last shown for: the state of a list's choices it opens
   private context: Context | undefined;
+  // The favourites as shown: the settings', then as the popup's stars change them
+  private favoriteRows: Favorites;
 
   constructor(
     readonly doc: Document,
-    readonly bridge: Bridge,
+    // Handed over anew when SilverBullet loads its configuration again (the settings the same)
+    public bridge: Bridge,
     readonly settings: Settings,
     // The actions offered, asked for each time they show (definitions made later count)
     private readonly actions: () => readonly Action[],
     // The settings dialog opened (none: not offered)
     private readonly openSettings?: () => void,
+    // The favourites saved, as the popup's stars change them (none: no stars)
+    private readonly saveFavorites?: (favorites: Favorites) => Promise<void>,
   ) {
+    this.favoriteRows = settings.favorites;
     this.watcher = new SelectionWatcher(doc, (range) => void this.selected(range), (node) => this.owns(node));
     this.bar = new Bar(doc, {
       run: (action) => void this.run(action),
@@ -102,7 +109,42 @@ export class Controller {
       run: (action) => void this.run(action),
       closed: () => this.focusEditor(),
       keeps: (node) => this.bar.owns(node),
+      ...(this.saveFavorites ? { favorite: { has: (action: Action) => this.isFavorite(action), toggle: (action: Action) => void this.toggleFavorite(action, context, range) } } : {}),
     });
+  }
+
+  /** The favourites as the toolbar shows them now (the stars' changes saved or not) */
+  get shownFavorites(): Favorites {
+    return this.favoriteRows;
+  }
+
+  private isFavorite(action: Action): boolean {
+    return this.favoriteRows.some((row) => row.some((item) => item.type !== "separator" && item.id === action.id));
+  }
+
+  /**
+   * A star of the popup: the action taken out of the favourites (every item of
+   * it, rows left empty left out), else added at the end of the last row; the
+   * toolbar shown so at once, the popup kept under it; saved, else put back
+   */
+  private async toggleFavorite(action: Action, context: Context, range: Range | undefined): Promise<void> {
+    const before = this.favoriteRows;
+    const had = this.isFavorite(action);
+    const rows = had
+      ? before.map((row) => row.filter((item) => item.type === "separator" || item.id !== action.id)).filter((row) => row.some((item) => item.type !== "separator"))
+      : before.length
+        ? [...before.slice(0, -1), [...before.at(-1)!, { id: action.id }]]
+        : [[{ id: action.id }]];
+    this.favoriteRows = rows;
+    this.showBar(context, range);
+    if (this.popup.isOpen && this.bar.shown) this.popup.place(this.bar.rect(), viewTopOf(range?.startContainer ?? null));
+    try {
+      await this.saveFavorites!(rows);
+    } catch (e) {
+      this.favoriteRows = before;
+      this.showBar(context, range);
+      void this.bridge.flash(`Silverware Toolbar: the favourites could not be saved (${String(e)})`, "error");
+    }
   }
 
   /** The modules' actions, and the core's own where it has them */
@@ -145,7 +187,7 @@ export class Controller {
   private favorites(context: Context): Shown[][] {
     const actions = this.offered();
     const all = [...actions, ...actions.flatMap((a) => a.choices ?? [])];
-    return this.settings.favorites
+    return this.favoriteRows
       .map((row) => {
         const items = row.flatMap((item): Shown[] => {
           if (item.type === "separator") return [{ separator: true }];

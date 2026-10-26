@@ -2,7 +2,7 @@
 //   js.importFromSpace("Library/damesene/silverware-toolbar.js").init({ ... editor functions ... })
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { actionsOf, customActionsAnew, defineCustomActions } from "./actions.ts";
-import { type Bridge, missingBridgeFunctions, PATHS, readSettings } from "./bridge.ts";
+import { type Bridge, missingBridgeFunctions, PATHS, readSettings, type Settings } from "./bridge.ts";
 import type { Action } from "./core/action.ts";
 import { Controller } from "./core/controller.ts";
 import { customFormatsAnew, defineCustomFormats, formatsOf } from "./formats/index.ts";
@@ -31,13 +31,32 @@ export async function init(bridge: Bridge): Promise<void> {
     return;
   }
   const settings = await readSettings(bridge);
+  const running = slot[GLOBAL_KEY];
+  // SilverBullet loads its configuration again (CONFIG saved: a star of the popup) and hands a new bridge over:
+  // with the same settings the toolbar as it is takes it, a popup open staying open
+  if (running && current && sameSettings(running, settings)) {
+    running.bridge = bridge;
+    current = { ...current, bridge };
+    return;
+  }
   // The one before stopped only now: init may be called again meanwhile (Space Lua loaded twice), each stops the last
-  slot[GLOBAL_KEY]?.stop();
+  running?.stop();
   const actions = createActions(settings.modules, { listCommands: bridge.listCommands, invokeCommand: bridge.invokeCommand });
-  const controller = new Controller(document, bridge, settings, actions, () => void openSettings());
+  const controller = new Controller(document, bridge, settings, actions, () => void openSettings(), canSaveIn(bridge) ? (favorites) => saveSettings(current?.bridge ?? bridge, { [PATHS.favorites]: favorites }) : undefined);
   slot[GLOBAL_KEY] = controller;
   current = { bridge, actions };
   controller.start();
+}
+
+/** Whether settings can be saved through the bridge (the CONFIG page, or a store of its own) */
+function canSaveIn(bridge: Bridge): boolean {
+  return !!bridge.saveSettings || (!!bridge.readPage && !!bridge.saveConfigPage);
+}
+
+/** Whether the toolbar running shows the settings read (its favourites as its stars left them, its modules) */
+function sameSettings(running: Controller, settings: Settings): boolean {
+  const modules = [...running.settings.modules].sort().join();
+  return modules === [...settings.modules].sort().join() && JSON.stringify(running.shownFavorites) === JSON.stringify(settings.favorites);
 }
 
 /** The "Silverware Toolbar: Show actions" command (its key too): the popup of every action, under the toolbar by the selection or the caret */
@@ -53,7 +72,7 @@ export async function openSettings(): Promise<void> {
     doc: document,
     bridge,
     actions,
-    canSave: !!bridge.saveSettings || (!!bridge.readPage && !!bridge.saveConfigPage),
+    canSave: canSaveIn(bridge),
     save: (values) => saveSettings(bridge, values),
     // The toolbar started anew with them (favourites need no reload)
     saved: () => void init(bridge),

@@ -7,7 +7,9 @@
 // actions, PageUp / PageDown by five, Enter runs the current one (or opens its
 // choices, as → does), Esc closes it (in the choices: back, as ← on an empty
 // field and Backspace there do); a click runs one. Actions not offered for the
-// selection show dimmed and are skipped.
+// selection show dimmed and are skipped. Where favourites can be saved, each
+// action has a star: a click on it (or Alt+Enter on the current one) puts it
+// in the toolbar or takes it out, the popup staying open.
 import { ICONS } from "../icons.ts";
 import type { Action } from "./action.ts";
 import { type Box, placeBy } from "./place.ts";
@@ -26,6 +28,8 @@ export type PopupOptions = {
   readonly closed: () => void;
   // Presses that do not close it (on the toolbar: its … closes it, its actions run)
   readonly keeps?: (node: Node) => boolean;
+  // The favourites: whether an action is one, and the star's toggle (none: no stars)
+  readonly favorite?: { readonly has: (action: Action) => boolean; readonly toggle: (action: Action) => void };
 };
 
 // How many actions PageUp / PageDown go by
@@ -177,6 +181,7 @@ export class Popup {
       row.innerHTML = `<span class="swb-icon">${entry.action.icon}</span><span class="swb-label"></span><span class="swb-check">${end}</span>`;
       if (entry.action.choices) row.setAttribute("aria-haspopup", "listbox");
       row.querySelector(".swb-label")!.textContent = entry.action.label;
+      if (options.favorite) row.insertBefore(this.star(entry.action, options.favorite), row.querySelector(".swb-check"));
       row.addEventListener("mousemove", () => this.setCurrent(i));
       row.addEventListener("click", () => this.runAt(i));
       rows.push(row);
@@ -191,6 +196,28 @@ export class Popup {
     this.current = -1;
     this.input.removeAttribute("aria-activedescendant");
     this.setCurrent(this.next(-1, 1));
+  }
+
+  /** An action's star: on while it is a favourite; a click toggles it, running nothing */
+  private star(action: Action, favorite: NonNullable<PopupOptions["favorite"]>): HTMLElement {
+    const star = this.doc.createElement("button");
+    star.type = "button";
+    star.className = "swb-star";
+    star.tabIndex = -1;
+    const shown = () => {
+      const on = favorite.has(action);
+      star.innerHTML = on ? ICONS.starOn : ICONS.star;
+      star.setAttribute("aria-pressed", String(on));
+      star.title = on ? `Take ${action.label} out of the toolbar (Alt+Enter)` : `Put ${action.label} in the toolbar (Alt+Enter)`;
+      star.setAttribute("aria-label", star.title);
+    };
+    shown();
+    star.addEventListener("click", (e) => {
+      e.stopPropagation();
+      favorite.toggle(action);
+      shown();
+    });
+    return star;
   }
 
   private enabled(i: number): boolean {
@@ -274,6 +301,9 @@ export class Popup {
         i = j;
       }
       this.setCurrent(i);
+    } else if (e.key === "Enter" && e.altKey) {
+      e.preventDefault();
+      this.list.querySelector<HTMLButtonElement>(`#swb-option-${this.current} .swb-star`)?.click();
     } else if (e.key === "Enter") {
       e.preventDefault();
       this.runAt(this.current);

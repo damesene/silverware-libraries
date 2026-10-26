@@ -514,7 +514,7 @@ end
 .swb-gesture-hint.swb-on {
   --swb-hint: 1;
   color: var(--ui-accent-color, #464cfc);
-  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 22%, transparent);
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 10%, transparent);
 }
 .swb-floating .swb-gesture-hint svg {
   width: 8px;

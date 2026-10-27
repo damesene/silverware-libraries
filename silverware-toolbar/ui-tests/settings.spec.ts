@@ -164,6 +164,21 @@ test.describe("The settings dialog", () => {
     await expect(popup(page).locator('[data-swb-action="actions.more"]')).toHaveCount(0);
   });
 
+  test("Reset to defaults asks first: no keeps them, yes puts the defaults back (saved, the toolbar shows them)", async ({ page }) => {
+    await openSettings(page);
+    await tab(page, "favorites").click();
+    await dialog(page).locator('[data-swb-row="0"] .swb-settings-row-remove').click();
+    await expect(dialog(page).locator(".swb-settings-favrow")).toHaveCount(1);
+    const reset = dialog(page).locator(".swb-settings-reset");
+    await answerConfirm(page, false, () => reset.click());
+    await expect(dialog(page).locator(".swb-settings-favrow")).toHaveCount(1);
+    await answerConfirm(page, true, () => reset.click());
+    await expect(dialog(page).locator(".swb-settings-favrow")).toHaveCount(2);
+    await expect(rowItems(page, 0)).toHaveText(["Turn into"]);
+    // The defaults as they were: nothing to save
+    await expect(save(page)).toBeDisabled();
+  });
+
   test("a row removed by its ×, its items with it: saved, the toolbar has one row", async ({ page }) => {
     await openSettings(page);
     await tab(page, "favorites").click();

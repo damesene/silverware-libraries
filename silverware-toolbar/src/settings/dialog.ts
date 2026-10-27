@@ -12,7 +12,7 @@ import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
 import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
-import { type FavoriteItem, type Favorites, hasAction, isKindItem, isSeparator, type KindItem, byTouch } from "../core/favorites.ts";
+import { DEFAULT_FAVORITES, type FavoriteItem, type Favorites, hasAction, isKindItem, isSeparator, type KindItem, byTouch } from "../core/favorites.ts";
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
@@ -104,7 +104,11 @@ export class SettingsDialog {
   private async dismiss(): Promise<boolean> {
     if (this.saving) return false;
     if (!Object.keys(this.changed()).length) return true;
-    const question = "Close the Silverware Toolbar settings without saving your changes?";
+    return this.ask("Close the Silverware Toolbar settings without saving your changes?");
+  }
+
+  /** A question answered yes or no: SilverBullet's confirm, else the browser's */
+  private async ask(question: string): Promise<boolean> {
     const { bridge, doc } = this.context;
     return bridge.confirm ? await bridge.confirm(question) : doc.defaultView!.confirm(question);
   }
@@ -303,8 +307,27 @@ export class SettingsDialog {
     });
     // Click from Touch only once Touch has its own
     copyButton.disabled = !other;
+    // The defaults, asked first (written only on Save): Click's the toolbar's own, Touch's none of its own (Click's show)
+    const resetButton = this.button(`${BASE}-reset`, "Reset to defaults", () => {
+      void (async () => {
+        const question =
+          this.device === "click"
+            ? "Reset the favourites for Click to the defaults?"
+            : "Reset the favourites for Touch to the defaults? Touch then has none of its own: Click's show by finger.";
+        if (!(await this.ask(question))) return;
+        if (this.device === "click") values.favorites = copy(DEFAULT_FAVORITES);
+        else {
+          values.touchFavorites = undefined;
+          values.touchOn = true;
+        }
+        this.picking = undefined;
+        this.changedFavorites(`.${BASE}-reset`);
+      })();
+    });
+    const actions = this.el("div", `${BASE}-device-actions`);
+    actions.append(resetButton, copyButton);
     const top = this.el("div", `${BASE}-devices-top`);
-    top.append(tabs, copyButton);
+    top.append(tabs, actions);
     bar.append(top);
     if (this.device === "touch") {
       const own = switchControl(this.context.doc, BASE, values.touchOn && !!values.touchFavorites, (on) => {

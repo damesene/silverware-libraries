@@ -343,7 +343,9 @@ config.set("silverware.toolbar.favorites", {
 - Settings: *Click* | *Touch* at the Favorites tab's top (by finger Touch's
   first where its own are on, else Click's); *Own favourites for touch* turns them on (the first time a copy of
   Click's) and off (Click's shown dimmed, not edited); *Copy from Click* /
-  *Copy from Touch* puts the other's over the ones shown.
+  *Copy from Touch* puts the other's over the ones shown; *Reset to
+  defaults* left of it (asked first): Click's the defaults, Touch's none of
+  its own.
 
 ### Kinds of favourites: the gesture button (decided and built 2026-10-26)
 

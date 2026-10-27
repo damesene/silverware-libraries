@@ -288,6 +288,28 @@ test.describe("The toolbar on a phone", () => {
     await expect.poll(bottomOf).toBe(bottom);
   });
 
+  test("on the bottom of SilverBullet's view where it pins it above the keyboard (its bar off), as it measures it anew @playground", async ({ page }) => {
+    // SilverBullet's root pinned above the keyboard (client/lib/keyboard_viewport.ts), as on a phone with it up
+    await page.evaluate(() => {
+      document.documentElement.classList.add("sb-viewport-tracked");
+      document.documentElement.style.setProperty("--sb-viewport-height", "500px");
+      const root = document.createElement("div");
+      root.id = "sb-root";
+      root.style.cssText = "position: fixed; left: 0; right: 0; top: 0; height: var(--sb-viewport-height); pointer-events: none";
+      document.body.append(root);
+    });
+    await selectByTouch(page, "some text");
+    await expect(bar(page)).toHaveClass(/swb-docked/);
+    const bottomOf = async () => {
+      const box = (await bar(page).boundingBox())!;
+      return Math.round(box.y + box.height);
+    };
+    await expect.poll(bottomOf).toBe(500);
+    // The keyboard gone: measured anew, no other event
+    await page.evaluate(() => document.documentElement.style.setProperty("--sb-viewport-height", `${innerHeight}px`));
+    await expect.poll(bottomOf).toBe(page.viewportSize()!.height);
+  });
+
   test("over SilverBullet's keyboard bar where it shows", async ({ page }) => {
     // SilverBullet's bar over the keyboard (its main; client/components/keyboard_bar.tsx), as it is laid out at the window's bottom
     await page.evaluate(() => {

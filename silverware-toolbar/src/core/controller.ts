@@ -10,7 +10,7 @@
 // or text is typed. The modules (modules.ts) give the actions; the core knows
 // none of them. The popup ends with the core's own item, the settings dialog.
 import type { Bridge, Settings } from "../bridge.ts";
-import { CONTENT_SELECTOR, keyboardBarTop, pageContentOf, viewTopOf } from "../dom.ts";
+import { CONTENT_SELECTOR, keyboardBarTop, pageContentOf, pinnedViewBottom, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
 import type { Action, ActionEditor, Change, Context } from "./action.ts";
 import { Bar, type Shown } from "./bar.ts";
@@ -546,6 +546,8 @@ export class Controller {
     this.watchingBar = on;
     if (on) {
       this.barWatch.observe(this.doc.body, { childList: true, subtree: true });
+      // (SilverBullet's view above the keyboard measured anew: its variables on html)
+      this.barWatch.observe(this.doc.documentElement, { attributes: true, attributeFilter: ["style", "class"] });
       return;
     }
     this.barWatch.disconnect();
@@ -561,17 +563,18 @@ export class Controller {
 
   /**
    * The line the docked toolbar stands on: SilverBullet's keyboard bar's top
-   * where it shows; else the on-screen keyboard's top: where it overlays the
-   * page (the VirtualKeyboard API's `overlaysContent`, which SilverBullet sets
-   * on a phone: the window and the visual viewport keep their size) its own
-   * rectangle's, else the visual viewport's bottom
+   * where it shows; else the bottom of what SilverBullet shows above the
+   * keyboard, where it pins its UI there (a phone); else the on-screen
+   * keyboard's top: where it overlays the page (the VirtualKeyboard API's
+   * `overlaysContent`: the window and the visual viewport keep their size) its
+   * own rectangle's, else the visual viewport's bottom
    */
   private dockLine(): number {
     const win = this.doc.defaultView!;
     const view = win.visualViewport;
     const keyboard = virtualKeyboardOf(win);
     const overlaid = keyboard?.overlaysContent && keyboard.boundingRect && keyboard.boundingRect.height > 0 ? keyboard.boundingRect.top : undefined;
-    return keyboardBarTop(this.doc) ?? overlaid ?? (view ? view.offsetTop + view.height : win.innerHeight);
+    return keyboardBarTop(this.doc) ?? pinnedViewBottom(this.doc) ?? overlaid ?? (view ? view.offsetTop + view.height : win.innerHeight);
   }
 
   private onPointer = (e: PointerEvent): void => {

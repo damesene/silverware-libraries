@@ -33,6 +33,20 @@ export function keyboardBarTop(doc: Document): number | undefined {
   return rect && rect.height > 0 ? rect.top : undefined;
 }
 
+/**
+ * The bottom of what SilverBullet shows above the on-screen keyboard, where it
+ * pins its UI there (a phone: `html.sb-viewport-tracked`, `#sb-root` fixed to
+ * the part in view, sized by `--sb-viewport-top` / `--sb-viewport-height` on
+ * `html`; client/lib/keyboard_viewport.ts of its main), else undefined: what it
+ * measures of the keyboard, which the VirtualKeyboard API's rectangle did not
+ * match on a phone (the toolbar too high in Chrome, off the screen in the app)
+ */
+export function pinnedViewBottom(doc: Document): number | undefined {
+  if (!doc.documentElement.classList.contains("sb-viewport-tracked")) return undefined;
+  const rect = doc.getElementById("sb-root")?.getBoundingClientRect();
+  return rect && rect.height > 0 ? rect.bottom : undefined;
+}
+
 /** The top of the page's view around a node (the toolbar goes below it there), else the window's */
 export function viewTopOf(node: Node | null): number {
   const element = node instanceof Element ? node : node?.parentElement;

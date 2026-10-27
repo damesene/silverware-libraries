@@ -202,7 +202,7 @@ export class Controller {
           }
           // A kind's: a kind no module on gives, or a slot without an action, left out
           const kind = kinds.find((k) => k.type === item.type);
-          if (!kind) return [];
+          if (!kind || kind.check?.(item)) return [];
           const slots = kind.slots.map(({ key, optional }) => ({ key, optional, action: all.find((a) => a.id === item[key]) }));
           if (slots.some(({ optional, action }) => !optional && !action)) return [];
           const found = Object.fromEntries(slots.flatMap(({ key, action }) => (action ? [[key, action]] : [])));

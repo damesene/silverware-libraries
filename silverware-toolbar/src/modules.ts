@@ -11,6 +11,7 @@ import { commandsModule } from "./modules/commands.ts";
 import { gesturesModule } from "./modules/gestures.ts";
 import { inlineModule } from "./modules/inline.ts";
 import { keyboardModule } from "./modules/keyboard.ts";
+import { snippetsModule } from "./modules/snippets.ts";
 
 const FACTORIES: readonly (readonly [ModuleName, (host: ModuleHost) => ToolbarModule])[] = [
   ["inline", inlineModule],
@@ -19,6 +20,7 @@ const FACTORIES: readonly (readonly [ModuleName, (host: ModuleHost) => ToolbarMo
   ["commands", commandsModule],
   ["keyboard", keyboardModule],
   ["gestures", gesturesModule],
+  ["snippets", snippetsModule],
 ];
 
 /**

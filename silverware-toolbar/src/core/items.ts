@@ -13,6 +13,13 @@ import type { Action } from "./action.ts";
  */
 export type ItemSlot = { readonly key: string; readonly label: string; readonly optional?: boolean };
 
+/**
+ * A field of a kind of favourite holding a text of the user's (a snippet's
+ * icon, label, text), which the settings dialog edits knowing nothing of what
+ * it is for; `multiline`: a text of several lines
+ */
+export type ItemField = { readonly key: string; readonly label: string; readonly placeholder?: string; readonly multiline?: boolean };
+
 /** A favourite of a kind a module gives, as the toolbar shows it now: its kind, its slots' actions (every one needed found; an optional one's where it is), its look */
 export type ShownItem = {
   readonly kind: ItemKind;
@@ -39,11 +46,16 @@ export type ItemHost = {
 export type ItemKind = {
   // Its favourites' `type`
   readonly type: string;
-  // As the settings dialog offers it (Add) and names it
+  // As the settings dialog offers it (Add) and names it, what it is beside it
   readonly label: string;
+  readonly description: string;
   readonly icon: string;
   // Every one not optional needed: a favourite without one of them, or with an id no action has, is left out
   readonly slots: readonly ItemSlot[];
+  // Texts of the user's it holds besides (a kind reads what is not right in them itself)
+  readonly fields?: readonly ItemField[];
+  // What is wrong with an item, where it cannot show (a snippet without its text): left out, the settings say why
+  readonly check?: (item: Readonly<Record<string, unknown>>) => string | undefined;
   // Its button in the toolbar
   readonly render: (shown: ShownItem, host: ItemHost) => HTMLButtonElement;
 };

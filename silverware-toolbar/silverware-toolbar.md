@@ -61,6 +61,22 @@ The settings dialog's *Favorites* tab edits them without writing Lua (see *Setti
 
 Where the screen is worked by finger (a phone, a tablet), the toolbar can show other favourites: `silverware.toolbar.favorites-touch`, written as the favourites are, say with gesture buttons in place of plain ones. Not set, the favourites show there too. A computer with a touch screen counts as one with a mouse (its touchpad is what it is mostly worked with). `silverware.toolbar.favorites-touch-enabled = false` turns them off for a while: the favourites show by finger too, those for touch kept. In the settings, *Favorites* has *Click* and *Touch* at its top (opened by finger on *Touch* where its own are on): *Own favourites for touch* turns them on (the first time as a copy of *Click*'s to change) and off, and *Copy from Click* / *Copy from Touch* puts the other's over the ones shown.
 
+### Text snippets
+
+A text snippet is a button of your own character (any, an emoji too) and label that writes your text at the cursor. In the text, `{s}` stands for the text selected and `{c}` for where the cursor goes:
+
+* `%%{s}%%` wraps the selection; it stays selected after (nothing selected: the cursor between the `%%`).
+* `**Note:** {c}` writes it and puts the cursor at its end of your choice; text selected is replaced.
+* Without `{s}` or `{c}` the text replaces the selection and the cursor goes to its end. `{{s}}` and `{{c}}` write `{s}` and `{c}` as they are.
+
+In the settings, *Add* offers *Text snippet*, its icon, label and text typed in place. In Lua:
+
+```lua
+{ type = "snippet", icon = "📌", label = "Comment", text = "%%{s}%%", show = "label" }
+```
+
+Text snippets come from the *Snippets* module: with it off they are left out.
+
 ### Gesture buttons
 
 A gesture button holds up to three actions in one place: a click (a tap) runs the first, swiping it up runs another, swiping it down a third. As you drag it up, its icon rolls up and the swipe's action comes in from below (dragging down, from above), following your finger or the mouse; let go once it is more than halfway in (or flick it) and that action runs; drag back and nothing happens. Each swipe's icon is shown small, in the button's top right corner for up and its bottom right corner for down: it tells the button from a plain one and shows what a swipe runs, in color where that action is on for the selection, so a swipe turns it off (a swipe for *Bold* on bold text). While you drag, the button is tinted once letting go would run the action. It is as wide as the widest of its actions, with their labels too where `show = "label"`. In the settings, *Add* offers *Gesture button*, then asks for its actions; either swipe may be *None*. In Lua:
@@ -283,6 +299,7 @@ config.define("silverware.toolbar", {
         clear = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Remove the inline formats of the selection.", ui = { category = "Silverware Toolbar", label = "Clear formatting", priority = 0.6 } } } },
         commands = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Every SilverBullet command, found by typing its name in the list of every action, and as a favourite.", ui = { category = "Silverware Toolbar", label = "Commands", priority = 0.5 } } } },
         keyboard = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "On a phone or tablet: an action hiding the on-screen keyboard, the selection kept as it is (to see more of the page while you format it).", ui = { category = "Silverware Toolbar", label = "Hide the keyboard", priority = 0.4 } } } },
+        snippets = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "A text snippet among the favourites: a button of your own character (an emoji too) and label writing your text at the cursor, {s} in it the text selected, {c} where the cursor goes.", ui = { category = "Silverware Toolbar", label = "Snippets", priority = 0.2 } } } },
         gestures = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "A gesture button among the favourites: two actions in one, a click runs the first, swiping it up the second.", ui = { category = "Silverware Toolbar", label = "Gestures", priority = 0.3 } } } },
       },
     },
@@ -659,6 +676,14 @@ end
   padding: 8px 10px;
   border-bottom: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
   opacity: 0.9;
+}
+/* A text snippet's character, as an icon is shown */
+.swb-glyph {
+  display: inline-block;
+  min-width: 18px;
+  font-size: 16px;
+  line-height: 1;
+  text-align: center;
 }
 /* Icons by the search field (the settings) */
 .swb-popup-tools {
@@ -1346,6 +1371,35 @@ end
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+/* A field of a kind's item (a snippet's icon, label, text), typed in place */
+.swb-settings-field {
+  display: inline-flex;
+  flex: 1 1 200px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 4px;
+}
+.swb-settings-field.swb-settings-field-multiline {
+  flex-basis: 100%;
+  align-items: flex-start;
+}
+.swb-settings-field-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  outline: none;
+  resize: vertical;
+}
+.swb-settings-field:focus-within {
+  border-color: var(--ui-accent-color, #464cfc);
 }
 .swb-settings-slot .swb-settings-item-icon:empty {
   display: none;

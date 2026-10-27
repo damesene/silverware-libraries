@@ -45,6 +45,7 @@ export function gesturesModule(): ToolbarModule {
 const GESTURE: ItemKind = {
   type: "gesture",
   label: "Gesture button",
+  description: "Several actions in one",
   icon: ICONS.gesture,
   slots: [
     { key: "tap", label: "Click" },

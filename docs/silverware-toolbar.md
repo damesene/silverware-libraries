@@ -380,6 +380,19 @@ or opening its choices).
   anew for the same favourite goes on from where the one before was let go,
   holds that face a moment and rolls back.
 
+### Text snippets (decided and built 2026-10-27)
+
+- The snippets module's kind `snippet`: `icon` (any character, an emoji
+  too), `label`, `text` written at the cursor, `show`. In the text `{s}` is
+  the selection, `{c}` the cursor (short, as only the user's own snippets
+  hold them; `{{s}}` / `{{c}}` write them as they are). With `{c}` the cursor
+  goes there; without it the first `{s}` is selected after (nothing selected:
+  the cursor there, `%%{s}%%` typed into); without either the selection is
+  replaced and the cursor goes to the end.
+- Kinds declare `fields` (texts the settings dialog types in place, knowing
+  nothing of them) and `check` (an item that cannot show is left out, the
+  dialog says why: a snippet without its text).
+
 ### Also decided
 
 - **Default favourites** in the core, in a file of their own

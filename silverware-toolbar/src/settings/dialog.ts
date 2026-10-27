@@ -13,7 +13,7 @@ import { tabs } from "../../../shared/tabs.ts";
 import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
 import { type FavoriteItem, type Favorites, hasAction, isKindItem, isSeparator, type KindItem, byTouch } from "../core/favorites.ts";
-import type { ItemKind, ItemSlot } from "../core/items.ts";
+import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
 import { reorder } from "./drag.ts";
@@ -403,12 +403,14 @@ export class SettingsDialog {
         name.textContent = kind?.label ?? item.type;
         element.append(icon, name);
         element.classList.add(`${BASE}-kind`);
+        const problem = kind?.check?.(item);
         if (!kind) {
           element.classList.add(`${BASE}-unknown`);
           element.title = `No module turned on gives the kind ${item.type}: the toolbar leaves it out`;
         } else {
+          if (problem) element.title = `${problem}: the toolbar leaves it out`;
           slots = this.el("div", `${BASE}-slots`);
-          slots.append(...kind.slots.map((slot) => this.slotButton(item, at, slot, known)));
+          slots.append(...kind.slots.map((slot) => this.slotButton(item, at, slot, known)), ...(kind.fields ?? []).map((field) => this.fieldInput(item, at, field)));
         }
       } else {
         const action = known.get(item.id);
@@ -440,7 +442,8 @@ export class SettingsDialog {
       }
     });
     element.addEventListener("pointerdown", (e) => {
-      if (e.button !== 0 || (e.target instanceof Element && e.target.closest("button"))) return;
+      // (Not from its controls: its buttons, a field typed in)
+      if (e.button !== 0 || (e.target instanceof Element && e.target.closest("button, input, textarea"))) return;
       const panel = this.favoritesPanel!;
       reorder(e, {
         element,
@@ -519,6 +522,34 @@ export class SettingsDialog {
     return button;
   }
 
+  /** A field of a kind's item: its text edited in place (written as typed, the tab not drawn anew: the field keeps the keyboard) */
+  private fieldInput(item: KindItem, at: At, field: ItemField): HTMLElement {
+    const value = item[field.key];
+    const input = field.multiline ? this.el("textarea", `${BASE}-field-input`) : this.el("input", `${BASE}-field-input`);
+    if (input instanceof HTMLInputElement) input.type = "text";
+    else input.rows = 2;
+    input.value = typeof value === "string" ? value : "";
+    input.placeholder = field.placeholder ?? "";
+    input.spellcheck = false;
+    input.setAttribute("aria-label", field.label);
+    input.addEventListener("input", () => {
+      this.setQuietly(setSlot(this.rows, at, field.key, input.value || undefined));
+    });
+    const label = this.el("label", `${BASE}-field${field.multiline ? ` ${BASE}-field-multiline` : ""}`);
+    label.dataset.swbField = field.key;
+    label.append(this.el("span", `${BASE}-slot-name`, field.label), input);
+    return label;
+  }
+
+  /** The favourites edited changed, the tab left as it is (a field being typed in) */
+  private setQuietly(favorites: Favorites): void {
+    if (this.device === "touch") {
+      this.values!.touchFavorites = favorites;
+      this.values!.touchOn = true;
+    } else this.values!.favorites = favorites;
+    this.update();
+  }
+
   /** The search opened for a row or a slot (open for it already: closed) */
   private openPicking(target: Picking): void {
     const open = !!this.picking && JSON.stringify(this.picking) === JSON.stringify(target);
@@ -568,7 +599,8 @@ export class SettingsDialog {
       const favorites = addItem(this.rows, row, { type: kind.type });
       const at = { row, index: favorites[row]!.length - 1 };
       this.picking = kind.slots[0] ? { at, key: kind.slots[0].key } : undefined;
-      this.edit(favorites, this.picking ? `[data-swb-row="${row}"] .${BASE}-pick-field` : `[data-swb-item="${at.row}:${at.index}"]`);
+      // No slot: its first field to type in
+      this.edit(favorites, this.picking ? `[data-swb-row="${row}"] .${BASE}-pick-field` : kind.fields?.length ? `[data-swb-item="${at.row}:${at.index}"] .${BASE}-field-input` : `[data-swb-item="${at.row}:${at.index}"]`);
     };
     // An action for the slot (an optional one: or none): the search goes on for the next slot after it without one
     const fill = (id: string | undefined) => {
@@ -593,7 +625,7 @@ export class SettingsDialog {
       const options = [
         ...(separator ? [this.option(`${BASE}-pick-separator`, "", "Separator", "", () => add({ type: "separator" }))] : []),
         ...(none ? [this.option(`${BASE}-pick-unset`, "", "None", `No action for ${slot!.label}`, () => fill(undefined))] : []),
-        ...kinds.map((kind) => this.option(`${BASE}-pick-kind`, kind.icon, kind.label, "Several actions in one", () => addKind(kind))),
+        ...kinds.map((kind) => this.option(`${BASE}-pick-kind`, kind.icon, kind.label, kind.description, () => addKind(kind))),
         ...found.map((entry) => this.option("", entry.action.icon, entry.action.label, entry.group, () => fill(entry.action.id))),
       ];
       list.replaceChildren(...(options.length ? options : [this.el("div", `${BASE}-pick-none`, "No action found")]));

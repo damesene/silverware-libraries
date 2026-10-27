@@ -345,11 +345,12 @@ config.set("silverware.toolbar.favorites", {
   them on and off (Click's shown dimmed, not edited); *Copy from Click* /
   *Copy from Touch* puts the other's over the ones shown; *Reset to
   defaults* left of it (asked first), each its own defaults.
-- Defaults (2026-10-27, as the user laid them out): Click six rows (Turn
-  into; H1-H3; B I U highlight strike; link, wiki link, code, code block;
-  task, bullet, numbered; Emoji, …); Touch, on by default, the same in
-  gesture buttons (H1 up H2 down H3; B up I down highlight; strike down U;
-  link up wiki link; code up code block; task up bullet down numbered). Not
+- Defaults (2026-10-27, as the user laid them out): Click four rows (Turn
+  into; B I highlight U strike; link, wiki link, code, code block; Emoji,
+  …); Touch, on by default, the same in gesture buttons (B up I down
+  highlight; strike down U; link up wiki link; code up code block).
+  Headings, task, bullet and numbered list are in Turn into only (the user
+  took them out of both the same day). Not
   where they would break what a space has: its own favourites and none for
   touch keep Touch off (its own by finger, as before), and without the
   Gestures module Touch has no defaults. Told by being set: config.define

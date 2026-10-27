@@ -7,17 +7,15 @@ const KEY = "Control+Shift+Q";
 test.describe("The toolbar's defaults", () => {
   test.use({ favorites: null });
 
-  test("six rows: Turn into; the headings; bold to strikethrough; links and code; lists; Emoji and …", async ({ page }) => {
+  test("four rows: Turn into; bold, italic, highlight, underline, strikethrough; links and code; Emoji and … (headings and lists in Turn into only)", async ({ page }) => {
     await select(page, "some text");
     const rows = bar(page).locator(".swb-row");
-    await expect(rows).toHaveCount(6);
+    await expect(rows).toHaveCount(4);
     const ids = (row: number) => rows.nth(row).locator("[data-swb-action]").evaluateAll((buttons) => buttons.map((b) => (b as HTMLElement).dataset.swbAction));
     expect(await ids(0)).toEqual(["actions.turnInto"]);
-    expect(await ids(1)).toEqual(["formats.heading1", "formats.heading2", "formats.heading3"]);
-    expect(await ids(2)).toEqual(["formats.bold", "formats.italic", "formats.underline", "formats.highlight", "formats.strikethrough"]);
-    expect(await ids(3)).toEqual(["formats.link", "formats.wikiLink", "formats.code", "formats.codeBlock"]);
-    expect(await ids(4)).toEqual(["formats.task", "formats.bullet", "formats.numbered"]);
-    expect(await ids(5)).toEqual(["actions.emoji", "actions.more"]);
+    expect(await ids(1)).toEqual(["formats.bold", "formats.italic", "formats.highlight", "formats.underline", "formats.strikethrough"]);
+    expect(await ids(2)).toEqual(["formats.link", "formats.wikiLink", "formats.code", "formats.codeBlock"]);
+    expect(await ids(3)).toEqual(["actions.emoji", "actions.more"]);
     await expect(barButton(page, "actions.emoji")).toHaveText("Emoji");
   });
 });

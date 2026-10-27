@@ -34,17 +34,14 @@ export const isKindItem = (item: FavoriteItem): item is KindItem => !isSeparator
 /** The favourites for a mouse (Click, and the default): a row of each kind of action */
 export const DEFAULT_FAVORITES: Favorites = [
   [{ id: "actions.turnInto", show: "label" }],
-  [{ id: "formats.heading1" }, { id: "formats.heading2" }, { id: "formats.heading3" }],
-  [{ id: "formats.bold" }, { id: "formats.italic" }, { id: "formats.underline" }, { id: "formats.highlight" }, { id: "formats.strikethrough" }],
+  [{ id: "formats.bold" }, { id: "formats.italic" }, { id: "formats.highlight" }, { id: "formats.underline" }, { id: "formats.strikethrough" }],
   [{ id: "formats.link" }, { id: "formats.wikiLink" }, { id: "formats.code" }, { id: "formats.codeBlock" }],
-  [{ id: "formats.task" }, { id: "formats.bullet" }, { id: "formats.numbered" }],
   [{ id: "actions.emoji", show: "label" }, { type: "separator" }, { id: "actions.more" }],
 ];
 
 /** The favourites for a finger (Touch): the same actions, the kin of one a swipe of its gesture button, so the bar at the bottom is short */
 export const DEFAULT_TOUCH_FAVORITES: Favorites = [
   [{ id: "actions.turnInto", show: "label" }],
-  [{ type: "gesture", tap: "formats.heading1", up: "formats.heading2", down: "formats.heading3" }],
   [
     { type: "gesture", tap: "formats.bold", up: "formats.italic", down: "formats.highlight" },
     { type: "gesture", tap: "formats.strikethrough", down: "formats.underline" },
@@ -53,7 +50,6 @@ export const DEFAULT_TOUCH_FAVORITES: Favorites = [
     { type: "gesture", tap: "formats.link", up: "formats.wikiLink" },
     { type: "gesture", tap: "formats.code", up: "formats.codeBlock" },
   ],
-  [{ type: "gesture", tap: "formats.task", up: "formats.bullet", down: "formats.numbered" }],
   [{ id: "actions.emoji" }, { id: "actions.more" }],
 ];
 

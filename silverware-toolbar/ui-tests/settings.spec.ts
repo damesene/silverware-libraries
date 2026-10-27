@@ -172,10 +172,10 @@ test.describe("The settings dialog", () => {
     await answerConfirm(page, false, () => reset.click());
     await expect(dialog(page).locator(".swb-settings-favrow")).toHaveCount(1);
     await answerConfirm(page, true, () => reset.click());
-    // The toolbar's defaults (not the tests' favourites): six rows
-    await expect(dialog(page).locator(".swb-settings-favrow")).toHaveCount(6);
+    // The toolbar's defaults (not the tests' favourites): four rows
+    await expect(dialog(page).locator(".swb-settings-favrow")).toHaveCount(4);
     await expect(rowItems(page, 0)).toHaveText(["Turn into"]);
-    await expect(rowItems(page, 1)).toHaveText(["Heading 1", "Heading 2", "Heading 3"]);
+    await expect(rowItems(page, 1)).toHaveText(["Bold", "Italic", "Highlight", "Underline", "Strikethrough"]);
     await expect(save(page)).toBeEnabled();
   });
 

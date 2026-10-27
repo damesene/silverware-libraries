@@ -399,8 +399,8 @@ or opening its choices).
 
 - The emoji module's `actions.emoji` opens a picker in a panel of its own
   (`Action.panel`, core/panel.ts): its groups over the search as filters
-  (*All*, then each group by its first emoji: that group alone, searched
-  too), search by name and keywords (English), the
+  (*All*, then each group by its icon, what it most plainly is: 😀 🧑 🐻
+  🍔 ✈️ ⚽ 💡 🔣 🚩; that group alone, searched too), search by name and keywords (English), the
   emoji by Unicode's groups, those used last first, arrows and Enter; one
   picked replaces the selection, the cursor after it. Its emoji are not the
   popup's actions (too many among the formats). Basic emoji only, no skin

@@ -8,7 +8,7 @@ import { emojiChange, type EmojiData, emojiModule } from "./emoji.ts";
 const DATA: EmojiData = {
   groups: [
     { name: "Smileys", items: [["😀", "grinning face", "happy smile"], ["🥳", "partying face", "celebration party"]] },
-    { name: "People", items: [["👍", "thumbs up", "good like yes"]] },
+    { name: "People", icon: "🧑", items: [["👍", "thumbs up", "good like yes"]] },
   ],
 };
 
@@ -88,8 +88,9 @@ describe("The emoji picker", () => {
     const tabs = Array.from(element.querySelectorAll<HTMLButtonElement>(".swb-emoji-tab"));
     expect(tabs.map((t) => [t.textContent, t.getAttribute("aria-checked")])).toEqual([
       ["All", "true"],
+      // Its icon, else its first emoji
       ["😀", "false"],
-      ["👍", "false"],
+      ["🧑", "false"],
     ]);
     tabs[2]!.click();
     expect(shown()).toEqual(["👍"]);

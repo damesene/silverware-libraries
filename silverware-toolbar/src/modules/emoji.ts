@@ -1,7 +1,6 @@
 // The emoji module: an action (`actions.emoji`) opening a picker of every
 // emoji in its panel (core/panel.ts): its groups over the search as filters
-// (All, then each group by its first emoji: only that group's shown, the
-// search too), a search by name and keywords (English, as Unicode's CLDR has
+// (All, then each group by its icon: only that group's shown, the search too), a search by name and keywords (English, as Unicode's CLDR has
 // them), the emoji in Unicode's groups, those used last first; one picked is written at the cursor (the selection replaced). The
 // emoji are not the popup's actions (too many among the formats): only the
 // picker finds them. Their data is a file beside the bundle
@@ -14,7 +13,8 @@ import { ICONS } from "../icons.ts";
 
 /** An emoji: its character, name and keywords */
 export type Emoji = readonly [emoji: string, name: string, keywords: string];
-export type EmojiData = { readonly groups: readonly { readonly name: string; readonly items: readonly Emoji[] }[] };
+// A group's `icon`: its emoji in the filters (else its first)
+export type EmojiData = { readonly groups: readonly { readonly name: string; readonly icon?: string; readonly items: readonly Emoji[] }[] };
 
 // Those used last, kept per browser (not a setting)
 const RECENT_KEY = "silverware.toolbar.recentEmoji";
@@ -219,7 +219,7 @@ function picker(panel: ActionPanel, loaded: () => Promise<EmojiData>): () => voi
         });
         return button;
       };
-      tabs.replaceChildren(tab("All", "All", undefined), ...groups.map((group, i) => tab(group.items[0]?.[0] ?? "?", group.name, i)));
+      tabs.replaceChildren(tab("All", "All", undefined), ...groups.map((group, i) => tab(group.icon ?? group.items[0]?.[0] ?? "?", group.name, i)));
       draw();
       panel.place();
     },

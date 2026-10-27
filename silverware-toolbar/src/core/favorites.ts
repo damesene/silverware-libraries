@@ -106,7 +106,8 @@ export const DEFAULT_TOUCH_FAVORITES: Favorites = [
     { type: "gesture", tap: "formats.link", up: "formats.wikiLink" },
     { type: "gesture", tap: "formats.code", up: "formats.codeBlock" },
   ],
-  [{ id: "actions.emoji" }, { id: "actions.more", pin: "right" }],
+  // … pinned at the right end, a swipe down on it hiding the keyboard
+  [{ id: "actions.emoji" }, { type: "gesture", tap: "actions.more", down: "actions.hideKeyboard", pin: "right" }],
 ];
 
 /**

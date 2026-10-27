@@ -371,7 +371,8 @@ config.set("silverware.toolbar.favorites", {
   right, edited as rows (a separator cannot be pinned); written back with
   each item's `pin`, the left ones at the first row's start, the right ones
   at the last row's end (`joinPins`). Touch's default: Turn into pinned left,
-  `width = 9` ("Paragraph"), … pinned right.
+  `width = 9` ("Paragraph"), … pinned right, as a gesture button whose
+  swipe down hides the keyboard (the user's, the same day).
 - An action's own icon and label (2026-10-27, as the user decided): an
   action's item's `icon` (up to 3 characters, an emoji counted as one,
   written as text: no SVG of the user's, which would put markup into the

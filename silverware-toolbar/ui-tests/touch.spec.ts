@@ -28,25 +28,27 @@ test.describe("The toolbar's defaults on a phone", () => {
     await expect(bar(page)).toHaveClass(/swb-docked/);
     const gestures = bar(page).locator(".swb-gesture");
     const of = (i: number) => gestures.nth(i).evaluate((b) => [(b as HTMLElement).dataset.swbGesture, (b as HTMLElement).dataset.swbUp ?? "", (b as HTMLElement).dataset.swbDown ?? ""]);
-    await expect(gestures).toHaveCount(4);
+    await expect(gestures).toHaveCount(5);
     expect(await of(0)).toEqual(["formats.bold", "formats.italic", "formats.highlight"]);
     expect(await of(1)).toEqual(["formats.strikethrough", "", "formats.underline"]);
     expect(await of(2)).toEqual(["formats.link", "formats.wikiLink", ""]);
     expect(await of(3)).toEqual(["formats.code", "formats.codeBlock", ""]);
+    // …, a swipe down hiding the keyboard
+    expect(await of(4)).toEqual(["actions.more", "", "actions.hideKeyboard"]);
     await expect(bar(page).locator('[data-swb-action^="formats.heading"], [data-swb-gesture^="formats.heading"]')).toHaveCount(0);
     await expect(barButton(page, "actions.turnInto")).toBeVisible();
     await expect(barButton(page, "actions.emoji")).toHaveCount(1);
   });
 
-  test("Turn into pinned at the left end, … at the right, out of what scrolls; Turn into as wide whatever it says, so nothing after it moves", async ({ page }) => {
+  test("Turn into pinned at the left end, … (a gesture button: swiped down, the keyboard hidden) at the right, out of what scrolls; Turn into as wide whatever it says, so nothing after it moves", async ({ page }) => {
     await selectByTouch(page, "some text");
     await expect(bar(page)).toHaveClass(/swb-docked/);
     const left = bar(page).locator(".swb-dock-pinned-left");
     const right = bar(page).locator(".swb-dock-pinned-right");
     await expect(left.locator("[data-swb-action]")).toHaveCount(1);
     await expect(left.locator('[data-swb-action="actions.turnInto"]')).toHaveClass(/swb-fixed/);
-    await expect(right.locator('[data-swb-action="actions.more"]')).toHaveCount(1);
-    await expect(bar(page).locator(".swb-dock-items [data-swb-action='actions.turnInto'], .swb-dock-items [data-swb-action='actions.more']")).toHaveCount(0);
+    await expect(right.locator('[data-swb-gesture="actions.more"][data-swb-down="actions.hideKeyboard"]')).toHaveCount(1);
+    await expect(bar(page).locator(".swb-dock-items [data-swb-action='actions.turnInto'], .swb-dock-items [data-swb-gesture='actions.more']")).toHaveCount(0);
     // Scrolled to its end: the pinned ones where they were
     const items = bar(page).locator(".swb-dock-items");
     const before = (await left.boundingBox())!;

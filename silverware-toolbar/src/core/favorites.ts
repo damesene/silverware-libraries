@@ -89,7 +89,7 @@ export const isKindItem = (item: FavoriteItem): item is KindItem => !isSeparator
 
 /** The favourites for a mouse (Click, and the default): a row of each kind of action */
 export const DEFAULT_FAVORITES: Favorites = [
-  [{ id: "actions.turnInto", show: "label" }],
+  [{ id: "actions.turnInto", show: "label", width: 8 }],
   [{ id: "formats.bold" }, { id: "formats.italic" }, { id: "formats.highlight" }, { id: "formats.underline" }, { id: "formats.strikethrough" }],
   [{ id: "formats.link" }, { id: "formats.wikiLink" }, { id: "formats.code" }, { id: "formats.codeBlock" }],
   [{ id: "actions.emoji", show: "label" }, { type: "separator" }, { id: "actions.more" }],
@@ -97,7 +97,7 @@ export const DEFAULT_FAVORITES: Favorites = [
 
 /** The favourites for a finger (Touch): the same actions, the kin of one a swipe of its gesture button, so the bar at the bottom is short */
 export const DEFAULT_TOUCH_FAVORITES: Favorites = [
-  [{ id: "actions.turnInto", show: "label", width: 9, pin: "left" }],
+  [{ id: "actions.turnInto", show: "label", width: 8, pin: "left" }],
   [
     { type: "gesture", tap: "formats.bold", up: "formats.italic", down: "formats.highlight" },
     { type: "gesture", tap: "formats.strikethrough", down: "formats.underline" },

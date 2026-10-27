@@ -969,6 +969,8 @@ end
      its body scrolls (a phone: the whole screen, below) */
   display: flex;
   flex-direction: column;
+  /* (Its border within the height: SilverBullet sets no box-sizing, the playground border-box) */
+  box-sizing: border-box;
   width: min(600px, calc(100vw - 24px));
   height: min(720px, calc(100vh - 32px));
   height: min(720px, calc(var(--sw-view-height, 100dvh) - 32px));

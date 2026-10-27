@@ -4,6 +4,24 @@ import { bar, barButton, caret, expect, lineBox, onSilverBullet, popup, select, 
 // The command's key, as the playground binds it (SilverBullet binds the library page's command so)
 const KEY = "Control+Shift+Q";
 
+test.describe("The toolbar's defaults", () => {
+  test.use({ favorites: null });
+
+  test("six rows: Turn into; the headings; bold to strikethrough; links and code; lists; Emoji and …", async ({ page }) => {
+    await select(page, "some text");
+    const rows = bar(page).locator(".swb-row");
+    await expect(rows).toHaveCount(6);
+    const ids = (row: number) => rows.nth(row).locator("[data-swb-action]").evaluateAll((buttons) => buttons.map((b) => (b as HTMLElement).dataset.swbAction));
+    expect(await ids(0)).toEqual(["actions.turnInto"]);
+    expect(await ids(1)).toEqual(["formats.heading1", "formats.heading2", "formats.heading3"]);
+    expect(await ids(2)).toEqual(["formats.bold", "formats.italic", "formats.underline", "formats.highlight", "formats.strikethrough"]);
+    expect(await ids(3)).toEqual(["formats.link", "formats.wikiLink", "formats.code", "formats.codeBlock"]);
+    expect(await ids(4)).toEqual(["formats.task", "formats.bullet", "formats.numbered"]);
+    expect(await ids(5)).toEqual(["actions.emoji", "actions.more"]);
+    await expect(barButton(page, "actions.emoji")).toHaveText("Emoji");
+  });
+});
+
 test.describe("The toolbar", () => {
   test("shows by a selection made, in rows (Turn into with its label above the icons), and goes when there is none", async ({ page }) => {
     await select(page, "Plain paragraph one");

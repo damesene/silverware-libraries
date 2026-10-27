@@ -17,6 +17,10 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
+import { SETTINGS_STORE } from "../../playground/toolbar-store.ts";
+import { withConfigSettings } from "../../shared/configpage.ts";
+import { OWN_MARKER } from "../src/bridge.ts";
+import type { Favorites } from "../src/core/favorites.ts";
 
 export { expect };
 
@@ -32,13 +36,33 @@ type View = {
   focus(): void;
 };
 
-/** Tests get `page` with the toolbar's sample open; an error in the page (thrown or logged) fails the test */
-export const test = base.extend({
+/**
+ * The favourites the tests start with (`favorites`, an option; null: the
+ * toolbar's own defaults, as undefined is the option's default to Playwright),
+ * so a test of how they work does not hang on what the defaults are: two rows,
+ * Turn into over the formats, … ending them; by finger the same (Touch's own
+ * the same too, off)
+ */
+export const TEST_FAVORITES: Favorites = [
+  [{ id: "actions.turnInto", show: "label" }],
+  [{ id: "formats.bold" }, { id: "formats.italic" }, { id: "formats.code" }, { type: "separator" }, { id: "formats.link" }, { id: "formats.highlight" }, { type: "separator" }, { id: "actions.more" }],
+];
+
+// The settings that give a test its favourites, by path (the playground's store, SilverBullet's CONFIG)
+const favoriteSettings = (favorites: Favorites) => ({
+  "silverware.toolbar.favorites": favorites,
+  "silverware.toolbar.favorites-touch": favorites,
+  "silverware.toolbar.favorites-touch-enabled": false,
+});
+
+/** Tests get `page` with the toolbar's sample open and the favourites asked for; an error in the page (thrown or logged) fails the test */
+export const test = base.extend<{ favorites: Favorites | null }>({
+  favorites: [TEST_FAVORITES, { option: true }],
   // Against SilverBullet, its worker's server
   baseURL: async ({ baseURL }, use) => {
     await use(target === "silverbullet" ? `http://127.0.0.1:${server().port}/` : baseURL);
   },
-  page: async ({ page }, use, testInfo) => {
+  page: async ({ page, favorites }, use, testInfo) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => {
@@ -51,8 +75,23 @@ export const test = base.extend({
         const path = join(server().space, `${name}.md`);
         await mkdir(dirname(path), { recursive: true });
         await writeFile(path, sample);
+        // The favourites in the toolbar's own block, the rest in the Configuration Manager's: as the settings save them
+        if (favorites) {
+          const { "silverware.toolbar.favorites-touch-enabled": enabled, ...tables } = favoriteSettings(favorites);
+          await writeFile(config, withConfigSettings(withConfigSettings("", tables, OWN_MARKER), { "silverware.toolbar.favorites-touch-enabled": enabled }));
+        }
         await page.goto(`/${name}`);
-      } else await page.goto("/toolbar.html");
+      } else {
+        // In the playground's store before it starts, unless a test saved its own meanwhile (a reload)
+        if (favorites)
+          await page.addInitScript(
+            ({ key, values }) => {
+              if (!localStorage.getItem(key)) localStorage.setItem(key, values);
+            },
+            { key: SETTINGS_STORE, values: JSON.stringify(favoriteSettings(favorites)) },
+          );
+        await page.goto("/toolbar.html");
+      }
       await ready(page);
       await use(page);
       expect(errors, "errors in the page").toEqual([]);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type Bridge, DEFAULT_SHORTCUT, missingBridgeFunctions, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, readSettings, readShortcut } from "./bridge.ts";
 import libraryPage from "../silverware-toolbar.md?raw";
-import { DEFAULT_FAVORITES } from "./core/favorites.ts";
+import { DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES } from "./core/favorites.ts";
 
 const bridge = (config: Record<string, unknown>, extra: Partial<Bridge> = {}): Bridge => ({
   getSelection: () => ({ from: 0, to: 0, text: "" }),
@@ -50,8 +50,15 @@ describe("Settings", () => {
     expect(settings.favorites).toEqual([[gesture]]);
   });
 
-  it("read touch's own favourites where set (not valid: none), on unless turned off", async () => {
-    expect((await readSettings(bridge({}))).touchFavorites).toBeUndefined();
+  it("read touch's own favourites: the defaults for touch, else as set (not valid: none, Click's show); on unless turned off", async () => {
+    expect((await readSettings(bridge({}))).touchFavorites).toEqual(DEFAULT_TOUCH_FAVORITES);
+    // A space's own favourites and none for touch: its own by finger too (as before), the defaults for touch kept
+    const own = await readSettings(bridge({ "silverware.toolbar.favorites": [[{ id: "formats.bold" }]] }));
+    expect([own.touchOn, own.touchFavorites]).toEqual([false, DEFAULT_TOUCH_FAVORITES]);
+    // Both set (the defaults written, as the settings save them): on
+    expect((await readSettings(bridge({ "silverware.toolbar.favorites": DEFAULT_FAVORITES, "silverware.toolbar.favorites-touch": DEFAULT_TOUCH_FAVORITES }))).touchOn).toBe(true);
+    // Gesture buttons without the Gestures module: no defaults for touch
+    expect((await readSettings(bridge({ "silverware.toolbar.modules.gestures.enabled": false }))).touchFavorites).toBeUndefined();
     expect((await readSettings(bridge({}))).touchOn).toBe(true);
     const settings = await readSettings(bridge({ "silverware.toolbar.favorites-touch": [[{ id: "formats.code" }]], "silverware.toolbar.favorites-touch-enabled": false }));
     expect(settings.touchFavorites).toEqual([[{ id: "formats.code" }]]);
@@ -74,16 +81,14 @@ describe("Settings", () => {
 describe("The library page", () => {
   const page = libraryPage;
 
-  it("defines the same default favourites, key and modules as the code", () => {
-    // The defaults as Lua writes them: rows of items
-    const lua = (value: unknown): string =>
-      Array.isArray(value)
-        ? `{ ${value.map(lua).join(", ")} }`
-        : typeof value === "object" && value
-          ? `{ ${Object.entries(value).map(([k, v]) => `${k} = ${lua(v)}`).join(", ")} }`
-          : JSON.stringify(value);
-    const defaults = /favorites = \{[\s\S]*?default = (\{[\s\S]*?\n {6}\}),/.exec(page)?.[1]?.replace(/\s+/g, " ").replace(/, \}/g, " }");
-    expect(defaults).toBe(lua(DEFAULT_FAVORITES));
+  it("defines no default for the favourites, and the same key and modules as the code", () => {
+    // The favourites have no default in config.define (left out, the toolbar's own apply: SilverBullet would copy a
+    // default in, and a space's own could not be told); the page names them for the user
+    for (const name of ["favorites", '\\["favorites-touch"\\]', '\\["favorites-touch-enabled"\\]']) {
+      const definition = new RegExp(`\\n    ${name} = \\{([\\s\\S]*?)\\n    \\},`).exec(page)?.[1];
+      expect(definition, name).toBeDefined();
+      expect(definition, name).not.toContain("default =");
+    }
     expect(/shortcut = \{[\s\S]*?default = "([^"]*)"/.exec(page)?.[1]).toBe(DEFAULT_SHORTCUT);
     expect(page).toContain(`config.get("silverware.toolbar.shortcut", "${DEFAULT_SHORTCUT}")`);
     for (const name of MODULE_NAMES) expect(page).toContain(`${name} = { type = "object"`);

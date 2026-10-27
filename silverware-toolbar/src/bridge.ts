@@ -1,7 +1,7 @@
 // The SilverBullet API Silverware Toolbar uses, handed over by the library
 // page's Space Lua (`editor.*` and `config.get`), so no SilverBullet internals
 // are needed.
-import { DEFAULT_FAVORITES, favoriteItemOf, type FavoriteItem, type Favorites } from "./core/favorites.ts";
+import { DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, favoriteItemOf, type FavoriteItem, type Favorites } from "./core/favorites.ts";
 
 export type Bridge = {
   // The main selection: where it is in the page's text, and its text
@@ -78,6 +78,10 @@ export const SHOW_LABELS: Readonly<Record<Show, string>> = { always: "Always", m
 
 export const PLACEMENT_LABELS: Readonly<Record<Placement, string>> = { auto: "Automatic", selection: "By the selection", bottom: "Docked at the bottom" };
 
+// The toolbar's own block of the CONFIG page, for tables (the favourites): the Configuration Manager's block
+// would lose them on its next save (shared/configpage.ts)
+export const OWN_MARKER = "-- managed-by: silverware-toolbar";
+
 /** Where each setting is in SilverBullet's configuration */
 export const PATHS = {
   favorites: "silverware.toolbar.favorites",
@@ -95,7 +99,7 @@ export const PATHS = {
 /** Silverware Toolbar's settings, read once it starts (a change applies on reload) */
 export type Settings = {
   readonly favorites: Favorites;
-  // For a device worked by a finger; undefined: the favourites there too
+  // For a device worked by a finger (the defaults for touch where not set); undefined: the favourites there too
   readonly touchFavorites: Favorites | undefined;
   // Whether touch's own show (they are kept while off)
   readonly touchOn: boolean;
@@ -128,16 +132,25 @@ export async function readSettings(bridge: Bridge): Promise<Settings> {
       return fallback;
     }
   };
-  const favorites = await get(PATHS.favorites, DEFAULT_FAVORITES);
+  // Not set: undefined (config.define gives them no default, so SilverBullet copies none in)
+  const favorites = await get(PATHS.favorites, undefined);
   const touch = await get(PATHS.touchFavorites, undefined);
+  const touchOn = await get(PATHS.touchOn, undefined);
   const modules = new Set<ModuleName>();
   for (const name of MODULE_NAMES) if ((await get(PATHS.module(name), true)) !== false) modules.add(name);
+  // A space's own: set
+  const ownFavorites = favorites != null;
+  const ownTouch = touch != null;
   const placement = await get(PATHS.placement, "auto");
   const show = await get(PATHS.show, "mobile");
   return {
-    favorites: favoritesOf(favorites),
-    touchFavorites: touch === undefined || touch === null ? undefined : rowsOf(touch),
-    touchOn: (await get(PATHS.touchOn, true)) !== false,
+    favorites: ownFavorites ? favoritesOf(favorites) : DEFAULT_FAVORITES,
+    // Not set: the defaults for touch, gesture buttons, so without the Gestures module none (Click's show)
+    touchFavorites: ownTouch ? rowsOf(touch) : modules.has("gestures") ? DEFAULT_TOUCH_FAVORITES : undefined,
+    // Not set: on, unless the favourites are a space's own and those for touch are not (its own show by finger too,
+    // as before there were favourites for touch); the settings dialog writes it with the favourites, so editing
+    // them does not change it
+    touchOn: touchOn == null ? !(ownFavorites && !ownTouch) : touchOn !== false,
     modules,
     placement: PLACEMENTS.includes(placement as Placement) ? (placement as Placement) : "auto",
     show: SHOWS.includes(show as Show) ? (show as Show) : "mobile",

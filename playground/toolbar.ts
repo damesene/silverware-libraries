@@ -11,6 +11,7 @@ import { EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { DEFAULT_SHORTCUT, PATHS } from "../silverware-toolbar/src/bridge.ts";
 import { init, openSettings, showActions } from "../silverware-toolbar/src/index.ts";
+import { SETTINGS_STORE } from "./toolbar-store.ts";
 import libraryPage from "../silverware-toolbar/silverware-toolbar.md";
 import { flash, setUpTheme } from "./common.ts";
 import sample from "./toolbar-sample.md";
@@ -22,7 +23,6 @@ style.textContent = /```space-style\r?\n([\s\S]*?)```/.exec(libraryPage)?.[1] ??
 document.head.append(style);
 
 const STORE = "silverware.toolbar.playground.text";
-const SETTINGS_STORE = "silverware.toolbar.playground.settings";
 const load = (key: string) => {
   try {
     return localStorage.getItem(key);

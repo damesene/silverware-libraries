@@ -52,18 +52,11 @@ Over several lines of one paragraph, a format of markers (bold, italic, striketh
 
 ## Favourites
 
-The toolbar shows your favourites: rows, one under another, each a list of items. An item is an action by its `id` (see *Actions*; its `type` is `"action"`, which can be left out), shown as its icon, or with `show = "label"` as its icon and its name, a separator (`type = "separator"`), or a gesture button (`type = "gesture"`, see below). An action that offers a list (*Turn into*) has an arrow, and shows the choice your selection has. Every action is in the **…** list: *Every action* (`actions.more`), an item as any other, in the default at the end of the last row. You can put it anywhere, or on a gesture button's swipe; favourites without it get it at the end of the toolbar, and the settings say so. An id no action has (a module turned off, a custom format not defined) is left out. The default:
-
-```lua
-config.set("silverware.toolbar.favorites", {
-  { { id = "actions.turnInto", show = "label" } },
-  { { id = "formats.bold" }, { id = "formats.italic" }, { id = "formats.code" }, { type = "separator" }, { id = "formats.link" }, { id = "formats.highlight" }, { type = "separator" }, { id = "actions.more" } },
-})
-```
+The toolbar shows your favourites: rows, one under another, each a list of items. An item is an action by its `id` (see *Actions*; its `type` is `"action"`, which can be left out), shown as its icon, or with `show = "label"` as its icon and its name, a separator (`type = "separator"`), or a gesture button (`type = "gesture"`, see below). An action that offers a list (*Turn into*) has an arrow, and shows the choice your selection has. Every action is in the **…** list: *Every action* (`actions.more`), an item as any other, in the default at the end of the last row. You can put it anywhere, or on a gesture button's swipe; favourites without it get it at the end of the toolbar, and the settings say so. An id no action has (a module turned off, a custom format not defined) is left out. The default: *Turn into* with its name; Heading 1 to 3; Bold, Italic, Underline, Highlight, Strikethrough; Link, Wiki link, Code, Code block; Task, Bullet list, Numbered list; *Emoji* with its name and **…**. Where the screen is worked by finger, the default is the same actions in a shorter bar, the kin of one on its gesture button's swipes: Heading 1 (up Heading 2, down Heading 3), Bold (up Italic, down Highlight), Strikethrough (down Underline), Link (up Wiki link), Code (up Code block), Task (up Bullet list, down Numbered list). That default needs the *Gestures* module: with it off, and for a space whose favourites are its own (set before favourites for touch came), the favourites show by finger too, until *Own favourites for touch* is turned on.
 
 The settings dialog's *Favorites* tab edits them without writing Lua (see *Settings*).
 
-Where the screen is worked by finger (a phone, a tablet), the toolbar can show other favourites: `silverware.toolbar.favorites-touch`, written as the favourites are, say with gesture buttons in place of plain ones. Not set, the favourites show there too. A computer with a touch screen counts as one with a mouse (its touchpad is what it is mostly worked with). `silverware.toolbar.favorites-touch-enabled = false` turns them off for a while: the favourites show by finger too, those for touch kept. In the settings, *Favorites* has *Click* and *Touch* at its top (opened by finger on *Touch* where its own are on): *Own favourites for touch* turns them on (the first time as a copy of *Click*'s to change) and off, *Copy from Click* / *Copy from Touch* puts the other's over the ones shown, and *Reset to defaults* (asked first) puts the defaults back: *Click*'s the toolbar's own, *Touch*'s none of its own.
+Where the screen is worked by finger (a phone, a tablet), the toolbar can show other favourites: `silverware.toolbar.favorites-touch`, written as the favourites are, with gesture buttons in place of plain ones (the default, see above). A computer with a touch screen counts as one with a mouse (its touchpad is what it is mostly worked with). `silverware.toolbar.favorites-touch-enabled = false` turns them off for a while: the favourites show by finger too, those for touch kept. In the settings, *Favorites* has *Click* and *Touch* at its top (opened by finger on *Touch* where its own are on): *Own favourites for touch* turns them on and off (off, *Click*'s show by finger, those for touch kept), *Copy from Click* / *Copy from Touch* puts the other's over the ones shown, and *Reset to defaults* (asked first) puts the defaults back, each its own.
 
 ### Text snippets
 
@@ -224,6 +217,8 @@ config.define("silverware.toolbar", {
   description = "Silverware Toolbar settings",
   type = "object",
   properties = {
+    -- No default for either favourites: left out they are told as not set (SilverBullet would copy a default in,
+    -- client/config.ts applySchemaDefaults); the toolbar's own defaults apply then (the library page says them)
     favorites = {
       type = "array",
       items = {
@@ -237,10 +232,6 @@ config.define("silverware.toolbar", {
             show = { type = "string", enum = { "icon", "label" } },
           },
         },
-      },
-      default = {
-        { { id = "actions.turnInto", show = "label" } },
-        { { id = "formats.bold" }, { id = "formats.italic" }, { id = "formats.code" }, { type = "separator" }, { id = "formats.link" }, { id = "formats.highlight" }, { type = "separator" }, { id = "actions.more" } },
       },
       description = "The toolbar's rows, each a list of items: { id = <its id>, show = \"icon\" or \"label\" }, { type = \"separator\" }, or a module's kind: { type = \"gesture\", tap = <an id>, up = <an id>, down = <an id> } (every action is in the list of the … button).",
       ui = { category = "Silverware Toolbar", label = "Favourite actions", priority = 2 },
@@ -259,13 +250,13 @@ config.define("silverware.toolbar", {
           },
         },
       },
-      description = "The toolbar's rows where the screen is worked by finger (a phone, a tablet), as the favourites are written; not set: the favourites there too.",
+      description = "The toolbar's rows where the screen is worked by finger (a phone, a tablet), as the favourites are written (gesture buttons need the Gestures module).",
       ui = { category = "Silverware Toolbar", label = "Favourite actions for touch", priority = 1.9 },
     },
+    -- No default either: left out, on unless the favourites are the space's own and those for touch are not
     ["favorites-touch-enabled"] = {
       type = "boolean",
-      default = true,
-      description = "Whether the favourite actions for touch show where the screen is worked by finger; off, the favourite actions show there, those for touch kept.",
+      description = "Whether the favourite actions for touch show where the screen is worked by finger; off, the favourite actions show there, those for touch kept. Not set: on, unless the favourite actions are your own and those for touch are not.",
       ui = { category = "Silverware Toolbar", label = "Own favourites for touch", priority = 1.8 },
     },
     shortcut = {

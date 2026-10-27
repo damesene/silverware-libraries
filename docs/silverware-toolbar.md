@@ -341,11 +341,21 @@ config.set("silverware.toolbar.favorites", {
   off for a while, its own kept: Click's show by finger too. Touch with none
   of its own shows Click's.
 - Settings: *Click* | *Touch* at the Favorites tab's top (by finger Touch's
-  first where its own are on, else Click's); *Own favourites for touch* turns them on (the first time a copy of
-  Click's) and off (Click's shown dimmed, not edited); *Copy from Click* /
+  first where its own are on, else Click's); *Own favourites for touch* turns
+  them on and off (Click's shown dimmed, not edited); *Copy from Click* /
   *Copy from Touch* puts the other's over the ones shown; *Reset to
-  defaults* left of it (asked first): Click's the defaults, Touch's none of
-  its own.
+  defaults* left of it (asked first), each its own defaults.
+- Defaults (2026-10-27, as the user laid them out): Click six rows (Turn
+  into; H1-H3; B I U highlight strike; link, wiki link, code, code block;
+  task, bullet, numbered; Emoji, …); Touch, on by default, the same in
+  gesture buttons (H1 up H2 down H3; B up I down highlight; strike down U;
+  link up wiki link; code up code block; task up bullet down numbered). Not
+  where they would break what a space has: its own favourites and none for
+  touch keep Touch off (its own by finger, as before), and without the
+  Gestures module Touch has no defaults. Told by being set: config.define
+  gives neither favourites (nor the switch) a default, as SilverBullet copies
+  a default into the configuration (client/config.ts `applySchemaDefaults`)
+  and a setting left out would come back as it; the toolbar applies its own.
 
 ### Kinds of favourites: the gesture button (decided and built 2026-10-26)
 

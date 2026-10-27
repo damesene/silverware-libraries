@@ -20,6 +20,26 @@ async function selectByTouch(page: Page, needle: string): Promise<void> {
   await select(page, needle);
 }
 
+test.describe("The toolbar's defaults on a phone", () => {
+  test.use({ favorites: null });
+
+  test("Touch's own: gesture buttons, the kin of each action on its swipes", async ({ page }) => {
+    await selectByTouch(page, "some text");
+    await expect(bar(page)).toHaveClass(/swb-docked/);
+    const gestures = bar(page).locator(".swb-gesture");
+    const of = (i: number) => gestures.nth(i).evaluate((b) => [(b as HTMLElement).dataset.swbGesture, (b as HTMLElement).dataset.swbUp ?? "", (b as HTMLElement).dataset.swbDown ?? ""]);
+    await expect(gestures).toHaveCount(6);
+    expect(await of(0)).toEqual(["formats.heading1", "formats.heading2", "formats.heading3"]);
+    expect(await of(1)).toEqual(["formats.bold", "formats.italic", "formats.highlight"]);
+    expect(await of(2)).toEqual(["formats.strikethrough", "", "formats.underline"]);
+    expect(await of(3)).toEqual(["formats.link", "formats.wikiLink", ""]);
+    expect(await of(4)).toEqual(["formats.code", "formats.codeBlock", ""]);
+    expect(await of(5)).toEqual(["formats.task", "formats.bullet", "formats.numbered"]);
+    await expect(barButton(page, "actions.turnInto")).toBeVisible();
+    await expect(barButton(page, "actions.emoji")).toHaveCount(1);
+  });
+});
+
 test.describe("The toolbar on a phone", () => {
   test("docked at the bottom as one row across the window, the rows one after another, … at its end", async ({ page }) => {
     await selectByTouch(page, "some text");

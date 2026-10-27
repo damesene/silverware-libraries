@@ -119,11 +119,10 @@ test.describe("The settings dialog", () => {
     await expect(rowItems(page, 0)).toHaveText(["Turn into"]);
   });
 
-  test("Touch: Click's shown dimmed until it has its own; on, a copy of Click's to change; saved, a mouse still has Click's; Copy from either way", async ({ page }) => {
+  test("Touch: Click's shown dimmed while its own are off; on, its own to change; saved, a mouse still has Click's; Copy from either way", async ({ page }) => {
     await openSettings(page);
     await tab(page, "favorites").click();
     await expect(dialog(page).locator('[data-swb-device="click"]')).toHaveAttribute("aria-checked", "true");
-    await expect(dialog(page).locator(".swb-settings-copy-from")).toBeDisabled();
     await dialog(page).locator('[data-swb-device="touch"]').click();
     await expect(dialog(page).locator(".swb-settings-rows-same")).toBeVisible();
     await dialog(page).locator(".swb-settings-devices .swb-settings-switch").click();
@@ -173,10 +172,11 @@ test.describe("The settings dialog", () => {
     await answerConfirm(page, false, () => reset.click());
     await expect(dialog(page).locator(".swb-settings-favrow")).toHaveCount(1);
     await answerConfirm(page, true, () => reset.click());
-    await expect(dialog(page).locator(".swb-settings-favrow")).toHaveCount(2);
+    // The toolbar's defaults (not the tests' favourites): six rows
+    await expect(dialog(page).locator(".swb-settings-favrow")).toHaveCount(6);
     await expect(rowItems(page, 0)).toHaveText(["Turn into"]);
-    // The defaults as they were: nothing to save
-    await expect(save(page)).toBeDisabled();
+    await expect(rowItems(page, 1)).toHaveText(["Heading 1", "Heading 2", "Heading 3"]);
+    await expect(save(page)).toBeEnabled();
   });
 
   test("a row removed by its ×, its items with it: saved, the toolbar has one row", async ({ page }) => {

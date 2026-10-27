@@ -12,7 +12,7 @@ import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
 import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
-import { DEFAULT_FAVORITES, type FavoriteItem, type Favorites, hasAction, isKindItem, isSeparator, type KindItem, byTouch } from "../core/favorites.ts";
+import { DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type FavoriteItem, type Favorites, hasAction, isKindItem, isSeparator, type KindItem, byTouch } from "../core/favorites.ts";
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
@@ -47,7 +47,7 @@ type Values = {
   show: Show;
   wordAtCaret: boolean;
   favorites: Favorites;
-  // Touch's own; undefined: none (Click's show)
+  // Touch's own (the defaults for touch where not set); undefined: none, an invalid one (Click's show)
   touchFavorites: Favorites | undefined;
   // Whether Touch's own show; off, Click's do (its own kept)
   touchOn: boolean;
@@ -305,19 +305,21 @@ export class SettingsDialog {
       this.picking = undefined;
       this.edit(copy(other), `.${BASE}-copy-from`);
     });
-    // Click from Touch only once Touch has its own
+    // (Click from Touch: Touch with none of its own, an invalid one, has nothing to give)
     copyButton.disabled = !other;
-    // The defaults, asked first (written only on Save): Click's the toolbar's own, Touch's none of its own (Click's show)
+    // The defaults, asked first (written only on Save): each its own
     const resetButton = this.button(`${BASE}-reset`, "Reset to defaults", () => {
       void (async () => {
         const question =
           this.device === "click"
             ? "Reset the favourites for Click to the defaults?"
-            : "Reset the favourites for Touch to the defaults? Touch then has none of its own: Click's show by finger.";
+            : "Reset the favourites for Touch to the defaults?";
         if (!(await this.ask(question))) return;
         if (this.device === "click") values.favorites = copy(DEFAULT_FAVORITES);
+        // Touch's are gesture buttons: without the Gestures module, none of its own (Click's show)
+        else if (!values.modules.gestures) values.touchFavorites = undefined;
         else {
-          values.touchFavorites = undefined;
+          values.touchFavorites = copy(DEFAULT_TOUCH_FAVORITES);
           values.touchOn = true;
         }
         this.picking = undefined;
@@ -331,7 +333,7 @@ export class SettingsDialog {
     bar.append(top);
     if (this.device === "touch") {
       const own = switchControl(this.context.doc, BASE, values.touchOn && !!values.touchFavorites, (on) => {
-        // On the first time: Click's copied to start from; off: Click's shown, its own kept for when it is on again
+        // On without any of its own (an invalid one): Click's copied to start from; off: Click's shown, its own kept for when it is on again
         values.touchOn = on;
         if (on && !values.touchFavorites) values.touchFavorites = copy(values.favorites);
         this.picking = undefined;
@@ -698,7 +700,8 @@ export class SettingsDialog {
     if (!sameRows(favorites, initial.favorites)) changed[PATHS.favorites] = favorites;
     const touch = values.touchFavorites && savedRows(values.touchFavorites);
     if (JSON.stringify(touch) !== JSON.stringify(initial.touchFavorites)) changed[PATHS.touchFavorites] = touch;
-    if (values.touchOn !== initial.touchOn) changed[PATHS.touchOn] = values.touchOn;
+    // With either favourites written too: as it is now, not as told again from them (readSettings)
+    if (values.touchOn !== initial.touchOn || PATHS.favorites in changed || PATHS.touchFavorites in changed) changed[PATHS.touchOn] = values.touchOn;
     for (const name of MODULE_NAMES) if (values.modules[name] !== initial.modules[name]) changed[PATHS.module(name)] = values.modules[name];
     return changed;
   }

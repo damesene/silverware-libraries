@@ -2,7 +2,7 @@
 //   js.importFromSpace("Library/damesene/silverware-toolbar.js").init({ ... editor functions ... })
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { actionsOf, customActionsAnew, defineCustomActions } from "./actions.ts";
-import { type Bridge, missingBridgeFunctions, PATHS, readSettings, type Settings } from "./bridge.ts";
+import { type Bridge, missingBridgeFunctions, OWN_MARKER, PATHS, readSettings, type Settings } from "./bridge.ts";
 import type { Action } from "./core/action.ts";
 import type { ItemKind } from "./core/items.ts";
 import { Controller, MORE_ACTION, SETTINGS_ACTION } from "./core/controller.ts";
@@ -16,10 +16,6 @@ export const version = "0.1.0";
 const GLOBAL_KEY = "__silverwareToolbar";
 
 const slot = globalThis as unknown as Record<string, Controller | undefined>;
-
-// The toolbar's own block of the CONFIG page, for tables (the favourites): the
-// Configuration Manager's block would lose them on its next save (shared/configpage.ts)
-export const OWN_MARKER = "-- managed-by: silverware-toolbar";
 
 // The bridge and the actions of the toolbar started last, for the settings dialog
 let current: { readonly bridge: Bridge; readonly actions: () => readonly Action[]; readonly kinds: () => readonly ItemKind[] } | undefined;

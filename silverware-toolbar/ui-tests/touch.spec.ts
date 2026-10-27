@@ -1,6 +1,6 @@
 // The toolbar on a phone (the "touch" project: a Pixel 7): text selected by touch docks it at the bottom, over the keyboard
 import type { Page } from "@playwright/test";
-import { addGesture, bar, barButton, caret, expect, gestureButton, lineBox, popup, select, selected, test, text } from "./helpers.ts";
+import { addGesture, bar, barButton, caret, expect, gestureButton, lineBox, popup, ready, select, selected, test, text } from "./helpers.ts";
 
 /** A finger moved from one point to another and lifted, as Chrome gets it (Playwright's touchscreen only taps) */
 async function swipe(page: Page, x: number, y: number, toX: number, toY: number, steps = 10): Promise<void> {
@@ -227,6 +227,65 @@ test.describe("The toolbar on a phone", () => {
     await expect(scroll).toHaveClass(/swb-more-right/);
     await bar(page).locator(".swb-dock-items").evaluate((items) => (items.scrollLeft = items.scrollWidth));
     await expect(scroll).not.toHaveClass(/swb-more-right/);
+  });
+
+  test("over the on-screen keyboard where it overlays the page (SilverBullet's keyboard bar off), else over that bar, both as they come and go", async ({ page }) => {
+    // The VirtualKeyboard API as SilverBullet sets it on a phone (overlaysContent: the window keeps its size);
+    // the emulation shows no keyboard, so its rectangle is given
+    // (Before the toolbar starts: it listens to it then)
+    await page.addInitScript(() => {
+      // Its rectangle as the window is laid out (none yet as this runs)
+      const keyboard = Object.assign(new EventTarget(), { overlaysContent: true, shown: true });
+      Object.defineProperty(keyboard, "boundingRect", { get: () => (keyboard.shown ? new DOMRect(0, innerHeight - 300, innerWidth, 300) : new DOMRect(0, innerHeight, innerWidth, 0)) });
+      Object.defineProperty(navigator, "virtualKeyboard", { value: keyboard, configurable: true });
+    });
+    await page.reload();
+    await ready(page);
+    await selectByTouch(page, "some text");
+    await expect(bar(page)).toHaveClass(/swb-docked/);
+    // Its line: the keyboard's top, or SilverBullet's keyboard bar's where it shows (SilverBullet lays it over the
+    // keyboard by the same API)
+    const line = (keyboardTop: string) =>
+      page.evaluate((top) => {
+        const own = document.querySelector(".sb-keyboard-bar")?.getBoundingClientRect();
+        return Math.round(own && own.height > 0 ? own.top : top === "shown" ? innerHeight - 300 : innerHeight);
+      }, keyboardTop);
+    const bottomOf = async () => {
+      const box = (await bar(page).boundingBox())!;
+      return Math.round(box.y + box.height);
+    };
+    await expect.poll(async () => (await bottomOf()) - (await line("shown"))).toBe(0);
+    expect(await bottomOf()).toBeLessThan(page.viewportSize()!.height - 250);
+    // The keyboard going: told by geometrychange, the toolbar at the window's bottom
+    await page.evaluate(() => {
+      const keyboard = (navigator as unknown as { virtualKeyboard: EventTarget & { shown: boolean } }).virtualKeyboard;
+      keyboard.shown = false;
+      keyboard.dispatchEvent(new Event("geometrychange"));
+    });
+    await expect.poll(async () => (await bottomOf()) - (await line("gone"))).toBe(0);
+  });
+
+  test("SilverBullet's keyboard bar put in while it is docked, and taken out: over it, and back, no event telling it", async ({ page }) => {
+    await selectByTouch(page, "some text");
+    await expect(bar(page)).toHaveClass(/swb-docked/);
+    const bottomOf = async () => {
+      const box = (await bar(page).boundingBox())!;
+      return Math.round(box.y + box.height);
+    };
+    const bottom = page.viewportSize()!.height;
+    await expect.poll(bottomOf).toBe(bottom);
+    await page.evaluate(() => {
+      const keyboardBar = document.createElement("div");
+      keyboardBar.className = "sb-keyboard-bar";
+      keyboardBar.style.cssText = "position: fixed; left: 0; right: 0; bottom: 0; height: 44px";
+      document.body.append(keyboardBar);
+    });
+    // Its top as laid out (SilverBullet's CSS styles the class too)
+    const top = await page.evaluate(() => Math.round(document.querySelector(".sb-keyboard-bar")!.getBoundingClientRect().top));
+    expect(top).toBeLessThan(bottom);
+    await expect.poll(bottomOf).toBe(top);
+    await page.evaluate(() => document.querySelector(".sb-keyboard-bar")?.remove());
+    await expect.poll(bottomOf).toBe(bottom);
   });
 
   test("over SilverBullet's keyboard bar where it shows", async ({ page }) => {

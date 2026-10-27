@@ -61,6 +61,11 @@ export class Bar {
     return this.dockedAt !== undefined;
   }
 
+  /** Docked: the line it stands on now */
+  get dockedLine(): number | undefined {
+    return this.dockedAt;
+  }
+
   /** Its rows of items; `more`: … pinned at the end of the last one (favourites without it) */
   show(rows: readonly (readonly Shown[])[], rect: Box, viewTop: number, more?: Extract<Shown, { action: Action }>): void {
     this.closeMenu();

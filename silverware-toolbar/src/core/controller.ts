@@ -71,6 +71,12 @@ export class Controller {
   private context: Context | undefined;
   // What pressed last (a pointer's type: touch, mouse, pen): a selection made by touch docks the toolbar at the bottom
   private pointer = "mouse";
+  // SilverBullet's keyboard bar put in or taken out (it renders it as the keyboard comes and goes, after the events
+  // that tell those): the docked toolbar placed again where its line moved, looked at once a frame at most; watched
+  // only while docked
+  private readonly barWatch: MutationObserver;
+  private barWatchFrame = 0;
+  private watchingBar = false;
   // The modules' actions to read anew as the toolbar next shows: after each load of Space Lua (its scripts define
   // commands after the toolbar starts, `reloaded`), or after a read that failed, not before `retryAt`
   private stale = true;
@@ -103,6 +109,15 @@ export class Controller {
     });
     this.popup = new Popup(doc);
     this.panel = new Panel(doc);
+    this.barWatch = new MutationObserver(() => {
+      if (this.barWatchFrame) return;
+      this.barWatchFrame = doc.defaultView!.requestAnimationFrame(() => {
+        this.barWatchFrame = 0;
+        // Not docked any more: no longer watched (docked again, watched again)
+        if (!this.bar.shown || !this.bar.docked) return this.watchBar(false);
+        if (this.dockLine() !== this.bar.dockedLine) this.onScroll();
+      });
+    });
   }
 
   start(): void {
@@ -118,6 +133,9 @@ export class Controller {
     // The on-screen keyboard coming or going: the docked toolbar stays over it
     win.visualViewport?.addEventListener("resize", this.onScroll);
     win.visualViewport?.addEventListener("scroll", this.onScroll);
+    // The keyboard overlaying the page (SilverBullet's on a phone): only it tells it came or went
+    virtualKeyboardOf(win)?.addEventListener("geometrychange", this.onScroll);
+
   }
 
   stop(): void {
@@ -133,6 +151,8 @@ export class Controller {
     this.doc.removeEventListener("focusout", this.onBlur);
     win.visualViewport?.removeEventListener("resize", this.onScroll);
     win.visualViewport?.removeEventListener("scroll", this.onScroll);
+    virtualKeyboardOf(win)?.removeEventListener("geometrychange", this.onScroll);
+    this.watchBar(false);
     this.bar.remove();
     this.popup.remove();
     this.panel.remove();
@@ -284,8 +304,10 @@ export class Controller {
     const more = rows.some((row) => row.some((item) => ("action" in item && item.action === MORE_ACTION) || ("item" in item && Object.values(item.item.actions).includes(MORE_ACTION))))
       ? undefined
       : { action: MORE_ACTION, active: false, enabled: true, labeled: false };
-    if (this.docks()) this.bar.dock(rows, this.dockLine(), more);
-    else this.bar.show(rows, rectOf(range), viewTopOf(range.startContainer), more);
+    if (this.docks()) {
+      this.bar.dock(rows, this.dockLine(), more);
+      this.watchBar(true);
+    } else this.bar.show(rows, rectOf(range), viewTopOf(range.startContainer), more);
   }
 
   /** A selection made in the page's text: the toolbar by it; none: the toolbar goes (unless shown at the caret) */
@@ -518,17 +540,38 @@ export class Controller {
     });
   };
 
+  /** SilverBullet's keyboard bar watched, or no longer (elements put in and taken out only: no text, no attributes) */
+  private watchBar(on: boolean): void {
+    if (on === this.watchingBar) return;
+    this.watchingBar = on;
+    if (on) {
+      this.barWatch.observe(this.doc.body, { childList: true, subtree: true });
+      return;
+    }
+    this.barWatch.disconnect();
+    if (this.barWatchFrame) this.doc.defaultView!.cancelAnimationFrame(this.barWatchFrame);
+    this.barWatchFrame = 0;
+  }
+
   /** Whether the toolbar docks at the bottom (the placement setting; auto: a selection made by touch) */
   private docks(): boolean {
     const { placement } = this.settings;
     return placement === "bottom" || (placement === "auto" && this.pointer === "touch");
   }
 
-  /** The line the docked toolbar stands on: SilverBullet's keyboard bar's top where it shows, else the visual viewport's bottom (the on-screen keyboard's top) */
+  /**
+   * The line the docked toolbar stands on: SilverBullet's keyboard bar's top
+   * where it shows; else the on-screen keyboard's top: where it overlays the
+   * page (the VirtualKeyboard API's `overlaysContent`, which SilverBullet sets
+   * on a phone: the window and the visual viewport keep their size) its own
+   * rectangle's, else the visual viewport's bottom
+   */
   private dockLine(): number {
     const win = this.doc.defaultView!;
     const view = win.visualViewport;
-    return keyboardBarTop(this.doc) ?? (view ? view.offsetTop + view.height : win.innerHeight);
+    const keyboard = virtualKeyboardOf(win);
+    const overlaid = keyboard?.overlaysContent && keyboard.boundingRect && keyboard.boundingRect.height > 0 ? keyboard.boundingRect.top : undefined;
+    return keyboardBarTop(this.doc) ?? overlaid ?? (view ? view.offsetTop + view.height : win.innerHeight);
   }
 
   private onPointer = (e: PointerEvent): void => {
@@ -550,6 +593,12 @@ export class Controller {
     if (this.popup.isOpen) this.popup.place(this.bar.rect(), viewTop);
     if (this.panel.isOpen) this.panel.place(this.bar.rect(), viewTop, false);
   };
+}
+
+/** The VirtualKeyboard API (Chrome on Android), where there is one: what the toolbar reads of it */
+type VirtualKeyboard = EventTarget & { readonly overlaysContent?: boolean; readonly boundingRect?: DOMRect };
+function virtualKeyboardOf(win: Window): VirtualKeyboard | undefined {
+  return (win.navigator as Navigator & { virtualKeyboard?: VirtualKeyboard }).virtualKeyboard;
 }
 
 /** Where a selection (or a caret) is on screen: the box around its parts that have a width, else its own */

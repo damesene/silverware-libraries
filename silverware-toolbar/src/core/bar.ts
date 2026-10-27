@@ -18,7 +18,17 @@ import { type Box, placeBy } from "./place.ts";
 
 /** An item as the toolbar shows it now: an action (with its label: `labeled`), a separator, or an item of a kind a module gives */
 export type Shown =
-  | { readonly action: Action; readonly active: boolean; readonly enabled: boolean; readonly labeled: boolean; readonly width?: number; readonly pin?: Pin }
+  | {
+      readonly action: Action;
+      readonly active: boolean;
+      readonly enabled: boolean;
+      readonly labeled: boolean;
+      readonly width?: number;
+      readonly pin?: Pin;
+      // The favourite's own icon (a character, an emoji) and label, in place of the action's
+      readonly ownIcon?: string;
+      readonly ownLabel?: string;
+    }
   | { readonly separator: true }
   | { readonly item: ShownItem };
 
@@ -220,23 +230,26 @@ export class Bar {
    * choices shows the choice on for the selection (none: `mixed`, else its own
    * icon and label) and a chevron, and opens their list
    */
-  private item({ action, active, enabled, labeled }: Extract<Shown, { action: Action }>): HTMLButtonElement {
+  private item({ action, active, enabled, labeled, ownIcon, ownLabel }: Extract<Shown, { action: Action }>): HTMLButtonElement {
     const button = this.button();
     button.dataset.swbAction = action.id;
     button.disabled = !enabled;
-    const { icon, label } = this.look(action, enabled);
-    button.innerHTML = icon + (labeled ? '<span class="swb-label"></span>' : "") + (action.choices ? ICONS.chevronDown : "");
+    const look = this.look(action, enabled);
+    // Its own label in place of the action's (one offering choices: the choice on still shown, its own label its name)
+    const label = action.choices ? look.label : (ownLabel ?? look.label);
+    button.innerHTML = (ownIcon ? '<span class="swb-own-icon"></span>' : look.icon) + (labeled ? '<span class="swb-label"></span>' : "") + (action.choices ? ICONS.chevronDown : "");
+    if (ownIcon) button.querySelector(".swb-own-icon")!.textContent = ownIcon;
     if (labeled) {
       button.classList.add("swb-labeled");
       button.querySelector(".swb-label")!.textContent = label;
     }
     if (action.choices) {
       button.classList.add("swb-choices");
-      this.name(button, label === action.label ? `${action.label}…` : `${action.label}: ${label}`);
+      this.name(button, ownLabel ?? (label === action.label ? `${action.label}…` : `${action.label}: ${label}`));
       button.setAttribute("aria-haspopup", "menu");
       button.addEventListener("click", () => this.toggleMenu(button, action));
     } else {
-      this.name(button, action.label);
+      this.name(button, label);
       button.setAttribute("aria-pressed", String(active));
       button.addEventListener("click", () => this.handlers.run(action));
     }

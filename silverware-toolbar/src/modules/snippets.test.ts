@@ -13,11 +13,12 @@ function write(snippet: string, page: string, from: number, to: number): { text:
 }
 
 describe("A text snippet", () => {
-  it("is a kind of favourite with fields of its own and no slots, its text required", () => {
+  it("is a kind of favourite with its text its field and no slots, its icon and label an item's own, its text required", () => {
     const [kind] = snippetsModule().itemKinds!();
     expect(kind!.type).toBe("snippet");
     expect(kind!.slots).toEqual([]);
-    expect(kind!.fields!.map((f) => f.key)).toEqual(["icon", "label", "text"]);
+    expect(kind!.fields!.map((f) => f.key)).toEqual(["text"]);
+    expect(kind!.ownLook).toBe(true);
     expect(kind!.check!({ type: "snippet" })).toBeTruthy();
     expect(kind!.check!({ type: "snippet", text: "x" })).toBeUndefined();
   });

@@ -12,12 +12,12 @@ import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
 import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
-import { byTouch, DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type FavoriteItem, type Favorites, hasAction, isKindItem, isSeparator, type KindItem, MAX_WIDTH, MIN_WIDTH, type Show as ItemShow, widthOf } from "../core/favorites.ts";
+import { byTouch, DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type FavoriteItem, type Favorites, hasAction, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Show as ItemShow, widthOf } from "../core/favorites.ts";
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
 import { reorder } from "./drag.ts";
-import { addItem, type At, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setSlot, splitPins, stepOf } from "./favorites.ts";
+import { addItem, type At, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, splitPins, stepOf } from "./favorites.ts";
 
 const BASE = "swb-settings";
 
@@ -453,8 +453,12 @@ export class SettingsDialog {
       if (isKindItem(item)) {
         // A kind's: its slots, each an action picked (the dialog knows nothing of what they are for)
         const kind = this.context.kinds().find((k) => k.type === item.type);
-        icon.innerHTML = kind?.icon ?? "";
-        name.textContent = kind?.label ?? item.type;
+        // Its own icon and label where its kind has them (a snippet's), as the toolbar shows them
+        const ownIcon = kind?.ownLook && typeof item.icon === "string" && item.icon ? item.icon : undefined;
+        const ownLabel = kind?.ownLook && typeof item.label === "string" && item.label ? item.label : undefined;
+        if (ownIcon) icon.textContent = ownIcon;
+        else icon.innerHTML = kind?.icon ?? "";
+        name.textContent = ownLabel ?? kind?.label ?? item.type;
         element.append(icon, name);
         element.classList.add(`${BASE}-kind`);
         const problem = kind?.check?.(item);
@@ -468,8 +472,10 @@ export class SettingsDialog {
         }
       } else {
         const action = known.get(item.id);
-        icon.innerHTML = action?.icon ?? "";
-        name.textContent = action?.label ?? item.id;
+        // Its own icon and label, as the toolbar shows them
+        if (item.icon) icon.textContent = item.icon;
+        else icon.innerHTML = action?.icon ?? "";
+        name.textContent = item.label ?? action?.label ?? item.id;
         element.append(icon, name);
         // As it shows in the toolbar: its icon alone (its name for a screen reader and in its tooltip), or its label too
         if (item.show !== "label") {
@@ -636,6 +642,13 @@ export class SettingsDialog {
       label.append(this.el("span", `${BASE}-look-name`, "Width"), field, this.el("span", `${BASE}-look-unit`, "characters"));
       panel.append(label);
     }
+    // An action's own icon and label (its label whatever it shows: its tooltip too), or a kind's whose items have their own
+    const kind = isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type) : undefined;
+    if (isActionItem(item) || kind?.ownLook) {
+      const placeholder = isActionItem(item) ? (this.known().get(item.id)?.label ?? item.id) : "Its name";
+      const own = (key: "icon" | "label") => (typeof item[key] === "string" ? (item[key] as string) : undefined);
+      panel.append(this.ownLine(at, "icon", "Icon", own("icon"), "★ 📌"), this.ownLine(at, "label", "Label", own("label"), placeholder));
+    }
     panel.append(this.button(`${BASE}-look-close`, "Close", () => this.toggleLook(at), ICONS.close));
     // Esc closes it, not the dialog
     panel.addEventListener("keydown", (e) => {
@@ -645,6 +658,34 @@ export class SettingsDialog {
       this.toggleLook(at);
     });
     return panel;
+  }
+
+  /**
+   * A line of an item's own icon or label: its field, named by a label it is
+   * in (empty: the default, the action's or the kind's), and where set, a
+   * button putting the default back
+   */
+  private ownLine(at: At, key: "icon" | "label", name: string, value: string | undefined, placeholder: string): HTMLElement {
+    const line = this.el("div", `${BASE}-look-line`);
+    const field = this.el("input", `${BASE}-look-own`);
+    field.type = "text";
+    field.value = value ?? "";
+    field.placeholder = placeholder;
+    field.spellcheck = false;
+    field.dataset.swbOwn = key;
+    field.setAttribute("aria-label", key === "icon" ? `Its own icon: up to ${MAX_ICON} characters, an emoji too (empty: the default)` : "Its own label (empty: the default)");
+    if (key === "icon") field.classList.add(`${BASE}-look-own-icon`);
+    field.addEventListener("change", () => this.edit(setOwn(this.rows, at, key, field.value), `[data-swb-look] [data-swb-own="${key}"]`));
+    // (The reset outside the label: a press on it is no press on the field)
+    const label = this.el("label", `${BASE}-look-own-line`);
+    label.append(this.el("span", `${BASE}-look-name`, name), field);
+    line.append(label);
+    if (value) {
+      const reset = this.button(`${BASE}-look-reset`, key === "icon" ? "Back to the default icon" : "Back to the default label", () => this.edit(setOwn(this.rows, at, key, undefined), `[data-swb-look] [data-swb-own="${key}"]`), ICONS.reset);
+      reset.dataset.swbReset = key;
+      line.append(reset);
+    }
+    return line;
   }
 
   /** A row's handle: dragged, the row moves up or down (the others sliding aside); Alt+↑ ↓ on it the same */

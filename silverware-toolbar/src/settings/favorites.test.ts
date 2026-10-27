@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Favorites, hasAction } from "../core/favorites.ts";
-import { addItem, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setSlot, splitPins, stepOf } from "./favorites.ts";
+import { addItem, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, splitPins, stepOf } from "./favorites.ts";
 
 const ROWS: Favorites = [[{ id: "actions.turnInto", show: "label" }], [{ id: "formats.bold" }, { type: "separator" }, { id: "formats.link" }]];
 
@@ -87,5 +87,17 @@ describe("The favourites as the settings edit them", () => {
     expect(joinPins([[{ type: "separator" }], [], [{ id: "formats.bold" }]])).toEqual([[{ id: "formats.bold" }]]);
     // A row of pinned items alone is not shown as an empty row; an empty row being edited is
     expect(splitPins([[{ id: "actions.turnInto", pin: "left" }], [{ id: "formats.bold" }], []])).toEqual([[{ id: "actions.turnInto", pin: "left" }], [], [{ id: "formats.bold" }], []]);
+  });
+
+  it("gives an item its own icon and label (an action's, a kind's whose items have them), an empty one none; nothing to a separator", () => {
+    const at = { row: 1, index: 0 };
+    const own = setOwn(setOwn(ROWS, at, "icon", " ★ "), at, "label", "Tučně");
+    expect(own[1]![0]).toEqual({ id: "formats.bold", icon: "★", label: "Tučně" });
+    expect(setOwn(own, at, "icon", undefined)[1]![0]).toEqual({ id: "formats.bold", label: "Tučně" });
+    expect(setOwn(own, at, "label", "  ")[1]![0]).toEqual({ id: "formats.bold", icon: "★" });
+    expect(setOwn(ROWS, { row: 1, index: 1 }, "label", "x")).toEqual(ROWS);
+    // An icon: its first 3 characters, an emoji of several code points one
+    expect(setOwn(ROWS, at, "icon", "abcd")[1]![0]).toEqual({ id: "formats.bold", icon: "abc" });
+    expect(setOwn(ROWS, at, "icon", "👍🏽👨‍👩‍👧🇨🇿x")[1]![0]).toEqual({ id: "formats.bold", icon: "👍🏽👨‍👩‍👧🇨🇿" });
   });
 });

@@ -58,6 +58,9 @@ export type ItemKind = {
   readonly slots: readonly ItemSlot[];
   // Texts of the user's it holds besides (a kind reads what is not right in them itself)
   readonly fields?: readonly ItemField[];
+  // Its items have an icon and a label of their own, as an action's item may (`icon`, `label`: the settings edit them
+  // in the item's panel), which it reads itself (a snippet; not a gesture button, which shows its actions)
+  readonly ownLook?: boolean;
   // What is wrong with an item, where it cannot show (a snippet without its text): left out, the settings say why
   readonly check?: (item: Readonly<Record<string, unknown>>) => string | undefined;
   // Its button in the toolbar

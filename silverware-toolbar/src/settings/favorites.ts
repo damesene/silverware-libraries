@@ -4,7 +4,7 @@
 // the rows (`splitPins`: left, right, the rows), written back with each one's
 // `pin` (`joinPins`).
 
-import { type FavoriteItem, type Favorites, isKindItem, isSeparator, type KindItem, type Pin, type Show, type SeparatorItem } from "../core/favorites.ts";
+import { type FavoriteItem, type Favorites, iconOf, isKindItem, isSeparator, type KindItem, type Pin, type Show, type SeparatorItem } from "../core/favorites.ts";
 
 export type At = { readonly row: number; readonly index: number };
 
@@ -66,6 +66,18 @@ export function setLook(rows: Favorites, at: At, show: Show, width: number | und
   if (!item || isSeparator(item)) return next;
   const { show: _, width: __, ...rest } = item as Exclude<FavoriteItem, SeparatorItem>;
   next[at.row]![at.index] = { ...rest, ...(show === "label" ? { show } : {}), ...(show === "label" && width !== undefined ? { width } : {}) } as FavoriteItem;
+  return next;
+}
+
+/** An action's item (or a kind's whose items have their own) with its own icon or label (undefined, or empty: none, the action's or the kind's) */
+export function setOwn(rows: Favorites, at: At, key: "icon" | "label", value: string | undefined): FavoriteItem[][] {
+  const next = copy(rows);
+  const item = next[at.row]?.[at.index];
+  if (!item || isSeparator(item)) return next;
+  const { [key]: _, ...rest } = item;
+  // An icon: its first characters only
+  const own = value === undefined ? undefined : key === "icon" ? iconOf(value) : value.trim();
+  next[at.row]![at.index] = (own ? { ...rest, [key]: own } : rest) as FavoriteItem;
   return next;
 }
 

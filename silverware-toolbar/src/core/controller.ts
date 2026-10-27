@@ -273,7 +273,7 @@ export class Controller {
           if (isSeparator(item)) return [{ separator: true }];
           if (isActionItem(item)) {
             const action = all.find((a) => a.id === item.id);
-            return action ? [{ action, ...lookOf(item), ...this.state(action, context) }] : [];
+            return action ? [{ action, ...lookOf(item), ...(item.icon ? { ownIcon: item.icon } : {}), ...(item.label ? { ownLabel: item.label } : {}), ...this.state(action, context) }] : [];
           }
           // A kind's: a kind no module on gives, or a slot without an action, left out
           const kind = kinds.find((k) => k.type === item.type);

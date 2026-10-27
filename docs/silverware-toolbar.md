@@ -372,6 +372,15 @@ config.set("silverware.toolbar.favorites", {
   each item's `pin`, the left ones at the first row's start, the right ones
   at the last row's end (`joinPins`). Touch's default: Turn into pinned left,
   `width = 9` ("Paragraph"), … pinned right.
+- An action's own icon and label (2026-10-27, as the user decided): an
+  action's item's `icon` (up to 3 characters, an emoji counted as one,
+  written as text: no SVG of the user's, which would put markup into the
+  page) and `label`, in place
+  of the action's in the toolbar and the settings; the label is its tooltip
+  and its name for a screen reader too, alone (not the action's after it), and
+  can be set whatever `show` is; an action offering choices (Turn into) keeps
+  showing the choice on, its own label its tooltip. In the settings' panel:
+  Icon and Label fields (empty: the action's), a ↺ beside one that is set.
 
 ### Kinds of favourites: the gesture button (decided and built 2026-10-26)
 
@@ -420,6 +429,10 @@ or opening its choices).
 - Kinds declare `fields` (texts the settings dialog types in place, knowing
   nothing of them) and `check` (an item that cannot show is left out, the
   dialog says why: a snippet without its text).
+- Since actions' items have their own icon and label (2026-10-27), the
+  snippet's are those (`ownLook` on its kind: set in the item's panel as an
+  action's, its chip showing them); its one field is its text. Its items as
+  written before keep working: the keys are the same.
 
 ### The emoji picker (decided and built 2026-10-27)
 

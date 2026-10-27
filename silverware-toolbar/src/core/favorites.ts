@@ -7,7 +7,11 @@
 // its label (in characters, MIN_WIDTH to MAX_WIDTH: a longer one cut with an
 // ellipsis, a shorter one leaving the room, so what comes after it keeps its
 // place), and be pinned (`pin`: "left" or "right") at an end of the toolbar
-// docked at the bottom, out of what scrolls, wherever it is in its rows.
+// docked at the bottom, out of what scrolls, wherever it is in its rows. An
+// action's item may have its own `icon` (a character, an emoji) and `label`
+// in place of the action's, as a text snippet has (its label also its
+// tooltip; an action offering choices shows the choice on, its own label its
+// tooltip only).
 // Decided: docs/silverware-toolbar.md. An action no module
 // gives (turned off, a format renamed or not defined), or a kind none gives, is
 // left out of the toolbar; a test keeps the defaults equal to the library
@@ -17,7 +21,7 @@ export type Show = "icon" | "label";
 export type Pin = "left" | "right";
 /** What an action's and a kind's item have alike: how it shows, its label's width, where it is pinned */
 export type Look = { readonly show?: Show; readonly width?: number; readonly pin?: Pin };
-export type ActionItem = Look & { readonly type?: "action"; readonly id: string };
+export type ActionItem = Look & { readonly type?: "action"; readonly id: string; readonly icon?: string; readonly label?: string };
 export type SeparatorItem = { readonly type: "separator" };
 /** An item of a kind a module gives: its type, its look, and its own fields (its slots' ids, what else its kind reads) */
 export type KindItem = Look & { readonly type: string; readonly [field: string]: unknown };
@@ -25,6 +29,18 @@ export type KindItem = Look & { readonly type: string; readonly [field: string]:
 // A label's fixed width, in characters: narrower, it would hide the label; wider, the toolbar would run off a phone
 export const MIN_WIDTH = 3;
 export const MAX_WIDTH = 30;
+
+// An item's own icon: as many characters at most (an emoji of several code points one), so a button stays a button
+export const MAX_ICON = 3;
+
+/** An own icon as configured or typed: its first MAX_ICON characters (graphemes), its spaces at the ends left out; undefined: none (empty) */
+export function iconOf(text: string): string | undefined {
+  const trimmed = text.trim();
+  if (!trimmed) return undefined;
+  const Segmenter = (Intl as { Segmenter?: new (locale?: string, options?: { granularity: string }) => { segment(t: string): Iterable<{ segment: string }> } }).Segmenter;
+  const characters = Segmenter ? Array.from(new Segmenter(undefined, { granularity: "grapheme" }).segment(trimmed), (s) => s.segment) : Array.from(trimmed);
+  return characters.slice(0, MAX_ICON).join("");
+}
 
 /** A width as configured or typed, kept within MIN_WIDTH and MAX_WIDTH, whole; undefined: none (not a number) */
 export function widthOf(value: unknown): number | undefined {
@@ -103,8 +119,13 @@ export function favoriteItemOf(value: unknown): FavoriteItem | undefined {
   if (type === "separator") return id === undefined && show === undefined && width === undefined && pin === undefined && !Object.keys(rest).length ? { type: "separator" } : undefined;
   const look = { ...(show ? { show } : {}), ...(width !== undefined ? { width: widthOf(width) } : {}), ...(pin ? { pin } : {}) } as Look;
   if (type === undefined || type === "action") {
-    if (Object.keys(rest).length || typeof id !== "string" || !id) return undefined;
-    return { id, ...look };
+    const { icon, label, ...more } = rest;
+    if (Object.keys(more).length || typeof id !== "string" || !id) return undefined;
+    if ((icon !== undefined && typeof icon !== "string") || (label !== undefined && typeof label !== "string")) return undefined;
+    // (An empty one: none)
+    const glyph = icon === undefined ? undefined : iconOf(icon);
+    const own = { ...(glyph ? { icon: glyph } : {}), ...(label?.trim() ? { label: label.trim() } : {}) };
+    return { id, ...look, ...own };
   }
   if (typeof type !== "string" || !type) return undefined;
   return { ...rest, ...(id !== undefined ? { id } : {}), type, ...look } as KindItem;

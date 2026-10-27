@@ -44,6 +44,25 @@ describe("Settings", () => {
     expect(settings.favorites).toEqual([[{ id: "formats.italic", show: "label" }, { id: "formats.link" }]]);
   });
 
+  it("take an action's own icon and label, a width within 3 and 30, a pin; an empty one none, one not text the item none", async () => {
+    const settings = await readSettings(
+      bridge({
+        "silverware.toolbar.favorites": [
+          [
+            { id: "formats.bold", icon: " ★ ", label: "Tučně", show: "label", width: 1, pin: "left" },
+            { id: "formats.italic", icon: "", label: "  " },
+            { id: "formats.code", label: 5 },
+            { id: "formats.link", width: 99, pin: "middle" },
+            { id: "formats.highlight", width: 99 },
+          ],
+        ],
+      }),
+    );
+    expect(settings.favorites).toEqual([
+      [{ id: "formats.bold", icon: "★", label: "Tučně", show: "label", width: 3, pin: "left" }, { id: "formats.italic" }, { id: "formats.highlight", width: 30 }],
+    ]);
+  });
+
   it("keep an item of another kind whole, its fields for its kind to read; its show checked", async () => {
     const gesture = { type: "gesture", tap: "formats.bold", up: "formats.italic", show: "label" };
     const settings = await readSettings(bridge({ "silverware.toolbar.favorites": [[gesture, { type: "gesture", show: "big" }, { type: "" }]] }));

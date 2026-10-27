@@ -1,14 +1,17 @@
 // The snippets module: a kind of favourite, the text snippet
 // (`{ type = "snippet", icon = "📌", label = "Comment", text = "%%{s}%%", show }`):
 // a button showing a character of the user's (an emoji too) that writes its
-// text at the cursor. `{s}` in the text stands for the text selected (none:
-// the selection is replaced), `{c}` for where the cursor goes; without `{c}`,
+// text at the cursor. Its icon and label are an item's own (`ownLook`, set in
+// the item's panel as an action's are); its text its field. `{s}` in the text
+// stands for the text selected (none: the selection is replaced), `{c}` for
+// where the cursor goes; without `{c}`,
 // what `{s}` wrote stays selected (nothing selected: the cursor there), and
 // without either the cursor goes to the text's end. `{{s}}` and `{{c}}` write
-// `{s}` and `{c}` as they are. Its fields are the kind's (`fields`), which the
-// settings dialog edits knowing nothing of what they are for.
+// `{s}` and `{c}` as they are. Its text is the kind's field (`fields`), which
+// the settings dialog edits knowing nothing of what it is for.
 import type { Action, Change, Context, ToolbarModule } from "../core/action.ts";
 import { cursor } from "../core/cursor.ts";
+import { iconOf } from "../core/favorites.ts";
 import type { ItemHost, ItemKind, ShownItem } from "../core/items.ts";
 import { ICONS } from "../icons.ts";
 
@@ -22,11 +25,8 @@ const SNIPPET: ItemKind = {
   description: "Your text written at the cursor",
   icon: ICONS.snippet,
   slots: [],
-  fields: [
-    { key: "icon", label: "Icon", placeholder: "A character or an emoji: 📌" },
-    { key: "label", label: "Label", placeholder: "Its name: Comment" },
-    { key: "text", label: "Text", placeholder: "Written at the cursor: %%{s}%% ({s} the text selected, {c} the cursor)", multiline: true },
-  ],
+  fields: [{ key: "text", label: "Text", placeholder: "Written at the cursor: %%{s}%% ({s} the text selected, {c} the cursor)", multiline: true }],
+  ownLook: true,
   check: (item) => (typeof item.text === "string" && item.text ? undefined : "No text yet"),
   render,
 };
@@ -71,7 +71,7 @@ function render(shown: ShownItem, host: ItemHost): HTMLButtonElement {
   const { icon, label } = shown.item;
   // (Its text there: `check`)
   const text = shown.item.text as string;
-  const glyph = typeof icon === "string" && icon.trim() ? icon.trim() : "✎";
+  const glyph = (typeof icon === "string" && iconOf(icon)) || "✎";
   const name = typeof label === "string" && label.trim() ? label.trim() : text;
   const action: Action = {
     id: "snippets.item",

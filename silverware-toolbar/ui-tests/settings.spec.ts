@@ -131,6 +131,37 @@ test.describe("The settings dialog", () => {
     expect(Math.abs((await turnInto.boundingBox())!.width - paragraph)).toBeLessThan(1);
   });
 
+  test("an action's own icon and label: shown in the settings and the toolbar, its label its tooltip whatever it shows; put back by its reset", async ({ page }) => {
+    await openSettings(page);
+    await tab(page, "favorites").click();
+    await item(page, 1, 0).click();
+    const look = dialog(page).locator("[data-swb-look]");
+    await look.locator('[data-swb-own="icon"]').fill("★");
+    await look.locator('[data-swb-own="icon"]').press("Enter");
+    await look.locator('[data-swb-own="label"]').fill("Tučně");
+    await look.locator('[data-swb-own="label"]').press("Enter");
+    await expect(item(page, 1, 0).locator(".swb-settings-item-icon")).toHaveText("★");
+    await expect(item(page, 1, 0)).toHaveAttribute("title", "Tučně");
+    await expect(look.locator("[data-swb-reset]")).toHaveCount(2);
+    await save(page).click();
+    await select(page, "some text");
+    // Shown as its icon: its own, its own label its tooltip
+    const bold = barButton(page, "formats.bold");
+    await expect(bold).toHaveText("★");
+    await expect(bold).toHaveAttribute("title", "Tučně");
+    // Its icon reset: the action's again, its label kept
+    await openSettings(page);
+    await tab(page, "favorites").click();
+    await item(page, 1, 0).click();
+    await dialog(page).locator('[data-swb-look] [data-swb-reset="icon"]').click();
+    await expect(dialog(page).locator('[data-swb-look] [data-swb-own="icon"]')).toHaveValue("");
+    await expect(dialog(page).locator('[data-swb-look] [data-swb-reset="icon"]')).toHaveCount(0);
+    await save(page).click();
+    await select(page, "some text");
+    await expect(bold.locator("svg")).toHaveCount(1);
+    await expect(bold).toHaveAttribute("title", "Tučně");
+  });
+
   test("an item let go in the gap between two others goes there; while dragged it holds its place, a copy following the pointer", async ({ page }) => {
     await openSettings(page);
     await tab(page, "favorites").click();

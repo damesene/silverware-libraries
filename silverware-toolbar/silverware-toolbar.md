@@ -891,12 +891,13 @@ end
 .swb-settings {
   --swb-settings-line: var(--button-border-color, rgba(128, 128, 128, 0.3));
   --swb-settings-card: color-mix(in srgb, var(--root-color) 4%, var(--root-background-color));
-  /* As tall as its content, as far as the window has room; then its body scrolls */
+  /* Of one height whatever its tab shows (switching tabs moves nothing), 720px where the window has room;
+     its body scrolls (a phone: the whole screen, below) */
   display: flex;
   flex-direction: column;
   width: min(600px, calc(100vw - 24px));
-  max-height: calc(100vh - 32px);
-  max-height: calc(var(--sw-view-height, 100dvh) - 32px);
+  height: min(720px, calc(100vh - 32px));
+  height: min(720px, calc(var(--sw-view-height, 100dvh) - 32px));
   color: var(--root-color);
   background: var(--root-background-color);
   border: 1px solid var(--swb-settings-line);
@@ -980,7 +981,7 @@ end
   border-bottom-color: var(--ui-accent-color);
 }
 .swb-settings-body {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding: 4px 16px 12px;

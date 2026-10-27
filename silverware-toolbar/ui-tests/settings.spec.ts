@@ -36,6 +36,17 @@ test.describe("The settings dialog", () => {
     await expect(dialog(page)).toHaveCount(0);
   });
 
+  test("is of one height whatever its tab shows, 720px where the window has room", async ({ page }) => {
+    await openSettings(page);
+    const heights: number[] = [];
+    for (const id of ["general", "favorites", "modules"]) {
+      await tab(page, id).click();
+      heights.push(Math.round((await dialog(page).boundingBox())!.height));
+    }
+    // (The test's window: 800px high, the dialog 720px)
+    expect(heights).toEqual([720, 720, 720]);
+  });
+
   test("an item removed and one added from the search: saved, the toolbar shows them at once and after a reload", async ({ page }) => {
     await openSettings(page);
     await tab(page, "favorites").click();

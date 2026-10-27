@@ -161,7 +161,7 @@ export class SettingsDialog {
     );
     const showRow = this.byDevice(
       "When the toolbar shows",
-      "While writing: with nothing selected too, its buttons the formats around the cursor; Esc leaves it.",
+      "While writing: with nothing selected too, its buttons the formats around the cursor; Esc leaves it. Always: also where the page's text has no focus.",
       PATHS.show,
       SHOWS.map((value) => [value, SHOW_LABELS[value]]),
       values.show,

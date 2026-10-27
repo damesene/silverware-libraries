@@ -339,9 +339,9 @@ test.describe("The settings dialog", () => {
     await expect(dialog(page)).toBeVisible();
   });
 
-  test("shown always: on a computer by the cursor, with nothing selected, following it as you type", async ({ page }) => {
+  test("shown while writing: on a computer by the cursor, with nothing selected, following it as you type; the text left, it goes", async ({ page }) => {
     await openSettings(page);
-    await dialog(page).locator(`[data-swb-setting="silverware.toolbar.show"] select[data-swb-for="click"]`).selectOption("always");
+    await dialog(page).locator(`[data-swb-setting="silverware.toolbar.show"] select[data-swb-for="click"]`).selectOption("writing");
     await expect(save(page)).toHaveText("Save");
     await save(page).click();
     await expect(dialog(page)).toHaveCount(0);
@@ -358,6 +358,25 @@ test.describe("The settings dialog", () => {
     const toolbar = (await bar(page).boundingBox())!;
     const line = await lineBox(page, "Plaxyin paragraph one");
     expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(line.y + 1);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await expect(bar(page)).toBeHidden();
+  });
+
+  test("shown always, docked: at once, the text left too; room kept for it at the editor's edge", async ({ page }) => {
+    await openSettings(page);
+    await dialog(page).locator(`[data-swb-setting="silverware.toolbar.show"] select[data-swb-for="click"]`).selectOption("always");
+    await dialog(page).locator(`[data-swb-setting="silverware.toolbar.placement"] select[data-swb-for="click"]`).selectOption("bottom");
+    await save(page).click();
+    await expect(dialog(page)).toHaveCount(0);
+    await expect(bar(page)).toBeVisible();
+    await expect(bar(page)).toHaveClass(/swb-docked/);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.waitForTimeout(100);
+    await expect(bar(page)).toBeVisible();
+    // Its height, by which SilverBullet's editor is padded (the library page's CSS)
+    const height = (await bar(page).boundingBox())!.height;
+    const room = await page.evaluate(() => document.documentElement.style.getPropertyValue("--swb-docked-bottom"));
+    expect(Math.abs(parseFloat(room) - height)).toBeLessThan(1);
   });
 
   test("a module turned off: Save and reload, its actions gone; closing with changes asks first", async ({ page }) => {

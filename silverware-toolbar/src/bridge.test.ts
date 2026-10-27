@@ -139,13 +139,13 @@ describe("The library page", () => {
     expect(page).toContain('["placement-touch"] = {\n      type = "string",\n      enum = { "selection", "bottom", "top" },\n      default = "bottom"');
   });
 
-  it("read when the toolbar shows, each device's: after a selection on a computer, always by touch, by default and where it is none of the values", async () => {
-    expect((await readSettings(bridge({}))).show).toEqual({ click: "selection", touch: "always" });
+  it("read when the toolbar shows, each device's: after a selection on a computer, while writing by touch, by default and where it is none of the values", async () => {
+    expect((await readSettings(bridge({}))).show).toEqual({ click: "selection", touch: "writing" });
     expect((await readSettings(bridge({ "silverware.toolbar.show": "always", "silverware.toolbar.show-touch": "selection" }))).show).toEqual({ click: "always", touch: "selection" });
     // As before: mobile
-    expect((await readSettings(bridge({ "silverware.toolbar.show": "mobile" }))).show).toEqual({ click: "selection", touch: "always" });
-    expect(page).toContain('show = {\n      type = "string",\n      enum = { "always", "selection" },\n      default = "selection"');
-    expect(page).toContain('["show-touch"] = {\n      type = "string",\n      enum = { "always", "selection" },\n      default = "always"');
+    expect((await readSettings(bridge({ "silverware.toolbar.show": "mobile" }))).show).toEqual({ click: "selection", touch: "writing" });
+    expect(page).toContain('show = {\n      type = "string",\n      enum = { "always", "writing", "selection" },\n      default = "selection"');
+    expect(page).toContain('["show-touch"] = {\n      type = "string",\n      enum = { "always", "writing", "selection" },\n      default = "writing"');
   });
 
   it("read a word at the caret as if selected: on by default", async () => {

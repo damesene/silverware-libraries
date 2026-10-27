@@ -70,16 +70,19 @@ export type Device = "click" | "touch";
  */
 export const PLACEMENTS = ["selection", "bottom", "top"] as const;
 export type Placement = (typeof PLACEMENTS)[number];
-/** When the toolbar shows: always while the page's text is edited (docked, or by the caret), or only after a selection */
-export const SHOWS = ["always", "selection"] as const;
+/**
+ * When the toolbar shows: always, the page's text edited or not (docked, or
+ * by the caret); while the page's text is edited; or only after a selection
+ */
+export const SHOWS = ["always", "writing", "selection"] as const;
 export type Show = (typeof SHOWS)[number];
-export const SHOW_LABELS: Readonly<Record<Show, string>> = { always: "While writing", selection: "After selecting text" };
+export const SHOW_LABELS: Readonly<Record<Show, string>> = { always: "Always", writing: "While writing", selection: "After selecting text" };
 
 export const PLACEMENT_LABELS: Readonly<Record<Placement, string>> = { selection: "By the selection", bottom: "Docked at the bottom", top: "Docked at the top" };
 
 // By touch docked at the bottom while writing (a phone's own menu of the selection is by it), else by the selection after one
 export const DEFAULT_PLACEMENT: Readonly<Record<Device, Placement>> = { click: "selection", touch: "bottom" };
-export const DEFAULT_SHOW: Readonly<Record<Device, Show>> = { click: "selection", touch: "always" };
+export const DEFAULT_SHOW: Readonly<Record<Device, Show>> = { click: "selection", touch: "writing" };
 
 // The toolbar's own block of the CONFIG page, for tables (the favourites): the Configuration Manager's block
 // would lose them on its next save (shared/configpage.ts)

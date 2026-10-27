@@ -52,6 +52,8 @@ export class Bar {
   private dockPlace: Dock | undefined;
   // Docked: its ends shaded where it scrolls further
   private shadeScroll: (() => void) | undefined;
+  // Docked: room kept for it at the editor's edge (`keepRoom`)
+  private room = false;
 
   constructor(
     private readonly doc: Document,
@@ -90,6 +92,7 @@ export class Bar {
   /** Its rows of items; `more`: … pinned at the end of the last one (favourites without it) */
   show(rows: readonly (readonly Shown[])[], rect: Box, viewTop: number, more?: Extract<Shown, { action: Action }>): void {
     this.closeMenu();
+    this.keepRoom(false);
     this.dockPlace = undefined;
     this.element.classList.remove("swb-docked");
     const doc = this.doc;
@@ -110,9 +113,10 @@ export class Bar {
   /**
    * Docked: one row across SilverBullet's editor (else the window) at its
    * bottom or its top, the rows one after another; the items pinned left and
-   * right at its ends, out of what scrolls; `more`: … pinned at its end
+   * right at its ends, out of what scrolls; `more`: … pinned at its end;
+   * `room`: room kept for it at the editor's edge, so it covers no text
    */
-  dock(rows: readonly (readonly Shown[])[], at: Dock, more?: Extract<Shown, { action: Action }>): void {
+  dock(rows: readonly (readonly Shown[])[], at: Dock, more: Extract<Shown, { action: Action }> | undefined, room: boolean): void {
     this.closeMenu();
     const pinned = (side: Pin) => rows.flatMap((row) => row.filter((item) => pinOf(item) === side));
     const left = pinned("left");
@@ -162,6 +166,22 @@ export class Bar {
     if (!this.element.isConnected) this.doc.body.append(this.element);
     this.element.classList.add("swb-visible");
     this.placeDocked(at);
+    this.keepRoom(room);
+  }
+
+  /**
+   * Room kept for it docked, or none: its height as `--swb-docked-top` or
+   * `--swb-docked-bottom` on html, by which the library page's CSS pads
+   * SilverBullet's editor, so it covers no text and the editor keeps its
+   * cursor clear of it; off, it lies over the editor
+   */
+  private keepRoom(on: boolean): void {
+    this.room = on;
+    const style = this.doc.documentElement.style;
+    for (const edge of ["top", "bottom"] as const) {
+      if (on && this.dockPlace?.edge === edge) style.setProperty(`--swb-docked-${edge}`, `${this.element.offsetHeight}px`);
+      else style.removeProperty(`--swb-docked-${edge}`);
+    }
   }
 
   /** Docked, placed again (the keyboard came or went, the editor's box changed) */
@@ -178,6 +198,8 @@ export class Bar {
       this.element.style.top = "auto";
       this.element.style.bottom = `${Math.max(0, this.doc.defaultView!.innerHeight - at.line)}px`;
     }
+    // (Its edge may have changed: the room with it)
+    if (this.room) this.keepRoom(true);
     // (The window resized: what it scrolls to may be more or less)
     this.shadeScroll?.();
     if (this.menu) this.placeMenu();
@@ -306,6 +328,7 @@ export class Bar {
 
   hide(): void {
     this.closeMenu();
+    this.keepRoom(false);
     this.element.classList.remove("swb-visible");
     this.at = undefined;
     this.dockPlace = undefined;

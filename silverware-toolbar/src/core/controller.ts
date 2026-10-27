@@ -135,7 +135,8 @@ export class Controller {
     win.visualViewport?.addEventListener("scroll", this.onScroll);
     // The keyboard overlaying the page (SilverBullet's on a phone): only it tells it came or went
     virtualKeyboardOf(win)?.addEventListener("geometrychange", this.onScroll);
-
+    // Shown always: from the start
+    void this.showStaying();
   }
 
   stop(): void {
@@ -309,7 +310,9 @@ export class Controller {
       ? undefined
       : { action: MORE_ACTION, active: false, enabled: true, labeled: false };
     if (this.docks()) {
-      this.bar.dock(rows, this.dockAt(), more);
+      // (Shown while writing or always: room kept for it, so it covers no text; shown by a selection alone, the
+      // editor would jump with each)
+      this.bar.dock(rows, this.dockAt(), more, this.persistent());
       this.watchBar(true);
     } else this.bar.show(rows, rectOf(range), viewTopOf(range.startContainer), more);
   }
@@ -319,7 +322,7 @@ export class Controller {
     const show = ++this.shows;
     if (!range) {
       // Shown always while writing: it goes to the caret once it settles (caretMoved)
-      if (!this.atCaret && !(this.persistent() && this.writing())) {
+      if (!this.atCaret && !(this.persistent() && (this.writing() || this.stays()))) {
         this.range = undefined;
         this.bar.hide();
         this.panel.close(true);
@@ -331,7 +334,9 @@ export class Controller {
     const context = await this.read();
     if (!context || show !== this.shows || this.stopped) return;
     // The editor's selection is a caret (the page's selection is not its own, or was just changed): no toolbar
+    // (shown always: it stays as it is)
     if (context.from === context.to) {
+      if (this.stays()) return;
       this.bar.hide();
       this.panel.close(true);
       return;
@@ -503,17 +508,34 @@ export class Controller {
     } else if (this.atCaret && !this.persistent() && !["Shift", "Control", "Alt", "Meta"].includes(e.key)) this.hideBar();
   };
 
-  // Shown at the caret, a press elsewhere hides it
+  // Shown at the caret, a press elsewhere hides it (shown always: it stays)
   private onPress = (e: MouseEvent): void => {
-    if (!this.atCaret || !this.bar.shown || (e.target instanceof Node && this.owns(e.target))) return;
+    if (!this.atCaret || !this.bar.shown || this.stays() || (e.target instanceof Node && this.owns(e.target))) return;
     // Shown always, a press in the page's text moves the caret it follows
     if (this.persistent() && e.target instanceof Node && pageContentOf(e.target)) return;
     this.hideBar();
   };
 
-  /** Whether the toolbar shows always while the page's text is edited (the show setting, this device's) */
+  /** Whether the toolbar shows while the page's text is edited, with nothing selected too (the show setting, this device's: writing, always) */
   private persistent(): boolean {
+    return this.settings.show[this.device()] !== "selection";
+  }
+
+  /** Whether the toolbar shows always, the page's text edited or not (the show setting, this device's) */
+  private stays(): boolean {
     return this.settings.show[this.device()] === "always";
+  }
+
+  /** Shown always: the toolbar at once, as the caret is (docked, also where the page's text has no focus) */
+  private async showStaying(): Promise<void> {
+    if (!this.stays() || this.bar.shown) return;
+    const show = ++this.shows;
+    const context = await this.read();
+    if (!context || show !== this.shows || this.stopped || this.bar.shown) return;
+    const range = this.watcher.caret() ?? (this.docks() ? this.doc.createRange() : undefined);
+    if (!range) return;
+    this.atCaret = context.from === context.to;
+    this.showBar(context, range);
   }
 
   /** This device as the settings tell them apart (worked by a finger or not) */
@@ -528,7 +550,7 @@ export class Controller {
 
   /** The caret moved (or came into the page's text): shown always, the toolbar goes with it, its buttons the formats around it */
   private async caretMoved(range: Range): Promise<void> {
-    if (!this.persistent() || !this.writing() || this.popup.isOpen) return;
+    if (!this.persistent() || !(this.writing() || this.stays()) || this.popup.isOpen) return;
     const show = ++this.shows;
     const context = await this.read();
     if (!context || show !== this.shows || this.stopped || context.from !== context.to) return;
@@ -546,7 +568,7 @@ export class Controller {
   private onBlur = (): void => {
     this.doc.defaultView!.setTimeout(() => {
       const active = this.doc.activeElement;
-      if (!this.persistent() || this.writing() || this.popup.isOpen || (active && this.owns(active))) return;
+      if (!this.persistent() || this.stays() || this.writing() || this.popup.isOpen || (active && this.owns(active))) return;
       this.hideBar();
     });
   };
@@ -581,10 +603,8 @@ export class Controller {
     const box = editorBox(this.doc);
     const left = box ? Math.max(0, box.left) : 0;
     const width = box ? Math.min(win.innerWidth, box.right) - left : win.innerWidth;
-    if (this.settings.placement[this.device()] === "top") {
-      const top = viewTopOf(this.doc.querySelector(CONTENT_SELECTOR));
-      return { edge: "top", line: Math.max(top, box?.top ?? 0), left, width };
-    }
+    // (The editor's top, not its view's: the view is below the room kept for the toolbar)
+    if (this.settings.placement[this.device()] === "top") return { edge: "top", line: box ? box.top : viewTopOf(this.doc.querySelector(CONTENT_SELECTOR)), left, width };
     const line = this.dockLine();
     return { edge: "bottom", line: box ? Math.min(line, box.bottom) : line, left, width };
   }

@@ -18,7 +18,7 @@ Select text in a page and a toolbar shows beside it: make it bold, italic or cod
 * **Every action**: the **…** button, or **Ctrl-Shift-q**, opens a list of every action under the toolbar, with a search field. Type to find (each word you type starts a word of an action's name: `num` finds *Numbered list*, `h2` *Heading 2*), **↑ ↓** to pick (Tab and Shift-Tab too, PageUp and PageDown by five), **Enter** to apply, **Esc** to close the list (a second **Esc** hides the toolbar). *Turn into* is one item there: **Enter** (or **→**) or a click opens its block formats in its place, and **Esc**, **←** or the arrow at the top goes back; typing finds the block formats straight away. The command *Silverware Toolbar: Show actions* is the same.
 * **Without a selection**, **Ctrl-Shift-q** shows the toolbar at the cursor with the list open. Its icons show the formats around the cursor: in a link, *Link* is pressed, and clicking it takes the link off. Typing or moving the cursor hides it.
 * The key is a setting (*Key for every action*). In Firefox on Windows, **Ctrl-Shift-q** quits the browser: choose another key there.
-* **On a phone** (text selected by touch) the toolbar is docked at the bottom, over the keyboard, as one row you scroll sideways (a shade at an end there is more to scroll to; **…** always at its end): the system's own menu (Cut, Copy, Paste) shows by the selection, where the toolbar would be. On a phone it stays there while you write, with nothing selected too, its buttons showing the formats around the cursor. *Where the toolbar shows* and *When the toolbar shows* (settings) are each set for **Click** (a computer) and **Touch** (a phone, a tablet) apart: by the selection, or docked at the bottom or at the top (under SilverBullet's top bar; docked, it is as wide as the editor, not over SilverBullet's sidebars); while writing (on a computer by the cursor; **Esc** then leaves it) or only after selecting text. By default a computer shows it by the selection after selecting text, a phone docked at the bottom while writing. SilverBullet's own bar over the keyboard, where it is on, stays under it; the settings offer to turn that one off.
+* **On a phone** (text selected by touch) the toolbar is docked at the bottom, over the keyboard, as one row you scroll sideways (a shade at an end there is more to scroll to; **…** always at its end): the system's own menu (Cut, Copy, Paste) shows by the selection, where the toolbar would be. On a phone it stays there while you write, with nothing selected too, its buttons showing the formats around the cursor. *Where the toolbar shows* and *When the toolbar shows* (settings) are each set for **Click** (a computer) and **Touch** (a phone, a tablet) apart: by the selection, or docked at the bottom or at the top (under SilverBullet's top bar; docked, it is as wide as the editor, not over SilverBullet's sidebars); always (also where you are not writing in the page), while writing (on a computer by the cursor; **Esc** then leaves it) or only after selecting text. Docked always or while writing, the editor makes room for it, so it covers no text. By default a computer shows it by the selection after selecting text, a phone docked at the bottom while writing. SilverBullet's own bar over the keyboard, where it is on, stays under it; the settings offer to turn that one off.
 
 ## Actions
 
@@ -329,16 +329,16 @@ config.define("silverware.toolbar", {
     },
     show = {
       type = "string",
-      enum = { "always", "selection" },
+      enum = { "always", "writing", "selection" },
       default = "selection",
-      description = "When the toolbar shows on a computer: always while you write (by the cursor, or docked), or only after selecting text.",
+      description = "When the toolbar shows on a computer: always, also where the page's text has no focus; while you write (by the cursor, or docked); or only after selecting text.",
       ui = { category = "Silverware Toolbar", label = "When the toolbar shows", priority = 0.94 },
     },
     ["show-touch"] = {
       type = "string",
-      enum = { "always", "selection" },
-      default = "always",
-      description = "When the toolbar shows where the screen is worked by finger: always while you write, or only after selecting text.",
+      enum = { "always", "writing", "selection" },
+      default = "writing",
+      description = "When the toolbar shows where the screen is worked by finger: always, also where the page's text has no focus; while you write; or only after selecting text.",
       ui = { category = "Silverware Toolbar", label = "When the toolbar shows by touch", priority = 0.935 },
     },
     wordAtCaret = {
@@ -501,6 +501,14 @@ end
   border-width: 1px 0 0;
   border-radius: 0;
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.12);
+}
+/* Room for the toolbar docked always or while writing (its height on html, set while it shows so): SilverBullet's
+   editor padded by it, so it covers no text and the editor keeps the cursor clear of it */
+#sb-editor {
+  /* (Its height SilverBullet's 100%: the padding within it) */
+  box-sizing: border-box;
+  padding-top: var(--swb-docked-top, 0px);
+  padding-bottom: var(--swb-docked-bottom, 0px);
 }
 /* Docked at the top: under SilverBullet's top bar, its line and shadow below it */
 .swb-bar.swb-docked.swb-docked-top {

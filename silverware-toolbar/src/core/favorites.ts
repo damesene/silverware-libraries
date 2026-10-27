@@ -42,6 +42,28 @@ export function iconOf(text: string): string | undefined {
   return characters.slice(0, MAX_ICON).join("");
 }
 
+/**
+ * A kind's slot as configured: an action's id, or the same with an icon and a
+ * label of its own (`{ id, icon, label }`, as an action's item has them); what
+ * it holds, else undefined (none, or not of that shape)
+ */
+export type SlotRef = { readonly id: string; readonly icon?: string; readonly label?: string };
+export function slotOf(value: unknown): SlotRef | undefined {
+  if (typeof value === "string") return value ? { id: value } : undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const { id, icon, label } = value as Record<string, unknown>;
+  if (typeof id !== "string" || !id) return undefined;
+  const glyph = typeof icon === "string" ? iconOf(icon) : undefined;
+  const name = typeof label === "string" ? label.trim() : "";
+  return { id, ...(glyph ? { icon: glyph } : {}), ...(name ? { label: name } : {}) };
+}
+
+/** An own icon as HTML, as an action's icon is (an SVG): its characters as they are */
+export function ownIconHtml(icon: string): string {
+  const text = icon.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return `<span class="swb-own-icon">${text}</span>`;
+}
+
 /** A width as configured or typed, kept within MIN_WIDTH and MAX_WIDTH, whole; undefined: none (not a number) */
 export function widthOf(value: unknown): number | undefined {
   if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
@@ -99,7 +121,7 @@ export function hasAction(rows: Favorites, id: string, kinds: readonly { readonl
       if (isSeparator(item)) return false;
       if (isActionItem(item)) return item.id === id;
       const kind = kinds.find((k) => k.type === item.type);
-      return !!kind && kind.slots.some((slot) => item[slot.key] === id);
+      return !!kind && kind.slots.some((slot) => slotOf(item[slot.key])?.id === id);
     }),
   );
 }

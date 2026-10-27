@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Favorites, hasAction } from "../core/favorites.ts";
-import { addItem, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, splitPins, stepOf } from "./favorites.ts";
+import { addItem, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setSlotOwn, splitPins, stepOf } from "./favorites.ts";
 
 const ROWS: Favorites = [[{ id: "actions.turnInto", show: "label" }], [{ id: "formats.bold" }, { type: "separator" }, { id: "formats.link" }]];
 
@@ -99,5 +99,18 @@ describe("The favourites as the settings edit them", () => {
     // An icon: its first 3 characters, an emoji of several code points one
     expect(setOwn(ROWS, at, "icon", "abcd")[1]![0]).toEqual({ id: "formats.bold", icon: "abc" });
     expect(setOwn(ROWS, at, "icon", "👍🏽👨‍👩‍👧🇨🇿x")[1]![0]).toEqual({ id: "formats.bold", icon: "👍🏽👨‍👩‍👧🇨🇿" });
+  });
+
+  it("gives a kind's slot its action's own icon and label ({ id, icon, label }), its id alone again once none is left", () => {
+    const rows: Favorites = [[{ type: "gesture", tap: "formats.bold", up: "formats.italic" }]];
+    const at = { row: 0, index: 0 };
+    const own = setSlotOwn(setSlotOwn(rows, at, "tap", "icon", "★★★★"), at, "tap", "label", "Tučně");
+    expect(own[0]![0]).toEqual({ type: "gesture", tap: { id: "formats.bold", icon: "★★★", label: "Tučně" }, up: "formats.italic" });
+    const back = setSlotOwn(setSlotOwn(own, at, "tap", "icon", undefined), at, "tap", "label", " ");
+    expect(back[0]![0]).toEqual(rows[0]![0]);
+    // Another action picked: its own look gone with the one before
+    expect(setSlot(own, at, "tap", "formats.code")[0]![0]).toEqual({ type: "gesture", tap: "formats.code", up: "formats.italic" });
+    // No action in the slot: nothing to give a look
+    expect(setSlotOwn(rows, at, "down", "label", "x")).toEqual(rows);
   });
 });

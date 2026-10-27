@@ -32,6 +32,47 @@ test.describe("The gesture button", () => {
     await expect(gestureButton(page)).toHaveAttribute("aria-pressed", "true");
   });
 
+  test("each of its actions with an icon and label of its own: set in its slot's panel, shown on its faces and in its name; another action picked drops them", async ({ page }) => {
+    await addGesture(page, "bold", "italic");
+    await barButton(page, "actions.more").click();
+    await popup(page).locator(".swb-search-field").fill("settings");
+    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
+    const dialog = page.locator(".swb-settings");
+    await dialog.locator('[data-swb-tab="favorites"]').click();
+    await dialog.locator('[data-swb-device="click"]').click();
+    const gesture = dialog.locator(".swb-settings-kind").last();
+    // Its Click: its panel, its action, its own icon and label
+    await gesture.locator('[data-swb-slot="tap"]').click();
+    const look = dialog.locator("[data-swb-look]");
+    await expect(look.locator(".swb-settings-look-action")).toHaveText("Bold");
+    await look.locator('[data-swb-own="icon"]').fill("★");
+    await look.locator('[data-swb-own="icon"]').press("Enter");
+    await look.locator('[data-swb-own="label"]').fill("Tučně");
+    await look.locator('[data-swb-own="label"]').press("Enter");
+    await expect(gesture.locator('[data-swb-slot="tap"]')).toContainText("★");
+    await expect(gesture.locator('[data-swb-slot="tap"]')).toContainText("Tučně");
+    // Its Swipe up: a label of its own
+    await gesture.locator('[data-swb-slot="up"]').click();
+    await look.locator('[data-swb-own="label"]').fill("Kurzíva");
+    await look.locator('[data-swb-own="label"]').press("Enter");
+    await dialog.locator(".swb-settings-save").click();
+    await select(page, "some text");
+    await expect(gestureButton(page).locator(".swb-gesture-tap")).toContainText("★");
+    await expect(gestureButton(page)).toHaveAttribute("aria-label", "Tučně (swipe up: Kurzíva)");
+    // Another action for Click, through Change…: its own icon and label gone
+    await barButton(page, "actions.more").click();
+    await popup(page).locator(".swb-search-field").fill("settings");
+    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
+    await dialog.locator('[data-swb-tab="favorites"]').click();
+    await dialog.locator('[data-swb-device="click"]').click();
+    await gesture.locator('[data-swb-slot="tap"]').click();
+    await look.locator(".swb-settings-look-change").click();
+    await dialog.locator(".swb-settings-pick-field").fill("code");
+    await page.keyboard.press("Enter");
+    await expect(gesture.locator('[data-swb-slot="tap"]')).toContainText("Code");
+    await expect(gesture.locator('[data-swb-slot="tap"]')).not.toContainText("★");
+  });
+
   test("dragged up past half its height: its second face rolls in, lit, and let go runs the second action", async ({ page }) => {
     await addGesture(page, "bold", "italic");
     const box = (await boxOf(gestureButton(page)));

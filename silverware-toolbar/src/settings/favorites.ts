@@ -4,7 +4,7 @@
 // the rows (`splitPins`: left, right, the rows), written back with each one's
 // `pin` (`joinPins`).
 
-import { type FavoriteItem, type Favorites, iconOf, isKindItem, isSeparator, type KindItem, type Pin, type Show, type SeparatorItem } from "../core/favorites.ts";
+import { type FavoriteItem, type Favorites, iconOf, isKindItem, type SlotRef, slotOf, isSeparator, type KindItem, type Pin, type Show, type SeparatorItem } from "../core/favorites.ts";
 
 export type At = { readonly row: number; readonly index: number };
 
@@ -78,6 +78,24 @@ export function setOwn(rows: Favorites, at: At, key: "icon" | "label", value: st
   // An icon: its first characters only
   const own = value === undefined ? undefined : key === "icon" ? iconOf(value) : value.trim();
   next[at.row]![at.index] = (own ? { ...rest, [key]: own } : rest) as FavoriteItem;
+  return next;
+}
+
+/**
+ * A kind's slot with its action's own icon or label (undefined, or empty:
+ * none, the action's): the slot `{ id, icon, label }`, or its id alone where
+ * nothing of its own is left
+ */
+export function setSlotOwn(rows: Favorites, at: At, slot: string, key: "icon" | "label", value: string | undefined): FavoriteItem[][] {
+  const next = copy(rows);
+  const item = next[at.row]?.[at.index];
+  if (!item || !isKindItem(item)) return next;
+  const ref = slotOf(item[slot]);
+  if (!ref) return next;
+  const { [key]: _, ...rest } = ref;
+  const own = value === undefined ? undefined : key === "icon" ? iconOf(value) : value.trim();
+  const updated: SlotRef = own ? { ...rest, [key]: own } : rest;
+  next[at.row]![at.index] = { ...item, [slot]: updated.icon || updated.label ? updated : updated.id } as KindItem;
   return next;
 }
 

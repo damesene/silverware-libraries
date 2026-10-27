@@ -12,12 +12,12 @@ import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
 import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
-import { byTouch, DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type FavoriteItem, type Favorites, hasAction, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Show as ItemShow, widthOf } from "../core/favorites.ts";
+import { byTouch, DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type FavoriteItem, type Favorites, hasAction, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Show as ItemShow, slotOf, widthOf } from "../core/favorites.ts";
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
 import { reorder } from "./drag.ts";
-import { addItem, type At, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, splitPins, stepOf } from "./favorites.ts";
+import { addItem, type At, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setSlotOwn, splitPins, stepOf } from "./favorites.ts";
 
 const BASE = "swb-settings";
 
@@ -69,7 +69,7 @@ export class SettingsDialog {
   // The search of actions open: to add to a row, or for a slot of a kind's item
   private picking: Picking | undefined;
   // The item whose look is being set (a panel under its row): its icon or label, the label's width
-  private adjusting: At | undefined;
+  private adjusting: (At & { readonly key?: string }) | undefined;
   // The favourites edited: this device's first
   private device: Device = "click";
   // SilverBullet's keyboard bar on, on a touch screen: the docked toolbar goes over it, its turning off offered
@@ -593,18 +593,28 @@ export class SettingsDialog {
 
   /** An item's look's panel opened, or closed where open (one at a time) */
   private toggleLook(at: At): void {
-    const open = this.adjusting?.row === at.row && this.adjusting.index === at.index;
+    const open = this.adjusting?.row === at.row && this.adjusting.index === at.index && !this.adjusting.key;
     this.adjusting = open ? undefined : at;
     this.picking = undefined;
     this.drawFavorites(open ? `[data-swb-item="${at.row}:${at.index}"]` : `[data-swb-look] .${BASE}-look-show[aria-checked="true"]`);
   }
 
+  /** A slot's panel opened (its action, its own icon and label), or closed where open */
+  private toggleSlot(at: At, key: string): void {
+    const open = this.adjusting?.row === at.row && this.adjusting.index === at.index && this.adjusting.key === key;
+    this.adjusting = open ? undefined : { ...at, key };
+    this.picking = undefined;
+    this.drawFavorites(open ? `[data-swb-item="${at.row}:${at.index}"] [data-swb-slot="${key}"]` : `[data-swb-look] .${BASE}-look-change`);
+  }
+
   /**
    * An item's look, under its row, each setting on a line of its own: shown as
-   * its icon or with its label; with its label, that label's width in characters (empty: as wide as
-   * it is; kept within MIN_WIDTH and MAX_WIDTH)
+   * its icon or with its label; with its label, that label's width in
+   * characters (empty: as wide as it is; kept within MIN_WIDTH and MAX_WIDTH);
+   * an action's own icon and label. For a slot of a kind's item: its panel.
    */
-  private lookPanel(at: At): HTMLElement {
+  private lookPanel(at: At & { readonly key?: string }): HTMLElement {
+    if (at.key) return this.slotPanel(at, at.key);
     const panel = this.el("div", `${BASE}-look`);
     panel.dataset.swbLook = `${at.row}:${at.index}`;
     const item = this.rows[at.row]?.[at.index];
@@ -647,15 +657,50 @@ export class SettingsDialog {
     if (isActionItem(item) || kind?.ownLook) {
       const placeholder = isActionItem(item) ? (this.known().get(item.id)?.label ?? item.id) : "Its name";
       const own = (key: "icon" | "label") => (typeof item[key] === "string" ? (item[key] as string) : undefined);
-      panel.append(this.ownLine(at, "icon", "Icon", own("icon"), "★ 📌"), this.ownLine(at, "label", "Label", own("label"), placeholder));
+      const set = (key: "icon" | "label") => (value: string | undefined) => setOwn(this.rows, at, key, value);
+      panel.append(this.ownLine("icon", "Icon", own("icon"), "★ 📌", set("icon")), this.ownLine("label", "Label", own("label"), placeholder, set("label")));
     }
-    panel.append(this.button(`${BASE}-look-close`, "Close", () => this.toggleLook(at), ICONS.close));
-    // Esc closes it, not the dialog
+    return this.closing(panel, () => this.toggleLook(at));
+  }
+
+  /**
+   * A slot of a kind's item (a gesture button's Click, Swipe up): its action,
+   * Change… opening the search for another (another's: its own look gone), and
+   * where it has one, its own icon and label, as an action's item has them
+   */
+  private slotPanel(at: At, key: string): HTMLElement {
+    const panel = this.el("div", `${BASE}-look`);
+    panel.dataset.swbLook = `${at.row}:${at.index}:${key}`;
+    const item = this.rows[at.row]?.[at.index];
+    const slot = item && isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type)?.slots.find((s) => s.key === key) : undefined;
+    if (!item || !isKindItem(item) || !slot) return panel;
+    const ref = slotOf(item[key]);
+    const action = ref ? this.known().get(ref.id) : undefined;
+    const line = this.el("div", `${BASE}-look-line`);
+    const current = this.el("span", `${BASE}-look-action`);
+    current.innerHTML = `<span class="${BASE}-item-icon">${action?.icon ?? ""}</span><span></span>`;
+    current.lastElementChild!.textContent = action?.label ?? ref?.id ?? "None";
+    const picking = this.picking;
+    const open = !!picking && "at" in picking && picking.key === key && picking.at.row === at.row && picking.at.index === at.index;
+    const change = this.button(`${BASE}-look-change`, open ? "Close" : "Change…", () => this.openPicking({ at, key }));
+    change.setAttribute("aria-expanded", String(open));
+    line.append(this.el("span", `${BASE}-look-name`, "Action"), current, change);
+    panel.append(line);
+    if (ref) {
+      const set = (field: "icon" | "label") => (value: string | undefined) => setSlotOwn(this.rows, at, key, field, value);
+      panel.append(this.ownLine("icon", "Icon", ref.icon, "★ 📌", set("icon")), this.ownLine("label", "Label", ref.label, action?.label ?? ref.id, set("label")));
+    }
+    return this.closing(panel, () => this.toggleSlot(at, key));
+  }
+
+  /** A panel's × and Esc closing it (Esc: the panel's, not the dialog's) */
+  private closing(panel: HTMLElement, close: () => void): HTMLElement {
+    panel.append(this.button(`${BASE}-look-close`, "Close", close, ICONS.close));
     panel.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
       e.stopPropagation();
       e.preventDefault();
-      this.toggleLook(at);
+      close();
     });
     return panel;
   }
@@ -665,7 +710,7 @@ export class SettingsDialog {
    * in (empty: the default, the action's or the kind's), and where set, a
    * button putting the default back
    */
-  private ownLine(at: At, key: "icon" | "label", name: string, value: string | undefined, placeholder: string): HTMLElement {
+  private ownLine(key: "icon" | "label", name: string, value: string | undefined, placeholder: string, set: (value: string | undefined) => Favorites): HTMLElement {
     const line = this.el("div", `${BASE}-look-line`);
     const field = this.el("input", `${BASE}-look-own`);
     field.type = "text";
@@ -675,13 +720,13 @@ export class SettingsDialog {
     field.dataset.swbOwn = key;
     field.setAttribute("aria-label", key === "icon" ? `Its own icon: up to ${MAX_ICON} characters, an emoji too (empty: the default)` : "Its own label (empty: the default)");
     if (key === "icon") field.classList.add(`${BASE}-look-own-icon`);
-    field.addEventListener("change", () => this.edit(setOwn(this.rows, at, key, field.value), `[data-swb-look] [data-swb-own="${key}"]`));
+    field.addEventListener("change", () => this.edit(set(field.value), `[data-swb-look] [data-swb-own="${key}"]`));
     // (The reset outside the label: a press on it is no press on the field)
     const label = this.el("label", `${BASE}-look-own-line`);
     label.append(this.el("span", `${BASE}-look-name`, name), field);
     line.append(label);
     if (value) {
-      const reset = this.button(`${BASE}-look-reset`, key === "icon" ? "Back to the default icon" : "Back to the default label", () => this.edit(setOwn(this.rows, at, key, undefined), `[data-swb-look] [data-swb-own="${key}"]`), ICONS.reset);
+      const reset = this.button(`${BASE}-look-reset`, key === "icon" ? "Back to the default icon" : "Back to the default label", () => this.edit(set(undefined), `[data-swb-look] [data-swb-own="${key}"]`), ICONS.reset);
       reset.dataset.swbReset = key;
       line.append(reset);
     }
@@ -738,22 +783,27 @@ export class SettingsDialog {
     this.update();
   }
 
-  /** A slot of a kind's item: the action picked for it (none yet: Choose…, an optional one None); a click opens the search for it */
+  /**
+   * A slot of a kind's item: the action picked for it, with its own icon and
+   * label where it has them (none yet: Choose…, an optional one None); a click
+   * opens its panel (a slot needing one and without it: the search at once)
+   */
   private slotButton(item: KindItem, at: At, slot: ItemSlot, known: Map<string, Action>): HTMLButtonElement {
-    const id = item[slot.key];
-    const action = typeof id === "string" ? known.get(id) : undefined;
-    const unset = !(typeof id === "string" && id);
-    const what = action?.label ?? (unset ? (slot.optional ? "None" : "Choose…") : (id as string));
-    const button = this.button(`${BASE}-slot`, `${slot.label}: ${what}`, () => this.openPicking({ at, key: slot.key }));
-    button.innerHTML = `<span class="${BASE}-slot-name"></span><span class="${BASE}-item-icon">${action?.icon ?? ""}</span><span class="${BASE}-slot-action"></span>`;
+    const ref = slotOf(item[slot.key]);
+    const action = ref ? known.get(ref.id) : undefined;
+    const unset = !ref;
+    const what = ref?.label ?? action?.label ?? (unset ? (slot.optional ? "None" : "Choose…") : ref.id);
+    const button = this.button(`${BASE}-slot`, `${slot.label}: ${what}`, () => (unset && !slot.optional ? this.openPicking({ at, key: slot.key }) : this.toggleSlot(at, slot.key)));
+    button.innerHTML = `<span class="${BASE}-slot-name"></span><span class="${BASE}-item-icon">${ref?.icon ? "" : (action?.icon ?? "")}</span><span class="${BASE}-slot-action"></span>`;
+    if (ref?.icon) button.querySelector(`.${BASE}-item-icon`)!.textContent = ref.icon;
     button.querySelector(`.${BASE}-slot-name`)!.textContent = slot.label;
     button.querySelector(`.${BASE}-slot-action`)!.textContent = what;
     button.setAttribute("aria-label", `${slot.label}: ${what}`);
     button.dataset.swbSlot = slot.key;
     if (!action && !(unset && slot.optional)) button.classList.add(`${BASE}-unknown`);
     if (unset && slot.optional) button.classList.add(`${BASE}-slot-unset`);
-    const picking = this.picking;
-    button.setAttribute("aria-expanded", String(!!picking && "at" in picking && picking.key === slot.key && picking.at.row === at.row && picking.at.index === at.index));
+    const adjusting = this.adjusting;
+    button.setAttribute("aria-expanded", String(!!adjusting && adjusting.key === slot.key && adjusting.row === at.row && adjusting.index === at.index));
     return button;
   }
 
@@ -841,7 +891,7 @@ export class SettingsDialog {
       const item = favorites[target.at.row]?.[target.at.index];
       const slots = this.kindOf(target.at)?.slots ?? [];
       const after = slots.slice(slots.findIndex((s) => s.key === target.key) + 1);
-      const next = item && isKindItem(item) ? after.find((s) => !item[s.key]) : undefined;
+      const next = item && isKindItem(item) ? after.find((s) => !slotOf(item[s.key])) : undefined;
       this.picking = next ? { at: target.at, key: next.key } : undefined;
       this.edit(favorites, next ? `[data-swb-row="${row}"] .${BASE}-pick-field` : `[data-swb-item="${target.at.row}:${target.at.index}"] [data-swb-slot="${target.key}"]`);
     };

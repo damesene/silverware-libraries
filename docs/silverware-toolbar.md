@@ -381,6 +381,13 @@ config.set("silverware.toolbar.favorites", {
   can be set whatever `show` is; an action offering choices (Turn into) keeps
   showing the choice on, its own label its tooltip. In the settings' panel:
   Icon and Label fields (empty: the action's), a ↺ beside one that is set.
+- A gesture button's actions each with their own (the same day): a slot is
+  an action's id or `{ id, icon, label }` (old ones keep working); the core
+  gives the kind the slot's action with its own icon and label (the kind
+  knows nothing of it). In the settings a click on a slot opens its panel,
+  as a click on an item opens the item's: Action (Change… opens the search,
+  another action drops the own look), Icon, Label; a slot needing an action
+  and without one opens the search at once.
 
 ### Kinds of favourites: the gesture button (decided and built 2026-10-26)
 

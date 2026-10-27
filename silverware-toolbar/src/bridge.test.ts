@@ -63,6 +63,15 @@ describe("Settings", () => {
     ]);
   });
 
+  it("read a kind's slot as an action's id, or one with its own icon and label", async () => {
+    const { slotOf } = await import("./core/favorites.ts");
+    expect(slotOf("formats.bold")).toEqual({ id: "formats.bold" });
+    expect(slotOf({ id: "formats.bold", icon: " ★ ", label: " Tučně " })).toEqual({ id: "formats.bold", icon: "★", label: "Tučně" });
+    expect(slotOf({ id: "formats.bold", icon: "", label: 3 })).toEqual({ id: "formats.bold" });
+    expect(slotOf("")).toBeUndefined();
+    expect(slotOf({ icon: "★" })).toBeUndefined();
+  });
+
   it("keep an item of another kind whole, its fields for its kind to read; its show checked", async () => {
     const gesture = { type: "gesture", tap: "formats.bold", up: "formats.italic", show: "label" };
     const settings = await readSettings(bridge({ "silverware.toolbar.favorites": [[gesture, { type: "gesture", show: "big" }, { type: "" }]] }));

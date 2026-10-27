@@ -15,7 +15,7 @@ import { ICONS } from "../icons.ts";
 import type { Action, ActionEditor, Change, Context } from "./action.ts";
 import { Bar, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
-import { byTouch, isActionItem, isSeparator, type Look, type Pin } from "./favorites.ts";
+import { byTouch, isActionItem, isSeparator, type Look, ownIconHtml, type Pin, type SlotRef, slotOf } from "./favorites.ts";
 import type { ItemKind } from "./items.ts";
 import { hideKeyboard } from "./keyboard.ts";
 import { marked } from "./cursor.ts";
@@ -278,7 +278,12 @@ export class Controller {
           // A kind's: a kind no module on gives, or a slot without an action, left out
           const kind = kinds.find((k) => k.type === item.type);
           if (!kind || kind.check?.(item)) return [];
-          const slots = kind.slots.map(({ key, optional }) => ({ key, optional, action: all.find((a) => a.id === item[key]) }));
+          // A slot's action with its own icon and label where the slot has them: the kind draws it as it is given
+          const slots = kind.slots.map(({ key, optional }) => {
+            const ref = slotOf(item[key]);
+            const found = ref && all.find((a) => a.id === ref.id);
+            return { key, optional, action: found && ref ? withOwnLook(found, ref) : found };
+          });
           if (slots.some(({ optional, action }) => !optional && !action)) return [];
           const found = Object.fromEntries(slots.flatMap(({ key, action }) => (action ? [[key, action]] : [])));
           return [{ item: { kind, actions: found as Record<string, Action>, ...lookOf(item), item } }];
@@ -301,7 +306,7 @@ export class Controller {
     this.refreshIfStale();
     const rows = this.favorites(context);
     // Favourites without … anywhere (an item of it, or a slot of a kind's): pinned at the end
-    const more = rows.some((row) => row.some((item) => ("action" in item && item.action === MORE_ACTION) || ("item" in item && Object.values(item.item.actions).includes(MORE_ACTION))))
+    const more = rows.some((row) => row.some((item) => ("action" in item && item.action === MORE_ACTION) || ("item" in item && Object.values(item.item.actions).some((a) => a.id === MORE_ACTION.id))))
       ? undefined
       : { action: MORE_ACTION, active: false, enabled: true, labeled: false };
     if (this.docks()) {
@@ -338,7 +343,8 @@ export class Controller {
   /** An action run on the selection: its change written as one edit, the selection set after it */
   private async run(action: Action): Promise<void> {
     // …: the popup opened, or closed again
-    if (action === MORE_ACTION) {
+    // (By its id: a gesture button's slot gives it with an icon or label of its own, another object)
+    if (action.id === MORE_ACTION.id) {
       if (this.popup.isOpen) this.popup.close();
       else void this.showActions();
       return;
@@ -628,4 +634,10 @@ function rectOf(range: Range): Box {
 function lookOf(item: Look): { labeled: boolean; width?: number; pin?: Pin } {
   const labeled = item.show === "label";
   return { labeled, ...(labeled && item.width ? { width: item.width } : {}), ...(item.pin ? { pin: item.pin } : {}) };
+}
+
+/** An action as a slot shows it: its own icon (a character, an emoji) and label in place of the action's, the rest the action's */
+function withOwnLook(action: Action, ref: SlotRef): Action {
+  if (!ref.icon && !ref.label) return action;
+  return { ...action, ...(ref.icon ? { icon: ownIconHtml(ref.icon) } : {}), ...(ref.label ? { label: ref.label } : {}) };
 }

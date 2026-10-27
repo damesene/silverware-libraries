@@ -85,6 +85,8 @@ A gesture button holds up to three actions in one place: a click (a tap) runs th
 { type = "gesture", tap = "formats.bold", up = "formats.highlight", down = "formats.code" }
 ```
 
+Each of its actions may have an icon and a label of its own, as an action's item has: write it as `{ id, icon, label }` in place of its id (`tap = { id = "formats.bold", icon = "★", label = "Tučně" }`). In the settings, click an action in the button: its panel shows the action (*Change…* picks another, which drops its own icon and label), and its own icon and label.
+
 The button shows as pressed when its first action is on for the selection; a swipe's action not offered there is dimmed and does nothing. Gesture buttons come from the *Gestures* module: with it off they are left out.
 
 ## Settings
@@ -92,7 +94,7 @@ The button shows as pressed when its first action is on for the selection; a swi
 *Silverware Toolbar settings…*, the gear by the search field of the **…** list (typing `settings` there finds it too; or the command *Silverware Toolbar: Settings*), opens the settings, for every page in the space:
 
 * **General**: the key for every action, as SilverBullet writes keys (`Ctrl-Shift-q`, `Alt-k`), where and when the toolbar shows, and whether a format works on the word at the cursor. On a phone with SilverBullet's keyboard bar on, it offers to turn that bar off (on that device, at once).
-* **Favorites**: *Click* (with a mouse) or *Touch* (by finger, see *Favourites*); the toolbar's rows, one under another. Drag an item within its row or into another, or with the keyboard: focus it (Tab) and press **Alt+←** or **Alt+→** to move it within its row, **Alt+↑** or **Alt+↓** into the row above or below, **Delete** to remove it. The button beside an action's name shows it as its icon or with its name too; **×** removes it. **Add** searches every action (and a separator, and a gesture button, whose two actions it asks for next; click either to change it) to add at the row's end; **Add row** adds a row, the **×** in a row's head removes it with its items. A row left empty is left out. An item no action has is dimmed, named by its id.
+* **Favorites**: *Click* (with a mouse) or *Touch* (by finger, see *Favourites*); the toolbar's rows, one under another. Each item shows as in the toolbar. Click it for its panel under the row: *Show* (its icon, or its label too), *Width* (its label's, in characters), and an action's own *Icon* and *Label* (↺ puts the action's back). Drag an item within its row or into another, or with the keyboard: focus it (Tab) and press **Alt+←** or **Alt+→** to move it within its row, **Alt+↑** or **Alt+↓** into the row above or below, **Delete** to remove it; **×** removes it. **Add** searches every action (and a separator, and a gesture button, whose actions it asks for next; click one of them for its panel: its action, *Change…*, its own icon and label) to add at the row's end; **Add row** adds a row, the **×** in a row's head removes it with its items. A row left empty is left out. An item no action has is dimmed, named by its id.
 * **Modules**: each part of the toolbar on or off (its actions with it).
 
 Nothing changes until **Save**. The favourites, where and when the toolbar shows and the word at the cursor apply at once; a module or the key needs the page loaded again (**Save and reload**). They are saved in your `CONFIG` page: the key and the modules in the block SilverBullet's own settings (*Configuration: Open*) keep, so either shows what the other wrote; the favourites in a block of their own (`-- managed-by: silverware-toolbar`), which SilverBullet's settings leave alone. You can edit both by hand too.
@@ -257,7 +259,8 @@ config.define("silverware.toolbar", {
         type = "array",
         items = {
           type = "object",
-          -- An item of a module's kind (the gestures module's button) has fields of its own, which its kind reads
+          -- An item of a module's kind (the gestures module's button) has fields of its own, which its kind reads;
+          -- a slot of it (tap, up, down) an action's id, or { id, icon, label }: the action with its own icon and label
           properties = {
             type = { type = "string" },
             id = { type = "string" },
@@ -280,7 +283,8 @@ config.define("silverware.toolbar", {
         type = "array",
         items = {
           type = "object",
-          -- An item of a module's kind (the gestures module's button) has fields of its own, which its kind reads
+          -- An item of a module's kind (the gestures module's button) has fields of its own, which its kind reads;
+          -- a slot of it (tap, up, down) an action's id, or { id, icon, label }: the action with its own icon and label
           properties = {
             type = { type = "string" },
             id = { type = "string" },
@@ -1486,6 +1490,21 @@ end
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+/* A slot's panel: its action and Change… */
+.swb-settings-look-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.swb-settings-look-change {
+  padding: 3px 10px;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 6px;
+  cursor: pointer;
 }
 .swb-settings-look-own {
   width: 14em;

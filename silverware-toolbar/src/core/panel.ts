@@ -41,7 +41,8 @@ export class Panel {
 
   /** Whether it is open for an action (its button again closes it) */
   isOpenFor(action: Action): boolean {
-    return this.shown?.action === action;
+    // (By its id: the toolbar drawn anew, or a slot's own look, gives the same action as another object)
+    return this.shown?.action.id === action.id;
   }
 
   owns(node: Node): boolean {
@@ -65,7 +66,7 @@ export class Panel {
       this.close();
       throw e;
     }
-    if (this.shown?.action === action) this.shown = { action, options, ...(ended ? { ended } : {}) };
+    if (this.shown?.action.id === action.id) this.shown = { action, options, ...(ended ? { ended } : {}) };
     this.place(options.rect, options.viewTop, options.above);
   }
 

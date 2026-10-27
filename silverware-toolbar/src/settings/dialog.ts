@@ -683,7 +683,7 @@ export class SettingsDialog {
       const placeholder = isActionItem(item) ? (this.known().get(item.id)?.label ?? item.id) : "Its name";
       const own = (key: "icon" | "label") => (typeof item[key] === "string" ? (item[key] as string) : undefined);
       const set = (key: "icon" | "label") => (value: string | undefined) => setOwn(this.rows, at, key, value);
-      panel.append(this.ownLine("icon", "Icon", own("icon"), "★ 📌", set("icon")), this.ownLine("label", "Label", own("label"), placeholder, set("label")));
+      panel.append(this.ownLine("icon", "Icon", own("icon"), "★", set("icon")), this.ownLine("label", "Label", own("label"), placeholder, set("label")));
     }
     return this.closing(panel, () => this.toggleLook(at));
   }
@@ -713,7 +713,7 @@ export class SettingsDialog {
     panel.append(line);
     if (ref) {
       const set = (field: "icon" | "label") => (value: string | undefined) => setSlotOwn(this.rows, at, key, field, value);
-      panel.append(this.ownLine("icon", "Icon", ref.icon, "★ 📌", set("icon")), this.ownLine("label", "Label", ref.label, action?.label ?? ref.id, set("label")));
+      panel.append(this.ownLine("icon", "Icon", ref.icon, "★", set("icon")), this.ownLine("label", "Label", ref.label, action?.label ?? ref.id, set("label")));
     }
     return this.closing(panel, () => this.toggleSlot(at, key));
   }

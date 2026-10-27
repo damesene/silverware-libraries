@@ -176,6 +176,8 @@ export class Bar {
    * cursor clear of it; off, it lies over the editor
    */
   private keepRoom(on: boolean): void {
+    // (None kept: nothing to give back; the variables may be another toolbar's, started after this one)
+    if (!on && !this.room) return;
     this.room = on;
     const style = this.doc.documentElement.style;
     for (const edge of ["top", "bottom"] as const) {
@@ -326,12 +328,18 @@ export class Bar {
     if (this.menu) this.placeMenu();
   }
 
-  hide(): void {
+  /** Hidden; `keepRoom`: the room kept for it docked stays (the editor does not jump: a table's cell edited) */
+  hide(keepRoom = false): void {
     this.closeMenu();
-    this.keepRoom(false);
+    if (!keepRoom) this.keepRoom(false);
     this.element.classList.remove("swb-visible");
     this.at = undefined;
     this.dockPlace = undefined;
+  }
+
+  /** Hidden, the room kept for it given back */
+  dropRoom(): void {
+    if (!this.shown) this.keepRoom(false);
   }
 
   remove(): void {

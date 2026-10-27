@@ -10,7 +10,7 @@
 // or text is typed. The modules (modules.ts) give the actions; the core knows
 // none of them. The popup ends with the core's own item, the settings dialog.
 import type { Bridge, Device, Settings } from "../bridge.ts";
-import { CONTENT_SELECTOR, editorBox, keyboardBarTop, pageContentOf, pinnedViewBottom, viewTopOf } from "../dom.ts";
+import { CONTENT_SELECTOR, editorBox, inEditor, keyboardBarTop, pageContentOf, pinnedViewBottom, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
 import type { Action, ActionEditor, Change, Context } from "./action.ts";
 import { Bar, type Dock, type Shown } from "./bar.ts";
@@ -67,6 +67,8 @@ export class Controller {
   private shows = 0;
   // Stopped (a newer controller started): a read answered after it shows nothing
   private stopped = false;
+  // The last press was in SilverBullet's editor (`stillEditing`)
+  private pressedInEditor = false;
   // The context the toolbar was last shown for: the state of a list's choices it opens
   private context: Context | undefined;
   // SilverBullet's keyboard bar put in or taken out (it renders it as the keyboard comes and goes, after the events
@@ -126,6 +128,7 @@ export class Controller {
     this.watcher.start();
     win.addEventListener("keydown", this.onKey, true);
     win.addEventListener("mousedown", this.onPress, true);
+    win.addEventListener("pointerdown", this.onPointer, { capture: true, passive: true });
     win.addEventListener("scroll", this.onScroll, { capture: true, passive: true });
     win.addEventListener("resize", this.onScroll);
     this.doc.addEventListener("focusin", this.onFocus);
@@ -145,6 +148,7 @@ export class Controller {
     this.watcher.stop();
     win.removeEventListener("keydown", this.onKey, true);
     win.removeEventListener("mousedown", this.onPress, true);
+    win.removeEventListener("pointerdown", this.onPointer, { capture: true });
     win.removeEventListener("scroll", this.onScroll, { capture: true });
     win.removeEventListener("resize", this.onScroll);
     this.doc.removeEventListener("focusin", this.onFocus);
@@ -491,10 +495,10 @@ export class Controller {
     else this.doc.querySelector<HTMLElement>(".cm-content")?.focus({ preventScroll: true });
   }
 
-  private hideBar(): void {
+  private hideBar(keepRoom = false): void {
     this.atCaret = false;
     this.range = undefined;
-    this.bar.hide();
+    this.bar.hide(keepRoom);
     this.panel.close(true);
   }
 
@@ -513,7 +517,8 @@ export class Controller {
     if (!this.atCaret || !this.bar.shown || this.stays() || (e.target instanceof Node && this.owns(e.target))) return;
     // Shown always, a press in the page's text moves the caret it follows
     if (this.persistent() && e.target instanceof Node && pageContentOf(e.target)) return;
-    this.hideBar();
+    // (Docked, a press elsewhere in the editor, a table's: the room kept for it stays, the editor does not jump)
+    this.hideBar(e.target instanceof Node && inEditor(e.target));
   };
 
   /** Whether the toolbar shows while the page's text is edited, with nothing selected too (the show setting, this device's: writing, always) */
@@ -564,13 +569,33 @@ export class Controller {
     if (pageContentOf(e.target instanceof Node ? e.target : null) && caret) void this.caretMoved(caret);
   };
 
-  // The page's text left (not for the toolbar's own controls): shown always, it goes until the page has the keyboard again
+  // The page's text left (not for the toolbar's own controls): shown while writing, it goes until the page has the
+  // keyboard again; the focus still in SilverBullet's editor (a table's cell edited), the room kept for it docked
+  // stays, else the editor would jump under the finger each time
   private onBlur = (): void => {
     this.doc.defaultView!.setTimeout(() => {
       const active = this.doc.activeElement;
+      if (!this.bar.shown) {
+        if (!this.stillEditing(active)) this.bar.dropRoom();
+        return;
+      }
       if (!this.persistent() || this.stays() || this.writing() || this.popup.isOpen || (active && this.owns(active))) return;
-      this.hideBar();
+      this.hideBar(this.stillEditing(active));
     });
+  };
+
+  /**
+   * Whether what has the focus is still SilverBullet's editor: a field in it (a
+   * table's cell editor), or none after a press in it (a table takes the focus
+   * on a touch)
+   */
+  private stillEditing(active: Element | null): boolean {
+    return inEditor(active) || ((!active || active === this.doc.body) && this.pressedInEditor);
+  }
+
+  // A press in SilverBullet's editor, the last one (for `stillEditing`)
+  private onPointer = (e: PointerEvent): void => {
+    this.pressedInEditor = e.target instanceof Node && inEditor(e.target);
   };
 
   /** SilverBullet's keyboard bar watched, or no longer (elements put in and taken out only: no text, no attributes) */

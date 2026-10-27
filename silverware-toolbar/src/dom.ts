@@ -57,6 +57,12 @@ export function editorBox(doc: Document): DOMRect | undefined {
   return rect && rect.width > 0 && rect.height > 0 ? rect : undefined;
 }
 
+/** Whether a node is in SilverBullet's editor (its text, or a widget's field there: a table's cell editor) */
+export function inEditor(node: Node | null): boolean {
+  const element = node instanceof Element ? node : node?.parentElement;
+  return !!element?.closest(EDITOR_SELECTOR);
+}
+
 /** The top of the page's view around a node (the toolbar goes below it there), else the window's */
 export function viewTopOf(node: Node | null): number {
   const element = node instanceof Element ? node : node?.parentElement;

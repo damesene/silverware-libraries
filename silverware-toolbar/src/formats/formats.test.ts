@@ -53,7 +53,7 @@ afterEach(() => resetCustomFormats());
 describe("Built-in formats", () => {
   it("are defined without a mistake, each by its id", () => {
     expect(BUILT_IN_PROBLEMS).toEqual([]);
-    expect(formatsIn("inline").map((f) => f.id)).toEqual(["formats.bold", "formats.italic", "formats.underline", "formats.strikethrough", "formats.highlight", "formats.code", "formats.link", "formats.wikiLink"]);
+    expect(formatsIn("inline").map((f) => f.id)).toEqual(["formats.bold", "formats.italic", "formats.underline", "formats.strikethrough", "formats.highlight", "formats.code", "formats.link", "formats.wikiLink", "formats.tag"]);
     expect(formatsIn("block").filter((f) => f.label).map((f) => f.name)).toEqual(["paragraph", "heading1", "heading2", "heading3", "bullet", "numbered", "task", "quote"]);
   });
 });
@@ -300,6 +300,22 @@ describe("Links", () => {
     expect(run("go ‸ now", "wikiLink")).toBe("go [[‸]] now");
     // Literal: no bold inside its name
     expect(canFormat(at("go [[Pa«g»e]] now"), format(BOLD))).toBe(false);
+  });
+
+  it("toggle a tag: a word, several (#<…>, as SilverBullet reads them), digits alone; the caret in one, or at its end, takes it off", () => {
+    expect(run("a «idea» b", "tag")).toBe("a «#idea» b");
+    expect(run("a «two words» b", "tag")).toBe("a «#<two words>» b");
+    expect(run("a «2026» b", "tag")).toBe("a «#<2026>» b");
+    expect(run("a ‸ b", "tag")).toBe("a #‸ b");
+    expect(run("a «#idea» b", "tag")).toBe("a «idea» b");
+    expect(run("a #id‸ea b", "tag")).toBe("a «idea» b");
+    expect(run("a #idea‸ b", "tag")).toBe("a «idea» b");
+    expect(run("a #<two wo‸rds> b", "tag")).toBe("a «two words» b");
+    expect(run("a #<«two» words> b", "tag")).toBe("a «two words» b");
+    // Not a tag: a # with a space after it, a word before the #
+    expect(isOn(at("a # id‸ea b"), format("tag"))).toBe(false);
+    // Literal: no bold inside its name
+    expect(canFormat(at("a #id«e»a b"), format(BOLD))).toBe(false);
   });
 });
 

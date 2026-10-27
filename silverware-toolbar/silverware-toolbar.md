@@ -32,6 +32,7 @@ Select text in a page and a toolbar shows beside it: make it bold, italic or cod
 | Code | `formats.code` | `` `text` ``; the formats inside it are taken off, and no format goes inside code |
 | Link | `formats.link` | `[text](…)`, the cursor where the URL goes; a URL selected becomes the link's target, the cursor where its text goes; nothing selected: `[link](…)`. In a link (selected, or the cursor in its text): the link taken off, its text kept |
 | Wiki link | `formats.wikiLink` | `[[text]]`, and back (a wiki link with an alias leaves the alias) |
+| Tag | `formats.tag` | `#text`, and back; a text that cannot be a tag of one word (spaces, digits alone) `#<text>`; nothing selected: `#` and the cursor |
 | Clear formatting | `actions.clear` | Takes bold, italic, underline, strikethrough, highlight and code off the selection, its text kept (links stay) |
 | Turn into | `actions.turnInto` | The list of the block formats below |
 | Any SilverBullet command | `commands.<its name>`, e.g. `commands.Navigate: Home` | Runs it, as the command palette does. There are many: type a command's name in the **…** list to find it (they are not listed until you type) |

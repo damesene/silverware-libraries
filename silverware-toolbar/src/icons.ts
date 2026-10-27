@@ -20,6 +20,7 @@ export const ICONS = {
   code: svg('<path d="m9 8-4 4 4 4M15 8l4 4-4 4"/>'),
   link: svg('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
   wikiLink: svg('<path d="M8 5H5v14h3M16 5h3v14h-3M10 9h4M10 15h4"/>'),
+  tag: svg('<path d="M5 9h14M5 15h14M10.5 4 8.5 20M15.5 4l-2 16"/>'),
   unlink: svg('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1M4 4l16 16"/>'),
   clear: svg('<path d="M6 5h12M12 5l-3 14M15 13l5 5M20 13l-5 5"/>'),
   paragraph: svg('<path d="M13 4v16M17 4v16M19 4H10a4 4 0 0 0 0 8h3"/>'),

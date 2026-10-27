@@ -1,7 +1,8 @@
 // Bundles each library's src/index.ts into the .js file next to its library page.
 // --check builds in memory and fails when a committed bundle differs from its sources.
 import * as esbuild from "esbuild";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import { emojiModuleText } from "./emoji.mjs";
 
 const libraries = ["silverware-table", "silverware-toolbar"];
 const watch = process.argv.includes("--watch");
@@ -36,4 +37,13 @@ for (const name of libraries) {
     await esbuild.build(options);
   }
 }
+// The toolbar's emoji data beside its bundle (scripts/emoji.mjs), made from the package as installed
+const emojiFile = "silverware-toolbar/silverware-toolbar-emoji.js";
+if (check) {
+  const committed = (await readFile(emojiFile, "utf8").catch(() => "")).replaceAll("\r\n", "\n");
+  if (committed !== emojiModuleText()) {
+    console.error(`${emojiFile} does not match emojibase-data: run npm run build`);
+    stale++;
+  }
+} else await writeFile(emojiFile, emojiModuleText());
 if (stale) process.exit(1);

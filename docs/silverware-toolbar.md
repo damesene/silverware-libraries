@@ -395,6 +395,24 @@ or opening its choices).
   nothing of them) and `check` (an item that cannot show is left out, the
   dialog says why: a snippet without its text).
 
+### The emoji picker (decided and built 2026-10-27)
+
+- The emoji module's `actions.emoji` opens a picker in a panel of its own
+  (`Action.panel`, core/panel.ts): search by name and keywords (English), the
+  emoji by Unicode's groups, those used last first, arrows and Enter; one
+  picked replaces the selection, the cursor after it. Its emoji are not the
+  popup's actions (too many among the formats). Basic emoji only, no skin
+  tones; Emoji 15.1 at most (newer ones were empty boxes in Chrome on Windows).
+- Its data is a file beside the bundle (`silverware-toolbar-emoji.js`, 118 kB,
+  39 kB gzipped), in the library page's `files:`, imported the first time the
+  picker opens through the bundle's own URL (`import.meta.url`): the main
+  bundle stays as it was, nothing is loaded with the module off. Verified by a
+  probe in the local SilverBullet and in 2.12.1 with its service worker; not
+  verified: offline, and an install from GitHub (*Library: Install* copies
+  every file of `files:`, by its source).
+- Made by scripts/emoji.mjs from emojibase-data (pinned, MIT; names and
+  keywords Unicode CLDR's), checked by `check-build` as the bundle is.
+
 ### Also decided
 
 - **Default favourites** in the core, in a file of their own

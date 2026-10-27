@@ -4,6 +4,7 @@ tags: meta/library
 description: "Silverware Toolbar: select text and a toolbar beside it formats it, or turns a paragraph into a list, a heading or a quote and back."
 files:
 - silverware-toolbar.js
+- silverware-toolbar-emoji.js
 ---
 # Silverware Toolbar
 
@@ -34,6 +35,7 @@ Select text in a page and a toolbar shows beside it: make it bold, italic or cod
 | Turn into | `actions.turnInto` | The list of the block formats below |
 | Any SilverBullet command | `commands.<its name>`, e.g. `commands.Navigate: Home` | Runs it, as the command palette does. There are many: type a command's name in the **…** list to find it (they are not listed until you type) |
 | Hide the keyboard | `actions.hideKeyboard` | On a phone or tablet: hides the on-screen keyboard, the selection kept as it is, the toolbar staying (to see more of the page while you format it); the next tap in the text brings the keyboard back. Put it in your favourites to have it in the bar at the bottom. (Where the browser cannot hide it alone, Safari on iOS, the text is left: the keyboard and the bar go.) |
+| Emoji | `actions.emoji` | A picker of every emoji: type to find one by its name or keywords (in English: `heart`, `thumb`, `party`), the arrows and Enter, or click it; those you used last come first. It is written at the cursor, replacing the text selected. The emoji themselves are not in the **…** list. Names and keywords are Unicode's (CLDR), through emojibase-data |
 | Silverware Toolbar settings… | `actions.settings` | The settings dialog (see *Settings*): the gear by the search field of the **…** list, found by typing too |
 | Paragraph | `formats.paragraph` | Plain lines: a list's, a heading's or a quote's marker taken off |
 | Heading 1, 2, 3 | `formats.heading1` … `formats.heading3` | `# `, `## `, `### ` |
@@ -299,6 +301,7 @@ config.define("silverware.toolbar", {
         clear = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Remove the inline formats of the selection.", ui = { category = "Silverware Toolbar", label = "Clear formatting", priority = 0.6 } } } },
         commands = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Every SilverBullet command, found by typing its name in the list of every action, and as a favourite.", ui = { category = "Silverware Toolbar", label = "Commands", priority = 0.5 } } } },
         keyboard = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "On a phone or tablet: an action hiding the on-screen keyboard, the selection kept as it is (to see more of the page while you format it).", ui = { category = "Silverware Toolbar", label = "Hide the keyboard", priority = 0.4 } } } },
+        emoji = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "An action picking an emoji to write at the cursor, found by its name and keywords.", ui = { category = "Silverware Toolbar", label = "Emoji", priority = 0.1 } } } },
         snippets = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "A text snippet among the favourites: a button of your own character (an emoji too) and label writing your text at the cursor, {s} in it the text selected, {c} where the cursor goes.", ui = { category = "Silverware Toolbar", label = "Snippets", priority = 0.2 } } } },
         gestures = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "A gesture button among the favourites: two actions in one, a click runs the first, swiping it up the second.", ui = { category = "Silverware Toolbar", label = "Gestures", priority = 0.3 } } } },
       },
@@ -684,6 +687,43 @@ end
   font-size: 16px;
   line-height: 1;
   text-align: center;
+}
+/* A panel of an action's own (the emoji picker), where the popup shows */
+.swb-panel.swb-visible {
+  flex-direction: column;
+  width: 340px;
+  max-width: calc(100vw - 16px);
+}
+.swb-emoji-list {
+  overflow-y: auto;
+  max-height: 280px;
+  padding: 4px 6px 6px;
+}
+.swb-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+}
+.swb-emoji {
+  height: 36px;
+  padding: 0;
+  font-size: 22px;
+  line-height: 1;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swb-emoji.swb-current {
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 16%, transparent);
+}
+.swb-emoji-name {
+  min-height: 1.3em;
+  padding: 6px 10px;
+  border-top: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
+  opacity: 0.75;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 /* Icons by the search field (the settings) */
 .swb-popup-tools {

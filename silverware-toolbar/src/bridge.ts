@@ -40,11 +40,11 @@ export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
 }
 
 /** The modules: the parts that can be turned off with `silverware.toolbar.modules.<name>.enabled` (default on) */
-export const MODULE_NAMES = ["inline", "blocks", "clear", "commands", "keyboard", "gestures", "snippets"] as const;
+export const MODULE_NAMES = ["inline", "blocks", "clear", "commands", "keyboard", "gestures", "snippets", "emoji"] as const;
 export type ModuleName = (typeof MODULE_NAMES)[number];
 
 /** A module's name and what it does, as the settings dialog shows them (the library page's config.define says the same) */
-export const MODULE_LABELS: Readonly<Record<ModuleName, string>> = { inline: "Inline formats", blocks: "Turn into", clear: "Clear formatting", commands: "Commands", keyboard: "Hide the keyboard", gestures: "Gestures", snippets: "Snippets" };
+export const MODULE_LABELS: Readonly<Record<ModuleName, string>> = { inline: "Inline formats", blocks: "Turn into", clear: "Clear formatting", commands: "Commands", keyboard: "Hide the keyboard", gestures: "Gestures", snippets: "Snippets", emoji: "Emoji" };
 export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
   inline: "Bold, italic, strikethrough, highlight, code, links and wiki links.",
   blocks: "Turn lines into a paragraph, a heading, a list, a task or a quote.",
@@ -52,6 +52,7 @@ export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
   commands: "Every SilverBullet command, found by typing its name in the list of every action, and as a favourite.",
   keyboard: "On a phone or tablet: an action hiding the on-screen keyboard, the selection kept as it is (to see more of the page while you format it).",
   gestures: "A gesture button among the favourites: two actions in one, a click runs the first, swiping it up the second.",
+  emoji: "An action picking an emoji to write at the cursor, found by its name and keywords.",
   snippets: "A text snippet among the favourites: a button of your own character (an emoji too) and label writing your text at the cursor, {s} in it the text selected, {c} where the cursor goes.",
 };
 

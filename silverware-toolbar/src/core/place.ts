@@ -9,6 +9,34 @@ const GAP = 8;
 
 export type Box = { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number };
 
+/**
+ * A floating element placed by the toolbar (the popup of every action, a
+ * panel): under it (no toolbar on screen: under the top of the view, in the
+ * middle), or `above` it (docked at the bottom), held by its bottom edge so
+ * what shows fewer gets shorter from the top
+ */
+export function placeByToolbar(element: HTMLElement, rect: Box | undefined, viewTop: number, above: boolean): void {
+  const win = element.ownerDocument.defaultView!;
+  if (above && rect) {
+    const left = Math.max(GAP, Math.min(rect.left + GAP, win.innerWidth - element.offsetWidth - GAP));
+    element.style.left = `${Math.round(left)}px`;
+    element.style.top = "auto";
+    element.style.bottom = `${Math.round(win.innerHeight - (rect.top - GAP))}px`;
+    return;
+  }
+  element.style.removeProperty("bottom");
+  const size = { width: element.offsetWidth, height: element.offsetHeight };
+  const at = rect ?? { left: win.innerWidth / 2, right: win.innerWidth / 2, top: viewTop, bottom: viewTop + 40 };
+  const { left, top } = placeBy(at, size, { width: win.innerWidth, height: win.innerHeight, top: viewTop }, !!rect);
+  element.style.left = `${left}px`;
+  element.style.top = `${top}px`;
+}
+
+/** The room over the toolbar docked at the bottom, its gaps left out (what floats there is at most as tall) */
+export function roomAbove(rect: Box, viewTop: number): number {
+  return rect.top - viewTop - 2 * GAP;
+}
+
 /** The element's place (its left and top, fixed) by `rect` (the selection's; `under`: another element's), the page's view's top being `top` */
 export function placeBy(
   rect: Box,

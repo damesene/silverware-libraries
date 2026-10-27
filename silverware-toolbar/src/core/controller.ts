@@ -20,6 +20,7 @@ import type { ItemKind } from "./items.ts";
 import { hideKeyboard } from "./keyboard.ts";
 import { marked } from "./cursor.ts";
 import type { Box } from "./place.ts";
+import { Panel } from "./panel.ts";
 import { Popup } from "./popup.ts";
 import { SelectionWatcher } from "./selection.ts";
 
@@ -53,6 +54,8 @@ export class Controller {
   private readonly watcher: SelectionWatcher;
   private readonly bar: Bar;
   private readonly popup: Popup;
+  // An action's own panel (the emoji picker)
+  private readonly panel: Panel;
   // The selection (or the caret) the toolbar is shown by
   private range: Range | undefined;
   // Shown at the caret (the command without a selection): it goes as the caret moves or text is typed
@@ -90,6 +93,7 @@ export class Controller {
       choices: (action) => (this.popup.isOpen ? this.popup.close() : void this.showActions(action)),
     });
     this.popup = new Popup(doc);
+    this.panel = new Panel(doc);
   }
 
   start(): void {
@@ -122,10 +126,13 @@ export class Controller {
     win.visualViewport?.removeEventListener("scroll", this.onScroll);
     this.bar.remove();
     this.popup.remove();
+    this.panel.remove();
   }
 
   /** The popup of every action under the toolbar (the toolbar's …, the command): by the selection, else the toolbar at the caret; `choices`: open at that action's */
   async showActions(choices?: Action): Promise<void> {
+    // The popup in a panel's place (the toolbar's … or a list's button while it is open): the panel done
+    this.panel.close(true);
     const context = await this.read();
     if (!context || this.stopped) return;
     const range = this.watcher.current() ?? this.watcher.caret();
@@ -154,7 +161,7 @@ export class Controller {
   }
 
   private owns(node: Node): boolean {
-    return this.bar.owns(node) || this.popup.owns(node);
+    return this.bar.owns(node) || this.popup.owns(node) || this.panel.owns(node);
   }
 
   /** An action's state for a context; one whose own functions fail is off and not offered */
@@ -218,6 +225,7 @@ export class Controller {
     this.range = range;
     if (!range) {
       this.bar.hide();
+      this.panel.close(true);
       return;
     }
     this.context = context;
@@ -238,6 +246,7 @@ export class Controller {
       if (!this.atCaret && !(this.persistent() && this.writing())) {
         this.range = undefined;
         this.bar.hide();
+        this.panel.close(true);
       }
       return;
     }
@@ -248,6 +257,7 @@ export class Controller {
     // The editor's selection is a caret (the page's selection is not its own, or was just changed): no toolbar
     if (context.from === context.to) {
       this.bar.hide();
+      this.panel.close(true);
       return;
     }
     this.showBar(context, range);
@@ -263,6 +273,11 @@ export class Controller {
     }
     // Run from the toolbar while the popup is open: the popup is done
     this.popup.close(true);
+    if (action.panel) {
+      this.togglePanel(action);
+      return;
+    }
+    this.panel.close(true);
     if (action === SETTINGS_ACTION) {
       this.hideBar();
       this.openSettings?.();
@@ -285,6 +300,50 @@ export class Controller {
     }
     this.focusEditor();
     // The toolbar shows what the change made (a format now on), once the editor has the selection set
+    this.doc.defaultView!.requestAnimationFrame(() => void this.again());
+  }
+
+  /** An action's own panel opened (by the toolbar, as the popup is), or closed again by its button */
+  private togglePanel(action: Action): void {
+    if (this.panel.isOpenFor(action)) {
+      this.panel.close();
+      return;
+    }
+    const range = this.range;
+    this.panel.open(
+      action,
+      {
+        rect: this.bar.shown ? this.bar.rect() : undefined,
+        viewTop: viewTopOf(range?.startContainer ?? this.doc.querySelector(".cm-content")),
+        above: this.bar.docked,
+        keeps: (node) => this.bar.owns(node),
+        closed: () => this.focusEditor(),
+      },
+      (element) =>
+        action.panel!({
+          doc: this.doc,
+          element,
+          docked: this.bar.docked,
+          write: (edit) => void this.panelWrite(edit),
+          close: () => this.panel.close(),
+          place: () => this.panel.place(),
+        }),
+    );
+  }
+
+  /** What a panel writes: the selection read anew, its change written as an action's */
+  private async panelWrite(edit: (context: Context) => Change | undefined): Promise<void> {
+    this.panel.close(true);
+    const context = await this.read();
+    if (context) {
+      try {
+        const change = edit(context);
+        if (change) await this.write(change, context);
+      } catch (e) {
+        void this.bridge.flash(`Silverware Toolbar: writing failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+      }
+    }
+    this.focusEditor();
     this.doc.defaultView!.requestAnimationFrame(() => void this.again());
   }
 
@@ -354,11 +413,13 @@ export class Controller {
     this.atCaret = false;
     this.range = undefined;
     this.bar.hide();
+    this.panel.close(true);
   }
 
   // Esc hides the toolbar (the popup's own Esc closes the popup first); shown at the caret, any key typed hides it
   private onKey = (e: KeyboardEvent): void => {
-    if (this.popup.isOpen || !this.bar.shown) return;
+    // (A panel's keys its own: its Esc closes it alone)
+    if (this.popup.isOpen || this.panel.isOpen || !this.bar.shown) return;
     if (e.key === "Escape") this.hideBar();
     else if (this.atCaret && !this.persistent() && !["Shift", "Control", "Alt", "Meta"].includes(e.key)) this.hideBar();
   };
@@ -429,6 +490,7 @@ export class Controller {
     if (this.bar.shown && this.bar.docked) {
       this.bar.placeDocked(this.dockLine());
       if (this.popup.isOpen) this.popup.place(this.bar.rect(), viewTopOf(this.range?.startContainer ?? null), true);
+      if (this.panel.isOpen) this.panel.place(this.bar.rect(), viewTopOf(this.range?.startContainer ?? null), true);
       return;
     }
     const range = this.range;
@@ -436,6 +498,7 @@ export class Controller {
     const viewTop = viewTopOf(range.startContainer);
     this.bar.place(rectOf(range), viewTop);
     if (this.popup.isOpen) this.popup.place(this.bar.rect(), viewTop);
+    if (this.panel.isOpen) this.panel.place(this.bar.rect(), viewTop, false);
   };
 }
 

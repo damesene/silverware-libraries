@@ -8,6 +8,7 @@ import type { ItemKind } from "./core/items.ts";
 import { blocksModule } from "./modules/blocks.ts";
 import { clearModule } from "./modules/clear.ts";
 import { commandsModule } from "./modules/commands.ts";
+import { emojiModule } from "./modules/emoji.ts";
 import { gesturesModule } from "./modules/gestures.ts";
 import { inlineModule } from "./modules/inline.ts";
 import { keyboardModule } from "./modules/keyboard.ts";
@@ -21,6 +22,7 @@ const FACTORIES: readonly (readonly [ModuleName, (host: ModuleHost) => ToolbarMo
   ["keyboard", keyboardModule],
   ["gestures", gesturesModule],
   ["snippets", snippetsModule],
+  ["emoji", () => emojiModule()],
 ];
 
 /**

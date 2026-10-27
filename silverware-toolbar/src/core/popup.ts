@@ -10,7 +10,7 @@
 // selection show dimmed and are skipped.
 import { ICONS } from "../icons.ts";
 import type { Action } from "./action.ts";
-import { type Box, placeBy } from "./place.ts";
+import { type Box, placeByToolbar, roomAbove } from "./place.ts";
 import { type Entry, entriesOf, findEntries } from "./search.ts";
 
 export type PopupOptions = {
@@ -36,8 +36,6 @@ export type PopupOptions = {
 
 // How many actions PageUp / PageDown go by
 const PAGE = 5;
-// Between the popup and the toolbar, and the window's edges
-const GAP = 8;
 
 export class Popup {
   readonly element: HTMLElement;
@@ -123,26 +121,10 @@ export class Popup {
   }
 
   place(rect: Box | undefined, viewTop: number, above = false): void {
-    const win = this.doc.defaultView!;
-    if (above && rect) {
-      // Over the toolbar, the list as tall as the room above it leaves
-      this.list.style.maxHeight = `${Math.max(120, rect.top - viewTop - 2 * GAP - (this.element.offsetHeight - this.list.offsetHeight))}px`;
-      const left = Math.max(GAP, Math.min(rect.left + GAP, win.innerWidth - this.element.offsetWidth - GAP));
-      this.element.style.left = `${Math.round(left)}px`;
-      // Held by its bottom edge over the toolbar: what is typed finds fewer, and it gets shorter from the top
-      this.element.style.top = "auto";
-      this.element.style.bottom = `${Math.round(win.innerHeight - (rect.top - GAP))}px`;
-      return;
-    }
-    this.list.style.removeProperty("max-height");
-    this.element.style.removeProperty("bottom");
-    const size = { width: this.element.offsetWidth, height: this.element.offsetHeight };
-    const view = { width: win.innerWidth, height: win.innerHeight, top: viewTop };
-    // Without a selection on screen: under the top of the view, in the middle
-    const at = rect ?? { left: win.innerWidth / 2, right: win.innerWidth / 2, top: viewTop, bottom: viewTop + 40 };
-    const { left, top } = placeBy(at, size, view, !!rect);
-    this.element.style.left = `${left}px`;
-    this.element.style.top = `${top}px`;
+    // Over the toolbar: the list as tall as the room above it leaves
+    if (above && rect) this.list.style.maxHeight = `${Math.max(120, roomAbove(rect, viewTop) - (this.element.offsetHeight - this.list.offsetHeight))}px`;
+    else this.list.style.removeProperty("max-height");
+    placeByToolbar(this.element, rect, viewTop, above);
   }
 
   /** Closed; `ran`: an action was run (its handler goes on), else the owner is told */

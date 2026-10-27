@@ -32,6 +32,24 @@ export type ActionEditor = {
   hideKeyboard(): void;
 };
 
+/**
+ * A panel an action fills with its own UI (`panel`: the emoji picker), shown
+ * by the toolbar as the popup of every action is; Esc or a press elsewhere
+ * closes it
+ */
+export type ActionPanel = {
+  readonly doc: Document;
+  // What it fills
+  readonly element: HTMLElement;
+  // The toolbar docked at the bottom (a phone): the panel over it
+  readonly docked: boolean;
+  // A change of the selection as it is then (read anew), written as an action's: one edit; the panel closed
+  readonly write: (edit: (context: Context) => Change | undefined) => void;
+  readonly close: () => void;
+  // Placed again, as what it shows changed its size
+  readonly place: () => void;
+};
+
 /** What an action may do once its change is written: the core's editor, positions in the page's text */
 export type Editor = {
   select(from: number, to: number): void;
@@ -76,6 +94,8 @@ export type Action = {
   readonly choices?: readonly Action[];
   // What a list shows in the toolbar when no choice is on for the selection (several at once: "Multiple types")
   readonly mixed?: string;
+  // Instead of running: a panel of its own UI filled (what it gives back runs as the panel closes); its button again closes it
+  readonly panel?: (panel: ActionPanel) => void | (() => void);
 };
 
 /** A module: the actions it offers, asked each time they show (definitions made later count), created once Silverware Toolbar starts (only the modules turned on) */

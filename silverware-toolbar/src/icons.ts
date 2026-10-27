@@ -37,6 +37,8 @@ export const ICONS = {
   keyboardHide: svg('<rect x="3" y="4" width="18" height="10" rx="2"/><path d="M7 8h.01M11 8h.01M15 8h.01M7 11h10M9 18l3 3 3-3"/>'),
   // A button and a finger's swipe up: the gesture button
   gesture: svg('<rect x="3" y="12" width="18" height="9" rx="2"/><path d="M12 9V3M9 6l3-3 3 3"/>'),
+  // A smiling face: the emoji picker
+  emoji: svg('<circle cx="12" cy="12" r="9"/><path d="M8.5 14a4 4 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/>'),
   // A page with text going in: the text snippet
   snippet: svg('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>'),
   command: svg('<path d="m5 8 4 4-4 4M12 16h7"/>'),

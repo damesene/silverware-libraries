@@ -1,7 +1,7 @@
 ---
 name: Library/damesene/silverware-toolbar
 tags: meta/library
-description: "Silverware Toolbar: select text and a toolbar beside it formats it, or turns a paragraph into a list, a heading or a quote and back."
+description: "Silverware Toolbar: select text and a toolbar beside it (over the keyboard on a phone) formats it, turns its lines into a list, a heading, a quote or a code block and back, and runs any action or command; gesture buttons, text snippets and an emoji picker."
 files:
 - silverware-toolbar.js
 - silverware-toolbar-emoji.js

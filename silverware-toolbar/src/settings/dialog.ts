@@ -172,7 +172,7 @@ export class SettingsDialog {
       values.wordAtCaret = on;
       this.update();
     });
-    const wordRow = settingRow(doc, BASE, "A word at the cursor as if selected", "With nothing selected, Bold (any inline format) and Clear formatting work on the word the cursor is in or touches: what spaces separate, its punctuation with it. The cursor stays where it was.", word);
+    const wordRow = settingRow(doc, BASE, "A word at the cursor as if selected", "With nothing selected, Bold (any inline format) and Clear formatting work on the word the cursor is in or touches: what spaces separate, without the punctuation at its ends (a period, a comma, quotes). The cursor stays where it was.", word);
     wordRow.dataset.swbSetting = PATHS.wordAtCaret;
     card.append(keyRow, placementRow, showRow, wordRow);
     // SilverBullet's keyboard bar on: said first, as it decides how the docked toolbar looks

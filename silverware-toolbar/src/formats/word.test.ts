@@ -30,14 +30,38 @@ describe("A word at the caret as if selected", () => {
     expect(word("say he|llo now")).toBe("hello");
     expect(word("say |hello now")).toBe("hello");
     expect(word("say hello| now")).toBe("hello");
-    expect(word("say **he|llo**, now")).toBe("**hello**,");
+    expect(word("say **he|llo**, now")).toBe("**hello**");
     expect(word("say  |  now")).toBeUndefined();
+  });
+
+  it("leaves a sentence's punctuation at its ends out, its brackets only where the word holds no other half of them", () => {
+    const word = (t: string) => {
+      const at = t.indexOf("|");
+      const text = t.replace("|", "");
+      const w = wordAt(contextOf(text, at, at));
+      return w && text.slice(w.from, w.to);
+    };
+    expect(word("an ide|a. Then")).toBe("idea");
+    expect(word("an ide|a!")).toBe("idea");
+    expect(word("say \"he|llo\", then")).toBe("hello");
+    expect(word("(some|thing)")).toBe("something");
+    expect(word("an e-ma|il, don't")).toBe("e-mail");
+    expect(word("an e-mail, do|n't")).toBe("don't");
+    expect(word("see [[Pa|ge]].")).toBe("[[Page]]");
+    expect(word("call f(|x) now")).toBe("f(x)");
+    // The caret in that punctuation: no word
+    expect(word("an idea.| Then")).toBeUndefined();
+  });
+
+  it("a tag of the word at the caret: the word alone, its punctuation left after it", () => {
+    expect(run("an ide|a. Then", "formats.tag")).toBe("an #ide|a. Then");
+    expect(run("wait, wh|at!", "formats.tag")).toBe("wait, #wh|at!");
   });
 
   it("takes a format on and off the word, the caret staying where it was in its text", () => {
     expect(run("say he|llo now", "formats.bold")).toBe("say **he|llo** now");
     expect(run("say **he|llo** now", "formats.bold")).toBe("say he|llo now");
-    expect(run("say he|llo, now", "formats.italic")).toBe("say _he|llo,_ now");
+    expect(run("say he|llo, now", "formats.italic")).toBe("say _he|llo_, now");
     // Another format's markers in the word: kept inside, the caret by the letters
     expect(run("say _he|llo_ now", "formats.bold")).toBe("say **_he|llo_** now");
     expect(run("say **_he|llo_** now", "formats.bold")).toBe("say _he|llo_ now");

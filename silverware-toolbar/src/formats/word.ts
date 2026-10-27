@@ -8,7 +8,21 @@ import type { Change, Context } from "../core/action.ts";
 import { contextOf } from "../core/context.ts";
 import { formatsIn } from "./registry.ts";
 
-/** The word the caret touches (in it, or at its start or end), what white space separates on its line; undefined: a selection, or no word there */
+// A sentence's punctuation at a word's ends, not the word's (as a word processor leaves it out): after it, and before it
+const AFTER_RE = /[.,;:!?…"'”’»]/u;
+const BEFORE_RE = /["'“‘«¿¡]/u;
+// Brackets: one at an end is the word's only where its other half is in the word too (`[[Page]]`, `f(x)`)
+const CLOSING: Readonly<Record<string, string>> = { ")": "(", "]": "[", "}": "{" };
+const OPENING: Readonly<Record<string, string>> = { "(": ")", "[": "]", "{": "}" };
+
+const count = (text: string, ch: string) => text.split(ch).length - 1;
+
+/**
+ * The word the caret touches (in it, or at its start or end): what white space
+ * separates on its line, its formats' markers with it, the punctuation of a
+ * sentence at its ends without it (`word.` is `word`, `(word)` is `word`);
+ * undefined: a selection, or no word there (the caret in that punctuation)
+ */
 export function wordAt(context: Context): { readonly from: number; readonly to: number } | undefined {
   if (context.from !== context.to) return undefined;
   const { text } = context;
@@ -18,7 +32,25 @@ export function wordAt(context: Context): { readonly from: number; readonly to: 
   let to = context.to;
   while (from > line.from && /\S/u.test(text[from - 1]!)) from--;
   while (to < line.to && /\S/u.test(text[to]!)) to++;
-  return from < to ? { from, to } : undefined;
+  for (let trimmed = true; trimmed && from < to; ) {
+    trimmed = false;
+    const word = text.slice(from, to);
+    const last = word.at(-1)!;
+    const first = word[0]!;
+    if (AFTER_RE.test(last) || (CLOSING[last] && count(word, CLOSING[last]) < count(word, last))) {
+      to--;
+      trimmed = true;
+    } else if (BEFORE_RE.test(first) || (OPENING[first] && count(word, OPENING[first]) < count(word, first))) {
+      from++;
+      trimmed = true;
+    } else if (first === "(" && last === ")" && word.length > 2) {
+      // A word in parentheses: they are the sentence's (not square ones: a wiki link's, a link's)
+      from++;
+      to--;
+      trimmed = true;
+    }
+  }
+  return from < to && from <= context.from && context.from <= to ? { from, to } : undefined;
 }
 
 /** The context with the word the caret touches as its selection (as it is where there is none) */
@@ -35,6 +67,13 @@ export function asWord(context: Context): Context {
 export function keptCaret(context: Context, change: Change | undefined, cleared?: (text: string) => string): Change | undefined {
   const word = wordAt(context);
   if (!word || !change?.select) return change;
+  // The word written as it was, put inside what the format writes (`#word`, `**word**`): the caret where it was in it
+  const own = context.text.slice(word.from, word.to);
+  const found = change.insert.indexOf(own);
+  if (!cleared && found >= 0 && change.insert.indexOf(own, found + 1) < 0) {
+    const at = change.from + found + (context.from - word.from);
+    return { ...change, select: { from: at, to: at } };
+  }
   const markers = new Set(formatsIn("inline").flatMap((f) => (f.markers ?? []).map((m) => m[0]!)));
   const counts = (ch: string) => !markers.has(ch);
   // `cleared`: the change takes the formats off (Clear formatting, a format's tags too): the caret's place in the word

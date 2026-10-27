@@ -1,7 +1,8 @@
 // The emoji module: an action (`actions.emoji`) opening a picker of every
-// emoji in its panel (core/panel.ts): a search by name and keywords (English,
-// as Unicode's CLDR has them), the emoji in Unicode's groups, those used last
-// first; one picked is written at the cursor (the selection replaced). The
+// emoji in its panel (core/panel.ts): its groups over the search as filters
+// (All, then each group by its first emoji: only that group's shown, the
+// search too), a search by name and keywords (English, as Unicode's CLDR has
+// them), the emoji in Unicode's groups, those used last first; one picked is written at the cursor (the selection replaced). The
 // emoji are not the popup's actions (too many among the formats): only the
 // picker finds them. Their data is a file beside the bundle
 // (silverware-toolbar-emoji.js, scripts/emoji.mjs), imported the first time the
@@ -68,7 +69,7 @@ function keepRecent(win: Window, emoji: string): void {
   }
 }
 
-/** The picker in the panel: its search, the emoji by groups (found: one list), the current one's name under them */
+/** The picker in the panel: its groups as filters, its search, the emoji by groups (found: one list), the current one's name under them */
 function picker(panel: ActionPanel, loaded: () => Promise<EmojiData>): () => void {
   const { doc, element } = panel;
   const win = doc.defaultView!;
@@ -91,7 +92,13 @@ function picker(panel: ActionPanel, loaded: () => Promise<EmojiData>): () => voi
   const list = el("div", "swb-emoji-list");
   list.setAttribute("role", "listbox");
   const name = el("div", "swb-emoji-name");
-  element.append(search, list, name);
+  // The groups as filters, made once the emoji are loaded
+  const tabs = el("div", "swb-emoji-tabs");
+  tabs.setAttribute("role", "radiogroup");
+  tabs.setAttribute("aria-label", "Emoji groups");
+  // A press there keeps the search's focus
+  tabs.addEventListener("mousedown", (e) => e.preventDefault());
+  element.append(tabs, search, list, name);
   // A press on an emoji keeps the search's focus (the keyboard stays on a phone)
   list.addEventListener("mousedown", (e) => e.preventDefault());
 
@@ -99,6 +106,8 @@ function picker(panel: ActionPanel, loaded: () => Promise<EmojiData>): () => voi
   let groups: EmojiData["groups"] = [];
   let shown: HTMLButtonElement[] = [];
   let current = -1;
+  // The group shown alone (undefined: All)
+  let only: number | undefined;
 
   const pick = (emoji: string) => {
     keepRecent(win, emoji);
@@ -142,10 +151,12 @@ function picker(panel: ActionPanel, loaded: () => Promise<EmojiData>): () => voi
     shown = [];
     current = -1;
     const query = input.value;
+    const group = only === undefined ? undefined : groups[only];
     if (query.trim()) {
-      const found = findByWords(all, query, (e) => `${e[1]} ${e[2]}`, (e) => e[1]);
-      list.replaceChildren(...(found.length ? section("Found", found) : [el("div", "swb-none", "No emoji found")]));
-    } else {
+      const found = findByWords(group ? group.items : all, query, (e) => `${e[1]} ${e[2]}`, (e) => e[1]);
+      list.replaceChildren(...(found.length ? section(group ? `Found in ${group.name}` : "Found", found) : [el("div", "swb-none", "No emoji found")]));
+    } else if (group) list.replaceChildren(...section(group.name, group.items));
+    else {
       const byEmoji = new Map(all.map((e) => [e[0], e]));
       // (Each an array itself: not flattened)
       const recent = readRecent(win)
@@ -192,6 +203,23 @@ function picker(panel: ActionPanel, loaded: () => Promise<EmojiData>): () => voi
       if (!open) return;
       groups = data.groups;
       all = groups.flatMap((group) => group.items);
+      const tab = (label: string, title: string, index: number | undefined) => {
+        const button = el("button", "swb-emoji-tab", label);
+        button.type = "button";
+        button.title = title;
+        button.setAttribute("role", "radio");
+        button.setAttribute("aria-label", title);
+        button.setAttribute("aria-checked", String(index === only));
+        if (index !== undefined) button.dataset.swbGroup = String(index);
+        button.addEventListener("click", () => {
+          only = index;
+          for (const other of tabs.children) other.setAttribute("aria-checked", String(other === button));
+          inGrid = false;
+          draw();
+        });
+        return button;
+      };
+      tabs.replaceChildren(tab("All", "All", undefined), ...groups.map((group, i) => tab(group.items[0]?.[0] ?? "?", group.name, i)));
       draw();
       panel.place();
     },

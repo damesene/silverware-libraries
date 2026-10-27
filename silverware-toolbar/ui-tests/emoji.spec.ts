@@ -36,6 +36,24 @@ test.describe("The emoji picker", () => {
     await expect(popup(page).locator(".swb-search-field")).toBeFocused();
   });
 
+  test("its groups over the search filter it: one group's emoji alone, All again every group", async ({ page }) => {
+    await select(page, "some text");
+    await barButton(page, "actions.more").click();
+    await popup(page).locator(".swb-search-field").fill("emoji");
+    await page.keyboard.press("Enter");
+    const panel = page.locator(".swb-panel.swb-visible");
+    const tabs = panel.locator(".swb-emoji-tab");
+    await expect(tabs.first()).toHaveText("All");
+    await expect(tabs.first()).toHaveAttribute("aria-checked", "true");
+    // Over the search
+    expect((await tabs.first().boundingBox())!.y).toBeLessThan((await panel.locator(".swb-search-field").boundingBox())!.y);
+    await panel.locator('.swb-emoji-tab[aria-label="Food & drink"]').click();
+    await expect(panel.locator(".swb-group")).toHaveText(["Food & drink"]);
+    await expect(panel.locator(".swb-search-field")).toBeFocused();
+    await tabs.first().click();
+    await expect(panel.locator(".swb-group")).toHaveCount(9);
+  });
+
   test("Esc closes it, nothing written", async ({ page }) => {
     await select(page, "some text");
     const before = await text(page);

@@ -83,6 +83,24 @@ describe("The emoji picker", () => {
     expect(written).toHaveLength(0);
   });
 
+  it("filters by a group over the search: All first and chosen, a group shows (and searches) its emoji alone", async () => {
+    const { element, input, shown } = await open();
+    const tabs = Array.from(element.querySelectorAll<HTMLButtonElement>(".swb-emoji-tab"));
+    expect(tabs.map((t) => [t.textContent, t.getAttribute("aria-checked")])).toEqual([
+      ["All", "true"],
+      ["😀", "false"],
+      ["👍", "false"],
+    ]);
+    tabs[2]!.click();
+    expect(shown()).toEqual(["👍"]);
+    expect(tabs[2]!.getAttribute("aria-checked")).toBe("true");
+    input.value = "party";
+    input.dispatchEvent(new Event("input"));
+    expect(shown()).toEqual([]);
+    tabs[0]!.click();
+    expect(shown()).toEqual(["🥳"]);
+  });
+
   it("puts the one used last first", async () => {
     const first = await open();
     first.element.querySelectorAll<HTMLButtonElement>(".swb-emoji")[2]!.click();

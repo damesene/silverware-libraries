@@ -130,18 +130,22 @@ describe("The library page", () => {
     }
   });
 
-  it("read where the toolbar shows: auto by default and where it is none of the three", async () => {
-    expect((await readSettings(bridge({}))).placement).toBe("auto");
-    expect((await readSettings(bridge({ "silverware.toolbar.placement": "bottom" }))).placement).toBe("bottom");
-    expect((await readSettings(bridge({ "silverware.toolbar.placement": "top" }))).placement).toBe("auto");
-    expect(page).toContain('enum = { "auto", "selection", "bottom" }');
+  it("read where the toolbar shows, each device's: by the selection on a computer, docked at the bottom by touch, by default and where it is none of the values", async () => {
+    expect((await readSettings(bridge({}))).placement).toEqual({ click: "selection", touch: "bottom" });
+    expect((await readSettings(bridge({ "silverware.toolbar.placement": "top", "silverware.toolbar.placement-touch": "selection" }))).placement).toEqual({ click: "top", touch: "selection" });
+    // As before: auto
+    expect((await readSettings(bridge({ "silverware.toolbar.placement": "auto" }))).placement).toEqual({ click: "selection", touch: "bottom" });
+    expect(page).toContain('placement = {\n      type = "string",\n      enum = { "selection", "bottom", "top" },\n      default = "selection"');
+    expect(page).toContain('["placement-touch"] = {\n      type = "string",\n      enum = { "selection", "bottom", "top" },\n      default = "bottom"');
   });
 
-  it("read when the toolbar shows: always on a phone by default, and where it is none of the three", async () => {
-    expect((await readSettings(bridge({}))).show).toBe("mobile");
-    expect((await readSettings(bridge({ "silverware.toolbar.show": "always" }))).show).toBe("always");
-    expect((await readSettings(bridge({ "silverware.toolbar.show": "never" }))).show).toBe("mobile");
-    expect(page).toContain('enum = { "always", "mobile", "selection" },\n      default = "mobile"');
+  it("read when the toolbar shows, each device's: after a selection on a computer, always by touch, by default and where it is none of the values", async () => {
+    expect((await readSettings(bridge({}))).show).toEqual({ click: "selection", touch: "always" });
+    expect((await readSettings(bridge({ "silverware.toolbar.show": "always", "silverware.toolbar.show-touch": "selection" }))).show).toEqual({ click: "always", touch: "selection" });
+    // As before: mobile
+    expect((await readSettings(bridge({ "silverware.toolbar.show": "mobile" }))).show).toEqual({ click: "selection", touch: "always" });
+    expect(page).toContain('show = {\n      type = "string",\n      enum = { "always", "selection" },\n      default = "selection"');
+    expect(page).toContain('["show-touch"] = {\n      type = "string",\n      enum = { "always", "selection" },\n      default = "always"');
   });
 
   it("read a word at the caret as if selected: on by default", async () => {

@@ -18,7 +18,7 @@ Select text in a page and a toolbar shows beside it: make it bold, italic or cod
 * **Every action**: the **…** button, or **Ctrl-Shift-q**, opens a list of every action under the toolbar, with a search field. Type to find (each word you type starts a word of an action's name: `num` finds *Numbered list*, `h2` *Heading 2*), **↑ ↓** to pick (Tab and Shift-Tab too, PageUp and PageDown by five), **Enter** to apply, **Esc** to close the list (a second **Esc** hides the toolbar). *Turn into* is one item there: **Enter** (or **→**) or a click opens its block formats in its place, and **Esc**, **←** or the arrow at the top goes back; typing finds the block formats straight away. The command *Silverware Toolbar: Show actions* is the same.
 * **Without a selection**, **Ctrl-Shift-q** shows the toolbar at the cursor with the list open. Its icons show the formats around the cursor: in a link, *Link* is pressed, and clicking it takes the link off. Typing or moving the cursor hides it.
 * The key is a setting (*Key for every action*). In Firefox on Windows, **Ctrl-Shift-q** quits the browser: choose another key there.
-* **On a phone** (text selected by touch) the toolbar is docked at the bottom, over the keyboard, as one row you scroll sideways (a shade at an end there is more to scroll to; **…** always at its end): the system's own menu (Cut, Copy, Paste) shows by the selection, where the toolbar would be. *Where the toolbar shows* (a setting) keeps it by the selection, or docked always, at the bottom or at the top (under SilverBullet's top bar). Docked, it is as wide as the editor, not over SilverBullet's sidebars. On a phone it stays there while you write, with nothing selected too, its buttons showing the formats around the cursor; *When the toolbar shows* makes it always (also by the cursor on a computer; **Esc** then leaves it) or only after selecting text. SilverBullet's own bar over the keyboard, where it is on, stays under it; the settings offer to turn that one off.
+* **On a phone** (text selected by touch) the toolbar is docked at the bottom, over the keyboard, as one row you scroll sideways (a shade at an end there is more to scroll to; **…** always at its end): the system's own menu (Cut, Copy, Paste) shows by the selection, where the toolbar would be. On a phone it stays there while you write, with nothing selected too, its buttons showing the formats around the cursor. *Where the toolbar shows* and *When the toolbar shows* (settings) are each set for **Click** (a computer) and **Touch** (a phone, a tablet) apart: by the selection, or docked at the bottom or at the top (under SilverBullet's top bar; docked, it is as wide as the editor, not over SilverBullet's sidebars); while writing (on a computer by the cursor; **Esc** then leaves it) or only after selecting text. By default a computer shows it by the selection after selecting text, a phone docked at the bottom while writing. SilverBullet's own bar over the keyboard, where it is on, stays under it; the settings offer to turn that one off.
 
 ## Actions
 
@@ -315,17 +315,31 @@ config.define("silverware.toolbar", {
     },
     placement = {
       type = "string",
-      enum = { "auto", "selection", "bottom", "top" },
-      default = "auto",
-      description = "Where the toolbar shows: auto docks it at the bottom, over the keyboard, when the text was selected by touch (on a phone the system's Cut / Copy / Paste menu is by the selection), else by the selection; selection always by it; bottom always docked at the bottom; top always docked at the top. Docked, it is as wide as the editor, not over SilverBullet's sidebars.",
+      enum = { "selection", "bottom", "top" },
+      default = "selection",
+      description = "Where the toolbar shows on a computer: by the selection, or docked at the bottom or at the top (as wide as the editor, not over SilverBullet's sidebars).",
       ui = { category = "Silverware Toolbar", label = "Where the toolbar shows", priority = 0.95 },
+    },
+    ["placement-touch"] = {
+      type = "string",
+      enum = { "selection", "bottom", "top" },
+      default = "bottom",
+      description = "Where the toolbar shows where the screen is worked by finger (a phone, a tablet): docked at the bottom over the keyboard (the system's Cut / Copy / Paste menu is by the selection), at the top, or by the selection.",
+      ui = { category = "Silverware Toolbar", label = "Where the toolbar shows by touch", priority = 0.945 },
     },
     show = {
       type = "string",
-      enum = { "always", "mobile", "selection" },
-      default = "mobile",
-      description = "When the toolbar shows: always while you write (docked at the bottom, or by the cursor), always on a phone (docked) and after selecting text elsewhere, or only after selecting text.",
+      enum = { "always", "selection" },
+      default = "selection",
+      description = "When the toolbar shows on a computer: always while you write (by the cursor, or docked), or only after selecting text.",
       ui = { category = "Silverware Toolbar", label = "When the toolbar shows", priority = 0.94 },
+    },
+    ["show-touch"] = {
+      type = "string",
+      enum = { "always", "selection" },
+      default = "always",
+      description = "When the toolbar shows where the screen is worked by finger: always while you write, or only after selecting text.",
+      ui = { category = "Silverware Toolbar", label = "When the toolbar shows by touch", priority = 0.935 },
     },
     wordAtCaret = {
       type = "boolean",
@@ -1098,6 +1112,33 @@ end
 }
 .swb-settings-row input.swb-settings-invalid {
   border-color: var(--danger-color, #c62828);
+}
+/* A setting of each device's own: under its name and hint, a choice for Click and one for Touch side by side, each named above it */
+.swb-settings-row.swb-settings-by-device {
+  flex-wrap: wrap;
+}
+.swb-settings-by-device .swb-settings-label {
+  flex: 1 1 100%;
+}
+.swb-settings-devices-pair {
+  flex: 1 1 100%;
+  display: flex;
+  gap: 12px;
+}
+.swb-settings-device-choice {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.swb-settings-device-name {
+  font-size: 12px;
+  opacity: 0.62;
+}
+.swb-settings-row .swb-settings-devices-pair select {
+  width: 100%;
+  max-width: 100%;
 }
 /* A switch: the checkbox (invisible, still focusable) drawn as a track and a knob */
 .swb-settings-switch {

@@ -7,10 +7,10 @@
 // module or the key changed: Save and reload (modules are created and the
 // command defined when the toolbar starts). The shared dialog, tabs and
 // controls (shared/), in the table's settings' look (classes `swb-settings-*`).
-import { settingRow, switchControl } from "../../../shared/controls.ts";
+import { settingLabel, settingRow, switchControl } from "../../../shared/controls.ts";
 import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
-import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
+import { type Bridge, DEFAULT_SHORTCUT, type Device, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
 import { byTouch, DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type FavoriteItem, type Favorites, hasAction, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Show as ItemShow, slotOf, widthOf } from "../core/favorites.ts";
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
@@ -43,8 +43,8 @@ type Picking = { readonly row: number } | { readonly at: At; readonly key: strin
 
 type Values = {
   shortcut: string;
-  placement: Placement;
-  show: Show;
+  placement: Readonly<Record<Device, Placement>>;
+  show: Readonly<Record<Device, Show>>;
   wordAtCaret: boolean;
   favorites: Favorites;
   // Touch's own (the defaults for touch where not set); undefined: none, an invalid one (Click's show)
@@ -53,9 +53,6 @@ type Values = {
   touchOn: boolean;
   modules: Record<ModuleName, boolean>;
 };
-
-// Which favourites the Favorites tab edits
-type Device = "click" | "touch";
 
 export class SettingsDialog {
   private readonly dialogs: Dialogs;
@@ -154,22 +151,22 @@ export class SettingsDialog {
     });
     const keyRow = settingRow(doc, BASE, "Key for every action", "As SilverBullet writes keys (Ctrl-Shift-q, Alt-k); with nothing selected it shows the toolbar at the cursor. Applies after a reload.", key);
     keyRow.dataset.swbSetting = PATHS.shortcut;
-    const placement = this.el("select");
-    for (const value of PLACEMENTS) placement.append(new Option(PLACEMENT_LABELS[value], value, false, value === values.placement));
-    placement.addEventListener("change", () => {
-      values.placement = placement.value as Placement;
-      this.update();
-    });
-    const placementRow = settingRow(doc, BASE, "Where the toolbar shows", "Automatic: docked at the bottom, one row over the keyboard, when you select by touch (a phone's own menu of the selection, Cut, Copy, Paste, is by it); else by the selection. Docked, it is as wide as the editor.", placement);
-    placementRow.dataset.swbSetting = PATHS.placement;
-    const show = this.el("select");
-    for (const value of SHOWS) show.append(new Option(SHOW_LABELS[value], value, false, value === values.show));
-    show.addEventListener("change", () => {
-      values.show = show.value as Show;
-      this.update();
-    });
-    const showRow = settingRow(doc, BASE, "When the toolbar shows", "Always: while you write, with nothing selected too (docked at the bottom, or by the cursor), its buttons the formats around the cursor. Always on a phone: so where it is docked, else after selecting text.", show);
-    showRow.dataset.swbSetting = PATHS.show;
+    const placementRow = this.byDevice(
+      "Where the toolbar shows",
+      "Docked: one row across the editor, at the bottom over the keyboard (a phone's own menu of the selection, Cut, Copy, Paste, is by the selection) or at the top.",
+      PATHS.placement,
+      PLACEMENTS.map((value) => [value, PLACEMENT_LABELS[value]]),
+      values.placement,
+      (placement) => (values.placement = placement),
+    );
+    const showRow = this.byDevice(
+      "When the toolbar shows",
+      "While writing: with nothing selected too, its buttons the formats around the cursor; Esc leaves it.",
+      PATHS.show,
+      SHOWS.map((value) => [value, SHOW_LABELS[value]]),
+      values.show,
+      (show) => (values.show = show),
+    );
     const word = switchControl(doc, BASE, values.wordAtCaret, (on) => {
       values.wordAtCaret = on;
       this.update();
@@ -221,6 +218,34 @@ export class SettingsDialog {
       dismiss: () => this.dismiss(),
     });
     this.update();
+  }
+
+  /**
+   * A setting of each device's own: its name and hint, a choice for Click and
+   * one for Touch (Touch where the screen is worked by a finger, as the
+   * favourites)
+   */
+  private byDevice<T extends string>(name: string, hint: string, path: string, choices: readonly (readonly [T, string])[], value: Readonly<Record<Device, T>>, set: (value: Readonly<Record<Device, T>>) => void): HTMLElement {
+    const { doc } = this.context;
+    const row = this.el("div", `${BASE}-row ${BASE}-by-device`);
+    row.dataset.swbSetting = path;
+    const pair = this.el("div", `${BASE}-devices-pair`);
+    let now = value;
+    for (const [device, label] of [["click", "Click"], ["touch", "Touch"]] as const) {
+      const select = this.el("select");
+      for (const [choice, text] of choices) select.append(new Option(text, choice, false, choice === now[device]));
+      select.dataset.swbFor = device;
+      select.addEventListener("change", () => {
+        now = { ...now, [device]: select.value as T };
+        set(now);
+        this.update();
+      });
+      const field = this.el("label", `${BASE}-device-choice`);
+      field.append(this.el("span", `${BASE}-device-name`, label), select);
+      pair.append(field);
+    }
+    row.append(settingLabel(doc, BASE, name, hint), pair);
+    return row;
   }
 
   /** Whether SilverBullet's keyboard bar is on, on a touch screen (its UI option; a release without it: off) */
@@ -952,8 +977,10 @@ export class SettingsDialog {
     if (!initial || !values) return {};
     const changed: Record<string, unknown> = {};
     if (values.shortcut !== initial.shortcut) changed[PATHS.shortcut] = values.shortcut;
-    if (values.placement !== initial.placement) changed[PATHS.placement] = values.placement;
-    if (values.show !== initial.show) changed[PATHS.show] = values.show;
+    if (values.placement.click !== initial.placement.click) changed[PATHS.placement] = values.placement.click;
+    if (values.placement.touch !== initial.placement.touch) changed[PATHS.placementTouch] = values.placement.touch;
+    if (values.show.click !== initial.show.click) changed[PATHS.show] = values.show.click;
+    if (values.show.touch !== initial.show.touch) changed[PATHS.showTouch] = values.show.touch;
     if (values.wordAtCaret !== initial.wordAtCaret) changed[PATHS.wordAtCaret] = values.wordAtCaret;
     const favorites = savedRows(values.favorites);
     if (!sameRows(favorites, initial.favorites)) changed[PATHS.favorites] = favorites;
@@ -967,7 +994,7 @@ export class SettingsDialog {
 
   /** Whether saving needs the page loaded anew: a module turned on or off, the key (the command's) */
   private reloads(changed: Readonly<Record<string, unknown>>): boolean {
-    return Object.keys(changed).some((path) => path !== PATHS.favorites && path !== PATHS.touchFavorites && path !== PATHS.touchOn && path !== PATHS.placement && path !== PATHS.show && path !== PATHS.wordAtCaret);
+    return Object.keys(changed).some((path) => path !== PATHS.favorites && path !== PATHS.touchFavorites && path !== PATHS.touchOn && path !== PATHS.placement && path !== PATHS.placementTouch && path !== PATHS.show && path !== PATHS.showTouch && path !== PATHS.wordAtCaret);
   }
 
   private update(): void {

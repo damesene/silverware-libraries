@@ -341,7 +341,7 @@ test.describe("The settings dialog", () => {
 
   test("shown always: on a computer by the cursor, with nothing selected, following it as you type", async ({ page }) => {
     await openSettings(page);
-    await dialog(page).locator(`[data-swb-setting="silverware.toolbar.show"] select`).selectOption("always");
+    await dialog(page).locator(`[data-swb-setting="silverware.toolbar.show"] select[data-swb-for="click"]`).selectOption("always");
     await expect(save(page)).toHaveText("Save");
     await save(page).click();
     await expect(dialog(page)).toHaveCount(0);
@@ -350,6 +350,9 @@ test.describe("The settings dialog", () => {
     await expect(bar(page)).not.toHaveClass(/swb-docked/);
     await page.keyboard.type("xy");
     await expect.poll(() => text(page)).toContain("Plaxyin paragraph one");
+    await expect(bar(page)).toBeVisible();
+    // Esc is the editor's: it stays
+    await page.keyboard.press("Escape");
     await expect(bar(page)).toBeVisible();
     // Above the line the cursor is in
     const toolbar = (await bar(page).boundingBox())!;

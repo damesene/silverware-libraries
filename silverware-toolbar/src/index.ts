@@ -75,8 +75,8 @@ function sameSettings(running: Controller, settings: Settings): boolean {
   const modules = [...running.settings.modules].sort().join();
   return (
     modules === [...settings.modules].sort().join() &&
-    running.settings.placement === settings.placement &&
-    running.settings.show === settings.show &&
+    JSON.stringify(running.settings.placement) === JSON.stringify(settings.placement) &&
+    JSON.stringify(running.settings.show) === JSON.stringify(settings.show) &&
     running.settings.wordAtCaret === settings.wordAtCaret &&
     JSON.stringify(running.settings.favorites) === JSON.stringify(settings.favorites) &&
     JSON.stringify(running.settings.touchFavorites) === JSON.stringify(settings.touchFavorites) &&

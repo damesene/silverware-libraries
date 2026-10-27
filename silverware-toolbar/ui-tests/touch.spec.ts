@@ -18,6 +18,9 @@ async function selectByTouch(page: Page, needle: string): Promise<void> {
   const line = await lineBox(page, "in this page");
   await page.touchscreen.tap(line.x + 4, line.y + line.height / 2);
   await select(page, needle);
+  // Told once settled (SETTLE_MS after the keys): the docked toolbar, shown already while writing, is drawn anew
+  // then, which would end a gesture begun on it before
+  await page.waitForTimeout(250);
 }
 
 test.describe("The toolbar's defaults on a phone", () => {

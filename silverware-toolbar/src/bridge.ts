@@ -59,25 +59,27 @@ export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
 // The key of the command showing every action (the library page gives it to the command: SilverBullet handles it)
 export const DEFAULT_SHORTCUT = "Ctrl-Shift-q";
 
+/** A device as the settings tell them apart: worked by a finger (`byTouch` in core/favorites.ts) or not */
+export type Device = "click" | "touch";
+
 /**
  * Where the toolbar shows: by the selection, or docked at the bottom over the
  * on-screen keyboard (on a phone the system's menu of a selection, Cut / Copy /
  * Paste, is where the toolbar would be) or at the top, under SilverBullet's top
- * bar, across its editor; `auto`: docked at the bottom when the selection was
- * made by touch, else by it
+ * bar, across its editor
  */
-export const PLACEMENTS = ["auto", "selection", "bottom", "top"] as const;
+export const PLACEMENTS = ["selection", "bottom", "top"] as const;
 export type Placement = (typeof PLACEMENTS)[number];
-/**
- * When the toolbar shows: always while the page's text is edited (docked, or by
- * the caret), always where it is docked (a phone) and after a selection elsewhere,
- * or only after a selection
- */
-export const SHOWS = ["always", "mobile", "selection"] as const;
+/** When the toolbar shows: always while the page's text is edited (docked, or by the caret), or only after a selection */
+export const SHOWS = ["always", "selection"] as const;
 export type Show = (typeof SHOWS)[number];
-export const SHOW_LABELS: Readonly<Record<Show, string>> = { always: "Always", mobile: "Always on a phone", selection: "After selecting text" };
+export const SHOW_LABELS: Readonly<Record<Show, string>> = { always: "While writing", selection: "After selecting text" };
 
-export const PLACEMENT_LABELS: Readonly<Record<Placement, string>> = { auto: "Automatic", selection: "By the selection", bottom: "Docked at the bottom", top: "Docked at the top" };
+export const PLACEMENT_LABELS: Readonly<Record<Placement, string>> = { selection: "By the selection", bottom: "Docked at the bottom", top: "Docked at the top" };
+
+// By touch docked at the bottom while writing (a phone's own menu of the selection is by it), else by the selection after one
+export const DEFAULT_PLACEMENT: Readonly<Record<Device, Placement>> = { click: "selection", touch: "bottom" };
+export const DEFAULT_SHOW: Readonly<Record<Device, Show>> = { click: "selection", touch: "always" };
 
 // The toolbar's own block of the CONFIG page, for tables (the favourites): the Configuration Manager's block
 // would lose them on its next save (shared/configpage.ts)
@@ -92,7 +94,9 @@ export const PATHS = {
   touchOn: "silverware.toolbar.favorites-touch-enabled",
   shortcut: "silverware.toolbar.shortcut",
   placement: "silverware.toolbar.placement",
+  placementTouch: "silverware.toolbar.placement-touch",
   show: "silverware.toolbar.show",
+  showTouch: "silverware.toolbar.show-touch",
   wordAtCaret: "silverware.toolbar.wordAtCaret",
   module: (name: ModuleName) => `silverware.toolbar.modules.${name}.enabled`,
 } as const;
@@ -105,8 +109,9 @@ export type Settings = {
   // Whether touch's own show (they are kept while off)
   readonly touchOn: boolean;
   readonly modules: ReadonlySet<ModuleName>;
-  readonly placement: Placement;
-  readonly show: Show;
+  // Each device's own
+  readonly placement: Readonly<Record<Device, Placement>>;
+  readonly show: Readonly<Record<Device, Show>>;
   // A caret touching a word stands for the word, as if selected (inline formats, Clear formatting)
   readonly wordAtCaret: boolean;
 };
@@ -142,8 +147,11 @@ export async function readSettings(bridge: Bridge): Promise<Settings> {
   // A space's own: set
   const ownFavorites = favorites != null;
   const ownTouch = touch != null;
-  const placement = await get(PATHS.placement, "auto");
-  const show = await get(PATHS.show, "mobile");
+  // Each its device's default where it is none of the values (as before: auto, mobile)
+  const one = async <T extends string>(path: string, values: readonly T[], fallback: T): Promise<T> => {
+    const value = await get(path, fallback);
+    return values.includes(value as T) ? (value as T) : fallback;
+  };
   return {
     favorites: ownFavorites ? favoritesOf(favorites) : DEFAULT_FAVORITES,
     // Not set: the defaults for touch, gesture buttons, so without the Gestures module none (Click's show)
@@ -153,8 +161,8 @@ export async function readSettings(bridge: Bridge): Promise<Settings> {
     // them does not change it
     touchOn: touchOn == null ? !(ownFavorites && !ownTouch) : touchOn !== false,
     modules,
-    placement: PLACEMENTS.includes(placement as Placement) ? (placement as Placement) : "auto",
-    show: SHOWS.includes(show as Show) ? (show as Show) : "mobile",
+    placement: { click: await one(PATHS.placement, PLACEMENTS, DEFAULT_PLACEMENT.click), touch: await one(PATHS.placementTouch, PLACEMENTS, DEFAULT_PLACEMENT.touch) },
+    show: { click: await one(PATHS.show, SHOWS, DEFAULT_SHOW.click), touch: await one(PATHS.showTouch, SHOWS, DEFAULT_SHOW.touch) },
     wordAtCaret: (await get(PATHS.wordAtCaret, true)) !== false,
   };
 }

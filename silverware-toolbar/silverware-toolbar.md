@@ -503,7 +503,8 @@ end
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.12);
 }
 /* Room for the toolbar docked always or while writing (its height on html, set while it shows so): SilverBullet's
-   editor padded by it, so it covers no text and the editor keeps the cursor clear of it */
+   editor padded by it, so it covers no text and the editor keeps the cursor clear of it. The one place outside
+   src/dom.ts that assumes SilverBullet's DOM: its editor's id, and its height (100%) */
 #sb-editor {
   /* (Its height SilverBullet's 100%: the padding within it) */
   box-sizing: border-box;

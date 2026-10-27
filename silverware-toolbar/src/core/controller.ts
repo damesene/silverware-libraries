@@ -10,11 +10,12 @@
 // or text is typed. The modules (modules.ts) give the actions; the core knows
 // none of them. The popup ends with the core's own item, the settings dialog.
 import type { Bridge, Device, Settings } from "../bridge.ts";
-import { CONTENT_SELECTOR, editorBox, inEditor, keyboardBarTop, pageContentOf, pinnedViewBottom, viewTopOf } from "../dom.ts";
+import { CONTENT_SELECTOR, inEditor, pageContentOf, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
 import type { Action, ActionEditor, Change, Context } from "./action.ts";
 import { Bar, type Dock, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
+import { Docking } from "./dock.ts";
 import { byTouch, isActionItem, isSeparator, type Look, ownIconHtml, type Pin, type SlotRef, slotOf } from "./favorites.ts";
 import type { ItemKind } from "./items.ts";
 import { hideKeyboard } from "./keyboard.ts";
@@ -67,16 +68,13 @@ export class Controller {
   private shows = 0;
   // Stopped (a newer controller started): a read answered after it shows nothing
   private stopped = false;
-  // The last press was in SilverBullet's editor (`stillEditing`)
-  private pressedInEditor = false;
   // The context the toolbar was last shown for: the state of a list's choices it opens
   private context: Context | undefined;
   // SilverBullet's keyboard bar put in or taken out (it renders it as the keyboard comes and goes, after the events
   // that tell those): the docked toolbar placed again where its line moved, looked at once a frame at most; watched
   // only while docked
-  private readonly barWatch: MutationObserver;
-  private barWatchFrame = 0;
-  private watchingBar = false;
+  // Where the docked toolbar goes, and what moves it (SilverBullet's editor, the keyboard)
+  private readonly docking: Docking;
   // The modules' actions to read anew as the toolbar next shows: after each load of Space Lua (its scripts define
   // commands after the toolbar starts, `reloaded`), or after a read that failed, not before `retryAt`
   private stale = true;
@@ -109,18 +107,7 @@ export class Controller {
     });
     this.popup = new Popup(doc);
     this.panel = new Panel(doc);
-    this.barWatch = new MutationObserver(() => {
-      if (this.barWatchFrame) return;
-      this.barWatchFrame = doc.defaultView!.requestAnimationFrame(() => {
-        this.barWatchFrame = 0;
-        // Not docked any more: no longer watched (docked again, watched again)
-        if (!this.bar.shown || !this.bar.docked) return this.watchBar(false);
-        // (Its line, or the editor's box: a sidebar opened or closed)
-        const at = this.dockAt();
-        const was = this.bar.dockedAt;
-        if (!was || at.line !== was.line || at.left !== was.left || at.width !== was.width) this.onScroll();
-      });
-    });
+    this.docking = new Docking(doc, () => (this.bar.shown ? this.bar.dockedAt : undefined), this.onScroll);
   }
 
   start(): void {
@@ -128,16 +115,11 @@ export class Controller {
     this.watcher.start();
     win.addEventListener("keydown", this.onKey, true);
     win.addEventListener("mousedown", this.onPress, true);
-    win.addEventListener("pointerdown", this.onPointer, { capture: true, passive: true });
     win.addEventListener("scroll", this.onScroll, { capture: true, passive: true });
     win.addEventListener("resize", this.onScroll);
     this.doc.addEventListener("focusin", this.onFocus);
     this.doc.addEventListener("focusout", this.onBlur);
-    // The on-screen keyboard coming or going: the docked toolbar stays over it
-    win.visualViewport?.addEventListener("resize", this.onScroll);
-    win.visualViewport?.addEventListener("scroll", this.onScroll);
-    // The keyboard overlaying the page (SilverBullet's on a phone): only it tells it came or went
-    virtualKeyboardOf(win)?.addEventListener("geometrychange", this.onScroll);
+    this.docking.start();
     // Shown always: from the start
     void this.showStaying();
   }
@@ -148,15 +130,11 @@ export class Controller {
     this.watcher.stop();
     win.removeEventListener("keydown", this.onKey, true);
     win.removeEventListener("mousedown", this.onPress, true);
-    win.removeEventListener("pointerdown", this.onPointer, { capture: true });
     win.removeEventListener("scroll", this.onScroll, { capture: true });
     win.removeEventListener("resize", this.onScroll);
     this.doc.removeEventListener("focusin", this.onFocus);
     this.doc.removeEventListener("focusout", this.onBlur);
-    win.visualViewport?.removeEventListener("resize", this.onScroll);
-    win.visualViewport?.removeEventListener("scroll", this.onScroll);
-    virtualKeyboardOf(win)?.removeEventListener("geometrychange", this.onScroll);
-    this.watchBar(false);
+    this.docking.stop();
     this.bar.remove();
     this.popup.remove();
     this.panel.remove();
@@ -184,7 +162,7 @@ export class Controller {
       state: (action) => this.state(action, context),
       rect: this.bar.shown ? this.bar.rect() : undefined,
       above: this.bar.docked && !this.bar.dockedTop,
-      viewTop: viewTopOf(range?.startContainer ?? this.doc.querySelector(".cm-content")),
+      viewTop: viewTopOf(range?.startContainer ?? this.doc.querySelector(CONTENT_SELECTOR)),
       run: (action) => void this.run(action),
       tools: this.openSettings ? [SETTINGS_ACTION] : [],
       closed: () => this.focusEditor(),
@@ -317,7 +295,7 @@ export class Controller {
       // (Shown while writing or always: room kept for it, so it covers no text; shown by a selection alone, the
       // editor would jump with each)
       this.bar.dock(rows, this.dockAt(), more, this.persistent());
-      this.watchBar(true);
+      this.docking.follow(true);
     } else this.bar.show(rows, rectOf(range), viewTopOf(range.startContainer), more);
   }
 
@@ -400,7 +378,7 @@ export class Controller {
       action,
       {
         rect: this.bar.shown ? this.bar.rect() : undefined,
-        viewTop: viewTopOf(range?.startContainer ?? this.doc.querySelector(".cm-content")),
+        viewTop: viewTopOf(range?.startContainer ?? this.doc.querySelector(CONTENT_SELECTOR)),
         above: this.bar.docked && !this.bar.dockedTop,
         keeps: (node) => this.bar.owns(node),
         closed: () => this.focusEditor(),
@@ -492,7 +470,7 @@ export class Controller {
 
   private focusEditor(): void {
     if (this.bridge.focus) void this.bridge.focus();
-    else this.doc.querySelector<HTMLElement>(".cm-content")?.focus({ preventScroll: true });
+    else this.doc.querySelector<HTMLElement>(CONTENT_SELECTOR)?.focus({ preventScroll: true });
   }
 
   private hideBar(keepRoom = false): void {
@@ -576,78 +554,22 @@ export class Controller {
     this.doc.defaultView!.setTimeout(() => {
       const active = this.doc.activeElement;
       if (!this.bar.shown) {
-        if (!this.stillEditing(active)) this.bar.dropRoom();
+        if (!this.docking.stillEditing(active)) this.bar.dropRoom();
         return;
       }
       if (!this.persistent() || this.stays() || this.writing() || this.popup.isOpen || (active && this.owns(active))) return;
-      this.hideBar(this.stillEditing(active));
+      this.hideBar(this.docking.stillEditing(active));
     });
   };
-
-  /**
-   * Whether what has the focus is still SilverBullet's editor: a field in it (a
-   * table's cell editor), or none after a press in it (a table takes the focus
-   * on a touch)
-   */
-  private stillEditing(active: Element | null): boolean {
-    return inEditor(active) || ((!active || active === this.doc.body) && this.pressedInEditor);
-  }
-
-  // A press in SilverBullet's editor, the last one (for `stillEditing`)
-  private onPointer = (e: PointerEvent): void => {
-    this.pressedInEditor = e.target instanceof Node && inEditor(e.target);
-  };
-
-  /** SilverBullet's keyboard bar watched, or no longer (elements put in and taken out only: no text, no attributes) */
-  private watchBar(on: boolean): void {
-    if (on === this.watchingBar) return;
-    this.watchingBar = on;
-    if (on) {
-      this.barWatch.observe(this.doc.body, { childList: true, subtree: true });
-      // (SilverBullet's view above the keyboard measured anew: its variables on html)
-      this.barWatch.observe(this.doc.documentElement, { attributes: true, attributeFilter: ["style", "class"] });
-      return;
-    }
-    this.barWatch.disconnect();
-    if (this.barWatchFrame) this.doc.defaultView!.cancelAnimationFrame(this.barWatchFrame);
-    this.barWatchFrame = 0;
-  }
 
   /** Whether the toolbar docks, at the bottom or the top (the placement setting, this device's) */
   private docks(): boolean {
     return this.settings.placement[this.device()] !== "selection";
   }
 
-  /**
-   * Where the toolbar docks: across SilverBullet's editor (else the window), so
-   * not over its sidebars; at the top, under its top bar (the page's view's
-   * top); at the bottom, on the line `dockLine` says, within the editor
-   */
+  /** Where the toolbar docks now (the placement setting's edge) */
   private dockAt(): Dock {
-    const win = this.doc.defaultView!;
-    const box = editorBox(this.doc);
-    const left = box ? Math.max(0, box.left) : 0;
-    const width = box ? Math.min(win.innerWidth, box.right) - left : win.innerWidth;
-    // (The editor's top, not its view's: the view is below the room kept for the toolbar)
-    if (this.settings.placement[this.device()] === "top") return { edge: "top", line: box ? box.top : viewTopOf(this.doc.querySelector(CONTENT_SELECTOR)), left, width };
-    const line = this.dockLine();
-    return { edge: "bottom", line: box ? Math.min(line, box.bottom) : line, left, width };
-  }
-
-  /**
-   * The line the docked toolbar stands on: SilverBullet's keyboard bar's top
-   * where it shows; else the bottom of what SilverBullet shows above the
-   * keyboard, where it pins its UI there (a phone); else the on-screen
-   * keyboard's top: where it overlays the page (the VirtualKeyboard API's
-   * `overlaysContent`: the window and the visual viewport keep their size) its
-   * own rectangle's, else the visual viewport's bottom
-   */
-  private dockLine(): number {
-    const win = this.doc.defaultView!;
-    const view = win.visualViewport;
-    const keyboard = virtualKeyboardOf(win);
-    const overlaid = keyboard?.overlaysContent && keyboard.boundingRect && keyboard.boundingRect.height > 0 ? keyboard.boundingRect.top : undefined;
-    return keyboardBarTop(this.doc) ?? pinnedViewBottom(this.doc) ?? overlaid ?? (view ? view.offsetTop + view.height : win.innerHeight);
+    return this.docking.at(this.settings.placement[this.device()] === "top" ? "top" : "bottom");
   }
 
   // The page scrolled or the window resized: the toolbar and the popup under it follow the selection (docked: the keyboard)
@@ -666,12 +588,6 @@ export class Controller {
     if (this.popup.isOpen) this.popup.place(this.bar.rect(), viewTop);
     if (this.panel.isOpen) this.panel.place(this.bar.rect(), viewTop, false);
   };
-}
-
-/** The VirtualKeyboard API (Chrome on Android), where there is one: what the toolbar reads of it */
-type VirtualKeyboard = EventTarget & { readonly overlaysContent?: boolean; readonly boundingRect?: DOMRect };
-function virtualKeyboardOf(win: Window): VirtualKeyboard | undefined {
-  return (win.navigator as Navigator & { virtualKeyboard?: VirtualKeyboard }).virtualKeyboard;
 }
 
 /** Where a selection (or a caret) is on screen: the box around its parts that have a width, else its own */

@@ -49,9 +49,11 @@ export async function init(bridge: Bridge): Promise<void> {
     ...(bridge.listCommands ? { listCommands: () => (latest().listCommands ?? bridge.listCommands!)() } : {}),
     ...(bridge.invokeCommand ? { invokeCommand: (name: string) => (latest().invokeCommand ?? bridge.invokeCommand!)(name) } : {}),
     wordAtCaret: settings.wordAtCaret,
-    touch: touchScreen(),
   });
-  const controller = new Controller(document, bridge, settings, actions, kinds, refresh, () => void openSettings());
+  // The toolbar's: those for a touch screen only where this is one (the settings get every action)
+  const touch = touchScreen();
+  const offered = () => actions().filter((action) => touch || !action.touchOnly);
+  const controller = new Controller(document, bridge, settings, offered, kinds, refresh, () => void openSettings());
   made = controller;
   slot[GLOBAL_KEY] = controller;
   current = { bridge, actions, kinds };

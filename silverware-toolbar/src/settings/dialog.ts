@@ -868,7 +868,8 @@ export class SettingsDialog {
     const list = this.el("div", `${BASE}-pick-list`);
     list.setAttribute("role", "listbox");
     const entries: Entry[] = [];
-    for (const action of this.context.actions()) {
+    // (An action for a touch screen only: for Touch's favourites alone)
+    for (const action of this.context.actions().filter((a) => this.device === "touch" || !a.touchOnly)) {
       if (!action.choices) entries.push({ action, group: action.group });
       else entries.push({ action, group: action.group }, ...action.choices.map((choice) => ({ action: choice, group: action.label })));
     }

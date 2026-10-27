@@ -256,6 +256,27 @@ test.describe("The settings dialog", () => {
     await expect(rowItems(page, 0)).toHaveText(["Bold"]);
   });
 
+  test("with a mouse: an action for a touch screen only (Hide the keyboard) not in the popup nor Click's search, but in Touch's, to set them here", async ({ page }) => {
+    await select(page, "some text");
+    await barButton(page, "actions.more").click();
+    await popup(page).locator(".swb-search-field").fill("hide the keyboard");
+    await expect(popup(page).locator('[data-swb-action="actions.hideKeyboard"]')).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await openSettings(page);
+    await tab(page, "favorites").click();
+    await dialog(page).locator('[data-swb-row="1"] .swb-settings-add').click();
+    await dialog(page).locator(".swb-settings-pick-field").fill("hide the keyboard");
+    await expect(dialog(page).locator(".swb-settings-pick")).toHaveCount(0);
+    await dialog(page).locator('[data-swb-device="touch"]').click();
+    await dialog(page).locator(".swb-settings-devices .swb-settings-switch").click();
+    await dialog(page).locator('[data-swb-row="3"] .swb-settings-add').click();
+    await dialog(page).locator(".swb-settings-pick-field").fill("hide the keyboard");
+    await page.keyboard.press("Enter");
+    await expect(rowItems(page, 3).last()).toHaveText("Hide the keyboard");
+    // Known: not dimmed as an action no module gives
+    await expect(item(page, 3, 8)).not.toHaveClass(/swb-settings-unknown/);
+  });
+
   test("Every action removed: the editor says it is required, and the toolbar has it pinned at its end", async ({ page }) => {
     await openSettings(page);
     await tab(page, "favorites").click();

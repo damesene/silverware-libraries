@@ -89,6 +89,9 @@ export type Action = {
   readonly perform?: (context: Context, editor: ActionEditor) => unknown;
   // false: found by the popup's search only, not listed as it opens (there are many: the commands)
   readonly listed?: boolean;
+  // Only where the screen is worked by finger (hiding the on-screen keyboard): left out elsewhere, but for
+  // the settings' favourites for touch, which are set on any device
+  readonly touchOnly?: boolean;
   // Instead of running: a list to pick from (Turn into: the block formats). The toolbar shows the choice on
   // (its icon and label; none on: `mixed`, else the label), a click opens the list under it
   readonly choices?: readonly Action[];
@@ -115,6 +118,4 @@ export type ModuleHost = {
   readonly invokeCommand?: (name: string) => unknown;
   // A caret touching a word stands for the word, as if selected (the setting wordAtCaret)
   readonly wordAtCaret?: boolean;
-  // A touch screen (an on-screen keyboard), as Silverware Toolbar started
-  readonly touch?: boolean;
 };

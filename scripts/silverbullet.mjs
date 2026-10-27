@@ -107,7 +107,9 @@ function start({ port, space }) {
 async function answering(port) {
   for (;;) {
     try {
-      if ((await fetch(`http://127.0.0.1:${port}/.ping`)).ok) return;
+      // Each try in a time of its own: a port forwarded before SilverBullet listens may take the
+      // connection and never answer it (Podman on Windows did), which would wait forever
+      if ((await fetch(`http://127.0.0.1:${port}/.ping`, { signal: AbortSignal.timeout(2000) })).ok) return;
     } catch {
       // Not listening yet
     }

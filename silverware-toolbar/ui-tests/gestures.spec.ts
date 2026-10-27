@@ -1,10 +1,10 @@
 // The gestures module's button with a mouse: a click runs its first action, dragged up its second
 import type { Page } from "@playwright/test";
-import { addGesture, barButton, expect, gestureButton, popup, select, selected, test, text } from "./helpers.ts";
+import { addGesture, barButton, boxOf, expect, gestureButton, popup, select, selected, test, text } from "./helpers.ts";
 
 /** The gesture button dragged from its middle up by `dy` px (negative: down), in steps, then let go where `back` says */
 async function dragUp(page: Page, dy: number, back = 0): Promise<void> {
-  const box = (await gestureButton(page).boundingBox())!;
+  const box = (await boxOf(gestureButton(page)));
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
   await page.mouse.move(x, y);
@@ -18,7 +18,7 @@ test.describe("The gesture button", () => {
   test("added in the settings: two actions in one, the second's icon small in its top right corner; a click runs the first", async ({ page }) => {
     await addGesture(page, "bold", "italic");
     // The second's icon small, in the top right corner
-    const box = (await gestureButton(page).boundingBox())!;
+    const box = (await boxOf(gestureButton(page)));
     const hint = (await gestureButton(page).locator(".swb-gesture-hint svg").boundingBox())!;
     const icon = (await gestureButton(page).locator(".swb-gesture-tap svg").boundingBox())!;
     expect(box.x + box.width - (hint.x + hint.width)).toBeLessThan(4);
@@ -34,7 +34,7 @@ test.describe("The gesture button", () => {
 
   test("dragged up past half its height: its second face rolls in, lit, and let go runs the second action", async ({ page }) => {
     await addGesture(page, "bold", "italic");
-    const box = (await gestureButton(page).boundingBox())!;
+    const box = (await boxOf(gestureButton(page)));
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - box.height * 0.3, { steps: 4 });
@@ -48,7 +48,7 @@ test.describe("The gesture button", () => {
     await expect.poll(() => text(page)).toContain("Select _some text_ in this page");
     expect(await selected(page)).toBe("some text");
     // Width kept as it rolls
-    expect(Math.round((await gestureButton(page).boundingBox())!.width)).toBe(Math.round(box.width));
+    expect(Math.round((await boxOf(gestureButton(page))).width)).toBe(Math.round(box.width));
   });
 
   test("its swipe's icon on where the second action is on: on italic text a swipe takes italic off", async ({ page }) => {
@@ -58,24 +58,24 @@ test.describe("The gesture button", () => {
     await select(page, "italic");
     await expect(hint).toHaveClass(/swb-on/);
     await expect(gestureButton(page)).toHaveAttribute("aria-pressed", "false");
-    await dragUp(page, (await gestureButton(page).boundingBox())!.height);
+    await dragUp(page, (await boxOf(gestureButton(page))).height);
     await expect.poll(() => text(page)).toContain("**bold**, italic, ~~struck~~");
   });
 
   test("a swipe down too: its icon in the bottom right corner, dragged down past half runs it; a swipe left out in the settings is None", async ({ page }) => {
     await addGesture(page, "bold", undefined, "italic");
     await expect(gestureButton(page).locator(".swb-hint-up")).toHaveCount(0);
-    const box = (await gestureButton(page).boundingBox())!;
+    const box = (await boxOf(gestureButton(page)));
     const hint = (await gestureButton(page).locator(".swb-hint-down svg").boundingBox())!;
     expect(box.x + box.width - (hint.x + hint.width)).toBeLessThan(4);
     expect(box.y + box.height - (hint.y + hint.height)).toBeLessThan(4);
     await expect(page.locator('.swb-settings')).toHaveCount(0);
-    await dragUp(page, -(await gestureButton(page).boundingBox())!.height);
+    await dragUp(page, -(await boxOf(gestureButton(page))).height);
     await expect.poll(() => text(page)).toContain("Select _some text_ in this page");
     // Up does nothing here
     const before = await text(page);
     await select(page, "some text");
-    await dragUp(page, (await gestureButton(page).boundingBox())!.height);
+    await dragUp(page, (await boxOf(gestureButton(page))).height);
     await page.waitForTimeout(300);
     expect(await text(page)).toBe(before);
   });
@@ -92,14 +92,14 @@ test.describe("The gesture button", () => {
     await dialog.locator(".swb-settings-save").click();
     await select(page, "some text");
     await expect(barButton(page, "actions.more")).toHaveCount(0);
-    await dragUp(page, (await gestureButton(page).boundingBox())!.height);
+    await dragUp(page, (await boxOf(gestureButton(page))).height);
     await expect(popup(page)).toBeVisible();
   });
 
   test("dragged up and back down, or not far enough, runs nothing and rolls back", async ({ page }) => {
     await addGesture(page, "bold", "italic");
     const before = await text(page);
-    const height = (await gestureButton(page).boundingBox())!.height;
+    const height = (await boxOf(gestureButton(page))).height;
     await dragUp(page, height * 0.8, height * 0.7);
     await dragUp(page, height * 0.3);
     await page.waitForTimeout(300);

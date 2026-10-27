@@ -235,3 +235,10 @@ export async function addGesture(page: Page, tap: string, up: string | undefined
   await select(page, needle);
   await expect(gestureButton(page)).toBeVisible();
 }
+
+/** Where an element is once laid out: waited for (a write, a hover or a save may render it anew meanwhile; a box read at once may be none) */
+export async function boxOf(target: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
+  let box: { x: number; y: number; width: number; height: number } | null = null;
+  await expect.poll(async () => (box = await target.boundingBox()) !== null).toBe(true);
+  return box!;
+}

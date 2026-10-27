@@ -1,5 +1,5 @@
 // The toolbar's row of names: what holds the table (its sheet) and the table, each after its icon button
-import { cell, closeNotification, expect, hoverCell, markdown, menu, notification, setPage, setSettings, table, tableIcon, test } from "./helpers.ts";
+import { boxOf, cell, closeNotification, expect, hoverCell, markdown, menu, notification, setPage, setSettings, table, tableIcon, test } from "./helpers.ts";
 
 const name = (page: import("@playwright/test").Page, slot: "container" | "table") => page.locator(`.swt-bar.swt-visible .swt-bar-name-${slot} .swt-bar-name`);
 
@@ -22,8 +22,8 @@ test.describe("Names in the ⋯ menu", () => {
     const title = menu.locator(".swt-menu-title-text");
     await expect(title).toHaveText("Table");
     // Centered: as far from the menu's left edge as from its right one, the pencil and the × aside
-    const m = (await menu.boundingBox())!;
-    const t = (await title.boundingBox())!;
+    const m = (await boxOf(menu));
+    const t = (await boxOf(title));
     expect(Math.abs(t.x + t.width / 2 - (m.x + m.width / 2))).toBeLessThan(24);
     await expect(menu.locator(".swt-menu-item").first()).toHaveText("Full screen");
     await expect(menu.locator(".swt-menu-item").nth(1)).toHaveText("Sheet view");
@@ -66,13 +66,13 @@ test("Shift pressed over a table with a long name: the names beside the icons, t
   await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
   await hoverCell(page, cell(page, 1, 0));
   const bar = page.locator(".swt-bar.swt-visible");
-  const before = (await bar.boundingBox())!;
+  const before = (await boxOf(bar));
   await page.keyboard.down("Shift");
   await expect(bar.locator(".swt-bar-names")).toBeVisible();
   // (Placed in the next frame)
-  await expect.poll(async () => (await bar.boundingBox())!.y).toBe(before.y);
-  const names = (await bar.locator(".swt-bar-names").boundingBox())!;
-  const main = (await bar.locator(".swt-bar-main").boundingBox())!;
+  await expect.poll(async () => (await boxOf(bar)).y).toBe(before.y);
+  const names = (await boxOf(bar.locator(".swt-bar-names")));
+  const main = (await boxOf(bar.locator(".swt-bar-main")));
   expect(names.y).toBe(main.y);
   expect(names.x + names.width).toBeLessThanOrEqual(main.x);
   expect(main.x + main.width).toBeCloseTo(before.x + before.width, 0);
@@ -146,13 +146,13 @@ test.describe("Names in the toolbar", () => {
     const bar = page.locator(".swt-bar.swt-visible");
     await expect(bar.locator(".swt-chip")).toBeVisible();
     // Each row on one line, its own height
-    for (const button of await bar.locator(".swt-bar-name").all()) expect((await button.boundingBox())!.height).toBeLessThan(23);
+    for (const button of await bar.locator(".swt-bar-name").all()) expect((await boxOf(button)).height).toBeLessThan(23);
     // The names above the rest (they do not fit beside it), the whole toolbar in the window
-    const names = (await bar.locator(".swt-bar-names").boundingBox())!;
-    const main = (await bar.locator(".swt-bar-main").boundingBox())!;
+    const names = (await boxOf(bar.locator(".swt-bar-names")));
+    const main = (await boxOf(bar.locator(".swt-bar-main")));
     expect(names.y + names.height).toBeLessThanOrEqual(main.y + 1);
     expect(Math.min(names.x, main.x)).toBeGreaterThanOrEqual(0);
-    const chip = (await bar.locator(".swt-chip").boundingBox())!;
+    const chip = (await boxOf(bar.locator(".swt-chip")));
     expect(chip.x).toBeGreaterThanOrEqual(0);
   });
 
@@ -192,7 +192,7 @@ test.describe("A table name two tables of the page have", () => {
     const note = notification(page, "2 tables on this page are named prices");
     await expect(note).toBeVisible();
     // Under the top bar, and still there after the time another notification goes
-    expect((await note.boundingBox())!.y).toBeLessThan(200);
+    expect((await boxOf(note)).y).toBeLessThan(200);
     await page.waitForTimeout(3500);
     await expect(note).toBeVisible();
     for (const index of [0, 1]) {

@@ -49,11 +49,12 @@ function formatOf(definition: unknown): Format | string {
   if (icon !== undefined && typeof icon !== "string") return "its icon is not text (an SVG)";
   if (group !== undefined && typeof group !== "string") return "its group is not text";
   if (keywords !== undefined && !(Array.isArray(keywords) && keywords.every((k) => typeof k === "string"))) return "its keywords are not a list of texts";
-  for (const fn of ["read", "write", "afterWrite"] as const) if (definition[fn] !== undefined && typeof definition[fn] !== "function") return `its ${fn} is not a function`;
+  for (const fn of ["read", "write", "afterWrite", "clear"] as const) if (definition[fn] !== undefined && typeof definition[fn] !== "function") return `its ${fn} is not a function`;
   // Functions of the user's: called through checked(), which checks what they give
   const read = definition.read as ((...args: unknown[]) => unknown) | undefined;
   const write = definition.write as ((...args: unknown[]) => unknown) | undefined;
   const afterWrite = definition.afterWrite as ((written: Written, editor: FormatEditor) => void) | undefined;
+  const clearOwn = definition.clear as ((text: string) => unknown) | undefined;
   const common = {
     id: `formats.${name}`,
     name,
@@ -70,6 +71,7 @@ function formatOf(definition: unknown): Format | string {
     if (joins !== undefined && typeof joins !== "boolean") return "joins is not true or false";
     if (marker === undefined && !read) return "it has neither a marker nor read";
     if (multiline && !write) return "it is multiline without write";
+    if (clearOwn) return "clear is for an inline format";
     const readOwn = read ?? (markerRead(marker as string) as (...args: unknown[]) => unknown);
     const writeLine = write ?? (marker === undefined || multiline ? undefined : (text: unknown) => (marker as string) + String(text));
     return {
@@ -90,6 +92,7 @@ function formatOf(definition: unknown): Format | string {
   }
   if (literal !== undefined && typeof literal !== "boolean") return "literal is not true or false";
   if (markers === undefined && (!read || !write)) return "it has neither a marker nor read and write";
+  if (clearOwn && markers) return "clear is for a format of its own read and write (Clear formatting takes markers off by itself)";
   return {
     ...common,
     markers: markers as string[] | undefined,
@@ -98,6 +101,8 @@ function formatOf(definition: unknown): Format | string {
     joins: false,
     ...(read ? { readInline: (text: string, context: ReadContext) => checked(name, "read", () => read(text, context), isFound) } : {}),
     ...(write ? { writeInline: (text: string, info: { readonly index: number }) => checked(name, "write", () => write(text, info), isText) } : {}),
+    // (A format of markers is cleared by them)
+    ...(clearOwn && !markers ? { clearInline: (text: string) => checked(name, "clear", () => clearOwn(text), isText) } : {}),
   };
 }
 

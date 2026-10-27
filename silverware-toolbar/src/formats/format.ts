@@ -78,6 +78,10 @@ export type InlineDefinition = Common & {
   readonly literal?: boolean;
   readonly read?: (text: string, context: ReadContext) => Found | undefined;
   readonly write?: (text: string, info: { readonly index: number }) => string;
+  // A format of its own read and write that Clear formatting takes off: the text without it (underline's: its
+  // whole pairs of tags), within the selection, and around it where nothing but the format is (taken off, the text
+  // selected alone is left). A format of markers Clear formatting always takes off; one without `clear` (a link) it leaves
+  readonly clear?: (text: string) => string;
 };
 
 export type FormatDefinition = BlockDefinition | InlineDefinition;
@@ -102,5 +106,7 @@ export type Format = {
   readonly writeLine?: (text: string, info: BlockInfo) => string;
   readonly writeLines?: (items: readonly BlockItem[]) => readonly string[];
   readonly writeInline?: (text: string, info: { readonly index: number }) => string;
+  // Inline, its own read and write: how Clear formatting takes it off a text (undefined: it is left)
+  readonly clearInline?: (text: string) => string;
   readonly afterWrite?: (written: Written, editor: FormatEditor) => void;
 };

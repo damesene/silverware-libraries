@@ -92,6 +92,20 @@ test.describe("The toolbar", () => {
     await expect.poll(() => text(page)).toContain("Select some text in this page");
   });
 
+  test("Clear formatting takes underline off, as it takes bold off", async ({ page }) => {
+    const run = async (name: string) => {
+      await barButton(page, "actions.more").click();
+      await popup(page).locator(".swb-search-field").fill(name);
+      await page.keyboard.press("Enter");
+    };
+    await select(page, "some text");
+    await run("underline");
+    await expect.poll(() => text(page)).toContain("Select <u>some text</u> in this page");
+    await select(page, "some text");
+    await run("clear formatting");
+    await expect.poll(() => text(page)).toContain("Select some text in this page");
+  });
+
   test("Turn into a code block: the lines between fences; in it, Turn into shows Code block and takes the fences off", async ({ page }) => {
     await select(page, "Plain paragraph one.\nPlain paragraph two");
     await barButton(page, "actions.turnInto").click();

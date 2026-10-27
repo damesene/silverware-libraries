@@ -3,6 +3,7 @@ import type { Change } from "../core/action.ts";
 import { contextOf } from "../core/context.ts";
 import { marked } from "../core/cursor.ts";
 import {
+  asWord,
   BUILT_IN_PROBLEMS,
   blockFormatOf,
   canCodeBlock,
@@ -17,6 +18,8 @@ import {
   formatsOf,
   inCodeBlock,
   isOn,
+  keptCaret,
+  plainText,
   resetCustomFormats,
   toggle,
   toggleCodeBlock,
@@ -193,6 +196,48 @@ describe("Underline", () => {
     expect(run("a «<u>word</u>» b")).toBe("a «word» b");
     expect(isOn(at("a <u>wo‸rd</u> b"), format("underline"))).toBe(true);
     expect(run("a ‸ b")).toBe("a <u>‸</u> b");
+  });
+});
+
+describe("Clear formatting", () => {
+  const run = (text: string) => {
+    const context = at(text);
+    return after(context.text, clear(context));
+  };
+
+  it("takes underline's tags off as it takes markers off: inside the selection, and right around it", () => {
+    expect(run("a «<u>word</u>» b")).toBe("a «word» b");
+    expect(run("a <u>«word»</u> b")).toBe("a «word» b");
+    expect(run("a **<u>«word»</u>** b")).toBe("a «word» b");
+    expect(run("«one <u>two</u> **three**»")).toBe("«one two three»");
+  });
+
+  it("takes whole pairs off only: a selection through an underline leaves it whole, no half pair behind", () => {
+    expect(run("a «<u>one» two</u> b")).toBe("unchanged");
+    expect(run("a <u>one «two»</u> b")).toBe("unchanged");
+  });
+
+  it("puts the caret back where it was in the word, the tags and markers not counted (a word at the caret)", () => {
+    const kept = (text: string) => {
+      const context = at(text);
+      return after(context.text, keptCaret(context, clear(asWord(context)), plainText));
+    };
+    expect(kept("a <u>wo‸rd</u> b")).toBe("a wo‸rd b");
+    // A marker's character in the word's own text counts
+    expect(kept("a **snake_ca‸se** b")).toBe("a snake_ca‸se b");
+  });
+
+  it("refuses a custom format's clear where it is not for one of its own read and write", () => {
+    const { problems } = formatsOf([
+      { name: "sup", scope: "inline", label: "Sup", marker: "^", clear: (t: string) => t },
+      { name: "box", scope: "block", label: "Box", marker: "[] ", clear: (t: string) => t },
+    ]);
+    expect(problems.join(" ")).toContain("clear is for a format of its own read and write");
+    expect(problems.join(" ")).toContain("clear is for an inline format");
+  });
+
+  it("leaves a link: a format of its own read and write that says not how to take it off", () => {
+    expect(run("«see [it](x)»")).toBe("unchanged");
   });
 });
 

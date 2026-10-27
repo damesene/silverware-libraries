@@ -32,14 +32,21 @@ export function asWord(context: Context): Context {
  * the word's text: after as many of its characters as were before it, the
  * formats' markers not counted (they are what the change puts on or takes off)
  */
-export function keptCaret(context: Context, change: Change | undefined): Change | undefined {
+export function keptCaret(context: Context, change: Change | undefined, cleared?: (text: string) => string): Change | undefined {
   const word = wordAt(context);
   if (!word || !change?.select) return change;
   const markers = new Set(formatsIn("inline").flatMap((f) => (f.markers ?? []).map((m) => m[0]!)));
   const counts = (ch: string) => !markers.has(ch);
-  const before = [...context.text.slice(word.from, context.from)].filter(counts).length;
+  // `cleared`: the change takes the formats off (Clear formatting, a format's tags too): the caret's place in the word
+  // as it is left, told by a mark put at the caret before the word is cleared
+  const MARK = "\uE010";
+  const marked = cleared?.(context.text.slice(word.from, context.from) + MARK + context.text.slice(context.from, word.to)).indexOf(MARK) ?? -1;
+  // (Not told so, the mark lost or inside a pair it broke: the word's characters but markers counted)
+  const byMark = marked >= 0;
+  const before = byMark ? marked : [...context.text.slice(word.from, context.from)].filter(counts).length;
   const { from, to } = change.select;
   let at = from;
-  for (let seen = 0; seen < before && at < to; at++) if (counts(change.insert[at - change.from] ?? "")) seen++;
+  // What was written is the cleared word where told by the mark: each of its characters counts
+  for (let seen = 0; seen < before && at < to; at++) if (byMark || counts(change.insert[at - change.from] ?? "")) seen++;
   return { ...change, select: { from: at, to: at } };
 }

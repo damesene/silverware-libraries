@@ -334,7 +334,7 @@ export function toggle(context: Context, format: Format): Change | undefined {
       // Already formatted while others are not: left as it is
       if (span) return { from: part.from, to: part.to, text: text.slice(part.from, part.to), around: [0, 0] as const };
       const own = text.slice(part.from, part.to);
-      const content = format.literal ? plain(own) : own;
+      const content = format.literal ? plainText(own) : own;
       if (format.markers) {
         const marker = format.markers[0]!;
         const inner = withoutPairs(content, format.markers);
@@ -378,18 +378,21 @@ function withoutPairs(text: string, markers: readonly string[]): string {
 }
 
 /**
- * A text's marker formats taken off: what is in a literal one (a code span)
- * kept as written, its markers gone; the longer markers first, so `**` is not
- * read as two `*`
+ * A text's formats taken off, as Clear formatting leaves it: those that say how
+ * (underline's tags), then the marker formats: what is in a literal one (a code
+ * span) kept as written, its markers gone; the longer markers first, so `**` is
+ * not read as two `*`
  */
-function plain(text: string): string {
+export function plainText(text: string): string {
   const formats = formatsIn("inline").filter((f) => f.markers);
   const literal = formats.filter((f) => f.literal).flatMap((f) => f.markers!);
   const others = formats
     .filter((f) => !f.literal)
     .flatMap((f) => f.markers!)
     .sort((a, b) => b.length - a.length);
-  const strip = (s: string) => withoutPairs(s, others);
+  // Formats of their own read and write that say how (underline's tags), then markers' pairs
+  const cleared = formatsIn("inline").filter((f) => f.clearInline);
+  const strip = (s: string) => withoutPairs(cleared.reduce((t, f) => clearedBy(f, t), s), others);
   // The literal formats' spans, in order, kept as they are
   const spans: { from: number; to: number; inner: string }[] = [];
   for (const marker of literal) {
@@ -410,19 +413,25 @@ function plain(text: string): string {
   return out + strip(text.slice(at));
 }
 
-/** Every marker format taken off the selection: the markers around each part and the pairs inside it */
+/**
+ * Every marker format taken off the selection, and every format of its own
+ * read that says how (`clearInline`: underline): the markers and tags around
+ * each part and the pairs inside it; others (a link) stay
+ */
 export function clear(context: Context): Change | undefined {
   const { text } = context;
   if (context.from === context.to) return undefined;
   const markers = formatsIn("inline")
     .flatMap((f) => f.markers ?? [])
     .sort((a, b) => b.length - a.length);
+  const cleared = formatsIn("inline").filter((f) => f.clearInline);
   return rewrite(
     text,
     partsOf(context, true).map((p) => {
       let a = p.from;
       let b = p.to;
-      // The markers around it, as many as there are (bold and italic: ***x***)
+      // The markers around it, as many as there are (bold and italic: ***x***), and the formats' that say how they
+      // are taken off (underline's tags: what is right before and after the part that is nothing but them)
       for (let again = true; again; ) {
         again = false;
         for (const m of markers) {
@@ -433,10 +442,38 @@ export function clear(context: Context): Change | undefined {
             break;
           }
         }
+        if (again) continue;
+        for (const f of cleared) {
+          let span: Span | undefined;
+          try {
+            span = found(context, f, { from: a, to: b, line: p.line });
+          } catch (e) {
+            // (A format whose read fails: left, the others cleared)
+            console.error(`Silverware Toolbar: ${e instanceof Error ? e.message : String(e)}`);
+            continue;
+          }
+          if (!span || (span.from === a && span.to === b)) continue;
+          // Only where what is around the part is nothing but the format: taken off, the part's text alone is left
+          if (clearedBy(f, text.slice(span.from, span.to)) !== text.slice(a, b)) continue;
+          a = span.from;
+          b = span.to;
+          again = true;
+          break;
+        }
       }
-      return { from: a, to: b, text: plain(text.slice(p.from, p.to)), around: [0, 0] as const };
+      return { from: a, to: b, text: plainText(text.slice(p.from, p.to)), around: [0, 0] as const };
     }),
   );
+}
+
+/** A text with a format's `clearInline` put to it; one that fails leaves the text as it is (logged), the others cleared */
+function clearedBy(format: Format, text: string): string {
+  try {
+    return format.clearInline!(text);
+  } catch (e) {
+    console.error(`Silverware Toolbar: ${e instanceof Error ? e.message : String(e)}`);
+    return text;
+  }
 }
 
 /** Whether there is anything to clear: the selection has text to format */

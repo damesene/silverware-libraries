@@ -26,6 +26,7 @@ Select text in a page and a toolbar shows beside it: make it bold, italic or cod
 |---|---|---|
 | Bold | `formats.bold` | `**text**`; also takes `__text__` off |
 | Italic | `formats.italic` | `_text_`; also takes `*text*` off |
+| Underline | `formats.underline` | `<u>text</u>` (markdown has no underline of its own; SilverBullet shows the HTML tag underlined), and back |
 | Strikethrough | `formats.strikethrough` | `~~text~~` |
 | Highlight | `formats.highlight` | `==text==` |
 | Code | `formats.code` | `` `text` ``; the formats inside it are taken off, and no format goes inside code |
@@ -43,6 +44,7 @@ Select text in a page and a toolbar shows beside it: make it bold, italic or cod
 | Numbered list | `formats.numbered` | `1. `, `2. `, … from 1 at each depth |
 | Task | `formats.task` | `- [ ] ` (a task done stays done) |
 | Quote | `formats.quote` | `> ` |
+| Code block | `formats.codeBlock` | The lines between ` ``` ` fences (indented as the first line, in a list's item too), the cursor after the opening one for the code's language; nothing selected on an empty line, the cursor between them. In a code block (on its fences too): its fences taken off, its lines kept |
 
 With nothing selected, a format (and *Clear formatting*) works on the word the cursor is in or touches, as if you had selected it: what spaces separate, its punctuation with it (`word,` bolded is `**word,**`); the cursor stays where it was. *A word at the cursor as if selected* (a setting) turns this off, so a format at the cursor writes its markers there to type into.
 

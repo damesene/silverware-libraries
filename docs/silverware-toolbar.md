@@ -428,7 +428,9 @@ or opening its choices).
   this order). See *Next*.
 - **The page unchanged between reading and writing**: an action checks it
   (a snapshot of the text it read), else writes nothing.
-- Not now: a code block format, keys per action, a dialog for links, phones.
+- Not now: keys per action, a dialog for links. (A code block came on
+  2026-10-27: Turn into's *Code block*, formats/codeblock.ts; and underline,
+  `<u>…</u>`.)
 
 ## Status and next (2026-10-26)
 

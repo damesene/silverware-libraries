@@ -62,6 +62,31 @@ test.describe("The toolbar", () => {
     await expect(barButton(page, "formats.bold")).toHaveAttribute("aria-pressed", "true");
   });
 
+  test("underline from the list of every action: <u> tags around the selection, and off again", async ({ page }) => {
+    await select(page, "some text");
+    await barButton(page, "actions.more").click();
+    await popup(page).locator(".swb-search-field").fill("underline");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => text(page)).toContain("Select <u>some text</u> in this page");
+    await barButton(page, "actions.more").click();
+    await popup(page).locator(".swb-search-field").fill("underline");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => text(page)).toContain("Select some text in this page");
+  });
+
+  test("Turn into a code block: the lines between fences; in it, Turn into shows Code block and takes the fences off", async ({ page }) => {
+    await select(page, "Plain paragraph one.\nPlain paragraph two");
+    await barButton(page, "actions.turnInto").click();
+    await page.locator('.swb-menu.swb-visible [data-swb-action="formats.codeBlock"]').click();
+    await expect.poll(() => text(page)).toContain("```\nPlain paragraph one.\nPlain paragraph two, with a [[Wiki link]] in it.\n```");
+    await select(page, "Plain paragraph one.");
+    await expect(barButton(page, "actions.turnInto")).toHaveText("Code block");
+    await barButton(page, "actions.turnInto").click();
+    await page.locator('.swb-menu.swb-visible [data-swb-action="formats.codeBlock"]').click();
+    await expect.poll(() => text(page)).toContain("\nPlain paragraph one.\nPlain paragraph two, with a [[Wiki link]] in it.\n\n### A smaller");
+    expect(await text(page)).not.toContain("```");
+  });
+
   test("a link made of the selection puts the caret where its url goes", async ({ page }) => {
     await select(page, "some text");
     await barButton(page, "formats.link").click();

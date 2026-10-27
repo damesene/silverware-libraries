@@ -5,6 +5,7 @@ import { marked } from "../core/cursor.ts";
 import {
   BUILT_IN_PROBLEMS,
   blockFormatOf,
+  canCodeBlock,
   canFormat,
   canTurn,
   clear,
@@ -14,9 +15,11 @@ import {
   formatById,
   formatsIn,
   formatsOf,
+  inCodeBlock,
   isOn,
   resetCustomFormats,
   toggle,
+  toggleCodeBlock,
   turnInto,
 } from "./index.ts";
 
@@ -47,7 +50,7 @@ afterEach(() => resetCustomFormats());
 describe("Built-in formats", () => {
   it("are defined without a mistake, each by its id", () => {
     expect(BUILT_IN_PROBLEMS).toEqual([]);
-    expect(formatsIn("inline").map((f) => f.id)).toEqual(["formats.bold", "formats.italic", "formats.strikethrough", "formats.highlight", "formats.code", "formats.link", "formats.wikiLink"]);
+    expect(formatsIn("inline").map((f) => f.id)).toEqual(["formats.bold", "formats.italic", "formats.underline", "formats.strikethrough", "formats.highlight", "formats.code", "formats.link", "formats.wikiLink"]);
     expect(formatsIn("block").filter((f) => f.label).map((f) => f.name)).toEqual(["paragraph", "heading1", "heading2", "heading3", "bullet", "numbered", "task", "quote"]);
   });
 });
@@ -174,6 +177,49 @@ describe("Inline formats", () => {
     expect(cleared("«\\*lit\\* and *it*»")).toBe("«\\*lit\\* and it»");
     // Not into a code block
     expect(cleared("«x\n```\na_b_c\n```»")).toBe("unchanged");
+  });
+});
+
+describe("Underline", () => {
+  const run = (text: string) => {
+    const context = at(text);
+    return after(context.text, toggle(context, format("underline")));
+  };
+
+  it("puts <u> tags around the selection, and takes them off: selected with them, its text alone inside them, or the caret in them", () => {
+    // Written whole and selected so (as a wiki link): pressed again, taken off
+    expect(run("a «word» b")).toBe("a «<u>word</u>» b");
+    expect(run("a <u>«word»</u> b")).toBe("a «word» b");
+    expect(run("a «<u>word</u>» b")).toBe("a «word» b");
+    expect(isOn(at("a <u>wo‸rd</u> b"), format("underline"))).toBe(true);
+    expect(run("a ‸ b")).toBe("a <u>‸</u> b");
+  });
+});
+
+describe("Code block", () => {
+  const run = (text: string) => {
+    const context = at(text);
+    return after(context.text, toggleCodeBlock(context));
+  };
+
+  it("puts the lines selected between fences, the cursor for the language; an empty line: the cursor between them", () => {
+    expect(run("a\n«one\ntw»o\nb")).toBe("a\n```‸\none\ntwo\n```\nb");
+    expect(run("‸")).toBe("```\n‸\n```");
+    // A list's item's indentation
+    expect(run("- a\n  «code»")).toBe("- a\n  ```‸\n  code\n  ```");
+  });
+
+  it("takes a code block's fences off, from its lines or its fences, its lines kept selected; an unclosed one too", () => {
+    expect(run("a\n```js\nx = 1\n‸y = 2\n```\nb")).toBe("a\n«x = 1\ny = 2»\nb");
+    expect(run("‸```\nx\n```")).toBe("«x»");
+    expect(run("```\nx\n‸y")).toBe("«x\ny»");
+    expect(inCodeBlock(at("```\nx‸\n```"))).toBe(true);
+    expect(inCodeBlock(at("x‸"))).toBe(false);
+  });
+
+  it("is not offered over lines partly in a code block", () => {
+    expect(canCodeBlock(at("«a\n```\nx»\n```"))).toBe(false);
+    expect(run("«a\n```\nx»\n```")).toBe("unchanged");
   });
 });
 

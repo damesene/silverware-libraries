@@ -14,11 +14,13 @@ import rule from "./rule.ts";
 import strikethrough from "./strikethrough.ts";
 import table from "./table.ts";
 import task from "./task.ts";
+import underline from "./underline.ts";
 import wikiLink from "./wikiLink.ts";
 
 export const BUILT_IN_DEFINITIONS = [
   bold,
   italic,
+  underline,
   strikethrough,
   highlight,
   code,

@@ -14,6 +14,9 @@ export const ICONS = {
   italic: svg('<path d="M14 5h-4M14 19h-4M14 5l-4 14"/>'),
   strike: svg('<path d="M5 12h14M16 7.5C15.4 6 13.9 5 12 5 9.8 5 8 6.3 8 8c0 1.5 1.1 2.4 3 3M8 16.5C8.6 18 10.1 19 12 19c2.2 0 4-1.3 4-3 0-.6-.2-1.2-.5-1.7"/>'),
   highlight: svg('<path d="m9 11-5 5v3h3l5-5M14.5 5.5l4 4M9 11l4-4 4 4-4 4z"/>'),
+  underline: svg('<path d="M7 4v7a5 5 0 0 0 10 0V4M5 20h14"/>'),
+  // A box of code: the code block
+  codeBlock: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m9 10-2 2 2 2M15 10l2 2-2 2"/>'),
   code: svg('<path d="m9 8-4 4 4 4M15 8l4 4-4 4"/>'),
   link: svg('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
   wikiLink: svg('<path d="M8 5H5v14h3M16 5h3v14h-3M10 9h4M10 15h4"/>'),

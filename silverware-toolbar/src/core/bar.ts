@@ -7,15 +7,18 @@
 // system's menu of a selection is where it would be by it), it is one row
 // across the bottom of the window, over the on-screen keyboard: the rows one
 // after another, a separator between them, scrolled sideways, … at its end
-// always in view; a list of choices opens over it.
+// always in view; items pinned left or right stay at its ends, out of what
+// scrolls; a list of choices opens over it. A label of a fixed width keeps
+// it, cut with an ellipsis where longer, so what follows keeps its place.
 import { ICONS } from "../icons.ts";
 import type { Action } from "./action.ts";
+import type { Pin } from "./favorites.ts";
 import type { ItemHost, ShownItem } from "./items.ts";
 import { type Box, placeBy } from "./place.ts";
 
 /** An item as the toolbar shows it now: an action (with its label: `labeled`), a separator, or an item of a kind a module gives */
 export type Shown =
-  | { readonly action: Action; readonly active: boolean; readonly enabled: boolean; readonly labeled: boolean }
+  | { readonly action: Action; readonly active: boolean; readonly enabled: boolean; readonly labeled: boolean; readonly width?: number; readonly pin?: Pin }
   | { readonly separator: true }
   | { readonly item: ShownItem };
 
@@ -86,12 +89,26 @@ export class Bar {
     this.place(rect, viewTop);
   }
 
-  /** Docked: one row across the bottom of the window standing on `bottom`, the rows one after another; `more`: … pinned at its end, out of what scrolls */
+  /**
+   * Docked: one row across the bottom of the window standing on `bottom`, the
+   * rows one after another; the items pinned left and right at its ends, out
+   * of what scrolls; `more`: … pinned at its end
+   */
   dock(rows: readonly (readonly Shown[])[], bottom: number, more?: Extract<Shown, { action: Action }>): void {
     this.closeMenu();
+    const pinned = (side: Pin) => rows.flatMap((row) => row.filter((item) => pinOf(item) === side));
+    const left = pinned("left");
+    const right = pinned("right");
+    // The rows without them, a separator then at a row's end or twice left out
+    const rest = rows
+      .map((row) => {
+        const kept = row.filter((item) => !pinOf(item));
+        return kept.filter((item, i) => !("separator" in item) || (i > 0 && i < kept.length - 1 && !("separator" in kept[i - 1]!)));
+      })
+      .filter((row) => row.some((item) => !("separator" in item)));
     const items = this.doc.createElement("div");
     items.className = "swb-row swb-dock-items";
-    rows.forEach((row, i) => {
+    rest.forEach((row, i) => {
       if (i > 0 && row.length) items.append(this.divider());
       items.append(...row.flatMap((item) => this.elementOf(item, true)));
     });
@@ -111,7 +128,18 @@ export class Bar {
       scroll.classList.toggle("swb-more-right", more > 1);
     };
     items.addEventListener("scroll", this.shadeScroll, { passive: true });
-    this.element.replaceChildren(scroll, ...(more ? [this.pinned(more)] : []));
+    const end = (side: Pin, elements: readonly HTMLElement[]) => {
+      const group = this.doc.createElement("div");
+      group.className = `swb-row swb-dock-pinned swb-dock-pinned-${side}`;
+      group.append(...elements);
+      return group;
+    };
+    const ofItems = (shown: readonly Shown[]) => shown.flatMap((item) => this.elementOf(item, true));
+    this.element.replaceChildren(
+      ...(left.length ? [end("left", ofItems(left))] : []),
+      scroll,
+      ...(right.length || more ? [end("right", [...ofItems(right), ...(more ? [this.pinned(more)] : [])])] : []),
+    );
     this.element.classList.add("swb-docked");
     if (!this.element.isConnected) this.doc.body.append(this.element);
     this.element.classList.add("swb-visible");
@@ -137,16 +165,22 @@ export class Bar {
     return button;
   }
 
-  /** An item's element (a kind's that fails to draw: none, logged); `docked`: for the toolbar docked at the bottom */
+  /** An item's element (a kind's that fails to draw: none, logged), its label's width fixed where it has one; `docked`: for the toolbar docked at the bottom */
   private elementOf(shown: Shown, docked: boolean): HTMLElement[] {
     if ("separator" in shown) return [this.divider()];
-    if ("action" in shown) return [this.item(shown)];
+    let element: HTMLElement;
     try {
-      return [shown.item.kind.render(shown.item, this.itemHost(docked))];
+      element = "action" in shown ? this.item(shown) : shown.item.kind.render(shown.item, this.itemHost(docked));
     } catch (e) {
-      console.error(`Silverware Toolbar: a favourite of the kind ${shown.item.kind.type} could not be shown:`, e);
+      console.error(`Silverware Toolbar: a favourite of the kind ${"item" in shown ? shown.item.kind.type : ""} could not be shown:`, e);
       return [];
     }
+    const width = "action" in shown ? shown.width : shown.item.width;
+    if (width) {
+      element.classList.add("swb-fixed");
+      element.style.setProperty("--swb-width", `${width}ch`);
+    }
+    return [element];
   }
 
   /** What a kind of item draws its button with */
@@ -308,4 +342,10 @@ export class Bar {
     this.menu.element.remove();
     this.menu = undefined;
   }
+}
+
+/** Where an item is pinned, docked (a separator: nowhere) */
+function pinOf(shown: Shown): Pin | undefined {
+  if ("separator" in shown) return undefined;
+  return "action" in shown ? shown.pin : shown.item.pin;
 }

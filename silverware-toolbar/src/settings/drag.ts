@@ -22,6 +22,8 @@ export type Reorder = {
   readonly layer?: HTMLElement;
   // Let go after moving: the container's index and the index it ends at; undefined: cancelled, or never moved
   readonly done: (to: { readonly container: number; readonly index: number } | undefined) => void;
+  // Let go without moving (a click, a tap): told after `done`
+  readonly clicked?: () => void;
 };
 
 // How far the pointer goes before it is a drag (a press without it is a click or a focus)
@@ -93,6 +95,7 @@ export function reorder(e: PointerEvent, options: Reorder): void {
     element.classList.remove(`${base}-placeholder`);
     if (!dropped || !moved) {
       options.done(undefined);
+      if (dropped) options.clicked?.();
       return;
     }
     const containers = options.containers();

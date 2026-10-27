@@ -55,7 +55,9 @@ Over several lines of one paragraph, a format of markers (bold, italic, striketh
 
 The toolbar shows your favourites: rows, one under another, each a list of items. An item is an action by its `id` (see *Actions*; its `type` is `"action"`, which can be left out), shown as its icon, or with `show = "label"` as its icon and its name, a separator (`type = "separator"`), or a gesture button (`type = "gesture"`, see below). An action that offers a list (*Turn into*) has an arrow, and shows the choice your selection has. Every action is in the **…** list: *Every action* (`actions.more`), an item as any other, in the default at the end of the last row. You can put it anywhere, or on a gesture button's swipe; favourites without it get it at the end of the toolbar, and the settings say so. An id no action has (a module turned off, a custom format not defined) is left out. The default: *Turn into* with its name; Bold, Italic, Highlight, Underline, Strikethrough; Link, Wiki link, Code, Code block; *Emoji* with its name and **…** (headings, lists and tasks are in *Turn into*). Where the screen is worked by finger, the default is the same actions in a shorter bar, the kin of one on its gesture button's swipes: Bold (up Italic, down Highlight), Strikethrough (down Underline), Link (up Wiki link), Code (up Code block). That default needs the *Gestures* module: with it off, and for a space whose favourites are its own (set before favourites for touch came), the favourites show by finger too, until *Own favourites for touch* is turned on.
 
-The settings dialog's *Favorites* tab edits them without writing Lua (see *Settings*).
+An item shown with its label may have a fixed width, in characters: `width = 9` (3 to 30). A longer label is cut with an ellipsis, a shorter one leaves the room, so what follows keeps its place as the label changes (*Turn into* saying *Paragraph*, then *Bullet list*). Where the toolbar is docked at the bottom (a phone), an item may be pinned at its left or right end, out of what scrolls: `pin = "left"` or `pin = "right"`, wherever it is in its rows.
+
+The settings dialog's *Favorites* tab edits them without writing Lua (see *Settings*). It shows each item as the toolbar does: its icon alone, or its label too, at its width. Click an item to change how it shows (its icon, or its icon and label) and its label's width. On *Touch*, *Pinned left* and *Pinned right* above the rows hold the items pinned at the ends: drag an item in to pin it, out to unpin it.
 
 Where the screen is worked by finger (a phone, a tablet), the toolbar can show other favourites: `silverware.toolbar.favorites-touch`, written as the favourites are, with gesture buttons in place of plain ones (the default, see above). A computer with a touch screen counts as one with a mouse (its touchpad is what it is mostly worked with). `silverware.toolbar.favorites-touch-enabled = false` turns them off for a while: the favourites show by finger too, those for touch kept. In the settings, *Favorites* has *Click* and *Touch* at its top (opened by finger on *Touch* where its own are on): *Own favourites for touch* turns them on and off (off, *Click*'s show by finger, those for touch kept), *Copy from Click* / *Copy from Touch* puts the other's over the ones shown, and *Reset to defaults* (asked first) puts the defaults back, each its own.
 
@@ -231,10 +233,13 @@ config.define("silverware.toolbar", {
             type = { type = "string" },
             id = { type = "string" },
             show = { type = "string", enum = { "icon", "label" } },
+            -- (Kept within 3 and 30 as it is read: not refused here, which would fail the whole setting)
+            width = { type = "number" },
+            pin = { type = "string", enum = { "left", "right" } },
           },
         },
       },
-      description = "The toolbar's rows, each a list of items: { id = <its id>, show = \"icon\" or \"label\" }, { type = \"separator\" }, or a module's kind: { type = \"gesture\", tap = <an id>, up = <an id>, down = <an id> } (every action is in the list of the … button).",
+      description = "The toolbar's rows, each a list of items: { id = <its id>, show = \"icon\" or \"label\", width = <its label's width in characters, 3 to 30>, pin = \"left\" or \"right\" (where the toolbar is docked at the bottom) }, { type = \"separator\" }, or a module's kind: { type = \"gesture\", tap = <an id>, up = <an id>, down = <an id> } (every action is in the list of the … button).",
       ui = { category = "Silverware Toolbar", label = "Favourite actions", priority = 2 },
     },
     ["favorites-touch"] = {
@@ -248,6 +253,9 @@ config.define("silverware.toolbar", {
             type = { type = "string" },
             id = { type = "string" },
             show = { type = "string", enum = { "icon", "label" } },
+            -- (Kept within 3 and 30 as it is read: not refused here, which would fail the whole setting)
+            width = { type = "number" },
+            pin = { type = "string", enum = { "left", "right" } },
           },
         },
       },
@@ -492,6 +500,23 @@ end
   flex: none;
   margin-left: 2px;
 }
+/* Items pinned at an end, out of what scrolls: a line between them and it */
+.swb-bar.swb-docked .swb-dock-pinned {
+  flex: none;
+}
+.swb-bar.swb-docked .swb-dock-pinned-left {
+  padding-right: 4px;
+  margin-right: 4px;
+  border-right: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
+}
+.swb-bar.swb-docked .swb-dock-pinned-right {
+  padding-left: 4px;
+  margin-left: 4px;
+  border-left: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
+}
+.swb-bar.swb-docked .swb-dock-pinned-right .swb-more {
+  margin-left: 0;
+}
 /* An action with its label, one offering choices with a chevron (its choice on) */
 .swb-button.swb-labeled,
 .swb-button.swb-choices {
@@ -507,6 +532,16 @@ end
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+/* A label of a fixed width (--swb-width, in characters): as wide whatever it says, a longer one cut */
+.swb-button.swb-fixed {
+  max-width: none;
+}
+.swb-fixed .swb-label {
+  flex: none;
+  box-sizing: content-box;
+  width: var(--swb-width);
+  text-align: left;
 }
 .swb-button.swb-choices:not(.swb-labeled) {
   gap: 0;
@@ -1309,7 +1344,6 @@ end
   width: 18px;
   height: 18px;
 }
-.swb-settings-show,
 .swb-settings-remove {
   display: inline-flex !important;
   align-items: center;
@@ -1322,19 +1356,130 @@ end
   border-radius: 4px;
   opacity: 0.7;
 }
-.swb-settings-show:hover,
 .swb-settings-remove:hover {
   opacity: 1;
   background: color-mix(in srgb, currentColor 10%, transparent);
 }
-.swb-settings-show[aria-pressed="true"] {
-  opacity: 1;
-  color: var(--ui-accent-color, #464cfc);
-}
-.swb-settings-show svg,
 .swb-settings-remove svg {
   width: 16px;
   height: 16px;
+}
+/* An item as it shows in the toolbar: its icon alone (its name kept for a screen reader, in its tooltip),
+   or its label too, of a fixed width (--swb-width, in characters) where it has one; its look's panel open: marked */
+.swb-settings-item.swb-settings-iconly .swb-settings-item-name {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.swb-settings-item.swb-settings-fixed .swb-settings-item-name {
+  flex: none;
+  box-sizing: content-box;
+  width: var(--swb-width);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.swb-settings-item[aria-expanded="true"] {
+  border-color: var(--ui-accent-color, #464cfc);
+}
+/* An item's look, under its row: each setting on a line of its own (icon or icon and label; the label's
+   width), its × in the top right corner */
+.swb-settings-look {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 36px 8px 8px;
+  font-size: 13px;
+  background: var(--root-background-color);
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 6px;
+}
+.swb-settings-look-shows {
+  display: inline-flex;
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.swb-settings-look-show {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.swb-settings-look-show + .swb-settings-look-show {
+  border-left: 1px solid var(--swb-settings-line);
+}
+.swb-settings-look-show[aria-checked="true"] {
+  color: var(--ui-accent-color, #464cfc);
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 12%, transparent);
+}
+.swb-settings-look-show svg {
+  width: 14px;
+  height: 14px;
+}
+.swb-settings-look-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.swb-settings-look-name {
+  flex: none;
+  width: 3.5em;
+  opacity: 0.8;
+}
+.swb-settings-look-unit {
+  opacity: 0.7;
+}
+.swb-settings-look-width {
+  width: 4.5em;
+  padding: 3px 6px;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 6px;
+}
+.swb-settings-look-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.swb-settings-look-close svg {
+  width: 14px;
+  height: 14px;
+}
+/* Touch's pinned items: two boxes side by side (one under the other on a phone), above the rows */
+.swb-settings-pins {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 12px;
+}
+.swb-settings-pins > .swb-settings-pin-box {
+  flex: 1 1 200px;
+  min-width: 0;
 }
 /* A kind's item (the gesture button): its name, look and × on the first line, its slots under them,
    side by side where they fit, else one under another (a phone) */

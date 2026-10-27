@@ -12,12 +12,12 @@ import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
 import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
-import { DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type FavoriteItem, type Favorites, hasAction, isKindItem, isSeparator, type KindItem, byTouch } from "../core/favorites.ts";
+import { byTouch, DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type FavoriteItem, type Favorites, hasAction, isKindItem, isSeparator, type KindItem, MAX_WIDTH, MIN_WIDTH, type Show as ItemShow, widthOf } from "../core/favorites.ts";
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
 import { reorder } from "./drag.ts";
-import { addItem, type At, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setSlot, stepOf, toggleShow } from "./favorites.ts";
+import { addItem, type At, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setSlot, splitPins, stepOf } from "./favorites.ts";
 
 const BASE = "swb-settings";
 
@@ -68,6 +68,8 @@ export class SettingsDialog {
   private note: HTMLElement | undefined;
   // The search of actions open: to add to a row, or for a slot of a kind's item
   private picking: Picking | undefined;
+  // The item whose look is being set (a panel under its row): its icon or label, the label's width
+  private adjusting: At | undefined;
   // The favourites edited: this device's first
   private device: Device = "click";
   // SilverBullet's keyboard bar on, on a touch screen: the docked toolbar goes over it, its turning off offered
@@ -266,10 +268,26 @@ export class SettingsDialog {
     return known;
   }
 
-  /** The favourites the tab edits: Click's, or Touch's (its own while on, else Click's, which it shows) */
+  /**
+   * The favourites the tab edits: Click's, or Touch's (its own while on, else
+   * Click's, which it shows); Touch's own laid out with the items pinned left
+   * and right in two lists before the rows (`pins`)
+   */
   private get rows(): Favorites {
     const values = this.values!;
+    if (this.pins) return splitPins(values.touchFavorites!);
     return (this.device === "touch" && values.touchOn && values.touchFavorites) || values.favorites;
+  }
+
+  /** Whether Touch's own are edited: pinned at the docked toolbar's ends in boxes of their own (Click's toolbar does not scroll) */
+  private get pins(): boolean {
+    const values = this.values!;
+    return this.device === "touch" && values.touchOn && !!values.touchFavorites;
+  }
+
+  /** The index of the first row in what the tab edits (after the two lists of pinned items, where they are) */
+  private get first(): number {
+    return this.pins ? 2 : 0;
   }
 
   /** Whether Touch shows Click's (off, or none of its own) */
@@ -288,6 +306,7 @@ export class SettingsDialog {
       const button = this.button(`${BASE}-device`, label, () => {
         this.device = device;
         this.picking = undefined;
+        this.adjusting = undefined;
         this.drawFavorites(`.${BASE}-device[data-swb-device="${device}"]`);
       });
       button.dataset.swbDevice = device;
@@ -302,9 +321,13 @@ export class SettingsDialog {
     const from = this.device === "click" ? "Touch" : "Click";
     const copyButton = this.button(`${BASE}-copy-from`, `Copy from ${from}`, () => {
       if (!other) return;
-      if (this.device === "touch") values.touchOn = true;
+      if (this.device === "touch") {
+        values.touchFavorites = copy(other);
+        values.touchOn = true;
+      } else values.favorites = copy(other);
       this.picking = undefined;
-      this.edit(copy(other), `.${BASE}-copy-from`);
+      this.adjusting = undefined;
+      this.changedFavorites(`.${BASE}-copy-from`);
     });
     // (Click from Touch: Touch with none of its own, an invalid one, has nothing to give)
     copyButton.disabled = !other;
@@ -340,7 +363,7 @@ export class SettingsDialog {
         this.picking = undefined;
         this.changedFavorites(`.${BASE}-devices input`);
       });
-      bar.append(settingRow(this.context.doc, BASE, "Own favourites for touch", "Where the screen is worked by finger (a phone, a tablet), say gesture buttons there. Off: Click's show; Touch's own are kept for when it is on again.", own));
+      bar.append(settingRow(this.context.doc, BASE, "Own favourites for touch", "On a phone or tablet. Off: Click's favourites show there, these are kept.", own));
     }
     return bar;
   }
@@ -357,23 +380,27 @@ export class SettingsDialog {
       ...(this.sameForTouch || hasAction(this.rows, "actions.more", this.context.kinds())
         ? []
         : [this.el("p", `${BASE}-warning`, "Every action (…) is required: these favourites do not have it, so it is added at the end of the toolbar. Add it anywhere (a gesture button's swipe too) to put it there.")]),
-      this.el("p", `${BASE}-intro`, "The toolbar's rows, one under another. Drag an item within its row or into another (Alt+arrows with the keyboard), a row by its handle (Alt+↑ ↓ on it); a row left empty is left out."),
+      this.el("p", `${BASE}-intro`, "Click an item to change how it shows. Drag items and rows to reorder them."),
     ];
+    if (this.pins) parts.push(this.pinBoxes(known));
     const rows = this.el("div", `${BASE}-rows`);
     // Click's shown for Touch where it has none of its own: not edited here
     if (this.sameForTouch) {
       rows.classList.add(`${BASE}-rows-same`);
       rows.setAttribute("inert", "");
     }
+    const first = this.first;
     this.rows.forEach((row, r) => {
+      // (The pinned items' lists: drawn above)
+      if (r < first) return;
       const block = this.el("div", `${BASE}-favrow`);
       block.dataset.swbRow = String(r);
       const head = this.el("div", `${BASE}-favhead`);
       head.append(
         this.rowGrip(r, block, rows),
-        this.el("span", "", `Row ${r + 1}`),
+        this.el("span", "", `Row ${r - first + 1}`),
         // The row gone, its items with it
-        this.button(`${BASE}-row-remove`, `Remove row ${r + 1}`, () => {
+        this.button(`${BASE}-row-remove`, `Remove row ${r - first + 1}`, () => {
           this.picking = undefined;
           this.edit(removeRow(this.rows, r), `.${BASE}-add-row`);
         }, ICONS.close),
@@ -389,6 +416,7 @@ export class SettingsDialog {
       const add = this.button(`${BASE}-add`, open ? "Close" : "Add", () => this.openPicking({ row: r }));
       add.setAttribute("aria-expanded", String(open));
       block.append(items, add);
+      if (this.adjusting?.row === r) block.append(this.lookPanel(this.adjusting));
       if (picking && ("row" in picking ? picking.row : picking.at.row) === r) block.append(this.picker(picking));
       rows.append(block);
     });
@@ -443,15 +471,24 @@ export class SettingsDialog {
         icon.innerHTML = action?.icon ?? "";
         name.textContent = action?.label ?? item.id;
         element.append(icon, name);
+        // As it shows in the toolbar: its icon alone (its name for a screen reader and in its tooltip), or its label too
+        if (item.show !== "label") {
+          element.classList.add(`${BASE}-iconly`);
+          element.title = name.textContent;
+        }
         if (!action) {
           element.classList.add(`${BASE}-unknown`);
           element.title = `No action has the id ${item.id} (its module is off, or it is not defined): the toolbar leaves it out`;
         }
       }
-      const labeled = item.show === "label";
-      const show = this.button(`${BASE}-show`, labeled ? "Shown with its label: show its icon only" : "Shown as its icon: show its label too", () => this.edit(toggleShow(this.rows, at), `[data-swb-item="${at.row}:${at.index}"] .${BASE}-show`), labeled ? ICONS.label : ICONS.iconOnly);
-      show.setAttribute("aria-pressed", String(labeled));
-      element.append(show);
+      // A label's fixed width, as in the toolbar (an ellipsis where longer)
+      if (item.show === "label" && item.width) {
+        element.classList.add(`${BASE}-fixed`);
+        element.style.setProperty("--swb-width", `${item.width}ch`);
+        if (!element.title) element.title = name.textContent ?? "";
+      }
+      // Its look set in a panel under its row: a click, Enter
+      element.setAttribute("aria-expanded", String(this.adjusting?.row === at.row && this.adjusting.index === at.index));
     }
     element.setAttribute("aria-label", `${name.textContent}, row ${at.row + 1}, item ${at.index + 1}`);
     element.append(this.button(`${BASE}-remove`, `Remove ${name.textContent}`, () => this.edit(removeItem(this.rows, at), `[data-swb-row="${at.row}"] .${BASE}-add`), ICONS.close));
@@ -460,11 +497,14 @@ export class SettingsDialog {
       if (e.target !== element) return;
       if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown")) {
         e.preventDefault();
-        const to = stepOf(this.rows, at, e.key);
+        const to = this.stepTo(at, e.key);
         if (to) this.edit(moveItem(this.rows, at, to), `[data-swb-item="${to.row}:${to.index}"]`);
       } else if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         this.edit(removeItem(this.rows, at), `[data-swb-row="${at.row}"] .${BASE}-add`);
+      } else if (e.key === "Enter" && !isSeparator(item)) {
+        e.preventDefault();
+        this.toggleLook(at);
       }
     });
     element.addEventListener("pointerdown", (e) => {
@@ -479,17 +519,138 @@ export class SettingsDialog {
         containers: () => Array.from(panel.querySelectorAll<HTMLElement>(`.${BASE}-items`)),
         items: (container) => Array.from(container.querySelectorAll<HTMLElement>(`:scope > .${BASE}-item`)),
         done: (to) => {
-          if (to && (to.container !== at.row || to.index !== at.index)) this.edit(moveItem(this.rows, at, { row: to.container, index: to.index }), `[data-swb-item="${to.container}:${to.index}"]`);
-          else this.drawFavorites();
+          // (A separator is not pinned: not into the pinned items' lists)
+          if (to && isSeparator(item) && to.container < this.first) this.drawFavorites();
+          else if (to && (to.container !== at.row || to.index !== at.index)) {
+            this.adjusting = undefined;
+            this.edit(moveItem(this.rows, at, { row: to.container, index: to.index }), `[data-swb-item="${to.container}:${to.index}"]`);
+          } else this.drawFavorites();
         },
+        // A click (a tap): its look's panel opened or closed (a separator has none)
+        ...(isSeparator(item) ? {} : { clicked: () => this.toggleLook(at) }),
       });
     });
     return element;
   }
 
+  /**
+   * Touch's pinned items: two boxes as rows are (Pinned left, Pinned right),
+   * the items at the docked toolbar's ends, out of what scrolls; an item
+   * dragged in is pinned, dragged out is not
+   */
+  private pinBoxes(known: Map<string, Action>): HTMLElement {
+    const boxes = this.el("div", `${BASE}-pins`);
+    const rows = this.rows;
+    const sides = [
+      [0, "Pinned left", "At the left end of the toolbar docked at the bottom, out of what scrolls"],
+      [1, "Pinned right", "At the right end of the toolbar docked at the bottom, out of what scrolls"],
+    ] as const;
+    for (const [r, title, hint] of sides) {
+      const box = this.el("div", `${BASE}-favrow ${BASE}-pin-box`);
+      box.dataset.swbRow = String(r);
+      box.title = hint;
+      const head = this.el("div", `${BASE}-favhead`);
+      head.append(this.el("span", "", title));
+      const items = this.el("div", `${BASE}-items`);
+      items.setAttribute("role", "list");
+      items.setAttribute("aria-label", title);
+      items.dataset.swbItems = String(r);
+      const row = rows[r] ?? [];
+      row.forEach((item, i) => items.append(this.itemElement(item, { row: r, index: i }, known)));
+      if (!row.length) items.append(this.el("span", `${BASE}-empty`, "Drag an item here"));
+      const picking = this.picking;
+      const open = !!picking && "row" in picking && picking.row === r;
+      const add = this.button(`${BASE}-add`, open ? "Close" : "Add", () => this.openPicking({ row: r }));
+      add.setAttribute("aria-expanded", String(open));
+      box.append(head, items, add);
+      if (this.adjusting?.row === r) box.append(this.lookPanel(this.adjusting));
+      if (picking && ("row" in picking ? picking.row : picking.at.row) === r) box.append(this.picker(picking));
+      boxes.append(box);
+    }
+    return boxes;
+  }
+
+  /**
+   * Where an item goes with Alt+arrows: as `stepOf` says, but Touch's pinned
+   * items' boxes side by side above the rows: ↓ from either into the first
+   * row, ↑ from the first row into Pinned left, never from one box to the other
+   */
+  private stepTo(at: At, key: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown"): At | undefined {
+    const rows = this.rows;
+    const first = this.first;
+    const into = (row: number) => ({ row, index: Math.min(at.index, rows[row]?.length ?? 0) });
+    if (first && at.row < first && key === "ArrowDown") return rows.length > first ? into(first) : undefined;
+    if (first && at.row < first && key === "ArrowUp") return undefined;
+    if (first && at.row === first && key === "ArrowUp") return into(0);
+    return stepOf(rows, at, key);
+  }
+
+  /** An item's look's panel opened, or closed where open (one at a time) */
+  private toggleLook(at: At): void {
+    const open = this.adjusting?.row === at.row && this.adjusting.index === at.index;
+    this.adjusting = open ? undefined : at;
+    this.picking = undefined;
+    this.drawFavorites(open ? `[data-swb-item="${at.row}:${at.index}"]` : `[data-swb-look] .${BASE}-look-show[aria-checked="true"]`);
+  }
+
+  /**
+   * An item's look, under its row, each setting on a line of its own: shown as
+   * its icon or with its label; with its label, that label's width in characters (empty: as wide as
+   * it is; kept within MIN_WIDTH and MAX_WIDTH)
+   */
+  private lookPanel(at: At): HTMLElement {
+    const panel = this.el("div", `${BASE}-look`);
+    panel.dataset.swbLook = `${at.row}:${at.index}`;
+    const item = this.rows[at.row]?.[at.index];
+    if (!item || isSeparator(item)) return panel;
+    const labeled = item.show === "label";
+    const width = labeled ? item.width : undefined;
+    const set = (show: ItemShow, w: number | undefined, focus: string) => this.edit(setLook(this.rows, at, show, w), `[data-swb-look] ${focus}`);
+    const shows = this.el("div", `${BASE}-look-shows`);
+    shows.setAttribute("role", "radiogroup");
+    shows.setAttribute("aria-label", "Shows as");
+    for (const [show, label, icon] of [["icon", "Icon", ICONS.iconOnly], ["label", "Label", ICONS.label]] as const) {
+      const button = this.button(`${BASE}-look-show`, label, () => set(show, width, `[data-swb-show="${show}"]`));
+      button.innerHTML = `${icon}<span></span>`;
+      button.querySelector("span")!.textContent = label;
+      button.dataset.swbShow = show;
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-checked", String((show === "label") === labeled));
+      shows.append(button);
+    }
+    // Each setting a line of its own, named as its property in the configuration (show, width), the names one under another
+    const show = this.el("div", `${BASE}-look-line`);
+    show.append(this.el("span", `${BASE}-look-name`, "Show"), shows);
+    panel.append(show);
+    if (labeled) {
+      const field = this.el("input", `${BASE}-look-width`);
+      field.type = "number";
+      field.min = String(MIN_WIDTH);
+      field.max = String(MAX_WIDTH);
+      field.step = "1";
+      field.placeholder = "auto";
+      field.value = width ? String(width) : "";
+      field.setAttribute("aria-label", `The label's width in characters, ${MIN_WIDTH} to ${MAX_WIDTH} (empty: as wide as it is)`);
+      field.addEventListener("change", () => set("label", field.value.trim() === "" ? undefined : widthOf(Number(field.value)), `.${BASE}-look-width`));
+      const label = this.el("label", `${BASE}-look-line`);
+      label.append(this.el("span", `${BASE}-look-name`, "Width"), field, this.el("span", `${BASE}-look-unit`, "characters"));
+      panel.append(label);
+    }
+    panel.append(this.button(`${BASE}-look-close`, "Close", () => this.toggleLook(at), ICONS.close));
+    // Esc closes it, not the dialog
+    panel.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      e.preventDefault();
+      this.toggleLook(at);
+    });
+    return panel;
+  }
+
   /** A row's handle: dragged, the row moves up or down (the others sliding aside); Alt+↑ ↓ on it the same */
   private rowGrip(r: number, block: HTMLElement, rows: HTMLElement): HTMLElement {
-    const grip = this.button(`${BASE}-row-grip`, `Move row ${r + 1} (drag, or Alt+↑ ↓)`, () => undefined, ICONS.grip);
+    const first = this.first;
+    const grip = this.button(`${BASE}-row-grip`, `Move row ${r - first + 1} (drag, or Alt+↑ ↓)`, () => undefined, ICONS.grip);
     grip.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       reorder(e, {
@@ -499,8 +660,10 @@ export class SettingsDialog {
         flow: "block",
         containers: () => [rows],
         items: (container) => Array.from(container.querySelectorAll<HTMLElement>(`:scope > .${BASE}-favrow`)),
+        // (Its index among the rows: after the pinned items' lists, where they are)
         done: (to) => {
-          if (to && to.index !== r) this.edit(moveRow(this.rows, r, to.index), `[data-swb-row="${to.index}"] .${BASE}-row-grip`);
+          const index = to ? to.index + first : r;
+          if (index !== r) this.edit(moveRow(this.rows, r, index), `[data-swb-row="${index}"] .${BASE}-row-grip`);
           else this.drawFavorites();
         },
       });
@@ -509,19 +672,24 @@ export class SettingsDialog {
       if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
       e.preventDefault();
       const to = r + (e.key === "ArrowUp" ? -1 : 1);
-      if (to >= 0 && to < this.rows.length) this.edit(moveRow(this.rows, r, to), `[data-swb-row="${to}"] .${BASE}-row-grip`);
+      if (to >= first && to < this.rows.length) this.edit(moveRow(this.rows, r, to), `[data-swb-row="${to}"] .${BASE}-row-grip`);
     });
     return grip;
   }
 
   /** The favourites edited changed (Click's, or Touch's own) */
   private edit(favorites: Favorites, focus?: string): void {
-    if (this.device === "touch") {
-      this.values!.touchFavorites = favorites;
-      this.values!.touchOn = true;
-    }
-    else this.values!.favorites = favorites;
+    this.store(favorites);
     this.changedFavorites(focus);
+  }
+
+  /** What the tab edits written back: Touch's own from their layout (each pinned item with its pin) */
+  private store(favorites: Favorites): void {
+    const values = this.values!;
+    if (this.device === "touch") {
+      values.touchFavorites = this.pins ? joinPins(favorites) : favorites;
+      values.touchOn = true;
+    } else values.favorites = favorites;
   }
 
   private changedFavorites(focus?: string): void {
@@ -569,10 +737,7 @@ export class SettingsDialog {
 
   /** The favourites edited changed, the tab left as it is (a field being typed in) */
   private setQuietly(favorites: Favorites): void {
-    if (this.device === "touch") {
-      this.values!.touchFavorites = favorites;
-      this.values!.touchOn = true;
-    } else this.values!.favorites = favorites;
+    this.store(favorites);
     this.update();
   }
 
@@ -587,7 +752,7 @@ export class SettingsDialog {
 
   /** The kind of the item at a place, where a module turned on gives it */
   private kindOf(at: At): ItemKind | undefined {
-    const item = this.values?.favorites[at.row]?.[at.index];
+    const item = this.rows[at.row]?.[at.index];
     return item && isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type) : undefined;
   }
 
@@ -643,7 +808,8 @@ export class SettingsDialog {
     const draw = () => {
       const found = findEntries(entries, field.value);
       const query = field.value.trim().toLowerCase();
-      const separator = forRow && (!query || "separator".startsWith(query));
+      // (Not for the pinned items' lists: a separator is not pinned)
+      const separator = forRow && row >= this.first && (!query || "separator".startsWith(query));
       const kinds = forRow ? this.context.kinds().filter((kind) => wordsStart(kind.label, query)) : [];
       // An optional slot may hold no action
       const none = !!slot?.optional && (!query || "none".startsWith(query));

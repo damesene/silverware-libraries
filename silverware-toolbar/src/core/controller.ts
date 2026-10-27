@@ -15,7 +15,7 @@ import { ICONS } from "../icons.ts";
 import type { Action, ActionEditor, Change, Context } from "./action.ts";
 import { Bar, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
-import { isActionItem, isSeparator, byTouch } from "./favorites.ts";
+import { byTouch, isActionItem, isSeparator, type Look, type Pin } from "./favorites.ts";
 import type { ItemKind } from "./items.ts";
 import { hideKeyboard } from "./keyboard.ts";
 import { marked } from "./cursor.ts";
@@ -273,7 +273,7 @@ export class Controller {
           if (isSeparator(item)) return [{ separator: true }];
           if (isActionItem(item)) {
             const action = all.find((a) => a.id === item.id);
-            return action ? [{ action, labeled: item.show === "label", ...this.state(action, context) }] : [];
+            return action ? [{ action, ...lookOf(item), ...this.state(action, context) }] : [];
           }
           // A kind's: a kind no module on gives, or a slot without an action, left out
           const kind = kinds.find((k) => k.type === item.type);
@@ -281,7 +281,7 @@ export class Controller {
           const slots = kind.slots.map(({ key, optional }) => ({ key, optional, action: all.find((a) => a.id === item[key]) }));
           if (slots.some(({ optional, action }) => !optional && !action)) return [];
           const found = Object.fromEntries(slots.flatMap(({ key, action }) => (action ? [[key, action]] : [])));
-          return [{ item: { kind, actions: found as Record<string, Action>, labeled: item.show === "label", item } }];
+          return [{ item: { kind, actions: found as Record<string, Action>, ...lookOf(item), item } }];
         });
         return items.filter((item, i) => !("separator" in item) || (i > 0 && i < items.length - 1 && !("separator" in items[i - 1]!)));
       })
@@ -622,4 +622,10 @@ function rectOf(range: Range): Box {
     right: Math.max(...rects.map((r) => r.right)),
     bottom: Math.max(...rects.map((r) => r.bottom)),
   };
+}
+
+/** How an item shows: with its label (and that label's fixed width), pinned at an end where docked */
+function lookOf(item: Look): { labeled: boolean; width?: number; pin?: Pin } {
+  const labeled = item.show === "label";
+  return { labeled, ...(labeled && item.width ? { width: item.width } : {}), ...(item.pin ? { pin: item.pin } : {}) };
 }

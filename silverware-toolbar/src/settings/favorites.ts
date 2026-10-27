@@ -1,7 +1,10 @@
 // The favourites as the settings dialog edits them: rows of items, each change
 // a new value (the dialog draws it again). An item is at a row and an index.
+// Touch's own are edited laid out with their pinned items in two lists before
+// the rows (`splitPins`: left, right, the rows), written back with each one's
+// `pin` (`joinPins`).
 
-import { type FavoriteItem, type Favorites, isKindItem, isSeparator, type KindItem, type SeparatorItem } from "../core/favorites.ts";
+import { type FavoriteItem, type Favorites, isKindItem, isSeparator, type KindItem, type Pin, type Show, type SeparatorItem } from "../core/favorites.ts";
 
 export type At = { readonly row: number; readonly index: number };
 
@@ -52,14 +55,60 @@ export function removeItem(rows: Favorites, at: At): FavoriteItem[][] {
   return next;
 }
 
-/** An item shown the other way (an action's, a kind's): its icon, or its icon and label */
-export function toggleShow(rows: Favorites, at: At): FavoriteItem[][] {
+/**
+ * An item's look (an action's, a kind's): its icon, or its icon and label, and
+ * that label's fixed width (undefined: as wide as it is); shown as its icon,
+ * it has no width
+ */
+export function setLook(rows: Favorites, at: At, show: Show, width: number | undefined): FavoriteItem[][] {
   const next = copy(rows);
   const item = next[at.row]?.[at.index];
   if (!item || isSeparator(item)) return next;
-  const { show, ...rest } = item as Exclude<FavoriteItem, SeparatorItem>;
-  next[at.row]![at.index] = (show === "label" ? rest : { ...rest, show: "label" }) as FavoriteItem;
+  const { show: _, width: __, ...rest } = item as Exclude<FavoriteItem, SeparatorItem>;
+  next[at.row]![at.index] = { ...rest, ...(show === "label" ? { show } : {}), ...(show === "label" && width !== undefined ? { width } : {}) } as FavoriteItem;
   return next;
+}
+
+/** An item without its pin */
+function unpinned(item: FavoriteItem): FavoriteItem {
+  if (isSeparator(item) || !("pin" in item)) return item;
+  const { pin: _, ...rest } = item as Exclude<FavoriteItem, SeparatorItem>;
+  return rest as FavoriteItem;
+}
+
+/**
+ * The favourites laid out for editing their pins: the items pinned left, those
+ * pinned right (each in their order), then the rows without them (a row of
+ * pinned items alone, none: an empty row stays, being edited)
+ */
+export function splitPins(rows: Favorites): FavoriteItem[][] {
+  const left: FavoriteItem[] = [];
+  const right: FavoriteItem[] = [];
+  const rest = rows.flatMap((row) => {
+    const kept = row.filter((item) => {
+      const pin = isSeparator(item) ? undefined : item.pin;
+      if (pin === "left") left.push(item);
+      else if (pin === "right") right.push(item);
+      return !pin;
+    });
+    return kept.length || !row.length ? [kept] : [];
+  });
+  return [left, right, ...rest];
+}
+
+/**
+ * The favourites written back from their layout: the items of the two lists
+ * pinned (at the first row's start and the last one's end, where they read in
+ * order; a separator there left out, as it cannot be pinned), the others not
+ */
+export function joinPins(layout: Favorites): FavoriteItem[][] {
+  const [left = [], right = [], ...rows] = layout;
+  const pinned = (items: readonly FavoriteItem[], pin: Pin) => items.flatMap((item) => (isSeparator(item) ? [] : [{ ...(item as Exclude<FavoriteItem, SeparatorItem>), pin } as FavoriteItem]));
+  const out = rows.map((row) => row.map(unpinned));
+  if (!out.length) out.push([]);
+  out[0] = [...pinned(left, "left"), ...out[0]!];
+  out[out.length - 1] = [...out[out.length - 1]!, ...pinned(right, "right")];
+  return out;
 }
 
 /** A kind's item with an action's id in one of its slots (undefined: none there) */

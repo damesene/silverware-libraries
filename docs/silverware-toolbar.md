@@ -357,6 +357,21 @@ config.set("silverware.toolbar.favorites", {
   gives neither favourites (nor the switch) a default, as SilverBullet copies
   a default into the configuration (client/config.ts `applySchemaDefaults`)
   and a setting left out would come back as it; the toolbar applies its own.
+- A label's fixed width and pinned items (2026-10-27, as the user decided):
+  an item's `width` (characters, kept within 3 and 30 as it is read: 0 would
+  hide the label, a large one run the bar off a phone; not refused by the
+  schema, which would fail the whole setting), so a label that changes
+  (Turn into) moves nothing after it; an item's `pin` ("left", "right"),
+  docked only (the floating toolbar does not scroll): pinned items at the
+  bar's ends, out of what scrolls, read wherever they are in the rows. The
+  settings show items as the toolbar does (an icon alone, its name kept for a
+  screen reader and its tooltip; a label at its width); a click (or Enter) on
+  one opens a panel under its row, each setting on a line of its own, named
+  as its property: Show (Icon | Label), Width (characters). On Touch two boxes above the rows, Pinned left and Pinned
+  right, edited as rows (a separator cannot be pinned); written back with
+  each item's `pin`, the left ones at the first row's start, the right ones
+  at the last row's end (`joinPins`). Touch's default: Turn into pinned left,
+  `width = 9` ("Paragraph"), … pinned right.
 
 ### Kinds of favourites: the gesture button (decided and built 2026-10-26)
 

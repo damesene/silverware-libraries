@@ -5,6 +5,7 @@
 // fills from its search of actions, knowing nothing of what they are for);
 // the kind draws its button in the toolbar and reads any other field it knows.
 import type { Action } from "./action.ts";
+import type { Pin } from "./favorites.ts";
 
 /**
  * A slot of a kind of favourite: a field holding an action's id, and what it
@@ -25,6 +26,9 @@ export type ShownItem = {
   readonly kind: ItemKind;
   readonly actions: Readonly<Record<string, Action>>;
   readonly labeled: boolean;
+  // Its label's fixed width in characters (labeled only), and where it is pinned (docked)
+  readonly width?: number;
+  readonly pin?: Pin;
   // The favourite as configured, its fields the kind may read
   readonly item: Readonly<Record<string, unknown>>;
 };

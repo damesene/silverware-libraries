@@ -63,7 +63,8 @@ test.describe("The settings dialog", () => {
     await tab(page, "favorites").click();
     // Bold dragged after Turn into, in the row above
     const target = (await item(page, 0, 0).boundingBox())!;
-    const from = (await item(page, 1, 0).locator(".swb-settings-item-name").boundingBox())!;
+    // (Shown as its icon alone, as in the toolbar)
+    const from = (await item(page, 1, 0).boundingBox())!;
     await page.mouse.move(from.x + 4, from.y + from.height / 2);
     await page.mouse.down();
     await page.mouse.move(target.x + target.width - 4, target.y + target.height / 2, { steps: 6 });
@@ -76,9 +77,12 @@ test.describe("The settings dialog", () => {
     await expect(rowItems(page, 0)).toHaveText(["Italic", "Turn into", "Bold"]);
     await page.keyboard.press("Alt+ArrowRight");
     await expect(rowItems(page, 0)).toHaveText(["Turn into", "Italic", "Bold"]);
-    // Italic shown with its label
-    await item(page, 0, 1).locator(".swb-settings-show").click();
-    await expect(item(page, 0, 1).locator(".swb-settings-show")).toHaveAttribute("aria-pressed", "true");
+    // Italic shown with its label: a click on it, its look's panel under the row
+    await item(page, 0, 1).click();
+    const look = dialog(page).locator("[data-swb-look]");
+    await look.locator('[data-swb-show="label"]').click();
+    await expect(look.locator('[data-swb-show="label"]')).toHaveAttribute("aria-checked", "true");
+    await expect(item(page, 0, 1)).not.toHaveClass(/swb-settings-iconly/);
     await save(page).click();
     await select(page, "some text");
     const first = bar(page).locator(".swb-row").first();
@@ -86,10 +90,40 @@ test.describe("The settings dialog", () => {
     await expect(first.locator('[data-swb-action="formats.italic"]')).toContainText("Italic");
   });
 
+  test("an item as it shows in the toolbar: its icon alone, or its label too, of a fixed width kept within 3 and 30 characters", async ({ page }) => {
+    await openSettings(page);
+    await tab(page, "favorites").click();
+    // Bold: its icon alone, its name in its tooltip
+    await expect(item(page, 1, 0)).toHaveClass(/swb-settings-iconly/);
+    await expect(item(page, 1, 0)).toHaveAttribute("title", "Bold");
+    // Turn into (with its label): a width of 1 typed is 3
+    await item(page, 0, 0).click();
+    const width = dialog(page).locator("[data-swb-look] .swb-settings-look-width");
+    await width.fill("1");
+    await width.press("Enter");
+    await expect(width).toHaveValue("3");
+    await width.fill("9");
+    await width.press("Enter");
+    await expect(item(page, 0, 0)).toHaveClass(/swb-settings-fixed/);
+    // Esc closes the panel, not the dialog
+    await width.press("Escape");
+    await expect(dialog(page).locator("[data-swb-look]")).toHaveCount(0);
+    await expect(dialog(page)).toBeVisible();
+    await save(page).click();
+    await select(page, "some text");
+    const turnInto = barButton(page, "actions.turnInto");
+    await expect(turnInto).toHaveClass(/swb-fixed/);
+    // As wide whatever the selection's block (a paragraph, a list)
+    const paragraph = (await turnInto.boundingBox())!.width;
+    await select(page, "Second item");
+    await expect(turnInto).toContainText("Bullet");
+    expect(Math.abs((await turnInto.boundingBox())!.width - paragraph)).toBeLessThan(1);
+  });
+
   test("an item let go in the gap between two others goes there; while dragged it holds its place, a copy following the pointer", async ({ page }) => {
     await openSettings(page);
     await tab(page, "favorites").click();
-    const link = (await item(page, 1, 4).locator(".swb-settings-item-name").boundingBox())!;
+    const link = (await item(page, 1, 4).boundingBox())!;
     const bold = (await item(page, 1, 0).boundingBox())!;
     const italic = (await item(page, 1, 1).boundingBox())!;
     await page.mouse.move(link.x + 4, link.y + link.height / 2);
@@ -127,9 +161,11 @@ test.describe("The settings dialog", () => {
     await expect(dialog(page).locator(".swb-settings-rows-same")).toBeVisible();
     await dialog(page).locator(".swb-settings-devices .swb-settings-switch").click();
     await expect(dialog(page).locator(".swb-settings-rows-same")).toHaveCount(0);
-    await expect(rowItems(page, 1)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
-    await item(page, 1, 0).locator(".swb-settings-remove").click();
-    await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
+    // Touch's own: its rows after the boxes of its pinned items (none pinned yet)
+    await expect(dialog(page).locator(".swb-settings-pin-box")).toHaveCount(2);
+    await expect(rowItems(page, 3)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
+    await item(page, 3, 0).locator(".swb-settings-remove").click();
+    await expect(rowItems(page, 3)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
     // Click's as they were; then Touch's copied over them, and back from Touch
     await dialog(page).locator('[data-swb-device="click"]').click();
     await expect(rowItems(page, 1)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
@@ -143,7 +179,39 @@ test.describe("The settings dialog", () => {
     await dialog(page).locator(".swb-settings-copy-from").click();
     await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
     await dialog(page).locator('[data-swb-device="touch"]').click();
-    await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
+    await expect(rowItems(page, 3)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
+  });
+
+  test("Touch: an item dragged into Pinned left is pinned there, saved so; dragged out, it is not", async ({ page }) => {
+    await openSettings(page);
+    await tab(page, "favorites").click();
+    await dialog(page).locator('[data-swb-device="touch"]').click();
+    await dialog(page).locator(".swb-settings-devices .swb-settings-switch").click();
+    const left = dialog(page).locator('[data-swb-items="0"]');
+    const box = (await left.boundingBox())!;
+    const bold = (await item(page, 3, 0).boundingBox())!;
+    await page.mouse.move(bold.x + 4, bold.y + bold.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 10, box.y + box.height / 2, { steps: 8 });
+    await page.mouse.up();
+    await expect(rowItems(page, 0)).toHaveText(["Bold"]);
+    await expect(rowItems(page, 3)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
+    await save(page).click();
+    await expect(dialog(page)).toHaveCount(0);
+    // Read back: pinned
+    await openSettings(page);
+    await tab(page, "favorites").click();
+    await dialog(page).locator('[data-swb-device="touch"]').click();
+    await expect(rowItems(page, 0)).toHaveText(["Bold"]);
+    // Out again with the keyboard, into the first row (not into Pinned right): no longer pinned
+    await item(page, 0, 0).focus();
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(rowItems(page, 0)).toHaveCount(0);
+    await expect(rowItems(page, 1)).toHaveCount(0);
+    await expect(rowItems(page, 2)).toHaveText(["Bold", "Turn into"]);
+    // And back up into Pinned left
+    await page.keyboard.press("Alt+ArrowUp");
+    await expect(rowItems(page, 0)).toHaveText(["Bold"]);
   });
 
   test("Every action removed: the editor says it is required, and the toolbar has it pinned at its end", async ({ page }) => {

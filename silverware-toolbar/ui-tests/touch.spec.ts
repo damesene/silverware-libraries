@@ -37,6 +37,28 @@ test.describe("The toolbar's defaults on a phone", () => {
     await expect(barButton(page, "actions.turnInto")).toBeVisible();
     await expect(barButton(page, "actions.emoji")).toHaveCount(1);
   });
+
+  test("Turn into pinned at the left end, … at the right, out of what scrolls; Turn into as wide whatever it says, so nothing after it moves", async ({ page }) => {
+    await selectByTouch(page, "some text");
+    await expect(bar(page)).toHaveClass(/swb-docked/);
+    const left = bar(page).locator(".swb-dock-pinned-left");
+    const right = bar(page).locator(".swb-dock-pinned-right");
+    await expect(left.locator("[data-swb-action]")).toHaveCount(1);
+    await expect(left.locator('[data-swb-action="actions.turnInto"]')).toHaveClass(/swb-fixed/);
+    await expect(right.locator('[data-swb-action="actions.more"]')).toHaveCount(1);
+    await expect(bar(page).locator(".swb-dock-items [data-swb-action='actions.turnInto'], .swb-dock-items [data-swb-action='actions.more']")).toHaveCount(0);
+    // Scrolled to its end: the pinned ones where they were
+    const items = bar(page).locator(".swb-dock-items");
+    const before = (await left.boundingBox())!;
+    const first = (await bar(page).locator(".swb-gesture").first().boundingBox())!;
+    await items.evaluate((e) => (e.scrollLeft = e.scrollWidth));
+    expect((await left.boundingBox())!.x).toBe(before.x);
+    // Another block's lines: Turn into says another, nothing after it moves
+    await select(page, "Plain", 0);
+    await selectByTouch(page, "Second item");
+    await expect(barButton(page, "actions.turnInto")).toContainText("Bullet");
+    expect((await bar(page).locator(".swb-gesture").first().boundingBox())!.x).toBe(first.x);
+  });
 });
 
 test.describe("The toolbar on a phone", () => {
@@ -184,7 +206,8 @@ test.describe("The toolbar on a phone", () => {
     await dialog.locator('[data-swb-device="touch"]').tap();
     const own = dialog.locator(".swb-settings-devices .swb-settings-switch");
     await own.tap();
-    await dialog.locator('[data-swb-item="1:0"] .swb-settings-remove').tap();
+    // (Its rows after the boxes of its pinned items)
+    await dialog.locator('[data-swb-item="3:0"] .swb-settings-remove').tap();
     await dialog.locator(".swb-settings-save").tap();
     await expect(dialog).toHaveCount(0);
     await select(page, "Plain", 0);
@@ -211,7 +234,7 @@ test.describe("The toolbar on a phone", () => {
     await expect(dialog.locator('[data-swb-device="click"]')).toHaveAttribute("aria-checked", "true");
     await dialog.locator('[data-swb-device="touch"]').tap();
     await own.tap();
-    await expect(dialog.locator('[data-swb-items="1"] .swb-settings-item-name').first()).toHaveText("Italic");
+    await expect(dialog.locator('[data-swb-items="3"] .swb-settings-item-name').first()).toHaveText("Italic");
   });
 
   test("a shade at each end it scrolls further to, gone at its ends", async ({ page }) => {

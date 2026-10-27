@@ -103,6 +103,10 @@ export type ToolbarModule = {
   readonly actions: () => readonly Action[];
   // Kinds of favourites it gives beyond an action and a separator (core/items.ts: the gestures module's button)
   readonly itemKinds?: () => readonly ItemKind[];
+  // Its actions read anew, as the core asks: once Space Lua has loaded and as the toolbar first shows after each
+  // load of it (SilverBullet's commands: a script's defined after the toolbar started); the core shows them once
+  // read, and asks again after a rejection
+  readonly refresh?: () => Promise<void>;
 };
 
 /** What a module may ask of the editor beyond the page's text: SilverBullet's commands (each optional: the library page hands them over) */

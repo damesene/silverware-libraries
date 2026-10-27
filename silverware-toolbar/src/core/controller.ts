@@ -26,6 +26,9 @@ import { SelectionWatcher } from "./selection.ts";
 
 type State = { readonly active: boolean; readonly enabled: boolean };
 
+// After a read of the modules' actions failed, how long before it is tried again
+const RETRY_MS = 5000;
+
 /**
  * The core's own action: the popup of every action (… in the toolbar), an item
  * of the favourites as any other; favourites without it anywhere get it pinned
@@ -68,6 +71,10 @@ export class Controller {
   private context: Context | undefined;
   // What pressed last (a pointer's type: touch, mouse, pen): a selection made by touch docks the toolbar at the bottom
   private pointer = "mouse";
+  // The modules' actions to read anew as the toolbar next shows: after each load of Space Lua (its scripts define
+  // commands after the toolbar starts, `reloaded`), or after a read that failed, not before `retryAt`
+  private stale = true;
+  private retryAt = 0;
 
   constructor(
     readonly doc: Document,
@@ -78,6 +85,8 @@ export class Controller {
     private readonly actions: () => readonly Action[],
     // The kinds of favourites the modules give (core/items.ts)
     private readonly kinds: () => readonly ItemKind[],
+    // The modules' actions read anew (a popup open lists them once read)
+    private readonly refresh: () => Promise<void>,
     // The settings dialog opened (none: not offered)
     private readonly openSettings?: () => void,
   ) {
@@ -129,20 +138,25 @@ export class Controller {
     this.panel.remove();
   }
 
+  /** Space Lua loaded again (the library page's init with the same settings): the modules' actions read anew as the toolbar next shows */
+  reloaded(): void {
+    this.stale = true;
+  }
+
   /** The popup of every action under the toolbar (the toolbar's …, the command): by the selection, else the toolbar at the caret; `choices`: open at that action's */
   async showActions(choices?: Action): Promise<void> {
     // The popup in a panel's place (the toolbar's … or a list's button while it is open): the panel done
     this.panel.close(true);
+    // (Also where no toolbar shows: no selection, no caret)
+    this.refreshIfStale();
     const context = await this.read();
     if (!context || this.stopped) return;
     const range = this.watcher.current() ?? this.watcher.caret();
     this.shows++;
     this.atCaret = context.from === context.to;
     this.showBar(context, range);
-    // (… itself not among them)
-    const actions = this.offered().filter((action) => action !== MORE_ACTION);
     this.popup.open({
-      actions,
+      actions: this.listed(),
       state: (action) => this.state(action, context),
       rect: this.bar.shown ? this.bar.rect() : undefined,
       above: this.bar.docked,
@@ -153,6 +167,40 @@ export class Controller {
       keeps: (node) => this.bar.owns(node),
       ...(choices ? { choices } : {}),
     });
+  }
+
+  /**
+   * The modules' actions read anew (nothing waits for it): once read, the popup
+   * open lists them and the toolbar is shown again by the selection as it is
+   * then (a favourite of a script's command); a read that failed is tried again
+   * as the toolbar next shows
+   */
+  refreshActions(): void {
+    this.stale = false;
+    this.refresh().then(
+      () => {
+        if (this.stopped) return;
+        if (this.popup.isOpen) this.popup.setActions(this.listed());
+        // (Not under an action's panel: its button stays as it is)
+        else if (this.bar.shown && !this.panel.isOpen) void this.again();
+      },
+      (e: unknown) => {
+        // Tried again as the toolbar shows, not sooner than RETRY_MS
+        this.stale = true;
+        this.retryAt = Date.now() + RETRY_MS;
+        console.error("Silverware Toolbar: the actions could not be read anew", e);
+      },
+    );
+  }
+
+  /** The actions read anew where they may lack some (`stale`), not before a failed read's retry is due */
+  private refreshIfStale(): void {
+    if (this.stale && Date.now() >= this.retryAt) this.refreshActions();
+  }
+
+  /** The actions the popup lists: the offered ones but … itself */
+  private listed(): readonly Action[] {
+    return this.offered().filter((action) => action !== MORE_ACTION);
   }
 
   /** The modules' actions, and the core's own (… and, where it has them, the settings) */
@@ -229,6 +277,8 @@ export class Controller {
       return;
     }
     this.context = context;
+    // The first show after Space Lua loaded: the actions read anew (a script's commands), shown once read
+    this.refreshIfStale();
     const rows = this.favorites(context);
     // Favourites without … anywhere (an item of it, or a slot of a kind's): pinned at the end
     const more = rows.some((row) => row.some((item) => ("action" in item && item.action === MORE_ACTION) || ("item" in item && Object.values(item.item.actions).includes(MORE_ACTION))))

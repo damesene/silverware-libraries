@@ -29,10 +29,13 @@ const FACTORIES: readonly (readonly [ModuleName, (host: ModuleHost) => ToolbarMo
  * The modules turned on: their actions, in their order, and the custom ones;
  * the kinds of favourites they give. Asked for each time they show
  */
-export function createModules(on: ReadonlySet<ModuleName>, host: ModuleHost = {}): { readonly actions: () => Action[]; readonly kinds: () => ItemKind[] } {
+export function createModules(on: ReadonlySet<ModuleName>, host: ModuleHost = {}): { readonly actions: () => Action[]; readonly kinds: () => ItemKind[]; readonly refresh: () => Promise<void> } {
   const modules = FACTORIES.filter(([name]) => on.has(name)).map(([, create]) => create(host));
   return {
     actions: () => withCustomActions(modules.flatMap((m) => m.actions())),
     kinds: () => modules.flatMap((m) => m.itemKinds?.() ?? []),
+    refresh: async () => {
+      await Promise.all(modules.map((m) => m.refresh?.()));
+    },
   };
 }

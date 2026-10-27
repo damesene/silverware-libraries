@@ -355,6 +355,13 @@ if js and js.window then
       silverwareToolbarJs.openSettings()
     end,
   }
+  -- Every script loaded (the toolbar started before the scripts after it): their commands read, as actions
+  event.listen {
+    name = "system:ready",
+    run = function()
+      silverwareToolbarJs.scriptsLoaded()
+    end,
+  }
   -- The key is the command's: SilverBullet handles it (and shows it in the command palette)
   command.define {
     name = "Silverware Toolbar: Show actions",

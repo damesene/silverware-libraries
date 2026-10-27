@@ -21,6 +21,8 @@ import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 export { expect };
 
 const target = process.env.SW_TARGET === "silverbullet" ? "silverbullet" : "playground";
+/** Whether the tests run against a real SilverBullet (else the playground) */
+export const onSilverBullet = target === "silverbullet";
 const sample = readFileSync(join(import.meta.dirname, "../../playground/toolbar-sample.md"), "utf8");
 const server = () => silverbulletServer(test.info().parallelIndex, process.env.SW_SB_SPACE ?? "");
 

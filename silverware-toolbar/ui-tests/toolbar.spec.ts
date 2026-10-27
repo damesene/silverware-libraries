@@ -1,5 +1,5 @@
 // The toolbar by a selection (or at the caret) and the popup of every action under it
-import { bar, barButton, caret, expect, lineBox, popup, select, selected, test, text } from "./helpers.ts";
+import { bar, barButton, caret, expect, lineBox, onSilverBullet, popup, select, selected, test, text } from "./helpers.ts";
 
 // The command's key, as the playground binds it (SilverBullet binds the library page's command so)
 const KEY = "Control+Shift+Q";
@@ -183,6 +183,15 @@ test.describe("The popup of every action", () => {
     await expect(popup(page).locator('[data-swb-action="commands.Text: Bold"]')).toBeVisible();
     await popup(page).locator('[data-swb-action="commands.Text: Bold"]').click();
     await expect.poll(() => text(page)).toContain("Select **some text** in this page");
+  });
+
+  // (The table's command: the test space has both libraries, scripts/deploy.mjs; its init page defines it after the toolbar started)
+  test("a command a Space Lua script defines (the table's) found the first time it opens", async ({ page }) => {
+    test.skip(!onSilverBullet, "Space Lua's commands are SilverBullet's");
+    await select(page, "some text");
+    await barButton(page, "actions.more").click();
+    await popup(page).locator(".swb-search-field").fill("silverware table");
+    await expect(popup(page).locator('[data-swb-action="commands.Silverware Table: Settings"]')).toBeVisible();
   });
 
   test("… in the toolbar opens it, and closes it again; a click on an action runs it", async ({ page }) => {

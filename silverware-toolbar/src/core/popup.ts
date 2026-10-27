@@ -120,6 +120,23 @@ export class Popup {
     this.input.focus({ preventScroll: true });
   }
 
+  /** The actions it lists replaced (read anew after it opened): what is typed finds among them, the one current and the list's scroll kept */
+  setActions(actions: readonly Action[]): void {
+    if (!this.options) return;
+    this.options = { ...this.options, actions };
+    // The choices shown (Turn into's), as the new actions have them: going back finds it among them
+    const level = this.level;
+    if (level) this.level = actions.find((action) => action.id === level.id) ?? level;
+    const was = this.found[this.current]?.action.id;
+    const scroll = this.list.scrollTop;
+    this.update();
+    // The current one still there: current again, the list scrolled as it was (it in view); else the first
+    const again = this.found.findIndex((entry) => entry.action.id === was);
+    if (again < 0) return;
+    this.list.scrollTop = scroll;
+    this.setCurrent(again);
+  }
+
   place(rect: Box | undefined, viewTop: number, above = false): void {
     // Over the toolbar: the list as tall as the room above it leaves
     if (above && rect) this.list.style.maxHeight = `${Math.max(120, roomAbove(rect, viewTop) - (this.element.offsetHeight - this.list.offsetHeight))}px`;

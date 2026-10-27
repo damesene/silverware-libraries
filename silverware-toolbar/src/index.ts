@@ -37,13 +37,26 @@ export async function init(bridge: Bridge): Promise<void> {
   // the toolbar as it is takes it, a popup open staying open
   if (running && current && sameSettings(running, settings)) {
     running.bridge = bridge;
+    // (Space Lua loaded again: commands may be new)
+    running.reloaded();
     current = { ...current, bridge };
     return;
   }
   // The one before stopped only now: init may be called again meanwhile (Space Lua loaded twice), each stops the last
   running?.stop();
-  const { actions, kinds } = createModules(settings.modules, { listCommands: bridge.listCommands, invokeCommand: bridge.invokeCommand, wordAtCaret: settings.wordAtCaret, touch: touchScreen() });
-  const controller = new Controller(document, bridge, settings, actions, kinds, () => void openSettings());
+  // The editor's commands through the bridge this toolbar has now (SilverBullet hands a new one as it loads Space Lua
+  // again: the controller's); before it is made, the one given
+  let made: Controller | undefined;
+  const latest = () => made?.bridge ?? bridge;
+  const { actions, kinds, refresh } = createModules(settings.modules, {
+    // (A bridge without them: the first one's, which has them)
+    ...(bridge.listCommands ? { listCommands: () => (latest().listCommands ?? bridge.listCommands!)() } : {}),
+    ...(bridge.invokeCommand ? { invokeCommand: (name: string) => (latest().invokeCommand ?? bridge.invokeCommand!)(name) } : {}),
+    wordAtCaret: settings.wordAtCaret,
+    touch: touchScreen(),
+  });
+  const controller = new Controller(document, bridge, settings, actions, kinds, refresh, () => void openSettings());
+  made = controller;
   slot[GLOBAL_KEY] = controller;
   current = { bridge, actions, kinds };
   controller.start();
@@ -71,6 +84,11 @@ function sameSettings(running: Controller, settings: Settings): boolean {
     JSON.stringify(running.settings.touchFavorites) === JSON.stringify(settings.touchFavorites) &&
     running.settings.touchOn === settings.touchOn
   );
+}
+
+/** SilverBullet ready, its Space Lua loaded (`system:ready`, the library page's listener): the actions read anew, a script's commands among them */
+export function scriptsLoaded(): void {
+  slot[GLOBAL_KEY]?.refreshActions();
 }
 
 /** The "Silverware Toolbar: Show actions" command (its key too): the popup of every action, under the toolbar by the selection or the caret */

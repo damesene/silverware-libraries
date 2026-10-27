@@ -161,9 +161,9 @@ export default (helpers) => [
 
 Each is `actions.<name>` (one of a built-in action's name, `turnInto` or `clear`, replaces it). `edit(context)` gets the page's `text`, the selection's `from` and `to`, and the `lines` it touches, and gives `{ from, to, text }`: the text replacing that part of the page (`helpers.cursor()` in it marks the cursor), or nothing. Also `icon`, `group` (else *Custom*), `keywords`, `enabled(context)` and `active(context)` (false: shown dimmed; true: shown pressed), `afterWrite`.
 
-Instead of `edit`, an action may offer `choices`: a list of actions, as *Turn into* does. In the toolbar it shows the choice that is `active` (its icon and label; none: its `mixed` text, else its label), and a click opens the list; in the list of every action it is one item that opens them, and the search finds them too.
+Instead of `edit`, an action may offer `choices`: a list of actions, as *Turn into* does. In the toolbar it shows the choice that is `active` (its icon and label; none: its `mixed` text, else its label), and a click opens the list; in the list of every action it is one item that opens them, and the search finds them too. Its choices are actions as any other, each with its `edit` or `perform` (below): they need not have anything to do with formats (see the example below).
 
-Or, instead of `edit`, `perform(context, editor)` does something that is no change of the text: the toolbar writes nothing for it. `editor` has `invokeCommand(name)` (runs a SilverBullet command), `navigate(page)` (opens a page), `flash(message, type)` (a notification) and `select(from, to)`; `perform` may be `async`, and a mistake it throws is shown. An action has one of `edit`, `perform` and `choices`.
+Or, instead of `edit`, `perform(context, editor)` does something that is no change of the text: the toolbar writes nothing for it. `editor` has `invokeCommand(name)` (runs a SilverBullet command, your own too: one a Space Lua script defines with `command.define` is how an action runs Lua), `navigate(page)` (opens a page), `flash(message, type)` (a notification) and `select(from, to)`; `perform` may be `async`, and a mistake it throws is shown. An action has one of `edit`, `perform` and `choices`.
 
 ```js
 {
@@ -172,6 +172,35 @@ Or, instead of `edit`, `perform(context, editor)` does something that is no chan
   listed: false,
   perform: (context, editor) => editor.navigate(context.text.slice(context.from, context.to)),
 }
+```
+
+A list of your own tools, one changing the text, one running a command of your own in Lua:
+
+```lua
+command.define {
+  name = "Say hello",
+  run = function()
+    editor.flashNotification("Hello from Lua")
+  end,
+}
+```
+
+```js
+export default (helpers) => [
+  {
+    name: "tools",
+    label: "Tools",
+    mixed: "Tools",
+    choices: [
+      {
+        name: "upper",
+        label: "Upper case",
+        edit: (context) => ({ from: context.from, to: context.to, text: context.text.slice(context.from, context.to).toUpperCase() }),
+      },
+      { name: "hello", label: "Say hello", perform: (context, editor) => editor.invokeCommand("Say hello") },
+    ],
+  },
+];
 ```
 
 `listed: false` keeps an action out of the list of every action as it opens: typing in its search finds it (SilverBullet's commands are so). It can be a favourite all the same.

@@ -77,6 +77,25 @@ describe("Custom actions", () => {
     expect(actionsOf({ name: "bad", label: "Bad", choices: [{ name: "c" }] }).problems).toEqual(["action bad: its choice 1: it has no label"]);
   });
 
+  it("offer choices that are any actions, nothing of formats: one editing, one running a command (a Space Lua one too), as the library page's example", async () => {
+    const run: string[] = [];
+    const editor: ActionEditor = { invokeCommand: async (name) => void run.push(name), navigate: async () => {}, flash: () => {}, select: () => {}, hideKeyboard: () => {} };
+    const { actions, problems } = actionsOf({
+      name: "tools",
+      label: "Tools",
+      mixed: "Tools",
+      choices: [
+        { name: "upper", label: "Upper case", edit: (c: Context) => ({ from: c.from, to: c.to, text: c.text.slice(c.from, c.to).toUpperCase() }) },
+        { name: "hello", label: "Say hello", perform: (_c: Context, e: ActionEditor) => e.invokeCommand("Say hello") },
+      ],
+    });
+    expect(problems).toEqual([]);
+    const [upper, hello] = actions[0]!.choices!;
+    expect(upper!.edit!(contextOf("a word", 2, 6))).toMatchObject({ from: 2, to: 6, insert: "WORD" });
+    await hello!.perform!(contextOf("x", 0, 0), editor);
+    expect(run).toEqual(["Say hello"]);
+  });
+
   it("are replaced by the definitions made after Space Lua loads again; a name defined twice is said", () => {
     const one = actionsOf({ name: "a", label: "A", edit: () => undefined }).actions;
     expect(defineCustomActions(one)).toEqual([]);

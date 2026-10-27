@@ -10,10 +10,10 @@
 // or text is typed. The modules (modules.ts) give the actions; the core knows
 // none of them. The popup ends with the core's own item, the settings dialog.
 import type { Bridge, Settings } from "../bridge.ts";
-import { CONTENT_SELECTOR, keyboardBarTop, pageContentOf, pinnedViewBottom, viewTopOf } from "../dom.ts";
+import { CONTENT_SELECTOR, editorBox, keyboardBarTop, pageContentOf, pinnedViewBottom, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
 import type { Action, ActionEditor, Change, Context } from "./action.ts";
-import { Bar, type Shown } from "./bar.ts";
+import { Bar, type Dock, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
 import { byTouch, isActionItem, isSeparator, type Look, ownIconHtml, type Pin, type SlotRef, slotOf } from "./favorites.ts";
 import type { ItemKind } from "./items.ts";
@@ -115,7 +115,10 @@ export class Controller {
         this.barWatchFrame = 0;
         // Not docked any more: no longer watched (docked again, watched again)
         if (!this.bar.shown || !this.bar.docked) return this.watchBar(false);
-        if (this.dockLine() !== this.bar.dockedLine) this.onScroll();
+        // (Its line, or the editor's box: a sidebar opened or closed)
+        const at = this.dockAt();
+        const was = this.bar.dockedAt;
+        if (!was || at.line !== was.line || at.left !== was.left || at.width !== was.width) this.onScroll();
       });
     });
   }
@@ -179,7 +182,7 @@ export class Controller {
       actions: this.listed(),
       state: (action) => this.state(action, context),
       rect: this.bar.shown ? this.bar.rect() : undefined,
-      above: this.bar.docked,
+      above: this.bar.docked && !this.bar.dockedTop,
       viewTop: viewTopOf(range?.startContainer ?? this.doc.querySelector(".cm-content")),
       run: (action) => void this.run(action),
       tools: this.openSettings ? [SETTINGS_ACTION] : [],
@@ -310,7 +313,7 @@ export class Controller {
       ? undefined
       : { action: MORE_ACTION, active: false, enabled: true, labeled: false };
     if (this.docks()) {
-      this.bar.dock(rows, this.dockLine(), more);
+      this.bar.dock(rows, this.dockAt(), more);
       this.watchBar(true);
     } else this.bar.show(rows, rectOf(range), viewTopOf(range.startContainer), more);
   }
@@ -393,7 +396,7 @@ export class Controller {
       {
         rect: this.bar.shown ? this.bar.rect() : undefined,
         viewTop: viewTopOf(range?.startContainer ?? this.doc.querySelector(".cm-content")),
-        above: this.bar.docked,
+        above: this.bar.docked && !this.bar.dockedTop,
         keeps: (node) => this.bar.owns(node),
         closed: () => this.focusEditor(),
       },
@@ -498,8 +501,10 @@ export class Controller {
   private onKey = (e: KeyboardEvent): void => {
     // (A panel's keys its own: its Esc closes it alone)
     if (this.popup.isOpen || this.panel.isOpen || !this.bar.shown) return;
-    if (e.key === "Escape") this.hideBar();
-    else if (this.atCaret && !this.persistent() && !["Shift", "Control", "Alt", "Meta"].includes(e.key)) this.hideBar();
+    // (Shown always: it stays, Esc is the editor's)
+    if (e.key === "Escape") {
+      if (!this.persistent()) this.hideBar();
+    } else if (this.atCaret && !this.persistent() && !["Shift", "Control", "Alt", "Meta"].includes(e.key)) this.hideBar();
   };
 
   // Shown at the caret, a press elsewhere hides it
@@ -561,10 +566,28 @@ export class Controller {
     this.barWatchFrame = 0;
   }
 
-  /** Whether the toolbar docks at the bottom (the placement setting; auto: a selection made by touch) */
+  /** Whether the toolbar docks, at the bottom or the top (the placement setting; auto: at the bottom for a selection made by touch) */
   private docks(): boolean {
     const { placement } = this.settings;
-    return placement === "bottom" || (placement === "auto" && this.pointer === "touch");
+    return placement === "bottom" || placement === "top" || (placement === "auto" && this.pointer === "touch");
+  }
+
+  /**
+   * Where the toolbar docks: across SilverBullet's editor (else the window), so
+   * not over its sidebars; at the top, under its top bar (the page's view's
+   * top); at the bottom, on the line `dockLine` says, within the editor
+   */
+  private dockAt(): Dock {
+    const win = this.doc.defaultView!;
+    const box = editorBox(this.doc);
+    const left = box ? Math.max(0, box.left) : 0;
+    const width = box ? Math.min(win.innerWidth, box.right) - left : win.innerWidth;
+    if (this.settings.placement === "top") {
+      const top = viewTopOf(this.doc.querySelector(CONTENT_SELECTOR));
+      return { edge: "top", line: Math.max(top, box?.top ?? 0), left, width };
+    }
+    const line = this.dockLine();
+    return { edge: "bottom", line: box ? Math.min(line, box.bottom) : line, left, width };
   }
 
   /**
@@ -590,9 +613,10 @@ export class Controller {
   // The page scrolled or the window resized: the toolbar and the popup under it follow the selection (docked: the keyboard)
   private onScroll = (): void => {
     if (this.bar.shown && this.bar.docked) {
-      this.bar.placeDocked(this.dockLine());
-      if (this.popup.isOpen) this.popup.place(this.bar.rect(), viewTopOf(this.range?.startContainer ?? null), true);
-      if (this.panel.isOpen) this.panel.place(this.bar.rect(), viewTopOf(this.range?.startContainer ?? null), true);
+      this.bar.placeDocked(this.dockAt());
+      const above = !this.bar.dockedTop;
+      if (this.popup.isOpen) this.popup.place(this.bar.rect(), viewTopOf(this.range?.startContainer ?? null), above);
+      if (this.panel.isOpen) this.panel.place(this.bar.rect(), viewTopOf(this.range?.startContainer ?? null), above);
       return;
     }
     const range = this.range;

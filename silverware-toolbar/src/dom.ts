@@ -47,6 +47,16 @@ export function pinnedViewBottom(doc: Document): number | undefined {
   return rect && rect.height > 0 ? rect.bottom : undefined;
 }
 
+// SilverBullet's editor, between its sidebars (client/components: its main's `#sb-editor`): a docked toolbar
+// stays within it, not over the sidebars
+const EDITOR_SELECTOR = "#sb-editor";
+
+/** Where SilverBullet's editor is on screen, if it shows (else undefined: the window is the toolbar's) */
+export function editorBox(doc: Document): DOMRect | undefined {
+  const rect = doc.querySelector(EDITOR_SELECTOR)?.getBoundingClientRect();
+  return rect && rect.width > 0 && rect.height > 0 ? rect : undefined;
+}
+
 /** The top of the page's view around a node (the toolbar goes below it there), else the window's */
 export function viewTopOf(node: Node | null): number {
   const element = node instanceof Element ? node : node?.parentElement;

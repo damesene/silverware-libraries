@@ -60,12 +60,13 @@ export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
 export const DEFAULT_SHORTCUT = "Ctrl-Shift-q";
 
 /**
- * Where the toolbar shows: by the selection, or docked at the bottom of the
- * window over the on-screen keyboard (on a phone the system's menu of a
- * selection, Cut / Copy / Paste, is where the toolbar would be); `auto`: docked
- * when the selection was made by touch, else by it
+ * Where the toolbar shows: by the selection, or docked at the bottom over the
+ * on-screen keyboard (on a phone the system's menu of a selection, Cut / Copy /
+ * Paste, is where the toolbar would be) or at the top, under SilverBullet's top
+ * bar, across its editor; `auto`: docked at the bottom when the selection was
+ * made by touch, else by it
  */
-export const PLACEMENTS = ["auto", "selection", "bottom"] as const;
+export const PLACEMENTS = ["auto", "selection", "bottom", "top"] as const;
 export type Placement = (typeof PLACEMENTS)[number];
 /**
  * When the toolbar shows: always while the page's text is edited (docked, or by
@@ -76,7 +77,7 @@ export const SHOWS = ["always", "mobile", "selection"] as const;
 export type Show = (typeof SHOWS)[number];
 export const SHOW_LABELS: Readonly<Record<Show, string>> = { always: "Always", mobile: "Always on a phone", selection: "After selecting text" };
 
-export const PLACEMENT_LABELS: Readonly<Record<Placement, string>> = { auto: "Automatic", selection: "By the selection", bottom: "Docked at the bottom" };
+export const PLACEMENT_LABELS: Readonly<Record<Placement, string>> = { auto: "Automatic", selection: "By the selection", bottom: "Docked at the bottom", top: "Docked at the top" };
 
 // The toolbar's own block of the CONFIG page, for tables (the favourites): the Configuration Manager's block
 // would lose them on its next save (shared/configpage.ts)

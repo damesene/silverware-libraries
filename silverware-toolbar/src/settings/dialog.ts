@@ -160,7 +160,7 @@ export class SettingsDialog {
       values.placement = placement.value as Placement;
       this.update();
     });
-    const placementRow = settingRow(doc, BASE, "Where the toolbar shows", "Automatic: docked at the bottom, one row over the keyboard, when you select by touch (a phone's own menu of the selection, Cut, Copy, Paste, is by it); else by the selection.", placement);
+    const placementRow = settingRow(doc, BASE, "Where the toolbar shows", "Automatic: docked at the bottom, one row over the keyboard, when you select by touch (a phone's own menu of the selection, Cut, Copy, Paste, is by it); else by the selection. Docked, it is as wide as the editor.", placement);
     placementRow.dataset.swbSetting = PATHS.placement;
     const show = this.el("select");
     for (const value of SHOWS) show.append(new Option(SHOW_LABELS[value], value, false, value === values.show));

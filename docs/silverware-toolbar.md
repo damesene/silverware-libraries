@@ -495,7 +495,9 @@ while writing, always on a phone (the default), or after a selection; checked
 in Chrome's phone emulation, against the playground and SilverBullet, not on a
 phone yet); kinds of favourites and the gestures module (*Kinds of
 favourites*; mouse and touch checked in the playground and Chrome's phone
-emulation, not on a phone yet).
+emulation, not on a phone yet); docked within SilverBullet's editor, not over
+its sidebars, and at the top as a choice of the placement, Esc leaving a
+toolbar shown always (the user's, 2026-10-27).
 
 **Checked in a real SilverBullet** (2026-10-26, its release 2.12.1, by the
 interaction tests, which run against it as against the playground): the

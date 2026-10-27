@@ -16,6 +16,9 @@ import type { Pin } from "./favorites.ts";
 import type { ItemHost, ShownItem } from "./items.ts";
 import { type Box, placeBy } from "./place.ts";
 
+/** Where the toolbar docks: at the bottom (standing on `line`) or the top (hanging from it), across `left` and `width` (SilverBullet's editor's, else the window's) */
+export type Dock = { readonly edge: "top" | "bottom"; readonly line: number; readonly left: number; readonly width: number };
+
 /** An item as the toolbar shows it now: an action (with its label: `labeled`), a separator, or an item of a kind a module gives */
 export type Shown =
   | {
@@ -45,8 +48,8 @@ export class Bar {
   // The list of a button's choices, open under it
   private menu: { readonly element: HTMLElement; readonly button: HTMLButtonElement; readonly action: string } | undefined;
   private at: { rect: Box; viewTop: number } | undefined;
-  // Docked at the bottom: the line it stands on (the keyboard's top, or SilverBullet's bar's)
-  private dockedAt: number | undefined;
+  // Docked: where (at the bottom, the line it stands on: the keyboard's top, or SilverBullet's bar's)
+  private dockPlace: Dock | undefined;
   // Docked: its ends shaded where it scrolls further
   private shadeScroll: (() => void) | undefined;
 
@@ -71,18 +74,23 @@ export class Bar {
   }
 
   get docked(): boolean {
-    return this.dockedAt !== undefined;
+    return this.dockPlace !== undefined;
   }
 
-  /** Docked: the line it stands on now */
-  get dockedLine(): number | undefined {
-    return this.dockedAt;
+  /** Docked: where now */
+  get dockedAt(): Dock | undefined {
+    return this.dockPlace;
+  }
+
+  /** Docked at the top: menus and the popup open under it, not over it */
+  get dockedTop(): boolean {
+    return this.dockPlace?.edge === "top";
   }
 
   /** Its rows of items; `more`: … pinned at the end of the last one (favourites without it) */
   show(rows: readonly (readonly Shown[])[], rect: Box, viewTop: number, more?: Extract<Shown, { action: Action }>): void {
     this.closeMenu();
-    this.dockedAt = undefined;
+    this.dockPlace = undefined;
     this.element.classList.remove("swb-docked");
     const doc = this.doc;
     const all = rows.length ? rows : [[]];
@@ -100,11 +108,11 @@ export class Bar {
   }
 
   /**
-   * Docked: one row across the bottom of the window standing on `bottom`, the
-   * rows one after another; the items pinned left and right at its ends, out
-   * of what scrolls; `more`: … pinned at its end
+   * Docked: one row across SilverBullet's editor (else the window) at its
+   * bottom or its top, the rows one after another; the items pinned left and
+   * right at its ends, out of what scrolls; `more`: … pinned at its end
    */
-  dock(rows: readonly (readonly Shown[])[], bottom: number, more?: Extract<Shown, { action: Action }>): void {
+  dock(rows: readonly (readonly Shown[])[], at: Dock, more?: Extract<Shown, { action: Action }>): void {
     this.closeMenu();
     const pinned = (side: Pin) => rows.flatMap((row) => row.filter((item) => pinOf(item) === side));
     const left = pinned("left");
@@ -153,16 +161,23 @@ export class Bar {
     this.element.classList.add("swb-docked");
     if (!this.element.isConnected) this.doc.body.append(this.element);
     this.element.classList.add("swb-visible");
-    this.placeDocked(bottom);
+    this.placeDocked(at);
   }
 
-  /** Docked, placed again on the line it stands on (the keyboard came or went) */
-  placeDocked(bottom: number): void {
-    this.dockedAt = bottom;
-    this.element.style.left = "0px";
-    // Held by its bottom edge: placed by its top, its height and the line rounded apart left a line of the page showing under it
-    this.element.style.top = "auto";
-    this.element.style.bottom = `${Math.max(0, this.doc.defaultView!.innerHeight - bottom)}px`;
+  /** Docked, placed again (the keyboard came or went, the editor's box changed) */
+  placeDocked(at: Dock): void {
+    this.dockPlace = at;
+    this.element.classList.toggle("swb-docked-top", at.edge === "top");
+    this.element.style.left = `${at.left}px`;
+    this.element.style.width = `${at.width}px`;
+    if (at.edge === "top") {
+      this.element.style.bottom = "auto";
+      this.element.style.top = `${at.line}px`;
+    } else {
+      // Held by its bottom edge: placed by its top, its height and the line rounded apart left a line of the page showing under it
+      this.element.style.top = "auto";
+      this.element.style.bottom = `${Math.max(0, this.doc.defaultView!.innerHeight - at.line)}px`;
+    }
     // (The window resized: what it scrolls to may be more or less)
     this.shadeScroll?.();
     if (this.menu) this.placeMenu();
@@ -278,6 +293,8 @@ export class Bar {
     if (this.docked) return;
     this.at = { rect, viewTop };
     this.element.style.removeProperty("bottom");
+    this.element.style.removeProperty("width");
+    this.element.classList.remove("swb-docked-top");
     const win = this.doc.defaultView!;
     const size = { width: this.element.offsetWidth, height: this.element.offsetHeight };
     // Left of the selection, ending where it starts: what is read beside it stays in view
@@ -291,7 +308,7 @@ export class Bar {
     this.closeMenu();
     this.element.classList.remove("swb-visible");
     this.at = undefined;
-    this.dockedAt = undefined;
+    this.dockPlace = undefined;
   }
 
   remove(): void {
@@ -343,8 +360,8 @@ export class Bar {
     const rect = button.getBoundingClientRect();
     const win = this.doc.defaultView!;
     const left = Math.max(8, Math.min(rect.left, win.innerWidth - menu.offsetWidth - 8));
-    // Under the button, or over it where the window ends (docked: always over it, the keyboard under it)
-    const below = !this.docked && rect.bottom + 4 + menu.offsetHeight <= win.innerHeight - 8;
+    // Under the button, or over it where the window ends (docked at the bottom: always over it, the keyboard under it; at the top: always under it)
+    const below = this.dockedTop || (!this.docked && rect.bottom + 4 + menu.offsetHeight <= win.innerHeight - 8);
     menu.style.left = `${Math.round(left)}px`;
     menu.style.top = `${Math.round(below ? rect.bottom + 4 : rect.top - 4 - menu.offsetHeight)}px`;
   }

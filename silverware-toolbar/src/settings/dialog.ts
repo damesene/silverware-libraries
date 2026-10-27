@@ -175,8 +175,9 @@ export class SettingsDialog {
     const wordRow = settingRow(doc, BASE, "A word at the cursor as if selected", "With nothing selected, Bold (any inline format) and Clear formatting work on the word the cursor is in or touches: what spaces separate, its punctuation with it. The cursor stays where it was.", word);
     wordRow.dataset.swbSetting = PATHS.wordAtCaret;
     card.append(keyRow, placementRow, showRow, wordRow);
-    general.append(card);
+    // SilverBullet's keyboard bar on: said first, as it decides how the docked toolbar looks
     if (this.keyboardBar) general.append(this.keyboardBarNote());
+    general.append(card);
 
     this.favoritesPanel = this.el("div");
     this.drawFavorites();

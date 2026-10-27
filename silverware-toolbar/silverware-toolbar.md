@@ -1557,6 +1557,9 @@ end
   margin-top: 12px;
   border-color: color-mix(in srgb, var(--ui-accent-color, #464cfc) 45%, var(--swb-settings-line));
 }
+.swb-settings-advice + .swb-settings-card {
+  margin-top: 12px;
+}
 .swb-settings-advice-button {
   flex: none;
   padding: 5px 12px;

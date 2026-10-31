@@ -96,7 +96,7 @@ async function showPanel(): Promise<void> {
     el.dataset.path = name;
     el.draggable = true;
     el.style.paddingLeft = `${6 + depth * 14}px`;
-    el.innerHTML = `<span>${tag ? "#" : "▸"}</span><span class="label"></span><span class="count"></span>`;
+    el.innerHTML = `<span>${tag && !tag.level ? "#" : "▸"}</span><span class="label"></span><span class="count"></span>`;
     el.querySelector(".label")!.textContent = name.slice(name.lastIndexOf("/") + 1);
     el.querySelector(".count")!.textContent = tag ? String(tag.count) : "";
     el.addEventListener("click", () => void panelSelect(name));

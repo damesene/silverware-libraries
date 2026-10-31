@@ -368,7 +368,8 @@ export class Workspace {
                 })
               : el(doc, "span", "swg-tree-toggle swg-tree-leaf"),
             el(doc, "span", { class: node.own ? "swg-tag-name" : "swg-tag-name swg-level", text: node.label, title: hashtagOf(node.name) }),
-            el(doc, "span", { class: "swg-count", text: String(node.own || ""), title: node.own ? counted(node.own, "page") : "" }),
+            // A tag with tags under it counts the pages using it or any of them, each once (as the panel does)
+            ((count) => el(doc, "span", { class: "swg-count", text: String(count || ""), title: count ? (folder ? `${counted(count, "page")} using it or a tag under it` : counted(count, "page")) : "" }))(folder ? pagesWith(catalog, node.name, true).length : node.own),
           ),
         );
         if (expanded) li.append(el(doc, "ul", { class: "swg-tree-children", attrs: { role: "group" } }, ...node.children.map(item)));

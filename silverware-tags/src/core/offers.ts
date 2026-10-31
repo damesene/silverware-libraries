@@ -18,8 +18,12 @@ export type PanelRow = {
   // The whole name, the tree's path ("project/alpha"), and its last level
   readonly name: string;
   readonly label: string;
-  // The pages using it (none: a level only), and whether any uses it as a page's tag, in a task, an item
+  // The pages using it, or any tag under it (each page once)
   readonly count: number;
+  // A level of tags only (no tag of its name); with tags under it
+  readonly level: boolean;
+  readonly parent: boolean;
+  // Whether it, or a tag under it, is a page's own tag somewhere, in a task, in an item
   readonly onPages: boolean;
   readonly inTasks: boolean;
   readonly inItems: boolean;

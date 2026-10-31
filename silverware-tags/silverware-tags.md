@@ -252,17 +252,22 @@ if js and js.window then
       presentation = {
         mode = "tree",
         row = {
+          -- A level of tags (no tag of its name) a folder; it has a row of its own, so it shows its count too
           icon = function(obj)
-            if obj.count then
-              return "hash"
+            if obj.level == true then
+              return "folder"
             end
-            return "folder"
+            return "hash"
           end,
           decorations = function(obj)
             if not obj.count then
               return {}
             end
-            return { { text = tostring(obj.count), position = "right", cssClass = "sb-nav-chip-hint", title = "Pages using it" } }
+            local title = "Pages using it"
+            if obj.parent == true then
+              title = "Pages using it or a tag under it"
+            end
+            return { { text = tostring(obj.count), position = "right", cssClass = "sb-nav-chip-hint", title = title } }
           end,
         },
       },

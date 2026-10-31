@@ -25,13 +25,15 @@ function host(rename?: RenameOffer) {
 }
 
 describe("the tags' panel", () => {
-  it("gives a row per tag with its pages and where it is used", async () => {
+  it("gives a row per tag and per level, with their pages and where they are used", async () => {
     const { space } = host();
-    const rows = panelRows((await readCatalog(space)).tags.values());
-    expect(rows.map((r) => [r.name, r.label, r.count, r.onPages, r.inTasks])).toEqual([
-      ["project/alpha", "alpha", 1, true, false],
-      ["project/beta", "beta", 1, true, false],
-      ["todo", "todo", 2, true, true],
+    const rows = panelRows(await readCatalog(space));
+    // A level counts the pages of the tags under it, each page once
+    expect(rows.map((r) => [r.name, r.label, r.count, r.level, r.parent, r.onPages, r.inTasks])).toEqual([
+      ["project", "project", 2, true, true, true, false],
+      ["project/alpha", "alpha", 1, false, false, true, false],
+      ["project/beta", "beta", 1, false, false, true, false],
+      ["todo", "todo", 2, false, false, true, true],
     ]);
   });
   it("opens the window at a tag picked, with its name's field for F2", async () => {

@@ -193,3 +193,16 @@ test("the settings dialog turns the protection off: meta tags then shown apart, 
   await expect(window.locator('[data-swg-tag="meta"]')).toBeVisible();
   await expect(window.locator('[data-swg-tag="todo"]')).toHaveCount(0);
 });
+
+test("a custom operation is a button of the tag, its changes reviewed and applied @playground", async ({ page }) => {
+  // (The playground gives the library page's example, as a space's script would)
+  const window = await openManager(page, "todo");
+  await window.locator('[data-swg-tag="todo"] .swg-tag-row').click();
+  await expect(window.locator('[data-swg-action="custom.promote"]')).toBeVisible();
+  // Offered only where it would change something: todo is lower case already
+  await expect(window.locator('[data-swg-action="custom.lowerCase"]')).toHaveCount(0);
+  await window.locator('[data-swg-action="custom.promote"]').click();
+  await expect(window.locator(".swg-review-title")).toHaveText("Make it the page's #todo");
+  await window.locator(".swg-apply").click();
+  await expect.poll(() => pageText(page, "Meetings/2026-10-15")).toBe("---\ntags:\n  - todo\n---\n#meeting\n\n- [ ] Send the notes #todo\n");
+});

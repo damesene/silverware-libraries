@@ -2,6 +2,7 @@
 // are listed: the core creates only those turned on, and knows none of them.
 import type { ModuleName } from "./bridge.ts";
 import type { ModuleHost, TagsModule } from "./core/module.ts";
+import { customModule } from "./modules/custom.ts";
 import { pagesModule } from "./modules/pages.ts";
 import { panelModule } from "./modules/panel.ts";
 import { removeModule } from "./modules/remove.ts";
@@ -12,6 +13,7 @@ const FACTORIES: readonly (readonly [ModuleName, (host: ModuleHost) => TagsModul
   ["pages", pagesModule],
   ["remove", removeModule],
   ["panel", panelModule],
+  ["custom", customModule],
 ];
 
 /** The modules turned on, each made with its own host (`hostFor`: the core's, what it offers its own) */

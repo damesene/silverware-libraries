@@ -5,7 +5,8 @@
 // library page's space-style block is applied as SilverBullet would, and its
 // commands are the header's buttons.
 import { readSettings } from "../silverware-tags/src/bridge.ts";
-import { panelMove, panelRename, panelRows, panelSelect, start } from "../silverware-tags/src/index.ts";
+import { defineOperations, panelMove, panelRename, panelRows, panelSelect, start } from "../silverware-tags/src/index.ts";
+import operations from "./tags-operations.ts";
 import type { SettingsStore } from "../silverware-tags/src/settings.ts";
 import { memorySpace } from "../silverware-tags/src/space/memory.ts";
 import libraryPage from "../silverware-tags/silverware-tags.md";
@@ -154,6 +155,8 @@ const store: SettingsStore = {
   confirm: async (question) => confirm(question),
   flash: (message, type) => flash(message, type),
 };
+// A space's own operations, as its Space Lua script would give them
+defineOperations(operations);
 const controller = await start(space, { flash: (message, type, actions) => flash(message, type, { actions }) }, await readSettings({ getConfig }), store);
 // The commands as SilverBullet would list them, as buttons (the prefix left out)
 document.getElementById("commands")!.replaceChildren(
@@ -168,6 +171,6 @@ document.getElementById("commands")!.replaceChildren(
   }),
 );
 // For the interaction tests: commands run as SilverBullet's client runs them, the space as it is
-Object.assign(window, { playgroundTags: { runCommand: (name: string) => controller.runCommand(name), space } });
+Object.assign(window, { playgroundTags: { runCommand: (name: string) => controller.runCommand(name), space, defineOperations } });
 showPage();
 void showPanel();

@@ -53,10 +53,72 @@ config.set("silverware.tags.modules", {
   pages = { enabled = true },  -- By page, Tag pages, Page tags, Add to pages, Remove from pages
   remove = { enabled = true }, -- Delete tag
   panel = { enabled = true },  -- The Tags panel beside the page
+  custom = { enabled = true }, -- Custom operations
 })
 ```
 
+## Custom operations
+
+Things of your own done with a tag, in a JS file of your space, given to Silverware Tags in Space Lua:
+
+```lua
+silverware.tags.defineOperations(js.importFromSpace("Library/me/tag-operations.js"))
+```
+
+Each is a button of the tag you pick in the window, after the built-in ones, and works as they do: you see every change first, *Undo* takes it back, and SilverBullet's meta pages are left alone (*Hide and protect meta pages*). The file exports a list of operations, or a function that gets the helpers and returns them:
+
+```js
+export default (helpers) => [
+  // The tag made lower case everywhere (merged with one of that name)
+  {
+    name: "lowerCase",
+    label: "Lower case",
+    when: (context) => context.tag !== context.tag.toLowerCase(),
+    edit: (text, page, context) => helpers.renameTags(text, (name) => (name === context.tag ? name.toLowerCase() : undefined)),
+  },
+  // The tag given to every page that uses it in a task, as a page's own tag
+  {
+    name: "promote",
+    label: "Make it the page's",
+    pages: (context) => context.contexts(context.tag).task ?? [],
+    edit: (text, page, context) => helpers.addPageTags(text, [context.tag]),
+  },
+];
+```
+
+* `name` (letters, digits, `_`), `label` (its button). `title(context)`: the review's title (else the label and the tag). `danger: true` shows it in the danger color (it takes something away).
+* `when(context)`: whether it is offered for the tag (left out: always).
+* `pages(context)`: the pages it may change (left out: those using the tag); the others are not read.
+* `edit(text, page, context)` gets a page's text and gives the text it should have: a text, `{ text, changes }` (what the helpers give), or nothing (the page as it is). It may be `async`.
+* `context`: `tag` (the tag the button is on), `tags` and `pages` (every tag and page of the space, meta pages left out while they are protected), `pagesWith(tag, children)` (the pages using a tag, with `children` its subtags' too), `contexts(tag)` (its pages by where it is used: `page`, `item`, `task`, `table`, `header`).
+* Helpers, the functions the built-in operations are made of (text in, text out): `renameTags(text, rename)` (`rename(name)` gives a tag's new name, or nothing), `removeTags(text, match)`, `addPageTags(text, names)` (into the frontmatter), `removePageTags(text, names)` (from the frontmatter and the tag lines), `pageTags(text)`, `frontmatterTags(text)`, `hashtags(text)` (each with its `name`, place and `context`), `tagUses(text)`, `hashtagOf(name)`, `isMetaTag(name)`, `renamedTag(name, from, to, children)`, `matches(name, tag, children)`, `isWithin(name, root)`, `parentOf(name)`, `nameProblem(name)`, `applyEdits(text, edits)`.
+
+A mistake in a definition is a notification; a page an operation's `edit` fails on is left alone and named in the review. Definitions are made again each time Space Lua loads. The *Custom operations* module (Settings) turns them off.
+
 ## Implementation
+
+```space-lua
+-- priority: 50
+-- Silverware Tags' Space Lua API, loaded before your scripts (they have priority 0
+-- unless they say otherwise): silverware.tags.defineOperations, see "Custom operations"
+silverware = silverware or {}
+silverware.tags = silverware.tags or {}
+if js and js.window then
+  local silverwareTagsJs = js.importFromSpace("Library/damesene/silverware-tags.js")
+  -- Space Lua is loaded (again): the scripts' definitions replace those of before (kept until then)
+  silverwareTagsJs.resetDefinitions()
+  -- The others are defined; a mistake is shown, the rest of the script goes on
+  function silverware.tags.defineOperations(definitions)
+    local problem = silverwareTagsJs.defineOperations(definitions)
+    if problem then
+      editor.flashNotification(problem, "error")
+    end
+  end
+else
+  -- Space Lua without a window (nothing to show): nothing to define
+  function silverware.tags.defineOperations() end
+end
+```
 
 ```space-lua
 -- Settings, shown in the Configuration Manager (Configuration: Open)
@@ -84,6 +146,7 @@ config.define("silverware.tags", {
         pages = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "The view by page: tags given to the pages picked in a tree of folders, and taken off them; the tags of the page you are on.", ui = { category = "Silverware Tags", label = "By page", priority = 0.8 } } } },
         remove = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Delete a tag everywhere it is used.", ui = { category = "Silverware Tags", label = "Delete a tag", priority = 0.6 } } } },
         panel = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "The tags as a panel beside the page (SilverBullet's navigator): a tag opens the Tags window, F2 renames it, a tag dragged under another moves it there.", ui = { category = "Silverware Tags", label = "Tags panel", priority = 0.5 } } } },
+        custom = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Your own operations on a tag, from a JS file of the space given with silverware.tags.defineOperations: a button of the tag, its changes reviewed first.", ui = { category = "Silverware Tags", label = "Custom operations", priority = 0.4 } } } },
       },
     },
   },

@@ -9,6 +9,7 @@ import { createModules } from "./modules.ts";
 import type { Notifier, Space } from "./space/space.ts";
 import { silverBulletNotifier, silverBulletSpace } from "./space/silverbullet.ts";
 import { SettingsDialog, type SettingsStore } from "./settings.ts";
+import { customOperationsAnew, defineCustomOperations, operationsOf } from "./custom.ts";
 
 export const version = "0.1.0";
 
@@ -91,4 +92,27 @@ export function panelRename(tag: string): Promise<void> {
 
 export function panelMove(tag: string, to: string): Promise<void> {
   return panel()?.move(tag, to) ?? Promise.resolve();
+}
+
+/**
+ * `silverware.tags.defineOperations` (the library page's Space Lua): custom
+ * operations, a definition, a list, or a function given the helpers that
+ * returns them, usually a JS module of the space. The others defined; what is
+ * wrong with any of them (or a name defined twice), which the library page
+ * shows as a notification (an error there would stop the rest of the user's
+ * script).
+ */
+export function defineOperations(definitions: unknown): string | undefined {
+  const { operations, problems } = operationsOf(definitions);
+  const again = defineCustomOperations(operations);
+  const lines = [
+    ...(problems.length ? [`custom operations not defined: ${problems.join("; ")}`] : []),
+    ...(again.length ? [`custom operations defined again (the last definition counts): ${again.join(", ")}`] : []),
+  ];
+  return lines.length ? `Silverware Tags: ${lines.join(". ")}` : undefined;
+}
+
+/** Space Lua is loaded (again): the custom definitions are made anew, replacing those of before */
+export function resetDefinitions(): void {
+  customOperationsAnew();
 }

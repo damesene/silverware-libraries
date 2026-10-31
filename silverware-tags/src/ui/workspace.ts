@@ -246,11 +246,21 @@ export class Workspace {
     this.body.replaceChildren(el(doc, "div", "swg-review", el(doc, "h3", { class: "swg-review-title", text: operation.label }), line, bar));
     const back = el(doc, "button", { class: "swg-button swg-back", text: "Back", run: () => this.back() });
     this.foot.replaceChildren(buttons(doc, back));
-    const plan = await this.options.plan(operation, (done, of) => {
-      line.textContent = `Reading page ${done} of ${of}…`;
-      bar.max = of;
-      bar.value = done;
-    });
+    let plan: Plan;
+    try {
+      plan = await this.options.plan(operation, (done, of) => {
+        line.textContent = `Reading page ${done} of ${of}…`;
+        bar.max = of;
+        bar.value = done;
+      });
+    } catch (e) {
+      // (A custom operation's pages failing): said in the review, Back to the view
+      if (this.reviewing !== reviewing) return;
+      line.textContent = e instanceof Error ? e.message : String(e);
+      line.classList.add("swg-error");
+      bar.remove();
+      return;
+    }
     // (Gone back, or another review asked for, meanwhile)
     if (this.reviewing !== reviewing) return;
     const changes = plan.changes.reduce((sum, change) => sum + change.changes, 0);

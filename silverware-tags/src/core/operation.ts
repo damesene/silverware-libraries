@@ -7,10 +7,10 @@ import type { Catalog } from "./catalog.ts";
 export type Operation = {
   // What it does, as the review's title says it ("Rename #a to #b")
   readonly label: string;
-  // The pages it may change (the rest are not read)
-  readonly pages: (catalog: Catalog) => readonly string[];
-  // Its edit of a page's text (pure)
-  readonly edit: (text: string, page: string) => EditResult;
+  // The pages it may change (the rest are not read); a promise may be given (a custom operation's)
+  readonly pages: (catalog: Catalog) => readonly string[] | Promise<readonly string[]>;
+  // Its edit of a page's text (pure; a promise may be given: a custom operation's, as Space Lua gives one)
+  readonly edit: (text: string, page: string) => EditResult | Promise<EditResult>;
   // What was done, as the notification says it
   readonly done: (pages: number, changes: number) => string;
   // A choice the review offers (with its subtags), the operation made anew by it

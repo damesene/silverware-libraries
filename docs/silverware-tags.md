@@ -209,9 +209,19 @@ under it) and, as a plan reads each page, by its text. Off: they show, their
 tags apart (Meta), as above. Every change of the settings reloads: the
 library page defines the panel's segments as it loads.
 
+### Custom operations (done 2026-10-31)
+
+`silverware.tags.defineOperations` (a priority-50 block of the library page,
+as the toolbar's `defineActions`): a JS file of the space gives operations, a
+list or a function given `HELPERS` (the domain's pure functions the built-in
+operations are made of). Each is an action on a tag as data (`TagAction`),
+the same the built-in modules give, so the core reviews, applies and undoes it
+and protects meta pages for it. Before them the host was made per module (as
+the table's) and the built-in actions became data, so the modules stand on
+the API the user's operations use.
+
 ## Not now (possible later)
 
-- The user's own operations from Space Lua (`silverware.tags.defineOperations`).
 - Rules by folder (pages under `Projects/Alpha` get `#project/alpha` as they are
   made): writing pages in the background, as SilverBullet's templates do better.
 - A tag's own page and color, aliases.

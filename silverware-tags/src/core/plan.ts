@@ -52,8 +52,14 @@ type Outcome<T> = { readonly ok: T } | { readonly skipped: Skipped } | undefined
 export type Guard = (text: string, page: string) => string | undefined;
 
 export async function makePlan(space: Space, catalog: Catalog, operation: Operation, progress?: Progress, guard?: Guard): Promise<Plan> {
+  let pages: readonly string[];
+  try {
+    pages = await operation.pages(catalog);
+  } catch (e) {
+    throw new Error(`${operation.label}: its pages could not be told (${reasonOf(e)})`);
+  }
   const outcomes = await each(
-    operation.pages(catalog),
+    pages,
     async (page): Promise<Outcome<PageChange>> => {
       let before: string;
       try {
@@ -64,7 +70,12 @@ export async function makePlan(space: Space, catalog: Catalog, operation: Operat
       // (Told by its text as it is now: the index may not have caught up with it)
       const guarded = guard?.(before, page);
       if (guarded) return { skipped: { page, reason: guarded } };
-      const result = operation.edit(before, page);
+      let result: Awaited<ReturnType<Operation["edit"]>>;
+      try {
+        result = await operation.edit(before, page);
+      } catch (e) {
+        return { skipped: { page, reason: `its edit failed (${reasonOf(e)}): left alone` } };
+      }
       if (result.problem) return { skipped: { page, reason: result.problem } };
       return result.changes && result.text !== before ? { ok: { page, before, after: result.text, changes: result.changes } } : undefined;
     },

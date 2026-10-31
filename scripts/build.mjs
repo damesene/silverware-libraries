@@ -4,7 +4,7 @@ import * as esbuild from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
 import { emojiModuleText } from "./emoji.mjs";
 
-const libraries = ["silverware-table", "silverware-toolbar"];
+const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags"];
 const watch = process.argv.includes("--watch");
 const check = process.argv.includes("--check");
 

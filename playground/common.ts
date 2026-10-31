@@ -31,11 +31,25 @@ export function setUpTheme(): void {
   document.querySelector("#theme")?.addEventListener("click", () => applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
 }
 
-/** A notification under the top bar (#flash), for a few seconds; as SilverBullet's, `timeout` 0 keeps it until it is clicked */
-export function flash(message: string, type: "info" | "error" = "info", options: { readonly timeout?: number } = {}): void {
+/**
+ * A notification under the top bar (#flash), for a few seconds; as
+ * SilverBullet's, `timeout` 0 keeps it until it is clicked, and `actions` are
+ * buttons in it (a click runs one and closes it)
+ */
+export function flash(message: string, type: "info" | "error" = "info", options: { readonly timeout?: number; readonly actions?: readonly { readonly name: string; readonly run: () => unknown }[] } = {}): void {
   const note = document.createElement("div");
   note.textContent = message;
   if (type === "error") note.className = "error";
+  for (const action of options.actions ?? []) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = action.name;
+    button.addEventListener("click", () => {
+      note.remove();
+      void action.run();
+    });
+    note.append(" ", button);
+  }
   document.querySelector("#flash")?.append(note);
   if (options.timeout === 0) note.addEventListener("click", () => note.remove());
   else window.setTimeout(() => note.remove(), options.timeout ?? 3000);

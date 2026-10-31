@@ -1,0 +1,104 @@
+/// <reference types="node" />
+// What the tags' interaction tests share: the sample space opened, a command
+// run, a page's text read.
+//
+// Against one of two targets (SW_TARGET, set by playwright.config.ts), as the
+// table's and the toolbar's tests:
+// - playground: the tags playground (a space of pages in memory, the page open
+//   the one shown; its pages start from the sample in each test's browser
+//   context).
+// - silverbullet: a real SilverBullet with the committed silverware-tags.js
+//   deployed: the sample's pages written into its worker's space under
+//   UiTags/ before the test (indexed as SilverBullet finds them), removed
+//   after; commands run as its client runs them.
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import { SAMPLE_PAGES } from "../../playground/tags-sample.ts";
+import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
+
+export { expect };
+
+const target = process.env.SW_TARGET === "silverbullet" ? "silverbullet" : "playground";
+export const onSilverBullet = target === "silverbullet";
+const server = () => silverbulletServer(test.info().parallelIndex, process.env.SW_SB_SPACE ?? "");
+
+// The sample's pages there: in a folder of their own, so a test's tree of pages is theirs
+const FOLDER = "UiTags";
+/** A sample page's name in the space the tests run against */
+export const pageName = (name: string): string => (onSilverBullet ? `${FOLDER}/${name}` : name);
+
+type Window = { playgroundTags?: { runCommand(name: string): Promise<void>; space: { pages: Map<string, string> } }; client?: { runCommandByName(name: string): Promise<void> } };
+
+/** Tests get `page` with the sample space open (its index page); an error in the page fails the test */
+export const test = base.extend({
+  baseURL: async ({ baseURL }, use) => {
+    await use(onSilverBullet ? `http://127.0.0.1:${server().port}/` : baseURL);
+  },
+  page: async ({ page }, use) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    page.on("console", (m) => {
+      if (m.type() === "error") errors.push(m.text());
+    });
+    try {
+      if (onSilverBullet) {
+        await rm(join(server().space, FOLDER), { recursive: true, force: true });
+        for (const [name, text] of Object.entries(SAMPLE_PAGES)) {
+          const path = join(server().space, `${pageName(name)}.md`);
+          await mkdir(dirname(path), { recursive: true });
+          await writeFile(path, text);
+        }
+        await page.goto(`/${pageName("index")}`);
+        await page.waitForFunction(() => !!(window as unknown as Window).client);
+      } else {
+        await page.goto("/tags.html");
+        await page.waitForFunction(() => !!(window as unknown as Window).playgroundTags);
+      }
+      await use(page);
+      expect(errors, "errors in the page").toEqual([]);
+    } finally {
+      if (onSilverBullet) {
+        await page.close();
+        await rm(join(server().space, FOLDER), { recursive: true, force: true });
+      }
+    }
+  },
+});
+
+/** Runs a command by its name, as SilverBullet's command palette runs it */
+export async function command(page: Page, name: string): Promise<void> {
+  await page.evaluate((name) => {
+    const w = window as unknown as Window;
+    void (w.playgroundTags ? w.playgroundTags.runCommand(name) : w.client!.runCommandByName(name));
+  }, name);
+}
+
+/** A sample page's text as it is now */
+export async function pageText(page: Page, name: string): Promise<string> {
+  if (onSilverBullet) return (await readFile(join(server().space, `${pageName(name)}.md`), "utf8").catch(() => "")).replace(/\r\n/g, "\n");
+  return page.evaluate((name) => (window as unknown as Window).playgroundTags!.space.pages.get(name) ?? "", name);
+}
+
+/** Opens a sample page (the page open in the editor) */
+export async function openPage(page: Page, name: string): Promise<void> {
+  if (onSilverBullet) await page.goto(`/${pageName(name)}`);
+  else await page.locator(`#pages [data-page="${name}"]`).click();
+}
+
+/** The manager open, its tags listed (SilverBullet's index caught up with the sample's pages: the tag shown) */
+export async function openManager(page: Page, tag: string): Promise<Locator> {
+  const manager = page.locator(".swg-manager");
+  await expect(async () => {
+    if (!(await manager.isVisible())) await command(page, "Silverware Tags: Manager");
+    await expect(manager).toBeVisible({ timeout: 2000 });
+    if (!(await manager.locator(`[data-swg-tag="${tag}"]`).isVisible())) {
+      // Not indexed yet: opened again
+      await manager.locator(".swg-dialog-close").click();
+      throw new Error(`${tag} not listed yet`);
+    }
+  }).toPass({ timeout: onSilverBullet ? 30_000 : 5_000 });
+  return manager;
+}
+
+export const dialog = (page: Page, className: string): Locator => page.locator(`.swg-dialog.${className}`);

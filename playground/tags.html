@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Silverware Tags playground</title>
+    <link rel="stylesheet" href="common.css" />
+    <link rel="stylesheet" href="tags-playground.css" />
+  </head>
+  <body>
+    <header>
+      <strong>Silverware Tags<span class="long"> playground</span></strong>
+      <nav class="playgrounds" aria-label="Playgrounds">
+        <a href="./">Table</a>
+        <a href="toolbar.html">Toolbar</a>
+        <a href="tags.html" aria-current="page">Tags</a>
+      </nav>
+      <span class="hint">Mock SilverBullet: a space of pages; its commands as buttons</span>
+      <span class="spacer"></span>
+      <span id="commands"></span>
+      <button id="reset" type="button" title="Reset sample"><span class="icon">↺</span><span class="label">Reset sample</span></button>
+      <button id="theme" type="button" title="Dark / light"><span class="icon">◐</span><span class="label">Dark / light</span></button>
+    </header>
+    <main id="sb-main">
+      <nav id="pages" aria-label="Pages"></nav>
+      <section id="page">
+        <h1 id="page-name"></h1>
+        <textarea id="page-text" spellcheck="false" aria-label="The page's text"></textarea>
+      </section>
+    </main>
+    <div id="flash" aria-live="polite"></div>
+    <script type="module" src="tags.js"></script>
+  </body>
+</html>

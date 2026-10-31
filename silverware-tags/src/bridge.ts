@@ -1,0 +1,69 @@
+// The SilverBullet API Silverware Tags uses, handed over by the library page's
+// Space Lua (`editor.*`, `space.*`, `config.get`, the index queried there), so
+// no SilverBullet internals are needed. Only space/silverbullet.ts reads it,
+// making the Space the rest works with.
+
+export type Bridge = {
+  // Every page (space.listPages: page objects with their name, or names)
+  readonly listPages: () => unknown;
+  // The index's tags (query[[from index.tag "tag"]]: { name, page, parent }; table rows' and headings' tags with parent "table", "header")
+  readonly queryTags: () => unknown;
+  readonly readPage: (name: string) => string | Promise<string>;
+  readonly writePage: (name: string, text: string) => unknown;
+  // The page open in the editor, its text and one edit of it (one undo step)
+  readonly getCurrentPage: () => string | Promise<string>;
+  readonly getText: () => string | Promise<string>;
+  readonly replaceRange: (from: number, to: number, text: string) => unknown;
+  readonly navigate: (page: string) => unknown;
+  // A notification; `options` as SilverBullet's main has them (buttons: actions), a release before them ignores them
+  readonly flash: (message: string, type?: "info" | "error", options?: unknown) => unknown;
+  // Optional: waits until the index has caught up (mq.awaitEmptyQueue("indexQueue"))
+  readonly awaitIndex?: () => unknown;
+  // Optional: without it, settings keep their defaults
+  readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
+};
+
+/** The bridge's functions it cannot work without, missing from what the library page gave */
+export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
+  return (["listPages", "queryTags", "readPage", "writePage", "getCurrentPage", "getText", "replaceRange", "navigate", "flash"] as const).filter((name) => typeof bridge[name] !== "function");
+}
+
+/** The modules: the parts that can be turned off with `silverware.tags.modules.<name>.enabled` (default on) */
+export const MODULE_NAMES = ["rename", "remove", "assign", "pageTags"] as const;
+export type ModuleName = (typeof MODULE_NAMES)[number];
+
+/** Where each setting is in SilverBullet's configuration */
+export const PATHS = {
+  module: (name: ModuleName) => `silverware.tags.modules.${name}.enabled`,
+} as const;
+
+/** Silverware Tags' settings, read once it starts (a change applies on reload) */
+export type Settings = {
+  readonly modules: ReadonlySet<ModuleName>;
+};
+
+/** The settings as configured, each its default where it is not set or not valid */
+export async function readSettings(bridge: Partial<Bridge>): Promise<Settings> {
+  const get = async (path: string, fallback: unknown) => {
+    try {
+      return await bridge.getConfig?.(path, fallback);
+    } catch {
+      return fallback;
+    }
+  };
+  const modules = new Set<ModuleName>();
+  for (const name of MODULE_NAMES) if ((await get(PATHS.module(name), true)) !== false) modules.add(name);
+  return { modules };
+}
+
+/**
+ * A list as handed over: an array, or a Lua table as an object with its
+ * items under 1, 2, … (both taken, as the toolbar's bridge does)
+ */
+export function listOf(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== "object") return [];
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (!entries.every(([key], i) => key === String(i + 1))) return [];
+  return entries.map(([, item]) => item);
+}

@@ -1,0 +1,71 @@
+/* The tags playground (common.css: what every playground shares): the pages
+   left, the page open right, its text as the editor */
+body {
+  display: flex;
+  flex-direction: column;
+}
+#commands {
+  display: inline-flex;
+  gap: 6px;
+}
+#sb-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+#pages {
+  flex: 0 0 240px;
+  overflow: auto;
+  padding: 8px;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+}
+#pages button {
+  display: block;
+  width: 100%;
+  margin: 1px 0;
+  text-align: left;
+  border: 0;
+  background: none;
+}
+#pages button[aria-current="page"] {
+  font-weight: 600;
+  background: color-mix(in srgb, var(--ui-accent-color) 16%, transparent);
+}
+#page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  padding: 12px 20px;
+}
+#page-name {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+#page-text {
+  flex: 1;
+  width: 100%;
+  padding: 12px;
+  font: 14px/1.5 ui-monospace, Menlo, Consolas, monospace;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  resize: none;
+}
+@media (max-width: 800px) {
+  #pages {
+    flex-basis: 140px;
+  }
+}
+/* Notifications over Silverware Tags' dialogs (an Undo in one, after a change applied from the manager) */
+#flash {
+  z-index: 110;
+}
+#flash button {
+  margin-left: 8px;
+  color: inherit;
+  background: transparent;
+  border-color: currentColor;
+}

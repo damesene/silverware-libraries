@@ -39,18 +39,34 @@ export type View = {
   readonly applied?: (state: unknown) => unknown;
 };
 
-/** A module's parts of the tag picked, in the tags' view */
+/** A module's parts of the tag picked, in the tags' view: UI of its own, where data would not do */
 export type TagParts = {
   // In place of the tag's name (a field renaming it); the first module's that gives one
   readonly name?: HTMLElement;
-  // Buttons under its uses, in the modules' order
-  readonly actions?: readonly HTMLElement[];
+};
+
+/**
+ * Something done with a tag, as data: the core shows it (a button of the tag
+ * picked, in the modules' order) and runs it. What it gives is reviewed (an
+ * operation: planned, shown, applied, kept for Undo, meta pages protected), or
+ * it does what it does itself through the window (another view shown)
+ */
+export type TagAction = {
+  // Its id (the button's data-swg-action)
+  readonly id: string;
+  readonly label: string;
+  // Taking something away (Delete): shown so
+  readonly danger?: boolean;
+  // Whether it is offered for this tag (left out: always)
+  readonly when?: (tag: string, catalog: Catalog) => boolean;
+  readonly run: (tag: string, host: WorkspaceHost) => Operation | void | Promise<Operation | void>;
 };
 
 export type TagsModule = {
   readonly commands?: () => readonly Command[];
   readonly views?: () => readonly View[];
   readonly tagParts?: (tag: string, host: WorkspaceHost) => TagParts;
+  readonly tagActions?: () => readonly TagAction[];
 };
 
 export type ModuleHost = {

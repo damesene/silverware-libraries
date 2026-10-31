@@ -176,17 +176,15 @@ export function pagesModule(module: ModuleHost): TagsModule {
         },
       },
     ],
-    tagParts: (tag, host) => {
-      const info = host.catalog.tags.get(tag);
-      const own = info?.byContext.get("page");
-      return {
-        actions: [
-          el(host.doc, "button", { class: "swg-button", text: "Add to pages…", attrs: { "data-swg-action": "pages.add" }, run: () => host.show(VIEW, { add: [tag] }) }),
-          ...(own?.size
-            ? [el(host.doc, "button", { class: "swg-button", text: "Remove from pages…", attrs: { "data-swg-action": "pages.remove" }, run: () => host.show(VIEW, { checked: [...own].sort((a, b) => a.localeCompare(b)), remove: [tag] }) })]
-            : []),
-        ],
-      };
-    },
+    tagActions: () => [
+      { id: "pages.add", label: "Add to pages…", run: (tag, host) => host.show(VIEW, { add: [tag] }) },
+      {
+        id: "pages.remove",
+        label: "Remove from pages…",
+        // Where it is a page's own tag somewhere
+        when: (tag, catalog) => !!catalog.tags.get(tag)?.byContext.get("page")?.size,
+        run: (tag, host) => host.show(VIEW, { checked: [...host.catalog.tags.get(tag)!.byContext.get("page")!].sort((a, b) => a.localeCompare(b)), remove: [tag] }),
+      },
+    ],
   };
 }

@@ -57,6 +57,7 @@ export class Controller {
       settings: this.options.settings ? () => void this.openSettings() : undefined,
       views: () => this.modules.flatMap((module) => module.views?.() ?? []),
       tagParts: (tag, host) => this.modules.flatMap((module) => (module.tagParts ? [module.tagParts(tag, host)] : [])),
+      tagActions: () => this.modules.flatMap((module) => module.tagActions?.() ?? []),
       navigate: (page) => space.navigate(page),
       plan: async (operation, progress) => makePlan(space, await catalog(), operation, progress, guard),
       apply: async (plan, progress) => {

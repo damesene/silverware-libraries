@@ -8,7 +8,7 @@
 // right the tag picked: its name (a module's field renaming it), where it is
 // used, the modules' actions, its pages (each opening it).
 import { type Catalog, pageCounts, pagesWith, type TagInfo } from "../core/catalog.ts";
-import type { TagParts, View, WorkspaceHost } from "../core/module.ts";
+import type { TagAction, TagParts, View, WorkspaceHost } from "../core/module.ts";
 import { counted, type Operation } from "../core/operation.ts";
 import type { Applied, Plan, Progress } from "../core/plan.ts";
 import { hashtagOf, isMetaTag } from "../tags/names.ts";
@@ -25,6 +25,8 @@ export type WorkspaceOptions = {
   readonly views: () => readonly View[];
   // The modules' parts of the tag picked, in their order
   readonly tagParts: (tag: string, host: WorkspaceHost) => readonly TagParts[];
+  // The modules' actions on a tag, in their order
+  readonly tagActions: () => readonly TagAction[];
   readonly navigate: (page: string) => unknown;
   readonly plan: (operation: Operation, progress: Progress) => Promise<Plan>;
   // Applied, kept for Undo and said
@@ -454,9 +456,36 @@ export class Workspace {
         class: "swg-detail-uses",
         text: [info ? `Used on ${counted(info.pages.size, "page")}` : "No page uses it itself", ...(uses.length > 1 ? [uses.join(", ")] : []), ...(subtags ? [`${counted(subtags, "tag")} under it, on ${counted(under, "page")} in all`] : [])].join(" · "),
       }),
-      el(doc, "div", "swg-actions", ...parts.flatMap((part) => part.actions ?? [])),
+      el(
+        doc,
+        "div",
+        "swg-actions",
+        ...this.options
+          .tagActions()
+          .filter((action) => action.when?.(tag, catalog) ?? true)
+          .map((action) =>
+            el(doc, "button", {
+              class: action.danger ? "swg-button swg-danger" : "swg-button",
+              text: action.label,
+              attrs: { "data-swg-action": action.id },
+              run: () => void this.runAction(action, tag),
+            }),
+          ),
+      ),
       ...(pages.length ? [this.pageList(tag, pages, info)] : []),
     ];
+  }
+
+  /** An action on a tag run: what it gives reviewed; a failure said where the window is */
+  private async runAction(action: TagAction, tag: string): Promise<void> {
+    let operation: Operation | void;
+    try {
+      operation = await action.run(tag, this.host());
+    } catch (e) {
+      this.body.prepend(el(this.doc, "p", { class: "swg-error", text: `${action.label}: ${e instanceof Error ? e.message : String(e)}` }));
+      return;
+    }
+    if (operation) await this.review(operation);
   }
 
   /** A tag's pages, the first PAGES_SHOWN of them until all are asked for (a tag may be on hundreds) */

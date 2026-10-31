@@ -6,7 +6,6 @@ import type { ModuleHost, TagsModule } from "../core/module.ts";
 import { counted, type Operation } from "../core/operation.ts";
 import { removeTags } from "../tags/edit.ts";
 import { hashtagOf, matches } from "../tags/names.ts";
-import { el } from "../ui/elements.ts";
 
 export function removeOperation(tag: string, children: boolean, subtags = 0): Operation {
   const what = `${hashtagOf(tag)}${children ? " and its subtags" : ""}`;
@@ -21,15 +20,13 @@ export function removeOperation(tag: string, children: boolean, subtags = 0): Op
 
 export function removeModule(_host: ModuleHost): TagsModule {
   return {
-    tagParts: (tag, host) => ({
-      actions: [
-        el(host.doc, "button", {
-          class: "swg-button swg-danger",
-          text: "Delete tag…",
-          attrs: { "data-swg-action": "remove" },
-          run: () => host.review(removeOperation(tag, false, subtagsOf(host.catalog, tag).length)),
-        }),
-      ],
-    }),
+    tagActions: () => [
+      {
+        id: "remove",
+        label: "Delete tag…",
+        danger: true,
+        run: (tag, host) => removeOperation(tag, false, subtagsOf(host.catalog, tag).length),
+      },
+    ],
   };
 }

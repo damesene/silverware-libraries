@@ -836,6 +836,9 @@ Setting a part replaces what an earlier `config.set` of the same part set: set e
   * `true`: a table edited with Silverware Table is written with aligned pipes, padded to the widest cell of each column and aligned as its delimiter row says.
   * `false`: each table keeps its own style: aligned tables stay aligned, compact tables stay compact, untouched rows are kept byte for byte.
   * Either way, *Format table* in the ⋯ menu of a table's toolbar aligns that table now (e.g. one typed by hand); an aligned table stays as it is.
+* **Align columns up to (characters)** (`silverware.table.formatMaxWidth`), default `40`
+  * A column is padded to its widest cell of at most this many characters. A longer cell, such as a long link, sticks out past the column's pipe instead of widening every row and the delimiter row.
+  * `0`: no limit, every column is as wide as its widest cell.
 
 ### Cell editor (`silverware.table.editor`)
 

@@ -205,7 +205,7 @@ class LazyTable {
       if (!range) return lost();
       const { table, skipped } = applyEdits(parseTable(range.text), [...held.edits.values()]);
       const format = await this.host.setting("autoFormat");
-      const markdown = serializeTable(format ? { ...table, padded: true } : table);
+      const markdown = serializeTable(format ? { ...table, padded: true } : table, await this.host.setting("formatMaxWidth"));
       await writePage(held.page, text.slice(0, range.from) + markdown + text.slice(range.to));
       this.held = undefined;
       const saved = count - skipped;

@@ -336,17 +336,22 @@ function sameCells(a: readonly string[], b: readonly string[] | undefined): bool
   return !!b && a.length === b.length && a.every((cell, i) => cell === b[i]);
 }
 
-export function serializeTable(table: Table): string {
+/**
+ * The table's markdown; padded, each column as wide as its widest cell, but for cells wider than `maxWidth` (where
+ * over 0): those stick out of the column, which the others are aligned to, so one long link does not widen every row
+ */
+export function serializeTable(table: Table, maxWidth = 0): string {
   const columns = table.align.length;
   const widths: number[] = [];
   for (const row of table.rows) {
     row.cells.forEach((cell, c) => {
-      widths[c] = Math.max(widths[c] ?? 3, shownLength(cell));
+      const length = shownLength(cell);
+      widths[c] = Math.max(widths[c] ?? 3, maxWidth > 0 && length > maxWidth ? 0 : length);
     });
   }
 
   const pad = (cell: string, c: number) => {
-    const gap = (widths[c] ?? 3) - shownLength(cell);
+    const gap = Math.max(0, (widths[c] ?? 3) - shownLength(cell));
     const align = table.align[c] ?? "";
     const left = align === "right" ? gap : align === "center" ? Math.floor(gap / 2) : 0;
     return " ".repeat(left) + cell + " ".repeat(gap - left);

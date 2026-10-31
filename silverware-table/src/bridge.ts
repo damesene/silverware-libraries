@@ -247,6 +247,14 @@ export const SETTINGS = {
     default: true,
     parse: (v) => (typeof v === "boolean" ? v : undefined),
   } satisfies Setting<boolean>,
+  // Characters; 0: no limit. A longer cell sticks out of its aligned column rather than widening every row
+  formatMaxWidth: {
+    path: "silverware.table.formatMaxWidth",
+    label: "Align columns up to (characters)",
+    hint: "Formatted, a column is padded to its widest cell of at most this many characters; a longer cell (a long link) sticks out instead of widening every row and the delimiter. 0: no limit",
+    default: 40,
+    parse: (v) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined),
+  } satisfies Setting<number>,
   // Milliseconds `${…}` cells wait after `page:index` for the indexers to write the index
   expressionsDelay: {
     path: "silverware.table.expressions.refreshDelay",

@@ -688,8 +688,7 @@ export class Controller implements TableHost {
       const held = this.features.flatMap((f) => f.pendingEdits?.(info) ?? []);
       const before = parseTable(range.text);
       const page: WritePage = { text, tables: pageTablesOf(text), from: range.from };
-      const format = await this.setting("autoFormat");
-      const serialize = (t: Table) => serializeTable(format ? { ...t, padded: true } : t);
+      const serialize = await this.serializer();
       // The other tables the features change for it, each seeing the earlier ones' changes
       const others = new Map<number, PageTable>();
       let pageNow = page;
@@ -2290,6 +2289,13 @@ export class Controller implements TableHost {
   }
 
   /** A setting's value, falling back to its default when unset or not valid */
+  /** How tables are written: with the autoFormat setting every edited table aligned, up to its maximum width */
+  private async serializer(): Promise<(table: Table) => string> {
+    const format = await this.setting("autoFormat");
+    const maxWidth = await this.setting("formatMaxWidth");
+    return (table) => serializeTable(format ? { ...table, padded: true } : table, maxWidth);
+  }
+
   async setting<K extends keyof typeof SETTINGS>(name: K): Promise<SettingValue<K>> {
     const { path, parse } = SETTINGS[name];
     const fallback = SETTINGS[name].default as SettingValue<K>;
@@ -2358,8 +2364,7 @@ export class Controller implements TableHost {
         return "failed";
       }
       const at = range ? range.to : text.length;
-      const format = await this.setting("autoFormat");
-      const serialize = (t: Table) => serializeTable(format ? { ...t, padded: true } : t);
+      const serialize = await this.serializer();
       // The new table's text: its key's once it is in the page
       if (key) this.register.writing(key, serialize(table).trimEnd());
       // An empty line before it, and after it where text follows
@@ -2468,9 +2473,7 @@ export class Controller implements TableHost {
       for (const feature of this.features) if (feature.writeStep) changed = feature.writeStep(before, changed, edit);
       changed = this.writeSteps.reduce((table, step) => step(before, table, options), changed);
       changed = this.withoutNewTags(before, changed, options, taken);
-      // With the autoFormat setting every edited table is written aligned
-      const format = await this.setting("autoFormat");
-      const serialize = (t: Table) => serializeTable(format ? { ...t, padded: true } : t);
+      const serialize = await this.serializer();
       const markdown = serialize(changed);
       if (markdown === range.text) {
         for (const pending of held) pending.written();

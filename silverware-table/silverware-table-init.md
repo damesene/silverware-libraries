@@ -45,6 +45,12 @@ config.define("silverware.table", {
       description = "Write tables edited with Silverware Table with aligned pipes. Off: each table keeps its own style (aligned or compact).",
       ui = { category = "Silverware Table", label = "Format tables", priority = 4 },
     },
+    formatMaxWidth = {
+      type = "number",
+      default = 40,
+      description = "With Format tables, a column is padded to its widest cell of at most this many characters; a longer cell (a long link) sticks out of the alignment instead of widening every row and the delimiter row. 0: no limit.",
+      ui = { category = "Silverware Table", label = "Align columns up to (characters)", priority = 3.8 },
+    },
     toolbarNames = {
       type = "string",
       enum = { "never", "always", "shift" },

@@ -127,6 +127,16 @@ describe("parseTable / serializeTable", () => {
     expect(parseTable(['| A                          | B   |', '| -------------------------- | --- |', `| 1 <meta formulas.f='=2-1'> | x   |`, '| 10                         | y   |'].join("\n")).padded).toBe(true);
   });
 
+  it("aligns a formatted table's columns up to the maximum width, a longer cell sticking out", () => {
+    const long = "[https://example.com/a/very/long/path](https://example.com)";
+    const table = { ...parseTable(`|ID|Link|Type|\n|:-|-|:-:|\n|01|${long}|A|\n|02|short|B|`), padded: true };
+    expect(serializeTable(table, 20)).toBe(
+      ["| ID  | Link  | Type |", "| :-- | ----- | :--: |", `| 01  | ${long} |  A   |`, "| 02  | short |  B   |"].join("\n"),
+    );
+    // No limit: the column as wide as the link
+    expect(serializeTable(table).split("\n")[1]).toBe(`| :-- | ${"-".repeat(long.length)} | :--: |`);
+  });
+
   it("keeps an aligned table aligned", () => {
     const text = ["| Name  | Age |", "| ----- | --: |", "| Alice |  30 |", "| Bob   |   4 |"].join("\n");
     const table = parseTable(text);

@@ -55,6 +55,8 @@ type Setting<T> = {
   readonly moreChoices?: (doc: Document) => readonly T[];
   // What the settings dialog calls a value of moreChoices
   readonly moreLabel?: (value: T) => string;
+  // The path of the switch it belongs to: it matters only while that is on, and the dialog shows it under it then
+  readonly under?: string;
 };
 
 // A number of pixels, 0 or more (0: no limit)
@@ -254,6 +256,7 @@ export const SETTINGS = {
     hint: "Formatted, a column is padded to its widest cell of at most this many characters; a longer cell (a long link) sticks out instead of widening every row and the delimiter. 0: no limit",
     default: 40,
     parse: (v) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined),
+    under: "silverware.table.autoFormat",
   } satisfies Setting<number>,
   // Milliseconds `${…}` cells wait after `page:index` for the indexers to write the index
   expressionsDelay: {

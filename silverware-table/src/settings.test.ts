@@ -59,6 +59,16 @@ describe("The settings dialog", () => {
     expect(dialog()).toBeNull();
   });
 
+  it("shows a setting under the switch it belongs to, while that is on", async () => {
+    await setup(PAGE, { "silverware.table.autoFormat": false });
+    await controller.openSettings();
+    const under = setting("silverware.table.formatMaxWidth").closest<HTMLElement>(".swt-settings-module-settings")!;
+    expect(under.closest(".swt-settings-module")!.contains(setting("silverware.table.autoFormat"))).toBe(true);
+    expect(under.hidden).toBe(true);
+    tick(box("silverware.table.autoFormat"), true);
+    expect(under.hidden).toBe(false);
+  });
+
   it("puts each module on the tab of the kind it declares, after General", async () => {
     expect(moduleTabs().flatMap((tab) => tab.modules).sort()).toEqual([...FEATURE_NAMES].sort());
     await setup(PAGE);

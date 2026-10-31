@@ -35,7 +35,7 @@ const TABS: readonly { readonly id: string; readonly title: string; readonly gro
     id: "general",
     title: "General",
     groups: [
-      { title: "Tables", keys: ["metadata", "autoFormat", "formatMaxWidth", "maxHeight", "toolbarNames"] },
+      { title: "Tables", keys: ["metadata", "autoFormat", "maxHeight", "toolbarNames"] },
       { title: "Cell editor", keys: ["enterKey", "selectOnClick", "ctrlEnterAddsRow"] },
       { title: "Cells with Lua expressions", keys: ["expressionsDelay"] },
     ],
@@ -52,10 +52,14 @@ export function moduleTabs(): { id: ModuleCategory; title: string; modules: Feat
 const moduleOf = (key: Key): FeatureName | undefined =>
   /^silverware\.table\.modules\.([^.]+)\./.exec(SETTINGS[key].path)?.[1] as FeatureName | undefined;
 const enabledPath = (name: FeatureName) => `silverware.table.modules.${name}.enabled`;
+// The settings under a switch (`under`), which matter only while it is on
+const keysUnder = (key: Key): Key[] =>
+  (Object.keys(SETTINGS) as Key[]).filter((other) => (SETTINGS[other] as { under?: string }).under === SETTINGS[key].path);
 
-/** Every setting the dialog shows: those of its tabs, and the modules' (a test checks none is left out) */
+/** Every setting the dialog shows: those of its tabs and under them, and the modules' (a test checks none is left out) */
 export function dialogKeys(): Key[] {
-  return [...TABS.flatMap((tab) => tab.groups.flatMap((group) => group.keys)), ...(Object.keys(SETTINGS) as Key[]).filter((key) => moduleOf(key))];
+  const shown = TABS.flatMap((tab) => tab.groups.flatMap((group) => group.keys));
+  return [...shown.flatMap((key) => [key, ...keysUnder(key)]), ...(Object.keys(SETTINGS) as Key[]).filter((key) => moduleOf(key))];
 }
 
 export class SettingsDialog {
@@ -68,6 +72,8 @@ export class SettingsDialog {
   private saveButton: HTMLButtonElement | undefined;
   private note: HTMLElement | undefined;
   private readonly moduleSettings = new Map<FeatureName, HTMLElement>();
+  // The settings under a switch, by its path
+  private readonly settingsUnder = new Map<string, HTMLElement>();
   private saving = false;
 
   constructor(private readonly context: SettingsContext) {
@@ -140,7 +146,7 @@ export class SettingsDialog {
       for (const group of tab.groups) {
         if (group.title) panel.append(el("h3", `${BASE}-group`, group.title));
         const card = el("div", `${BASE}-card`);
-        for (const key of group.keys) card.append(this.row(key));
+        for (const key of group.keys) card.append(this.rowWithUnder(key));
         panel.append(card);
       }
       list.push({ id: tab.id, title: tab.title, panel });
@@ -188,6 +194,18 @@ export class SettingsDialog {
     const row = settingRow(this.context.doc, BASE, setting.label, (setting as { hint?: string }).hint, this.control(key));
     row.dataset.swtSetting = setting.path;
     return row;
+  }
+
+  /** A setting's row, and the settings under it (shown as a module's own: while it is on) */
+  private rowWithUnder(key: Key): HTMLElement {
+    const keys = keysUnder(key);
+    if (keys.length === 0) return this.row(key);
+    const block = this.el("div", `${BASE}-module`);
+    const own = this.el("div", `${BASE}-module-settings`);
+    for (const under of keys) own.append(this.row(under));
+    block.append(this.row(key), own);
+    this.settingsUnder.set(SETTINGS[key].path, own);
+    return block;
   }
 
   /** A setting's control: a switch, a choice or a number */
@@ -262,6 +280,7 @@ export class SettingsDialog {
     }
     // A module's own settings show while it is on
     for (const [name, own] of this.moduleSettings) own.hidden = this.values.get(enabledPath(name)) !== true;
+    for (const [path, own] of this.settingsUnder) own.hidden = this.values.get(path) !== true;
     for (const input of Array.from(this.dialog?.element.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select") ?? [])) {
       input.disabled = this.saving;
     }

@@ -5,7 +5,7 @@
 // library page's space-style block is applied as SilverBullet would, and its
 // commands are the header's buttons.
 import { readSettings } from "../silverware-tags/src/bridge.ts";
-import { defineOperations, panelActionList, panelMove, panelPageFirst, panelRows, panelRun, start } from "../silverware-tags/src/index.ts";
+import { defineOperations, panelActionList, panelClicked, panelMove, panelPageFirst, panelRows, panelRun, start } from "../silverware-tags/src/index.ts";
 import type { SettingsStore } from "../silverware-tags/src/settings.ts";
 import { memorySpace } from "../silverware-tags/src/space/memory.ts";
 import libraryPage from "../silverware-tags/silverware-tags.md";
@@ -123,6 +123,10 @@ async function showPanel(): Promise<void> {
       button.addEventListener("click", () => void panelRun(action.id, name));
       el.append(button);
     }
+    // Each click told, as the navigator's onSelect tells it (two soon after: the window)
+    el.addEventListener("click", (e) => {
+      if (!(e.target as Element).closest("button")) void panelClicked(name);
+    });
     el.addEventListener("keydown", (e) => {
       const action = actions.find((a) => a.key === e.key && tag?.can?.[a.id]);
       if (action) void panelRun(action.id, name);

@@ -68,6 +68,14 @@ describe("the tags' panel", () => {
     expect(rows.find((r) => r.name === "todo")!.can).toEqual({ "panel.add": true, "panel.remove": false, "rename.rename": true, "panel.open": true });
     expect(rows.find((r) => r.name === "project")!.can!["panel.add"]).toBe(false);
   });
+  it("opens the window at a row clicked twice soon after, not at one clicked once", async () => {
+    const { panel, calls } = host();
+    await panel.clicked("todo");
+    await panel.clicked("idea");
+    expect(calls).toEqual([]);
+    await panel.clicked("idea");
+    expect(calls).toEqual(['open tags "idea"']);
+  });
   it("runs a row's action: the panel's own (+ applied at once, Open the window), another module's", async () => {
     const { panel, calls, space } = host();
     (space as { current?: string }).current = "B";

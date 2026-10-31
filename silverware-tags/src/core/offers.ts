@@ -58,6 +58,8 @@ export type PanelOffer = {
   actions(): readonly PanelActionInfo[];
   /** A row's action run on its tag */
   run(id: string, tag: string): Promise<void>;
+  /** A row clicked (the host tells every click: SilverBullet's navigator has no double click): twice on it soon after, the window at it */
+  clicked(tag: string): Promise<void>;
   /** A tag dragged under another level: renamed so (reviewed), its subtags with it */
   move(tag: string, to: string): Promise<void>;
 };

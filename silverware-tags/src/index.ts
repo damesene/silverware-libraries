@@ -96,6 +96,11 @@ export function panelRun(id: string, tag: string): Promise<void> {
   return panel()?.run(id, tag) ?? Promise.resolve();
 }
 
+/** A row clicked (every click: two on a row soon after open the window at it) */
+export function panelClicked(tag: string): Promise<void> {
+  return panel()?.clicked(tag) ?? Promise.resolve();
+}
+
 export function panelMove(tag: string, to: string): Promise<void> {
   return panel()?.move(tag, to) ?? Promise.resolve();
 }

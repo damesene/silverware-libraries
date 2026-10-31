@@ -8,7 +8,7 @@
 // actions (`panelActions`: Rename, the rename module's); dragged under another level, the
 // rename is reviewed (through the rename module's offer: off, the drag is
 // refused and said). A click does nothing more than the tree does (a level
-// opens): the window is one of the actions. The tags of the page open are
+// opens); a double click opens the window at it, as its action does. The tags of the page open are
 // marked `here`, and shown first where the setting says so (else by name).
 import type { Catalog } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule } from "../core/module.ts";
@@ -54,6 +54,9 @@ export function panelRows(catalog: Catalog, page?: string, own: ReadonlySet<stri
     .sort((a, b) => (pageFirst ? Number(b.here) - Number(a.here) : 0) || a.name.localeCompare(b.name));
 }
 
+// Two clicks of a row this close are a double click (the window opened at it)
+const DOUBLE_CLICK_MS = 400;
+
 /** The panel's own setting (bridge.ts reads it; a module knows nothing of how) */
 export type PanelSettings = { readonly pageFirst: boolean };
 
@@ -72,6 +75,8 @@ export function panelModule(host: ModuleHost, settings: PanelSettings): TagsModu
       done: () => `${page}: ${verb === "add" ? "added" : "removed"} ${hashtagOf(tag)}`,
     });
   };
+  // The last click (its tag and when), told apart from a double click
+  let last: { readonly tag: string; readonly at: number } | undefined;
   const offer: PanelOffer = {
     rows: async () => {
       const page = await host.space.currentPage();
@@ -87,6 +92,12 @@ export function panelModule(host: ModuleHost, settings: PanelSettings): TagsModu
       return panelRows(await host.catalog(), page, own, settings.pageFirst).map((row) => ({ ...row, can: Object.fromEntries(actions.map((action) => [action.id, action.when?.(row) ?? true])) }));
     },
     actions: () => host.panelActions().map(({ id, icon, label, key }) => ({ id, icon, label, ...(key ? { key } : {}) })),
+    clicked: async (tag) => {
+      const now = Date.now();
+      const twice = last?.tag === tag && now - last.at < DOUBLE_CLICK_MS;
+      last = twice ? undefined : { tag, at: now };
+      if (twice) await host.open("tags", tag);
+    },
     run: async (id, tag) => {
       await host.panelActions().find((action) => action.id === id)?.run(tag);
     },

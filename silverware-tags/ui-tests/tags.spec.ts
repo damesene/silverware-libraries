@@ -152,6 +152,11 @@ test("the tags' panel: a click opens no window; its actions open it, F2 with the
   await expect(window.locator(".swg-name-field")).toHaveValue("todo");
   await page.keyboard.press("Escape");
   await expect(window).toHaveCount(0);
+  // A double click opens it too
+  await (await panelRow(page, "idea")).dblclick();
+  await expect(window.locator(".swg-name-field")).toHaveValue("idea");
+  await page.keyboard.press("Escape");
+  await expect(window).toHaveCount(0);
   // A click picks the row (it opens nothing), F2 opens the window at it (the navigator's keys act on the row picked)
   const row = await panelRow(page, "milestone");
   await row.click();

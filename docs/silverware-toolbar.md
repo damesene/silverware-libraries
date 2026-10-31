@@ -1,7 +1,7 @@
 # Silverware Toolbar: plan
 
-Status: decided on 2026-10-26, built on the long-lived branch
-`silverware-toolbar` (merged into `main` once ready).
+Status: decided on 2026-10-26, built on the branch `silverware-toolbar`,
+merged into `main` (the branch deleted on 2026-10-31).
 
 ## The request
 
@@ -481,7 +481,7 @@ or opening its choices).
 
 ## Status and next (2026-10-26)
 
-**Done** (branch `silverware-toolbar`): steps 1 to 5; *Extensions* (the
+**Done** (on `main`): steps 1 to 5; *Extensions* (the
 formats domain, `defineFormats`, `defineActions` with `choices` and `mixed`,
 ids `formats.<name>` / `actions.<name>`, the key as the command's, the
 toolbar at the caret, the popup under the toolbar, the page checked

@@ -14,8 +14,9 @@ describe("FUNCTIONS", () => {
     expect(name).toBe(name.toUpperCase());
     expect(f.syntax.startsWith(`${name}(`)).toBe(true);
     expect(f.description).not.toBe("");
-    // The Functions table in silverware-table.md: | `SYNTAX` | Description |
-    expect(libraryPage).toContain(`| \`${f.syntax}\` | ${f.description} |`);
+    // The Functions table in silverware-table.md: | `SYNTAX` | Description |, an error code in it as code
+    // (`#VALUE!`: else SilverBullet indexes it as a tag); the description itself is plain text (the Functions dialog's)
+    expect(libraryPage).toContain(`| \`${f.syntax}\` | ${f.description.replace(/#(?:VALUE!|DIV\/0!|N\/A|REF!|NAME\?|NUM!|CYCLE!)/g, "`$&`")} |`);
     // In a group of the Functions dialog, with an example of it that formulas read
     expect(Object.keys(FUNCTION_CATEGORIES)).toContain(f.category);
     expect(f.example!.startsWith("=") && f.example!.includes(`${name}(`)).toBe(true);

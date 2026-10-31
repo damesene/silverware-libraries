@@ -130,11 +130,24 @@ describe("parseTable / serializeTable", () => {
   it("aligns a formatted table's columns up to the maximum width, a longer cell sticking out", () => {
     const long = "[https://example.com/a/very/long/path](https://example.com)";
     const table = { ...parseTable(`|ID|Link|Type|\n|:-|-|:-:|\n|01|${long}|A|\n|02|short|B|`), padded: true };
-    expect(serializeTable(table, 20)).toBe(
+    expect(serializeTable(table, { cellWidth: 20 })).toBe(
       ["| ID  | Link  | Type |", "| :-- | ----- | :--: |", `| 01  | ${long} |  A   |`, "| 02  | short |  B   |"].join("\n"),
     );
     // No limit: the column as wide as the link
     expect(serializeTable(table).split("\n")[1]).toBe(`| :-- | ${"-".repeat(long.length)} | :--: |`);
+  });
+
+  it("writes a formatted table compact where a line of it padded would be longer than the line width, every row anew", () => {
+    const long = "[https://example.com/a/very/long/path](https://example.com)";
+    // Aligned before, its rows as they were: compact, none of them kept padded
+    const text = ["| ID  | Link  | Type |", "| :-- | ----- | :--: |", "| 02  | short |  B   |"].join("\n");
+    const table = parseTable(text);
+    const grown = { ...table, rows: [...table.rows, { cells: ["01", long, "A"] }] };
+    expect(serializeTable(grown, { lineWidth: 60 })).toBe(["| ID | Link | Type |", "|:---|---|:---:|", "| 02 | short | B |", `| 01 | ${long} | A |`].join("\n"));
+    // Narrow enough: aligned
+    expect(serializeTable(table, { lineWidth: 60 })).toBe(text);
+    // No limit: aligned whatever its width
+    expect(serializeTable(grown).split("\n")[1]).toBe(`| :-- | ${"-".repeat(long.length)} | :--: |`);
   });
 
   it("keeps an aligned table aligned", () => {

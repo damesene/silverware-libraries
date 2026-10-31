@@ -1,7 +1,7 @@
 // Enhances SilverBullet's rendered markdown tables in place: sorting, filtering,
 // inline cell editing and row/column editing. Every change to the markdown is
 // one `editor.replaceRange`, so undo works as for any other edit.
-import { type Bridge, type FeatureName, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
+import { type Bridge, type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
 import { type AdapterFeature, type AddressFrame, type AlsoChanged, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type TableHost, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
@@ -2289,11 +2289,11 @@ export class Controller implements TableHost {
   }
 
   /** A setting's value, falling back to its default when unset or not valid */
-  /** How tables are written: with the autoFormat setting every edited table aligned, up to its maximum width */
+  /** How tables are written: with the autoFormat setting every edited table aligned; a padded one as Long content says */
   private async serializer(): Promise<(table: Table) => string> {
     const format = await this.setting("autoFormat");
-    const maxWidth = await this.setting("formatMaxWidth");
-    return (table) => serializeTable(format ? { ...table, padded: true } : table, maxWidth);
+    const rule = await formatRule((name) => this.setting(name));
+    return (table) => serializeTable(format ? { ...table, padded: true } : table, rule);
   }
 
   async setting<K extends keyof typeof SETTINGS>(name: K): Promise<SettingValue<K>> {

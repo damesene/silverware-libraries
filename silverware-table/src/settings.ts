@@ -35,7 +35,8 @@ const TABS: readonly { readonly id: string; readonly title: string; readonly gro
     id: "general",
     title: "General",
     groups: [
-      { title: "Tables", keys: ["metadata", "autoFormat", "maxHeight", "toolbarNames"] },
+      { title: "Tables", keys: ["metadata", "maxHeight", "toolbarNames"] },
+      { title: "Formatting", keys: ["autoFormat", "formatLong"] },
       { title: "Cell editor", keys: ["enterKey", "selectOnClick", "ctrlEnterAddsRow"] },
       { title: "Cells with Lua expressions", keys: ["expressionsDelay"] },
     ],
@@ -52,9 +53,9 @@ export function moduleTabs(): { id: ModuleCategory; title: string; modules: Feat
 const moduleOf = (key: Key): FeatureName | undefined =>
   /^silverware\.table\.modules\.([^.]+)\./.exec(SETTINGS[key].path)?.[1] as FeatureName | undefined;
 const enabledPath = (name: FeatureName) => `silverware.table.modules.${name}.enabled`;
-// The settings under a switch (`under`), which matter only while it is on
-const keysUnder = (key: Key): Key[] =>
-  (Object.keys(SETTINGS) as Key[]).filter((other) => (SETTINGS[other] as { under?: string }).under === SETTINGS[key].path);
+// The settings under another (`under`), which matter only while it has their value
+const underOf = (key: Key) => (SETTINGS[key] as { under?: { path: string; value: unknown } }).under;
+const keysUnder = (key: Key): Key[] => (Object.keys(SETTINGS) as Key[]).filter((other) => underOf(other)?.path === SETTINGS[key].path);
 
 /** Every setting the dialog shows: those of its tabs and under them, and the modules' (a test checks none is left out) */
 export function dialogKeys(): Key[] {
@@ -72,8 +73,8 @@ export class SettingsDialog {
   private saveButton: HTMLButtonElement | undefined;
   private note: HTMLElement | undefined;
   private readonly moduleSettings = new Map<FeatureName, HTMLElement>();
-  // The settings under a switch, by its path
-  private readonly settingsUnder = new Map<string, HTMLElement>();
+  // The settings under another: its path and their value
+  private readonly settingsUnder: { readonly path: string; readonly value: unknown; readonly element: HTMLElement }[] = [];
   private saving = false;
 
   constructor(private readonly context: SettingsContext) {
@@ -196,15 +197,18 @@ export class SettingsDialog {
     return row;
   }
 
-  /** A setting's row, and the settings under it (shown as a module's own: while it is on) */
+  /** A setting's row, and the settings under it (shown as a module's own: while it has their value) */
   private rowWithUnder(key: Key): HTMLElement {
     const keys = keysUnder(key);
     if (keys.length === 0) return this.row(key);
     const block = this.el("div", `${BASE}-module`);
-    const own = this.el("div", `${BASE}-module-settings`);
-    for (const under of keys) own.append(this.row(under));
-    block.append(this.row(key), own);
-    this.settingsUnder.set(SETTINGS[key].path, own);
+    block.append(this.row(key));
+    for (const under of keys) {
+      const own = this.el("div", `${BASE}-module-settings`);
+      own.append(this.row(under));
+      block.append(own);
+      this.settingsUnder.push({ path: SETTINGS[key].path, value: underOf(under)!.value, element: own });
+    }
     return block;
   }
 
@@ -280,7 +284,7 @@ export class SettingsDialog {
     }
     // A module's own settings show while it is on
     for (const [name, own] of this.moduleSettings) own.hidden = this.values.get(enabledPath(name)) !== true;
-    for (const [path, own] of this.settingsUnder) own.hidden = this.values.get(path) !== true;
+    for (const { path, value, element } of this.settingsUnder) element.hidden = this.values.get(path) !== value;
     for (const input of Array.from(this.dialog?.element.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select") ?? [])) {
       input.disabled = this.saving;
     }

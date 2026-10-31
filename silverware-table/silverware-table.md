@@ -832,13 +832,16 @@ Setting a part replaces what an earlier `config.set` of the same part set: set e
 * **Maximum table height (px)** (`silverware.table.maxHeight`), default `0`
   * `0`: no limit, a table is as tall as its rows.
   * A number of pixels, e.g. `400`: a taller table gets its own vertical scrollbar.
-* **Format tables** (`silverware.table.autoFormat`), default `true`
-  * `true`: a table edited with Silverware Table is written with aligned pipes, padded to the widest cell of each column and aligned as its delimiter row says.
+
+### Formatting
+
+* **Format edited tables** (`silverware.table.autoFormat`), default `true`
+  * `true`: a table edited with Silverware Table is written with aligned pipes, padded to the widest cell of each column (as *Long content* allows) and aligned as its delimiter row says.
   * `false`: each table keeps its own style: aligned tables stay aligned, compact tables stay compact, untouched rows are kept byte for byte.
   * Either way, *Format table* in the ⋯ menu of a table's toolbar aligns that table now (e.g. one typed by hand); an aligned table stays as it is.
-  * **Longest cell aligned (characters)** (`silverware.table.formatMaxWidth`), default `40`: how wide a column is padded when a table is formatted.
-    * Each column is padded to its longest cell of at most this many characters. A longer cell, such as a long link, is written as it is, past the column's `|`, so the other rows and the delimiter row do not widen.
-    * `0`: no limit, every column is as wide as its widest cell.
+* **Long content** (`silverware.table.formatLong`), default `limit`: how a table is formatted where cells are long, such as a link. It applies to tables formatted as they are edited and to *Format table*.
+  * `limit` (*Pad columns up to a width*): **Longest cell aligned (characters)** (`silverware.table.formatCellWidth`), default `40`. Each column is padded to its longest cell of at most this many characters. A longer cell is written as it is, past the column's `|`, so the other rows and the delimiter row do not widen. `0`: no limit, every column is as wide as its widest cell.
+  * `compact` (*Compact a table too wide*): **Compact when wider than (characters)** (`silverware.table.formatLineWidth`), default `80`. A table whose longest line would be longer than this with its columns padded is written compact: no padding, the delimiter row `---`, as Prettier does with `proseWrap: "never"`. Narrower tables stay aligned. `0`: no limit.
 
 ### Cell editor (`silverware.table.editor`)
 
@@ -933,7 +936,7 @@ With the *Store table metadata* setting on, Silverware Table stores a table's se
 ## How your markdown is kept
 
 * Every change is one ordinary edit: Ctrl+Z undoes it.
-* With *Format tables* on (the default), every table you edit is written with aligned pipes. Tables are formatted only when edited, never just by viewing them. With it off, rows you did not change are kept byte for byte, and aligned tables stay aligned, compact ones compact. See [[#Settings]].
+* With *Format edited tables* on (the default), every table you edit is written with aligned pipes (a table with long cells as *Long content* says). Tables are formatted only when edited, never just by viewing them. With it off, rows you did not change are kept byte for byte, and aligned tables stay aligned, compact ones compact. See [[#Settings]].
 * Cells that are one `${…}` expression (e.g. formulas of a spreadsheet library such as MdTableSheet) are re-evaluated once the page is re-indexed after an edit, so they do not keep a stale result.
 * Sorting (unless stored as [[#Table metadata]]), filters and scroll positions (sideways and, with a maximum height, up and down) are views only: they are remembered per table until the page is reloaded, and never written to the page.
 * SilverBullet does not show columns without a name, which shifts the header against the data. For such a table Silverware Table shows a notice with a *Name them* button instead of enhancing it.

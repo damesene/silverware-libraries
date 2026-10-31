@@ -11,6 +11,7 @@
 // to the background, they are written at once; the tab closing, too, and the
 // browser asks whether to leave.
 import { type CellEditor, type Feature, type HeldEdit, type ModelHost, type PartTable, type PendingEdits, type TableInfo, type TableLooks, tablePartsOf, type ToolbarButton } from "../core/feature.ts";
+import { formatRule } from "../bridge.ts";
 import { ICONS } from "../icons.ts";
 import { locateBySource, parseTable, serializeTable, type Table, unescapeCell } from "../markdown.ts";
 import { setCell } from "../ops.ts";
@@ -205,7 +206,7 @@ class LazyTable {
       if (!range) return lost();
       const { table, skipped } = applyEdits(parseTable(range.text), [...held.edits.values()]);
       const format = await this.host.setting("autoFormat");
-      const markdown = serializeTable(format ? { ...table, padded: true } : table, await this.host.setting("formatMaxWidth"));
+      const markdown = serializeTable(format ? { ...table, padded: true } : table, await formatRule((name) => this.host.setting(name)));
       await writePage(held.page, text.slice(0, range.from) + markdown + text.slice(range.to));
       this.held = undefined;
       const saved = count - skipped;

@@ -337,10 +337,30 @@ function sameCells(a: readonly string[], b: readonly string[] | undefined): bool
 }
 
 /**
- * The table's markdown; padded, each column as wide as its widest cell, but for cells wider than `maxWidth` (where
- * over 0): those stick out of the column, which the others are aligned to, so one long link does not widen every row
+ * How a padded table takes long content (each over 0, else no limit): `cellWidth`, a column as wide as its widest cell
+ * of at most so many characters, a longer one sticking out of it (the others aligned to it); `lineWidth`, the whole
+ * table compact where a line of it padded would be longer, as Prettier writes one with `proseWrap: "never"`
  */
-export function serializeTable(table: Table, maxWidth = 0): string {
+export type FormatRule = { readonly cellWidth?: number; readonly lineWidth?: number };
+
+/** The table's markdown; padded, each column as wide as its widest cell, as the rule lets it */
+export function serializeTable(table: Table, rule: FormatRule = {}): string {
+  let lines = tableLines(table, rule.cellWidth ?? 0);
+  const lineWidth = rule.lineWidth ?? 0;
+  if (table.padded && lineWidth > 0 && lines.some((line) => shownLength(line) > lineWidth)) {
+    // Compact, every row written anew: one kept as it was would stay padded
+    const rows = table.rows.map((row) => ({ cells: row.cells }));
+    const { delimiterSource: _, ...rest } = table;
+    lines = tableLines({ ...rest, padded: false, rows }, 0);
+  }
+  // An unchanged metadata row is kept as it was; one without attributes is dropped
+  if (table.meta && table.metaSource?.meta === table.meta) lines.push(table.metaSource.line);
+  else if (table.meta && Object.keys(table.meta).length > 0) lines.push(metaRow(table.indent, table.meta));
+  return lines.join("\n");
+}
+
+/** The table's lines but its metadata row; padded, cells wider than `maxWidth` (over 0) left out of their column's width */
+function tableLines(table: Table, maxWidth: number): string[] {
   const columns = table.align.length;
   const widths: number[] = [];
   for (const row of table.rows) {
@@ -380,11 +400,7 @@ export function serializeTable(table: Table, maxWidth = 0): string {
       : `${table.indent}|${table.align.slice(0, columns).map(delimiterCell).join("|")}|`;
 
   const [header, ...body] = table.rows;
-  const lines = [header ? rowText(header) : "", delimiterText, ...body.map(rowText)];
-  // An unchanged metadata row is kept as it was; one without attributes is dropped
-  if (table.meta && table.metaSource?.meta === table.meta) lines.push(table.metaSource.line);
-  else if (table.meta && Object.keys(table.meta).length > 0) lines.push(metaRow(table.indent, table.meta));
-  return lines.join("\n");
+  return [header ? rowText(header) : "", delimiterText, ...body.map(rowText)];
 }
 
 /** Text typed into a cell editor, as markdown cell content */

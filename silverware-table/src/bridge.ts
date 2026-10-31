@@ -1,5 +1,6 @@
 // The SilverBullet API Silverware Table uses, handed over by the library page's
 // Space Lua (`editor.*` and `config.get`), so no SilverBullet internals are needed.
+import type { FormatRule } from "./markdown.ts";
 import { BUILT_IN_THEMES, NATIVE_THEME, STRIPES, type Stripes, stripesLabel, stripesName, themeLabel, themeName, themesInStyles } from "./themes.ts";
 
 export type Bridge = {
@@ -55,8 +56,8 @@ type Setting<T> = {
   readonly moreChoices?: (doc: Document) => readonly T[];
   // What the settings dialog calls a value of moreChoices
   readonly moreLabel?: (value: T) => string;
-  // The path of the switch it belongs to: it matters only while that is on, and the dialog shows it under it then
-  readonly under?: string;
+  // The setting it belongs to and its value: it matters only while that has it, and the dialog shows it under it then
+  readonly under?: { readonly path: string; readonly value: unknown };
 };
 
 // A number of pixels, 0 or more (0: no limit)
@@ -244,19 +245,38 @@ export const SETTINGS = {
   // Write edited tables with aligned pipes; off: keep each table's own style
   autoFormat: {
     path: "silverware.table.autoFormat",
-    label: "Format tables",
-    hint: "A table edited with Silverware Table is written with its columns aligned; off, each table keeps its own style",
+    label: "Format edited tables",
+    hint: "A table edited with Silverware Table is written with its columns aligned, as Long content says; off, each table keeps its own style",
     default: true,
     parse: (v) => (typeof v === "boolean" ? v : undefined),
   } satisfies Setting<boolean>,
+  // How a formatted table takes a long cell (a link): its columns padded up to a width, or the table compact where too wide
+  formatLong: {
+    path: "silverware.table.formatLong",
+    label: "Long content",
+    hint: "How a table is formatted where cells are long (a link), edited or by Format table in its ⋯ menu: its columns padded up to a width, a longer cell sticking out; or the whole table compact where a line would be too long",
+    default: "limit",
+    choices: ["limit", "compact"],
+    choiceLabels: ["Pad columns up to a width", "Compact a table too wide"],
+    parse: (v) => (v === "limit" || v === "compact" ? v : undefined),
+  } satisfies Setting<"limit" | "compact">,
   // Characters; 0: no limit. A longer cell is written past its aligned column rather than widening every row
-  formatMaxWidth: {
-    path: "silverware.table.formatMaxWidth",
+  formatCellWidth: {
+    path: "silverware.table.formatCellWidth",
     label: "Longest cell aligned (characters)",
     hint: "Each column is padded to its longest cell of at most this many characters. A longer cell, such as a long link, is written as it is, past the column's |, so the other rows and the delimiter do not widen. 0: no limit",
     default: 40,
     parse: (v) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined),
-    under: "silverware.table.autoFormat",
+    under: { path: "silverware.table.formatLong", value: "limit" },
+  } satisfies Setting<number>,
+  // Characters; 0: no limit. As Prettier's printWidth with proseWrap "never"
+  formatLineWidth: {
+    path: "silverware.table.formatLineWidth",
+    label: "Compact when wider than (characters)",
+    hint: "A table whose longest line would be longer than this, its columns padded, is written compact: no padding, the delimiter row --- (as Prettier does with proseWrap never). 0: no limit",
+    default: 80,
+    parse: (v) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined),
+    under: { path: "silverware.table.formatLong", value: "compact" },
   } satisfies Setting<number>,
   // Milliseconds `${…}` cells wait after `page:index` for the indexers to write the index
   expressionsDelay: {
@@ -339,6 +359,13 @@ export const SETTINGS = {
     parse: pixels,
   } satisfies Setting<number>,
 };
+
+/** How tables are formatted where cells are long, as the settings say (Long content and its width) */
+export async function formatRule(setting: <K extends keyof typeof SETTINGS>(name: K) => Promise<SettingValue<K>>): Promise<FormatRule> {
+  return (await setting("formatLong")) === "compact"
+    ? { lineWidth: await setting("formatLineWidth") }
+    : { cellWidth: await setting("formatCellWidth") };
+}
 
 /**
  * A choice setting's options, for the settings dialog and the playground: its

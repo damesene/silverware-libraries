@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignOperation } from "../modules/assign.ts";
-import { pageTagsOperation } from "../modules/pagetags.ts";
+import { pagesOperation } from "../modules/pages.ts";
 import { removeOperation } from "../modules/remove.ts";
 import { renameOperation, renameProblem } from "../modules/rename.ts";
 import { memorySpace } from "../space/memory.ts";
@@ -95,14 +94,21 @@ describe("operations", () => {
   });
   it("tags pages: added into the frontmatter, removed from it and the tag lines", async () => {
     const space = pages();
-    await applyPlan(space, await makePlan(space, await readCatalog(space), assignOperation(["A", "C"], ["review"], ["project/alpha"])));
+    await applyPlan(space, await makePlan(space, await readCatalog(space), pagesOperation(["A", "C"], ["review"], ["project/alpha"])));
     expect(space.pages.get("A")).toBe("---\ntags: [review]\n---\n- [ ] do #todo");
     expect(space.pages.get("C")).toBe("---\ntags:\n  - review\n---\nNothing here");
   });
-  it("sets a page's tags", async () => {
+  it("changes one page's tags", async () => {
     const space = pages();
-    await applyPlan(space, await makePlan(space, await readCatalog(space), pageTagsOperation("A/Plan", ["project/alpha", "plan"], ["plan", "draft"])));
+    await applyPlan(space, await makePlan(space, await readCatalog(space), pagesOperation(["A/Plan"], ["draft"], ["project/alpha"])));
     expect(space.pages.get("A/Plan")).toBe("---\ntags:\n  - draft\n---\n#plan\n\ntext");
+  });
+  it("offers the subtags in the review, the operation made anew", () => {
+    const op = renameOperation("project", "work", true, 2);
+    expect(op.option?.on).toBe(true);
+    expect(op.option?.toggled().option?.on).toBe(false);
+    expect(op.shows).toBe("work");
+    expect(removeOperation("project", false, 0).option).toBeUndefined();
   });
   it("says what is wrong with a rename", () => {
     expect(renameProblem("a", "a")).toBeDefined();

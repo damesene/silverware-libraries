@@ -96,6 +96,8 @@ export type ChipsField = {
   readonly input: HTMLInputElement;
   // The tags chosen, what is still typed added first where it is a name
   values(): string[];
+  // The tags chosen as chips, what is typed left as it is
+  chosen(): string[];
 };
 
 /** Tags as chips, the space's offered as one is typed */
@@ -169,5 +171,6 @@ export function chipsField(doc: Document, options: { readonly values?: readonly 
       if (input.value.trim()) add(input.value);
       return [...values];
     },
+    chosen: () => [...values],
   };
 }

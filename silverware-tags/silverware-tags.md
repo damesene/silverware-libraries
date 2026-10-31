@@ -1,23 +1,26 @@
 ---
 name: Library/damesene/silverware-tags
 tags: meta/library
-description: "Silverware Tags: manage the tags of your space: rename and merge them everywhere (pages, items, tasks), delete them, give tags to many pages at once or to every page under a folder, edit a page's tags; every change previewed first, and undone with one command."
+description: "Silverware Tags: manage the tags of your space in one window: rename and merge them everywhere (pages, items, tasks), delete them, give tags to many pages at once or to every page under a folder, edit a page's tags; every change reviewed first, and undone with one command."
 files:
 - silverware-tags.js
 ---
 # Silverware Tags
 
-A manager for the tags of your space. Rename a tag everywhere it is used, merge two tags into one, delete a tag, give tags to many pages at once (every page of a folder too), and edit the tags of the page you are on. Every change across pages shows you what it changes first, and *Undo* takes it back.
+A manager for the tags of your space. Rename a tag everywhere it is used, merge two tags into one, delete a tag, give tags to many pages at once (every page of a folder too), and edit the tags of the page you are on. Every change shows you what it changes first, and *Undo* takes it back.
 
 ## At a glance
 
-* **Silverware Tags: Manager** shows every tag of the space as a tree: `project/alpha` is under `project` (a `/` in a tag's name makes levels). Type to find a tag, **↑ ↓** to go through them, **→ ←** to open and close a level. The tag you pick shows how many pages use it and where (on the page itself, in items, in tasks), the pages (click one to open it), and what you can do with it: *Rename…*, *Add to pages…*, *Remove from pages…*, *Delete…*.
-* **Rename** a tag (*Rename…* in the manager, or the command **Silverware Tags: Rename tag**): every use of it changes, in the pages' frontmatter, on their tag lines, and in their text, items, tasks and tables. Renaming into a tag that exists merges the two. *With its subtags* renames the tags under it too: `project` to `work/project` makes `project/alpha` into `work/project/alpha`.
-* **Tag pages** (the command **Silverware Tags: Tag pages**, or *Add to pages…* in the manager): pick pages in a tree of your folders (a folder's box picks every page under it, its own page too; type to find pages), then the tags to add and the tags to remove. Tags are added into each page's frontmatter (a page that has one already is left as it is); removed from the frontmatter and from the page's tag lines.
-* **Page tags** (the command **Silverware Tags: Page tags**): the tags of the page you are on, to remove (×) or add (type, **Enter**; the tags of your space are offered as you type, **↑ ↓** and **Enter** or **Tab** to take one). *Save* writes them at once; **Ctrl+Z** in the page undoes it too.
-* **Delete** a tag (*Delete…* in the manager): it is taken off every page using it: from the frontmatter, the tag lines, and the text (with the space beside it).
-* **Before anything is written** you see each page that changes, its lines before and after, and the pages left alone and why. *Apply* writes them; *Cancel* writes nothing.
-* **Undo**: the notification after a change has an *Undo* button (in SilverBullet's newer versions), the manager has one at its bottom, and the command **Silverware Tags: Undo last change** takes back the last change: every page goes back to how it was, unless you edited it since (that page is left as it is and named).
+Everything is in one window, **Silverware Tags: Manager**, with two views (tabs at its top) and nothing opening over it:
+
+* **By tag**: every tag of the space as a tree (`project/alpha` is under `project`: a `/` in a tag's name makes levels). Type to find a tag, **↑ ↓** to go through them, **→ ←** to open and close a level. The tag you pick shows how many pages use it and where (on the page itself, in items, in tasks, in tables), its pages (click one to open it) and what you can do with it.
+  * **Rename**: its name is a field: type the new name and press **Enter** (or *Rename…*). Every use of it changes: the pages' frontmatter, their tag lines, and their text, items, tasks, tables and headings. A name another tag has merges the two, which the field says as you type. A tag with tags under it renames them too (`project` to `work/project` makes `project/alpha` into `work/project/alpha`), unless you untick *Its subtags too* in the review. **Esc** puts the name back.
+  * **Delete tag…**: takes it off every page using it (from the frontmatter, the tag lines and the text, with the space beside it); its subtags too if you tick that in the review.
+  * **Add to pages…** and **Remove from pages…** take you to *By page* with the tag to add, or with the pages having it picked and the tag to take off.
+* **By page** (the command **Silverware Tags: Tag pages**): your pages as a tree of folders. Tick pages, or a folder for every page under it (its own page too); type to find pages. On the right are the tags the pages you picked have, each with how many of them have it (`2/3`): **×** takes one off them all (click again to keep it), and the *Add* field gives tags to them all (the tags of your space are offered as you type: **↑ ↓** and **Enter**, or **Tab** for the first). Then *Review changes…*. Tags are added into each page's frontmatter (a page that has one already is left as it is) and taken off its frontmatter and its tag lines; a hashtag in a page's text stays (*Delete tag* takes those off).
+* **Silverware Tags: Page tags** opens *By page* with the page you are on picked.
+* **Every change is reviewed first**, in the same window: each page that changes with its lines before and after (the first few open, click a page for its lines), and the pages left alone and why. *Apply* writes them and takes you back; *Back* (or **Esc**) changes nothing.
+* **Undo**: the window's *Undo* at its bottom, the notification after a change (in SilverBullet's newer versions) and the command **Silverware Tags: Undo last change** take back the last change: every page goes back to how it was, unless you edited it since (that page is left as it is and named).
 
 ## Where tags are written
 
@@ -31,7 +34,7 @@ tags:
 ---
 ```
 
-A page without a frontmatter gets one; a page whose `tags` is written `tags: [a, b]` or `tags: a, b` keeps that form. The rest of the frontmatter stays as you wrote it, its comments too. A page whose tags it cannot read safely (a list in brackets over several lines) is left alone, and the preview says so.
+A page without a frontmatter gets one; a page whose `tags` is written `tags: [a, b]` or `tags: a, b` keeps that form. The rest of the frontmatter stays as you wrote it, its comments too. A page whose tags it cannot read safely (a list in brackets over several lines) is left alone, and the review says so.
 
 Hashtags are found as SilverBullet finds them: not in code (blocks and `inline`), links, URLs or HTML. Those in headings and tables count too.
 
@@ -43,10 +46,9 @@ Each part can be turned off (CONFIG, or *Configuration: Open*); a change applies
 
 ```lua
 config.set("silverware.tags.modules", {
-  rename = { enabled = true },   -- Rename (and merge)
-  assign = { enabled = true },   -- Tag pages, Add to pages, Remove from pages
-  pageTags = { enabled = true }, -- Page tags
-  remove = { enabled = true },   -- Delete a tag
+  rename = { enabled = true }, -- Rename (and merge): the tag's name as a field
+  pages = { enabled = true },  -- By page, Tag pages, Page tags, Add to pages, Remove from pages
+  remove = { enabled = true }, -- Delete tag
 })
 ```
 
@@ -69,8 +71,7 @@ config.define("silverware.tags", {
       additionalProperties = false,
       properties = {
         rename = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Rename a tag everywhere it is used; into a tag that exists, the two merge.", ui = { category = "Silverware Tags", label = "Rename", priority = 0.9 } } } },
-        assign = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Give tags to pages picked in a tree of folders, and take them off.", ui = { category = "Silverware Tags", label = "Tag pages", priority = 0.8 } } } },
-        pageTags = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Edit the tags of the page you are on.", ui = { category = "Silverware Tags", label = "Page tags", priority = 0.7 } } } },
+        pages = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "The view by page: tags given to the pages picked in a tree of folders, and taken off them; the tags of the page you are on.", ui = { category = "Silverware Tags", label = "By page", priority = 0.8 } } } },
         remove = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Delete a tag everywhere it is used.", ui = { category = "Silverware Tags", label = "Delete a tag", priority = 0.6 } } } },
       },
     },
@@ -171,7 +172,7 @@ end
 .swg-dialog.swg-small {
   width: min(480px, calc(100vw - 24px));
 }
-.swg-dialog.swg-manager {
+.swg-dialog.swg-workspace {
   height: min(760px, calc(var(--sw-view-height, 100dvh) - 32px));
 }
 .swg-dialog *,
@@ -503,10 +504,117 @@ end
   opacity: 0.55;
 }
 
-/* The manager: the tags left, the tag picked right (one under the other where it is narrow) */
-.swg-manager .swg-dialog-body {
+/* The window: its views as tabs under the title (By tag, By page), the view or a change's review in its body */
+.swg-views {
+  flex: none;
   display: flex;
+  gap: 2px;
+  padding: 0 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--swg-line);
+}
+.swg-views[hidden] {
+  display: none;
+}
+.swg-view-tab {
+  flex: none;
+  padding: 7px 10px;
+  margin-bottom: -1px;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  opacity: 0.7;
+}
+.swg-view-tab:hover {
+  opacity: 1;
+}
+.swg-view-tab[aria-selected="true"] {
+  opacity: 1;
+  font-weight: 600;
+  border-bottom-color: var(--swg-accent);
+}
+.swg-workspace .swg-dialog-body {
+  display: flex;
+  padding-top: 12px;
   padding-bottom: 0;
+}
+.swg-workspace-body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.swg-review {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding-bottom: 12px;
+}
+.swg-review-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+/* The tag's name, a field renaming it: as a heading until it is edited */
+.swg-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 4px;
+  margin: 0 0 4px;
+}
+.swg-name-hash {
+  font-size: 18px;
+  font-weight: 700;
+  opacity: 0.45;
+}
+.swg-name > .swg-field-wrap {
+  flex: 1;
+  min-width: 160px;
+}
+.swg-dialog .swg-name-field {
+  padding: 2px 6px;
+  font-size: 18px;
+  font-weight: 700;
+  border-color: transparent;
+  background: transparent;
+}
+.swg-dialog .swg-name-field:hover,
+.swg-dialog .swg-name-field:focus {
+  border-color: var(--swg-line);
+  background: var(--root-background-color);
+}
+.swg-name-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-basis: 100%;
+  padding-left: 16px;
+}
+.swg-name-actions[hidden] {
+  display: none;
+}
+.swg-name-actions .swg-note {
+  flex: 1;
+  margin: 0;
+}
+/* The tags of the pages checked: how many of them have one, one to take off struck through */
+.swg-their-tags {
+  min-height: 38px;
+  cursor: default;
+}
+.swg-chip-count {
+  margin-left: 4px;
+  font-size: 11px;
+  opacity: 0.65;
+}
+.swg-chip.swg-removing {
+  background: color-mix(in srgb, var(--swg-danger) 14%, transparent);
+}
+.swg-chip.swg-removing .swg-chip-name {
+  text-decoration: line-through;
+  opacity: 0.7;
 }
 .swg-manager-body {
   display: flex;
@@ -596,32 +704,18 @@ end
   white-space: nowrap;
 }
 
-/* Tag pages: the pages left, the tags right */
-.swg-assign-body {
-  display: flex;
-  gap: 16px;
-  min-height: 0;
-}
-.swg-assign-pages {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1 1 55%;
-  min-width: 0;
-}
+/* By page: the pages' tree in a box of its own, scrolled */
 .swg-tree-box-list {
-  height: min(420px, calc(var(--sw-view-height, 100dvh) - 300px));
+  flex: 1;
+  min-height: 0;
   overflow: auto;
+  margin-bottom: 12px;
   border: 1px solid var(--swg-line);
   border-radius: 6px;
   padding: 4px;
 }
-.swg-assign-body > .swg-form {
-  flex: 1 1 45%;
-  min-width: 0;
-}
 
-/* The preview: each page's lines before and after */
+/* The review: each page's lines before and after */
 .swg-preview-page {
   margin: 0 0 6px;
   border: 1px solid var(--swg-line);
@@ -686,15 +780,11 @@ end
     height: var(--sw-view-height, 100dvh);
     border-radius: 0;
   }
-  .swg-manager-body,
-  .swg-assign-body {
+  .swg-manager-body {
     flex-direction: column;
   }
   .swg-manager-tags {
     flex: 0 0 40%;
-  }
-  .swg-tree-box-list {
-    height: 40vh;
   }
 }
 ```

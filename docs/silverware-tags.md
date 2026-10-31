@@ -156,6 +156,25 @@ silverware-tags/
   notification of what was done. *Undo* (`Silverware Tags: Undo`, and in the
   manager) undoes the last change.
 
+### One window (decided 2026-10-31, replacing the UX above)
+
+The first version had five dialogs, one over another (the manager, Rename,
+Delete, the preview, Tag pages and Page tags apart): too many places for one
+task. Now one window, nothing over it:
+
+- **Views as tabs**: *By tag* (the core's) and the modules' (*By page*, the
+  pages module's). Page tags is *By page* with the page open ticked; Tag pages
+  is *By page*.
+- **The tag's name is a field**: typed anew, what it would do is said under it
+  (merging into a tag that exists), Enter reviews it; Esc puts it back.
+- **By page as labels of mail**: the tags of the pages ticked, each with how
+  many of them have it (`1/2`); × marks it to take off them all (struck
+  through, ↺ keeps it), a field adds tags to them all.
+- **The review in place of the view**: Back (or Esc) to the view as it was
+  (`remember`), Apply writes and goes back (the view by page with its pages
+  still ticked, nothing to change; a rename to its new name). An operation's
+  option (its subtags) is a box in the review, the plan made anew by it.
+
 ## Not now (possible later)
 
 - The user's own operations from Space Lua (`silverware.tags.defineOperations`).

@@ -1,14 +1,14 @@
-// The core: the host the modules get (the space, the catalog, operations run
-// through a preview and kept for Undo), its own commands (the manager, Undo)
-// and the modules' commands. Knows no module by name.
+// The core: the window of tags (ui/workspace.ts) with the modules' views and
+// parts, operations planned, reviewed there, applied and kept for Undo, its
+// own commands (the window, Undo) and the modules' commands. Knows no module
+// by name.
 import type { Notifier, Space } from "../space/space.ts";
-import { showManager } from "../ui/manager.ts";
-import { showPreview } from "../ui/preview.ts";
 import { showProgress } from "../ui/progress.ts";
-import { type Catalog, readCatalog } from "./catalog.ts";
+import { TAGS_VIEW, Workspace } from "../ui/workspace.ts";
+import { readCatalog } from "./catalog.ts";
 import { History } from "./history.ts";
 import type { Command, ModuleHost, TagsModule } from "./module.ts";
-import { counted, type Operation } from "./operation.ts";
+import { counted } from "./operation.ts";
 import { type Applied, applyPlan, makePlan, type Skipped, undoApplied } from "./plan.ts";
 
 // Pages left alone a notification names (the rest counted)
@@ -27,20 +27,27 @@ export class Controller {
   readonly host: ModuleHost;
   private readonly history = new History();
   private modules: readonly TagsModule[] = [];
+  private readonly workspace: Workspace;
 
   constructor(
     private readonly doc: Document,
     private readonly space: Space,
     private readonly notifier: Notifier,
   ) {
-    this.host = {
-      doc,
-      space,
-      notifier,
+    this.workspace = new Workspace(doc, {
       catalog: () => readCatalog(space),
-      run: (operation) => this.run(operation),
-      apply: (operation) => this.apply(operation),
-    };
+      views: () => this.modules.flatMap((module) => module.views?.() ?? []),
+      tagParts: (tag, host) => this.modules.flatMap((module) => (module.tagParts ? [module.tagParts(tag, host)] : [])),
+      navigate: (page) => space.navigate(page),
+      plan: async (operation, progress) => makePlan(space, await readCatalog(space), operation, progress),
+      apply: async (plan, progress) => {
+        const applied = await applyPlan(space, plan, progress);
+        this.said(applied);
+        return applied;
+      },
+      undo: () => (this.history.last ? { label: this.history.last.operation.label, run: () => this.undo() } : undefined),
+    });
+    this.host = { doc, space, notifier, open: (view, state) => this.workspace.show(view, state) };
   }
 
   /** The modules, made with the host (modules.ts) */
@@ -51,9 +58,9 @@ export class Controller {
   /** Every command: the core's, then the modules' in their order */
   commands(): Command[] {
     return [
-      { name: MANAGER_COMMAND, run: () => this.openManager() },
+      { name: MANAGER_COMMAND, run: () => this.workspace.show(TAGS_VIEW) },
       ...this.modules.flatMap((module) => module.commands?.() ?? []),
-      { name: UNDO_COMMAND, run: () => this.undo() },
+      { name: UNDO_COMMAND, run: () => this.undoAndShow() },
     ];
   }
 
@@ -71,69 +78,33 @@ export class Controller {
     }
   }
 
-  async openManager(tag?: string): Promise<void> {
-    await showManager(this.doc, {
-      catalog: () => readCatalog(this.space),
-      actions: (name, catalog: Catalog) => this.modules.flatMap((module) => module.tagActions?.(name, catalog) ?? []),
-      navigate: (page) => this.space.navigate(page),
-      undo: () => (this.history.last ? { label: this.history.last.operation.label, run: () => this.undo() } : undefined),
-      tag,
-    });
-  }
-
-  private async run(operation: Operation): Promise<boolean> {
-    const progress = showProgress(this.doc, operation.label, "Reading page");
-    let plan;
-    try {
-      plan = await makePlan(this.space, await readCatalog(this.space), operation, (done, of) => progress.update(done, of));
-    } finally {
-      progress.close();
-    }
-    if (!plan.changes.length && !plan.skipped.length) {
-      this.notifier.flash(`${operation.label}: nothing to change`);
-      return false;
-    }
-    let applied: Applied | undefined;
-    const done = await showPreview(this.doc, plan, async (progress) => {
-      applied = await applyPlan(this.space, plan, progress);
-    });
-    if (!done || !applied) return false;
-    this.said(applied);
-    return true;
-  }
-
-  private async apply(operation: Operation): Promise<boolean> {
-    const plan = await makePlan(this.space, await readCatalog(this.space), operation);
-    if (plan.skipped.length && !plan.changes.length) {
-      this.notifier.flash(`${operation.label}: ${leftAlone(plan.skipped)}`, "error");
-      return false;
-    }
-    const applied = await applyPlan(this.space, plan);
-    this.said(applied);
-    return applied.written.length > 0;
-  }
-
   /** What was applied said, with Undo; kept for it */
   private said(applied: Applied): void {
     this.history.push(applied);
     const changes = applied.written.reduce((sum, change) => sum + change.changes, 0);
     const skipped = applied.skipped.length ? ` (${counted(applied.skipped.length, "page")} left alone)` : "";
-    this.notifier.flash(`${applied.operation.done(applied.written.length, changes)}${skipped}`, applied.written.length ? "info" : "error", applied.written.length ? [{ name: "Undo", run: () => void this.undo() }] : undefined);
+    this.notifier.flash(`${applied.operation.done(applied.written.length, changes)}${skipped}`, applied.written.length ? "info" : "error", applied.written.length ? [{ name: "Undo", run: () => void this.undoAndShow() }] : undefined);
   }
 
-  /** The last change applied undone, where its pages are still as written */
+  /** Undo from a command or a notification: the window, where it is open, shows the tags as they are then */
+  private async undoAndShow(): Promise<void> {
+    await this.undo();
+    if (this.workspace.isOpen) await this.workspace.show(TAGS_VIEW);
+  }
+
+  /** The last change applied undone, where its pages are still as written (counted in a dialog of its own outside the window) */
   async undo(): Promise<void> {
     const last = this.history.pop();
     if (!last) {
       this.notifier.flash("Silverware Tags: nothing to undo");
       return;
     }
-    const progress = showProgress(this.doc, `Undo: ${last.operation.label}`, "Writing page");
+    const progress = this.workspace.isOpen ? undefined : showProgress(this.doc, `Undo: ${last.operation.label}`, "Writing page");
     let undone;
     try {
-      undone = await undoApplied(this.space, last, (done, of) => progress.update(done, of));
+      undone = await undoApplied(this.space, last, (done, of) => progress?.update(done, of));
     } finally {
-      progress.close();
+      progress?.close();
     }
     const { restored, skipped } = undone;
     const left = skipped.length ? `; ${leftAlone(skipped)}` : "";

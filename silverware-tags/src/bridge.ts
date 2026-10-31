@@ -29,7 +29,7 @@ export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
 }
 
 /** The modules: the parts that can be turned off with `silverware.tags.modules.<name>.enabled` (default on) */
-export const MODULE_NAMES = ["rename", "remove", "assign", "pageTags"] as const;
+export const MODULE_NAMES = ["rename", "pages", "remove"] as const;
 export type ModuleName = (typeof MODULE_NAMES)[number];
 
 /** Where each setting is in SilverBullet's configuration */

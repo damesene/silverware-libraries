@@ -52,7 +52,8 @@ export type PageTree = {
 export function pageTree(doc: Document, pages: readonly string[], options: { readonly checked?: readonly string[]; readonly changed?: () => void } = {}): PageTree {
   const roots = treeOf(pages);
   const checked = new Set(options.checked ?? []);
-  const open = new Set<string>();
+  // The folders above the pages checked at the start open, so they show
+  const open = new Set<string>((options.checked ?? []).flatMap((page) => page.split("/").slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join("/"))));
   let query = "";
   const list = el(doc, "ul", { class: "swg-tree", attrs: { role: "tree" } });
 

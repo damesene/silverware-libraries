@@ -101,9 +101,9 @@ export async function openPage(page: Page, name: string): Promise<void> {
   else await page.locator(`#pages [data-page="${name}"]`).click();
 }
 
-/** The manager open, its tags listed (SilverBullet's index caught up with the sample's pages: the tag shown) */
+/** The window open by tag, its tags listed (SilverBullet's index caught up with the sample's pages: the tag shown) */
 export async function openManager(page: Page, tag: string): Promise<Locator> {
-  const manager = page.locator(".swg-manager");
+  const manager = page.locator(".swg-workspace");
   await expect(async () => {
     if (!(await manager.isVisible())) await command(page, "Silverware Tags: Manager");
     await expect(manager).toBeVisible({ timeout: 2000 });
@@ -116,4 +116,3 @@ export async function openManager(page: Page, tag: string): Promise<Locator> {
   return manager;
 }
 
-export const dialog = (page: Page, className: string): Locator => page.locator(`.swg-dialog.${className}`);

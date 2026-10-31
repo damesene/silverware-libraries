@@ -8,15 +8,16 @@
 // right the tag picked: its name (a module's field renaming it), where it is
 // used, the modules' actions, its pages (each opening it).
 import { type Catalog, pageCounts, pagesWith, subtagsOf, type TagInfo } from "../core/catalog.ts";
-import type { TagAction, TagParts, View, WorkspaceHost } from "../core/module.ts";
+import type { TagAction, TagParts, TagsAction, View, WorkspaceHost } from "../core/module.ts";
 import { counted, type Operation } from "../core/operation.ts";
 import type { Applied, Plan, Progress } from "../core/plan.ts";
-import { hashtagOf, isMetaTag } from "../tags/names.ts";
+import { hashtagOf, isMetaTag, nameProblem } from "../tags/names.ts";
 import { filterTree, type TagNode, tagTree } from "../tags/tree.ts";
 import { buttons, openDialog } from "./dialog.ts";
 import { el } from "./elements.ts";
 import { ICONS } from "./icons.ts";
-import { checkbox } from "./form.ts";
+import { suggestions, tagField } from "./chips.ts";
+import { checkbox, labelled, note } from "./form.ts";
 import { reviewList } from "./review.ts";
 
 export type WorkspaceOptions = {
@@ -25,8 +26,9 @@ export type WorkspaceOptions = {
   readonly views: () => readonly View[];
   // The modules' parts of the tag picked, in their order
   readonly tagParts: (tag: string, host: WorkspaceHost) => readonly TagParts[];
-  // The modules' actions on a tag, in their order
+  // The modules' actions on a tag, and on several picked together, in their order
   readonly tagActions: () => readonly TagAction[];
+  readonly tagsActions: () => readonly TagsAction[];
   readonly navigate: (page: string) => unknown;
   readonly plan: (operation: Operation, progress: Progress) => Promise<Plan>;
   // Applied, kept for Undo and said
@@ -60,6 +62,8 @@ export class Workspace {
   private reviewing: { readonly operation: Operation; applying: boolean } | undefined;
   // The tags' view as it was left
   private picked: string | undefined;
+  // Several tags picked together (Ctrl or Shift and a click): two or more, else the one picked alone
+  private readonly chosen = new Set<string>();
   private readonly opened = new Set<string>();
   private query = "";
   // Whether the tags' view shows SilverBullet's own tags (meta and under it), apart from the others as its tree shows meta pages
@@ -304,6 +308,7 @@ export class Workspace {
     }
     this.catalog = await this.options.catalog();
     if (reviewing.operation.shows) this.picked = reviewing.operation.shows;
+    this.chosen.clear();
     const view = this.options.views().find((v) => v.id === this.view);
     this.go(reviewing.operation.shows ? TAGS_VIEW : this.view, view?.applied ? view.applied(this.state) : this.state);
   }
@@ -350,11 +355,11 @@ export class Workspace {
         const li = el(
           doc,
           "li",
-          { class: "swg-tag-item", attrs: { role: "treeitem", "data-swg-tag": node.name, "aria-selected": String(node.name === this.picked), "aria-expanded": folder ? String(expanded) : undefined } },
+          { class: "swg-tag-item", attrs: { role: "treeitem", "data-swg-tag": node.name, "aria-selected": String(this.chosen.size > 1 ? this.chosen.has(node.name) : node.name === this.picked), "aria-expanded": folder ? String(expanded) : undefined } },
           el(
             doc,
             "div",
-            { class: "swg-tag-row", on: { click: () => pick(node.name) } },
+            { class: "swg-tag-row", on: { click: (e) => pickWith(node.name, e) } },
             folder
               ? el(doc, "button", {
                   class: "swg-tree-toggle",
@@ -381,18 +386,48 @@ export class Workspace {
       const nodes = shownNodes();
       list.replaceChildren(...(nodes.length ? nodes.map(item) : [el(doc, "li", { class: "swg-empty", text: tree.length ? "No tag holds that." : "No tags in this space yet." })]));
     };
+    const showDetail = () =>
+      detail.replaceChildren(
+        ...(this.chosen.size > 1 ? this.tagsDetail([...this.chosen].sort((a, b) => a.localeCompare(b)), () => showAll()) : this.picked ? this.tagDetail(this.picked) : [el(doc, "p", { class: "swg-empty", text: "Pick a tag." })]),
+      );
+    const showAll = () => {
+      renderTree();
+      showDetail();
+    };
+    // A tag picked alone (a click, the arrows)
     const pick = (tag: string) => {
       this.picked = tag;
-      renderTree();
-      detail.replaceChildren(...this.tagDetail(tag));
+      this.chosen.clear();
+      showAll();
+    };
+    // Ctrl (Cmd) and a click adds a tag to those picked or takes it off, Shift and a click picks those from the one picked before
+    const pickWith = (tag: string, e: MouseEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (!this.chosen.size && this.picked) this.chosen.add(this.picked);
+        if (this.chosen.has(tag)) this.chosen.delete(tag);
+        else this.chosen.add(tag);
+        this.picked = tag;
+        if (this.chosen.size < 2) {
+          this.picked = [...this.chosen][0] ?? tag;
+          this.chosen.clear();
+        }
+        showAll();
+      } else if (e.shiftKey && this.picked) {
+        const shown = visible();
+        const [a, b] = [shown.indexOf(this.picked), shown.indexOf(tag)].sort((x, y) => x - y);
+        this.chosen.clear();
+        for (const name of shown.slice(a!, b! + 1)) this.chosen.add(name);
+        if (this.chosen.size < 2) this.chosen.clear();
+        showAll();
+      } else pick(tag);
     };
 
     search.addEventListener("input", () => {
       this.query = search.value;
       const shown = visible();
       if (!this.picked || !shown.includes(this.picked)) this.picked = shown[0];
-      renderTree();
-      detail.replaceChildren(...(this.picked ? this.tagDetail(this.picked) : [el(doc, "p", { class: "swg-empty", text: "Pick a tag." })]));
+      this.chosen.clear();
+      showAll();
     });
     // ↑ ↓ through the tags shown, → opens a level, ← closes it (from the search field too)
     const keys = (e: KeyboardEvent) => {
@@ -408,6 +443,13 @@ export class Workspace {
         if (e.key === "ArrowRight") this.opened.add(this.picked);
         else this.opened.delete(this.picked);
         renderTree();
+      } else if (e.currentTarget === list && this.chosen.size > 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // The tags picked together: an action's key of theirs
+        const action = this.options.tagsActions().find((a) => a.key === e.key && !a.ask);
+        if (action) {
+          e.preventDefault();
+          void this.runTagsAction(action, [...this.chosen]);
+        }
       } else if (e.currentTarget === list && this.picked && !e.ctrlKey && !e.metaKey && !e.altKey) {
         // The tag's keys in the tree (not the search field, whose keys are its text's): F2 its name's field, an action's own
         if (e.key === "F2") {
@@ -426,8 +468,11 @@ export class Workspace {
     search.addEventListener("keydown", keys);
     list.addEventListener("keydown", keys);
 
+    // (Those picked before that are gone, renamed or deleted, left out)
+    for (const name of [...this.chosen]) if (!this.exists(name)) this.chosen.delete(name);
+    if (this.chosen.size < 2) this.chosen.clear();
     renderTree();
-    detail.replaceChildren(...(this.picked ? this.tagDetail(this.picked) : [el(doc, "p", { class: "swg-empty", text: "No tags in this space yet." })]));
+    showDetail();
     // Tags | Meta, as SilverBullet's tree has its pages and its meta pages apart
     const kinds = el(
       doc,
@@ -502,6 +547,99 @@ export class Workspace {
       ),
       ...(pages.length ? [this.pageList(tag, pages, info)] : []),
     ];
+  }
+
+  /**
+   * Several tags picked together: them (each × leaving it out), how many
+   * pages they are on, the modules' actions on them all (one asking for a name
+   * first: a field, the space's tags offered)
+   */
+  private tagsDetail(tags: readonly string[], changed: () => void): HTMLElement[] {
+    const { doc } = this;
+    const catalog = this.catalog!;
+    const pages = new Set(tags.flatMap((tag) => [...(catalog.tags.get(tag)?.pages ?? [])]));
+    const asking = el(doc, "div", "swg-ask");
+    const labelOf = (action: TagsAction) => action.label.replace("{n}", String(tags.length));
+    const ask = (action: TagsAction) => {
+      const field = tagField(doc, { placeholder: "A tag's name", suggest: (typed) => suggestions([...catalog.tags.keys()], typed) });
+      const said = note(doc);
+      const submit = () => {
+        const name = field.value();
+        const problem = nameProblem(name) ?? action.ask?.problem?.(name, tags);
+        if (problem) {
+          said.say(problem, true);
+          return;
+        }
+        void this.runTagsAction(action, tags, name);
+      };
+      const go = el(doc, "button", { class: "swg-button swg-primary swg-ask-go", text: labelOf(action).replace(/…$/, ""), run: () => submit() });
+      field.input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.defaultPrevented) {
+          e.preventDefault();
+          submit();
+        }
+      });
+      asking.replaceChildren(labelled(doc, action.ask!.label, field.element), el(doc, "div", "swg-actions", go), said.element);
+      field.input.focus();
+    };
+    return [
+      el(doc, "h3", { class: "swg-detail-name", text: `${counted(tags.length, "tag")} picked` }),
+      el(doc, "p", { class: "swg-detail-uses", text: `On ${counted(pages.size, "page")} in all · Ctrl or Shift and a click picks more` }),
+      el(
+        doc,
+        "div",
+        "swg-chips swg-chosen",
+        ...tags.map((tag) =>
+          el(
+            doc,
+            "span",
+            { class: "swg-chip", attrs: { "data-swg-chip": tag } },
+            el(doc, "span", { class: "swg-chip-name", text: hashtagOf(tag) }),
+            el(doc, "button", {
+              class: "swg-chip-remove",
+              html: ICONS.close,
+              title: `Leave ${hashtagOf(tag)} out`,
+              attrs: { "aria-label": `Leave ${hashtagOf(tag)} out` },
+              run: () => {
+                this.chosen.delete(tag);
+                if (this.chosen.size < 2) {
+                  this.picked = [...this.chosen][0] ?? this.picked;
+                  this.chosen.clear();
+                }
+                changed();
+              },
+            }),
+          ),
+        ),
+      ),
+      el(
+        doc,
+        "div",
+        "swg-actions",
+        ...this.options.tagsActions().map((action) =>
+          el(doc, "button", {
+            class: action.danger ? "swg-button swg-danger" : "swg-button",
+            text: labelOf(action),
+            title: action.key ? `${labelOf(action)} (${action.key})` : undefined,
+            attrs: { "data-swg-action": action.id },
+            run: () => (action.ask ? ask(action) : void this.runTagsAction(action, tags)),
+          }),
+        ),
+      ),
+      asking,
+    ];
+  }
+
+  /** An action on several tags run: what it gives reviewed */
+  private async runTagsAction(action: TagsAction, tags: readonly string[], name?: string): Promise<void> {
+    let operation: Operation | void;
+    try {
+      operation = await action.run(tags, this.host(), name);
+    } catch (e) {
+      this.body.prepend(el(this.doc, "p", { class: "swg-error", text: `${action.label}: ${e instanceof Error ? e.message : String(e)}` }));
+      return;
+    }
+    if (operation) await this.review(operation);
   }
 
   /** An action on a tag run: what it gives reviewed; a failure said where the window is */

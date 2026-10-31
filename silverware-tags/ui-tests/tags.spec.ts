@@ -245,3 +245,18 @@ test("the window's tree: F2 the tag's name to type, Delete its Delete tag", asyn
   await page.keyboard.press("Delete");
   await expect(window.locator(".swg-review-title")).toHaveText("Delete #idea");
 });
+
+test("several tags picked with Ctrl merged into one, reviewed", async ({ page }) => {
+  const window = await openManager(page, "idea");
+  await window.locator('[data-swg-tag="idea"] .swg-tag-row').click();
+  await window.locator('[data-swg-tag="plan"] .swg-tag-row').click({ modifiers: ["Control"] });
+  await expect(window.locator(".swg-detail-name")).toHaveText("2 tags picked");
+  await window.locator('[data-swg-action="rename.merge"]').click();
+  const into = window.locator(".swg-ask .swg-field");
+  await into.fill("thoughts");
+  await into.press("Enter");
+  await expect(window.locator(".swg-review-title")).toHaveText("Merge #idea #plan into #thoughts");
+  await window.locator(".swg-apply").click();
+  await expect.poll(() => pageText(page, "Projects/Alpha/Plan")).toContain("#project/alpha #thoughts");
+  expect(await pageText(page, "Journal/2026-10-30")).toContain("Thinking about #thoughts of a garden.");
+});

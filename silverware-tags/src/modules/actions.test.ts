@@ -3,8 +3,8 @@ import { readCatalog } from "../core/catalog.ts";
 import type { ModuleHost, TagAction, WorkspaceHost } from "../core/module.ts";
 import { memorySpace } from "../space/memory.ts";
 import { pagesModule } from "./pages.ts";
-import { removeModule } from "./remove.ts";
-import { renameOperation } from "./rename.ts";
+import { removeManyOperation, removeModule } from "./remove.ts";
+import { mergeOperation, mergeProblem, renameOperation } from "./rename.ts";
 import { applyPlan, makePlan } from "../core/plan.ts";
 
 const space = memorySpace({ A: "#todo\n\n- [ ] do #todo/later", B: "- item #todo" });
@@ -46,5 +46,22 @@ describe("a rename into a subtag of its own", () => {
     const s = memorySpace({ P: "#a #a/x #a/y" });
     await applyPlan(s, await makePlan(s, await readCatalog(s), renameOperation("a", "a/x", true, 2)));
     expect(s.pages.get("P")).toBe("#a/x #a/x #a/x/y");
+  });
+});
+
+describe("several tags at once", () => {
+  it("merges tags into one, their subtags under it, one under the target left", async () => {
+    const s = memorySpace({ P: "#Todo #to-do #todo", Q: "- [ ] x #to-do/later", R: "#todo/now" });
+    await applyPlan(s, await makePlan(s, await readCatalog(s), mergeOperation(["Todo", "to-do", "todo"], "todo", true, 1)));
+    expect(s.pages.get("P")).toBe("#todo #todo #todo");
+    expect(s.pages.get("Q")).toBe("- [ ] x #todo/later");
+    expect(s.pages.get("R")).toBe("#todo/now");
+    expect(mergeProblem("a/x", ["a", "b"])).toBeDefined();
+    expect(mergeProblem("a", ["a", "b"])).toBeUndefined();
+  });
+  it("deletes several tags", async () => {
+    const s = memorySpace({ P: "Text #a and #b here, #c stays" });
+    await applyPlan(s, await makePlan(s, await readCatalog(s), removeManyOperation(["a", "b"], false)));
+    expect(s.pages.get("P")).toBe("Text and here, #c stays");
   });
 });

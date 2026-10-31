@@ -29,6 +29,37 @@ export function renameOperation(from: string, to: string, children: boolean, sub
   };
 }
 
+/**
+ * Several tags merged into one (`into`: a tag of the space or a new one):
+ * every use of each renamed to it, with `children` the tags under each moved
+ * under it (`a/x` into `c`: `c/x`); tags already under `into` stay as they are
+ */
+export function mergeOperation(tags: readonly string[], into: string, children: boolean, subtags = 0): Operation {
+  const what = `${tags.map(hashtagOf).join(" ")} into ${hashtagOf(into)}${children ? " with their subtags" : ""}`;
+  const renamed = (name: string) => {
+    if (isWithin(name, into)) return undefined;
+    for (const from of tags) {
+      const to = renamedTag(name, from, into, children);
+      if (to !== undefined) return to;
+    }
+    return undefined;
+  };
+  return {
+    label: `Merge ${what}`,
+    pages: (catalog) => [...new Set(tags.flatMap((tag) => pagesWith(catalog, tag, children)))].sort((a, b) => a.localeCompare(b)),
+    edit: (text) => renameTags(text, renamed),
+    done: (pages, changes) => `Merged ${what}: ${counted(changes, "tag")} on ${counted(pages, "page")}`,
+    ...(subtags ? { option: { label: `Their subtags too (${subtags})`, on: children, toggled: () => mergeOperation(tags, into, !children, subtags) } } : {}),
+    shows: into,
+  };
+}
+
+/** What is wrong with merging `tags` into `into` (nothing: undefined) */
+export function mergeProblem(into: string, tags: readonly string[]): string | undefined {
+  if (tags.some((tag) => tag !== into && isWithin(into, tag))) return "the tag they become cannot be under one of them";
+  return undefined;
+}
+
 /** What is wrong with renaming `from` to `to` (nothing: undefined) */
 export function renameProblem(from: string, to: string): string | undefined {
   if (!from) return "Which tag?";
@@ -91,5 +122,16 @@ export function renameModule(host: ModuleHost): TagsModule {
   host.offer(offer);
   return {
     tagParts: (tag, host) => ({ name: nameField(tag, host) }),
+    tagsActions: () => [
+      {
+        id: "rename.merge",
+        label: "Merge into…",
+        ask: { label: "Into the tag", problem: mergeProblem },
+        run: (tags, host, into) => {
+          const subtags = new Set(tags.flatMap((tag) => subtagsOf(host.catalog, tag))).size;
+          return mergeOperation(tags, into!, subtags > 0, subtags);
+        },
+      },
+    ],
   };
 }

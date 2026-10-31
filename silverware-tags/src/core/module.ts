@@ -64,11 +64,29 @@ export type TagAction = {
   readonly run: (tag: string, host: WorkspaceHost) => Operation | void | Promise<Operation | void>;
 };
 
+/**
+ * Something done with several tags picked together (Ctrl or Shift and a
+ * click in the window's tree), as data the core shows and runs: what it gives
+ * is reviewed. Where it needs a name (Merge into…) it asks for it first, a
+ * field the core shows with the space's tags offered
+ */
+export type TagsAction = {
+  readonly id: string;
+  readonly label: string;
+  readonly danger?: boolean;
+  // A key running it while the tags are picked (KeyboardEvent.key)
+  readonly key?: string;
+  // A tag's name asked for first: the field's label, and what is wrong with a name typed (nothing: undefined)
+  readonly ask?: { readonly label: string; readonly problem?: (name: string, tags: readonly string[]) => string | undefined };
+  readonly run: (tags: readonly string[], host: WorkspaceHost, name?: string) => Operation | void | Promise<Operation | void>;
+};
+
 export type TagsModule = {
   readonly commands?: () => readonly Command[];
   readonly views?: () => readonly View[];
   readonly tagParts?: (tag: string, host: WorkspaceHost) => TagParts;
   readonly tagActions?: () => readonly TagAction[];
+  readonly tagsActions?: () => readonly TagsAction[];
 };
 
 export type ModuleHost = {

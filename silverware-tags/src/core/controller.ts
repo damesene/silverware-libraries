@@ -61,6 +61,7 @@ export class Controller {
       views: () => this.modules.flatMap((module) => module.views?.() ?? []),
       tagParts: (tag, host) => this.modules.flatMap((module) => (module.tagParts ? [module.tagParts(tag, host)] : [])),
       tagActions: () => this.modules.flatMap((module) => module.tagActions?.() ?? []),
+      tagsActions: () => this.modules.flatMap((module) => module.tagsActions?.() ?? []),
       navigate: (page) => space.navigate(page),
       // An undo not guarded: it puts back text the guard let through, where the page is as written (a change that made a page a meta page is undone too)
       plan: async (operation, progress) => makePlan(space, await catalog(), operation, progress, operation.undoes ? undefined : guard),

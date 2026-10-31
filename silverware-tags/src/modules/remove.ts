@@ -18,6 +18,18 @@ export function removeOperation(tag: string, children: boolean, subtags = 0): Op
   };
 }
 
+/** Several tags deleted everywhere they are used (with `children`, the tags under each too) */
+export function removeManyOperation(tags: readonly string[], children: boolean, subtags = 0): Operation {
+  const what = `${tags.map(hashtagOf).join(" ")}${children ? " and their subtags" : ""}`;
+  return {
+    label: `Delete ${what}`,
+    pages: (catalog) => [...new Set(tags.flatMap((tag) => pagesWith(catalog, tag, children)))].sort((a, b) => a.localeCompare(b)),
+    edit: (text) => removeTags(text, (name) => tags.some((tag) => matches(name, tag, children))),
+    done: (pages, changes) => `Deleted ${what}: ${counted(changes, "tag")} on ${counted(pages, "page")}`,
+    ...(subtags ? { option: { label: `Their subtags too (${subtags})`, on: children, toggled: () => removeManyOperation(tags, !children, subtags) } } : {}),
+  };
+}
+
 export function removeModule(_host: ModuleHost): TagsModule {
   return {
     tagActions: () => [
@@ -27,6 +39,15 @@ export function removeModule(_host: ModuleHost): TagsModule {
         danger: true,
         key: "Delete",
         run: (tag, host) => removeOperation(tag, false, subtagsOf(host.catalog, tag).length),
+      },
+    ],
+    tagsActions: () => [
+      {
+        id: "remove.many",
+        label: "Delete {n} tags…",
+        danger: true,
+        key: "Delete",
+        run: (tags, host) => removeManyOperation(tags, false, new Set(tags.flatMap((tag) => subtagsOf(host.catalog, tag))).size),
       },
     ],
   };

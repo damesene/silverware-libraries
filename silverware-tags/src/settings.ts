@@ -99,7 +99,7 @@ export class SettingsDialog {
       values.pageFirst = on;
       this.update();
     });
-    const firstRow = settingRow(doc, BASE, "The page open's tags first in the Tags panel", "On: the tags of the page you are on come first in the panel (their # marked either way). Off: by name, folders first, as SilverBullet's own tree.", first);
+    const firstRow = settingRow(doc, BASE, "List this page's tags first in the Tags panel", "Tags used on the page you are viewing appear at the top. Off: all tags are sorted by name, folders first.", first);
     firstRow.dataset.swgSetting = PATHS.pageFirst;
     const form = this.el("select");
     for (const value of NEW_TAGS_FORMS) form.append(new Option(NEW_TAGS_FORM_LABELS[value], value, false, value === values.newTagsForm));

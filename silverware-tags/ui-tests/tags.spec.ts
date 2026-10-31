@@ -276,8 +276,9 @@ test("Cleanup: tags likely one merged into the one picked, tags used once listed
   await window.locator(".swg-apply").click();
   await expect.poll(() => pageText(page, "Notes/One")).toBe("#idea\n\nAn idea.\n");
   expect(await pageText(page, "Notes/Two")).toBe("#idea\n\nMore.\n");
-  // Back in Cleanup, the group gone
+  // Back in Cleanup, the group merged gone (the index waited for: SilverBullet's indexes the pages a moment later)
   await expect(window.locator('[data-swg-view="cleanup"]')).toHaveAttribute("aria-selected", "true");
+  await expect(group).toHaveCount(0);
   await expect(window.locator(".swg-cleanup-once")).toContainText("#milestone");
 });
 

@@ -48,8 +48,8 @@ config.define("silverware.table", {
     formatMaxWidth = {
       type = "number",
       default = 40,
-      description = "With Format tables, a column is padded to its widest cell of at most this many characters; a longer cell (a long link) sticks out of the alignment instead of widening every row and the delimiter row. 0: no limit.",
-      ui = { category = "Silverware Table", label = "Align columns up to (characters)", priority = 3.8 },
+      description = "With Format tables: each column is padded to its longest cell of at most this many characters. A longer cell, such as a long link, is written as it is, past the column's |, so the other rows and the delimiter do not widen. 0: no limit.",
+      ui = { category = "Silverware Table", label = "Longest cell aligned (characters)", priority = 3.8 },
     },
     toolbarNames = {
       type = "string",

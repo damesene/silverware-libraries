@@ -198,6 +198,17 @@ Tasks without them, Meta with them alone), the window (Tags | Meta) and By page
 (no meta pages, their meta tags not offered to take off: a library's
 `meta/library` is how it is installed).
 
+### Hide and protect meta pages (decided 2026-10-31)
+
+A setting, on by default (*Silverware Tags: Settings*, a dialog as the other
+plugins have, of one height): SilverBullet's meta pages are out of everything,
+their tags shown nowhere (a library's documentation writing `#VALUE!` is no
+tag of the user's) and never changed: a rename of a tag they use too renames
+it on every other page. Told by the index (a page whose own tag is `meta` or
+under it) and, as a plan reads each page, by its text. Off: they show, their
+tags apart (Meta), as above. Every change of the settings reloads: the
+library page defines the panel's segments as it loads.
+
 ## Not now (possible later)
 
 - The user's own operations from Space Lua (`silverware.tags.defineOperations`).

@@ -12,6 +12,7 @@ function host(rename?: RenameOffer) {
   const h: ModuleHost = {
     doc: undefined as unknown as Document,
     space: memorySpace({ A: "#project/alpha\n\n- [ ] do #todo", B: "#project/beta #todo" }),
+    catalog: () => readCatalog(h.space),
     notifier: { flash: (message) => void calls.push(`flash ${message}`) },
     open: async (view, state) => void calls.push(`open ${view} ${JSON.stringify(state)}`),
     review: async () => undefined,

@@ -20,7 +20,7 @@ Everything is in one window, **Silverware Tags: Manager**, with two views (tabs 
 * **By page** (the command **Silverware Tags: Tag pages**): your pages as a tree of folders. Tick pages, or a folder for every page under it (its own page too); type to find pages. On the right are the tags the pages you picked have, each with how many of them have it (`2/3`): **×** takes one off them all (click again to keep it), and the *Add* field gives tags to them all (the tags of your space are offered as you type: **↑ ↓** and **Enter**, or **Tab** for the first). Then *Review changes…*. Tags are added into each page's frontmatter (a page that has one already is left as it is) and taken off its frontmatter and its tag lines; a hashtag in a page's text stays (*Delete tag* takes those off).
 * **Silverware Tags: Page tags** opens *By page* with the page you are on picked.
 * **The Tags panel** (the command **Silverware Tags: Tags panel**): the tags as a tree in SilverBullet's right sidebar, beside your pages (its menu moves it to the left or the bottom; it stays open across reloads). Each tag shows how many pages use it; its filter field finds a tag, and *Page tags* and *Tasks* above it show only those.
-* **SilverBullet's own tags** (`meta` and those under it, `meta/library`, `meta/template`…, which mark libraries, templates and its API) are apart, as SilverBullet's own tree has its meta pages apart: in the panel's *Meta* and the window's *Meta* (above the tags), not among your tags. *By page* leaves out SilverBullet's meta pages and does not offer their meta tags to take off. **Enter** or a click opens the tag in the window, **F2** opens it with its name to type, and dragging a tag onto another level moves it there (`alpha` dropped on `work` becomes `work/alpha`, its subtags with it), reviewed in the window first.
+* **SilverBullet's own pages are left alone** (*Hide and protect meta pages*, on by default): a page tagged `meta` or a tag under it (`meta/library`, `meta/template`…: libraries, templates, SilverBullet's API) is out of everything. Its tags show nowhere (a tag a library's documentation uses, `#VALUE!` written in its text, is not one of yours), and no change touches it: renaming `#auto` to `#automobile` renames it on every page but those. Turned off (*Silverware Tags: Settings*), they show, their tags apart (the panel's and the window's *Meta*, as SilverBullet's own tree has its meta pages apart), and changes reach them. **Enter** or a click opens the tag in the window, **F2** opens it with its name to type, and dragging a tag onto another level moves it there (`alpha` dropped on `work` becomes `work/alpha`, its subtags with it), reviewed in the window first.
 * **Every change is reviewed first**, in the same window: each page that changes with its lines before and after (the first few open, click a page for its lines), and the pages left alone and why. *Apply* writes them and takes you back; *Back* (or **Esc**) changes nothing.
 * **Undo**: the window's *Undo* at its bottom, the notification after a change (in SilverBullet's newer versions) and the command **Silverware Tags: Undo last change** take back the last change: every page goes back to how it was, unless you edited it since (that page is left as it is and named).
 
@@ -44,9 +44,10 @@ Hashtags are found as SilverBullet finds them: not in code (blocks and `inline`)
 
 ## Settings
 
-Each part can be turned off (CONFIG, or *Configuration: Open*); a change applies after a reload:
+**Silverware Tags: Settings** (or the gear at the bottom of the window): *Hide and protect meta pages* on the *General* tab, each part on the *Modules* tab. They are saved in CONFIG (shown in *Configuration: Open* too); a module turned on or off applies after a reload, which *Save and reload* does. In CONFIG:
 
 ```lua
+config.set("silverware.tags.protectMeta", true)
 config.set("silverware.tags.modules", {
   rename = { enabled = true }, -- Rename (and merge): the tag's name as a field
   pages = { enabled = true },  -- By page, Tag pages, Page tags, Add to pages, Remove from pages
@@ -69,6 +70,12 @@ config.define("silverware.tags", {
   description = "Silverware Tags settings",
   type = "object",
   properties = {
+    protectMeta = {
+      type = "boolean",
+      default = true,
+      description = "SilverBullet's own pages (tagged meta or a tag under it: libraries, templates, its API) are left out: their tags show nowhere and no change touches them. Off: they show, their tags apart (Meta), and changes reach them.",
+      ui = { category = "Silverware Tags", label = "Hide and protect meta pages", priority = 1 },
+    },
     modules = {
       type = "object",
       additionalProperties = false,
@@ -125,6 +132,24 @@ if js and js.window then
       mq.awaitEmptyQueue("indexQueue")
     end,
     getConfig = config.get,
+    confirm = editor.confirm,
+    -- The settings dialog: saved as SilverBullet's Configuration Manager saves
+    -- (the CONFIG page, indexed, the configuration loaded again)
+    saveConfigPage = function(text)
+      space.writePage("CONFIG", text)
+      -- Written: the rest only loads it; a failure there says so, the page is saved
+      local ok, err = pcall(function()
+        if sync and sync.performFileSync then sync.performFileSync("CONFIG.md") end
+        mq.send("indexQueue", "CONFIG.md")
+        mq.awaitEmptyQueue("indexQueue")
+        editor.reloadConfigAndCommands()
+        if editor.rebuildEditorState then editor.rebuildEditorState() end
+      end)
+      if not ok then
+        editor.flashNotification("Silverware Tags: the settings are saved in CONFIG, but loading them failed (" .. tostring(err) .. "): reload the page", "error")
+      end
+    end,
+    reloadUI = editor.reloadUI,
   })
   -- The commands of the core and of the modules turned on
   for _, name in ipairs(silverwareTagsJs.commandNames()) do
@@ -137,6 +162,17 @@ if js and js.window then
   end
   -- The tags' panel (the panel module): SilverBullet's navigator draws the rows the JS gives as a tree by "/",
   -- what is done with them goes back to the JS (the window); only where SilverBullet has views (view.define)
+  -- As SilverBullet's own tree has its meta pages: SilverBullet's tags (meta and under it) in Meta alone, where
+  -- they show (the setting protecting meta pages leaves them out); segments filter the rows before the tree is
+  -- made of them, so a level shows where a row under it does
+  local silverwareTagsSegments = {
+    { label = "All", icon = "hash", default = true, where = function(obj) return obj.meta ~= true end },
+    { label = "Page tags", icon = "file-text", where = function(obj) return obj.onPages == true and obj.meta ~= true end },
+    { label = "Tasks", icon = "check-square", where = function(obj) return obj.inTasks == true and obj.meta ~= true end },
+  }
+  if silverwareTagsJs.panelMetaApart() then
+    table.insert(silverwareTagsSegments, { label = "Meta", icon = "settings", placeholder = "Meta tag", where = function(obj) return obj.meta == true end })
+  end
   if view and view.define and silverwareTagsJs.panelOn() then
     view.define {
       name = "silverware.tags",
@@ -167,14 +203,7 @@ if js and js.window then
           end,
         },
       },
-      -- As SilverBullet's own tree has its meta pages: SilverBullet's tags (meta and under it) in Meta alone
-      -- (segments filter the rows before the tree is made of them, so a level shows where a row under it does)
-      segments = {
-        { label = "All", icon = "hash", default = true, where = function(obj) return obj.meta ~= true end },
-        { label = "Page tags", icon = "file-text", where = function(obj) return obj.onPages == true and obj.meta ~= true end },
-        { label = "Tasks", icon = "check-square", where = function(obj) return obj.inTasks == true and obj.meta ~= true end },
-        { label = "Meta", icon = "settings", placeholder = "Meta tag", where = function(obj) return obj.meta == true end },
-      },
+      segments = silverwareTagsSegments,
       onSelect = function(obj)
         silverwareTagsJs.panelSelect(obj.name)
         -- The panel stays open beside the window
@@ -868,6 +897,310 @@ end
   }
   .swg-manager-tags {
     flex: 0 0 40%;
+  }
+}
+
+/* The settings dialog ("Silverware Tags: Settings", the window's gear):
+   the toolbar's settings' look: tabs, rows in cards, switches; of one height, so switching tabs moves nothing */
+/* Over the part of the window an on-screen keyboard leaves (shared/dialog.ts sets where it is) */
+.swg-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  top: var(--sw-view-top, 0);
+  bottom: auto;
+  height: var(--sw-view-height, 100%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--modal-backdrop-color, rgba(0, 0, 0, 0.35));
+  font-family: var(--ui-font, system-ui, sans-serif);
+}
+.swg-settings {
+  --swg-settings-line: var(--button-border-color, rgba(128, 128, 128, 0.3));
+  --swg-settings-card: color-mix(in srgb, var(--root-color) 4%, var(--root-background-color));
+  /* Of one height whatever its tab shows (switching tabs moves nothing), 720px where the window has room;
+     its body scrolls (a phone: the whole screen, below) */
+  display: flex;
+  flex-direction: column;
+  /* (Its border within the height: SilverBullet sets no box-sizing, the playground border-box) */
+  box-sizing: border-box;
+  width: min(600px, calc(100vw - 24px));
+  height: min(560px, calc(100vh - 32px));
+  height: min(560px, calc(var(--sw-view-height, 100dvh) - 32px));
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border: 1px solid var(--swg-settings-line);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+  font-size: 14px;
+  overflow: hidden;
+}
+.swg-settings:focus {
+  outline: none;
+}
+.swg-settings button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.swg-settings-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 16px 8px;
+}
+.swg-settings-titles {
+  flex: 1;
+  min-width: 0;
+}
+.swg-settings-title {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.3;
+}
+.swg-settings-subtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  opacity: 0.65;
+}
+.swg-settings-close {
+  display: inline-flex;
+  padding: 5px;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  opacity: 0.65;
+}
+.swg-settings-close:hover {
+  opacity: 1;
+  background: var(--swg-settings-card);
+}
+.swg-settings-close svg {
+  width: 16px;
+  height: 16px;
+}
+/* One row however many tabs: too wide for the dialog (a phone), it scrolls sideways */
+.swg-settings-tabs {
+  /* Never shrunk by a tall body (it scrolls sideways, so a column's flex would squeeze it: on a phone it slid under the body) */
+  flex: none;
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: 2px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--swg-settings-line);
+}
+.swg-settings-tab {
+  flex: none;
+  white-space: nowrap;
+  padding: 7px 10px;
+  margin-bottom: -1px;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  opacity: 0.7;
+}
+.swg-settings-tab:hover {
+  opacity: 1;
+}
+.swg-settings-tab[aria-selected="true"] {
+  opacity: 1;
+  font-weight: 600;
+  border-bottom-color: var(--ui-accent-color);
+}
+.swg-settings-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 16px 12px;
+}
+.swg-settings-panel[hidden] {
+  display: none;
+}
+.swg-settings-group {
+  margin: 14px 2px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.6;
+}
+.swg-settings-panel > .swg-settings-card:first-child {
+  margin-top: 12px;
+}
+.swg-settings-card {
+  background: var(--swg-settings-card);
+  border: 1px solid var(--swg-settings-line);
+  border-radius: 8px;
+}
+.swg-settings-card > :not(:first-child) {
+  border-top: 1px solid var(--swg-settings-line);
+}
+.swg-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+}
+.swg-settings-label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.swg-settings-module-name,
+.swg-settings-name {
+  font-weight: 500;
+}
+.swg-settings-hint {
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0.62;
+}
+.swg-settings-row select,
+.swg-settings-row input[type="number"] {
+  flex: none;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swg-settings-line);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.swg-settings-row select {
+  max-width: 55%;
+}
+.swg-settings-row input[type="number"] {
+  width: 6.5em;
+}
+.swg-settings-row input.swg-settings-invalid {
+  border-color: var(--danger-color, #c62828);
+}
+/* A switch: the checkbox (invisible, still focusable) drawn as a track and a knob */
+.swg-settings-switch {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+}
+.swg-settings-switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.swg-settings-knob {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--root-color) 22%, var(--root-background-color));
+  transition: background 0.15s;
+  pointer-events: none;
+}
+.swg-settings-knob::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s;
+}
+.swg-settings-switch input:checked + .swg-settings-knob {
+  background: var(--ui-accent-color);
+}
+.swg-settings-switch input:checked + .swg-settings-knob::after {
+  transform: translateX(14px);
+}
+.swg-settings-switch input:focus-visible + .swg-settings-knob {
+  outline: 2px solid var(--ui-accent-color);
+  outline-offset: 2px;
+}
+.swg-settings-switch input:disabled + .swg-settings-knob {
+  opacity: 0.5;
+}
+/* A module's own settings: under it, indented, while it is on */
+.swg-settings-module-settings {
+  margin: 0 12px 10px 24px;
+  border-left: 2px solid var(--swg-settings-line);
+}
+.swg-settings-module-settings .swg-settings-row {
+  padding: 6px 0 6px 12px;
+}
+.swg-settings-module-settings[hidden] {
+  display: none;
+}
+.swg-settings-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--swg-settings-line);
+}
+.swg-settings-note {
+  flex: 1;
+  font-size: 12px;
+  opacity: 0.75;
+}
+.swg-settings-cancel,
+.swg-settings-save {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--swg-settings-line);
+  background: var(--root-background-color);
+}
+.swg-settings-save {
+  color: #fff !important;
+  background: var(--ui-accent-color);
+  border-color: var(--ui-accent-color);
+}
+.swg-settings-save:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+@media (max-width: 480px), (pointer: coarse) and (max-height: 600px) {
+  .swg-settings {
+    width: 100vw;
+    height: 100vh;
+    height: var(--sw-view-height, 100dvh);
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+  .swg-settings-body {
+    flex: 1 1 auto;
+  }
+  .swg-settings-tab {
+    padding: 10px 12px;
+  }
+  .swg-settings-row {
+    min-height: 44px;
+  }
+  .swg-settings-cancel,
+  .swg-settings-save {
+    padding: 10px 18px;
+  }
+  .swg-settings-row {
+    flex-wrap: wrap;
+  }
+  /* The name keeps room to be read; a control that does not fit beside it goes under it, the row's width */
+  .swg-settings-label {
+    flex: 1 1 14em;
+  }
+  .swg-settings-row select {
+    flex: 1 1 auto;
+    max-width: 100%;
+  }
+  .swg-settings-row select,
+  .swg-settings-row input[type="number"] {
+    font-size: 16px;
   }
 }
 ```

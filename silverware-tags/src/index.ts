@@ -1,12 +1,14 @@
 // Silverware Tags entry point, loaded by the library page's Space Lua:
 //   js.importFromSpace("Library/damesene/silverware-tags.js").init({ ... the bridge ... })
 // then its commands defined by `commandNames()`, each running `runCommand(name)`.
-import { type Bridge, missingBridgeFunctions, readSettings } from "./bridge.ts";
+import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
+import { type Bridge, missingBridgeFunctions, readSettings, type Settings } from "./bridge.ts";
 import { Controller } from "./core/controller.ts";
 import { PANEL_OFFER, type PanelOffer, type PanelRow } from "./core/offers.ts";
 import { createModules } from "./modules.ts";
 import type { Notifier, Space } from "./space/space.ts";
 import { silverBulletNotifier, silverBulletSpace } from "./space/silverbullet.ts";
+import { SettingsDialog, type SettingsStore } from "./settings.ts";
 
 export const version = "0.1.0";
 
@@ -20,15 +22,39 @@ export async function init(bridge: Bridge): Promise<void> {
     console.error(`Silverware Tags: the library page did not hand over ${missing.join(", ")}`);
     return;
   }
-  await start(silverBulletSpace(bridge), silverBulletNotifier(bridge), await readSettings(bridge));
+  const space = silverBulletSpace(bridge);
+  const notifier = silverBulletNotifier(bridge);
+  const store: SettingsStore = {
+    read: () => readSettings(bridge),
+    canSave: !!bridge.saveConfigPage,
+    // In the Configuration Manager's block of CONFIG (it shows them, Ctrl-,), as the other plugins save theirs
+    save: (values) => saveConfigPage({ readPage: (name) => bridge.readPage(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values)),
+    reload: async () => {
+      if (bridge.reloadUI) await bridge.reloadUI();
+      else globalThis.location?.reload();
+    },
+    confirm: async (question) => (bridge.confirm ? !!(await bridge.confirm(question)) : globalThis.confirm(question)),
+    flash: (message, type) => notifier.flash(message, type),
+  };
+  await start(space, notifier, await readSettings(bridge), store);
 }
 
-/** The core and the modules on, over a space (SilverBullet's, or the playground's) */
-export async function start(space: Space, notifier: Notifier, settings: Awaited<ReturnType<typeof readSettings>>): Promise<Controller> {
-  const controller = new Controller(document, space, notifier);
+/** The core and the modules on, over a space (SilverBullet's, or the playground's); the settings dialog where a store is given */
+export async function start(space: Space, notifier: Notifier, settings: Settings, store?: SettingsStore): Promise<Controller> {
+  const dialog = store ? new SettingsDialog(document, store) : undefined;
+  const controller = new Controller(document, space, notifier, { protectMeta: settings.protectMeta, settings: dialog ? () => dialog.open() : undefined });
   controller.setModules(createModules(settings.modules, controller.host));
   slot[GLOBAL_KEY] = controller;
+  shown = settings;
   return controller;
+}
+
+// The settings Silverware Tags runs with
+let shown: Settings | undefined;
+
+/** Whether the panel shows SilverBullet's own tags apart (Meta), as they are not left out (the setting) */
+export function panelMetaApart(): boolean {
+  return !(shown?.protectMeta ?? true);
 }
 
 /** The commands' names, for the library page to define them (the core's and those of the modules on) */

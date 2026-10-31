@@ -136,3 +136,16 @@ describe("edits and diffs", () => {
     ]);
   });
 });
+
+describe("meta pages protected", () => {
+  it("leaves meta pages out of the catalog, and a plan's guard leaves one alone as read", async () => {
+    const space = memorySpace({ Lib: "---\ntags: meta/library\n---\nWrites #auto.", Car: "#auto" });
+    const catalog = await readCatalog(space, { hideMeta: true });
+    expect([...catalog.tags.keys()]).toEqual(["auto"]);
+    expect(catalog.pages).toEqual(["Car"]);
+    // A page the index had as no meta page, made one since: the guard reads its text
+    const plan = await makePlan(space, await readCatalog(space), renameOperation("auto", "automobile", false), undefined, (text) => (text.includes("meta/library") ? "a meta page" : undefined));
+    expect(plan.changes.map((c) => c.page)).toEqual(["Car"]);
+    expect(plan.skipped).toEqual([{ page: "Lib", reason: "a meta page" }]);
+  });
+});

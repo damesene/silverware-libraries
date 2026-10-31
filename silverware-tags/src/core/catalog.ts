@@ -16,9 +16,16 @@ export type Catalog = {
   readonly pages: readonly string[];
 };
 
-export function catalogOf(records: readonly TagRecord[], pages: readonly string[]): Catalog {
+export type CatalogOptions = {
+  // SilverBullet's meta pages (a page whose own tag is meta or under it) left out: their tags, the pages themselves
+  readonly hideMeta?: boolean;
+};
+
+export function catalogOf(records: readonly TagRecord[], pages: readonly string[], options: CatalogOptions = {}): Catalog {
+  const hidden = options.hideMeta ? new Set(records.filter((r) => r.parent === "page" && isMetaTag(r.name)).map((r) => r.page)) : new Set<string>();
   const tags = new Map<string, { name: string; pages: Set<string>; byContext: Map<string, Set<string>> }>();
   for (const { name, page, parent } of records) {
+    if (hidden.has(page)) continue;
     let info = tags.get(name);
     if (!info) tags.set(name, (info = { name, pages: new Set(), byContext: new Map() }));
     info.pages.add(page);
@@ -26,12 +33,12 @@ export function catalogOf(records: readonly TagRecord[], pages: readonly string[
     if (!context) info.byContext.set(parent, (context = new Set()));
     context.add(page);
   }
-  return { tags, pages: [...pages].sort((a, b) => a.localeCompare(b)) };
+  return { tags, pages: pages.filter((page) => !hidden.has(page)).sort((a, b) => a.localeCompare(b)) };
 }
 
-export async function readCatalog(space: Space): Promise<Catalog> {
+export async function readCatalog(space: Space, options: CatalogOptions = {}): Promise<Catalog> {
   const [records, pages] = await Promise.all([space.tagRecords(), space.pageNames()]);
-  return catalogOf(records, pages);
+  return catalogOf(records, pages, options);
 }
 
 /** How many pages use each tag */

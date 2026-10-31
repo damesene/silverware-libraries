@@ -57,6 +57,8 @@ export type ModuleHost = {
   readonly doc: Document;
   readonly space: Space;
   readonly notifier: Notifier;
+  /** The tags of the space, read anew (SilverBullet's meta pages left out where the setting protects them) */
+  catalog(): Promise<Catalog>;
   /**
    * The window opened (or brought to) a view: "tags" (a tag picked: `state`
    * its name, or `{ tag, focus: "name" }` with its name's field focused) or a

@@ -61,6 +61,8 @@ export const test = base.extend({
       if (onSilverBullet) {
         await page.close();
         await rm(join(server().space, FOLDER), { recursive: true, force: true });
+        // The settings a test saved go with it (CONFIG, written once the page is closed)
+        await writeFile(join(server().space, "CONFIG.md"), "");
       }
     }
   },

@@ -21,6 +21,12 @@ export type Bridge = {
   readonly awaitIndex?: () => unknown;
   // Optional: without it, settings keep their defaults
   readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
+  // Optional, for the settings dialog: asks before closing it with changes (else the browser's confirm)
+  readonly confirm?: (message: string) => boolean | Promise<boolean>;
+  // Optional, for the settings dialog: the CONFIG page saved as SilverBullet's Configuration Manager saves it (readPage reads it)
+  readonly saveConfigPage?: (text: string) => unknown;
+  // Optional: the page loaded anew, as a module turned on or off needs (else the window reloaded)
+  readonly reloadUI?: () => unknown;
 };
 
 /** The bridge's functions it cannot work without, missing from what the library page gave */
@@ -32,14 +38,26 @@ export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
 export const MODULE_NAMES = ["rename", "pages", "remove", "panel"] as const;
 export type ModuleName = (typeof MODULE_NAMES)[number];
 
+/** A module's name and what it does, as the settings dialog shows them (the library page's config.define says the same) */
+export const MODULE_LABELS: Readonly<Record<ModuleName, string>> = { rename: "Rename", pages: "By page", remove: "Delete a tag", panel: "Tags panel" };
+export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
+  rename: "Rename a tag everywhere it is used; into a tag that exists, the two merge.",
+  pages: "The view by page: tags given to the pages picked in a tree of folders, and taken off them; the tags of the page you are on.",
+  remove: "Delete a tag everywhere it is used.",
+  panel: "The tags as a panel beside the page (SilverBullet's navigator): a tag opens the Tags window, F2 renames it, a tag dragged under another moves it there.",
+};
+
 /** Where each setting is in SilverBullet's configuration */
 export const PATHS = {
+  protectMeta: "silverware.tags.protectMeta",
   module: (name: ModuleName) => `silverware.tags.modules.${name}.enabled`,
 } as const;
 
-/** Silverware Tags' settings, read once it starts (a change applies on reload) */
+/** Silverware Tags' settings, read as it starts (the settings dialog starts it anew; modules apply on reload) */
 export type Settings = {
   readonly modules: ReadonlySet<ModuleName>;
+  // SilverBullet's meta pages (a page tagged meta or under it) left out of everything and never changed
+  readonly protectMeta: boolean;
 };
 
 /** The settings as configured, each its default where it is not set or not valid */
@@ -53,7 +71,7 @@ export async function readSettings(bridge: Partial<Bridge>): Promise<Settings> {
   };
   const modules = new Set<ModuleName>();
   for (const name of MODULE_NAMES) if ((await get(PATHS.module(name), true)) !== false) modules.add(name);
-  return { modules };
+  return { modules, protectMeta: (await get(PATHS.protectMeta, true)) !== false };
 }
 
 /**

@@ -5,7 +5,6 @@
 // above tags a row too. Picked, the window opens at it; F2, at it with its name
 // to type; dragged under another level, the rename is reviewed (through the
 // rename module's offer: off, the drag is refused and said).
-import { readCatalog } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule } from "../core/module.ts";
 import { PANEL_OFFER, type PanelOffer, type PanelRow, RENAME_OFFER, type RenameOffer } from "../core/offers.ts";
 import { hashtagOf, isMetaTag } from "../tags/names.ts";
@@ -27,7 +26,7 @@ export function panelRows(tags: Iterable<{ readonly name: string; readonly pages
 
 export function panelModule(host: ModuleHost): TagsModule {
   const offer: PanelOffer = {
-    rows: async () => panelRows((await readCatalog(host.space)).tags.values()),
+    rows: async () => panelRows((await host.catalog()).tags.values()),
     select: (tag) => host.open("tags", tag),
     rename: (tag) => host.open("tags", { tag, focus: "name" }),
     move: async (tag, to) => {

@@ -10,4 +10,7 @@ export const SAMPLE_PAGES: Readonly<Record<string, string>> = {
   "Meetings/2026-10-15": "#meeting\n\n- [ ] Send the notes #todo\n",
   "Journal/2026-10-30": "Thinking about #idea of a garden.\n\n```\n#notatag in code\n```\n",
   "Recipes/Soup": "---\ntitle: Soup\n---\nCarrots, onions, salt.\n",
+  "Garage/Car": "#auto\n\nThe car's service book.\n",
+  // SilverBullet's own page (a library's): hidden and protected by default
+  "Library/Cars": "---\ntags: meta/library\n---\nA library page that writes #auto in its text.\n",
 };

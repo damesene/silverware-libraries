@@ -5,11 +5,13 @@
 import type { Notifier, Space } from "../space/space.ts";
 import { showProgress } from "../ui/progress.ts";
 import { TAGS_VIEW, Workspace } from "../ui/workspace.ts";
+import { isMetaTag } from "../tags/names.ts";
+import { pageTags } from "../tags/edit.ts";
 import { readCatalog } from "./catalog.ts";
 import { History } from "./history.ts";
 import type { Command, ModuleHost, TagsModule } from "./module.ts";
 import { counted } from "./operation.ts";
-import { type Applied, applyPlan, makePlan, type Skipped, undoApplied } from "./plan.ts";
+import { type Applied, applyPlan, type Guard, makePlan, type Skipped, undoApplied } from "./plan.ts";
 
 // Pages left alone a notification names (the rest counted)
 const NAMED = 3;
@@ -22,6 +24,14 @@ function leftAlone(skipped: readonly Skipped[]): string {
 
 export const MANAGER_COMMAND = "Silverware Tags: Manager";
 export const UNDO_COMMAND = "Silverware Tags: Undo last change";
+export const SETTINGS_COMMAND = "Silverware Tags: Settings";
+
+export type ControllerOptions = {
+  // SilverBullet's meta pages left out of everything and never changed (the setting)
+  readonly protectMeta?: boolean;
+  // The settings dialog, where the host has one (index.ts makes it of the bridge)
+  readonly settings?: () => Promise<void>;
+};
 
 export class Controller {
   readonly host: ModuleHost;
@@ -35,13 +45,19 @@ export class Controller {
     private readonly doc: Document,
     private readonly space: Space,
     private readonly notifier: Notifier,
+    private readonly options: ControllerOptions = {},
   ) {
+    const catalog = () => readCatalog(space, { hideMeta: this.options.protectMeta });
+    // A meta page as read now is never changed (the index may not have caught up with it)
+    const guard: Guard | undefined = this.options.protectMeta ? (text) => (pageTags(text).some(isMetaTag) ? "a meta page: left alone (Hide and protect meta pages)" : undefined) : undefined;
     this.workspace = new Workspace(doc, {
-      catalog: () => readCatalog(space),
+      catalog,
+      metaApart: !this.options.protectMeta,
+      settings: this.options.settings ? () => void this.openSettings() : undefined,
       views: () => this.modules.flatMap((module) => module.views?.() ?? []),
       tagParts: (tag, host) => this.modules.flatMap((module) => (module.tagParts ? [module.tagParts(tag, host)] : [])),
       navigate: (page) => space.navigate(page),
-      plan: async (operation, progress) => makePlan(space, await readCatalog(space), operation, progress),
+      plan: async (operation, progress) => makePlan(space, await catalog(), operation, progress, guard),
       apply: async (plan, progress) => {
         const applied = await applyPlan(space, plan, progress);
         this.said(applied);
@@ -53,6 +69,7 @@ export class Controller {
       doc,
       space,
       notifier,
+      catalog,
       open: (view, state) => this.workspace.show(view, state),
       review: (operation, tag) => this.workspace.showReview(operation, tag),
       offer: (name, api) => void this.offers.set(name, api),
@@ -76,6 +93,7 @@ export class Controller {
       { name: MANAGER_COMMAND, run: () => this.workspace.show(TAGS_VIEW) },
       ...this.modules.flatMap((module) => module.commands?.() ?? []),
       { name: UNDO_COMMAND, run: () => this.undoAndShow() },
+      ...(this.options.settings ? [{ name: SETTINGS_COMMAND, run: () => this.openSettings() }] : []),
     ];
   }
 
@@ -91,6 +109,12 @@ export class Controller {
     } catch (e) {
       this.failed(e);
     }
+  }
+
+  /** The settings dialog, the window closed first (its settings start Silverware Tags anew) */
+  private async openSettings(): Promise<void> {
+    this.workspace.close();
+    await this.options.settings?.();
   }
 
   /** What was applied said, with Undo; kept for it */

@@ -159,13 +159,37 @@ test("the tags' panel: a tag dragged onto a level is renamed under it, reviewed 
   await expect.poll(() => pageText(page, "Journal/2026-10-30")).toContain("Thinking about #project/idea of a garden.");
 });
 
-test("SilverBullet's own tags apart: Meta in the window, its meta pages not by page", async ({ page }) => {
-  await addPages(page, { "Templates/Note": "---\ntags: meta/template\n---\nA template.\n" });
-  const window = await openManager(page, "todo");
+test("meta pages hidden and protected by default: their tags show nowhere, a rename passes them by", async ({ page }) => {
+  const window = await openManager(page, "auto");
+  // Library/Cars (meta/library) uses #auto too: one page counted, no meta tag, no Meta
+  await expect(window.locator('[data-swg-tag="auto"] .swg-count')).toHaveText("1");
   await expect(window.locator('[data-swg-tag="meta"]')).toHaveCount(0);
+  await expect(window.locator('[data-swg-segment="meta"]')).toHaveCount(0);
+  await window.locator('[data-swg-tag="auto"] .swg-tag-row').click();
+  await window.locator(".swg-name-field").fill("automobile");
+  await window.locator(".swg-name-field").press("Enter");
+  await expect(window.locator(".swg-preview-page")).toHaveCount(1);
+  await window.locator(".swg-apply").click();
+  await expect.poll(() => pageText(page, "Garage/Car")).toContain("#automobile");
+  expect(await pageText(page, "Library/Cars")).toContain("writes #auto in its text");
+  // By page: SilverBullet's meta pages left out
+  await window.locator('[data-swg-view="pages"]').click();
+  await expect(window.locator(`[data-swg-page="${pageName("Library")}"]`)).toHaveCount(0);
+  await expect(window.locator(`[data-swg-page="${pageName("Garage")}"]`)).toBeVisible();
+});
+
+test("the settings dialog turns the protection off: meta tags then shown apart, under Meta", async ({ page }) => {
+  await command(page, "Silverware Tags: Settings");
+  const settings = page.locator(".swg-settings");
+  await expect(settings).toBeVisible();
+  const save = settings.locator(".swg-settings-save");
+  await expect(save).toBeDisabled();
+  await settings.locator('[data-swg-setting="silverware.tags.protectMeta"] input').uncheck();
+  await expect(save).toHaveText("Save and reload");
+  await save.click();
+  // Reloaded with it off
+  const window = await openManager(page, "todo");
   await window.locator('[data-swg-segment="meta"]').click();
   await expect(window.locator('[data-swg-tag="meta"]')).toBeVisible();
   await expect(window.locator('[data-swg-tag="todo"]')).toHaveCount(0);
-  await window.locator('[data-swg-view="pages"]').click();
-  await expect(window.locator(`[data-swg-page="${pageName("Templates")}"]`)).toHaveCount(0);
 });

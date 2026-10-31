@@ -6,6 +6,7 @@
 // commands are the header's buttons.
 import { readSettings } from "../silverware-tags/src/bridge.ts";
 import { panelMove, panelRename, panelRows, panelSelect, start } from "../silverware-tags/src/index.ts";
+import type { SettingsStore } from "../silverware-tags/src/settings.ts";
 import { memorySpace } from "../silverware-tags/src/space/memory.ts";
 import libraryPage from "../silverware-tags/silverware-tags.md";
 import { flash, setUpTheme } from "./common.ts";
@@ -129,7 +130,31 @@ document.getElementById("reset")!.addEventListener("click", () => {
   void space.navigate("index");
 });
 
-const controller = await start(space, { flash: (message, type, actions) => flash(message, type, { actions }) }, await readSettings({}));
+// The settings by path, as config.get gives them: the playground's own store (no CONFIG page here)
+const SETTINGS = "silverware.tags.playground.settings";
+const readStored = (): Record<string, unknown> => {
+  try {
+    return JSON.parse(localStorage.getItem(SETTINGS) ?? "{}") ?? {};
+  } catch {
+    return {};
+  }
+};
+const getConfig = (path: string, fallback: unknown) => (path in readStored() ? readStored()[path] : fallback);
+const store: SettingsStore = {
+  read: () => readSettings({ getConfig }),
+  canSave: true,
+  save: async (values) => {
+    try {
+      localStorage.setItem(SETTINGS, JSON.stringify({ ...readStored(), ...values }));
+    } catch {
+      // A private window: kept for this visit
+    }
+  },
+  reload: async () => location.reload(),
+  confirm: async (question) => confirm(question),
+  flash: (message, type) => flash(message, type),
+};
+const controller = await start(space, { flash: (message, type, actions) => flash(message, type, { actions }) }, await readSettings({ getConfig }), store);
 // The commands as SilverBullet would list them, as buttons (the prefix left out)
 document.getElementById("commands")!.replaceChildren(
   ...controller.commands().map(({ name }) => {

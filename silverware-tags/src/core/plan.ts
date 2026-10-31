@@ -48,7 +48,10 @@ async function each<T, R>(items: readonly T[], work: (item: T) => Promise<R>, pr
 
 type Outcome<T> = { readonly ok: T } | { readonly skipped: Skipped } | undefined;
 
-export async function makePlan(space: Space, catalog: Catalog, operation: Operation, progress?: Progress): Promise<Plan> {
+/** Why a page is left alone whatever an operation would do (a meta page, protected), as read; none: undefined */
+export type Guard = (text: string, page: string) => string | undefined;
+
+export async function makePlan(space: Space, catalog: Catalog, operation: Operation, progress?: Progress, guard?: Guard): Promise<Plan> {
   const outcomes = await each(
     operation.pages(catalog),
     async (page): Promise<Outcome<PageChange>> => {
@@ -58,6 +61,9 @@ export async function makePlan(space: Space, catalog: Catalog, operation: Operat
       } catch (e) {
         return { skipped: { page, reason: `could not be read (${reasonOf(e)})` } };
       }
+      // (Told by its text as it is now: the index may not have caught up with it)
+      const guarded = guard?.(before, page);
+      if (guarded) return { skipped: { page, reason: guarded } };
       const result = operation.edit(before, page);
       if (result.problem) return { skipped: { page, reason: result.problem } };
       return result.changes && result.text !== before ? { ok: { page, before, after: result.text, changes: result.changes } } : undefined;

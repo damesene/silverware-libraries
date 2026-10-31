@@ -5,7 +5,7 @@
 // with subtags: the review offers to rename them too (`project/alpha` →
 // `work/project/alpha`), on by default. It offers the others a rename
 // reviewed (`rename`: the panel's drag).
-import { pagesWith, readCatalog, subtagsOf } from "../core/catalog.ts";
+import { pagesWith, subtagsOf } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule, WorkspaceHost } from "../core/module.ts";
 import { RENAME_OFFER, type RenameOffer } from "../core/offers.ts";
 import { counted, type Operation } from "../core/operation.ts";
@@ -81,7 +81,7 @@ function nameField(tag: string, host: WorkspaceHost): HTMLElement {
 export function renameModule(host: ModuleHost): TagsModule {
   const offer: RenameOffer = {
     review: async (from, to) => {
-      const subtags = subtagsOf(await readCatalog(host.space), from).length;
+      const subtags = subtagsOf(await host.catalog(), from).length;
       await host.review(renameOperation(from, to, subtags > 0, subtags), from);
     },
     problem: renameProblem,

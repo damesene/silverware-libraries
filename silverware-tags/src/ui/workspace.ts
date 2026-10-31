@@ -31,6 +31,10 @@ export type WorkspaceOptions = {
   readonly apply: (plan: Plan, progress: Progress) => Promise<Applied>;
   // The last change to undo, while there is one
   readonly undo: () => { readonly label: string; readonly run: () => Promise<void> } | undefined;
+  // Whether SilverBullet's own tags are shown, apart (Tags | Meta); else they are left out (the setting protecting meta pages)
+  readonly metaApart: boolean;
+  // The settings dialog, where there is one: a gear in the window's foot
+  readonly settings?: () => void;
 };
 
 // What a context is called where a tag is used (SilverBullet's `parent`): of several pages, of one
@@ -210,7 +214,9 @@ export class Workspace {
         })
       : null;
     undoButton?.append(` Undo: ${undo!.label}`);
-    this.foot.replaceChildren(buttons(doc, ...(undoButton ? [undoButton] : []), el(doc, "span", "swg-spacer"), el(doc, "button", { class: "swg-button", text: "Close", run: () => this.close() })));
+    const settings = this.options.settings;
+    const gear = settings ? el(doc, "button", { class: "swg-button swg-settings-open", html: ICONS.gear, title: "Silverware Tags settings", attrs: { "aria-label": "Silverware Tags settings" }, run: () => settings() }) : null;
+    this.foot.replaceChildren(buttons(doc, ...(undoButton ? [undoButton] : []), el(doc, "span", "swg-spacer"), ...(gear ? [gear] : []), el(doc, "button", { class: "swg-button", text: "Close", run: () => this.close() })));
   }
 
   /** The field of the tag's name focused, its text selected (a module's part in the name's place) */
@@ -416,7 +422,7 @@ export class Workspace {
         }),
       ),
     );
-    return el(doc, "div", "swg-manager-body", el(doc, "div", "swg-manager-tags", kinds, search, list), detail);
+    return el(doc, "div", "swg-manager-body", el(doc, "div", "swg-manager-tags", this.options.metaApart ? kinds : null, search, list), detail);
   }
 
   /** Whether a tag is in the tree (used, or a level above one) */

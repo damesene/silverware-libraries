@@ -93,6 +93,9 @@ body {
 }
 #tags-panel .row.here {
   font-weight: 600;
+  color: var(--ui-accent-color);
+  background: color-mix(in srgb, var(--ui-accent-color) 12%, transparent);
+  box-shadow: inset 3px 0 0 var(--ui-accent-color);
 }
 #tags-panel .count {
   margin-left: auto;

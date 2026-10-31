@@ -852,9 +852,17 @@ end
   border: 0;
   cursor: pointer;
 }
-/* The Tags panel (SilverBullet's navigator): the page open's tags, shown first, in bold */
+/* The Tags panel (SilverBullet's navigator): the page open's tags, shown first, marked by the accent color: a bar
+   at the row's left, a tint, its name and icon in it */
 .sb-nav-row.swg-here {
   font-weight: 600;
+  color: var(--ui-accent-color);
+  background: color-mix(in srgb, var(--ui-accent-color) 12%, transparent);
+  box-shadow: inset 3px 0 0 var(--ui-accent-color);
+}
+.sb-nav-row.swg-here .sb-nav-icon {
+  color: var(--ui-accent-color);
+  opacity: 1;
 }
 /* Several tags picked: them as chips, an action asking for a name under its buttons */
 .swg-chosen {

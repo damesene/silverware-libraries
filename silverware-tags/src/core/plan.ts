@@ -6,7 +6,7 @@
 // SilverBullet), in their order, the progress reported after each.
 import { breather, type Space } from "../space/space.ts";
 import type { Catalog } from "./catalog.ts";
-import type { Operation } from "./operation.ts";
+import { counted, type Operation } from "./operation.ts";
 
 export type PageChange = { readonly page: string; readonly before: string; readonly after: string; readonly changes: number };
 export type Skipped = { readonly page: string; readonly reason: string };
@@ -105,19 +105,23 @@ export async function applyPlan(space: Space, plan: Plan, progress?: Progress): 
   return { operation: plan.operation, written: oks(outcomes), skipped: [...plan.skipped, ...skips(outcomes)] };
 }
 
-/** What was applied written back, where a page is still as it was written */
-export async function undoApplied(space: Space, applied: Applied, progress?: Progress): Promise<{ readonly restored: readonly string[]; readonly skipped: readonly Skipped[] }> {
-  const outcomes = await each(
-    applied.written,
-    async (change): Promise<Outcome<string>> => {
-      try {
-        return (await space.write(change.page, change.before, change.after)) === "written" ? { ok: change.page } : { skipped: { page: change.page, reason: "changed since: left as it is" } };
-      } catch (e) {
-        return { skipped: { page: change.page, reason: `could not be written (${reasonOf(e)})` } };
-      }
+/**
+ * What was applied written back, as an operation reviewed as any other: each
+ * page as it was before, where it is still as it was written (a page changed
+ * since is left as it is, said in the review)
+ */
+export function undoOperation(applied: Applied): Operation {
+  const byPage = new Map(applied.written.map((change) => [change.page, change]));
+  const label = `Undo: ${applied.operation.label}`;
+  return {
+    label,
+    pages: () => applied.written.map((change) => change.page),
+    edit: (text, page) => {
+      const change = byPage.get(page)!;
+      if (text !== change.after) return { text, changes: 0, problem: "changed since it was written: left as it is" };
+      return { text: change.before, changes: change.changes };
     },
-    progress,
-  );
-  await space.settled();
-  return { restored: oks(outcomes), skipped: skips(outcomes) };
+    done: (pages) => `Undone: ${applied.operation.label} (${counted(pages, "page")})`,
+    undoes: applied,
+  };
 }

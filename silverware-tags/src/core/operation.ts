@@ -17,6 +17,8 @@ export type Operation = {
   readonly option?: { readonly label: string; readonly on: boolean; readonly toggled: () => Operation };
   // The tag the window shows once it is applied (a rename's new name)
   readonly shows?: string;
+  // The change it undoes (the core's Undo): applied, that change is taken off the history, not kept as one of its own
+  readonly undoes?: object;
 };
 
 /** "1 page", "3 pages" */

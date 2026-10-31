@@ -3,7 +3,6 @@
 // own commands (the window, Undo) and the modules' commands. Knows no module
 // by name.
 import type { Notifier, Space } from "../space/space.ts";
-import { showProgress } from "../ui/progress.ts";
 import { TAGS_VIEW, Workspace } from "../ui/workspace.ts";
 import { isMetaTag } from "../tags/names.ts";
 import { pageTags } from "../tags/edit.ts";
@@ -11,7 +10,7 @@ import { readCatalog } from "./catalog.ts";
 import { History } from "./history.ts";
 import type { Command, ModuleHost, TagsModule } from "./module.ts";
 import { counted } from "./operation.ts";
-import { type Applied, applyPlan, type Guard, makePlan, type Skipped, undoApplied } from "./plan.ts";
+import { type Applied, applyPlan, type Guard, makePlan, type Skipped, undoOperation } from "./plan.ts";
 
 // Pages left alone a notification names (the rest counted)
 const NAMED = 3;
@@ -43,8 +42,8 @@ export class Controller {
   private readonly offers = new Map<string, unknown>();
 
   constructor(
-    private readonly doc: Document,
-    private readonly space: Space,
+    doc: Document,
+    space: Space,
     private readonly notifier: Notifier,
     private readonly options: ControllerOptions = {},
   ) {
@@ -102,7 +101,7 @@ export class Controller {
     return [
       { name: MANAGER_COMMAND, run: () => this.workspace.show(TAGS_VIEW) },
       ...this.modules.flatMap((module) => module.commands?.() ?? []),
-      { name: UNDO_COMMAND, run: () => this.undoAndShow() },
+      { name: UNDO_COMMAND, run: () => this.undo() },
       ...(this.options.settings ? [{ name: SETTINGS_COMMAND, run: () => this.openSettings() }] : []),
     ];
   }
@@ -127,37 +126,25 @@ export class Controller {
     await this.options.settings?.();
   }
 
-  /** What was applied said, with Undo; kept for it */
+  /** What was applied said, with Undo, and kept for it; an undo takes the change it undid off instead */
   private said(applied: Applied): void {
-    this.history.push(applied);
+    const undid = applied.operation.undoes;
+    if (undid) this.history.remove(undid);
+    else this.history.push(applied);
     const changes = applied.written.reduce((sum, change) => sum + change.changes, 0);
-    const skipped = applied.skipped.length ? ` (${counted(applied.skipped.length, "page")} left alone)` : "";
-    this.notifier.flash(`${applied.operation.done(applied.written.length, changes)}${skipped}`, applied.written.length ? "info" : "error", applied.written.length ? [{ name: "Undo", run: () => void this.undoAndShow() }] : undefined);
+    const skipped = applied.skipped.length ? ` (${leftAlone(applied.skipped)})` : "";
+    const undo = applied.written.length && !undid ? [{ name: "Undo", run: () => void this.undo() }] : undefined;
+    this.notifier.flash(`${applied.operation.done(applied.written.length, changes)}${skipped}`, applied.written.length ? "info" : "error", undo);
   }
 
-  /** Undo from a command or a notification: the window, where it is open, shows the tags as they are then */
-  private async undoAndShow(): Promise<void> {
-    await this.undo();
-    if (this.workspace.isOpen) await this.workspace.show(TAGS_VIEW);
-  }
-
-  /** The last change applied undone, where its pages are still as written (counted in a dialog of its own outside the window) */
+  /** The last change applied, reviewed to be undone in the window (as any change: what goes back, page by page) */
   async undo(): Promise<void> {
-    const last = this.history.pop();
+    const last = this.history.last;
     if (!last) {
       this.notifier.flash("Silverware Tags: nothing to undo");
       return;
     }
-    const progress = this.workspace.isOpen ? undefined : showProgress(this.doc, `Undo: ${last.operation.label}`, "Writing page");
-    let undone;
-    try {
-      undone = await undoApplied(this.space, last, (done, of) => progress?.update(done, of));
-    } finally {
-      progress?.close();
-    }
-    const { restored, skipped } = undone;
-    const left = skipped.length ? `; ${leftAlone(skipped)}` : "";
-    this.notifier.flash(`Undone: ${last.operation.label} (${counted(restored.length, "page")})${left}`, skipped.length ? "error" : "info");
+    await this.workspace.showReview(undoOperation(last));
   }
 
   private failed(e: unknown): void {

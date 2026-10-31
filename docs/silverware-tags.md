@@ -71,10 +71,11 @@ abstraction of its own, room for more operations.
    (lines before and after), what is skipped and why; nothing is written until
    *Apply*. One page edited in its own dialog (the page's tags) is written at
    once.
-7. **Undo**: the last changes (this session) can be undone, page by page,
-   where the page is still as written (else that page is said to be changed
-   since and left). A change of the page open in the editor is one edit of the
-   editor (Ctrl+Z works too).
+7. **Undo**: the last changes (this session) can be undone, last first, as an
+   operation reviewed as any other (decided 2026-10-31: first it wrote at
+   once): each page going back, a page changed since left as it is and said;
+   applied, that change goes off the list. A change of the page open in the
+   editor is one edit of the editor (Ctrl+Z works too).
 8. **The page open in the editor** is changed through the editor
    (`editor.replaceRange`, one minimal edit), never by writing its file:
    SilverBullet keeps its copy and would write a conflict.

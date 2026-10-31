@@ -18,8 +18,9 @@ export class History {
     return this.applied[this.applied.length - 1];
   }
 
-  /** The last change taken off the list (it is being undone) */
-  pop(): Applied | undefined {
-    return this.applied.pop();
+  /** A change taken off the list (it is undone) */
+  remove(applied: object): void {
+    const at = this.applied.indexOf(applied as Applied);
+    if (at >= 0) this.applied.splice(at, 1);
   }
 }

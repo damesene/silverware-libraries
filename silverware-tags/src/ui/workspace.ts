@@ -208,11 +208,8 @@ export class Workspace {
           html: ICONS.undo,
           title: `Undo: ${undo.label}`,
           attrs: { "aria-label": `Undo: ${undo.label}` },
-          run: () =>
-            void undo.run().then(async () => {
-              this.catalog = await this.options.catalog();
-              this.go(this.view, this.state);
-            }),
+          // Its review in the window, as any change's
+          run: () => void undo.run(),
         })
       : null;
     undoButton?.append(` Undo: ${undo!.label}`);

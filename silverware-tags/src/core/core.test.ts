@@ -7,7 +7,7 @@ import { minimalEdit } from "../space/space.ts";
 import { metaPages, pagesWith, readCatalog, subtagsOf } from "./catalog.ts";
 import { diffLines } from "./diff.ts";
 import { History } from "./history.ts";
-import { applyPlan, makePlan, undoApplied } from "./plan.ts";
+import { type Applied, applyPlan, makePlan, undoOperation } from "./plan.ts";
 
 const pages = () =>
   memorySpace({
@@ -46,8 +46,11 @@ describe("plans", () => {
     expect(applied.written).toHaveLength(3);
     expect(space.pages.get("A")).toBe("---\ntags: [work/alpha]\n---\n- [ ] do #todo");
     expect(space.pages.get("B")).toBe("#work/beta\n\nnote #idea");
-    const undone = await undoApplied(space, applied);
-    expect(undone.restored).toHaveLength(3);
+    // Undo: an operation as any other, its review the pages going back
+    const undo = await makePlan(space, await readCatalog(space), undoOperation(applied));
+    expect(undo.changes.map((c) => c.page)).toEqual(["A", "A/Plan", "B"]);
+    expect(undo.operation.undoes).toBe(applied);
+    await applyPlan(space, undo);
     expect(space.pages.get("A")).toBe("---\ntags: [project/alpha]\n---\n- [ ] do #todo");
   });
   it("leaves a page changed since it was read, and one changed since it was written", async () => {
@@ -60,7 +63,9 @@ describe("plans", () => {
 
     const again = await applyPlan(space, await makePlan(space, await readCatalog(space), renameOperation("plan", "plans", false)));
     space.pages.set("A/Plan", "#plans edited later");
-    expect((await undoApplied(space, again)).skipped).toHaveLength(1);
+    const undo = await makePlan(space, await readCatalog(space), undoOperation(again));
+    expect(undo.skipped.map((s) => s.reason)).toEqual(["changed since it was written: left as it is"]);
+    await applyPlan(space, undo);
     expect(space.pages.get("A/Plan")).toBe("#plans edited later");
   });
   it("reads hundreds of pages a few at a time, in their order", async () => {
@@ -81,13 +86,18 @@ describe("plans", () => {
     expect(most).toBeLessThanOrEqual(6);
     expect(seen.at(-1)).toBe(300);
   });
-  it("keeps the changes applied, the last first", () => {
+  it("keeps the changes applied, the last first, one undone taken off", () => {
     const history = new History();
     const op = renameOperation("a", "b", false);
     history.push({ operation: op, written: [], skipped: [] });
     expect(history.last).toBeUndefined();
-    history.push({ operation: op, written: [{ page: "x", before: "", after: "", changes: 1 }], skipped: [] });
-    expect(history.pop()?.operation).toBe(op);
+    const first: Applied = { operation: op, written: [{ page: "x", before: "", after: "", changes: 1 }], skipped: [] };
+    const second: Applied = { ...first };
+    history.push(first);
+    history.push(second);
+    expect(history.last).toBe(second);
+    history.remove(second);
+    expect(history.last).toBe(first);
   });
 });
 

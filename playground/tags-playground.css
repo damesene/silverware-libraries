@@ -4,9 +4,19 @@ body {
   display: flex;
   flex-direction: column;
 }
+/* The commands as SilverBullet's command palette would list them: a row of their own under the header, scrolled
+   sideways where the window is narrower (the header has no room for them on a phone) */
 #commands {
-  display: inline-flex;
+  display: flex;
   gap: 6px;
+  padding: 6px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+#commands button {
+  flex: none;
 }
 #sb-main {
   display: flex;

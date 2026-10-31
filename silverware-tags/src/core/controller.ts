@@ -38,6 +38,8 @@ export class Controller {
   private readonly history = new History();
   private modules: readonly TagsModule[] = [];
   private readonly workspace: Workspace;
+  // What leaves a meta page alone where they are protected
+  private guard: Guard | undefined;
   // What the modules offer each other, by the name of the module offering it (made as they are created)
   private readonly offers = new Map<string, unknown>();
 
@@ -51,7 +53,7 @@ export class Controller {
     // A meta page as read now is never changed (the index may not have caught up with it); its tags as the
     // index has the page's (the catalog hides by them): the frontmatter's, tag lines', a paragraph's hashtags
     const meta = (text: string) => tagUses(text).some((use) => (use.context === "page" || use.context === "paragraph") && isMetaTag(use.name));
-    const guard: Guard | undefined = this.options.protectMeta ? (text) => (meta(text) ? "a meta page: left alone (Hide and protect meta pages)" : undefined) : undefined;
+    const guard: Guard | undefined = (this.guard = this.options.protectMeta ? (text) => (meta(text) ? "a meta page: left alone (Hide and protect meta pages)" : undefined) : undefined);
     this.workspace = new Workspace(doc, {
       catalog,
       metaApart: !this.options.protectMeta,
@@ -76,6 +78,14 @@ export class Controller {
       catalog,
       open: (view, state) => this.workspace.show(view, state),
       review: (operation, tag) => this.workspace.showReview(operation, tag),
+      apply: async (operation) => {
+        const plan = await makePlan(space, await catalog(), operation, undefined, this.guard);
+        if (!plan.changes.length) {
+          this.notifier.flash(plan.skipped.length ? `${operation.label}: ${leftAlone(plan.skipped)}` : `${operation.label}: nothing to change`, plan.skipped.length ? "error" : "info");
+          return;
+        }
+        this.said(await applyPlan(space, plan));
+      },
       offered: <T>(name: string) => this.offers.get(name) as T | undefined,
     };
   }

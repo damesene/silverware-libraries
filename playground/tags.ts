@@ -5,7 +5,7 @@
 // library page's space-style block is applied as SilverBullet would, and its
 // commands are the header's buttons.
 import { readSettings } from "../silverware-tags/src/bridge.ts";
-import { defineOperations, panelMove, panelRename, panelRows, panelSelect, start } from "../silverware-tags/src/index.ts";
+import { defineOperations, panelAddToPage, panelMove, panelRename, panelRows, panelSelect, start } from "../silverware-tags/src/index.ts";
 import type { SettingsStore } from "../silverware-tags/src/settings.ts";
 import { memorySpace } from "../silverware-tags/src/space/memory.ts";
 import libraryPage from "../silverware-tags/silverware-tags.md";
@@ -96,13 +96,16 @@ async function showPanel(): Promise<void> {
     el.dataset.path = name;
     el.draggable = true;
     el.style.paddingLeft = `${6 + depth * 14}px`;
-    el.innerHTML = `<span>${tag && !tag.level ? "#" : "▸"}</span><span class="label"></span><span class="count"></span>`;
+    el.innerHTML = `<span>${tag && !tag.level ? "#" : "▸"}</span><span class="label"></span><span class="count"></span><button type="button" class="add" title="Add to the page open" aria-label="Add to the page open">+</button><button type="button" class="open" title="Open in the Tags window" aria-label="Open in the Tags window">↗</button>`;
     el.querySelector(".label")!.textContent = name.slice(name.lastIndexOf("/") + 1);
     el.querySelector(".count")!.textContent = tag ? String(tag.count) : "";
-    el.addEventListener("click", () => void panelSelect(name));
+    // The row's actions, as the navigator's buttons of a row (a click on the row itself: nothing, as there)
+    const add = el.querySelector<HTMLButtonElement>(".add")!;
+    if (!tag || tag.level) add.remove();
+    else add.addEventListener("click", () => void panelAddToPage(name));
+    el.querySelector(".open")!.addEventListener("click", () => void panelSelect(name));
     el.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") void panelSelect(name);
-      else if (e.key === "F2") void panelRename(name);
+      if (e.key === "F2") void panelRename(name);
     });
     el.addEventListener("dragstart", (e) => e.dataTransfer?.setData("text/plain", name));
     el.addEventListener("dragover", (e) => {

@@ -38,8 +38,10 @@ export type PanelRow = {
  */
 export type PanelOffer = {
   rows(): Promise<readonly PanelRow[]>;
-  /** A tag picked: the window at it */
+  /** Open in the Tags window (an action of a row): the window at the tag */
   select(tag: string): Promise<void>;
+  /** Add to the page open (an action of a row): the tag given to it at once, as one of its own (its frontmatter) */
+  addToPage(tag: string): Promise<void>;
   /** Rename asked for (F2): the window at it, its name's field focused */
   rename(tag: string): Promise<void>;
   /** A tag dragged under another level: renamed so (reviewed), its subtags with it */

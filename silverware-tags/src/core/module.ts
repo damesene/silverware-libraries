@@ -83,6 +83,8 @@ export type ModuleHost = {
   open(view?: string, state?: unknown): Promise<void>;
   /** The window opened at an operation's review (Back: the tags, `tag` picked) */
   review(operation: Operation, tag?: string): Promise<void>;
+  /** An operation applied at once, without a review (one page the user asked a change of: said, with Undo), meta pages protected */
+  apply(operation: Operation): Promise<void>;
   /** What this module offers the others, under its own name (a module uses another's only so: none imports another) */
   offer(api: unknown): void;
   /** What the module of that name offers; undefined while it is off or offers nothing */

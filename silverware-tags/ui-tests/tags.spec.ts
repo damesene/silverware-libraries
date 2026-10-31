@@ -1,4 +1,4 @@
-import { addPages, command, expect, openManager, openPage, pageName, pageText, panelRow, test } from "./helpers.ts";
+import { addPages, command, expect, openManager, openPage, pageName, pageText, panelAction, panelRow, test } from "./helpers.ts";
 
 test("the window shows the tags as a tree and a tag's pages", async ({ page }) => {
   const window = await openManager(page, "todo");
@@ -143,9 +143,12 @@ test("a tag on hundreds of pages: its pages listed a hundred at first, all revie
   expect(await pageText(page, "Many/000")).toBe("#batch\n\nPage 0.\n");
 });
 
-test("the tags' panel: a tag picked opens the window at it, F2 with its name to type", async ({ page }) => {
-  await (await panelRow(page, "todo")).click();
+test("the tags' panel: a click opens no window; its actions open it, F2 with the name to type", async ({ page }) => {
+  const todo = await panelRow(page, "todo");
+  await todo.click();
   const window = page.locator(".swg-workspace");
+  await expect(window).toHaveCount(0);
+  await panelAction(page, todo, "Open in the Tags window");
   await expect(window.locator(".swg-name-field")).toHaveValue("todo");
   await page.keyboard.press("Escape");
   await expect(window).toHaveCount(0);
@@ -154,6 +157,14 @@ test("the tags' panel: a tag picked opens the window at it, F2 with its name to 
   await row.press("F2");
   await expect(window.locator(".swg-name-field")).toBeFocused();
   await expect(window.locator(".swg-name-field")).toHaveValue("milestone");
+});
+
+test("the tags' panel: + adds the tag to the page open, at once, with Undo", async ({ page }) => {
+  await openPage(page, "Recipes/Soup");
+  await panelAction(page, await panelRow(page, "idea"), "Add to the page open");
+  await expect.poll(() => pageText(page, "Recipes/Soup")).toBe("---\ntitle: Soup\ntags:\n  - idea\n---\nCarrots, onions, salt.\n");
+  // No window: one page, the user's own ask
+  await expect(page.locator(".swg-workspace")).toHaveCount(0);
 });
 
 test("the tags' panel: a tag dragged onto a level is renamed under it, reviewed first", async ({ page }) => {

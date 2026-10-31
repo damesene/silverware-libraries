@@ -131,3 +131,9 @@ export async function panelRow(page: Page, tag: string): Promise<Locator> {
   }).toPass({ timeout: onSilverBullet ? 30_000 : 5_000 });
   return row;
 }
+
+/** One of a panel row's actions run: its button (shown as the pointer is over the row), by its label */
+export async function panelAction(page: Page, row: Locator, label: string): Promise<void> {
+  await row.hover();
+  await row.getByRole("button", { name: label }).click();
+}

@@ -16,6 +16,7 @@ function host(rename?: RenameOffer) {
     notifier: { flash: (message) => void calls.push(`flash ${message}`) },
     open: async (view, state) => void calls.push(`open ${view} ${JSON.stringify(state)}`),
     review: async () => undefined,
+    apply: async (operation) => void calls.push(`apply ${operation.label}`),
     // (The panel module's own host)
     offer: (api) => void offers.set(PANEL_OFFER, api),
     offered: <T>(name: string) => offers.get(name) as T | undefined,
@@ -35,6 +36,12 @@ describe("the tags' panel", () => {
       ["project/beta", "beta", 1, false, false, true, false],
       ["todo", "todo", 2, false, false, true, true],
     ]);
+  });
+  it("adds a tag to the page open at once, as an operation the core applies", async () => {
+    const { panel, calls, space } = host();
+    (space as { current?: string }).current = "B";
+    await panel.addToPage("idea");
+    expect(calls).toEqual(["apply Tags of B: add #idea"]);
   });
   it("opens the window at a tag picked, with its name's field for F2", async () => {
     const { panel, calls } = host();

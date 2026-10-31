@@ -96,6 +96,17 @@ body {
   font-size: 12px;
   opacity: 0.6;
 }
+#tags-panel .row button {
+  padding: 0 4px;
+  font-size: 12px;
+  border: 0;
+  background: none;
+  opacity: 0;
+}
+#tags-panel .row:hover button,
+#tags-panel .row:focus-within button {
+  opacity: 0.8;
+}
 @media (max-width: 800px) {
   #pages {
     flex-basis: 140px;

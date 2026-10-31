@@ -2,12 +2,16 @@
 // rows a host draws as a tree by "/" (SilverBullet's navigator, wired by the
 // library page's Lua: this module knows nothing of it). Each row a tag with
 // the pages using it and where (a page's tag, a task's, an item's), a level
-// above tags a row too, counting the pages of the tags under it. Picked, the window opens at it; F2, at it with its name
-// to type; dragged under another level, the rename is reviewed (through the
-// rename module's offer: off, the drag is refused and said).
+// above tags a row too, counting the pages of the tags under it. Its actions:
+// Add to the page open (at once, with Undo), Open in the Tags window; F2 opens
+// the window at it with its name to type; dragged under another level, the
+// rename is reviewed (through the rename module's offer: off, the drag is
+// refused and said). A click does nothing more than the tree does (a level
+// opens): the window is one of the actions.
 import type { Catalog } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule } from "../core/module.ts";
 import { type PanelOffer, type PanelRow, RENAME_OFFER, type RenameOffer } from "../core/offers.ts";
+import { addPageTags } from "../tags/edit.ts";
 import { hashtagOf, isMetaTag, isWithin } from "../tags/names.ts";
 
 /**
@@ -49,6 +53,20 @@ export function panelModule(host: ModuleHost): TagsModule {
   const offer: PanelOffer = {
     rows: async () => panelRows(await host.catalog()),
     select: (tag) => host.open("tags", tag),
+    addToPage: async (tag) => {
+      const page = await host.space.currentPage();
+      if (!page) {
+        host.notifier.flash("Silverware Tags: no page is open", "error");
+        return;
+      }
+      // One page, the user's own ask: applied at once (said, with Undo; through the editor, Ctrl+Z there too)
+      await host.apply({
+        label: `Tags of ${page}: add ${hashtagOf(tag)}`,
+        pages: () => [page],
+        edit: (text) => addPageTags(text, [tag]),
+        done: () => `${page}: added ${hashtagOf(tag)}`,
+      });
+    },
     rename: (tag) => host.open("tags", { tag, focus: "name" }),
     move: async (tag, to) => {
       const rename = host.offered<RenameOffer>(RENAME_OFFER);

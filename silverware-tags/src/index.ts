@@ -86,6 +86,10 @@ export function panelSelect(tag: string): Promise<void> {
   return panel()?.select(tag) ?? Promise.resolve();
 }
 
+export function panelAddToPage(tag: string): Promise<void> {
+  return panel()?.addToPage(tag) ?? Promise.resolve();
+}
+
 export function panelRename(tag: string): Promise<void> {
   return panel()?.rename(tag) ?? Promise.resolve();
 }

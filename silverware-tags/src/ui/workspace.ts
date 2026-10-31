@@ -90,7 +90,10 @@ export class Workspace {
   async show(view = TAGS_VIEW, state?: unknown): Promise<void> {
     // (A change being written stays shown until it is: the panel, a command or Undo would take its place meanwhile)
     if (this.reviewing?.applying) return;
-    this.catalog = await this.options.catalog();
+    const catalog = await this.options.catalog();
+    // (Apply clicked meanwhile)
+    if (this.reviewing?.applying) return;
+    this.catalog = catalog;
     this.reviewing = undefined;
     // The tags' view at a tag: its name, or { tag, focus: "name" } with the field of its name focused
     const at = view === TAGS_VIEW ? (typeof state === "string" ? { tag: state } : ((state ?? {}) as { tag?: string; focus?: string })) : {};
@@ -128,6 +131,7 @@ export class Workspace {
   async showReview(operation: Operation, tag?: string): Promise<void> {
     if (this.reviewing?.applying) return;
     await this.show(TAGS_VIEW, tag);
+    if (this.reviewing?.applying) return;
     await this.review(operation);
   }
 
@@ -310,7 +314,12 @@ export class Workspace {
       this.body.prepend(el(this.doc, "p", { class: "swg-error", text: `Not applied: ${e instanceof Error ? e.message : String(e)}` }));
       return;
     }
-    this.catalog = await this.options.catalog();
+    try {
+      this.catalog = await this.options.catalog();
+    } catch (e) {
+      // (Applied: the tags as read before, else the window would stay at the review, applying, for good)
+      console.error("Silverware Tags: the tags could not be read again", e);
+    }
     if (reviewing.operation.shows) this.picked = reviewing.operation.shows;
     this.chosen.clear();
     const view = this.options.views().find((v) => v.id === this.view);

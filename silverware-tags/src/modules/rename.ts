@@ -32,13 +32,16 @@ export function renameOperation(from: string, to: string, children: boolean, sub
 /**
  * Several tags merged into one (`into`: a tag of the space or a new one):
  * every use of each renamed to it, with `children` the tags under each moved
- * under it (`a/x` into `c`: `c/x`); tags already under `into` stay as they are
+ * under it (`a/x` into `c`: `c/x`); tags already under `into` stay as they are,
+ * but those picked (`a/b` into `a`: `a`) and theirs
  */
 export function mergeOperation(tags: readonly string[], into: string, children: boolean, subtags = 0): Operation {
   const what = `${tags.map(hashtagOf).join(" ")} into ${hashtagOf(into)}${children ? " with their subtags" : ""}`;
   const renamed = (name: string) => {
-    if (isWithin(name, into)) return undefined;
     for (const from of tags) {
+      if (from === into) continue;
+      // Into a subtag of its own (as a rename): the tags under the target stay
+      if (isWithin(into, from) && isWithin(name, into)) return undefined;
       const to = renamedTag(name, from, into, children);
       if (to !== undefined) return to;
     }

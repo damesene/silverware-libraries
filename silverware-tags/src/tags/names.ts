@@ -8,6 +8,7 @@
 // punctuation, not of digits alone, not ending in a hyphen; or any text in < >
 export const TAG_SOURCE = String.raw`#(?:(?:\d*[^\d\s!@#$%^&*(),.?":{}|<>\\';\/–—][^\s!@#$%^&*(),.?":{}|<>\\]*)|(?:<[^>\n]+>))(?<!-)`;
 const WHOLE_RE = new RegExp(`^${TAG_SOURCE}$`);
+const START_RE = new RegExp(`^${TAG_SOURCE}`);
 
 /** A tag's name of its hashtag: what is in its < >, else after its # */
 export function nameOfHashtag(hashtag: string): string {
@@ -18,6 +19,17 @@ export function nameOfHashtag(hashtag: string): string {
 export function hashtagOf(name: string): string {
   const plain = `#${name}`;
   return WHOLE_RE.test(plain) ? plain : `#<${name}>`;
+}
+
+/**
+ * A name as a hashtag written before `after` (the text that follows it): in
+ * < > also where `#name` would read on into that text (`#<my tag>foo` renamed
+ * `b` is `#<b>foo`, not `#bfoo`)
+ */
+export function hashtagBefore(name: string, after: string): string {
+  const tag = hashtagOf(name);
+  if (tag.startsWith("#<") || !after) return tag;
+  return START_RE.exec(tag + after)?.[0].length === tag.length ? tag : `#<${name}>`;
 }
 
 /** What is wrong with a name for a tag (nothing: undefined) */

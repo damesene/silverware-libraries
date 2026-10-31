@@ -4,7 +4,7 @@
 // (frontmatter.ts); a page's tag lines are read as its tags too, as
 // SilverBullet reads them.
 import { type FrontmatterForm, readFrontmatter, writeTags } from "./frontmatter.ts";
-import { hashtagOf } from "./names.ts";
+import { hashtagBefore } from "./names.ts";
 import { type Hashtag, scanHashtags, type TagContext, type TagScanner } from "./scan.ts";
 
 export type TextEdit = { readonly from: number; readonly to: number; readonly insert: string };
@@ -63,7 +63,7 @@ export function renameTags(text: string, rename: (name: string) => string | unde
   for (const tag of scanner(text, frontmatter.bodyStart)) {
     const to = rename(tag.name);
     if (to === undefined || to === tag.name) continue;
-    edits.push({ from: tag.from, to: tag.to, insert: hashtagOf(to) });
+    edits.push({ from: tag.from, to: tag.to, insert: hashtagBefore(to, text.slice(tag.to, tag.line.to)) });
     changes++;
   }
   return changes ? { text: applyEdits(text, edits), changes } : unchanged(text);

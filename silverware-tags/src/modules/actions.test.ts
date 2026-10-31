@@ -59,6 +59,12 @@ describe("several tags at once", () => {
     expect(mergeProblem("a/x", ["a", "b"])).toBeDefined();
     expect(mergeProblem("a", ["a", "b"])).toBeUndefined();
   });
+  it("merges a tag picked under the target into it", async () => {
+    const s = memorySpace({ P: "#a #a/b", Q: "#a/b/c" });
+    await applyPlan(s, await makePlan(s, await readCatalog(s), mergeOperation(["a", "a/b"], "a", true, 1)));
+    expect(s.pages.get("P")).toBe("#a #a");
+    expect(s.pages.get("Q")).toBe("#a/c");
+  });
   it("deletes several tags", async () => {
     const s = memorySpace({ P: "Text #a and #b here, #c stays" });
     await applyPlan(s, await makePlan(s, await readCatalog(s), removeManyOperation(["a", "b"], false)));

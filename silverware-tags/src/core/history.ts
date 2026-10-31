@@ -18,6 +18,11 @@ export class History {
     return this.applied[this.applied.length - 1];
   }
 
+  /** Whether a change is still to undo */
+  has(applied: Applied): boolean {
+    return this.applied.includes(applied);
+  }
+
   /** A change taken off the list (it is undone) */
   remove(applied: object): void {
     const at = this.applied.indexOf(applied as Applied);

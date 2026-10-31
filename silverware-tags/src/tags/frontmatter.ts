@@ -86,9 +86,10 @@ export function readFrontmatter(text: string): Frontmatter {
     return { range, yaml, bodyStart: to, key: { from: line.from, to: line.to, form: "flow", items, indent: "", separator: ", ", hashes: false } };
   }
   if (/^[&*!|>{]/.test(withoutComment)) return { range, yaml, bodyStart: to, key: undefined, unreadable: `its frontmatter's tags are written as ${withoutComment}` };
-  const string = scalarName(withoutComment);
+  // (Its leading # kept: each name's is taken off below, so a string of hashtags, "#a #b", keeps its form)
+  const string = scalarName(withoutComment, true);
   if (string === undefined) return { range, yaml, bodyStart: to, key: undefined, unreadable: `its frontmatter's tags are written as ${withoutComment}` };
-  const parts = string.split(/,\s*|\s+/).filter(Boolean);
+  const parts = string.split(/,\s*|\s+/).filter((part) => part.replace(/^#/, ""));
   const separator = /,/.test(string) ? ", " : " ";
   const hashes = parts.length > 0 && parts.every((part) => part.startsWith("#"));
   return {
@@ -134,8 +135,8 @@ function splitFlow(inner: string): string[] {
   return parts.filter((part) => part.trim());
 }
 
-/** A scalar's text as written: its name (quotes off, a leading # off); undefined: not a plain name */
-function scalarName(raw: string): string | undefined {
+/** A scalar's text as written: its name (quotes off, a leading # off unless `keepHash`); undefined: not a plain name */
+function scalarName(raw: string, keepHash = false): string | undefined {
   const value = stripComment(raw);
   if (!value) return undefined;
   let name: string;
@@ -151,12 +152,13 @@ function scalarName(raw: string): string | undefined {
     name = value.slice(1, -1).replace(/''/g, "'");
   } else if (/^[[{&*!|>]/.test(value)) return undefined;
   else name = value;
-  return name.replace(/^#/, "").trim() || undefined;
+  return (keepHash ? name : name.replace(/^#/, "")).trim() || undefined;
 }
 
 /** A name as a YAML scalar: as it is where YAML reads it so, else in quotes */
 export function yamlScalar(name: string): string {
-  return /^[\p{L}\p{N}_][\p{L}\p{N}_\-/.+]*$/u.test(name) && !/^(true|false|null|yes|no|on|off|~|[-+]?\d[\d_.]*([eE][-+]?\d+)?)$/i.test(name) ? name : JSON.stringify(name);
+  // (Read otherwise unquoted: booleans, null, numbers, hex and octal numbers, dates as timestamps)
+  return /^[\p{L}\p{N}_][\p{L}\p{N}_\-/.+]*$/u.test(name) && !/^(true|false|null|yes|no|on|off|~|[-+]?\d[\d_.]*([eE][-+]?\d+)?|0x[\da-f_]+|0o[0-7_]+|\d{4}-\d\d?-\d\d?\b.*)$/i.test(name) ? name : JSON.stringify(name);
 }
 
 /**

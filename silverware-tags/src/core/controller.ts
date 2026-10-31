@@ -73,7 +73,8 @@ export class Controller {
         this.said(applied);
         // The window then reads the tags anew: as the change left them, not as the index had them before it
         waiting?.();
-        await indexCaughtUp(space, applied.written);
+        // (Only a wait: the pages are written, so a failed read of the index is no failure of the change)
+        await indexCaughtUp(space, applied.written).catch((e: unknown) => console.error("Silverware Tags: waiting for the index failed", e));
         return applied;
       },
       undo: () => (this.history.last ? { label: this.history.last.operation.label, run: () => this.undo() } : undefined),
@@ -156,22 +157,25 @@ export class Controller {
   /** What was applied said, with Undo, and kept for it; an undo takes the change it undid off instead */
   private said(applied: Applied): void {
     const undid = applied.operation.undoes;
-    if (undid) this.history.remove(undid);
-    else this.history.push(applied);
+    // (An undo that wrote nothing, every page left alone or failing, keeps the change to undo)
+    if (undid) {
+      if (applied.written.length) this.history.remove(undid);
+    } else this.history.push(applied);
     const changes = applied.written.reduce((sum, change) => sum + change.changes, 0);
     const skipped = applied.skipped.length ? ` (${leftAlone(applied.skipped)})` : "";
-    const undo = applied.written.length && !undid ? [{ name: "Undo", run: () => void this.undo() }] : undefined;
+    // Its own Undo: this change, not whichever was applied last when it is clicked
+    const undo = applied.written.length && !undid ? [{ name: "Undo", run: () => void this.undo(applied) }] : undefined;
     this.notifier.flash(`${applied.operation.done(applied.written.length, changes)}${skipped}`, applied.written.length ? "info" : "error", undo);
   }
 
-  /** The last change applied, reviewed to be undone in the window (as any change: what goes back, page by page) */
-  async undo(): Promise<void> {
-    const last = this.history.last;
-    if (!last) {
-      this.notifier.flash("Silverware Tags: nothing to undo");
+  /** The last change applied (or `applied`, while it is still to undo), reviewed to be undone in the window (as any change: what goes back, page by page) */
+  async undo(applied?: Applied): Promise<void> {
+    const target = applied ? (this.history.has(applied) ? applied : undefined) : this.history.last;
+    if (!target) {
+      this.notifier.flash(applied ? `Silverware Tags: ${applied.operation.label} is undone already, or no longer kept` : "Silverware Tags: nothing to undo");
       return;
     }
-    await this.workspace.showReview(undoOperation(last));
+    await this.workspace.showReview(undoOperation(target));
   }
 
   private failed(e: unknown): void {

@@ -87,6 +87,13 @@ describe("frontmatter", () => {
     expect(write(["yes"])).toBe('---\ntags: "yes"\n---\n');
     expect(write(["a", "c"])).toBe("---\ntags: a c\n---\n");
     for (const names of [["[x]", "b"], ["@x"], ["yes"]]) expect(readFrontmatter(write(names)).key?.items.map((i) => i.name)).toEqual(names);
+    // Dates and hex numbers, which YAML reads as a timestamp or a number
+    expect(write(["2024-01-01"])).toBe('---\ntags: "2024-01-01"\n---\n');
+    expect(write(["0x1F"])).toBe('---\ntags: "0x1F"\n---\n');
+  });
+  it("keeps a string of hashtags so", () => {
+    const text = '---\ntags: "#a #b"\n---\n';
+    expect(renameTags(text, (name) => (name === "a" ? "c" : undefined)).text).toBe('---\ntags: "#c #b"\n---\n');
   });
 });
 
@@ -96,6 +103,10 @@ describe("editing", () => {
     const result = renameTags(text, (name) => renamedTag(name, "old", "new", true));
     expect(result.text).toBe("---\ntags:\n  - new\n---\n#new\n\n- [ ] do #new/sub\n- item #new");
     expect(result.changes).toBe(4);
+  });
+  it("writes a new name in < > where it would run on into the text after it", () => {
+    expect(renameTags("x #<my tag>foo y", (name) => (name === "my tag" ? "b" : undefined)).text).toBe("x #<b>foo y");
+    expect(renameTags("x #<my tag>, y", (name) => (name === "my tag" ? "b" : undefined)).text).toBe("x #b, y");
   });
   it("adds page tags into the frontmatter, made where there is none", () => {
     expect(addPageTags("Hello", ["a", "b"]).text).toBe("---\ntags: [a, b]\n---\nHello");

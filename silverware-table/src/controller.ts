@@ -2289,7 +2289,7 @@ export class Controller implements TableHost {
   }
 
   /** A setting's value, falling back to its default when unset or not valid */
-  /** How tables are written: with the autoFormat setting every edited table aligned; a padded one as Long content says */
+  /** How tables are written: with the autoFormat setting every edited table aligned; a padded one as Long cells says */
   private async serializer(): Promise<(table: Table) => string> {
     const format = await this.setting("autoFormat");
     const rule = await formatRule((name) => this.setting(name));

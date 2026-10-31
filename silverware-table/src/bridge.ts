@@ -245,19 +245,19 @@ export const SETTINGS = {
   // Write edited tables with aligned pipes; off: keep each table's own style
   autoFormat: {
     path: "silverware.table.autoFormat",
-    label: "Format edited tables",
-    hint: "A table edited with Silverware Table is written with its columns aligned, as Long content says; off, each table keeps its own style",
+    label: "Auto-format edited tables",
+    hint: "A table edited with Silverware Table is written with its columns aligned, as Long cells says; off, each table keeps its own style",
     default: true,
     parse: (v) => (typeof v === "boolean" ? v : undefined),
   } satisfies Setting<boolean>,
   // How a formatted table takes a long cell (a link): its columns padded up to a width, or the table compact where too wide
   formatLong: {
     path: "silverware.table.formatLong",
-    label: "Long content",
+    label: "Long cells",
     hint: "How a table is formatted where cells are long (a link), edited or by Format table in its ⋯ menu: its columns padded up to a width, a longer cell sticking out; or the whole table compact where a line would be too long",
     default: "limit",
     choices: ["limit", "compact"],
-    choiceLabels: ["Pad columns up to a width", "Compact a table too wide"],
+    choiceLabels: ["Pad columns up to a width", "Compact the table when too wide"],
     parse: (v) => (v === "limit" || v === "compact" ? v : undefined),
   } satisfies Setting<"limit" | "compact">,
   // Characters; 0: no limit. A longer cell is written past its aligned column rather than widening every row
@@ -272,7 +272,7 @@ export const SETTINGS = {
   // Characters; 0: no limit. As Prettier's printWidth with proseWrap "never"
   formatLineWidth: {
     path: "silverware.table.formatLineWidth",
-    label: "Compact when wider than (characters)",
+    label: "Compact when a line is longer than (characters)",
     hint: "A table whose longest line would be longer than this, its columns padded, is written compact: no padding, the delimiter row --- (as Prettier does with proseWrap never). 0: no limit",
     default: 80,
     parse: (v) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined),
@@ -360,7 +360,7 @@ export const SETTINGS = {
   } satisfies Setting<number>,
 };
 
-/** How tables are formatted where cells are long, as the settings say (Long content and its width) */
+/** How tables are formatted where cells are long, as the settings say (Long cells and their width) */
 export async function formatRule(setting: <K extends keyof typeof SETTINGS>(name: K) => Promise<SettingValue<K>>): Promise<FormatRule> {
   return (await setting("formatLong")) === "compact"
     ? { lineWidth: await setting("formatLineWidth") }

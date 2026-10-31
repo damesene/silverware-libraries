@@ -43,14 +43,14 @@ config.define("silverware.table", {
       type = "boolean",
       default = true,
       description = "Write tables edited with Silverware Table with aligned pipes, as formatLong says. Off: each table keeps its own style (aligned or compact).",
-      ui = { category = "Silverware Table", label = "Format edited tables", priority = 4 },
+      ui = { category = "Silverware Table", label = "Auto-format edited tables", priority = 4 },
     },
     formatLong = {
       type = "string",
       enum = { "limit", "compact" },
       default = "limit",
-      description = "How a table is formatted where cells are long (a link), edited with Format edited tables or by Format table in its ⋯ menu. limit: its columns padded up to formatCellWidth, a longer cell sticking out. compact: the whole table written compact where a line of it padded would be longer than formatLineWidth.",
-      ui = { category = "Silverware Table", label = "Long content", priority = 3.9 },
+      description = "How a table is formatted where cells are long (a link), edited with Auto-format edited tables or by Format table in its ⋯ menu. limit: its columns padded up to formatCellWidth, a longer cell sticking out. compact: the whole table written compact where a line of it padded would be longer than formatLineWidth.",
+      ui = { category = "Silverware Table", label = "Long cells", priority = 3.9 },
     },
     formatCellWidth = {
       type = "number",
@@ -62,7 +62,7 @@ config.define("silverware.table", {
       type = "number",
       default = 80,
       description = "With formatLong compact: a table whose longest line would be longer than this, its columns padded, is written compact: no padding, the delimiter row --- (as Prettier does with proseWrap never). 0: no limit.",
-      ui = { category = "Silverware Table", label = "Compact when wider than (characters)", priority = 3.7 },
+      ui = { category = "Silverware Table", label = "Compact when a line is longer than (characters)", priority = 3.7 },
     },
     toolbarNames = {
       type = "string",

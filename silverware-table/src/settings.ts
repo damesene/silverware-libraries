@@ -140,6 +140,8 @@ export class SettingsDialog {
   private render(): void {
     const { doc } = this.context;
     const el = this.el.bind(this);
+    // (Opened again: the rows of before are gone)
+    this.settingsUnder.length = 0;
     // Tabs: the settings, then the modules by kind
     const list: { id: string; title: string; panel: HTMLElement }[] = [];
     for (const tab of TABS) {

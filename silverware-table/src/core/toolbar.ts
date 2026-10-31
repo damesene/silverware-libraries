@@ -252,7 +252,7 @@ export class Toolbar {
       // Aligned already, it writes nothing
       {
         label: "Format table",
-        title: "Align the table's markdown: its columns padded to one width",
+        title: "Align the table's markdown: its columns padded to one width, as the Long cells setting says",
         icon: ICONS.format,
         run: () => {
           const [w] = this.context.current(widget, info);

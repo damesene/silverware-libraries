@@ -2288,7 +2288,6 @@ export class Controller implements TableHost {
     return this.rows.shownRows(info);
   }
 
-  /** A setting's value, falling back to its default when unset or not valid */
   /** How tables are written: with the autoFormat setting every edited table aligned; a padded one as Long cells says */
   private async serializer(): Promise<(table: Table) => string> {
     const format = await this.setting("autoFormat");
@@ -2296,6 +2295,7 @@ export class Controller implements TableHost {
     return (table) => serializeTable(format ? { ...table, padded: true } : table, rule);
   }
 
+  /** A setting's value, falling back to its default when unset or not valid */
   async setting<K extends keyof typeof SETTINGS>(name: K): Promise<SettingValue<K>> {
     const { path, parse } = SETTINGS[name];
     const fallback = SETTINGS[name].default as SettingValue<K>;

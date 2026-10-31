@@ -113,12 +113,12 @@ describe("operations", () => {
     const space = pages();
     await applyPlan(space, await makePlan(space, await readCatalog(space), pagesOperation(["A", "C"], ["review"], ["project/alpha"])));
     expect(space.pages.get("A")).toBe("---\ntags: [review]\n---\n- [ ] do #todo");
-    expect(space.pages.get("C")).toBe("---\ntags:\n  - review\n---\nNothing here");
+    expect(space.pages.get("C")).toBe("---\ntags: [review]\n---\nNothing here");
   });
   it("changes one page's tags", async () => {
     const space = pages();
     await applyPlan(space, await makePlan(space, await readCatalog(space), pagesOperation(["A/Plan"], ["draft"], ["project/alpha"])));
-    expect(space.pages.get("A/Plan")).toBe("---\ntags:\n  - draft\n---\n#plan\n\ntext");
+    expect(space.pages.get("A/Plan")).toBe("---\ntags: [draft]\n---\n#plan\n\ntext");
   });
   it("offers the subtags in the review, the operation made anew", () => {
     const op = renameOperation("project", "work", true, 2);

@@ -90,7 +90,7 @@ test("by page: a folder picks its pages, their tags shown with counts, a tag add
   await window.locator(".swg-apply").click();
   await expect.poll(() => pageText(page, "Meetings/2026-10-01")).toContain("tags: project/alpha, review\n");
   // A page without a frontmatter gets one; its tag line, left with no tag, goes
-  expect(await pageText(page, "Meetings/2026-10-15")).toBe("---\ntags:\n  - review\n---\n- [ ] Send the notes #todo\n");
+  expect(await pageText(page, "Meetings/2026-10-15")).toBe("---\ntags: [review]\n---\n- [ ] Send the notes #todo\n");
   // Back in the view, the same pages picked, nothing left to change
   await expect(window.locator('.swg-their-tags [data-swg-chip="review"]')).toBeVisible();
   await expect(window.locator(".swg-review-changes")).toBeDisabled();
@@ -120,7 +120,7 @@ test("Page tags: the window by page with the page open picked, its tags changed"
   await add.press("Enter");
   await window.locator(".swg-review-changes").click();
   await window.locator(".swg-apply").click();
-  await expect.poll(() => pageText(page, "Projects/Alpha/Plan")).toBe("---\ntags:\n  - draft\n---\n#project/alpha\n\nThe plan of Alpha.\n\n- Phase one #milestone\n- Phase two #milestone\n");
+  await expect.poll(() => pageText(page, "Projects/Alpha/Plan")).toBe("---\ntags: [draft]\n---\n#project/alpha\n\nThe plan of Alpha.\n\n- Phase one #milestone\n- Phase two #milestone\n");
 });
 
 test("a tag on hundreds of pages: its pages listed a hundred at first, all reviewed and renamed", async ({ page }) => {
@@ -169,7 +169,7 @@ test("the tags' panel: a click opens no window; its actions open it, F2 with the
 test("the tags' panel: + adds the tag to the page open at once, − of one of its own takes it off", async ({ page }) => {
   await openPage(page, "Recipes/Soup");
   await panelAction(page, await panelRow(page, "idea"), "Add to the page open");
-  await expect.poll(() => pageText(page, "Recipes/Soup")).toBe("---\ntitle: Soup\ntags:\n  - idea\n---\nCarrots, onions, salt.\n");
+  await expect.poll(() => pageText(page, "Recipes/Soup")).toBe("---\ntitle: Soup\ntags: [idea]\n---\nCarrots, onions, salt.\n");
   // No window: one page, the user's own ask
   await expect(page.locator(".swg-workspace")).toHaveCount(0);
   // Its own now: − in place of +
@@ -245,7 +245,7 @@ test("a custom operation is a button of the tag, its changes reviewed and applie
   await window.locator('[data-swg-action="custom.promote"]').click();
   await expect(window.locator(".swg-review-title")).toHaveText("Make it the page's #todo");
   await window.locator(".swg-apply").click();
-  await expect.poll(() => pageText(page, "Meetings/2026-10-15")).toBe("---\ntags:\n  - todo\n---\n#meeting\n\n- [ ] Send the notes #todo\n");
+  await expect.poll(() => pageText(page, "Meetings/2026-10-15")).toBe("---\ntags: [todo]\n---\n#meeting\n\n- [ ] Send the notes #todo\n");
 });
 
 test("the window's tree: F2 the tag's name to type, Delete its Delete tag", async ({ page }) => {

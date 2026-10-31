@@ -98,8 +98,10 @@ describe("editing", () => {
     expect(result.changes).toBe(4);
   });
   it("adds page tags into the frontmatter, made where there is none", () => {
-    expect(addPageTags("Hello", ["a", "b"]).text).toBe("---\ntags:\n  - a\n  - b\n---\nHello");
-    expect(addPageTags("---\ntitle: T\n---\nHello", ["a"]).text).toBe("---\ntitle: T\ntags:\n  - a\n---\nHello");
+    expect(addPageTags("Hello", ["a", "b"]).text).toBe("---\ntags: [a, b]\n---\nHello");
+    expect(addPageTags("---\ntitle: T\n---\nHello", ["a"]).text).toBe("---\ntitle: T\ntags: [a]\n---\nHello");
+    // A name with a space quoted, on the same one line
+    expect(addPageTags("Hello", ["two words"]).text).toBe('---\ntags: ["two words"]\n---\nHello');
     // Those it has on a tag line are left out
     expect(addPageTags("#a\n\nHello", ["a"]).changes).toBe(0);
   });

@@ -51,8 +51,10 @@ abstraction of its own, room for more operations.
 2. **Page tags go into the frontmatter**: added to its `tags` (a key made where
    there is none, the frontmatter too); removed from the frontmatter and from
    the page's tag lines (a line left empty goes). The form a page has is kept
-   (a list stays a list, a string a string); new: a block list, as
-   SilverBullet's own YAML writes it.
+   (a list stays a list, a string a string); new: a list in brackets on one
+   line, `tags: [a, b]` (decided 2026-11-01: a block list before, as
+   SilverBullet's own YAML writes it; a string a name with a space cannot be in
+   turns into the list in brackets too).
 3. **A rename changes every occurrence**: the frontmatter, the tag lines,
    hashtags in paragraphs, items, tasks, tables. Renaming into a tag that
    exists merges them (a page's frontmatter keeps one). With *its subtags*

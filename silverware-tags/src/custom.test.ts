@@ -59,6 +59,6 @@ describe("custom operations", () => {
     expect(lower.s.pages.get("B")).toBe("- [ ] task #todo");
     const promoted = await runOn("custom.promote", "Todo");
     expect(promoted.plan.changes.map((c) => c.page)).toEqual(["B"]);
-    expect(promoted.s.pages.get("B")).toBe("---\ntags:\n  - Todo\n---\n- [ ] task #Todo");
+    expect(promoted.s.pages.get("B")).toBe("---\ntags: [Todo]\n---\n- [ ] task #Todo");
   });
 });

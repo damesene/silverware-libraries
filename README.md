@@ -2,6 +2,8 @@
 
 [![Unit tests](https://github.com/damesene/silverware-libraries/actions/workflows/unit-tests.yml/badge.svg?branch=main)](https://github.com/damesene/silverware-libraries/actions/workflows/unit-tests.yml)
 [![Integration tests](https://github.com/damesene/silverware-libraries/actions/workflows/integration-tests.yml/badge.svg?branch=main)](https://github.com/damesene/silverware-libraries/actions/workflows/integration-tests.yml)
+[![tested against SilverBullet](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdamesene%2Fsilverware-libraries%2Fmain%2Fscripts%2Fsilverbullet%2FDockerfile&search=silverbullet%3A(%5B%5E-%5Cs%5D%2B)&replace=%241&label=tested%20against%20SilverBullet)](https://github.com/damesene/silverware-libraries/blob/main/scripts/silverbullet/Dockerfile)
+[![SilverBullet bumped](https://img.shields.io/github/last-commit/damesene/silverware-libraries/main?path=scripts%2Fsilverbullet%2FDockerfile&label=SilverBullet%20bumped)](https://github.com/damesene/silverware-libraries/commits/main/scripts/silverbullet/Dockerfile)
 
 Silverware is a collection of plugins (libraries) for [SilverBullet](https://silverbullet.md) by `damesene`.
 

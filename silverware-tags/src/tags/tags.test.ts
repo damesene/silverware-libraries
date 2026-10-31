@@ -94,6 +94,8 @@ describe("editing", () => {
   });
   it("removes a tag everywhere with a space beside it", () => {
     expect(removeTags("Text #a here\n- [ ] do #a", (n) => n === "a").text).toBe("Text here\n- [ ] do");
+    // Two side by side taking the same space
+    expect(removeTags("x #a #a", (n) => n === "a").text).toBe("x");
   });
   it("leaves a page whose frontmatter it cannot read", () => {
     const result = renameTags("---\ntags: [a,\n b]\n---\n#a", () => "x");

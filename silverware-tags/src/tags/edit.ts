@@ -94,7 +94,13 @@ export function removeTags(text: string, match: (name: string) => boolean, conte
   }
   for (const tags of byLine.values()) {
     const { line } = tags[0]!;
-    const lineEdits = tags.map((tag) => withSpace(text, tag, line));
+    // A removal reaching the line's end takes the spaces before it too (none left trailing)
+    const lineEdits = merged(tags.map((tag) => withSpace(text, tag, line))).map((edit) => {
+      if (edit.to !== line.to) return edit;
+      let from = edit.from;
+      while (from > line.from && /[ \t]/.test(text[from - 1]!)) from--;
+      return { ...edit, from };
+    });
     const left = applyEdits(text.slice(line.from, line.to), lineEdits.map((e) => ({ ...e, from: e.from - line.from, to: e.to - line.from })));
     if (!left.trim() && tags[0]!.context === "page") edits.push(lineRemoved(text, line, frontmatter.bodyStart));
     else edits.push(...lineEdits);
@@ -107,6 +113,17 @@ function withSpace(text: string, tag: Hashtag, line: { readonly from: number; re
   if (tag.to < line.to && /[ \t]/.test(text[tag.to]!)) return { from: tag.from, to: tag.to + 1, insert: "" };
   if (tag.from > line.from && /[ \t]/.test(text[tag.from - 1]!)) return { from: tag.from - 1, to: tag.to, insert: "" };
   return { from: tag.from, to: tag.to, insert: "" };
+}
+
+/** Removals that overlap made one (two hashtags side by side take the same space: `x #a #a`) */
+function merged(edits: readonly TextEdit[]): TextEdit[] {
+  const out: TextEdit[] = [];
+  for (const edit of [...edits].sort((a, b) => a.from - b.from)) {
+    const last = out[out.length - 1];
+    if (last && edit.from <= last.to) out[out.length - 1] = { from: last.from, to: Math.max(last.to, edit.to), insert: "" };
+    else out.push(edit);
+  }
+  return out;
 }
 
 /** A line removed with its line break; a blank line after it too where one is before it (no two blank lines left) */

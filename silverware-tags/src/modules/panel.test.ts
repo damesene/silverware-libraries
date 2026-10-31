@@ -21,7 +21,7 @@ function host(rename?: RenameOffer) {
     offer: (api) => void offers.set(PANEL_OFFER, api),
     offered: <T>(name: string) => offers.get(name) as T | undefined,
   };
-  panelModule(h);
+  panelModule(h, { pageFirst: false });
   return { panel: offers.get(PANEL_OFFER) as PanelOffer, calls, space: h.space };
 }
 

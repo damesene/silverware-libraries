@@ -28,7 +28,7 @@ export type SettingsStore = {
   flash(message: string, type: "info" | "error"): void;
 };
 
-type Values = { protectMeta: boolean; modules: Record<ModuleName, boolean> };
+type Values = { protectMeta: boolean; pageFirst: boolean; modules: Record<ModuleName, boolean> };
 
 export class SettingsDialog {
   private readonly dialogs: Dialogs;
@@ -55,8 +55,8 @@ export class SettingsDialog {
     if (this.isOpen) return;
     const settings = await this.store.read();
     const modules = Object.fromEntries(MODULE_NAMES.map((name) => [name, settings.modules.has(name)])) as Record<ModuleName, boolean>;
-    this.initial = { protectMeta: settings.protectMeta, modules };
-    this.values = { protectMeta: settings.protectMeta, modules: { ...modules } };
+    this.initial = { protectMeta: settings.protectMeta, pageFirst: settings.pageFirst, modules };
+    this.values = { protectMeta: settings.protectMeta, pageFirst: settings.pageFirst, modules: { ...modules } };
     this.render();
   }
 
@@ -95,7 +95,13 @@ export class SettingsDialog {
       protect,
     );
     protectRow.dataset.swgSetting = PATHS.protectMeta;
-    card.append(protectRow);
+    const first = switchControl(doc, BASE, values.pageFirst, (on) => {
+      values.pageFirst = on;
+      this.update();
+    });
+    const firstRow = settingRow(doc, BASE, "The page open's tags first in the Tags panel", "On: the tags of the page you are on come first in the panel (their # marked either way). Off: by name, folders first, as SilverBullet's own tree.", first);
+    firstRow.dataset.swgSetting = PATHS.pageFirst;
+    card.append(protectRow, firstRow);
     general.append(card);
 
     const modules = this.el("div");
@@ -153,6 +159,7 @@ export class SettingsDialog {
     if (!initial || !values) return {};
     const changed: Record<string, unknown> = {};
     if (values.protectMeta !== initial.protectMeta) changed[PATHS.protectMeta] = values.protectMeta;
+    if (values.pageFirst !== initial.pageFirst) changed[PATHS.pageFirst] = values.pageFirst;
     for (const name of MODULE_NAMES) if (values.modules[name] !== initial.modules[name]) changed[PATHS.module(name)] = values.modules[name];
     return changed;
   }

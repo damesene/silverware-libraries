@@ -5,7 +5,7 @@
 // library page's space-style block is applied as SilverBullet would, and its
 // commands are the header's buttons.
 import { readSettings } from "../silverware-tags/src/bridge.ts";
-import { defineOperations, panelAddToPage, panelMove, panelRemoveFromPage, panelRename, panelRows, panelSelect, start } from "../silverware-tags/src/index.ts";
+import { defineOperations, panelAddToPage, panelMove, panelPageFirst, panelRemoveFromPage, panelRename, panelRows, panelSelect, start } from "../silverware-tags/src/index.ts";
 import type { SettingsStore } from "../silverware-tags/src/settings.ts";
 import { memorySpace } from "../silverware-tags/src/space/memory.ts";
 import libraryPage from "../silverware-tags/silverware-tags.md";
@@ -91,9 +91,11 @@ async function showPanel(): Promise<void> {
   // Every level above a tag is a row too, a folder
   // (SilverBullet's own tags in a Meta segment of their own there: the playground's space has none)
   const names = [...new Set(rows.filter((row) => !row.meta).flatMap((row) => row.name.split("/").map((_, i, parts) => parts.slice(0, i + 1).join("/"))))].sort();
-  // The page open's tags first at the top (their priority, as the navigator sorts each level by it), in bold
-  const here = (name: string) => byName.get(name.split("/")[0]!)?.here ?? false;
-  names.sort((a, b) => Number(here(b)) - Number(here(a)));
+  // The page open's tags first where the setting says so (the rows' order, which the navigator keeps)
+  if (panelPageFirst()) {
+    const here = (name: string) => byName.get(name.split("/")[0]!)?.here ?? false;
+    names.sort((a, b) => Number(here(b)) - Number(here(a)));
+  }
   const row = (name: string) => {
     const tag = byName.get(name);
     const depth = name.split("/").length - 1;

@@ -288,12 +288,22 @@ test("Cleanup: tags likely one merged into the one picked, tags used once listed
   await expect(window.locator(".swg-cleanup-once")).toContainText("#milestone");
 });
 
-test("the tags' panel: the page open's tags first, marked, read again as another page opens", async ({ page }) => {
+test("the tags' panel: the page open's tags marked; first only with the setting, read again as another page opens", async ({ page }) => {
   await openPage(page, "Projects/Alpha");
   await expect(await panelRow(page, "active")).toHaveClass(/here/);
   const rows = page.locator(onSilverBullet ? ".sb-nav-row" : "#tags-panel .row");
+  const paths = async () => (await rows.evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.path))).filter((path) => !path?.includes("/"));
+  // By default by name (folders first in SilverBullet, as its own tree): #active comes before #auto, #done after #decision
+  await expect.poll(async () => (await paths()).filter((path) => path !== "project").slice(0, 4).join(" ")).toBe("active auto decision done");
+  // The setting on (saved, the page loaded anew)
+  await command(page, "Silverware Tags: Settings");
+  const settings = page.locator(".swg-settings");
+  await settings.locator('[data-swg-setting="silverware.tags.panelPageFirst"] input').check();
+  await Promise.all([page.waitForEvent("load"), settings.locator(".swg-settings-save").click()]);
+  await openPage(page, "Projects/Alpha");
+  await panelRow(page, "active");
   // The page's: #project (a level holding #project/alpha), #active, #done, #todo, before any other tag
-  await expect.poll(async () => (await rows.evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.path))).slice(0, 4).sort().join(" ")).toBe("active done project todo");
+  await expect.poll(async () => (await paths()).slice(0, 4).sort().join(" ")).toBe("active done project todo");
   await openPage(page, "Recipes/Soup");
   await expect(await panelRow(page, "active")).not.toHaveClass(/here/);
 });

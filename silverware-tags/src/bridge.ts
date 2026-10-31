@@ -52,6 +52,7 @@ export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
 /** Where each setting is in SilverBullet's configuration */
 export const PATHS = {
   protectMeta: "silverware.tags.protectMeta",
+  pageFirst: "silverware.tags.panelPageFirst",
   module: (name: ModuleName) => `silverware.tags.modules.${name}.enabled`,
 } as const;
 
@@ -60,6 +61,8 @@ export type Settings = {
   readonly modules: ReadonlySet<ModuleName>;
   // SilverBullet's meta pages (a page tagged meta or under it) left out of everything and never changed
   readonly protectMeta: boolean;
+  // The Tags panel: the page open's tags first (else as SilverBullet's tree sorts: by name, folders first)
+  readonly pageFirst: boolean;
 };
 
 /** The settings as configured, each its default where it is not set or not valid */
@@ -73,7 +76,7 @@ export async function readSettings(bridge: Partial<Bridge>): Promise<Settings> {
   };
   const modules = new Set<ModuleName>();
   for (const name of MODULE_NAMES) if ((await get(PATHS.module(name), true)) !== false) modules.add(name);
-  return { modules, protectMeta: (await get(PATHS.protectMeta, true)) !== false };
+  return { modules, protectMeta: (await get(PATHS.protectMeta, true)) !== false, pageFirst: (await get(PATHS.pageFirst, false)) === true };
 }
 
 /**

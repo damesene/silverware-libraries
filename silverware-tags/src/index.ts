@@ -44,7 +44,7 @@ export async function init(bridge: Bridge): Promise<void> {
 export async function start(space: Space, notifier: Notifier, settings: Settings, store?: SettingsStore): Promise<Controller> {
   const dialog = store ? new SettingsDialog(document, store) : undefined;
   const controller = new Controller(document, space, notifier, { protectMeta: settings.protectMeta, settings: dialog ? () => dialog.open() : undefined });
-  controller.setModules(createModules(settings.modules, (name) => controller.hostFor(name)));
+  controller.setModules(createModules(settings, (name) => controller.hostFor(name)));
   slot[GLOBAL_KEY] = controller;
   shown = settings;
   return controller;
@@ -52,6 +52,11 @@ export async function start(space: Space, notifier: Notifier, settings: Settings
 
 // The settings Silverware Tags runs with
 let shown: Settings | undefined;
+
+/** Whether the panel shows the page open's tags first (the setting): the library page's view keeps folders among them then */
+export function panelPageFirst(): boolean {
+  return shown?.pageFirst ?? false;
+}
 
 /** Whether the panel shows SilverBullet's own tags apart (Meta), as they are not left out (the setting) */
 export function panelMetaApart(): boolean {

@@ -1,4 +1,4 @@
-import { command, dialog, expect, openManager, openPage, pageName, pageText, test } from "./helpers.ts";
+import { addPages, command, dialog, expect, openManager, openPage, pageName, pageText, test } from "./helpers.ts";
 
 test("the manager shows the tags as a tree and a tag's pages", async ({ page }) => {
   const manager = await openManager(page, "todo");
@@ -98,3 +98,25 @@ test("page tags: the open page's tags edited, saved through the editor", async (
   await expect.poll(() => pageText(page, "Projects/Alpha/Plan")).toBe("---\ntags:\n  - draft\n---\n#project/alpha\n\nThe plan of Alpha.\n\n- Phase one #milestone\n- Phase two #milestone\n");
 });
 
+test("a tag on hundreds of pages: its pages listed a hundred at first, all previewed and renamed", async ({ page }) => {
+  const many = Object.fromEntries(Array.from({ length: 150 }, (_, i) => [`Many/${String(i).padStart(3, "0")}`, `#bulk\n\nPage ${i}.\n`]));
+  await addPages(page, many);
+  const manager = await openManager(page, "bulk");
+  await manager.locator('[data-swg-tag="bulk"] .swg-tag-row').click();
+  await expect(manager.locator(".swg-pages .swg-page-link")).toHaveCount(100);
+  await manager.locator(".swg-more").click();
+  await expect(manager.locator(".swg-pages .swg-page-link")).toHaveCount(150);
+  await manager.locator('[data-swg-action="rename"]').click();
+  await dialog(page, "swg-small").locator(".swg-field").fill("batch");
+  await page.keyboard.press("Enter");
+  const preview = dialog(page, "swg-preview-dialog");
+  await expect(preview.locator(".swg-preview-page")).toHaveCount(150);
+  // The first few open with their lines, the rest made as they are opened
+  await expect(preview.locator(".swg-diff-run")).toHaveCount(3);
+  await preview.locator('.swg-preview-page[data-swg-page$="Many/149"] summary').click();
+  await expect(preview.locator(".swg-diff-run")).toHaveCount(4);
+  await preview.locator(".swg-apply").click();
+  await expect(preview).toHaveCount(0);
+  await expect.poll(() => pageText(page, "Many/149")).toBe("#batch\n\nPage 149.\n");
+  expect(await pageText(page, "Many/000")).toBe("#batch\n\nPage 0.\n");
+});

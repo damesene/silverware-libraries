@@ -80,6 +80,21 @@ export async function pageText(page: Page, name: string): Promise<string> {
   return page.evaluate((name) => (window as unknown as Window).playgroundTags!.space.pages.get(name) ?? "", name);
 }
 
+/** Pages added to the sample (by their names in it) */
+export async function addPages(page: Page, pages: Readonly<Record<string, string>>): Promise<void> {
+  if (onSilverBullet) {
+    for (const [name, text] of Object.entries(pages)) {
+      const path = join(server().space, `${pageName(name)}.md`);
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, text);
+    }
+    return;
+  }
+  await page.evaluate((pages) => {
+    for (const [name, text] of Object.entries(pages)) (window as unknown as Window).playgroundTags!.space.pages.set(name, text);
+  }, pages);
+}
+
 /** Opens a sample page (the page open in the editor) */
 export async function openPage(page: Page, name: string): Promise<void> {
   if (onSilverBullet) await page.goto(`/${pageName(name)}`);

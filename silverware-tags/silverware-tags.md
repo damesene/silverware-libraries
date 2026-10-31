@@ -582,6 +582,13 @@ end
   opacity: 0.6;
   white-space: nowrap;
 }
+.swg-more {
+  margin-top: 8px;
+}
+.swg-progress {
+  width: 100%;
+  accent-color: var(--swg-accent);
+}
 .swg-foot-row .swg-undo {
   max-width: 100%;
   overflow: hidden;

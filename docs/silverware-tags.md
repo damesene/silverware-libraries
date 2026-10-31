@@ -87,7 +87,7 @@ abstraction of its own, room for more operations.
 
 ### Layers
 
-```
+```text
 silverware-tags/
   silverware-tags.md   library page: docs, config.define, the Lua that loads the JS and hands over the bridge, commands, CSS
   silverware-tags.js   the bundle
@@ -181,6 +181,13 @@ silverware-tags/
   are read too, else a rename missed them.
 - Not verified: SilverBullet 2.12.1 (the release CI runs), the notification's
   Undo button there (its options came later), a phone.
+- Hundreds of pages to a tag (the same day): pages read and written six at a
+  time (each a call into SilverBullet), a progress dialog while a preview's
+  pages are read and while a change is undone (shown after 300 ms), the
+  preview's lines of a page made as it is opened (the first three open), the
+  manager's pages a hundred at first (*Show all*), a notification naming three
+  pages left alone and counting the rest, ten changes kept for Undo (each holds
+  every page's text twice). Not measured in SilverBullet with that many pages.
 - Next: the UI tests against SilverBullet in CI; the playground's toolbar page
   has no link to the tags playground (one in its header broke the toolbar's
   touch tests: the header's width on a phone).

@@ -1,5 +1,6 @@
 // A plan shown before anything is written: each page that changes with its
-// lines before and after (folded under its name, the first few open), the
+// lines before and after (folded under its name, the first few open, the
+// others' lines made as they are opened), the
 // pages left alone and why. Apply writes them (its button counting them as
 // they are written); Cancel, Esc or × writes nothing.
 import { diffLines } from "../core/diff.ts";
@@ -10,8 +11,8 @@ import { el } from "./elements.ts";
 
 // Pages shown open at the start
 const OPEN = 3;
-// Pages listed at most (the rest counted)
-const LISTED = 200;
+// Pages listed at most (the rest counted): each a line, its lines before and after made as it is opened
+const LISTED = 1000;
 
 /** The plan shown; `apply` called once the user applies it (given a progress to report); true: applied */
 export function showPreview(doc: Document, plan: Plan, apply: (progress: (done: number, of: number) => void) => Promise<void>): Promise<boolean> {
@@ -28,17 +29,19 @@ export function showPreview(doc: Document, plan: Plan, apply: (progress: (done: 
     if (plan.changes.length) {
       const list = el(doc, "div", "swg-preview-pages");
       plan.changes.slice(0, LISTED).forEach((change, i) => {
-        const runs = diffLines(change.before, change.after);
+        const diff = el(doc, "div", "swg-diff");
         const details = el(
           doc,
           "details",
           { class: "swg-preview-page", attrs: { "data-swg-page": change.page } },
           el(doc, "summary", "swg-preview-summary", el(doc, "span", { class: "swg-preview-name", text: change.page }), el(doc, "span", { class: "swg-count", text: counted(change.changes, "change") })),
-          el(
-            doc,
-            "div",
-            "swg-diff",
-            ...runs.map((run) =>
+          diff,
+        );
+        // Its lines made as it is first opened (hundreds of pages: only those looked at)
+        const fill = () => {
+          if (diff.childElementCount) return;
+          diff.append(
+            ...diffLines(change.before, change.after).map((run) =>
               el(
                 doc,
                 "div",
@@ -48,9 +51,13 @@ export function showPreview(doc: Document, plan: Plan, apply: (progress: (done: 
                 ...run.added.map((line) => el(doc, "div", { class: "swg-diff-added", text: line || " " })),
               ),
             ),
-          ),
-        );
-        details.open = i < OPEN;
+          );
+        };
+        details.addEventListener("toggle", () => details.open && fill());
+        if (i < OPEN) {
+          fill();
+          details.open = true;
+        }
         list.append(details);
       });
       if (plan.changes.length > LISTED) list.append(el(doc, "p", { class: "swg-note", text: `and ${counted(plan.changes.length - LISTED, "more page")}` }));

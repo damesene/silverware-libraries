@@ -4,11 +4,21 @@
 import type { Notifier, Space } from "../space/space.ts";
 import { showManager } from "../ui/manager.ts";
 import { showPreview } from "../ui/preview.ts";
+import { showProgress } from "../ui/progress.ts";
 import { type Catalog, readCatalog } from "./catalog.ts";
 import { History } from "./history.ts";
 import type { Command, ModuleHost, TagsModule } from "./module.ts";
 import { counted, type Operation } from "./operation.ts";
-import { type Applied, applyPlan, makePlan, undoApplied } from "./plan.ts";
+import { type Applied, applyPlan, makePlan, type Skipped, undoApplied } from "./plan.ts";
+
+// Pages left alone a notification names (the rest counted)
+const NAMED = 3;
+
+/** The pages left alone and why, the first few named */
+function leftAlone(skipped: readonly Skipped[]): string {
+  const named = skipped.slice(0, NAMED).map((skip) => `${skip.page} ${skip.reason}`);
+  return [...named, ...(skipped.length > NAMED ? [`and ${counted(skipped.length - NAMED, "more page")}`] : [])].join("; ");
+}
 
 export const MANAGER_COMMAND = "Silverware Tags: Manager";
 export const UNDO_COMMAND = "Silverware Tags: Undo last change";
@@ -72,7 +82,13 @@ export class Controller {
   }
 
   private async run(operation: Operation): Promise<boolean> {
-    const plan = await makePlan(this.space, await readCatalog(this.space), operation);
+    const progress = showProgress(this.doc, operation.label, "Reading page");
+    let plan;
+    try {
+      plan = await makePlan(this.space, await readCatalog(this.space), operation, (done, of) => progress.update(done, of));
+    } finally {
+      progress.close();
+    }
     if (!plan.changes.length && !plan.skipped.length) {
       this.notifier.flash(`${operation.label}: nothing to change`);
       return false;
@@ -89,7 +105,7 @@ export class Controller {
   private async apply(operation: Operation): Promise<boolean> {
     const plan = await makePlan(this.space, await readCatalog(this.space), operation);
     if (plan.skipped.length && !plan.changes.length) {
-      this.notifier.flash(`${operation.label}: ${plan.skipped.map((skip) => `${skip.page} ${skip.reason}`).join("; ")}`, "error");
+      this.notifier.flash(`${operation.label}: ${leftAlone(plan.skipped)}`, "error");
       return false;
     }
     const applied = await applyPlan(this.space, plan);
@@ -112,8 +128,15 @@ export class Controller {
       this.notifier.flash("Silverware Tags: nothing to undo");
       return;
     }
-    const { restored, skipped } = await undoApplied(this.space, last);
-    const left = skipped.length ? `; ${skipped.map((skip) => `${skip.page} ${skip.reason}`).join("; ")}` : "";
+    const progress = showProgress(this.doc, `Undo: ${last.operation.label}`, "Writing page");
+    let undone;
+    try {
+      undone = await undoApplied(this.space, last, (done, of) => progress.update(done, of));
+    } finally {
+      progress.close();
+    }
+    const { restored, skipped } = undone;
+    const left = skipped.length ? `; ${leftAlone(skipped)}` : "";
     this.notifier.flash(`Undone: ${last.operation.label} (${counted(restored.length, "page")})${left}`, skipped.length ? "error" : "info");
   }
 

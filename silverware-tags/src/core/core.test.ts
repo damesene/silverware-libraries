@@ -57,6 +57,24 @@ describe("plans", () => {
     expect((await undoApplied(space, again)).skipped).toHaveLength(1);
     expect(space.pages.get("A/Plan")).toBe("#plans edited later");
   });
+  it("reads hundreds of pages a few at a time, in their order", async () => {
+    const pages = Object.fromEntries(Array.from({ length: 300 }, (_, i) => [`P/${String(i).padStart(3, "0")}`, `#many ${i}`]));
+    const space = memorySpace(pages);
+    let reading = 0;
+    let most = 0;
+    const read = space.read;
+    space.read = async (page) => {
+      most = Math.max(most, ++reading);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      reading--;
+      return read(page);
+    };
+    const seen: number[] = [];
+    const plan = await makePlan(space, await readCatalog(space), renameOperation("many", "lots", false), (done) => seen.push(done));
+    expect(plan.changes.map((c) => c.page)).toEqual(Object.keys(pages));
+    expect(most).toBeLessThanOrEqual(6);
+    expect(seen.at(-1)).toBe(300);
+  });
   it("keeps the changes applied, the last first", () => {
     const history = new History();
     const op = renameOperation("a", "b", false);

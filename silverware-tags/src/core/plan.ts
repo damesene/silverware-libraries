@@ -1,7 +1,9 @@
 // An operation over its pages: planned (each page read and edited, nothing
 // written: what the preview shows), applied (each page written where it is
 // still as it was read, the others skipped and said), undone (each page
-// written back where it is still as applied).
+// written back where it is still as applied). A tag may be on hundreds of
+// pages: they are read and written a few at a time (each a call into
+// SilverBullet), in their order, the progress reported after each.
 import type { Space } from "../space/space.ts";
 import type { Catalog } from "./catalog.ts";
 import type { Operation } from "./operation.ts";
@@ -21,56 +23,83 @@ export type Applied = {
   readonly skipped: readonly Skipped[];
 };
 
+export type Progress = (done: number, of: number) => void;
+
+// Pages read or written at once
+const AT_ONCE = 6;
+
 const reasonOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-export async function makePlan(space: Space, catalog: Catalog, operation: Operation): Promise<Plan> {
-  const changes: PageChange[] = [];
-  const skipped: Skipped[] = [];
-  for (const page of operation.pages(catalog)) {
-    let before: string;
-    try {
-      before = await space.read(page);
-    } catch (e) {
-      skipped.push({ page, reason: `could not be read (${reasonOf(e)})` });
-      continue;
+/** `work` for each item, `AT_ONCE` at a time; the results in the items' order, `progress` after each */
+async function each<T, R>(items: readonly T[], work: (item: T) => Promise<R>, progress?: Progress): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  let done = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const at = next++;
+      results[at] = await work(items[at]!);
+      progress?.(++done, items.length);
     }
-    const result = operation.edit(before, page);
-    if (result.problem) skipped.push({ page, reason: result.problem });
-    else if (result.changes && result.text !== before) changes.push({ page, before, after: result.text, changes: result.changes });
-  }
-  return { operation, changes, skipped };
+  };
+  await Promise.all(Array.from({ length: Math.min(AT_ONCE, items.length) }, worker));
+  return results;
 }
 
-/** The plan written, page by page (`progress` after each) */
-export async function applyPlan(space: Space, plan: Plan, progress?: (done: number, of: number) => void): Promise<Applied> {
-  const written: PageChange[] = [];
-  const skipped: Skipped[] = [...plan.skipped];
-  let done = 0;
-  for (const change of plan.changes) {
-    try {
-      if ((await space.write(change.page, change.after, change.before)) === "written") written.push(change);
-      else skipped.push({ page: change.page, reason: "changed since it was read: left alone" });
-    } catch (e) {
-      skipped.push({ page: change.page, reason: `could not be written (${reasonOf(e)})` });
-    }
-    progress?.(++done, plan.changes.length);
-  }
+type Outcome<T> = { readonly ok: T } | { readonly skipped: Skipped } | undefined;
+
+export async function makePlan(space: Space, catalog: Catalog, operation: Operation, progress?: Progress): Promise<Plan> {
+  const outcomes = await each(
+    operation.pages(catalog),
+    async (page): Promise<Outcome<PageChange>> => {
+      let before: string;
+      try {
+        before = await space.read(page);
+      } catch (e) {
+        return { skipped: { page, reason: `could not be read (${reasonOf(e)})` } };
+      }
+      const result = operation.edit(before, page);
+      if (result.problem) return { skipped: { page, reason: result.problem } };
+      return result.changes && result.text !== before ? { ok: { page, before, after: result.text, changes: result.changes } } : undefined;
+    },
+    progress,
+  );
+  return { operation, changes: oks(outcomes), skipped: skips(outcomes) };
+}
+
+const oks = <T>(outcomes: readonly Outcome<T>[]): T[] => outcomes.flatMap((o) => (o && "ok" in o ? [o.ok] : []));
+const skips = <T>(outcomes: readonly Outcome<T>[]): Skipped[] => outcomes.flatMap((o) => (o && "skipped" in o ? [o.skipped] : []));
+
+/** The plan written, its pages a few at a time */
+export async function applyPlan(space: Space, plan: Plan, progress?: Progress): Promise<Applied> {
+  const outcomes = await each(
+    plan.changes,
+    async (change): Promise<Outcome<PageChange>> => {
+      try {
+        return (await space.write(change.page, change.after, change.before)) === "written" ? { ok: change } : { skipped: { page: change.page, reason: "changed since it was read: left alone" } };
+      } catch (e) {
+        return { skipped: { page: change.page, reason: `could not be written (${reasonOf(e)})` } };
+      }
+    },
+    progress,
+  );
   await space.settled();
-  return { operation: plan.operation, written, skipped };
+  return { operation: plan.operation, written: oks(outcomes), skipped: [...plan.skipped, ...skips(outcomes)] };
 }
 
 /** What was applied written back, where a page is still as it was written */
-export async function undoApplied(space: Space, applied: Applied): Promise<{ readonly restored: readonly string[]; readonly skipped: readonly Skipped[] }> {
-  const restored: string[] = [];
-  const skipped: Skipped[] = [];
-  for (const change of applied.written) {
-    try {
-      if ((await space.write(change.page, change.before, change.after)) === "written") restored.push(change.page);
-      else skipped.push({ page: change.page, reason: "changed since: left as it is" });
-    } catch (e) {
-      skipped.push({ page: change.page, reason: `could not be written (${reasonOf(e)})` });
-    }
-  }
+export async function undoApplied(space: Space, applied: Applied, progress?: Progress): Promise<{ readonly restored: readonly string[]; readonly skipped: readonly Skipped[] }> {
+  const outcomes = await each(
+    applied.written,
+    async (change): Promise<Outcome<string>> => {
+      try {
+        return (await space.write(change.page, change.before, change.after)) === "written" ? { ok: change.page } : { skipped: { page: change.page, reason: "changed since: left as it is" } };
+      } catch (e) {
+        return { skipped: { page: change.page, reason: `could not be written (${reasonOf(e)})` } };
+      }
+    },
+    progress,
+  );
   await space.settled();
-  return { restored, skipped };
+  return { restored: oks(outcomes), skipped: skips(outcomes) };
 }

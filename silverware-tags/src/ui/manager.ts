@@ -4,7 +4,7 @@
 // …), the pages (each opening it), the modules' actions on it. Read anew after
 // an action changed something; Undo in its foot while there is a change to
 // undo.
-import type { Catalog } from "../core/catalog.ts";
+import type { Catalog, TagInfo } from "../core/catalog.ts";
 import { pageCounts, pagesWith } from "../core/catalog.ts";
 import type { TagAction } from "../core/module.ts";
 import { counted } from "../core/operation.ts";
@@ -27,6 +27,9 @@ export type ManagerOptions = {
 // What a context is called where a tag is used (SilverBullet's `parent`): of several pages, of one
 const CONTEXTS: Readonly<Record<string, string>> = { page: "pages", item: "items", task: "tasks", table: "tables", header: "headings", paragraph: "paragraphs", data: "data" };
 const CONTEXT: Readonly<Record<string, string>> = { page: "page", item: "item", task: "task", table: "table", header: "heading", paragraph: "paragraph", data: "data" };
+
+// A tag's pages listed at first (the rest at a click)
+const PAGES_SHOWN = 100;
 
 export async function showManager(doc: Document, options: ManagerOptions): Promise<void> {
   let catalog = await options.catalog();
@@ -129,33 +132,41 @@ export async function showManager(doc: Document, options: ManagerOptions): Promi
           }),
         ),
       ),
-      pages.length
-        ? el(
-            doc,
-            "ul",
-            { class: "swg-pages", attrs: { "aria-label": `Pages tagged ${hashtagOf(tag)}` } },
-            ...pages.map((page) =>
-              el(
-                doc,
-                "li",
-                {},
-                el(doc, "button", {
-                  class: "swg-page-link",
-                  text: page,
-                  title: `Open ${page}`,
-                  attrs: { "data-swg-page": page },
-                  run: () => {
-                    dialog.close();
-                    void options.navigate(page);
-                  },
-                }),
-                el(doc, "span", { class: "swg-page-contexts", text: info ? [...info.byContext].filter(([, set]) => set.has(page)).map(([context]) => CONTEXT[context] ?? context).join(", ") : "" }),
-              ),
-            ),
-          )
-        : null,
+      pages.length ? pageList(tag, pages, info) : null,
     ];
     detail.replaceChildren(...parts.filter((part) => part !== null));
+  };
+
+  // A tag's pages, the first PAGES_SHOWN of them until all are asked for (a tag may be on hundreds)
+  const pageList = (tag: string, pages: readonly string[], info: TagInfo | undefined): HTMLElement => {
+    const item = (page: string) =>
+      el(
+        doc,
+        "li",
+        {},
+        el(doc, "button", {
+          class: "swg-page-link",
+          text: page,
+          title: `Open ${page}`,
+          attrs: { "data-swg-page": page },
+          run: () => {
+            dialog.close();
+            void options.navigate(page);
+          },
+        }),
+        el(doc, "span", { class: "swg-page-contexts", text: info ? [...info.byContext].filter(([, set]) => set.has(page)).map(([context]) => CONTEXT[context] ?? context).join(", ") : "" }),
+      );
+    const list = el(doc, "ul", { class: "swg-pages", attrs: { "aria-label": `Pages tagged ${hashtagOf(tag)}` } }, ...pages.slice(0, PAGES_SHOWN).map(item));
+    if (pages.length <= PAGES_SHOWN) return list;
+    const more = el(doc, "button", {
+      class: "swg-button swg-more",
+      text: `Show all ${counted(pages.length, "page")}`,
+      run: () => {
+        list.append(...pages.slice(PAGES_SHOWN).map(item));
+        more.remove();
+      },
+    });
+    return el(doc, "div", "swg-pages-wrap", list, more);
   };
 
   const renderFoot = () => {

@@ -1,8 +1,8 @@
 // The changes applied in this session (this window), the last undone first.
 import type { Applied } from "./plan.ts";
 
-// At most this many kept: each holds every page's text before and after
-const KEPT = 20;
+// At most this many kept: each holds every page's text before and after (a change of hundreds of pages, megabytes)
+const KEPT = 10;
 
 export class History {
   private readonly applied: Applied[] = [];

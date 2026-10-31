@@ -250,7 +250,6 @@ if js and js.window then
       -- Read again as the index changes, and as another page opens (its tags first)
       refreshOn = { "index", "navigate" },
       placeholder = "Tag",
-      helpText = "+ / − the page open's tag · F2 renames · drag to move",
       source = function()
         return silverwareTagsJs.panelRows()
       end,

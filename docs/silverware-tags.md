@@ -228,6 +228,22 @@ the API the user's operations use.
 - A tag's own page and color, aliases.
 - SilverBullet's parser instead of the scanner (`markdown.parseMarkdown`, async).
 - Tags of a selection of the page's objects (a task's tags in the manager).
+- **A page dragged from the space tree onto a tag of the panel tags it**
+  (weighed 2026-10-31, set aside). The space tree's drag carries the page
+  (`application/x-sb-space-file`, `{ path, kind }`, and its own
+  `application/x-sb-nav-path`), but a view's tree takes only a drag of its own
+  rows (`onMove`) or files from the disk (`uploadFiles`): its `dragover` lets
+  nothing else drop (plug-api/ui/tree_view.tsx in 2.12.1), and `view.define`
+  has no option for it. Two ways: a change of SilverBullet (a view's option,
+  say `onDropPage(obj, page)`), or listeners of our own on our panel's rows
+  through its DOM (`.sb-nav-row[data-path]` within the panel, told by our help
+  text: a panel has only `data-slot`; the navigator's own drop stopped, else it
+  would take it as a move). The second: of medium fragility (the navigator is
+  young and changes fast: nav_root.tsx 24 commits since 2026-08-17, the tree
+  virtual since 2026-10-01, its view API marked experimental), safe when it
+  breaks (a drop opens a review, nothing written without Apply), caught by a
+  UI test in CI against each SilverBullet Dependabot offers; never on a touch
+  screen nor in SilverBullet Desktop (its tree starts a native drag instead).
 
 ## Status and next
 

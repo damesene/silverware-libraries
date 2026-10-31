@@ -16,7 +16,8 @@ function host(rename?: RenameOffer) {
     notifier: { flash: (message) => void calls.push(`flash ${message}`) },
     open: async (view, state) => void calls.push(`open ${view} ${JSON.stringify(state)}`),
     review: async () => undefined,
-    offer: (name, api) => void offers.set(name, api),
+    // (The panel module's own host)
+    offer: (api) => void offers.set(PANEL_OFFER, api),
     offered: <T>(name: string) => offers.get(name) as T | undefined,
   };
   panelModule(h);

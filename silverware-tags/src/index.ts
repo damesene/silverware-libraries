@@ -43,7 +43,7 @@ export async function init(bridge: Bridge): Promise<void> {
 export async function start(space: Space, notifier: Notifier, settings: Settings, store?: SettingsStore): Promise<Controller> {
   const dialog = store ? new SettingsDialog(document, store) : undefined;
   const controller = new Controller(document, space, notifier, { protectMeta: settings.protectMeta, settings: dialog ? () => dialog.open() : undefined });
-  controller.setModules(createModules(settings.modules, controller.host));
+  controller.setModules(createModules(settings.modules, (name) => controller.hostFor(name)));
   slot[GLOBAL_KEY] = controller;
   shown = settings;
   return controller;

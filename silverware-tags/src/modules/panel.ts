@@ -6,7 +6,7 @@
 // to type; dragged under another level, the rename is reviewed (through the
 // rename module's offer: off, the drag is refused and said).
 import type { ModuleHost, TagsModule } from "../core/module.ts";
-import { PANEL_OFFER, type PanelOffer, type PanelRow, RENAME_OFFER, type RenameOffer } from "../core/offers.ts";
+import { type PanelOffer, type PanelRow, RENAME_OFFER, type RenameOffer } from "../core/offers.ts";
 import { hashtagOf, isMetaTag } from "../tags/names.ts";
 
 /** The rows of a catalog's tags (each tag; the levels above them are the host's tree's folders) */
@@ -43,6 +43,6 @@ export function panelModule(host: ModuleHost): TagsModule {
       await rename.review(tag, to);
     },
   };
-  host.offer(PANEL_OFFER, offer);
+  host.offer(offer);
   return {};
 }

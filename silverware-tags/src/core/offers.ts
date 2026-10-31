@@ -1,6 +1,7 @@
-// What modules offer each other and the host, by name (`ModuleHost.offer`,
-// `offered`): the contracts only, so a module using another's offer imports
-// the core, never that module. Undefined while the module offering it is off.
+// What modules offer each other and the host, each under the name of the module
+// offering it (`ModuleHost.offer`, `offered(module)`): the contracts only, so a
+// module using another's offer imports the core, never that module. Undefined
+// while the module offering it is off.
 
 /** `rename` (the rename module): a rename reviewed in the window */
 export type RenameOffer = {
@@ -9,6 +10,7 @@ export type RenameOffer = {
   /** What is wrong with it (nothing: undefined) */
   problem(from: string, to: string): string | undefined;
 };
+// (The module's name, bridge.ts MODULE_NAMES)
 export const RENAME_OFFER = "rename";
 
 /** A row of the tags' panel: a tag (or a level of them), as a host's tree of rows shows it */
@@ -39,4 +41,5 @@ export type PanelOffer = {
   /** A tag dragged under another level: renamed so (reviewed), its subtags with it */
   move(tag: string, to: string): Promise<void>;
 };
+// (The module's name)
 export const PANEL_OFFER = "panel";

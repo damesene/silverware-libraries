@@ -14,6 +14,7 @@ const FACTORIES: readonly (readonly [ModuleName, (host: ModuleHost) => TagsModul
   ["panel", panelModule],
 ];
 
-export function createModules(on: ReadonlySet<ModuleName>, host: ModuleHost): TagsModule[] {
-  return FACTORIES.filter(([name]) => on.has(name)).map(([, create]) => create(host));
+/** The modules turned on, each made with its own host (`hostFor`: the core's, what it offers its own) */
+export function createModules(on: ReadonlySet<ModuleName>, hostFor: (name: ModuleName) => ModuleHost): TagsModule[] {
+  return FACTORIES.filter(([name]) => on.has(name)).map(([name, create]) => create(hostFor(name)));
 }

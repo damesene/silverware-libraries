@@ -34,11 +34,12 @@ export type ControllerOptions = {
 };
 
 export class Controller {
-  readonly host: ModuleHost;
+  // What every module's host has; each module gets its own of it (`hostFor`)
+  private readonly host: Omit<ModuleHost, "offer">;
   private readonly history = new History();
   private modules: readonly TagsModule[] = [];
   private readonly workspace: Workspace;
-  // What the modules offer each other, by name (made as they are created)
+  // What the modules offer each other, by the name of the module offering it (made as they are created)
   private readonly offers = new Map<string, unknown>();
 
   constructor(
@@ -72,17 +73,25 @@ export class Controller {
       catalog,
       open: (view, state) => this.workspace.show(view, state),
       review: (operation, tag) => this.workspace.showReview(operation, tag),
-      offer: (name, api) => void this.offers.set(name, api),
       offered: <T>(name: string) => this.offers.get(name) as T | undefined,
     };
   }
 
-  /** The modules, made with the host (modules.ts) */
+  /**
+   * The host a module gets, made for it: what it offers is its own, under its
+   * name (as Silverware Table's modules get theirs: the module never says who
+   * it is, and cannot offer as another)
+   */
+  hostFor(name: string): ModuleHost {
+    return { ...this.host, offer: (api) => void this.offers.set(name, api) };
+  }
+
+  /** The modules, made each with its host (modules.ts) */
   setModules(modules: readonly TagsModule[]): void {
     this.modules = modules;
   }
 
-  /** What a module offers by that name (index.ts hands the panel's to the library page) */
+  /** What the module of that name offers (index.ts hands the panel's to the library page) */
   offered<T>(name: string): T | undefined {
     return this.offers.get(name) as T | undefined;
   }

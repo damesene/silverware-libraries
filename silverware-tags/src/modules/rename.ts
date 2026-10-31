@@ -7,7 +7,7 @@
 // reviewed (`rename`: the panel's drag).
 import { pagesWith, subtagsOf } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule, WorkspaceHost } from "../core/module.ts";
-import { RENAME_OFFER, type RenameOffer } from "../core/offers.ts";
+import type { RenameOffer } from "../core/offers.ts";
 import { counted, type Operation } from "../core/operation.ts";
 import { renameTags } from "../tags/edit.ts";
 import { cleanName, hashtagOf, nameProblem, renamedTag } from "../tags/names.ts";
@@ -86,7 +86,7 @@ export function renameModule(host: ModuleHost): TagsModule {
     },
     problem: renameProblem,
   };
-  host.offer(RENAME_OFFER, offer);
+  host.offer(offer);
   return {
     tagParts: (tag, host) => ({ name: nameField(tag, host) }),
   };

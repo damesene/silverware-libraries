@@ -1,6 +1,6 @@
 # A Dependabot pull request (a new SilverBullet: .github/dependabot.yml) merges by
 # itself once the checks the main branch requires pass (GitHub's auto-merge); one
-# they fail on stays open, its owner assigned (ui-tests.yml). Needs, in the
+# they fail on stays open, its owner assigned (integration-tests.yml). Needs, in the
 # repository's settings: Allow auto-merge, a rule for main requiring the checks
 # Verify and Tests (silverbullet), and the pull request's title as the default
 # message of a squash merge (a commit's one line, no body).

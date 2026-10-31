@@ -1,15 +1,15 @@
-# The checks of npm run verify and the interaction tests (playwright.config.ts)
-# against a real SilverBullet, the version scripts/silverbullet/Dockerfile names,
-# on a push to main and on a pull request, the two jobs side by side. Dependabot
-# offers each new SilverBullet in a pull request (.github/dependabot.yml), which
-# these tests then run against: green, it merges by itself (dependabot.yml in this
-# folder); red, the repository's owner is assigned to it, which GitHub tells them.
-# Run by hand (Actions > Interaction tests > Run workflow), the target and the
+# The interaction tests (playwright.config.ts) against a real SilverBullet, the
+# version scripts/silverbullet/Dockerfile names, on a push to main and on a pull
+# request, beside unit-tests.yml. Dependabot offers each new SilverBullet in a pull
+# request (.github/dependabot.yml), which these tests then run against: green, it
+# merges by itself (dependabot.yml in this folder); red, the repository's owner is
+# assigned to it, which GitHub tells them.
+# Run by hand (Actions > Integration tests > Run workflow), the target and the
 # image can be chosen (the playground, or another SilverBullet: ghcr.io/silverbulletmd/silverbullet:latest-slim).
 # Each run's job summary has the counts and the tests that failed; the HTML report
 # (each test's error, screenshot, trace and browser console) and SilverBullet's
 # log are artifacts of the run.
-name: Interaction tests
+name: Integration tests
 
 on:
   push:
@@ -30,28 +30,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: ui-tests-${{ github.ref }}-${{ github.event_name }}
+  group: integration-tests-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
-  verify:
-    name: Verify
-    if: github.event_name != 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      - name: Types, unit tests, bundles match their sources
-        run: npm run verify
-
   test:
     name: Tests (${{ inputs.target || 'silverbullet' }})
     runs-on: ubuntu-latest

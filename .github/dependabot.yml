@@ -1,5 +1,5 @@
 # A pull request for each new SilverBullet release: the interaction tests run
-# against it (.github/workflows/ui-tests.yml), and it merges by itself once they
+# against it (.github/workflows/integration-tests.yml), and it merges by itself once they
 # pass (.github/workflows/dependabot.yml)
 version: 2
 updates:

@@ -1,5 +1,8 @@
 # Silverware
 
+[![Unit tests](https://github.com/damesene/silverware-libraries/actions/workflows/unit-tests.yml/badge.svg?branch=main)](https://github.com/damesene/silverware-libraries/actions/workflows/unit-tests.yml)
+[![Integration tests](https://github.com/damesene/silverware-libraries/actions/workflows/integration-tests.yml/badge.svg?branch=main)](https://github.com/damesene/silverware-libraries/actions/workflows/integration-tests.yml)
+
 Silverware is a collection of plugins (libraries) for [SilverBullet](https://silverbullet.md) by `damesene`.
 
 ## Install

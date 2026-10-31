@@ -4,7 +4,9 @@
 // starts them; a test finds its worker's by its parallelIndex (helpers.ts).
 import { join } from "node:path";
 
-const FIRST_PORT = 3010;
+// SW_SB_FIRST_PORT moves them where a machine reserves these (Windows keeps ranges of ports for itself:
+// `netsh interface ipv4 show excludedportrange protocol=tcp`)
+const FIRST_PORT = Number(process.env.SW_SB_FIRST_PORT) || 3010;
 
 /** Worker `index`'s server: its port, and its space, a folder in `spaces` */
 export function silverbulletServer(index: number, spaces: string): { readonly port: number; readonly space: string } {

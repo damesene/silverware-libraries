@@ -70,6 +70,17 @@ export const test = base.extend({
 
 /** Runs a command by its name, as SilverBullet's command palette runs it */
 export async function command(page: Page, name: string): Promise<void> {
+  // SilverBullet defines the library page's commands once its Space Lua has loaded (after the client is there):
+  // waited for as its client finds a command (its view state, else its command hook)
+  if (onSilverBullet)
+    await page.waitForFunction(
+      (name) => {
+        const c = (window as unknown as { client?: { ui?: { viewState?: { commands?: Map<string, unknown> } }; clientSystem?: { commandHook?: { buildAllCommands?(): Map<string, unknown> } } } }).client;
+        return !!(c?.ui?.viewState?.commands?.has(name) || c?.clientSystem?.commandHook?.buildAllCommands?.().has(name));
+      },
+      name,
+      { timeout: 30_000 },
+    );
   await page.evaluate((name) => {
     const w = window as unknown as Window;
     void (w.playgroundTags ? w.playgroundTags.runCommand(name) : w.client!.runCommandByName(name));

@@ -152,9 +152,10 @@ test("the tags' panel: a click opens no window; its actions open it, F2 with the
   await expect(window.locator(".swg-name-field")).toHaveValue("todo");
   await page.keyboard.press("Escape");
   await expect(window).toHaveCount(0);
+  // A click picks the row (it opens nothing), F2 opens the window at it (the navigator's keys act on the row picked)
   const row = await panelRow(page, "milestone");
-  await row.focus();
-  await row.press("F2");
+  await row.click();
+  await page.keyboard.press("F2");
   await expect(window.locator(".swg-name-field")).toBeFocused();
   await expect(window.locator(".swg-name-field")).toHaveValue("milestone");
 });
@@ -189,8 +190,9 @@ test("meta pages hidden and protected by default: their tags show nowhere, a ren
   await window.locator(".swg-apply").click();
   await expect.poll(() => pageText(page, "Garage/Car")).toContain("#automobile");
   expect(await pageText(page, "Library/Cars")).toContain("writes #auto in its text");
-  // By page: SilverBullet's meta pages left out
+  // By page: SilverBullet's meta pages left out (against SilverBullet the sample is in a folder of its own: opened)
   await window.locator('[data-swg-view="pages"]').click();
+  if (pageName("Garage") !== "Garage") await window.locator(`[data-swg-page="${pageName("Garage").split("/")[0]}"] > .swg-tree-row .swg-tree-toggle`).click();
   await expect(window.locator(`[data-swg-page="${pageName("Library")}"]`)).toHaveCount(0);
   await expect(window.locator(`[data-swg-page="${pageName("Garage")}"]`)).toBeVisible();
 });
@@ -203,8 +205,8 @@ test("the settings dialog turns the protection off: meta tags then shown apart, 
   await expect(save).toBeDisabled();
   await settings.locator('[data-swg-setting="silverware.tags.protectMeta"] input').uncheck();
   await expect(save).toHaveText("Save and reload");
-  await save.click();
-  // Reloaded with it off
+  // Reloaded with it off (the window opened on the page as loaded anew, not the one before)
+  await Promise.all([page.waitForEvent("load"), save.click()]);
   const window = await openManager(page, "todo");
   await window.locator('[data-swg-segment="meta"]').click();
   await expect(window.locator('[data-swg-tag="meta"]')).toBeVisible();

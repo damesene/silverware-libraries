@@ -64,6 +64,7 @@ settings go into `.env.local` (not committed; a variable set in the shell wins):
 SW_SB_WORKERS=8                                           # how many workers, each with its own SilverBullet
 SB_IMAGE=ghcr.io/silverbulletmd/silverbullet:latest-slim  # another image than scripts/silverbullet/Dockerfile's
 SB_BIN=/path/to/silverbullet                              # a silverbullet binary instead of Docker
+SW_SB_FIRST_PORT=3210                                     # the first server's port, where 3010 on is reserved (Windows)
 ```
 
 After deploying, reload the SilverBullet page so the new `.js` module is loaded. How Silverware Table is built

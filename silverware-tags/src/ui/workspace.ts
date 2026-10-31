@@ -408,6 +408,19 @@ export class Workspace {
         if (e.key === "ArrowRight") this.opened.add(this.picked);
         else this.opened.delete(this.picked);
         renderTree();
+      } else if (e.currentTarget === list && this.picked && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // The tag's keys in the tree (not the search field, whose keys are its text's): F2 its name's field, an action's own
+        if (e.key === "F2") {
+          e.preventDefault();
+          this.focusName();
+          return;
+        }
+        const tag = this.picked;
+        const action = this.options.tagActions().find((a) => a.key === e.key && (a.when?.(tag, catalog) ?? true));
+        if (action) {
+          e.preventDefault();
+          void this.runAction(action, tag);
+        }
       }
     };
     search.addEventListener("keydown", keys);
@@ -481,6 +494,7 @@ export class Workspace {
             el(doc, "button", {
               class: action.danger ? "swg-button swg-danger" : "swg-button",
               text: action.label,
+              title: action.key ? `${action.label} (${action.key})` : undefined,
               attrs: { "data-swg-action": action.id },
               run: () => void this.runAction(action, tag),
             }),

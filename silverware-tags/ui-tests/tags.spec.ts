@@ -233,3 +233,15 @@ test("a custom operation is a button of the tag, its changes reviewed and applie
   await window.locator(".swg-apply").click();
   await expect.poll(() => pageText(page, "Meetings/2026-10-15")).toBe("---\ntags:\n  - todo\n---\n#meeting\n\n- [ ] Send the notes #todo\n");
 });
+
+test("the window's tree: F2 the tag's name to type, Delete its Delete tag", async ({ page }) => {
+  const window = await openManager(page, "idea");
+  await window.locator('[data-swg-tag="idea"] .swg-tag-row').click();
+  const tree = window.locator(".swg-tags");
+  await tree.focus();
+  await page.keyboard.press("F2");
+  await expect(window.locator(".swg-name-field")).toBeFocused();
+  await tree.focus();
+  await page.keyboard.press("Delete");
+  await expect(window.locator(".swg-review-title")).toHaveText("Delete #idea");
+});

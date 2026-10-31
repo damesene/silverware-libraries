@@ -25,6 +25,7 @@ export function removeModule(_host: ModuleHost): TagsModule {
         id: "remove",
         label: "Delete tag…",
         danger: true,
+        key: "Delete",
         run: (tag, host) => removeOperation(tag, false, subtagsOf(host.catalog, tag).length),
       },
     ],

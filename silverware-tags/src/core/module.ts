@@ -57,6 +57,8 @@ export type TagAction = {
   readonly label: string;
   // Taking something away (Delete): shown so
   readonly danger?: boolean;
+  // A key running it while the tag is picked in the window's tree (KeyboardEvent.key: "Delete"), shown in its tooltip
+  readonly key?: string;
   // Whether it is offered for this tag (left out: always)
   readonly when?: (tag: string, catalog: Catalog) => boolean;
   readonly run: (tag: string, host: WorkspaceHost) => Operation | void | Promise<Operation | void>;

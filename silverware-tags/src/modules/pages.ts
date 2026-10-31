@@ -9,10 +9,11 @@
 // Its commands: Tag pages (the view), Page tags (the view, the page open
 // checked). The tag picked in the view by tag: Add to pages… (the tag to add),
 // Remove from pages… (the pages having it checked, the tag taken off).
+import { metaPages } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule, WorkspaceHost } from "../core/module.ts";
 import { counted, type Operation } from "../core/operation.ts";
 import { addPageTags, pageTags, removePageTags } from "../tags/edit.ts";
-import { hashtagOf } from "../tags/names.ts";
+import { hashtagOf, isMetaTag } from "../tags/names.ts";
 import { chipsField, suggestions } from "../ui/chips.ts";
 import { el } from "../ui/elements.ts";
 import { ICONS } from "../ui/icons.ts";
@@ -63,7 +64,9 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
   };
 
   const search = el(doc, "input", { class: "swg-field swg-search", attrs: { type: "search", placeholder: "Search pages", "aria-label": "Search pages", spellcheck: "false", "data-swg-focus": "" } });
-  const tree = pageTree(doc, catalog.pages, { checked: state.checked, changed: () => picked() });
+  // SilverBullet's meta pages (libraries, templates) left out, as its own tree's Pages leaves them
+  const meta = metaPages(catalog);
+  const tree = pageTree(doc, catalog.pages.filter((page) => !meta.has(page) || state.checked.includes(page)), { checked: state.checked, changed: () => picked() });
   search.addEventListener("input", () => tree.filter(search.value));
 
   const heading = el(doc, "h3", "swg-detail-name");
@@ -117,7 +120,8 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
     heading.textContent = pages.length ? (pages.length === 1 ? pages[0]! : `${counted(pages.length, "page")} picked`) : "Pick pages";
     const read = pages.filter((page) => tagsOf.has(page));
     const counts = new Map<string, number>();
-    for (const page of read) for (const tag of tagsOf.get(page)!) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    // (SilverBullet's own tags not offered to take off: a library's meta/library is how it is installed)
+    for (const page of read) for (const tag of tagsOf.get(page)!) if (!isMetaTag(tag)) counts.set(tag, (counts.get(tag) ?? 0) + 1);
     // A tag to take off that none of them has any more is no change
     if (state.remove.some((tag) => !counts.has(tag)) && read.length === pages.length) keep({ remove: state.remove.filter((tag) => counts.has(tag)) });
     const chips = [...counts].sort(([a], [b]) => a.localeCompare(b)).map(([tag, count]) => {

@@ -19,7 +19,8 @@ Everything is in one window, **Silverware Tags: Manager**, with two views (tabs 
   * **Add to pages…** and **Remove from pages…** take you to *By page* with the tag to add, or with the pages having it picked and the tag to take off.
 * **By page** (the command **Silverware Tags: Tag pages**): your pages as a tree of folders. Tick pages, or a folder for every page under it (its own page too); type to find pages. On the right are the tags the pages you picked have, each with how many of them have it (`2/3`): **×** takes one off them all (click again to keep it), and the *Add* field gives tags to them all (the tags of your space are offered as you type: **↑ ↓** and **Enter**, or **Tab** for the first). Then *Review changes…*. Tags are added into each page's frontmatter (a page that has one already is left as it is) and taken off its frontmatter and its tag lines; a hashtag in a page's text stays (*Delete tag* takes those off).
 * **Silverware Tags: Page tags** opens *By page* with the page you are on picked.
-* **The Tags panel** (the command **Silverware Tags: Tags panel**): the tags as a tree in SilverBullet's right sidebar, beside your pages (its menu moves it to the left or the bottom; it stays open across reloads). Each tag shows how many pages use it; its filter field finds a tag, and *Page tags* and *Tasks* above it show only those. **Enter** or a click opens the tag in the window, **F2** opens it with its name to type, and dragging a tag onto another level moves it there (`alpha` dropped on `work` becomes `work/alpha`, its subtags with it), reviewed in the window first.
+* **The Tags panel** (the command **Silverware Tags: Tags panel**): the tags as a tree in SilverBullet's right sidebar, beside your pages (its menu moves it to the left or the bottom; it stays open across reloads). Each tag shows how many pages use it; its filter field finds a tag, and *Page tags* and *Tasks* above it show only those.
+* **SilverBullet's own tags** (`meta` and those under it, `meta/library`, `meta/template`…, which mark libraries, templates and its API) are apart, as SilverBullet's own tree has its meta pages apart: in the panel's *Meta* and the window's *Meta* (above the tags), not among your tags. *By page* leaves out SilverBullet's meta pages and does not offer their meta tags to take off. **Enter** or a click opens the tag in the window, **F2** opens it with its name to type, and dragging a tag onto another level moves it there (`alpha` dropped on `work` becomes `work/alpha`, its subtags with it), reviewed in the window first.
 * **Every change is reviewed first**, in the same window: each page that changes with its lines before and after (the first few open, click a page for its lines), and the pages left alone and why. *Apply* writes them and takes you back; *Back* (or **Esc**) changes nothing.
 * **Undo**: the window's *Undo* at its bottom, the notification after a change (in SilverBullet's newer versions) and the command **Silverware Tags: Undo last change** take back the last change: every page goes back to how it was, unless you edited it since (that page is left as it is and named).
 
@@ -166,10 +167,13 @@ if js and js.window then
           end,
         },
       },
+      -- As SilverBullet's own tree has its meta pages: SilverBullet's tags (meta and under it) in Meta alone
+      -- (segments filter the rows before the tree is made of them, so a level shows where a row under it does)
       segments = {
-        { label = "All", icon = "hash", default = true },
-        { label = "Page tags", icon = "file-text", where = function(obj) return obj.onPages == true end },
-        { label = "Tasks", icon = "check-square", where = function(obj) return obj.inTasks == true end },
+        { label = "All", icon = "hash", default = true, where = function(obj) return obj.meta ~= true end },
+        { label = "Page tags", icon = "file-text", where = function(obj) return obj.onPages == true and obj.meta ~= true end },
+        { label = "Tasks", icon = "check-square", where = function(obj) return obj.inTasks == true and obj.meta ~= true end },
+        { label = "Meta", icon = "settings", placeholder = "Meta tag", where = function(obj) return obj.meta == true end },
       },
       onSelect = function(obj)
         silverwareTagsJs.panelSelect(obj.name)
@@ -610,6 +614,30 @@ end
   margin: 0 0 4px;
   font-size: 16px;
   overflow-wrap: anywhere;
+}
+/* Tags | Meta above the tags, as SilverBullet's tree has its segments */
+.swg-segments {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--swg-card);
+  border: 1px solid var(--swg-line);
+  border-radius: 6px;
+}
+.swg-segment {
+  flex: 1;
+  padding: 3px 8px;
+  font-size: 13px;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  opacity: 0.75;
+}
+.swg-segment[aria-pressed="true"] {
+  opacity: 1;
+  font-weight: 600;
+  background: var(--root-background-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 /* The tag's name, a field renaming it: as a heading until it is edited */
 .swg-name {

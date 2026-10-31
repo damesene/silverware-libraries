@@ -158,3 +158,14 @@ test("the tags' panel: a tag dragged onto a level is renamed under it, reviewed 
   await window.locator(".swg-apply").click();
   await expect.poll(() => pageText(page, "Journal/2026-10-30")).toContain("Thinking about #project/idea of a garden.");
 });
+
+test("SilverBullet's own tags apart: Meta in the window, its meta pages not by page", async ({ page }) => {
+  await addPages(page, { "Templates/Note": "---\ntags: meta/template\n---\nA template.\n" });
+  const window = await openManager(page, "todo");
+  await expect(window.locator('[data-swg-tag="meta"]')).toHaveCount(0);
+  await window.locator('[data-swg-segment="meta"]').click();
+  await expect(window.locator('[data-swg-tag="meta"]')).toBeVisible();
+  await expect(window.locator('[data-swg-tag="todo"]')).toHaveCount(0);
+  await window.locator('[data-swg-view="pages"]').click();
+  await expect(window.locator(`[data-swg-page="${pageName("Templates")}"]`)).toHaveCount(0);
+});

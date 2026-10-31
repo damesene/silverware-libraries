@@ -189,6 +189,15 @@ dropped on a level is renamed under it (its subtags with it) through the
 rename module's offer, reviewed. A drop onto a name a tag has is refused by
 the navigator itself (merging stays the window's).
 
+### SilverBullet's own tags apart (decided 2026-10-31)
+
+`meta` and the tags under it (`meta/library`, `meta/template/…`, `meta/api`)
+mark SilverBullet's own pages; its tree keeps meta pages in a Meta segment
+of their own (All and Pages leave them out). So do the panel (All, Page tags,
+Tasks without them, Meta with them alone), the window (Tags | Meta) and By page
+(no meta pages, their meta tags not offered to take off: a library's
+`meta/library` is how it is installed).
+
 ## Not now (possible later)
 
 - The user's own operations from Space Lua (`silverware.tags.defineOperations`).

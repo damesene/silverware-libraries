@@ -2,7 +2,7 @@
 // it, by context. Read anew whenever a dialog opens or a change is applied
 // (the index is the space's, it changes without telling).
 import type { Space, TagRecord } from "../space/space.ts";
-import { matches } from "../tags/names.ts";
+import { isMetaTag, matches } from "../tags/names.ts";
 
 export type TagInfo = {
   readonly name: string;
@@ -44,6 +44,13 @@ export function pagesWith(catalog: Catalog, name: string, children: boolean): st
   const pages = new Set<string>();
   for (const tag of catalog.tags.values()) if (matches(tag.name, name, children)) for (const page of tag.pages) pages.add(page);
   return [...pages].sort((a, b) => a.localeCompare(b));
+}
+
+/** The meta pages: those a meta tag is a page's tag of (SilverBullet's own: libraries, templates) */
+export function metaPages(catalog: Catalog): Set<string> {
+  const pages = new Set<string>();
+  for (const tag of catalog.tags.values()) if (isMetaTag(tag.name)) for (const page of tag.byContext.get("page") ?? []) pages.add(page);
+  return pages;
 }
 
 /** The tags under a tag (not itself) */

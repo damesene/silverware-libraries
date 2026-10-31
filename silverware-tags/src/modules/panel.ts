@@ -8,7 +8,7 @@
 import { readCatalog } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule } from "../core/module.ts";
 import { PANEL_OFFER, type PanelOffer, type PanelRow, RENAME_OFFER, type RenameOffer } from "../core/offers.ts";
-import { hashtagOf } from "../tags/names.ts";
+import { hashtagOf, isMetaTag } from "../tags/names.ts";
 
 /** The rows of a catalog's tags (each tag; the levels above them are the host's tree's folders) */
 export function panelRows(tags: Iterable<{ readonly name: string; readonly pages: ReadonlySet<string>; readonly byContext: ReadonlyMap<string, ReadonlySet<string>> }>): PanelRow[] {
@@ -20,6 +20,7 @@ export function panelRows(tags: Iterable<{ readonly name: string; readonly pages
       onPages: tag.byContext.has("page"),
       inTasks: tag.byContext.has("task"),
       inItems: tag.byContext.has("item"),
+      meta: isMetaTag(tag.name),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }

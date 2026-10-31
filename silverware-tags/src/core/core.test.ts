@@ -4,7 +4,7 @@ import { removeOperation } from "../modules/remove.ts";
 import { renameOperation, renameProblem } from "../modules/rename.ts";
 import { memorySpace } from "../space/memory.ts";
 import { minimalEdit } from "../space/space.ts";
-import { pagesWith, readCatalog, subtagsOf } from "./catalog.ts";
+import { metaPages, pagesWith, readCatalog, subtagsOf } from "./catalog.ts";
 import { diffLines } from "./diff.ts";
 import { History } from "./history.ts";
 import { applyPlan, makePlan, undoApplied } from "./plan.ts";
@@ -25,6 +25,13 @@ describe("catalog", () => {
     expect(pagesWith(catalog, "project", true)).toEqual(["A", "A/Plan", "B"]);
     expect(subtagsOf(catalog, "project")).toEqual(["project/alpha", "project/beta"]);
     expect(catalog.pages).toEqual(["A", "A/Plan", "B", "C"]);
+  });
+});
+
+describe("meta", () => {
+  it("tells SilverBullet's own pages by their meta tags", async () => {
+    const space = memorySpace({ Lib: "---\ntags: meta/library\n---\n", Mine: "#meta-notes\n\n#metal", Tpl: "#meta" });
+    expect([...metaPages(await readCatalog(space))].sort()).toEqual(["Lib", "Tpl"]);
   });
 });
 

@@ -11,7 +11,7 @@ import { type Catalog, pageCounts, pagesWith, type TagInfo } from "../core/catal
 import type { TagParts, View, WorkspaceHost } from "../core/module.ts";
 import { counted, type Operation } from "../core/operation.ts";
 import type { Applied, Plan, Progress } from "../core/plan.ts";
-import { hashtagOf } from "../tags/names.ts";
+import { hashtagOf, isMetaTag } from "../tags/names.ts";
 import { filterTree, type TagNode, tagTree } from "../tags/tree.ts";
 import { buttons, openDialog } from "./dialog.ts";
 import { el } from "./elements.ts";
@@ -56,6 +56,8 @@ export class Workspace {
   private picked: string | undefined;
   private readonly opened = new Set<string>();
   private query = "";
+  // Whether the tags' view shows SilverBullet's own tags (meta and under it), apart from the others as its tree shows meta pages
+  private meta = false;
 
   private readonly tabs: HTMLElement;
   private readonly body: HTMLElement;
@@ -83,6 +85,8 @@ export class Workspace {
     if (at.tag) {
       this.picked = at.tag;
       this.query = "";
+      // A meta tag (from the panel's Meta) shown among SilverBullet's own
+      this.meta = isMetaTag(at.tag);
     }
     this.go(view, view === TAGS_VIEW ? undefined : state);
     this.opening();
@@ -296,8 +300,8 @@ export class Workspace {
   private tagsView(): HTMLElement {
     const { doc } = this;
     const catalog = this.catalog!;
-    const tree = tagTree(pageCounts(catalog));
-    if (this.picked && !this.exists(this.picked)) this.picked = undefined;
+    const tree = tagTree(new Map([...pageCounts(catalog)].filter(([name]) => isMetaTag(name) === this.meta)));
+    if (this.picked && (!this.exists(this.picked) || isMetaTag(this.picked) !== this.meta)) this.picked = undefined;
     this.picked ??= tree[0]?.name;
     this.openTo(this.picked);
     const search = el(doc, "input", { class: "swg-field swg-search", attrs: { type: "search", placeholder: "Search tags", "aria-label": "Search tags", spellcheck: "false", "data-swg-focus": "" } });
@@ -389,7 +393,30 @@ export class Workspace {
 
     renderTree();
     detail.replaceChildren(...(this.picked ? this.tagDetail(this.picked) : [el(doc, "p", { class: "swg-empty", text: "No tags in this space yet." })]));
-    return el(doc, "div", "swg-manager-body", el(doc, "div", "swg-manager-tags", search, list), detail);
+    // Tags | Meta, as SilverBullet's tree has its pages and its meta pages apart
+    const kinds = el(
+      doc,
+      "div",
+      { class: "swg-segments", attrs: { role: "group", "aria-label": "Which tags" } },
+      ...[
+        { meta: false, label: "Tags", title: "The tags of your pages" },
+        { meta: true, label: "Meta", title: "SilverBullet's own tags (meta and under it), marking libraries, templates and its API" },
+      ].map((kind) =>
+        el(doc, "button", {
+          class: "swg-segment",
+          text: kind.label,
+          title: kind.title,
+          attrs: { "aria-pressed": String(kind.meta === this.meta), "data-swg-segment": kind.meta ? "meta" : "tags" },
+          run: () => {
+            if (kind.meta === this.meta) return;
+            this.meta = kind.meta;
+            this.picked = undefined;
+            this.go(TAGS_VIEW);
+          },
+        }),
+      ),
+    );
+    return el(doc, "div", "swg-manager-body", el(doc, "div", "swg-manager-tags", kinds, search, list), detail);
   }
 
   /** Whether a tag is in the tree (used, or a level above one) */

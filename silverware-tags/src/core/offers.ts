@@ -21,6 +21,8 @@ export type PanelRow = {
   readonly onPages: boolean;
   readonly inTasks: boolean;
   readonly inItems: boolean;
+  // SilverBullet's own (`meta` and under it): shown apart, as its tree shows meta pages
+  readonly meta: boolean;
 };
 
 /**

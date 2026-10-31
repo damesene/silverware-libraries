@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addPageTags, pageTags, removePageTags, removeTags, renameTags, tagUses } from "./edit.ts";
 import { readFrontmatter, writeTags } from "./frontmatter.ts";
-import { cleanName, hashtagOf, isWithin, nameProblem, renamedTag } from "./names.ts";
+import { cleanName, hashtagOf, isMetaTag, isWithin, nameProblem, renamedTag } from "./names.ts";
 import { scanHashtags } from "./scan.ts";
 import { filterTree, tagTree } from "./tree.ts";
 
@@ -20,6 +20,9 @@ describe("names", () => {
     expect(renamedTag("projects", "project", "work", true)).toBeUndefined();
     expect(isWithin("a/b", "a")).toBe(true);
     expect(isWithin("ab", "a")).toBe(false);
+  });
+  it("tells SilverBullet's own tags", () => {
+    expect([isMetaTag("meta"), isMetaTag("meta/library"), isMetaTag("metal"), isMetaTag("meta-notes")]).toEqual([true, true, false, false]);
   });
   it("reads a typed name and says what is wrong with one", () => {
     expect(cleanName(" #todo ")).toBe("todo");

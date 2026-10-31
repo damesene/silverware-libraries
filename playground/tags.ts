@@ -77,7 +77,8 @@ async function showPanel(): Promise<void> {
   const rows = await panelRows();
   const byName = new Map(rows.map((row) => [row.name, row]));
   // Every level above a tag is a row too, a folder
-  const names = [...new Set(rows.flatMap((row) => row.name.split("/").map((_, i, parts) => parts.slice(0, i + 1).join("/"))))].sort();
+  // (SilverBullet's own tags in a Meta segment of their own there: the playground's space has none)
+  const names = [...new Set(rows.filter((row) => !row.meta).flatMap((row) => row.name.split("/").map((_, i, parts) => parts.slice(0, i + 1).join("/"))))].sort();
   const row = (name: string) => {
     const tag = byName.get(name);
     const depth = name.split("/").length - 1;

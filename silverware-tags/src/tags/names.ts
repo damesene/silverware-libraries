@@ -36,6 +36,16 @@ export function cleanName(typed: string): string {
   return name.replace(/^#/, "").trim();
 }
 
+/**
+ * Whether a tag is SilverBullet's own, marking its meta pages (libraries,
+ * templates, its API): `meta` and every tag under it, as its `isMetaTag`
+ * (plug-api/lib/tags.ts) tells them; shown apart, as its own tree shows meta
+ * pages apart
+ */
+export function isMetaTag(tag: string): boolean {
+  return tag === "meta" || tag.startsWith("meta/");
+}
+
 /** The tag `tag` is directly under (none at the top) */
 export function parentOf(tag: string): string | undefined {
   const at = tag.lastIndexOf("/");

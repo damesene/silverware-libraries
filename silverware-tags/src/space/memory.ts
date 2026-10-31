@@ -4,7 +4,7 @@
 // Lua reads them): the unit tests and the playground work with it.
 import { tagUses } from "../tags/edit.ts";
 import type { TagContext } from "../tags/scan.ts";
-import type { Space, TagRecord } from "./space.ts";
+import { breather, type Space, type TagRecord } from "./space.ts";
 
 const PARENT: Readonly<Record<TagContext, string>> = { page: "page", paragraph: "page", item: "item", task: "task", table: "table", heading: "header" };
 
@@ -21,7 +21,10 @@ export function memorySpace(pages: Readonly<Record<string, string>>, options: { 
     pageNames: async () => [...map.keys()].sort(),
     tagRecords: async () => {
       const records: TagRecord[] = [];
+      // (Thousands of pages read here at once: the browser given its turns, as an index's query would)
+      const breathe = breather();
       for (const [page, text] of map) {
+        await breathe();
         const seen = new Set<string>();
         for (const use of tagUses(text)) {
           const parent = PARENT[use.context];

@@ -4,7 +4,7 @@
 // written back where it is still as applied). A tag may be on hundreds of
 // pages: they are read and written a few at a time (each a call into
 // SilverBullet), in their order, the progress reported after each.
-import type { Space } from "../space/space.ts";
+import { breather, type Space } from "../space/space.ts";
 import type { Catalog } from "./catalog.ts";
 import type { Operation } from "./operation.ts";
 
@@ -27,7 +27,6 @@ export type Progress = (done: number, of: number) => void;
 
 // Pages read or written at once
 const AT_ONCE = 6;
-
 const reasonOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** `work` for each item, `AT_ONCE` at a time; the results in the items' order, `progress` after each */
@@ -35,11 +34,13 @@ async function each<T, R>(items: readonly T[], work: (item: T) => Promise<R>, pr
   const results = new Array<R>(items.length);
   let next = 0;
   let done = 0;
+  const breathe = breather();
   const worker = async () => {
     while (next < items.length) {
       const at = next++;
       results[at] = await work(items[at]!);
       progress?.(++done, items.length);
+      await breathe();
     }
   };
   await Promise.all(Array.from({ length: Math.min(AT_ONCE, items.length) }, worker));

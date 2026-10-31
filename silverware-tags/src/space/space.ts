@@ -34,6 +34,20 @@ export interface Notifier {
   flash(message: string, type?: "info" | "error", actions?: readonly { readonly name: string; readonly run: () => void }[]): void;
 }
 
+// How long work runs before it gives the browser a turn (to paint the progress, to take a click): a space whose
+// reads and writes answer at once (in memory, the playground's) would otherwise run hundreds of pages in one task
+const TURN_MS = 30;
+
+/** A turn given to the browser where the work has run TURN_MS since the last one (a macrotask: painting comes first) */
+export function breather(): () => Promise<void> {
+  let since = performance.now();
+  return async () => {
+    if (performance.now() - since < TURN_MS) return;
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    since = performance.now();
+  };
+}
+
 /** The one edit making `before` into `after`: what lies between their common start and end */
 export function minimalEdit(before: string, after: string): { from: number; to: number; insert: string } | undefined {
   if (before === after) return undefined;

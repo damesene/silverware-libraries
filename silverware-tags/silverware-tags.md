@@ -19,6 +19,7 @@ Everything is in one window, **Silverware Tags: Manager**, with two views (tabs 
   * **Add to pages…** and **Remove from pages…** take you to *By page* with the tag to add, or with the pages having it picked and the tag to take off.
 * **By page** (the command **Silverware Tags: Tag pages**): your pages as a tree of folders. Tick pages, or a folder for every page under it (its own page too); type to find pages. On the right are the tags the pages you picked have, each with how many of them have it (`2/3`): **×** takes one off them all (click again to keep it), and the *Add* field gives tags to them all (the tags of your space are offered as you type: **↑ ↓** and **Enter**, or **Tab** for the first). Then *Review changes…*. Tags are added into each page's frontmatter (a page that has one already is left as it is) and taken off its frontmatter and its tag lines; a hashtag in a page's text stays (*Delete tag* takes those off).
 * **Silverware Tags: Page tags** opens *By page* with the page you are on picked.
+* **The Tags panel** (the command **Silverware Tags: Tags panel**): the tags as a tree in SilverBullet's right sidebar, beside your pages (its menu moves it to the left or the bottom; it stays open across reloads). Each tag shows how many pages use it; its filter field finds a tag, and *Page tags* and *Tasks* above it show only those. **Enter** or a click opens the tag in the window, **F2** opens it with its name to type, and dragging a tag onto another level moves it there (`alpha` dropped on `work` becomes `work/alpha`, its subtags with it), reviewed in the window first.
 * **Every change is reviewed first**, in the same window: each page that changes with its lines before and after (the first few open, click a page for its lines), and the pages left alone and why. *Apply* writes them and takes you back; *Back* (or **Esc**) changes nothing.
 * **Undo**: the window's *Undo* at its bottom, the notification after a change (in SilverBullet's newer versions) and the command **Silverware Tags: Undo last change** take back the last change: every page goes back to how it was, unless you edited it since (that page is left as it is and named).
 
@@ -49,6 +50,7 @@ config.set("silverware.tags.modules", {
   rename = { enabled = true }, -- Rename (and merge): the tag's name as a field
   pages = { enabled = true },  -- By page, Tag pages, Page tags, Add to pages, Remove from pages
   remove = { enabled = true }, -- Delete tag
+  panel = { enabled = true },  -- The Tags panel beside the page
 })
 ```
 
@@ -73,6 +75,7 @@ config.define("silverware.tags", {
         rename = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Rename a tag everywhere it is used; into a tag that exists, the two merge.", ui = { category = "Silverware Tags", label = "Rename", priority = 0.9 } } } },
         pages = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "The view by page: tags given to the pages picked in a tree of folders, and taken off them; the tags of the page you are on.", ui = { category = "Silverware Tags", label = "By page", priority = 0.8 } } } },
         remove = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Delete a tag everywhere it is used.", ui = { category = "Silverware Tags", label = "Delete a tag", priority = 0.6 } } } },
+        panel = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "The tags as a panel beside the page (SilverBullet's navigator): a tag opens the Tags window, F2 renames it, a tag dragged under another moves it there.", ui = { category = "Silverware Tags", label = "Tags panel", priority = 0.5 } } } },
       },
     },
   },
@@ -128,6 +131,58 @@ if js and js.window then
       name = name,
       run = function()
         silverwareTagsJs.runCommand(name)
+      end,
+    }
+  end
+  -- The tags' panel (the panel module): SilverBullet's navigator draws the rows the JS gives as a tree by "/",
+  -- what is done with them goes back to the JS (the window); only where SilverBullet has views (view.define)
+  if view and view.define and silverwareTagsJs.panelOn() then
+    view.define {
+      name = "silverware.tags",
+      title = "Tags",
+      command = "Silverware Tags: Tags panel",
+      dock = "rhs",
+      supportedDocks = { "rhs", "lhs", "bhs" },
+      refreshOn = { "index" },
+      placeholder = "Tag",
+      helpText = "Enter opens · F2 renames · drag to move",
+      source = function()
+        return silverwareTagsJs.panelRows()
+      end,
+      presentation = {
+        mode = "tree",
+        row = {
+          icon = function(obj)
+            if obj.count then
+              return "hash"
+            end
+            return "folder"
+          end,
+          decorations = function(obj)
+            if not obj.count then
+              return {}
+            end
+            return { { text = tostring(obj.count), position = "right", cssClass = "sb-nav-chip-hint", title = "Pages using it" } }
+          end,
+        },
+      },
+      segments = {
+        { label = "All", icon = "hash", default = true },
+        { label = "Page tags", icon = "file-text", where = function(obj) return obj.onPages == true end },
+        { label = "Tasks", icon = "check-square", where = function(obj) return obj.inTasks == true end },
+      },
+      onSelect = function(obj)
+        silverwareTagsJs.panelSelect(obj.name)
+        -- The panel stays open beside the window
+        return false
+      end,
+      keymap = {
+        F2 = function(obj)
+          silverwareTagsJs.panelRename(obj.name)
+        end,
+      },
+      onMove = function(obj, newName)
+        silverwareTagsJs.panelMove(obj.name, newName)
       end,
     }
   end

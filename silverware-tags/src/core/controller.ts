@@ -28,6 +28,8 @@ export class Controller {
   private readonly history = new History();
   private modules: readonly TagsModule[] = [];
   private readonly workspace: Workspace;
+  // What the modules offer each other, by name (made as they are created)
+  private readonly offers = new Map<string, unknown>();
 
   constructor(
     private readonly doc: Document,
@@ -47,12 +49,25 @@ export class Controller {
       },
       undo: () => (this.history.last ? { label: this.history.last.operation.label, run: () => this.undo() } : undefined),
     });
-    this.host = { doc, space, notifier, open: (view, state) => this.workspace.show(view, state) };
+    this.host = {
+      doc,
+      space,
+      notifier,
+      open: (view, state) => this.workspace.show(view, state),
+      review: (operation, tag) => this.workspace.showReview(operation, tag),
+      offer: (name, api) => void this.offers.set(name, api),
+      offered: <T>(name: string) => this.offers.get(name) as T | undefined,
+    };
   }
 
   /** The modules, made with the host (modules.ts) */
   setModules(modules: readonly TagsModule[]): void {
     this.modules = modules;
+  }
+
+  /** What a module offers by that name (index.ts hands the panel's to the library page) */
+  offered<T>(name: string): T | undefined {
+    return this.offers.get(name) as T | undefined;
   }
 
   /** Every command: the core's, then the modules' in their order */

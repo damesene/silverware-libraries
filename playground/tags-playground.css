@@ -64,9 +64,44 @@ body {
   border-radius: 6px;
   resize: none;
 }
+/* The tags' panel as SilverBullet's navigator draws it, in short: a tree of the panel module's rows */
+#tags-panel {
+  flex: 0 0 240px;
+  overflow: auto;
+  padding: 8px;
+  border-left: 1px solid var(--border);
+  background: var(--panel);
+  font-size: 14px;
+}
+#tags-panel h2 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  opacity: 0.7;
+}
+#tags-panel .row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#tags-panel .row:focus,
+#tags-panel .row.over {
+  outline: none;
+  background: color-mix(in srgb, var(--ui-accent-color) 16%, transparent);
+}
+#tags-panel .count {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0.6;
+}
 @media (max-width: 800px) {
   #pages {
     flex-basis: 140px;
+  }
+  #tags-panel {
+    display: none;
   }
 }
 /* Notifications over Silverware Tags' dialogs (an Undo in one, after a change applied from the manager) */

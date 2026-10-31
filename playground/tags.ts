@@ -5,7 +5,7 @@
 // library page's space-style block is applied as SilverBullet would, and its
 // commands are the header's buttons.
 import { readSettings } from "../silverware-tags/src/bridge.ts";
-import { start } from "../silverware-tags/src/index.ts";
+import { panelMove, panelRename, panelRows, panelSelect, start } from "../silverware-tags/src/index.ts";
 import { memorySpace } from "../silverware-tags/src/space/memory.ts";
 import libraryPage from "../silverware-tags/silverware-tags.md";
 import { flash, setUpTheme } from "./common.ts";
@@ -40,6 +40,7 @@ const space = memorySpace(load() ?? SAMPLE_PAGES, {
     save();
     if (page === space.current) text.value = space.pages.get(page) ?? "";
     showPages();
+    void showPanel();
   },
   navigated: () => showPage(),
 });
@@ -63,6 +64,54 @@ function showPage(): void {
   document.getElementById("page-name")!.textContent = space.current ?? "";
   text.value = space.pages.get(space.current ?? "") ?? "";
   showPages();
+}
+
+/**
+ * The tags' panel as SilverBullet's navigator shows the rows the library page
+ * hands it: a tree by "/" (a level of tags a folder row), a click or Enter
+ * picks, F2 renames, a row dropped on a level moves it there (the navigator's
+ * onMove: the level plus the row's last part)
+ */
+async function showPanel(): Promise<void> {
+  const panel = document.getElementById("tags-panel")!;
+  const rows = await panelRows();
+  const byName = new Map(rows.map((row) => [row.name, row]));
+  // Every level above a tag is a row too, a folder
+  const names = [...new Set(rows.flatMap((row) => row.name.split("/").map((_, i, parts) => parts.slice(0, i + 1).join("/"))))].sort();
+  const row = (name: string) => {
+    const tag = byName.get(name);
+    const depth = name.split("/").length - 1;
+    const el = document.createElement("div");
+    el.className = "row";
+    el.tabIndex = 0;
+    el.dataset.path = name;
+    el.draggable = true;
+    el.style.paddingLeft = `${6 + depth * 14}px`;
+    el.innerHTML = `<span>${tag ? "#" : "▸"}</span><span class="label"></span><span class="count"></span>`;
+    el.querySelector(".label")!.textContent = name.slice(name.lastIndexOf("/") + 1);
+    el.querySelector(".count")!.textContent = tag ? String(tag.count) : "";
+    el.addEventListener("click", () => void panelSelect(name));
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") void panelSelect(name);
+      else if (e.key === "F2") void panelRename(name);
+    });
+    el.addEventListener("dragstart", (e) => e.dataTransfer?.setData("text/plain", name));
+    el.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      el.classList.add("over");
+    });
+    el.addEventListener("dragleave", () => el.classList.remove("over"));
+    el.addEventListener("drop", (e) => {
+      e.preventDefault();
+      el.classList.remove("over");
+      const dragged = e.dataTransfer?.getData("text/plain");
+      if (dragged && dragged !== name) void panelMove(dragged, `${name}/${dragged.slice(dragged.lastIndexOf("/") + 1)}`);
+    });
+    return el;
+  };
+  const heading = document.createElement("h2");
+  heading.textContent = "Tags panel (SilverBullet's navigator)";
+  panel.replaceChildren(heading, ...names.map(row));
 }
 
 // The editor: what is typed is the page's text
@@ -95,3 +144,4 @@ document.getElementById("commands")!.replaceChildren(
 // For the interaction tests: commands run as SilverBullet's client runs them, the space as it is
 Object.assign(window, { playgroundTags: { runCommand: (name: string) => controller.runCommand(name), space } });
 showPage();
+void showPanel();

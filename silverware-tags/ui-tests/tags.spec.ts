@@ -1,4 +1,4 @@
-import { addPages, command, expect, openManager, openPage, pageName, pageText, test } from "./helpers.ts";
+import { addPages, command, expect, openManager, openPage, pageName, pageText, panelRow, test } from "./helpers.ts";
 
 test("the window shows the tags as a tree and a tag's pages", async ({ page }) => {
   const window = await openManager(page, "todo");
@@ -135,4 +135,26 @@ test("a tag on hundreds of pages: its pages listed a hundred at first, all revie
   await window.locator(".swg-apply").click();
   await expect.poll(() => pageText(page, "Many/149")).toBe("#batch\n\nPage 149.\n");
   expect(await pageText(page, "Many/000")).toBe("#batch\n\nPage 0.\n");
+});
+
+test("the tags' panel: a tag picked opens the window at it, F2 with its name to type", async ({ page }) => {
+  await (await panelRow(page, "todo")).click();
+  const window = page.locator(".swg-workspace");
+  await expect(window.locator(".swg-name-field")).toHaveValue("todo");
+  await page.keyboard.press("Escape");
+  await expect(window).toHaveCount(0);
+  const row = await panelRow(page, "milestone");
+  await row.focus();
+  await row.press("F2");
+  await expect(window.locator(".swg-name-field")).toBeFocused();
+  await expect(window.locator(".swg-name-field")).toHaveValue("milestone");
+});
+
+test("the tags' panel: a tag dragged onto a level is renamed under it, reviewed first", async ({ page }) => {
+  const idea = await panelRow(page, "idea");
+  await idea.dragTo(await panelRow(page, "project"));
+  const window = page.locator(".swg-workspace");
+  await expect(window.locator(".swg-review-title")).toHaveText("Rename #idea to #project/idea");
+  await window.locator(".swg-apply").click();
+  await expect.poll(() => pageText(page, "Journal/2026-10-30")).toContain("Thinking about #project/idea of a garden.");
 });

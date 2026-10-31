@@ -42,6 +42,9 @@ const PAGES_SHOWN = 100;
 
 export const TAGS_VIEW = "tags";
 
+// How long after it opens the window takes its focus back from what takes it (keepFocus)
+const KEEP_FOCUS_MS = 500;
+
 export class Workspace {
   private dialog: ReturnType<typeof openDialog> | undefined;
   private catalog: Catalog | undefined;
@@ -75,8 +78,44 @@ export class Workspace {
   async show(view = TAGS_VIEW, state?: unknown): Promise<void> {
     this.catalog = await this.options.catalog();
     this.reviewing = undefined;
-    if (view === TAGS_VIEW && typeof state === "string") this.picked = state;
-    this.go(view, state);
+    // The tags' view at a tag: its name, or { tag, focus: "name" } with the field of its name focused
+    const at = view === TAGS_VIEW ? (typeof state === "string" ? { tag: state } : ((state ?? {}) as { tag?: string; focus?: string })) : {};
+    if (at.tag) {
+      this.picked = at.tag;
+      this.query = "";
+    }
+    this.go(view, view === TAGS_VIEW ? undefined : state);
+    this.opening();
+    const focus = () => (at.focus === "name" ? this.focusName() : this.focusView());
+    focus();
+    this.keepFocus(focus);
+  }
+
+  /**
+   * The focus taken back where something outside takes it right after the
+   * window opened from it: SilverBullet's navigator focuses its own filter field
+   * once the key (F2) it handed over is handled, which left the window's keys to
+   * the navigator
+   */
+  private keepFocus(focus: () => void): void {
+    const win = this.doc.defaultView;
+    const dialog = this.dialog;
+    if (!win || !dialog) return;
+    const taken = () => {
+      if (this.dialog === dialog && !dialog.element.contains(this.doc.activeElement)) focus();
+    };
+    this.doc.addEventListener("focusin", taken, true);
+    win.setTimeout(() => this.doc.removeEventListener("focusin", taken, true), KEEP_FOCUS_MS);
+  }
+
+  /** The window opened at an operation's review, the tags' view (at `tag`) under it for Back */
+  async showReview(operation: Operation, tag?: string): Promise<void> {
+    await this.show(TAGS_VIEW, tag);
+    await this.review(operation);
+  }
+
+  /** The dialog made, where it is not open yet */
+  private opening(): void {
     if (this.dialog) return;
     this.dialog = openDialog(this.doc, {
       title: "Tags",
@@ -168,6 +207,13 @@ export class Workspace {
       : null;
     undoButton?.append(` Undo: ${undo!.label}`);
     this.foot.replaceChildren(buttons(doc, ...(undoButton ? [undoButton] : []), el(doc, "span", "swg-spacer"), el(doc, "button", { class: "swg-button", text: "Close", run: () => this.close() })));
+  }
+
+  /** The field of the tag's name focused, its text selected (a module's part in the name's place) */
+  private focusName(): void {
+    const field = this.body.querySelector<HTMLInputElement>(".swg-detail [data-swg-name] input, .swg-detail input[data-swg-name]");
+    field?.focus({ preventScroll: true });
+    field?.select();
   }
 
   private focusView(): void {
@@ -366,6 +412,8 @@ export class Workspace {
     const uses = info ? [...info.byContext].map(([context, pages]) => `${counted(pages.size, "page")} in ${CONTEXTS[context] ?? context}`) : [];
     const parts = this.options.tagParts(tag, this.host());
     const name = parts.find((part) => part.name)?.name ?? el(doc, "h3", { class: "swg-detail-name", text: hashtagOf(tag) });
+    // (Where the window is asked to focus the tag's name: whatever a module put there)
+    name.setAttribute("data-swg-name", "");
     const pages = info ? [...info.pages].sort((a, b) => a.localeCompare(b)) : [];
     return [
       name,

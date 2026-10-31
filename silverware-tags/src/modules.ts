@@ -3,6 +3,7 @@
 import type { ModuleName } from "./bridge.ts";
 import type { ModuleHost, TagsModule } from "./core/module.ts";
 import { pagesModule } from "./modules/pages.ts";
+import { panelModule } from "./modules/panel.ts";
 import { removeModule } from "./modules/remove.ts";
 import { renameModule } from "./modules/rename.ts";
 
@@ -10,6 +11,7 @@ const FACTORIES: readonly (readonly [ModuleName, (host: ModuleHost) => TagsModul
   ["rename", renameModule],
   ["pages", pagesModule],
   ["remove", removeModule],
+  ["panel", panelModule],
 ];
 
 export function createModules(on: ReadonlySet<ModuleName>, host: ModuleHost): TagsModule[] {

@@ -3,9 +3,11 @@
 // frontmatter, tag lines, paragraphs, items, tasks, tables, headings); into a
 // name a tag has, the two merge, which the field says as it is typed. A tag
 // with subtags: the review offers to rename them too (`project/alpha` →
-// `work/project/alpha`), on by default.
-import { pagesWith, subtagsOf } from "../core/catalog.ts";
+// `work/project/alpha`), on by default. It offers the others a rename
+// reviewed (`rename`: the panel's drag).
+import { pagesWith, readCatalog, subtagsOf } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule, WorkspaceHost } from "../core/module.ts";
+import { RENAME_OFFER, type RenameOffer } from "../core/offers.ts";
 import { counted, type Operation } from "../core/operation.ts";
 import { renameTags } from "../tags/edit.ts";
 import { cleanName, hashtagOf, nameProblem, renamedTag } from "../tags/names.ts";
@@ -76,7 +78,15 @@ function nameField(tag: string, host: WorkspaceHost): HTMLElement {
   return el(doc, "div", "swg-name", el(doc, "span", { class: "swg-name-hash", text: "#" }), field.element, actions);
 }
 
-export function renameModule(_host: ModuleHost): TagsModule {
+export function renameModule(host: ModuleHost): TagsModule {
+  const offer: RenameOffer = {
+    review: async (from, to) => {
+      const subtags = subtagsOf(await readCatalog(host.space), from).length;
+      await host.review(renameOperation(from, to, subtags > 0, subtags), from);
+    },
+    problem: renameProblem,
+  };
+  host.offer(RENAME_OFFER, offer);
   return {
     tagParts: (tag, host) => ({ name: nameField(tag, host) }),
   };

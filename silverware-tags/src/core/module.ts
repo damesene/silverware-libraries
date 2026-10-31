@@ -57,6 +57,16 @@ export type ModuleHost = {
   readonly doc: Document;
   readonly space: Space;
   readonly notifier: Notifier;
-  /** The window opened (or brought to) a view: "tags" (a tag picked, `state` its name) or a module's */
+  /**
+   * The window opened (or brought to) a view: "tags" (a tag picked: `state`
+   * its name, or `{ tag, focus: "name" }` with its name's field focused) or a
+   * module's
+   */
   open(view?: string, state?: unknown): Promise<void>;
+  /** The window opened at an operation's review (Back: the tags, `tag` picked) */
+  review(operation: Operation, tag?: string): Promise<void>;
+  /** What this module offers the others, by a name (a module uses another's only so: none imports another) */
+  offer(name: string, api: unknown): void;
+  /** What a module offers by that name; undefined while it is off */
+  offered<T>(name: string): T | undefined;
 };

@@ -175,6 +175,20 @@ task. Now one window, nothing over it:
   still ticked, nothing to change; a rename to its new name). An operation's
   option (its subtags) is a box in the review, the plan made anew by it.
 
+### The Tags panel (decided 2026-10-31)
+
+Browsing in SilverBullet's navigator, bulk changes in the window. The
+navigator (`view.define`, in 2.12.1: its tag's source) draws a view of rows as
+a tree by "/", with decorations, segments, keys and a drag onto a level
+(`onMove`); its built-in space tree cannot be changed, and it selects one row
+at a time, so ticking pages and the review stay in the window. The panel
+module gives the rows and what is done with them (`PanelOffer`), the library
+page's Lua makes the view of them: the JS knows nothing of the navigator. A
+tag picked opens the window at it, F2 with its name's field focused, a tag
+dropped on a level is renamed under it (its subtags with it) through the
+rename module's offer, reviewed. A drop onto a name a tag has is refused by
+the navigator itself (merging stays the window's).
+
 ## Not now (possible later)
 
 - The user's own operations from Space Lua (`silverware.tags.defineOperations`).

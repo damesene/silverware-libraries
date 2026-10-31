@@ -116,3 +116,16 @@ export async function openManager(page: Page, tag: string): Promise<Locator> {
   return manager;
 }
 
+/**
+ * The tags' panel open (SilverBullet's navigator by its command; the
+ * playground's always shows) and its row of a tag, by its path as both draw it
+ * (`data-path`); a sample's tags shown (SilverBullet's index caught up)
+ */
+export async function panelRow(page: Page, tag: string): Promise<Locator> {
+  const row = page.locator(onSilverBullet ? `.sb-nav-row[data-path="${tag}"]` : `#tags-panel .row[data-path="${tag}"]`);
+  await expect(async () => {
+    if (onSilverBullet && !(await row.isVisible())) await command(page, "Silverware Tags: Tags panel");
+    await expect(row).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: onSilverBullet ? 30_000 : 5_000 });
+  return row;
+}

@@ -245,7 +245,7 @@ export const SETTINGS = {
   // Write edited tables with aligned pipes; off: keep each table's own style
   autoFormat: {
     path: "silverware.table.autoFormat",
-    label: "Auto-format edited tables",
+    label: "Auto-format on edit",
     hint: "A table edited with Silverware Table is written with its columns aligned, as Long cells says; off, each table keeps its own style",
     default: true,
     parse: (v) => (typeof v === "boolean" ? v : undefined),
@@ -257,13 +257,13 @@ export const SETTINGS = {
     hint: "How a table is formatted where cells are long (a link), edited or by Format table in its ⋯ menu: its columns padded up to a width, a longer cell sticking out; or the whole table compact where a line would be too long",
     default: "limit",
     choices: ["limit", "compact"],
-    choiceLabels: ["Pad columns up to a width", "Compact the table when too wide"],
+    choiceLabels: ["Limit column width", "Compact if too wide"],
     parse: (v) => (v === "limit" || v === "compact" ? v : undefined),
   } satisfies Setting<"limit" | "compact">,
   // Characters; 0: no limit. A longer cell is written past its aligned column rather than widening every row
   formatCellWidth: {
     path: "silverware.table.formatCellWidth",
-    label: "Longest cell aligned (characters)",
+    label: "Max padded cell (chars)",
     hint: "Each column is padded to its longest cell of at most this many characters. A longer cell, such as a long link, is written as it is, past the column's |, so the other rows and the delimiter do not widen. 0: no limit",
     default: 40,
     parse: (v) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined),
@@ -272,7 +272,7 @@ export const SETTINGS = {
   // Characters; 0: no limit. As Prettier's printWidth with proseWrap "never"
   formatLineWidth: {
     path: "silverware.table.formatLineWidth",
-    label: "Compact when a line is longer than (characters)",
+    label: "Max line length (chars)",
     hint: "A table whose longest line would be longer than this, its columns padded, is written compact: no padding, the delimiter row --- (as Prettier does with proseWrap never). 0: no limit",
     default: 80,
     parse: (v) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined),

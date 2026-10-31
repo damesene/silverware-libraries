@@ -1,4 +1,4 @@
-import { addPages, command, expect, openManager, openPage, pageName, pageText, panelAction, panelRow, test } from "./helpers.ts";
+import { addPages, command, expect, onSilverBullet, openManager, openPage, pageName, pageText, panelAction, panelRow, test } from "./helpers.ts";
 
 test("the window shows the tags as a tree and a tag's pages", async ({ page }) => {
   const window = await openManager(page, "todo");
@@ -279,4 +279,14 @@ test("Cleanup: tags likely one merged into the one picked, tags used once listed
   // Back in Cleanup, the group gone
   await expect(window.locator('[data-swg-view="cleanup"]')).toHaveAttribute("aria-selected", "true");
   await expect(window.locator(".swg-cleanup-once")).toContainText("#milestone");
+});
+
+test("the tags' panel: the page open's tags first, in bold, read again as another page opens", async ({ page }) => {
+  await openPage(page, "Projects/Alpha");
+  await expect(await panelRow(page, "active")).toHaveClass(/here/);
+  const rows = page.locator(onSilverBullet ? ".sb-nav-row" : "#tags-panel .row");
+  // The page's: #project (a level holding #project/alpha), #active, #done, #todo, before any other tag
+  await expect.poll(async () => (await rows.evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.path))).slice(0, 4).sort().join(" ")).toBe("active done project todo");
+  await openPage(page, "Recipes/Soup");
+  await expect(await panelRow(page, "active")).not.toHaveClass(/here/);
 });

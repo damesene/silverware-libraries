@@ -32,7 +32,7 @@ export type WorkspaceOptions = {
   readonly navigate: (page: string) => unknown;
   readonly plan: (operation: Operation, progress: Progress) => Promise<Plan>;
   // Applied, kept for Undo and said
-  readonly apply: (plan: Plan, progress: Progress) => Promise<Applied>;
+  readonly apply: (plan: Plan, progress: Progress, waiting?: () => void) => Promise<Applied>;
   // The last change to undo, while there is one
   readonly undo: () => { readonly label: string; readonly run: () => Promise<void> } | undefined;
   // Whether SilverBullet's own tags are shown, apart (Tags | Meta); else they are left out (the setting protecting meta pages)
@@ -297,7 +297,11 @@ export class Workspace {
     button.disabled = true;
     back.disabled = true;
     try {
-      await this.options.apply(plan, (done, of) => (button.textContent = `Applying ${done} of ${of}…`));
+      await this.options.apply(
+        plan,
+        (done, of) => (button.textContent = `Applying ${done} of ${of}…`),
+        () => (button.textContent = "Waiting for SilverBullet's index…"),
+      );
     } catch (e) {
       reviewing.applying = false;
       back.disabled = false;

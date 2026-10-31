@@ -6,7 +6,7 @@ import type { Notifier, Space } from "../space/space.ts";
 import { TAGS_VIEW, Workspace } from "../ui/workspace.ts";
 import { isMetaTag } from "../tags/names.ts";
 import { tagUses } from "../tags/edit.ts";
-import { readCatalog } from "./catalog.ts";
+import { indexCaughtUp, readCatalog } from "./catalog.ts";
 import { History } from "./history.ts";
 import type { Command, ModuleHost, TagsModule } from "./module.ts";
 import { counted } from "./operation.ts";
@@ -65,9 +65,12 @@ export class Controller {
       navigate: (page) => space.navigate(page),
       // An undo not guarded: it puts back text the guard let through, where the page is as written (a change that made a page a meta page is undone too)
       plan: async (operation, progress) => makePlan(space, await catalog(), operation, progress, operation.undoes ? undefined : guard),
-      apply: async (plan, progress) => {
+      apply: async (plan, progress, waiting) => {
         const applied = await applyPlan(space, plan, progress);
         this.said(applied);
+        // The window then reads the tags anew: as the change left them, not as the index had them before it
+        waiting?.();
+        await indexCaughtUp(space, applied.written);
         return applied;
       },
       undo: () => (this.history.last ? { label: this.history.last.operation.label, run: () => this.undo() } : undefined),

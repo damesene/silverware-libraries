@@ -20,7 +20,7 @@ Everything is in one window, **Silverware Tags: Manager**, with two views (tabs 
 * **By page** (the command **Silverware Tags: Tag pages**): your pages as a tree of folders. Tick pages, or a folder for every page under it (its own page too); type to find pages. On the right are the tags the pages you picked have, each with how many of them have it (`2/3`): **×** takes one off them all (click again to keep it), and the *Add* field gives tags to them all (the tags of your space are offered as you type: **↑ ↓** and **Enter**, or **Tab** for the first). Then *Review changes…*. Tags are added into each page's frontmatter (a page that has one already is left as it is) and taken off its frontmatter and its tag lines; a hashtag in a page's text stays (*Delete tag* takes those off).
 * **Silverware Tags: Page tags** opens *By page* with the page you are on picked.
 * **Cleanup** (a tab of the window): tags that are likely one, found by their names: the same but for capitals or a separator (`Todo`, `to-do`, `todo`), a plural of another (`ideas`, `idea`), or one letter apart at the same level (`meeting`, `meetnig`; names of five letters or more). Each group offers the tag to merge into (the most used, unless you pick another) and *Merge…*, reviewed first. Below them the tags used on one page only, each opening in *By tag*.
-* **The Tags panel** (the command **Silverware Tags: Tags panel**): the tags as a tree in SilverBullet's right sidebar, beside your pages (its menu moves it to the left or the bottom; it stays open across reloads). Each tag shows how many pages use it, a level how many use a tag under it; its filter field finds a tag, and *Page tags* and *Tasks* above it show only those. A click opens a level; the buttons of a row (shown as the pointer is over it) **add the tag to the page you are on** (at once, as one of its own tags; Undo takes it back) and **open it in the window**. **F2** opens it in the window with its name to type, and dragging a tag onto another level moves it there (`alpha` dropped on `work` becomes `work/alpha`, its subtags with it), reviewed in the window first.
+* **The Tags panel** (the command **Silverware Tags: Tags panel**): the tags as a tree in SilverBullet's right sidebar, beside your pages (its menu moves it to the left or the bottom; it stays open across reloads). Each tag shows how many pages use it, a level how many use a tag under it. **The tags of the page you are on come first, in bold** (and so does a level holding one); *This page* above it shows only them, *Page tags* and *Tasks* only those, and its filter field finds a tag. A click opens a level; the buttons of a row (shown as the pointer is over it) **add the tag to the page you are on** (at once, as one of its own tags; Undo takes it back) and **open it in the window**. **F2** opens it in the window with its name to type, and dragging a tag onto another level moves it there (`alpha` dropped on `work` becomes `work/alpha`, its subtags with it), reviewed in the window first.
 * **SilverBullet's own pages are left alone** (*Hide and protect meta pages*, on by default): a page tagged `meta` or a tag under it (`meta/library`, `meta/template`…: libraries, templates, SilverBullet's API) is out of everything. Its tags show nowhere (a tag a library's documentation uses, `#VALUE!` written in its text, is not one of yours), and no change touches it: renaming `#auto` to `#automobile` renames it on every page but those. Turned off (*Silverware Tags: Settings*), they show, their tags apart (the panel's and the window's *Meta*, as SilverBullet's own tree has its meta pages apart), and changes reach them. **Enter** or a click opens the tag in the window, **F2** opens it with its name to type, and dragging a tag onto another level moves it there (`alpha` dropped on `work` becomes `work/alpha`, its subtags with it), reviewed in the window first.
 * **Every change is reviewed first**, in the same window: each page that changes with its lines before and after (the first few open, click a page for its lines), and the pages left alone and why. *Apply* writes them and takes you back; *Back* (or **Esc**) changes nothing.
 * **Undo**: the window's *Undo* at its bottom, the notification after a change (in SilverBullet's newer versions) and the command **Silverware Tags: Undo last change** take back the last change, reviewed as any change: you see each page going back to how it was, and a page you edited since is left as it is (named in the review). *Apply* writes them; the change before it is then the one to undo.
@@ -235,6 +235,7 @@ if js and js.window then
     { label = "All", icon = "hash", default = true, where = function(obj) return obj.meta ~= true end },
     { label = "Page tags", icon = "file-text", where = function(obj) return obj.onPages == true and obj.meta ~= true end },
     { label = "Tasks", icon = "check-square", where = function(obj) return obj.inTasks == true and obj.meta ~= true end },
+    { label = "This page", icon = "file", where = function(obj) return obj.here == true and obj.meta ~= true end },
   }
   if silverwareTagsJs.panelMetaApart() then
     table.insert(silverwareTagsSegments, { label = "Meta", icon = "settings", placeholder = "Meta tag", where = function(obj) return obj.meta == true end })
@@ -246,7 +247,8 @@ if js and js.window then
       command = "Silverware Tags: Tags panel",
       dock = "rhs",
       supportedDocks = { "rhs", "lhs", "bhs" },
-      refreshOn = { "index" },
+      -- Read again as the index changes, and as another page opens (its tags first)
+      refreshOn = { "index", "navigate" },
       placeholder = "Tag",
       helpText = "+ adds to the page open · F2 renames · drag to move",
       source = function()
@@ -254,7 +256,15 @@ if js and js.window then
       end,
       presentation = {
         mode = "tree",
+        -- The page open's tags first: the rows come in that order, which the tree keeps (a view's row priority is the
+        -- built-in views' only in 2.12.1); folders among the others, else they would come first whatever
+        foldersFirst = false,
         row = {
+          cssClass = function(obj)
+            if obj.here == true then
+              return "swg-here"
+            end
+          end,
           -- A level of tags (no tag of its name) a folder; it has a row of its own, so it shows its count too
           icon = function(obj)
             if obj.level == true then
@@ -841,6 +851,10 @@ end
   padding: 1px 8px;
   border: 0;
   cursor: pointer;
+}
+/* The Tags panel (SilverBullet's navigator): the page open's tags, shown first, in bold */
+.sb-nav-row.swg-here {
+  font-weight: 600;
 }
 /* Several tags picked: them as chips, an action asking for a name under its buttons */
 .swg-chosen {

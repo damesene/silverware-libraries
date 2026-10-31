@@ -4,7 +4,7 @@ import { removeOperation } from "../modules/remove.ts";
 import { renameOperation, renameProblem } from "../modules/rename.ts";
 import { memorySpace } from "../space/memory.ts";
 import { minimalEdit } from "../space/space.ts";
-import { metaPages, pagesWith, readCatalog, subtagsOf } from "./catalog.ts";
+import { indexCaughtUp, metaPages, pagesWith, readCatalog, subtagsOf } from "./catalog.ts";
 import { diffLines } from "./diff.ts";
 import { History } from "./history.ts";
 import { type Applied, applyPlan, makePlan, undoOperation } from "./plan.ts";
@@ -157,5 +157,18 @@ describe("meta pages protected", () => {
     const plan = await makePlan(space, await readCatalog(space), renameOperation("auto", "automobile", false), undefined, (text) => (text.includes("meta/library") ? "a meta page" : undefined));
     expect(plan.changes.map((c) => c.page)).toEqual(["Car"]);
     expect(plan.skipped).toEqual([{ page: "Lib", reason: "a meta page" }]);
+  });
+});
+
+describe("the index caught up", () => {
+  it("waits until the index has the pages as written: the tags taken off gone, those given there", async () => {
+    const s = memorySpace({ A: "#old" });
+    const records = s.tagRecords;
+    let calls = 0;
+    // An index two reads behind the writes
+    s.tagRecords = async () => (++calls < 3 ? [{ name: "old", page: "A", parent: "page" }] : records());
+    s.pages.set("A", "#new");
+    await indexCaughtUp(s, [{ page: "A", before: "#old", after: "#new" }]);
+    expect(calls).toBe(3);
   });
 });

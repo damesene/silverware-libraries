@@ -50,7 +50,11 @@ const space = memorySpace(load() ?? SAMPLE_PAGES, {
       void showPanel();
     });
   },
-  navigated: () => showPage(),
+  navigated: () => {
+    showPage();
+    // (The navigator's view reads its rows again as another page opens)
+    void showPanel();
+  },
 });
 
 function showPages(): void {
@@ -87,11 +91,14 @@ async function showPanel(): Promise<void> {
   // Every level above a tag is a row too, a folder
   // (SilverBullet's own tags in a Meta segment of their own there: the playground's space has none)
   const names = [...new Set(rows.filter((row) => !row.meta).flatMap((row) => row.name.split("/").map((_, i, parts) => parts.slice(0, i + 1).join("/"))))].sort();
+  // The page open's tags first at the top (their priority, as the navigator sorts each level by it), in bold
+  const here = (name: string) => byName.get(name.split("/")[0]!)?.here ?? false;
+  names.sort((a, b) => Number(here(b)) - Number(here(a)));
   const row = (name: string) => {
     const tag = byName.get(name);
     const depth = name.split("/").length - 1;
     const el = document.createElement("div");
-    el.className = "row";
+    el.className = tag?.here ? "row here" : "row";
     el.tabIndex = 0;
     el.dataset.path = name;
     el.draggable = true;

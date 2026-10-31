@@ -7,7 +7,8 @@
 // the window at it with its name to type; dragged under another level, the
 // rename is reviewed (through the rename module's offer: off, the drag is
 // refused and said). A click does nothing more than the tree does (a level
-// opens): the window is one of the actions.
+// opens): the window is one of the actions. The tags of the page open are
+// marked `here`: the host shows them first.
 import type { Catalog } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule } from "../core/module.ts";
 import { type PanelOffer, type PanelRow, RENAME_OFFER, type RenameOffer } from "../core/offers.ts";
@@ -20,7 +21,7 @@ import { hashtagOf, isMetaTag, isWithin } from "../tags/names.ts";
  * into the folder of its path). A row with tags under it counts the pages
  * using it or any of them, each page once; one without, the pages using it
  */
-export function panelRows(catalog: Catalog): PanelRow[] {
+export function panelRows(catalog: Catalog, page?: string): PanelRow[] {
   // Each tag added to its own row and to every level above it, in one pass over the tags
   const rows = new Map<string, { pages: Set<string>; contexts: Set<string>; parent: boolean }>();
   for (const tag of catalog.tags.values()) {
@@ -45,13 +46,15 @@ export function panelRows(catalog: Catalog): PanelRow[] {
       inTasks: row.contexts.has("task"),
       inItems: row.contexts.has("item"),
       meta: isMetaTag(name),
+      here: page !== undefined && row.pages.has(page),
     }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    // The page open's first (a host's tree keeps the rows' order: SilverBullet's, its sort stable), then by name
+    .sort((a, b) => Number(b.here) - Number(a.here) || a.name.localeCompare(b.name));
 }
 
 export function panelModule(host: ModuleHost): TagsModule {
   const offer: PanelOffer = {
-    rows: async () => panelRows(await host.catalog()),
+    rows: async () => panelRows(await host.catalog(), await host.space.currentPage()),
     select: (tag) => host.open("tags", tag),
     addToPage: async (tag) => {
       const page = await host.space.currentPage();

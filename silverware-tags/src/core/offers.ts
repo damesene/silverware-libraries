@@ -34,6 +34,8 @@ export type PanelRow = {
   readonly inItems: boolean;
   // SilverBullet's own (`meta` and under it): shown apart, as its tree shows meta pages
   readonly meta: boolean;
+  // On the page open (it, or a tag under it): shown first and marked
+  readonly here: boolean;
 };
 
 /**

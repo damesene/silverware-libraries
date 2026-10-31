@@ -91,6 +91,9 @@ body {
   outline: none;
   background: color-mix(in srgb, var(--ui-accent-color) 16%, transparent);
 }
+#tags-panel .row.here {
+  font-weight: 600;
+}
 #tags-panel .count {
   margin-left: auto;
   font-size: 12px;

@@ -37,6 +37,11 @@ describe("the tags' panel", () => {
       ["todo", "todo", 2, false, false, true, true],
     ]);
   });
+  it("marks the page open's tags, and a level holding one", async () => {
+    const { space } = host();
+    const here = panelRows(await readCatalog(space), "A").filter((r) => r.here).map((r) => r.name);
+    expect(here).toEqual(["project", "project/alpha", "todo"]);
+  });
   it("adds a tag to the page open at once, as an operation the core applies", async () => {
     const { panel, calls, space } = host();
     (space as { current?: string }).current = "B";

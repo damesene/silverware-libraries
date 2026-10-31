@@ -2,6 +2,7 @@
 // it, by context. Read anew whenever a dialog opens or a change is applied
 // (the index is the space's, it changes without telling).
 import type { Space, TagRecord } from "../space/space.ts";
+import { tagUses } from "../tags/edit.ts";
 import { isMetaTag, matches } from "../tags/names.ts";
 
 export type TagInfo = {
@@ -39,6 +40,45 @@ export function catalogOf(records: readonly TagRecord[], pages: readonly string[
 export async function readCatalog(space: Space, options: CatalogOptions = {}): Promise<Catalog> {
   const [records, pages] = await Promise.all([space.tagRecords(), space.pageNames()]);
   return catalogOf(records, pages, options);
+}
+
+// How long a change waits for the index to have its pages as written, before the tags are read as they are
+const INDEX_WAIT_MS = 10_000;
+const INDEX_POLL_MS = 300;
+
+/**
+ * Waits until the index has the pages written as they are now (a space's
+ * index catches up on its own, after the writes: SilverBullet's indexes each
+ * page written a moment later): for each page, the tags the change took off
+ * it gone from its records, those it gave it there. At most INDEX_WAIT_MS
+ * (a tag the index reads otherwise than the scanner does would wait for
+ * nothing: only the tags the change made a difference to are looked at)
+ */
+export async function indexCaughtUp(space: Space, written: readonly { readonly page: string; readonly before: string; readonly after: string }[]): Promise<void> {
+  const names = (text: string) => new Set(tagUses(text).map((use) => use.name));
+  const expected = written.flatMap(({ page, before, after }) => {
+    const was = names(before);
+    const now = names(after);
+    const gone = [...was].filter((name) => !now.has(name));
+    const added = [...now].filter((name) => !was.has(name));
+    return gone.length || added.length ? [{ page, gone, added }] : [];
+  });
+  if (!expected.length) return;
+  const until = performance.now() + INDEX_WAIT_MS;
+  while (performance.now() < until) {
+    const byPage = new Map<string, Set<string>>();
+    for (const record of await space.tagRecords()) {
+      let set = byPage.get(record.page);
+      if (!set) byPage.set(record.page, (set = new Set()));
+      set.add(record.name);
+    }
+    const caught = expected.every(({ page, gone, added }) => {
+      const has = byPage.get(page) ?? new Set<string>();
+      return gone.every((name) => !has.has(name)) && added.every((name) => has.has(name));
+    });
+    if (caught) return;
+    await new Promise((resolve) => setTimeout(resolve, INDEX_POLL_MS));
+  }
 }
 
 /** How many pages use each tag */

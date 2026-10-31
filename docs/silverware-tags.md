@@ -170,3 +170,17 @@ silverware-tags/
 - 2026-10-31: the plan; the domain, the space, the core, the modules, the
   dialogs, the library page, the playground (`/tags.html`) and the tests on the
   branch `silverware-tags`.
+- Verified the same day in the local SilverBullet (main of 2026-10-16, by a
+  script driving it, not the UI tests: ports 2955-3054 are reserved on this
+  machine, so `npm run test:ui:sb` could not start its servers): the Lua bridge,
+  the commands defined from `commandNames()`, the manager listing the index's
+  tags, a rename applied (a table cell's tag too), Page tags written through the
+  editor. A table row's and a heading's hashtags are in no `tag` object of the
+  index (`plugs/index/tags.ts` takes only paragraphs, items and tasks): the
+  rows' (`index.tag "table"`) and headings' (`index.tag "header"`) own `tags`
+  are read too, else a rename missed them.
+- Not verified: SilverBullet 2.12.1 (the release CI runs), the notification's
+  Undo button there (its options came later), a phone.
+- Next: the UI tests against SilverBullet in CI; the playground's toolbar page
+  has no link to the tags playground (one in its header broke the toolbar's
+  touch tests: the header's width on a phone).

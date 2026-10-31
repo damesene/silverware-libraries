@@ -20,6 +20,8 @@ Then install a plugin with `Library: Install`.
 
 - **Silverware Table** ([`silverware-table/`](silverware-table/silverware-table.md)): sort, filter and edit markdown tables
   in place, formulas, column types, and moving, adding or deleting rows and columns. Tables stay plain markdown.
+- **Silverware Tags** ([`silverware-tags/`](silverware-tags/silverware-tags.md)): a manager of the space's tags: rename and
+  merge them everywhere, delete them, tag many pages at once (a folder's too), edit a page's tags; every change previewed.
 
 ## Layout
 

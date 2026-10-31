@@ -2,7 +2,7 @@
 
 **Silverware**: a collection of plugins (SilverBullet libraries) for [SilverBullet](https://silverbullet.md), installed straight from this repository (`REPO.md` lists them). Each plugin is a folder `silverware-<name>/` (its library page `silverware-<name>.md`, the built `silverware-<name>.js`, `src/`, `silverware-table/ui-tests/`), shown as **Silverware <Name>** (its commands `Silverware <Name>: …`), its settings and Space Lua API under `silverware.<name>` (one global `silverware` the plugins share: `silverware = silverware or {}`, then their field; what a plugin's Lua blocks share between them and keep across loads of Space Lua, not API, under `silverware_internal.<name>`, so `silverware.<name>.` completes to the API alone; `config.define("silverware.<name>", …)`: SilverBullet's config splits a dotted key into nested objects, verified in its `client/config.ts`), its CSS classes, data attributes and CSS variables under a prefix of its own. The scripts (build, deploy) list the plugins; vitest, tsc and Playwright find every plugin folder's tests. Renamed from Table Plus (`tablePlus.*`, `tp-`, the repository `silverbullet-libraries`) on 2026-10-22, without keeping the old names: a space using it changes its CONFIG, its scripts (`tablePlus.define…`) and its themes (`data-tp-theme`, `--tp-*`).
 
-The plugins: **Silverware Toolbar** (`silverware-toolbar/`, prefix `swb-`, on `main` since its branch `silverware-toolbar` was merged: see *Silverware Toolbar* below and [docs/silverware-toolbar.md](docs/silverware-toolbar.md)), and **Silverware Table** (`silverware-table/`, prefix `swt-`): interactive markdown tables (in-place editing, sorting, filtering, rows and columns, pinning, formulas, column types, copy and paste with spreadsheets). The user-facing documentation is the library page [silverware-table/silverware-table.md](silverware-table/silverware-table.md); this file is the context behind it: how the code is built, what was verified about SilverBullet, and why things are the way they are.
+The plugins: **Silverware Toolbar** (`silverware-toolbar/`, prefix `swb-`, on `main` since its branch `silverware-toolbar` was merged: see *Silverware Toolbar* below and [docs/silverware-toolbar.md](docs/silverware-toolbar.md)), **Silverware Tags** (`silverware-tags/`, prefix `swg-`, on the branch `silverware-tags`: see *Silverware Tags* below and [docs/silverware-tags.md](docs/silverware-tags.md)), and **Silverware Table** (`silverware-table/`, prefix `swt-`): interactive markdown tables (in-place editing, sorting, filtering, rows and columns, pinning, formulas, column types, copy and paste with spreadsheets). The user-facing documentation is the library page [silverware-table/silverware-table.md](silverware-table/silverware-table.md); this file is the context behind it: how the code is built, what was verified about SilverBullet, and why things are the way they are.
 
 ## Commands
 
@@ -213,6 +213,23 @@ playground/toolbar.html toolbar.ts toolbar-playground.css   a CodeMirror editor 
 ```
 
 Verified in SilverBullet's source (2026-10-26): dialogs are `<dialog class="sb-modal-box">`, their fields and the page name are plain inputs (so the page's only CodeMirror is its text). Not verified in a live SilverBullet yet: the command's `key` taken from `config.get` on the library page (CONFIG is evaluated at boot, before the other scripts: `client/boot.ts`, so it should be there), `editor.focus`, the toolbar over its top bar and with the Tiniri theme. Desktop first (a phone has SilverBullet's own bar and the system's selection menu).
+
+## Silverware Tags
+
+A manager of the space's tags (the plan, the decisions and what was verified: [docs/silverware-tags.md](docs/silverware-tags.md)): the Manager (the tags as a tree by "/", a tag's uses and pages, the modules' actions on it), Rename (merging into a tag that exists, with its subtags), Delete, Tag pages (pages picked in a tree of folders, tags added and removed), Page tags (the page open). Page tags are written into the frontmatter in the page's own form; a rename changes every hashtag (items, tasks, tables, headings too). Every change across pages is planned (pages read and edited, nothing written), previewed (lines before and after, pages left alone and why), applied page by page where a page is still as read, and kept for Undo (written back where a page is still as applied). Built as the others: a core that knows no module, modules turned off not loaded (`silverware.tags.modules.<name>.enabled`), and SilverBullet behind a `Space` of its own.
+
+```
+silverware-tags/
+  silverware-tags.md   library page: user docs, config.define, the Lua handing over the bridge (the index's tags: `tag` objects, and the `tags` of table rows and headings, which are in no `tag` object), the commands defined from `commandNames()`, the CSS
+  src/
+    index.ts bridge.ts modules.ts   entry (init, start over any Space, commandNames, runCommand); the SilverBullet API used and the settings; the modules in their order
+    tags/              the domain, pure (imports nothing outside it: isolation.test.ts): names.ts (tagRegex as SilverBullet's, hashtags `#a` / `#<a b>`, the hierarchy), scan.ts (TagScanner: the body's hashtags with their context, as SilverBullet's parser finds them, line by line), frontmatter.ts (the `tags` key read with its form and written in it), edit.ts (rename, remove, add to / remove from a page), tree.ts
+    space/             space.ts (Space, Notifier, minimalEdit), silverbullet.ts (Space over the bridge: the page open read and written through the editor, one replaceRange, never its file), memory.ts (a map of pages, its index by the scanner: tests, the playground)
+    core/              catalog.ts (the index's tags by page and context), operation.ts (what a module wants done: its pages, its edit), plan.ts (make, apply, undo), history.ts, diff.ts, module.ts (TagsModule, ModuleHost), controller.ts (the host, the core's commands: Manager, Undo)
+    ui/                the dialogs (shared/dialog.ts, one layer each: the preview over the manager), manager.ts, preview.ts, chips.ts, pagetree.ts, form.ts
+    modules/           rename.ts, remove.ts, assign.ts (Tag pages), pagetags.ts: each its operation (pure, tested) and its dialog; none imports another, the bridge or space/
+playground/tags.html tags.ts tags-sample.ts   the space in memory, its pages left, the page open's text right (the editor), the commands as buttons
+```
 
 ## What was verified in SilverBullet (by probe pages)
 

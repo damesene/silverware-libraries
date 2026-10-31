@@ -75,6 +75,18 @@ describe("frontmatter", () => {
     const f = writeTags(flow, readFrontmatter(flow), ["a", "b c"])!;
     expect(flow.slice(0, f.from) + f.insert + flow.slice(f.to)).toBe('---\ntags: [a, "b c"]\n---\n');
   });
+  it("quotes a string of tags YAML would read otherwise", () => {
+    const string = "---\ntags: a b\n---\n";
+    const write = (names: string[]) => {
+      const edit = writeTags(string, readFrontmatter(string), names)!;
+      return string.slice(0, edit.from) + edit.insert + string.slice(edit.to);
+    };
+    expect(write(["[x]", "b"])).toBe('---\ntags: "[x] b"\n---\n');
+    expect(write(["@x"])).toBe('---\ntags: "@x"\n---\n');
+    expect(write(["yes"])).toBe('---\ntags: "yes"\n---\n');
+    expect(write(["a", "c"])).toBe("---\ntags: a c\n---\n");
+    for (const names of [["[x]", "b"], ["@x"], ["yes"]]) expect(readFrontmatter(write(names)).key?.items.map((i) => i.name)).toEqual(names);
+  });
 });
 
 describe("editing", () => {

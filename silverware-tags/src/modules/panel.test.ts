@@ -51,4 +51,11 @@ describe("the tags' panel", () => {
     await off.panel.move("todo", "project/todo");
     expect(off.calls[0]).toMatch(/Rename is turned off/);
   });
+  it("refuses to move a tag under itself", async () => {
+    const reviewed: string[] = [];
+    const { panel, calls } = host({ review: async (from, to) => void reviewed.push(`${from} > ${to}`), problem: () => undefined });
+    await panel.move("project", "project/alpha/project");
+    expect(reviewed).toEqual([]);
+    expect(calls[0]).toMatch(/cannot move under itself/);
+  });
 });

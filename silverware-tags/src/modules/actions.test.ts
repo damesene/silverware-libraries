@@ -4,6 +4,8 @@ import type { ModuleHost, TagAction, WorkspaceHost } from "../core/module.ts";
 import { memorySpace } from "../space/memory.ts";
 import { pagesModule } from "./pages.ts";
 import { removeModule } from "./remove.ts";
+import { renameOperation } from "./rename.ts";
+import { applyPlan, makePlan } from "../core/plan.ts";
 
 const space = memorySpace({ A: "#todo\n\n- [ ] do #todo/later", B: "- item #todo" });
 const moduleHost = { space, catalog: () => readCatalog(space) } as unknown as ModuleHost;
@@ -36,5 +38,13 @@ describe("the built-in modules' actions on a tag, as data", () => {
       ["pages", { add: ["todo"] }],
       ["pages", { checked: ["A"], remove: ["todo"] }],
     ]);
+  });
+});
+
+describe("a rename into a subtag of its own", () => {
+  it("leaves the tags under the target as they are: the two merge", async () => {
+    const s = memorySpace({ P: "#a #a/x #a/y" });
+    await applyPlan(s, await makePlan(s, await readCatalog(s), renameOperation("a", "a/x", true, 2)));
+    expect(s.pages.get("P")).toBe("#a/x #a/x #a/x/y");
   });
 });

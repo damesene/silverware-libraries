@@ -10,7 +10,7 @@ import type { ModuleHost, TagsModule, WorkspaceHost } from "../core/module.ts";
 import type { RenameOffer } from "../core/offers.ts";
 import { counted, type Operation } from "../core/operation.ts";
 import { renameTags } from "../tags/edit.ts";
-import { cleanName, hashtagOf, nameProblem, renamedTag } from "../tags/names.ts";
+import { cleanName, hashtagOf, isWithin, nameProblem, renamedTag } from "../tags/names.ts";
 import { suggestions, tagField } from "../ui/chips.ts";
 import { el } from "../ui/elements.ts";
 import { note } from "../ui/form.ts";
@@ -20,7 +20,9 @@ export function renameOperation(from: string, to: string, children: boolean, sub
   return {
     label: `Rename ${what}`,
     pages: (catalog) => pagesWith(catalog, from, children),
-    edit: (text) => renameTags(text, (name) => renamedTag(name, from, to, children)),
+    // Into a subtag of its own (#a to #a/x): the tags under the target stay as they are, so the two merge as the
+    // field said, else #a/x would move on to #a/x/x
+    edit: (text) => renameTags(text, (name) => (to !== from && isWithin(to, from) && isWithin(name, to) ? undefined : renamedTag(name, from, to, children))),
     done: (pages, changes) => `Renamed ${what}: ${counted(changes, "tag")} on ${counted(pages, "page")}`,
     ...(subtags ? { option: { label: `Its subtags too (${subtags})`, on: children, toggled: () => renameOperation(from, to, !children, subtags) } } : {}),
     shows: to,
@@ -54,7 +56,7 @@ function nameField(tag: string, host: WorkspaceHost): HTMLElement {
     const problem = renameProblem(tag, name);
     rename.disabled = !!problem;
     if (problem) said.say(problem, true);
-    else said.say(catalog.tags.has(name) ? `${hashtagOf(name)} exists: the two become one.` : `Renames it on ${counted(pagesWith(catalog, tag, false).length, "page")}; you see every change first.`);
+    else said.say(catalog.tags.has(name) ? `${hashtagOf(name)} exists: the two become one.` : `Renames it on ${counted(catalog.tags.get(tag)?.pages.size ?? 0, "page")}; you see every change first.`);
   };
   const submit = () => {
     const name = field.value();

@@ -188,7 +188,7 @@ export function writeTags(text: string, frontmatter: Frontmatter, names: readonl
   if (key.form === "string" && names.every((name) => !/[\s,]/.test(name))) {
     const value = names.map((name) => (key.hashes ? `#${name}` : name)).join(key.separator);
     const head = /^tags[ \t]*:[ \t]*/.exec(text.slice(key.from))![0];
-    return { from: key.from, to: key.to, insert: `${head}${/^#/.test(value) ? JSON.stringify(value) : value}${newline}` };
+    return { from: key.from, to: key.to, insert: `${head}${stringValue(value)}${newline}` };
   }
   if (key.form === "flow") {
     const head = /^tags[ \t]*:[ \t]*/.exec(text.slice(key.from))![0];
@@ -199,6 +199,17 @@ export function writeTags(text: string, frontmatter: Frontmatter, names: readonl
   const items = names.map((name) => `${indent}- ${(key.form === "block" && raw(name)) || yamlScalar(name)}\n`).join("");
   const insert = head + items;
   return { from: key.from, to: key.to, insert: newline ? insert : insert.replace(/\n$/, "") };
+}
+
+/**
+ * A string of names as YAML reads it back whole: one name as a scalar
+ * (`yamlScalar`: `yes`, `123` quoted), several in quotes where YAML would read
+ * them otherwise (starting with an indicator, `[x] b` a list, `@x` an error;
+ * `: ` or ` #` inside)
+ */
+function stringValue(value: string): string {
+  if (!/[\s,]/.test(value)) return yamlScalar(value);
+  return /^[-?:,[\]{}#&*!|>'"%@`]/.test(value) || /:(\s|$)|\s#/.test(value) ? JSON.stringify(value) : value;
 }
 
 function blockKey(names: readonly string[], indent: string): string {

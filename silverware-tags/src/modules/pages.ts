@@ -12,6 +12,7 @@
 import { metaPages } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule, WorkspaceHost } from "../core/module.ts";
 import { counted, type Operation } from "../core/operation.ts";
+import { each } from "../core/plan.ts";
 import { addPageTags, pageTags, removePageTags } from "../tags/edit.ts";
 import { hashtagOf, isMetaTag } from "../tags/names.ts";
 import { chipsField, suggestions } from "../ui/chips.ts";
@@ -49,9 +50,6 @@ const stateOf = (value: unknown): State => {
   return { checked: s.checked ?? [], add: s.add ?? [], remove: s.remove ?? [] };
 };
 
-// Pages read at once for their tags
-const AT_ONCE = 6;
-
 function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTMLElement {
   const { doc, catalog } = host;
   let state = stateOf(given);
@@ -70,6 +68,10 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
   search.addEventListener("input", () => tree.filter(search.value));
 
   const heading = el(doc, "h3", "swg-detail-name");
+  // What of the tags asked to take off cannot be (none of the pages has it as its own)
+  const said = el(doc, "p", { class: "swg-note", attrs: { "aria-live": "polite" } });
+  // Those dropped so, said until the pages picked change
+  let dropped: readonly string[] = [];
   const theirs = el(doc, "div", { class: "swg-chips swg-their-tags", attrs: { "aria-label": "Their tags" } });
   const add = chipsField(doc, { values: state.add, placeholder: "Add a tag to them", suggest: (typed) => suggestions(names, typed), changed: () => (keep({ add: add.chosen() }), update()), kind: "add" });
   const reviewButton = el(doc, "button", {
@@ -90,27 +92,28 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
     el(doc, "div", "swg-form-row", el(doc, "span", { class: "swg-form-label", text: "Their tags" }), theirs),
     el(doc, "div", "swg-form-row", el(doc, "span", { class: "swg-form-label", text: "Add" }), add.element),
     el(doc, "div", "swg-actions", reviewButton),
+    said,
   );
 
   let reading = 0;
   /** The pages checked changed: their tags read (those not read yet), shown */
   const picked = () => {
-    keep({ checked: tree.checked() });
+    const checked = tree.checked();
+    if (checked.join("\n") !== state.checked.join("\n")) dropped = [];
+    keep({ checked });
     const read = ++reading;
     const missing = state.checked.filter((page) => !tagsOf.has(page));
     update();
     if (!missing.length) return;
     void (async () => {
-      for (let i = 0; i < missing.length; i += AT_ONCE)
-        await Promise.all(
-          missing.slice(i, i + AT_ONCE).map(async (page) => {
-            try {
-              tagsOf.set(page, pageTags(await module.space.read(page)));
-            } catch {
-              tagsOf.set(page, []);
-            }
-          }),
-        );
+      // (A few at a time, as a plan reads them)
+      await each(missing, async (page) => {
+        try {
+          tagsOf.set(page, pageTags(await module.space.read(page)));
+        } catch {
+          tagsOf.set(page, []);
+        }
+      });
       if (read === reading) update();
     })();
   };
@@ -122,8 +125,13 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
     const counts = new Map<string, number>();
     // (SilverBullet's own tags not offered to take off: a library's meta/library is how it is installed)
     for (const page of read) for (const tag of tagsOf.get(page)!) if (!isMetaTag(tag)) counts.set(tag, (counts.get(tag) ?? 0) + 1);
-    // A tag to take off that none of them has any more is no change
-    if (state.remove.some((tag) => !counts.has(tag)) && read.length === pages.length) keep({ remove: state.remove.filter((tag) => counts.has(tag)) });
+    // A tag to take off that none of them has as its own (only in their text, a paragraph's hashtag) is no change: said, and dropped
+    const notOwn = read.length === pages.length ? state.remove.filter((tag) => !counts.has(tag)) : [];
+    if (notOwn.length) {
+      keep({ remove: state.remove.filter((tag) => counts.has(tag)) });
+      dropped = notOwn;
+    }
+    said.textContent = dropped.length ? `${dropped.map(hashtagOf).join(" ")}: none of these pages has it as its own tag, only in their text (Delete tag takes it off the text).` : "";
     const chips = [...counts].sort(([a], [b]) => a.localeCompare(b)).map(([tag, count]) => {
       const off = state.remove.includes(tag);
       return el(

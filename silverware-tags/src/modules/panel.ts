@@ -17,25 +17,31 @@ import { hashtagOf, isMetaTag, isWithin } from "../tags/names.ts";
  * using it or any of them, each page once; one without, the pages using it
  */
 export function panelRows(catalog: Catalog): PanelRow[] {
-  const names = new Set<string>();
-  for (const name of catalog.tags.keys()) name.split("/").forEach((_, i, parts) => names.add(parts.slice(0, i + 1).join("/")));
-  return [...names]
-    .map((name) => {
-      const under = [...catalog.tags.values()].filter((tag) => isWithin(tag.name, name));
-      const pages = new Set(under.flatMap((tag) => [...tag.pages]));
-      const has = (context: string) => under.some((tag) => tag.byContext.has(context));
-      return {
-        name,
-        label: name.slice(name.lastIndexOf("/") + 1),
-        count: pages.size,
-        level: !catalog.tags.has(name),
-        parent: under.some((tag) => tag.name !== name),
-        onPages: has("page"),
-        inTasks: has("task"),
-        inItems: has("item"),
-        meta: isMetaTag(name),
-      };
-    })
+  // Each tag added to its own row and to every level above it, in one pass over the tags
+  const rows = new Map<string, { pages: Set<string>; contexts: Set<string>; parent: boolean }>();
+  for (const tag of catalog.tags.values()) {
+    const parts = tag.name.split("/");
+    for (let i = 1; i <= parts.length; i++) {
+      const name = parts.slice(0, i).join("/");
+      let row = rows.get(name);
+      if (!row) rows.set(name, (row = { pages: new Set(), contexts: new Set(), parent: false }));
+      for (const page of tag.pages) row.pages.add(page);
+      for (const context of tag.byContext.keys()) row.contexts.add(context);
+      if (i < parts.length) row.parent = true;
+    }
+  }
+  return [...rows]
+    .map(([name, row]) => ({
+      name,
+      label: name.slice(name.lastIndexOf("/") + 1),
+      count: row.pages.size,
+      level: !catalog.tags.has(name),
+      parent: row.parent,
+      onPages: row.contexts.has("page"),
+      inTasks: row.contexts.has("task"),
+      inItems: row.contexts.has("item"),
+      meta: isMetaTag(name),
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -50,7 +56,8 @@ export function panelModule(host: ModuleHost): TagsModule {
         host.notifier.flash("Silverware Tags: moving a tag renames it, and Rename is turned off", "error");
         return;
       }
-      const problem = rename.problem(tag, to);
+      // (Under itself, its subtags with it, the level dropped on would move under its own new name)
+      const problem = to !== tag && isWithin(to, tag) ? "a tag cannot move under itself" : rename.problem(tag, to);
       if (problem) {
         host.notifier.flash(`Silverware Tags: ${hashtagOf(tag)} to ${hashtagOf(to)}: ${problem}`, "error");
         return;

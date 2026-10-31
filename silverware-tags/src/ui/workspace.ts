@@ -7,7 +7,7 @@
 // using it; a search cuts it to the tags holding what is typed; ↑ ↓ → ←),
 // right the tag picked: its name (a module's field renaming it), where it is
 // used, the modules' actions, its pages (each opening it).
-import { type Catalog, pageCounts, pagesWith, type TagInfo } from "../core/catalog.ts";
+import { type Catalog, pageCounts, pagesWith, subtagsOf, type TagInfo } from "../core/catalog.ts";
 import type { TagAction, TagParts, View, WorkspaceHost } from "../core/module.ts";
 import { counted, type Operation } from "../core/operation.ts";
 import type { Applied, Plan, Progress } from "../core/plan.ts";
@@ -84,6 +84,8 @@ export class Workspace {
 
   /** The window opened at a view (or brought to it); "tags" with a tag's name shows that tag */
   async show(view = TAGS_VIEW, state?: unknown): Promise<void> {
+    // (A change being written stays shown until it is: the panel, a command or Undo would take its place meanwhile)
+    if (this.reviewing?.applying) return;
     this.catalog = await this.options.catalog();
     this.reviewing = undefined;
     // The tags' view at a tag: its name, or { tag, focus: "name" } with the field of its name focused
@@ -120,6 +122,7 @@ export class Workspace {
 
   /** The window opened at an operation's review, the tags' view (at `tag`) under it for Back */
   async showReview(operation: Operation, tag?: string): Promise<void> {
+    if (this.reviewing?.applying) return;
     await this.show(TAGS_VIEW, tag);
     await this.review(operation);
   }
@@ -325,6 +328,9 @@ export class Workspace {
     const detail = el(doc, "div", "swg-detail");
 
     const shownNodes = () => filterTree(tree, this.query);
+    // A level's pages, counted once for this showing of the view (the tree is drawn anew at each key)
+    const levelCounts = new Map<string, number>();
+    const levelCount = (name: string) => levelCounts.get(name) ?? levelCounts.set(name, pagesWith(catalog, name, true).length).get(name)!;
     // The tags in the order they show (those open), for the arrows
     const visible = (): string[] => {
       const out: string[] = [];
@@ -366,7 +372,7 @@ export class Workspace {
               : el(doc, "span", "swg-tree-toggle swg-tree-leaf"),
             el(doc, "span", { class: node.own ? "swg-tag-name" : "swg-tag-name swg-level", text: node.label, title: hashtagOf(node.name) }),
             // A tag with tags under it counts the pages using it or any of them, each once (as the panel does)
-            ((count) => el(doc, "span", { class: "swg-count", text: String(count || ""), title: count ? (folder ? `${counted(count, "page")} using it or a tag under it` : counted(count, "page")) : "" }))(folder ? pagesWith(catalog, node.name, true).length : node.own),
+            ((count) => el(doc, "span", { class: "swg-count", text: String(count || ""), title: count ? (folder ? `${counted(count, "page")} using it or a tag under it` : counted(count, "page")) : "" }))(folder ? levelCount(node.name) : node.own),
           ),
         );
         if (expanded) li.append(el(doc, "ul", { class: "swg-tree-children", attrs: { role: "group" } }, ...node.children.map(item)));
@@ -451,7 +457,7 @@ export class Workspace {
     const catalog = this.catalog!;
     const info = catalog.tags.get(tag);
     const under = pagesWith(catalog, tag, true).length;
-    const subtags = [...catalog.tags.keys()].filter((name) => name.startsWith(`${tag}/`)).length;
+    const subtags = subtagsOf(catalog, tag).length;
     const uses = info ? [...info.byContext].map(([context, pages]) => `${counted(pages.size, "page")} in ${CONTEXTS[context] ?? context}`) : [];
     const parts = this.options.tagParts(tag, this.host());
     const name = parts.find((part) => part.name)?.name ?? el(doc, "h3", { class: "swg-detail-name", text: hashtagOf(tag) });

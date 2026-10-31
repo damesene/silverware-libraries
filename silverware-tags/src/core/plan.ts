@@ -30,7 +30,7 @@ const AT_ONCE = 6;
 const reasonOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** `work` for each item, `AT_ONCE` at a time; the results in the items' order, `progress` after each */
-async function each<T, R>(items: readonly T[], work: (item: T) => Promise<R>, progress?: Progress): Promise<R[]> {
+export async function each<T, R>(items: readonly T[], work: (item: T) => Promise<R>, progress?: Progress): Promise<R[]> {
   const results = new Array<R>(items.length);
   let next = 0;
   let done = 0;

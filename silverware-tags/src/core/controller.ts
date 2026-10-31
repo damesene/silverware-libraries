@@ -5,7 +5,7 @@
 import type { Notifier, Space } from "../space/space.ts";
 import { TAGS_VIEW, Workspace } from "../ui/workspace.ts";
 import { isMetaTag } from "../tags/names.ts";
-import { pageTags } from "../tags/edit.ts";
+import { tagUses } from "../tags/edit.ts";
 import { readCatalog } from "./catalog.ts";
 import { History } from "./history.ts";
 import type { Command, ModuleHost, TagsModule } from "./module.ts";
@@ -48,8 +48,10 @@ export class Controller {
     private readonly options: ControllerOptions = {},
   ) {
     const catalog = () => readCatalog(space, { hideMeta: this.options.protectMeta });
-    // A meta page as read now is never changed (the index may not have caught up with it)
-    const guard: Guard | undefined = this.options.protectMeta ? (text) => (pageTags(text).some(isMetaTag) ? "a meta page: left alone (Hide and protect meta pages)" : undefined) : undefined;
+    // A meta page as read now is never changed (the index may not have caught up with it); its tags as the
+    // index has the page's (the catalog hides by them): the frontmatter's, tag lines', a paragraph's hashtags
+    const meta = (text: string) => tagUses(text).some((use) => (use.context === "page" || use.context === "paragraph") && isMetaTag(use.name));
+    const guard: Guard | undefined = this.options.protectMeta ? (text) => (meta(text) ? "a meta page: left alone (Hide and protect meta pages)" : undefined) : undefined;
     this.workspace = new Workspace(doc, {
       catalog,
       metaApart: !this.options.protectMeta,
@@ -58,7 +60,8 @@ export class Controller {
       tagParts: (tag, host) => this.modules.flatMap((module) => (module.tagParts ? [module.tagParts(tag, host)] : [])),
       tagActions: () => this.modules.flatMap((module) => module.tagActions?.() ?? []),
       navigate: (page) => space.navigate(page),
-      plan: async (operation, progress) => makePlan(space, await catalog(), operation, progress, guard),
+      // An undo not guarded: it puts back text the guard let through, where the page is as written (a change that made a page a meta page is undone too)
+      plan: async (operation, progress) => makePlan(space, await catalog(), operation, progress, operation.undoes ? undefined : guard),
       apply: async (plan, progress) => {
         const applied = await applyPlan(space, plan, progress);
         this.said(applied);

@@ -195,12 +195,22 @@ test("the settings dialog turns the protection off: meta tags then shown apart, 
 });
 
 test("a custom operation is a button of the tag, its changes reviewed and applied @playground", async ({ page }) => {
-  // (The playground gives the library page's example, as a space's script would)
+  // Defined as a space's script would (silverware.tags.defineOperations): the library page's example
+  await page.evaluate(() => {
+    type Helpers = { addPageTags(text: string, names: string[]): unknown };
+    type Context = { tag: string; contexts(tag: string): Record<string, string[]> };
+    const w = window as unknown as { playgroundTags: { defineOperations(definitions: unknown): string | undefined } };
+    w.playgroundTags.defineOperations((helpers: Helpers) => [
+      {
+        name: "promote",
+        label: "Make it the page's",
+        pages: (context: Context) => context.contexts(context.tag).task ?? [],
+        edit: (text: string, _page: string, context: Context) => helpers.addPageTags(text, [context.tag]),
+      },
+    ]);
+  });
   const window = await openManager(page, "todo");
   await window.locator('[data-swg-tag="todo"] .swg-tag-row').click();
-  await expect(window.locator('[data-swg-action="custom.promote"]')).toBeVisible();
-  // Offered only where it would change something: todo is lower case already
-  await expect(window.locator('[data-swg-action="custom.lowerCase"]')).toHaveCount(0);
   await window.locator('[data-swg-action="custom.promote"]').click();
   await expect(window.locator(".swg-review-title")).toHaveText("Make it the page's #todo");
   await window.locator(".swg-apply").click();

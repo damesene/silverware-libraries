@@ -3,7 +3,7 @@
 // why a page was left alone. Page tags are written into the frontmatter
 // (frontmatter.ts); a page's tag lines are read as its tags too, as
 // SilverBullet reads them.
-import { readFrontmatter, writeTags } from "./frontmatter.ts";
+import { type FrontmatterForm, readFrontmatter, writeTags } from "./frontmatter.ts";
 import { hashtagOf } from "./names.ts";
 import { type Hashtag, scanHashtags, type TagContext, type TagScanner } from "./scan.ts";
 
@@ -138,15 +138,15 @@ function lineRemoved(text: string, line: { readonly from: number; readonly to: n
   return { from, to, insert: "" };
 }
 
-/** Tags given to the page: into its frontmatter, those it has (there or on a tag line) left out */
-export function addPageTags(text: string, names: readonly string[], scanner: TagScanner = scanHashtags): EditResult {
+/** Tags given to the page: into its frontmatter (a key made anew in `form`), those it has (there or on a tag line) left out */
+export function addPageTags(text: string, names: readonly string[], form: FrontmatterForm = "flow", scanner: TagScanner = scanHashtags): EditResult {
   const frontmatter = readFrontmatter(text);
   if (frontmatter.unreadable) return unchanged(text, `${frontmatter.unreadable}: left alone`);
   const has = new Set(pageTags(text, scanner));
   const added = [...new Set(names)].filter((name) => !has.has(name));
   if (!added.length) return unchanged(text);
   const current = frontmatter.key?.items.map((item) => item.name) ?? [];
-  const edit = writeTags(text, frontmatter, [...current, ...added]);
+  const edit = writeTags(text, frontmatter, [...current, ...added], form);
   return edit ? { text: applyEdits(text, [edit]), changes: added.length } : unchanged(text);
 }
 

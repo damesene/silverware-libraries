@@ -71,7 +71,7 @@ export function panelModule(host: ModuleHost, settings: PanelSettings): TagsModu
     await host.apply({
       label: `Tags of ${page}: ${verb} ${hashtagOf(tag)}`,
       pages: () => [page],
-      edit: (text) => (verb === "add" ? addPageTags(text, [tag]) : removePageTags(text, [tag])),
+      edit: (text) => (verb === "add" ? addPageTags(text, [tag], host.newTagsForm) : removePageTags(text, [tag])),
       done: () => `${page}: ${verb === "add" ? "added" : "removed"} ${hashtagOf(tag)}`,
     });
   };

@@ -318,3 +318,13 @@ test("the tags' panel: the page open's tags marked; first only with the setting,
   await openPage(page, "Recipes/Soup");
   await expect(await panelRow(page, "active")).not.toHaveClass(/here/);
 });
+
+test("How new tags are written, a setting: as - lines where a page has none yet", async ({ page }) => {
+  await command(page, "Silverware Tags: Settings");
+  const settings = page.locator(".swg-settings");
+  await settings.locator('[data-swg-setting="silverware.tags.newTagsForm"] select').selectOption("block");
+  await Promise.all([page.waitForEvent("load"), settings.locator(".swg-settings-save").click()]);
+  await openPage(page, "Recipes/Soup");
+  await panelAction(page, await panelRow(page, "idea"), "Add to the page open");
+  await expect.poll(() => pageText(page, "Recipes/Soup")).toBe("---\ntitle: Soup\ntags:\n  - idea\n---\nCarrots, onions, salt.\n");
+});

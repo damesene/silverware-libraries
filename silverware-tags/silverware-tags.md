@@ -27,7 +27,7 @@ Everything is in one window, **Silverware Tags: Manager**, with two views (tabs 
 
 ## Where tags are written
 
-A page's own tags are its frontmatter's `tags` and its **tag lines** (a paragraph of nothing but hashtags, as SilverBullet reads them). Silverware Tags adds a page's tags into its frontmatter. A page that has no `tags` yet gets them on one line (a page without a frontmatter gets one too):
+A page's own tags are its frontmatter's `tags` and its **tag lines** (a paragraph of nothing but hashtags, as SilverBullet reads them). Silverware Tags adds a page's tags into its frontmatter. A page that has no `tags` yet gets them on one line by default (a page without a frontmatter gets one too); *How new tags are written* (Settings) writes them as `- ` lines or as `tags: a, b` instead:
 
 ```yaml
 ---
@@ -48,6 +48,7 @@ Hashtags are found as SilverBullet finds them: not in code (blocks and `inline`)
 ```lua
 config.set("silverware.tags.protectMeta", true)
 config.set("silverware.tags.panelPageFirst", false)
+config.set("silverware.tags.newTagsForm", "flow") -- or "block", "string"
 config.set("silverware.tags.modules", {
   rename = { enabled = true }, -- Rename (and merge): the tag's name as a field
   pages = { enabled = true },  -- By page, Tag pages, Page tags, Add to pages, Remove from pages
@@ -138,6 +139,13 @@ config.define("silverware.tags", {
       default = true,
       description = "SilverBullet's own pages (tagged meta or a tag under it: libraries, templates, its API) are left out: their tags show nowhere and no change touches them. Off: they show, their tags apart (Meta), and changes reach them.",
       ui = { category = "Silverware Tags", label = "Hide and protect meta pages", priority = 1 },
+    },
+    newTagsForm = {
+      type = "string",
+      enum = { "flow", "block", "string" },
+      default = "flow",
+      description = "How a page's tags are written where it has none yet: flow on one line in brackets (tags: [a, b]), block as - lines, string as tags: a, b (a tag with a space in it makes it [ ]). A page that has tags keeps their form.",
+      ui = { category = "Silverware Tags", label = "How new tags are written", priority = 0.97 },
     },
     panelPageFirst = {
       type = "boolean",

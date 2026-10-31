@@ -14,6 +14,7 @@ import type { ModuleHost, TagsModule, WorkspaceHost } from "../core/module.ts";
 import { counted, type Operation } from "../core/operation.ts";
 import { each } from "../core/plan.ts";
 import { addPageTags, pageTags, removePageTags } from "../tags/edit.ts";
+import type { FrontmatterForm } from "../tags/frontmatter.ts";
 import { hashtagOf, isMetaTag } from "../tags/names.ts";
 import { chipsField, suggestions } from "../ui/chips.ts";
 import { el } from "../ui/elements.ts";
@@ -28,14 +29,14 @@ type State = { readonly checked: readonly string[]; readonly add: readonly strin
 
 const listed = (names: readonly string[]) => names.map(hashtagOf).join(" ");
 
-export function pagesOperation(pages: readonly string[], add: readonly string[], remove: readonly string[]): Operation {
+export function pagesOperation(pages: readonly string[], add: readonly string[], remove: readonly string[], form: FrontmatterForm = "flow"): Operation {
   const parts = [...(add.length ? [`add ${listed(add)}`] : []), ...(remove.length ? [`remove ${listed(remove)}`] : [])].join(", ");
   const which = pages.length === 1 ? pages[0]! : counted(pages.length, "page");
   return {
     label: `Tags of ${which}: ${parts}`,
     pages: () => pages,
     edit: (text) => {
-      const added = addPageTags(text, add);
+      const added = addPageTags(text, add, form);
       if (added.problem) return added;
       const removed = removePageTags(added.text, remove);
       if (removed.problem) return removed;
@@ -81,7 +82,7 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
       const toAdd = add.values();
       if (!state.checked.length || (!toAdd.length && !state.remove.length)) return;
       keep({ add: toAdd });
-      host.review(pagesOperation(state.checked, toAdd, state.remove));
+      host.review(pagesOperation(state.checked, toAdd, state.remove, module.newTagsForm));
     },
   });
   const right = el(

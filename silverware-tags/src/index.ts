@@ -9,7 +9,7 @@ import { createModules } from "./modules.ts";
 import type { Notifier, Space } from "./space/space.ts";
 import { silverBulletNotifier, silverBulletSpace } from "./space/silverbullet.ts";
 import { SettingsDialog, type SettingsStore } from "./settings.ts";
-import { customOperationsAnew, defineCustomOperations, operationsOf } from "./custom.ts";
+import { customOperationsAnew, defineCustomOperations, operationsOf, setNewTagsForm } from "./custom.ts";
 
 export const version = "0.1.0";
 
@@ -43,7 +43,8 @@ export async function init(bridge: Bridge): Promise<void> {
 /** The core and the modules on, over a space (SilverBullet's, or the playground's); the settings dialog where a store is given */
 export async function start(space: Space, notifier: Notifier, settings: Settings, store?: SettingsStore): Promise<Controller> {
   const dialog = store ? new SettingsDialog(document, store) : undefined;
-  const controller = new Controller(document, space, notifier, { protectMeta: settings.protectMeta, settings: dialog ? () => dialog.open() : undefined });
+  const controller = new Controller(document, space, notifier, { protectMeta: settings.protectMeta, newTagsForm: settings.newTagsForm, settings: dialog ? () => dialog.open() : undefined });
+  setNewTagsForm(settings.newTagsForm);
   controller.setModules(createModules(settings, (name) => controller.hostFor(name)));
   slot[GLOBAL_KEY] = controller;
   shown = settings;

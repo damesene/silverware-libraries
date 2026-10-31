@@ -12,7 +12,7 @@ import { pagesWith } from "./core/catalog.ts";
 import type { TagAction } from "./core/module.ts";
 import { counted, type Operation } from "./core/operation.ts";
 import { addPageTags, applyEdits, type EditResult, frontmatterTags, pageTags, removePageTags, removeTags, renameTags, tagUses } from "./tags/edit.ts";
-import { readFrontmatter } from "./tags/frontmatter.ts";
+import { type FrontmatterForm, readFrontmatter } from "./tags/frontmatter.ts";
 import { hashtagOf, isMetaTag, isWithin, matches, nameProblem, parentOf, renamedTag } from "./tags/names.ts";
 import { scanHashtags } from "./tags/scan.ts";
 
@@ -47,7 +47,8 @@ export type OperationDefinition = {
 export const HELPERS = {
   renameTags,
   removeTags,
-  addPageTags,
+  // (In the form the setting asks for where a page has no tags yet, unless one is given)
+  addPageTags: (text: string, names: readonly string[], form?: FrontmatterForm) => addPageTags(text, names, form ?? newTagsForm),
   removePageTags,
   pageTags,
   frontmatterTags,
@@ -62,6 +63,14 @@ export const HELPERS = {
   parentOf,
   renamedTag,
 };
+
+// How a page's tags are written where it has none yet, as Silverware Tags started with (the setting)
+let newTagsForm: FrontmatterForm = "flow";
+
+/** The setting as Silverware Tags starts, for the helpers' addPageTags */
+export function setNewTagsForm(form: FrontmatterForm): void {
+  newTagsForm = form;
+}
 
 const NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/;
 

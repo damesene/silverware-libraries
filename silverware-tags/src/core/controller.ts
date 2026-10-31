@@ -4,6 +4,7 @@
 // by name.
 import type { Notifier, Space } from "../space/space.ts";
 import { TAGS_VIEW, Workspace } from "../ui/workspace.ts";
+import type { FrontmatterForm } from "../tags/frontmatter.ts";
 import { isMetaTag } from "../tags/names.ts";
 import { tagUses } from "../tags/edit.ts";
 import { indexCaughtUp, readCatalog } from "./catalog.ts";
@@ -30,6 +31,8 @@ export type ControllerOptions = {
   readonly protectMeta?: boolean;
   // The settings dialog, where the host has one (index.ts makes it of the bridge)
   readonly settings?: () => Promise<void>;
+  // How a page's tags are written where it has none yet (the setting)
+  readonly newTagsForm?: FrontmatterForm;
 };
 
 export class Controller {
@@ -80,6 +83,7 @@ export class Controller {
       space,
       notifier,
       catalog,
+      newTagsForm: this.options.newTagsForm ?? "flow",
       open: (view, state) => this.workspace.show(view, state),
       review: (operation, tag) => this.workspace.showReview(operation, tag),
       apply: async (operation) => {

@@ -53,6 +53,7 @@ export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
 export const PATHS = {
   protectMeta: "silverware.tags.protectMeta",
   pageFirst: "silverware.tags.panelPageFirst",
+  newTagsForm: "silverware.tags.newTagsForm",
   module: (name: ModuleName) => `silverware.tags.modules.${name}.enabled`,
 } as const;
 
@@ -63,7 +64,14 @@ export type Settings = {
   readonly protectMeta: boolean;
   // The Tags panel: the page open's tags first (else as SilverBullet's tree sorts: by name, folders first)
   readonly pageFirst: boolean;
+  // How a page's tags are written where it has none yet
+  readonly newTagsForm: NewTagsForm;
 };
+
+/** How a page's tags are written where it has none yet: on one line in brackets, as `- ` lines, as a string */
+export const NEW_TAGS_FORMS = ["flow", "block", "string"] as const;
+export type NewTagsForm = (typeof NEW_TAGS_FORMS)[number];
+export const NEW_TAGS_FORM_LABELS: Readonly<Record<NewTagsForm, string>> = { flow: "tags: [a, b]", block: "tags: with - lines", string: "tags: a, b" };
 
 /** The settings as configured, each its default where it is not set or not valid */
 export async function readSettings(bridge: Partial<Bridge>): Promise<Settings> {
@@ -76,7 +84,13 @@ export async function readSettings(bridge: Partial<Bridge>): Promise<Settings> {
   };
   const modules = new Set<ModuleName>();
   for (const name of MODULE_NAMES) if ((await get(PATHS.module(name), true)) !== false) modules.add(name);
-  return { modules, protectMeta: (await get(PATHS.protectMeta, true)) !== false, pageFirst: (await get(PATHS.pageFirst, false)) === true };
+  const form = await get(PATHS.newTagsForm, "flow");
+  return {
+    modules,
+    protectMeta: (await get(PATHS.protectMeta, true)) !== false,
+    pageFirst: (await get(PATHS.pageFirst, false)) === true,
+    newTagsForm: NEW_TAGS_FORMS.includes(form as NewTagsForm) ? (form as NewTagsForm) : "flow",
+  };
 }
 
 /**

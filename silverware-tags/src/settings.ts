@@ -10,7 +10,7 @@
 import { settingRow, switchControl } from "../../shared/controls.ts";
 import { type Dialog, Dialogs } from "../../shared/dialog.ts";
 import { tabs } from "../../shared/tabs.ts";
-import { MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Settings } from "./bridge.ts";
+import { MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, NEW_TAGS_FORM_LABELS, NEW_TAGS_FORMS, type NewTagsForm, PATHS, type Settings } from "./bridge.ts";
 import { ICONS } from "./ui/icons.ts";
 
 const BASE = "swg-settings";
@@ -28,7 +28,7 @@ export type SettingsStore = {
   flash(message: string, type: "info" | "error"): void;
 };
 
-type Values = { protectMeta: boolean; pageFirst: boolean; modules: Record<ModuleName, boolean> };
+type Values = { protectMeta: boolean; pageFirst: boolean; newTagsForm: NewTagsForm; modules: Record<ModuleName, boolean> };
 
 export class SettingsDialog {
   private readonly dialogs: Dialogs;
@@ -55,8 +55,8 @@ export class SettingsDialog {
     if (this.isOpen) return;
     const settings = await this.store.read();
     const modules = Object.fromEntries(MODULE_NAMES.map((name) => [name, settings.modules.has(name)])) as Record<ModuleName, boolean>;
-    this.initial = { protectMeta: settings.protectMeta, pageFirst: settings.pageFirst, modules };
-    this.values = { protectMeta: settings.protectMeta, pageFirst: settings.pageFirst, modules: { ...modules } };
+    this.initial = { protectMeta: settings.protectMeta, pageFirst: settings.pageFirst, newTagsForm: settings.newTagsForm, modules };
+    this.values = { protectMeta: settings.protectMeta, pageFirst: settings.pageFirst, newTagsForm: settings.newTagsForm, modules: { ...modules } };
     this.render();
   }
 
@@ -101,7 +101,15 @@ export class SettingsDialog {
     });
     const firstRow = settingRow(doc, BASE, "The page open's tags first in the Tags panel", "On: the tags of the page you are on come first in the panel (their # marked either way). Off: by name, folders first, as SilverBullet's own tree.", first);
     firstRow.dataset.swgSetting = PATHS.pageFirst;
-    card.append(protectRow, firstRow);
+    const form = this.el("select");
+    for (const value of NEW_TAGS_FORMS) form.append(new Option(NEW_TAGS_FORM_LABELS[value], value, false, value === values.newTagsForm));
+    form.addEventListener("change", () => {
+      values.newTagsForm = form.value as NewTagsForm;
+      this.update();
+    });
+    const formRow = settingRow(doc, BASE, "How new tags are written", "Where a page has no tags yet: on one line in brackets (tags: [a, b]), as - lines, or as a string (tags: a, b; a tag with a space in it makes it [ ]). A page that has tags keeps their form.", form);
+    formRow.dataset.swgSetting = PATHS.newTagsForm;
+    card.append(protectRow, firstRow, formRow);
     general.append(card);
 
     const modules = this.el("div");
@@ -160,6 +168,7 @@ export class SettingsDialog {
     const changed: Record<string, unknown> = {};
     if (values.protectMeta !== initial.protectMeta) changed[PATHS.protectMeta] = values.protectMeta;
     if (values.pageFirst !== initial.pageFirst) changed[PATHS.pageFirst] = values.pageFirst;
+    if (values.newTagsForm !== initial.newTagsForm) changed[PATHS.newTagsForm] = values.newTagsForm;
     for (const name of MODULE_NAMES) if (values.modules[name] !== initial.modules[name]) changed[PATHS.module(name)] = values.modules[name];
     return changed;
   }

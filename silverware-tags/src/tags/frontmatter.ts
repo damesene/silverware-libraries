@@ -5,8 +5,8 @@
 // items as written), a list in brackets on one line, a string of names; a
 // name the string cannot hold (a space in it) turns it into a block list.
 // A form not read here (a list in brackets over several lines, an anchor) is
-// `unreadable`: the page is left alone. A key made anew is a list in brackets,
-// on one line (`tags: [a, b]`).
+// `unreadable`: the page is left alone. A key made anew is in the form asked
+// for (the setting): a list in brackets on one line by default (`tags: [a, b]`).
 
 export type FrontmatterForm = "block" | "flow" | "string";
 
@@ -164,19 +164,19 @@ export function yamlScalar(name: string): string {
  * (`from`, `to`, `insert`), its form kept; none where they are as written.
  * Empty: the key goes, and a frontmatter left empty with it.
  */
-export function writeTags(text: string, frontmatter: Frontmatter, names: readonly string[]): { from: number; to: number; insert: string } | undefined {
+export function writeTags(text: string, frontmatter: Frontmatter, names: readonly string[], form: FrontmatterForm = "flow"): { from: number; to: number; insert: string } | undefined {
   const { key, range, yaml } = frontmatter;
   const current = key?.items.map((item) => item.name) ?? [];
   if (current.length === names.length && current.every((name, i) => name === names[i])) return undefined;
   if (!range || !yaml) {
     if (!names.length) return undefined;
-    return { from: 0, to: 0, insert: `---\n${flowKey(names)}---\n` };
+    return { from: 0, to: 0, insert: `---\n${newKey(names, form)}---\n` };
   }
   if (!key) {
     if (!names.length) return undefined;
     // Before the closing fence
     const before = yaml.to > yaml.from && text[yaml.to - 1] !== "\n" ? "\n" : "";
-    return { from: yaml.to, to: yaml.to, insert: before + flowKey(names) };
+    return { from: yaml.to, to: yaml.to, insert: before + newKey(names, form) };
   }
   if (!names.length) {
     // The frontmatter left empty (blank lines alone; a comment stays): it goes
@@ -214,8 +214,15 @@ function stringValue(value: string): string {
   return /^[-?:,[\]{}#&*!|>'"%@`]/.test(value) || /:(\s|$)|\s#/.test(value) ? JSON.stringify(value) : value;
 }
 
-/** A `tags` key made anew: on one line, a list in brackets (any name, quoted where YAML would read it otherwise) */
-function flowKey(names: readonly string[]): string {
+/**
+ * A `tags` key made anew, in the form asked for: a list in brackets on one
+ * line (`flow`, any name, quoted where YAML would read it otherwise), a block
+ * list (`- ` lines), a string of names (`tags: a, b`; one with a space or a
+ * comma in it cannot be one: a list in brackets then)
+ */
+function newKey(names: readonly string[], form: FrontmatterForm): string {
+  if (form === "block") return `tags:\n${names.map((name) => `  - ${yamlScalar(name)}\n`).join("")}`;
+  if (form === "string" && names.every((name) => !/[\s,]/.test(name))) return `tags: ${stringValue(names.join(", "))}\n`;
   return `tags: [${names.map(yamlScalar).join(", ")}]\n`;
 }
 

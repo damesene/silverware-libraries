@@ -35,13 +35,20 @@ const save = () => {
 };
 
 const text = document.getElementById("page-text") as HTMLTextAreaElement;
+// The lists and the store, drawn and written in the next frame after pages changed (0: none asked for)
+let redraw = 0;
 const space = memorySpace(load() ?? SAMPLE_PAGES, {
   current: "index",
   changed: (page) => {
-    save();
     if (page === space.current) text.value = space.pages.get(page) ?? "";
-    showPages();
-    void showPanel();
+    // Once a frame however many pages a change writes (hundreds: the lists drawn and the store written each time cost more than the change)
+    if (redraw) return;
+    redraw = requestAnimationFrame(() => {
+      redraw = 0;
+      save();
+      showPages();
+      void showPanel();
+    });
   },
   navigated: () => showPage(),
 });
@@ -121,6 +128,26 @@ text.addEventListener("input", () => {
   if (!space.current) return;
   space.pages.set(space.current, text.value);
   save();
+});
+
+// A larger space to try: 1000 pages in 10 folders, tags each on about 250 of them, in every form a page has them
+// (the frontmatter, a tag line, a task), shared with the sample's #todo
+document.getElementById("generate")!.addEventListener("click", () => {
+  const kinds = ["alpha", "beta", "gamma", "delta"];
+  const colors = ["red", "green", "blue", "yellow"];
+  const at = [...space.pages.keys()].filter((page) => page.startsWith("Bulk/")).length;
+  for (let n = at; n < at + 1000; n++) {
+    const kind = kinds[n % 4]!;
+    const color = colors[Math.floor(n / 250) % 4]!;
+    const lines = ["---", "tags:", `  - bulk/${kind}`, "---", `#topic/${color}`, "", `Generated page ${n + 1}.`];
+    if (n % 4 === 1) lines.push("", "- [ ] Check it #review");
+    if (n % 4 === 2) lines.push("", "- [ ] Follow up #todo");
+    space.pages.set(`Bulk/Group ${Math.floor(n / 100) + 1}/Page ${String(n + 1).padStart(4, "0")}`, `${lines.join("\n")}\n`);
+  }
+  save();
+  showPages();
+  void showPanel();
+  flash(`Added 1000 pages (${at + 1000} generated in all)`);
 });
 
 document.getElementById("reset")!.addEventListener("click", () => {

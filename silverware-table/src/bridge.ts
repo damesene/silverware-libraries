@@ -254,7 +254,7 @@ export const SETTINGS = {
   formatLong: {
     path: "silverware.table.formatLong",
     label: "Long cells",
-    hint: "How a table is formatted where cells are long (a link), edited or by Format table in its ⋯ menu: its columns padded up to a width, a longer cell sticking out; or the whole table compact where a line would be too long",
+    hint: "For auto-format and Format table: pad columns up to a width (longer cells stick out), or write the whole table compact when a line is too long",
     default: "limit",
     choices: ["limit", "compact"],
     choiceLabels: ["Limit column width", "Compact if too wide"],

@@ -4,7 +4,7 @@
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { type Bridge, missingBridgeFunctions, readSettings, type Settings } from "./bridge.ts";
 import { Controller } from "./core/controller.ts";
-import { PANEL_OFFER, type PanelOffer, type PanelRow } from "./core/offers.ts";
+import { PANEL_OFFER, type PanelActionInfo, type PanelOffer, type PanelRow } from "./core/offers.ts";
 import { createModules } from "./modules.ts";
 import type { Notifier, Space } from "./space/space.ts";
 import { silverBulletNotifier, silverBulletSpace } from "./space/silverbullet.ts";
@@ -87,20 +87,13 @@ export async function panelRows(): Promise<PanelRow[]> {
   return [...((await panel()?.rows()) ?? [])];
 }
 
-export function panelSelect(tag: string): Promise<void> {
-  return panel()?.select(tag) ?? Promise.resolve();
+/** The panel's row actions, every module's (the library page defines them as the navigator's, each running `panelRun`) */
+export function panelActionList(): PanelActionInfo[] {
+  return [...(panel()?.actions() ?? [])];
 }
 
-export function panelAddToPage(tag: string): Promise<void> {
-  return panel()?.addToPage(tag) ?? Promise.resolve();
-}
-
-export function panelRemoveFromPage(tag: string): Promise<void> {
-  return panel()?.removeFromPage(tag) ?? Promise.resolve();
-}
-
-export function panelRename(tag: string): Promise<void> {
-  return panel()?.rename(tag) ?? Promise.resolve();
+export function panelRun(id: string, tag: string): Promise<void> {
+  return panel()?.run(id, tag) ?? Promise.resolve();
 }
 
 export function panelMove(tag: string, to: string): Promise<void> {

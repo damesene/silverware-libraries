@@ -126,6 +126,8 @@ export function renameModule(host: ModuleHost): TagsModule {
   host.offer(offer);
   return {
     tagParts: (tag, host) => ({ name: nameField(tag, host) }),
+    // A button of the Tags panel's rows, and F2 there: the window at the tag, its name to type
+    panelActions: () => [{ id: "rename.rename", icon: "edit-2", label: "Rename", key: "F2", order: 20, run: (tag) => host.open("tags", { tag, focus: "name" }) }],
     tagsActions: () => [
       {
         id: "rename.merge",

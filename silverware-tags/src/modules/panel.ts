@@ -4,8 +4,8 @@
 // the pages using it and where (a page's tag, a task's, an item's), a level
 // above tags a row too, counting the pages of the tags under it. Its actions:
 // Add to the page open, or for one of its own tags Remove from the page open
-// (at once, with Undo), Open in the Tags window; F2 opens
-// the window at it with its name to type; dragged under another level, the
+// (at once, with Undo), Open in the Tags window, and the other modules' row
+// actions (`panelActions`: Rename, the rename module's); dragged under another level, the
 // rename is reviewed (through the rename module's offer: off, the drag is
 // refused and said). A click does nothing more than the tree does (a level
 // opens): the window is one of the actions. The tags of the page open are
@@ -58,6 +58,20 @@ export function panelRows(catalog: Catalog, page?: string, own: ReadonlySet<stri
 export type PanelSettings = { readonly pageFirst: boolean };
 
 export function panelModule(host: ModuleHost, settings: PanelSettings): TagsModule {
+  const onPage = async (tag: string, verb: "add" | "remove") => {
+    const page = await host.space.currentPage();
+    if (!page) {
+      host.notifier.flash("Silverware Tags: no page is open", "error");
+      return;
+    }
+    // One page, the user's own ask: applied at once (said, with Undo; through the editor, Ctrl+Z there too)
+    await host.apply({
+      label: `Tags of ${page}: ${verb} ${hashtagOf(tag)}`,
+      pages: () => [page],
+      edit: (text) => (verb === "add" ? addPageTags(text, [tag]) : removePageTags(text, [tag])),
+      done: () => `${page}: ${verb === "add" ? "added" : "removed"} ${hashtagOf(tag)}`,
+    });
+  };
   const offer: PanelOffer = {
     rows: async () => {
       const page = await host.space.currentPage();
@@ -69,37 +83,13 @@ export function panelModule(host: ModuleHost, settings: PanelSettings): TagsModu
         } catch {
           // (A page not read: none marked its own)
         }
-      return panelRows(await host.catalog(), page, own, settings.pageFirst);
+      const actions = host.panelActions();
+      return panelRows(await host.catalog(), page, own, settings.pageFirst).map((row) => ({ ...row, can: Object.fromEntries(actions.map((action) => [action.id, action.when?.(row) ?? true])) }));
     },
-    select: (tag) => host.open("tags", tag),
-    addToPage: async (tag) => {
-      const page = await host.space.currentPage();
-      if (!page) {
-        host.notifier.flash("Silverware Tags: no page is open", "error");
-        return;
-      }
-      // One page, the user's own ask: applied at once (said, with Undo; through the editor, Ctrl+Z there too)
-      await host.apply({
-        label: `Tags of ${page}: add ${hashtagOf(tag)}`,
-        pages: () => [page],
-        edit: (text) => addPageTags(text, [tag]),
-        done: () => `${page}: added ${hashtagOf(tag)}`,
-      });
+    actions: () => host.panelActions().map(({ id, icon, label, key }) => ({ id, icon, label, ...(key ? { key } : {}) })),
+    run: async (id, tag) => {
+      await host.panelActions().find((action) => action.id === id)?.run(tag);
     },
-    removeFromPage: async (tag) => {
-      const page = await host.space.currentPage();
-      if (!page) {
-        host.notifier.flash("Silverware Tags: no page is open", "error");
-        return;
-      }
-      await host.apply({
-        label: `Tags of ${page}: remove ${hashtagOf(tag)}`,
-        pages: () => [page],
-        edit: (text) => removePageTags(text, [tag]),
-        done: () => `${page}: removed ${hashtagOf(tag)}`,
-      });
-    },
-    rename: (tag) => host.open("tags", { tag, focus: "name" }),
     move: async (tag, to) => {
       const rename = host.offered<RenameOffer>(RENAME_OFFER);
       if (!rename) {
@@ -116,5 +106,13 @@ export function panelModule(host: ModuleHost, settings: PanelSettings): TagsModu
     },
   };
   host.offer(offer);
-  return {};
+  return {
+    // Its own row actions, among the other modules' (Rename is the rename module's)
+    panelActions: () => [
+      { id: "panel.add", icon: "plus", label: "Add to the page open", order: 10, when: (row) => !row.level && !row.own, run: (tag) => onPage(tag, "add") },
+      // One of the page open's own tags: taken off it instead
+      { id: "panel.remove", icon: "minus", label: "Remove from the page open", order: 10, when: (row) => row.own, run: (tag) => onPage(tag, "remove") },
+      { id: "panel.open", icon: "external-link", label: "Open in the Tags window", order: 90, run: (tag) => host.open("tags", tag) },
+    ],
+  };
 }

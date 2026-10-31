@@ -158,6 +158,12 @@ test("the tags' panel: a click opens no window; its actions open it, F2 with the
   await page.keyboard.press("F2");
   await expect(window.locator(".swg-name-field")).toBeFocused();
   await expect(window.locator(".swg-name-field")).toHaveValue("milestone");
+  // The rename module's button of a row, as its F2
+  await page.keyboard.press("Escape");
+  await expect(window).toHaveCount(0);
+  await panelAction(page, await panelRow(page, "plan"), "Rename");
+  await expect(window.locator(".swg-name-field")).toBeFocused();
+  await expect(window.locator(".swg-name-field")).toHaveValue("plan");
 });
 
 test("the tags' panel: + adds the tag to the page open at once, − of one of its own takes it off", async ({ page }) => {

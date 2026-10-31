@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { readCatalog } from "../core/catalog.ts";
-import type { ModuleHost } from "../core/module.ts";
+import type { ModuleHost, PanelAction } from "../core/module.ts";
 import { PANEL_OFFER, type PanelOffer, RENAME_OFFER, type RenameOffer } from "../core/offers.ts";
 import { memorySpace } from "../space/memory.ts";
 import { panelModule, panelRows } from "./panel.ts";
 
-/** A host recording what the panel asks of it; the rename module's offer where `rename` is given */
+/**
+ * A host recording what the panel asks of it; the rename module's offer where
+ * `rename` is given; the row actions the panel's own and another module's (its
+ * Rename, as the rename module gives it)
+ */
 function host(rename?: RenameOffer) {
   const offers = new Map<string, unknown>(rename ? [[RENAME_OFFER, rename]] : []);
   const calls: string[] = [];
+  let own: readonly PanelAction[] = [];
+  const other: PanelAction = { id: "rename.rename", icon: "edit-2", label: "Rename", key: "F2", order: 20, run: (tag) => calls.push(`rename ${tag}`) };
   const h: ModuleHost = {
     doc: undefined as unknown as Document,
     space: memorySpace({ A: "#project/alpha\n\n- [ ] do #todo", B: "#project/beta #todo" }),
@@ -20,8 +26,9 @@ function host(rename?: RenameOffer) {
     // (The panel module's own host)
     offer: (api) => void offers.set(PANEL_OFFER, api),
     offered: <T>(name: string) => offers.get(name) as T | undefined,
+    panelActions: () => [...own, other].sort((a, b) => (a.order ?? 50) - (b.order ?? 50)),
   };
-  panelModule(h, { pageFirst: false });
+  own = panelModule(h, { pageFirst: false }).panelActions?.() ?? [];
   return { panel: offers.get(PANEL_OFFER) as PanelOffer, calls, space: h.space };
 }
 
@@ -47,17 +54,27 @@ describe("the tags' panel", () => {
     const here = panelRows(await readCatalog(space), "A").filter((r) => r.here).map((r) => r.name);
     expect(here).toEqual(["project", "project/alpha", "todo"]);
   });
-  it("adds a tag to the page open at once, as an operation the core applies", async () => {
+  it("draws every module's row actions in their order, each offered where its row allows it", async () => {
+    const { panel, space } = host();
+    (space as { current?: string }).current = "A";
+    expect(panel.actions().map((a) => [a.id, a.key])).toEqual([
+      ["panel.add", undefined],
+      ["panel.remove", undefined],
+      ["rename.rename", "F2"],
+      ["panel.open", undefined],
+    ]);
+    const rows = await panel.rows();
+    // #todo is in a task of A, not one of its own tags: + offered; a level: no +
+    expect(rows.find((r) => r.name === "todo")!.can).toEqual({ "panel.add": true, "panel.remove": false, "rename.rename": true, "panel.open": true });
+    expect(rows.find((r) => r.name === "project")!.can!["panel.add"]).toBe(false);
+  });
+  it("runs a row's action: the panel's own (+ applied at once, Open the window), another module's", async () => {
     const { panel, calls, space } = host();
     (space as { current?: string }).current = "B";
-    await panel.addToPage("idea");
-    expect(calls).toEqual(["apply Tags of B: add #idea"]);
-  });
-  it("opens the window at a tag picked, with its name's field for F2", async () => {
-    const { panel, calls } = host();
-    await panel.select("todo");
-    await panel.rename("todo");
-    expect(calls).toEqual(['open tags "todo"', 'open tags {"tag":"todo","focus":"name"}']);
+    await panel.run("panel.add", "idea");
+    await panel.run("panel.open", "todo");
+    await panel.run("rename.rename", "todo");
+    expect(calls).toEqual(["apply Tags of B: add #idea", 'open tags "todo"', "rename todo"]);
   });
   it("moves a tag through the rename module's offer, refused and said without it", async () => {
     const reviewed: string[] = [];

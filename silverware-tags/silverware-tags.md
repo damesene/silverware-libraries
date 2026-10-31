@@ -20,7 +20,7 @@ Everything is in one window, **Silverware Tags: Manager**, with two views (tabs 
 * **By page** (the command **Silverware Tags: Tag pages**): your pages as a tree of folders. Tick pages, or a folder for every page under it (its own page too); type to find pages. On the right are the tags the pages you picked have, each with how many of them have it (`2/3`): **×** takes one off them all (click again to keep it), and the *Add* field gives tags to them all (the tags of your space are offered as you type: **↑ ↓** and **Enter**, or **Tab** for the first). Then *Review changes…*. Tags are added into each page's frontmatter (a page that has one already is left as it is) and taken off its frontmatter and its tag lines; a hashtag in a page's text stays (*Delete tag* takes those off).
 * **Silverware Tags: Page tags** opens *By page* with the page you are on picked.
 * **Cleanup** (a tab of the window): tags that are likely one, found by their names: the same but for capitals or a separator (`Todo`, `to-do`, `todo`), a plural of another (`ideas`, `idea`), or one letter apart at the same level (`meeting`, `meetnig`; names of five letters or more). Each group offers the tag to merge into (the most used, unless you pick another) and *Merge…*, reviewed first. Below them the tags used on one page only, each opening in *By tag*.
-* **The Tags panel** (the command **Silverware Tags: Tags panel**): the tags as a tree in SilverBullet's right sidebar, beside your pages (its menu moves it to the left or the bottom; it stays open across reloads). Each tag shows how many pages use it, a level how many use a tag under it. **The tags of the page you are on have their # in the accent color** (and so does a level holding one), and come first where *The page open's tags first in the Tags panel* is on (Settings; off by default: by name, folders first); *This page* above it shows only them, *Page tags* and *Tasks* only those, and its filter field finds a tag. A click opens a level; the buttons of a row (shown as the pointer is over it) **add the tag to the page you are on** (+; at once, as one of its own tags; Undo takes it back), or where it is one of the page's own tags already **take it off** (−: from its frontmatter and tag lines), and **open it in the window**. **F2** opens it in the window with its name to type, and dragging a tag onto another level moves it there (`alpha` dropped on `work` becomes `work/alpha`, its subtags with it), reviewed in the window first.
+* **The Tags panel** (the command **Silverware Tags: Tags panel**): the tags as a tree in SilverBullet's right sidebar, beside your pages (its menu moves it to the left or the bottom; it stays open across reloads). Each tag shows how many pages use it, a level how many use a tag under it. **The tags of the page you are on have their # in the accent color** (and so does a level holding one), and come first where *The page open's tags first in the Tags panel* is on (Settings; off by default: by name, folders first); *This page* above it shows only them, *Page tags* and *Tasks* only those, and its filter field finds a tag. A click opens a level; the buttons of a row (shown as the pointer is over it) **add the tag to the page you are on** (+; at once, as one of its own tags; Undo takes it back), or where it is one of the page's own tags already **take it off** (−: from its frontmatter and tag lines), **rename it** (✎, or **F2**: the window with its name to type) and **open it in the window**, and dragging a tag onto another level moves it there (`alpha` dropped on `work` becomes `work/alpha`, its subtags with it), reviewed in the window first.
 * **SilverBullet's own pages are left alone** (*Hide and protect meta pages*, on by default): a page tagged `meta` or a tag under it (`meta/library`, `meta/template`…: libraries, templates, SilverBullet's API) is out of everything. Its tags show nowhere (a tag a library's documentation uses, `#VALUE!` written in its text, is not one of yours), and no change touches it: renaming `#auto` to `#automobile` renames it on every page but those. Turned off (*Silverware Tags: Settings*), they show, their tags apart (the panel's and the window's *Meta*, as SilverBullet's own tree has its meta pages apart), and changes reach them. **Enter** or a click opens the tag in the window, **F2** opens it with its name to type, and dragging a tag onto another level moves it there (`alpha` dropped on `work` becomes `work/alpha`, its subtags with it), reviewed in the window first.
 * **Every change is reviewed first**, in the same window: each page that changes with its lines before and after (the first few open, click a page for its lines), and the pages left alone and why. *Apply* writes them and takes you back; *Back* (or **Esc**) changes nothing.
 * **Undo**: the window's *Undo* at its bottom, the notification after a change (in SilverBullet's newer versions) and the command **Silverware Tags: Undo last change** take back the last change, reviewed as any change: you see each page going back to how it was, and a page you edited since is left as it is (named in the review). *Apply* writes them; the change before it is then the one to undo.
@@ -247,6 +247,29 @@ if js and js.window then
   if silverwareTagsJs.panelMetaApart() then
     table.insert(silverwareTagsSegments, { label = "Meta", icon = "settings", placeholder = "Meta tag", where = function(obj) return obj.meta == true end })
   end
+  -- The panel's row actions and their keys, as the modules turned on give them
+  local silverwareTagsActions = {}
+  local silverwareTagsKeys = {}
+  if silverwareTagsJs.panelOn() then
+    for _, action in ipairs(silverwareTagsJs.panelActionList()) do
+      local id = action.id
+      table.insert(silverwareTagsActions, {
+        icon = action.icon,
+        label = action.label,
+        when = function(obj) return obj.can ~= nil and obj.can[id] == true end,
+        run = function(obj)
+          silverwareTagsJs.panelRun(id, obj.name)
+        end,
+      })
+      if action.key then
+        silverwareTagsKeys[action.key] = function(obj)
+          if obj.can ~= nil and obj.can[id] == true then
+            silverwareTagsJs.panelRun(id, obj.name)
+          end
+        end
+      end
+    end
+  end
   if view and view.define and silverwareTagsJs.panelOn() then
     view.define {
       name = "silverware.tags",
@@ -300,37 +323,10 @@ if js and js.window then
         end
         return false
       end,
-      actions = {
-        {
-          icon = "plus",
-          label = "Add to the page open",
-          when = function(obj) return obj.level ~= true and obj.own ~= true end,
-          run = function(obj)
-            silverwareTagsJs.panelAddToPage(obj.name)
-          end,
-        },
-        -- One of the page open's own tags: taken off it instead
-        {
-          icon = "minus",
-          label = "Remove from the page open",
-          when = function(obj) return obj.own == true end,
-          run = function(obj)
-            silverwareTagsJs.panelRemoveFromPage(obj.name)
-          end,
-        },
-        {
-          icon = "external-link",
-          label = "Open in the Tags window",
-          run = function(obj)
-            silverwareTagsJs.panelSelect(obj.name)
-          end,
-        },
-      },
-      keymap = {
-        F2 = function(obj)
-          silverwareTagsJs.panelRename(obj.name)
-        end,
-      },
+      -- Every module's row actions (the panel's +, − and Open, the rename module's Rename…): a button of a row where
+      -- the JS offers it for that row (its `can`), a key where one has it
+      actions = silverwareTagsActions,
+      keymap = silverwareTagsKeys,
       onMove = function(obj, newName)
         silverwareTagsJs.panelMove(obj.name, newName)
       end,

@@ -38,23 +38,26 @@ export type PanelRow = {
   readonly here: boolean;
   // One of the page open's own tags (its frontmatter's, its tag lines'): it offers to take it off, not to add it
   readonly own: boolean;
+  // The row's actions offered for it, by id (the modules' panelActions)
+  readonly can?: Readonly<Record<string, boolean>>;
 };
+
+/** A row action as a host draws it (its run by id: `PanelOffer.run`) */
+export type PanelActionInfo = { readonly id: string; readonly icon: string; readonly label: string; readonly key?: string };
 
 /**
  * `panel` (the panel module): the tags as a panel beside the page shows them,
  * whatever draws it (SilverBullet's navigator, through the library page; the
- * playground's list). What the panel does goes to the window
+ * playground's list). Its row actions are the modules' (`panelActions`),
+ * the panel's own among them: it knows none of the others
  */
 export type PanelOffer = {
+  /** The rows, each with the actions offered for it (`can`) */
   rows(): Promise<readonly PanelRow[]>;
-  /** Open in the Tags window (an action of a row): the window at the tag */
-  select(tag: string): Promise<void>;
-  /** Add to the page open (an action of a row): the tag given to it at once, as one of its own (its frontmatter) */
-  addToPage(tag: string): Promise<void>;
-  /** Remove from the page open (the action of a row of one of its own tags): taken off its frontmatter and tag lines at once */
-  removeFromPage(tag: string): Promise<void>;
-  /** Rename asked for (F2): the window at it, its name's field focused */
-  rename(tag: string): Promise<void>;
+  /** Every module's row actions, in their order (buttons of a row, a key where one has it) */
+  actions(): readonly PanelActionInfo[];
+  /** A row's action run on its tag */
+  run(id: string, tag: string): Promise<void>;
   /** A tag dragged under another level: renamed so (reviewed), its subtags with it */
   move(tag: string, to: string): Promise<void>;
 };

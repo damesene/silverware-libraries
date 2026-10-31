@@ -5,7 +5,7 @@
 // library page's space-style block is applied as SilverBullet would, and its
 // commands are the header's buttons.
 import { readSettings } from "../silverware-tags/src/bridge.ts";
-import { defineOperations, panelAddToPage, panelMove, panelPageFirst, panelRemoveFromPage, panelRename, panelRows, panelSelect, start } from "../silverware-tags/src/index.ts";
+import { defineOperations, panelActionList, panelMove, panelPageFirst, panelRows, panelRun, start } from "../silverware-tags/src/index.ts";
 import type { SettingsStore } from "../silverware-tags/src/settings.ts";
 import { memorySpace } from "../silverware-tags/src/space/memory.ts";
 import libraryPage from "../silverware-tags/silverware-tags.md";
@@ -78,15 +78,20 @@ function showPage(): void {
   showPages();
 }
 
+// The row actions' icons (the navigator's are Feather's, by these names) as text
+const ICON_TEXT: Readonly<Record<string, string>> = { plus: "+", minus: "−", "edit-2": "✎", "external-link": "↗" };
+
 /**
  * The tags' panel as SilverBullet's navigator shows the rows the library page
- * hands it: a tree by "/" (a level of tags a folder row), a click or Enter
- * picks, F2 renames, a row dropped on a level moves it there (the navigator's
- * onMove: the level plus the row's last part)
+ * hands it: a tree by "/" (a level of tags a folder row), every module's row
+ * actions as its buttons where the row offers them (`can`) and their keys, a
+ * row dropped on a level moves it there (the navigator's onMove: the level
+ * plus the row's last part)
  */
 async function showPanel(): Promise<void> {
   const panel = document.getElementById("tags-panel")!;
   const rows = await panelRows();
+  const actions = panelActionList();
   const byName = new Map(rows.map((row) => [row.name, row]));
   // Every level above a tag is a row too, a folder
   // (SilverBullet's own tags in a Meta segment of their own there: the playground's space has none)
@@ -105,19 +110,22 @@ async function showPanel(): Promise<void> {
     el.dataset.path = name;
     el.draggable = true;
     el.style.paddingLeft = `${6 + depth * 14}px`;
-    el.innerHTML = `<span>${tag && !tag.level ? "#" : "▸"}</span><span class="label"></span><span class="count"></span><button type="button" class="add" title="Add to the page open" aria-label="Add to the page open">+</button><button type="button" class="remove" title="Remove from the page open" aria-label="Remove from the page open">−</button><button type="button" class="open" title="Open in the Tags window" aria-label="Open in the Tags window">↗</button>`;
+    el.innerHTML = `<span>${tag && !tag.level ? "#" : "▸"}</span><span class="label"></span><span class="count"></span>`;
     el.querySelector(".label")!.textContent = name.slice(name.lastIndexOf("/") + 1);
     el.querySelector(".count")!.textContent = tag ? String(tag.count) : "";
     // The row's actions, as the navigator's buttons of a row (a click on the row itself: nothing, as there)
-    const add = el.querySelector<HTMLButtonElement>(".add")!;
-    if (!tag || tag.level || tag.own) add.remove();
-    else add.addEventListener("click", () => void panelAddToPage(name));
-    const remove = el.querySelector<HTMLButtonElement>(".remove")!;
-    if (!tag?.own) remove.remove();
-    else remove.addEventListener("click", () => void panelRemoveFromPage(name));
-    el.querySelector(".open")!.addEventListener("click", () => void panelSelect(name));
+    for (const action of actions.filter((a) => tag?.can?.[a.id])) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = ICON_TEXT[action.icon] ?? action.label.charAt(0);
+      button.title = action.label;
+      button.setAttribute("aria-label", action.label);
+      button.addEventListener("click", () => void panelRun(action.id, name));
+      el.append(button);
+    }
     el.addEventListener("keydown", (e) => {
-      if (e.key === "F2") void panelRename(name);
+      const action = actions.find((a) => a.key === e.key && tag?.can?.[a.id]);
+      if (action) void panelRun(action.id, name);
     });
     el.addEventListener("dragstart", (e) => e.dataTransfer?.setData("text/plain", name));
     el.addEventListener("dragover", (e) => {

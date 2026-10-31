@@ -91,6 +91,12 @@ export class Controller {
         this.said(await applyPlan(space, plan));
       },
       offered: <T>(name: string) => this.offers.get(name) as T | undefined,
+      panelActions: () =>
+        this.modules
+          .flatMap((module) => module.panelActions?.() ?? [])
+          .map((action, i) => ({ action, i }))
+          .sort((a, b) => (a.action.order ?? 50) - (b.action.order ?? 50) || a.i - b.i)
+          .map(({ action }) => action),
     };
   }
 

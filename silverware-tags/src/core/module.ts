@@ -5,6 +5,7 @@
 // operations they make through a review in that window.
 import type { Notifier, Space } from "../space/space.ts";
 import type { Catalog } from "./catalog.ts";
+import type { PanelRow } from "./offers.ts";
 import type { Operation } from "./operation.ts";
 
 export type Command = {
@@ -81,12 +82,31 @@ export type TagsAction = {
   readonly run: (tags: readonly string[], host: WorkspaceHost, name?: string) => Operation | void | Promise<Operation | void>;
 };
 
+/**
+ * An action of a row of the Tags panel (a button of the row, a key where it
+ * has one), as data a module gives: the panel draws every module's and runs
+ * them. `order` places it among the others (less first)
+ */
+export type PanelAction = {
+  readonly id: string;
+  // An icon's name as SilverBullet's navigator takes it (Feather's: "plus", "edit-2")
+  readonly icon: string;
+  readonly label: string;
+  // A key running it on the row picked (KeyboardEvent.key: "F2")
+  readonly key?: string;
+  readonly order?: number;
+  // Whether it is offered for a row (left out: always)
+  readonly when?: (row: PanelRow) => boolean;
+  readonly run: (tag: string) => unknown;
+};
+
 export type TagsModule = {
   readonly commands?: () => readonly Command[];
   readonly views?: () => readonly View[];
   readonly tagParts?: (tag: string, host: WorkspaceHost) => TagParts;
   readonly tagActions?: () => readonly TagAction[];
   readonly tagsActions?: () => readonly TagsAction[];
+  readonly panelActions?: () => readonly PanelAction[];
 };
 
 export type ModuleHost = {
@@ -105,6 +125,8 @@ export type ModuleHost = {
   review(operation: Operation, tag?: string): Promise<void>;
   /** An operation applied at once, without a review (one page the user asked a change of: said, with Undo), meta pages protected */
   apply(operation: Operation): Promise<void>;
+  /** Every module's row actions of the Tags panel, in their order (the panel module draws them) */
+  panelActions(): readonly PanelAction[];
   /** What this module offers the others, under its own name (a module uses another's only so: none imports another) */
   offer(api: unknown): void;
   /** What the module of that name offers; undefined while it is off or offers nothing */

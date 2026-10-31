@@ -39,6 +39,21 @@ test.describe("Toolbar and menus", () => {
     await expect(menu(page)).toHaveCount(0);
   });
 
+  test("the settings dialog is of one height whatever its tab shows, 720px where the window has room", async ({ page }) => {
+    await hoverCell(page, cell(page, 2, 1));
+    await page.locator(".swt-bar .swt-bar-more").click();
+    await menu(page).locator(".swt-menu-item").filter({ hasText: "Silverware Table settings…" }).click();
+    const dialog = page.locator(".swt-settings");
+    const tabs = dialog.locator(".swt-settings-tab");
+    const heights: number[] = [];
+    for (let i = 0; i < (await tabs.count()); i++) {
+      await tabs.nth(i).click();
+      heights.push(Math.round((await dialog.boundingBox())!.height));
+    }
+    // (The test's window: 800px high, the dialog 720px)
+    expect(new Set(heights)).toEqual(new Set([720]));
+  });
+
   test("a right click opens the cell's menu; a press elsewhere closes it", async ({ page }) => {
     await cell(page, 2, 1).click({ button: "right" });
     await expect(menuTitle(page)).toHaveText("Cell: Qty, row 2");

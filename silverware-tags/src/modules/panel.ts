@@ -3,7 +3,8 @@
 // library page's Lua: this module knows nothing of it). Each row a tag with
 // the pages using it and where (a page's tag, a task's, an item's), a level
 // above tags a row too, counting the pages of the tags under it. Its actions:
-// Add to the page open (at once, with Undo), Open in the Tags window; F2 opens
+// Add to the page open, or for one of its own tags Remove from the page open
+// (at once, with Undo), Open in the Tags window; F2 opens
 // the window at it with its name to type; dragged under another level, the
 // rename is reviewed (through the rename module's offer: off, the drag is
 // refused and said). A click does nothing more than the tree does (a level
@@ -12,7 +13,7 @@
 import type { Catalog } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule } from "../core/module.ts";
 import { type PanelOffer, type PanelRow, RENAME_OFFER, type RenameOffer } from "../core/offers.ts";
-import { addPageTags } from "../tags/edit.ts";
+import { addPageTags, pageTags, removePageTags } from "../tags/edit.ts";
 import { hashtagOf, isMetaTag, isWithin } from "../tags/names.ts";
 
 /**
@@ -21,7 +22,7 @@ import { hashtagOf, isMetaTag, isWithin } from "../tags/names.ts";
  * into the folder of its path). A row with tags under it counts the pages
  * using it or any of them, each page once; one without, the pages using it
  */
-export function panelRows(catalog: Catalog, page?: string): PanelRow[] {
+export function panelRows(catalog: Catalog, page?: string, own: ReadonlySet<string> = new Set()): PanelRow[] {
   // Each tag added to its own row and to every level above it, in one pass over the tags
   const rows = new Map<string, { pages: Set<string>; contexts: Set<string>; parent: boolean }>();
   for (const tag of catalog.tags.values()) {
@@ -47,6 +48,7 @@ export function panelRows(catalog: Catalog, page?: string): PanelRow[] {
       inItems: row.contexts.has("item"),
       meta: isMetaTag(name),
       here: page !== undefined && row.pages.has(page),
+      own: own.has(name),
     }))
     // The page open's first (a host's tree keeps the rows' order: SilverBullet's, its sort stable), then by name
     .sort((a, b) => Number(b.here) - Number(a.here) || a.name.localeCompare(b.name));
@@ -54,7 +56,18 @@ export function panelRows(catalog: Catalog, page?: string): PanelRow[] {
 
 export function panelModule(host: ModuleHost): TagsModule {
   const offer: PanelOffer = {
-    rows: async () => panelRows(await host.catalog(), await host.space.currentPage()),
+    rows: async () => {
+      const page = await host.space.currentPage();
+      // Its own tags as its text has them now (the index's a moment late after the row's + or −)
+      let own = new Set<string>();
+      if (page)
+        try {
+          own = new Set(pageTags(await host.space.read(page)));
+        } catch {
+          // (A page not read: none marked its own)
+        }
+      return panelRows(await host.catalog(), page, own);
+    },
     select: (tag) => host.open("tags", tag),
     addToPage: async (tag) => {
       const page = await host.space.currentPage();
@@ -68,6 +81,19 @@ export function panelModule(host: ModuleHost): TagsModule {
         pages: () => [page],
         edit: (text) => addPageTags(text, [tag]),
         done: () => `${page}: added ${hashtagOf(tag)}`,
+      });
+    },
+    removeFromPage: async (tag) => {
+      const page = await host.space.currentPage();
+      if (!page) {
+        host.notifier.flash("Silverware Tags: no page is open", "error");
+        return;
+      }
+      await host.apply({
+        label: `Tags of ${page}: remove ${hashtagOf(tag)}`,
+        pages: () => [page],
+        edit: (text) => removePageTags(text, [tag]),
+        done: () => `${page}: removed ${hashtagOf(tag)}`,
       });
     },
     rename: (tag) => host.open("tags", { tag, focus: "name" }),

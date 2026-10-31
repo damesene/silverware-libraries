@@ -36,6 +36,8 @@ export type PanelRow = {
   readonly meta: boolean;
   // On the page open (it, or a tag under it): shown first and marked
   readonly here: boolean;
+  // One of the page open's own tags (its frontmatter's, its tag lines'): it offers to take it off, not to add it
+  readonly own: boolean;
 };
 
 /**
@@ -49,6 +51,8 @@ export type PanelOffer = {
   select(tag: string): Promise<void>;
   /** Add to the page open (an action of a row): the tag given to it at once, as one of its own (its frontmatter) */
   addToPage(tag: string): Promise<void>;
+  /** Remove from the page open (the action of a row of one of its own tags): taken off its frontmatter and tag lines at once */
+  removeFromPage(tag: string): Promise<void>;
   /** Rename asked for (F2): the window at it, its name's field focused */
   rename(tag: string): Promise<void>;
   /** A tag dragged under another level: renamed so (reviewed), its subtags with it */

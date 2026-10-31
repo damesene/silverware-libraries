@@ -160,12 +160,18 @@ test("the tags' panel: a click opens no window; its actions open it, F2 with the
   await expect(window.locator(".swg-name-field")).toHaveValue("milestone");
 });
 
-test("the tags' panel: + adds the tag to the page open, at once, with Undo", async ({ page }) => {
+test("the tags' panel: + adds the tag to the page open at once, − of one of its own takes it off", async ({ page }) => {
   await openPage(page, "Recipes/Soup");
   await panelAction(page, await panelRow(page, "idea"), "Add to the page open");
   await expect.poll(() => pageText(page, "Recipes/Soup")).toBe("---\ntitle: Soup\ntags:\n  - idea\n---\nCarrots, onions, salt.\n");
   // No window: one page, the user's own ask
   await expect(page.locator(".swg-workspace")).toHaveCount(0);
+  // Its own now: − in place of +
+  const idea = await panelRow(page, "idea");
+  await idea.hover();
+  await expect(idea.getByRole("button", { name: "Add to the page open" })).toHaveCount(0);
+  await panelAction(page, idea, "Remove from the page open");
+  await expect.poll(() => pageText(page, "Recipes/Soup")).toBe("---\ntitle: Soup\n---\nCarrots, onions, salt.\n");
 });
 
 test("the tags' panel: a tag dragged onto a level is renamed under it, reviewed first", async ({ page }) => {
@@ -282,7 +288,7 @@ test("Cleanup: tags likely one merged into the one picked, tags used once listed
   await expect(window.locator(".swg-cleanup-once")).toContainText("#milestone");
 });
 
-test("the tags' panel: the page open's tags first, in bold, read again as another page opens", async ({ page }) => {
+test("the tags' panel: the page open's tags first, marked, read again as another page opens", async ({ page }) => {
   await openPage(page, "Projects/Alpha");
   await expect(await panelRow(page, "active")).toHaveClass(/here/);
   const rows = page.locator(onSilverBullet ? ".sb-nav-row" : "#tags-panel .row");

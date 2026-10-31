@@ -90,6 +90,10 @@ export function panelAddToPage(tag: string): Promise<void> {
   return panel()?.addToPage(tag) ?? Promise.resolve();
 }
 
+export function panelRemoveFromPage(tag: string): Promise<void> {
+  return panel()?.removeFromPage(tag) ?? Promise.resolve();
+}
+
 export function panelRename(tag: string): Promise<void> {
   return panel()?.rename(tag) ?? Promise.resolve();
 }

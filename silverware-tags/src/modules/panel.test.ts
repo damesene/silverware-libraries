@@ -37,6 +37,11 @@ describe("the tags' panel", () => {
       ["todo", "todo", 2, false, false, true, true],
     ]);
   });
+  it("marks the page open's own tags (−, not +)", async () => {
+    const { space } = host();
+    const own = panelRows(await readCatalog(space), "A", new Set(["project/alpha"])).filter((r) => r.own).map((r) => r.name);
+    expect(own).toEqual(["project/alpha"]);
+  });
   it("marks the page open's tags, and a level holding one", async () => {
     const { space } = host();
     const here = panelRows(await readCatalog(space), "A").filter((r) => r.here).map((r) => r.name);

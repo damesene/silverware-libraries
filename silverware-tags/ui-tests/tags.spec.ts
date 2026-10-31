@@ -260,3 +260,21 @@ test("several tags picked with Ctrl merged into one, reviewed", async ({ page })
   await expect.poll(() => pageText(page, "Projects/Alpha/Plan")).toContain("#project/alpha #thoughts");
   expect(await pageText(page, "Journal/2026-10-30")).toContain("Thinking about #thoughts of a garden.");
 });
+
+test("Cleanup: tags likely one merged into the one picked, tags used once listed", async ({ page }) => {
+  await addPages(page, { "Notes/One": "#Idea\n\nAn idea.\n", "Notes/Two": "#ideas\n\nMore.\n" });
+  const window = await openManager(page, "todo");
+  await window.locator('[data-swg-view="cleanup"]').click();
+  const group = window.locator(".swg-cleanup-group", { has: page.locator('[data-swg-chip="ideas"]') });
+  await expect(group.locator(".swg-cleanup-choice")).toHaveCount(3);
+  // The most used first, picked to merge into
+  await expect(group.locator('input[value="idea"]')).toBeChecked();
+  await group.locator('[data-swg-action="cleanup.merge"]').click();
+  await expect(window.locator(".swg-review-title")).toHaveText("Merge #idea #Idea #ideas into #idea");
+  await window.locator(".swg-apply").click();
+  await expect.poll(() => pageText(page, "Notes/One")).toBe("#idea\n\nAn idea.\n");
+  expect(await pageText(page, "Notes/Two")).toBe("#idea\n\nMore.\n");
+  // Back in Cleanup, the group gone
+  await expect(window.locator('[data-swg-view="cleanup"]')).toHaveAttribute("aria-selected", "true");
+  await expect(window.locator(".swg-cleanup-once")).toContainText("#milestone");
+});

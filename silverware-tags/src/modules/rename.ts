@@ -118,6 +118,10 @@ export function renameModule(host: ModuleHost): TagsModule {
       await host.review(renameOperation(from, to, subtags > 0, subtags), from);
     },
     problem: renameProblem,
+    merge: (tags, into, catalog) => {
+      const subtags = new Set(tags.flatMap((tag) => subtagsOf(catalog, tag))).size;
+      return mergeOperation(tags, into, subtags > 0, subtags);
+    },
   };
   host.offer(offer);
   return {

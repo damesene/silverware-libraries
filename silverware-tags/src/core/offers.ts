@@ -1,3 +1,6 @@
+import type { Catalog } from "./catalog.ts";
+import type { Operation } from "./operation.ts";
+
 // What modules offer each other and the host, each under the name of the module
 // offering it (`ModuleHost.offer`, `offered(module)`): the contracts only, so a
 // module using another's offer imports the core, never that module. Undefined
@@ -9,6 +12,8 @@ export type RenameOffer = {
   review(from: string, to: string): Promise<void>;
   /** What is wrong with it (nothing: undefined) */
   problem(from: string, to: string): string | undefined;
+  /** Several tags merged into one, as an operation to review where the asker is (their subtags under it) */
+  merge(tags: readonly string[], into: string, catalog: Catalog): Operation;
 };
 // (The module's name, bridge.ts MODULE_NAMES)
 export const RENAME_OFFER = "rename";

@@ -19,6 +19,7 @@ Everything is in one window, **Silverware Tags: Manager**, with two views (tabs 
   * **Add to pages…** and **Remove from pages…** take you to *By page* with the tag to add, or with the pages having it picked and the tag to take off.
 * **By page** (the command **Silverware Tags: Tag pages**): your pages as a tree of folders. Tick pages, or a folder for every page under it (its own page too); type to find pages. On the right are the tags the pages you picked have, each with how many of them have it (`2/3`): **×** takes one off them all (click again to keep it), and the *Add* field gives tags to them all (the tags of your space are offered as you type: **↑ ↓** and **Enter**, or **Tab** for the first). Then *Review changes…*. Tags are added into each page's frontmatter (a page that has one already is left as it is) and taken off its frontmatter and its tag lines; a hashtag in a page's text stays (*Delete tag* takes those off).
 * **Silverware Tags: Page tags** opens *By page* with the page you are on picked.
+* **Cleanup** (a tab of the window): tags that are likely one, found by their names: the same but for capitals or a separator (`Todo`, `to-do`, `todo`), a plural of another (`ideas`, `idea`), or one letter apart at the same level (`meeting`, `meetnig`; names of five letters or more). Each group offers the tag to merge into (the most used, unless you pick another) and *Merge…*, reviewed first. Below them the tags used on one page only, each opening in *By tag*.
 * **The Tags panel** (the command **Silverware Tags: Tags panel**): the tags as a tree in SilverBullet's right sidebar, beside your pages (its menu moves it to the left or the bottom; it stays open across reloads). Each tag shows how many pages use it, a level how many use a tag under it; its filter field finds a tag, and *Page tags* and *Tasks* above it show only those. A click opens a level; the buttons of a row (shown as the pointer is over it) **add the tag to the page you are on** (at once, as one of its own tags; Undo takes it back) and **open it in the window**. **F2** opens it in the window with its name to type, and dragging a tag onto another level moves it there (`alpha` dropped on `work` becomes `work/alpha`, its subtags with it), reviewed in the window first.
 * **SilverBullet's own pages are left alone** (*Hide and protect meta pages*, on by default): a page tagged `meta` or a tag under it (`meta/library`, `meta/template`…: libraries, templates, SilverBullet's API) is out of everything. Its tags show nowhere (a tag a library's documentation uses, `#VALUE!` written in its text, is not one of yours), and no change touches it: renaming `#auto` to `#automobile` renames it on every page but those. Turned off (*Silverware Tags: Settings*), they show, their tags apart (the panel's and the window's *Meta*, as SilverBullet's own tree has its meta pages apart), and changes reach them. **Enter** or a click opens the tag in the window, **F2** opens it with its name to type, and dragging a tag onto another level moves it there (`alpha` dropped on `work` becomes `work/alpha`, its subtags with it), reviewed in the window first.
 * **Every change is reviewed first**, in the same window: each page that changes with its lines before and after (the first few open, click a page for its lines), and the pages left alone and why. *Apply* writes them and takes you back; *Back* (or **Esc**) changes nothing.
@@ -52,6 +53,7 @@ config.set("silverware.tags.modules", {
   rename = { enabled = true }, -- Rename (and merge): the tag's name as a field
   pages = { enabled = true },  -- By page, Tag pages, Page tags, Add to pages, Remove from pages
   remove = { enabled = true }, -- Delete tag
+  cleanup = { enabled = true }, -- Cleanup: tags likely one, tags used once
   panel = { enabled = true },  -- The Tags panel beside the page
   custom = { enabled = true }, -- Custom operations
 })
@@ -145,6 +147,7 @@ config.define("silverware.tags", {
         rename = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Rename a tag everywhere it is used; into a tag that exists, the two merge.", ui = { category = "Silverware Tags", label = "Rename", priority = 0.9 } } } },
         pages = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "The view by page: tags given to the pages picked in a tree of folders, and taken off them; the tags of the page you are on.", ui = { category = "Silverware Tags", label = "By page", priority = 0.8 } } } },
         remove = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Delete a tag everywhere it is used.", ui = { category = "Silverware Tags", label = "Delete a tag", priority = 0.6 } } } },
+        cleanup = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "The window's Cleanup: tags likely one (case, a separator, a plural, a typo) to merge, tags used on one page only.", ui = { category = "Silverware Tags", label = "Cleanup", priority = 0.55 } } } },
         panel = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "The tags as a panel beside the page (SilverBullet's navigator): a tag opens the Tags window, F2 renames it, a tag dragged under another moves it there.", ui = { category = "Silverware Tags", label = "Tags panel", priority = 0.5 } } } },
         custom = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Your own operations on a tag, from a JS file of the space given with silverware.tags.defineOperations: a button of the tag, its changes reviewed first.", ui = { category = "Silverware Tags", label = "Custom operations", priority = 0.4 } } } },
       },
@@ -800,6 +803,45 @@ end
   margin: 0;
 }
 /* The tags of the pages checked: how many of them have one, one to take off struck through */
+/* Cleanup: each group of tags likely one, the tag to merge into picked among them */
+.swg-cleanup-group {
+  padding: 8px 10px;
+  margin: 0 0 8px;
+  border: 1px solid var(--swg-line);
+  border-radius: 6px;
+}
+.swg-cleanup-group .swg-form-label {
+  margin: 0 0 6px;
+}
+.swg-cleanup-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.swg-dialog .swg-cleanup-chips {
+  flex: 1;
+  outline: none;
+  border: 0;
+  padding: 0;
+  background: none;
+}
+.swg-cleanup-choice {
+  cursor: pointer;
+  padding-right: 8px;
+}
+.swg-cleanup-choice input {
+  margin: 0 4px 0 0;
+}
+.swg-cleanup-once {
+  border: 0;
+  padding: 0;
+  background: none;
+}
+.swg-dialog .swg-cleanup-tag {
+  padding: 1px 8px;
+  border: 0;
+  cursor: pointer;
+}
 /* Several tags picked: them as chips, an action asking for a name under its buttons */
 .swg-chosen {
   margin: 0 0 12px;

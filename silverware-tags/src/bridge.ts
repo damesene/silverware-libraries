@@ -35,15 +35,16 @@ export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
 }
 
 /** The modules: the parts that can be turned off with `silverware.tags.modules.<name>.enabled` (default on) */
-export const MODULE_NAMES = ["rename", "pages", "remove", "panel", "custom"] as const;
+export const MODULE_NAMES = ["rename", "pages", "remove", "cleanup", "panel", "custom"] as const;
 export type ModuleName = (typeof MODULE_NAMES)[number];
 
 /** A module's name and what it does, as the settings dialog shows them (the library page's config.define says the same) */
-export const MODULE_LABELS: Readonly<Record<ModuleName, string>> = { rename: "Rename", pages: "By page", remove: "Delete a tag", panel: "Tags panel", custom: "Custom operations" };
+export const MODULE_LABELS: Readonly<Record<ModuleName, string>> = { rename: "Rename", pages: "By page", remove: "Delete a tag", cleanup: "Cleanup", panel: "Tags panel", custom: "Custom operations" };
 export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
   rename: "Rename a tag everywhere it is used; into a tag that exists, the two merge.",
   pages: "The view by page: tags given to the pages picked in a tree of folders, and taken off them; the tags of the page you are on.",
   remove: "Delete a tag everywhere it is used.",
+  cleanup: "The window's Cleanup: tags likely one (case, a separator, a plural, a typo) to merge, tags used on one page only.",
   panel: "The tags as a panel beside the page (SilverBullet's navigator): a tag opens the Tags window, F2 renames it, a tag dragged under another moves it there.",
   custom: "Your own operations on a tag, from a JS file of the space given with silverware.tags.defineOperations: a button of the tag, its changes reviewed first.",
 };

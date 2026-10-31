@@ -310,7 +310,8 @@ export class Workspace {
     if (reviewing.operation.shows) this.picked = reviewing.operation.shows;
     this.chosen.clear();
     const view = this.options.views().find((v) => v.id === this.view);
-    this.go(reviewing.operation.shows ? TAGS_VIEW : this.view, view?.applied ? view.applied(this.state) : this.state);
+    // Back where it was asked for (a rename's new name shown where that is the tags' view; a module's view stays its own)
+    this.go(this.view, view?.applied ? view.applied(this.state) : this.state);
   }
 
   /** Back from the review to the view it came from, as it was */

@@ -51,7 +51,7 @@ describe("the tags' panel", () => {
   });
   it("moves a tag through the rename module's offer, refused and said without it", async () => {
     const reviewed: string[] = [];
-    const { panel } = host({ review: async (from, to) => void reviewed.push(`${from} > ${to}`), problem: () => undefined });
+    const { panel } = host({ review: async (from, to) => void reviewed.push(`${from} > ${to}`), problem: () => undefined, merge: () => { throw new Error("not here"); } });
     await panel.move("todo", "project/todo");
     expect(reviewed).toEqual(["todo > project/todo"]);
     const off = host();
@@ -60,7 +60,7 @@ describe("the tags' panel", () => {
   });
   it("refuses to move a tag under itself", async () => {
     const reviewed: string[] = [];
-    const { panel, calls } = host({ review: async (from, to) => void reviewed.push(`${from} > ${to}`), problem: () => undefined });
+    const { panel, calls } = host({ review: async (from, to) => void reviewed.push(`${from} > ${to}`), problem: () => undefined, merge: () => { throw new Error("not here"); } });
     await panel.move("project", "project/alpha/project");
     expect(reviewed).toEqual([]);
     expect(calls[0]).toMatch(/cannot move under itself/);

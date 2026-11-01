@@ -149,7 +149,7 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       await setup(`${TABLE}\nafter\n`, { "silverware.table.metadata": true });
       const seen: unknown[] = [];
       onWrite((written: string, context: { renamed(): boolean; table(name: string): { name?: string; column(name: string): string | undefined } | undefined; tableAt(at: number): { name?: string } | undefined }) => {
-        seen.push({ renamed: context.renamed(), name: context.table("PRICES")?.name, Name: context.table("prices")?.column("name"), cost: context.table("prices")?.column("cost"), at: context.tableAt(3)?.name, none: context.table("nope"), outside: context.tableAt(written.length - 2) });
+        seen.push({ renamed: context.renamed(), name: context.table("PRICES")?.name, Name: context.table("prices")?.column("name"), byKey: context.table("prices")?.column("price"), cost: context.table("prices")?.column("cost"), at: context.tableAt(3)?.name, none: context.table("nope"), outside: context.tableAt(written.length - 2) });
         return [];
       });
       await controller.scan();
@@ -159,7 +159,7 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       field.value = "Fruit";
       key(field, "Enter");
       await flush();
-      expect(seen.at(-1)).toEqual({ renamed: true, name: "prices", Name: "Fruit", cost: "cost", at: "prices", none: undefined, outside: undefined });
+      expect(seen.at(-1)).toEqual({ renamed: true, name: "prices", Name: "Fruit", byKey: "cost", cost: "cost", at: "prices", none: undefined, outside: undefined });
       // The table renamed by its name in the toolbar
       await controller.scan();
       toolbarName("table");

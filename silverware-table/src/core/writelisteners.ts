@@ -9,7 +9,7 @@
 // The context is functions, not data: what a listener may ask (a table's name
 // now, a column's name now) is the contract, how the write keeps it is not,
 // so it can change without breaking a listener.
-import { columnName } from "../columns.ts";
+import { columnKey, columnName } from "../columns.ts";
 import { findTables, type Table } from "../markdown.ts";
 import { metaName } from "../meta.ts";
 import { columnNameIn } from "../names.ts";
@@ -20,7 +20,7 @@ export type TextEdit = { readonly from: number; readonly to: number; readonly te
 export type WrittenTable = {
   /** Its name now (undefined: it has none) */
   readonly name: string | undefined;
-  /** The name a column has now that had `before` before the write (any case); undefined where it was deleted or there was none */
+  /** The name a column has now that had the name `before` before the write (any case; or its key); undefined where it was deleted or there was none */
   column(before: string): string | undefined;
 };
 
@@ -59,13 +59,13 @@ export function writeContext(written: readonly TableWritten[], text: () => strin
     const went = (column: number) => (columnMap ? columnMap(column) : column < (after.rows[0]?.cells.length ?? 0) ? column : undefined);
     const columns = Array.from({ length: width }, (_, i) => {
       const now = went(i);
-      return { before: nameOfColumn(before, i), after: now === undefined ? undefined : nameOfColumn(after, now) };
+      return { before: nameOfColumn(before, i), key: columnKey(before.rows[0]?.cells[i] ?? ""), after: now === undefined ? undefined : nameOfColumn(after, now) };
     });
     const nameBefore = metaName(before);
     const nameAfter = metaName(after);
     const view: WrittenTable = {
       name: nameAfter,
-      column: (name) => columns.find((c) => same(c.before, name))?.after,
+      column: (name) => (columns.find((c) => same(c.before, name)) ?? columns.find((c) => c.key === name))?.after,
     };
     return { markdown: markdown.trimEnd(), nameBefore, view, renamed: !same(nameBefore, nameAfter) || columns.some((c) => c.after !== undefined && c.after !== c.before) };
   });

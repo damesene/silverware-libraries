@@ -46,6 +46,11 @@ function withData(model: ChartModel, data: SourceData): ChartModel {
   };
 }
 
+/** Whether a source's data are as they were */
+function sameSource(a: SourceData, b: SourceData): boolean {
+  return a.labels.length === b.labels.length && a.labels.every((label, i) => label === b.labels[i]) && a.series.length === b.series.length && a.series.every((values, i) => values.length === b.series[i]?.length && values.every((v, j) => v === b.series[i]?.[j]));
+}
+
 /** Whether the block's data are its source's (no value and 0 alike: a format may write no value as 0) */
 function sameData(model: ChartModel, data: SourceData): boolean {
   const value = (v: number | null | undefined) => v ?? 0;
@@ -161,7 +166,7 @@ export class Controller {
     let entry: Drawn;
     try {
       const chart = new Chart(canvas, type.config(data ? withData(model, data) : model, themeOf(this.doc)));
-      entry = { box, chart, page, model, language, body: text, format: read.format, made: Date.now(), seen: false };
+      entry = { box, chart, page, model, language, body: text, format: read.format, data, made: Date.now(), seen: false };
       this.drawn.add(entry);
     } catch (e) {
       return this.problem(`the chart could not be drawn: ${e instanceof Error ? e.message : String(e)}`);
@@ -185,7 +190,11 @@ export class Controller {
       const data = await this.sourceData(entry.model, page, text, blockOf(text, entry.language, entry.body));
       // A source that cannot be read now (a table being renamed): the chart stays as it was until it can
       if (!data || isUnreadable(data)) continue;
-      this.redraw(entry, withData(entry.model, data));
+      // Drawn anew only where its data changed: an edit elsewhere on the page would start its animation with each key
+      if (!entry.data || !sameSource(entry.data, data)) {
+        entry.data = data;
+        this.redraw(entry, withData(entry.model, data));
+      }
       this.markStale(entry, data);
     }
   }

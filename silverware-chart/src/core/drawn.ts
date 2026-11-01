@@ -8,6 +8,7 @@
 // observer otherwise).
 import type { ChartFormat } from "./format.ts";
 import type { ChartModel } from "./model.ts";
+import type { SourceData } from "./module.ts";
 import type { ChartConfig } from "./type.ts";
 
 /** What the core uses of Chart.js: an instance on a canvas, its data and options replaced and updated */
@@ -29,6 +30,8 @@ export type Drawn = {
   readonly language: string;
   readonly body: string;
   readonly format: ChartFormat;
+  // Its source's data as last drawn (undefined: the block's own)
+  data: SourceData | undefined;
   // Made at (ms), and whether it was seen in the document since
   readonly made: number;
   seen: boolean;

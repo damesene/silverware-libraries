@@ -156,6 +156,10 @@ describe("a markdown table as the source (the tables module)", () => {
     await vi.advanceTimersByTimeAsync(100);
     expect(made[0]?.updates).toBe(1);
     expect((made[0]?.data as ChartConfig["data"]).datasets[0]?.data).toEqual([120, 300]);
+    // An edit elsewhere on the page leaves its data as they are: not drawn anew (its animation would start with each key)
+    core.pageModified(`Typing here.\n${page(block, SALES.replace("| 140 |", "| 300 |"))}`, "Sales");
+    await vi.advanceTimersByTimeAsync(200);
+    expect(made[0]?.updates).toBe(1);
     // Another page's edit is not its
     core.pageModified("", "Other");
     await vi.advanceTimersByTimeAsync(200);

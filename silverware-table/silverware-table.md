@@ -553,7 +553,21 @@ VAT: ${te("=fruit!vat")}
 Two functions let another plugin (or a script of yours) work with tables without reading their markdown itself. [[Library/damesene/silverware-chart|Silverware Chart]] uses them for charts of named tables.
 
 * `silverware.table.tables(text)` gives the tables of a markdown text (usually `editor.getText()`): each with its `name` (where you named it), its place `from` and `to` in the text, its `columns` (each `{ name, key }`, the key as SilverBullet's index has it) and its body's cells as they show, row by row, in `rows`.
-* `silverware.table.onWrite(fn)` calls `fn(text)` whenever Silverware Table writes tables, `text` the page's text as the write leaves it. `fn` gives a list of edits of that text outside the tables, `{ from = 10, to = 14, text = "new" }`, which are written in the same edit: one Ctrl+Z undoes them with the table. An edit that touches a table, reaches past the text or overlaps another is left out. Keep `fn` quick and let it write nothing itself; give it again in each load of Space Lua (a `space-lua` block does).
+* `silverware.table.onWrite(fn)` calls `fn(text, context)` whenever Silverware Table writes tables, `text` the page's text as the write leaves it. `fn` gives a list of edits of that text outside the tables, `{ from = 10, to = 14, text = "new" }`, which are written in the same edit: one Ctrl+Z undoes them with the table. An edit that touches a table, reaches past the text or overlaps another is left out. Keep `fn` quick and let it write nothing itself; give it again in each load of Space Lua (a `space-lua` block does).
+* `context` tells what the write did, so a reference to a table or a column can follow it:
+  * `context.renamed()`: whether a table or a column was renamed (check it first: most writes rename nothing);
+  * `context.table("sales")`: the table that was named *sales* before the write, if the write wrote it; `context.tableAt(offset)`: the table written at that offset of `text`;
+  * on either, `.name` is its name now and `.column("Qty")` the name the column *Qty* has now (`nil` where it was deleted).
+
+```lua
+silverware.table.onWrite(function(text, context)
+  if context.renamed() then
+    local t = context.table("sales")
+    if t then print("Qty is now " .. tostring(t.column("Qty"))) end
+  end
+  return {}
+end)
+```
 
 ### Errors
 

@@ -145,6 +145,29 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       expect(text.endsWith("Chart: 40, 3\n")).toBe(true);
     });
 
+    it("tells a listener what the write renamed: the table's name now and a column's, by their names before or the table's place", async () => {
+      await setup(`${TABLE}\nafter\n`, { "silverware.table.metadata": true });
+      const seen: unknown[] = [];
+      onWrite((written: string, context: { renamed(): boolean; table(name: string): { name?: string; column(name: string): string | undefined } | undefined; tableAt(at: number): { name?: string } | undefined }) => {
+        seen.push({ renamed: context.renamed(), name: context.table("PRICES")?.name, Name: context.table("prices")?.column("name"), cost: context.table("prices")?.column("cost"), at: context.tableAt(3)?.name, none: context.table("nope"), outside: context.tableAt(written.length - 2) });
+        return [];
+      });
+      await controller.scan();
+      // A header renamed: the column of it renamed, the table's name as it was
+      clickOn(cell(0, 0));
+      const field = editor.querySelector<HTMLInputElement>(".swt-cell-editor")!;
+      field.value = "Fruit";
+      key(field, "Enter");
+      await flush();
+      expect(seen.at(-1)).toEqual({ renamed: true, name: "prices", Name: "Fruit", cost: "cost", at: "prices", none: undefined, outside: undefined });
+      // The table renamed by its name in the toolbar
+      await controller.scan();
+      toolbarName("table");
+      expect(await nameInMenu("costs")).toBeUndefined();
+      // (its columns by their names before this write: "name" is Fruit's no more)
+      expect(seen.at(-1)).toMatchObject({ renamed: true, name: "costs", Name: undefined, cost: "cost", at: "costs" });
+    });
+
     it("leaves out an edit that touches a table, reaches past the text or overlaps another; a listener's throw writes the table all the same", async () => {
       await setup(`${TABLE}\nafter\n`, { "silverware.table.metadata": true });
       onWrite((written: string) => [

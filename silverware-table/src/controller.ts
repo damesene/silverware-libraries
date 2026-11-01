@@ -2541,8 +2541,8 @@ export class Controller implements TableHost {
       for (const update of [...updates].sort((a, b) => b.range.from - a.range.from)) {
         written = written.slice(0, update.range.from) + update.markdown + written.slice(update.range.to);
       }
-      // What other plugins write with it (silverware.table.onWrite), in the same edit
-      written = await withWriteListeners(written);
+      // What other plugins write with it (silverware.table.onWrite), in the same edit, told what it did to the table
+      written = await withWriteListeners(written, [{ before, after: changed, markdown, columnMap }]);
       const replace = minimalEdit(text, written);
       // The edit spans all the tables written: features see that span, so what
       // they place after it (the history marker) is outside every one of them.

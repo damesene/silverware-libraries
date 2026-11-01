@@ -113,10 +113,12 @@ export { luaCallPlaces } from "./host/lua.ts";
 
 /**
  * `silverware.table.onWrite`: a function told of each write of tables, the
- * page's text as the write leaves it, giving edits of the text outside the
+ * page's text as the write leaves it and a context to ask what the write did
+ * (`renamed()`, `table(name)`, `tableAt(at)`: a table's `name` now and
+ * `column(name)` a column's name now), giving edits of the text outside the
  * tables (`{ from, to, text }`), written in the same edit. Another plugin's
- * (Silverware Chart writes its charts' data so); Silverware Table knows
- * nothing of what they are for.
+ * (Silverware Chart writes its charts' data and follows renames so);
+ * Silverware Table knows nothing of what they are for.
  */
 export function onWrite(listener: unknown): void {
   if (typeof listener === "function") addWriteListener(listener as WriteListener);

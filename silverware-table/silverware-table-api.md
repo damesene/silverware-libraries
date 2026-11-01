@@ -123,10 +123,13 @@ if js and js.window then
   function silverware.table.tables(text)
     return silverwareTableJs.tables(text)
   end
-  --- A function told of each write of tables: given the page's text as the write leaves it, it gives edits of
-  --- the text outside the tables ({ { from, to, text } }, offsets in that text), written in the same edit (one
-  --- undo step). Fast, and writing nothing itself; an edit touching a table is left out.
-  --- @param fn function the function, given the text
+  --- A function told of each write of tables: given the page's text as the write leaves it and a context to ask
+  --- what the write did, it gives edits of the text outside the tables ({ { from, to, text } }, offsets in that
+  --- text), written in the same edit (one undo step). Fast, and writing nothing itself; an edit touching a table
+  --- is left out. The context: renamed() whether a table or a column was renamed; table(name) the table that had
+  --- that name before, tableAt(offset) the table written at that offset of the text, each with its name now
+  --- (.name) and column(name) a column's name now (nil: deleted); nil where the write wrote no such table.
+  --- @param fn function the function, given the text and the context
   --- @see Library/damesene/silverware-table#For other plugins
   function silverware.table.onWrite(fn)
     silverwareTableJs.onWrite(fn)

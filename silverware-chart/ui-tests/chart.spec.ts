@@ -106,3 +106,70 @@ test("offers the table's columns where a reference finds none, one picked writte
   await expect.poll(() => savedText(page)).toContain("%% chart.series: Revenue");
   await expect.poll(() => charts(page)).toEqual([{ type: "bar", labels: ["Oct", "Nov"], data: [[120, 140]] }]);
 });
+
+/** The chart's ⋯ menu opened (the toolbar shown by hovering the chart) */
+async function chartMenu(page: import("@playwright/test").Page, index = 0): Promise<void> {
+  const chart = page.locator(".swc-chart").nth(index);
+  await chart.hover({ position: { x: 200, y: 100 } });
+  await page.locator(".swc-bar.swc-visible .swc-bar-more").click();
+}
+
+test("the menu's Type gallery writes the type picked", async ({ page, open }) => {
+  await open(`# Sales\n\n${block("above", "120, 140")}\n`.replace("%% chart.source: above\n%% chart.x: month\n%% chart.series: revenue\n", ""));
+  await expect.poll(() => charts(page)).toHaveLength(1);
+  await chartMenu(page);
+  await page.locator(".swc-menu-item", { hasText: "Type" }).click();
+  await page.locator(".swc-menu-tile", { hasText: "Stacked bar" }).click();
+  await expect.poll(() => savedText(page)).toContain("%% chart.stacked: true");
+  await chartMenu(page);
+  await page.locator(".swc-menu-item", { hasText: "Type" }).click();
+  await expect(page.locator(".swc-menu-tile[aria-checked=true]")).toHaveText("Stacked bar");
+  await page.locator(".swc-menu-tile", { hasText: "Doughnut" }).click();
+  await expect.poll(() => savedText(page)).toContain("%% chart.type: doughnut");
+  await expect.poll(async () => (await charts(page))[0]?.type).toBe("doughnut");
+});
+
+test("the menu's Data draws a table of the page, its columns picked", async ({ page, open }) => {
+  await open(`# Sales\n\n${SALES}\n\`\`\`mermaid\nxychart-beta\n  x-axis ["a"]\n  bar [1]\n\`\`\`\n`);
+  await expect.poll(() => charts(page)).toHaveLength(1);
+  await chartMenu(page);
+  await page.locator(".swc-menu-item", { hasText: "Data" }).click();
+  await page.locator(".swc-menu-item", { hasText: "Table above" }).click();
+  await page.locator(".swc-menu-check", { hasText: "Cost" }).locator("input").check();
+  await page.locator(".swc-menu-apply").click();
+  await expect.poll(() => savedText(page)).toContain("%% chart.source: above\n%% chart.x: Month\n%% chart.series: Revenue, Cost");
+  await expect.poll(() => charts(page)).toEqual([{ type: "bar", labels: ["Oct", "Nov"], data: [[120, 140], [80, 85]] }]);
+});
+
+test("the menu's Edit source shows the block's markdown", async ({ page, open }) => {
+  await open(`# Sales\n\n${block("above", "120, 140")}\n`.replace("%% chart.source: above\n%% chart.x: month\n%% chart.series: revenue\n", ""));
+  await expect.poll(() => charts(page)).toHaveLength(1);
+  await chartMenu(page);
+  await page.locator(".swc-menu-item", { hasText: "Edit source" }).click();
+  await expect(page.locator(".swc-chart")).toHaveCount(0);
+  await expect(page.locator(".cm-content")).toContainText("xychart-beta");
+});
+
+test("Insert chart of the table puts a chart of it under the table", async ({ page, open }) => {
+  await open(`# Sales\n\n${SALES}\nAfter.\n`);
+  await expect(page.locator(".sb-table-widget")).toBeVisible();
+  // The cursor on the line after the table, the command run as SilverBullet's palette runs it (once its Space Lua has defined it)
+  const name = "Silverware Chart: Insert chart of the table";
+  await page.waitForFunction(
+    (name) => {
+      const c = (window as unknown as { client?: { ui?: { viewState?: { commands?: Map<string, unknown> } }; clientSystem?: { commandHook?: { buildAllCommands?(): Map<string, unknown> } } } }).client;
+      return !!(c?.ui?.viewState?.commands?.has(name) || c?.clientSystem?.commandHook?.buildAllCommands?.().has(name));
+    },
+    name,
+    { timeout: 30_000 },
+  );
+  await page.evaluate((name) => {
+    const client = (window as unknown as { client: { editorView: { state: { doc: { toString(): string } }; dispatch(t: unknown): void }; runCommandByName(name: string): Promise<void> } }).client;
+    const text = client.editorView.state.doc.toString();
+    client.editorView.dispatch({ selection: { anchor: text.indexOf("After.") } });
+    void client.runCommandByName(name);
+  }, name);
+  await expect
+    .poll(() => savedText(page))
+    .toContain('```mermaid\nxychart-beta\n  x-axis ["Oct", "Nov"]\n  bar "Revenue" [120, 140]\n  bar "Cost" [80, 85]\n%% chart.source: above\n%% chart.x: Month\n%% chart.series: Revenue, Cost\n```');
+});

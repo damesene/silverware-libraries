@@ -240,5 +240,9 @@ tests (the format, the markdown reading, blocks, the core, custom formats,
 isolation; Silverware Table's `tables` and `onWrite`) and Playwright against
 SilverBullet (drawing, a flowchart handed on, a problem said, a named table
 and the table above followed and written with a cell's edit, Stale and
-Update data). Not done of step 2: a formula as a series (later). Next: step 4
-(the toolbar and its menus).
+Update data). Step 4 done on 2026-11-02: the toolbar of the chart hovered
+and its ⋯ menu (Type, Data, Edit source, Copy as image; Convert to once there
+is another format), the command *Insert chart of the table*; a reference
+following renames (Silverware Table's write context) and the columns offered
+where one finds none. Not done of step 2: a formula as a series (later).
+Next: step 5 (Obsidian Charts, the default format, Convert to).

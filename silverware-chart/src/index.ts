@@ -24,12 +24,15 @@ export async function init(bridge: Bridge): Promise<void> {
     console.error(`Silverware Chart: the library page did not hand over ${missing.join(", ")}`);
     return;
   }
-  const { replaceRange } = bridge;
+  const { replaceRange, getCursor, moveCursor, flash } = bridge;
   start(document, await readSettings(bridge), {
     getText: async () => String(await bridge.getText()),
     getCurrentPage: async () => String(await bridge.getCurrentPage()),
     readPage: async (name) => String(await bridge.readPage(name)),
     replaceRange: replaceRange ? async (from, to, text) => void (await replaceRange(from, to, text)) : undefined,
+    getCursor: getCursor ? async () => Number(await getCursor()) : undefined,
+    moveCursor: moveCursor ? async (at) => void (await moveCursor(at)) : undefined,
+    flash: flash ? (message, type) => void flash(message, type) : undefined,
     loadChart,
     table: tableApi(bridge),
   });
@@ -65,6 +68,16 @@ export function languages(): string[] {
 /** A code block's element: its chart (or why it cannot be drawn); undefined where it is no chart (handed on) */
 export function render(language: string, text: string, page: string): Promise<HTMLElement | undefined> {
   return slot[GLOBAL_KEY]?.render(String(language), String(text), String(page)) ?? Promise.resolve(undefined);
+}
+
+/** The commands' names, for the library page to define them (the modules' on) */
+export function commandNames(): string[] {
+  return slot[GLOBAL_KEY]?.commands().map((command) => command.name) ?? [];
+}
+
+/** A command run (the library page's commands call it) */
+export async function runCommand(name: string): Promise<void> {
+  await slot[GLOBAL_KEY]?.commands().find((command) => command.name === name)?.run();
 }
 
 /** A block shown as code, where it is no chart and nothing drew its language before */

@@ -11,7 +11,9 @@ import { type Block, blockOf, blocksOf } from "./blocks.ts";
 import { type ChartConstructor, chartBox, type Drawn, DrawnCharts } from "./drawn.ts";
 import type { ChartFormat } from "./format.ts";
 import { type ChartModel, isUnreadable, type Source, type Unreadable } from "./model.ts";
-import type { ChartModule, ChartSource, FollowSource, ModuleHost, SourceData, TableApi, TextEdit } from "./module.ts";
+import { type ChartMenuHost, chartMenu } from "./chartmenu.ts";
+import type { Candidate, ChartModule, ChartSource, Command, FollowSource, ModuleHost, SourceData, TableApi, TextEdit } from "./module.ts";
+import { ChartToolbar } from "./toolbar.ts";
 import { themeOf, watchTheme } from "./theme.ts";
 import type { ChartType } from "./type.ts";
 
@@ -22,6 +24,10 @@ export type ControllerEnv = {
   readonly readPage: (name: string) => Promise<string>;
   // One edit of the page open (one undo step): Update data
   readonly replaceRange?: (from: number, to: number, text: string) => Promise<void>;
+  // The cursor's offset in the page open, and putting it somewhere (Edit source: a block with the cursor in it shows its markdown)
+  readonly getCursor?: () => Promise<number>;
+  readonly moveCursor?: (at: number) => Promise<void>;
+  readonly flash?: (message: string, type?: "info" | "error") => void;
   // Chart.js, loaded the first time a chart is drawn
   readonly loadChart: () => Promise<ChartConstructor>;
   readonly table?: TableApi;
@@ -44,6 +50,11 @@ function withData(model: ChartModel, data: SourceData): ChartModel {
       values: [...values],
     })),
   };
+}
+
+/** A chart's whole block: its text in fences, the language its format reads first */
+function fenced(format: ChartFormat, text: string): string {
+  return "```" + (format.languages[0] ?? format.name) + "\n" + text + "\n```";
 }
 
 /** Whether two references say the same: the table, its labels' column and its values' columns */
@@ -87,6 +98,10 @@ export class Controller {
   private modules: readonly ChartModule[] = [];
   private readonly offers = new Map<string, unknown>();
   private readonly drawn = new DrawnCharts();
+  // The chart drawn in each box (the toolbar's menu is its)
+  private readonly boxes = new WeakMap<HTMLElement, Drawn>();
+  // The toolbar of the chart hovered, where its block can be written
+  private readonly toolbar: ChartToolbar | undefined;
   private chart: Promise<ChartConstructor> | undefined;
   private following: ReturnType<typeof setTimeout> | undefined;
 
@@ -95,6 +110,12 @@ export class Controller {
     private readonly env: ControllerEnv,
   ) {
     watchTheme(doc, () => void this.drawAnew());
+    if (env.replaceRange) {
+      this.toolbar = new ChartToolbar(doc, (box) => {
+        const entry = this.boxes.get(box);
+        return entry ? chartMenu(this.menuHost(), entry) : undefined;
+      });
+    }
   }
 
   /** The host a module gets: the core's, with what it offers kept under its name */
@@ -102,6 +123,10 @@ export class Controller {
     return {
       table: this.env.table,
       readPage: (page) => this.env.readPage(page),
+      page: async () => ({ name: await this.env.getCurrentPage(), text: await this.env.getText(), cursor: (await this.env.getCursor?.()) ?? 0 }),
+      replaceRange: async (from, to, text) => void (await this.env.replaceRange?.(from, to, text)),
+      flash: (message, type) => this.env.flash?.(message, type),
+      newBlock: (model) => this.newBlock(model),
       dataEdits: (text, follow) => this.dataEdits(text, follow),
       offer: (api) => void this.offers.set(name, api),
       offered: <T>(module: string) => this.offers.get(module) as T | undefined,
@@ -118,6 +143,11 @@ export class Controller {
     const builtIn = this.modules.flatMap((module) => module.formats?.() ?? []);
     const names = new Set(custom.map((format) => format.name));
     return [...custom, ...builtIn.filter((format) => !names.has(format.name))];
+  }
+
+  /** The modules' commands (the library page defines them) */
+  commands(): Command[] {
+    return this.modules.flatMap((module) => module.commands?.() ?? []);
   }
 
   types(): ChartType[] {
@@ -182,6 +212,8 @@ export class Controller {
     const canvas = this.doc.createElement("canvas");
     box.append(canvas);
     const entry: Drawn = { box, page, model, language, body: text, format: read.format, data };
+    this.boxes.set(box, entry);
+    this.toolbar?.watch(box);
     try {
       // Made now, and again where the box comes back after its chart was let go: with the data as last drawn
       box.setUp(
@@ -281,7 +313,7 @@ export class Controller {
    */
   private async blockEdit(block: Block, page: string, text: string, source?: Source): Promise<TextEdit | undefined> {
     const read = this.read(block.language, block.body);
-    if (!read || isUnreadable(read.model) || !read.model.source) return undefined;
+    if (!read || isUnreadable(read.model) || !(source ?? read.model.source)) return undefined;
     const model = source ? withSource(read.model, source) : read.model;
     const data = await this.sourceData(model, page, text, block);
     const readable = data && !isUnreadable(data) ? data : undefined;
@@ -328,6 +360,90 @@ export class Controller {
     if (!block) return;
     const edit = await this.blockEdit(block, page, text, source);
     if (edit) await this.env.replaceRange?.(edit.from, edit.to, edit.text);
+  }
+
+  /** The format new charts are written in: the first built-in one (the setting of a default, later), else the first */
+  private defaultFormat(): ChartFormat | undefined {
+    return this.modules.flatMap((module) => module.formats?.() ?? [])[0] ?? this.formats()[0];
+  }
+
+  /** A chart's whole block in the default format */
+  private newBlock(model: ChartModel): string {
+    const format = this.defaultFormat();
+    if (!format) throw new Error("no format to write a chart in (the mermaid module is off)");
+    return fenced(format, format.write(model));
+  }
+
+  /** What the chart's menu does */
+  private menuHost(): ChartMenuHost {
+    // The chart's block in the page now, with the page's text and the model it holds
+    const located = async (entry: Drawn) => {
+      const text = await this.env.getText();
+      const block = blockOf(text, entry.language, entry.body);
+      const read = block && this.read(block.language, block.body);
+      if (!block || !read || isUnreadable(read.model)) {
+        this.env.flash?.("Silverware Chart: the chart's block is not where it was (edited meanwhile): nothing was written", "error");
+        return undefined;
+      }
+      return { text, block, model: read.model, format: read.format };
+    };
+    return {
+      doc: this.doc,
+      types: () => this.types(),
+      formats: () => this.formats(),
+      candidates: async (entry) => {
+        const text = await this.pageText(entry.page, entry.body);
+        const context = { page: entry.page, text, block: blockOf(text, entry.language, entry.body) };
+        const seen = new Set<string>();
+        const out: Candidate[] = [];
+        for (const source of this.sources()) {
+          for (const candidate of (await source.candidates?.(context).catch(() => [])) ?? []) {
+            if (seen.has(candidate.table)) continue;
+            seen.add(candidate.table);
+            out.push(candidate);
+          }
+        }
+        return out;
+      },
+      rewrite: async (entry, change) => {
+        const at = await located(entry);
+        if (!at) return;
+        const written = at.format.write(change(at.model), at.block.body);
+        if (written !== at.block.body) await this.env.replaceRange?.(at.block.bodyFrom, at.block.bodyTo, written);
+      },
+      pick: async (entry, source) => {
+        const at = await located(entry);
+        if (!at) return;
+        const edit = await this.blockEdit(at.block, entry.page, at.text, source);
+        if (edit) await this.env.replaceRange?.(edit.from, edit.to, edit.text);
+      },
+      convert: async (entry, format) => {
+        const at = await located(entry);
+        if (!at) return;
+        await this.env.replaceRange?.(at.block.from, at.block.to, fenced(format, format.write(at.model)));
+      },
+      editSource: async (entry) => {
+        const at = await located(entry);
+        if (at) await this.env.moveCursor?.(at.block.bodyFrom);
+      },
+      copyImage: (entry) => {
+        const view = this.doc.defaultView as (Window & { ClipboardItem?: typeof ClipboardItem }) | null;
+        const clipboard = view?.navigator.clipboard;
+        const canvas = entry.box.querySelector("canvas");
+        if (!clipboard?.write || !view?.ClipboardItem || !canvas) return undefined;
+        const Item = view.ClipboardItem;
+        return async () => {
+          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+          if (!blob) return;
+          try {
+            await clipboard.write([new Item({ "image/png": blob })]);
+            this.env.flash?.("Chart copied as an image");
+          } catch (e) {
+            this.env.flash?.(`Silverware Chart: the chart could not be copied (${e instanceof Error ? e.message : String(e)})`, "error");
+          }
+        };
+      },
+    };
   }
 
   /** The page's text: the editor's while it holds the page (a block of it in there), else the page as saved */

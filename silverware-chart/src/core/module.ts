@@ -3,7 +3,7 @@
 // (formats, types, sources) and use each other only through what they offer.
 import type { Block } from "./blocks.ts";
 import type { ChartFormat } from "./format.ts";
-import type { Source, Unreadable } from "./model.ts";
+import type { ChartModel, Source, Unreadable } from "./model.ts";
 import type { ChartType } from "./type.ts";
 
 /** A source's data: labels, and a series of values for each of its columns, in their order */
@@ -20,9 +20,19 @@ export type SourceContext = {
   readonly block: Block | undefined;
 };
 
+/** A table a chart could draw, as the Data menu offers it: its reference (source:), and its columns */
+export type Candidate = {
+  readonly label: string;
+  readonly table: string;
+  // Each column's name, and whether its cells are numbers (a series' column offered ticked)
+  readonly columns: readonly { readonly name: string; readonly numeric: boolean }[];
+};
+
 /** Where a chart's data come from instead of its block (a table) */
 export type ChartSource = {
   readonly id: string;
+  /** The tables of the chart's page this source can read, for the Data menu */
+  readonly candidates?: (context: SourceContext) => Promise<readonly Candidate[]>;
   /**
    * The data a source reference says: undefined where this source does not
    * read such references (another one may), Unreadable where it does but
@@ -31,7 +41,14 @@ export type ChartSource = {
   readonly read: (source: Source, context: SourceContext) => Promise<SourceData | Unreadable | undefined>;
 };
 
+/** A command of a module's (as SilverBullet lists it: "Silverware Chart: Insert chart") */
+export type Command = {
+  readonly name: string;
+  readonly run: () => unknown;
+};
+
 export type ChartModule = {
+  readonly commands?: () => readonly Command[];
   readonly formats?: () => readonly ChartFormat[];
   readonly types?: () => readonly ChartType[];
   readonly sources?: () => readonly ChartSource[];
@@ -78,6 +95,14 @@ export type ModuleHost = {
   readonly table: TableApi | undefined;
   /** A page's text as saved */
   readPage(name: string): Promise<string>;
+  /** The page open: its name, its text, the cursor's offset in it */
+  page(): Promise<{ readonly name: string; readonly text: string; readonly cursor: number }>;
+  /** One edit of the page open (one undo step) */
+  replaceRange(from: number, to: number, text: string): Promise<void>;
+  /** A notification */
+  flash(message: string, type?: "info" | "error"): void;
+  /** A chart's whole block (its fences too) in the format new charts are written in */
+  newBlock(model: ChartModel): string;
   /**
    * The edits that bring the data of every chart of a page's text up to its
    * source's, each block written by its format (none where all are): what a

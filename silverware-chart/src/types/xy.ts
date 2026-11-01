@@ -54,6 +54,10 @@ export const BAR: ChartType = {
   label: "Bar",
   icon: icon('<path d="M6 20V10M12 20V4M18 20v-7"/>'),
   config: (model, theme) => xyConfig(model, theme, "bar", false),
+  variants: [
+    { label: "Stacked bar", icon: icon('<path d="M6 20v-6M6 14v-4M12 20v-9M12 11V4M18 20v-4M18 16v-3"/><path d="M4 14h4M10 11h4M16 16h4"/>'), stacked: true },
+    { label: "Horizontal bar", icon: icon('<path d="M4 6h10M4 12h16M4 18h7"/>'), horizontal: true },
+  ],
 };
 
 export const LINE: ChartType = {
@@ -68,6 +72,7 @@ export const AREA: ChartType = {
   label: "Area",
   icon: icon('<path d="M3 17l6-6 4 4 8-8v13H3z"/>'),
   config: (model, theme) => xyConfig(model, theme, "line", true),
+  variants: [{ label: "Stacked area", icon: icon('<path d="M3 20l6-5 4 3 8-6v8z"/><path d="M3 14l6-6 4 4 8-7"/>'), stacked: true }],
 };
 
 export const SCATTER: ChartType = {

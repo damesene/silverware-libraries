@@ -9,6 +9,10 @@ export type Bridge = {
   readonly readPage: (name: string) => string | Promise<string>;
   // Optional: one edit of the page open (Update data); without it, a chart's data are not written
   readonly replaceRange?: (from: number, to: number, text: string) => unknown;
+  // Optional: the cursor's offset, putting it somewhere (Edit source), a notification
+  readonly getCursor?: () => unknown;
+  readonly moveCursor?: (at: number) => unknown;
+  readonly flash?: (message: string, type?: "info" | "error") => unknown;
   // Optional: without it, settings keep their defaults
   readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
   // Optional, Silverware Table's (silverware.table.tables and onWrite), where it is installed

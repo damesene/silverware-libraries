@@ -92,6 +92,19 @@ xychart-beta
 * Rename a column or the table with Silverware Table and the chart follows: its `source`, `x` and `series` are written with the new names in the same edit (a series named as its column takes the new name too).
 * A column the chart names that the table does not have (renamed in the markdown by hand) is said in the chart's place, with the table's columns to pick from: click one and it is written into the block.
 
+## The chart's menu
+
+Point at a chart and a small toolbar shows above its top left corner; its **⋯** opens the chart's menu:
+
+* **Type**: every type of chart as a gallery (bars, stacked bars, horizontal bars, lines, areas, stacked areas, scatter, pie, doughnut, polar area, radar); click one and the chart is written so.
+* **Data**: the tables of the page the chart can draw (the table above it, below it, each first table under a heading, and with Silverware Table those you named); pick one, then the column of the labels and the columns of the values, and *Draw these*. *No table* goes back to the block's own numbers.
+* **Edit source**: the block's markdown, to edit it by hand.
+* **Copy as image**: the chart as a picture on your clipboard (where the browser allows it: SilverBullet over https or on your own computer).
+
+Every change is one edit of the block you can undo.
+
+**Silverware Chart: Insert chart of the table** (a command) puts a chart of the table your cursor is in (or the nearest above it) right under it: bars of its columns of numbers over its first other column, drawn from the table (`source: above`).
+
 ## Settings
 
 | Setting | Default | What it does |
@@ -198,6 +211,11 @@ if js and js.window then
     getCurrentPage = editor.getCurrentPage,
     readPage = space.readPage,
     replaceRange = editor.replaceRange,
+    getCursor = editor.getCursor,
+    moveCursor = editor.moveCursor,
+    flash = function(message, type)
+      editor.flashNotification(message, type)
+    end,
     getConfig = config.get,
   }
   -- Silverware Table's API, where it is installed (its API page has priority 50: defined before this block)
@@ -206,6 +224,15 @@ if js and js.window then
     bridge.onWrite = silverware.table.onWrite
   end
   silverwareChartJs.init(bridge)
+  -- The commands of the modules turned on
+  for _, name in ipairs(silverwareChartJs.commandNames()) do
+    command.define {
+      name = name,
+      run = function()
+        silverwareChartJs.runCommand(name)
+      end,
+    }
+  end
   -- A code widget for each language a format reads; a block that is no chart goes to what drew that language before
   for _, language in ipairs(silverwareChartJs.languages()) do
     local before = config.get({ "codeWidgets", language }, nil)
@@ -292,6 +319,233 @@ end
 
 .swc-choice:hover {
   border-color: var(--ui-accent-color, #4e79a7);
+}
+
+/* The toolbar of the chart hovered and its menu, floating in the page (Silverware Table's look) */
+.swc-floating {
+  position: fixed;
+  z-index: 50;
+  display: none !important;
+  font-family: var(--ui-font, system-ui, sans-serif);
+}
+
+.swc-floating.swc-visible {
+  display: flex !important;
+}
+
+.swc-bar {
+  box-sizing: border-box;
+  height: 26px;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 2px;
+  font-size: 12px;
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.swc-bar button {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.swc-bar button:hover {
+  background: color-mix(in srgb, var(--ui-accent-color) 16%, transparent);
+}
+
+.swc-menu {
+  z-index: 60;
+  flex-direction: column;
+  min-width: 220px;
+  max-width: 340px;
+  padding: 4px;
+  font-size: 13px;
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+
+.swc-menu-title {
+  display: grid;
+  grid-template-columns: 22px 1fr 22px;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.swc-menu-back,
+.swc-menu-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.swc-menu-back[hidden] {
+  visibility: hidden;
+  display: inline-flex;
+}
+
+.swc-menu-back:hover,
+.swc-menu-close:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+}
+
+.swc-menu-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.swc-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.swc-menu-item .swc-label {
+  flex: 1;
+}
+
+.swc-menu-item.swc-menu-sub::after {
+  content: "\203A";
+  opacity: 0.6;
+}
+
+.swc-menu-item[aria-checked="true"] .swc-label::after,
+.swc-menu-tile[aria-checked="true"] .swc-label::after {
+  content: " \2713";
+  color: var(--ui-accent-color);
+}
+
+.swc-menu-item[aria-disabled="true"],
+.swc-menu-tile[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.swc-menu-item:not([aria-disabled="true"]):hover,
+.swc-menu-tile:not([aria-disabled="true"]):hover,
+.swc-menu-item:focus-visible,
+.swc-menu-tile:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+
+.swc-menu-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+}
+
+.swc-menu-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  font: inherit;
+  font-size: 11px;
+  color: inherit;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.swc-menu-tile[aria-checked="true"] {
+  border-color: var(--ui-accent-color);
+}
+
+.swc-menu-tile svg {
+  width: 22px;
+  height: 22px;
+}
+
+.swc-icon {
+  display: inline-flex;
+}
+
+.swc-menu-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 8px 6px;
+}
+
+.swc-menu-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.swc-menu-field select {
+  flex: 1;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 4px;
+}
+
+.swc-menu-field-title {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.swc-menu-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.swc-menu-apply {
+  margin-top: 8px;
+  padding: 4px 10px;
+  font: inherit;
+  color: var(--ui-accent-contrast-color, #fff);
+  background: var(--ui-accent-color, #4e79a7);
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.swc-menu-apply:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .swc-code {

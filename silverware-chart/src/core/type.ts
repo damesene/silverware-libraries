@@ -25,4 +25,6 @@ export type ChartType = {
   // A line icon (an SVG), for the menu's gallery
   readonly icon: string;
   readonly config: (model: ChartModel, theme: Theme) => ChartConfig;
+  // Its kinds the menu offers apart (stacked bars, horizontal bars): the model's flags set for each
+  readonly variants?: readonly { readonly label: string; readonly icon: string; readonly stacked?: boolean; readonly horizontal?: boolean }[];
 };

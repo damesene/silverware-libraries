@@ -94,6 +94,47 @@ table. The chart's type and its table are picked from a menu, not typed.
 - The menu: Silverware Table's menus (core/menu.ts) are its own; the chart's
   toolbar and menus would share them through `shared/`.
 
+## What the proof of concept showed (2026-11-01, local SilverBullet 2.12.1 of main)
+
+A throwaway space (a `space-lua` page defining the `mermaid` code widget, a JS
+module, Chart.js from a CDN) with six blocks: the request's example, stacked
+bars, an area, a pie and a doughnut, a chart of a named table, a flowchart.
+
+- **The block reads well and draws**: `xychart-beta` and `pie` drawn by
+  Chart.js from the block as Mermaid writes it, the `%% chart.*` lines read;
+  Mermaid's own range (`0 --> 198.2`) and axis titles taken over.
+- **Taking `mermaid` over works**: a block of `-- priority: -10` loads after
+  the Mermaid library (scripts run by priority, highest first:
+  `client/space_lua.ts`), so its definition wins; a flowchart handed to
+  `mermaid.diagram` drew as before.
+- **The widget may be an element**: `widget.new { html = <HTMLElement> }`; the
+  element is made before SilverBullet attaches it, and Chart.js (responsive)
+  sizes its canvas once it is attached.
+- **A code widget is not rendered anew when what it read changes**, unlike
+  `${…}` (verified with a probe: a `${silverware.table.evaluate(…)}` and a code
+  widget calling `editor.getText()` and the same evaluate, a table cell edited:
+  the `${…}` showed the new value, the code widget not, even 12 s later). Its
+  cache key is its language, page and text (`fenced_code.ts`); why its
+  triggers do not refresh it is not found. So the chart follows its table
+  itself: on `editor:pageModified` (an event listener in Space Lua) the charts
+  shown read their tables again through Silverware Table's JS (`evaluated`,
+  the module imported by its path, the same instance) and update the Chart.js
+  instance in place (`chart.update()`, animated): 1.5 ms for one chart, the
+  chart changed 130 ms after a cell's edit through Silverware Table and after
+  an edit of the markdown alike. A source on another page would need its
+  `page:saved` too (not tried).
+- **SilverBullet renders each code widget twice** (12 renders for 6 blocks on
+  opening the page), one element never attached: a chart made for it is to be
+  destroyed (kept in a registry, let go once detached).
+- **A click on the chart** does not open the block's markdown (unlike a
+  table); SilverBullet's own widget menu (⋯: Edit source, Reload, Copy) shows
+  at its top right on hover: our toolbar has to sit beside it.
+- **Colors** are read from SilverBullet's variables when a chart is made: a
+  change of the theme or dark mode needs the charts made anew (not done in
+  the PoC). The table's border color is too strong for a grid: a light gray.
+- **Chart.js orders datasets** by `order`: a line drawn over bars needs a lower
+  one.
+
 ## Steps
 
 1. The plugin's frame (library page, API block, build, deploy, playground,

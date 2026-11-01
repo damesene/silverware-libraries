@@ -19,13 +19,13 @@ async function windowHost() {
 const actionsOf = (actions: readonly TagAction[] | undefined) => Object.fromEntries((actions ?? []).map((a) => [a.id, a]));
 
 describe("the built-in modules' actions on a tag, as data", () => {
-  it("Delete gives its operation to review, its subtags offered", async () => {
+  it("Remove gives its operation to review, its subtags offered", async () => {
     const { host } = await windowHost();
     const remove = actionsOf(removeModule(moduleHost).tagActions?.()).remove!;
     expect(remove.danger).toBe(true);
     const operation = await remove.run("todo", host);
-    expect(operation && operation.label).toBe("Delete #todo");
-    expect(operation && operation.option?.label).toBe("Its subtags too (1)");
+    expect(operation && operation.label).toBe("Remove #todo");
+    expect(operation && operation.options?.map((o) => o.label)).toEqual(["Remove from", "In the text", "Its subtags too (1)"]);
   });
   it("Add to pages and Remove from pages show the view by page; Remove only for a page's own tag", async () => {
     const { host, shown } = await windowHost();
@@ -67,7 +67,7 @@ describe("several tags at once", () => {
   });
   it("deletes several tags", async () => {
     const s = memorySpace({ P: "Text #a and #b here, #c stays" });
-    await applyPlan(s, await makePlan(s, await readCatalog(s), removeManyOperation(["a", "b"], false)));
+    await applyPlan(s, await makePlan(s, await readCatalog(s), removeManyOperation(["a", "b"], false, 0, { from: "all", keepWord: false })));
     expect(s.pages.get("P")).toBe("Text and here, #c stays");
   });
 });

@@ -13,13 +13,18 @@ export type Operation = {
   readonly edit: (text: string, page: string) => EditResult | Promise<EditResult>;
   // What was done, as the notification says it
   readonly done: (pages: number, changes: number) => string;
-  // A choice the review offers (with its subtags), the operation made anew by it
-  readonly option?: { readonly label: string; readonly on: boolean; readonly toggled: () => Operation };
+  // The choices the review offers (with its subtags; where it takes tags off), each making the operation anew
+  readonly options?: readonly OperationOption[];
   // The tag the window shows once it is applied (a rename's new name)
   readonly shows?: string;
   // The change it undoes (the core's Undo): applied, that change is taken off the history, not kept as one of its own
   readonly undoes?: object;
 };
+
+/** A choice of the review: a box ticked or not, or one of several (a list; `buttons`: each a radio button) */
+export type OperationOption =
+  | { readonly label: string; readonly on: boolean; readonly toggled: () => Operation }
+  | { readonly label: string; readonly choices: readonly string[]; readonly chosen: number; readonly choose: (index: number) => Operation; readonly buttons?: boolean };
 
 /** "1 page", "3 pages" */
 export const counted = (count: number, one: string, many = `${one}s`): string => `${count} ${count === 1 ? one : many}`;

@@ -104,7 +104,7 @@ describe("plans", () => {
 describe("operations", () => {
   it("deletes a tag with its subtags", async () => {
     const space = pages();
-    await applyPlan(space, await makePlan(space, await readCatalog(space), removeOperation("project", true)));
+    await applyPlan(space, await makePlan(space, await readCatalog(space), removeOperation("project", true, 0, { from: "all", keepWord: false })));
     expect(space.pages.get("A")).toBe("- [ ] do #todo");
     expect(space.pages.get("A/Plan")).toBe("#plan\n\ntext");
     expect(space.pages.get("B")).toBe("note #idea");
@@ -122,10 +122,12 @@ describe("operations", () => {
   });
   it("offers the subtags in the review, the operation made anew", () => {
     const op = renameOperation("project", "work", true, 2);
-    expect(op.option?.on).toBe(true);
-    expect(op.option?.toggled().option?.on).toBe(false);
+    const subtags = op.options?.[0];
+    expect(subtags && "on" in subtags && subtags.on).toBe(true);
+    const again = subtags && "toggled" in subtags ? subtags.toggled().options?.[0] : undefined;
+    expect(again && "on" in again && again.on).toBe(false);
     expect(op.shows).toBe("work");
-    expect(removeOperation("project", false, 0).option).toBeUndefined();
+    expect(removeOperation("project", false, 0).options?.map((o) => o.label)).toEqual(["Remove from", "In the text"]);
   });
   it("says what is wrong with a rename", () => {
     expect(renameProblem("a", "a")).toBeDefined();

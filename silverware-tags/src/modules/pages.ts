@@ -4,7 +4,7 @@
 // it, × to take it off them all (again: kept), a field adding tags to them
 // all. Review changes… shows what changes. Tags are added into each page's
 // frontmatter (those it has left out), taken off its frontmatter and its tag
-// lines (a hashtag in its text stays: Delete tag takes it off).
+// lines (a hashtag in its text stays: Remove tag takes it off).
 //
 // Its commands: Tag pages (the view), Page tags (the view, the page open
 // checked). The tag picked in the view by tag: Add to pages… (the tag to add),
@@ -132,7 +132,7 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
       keep({ remove: state.remove.filter((tag) => counts.has(tag)) });
       dropped = notOwn;
     }
-    said.textContent = dropped.length ? `${dropped.map(hashtagOf).join(" ")}: none of these pages has it as its own tag, only in their text (Delete tag takes it off the text).` : "";
+    said.textContent = dropped.length ? `${dropped.map(hashtagOf).join(" ")}: none of these pages has it as its own tag, only in their text (Remove tag takes it off the text).` : "";
     const chips = [...counts].sort(([a], [b]) => a.localeCompare(b)).map(([tag, count]) => {
       const off = state.remove.includes(tag);
       return el(

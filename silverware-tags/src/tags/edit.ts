@@ -69,28 +69,45 @@ export function renameTags(text: string, rename: (name: string) => string | unde
   return changes ? { text: applyEdits(text, edits), changes } : unchanged(text);
 }
 
+/** How `removeTags` takes tags off */
+export type RemoveHow = {
+  // The frontmatter's too (so by default)
+  readonly frontmatter?: boolean;
+  // The hashtags of these contexts only (all where undefined)
+  readonly contexts?: ReadonlySet<TagContext>;
+  // A hashtag in the text leaves its name, only the # going (`#<two words>`: two words); a tag line's goes whole
+  readonly keepWord?: boolean;
+};
+
 /**
  * Every tag `match` matches removed: from the frontmatter, and its hashtags
- * of the contexts `contexts` (all where undefined); a tag line left with no
- * tag goes, a hashtag in text goes with a space beside it
+ * (of `how.contexts`); a tag line left with no tag goes, a hashtag in text
+ * goes with a space beside it, or (`how.keepWord`) leaves its name
  */
-export function removeTags(text: string, match: (name: string) => boolean, contexts?: ReadonlySet<TagContext>, scanner: TagScanner = scanHashtags): EditResult {
+export function removeTags(text: string, match: (name: string) => boolean, how: RemoveHow = {}, scanner: TagScanner = scanHashtags): EditResult {
   const frontmatter = readFrontmatter(text);
   if (frontmatter.unreadable) return unchanged(text, `${frontmatter.unreadable}: left alone`);
   const edits: TextEdit[] = [];
-  const current = frontmatter.key?.items.map((item) => item.name) ?? [];
-  const kept = current.filter((name) => !match(name));
-  let changes = current.length - kept.length;
-  const front = writeTags(text, frontmatter, kept);
-  if (front) edits.push(front);
+  let changes = 0;
+  if (how.frontmatter ?? true) {
+    const current = frontmatter.key?.items.map((item) => item.name) ?? [];
+    const kept = current.filter((name) => !match(name));
+    changes += current.length - kept.length;
+    const front = writeTags(text, frontmatter, kept);
+    if (front) edits.push(front);
+  }
   // By line: a line left with nothing goes whole
   const byLine = new Map<number, Hashtag[]>();
   for (const tag of scanner(text, frontmatter.bodyStart)) {
-    if (!match(tag.name) || (contexts && !contexts.has(tag.context))) continue;
+    if (!match(tag.name) || (how.contexts && !how.contexts.has(tag.context))) continue;
+    changes++;
+    if (how.keepWord && tag.context !== "page") {
+      edits.push({ from: tag.from, to: tag.to, insert: tag.name });
+      continue;
+    }
     const line = byLine.get(tag.line.from) ?? [];
     line.push(tag);
     byLine.set(tag.line.from, line);
-    changes++;
   }
   for (const tags of byLine.values()) {
     const { line } = tags[0]!;
@@ -153,5 +170,5 @@ export function addPageTags(text: string, names: readonly string[], form: Frontm
 /** Tags taken off the page: from its frontmatter and its tag lines (a hashtag in its text stays) */
 export function removePageTags(text: string, names: readonly string[], scanner: TagScanner = scanHashtags): EditResult {
   const off = new Set(names);
-  return removeTags(text, (name) => off.has(name), new Set(["page"]), scanner);
+  return removeTags(text, (name) => off.has(name), { contexts: new Set(["page"]) }, scanner);
 }

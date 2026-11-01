@@ -130,6 +130,15 @@ describe("editing", () => {
     // Two side by side taking the same space
     expect(removeTags("x #a #a", (n) => n === "a").text).toBe("x");
   });
+  it("keeps the word where asked, only the # going; a page's own tags go whole", () => {
+    const text = "---\ntags: [a, b]\n---\n#a #b\n\nAn #a and #<a b c> here.\n- [ ] do #a/x";
+    const all = (n: string) => n === "a" || n === "a b c" || n === "a/x";
+    expect(removeTags(text, all, { keepWord: true }).text).toBe("---\ntags: [b]\n---\n#b\n\nAn a and a b c here.\n- [ ] do a/x");
+    // The text only: the frontmatter and the tag line stay
+    expect(removeTags(text, all, { frontmatter: false, contexts: new Set(["paragraph", "task"]), keepWord: true }).text).toBe("---\ntags: [a, b]\n---\n#a #b\n\nAn a and a b c here.\n- [ ] do a/x");
+    // The page's own only: the text stays
+    expect(removeTags(text, all, { contexts: new Set(["page"]) }).text).toBe("---\ntags: [b]\n---\n#b\n\nAn #a and #<a b c> here.\n- [ ] do #a/x");
+  });
   it("leaves a page whose frontmatter it cannot read", () => {
     const result = renameTags("---\ntags: [a,\n b]\n---\n#a", () => "x");
     expect(result.changes).toBe(0);

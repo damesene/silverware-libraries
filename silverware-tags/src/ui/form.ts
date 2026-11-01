@@ -15,7 +15,36 @@ export function checkbox(doc: Document, label: string, checked: boolean, changed
   return { element: el(doc, "label", "swg-check", box, el(doc, "span", { text: label })), box };
 }
 
-/** A line under a form: what will happen, or (`error`) what is wrong */
+/** One of several with its label before it: a list, or (`buttons`) radio buttons */
+export function choice(doc: Document, label: string, choices: readonly string[], chosen: number, changed: (index: number) => void, buttons = false): HTMLElement {
+  const name = el(doc, "span", { class: "swg-form-label", text: label });
+  if (!buttons) {
+    const select = el(doc, "select", { class: "swg-field swg-select", attrs: { "aria-label": label } }, ...choices.map((text, i) => el(doc, "option", { text, attrs: { value: String(i) } })));
+    select.value = String(chosen);
+    select.addEventListener("change", () => changed(Number(select.value)));
+    return el(doc, "label", "swg-choice", name, select);
+  }
+  const group = `swg-choice-${Math.random().toString(36).slice(2)}`;
+  return el(
+    doc,
+    "div",
+    { class: "swg-choice", attrs: { role: "radiogroup", "aria-label": label } },
+    name,
+    el(
+      doc,
+      "div",
+      "swg-choice-buttons",
+      ...choices.map((text, i) => {
+        const radio = el(doc, "input", { attrs: { type: "radio", name: group, value: String(i) } });
+        radio.checked = i === chosen;
+        radio.addEventListener("change", () => radio.checked && changed(i));
+        return el(doc, "label", "swg-check", radio, el(doc, "span", { text }));
+      }),
+    ),
+  );
+}
+
+/** A line under a form:what will happen, or (`error`) what is wrong */
 export function note(doc: Document): { readonly element: HTMLElement; say(text: string, error?: boolean): void } {
   const element = el(doc, "p", { class: "swg-note", attrs: { "aria-live": "polite" } });
   return {

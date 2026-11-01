@@ -85,6 +85,16 @@ abstraction of its own, room for more operations.
    pages are then read and edited as they are. A page the index has not caught
    up with is not found; the preview shows what was found.
 10. **Tags are case sensitive**, as SilverBullet's index keeps them.
+11. **Removing a tag** (decided 2026-11-01; *Delete tag* before, which took
+    every hashtag out): *Remove tag…*, its review choosing where from (the
+    text and the page's own tags, the default; the text only; the page's own
+    tags only) and how in the text (the word kept, only the `#` going, the
+    default: `#project/alpha` → `project/alpha`, `#<two words>` → `two words`;
+    or taken out with the space beside it). The page's own tags are its
+    frontmatter's and its tag lines' (a paragraph directly under the document of
+    hashtags alone: SilverBullet's `plugs/index/frontmatter.ts` reads them as
+    the page's tags, verified the same day), and always go whole: a bare word
+    on a tag line would mean nothing.
 
 ## Design
 
@@ -123,7 +133,7 @@ silverware-tags/
       pagetree.ts      pages as a tree by folder, with check boxes (a folder checks what is under it)
     modules/
       rename.ts        Rename (merge into a tag that exists; with its subtags)
-      remove.ts        Delete a tag everywhere (with its subtags)
+      remove.ts        Remove a tag everywhere (where from, the word kept or not, its subtags: the review's choices)
       assign.ts        Tag pages: pages picked in a tree (a folder: everything under it), tags added and removed; from the manager for a tag
       pagetags.ts      the tags of the page open: chips, saved at once
 ```
@@ -145,7 +155,7 @@ silverware-tags/
 - **Tag manager** (`Silverware Tags: Manager`): left the tags as a tree by
   `/` (each with how many pages and objects use it; a search filters it),
   right the tag picked: its uses by kind (pages, items, tasks, …) and the
-  pages, each opening it; its actions (Rename…, Delete…, Add to pages…).
+  pages, each opening it; its actions (Rename…, Remove…, Add to pages…).
 - **Rename**: a field with the new name (the tags of the space offered), *with
   its subtags* where it has some; a name taken says it will merge. Then the
   preview.

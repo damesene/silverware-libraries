@@ -17,7 +17,7 @@ import { buttons, openDialog } from "./dialog.ts";
 import { el } from "./elements.ts";
 import { ICONS } from "./icons.ts";
 import { suggestions, tagField } from "./chips.ts";
-import { checkbox, labelled, note } from "./form.ts";
+import { checkbox, choice, labelled, note } from "./form.ts";
 import { reviewList } from "./review.ts";
 
 export type WorkspaceOptions = {
@@ -272,7 +272,9 @@ export class Workspace {
     // (Gone back, or another review asked for, meanwhile)
     if (this.reviewing !== reviewing) return;
     const changes = plan.changes.reduce((sum, change) => sum + change.changes, 0);
-    const option = operation.option ? checkbox(doc, operation.option.label, operation.option.on, () => void this.review(operation.option!.toggled())) : undefined;
+    const options = (operation.options ?? []).map((option) =>
+      "toggled" in option ? checkbox(doc, option.label, option.on, () => void this.review(option.toggled())).element : choice(doc, option.label, option.choices, option.chosen, (i) => void this.review(option.choose(i)), option.buttons),
+    );
     this.body.replaceChildren(
       el(
         doc,
@@ -280,7 +282,7 @@ export class Workspace {
         "swg-review",
         el(doc, "h3", { class: "swg-review-title", text: operation.label }),
         el(doc, "p", { class: "swg-note", text: plan.changes.length ? `${counted(changes, "tag")} on ${counted(plan.changes.length, "page")} change. Nothing is written until you apply it.` : "Nothing to change." }),
-        option?.element ?? null,
+        options.length ? el(doc, "div", "swg-review-options", ...options) : null,
         reviewList(doc, plan),
       ),
     );

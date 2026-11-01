@@ -13,11 +13,11 @@ A manager for the tags of your space. Rename a tag everywhere it is used, merge 
 
 Everything is in one window, **Silverware Tags: Manager**, with two views (tabs at its top) and nothing opening over it:
 
-* **By tag**: every tag of the space as a tree (`project/alpha` is under `project`: a `/` in a tag's name makes levels). Type to find a tag, **↑ ↓** to go through them, **→ ←** to open and close a level; in the tree **F2** puts you in the tag's name to rename it, **Delete** deletes it (reviewed first). **Ctrl** (Cmd) and a click picks several tags (**Shift** and a click those between): *Merge into…* makes them one tag (the field offers your tags; a new name too), *Delete N tags…* deletes them all, each reviewed first. The tag you pick shows how many pages use it and where (on the page itself, in items, in tasks, in tables), its pages (click one to open it) and what you can do with it.
+* **By tag**: every tag of the space as a tree (`project/alpha` is under `project`: a `/` in a tag's name makes levels). Type to find a tag, **↑ ↓** to go through them, **→ ←** to open and close a level; in the tree **F2** puts you in the tag's name to rename it, **Delete** removes it (reviewed first). **Ctrl** (Cmd) and a click picks several tags (**Shift** and a click those between): *Merge into…* makes them one tag (the field offers your tags; a new name too), *Remove N tags…* removes them all, reviewed first. The tag you pick shows how many pages use it and where (on the page itself, in items, in tasks, in tables), its pages (click one to open it) and what you can do with it.
   * **Rename**: its name is a field: type the new name and press **Enter** (or *Rename…*). Every use of it changes: the pages' frontmatter, their tag lines, and their text, items, tasks, tables and headings. A name another tag has merges the two, which the field says as you type. A tag with tags under it renames them too (`project` to `work/project` makes `project/alpha` into `work/project/alpha`), unless you untick *Its subtags too* in the review. **Esc** puts the name back.
-  * **Delete tag…**: takes it off every page using it (from the frontmatter, the tag lines and the text, with the space beside it); its subtags too if you tick that in the review.
+  * **Remove tag…**: takes it off every page using it. The review lets you choose *Remove from*: the text and the page's own tags (the default), the text only, or the page's own tags only (its frontmatter and its tag lines, a line of hashtags alone, which SilverBullet reads as the page's tags too). In the text you choose to keep the word, only the `#` going (the default: `#project/alpha` becomes `project/alpha`, `#<two words>` becomes `two words`), or to take it out with the space beside it. A page's own tag always goes whole. Its subtags go too if you tick that.
   * **Add to pages…** and **Remove from pages…** take you to *By page* with the tag to add, or with the pages having it picked and the tag to take off.
-* **By page** (the command **Silverware Tags: Tag pages**): your pages as a tree of folders. Tick pages, or a folder for every page under it (its own page too); type to find pages. On the right are the tags the pages you picked have, each with how many of them have it (`2/3`): **×** takes one off them all (click again to keep it), and the *Add* field gives tags to them all (the tags of your space are offered as you type: **↑ ↓** and **Enter**, or **Tab** for the first). Then *Review changes…*. Tags are added into each page's frontmatter (a page that has one already is left as it is) and taken off its frontmatter and its tag lines; a hashtag in a page's text stays (*Delete tag* takes those off).
+* **By page** (the command **Silverware Tags: Tag pages**): your pages as a tree of folders. Tick pages, or a folder for every page under it (its own page too); type to find pages. On the right are the tags the pages you picked have, each with how many of them have it (`2/3`): **×** takes one off them all (click again to keep it), and the *Add* field gives tags to them all (the tags of your space are offered as you type: **↑ ↓** and **Enter**, or **Tab** for the first). Then *Review changes…*. Tags are added into each page's frontmatter (a page that has one already is left as it is) and taken off its frontmatter and its tag lines; a hashtag in a page's text stays (*Remove tag* takes those off).
 * **Silverware Tags: Page tags** opens *By page* with the page you are on picked.
 * **Cleanup** (a tab of the window): tags that are likely one, found by their names: the same but for capitals or a separator (`Todo`, `to-do`, `todo`), a plural of another (`ideas`, `idea`), or one letter apart at the same level (`meeting`, `meetnig`; names of five letters or more). Each group offers the tag to merge into (the most used, unless you pick another) and *Merge…*, reviewed first. Below them the tags used on one page only, each opening in *By tag*.
 * **The Tags panel** (the command **Silverware Tags: Tags panel**): the tags as a tree in SilverBullet's right sidebar, beside your pages (its menu moves it to the left or the bottom; it stays open across reloads). Each tag shows how many pages use it, a level how many use a tag under it. **The tags of the page you are on have their # in the accent color** (and so does a level holding one), and come first where *List this page's tags first in the Tags panel* is on (Settings; off by default: by name, folders first); *This page* above it shows only them, *Page tags* and *Tasks* only those, and its filter field finds a tag. A click opens a level, a **double click** opens the tag in the window; the buttons of a row (shown as the pointer is over it) **add the tag to the page you are on** (+; at once, as one of its own tags; Undo takes it back), or where it is one of the page's own tags already **take it off** (−: from its frontmatter and tag lines), **rename it** (✎, or **F2**: the window with its name to type) and **open it in the window**, and dragging a tag onto another level moves it there (`alpha` dropped on `work` becomes `work/alpha`, its subtags with it), reviewed in the window first.
@@ -52,7 +52,7 @@ config.set("silverware.tags.newTagsForm", "flow") -- or "block", "string"
 config.set("silverware.tags.modules", {
   rename = { enabled = true }, -- Rename (and merge): the tag's name as a field
   pages = { enabled = true },  -- By page, Tag pages, Page tags, Add to pages, Remove from pages
-  remove = { enabled = true }, -- Delete tag
+  remove = { enabled = true }, -- Remove tag
   cleanup = { enabled = true }, -- Cleanup: tags likely one, tags used once
   panel = { enabled = true },  -- The Tags panel beside the page
   custom = { enabled = true }, -- Custom operations
@@ -93,7 +93,7 @@ export default (helpers) => [
 * `pages(context)`: the pages it may change (left out: those using the tag); the others are not read.
 * `edit(text, page, context)` gets a page's text and gives the text it should have: a text, `{ text, changes }` (what the helpers give), or nothing (the page as it is). It may be `async`.
 * `context`: `tag` (the tag the button is on), `tags` and `pages` (every tag and page of the space, meta pages left out while they are protected), `pagesWith(tag, children)` (the pages using a tag, with `children` its subtags' too), `contexts(tag)` (its pages by where it is used: `page`, `item`, `task`, `table`, `header`).
-* Helpers, the functions the built-in operations are made of (text in, text out): `renameTags(text, rename)` (`rename(name)` gives a tag's new name, or nothing), `removeTags(text, match)`, `addPageTags(text, names)` (into the frontmatter), `removePageTags(text, names)` (from the frontmatter and the tag lines), `pageTags(text)`, `frontmatterTags(text)`, `hashtags(text)` (each with its `name`, place and `context`), `tagUses(text)`, `hashtagOf(name)`, `isMetaTag(name)`, `renamedTag(name, from, to, children)`, `matches(name, tag, children)`, `isWithin(name, root)`, `parentOf(name)`, `nameProblem(name)`, `applyEdits(text, edits)`.
+* Helpers, the functions the built-in operations are made of (text in, text out): `renameTags(text, rename)` (`rename(name)` gives a tag's new name, or nothing), `removeTags(text, match, how)` (`how` optional: `{ frontmatter = false }` leaves the frontmatter, `contexts` the hashtags of those contexts only, `keepWord = true` leaves a hashtag's name in the text), `addPageTags(text, names)` (into the frontmatter), `removePageTags(text, names)` (from the frontmatter and the tag lines), `pageTags(text)`, `frontmatterTags(text)`, `hashtags(text)` (each with its `name`, place and `context`), `tagUses(text)`, `hashtagOf(name)`, `isMetaTag(name)`, `renamedTag(name, from, to, children)`, `matches(name, tag, children)`, `isWithin(name, root)`, `parentOf(name)`, `nameProblem(name)`, `applyEdits(text, edits)`.
 
 A mistake in a definition is a notification; a page an operation's `edit` fails on is left alone and named in the review. Definitions are made again each time Space Lua loads. The *Custom operations* module (Settings) turns them off.
 
@@ -634,6 +634,32 @@ end
 }
 .swg-check[hidden] {
   display: none;
+}
+/* The review's choices: where from, how in the text, the subtags */
+.swg-review-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.swg-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.swg-choice .swg-form-label {
+  min-width: 7em;
+}
+.swg-choice-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.swg-select {
+  width: auto;
+  max-width: 100%;
+  padding: 4px 8px;
 }
 
 /* Trees: the manager's tags, the pages to tag */

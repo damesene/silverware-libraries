@@ -24,7 +24,7 @@ export function renameOperation(from: string, to: string, children: boolean, sub
     // field said, else #a/x would move on to #a/x/x
     edit: (text) => renameTags(text, (name) => (to !== from && isWithin(to, from) && isWithin(name, to) ? undefined : renamedTag(name, from, to, children))),
     done: (pages, changes) => `Renamed ${what}: ${counted(changes, "tag")} on ${counted(pages, "page")}`,
-    ...(subtags ? { option: { label: `Its subtags too (${subtags})`, on: children, toggled: () => renameOperation(from, to, !children, subtags) } } : {}),
+    ...(subtags ? { options: [{ label: `Its subtags too (${subtags})`, on: children, toggled: () => renameOperation(from, to, !children, subtags) }] } : {}),
     shows: to,
   };
 }
@@ -52,7 +52,7 @@ export function mergeOperation(tags: readonly string[], into: string, children: 
     pages: (catalog) => [...new Set(tags.flatMap((tag) => pagesWith(catalog, tag, children)))].sort((a, b) => a.localeCompare(b)),
     edit: (text) => renameTags(text, renamed),
     done: (pages, changes) => `Merged ${what}: ${counted(changes, "tag")} on ${counted(pages, "page")}`,
-    ...(subtags ? { option: { label: `Their subtags too (${subtags})`, on: children, toggled: () => mergeOperation(tags, into, !children, subtags) } } : {}),
+    ...(subtags ? { options: [{ label: `Their subtags too (${subtags})`, on: children, toggled: () => mergeOperation(tags, into, !children, subtags) }] } : {}),
     shows: into,
   };
 }

@@ -96,7 +96,7 @@ test("by page: a folder picks its pages, their tags shown with counts, a tag add
   await expect(window.locator(".swg-review-changes")).toBeDisabled();
 });
 
-test("Delete tag is reviewed; Back writes nothing, Apply takes it off with the space beside it", async ({ page }) => {
+test("Remove tag is reviewed; Back writes nothing, Apply keeps the word, only the # going", async ({ page }) => {
   const window = await openManager(page, "idea");
   await window.locator('[data-swg-tag="idea"] .swg-tag-row').click();
   await window.locator('[data-swg-action="remove"]').click();
@@ -104,6 +104,22 @@ test("Delete tag is reviewed; Back writes nothing, Apply takes it off with the s
   await window.locator(".swg-back").click();
   expect(await pageText(page, "Journal/2026-10-30")).toContain("#idea");
   await window.locator('[data-swg-action="remove"]').click();
+  await window.locator(".swg-apply").click();
+  await expect.poll(() => pageText(page, "Journal/2026-10-30")).toContain("Thinking about idea of a garden.");
+});
+
+test("Remove tag taking it out of the text, with the space beside it; the page's own tags only leaves the text", async ({ page }) => {
+  const window = await openManager(page, "idea");
+  await window.locator('[data-swg-tag="idea"] .swg-tag-row').click();
+  await window.locator('[data-swg-action="remove"]').click();
+  await window.locator(".swg-select").selectOption({ label: "The page's own tags only (frontmatter, tag lines)" });
+  await expect(window.locator(".swg-review-title")).toHaveText("Remove #idea from the pages' own tags");
+  await expect(window.getByLabel("Take it out of the text")).toHaveCount(0);
+  await expect(window.locator(".swg-preview-page")).toHaveCount(0);
+  await window.locator(".swg-select").selectOption({ label: "Text and the page's own tags" });
+  await window.getByLabel("Take it out of the text").check();
+  await expect(window.getByLabel("Take it out of the text")).toBeChecked();
+  await expect(window.locator(".swg-preview-page")).toHaveCount(2);
   await window.locator(".swg-apply").click();
   await expect.poll(() => pageText(page, "Journal/2026-10-30")).toContain("Thinking about of a garden.");
 });
@@ -253,7 +269,7 @@ test("a custom operation is a button of the tag, its changes reviewed and applie
   await expect.poll(() => pageText(page, "Meetings/2026-10-15")).toBe("---\ntags: [todo]\n---\n#meeting\n\n- [ ] Send the notes #todo\n");
 });
 
-test("the window's tree: F2 the tag's name to type, Delete its Delete tag", async ({ page }) => {
+test("the window's tree: F2 the tag's name to type, Delete its Remove tag", async ({ page }) => {
   const window = await openManager(page, "idea");
   await window.locator('[data-swg-tag="idea"] .swg-tag-row').click();
   const tree = window.locator(".swg-tags");
@@ -262,7 +278,7 @@ test("the window's tree: F2 the tag's name to type, Delete its Delete tag", asyn
   await expect(window.locator(".swg-name-field")).toBeFocused();
   await tree.focus();
   await page.keyboard.press("Delete");
-  await expect(window.locator(".swg-review-title")).toHaveText("Delete #idea");
+  await expect(window.locator(".swg-review-title")).toHaveText("Remove #idea");
 });
 
 test("several tags picked with Ctrl merged into one, reviewed", async ({ page }) => {

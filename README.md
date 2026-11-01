@@ -22,6 +22,8 @@ Then install a plugin with `Library: Install`.
   in place, formulas, column types, and moving, adding or deleting rows and columns. Tables stay plain markdown.
 - **Silverware Tags** ([`silverware-tags/`](silverware-tags/silverware-tags.md)): a manager of the space's tags: rename and
   merge them everywhere, delete them, tag many pages at once (a folder's too), edit a page's tags; every change previewed.
+- **Silverware Chart** ([`silverware-chart/`](silverware-chart/silverware-chart.md)): charts written as Mermaid (GitHub
+  draws them too), drawn in SilverBullet with Chart.js; their data from the block or from a named table, followed live.
 
 ## Layout
 

@@ -4,15 +4,17 @@ import * as esbuild from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
 import { emojiModuleText } from "./emoji.mjs";
 
-const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags"];
+const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart"];
+// Files bundled beside a library's, loaded by it when needed: Chart.js beside the chart's (src/chartjs.ts)
+const beside = [{ entry: "silverware-chart/src/chartjs.ts", outfile: "silverware-chart/silverware-chart-chartjs.js" }];
 const watch = process.argv.includes("--watch");
 const check = process.argv.includes("--check");
 
 let stale = 0;
-for (const name of libraries) {
+for (const { entry, outfile, name } of [...libraries.map((name) => ({ entry: `${name}/src/index.ts`, outfile: `${name}/${name}.js`, name })), ...beside.map((file) => ({ ...file, name: file.entry }))]) {
   const options = {
-    entryPoints: [`${name}/src/index.ts`],
-    outfile: `${name}/${name}.js`,
+    entryPoints: [entry],
+    outfile,
     bundle: true,
     format: "esm",
     target: "es2022",
@@ -30,7 +32,7 @@ for (const name of libraries) {
     // The working copy may have CRLF line endings on Windows; git commits LF
     const committed = (await readFile(options.outfile, "utf8").catch(() => "")).replaceAll("\r\n", "\n");
     if (built !== committed) {
-      console.error(`${options.outfile} does not match ${name}/src: run npm run build`);
+      console.error(`${options.outfile} does not match ${name}: run npm run build`);
       stale++;
     }
   } else {

@@ -1,0 +1,88 @@
+// Silverware Chart entry point, loaded by the library page's Space Lua:
+//   js.importFromSpace("Library/damesene/silverware-chart.js").init({ ... the bridge ... })
+// then a code widget defined for each of `languages()`, rendering `render(…)`,
+// and the page's edits told to `pageModified(…)`.
+import { type Bridge, missingBridgeFunctions, readSettings, type Settings } from "./bridge.ts";
+import { Controller } from "./core/controller.ts";
+import type { ChartConstructor } from "./core/drawn.ts";
+import { customFormatsAnew, defineCustomFormats, formatsOf } from "./custom.ts";
+import { createModules } from "./modules.ts";
+
+export const version = "0.1.0";
+
+// One controller per window, even if the module is loaded again (e.g. after an update)
+const GLOBAL_KEY = "__silverwareChart";
+const slot = globalThis as unknown as Record<string, Controller | undefined>;
+
+// Chart.js, a file beside the bundle (the library page's files: install it there), loaded the first time a chart is drawn
+const loadChart = (): Promise<ChartConstructor> => import(new URL("./silverware-chart-chartjs.js", import.meta.url).href).then((m: { Chart: ChartConstructor }) => m.Chart);
+
+export async function init(bridge: Bridge): Promise<void> {
+  const missing = missingBridgeFunctions(bridge);
+  if (missing.length) {
+    console.error(`Silverware Chart: the library page did not hand over ${missing.join(", ")}`);
+    return;
+  }
+  const evaluate = bridge.evaluate;
+  start(document, await readSettings(bridge), {
+    getText: async () => String(await bridge.getText()),
+    getCurrentPage: async () => String(await bridge.getCurrentPage()),
+    readPage: async (name) => String(await bridge.readPage(name)),
+    loadChart,
+    table: evaluate ? { evaluate: async (formula, text, page) => String(await evaluate(formula, text, page)) } : undefined,
+  });
+}
+
+/** The core and the modules on, over a host's API (SilverBullet's, or the playground's) */
+export function start(doc: Document, settings: Settings, env: Omit<ConstructorParameters<typeof Controller>[1], "height">): Controller {
+  const controller = new Controller(doc, { ...env, height: settings.height });
+  controller.setModules(createModules(settings, (name) => controller.hostFor(name)));
+  slot[GLOBAL_KEY] = controller;
+  return controller;
+}
+
+/** The code blocks' languages charts are written in (the library page defines a code widget for each) */
+export function languages(): string[] {
+  return slot[GLOBAL_KEY]?.languages() ?? [];
+}
+
+/** A code block's element: its chart (or why it cannot be drawn); undefined where it is no chart (handed on) */
+export function render(language: string, text: string, page: string): Promise<HTMLElement | undefined> {
+  return slot[GLOBAL_KEY]?.render(String(language), String(text), String(page)) ?? Promise.resolve(undefined);
+}
+
+/** A block shown as code, where it is no chart and nothing drew its language before */
+export function codeBlock(language: string, text: string): HTMLElement {
+  const pre = document.createElement("pre");
+  pre.className = "swc-code";
+  const code = pre.appendChild(document.createElement("code"));
+  code.textContent = String(text);
+  code.dataset.language = String(language);
+  return pre;
+}
+
+/** The page open was edited (the library page's editor:pageModified listener): the charts on it follow their sources */
+export function pageModified(text: string, page: string): void {
+  slot[GLOBAL_KEY]?.pageModified(String(text), String(page));
+}
+
+/**
+ * `silverware.chart.defineFormats` (the library page's Space Lua): custom
+ * formats, a definition, a list, or a function given the helpers that returns
+ * them, usually a JS module of the space. The others defined; what is wrong
+ * with any of them, which the library page shows as a notification.
+ */
+export function defineFormats(definitions: unknown): string | undefined {
+  const { formats, problems } = formatsOf(definitions);
+  const again = defineCustomFormats(formats);
+  const lines = [
+    ...(problems.length ? [`custom formats not defined: ${problems.join("; ")}`] : []),
+    ...(again.length ? [`custom formats defined again (the last definition counts): ${again.join(", ")}`] : []),
+  ];
+  return lines.length ? `Silverware Chart: ${lines.join(". ")}` : undefined;
+}
+
+/** Space Lua is loaded (again): the custom definitions are made anew, replacing those of before */
+export function resetDefinitions(): void {
+  customFormatsAnew();
+}

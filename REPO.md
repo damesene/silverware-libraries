@@ -26,3 +26,11 @@ author: damesene
 website: https://github.com/damesene/silverware-libraries/tree/main/silverware-tags
 uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-tags/silverware-tags.md
 ```
+
+```#meta/library/remote
+name: Silverware Chart
+description: "Charts written as Mermaid (GitHub draws them too), drawn in SilverBullet with Chart.js: bar, line, area, pie, doughnut, radar and more, colors from your theme; their data from the block or from a named table of Silverware Table, the chart following the table as you edit it."
+author: damesene
+website: https://github.com/damesene/silverware-libraries/tree/main/silverware-chart
+uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-chart/silverware-chart.md
+```

@@ -1,6 +1,6 @@
 # Silverware Chart: plan
 
-Status: proposed on 2026-11-01, on the branch `silverware-chart`. *Status and
+Status: decided on 2026-11-01, built on the branch `silverware-chart`. *Status and
 next* at the end says what is done.
 
 ## The request
@@ -177,4 +177,11 @@ bars, an area, a pie and a doughnut, a chart of a named table, a flowchart.
 
 ## Status and next
 
-A proof of concept done (above); nothing of the plugin built. Waiting for the go-ahead (2026-11-01).
+Started on 2026-11-01. Done: step 1 (the frame, the core, the model and the
+format registry, the Mermaid format, the built-in types, Chart.js loaded beside
+the bundle, other Mermaid blocks handed on to what drew them before, custom
+formats) and step 2 (a named table as the source, followed live as the page is
+edited; the table's `silverware.table.evaluate` takes the page's text for it).
+Tested: unit tests (the format, the core, custom formats, isolation) and
+Playwright against SilverBullet. Next: step 3 (the block's data written with
+the table's writes, *Stale*), then step 4 (the toolbar and its menus).

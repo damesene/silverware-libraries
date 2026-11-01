@@ -153,6 +153,11 @@ typed.
     | `silverwareTable` | tables named by Silverware Table, the block's data written with the table's writes (`onWrite`), formulas | Silverware Table's API (the bridge has it only where `silverware.table` exists) |
 
     What the plugin assumes about SilverBullet's DOM in one file.
+13. **No raw Chart.js options** (decided 2026-11-02): no key passing Chart.js's
+    options through as they are (`%% chart.options: {…}`, as malys's `G` has
+    them). What a chart can be set to is our model's keys, each offered in the
+    chart's menu as it comes (the toolbar), so the block stays readable and
+    every format can say it.
 
 ## Open
 

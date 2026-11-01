@@ -1,7 +1,7 @@
 # Silverware Tags: plan
 
-Status: decided on 2026-10-31, built on the branch `silverware-tags` (not
-merged). *Status and next* at the end says what is done.
+Status: decided on 2026-10-31, built on the branch `silverware-tags`, merged
+into `main` on 2026-11-01. *Status and next* at the end says what is done.
 
 ## The request
 

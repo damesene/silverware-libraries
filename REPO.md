@@ -21,7 +21,7 @@ uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-toolb
 
 ```#meta/library/remote
 name: Silverware Tags
-description: Manage the tags of your space: rename and merge them everywhere (pages, items, tasks), delete them, give tags to many pages at once or to every page of a folder, edit a page's tags; every change previewed first and undone with one command.
+description: Manage the tags of your space: rename and merge them everywhere (pages, items, tasks), remove them (or only their #), tag many pages at once found by folder or by their tags, clean up tags likely the same, a Tags panel in the navigator; every change reviewed first and undoable.
 author: damesene
 website: https://github.com/damesene/silverware-libraries/tree/main/silverware-tags
 uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-tags/silverware-tags.md

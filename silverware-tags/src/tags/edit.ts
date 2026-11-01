@@ -73,8 +73,8 @@ export function renameTags(text: string, rename: (name: string) => string | unde
 export type RemoveHow = {
   // The frontmatter's too (so by default)
   readonly frontmatter?: boolean;
-  // The hashtags of these contexts only (all where undefined)
-  readonly contexts?: ReadonlySet<TagContext>;
+  // The hashtags of these contexts only (all where undefined; a list too, as a custom operation gives it)
+  readonly contexts?: Iterable<TagContext>;
   // A hashtag in the text leaves its name, only the # going (`#<two words>`: two words); a tag line's goes whole
   readonly keepWord?: boolean;
 };
@@ -86,10 +86,13 @@ export type RemoveHow = {
  */
 export function removeTags(text: string, match: (name: string) => boolean, how: RemoveHow = {}, scanner: TagScanner = scanHashtags): EditResult {
   const frontmatter = readFrontmatter(text);
-  if (frontmatter.unreadable) return unchanged(text, `${frontmatter.unreadable}: left alone`);
+  const withFrontmatter = how.frontmatter ?? true;
+  // (A frontmatter it cannot edit matters only where it is edited)
+  if (frontmatter.unreadable && withFrontmatter) return unchanged(text, `${frontmatter.unreadable}: left alone`);
+  const contexts = how.contexts && new Set(how.contexts);
   const edits: TextEdit[] = [];
   let changes = 0;
-  if (how.frontmatter ?? true) {
+  if (withFrontmatter) {
     const current = frontmatter.key?.items.map((item) => item.name) ?? [];
     const kept = current.filter((name) => !match(name));
     changes += current.length - kept.length;
@@ -99,7 +102,7 @@ export function removeTags(text: string, match: (name: string) => boolean, how: 
   // By line: a line left with nothing goes whole
   const byLine = new Map<number, Hashtag[]>();
   for (const tag of scanner(text, frontmatter.bodyStart)) {
-    if (!match(tag.name) || (how.contexts && !how.contexts.has(tag.context))) continue;
+    if (!match(tag.name) || (contexts && !contexts.has(tag.context))) continue;
     changes++;
     if (how.keepWord && tag.context !== "page") {
       edits.push({ from: tag.from, to: tag.to, insert: tag.name });

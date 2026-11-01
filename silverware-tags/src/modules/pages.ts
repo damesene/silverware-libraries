@@ -102,9 +102,10 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
   const filterNote = () => {
     const shown = tree.shown();
     const visible = new Set(shown);
+    const checked = new Set(state.checked);
     const hidden = state.checked.filter((page) => !visible.has(page)).length;
     shownLine.textContent = `${counted(shown.length, "page")} shown${hidden ? `, ${hidden} checked hidden by the search` : ""}`;
-    checkShown.disabled = !shown.length || shown.every((page) => state.checked.includes(page));
+    checkShown.disabled = !shown.length || shown.every((page) => checked.has(page));
   };
 
   const heading = el(doc, "h3", "swg-detail-name");

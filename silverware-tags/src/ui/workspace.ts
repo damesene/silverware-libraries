@@ -243,8 +243,8 @@ export class Workspace {
 
   // ---- The review
 
-  /** The operation's changes shown in place of the view: read first (counted), then each page's lines */
-  private async review(operation: Operation): Promise<void> {
+  /** The operation's changes shown in place of the view: read first (counted), then each page's lines; `chose` the label of the choice that made it, focused again */
+  private async review(operation: Operation, chose?: string): Promise<void> {
     const { doc } = this;
     const reviewing = { operation, applying: false };
     this.reviewing = reviewing;
@@ -272,9 +272,13 @@ export class Workspace {
     // (Gone back, or another review asked for, meanwhile)
     if (this.reviewing !== reviewing) return;
     const changes = plan.changes.reduce((sum, change) => sum + change.changes, 0);
-    const options = (operation.options ?? []).map((option) =>
-      "toggled" in option ? checkbox(doc, option.label, option.on, () => void this.review(option.toggled())).element : choice(doc, option.label, option.choices, option.chosen, (i) => void this.review(option.choose(i)), option.buttons),
-    );
+    const options = (operation.options ?? []).map((option) => {
+      const element =
+        "toggled" in option
+          ? checkbox(doc, option.label, option.on, () => void this.review(option.toggled(), option.label)).element
+          : choice(doc, option.label, option.choices, option.chosen, (i) => void this.review(option.choose(i), option.label), option.buttons);
+      return { label: option.label, element };
+    });
     this.body.replaceChildren(
       el(
         doc,
@@ -282,7 +286,7 @@ export class Workspace {
         "swg-review",
         el(doc, "h3", { class: "swg-review-title", text: operation.label }),
         el(doc, "p", { class: "swg-note", text: plan.changes.length ? `${counted(changes, "tag")} on ${counted(plan.changes.length, "page")} change. Nothing is written until you apply it.` : "Nothing to change." }),
-        options.length ? el(doc, "div", "swg-review-options", ...options) : null,
+        options.length ? el(doc, "div", "swg-review-options", ...options.map((o) => o.element)) : null,
         reviewList(doc, plan),
       ),
     );
@@ -294,7 +298,9 @@ export class Workspace {
     });
     apply.disabled = !plan.changes.length;
     this.foot.replaceChildren(buttons(doc, back, el(doc, "span", "swg-spacer"), apply));
-    (plan.changes.length ? apply : back).focus({ preventScroll: true });
+    // A choice made from the keyboard keeps its place: its control focused again, else Apply (Back where nothing changes)
+    const again = options.find((o) => o.label === chose)?.element.querySelector<HTMLElement>("select, input:checked, input");
+    (again ?? (plan.changes.length ? apply : back)).focus({ preventScroll: true });
   }
 
   private async apply(plan: Plan, reviewing: { readonly operation: Operation; applying: boolean }, button: HTMLButtonElement, back: HTMLButtonElement): Promise<void> {

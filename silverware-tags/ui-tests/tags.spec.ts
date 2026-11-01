@@ -114,6 +114,8 @@ test("Remove tag taking it out of the text, with the space beside it; the page's
   await window.locator('[data-swg-action="remove"]').click();
   await window.locator(".swg-select").selectOption({ label: "The page's own tags only (frontmatter, tag lines)" });
   await expect(window.locator(".swg-review-title")).toHaveText("Remove #idea from the pages' own tags");
+  // The review made anew keeps the choice focused
+  await expect(window.locator(".swg-select")).toBeFocused();
   await expect(window.getByLabel("Take it out of the text")).toHaveCount(0);
   await expect(window.locator(".swg-preview-page")).toHaveCount(0);
   await window.locator(".swg-select").selectOption({ label: "Text and the page's own tags" });

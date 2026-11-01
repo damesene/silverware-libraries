@@ -136,6 +136,9 @@ describe("editing", () => {
     expect(removeTags(text, all, { keepWord: true }).text).toBe("---\ntags: [b]\n---\n#b\n\nAn a and a b c here.\n- [ ] do a/x");
     // The text only: the frontmatter and the tag line stay
     expect(removeTags(text, all, { frontmatter: false, contexts: new Set(["paragraph", "task"]), keepWord: true }).text).toBe("---\ntags: [a, b]\n---\n#a #b\n\nAn a and a b c here.\n- [ ] do a/x");
+    // Contexts as a list (a custom operation's); a frontmatter it cannot edit no matter where it is left as it is
+    expect(removeTags("---\ntags: [a,\n b]\n---\n- [ ] do #a", all, { frontmatter: false, contexts: ["task"] }).text).toBe("---\ntags: [a,\n b]\n---\n- [ ] do");
+    expect(removeTags("---\ntags: [a,\n b]\n---\n- [ ] do #a", all).problem).toBeDefined();
     // The page's own only: the text stays
     expect(removeTags(text, all, { contexts: new Set(["page"]) }).text).toBe("---\ntags: [b]\n---\n#b\n\nAn #a and #<a b c> here.\n- [ ] do #a/x");
   });

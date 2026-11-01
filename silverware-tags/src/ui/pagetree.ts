@@ -117,7 +117,9 @@ export function pageTree(doc: Document, pages: readonly string[], options: { rea
       render();
     },
     filter: (shows) => {
-      keeps = shows;
+      // Asked once per page (a search's test reads its tags), not per folder it is under
+      const kept = shows && new Set(pages.filter(shows));
+      keeps = kept && ((page) => kept.has(page));
       render();
     },
     shown: () => (keeps ? pages.filter(keeps) : [...pages]),

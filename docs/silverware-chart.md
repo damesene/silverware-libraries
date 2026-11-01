@@ -73,34 +73,58 @@ typed.
 6. **Drawn by Chart.js**, loaded the first time a chart shows (a file beside
    the bundle, as the toolbar's emoji data); colors from SilverBullet's
    variables (light and dark, themes), the charts made anew as those change.
-7. **A named table as the source**: `source: sales` (`[[Page]]sales` on another
-   page), `x: month` (the labels' column), `series: revenue, cost` (the values'
-   columns), columns by their key as formulas read them (a rename or a move
-   breaks nothing). In SilverBullet the chart reads the table live through
-   Silverware Table's public API and follows its edits in place (see the proof
-   of concept), on any page.
-8. **The data in the block follow the table** where Silverware Table writes it:
-   a write of the table writes the block's data anew in the same edit (one undo
-   step), through the block's format's writer and a generic place in Silverware
-   Table's write (as formulas in Space Lua calls are written today:
-   `defineFormulaPlaces`), which knows no chart. Changed otherwise (the markdown
-   edited by hand, the table on another page), the chart in SilverBullet is
-   right (it reads live) and the block's data are behind: the chart is marked
-   *Stale* with *Update data*. Viewing writes nothing.
-9. **Without a source** the block's data are the chart's; Chart.js only draws
-   them.
-10. **A toolbar on the chart hovered**, as a table's (decided 2026-11-01): its
+7. **Charts do not need Silverware Table** (decided 2026-11-01). A table as the
+   source is read by the chart itself: a markdown table of the page (or of
+   another), found by where it is, its columns by their names as SilverBullet's
+   index keys them (`Unit price` is `unit_price`), live as the page is edited
+   (see the proof of concept). `source:` says which table:
+   - `above` / `below`: the nearest table above / below the chart;
+   - `#Sales`: the first table under the heading "Sales" (`[[Page]]#Sales` on
+     another page);
+   - `sales`: a table named by Silverware Table (`[[Page]]sales` on another
+     page): only where Silverware Table is installed, through its API (below);
+     the chart does not read its metadata.
+   `x:` the labels' column (left out: 1, 2, …), `series:` the values' columns.
+   No table by its place among the page's tables (the second): an inserted one
+   moves it.
+8. **What Silverware Table adds, where it is installed**, a module of the
+   chart's using only its public Space Lua API (Silverware Table knows no
+   chart):
+   - `silverware.table.tables(text)`: the tables of a markdown text, each with
+     its name, its place (`from`, `to`) and its columns (name, key). A pure
+     function of the text (the caller has it: the editor's, a page read, the
+     text a write is making); the names are Silverware Table's, so the chart
+     reads none of its metadata.
+   - `silverware.table.onWrite(fn)`: `fn(text)` called in each of its writes
+     with the page's text as the write leaves it, giving edits of the text
+     outside the tables (`{ from, to, text }`); Silverware Table checks them
+     (in the text, apart from its tables and each other) and writes them with
+     its own in the one `replaceRange` (one undo step); an edit that fails the
+     check is left out and logged, never failing the table's write. `fn` is
+     fast and writes nothing itself. The chart gives its blocks reading that
+     table their data anew, written by the block's format.
+   - A formula as a series (`=sales![revenue] * 1.21`) through
+     `silverware.table.evaluate`, later.
+9. **The data in the block behind the source**: where the block's data are not
+   the source's (the markdown edited by hand, a table edited without
+   Silverware Table, or without it installed), the chart in SilverBullet is
+   right (it reads live) and is marked *Stale* with *Update data*, which writes
+   the source's data into the block through its format's writer: the core's,
+   for any source. Viewing writes nothing.
+10. **Without a source** the block's data are the chart's; Chart.js only draws
+    them.
+11. **A toolbar on the chart hovered**, as a table's (decided 2026-11-01): its
     place and look the table's toolbar's, beside SilverBullet's own widget
     menu; at first only its ⋯ menu, items to be added to the bar as they come.
     The ⋯ menu: *Type* (a gallery of the types with their icons: bar, stacked
     bar, horizontal bar, line, area, scatter, pie, doughnut, radar; written by
     the block's format), *Data* (the named tables, the page's first, then the
     space's, each with its columns; picked, its columns to tick: x, series),
-    *Convert to …*, *Edit source*, *Copy as image*. *Insert chart…* in a named
-    table's ⋯ menu (Silverware Table) puts a chart of it under the table in the
-    default format, through the chart's public API. A pick writes the block
+    *Convert to …*, *Edit source*, *Copy as image*. (*Insert chart…* in a
+    table's ⋯ menu would need Silverware Table to know charts: not so; the
+    chart's own command or menu inserts one under a table instead.) A pick writes the block
     with one `editor.replaceRange`.
-11. **Built as the others** (Silverware Table, Toolbar, Tags): a core that knows
+12. **Built as the others** (Silverware Table, Toolbar, Tags): a core that knows
     no module, no format and no type of chart, offering the modules an API (the
     chart's model, drawing, the toolbar and its menu, writing a block, reading
     a source); modules isolated, each with its own host, using the core and
@@ -108,8 +132,16 @@ typed.
     off (`silverware.chart.modules.<name>.enabled`) not loaded. Formats, types
     of charts and sources are registries the modules fill, the user's
     definitions joining them. Silverware Table is used only through its public
-    API (no shared code at run time); without it, charts of the block's data
-    only. What the plugin assumes about SilverBullet's DOM in one file.
+    API (no shared code at run time) by a module of its own. The modules:
+
+    | Module | What it does | Needs |
+    |---|---|---|
+    | `mermaid` | the Mermaid format | nothing |
+    | `types` | the built-in types of charts | nothing |
+    | `tables` | markdown tables as sources: `above`, `below`, `#Heading`, other pages | nothing |
+    | `silverwareTable` | tables named by Silverware Table, the block's data written with the table's writes (`onWrite`), formulas | Silverware Table's API (the bridge has it only where `silverware.table` exists) |
+
+    What the plugin assumes about SilverBullet's DOM in one file.
 
 ## Open
 
@@ -117,9 +149,8 @@ typed.
   beta syntax; each host bundles its own Mermaid). Left for later (2026-11-01).
 - Obsidian Charts' syntax, its table source and whether it leaves unknown keys
   alone: from its documentation before its format is built.
-- The space's named tables for the *Data* menu: the index has every table's
-  rows with their raw cells (the metadata row's `<meta core.table core.name>`
-  among them); a query of it, or the page's tables only at first.
+- The *Data* menu's tables: the page's (by `tables` and, with Silverware
+  Table, its named ones); the space's later.
 - The menu: Silverware Table's menus (core/menu.ts) are its own; the chart's
   toolbar and menus would share them through `shared/`.
 
@@ -170,8 +201,12 @@ bars, an area, a pie and a doughnut, a chart of a named table, a flowchart.
    tests against SilverBullet); the core, the model and the format registry;
    the Mermaid format (`xychart-beta`, `pie`, its metadata) drawn by Chart.js;
    other Mermaid blocks handed on.
-2. A named table as the source, read live.
-3. The block's data written with the table's writes; *Stale* and *Update data*.
+2. A named table as the source, read live (done through `evaluate`; to be
+   made the `tables` and `silverwareTable` modules of decisions 7 and 8).
+3. Silverware Table's `tables(text)` and `onWrite(fn)`; the `tables` module
+   (`above`, `below`, `#Heading`) and the `silverwareTable` module (named
+   tables, the block's data written with the table's writes); *Stale* and
+   *Update data*.
 4. The chart's toolbar: Type and Data menus; *Insert chart…* in a table's menu.
 5. The Obsidian Charts format; the default format setting; *Convert to …*.
 
@@ -183,5 +218,7 @@ the bundle, other Mermaid blocks handed on to what drew them before, custom
 formats) and step 2 (a named table as the source, followed live as the page is
 edited; the table's `silverware.table.evaluate` takes the page's text for it).
 Tested: unit tests (the format, the core, custom formats, isolation) and
-Playwright against SilverBullet. Next: step 3 (the block's data written with
-the table's writes, *Stale*), then step 4 (the toolbar and its menus).
+Playwright against SilverBullet. Next: step 3 as decided on 2026-11-01
+(decisions 7 to 9: charts without Silverware Table, its `tables(text)` and
+`onWrite(fn)` used by a module of their own, *Stale*), then step 4 (the
+toolbar and its menus).

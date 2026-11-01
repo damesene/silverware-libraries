@@ -5,6 +5,7 @@ import { type Bridge, type FeatureName, formatRule, moduleOnByDefault, SETTINGS,
 import { type AdapterFeature, type AddressFrame, type AlsoChanged, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type TableHost, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
+import { withWriteListeners } from "./core/writelisteners.ts";
 import { placeAtEnd, TableRows } from "./core/rows.ts";
 import { CellEditing } from "./core/editor.ts";
 import { InsertControls, type PointerAt } from "./core/insert.ts";
@@ -713,6 +714,8 @@ export class Controller implements TableHost {
       const updates = [{ from, to, markdown: "" }, ...[...others.values()].map((o) => ({ from: o.range.from, to: o.range.to, markdown: serialize(o.table) }))];
       let written = text;
       for (const update of [...updates].sort((a, b) => b.from - a.from)) written = written.slice(0, update.from) + update.markdown + written.slice(update.to);
+      // What other plugins write with it (silverware.table.onWrite), in the same edit
+      written = await withWriteListeners(written);
       const replace = minimalEdit(text, written);
       // The span the features see: the tables written, the deleted one's own (not the blank line after it: what is
       // placed after it, the history marker, would be in the next table)
@@ -2372,6 +2375,8 @@ export class Controller implements TableHost {
       const updates = [{ from: at, to: at, text: insert }, ...(changed ? [{ from: changed.from, to: changed.to, text: serialize(also!.change(parseTable(changed.text))) }] : [])];
       let written = text;
       for (const update of [...updates].sort((a, b) => b.from - a.from)) written = written.slice(0, update.from) + update.text + written.slice(update.to);
+      // What other plugins write with it (silverware.table.onWrite), in the same edit
+      written = await withWriteListeners(written);
       const replace = minimalEdit(text, written);
       const thens: ((editFrom: number, lengthChange: number) => void)[] = [];
       // The span the features see: the tables written and the one it goes after (the history marker goes outside them)
@@ -2536,6 +2541,8 @@ export class Controller implements TableHost {
       for (const update of [...updates].sort((a, b) => b.range.from - a.range.from)) {
         written = written.slice(0, update.range.from) + update.markdown + written.slice(update.range.to);
       }
+      // What other plugins write with it (silverware.table.onWrite), in the same edit
+      written = await withWriteListeners(written);
       const replace = minimalEdit(text, written);
       // The edit spans all the tables written: features see that span, so what
       // they place after it (the history marker) is outside every one of them.

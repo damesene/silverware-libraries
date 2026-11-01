@@ -548,6 +548,13 @@ VAT: ${te("=fruit!vat")}
 * A name a Lua function cannot have, or one already taken by something else (`print`, a function of yours), is refused with a notification that says where it was called.
 * Remove the line and the name no longer completes; the function itself goes once the page is loaded again.
 
+### For other plugins
+
+Two functions let another plugin (or a script of yours) work with tables without reading their markdown itself. [[Library/damesene/silverware-chart|Silverware Chart]] uses them for charts of named tables.
+
+* `silverware.table.tables(text)` gives the tables of a markdown text (usually `editor.getText()`): each with its `name` (where you named it), its place `from` and `to` in the text, its `columns` (each `{ name, key }`, the key as SilverBullet's index has it) and its body's cells as they show, row by row, in `rows`.
+* `silverware.table.onWrite(fn)` calls `fn(text)` whenever Silverware Table writes tables, `text` the page's text as the write leaves it. `fn` gives a list of edits of that text outside the tables, `{ from = 10, to = 14, text = "new" }`, which are written in the same edit: one Ctrl+Z undoes them with the table. An edit that touches a table, reaches past the text or overlaps another is left out. Keep `fn` quick and let it write nothing itself; give it again in each load of Space Lua (a `space-lua` block does).
+
 ### Errors
 
 | Shows | Because |

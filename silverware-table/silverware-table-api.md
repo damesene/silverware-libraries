@@ -3,14 +3,15 @@ tags: meta
 ---
 # Silverware Table API
 
-The Space Lua API of [[Library/damesene/silverware-table|Silverware Table]]: `silverware.table.defineFunctions`, `defineTypes` and `defineSeries` (your own functions, column types and AutoFill series) and `silverware.table.evaluate` (a formula calculated from Space Lua), with `silverware.table.evaluateAlias` giving it a shorter name. It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [[Library/damesene/silverware-table-init]] for what starts Silverware Table.
+The Space Lua API of [[Library/damesene/silverware-table|Silverware Table]]: `silverware.table.defineFunctions`, `defineTypes` and `defineSeries` (your own functions, column types and AutoFill series) `silverware.table.evaluate` (a formula calculated from Space Lua), with `silverware.table.evaluateAlias` giving it a shorter name, and for other plugins `silverware.table.tables` (a text's tables as data) and `silverware.table.onWrite` (edits of the page written with the tables' writes). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [[Library/damesene/silverware-table-init]] for what starts Silverware Table.
 
 ```space-lua
 -- priority: 50
 -- Silverware Table's Space Lua API, loaded before your scripts (they have priority 0
 -- unless they say otherwise): silverware.table.defineFunctions, silverware.table.defineTypes and
 -- silverware.table.defineSeries, see "Custom functions", "Custom column types" and "Custom series";
--- silverware.table.evaluate and silverware.table.evaluateAlias, see "Formulas from Space Lua"
+-- silverware.table.evaluate and silverware.table.evaluateAlias, see "Formulas from Space Lua";
+-- silverware.table.tables and silverware.table.onWrite, see "For other plugins"
 silverware = silverware or {}
 silverware.table = silverware.table or {}
 -- What Silverware Table's Lua shares between its blocks (this page's and the init page's) and keeps across
@@ -114,6 +115,22 @@ if js and js.window then
     end
     return result.value
   end
+  --- The tables of a markdown text (a page's, as you have it): each with its name (where Silverware Table
+  --- named it), its place in the text, its columns (their names and keys) and its body's cells as they show.
+  --- @param text string the text, e.g. editor.getText()
+  --- @return table a list of { name, from, to, columns = { { name, key } }, rows = { { cell, … } } }
+  --- @see Library/damesene/silverware-table#For other plugins
+  function silverware.table.tables(text)
+    return silverwareTableJs.tables(text)
+  end
+  --- A function told of each write of tables: given the page's text as the write leaves it, it gives edits of
+  --- the text outside the tables ({ { from, to, text } }, offsets in that text), written in the same edit (one
+  --- undo step). Fast, and writing nothing itself; an edit touching a table is left out.
+  --- @param fn function the function, given the text
+  --- @see Library/damesene/silverware-table#For other plugins
+  function silverware.table.onWrite(fn)
+    silverwareTableJs.onWrite(fn)
+  end
   -- The names evaluateAlias gave silverware.table.evaluate, for completion in a formula given to one (the init
   -- page's listener reads them); made anew each time Space Lua loads, as the scripts calling it run again
   internal.evaluateAliases = {}
@@ -151,5 +168,7 @@ else
   function silverware.table.defineSeries() end
   function silverware.table.evaluate() return "#N/A" end
   function silverware.table.evaluateAlias() end
+  function silverware.table.tables() return {} end
+  function silverware.table.onWrite() end
 end
 ```

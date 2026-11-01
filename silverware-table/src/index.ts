@@ -10,6 +10,12 @@ import { choiceText, type FormulasOffer, functionNamed, scalarText } from "./for
 import { defineFormulaPlaces as defineFormulaPlacesIn, type FormulaPlaces } from "./formulas/places.ts";
 import { isRange, single } from "./formulas/values.ts";
 import { customFunctionsAnew, defineCustomFunctions } from "./formulas/registry.ts";
+import { columnKey, columnName } from "./columns.ts";
+import { addWriteListener, type WriteListener, writeListenersAnew } from "./core/writelisteners.ts";
+import { pageTablesOf, unescapeCell } from "./markdown.ts";
+import { metaName } from "./meta.ts";
+import { columnNameIn } from "./names.ts";
+import { withoutTags } from "./tags.ts";
 
 export const version = "0.1.0";
 
@@ -105,6 +111,50 @@ export function defineFormulaPlaces(finder: unknown): void {
 // library's init page registers: host/lua.ts, apart from the rest, which knows nothing of Lua
 export { luaCallPlaces } from "./host/lua.ts";
 
+/**
+ * `silverware.table.onWrite`: a function told of each write of tables, the
+ * page's text as the write leaves it, giving edits of the text outside the
+ * tables (`{ from, to, text }`), written in the same edit. Another plugin's
+ * (Silverware Chart writes its charts' data so); Silverware Table knows
+ * nothing of what they are for.
+ */
+export function onWrite(listener: unknown): void {
+  if (typeof listener === "function") addWriteListener(listener as WriteListener);
+}
+
+/** One table of a text as `tables` gives it */
+export type TableOfText = {
+  readonly name?: string;
+  readonly from: number;
+  readonly to: number;
+  // Each column's name (its fixed one, else its header's) and the key SilverBullet's index gives it
+  readonly columns: readonly { readonly name: string; readonly key: string }[];
+  // The body's cells as they show (hidden tags left out), row by row; no metadata row
+  readonly rows: readonly (readonly string[])[];
+};
+
+/**
+ * `silverware.table.tables`: the tables of a markdown text (a page's, as the
+ * caller has it), each with its name, its place, its columns and its body's
+ * cells: what another plugin reads tables by, without reading their metadata
+ */
+export function tables(text: string): TableOfText[] {
+  return pageTablesOf(String(text)).map(({ range, table }) => {
+    const name = metaName(table);
+    const header = table.rows[0]?.cells ?? [];
+    return {
+      ...(name ? { name } : {}),
+      from: range.from,
+      to: range.to,
+      columns: header.map((cell, i) => {
+        const shown = columnName(cell);
+        return { name: columnNameIn(table, i) ?? shown, key: columnKey(shown) };
+      }),
+      rows: table.rows.slice(1).map((row) => row.cells.map((cell) => unescapeCell(withoutTags(cell)).trim())),
+    };
+  });
+}
+
 /** As `evaluated`, its value only */
 export async function evaluate(formula: string): Promise<string> {
   return (await evaluated(formula)).value;
@@ -161,6 +211,7 @@ export function resetDefinitions(): void {
   customFunctionsAnew();
   customTypesAnew();
   customSeriesAnew();
+  writeListenersAnew();
 }
 
 // Tables are checked again once for definitions made in one go (a script's calls one after another)

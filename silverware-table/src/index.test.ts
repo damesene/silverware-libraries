@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
-import { completions, defineFormulaPlaces, evaluate, evaluated, luaCallPlaces } from "./index.ts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { completions, defineFormulaPlaces, evaluate, evaluated, luaCallPlaces, onWrite, resetDefinitions, tables } from "./index.ts";
 import { buttonLabel, cell, clickOn, controller, editor, edits, flush, key, menuButtons, nameInMenu, setup, text, toolbarName, useTablePage } from "./testing/page.ts";
 
 describe("silverware.table.evaluate: a formula calculated on the page shown", () => {
@@ -93,6 +93,78 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       await setup(PAGE, { "silverware.table.modules.formulas.enabled": false });
       started();
       expect(at("=SU")).toBeUndefined();
+    });
+  });
+
+  describe("for other plugins: a text's tables as data, edits written with the tables' writes", () => {
+    const TABLE = "| Name | Price #euro <meta core.n='cost'> |\n|---|---|\n| Pear <meta core.n='pear'> | 12 |\n| Fig \\| date | 3 |\n| <meta core.table core.name='prices'> |\n";
+    afterEach(() => {
+      resetDefinitions();
+      onWrite(() => []);
+    });
+
+    it("gives each table's name, place, columns and body as it shows", () => {
+      const page = `Intro\n\n${TABLE}\n| A |\n|---|\n| x |\n`;
+      const [named, plain] = tables(page);
+      expect(named).toEqual({
+        name: "prices",
+        from: 7,
+        to: 7 + TABLE.trimEnd().length,
+        columns: [
+          { name: "Name", key: "name" },
+          { name: "cost", key: "price" },
+        ],
+        rows: [
+          ["Pear", "12"],
+          ["Fig | date", "3"],
+        ],
+      });
+      expect(plain).toMatchObject({ columns: [{ name: "A", key: "a" }], rows: [["x"]] });
+      expect(plain).not.toHaveProperty("name");
+    });
+
+    it("writes the listeners' edits in the same edit as the table, each told the text as the table was written", async () => {
+      await setup(`${TABLE}\nChart: 12, 3\n`, { "silverware.table.metadata": true });
+      const told: string[] = [];
+      onWrite((written: string) => {
+        told.push(written);
+        const at = written.indexOf("Chart: ") + "Chart: ".length;
+        const values = tables(written)[0]!.rows.map((row) => row[1]).join(", ");
+        return [{ from: at, to: written.indexOf("\n", at), text: values }];
+      });
+      await controller.scan();
+      clickOn(cell(1, 1));
+      const field = editor.querySelector<HTMLInputElement>(".swt-cell-editor")!;
+      field.value = "40";
+      const writes = edits;
+      key(field, "Enter");
+      await flush();
+      expect(edits).toBe(writes + 1);
+      expect(told).toHaveLength(1);
+      expect(told[0]).toContain("| Pear <meta core.n='pear'> | 40 |");
+      expect(text.endsWith("Chart: 40, 3\n")).toBe(true);
+    });
+
+    it("leaves out an edit that touches a table, reaches past the text or overlaps another; a listener's throw writes the table all the same", async () => {
+      await setup(`${TABLE}\nafter\n`, { "silverware.table.metadata": true });
+      onWrite((written: string) => [
+        { from: 0, to: 3, text: "x" },
+        { from: 0, to: written.length + 5, text: "x" },
+        { from: written.length - 6, to: written.length - 1, text: "AFTER" },
+        { from: written.length - 5, to: written.length - 2, text: "y" },
+        "nonsense",
+      ]);
+      onWrite(() => {
+        throw new Error("broken");
+      });
+      const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+      await controller.scan();
+      toolbarName("table");
+      expect(await nameInMenu("costs")).toBeUndefined();
+      expect(text).toContain("core.name='costs'");
+      expect(text.endsWith("\nAFTER\n")).toBe(true);
+      expect(errors).toHaveBeenCalled();
+      errors.mockRestore();
     });
   });
 

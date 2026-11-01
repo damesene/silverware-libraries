@@ -1,5 +1,7 @@
 // The pages module: the window's view by page. Left the pages as a tree by
-// folder (a folder's box checks every page under it; a search), right the tags
+// folder (a folder's box checks every page under it shown), a search of them
+// by name and tags (`#a`, `-#a`: tags/query.ts, the index's tags of every
+// context) and Untagged (pages using no tag), Check all shown; right the tags
 // of the pages checked, as labels of mail are: each with how many of them have
 // it, × to take it off them all (again: kept), a field adding tags to them
 // all. Review changes… shows what changes. Tags are added into each page's
@@ -16,7 +18,9 @@ import { each } from "../core/plan.ts";
 import { addPageTags, pageTags, removePageTags } from "../tags/edit.ts";
 import type { FrontmatterForm } from "../tags/frontmatter.ts";
 import { hashtagOf, isMetaTag } from "../tags/names.ts";
-import { chipsField, suggestions } from "../ui/chips.ts";
+import { isEmptyQuery, pageMatches, parsePageQuery } from "../tags/query.ts";
+import { chipsField, suggestions, tagSearchField } from "../ui/chips.ts";
+import { checkbox } from "../ui/form.ts";
 import { el } from "../ui/elements.ts";
 import { ICONS } from "../ui/icons.ts";
 import { pageTree } from "../ui/pagetree.ts";
@@ -25,7 +29,14 @@ export const VIEW = "pages";
 export const TAG_PAGES_COMMAND = "Silverware Tags: Tag pages";
 export const PAGE_TAGS_COMMAND = "Silverware Tags: Page tags";
 
-type State = { readonly checked: readonly string[]; readonly add: readonly string[]; readonly remove: readonly string[] };
+type State = {
+  readonly checked: readonly string[];
+  readonly add: readonly string[];
+  readonly remove: readonly string[];
+  // The search as typed, and whether it shows the pages using no tag only
+  readonly search: string;
+  readonly untagged: boolean;
+};
 
 const listed = (names: readonly string[]) => names.map(hashtagOf).join(" ");
 
@@ -48,7 +59,7 @@ export function pagesOperation(pages: readonly string[], add: readonly string[],
 
 const stateOf = (value: unknown): State => {
   const s = (value ?? {}) as Partial<State>;
-  return { checked: s.checked ?? [], add: s.add ?? [], remove: s.remove ?? [] };
+  return { checked: s.checked ?? [], add: s.add ?? [], remove: s.remove ?? [], search: s.search ?? "", untagged: s.untagged ?? false };
 };
 
 function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTMLElement {
@@ -62,11 +73,39 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
     host.remember(state);
   };
 
-  const search = el(doc, "input", { class: "swg-field swg-search", attrs: { type: "search", placeholder: "Search pages", "aria-label": "Search pages", spellcheck: "false", "data-swg-focus": "" } });
   // SilverBullet's meta pages (libraries, templates) left out, as its own tree's Pages leaves them
   const meta = metaPages(catalog);
   const tree = pageTree(doc, catalog.pages.filter((page) => !meta.has(page) || state.checked.includes(page)), { checked: state.checked, changed: () => picked() });
-  search.addEventListener("input", () => tree.filter(search.value));
+  // Every tag each page uses, as the index has them (any context)
+  const usedBy = new Map<string, string[]>();
+  for (const [name, info] of catalog.tags) for (const page of info.pages) (usedBy.get(page) ?? usedBy.set(page, []).get(page)!).push(name);
+  const search = tagSearchField(doc, { value: state.search, placeholder: "Search pages, #tag, -#tag", names, changed: () => (keep({ search: search.value() }), filtered()) });
+  const untagged = checkbox(doc, "Untagged", state.untagged, (on) => (keep({ untagged: on }), filtered()));
+  untagged.element.title = "Only the pages using no tag";
+  const shownLine = el(doc, "span", { class: "swg-note swg-shown" });
+  const checkShown = el(doc, "button", {
+    class: "swg-button swg-check-shown",
+    text: "Check all shown",
+    run: () => {
+      tree.check(tree.shown(), true);
+      picked();
+    },
+  });
+  const filters = el(doc, "div", "swg-page-filters", untagged.element, shownLine, checkShown);
+  /** The search or Untagged changed: the tree shows the pages they find */
+  const filtered = () => {
+    const query = parsePageQuery(state.search);
+    const on = state.untagged || !isEmptyQuery(query);
+    tree.filter(on ? (page) => (!state.untagged || !usedBy.has(page)) && pageMatches(query, page, usedBy.get(page) ?? []) : undefined);
+    filterNote();
+  };
+  const filterNote = () => {
+    const shown = tree.shown();
+    const visible = new Set(shown);
+    const hidden = state.checked.filter((page) => !visible.has(page)).length;
+    shownLine.textContent = `${counted(shown.length, "page")} shown${hidden ? `, ${hidden} checked hidden by the search` : ""}`;
+    checkShown.disabled = !shown.length || shown.every((page) => state.checked.includes(page));
+  };
 
   const heading = el(doc, "h3", "swg-detail-name");
   // What of the tags asked to take off cannot be (none of the pages has it as its own)
@@ -102,6 +141,7 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
     const checked = tree.checked();
     if (checked.join("\n") !== state.checked.join("\n")) dropped = [];
     keep({ checked });
+    filterNote();
     const read = ++reading;
     const missing = state.checked.filter((page) => !tagsOf.has(page));
     update();
@@ -160,8 +200,9 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
     reviewButton.disabled = !pages.length || !changes;
   };
 
+  filtered();
   picked();
-  return el(doc, "div", "swg-manager-body", el(doc, "div", "swg-manager-tags", search, el(doc, "div", "swg-tree-box-list", tree.element)), right);
+  return el(doc, "div", "swg-manager-body", el(doc, "div", "swg-manager-tags", search.element, filters, el(doc, "div", "swg-tree-box-list", tree.element)), right);
 }
 
 export function pagesModule(module: ModuleHost): TagsModule {
@@ -172,7 +213,7 @@ export function pagesModule(module: ModuleHost): TagsModule {
         label: "By page",
         render: (host, state) => pagesView(module, host, state),
         // Applied: the same pages checked, nothing to change
-        applied: (state) => ({ checked: stateOf(state).checked, add: [], remove: [] }),
+        applied: (state) => ({ ...stateOf(state), add: [], remove: [] }),
       },
     ],
     commands: () => [

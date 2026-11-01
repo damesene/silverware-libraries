@@ -1,8 +1,8 @@
 // Pages as a tree by folder ("/" in a page's name: `Projects/Alpha/Plan`),
 // each with a check box; a folder's box checks every page under it (its own
 // page too, where a page has its name), shown checked where all are and in
-// between where some are. A search shows the pages whose name holds it, with
-// the folders above them open. Folders open as they are clicked; only those
+// between where some are. A filter (a search) shows the pages it keeps, with
+// the folders above them open; a folder's box then checks those shown only. Folders open as they are clicked; only those
 // open are in the document (a space of thousands of pages).
 import { el } from "./elements.ts";
 import { ICONS } from "./icons.ts";
@@ -46,7 +46,10 @@ export type PageTree = {
   checked(): string[];
   // Pages checked (as a folder's box checks them)
   check(pages: readonly string[], on: boolean): void;
-  filter(query: string): void;
+  // Only the pages `shows` keeps shown (none: all)
+  filter(shows?: (page: string) => boolean): void;
+  // The pages shown, in the space's order
+  shown(): string[];
 };
 
 export function pageTree(doc: Document, pages: readonly string[], options: { readonly checked?: readonly string[]; readonly changed?: () => void } = {}): PageTree {
@@ -54,24 +57,27 @@ export function pageTree(doc: Document, pages: readonly string[], options: { rea
   const checked = new Set(options.checked ?? []);
   // The folders above the pages checked at the start open, so they show
   const open = new Set<string>((options.checked ?? []).flatMap((page) => page.split("/").slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join("/"))));
-  let query = "";
+  let keeps: ((page: string) => boolean) | undefined;
+  // The pages shown under a node (all where nothing filters)
+  const visible = (node: Node): string[] => (keeps ? node.pages.filter(keeps) : node.pages);
   const list = el(doc, "ul", { class: "swg-tree", attrs: { role: "tree" } });
 
-  const shown = (node: Node): boolean => !query || node.pages.some((page) => page.toLowerCase().includes(query));
+  const shown = (node: Node): boolean => !keeps || node.pages.some(keeps);
   const stateOf = (node: Node): "on" | "off" | "some" => {
-    const on = node.pages.filter((page) => checked.has(page)).length;
-    return on === 0 ? "off" : on === node.pages.length ? "on" : "some";
+    const pages = visible(node);
+    const on = pages.filter((page) => checked.has(page)).length;
+    return on === 0 ? "off" : on === pages.length ? "on" : "some";
   };
   const render = () => list.replaceChildren(...roots.filter(shown).map(item));
   const item = (node: Node): HTMLElement => {
     const folder = node.children.length > 0;
-    const expanded = folder && (open.has(node.path) || !!query);
+    const expanded = folder && (open.has(node.path) || !!keeps);
     const box = el(doc, "input", { class: "swg-tree-box", attrs: { type: "checkbox", "aria-label": node.path } });
     const state = stateOf(node);
     box.checked = state === "on";
     box.indeterminate = state === "some";
     box.addEventListener("change", () => {
-      api.check(node.pages, stateOf(node) !== "on");
+      api.check(visible(node), stateOf(node) !== "on");
       options.changed?.();
     });
     const toggle = folder
@@ -93,7 +99,7 @@ export function pageTree(doc: Document, pages: readonly string[], options: { rea
       "swg-tree-row",
       toggle,
       el(doc, "label", "swg-tree-label", box, el(doc, "span", { class: "swg-tree-icon", html: node.page && !folder ? ICONS.page : ICONS.folder }), el(doc, "span", { class: "swg-tree-name", text: node.label })),
-      folder ? el(doc, "span", { class: "swg-count", text: String(node.pages.length), title: `${node.pages.length} pages` }) : null,
+      folder ? el(doc, "span", { class: "swg-count", text: String(visible(node).length), title: `${visible(node).length} pages` }) : null,
     );
     const li = el(doc, "li", { class: "swg-tree-item", attrs: { role: "treeitem", "data-swg-page": node.path, "aria-expanded": folder ? String(expanded) : undefined } }, row);
     if (expanded) li.append(el(doc, "ul", { class: "swg-tree-children", attrs: { role: "group" } }, ...node.children.filter(shown).map(item)));
@@ -110,10 +116,11 @@ export function pageTree(doc: Document, pages: readonly string[], options: { rea
       }
       render();
     },
-    filter: (q) => {
-      query = q.trim().toLowerCase();
+    filter: (shows) => {
+      keeps = shows;
       render();
     },
+    shown: () => (keeps ? pages.filter(keeps) : [...pages]),
   };
   render();
   return api;

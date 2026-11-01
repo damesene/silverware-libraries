@@ -17,7 +17,7 @@ Everything is in one window, **Silverware Tags: Manager**, with two views (tabs 
   * **Rename**: its name is a field: type the new name and press **Enter** (or *Rename…*). Every use of it changes: the pages' frontmatter, their tag lines, and their text, items, tasks, tables and headings. A name another tag has merges the two, which the field says as you type. A tag with tags under it renames them too (`project` to `work/project` makes `project/alpha` into `work/project/alpha`), unless you untick *Its subtags too* in the review. **Esc** puts the name back.
   * **Remove tag…**: takes it off every page using it. The review lets you choose *Remove from*: the text and the page's own tags (the default), the text only, or the page's own tags only (its frontmatter and its tag lines, a line of hashtags alone, which SilverBullet reads as the page's tags too). In the text you choose to keep the word, only the `#` going (the default: `#project/alpha` becomes `project/alpha`, `#<two words>` becomes `two words`), or to take it out with the space beside it. A page's own tag always goes whole. Its subtags go too if you tick that.
   * **Add to pages…** and **Remove from pages…** take you to *By page* with the tag to add, or with the pages having it picked and the tag to take off.
-* **By page** (the command **Silverware Tags: Tag pages**): your pages as a tree of folders. Tick pages, or a folder for every page under it (its own page too); type to find pages. On the right are the tags the pages you picked have, each with how many of them have it (`2/3`): **×** takes one off them all (click again to keep it), and the *Add* field gives tags to them all (the tags of your space are offered as you type: **↑ ↓** and **Enter**, or **Tab** for the first). Then *Review changes…*. Tags are added into each page's frontmatter (a page that has one already is left as it is) and taken off its frontmatter and its tag lines; a hashtag in a page's text stays (*Remove tag* takes those off).
+* **By page** (the command **Silverware Tags: Tag pages**): your pages as a tree of folders. Tick pages, or a folder for every page under it (its own page too); type to find pages. The search takes tags too: `#project` finds the pages using the tag anywhere (in their frontmatter, tag lines or text; its subtags too, `#project/alpha`), `-#done` leaves out those using it, other words look in the page's name, and all of them must hold (`#project -#done plan`); the tags of your space are offered as you type a `#`. *Untagged* shows the pages using no tag. While a search shows some pages only, a folder's box ticks the pages shown, *Check all shown* ticks them all, and pages you ticked that the search hides stay ticked (it says how many). On the right are the tags the pages you picked have, each with how many of them have it (`2/3`): **×** takes one off them all (click again to keep it), and the *Add* field gives tags to them all (the tags of your space are offered as you type: **↑ ↓** and **Enter**, or **Tab** for the first). Then *Review changes…*. Tags are added into each page's frontmatter (a page that has one already is left as it is) and taken off its frontmatter and its tag lines; a hashtag in a page's text stays (*Remove tag* takes those off).
 * **Silverware Tags: Page tags** opens *By page* with the page you are on picked.
 * **Cleanup** (a tab of the window): tags that are likely one, found by their names: the same but for capitals or a separator (`Todo`, `to-do`, `todo`), a plural of another (`ideas`, `idea`), or one letter apart at the same level (`meeting`, `meetnig`; names of five letters or more). Each group offers the tag to merge into (the most used, unless you pick another) and *Merge…*, reviewed first. Below them the tags used on one page only, each opening in *By tag*.
 * **The Tags panel** (the command **Silverware Tags: Tags panel**): the tags as a tree in SilverBullet's right sidebar, beside your pages (its menu moves it to the left or the bottom; it stays open across reloads). Each tag shows how many pages use it, a level how many use a tag under it. **The tags of the page you are on have their # in the accent color** (and so does a level holding one), and come first where *List this page's tags first in the Tags panel* is on (Settings; off by default: by name, folders first); *This page* above it shows only them, *Page tags* and *Tasks* only those, and its filter field finds a tag. A click opens a level, a **double click** opens the tag in the window; the buttons of a row (shown as the pointer is over it) **add the tag to the page you are on** (+; at once, as one of its own tags; Undo takes it back), or where it is one of the page's own tags already **take it off** (−: from its frontmatter and tag lines), **rename it** (✎, or **F2**: the window with its name to type) and **open it in the window**, and dragging a tag onto another level moves it there (`alpha` dropped on `work` becomes `work/alpha`, its subtags with it), reviewed in the window first.
@@ -1017,6 +1017,22 @@ end
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* By page: Untagged, how many the search shows, Check all shown */
+.swg-page-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+.swg-page-filters .swg-shown {
+  flex: 1;
+  margin: 0;
+}
+.swg-check-shown {
+  padding: 2px 8px;
+  font-size: 12px;
 }
 
 /* By page: the pages' tree in a box of its own, scrolled */

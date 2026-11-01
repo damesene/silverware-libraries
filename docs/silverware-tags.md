@@ -95,6 +95,12 @@ abstraction of its own, room for more operations.
     hashtags alone: SilverBullet's `plugs/index/frontmatter.ts` reads them as
     the page's tags, verified the same day), and always go whole: a bare word
     on a tag line would mean nothing.
+12. **A search of pages by tags** in By page (decided 2026-11-01): `#a` the
+    pages using the tag in any context (their own tags and their text), its
+    subtags counting, `-#a` those not; words of the name; all together (no
+    "or"), case ignored (tags/query.ts, from the catalog: no page read).
+    *Untagged*: pages using no tag. A folder's box ticks the pages shown only;
+    *Check all shown*; pages ticked that the search hides stay ticked, said.
 
 ## Design
 

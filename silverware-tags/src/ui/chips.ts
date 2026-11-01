@@ -7,6 +7,7 @@
 import { el } from "./elements.ts";
 import { ICONS } from "./icons.ts";
 import { cleanName, hashtagOf, nameProblem } from "../tags/names.ts";
+import { tagAtCaret } from "../tags/query.ts";
 
 // At most this many offered
 const OFFERED = 8;
@@ -89,6 +90,32 @@ export function tagField(doc: Document, options: { readonly value?: string; read
   input.addEventListener("input", () => options.changed?.());
   const element = el(doc, "div", "swg-field-wrap", input, list);
   return { element, input, value: () => cleanName(input.value) };
+}
+
+/** A search of pages (tags/query.ts): the `#tag` typed at the caret offered the space's tags, the one taken written in its place */
+export function tagSearchField(doc: Document, options: { readonly value?: string; readonly placeholder: string; readonly names: readonly string[]; readonly changed: () => void }): TagField {
+  const input = el(doc, "input", { class: "swg-field swg-search", attrs: { type: "search", placeholder: options.placeholder, "aria-label": options.placeholder, spellcheck: "false", autocomplete: "off", "data-swg-focus": "" } });
+  input.value = options.value ?? "";
+  const caret = () => input.selectionStart ?? input.value.length;
+  const list = withSuggestions(
+    doc,
+    input,
+    (value) => {
+      const at = tagAtCaret(value, caret());
+      return at?.typed.trim() ? suggestions(options.names, at.typed) : [];
+    },
+    (name) => {
+      const at = tagAtCaret(input.value, caret());
+      if (!at) return;
+      const written = `${at.not ? "-" : ""}${hashtagOf(name)} `;
+      input.value = input.value.slice(0, at.from) + written + input.value.slice(at.to).replace(/^ /, "");
+      const end = at.from + written.length;
+      input.setSelectionRange(end, end);
+      options.changed();
+    },
+  );
+  input.addEventListener("input", () => options.changed());
+  return { element: el(doc, "div", "swg-field-wrap", input, list), input, value: () => input.value };
 }
 
 export type ChipsField = {

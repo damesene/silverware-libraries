@@ -124,6 +124,38 @@ test("Remove tag taking it out of the text, with the space beside it; the page's
   await expect.poll(() => pageText(page, "Journal/2026-10-30")).toContain("Thinking about of a garden.");
 });
 
+test("by page: a search by tags (a tag offered as typed), Untagged, Check all shown, the checked it hides said", async ({ page }) => {
+  await command(page, "Silverware Tags: Tag pages");
+  const window = page.locator(".swg-workspace");
+  const search = window.locator(".swg-search");
+  await search.fill("#to");
+  await expect(window.locator('.swg-suggest-item[data-swg-name="todo"]')).toBeVisible();
+  await search.press("Tab");
+  await expect(search).toHaveValue("#todo ");
+  // #todo in a task, a table's cell: without the pages with #meeting, only Alpha
+  await search.pressSequentially("-#meeting");
+  await expect(window.locator(".swg-shown")).toHaveText("1 page shown");
+  await expect(window.locator(`[data-swg-page="${pageName("Projects/Alpha")}"]`)).toBeVisible();
+  await window.locator(".swg-check-shown").click();
+  await expect(window.locator(".swg-detail-name")).toHaveText(pageName("Projects/Alpha"));
+  await expect(window.locator(".swg-check-shown")).toBeDisabled();
+  // Another search: the page checked stays so, said as hidden
+  await search.fill("");
+  await window.getByLabel("Untagged").check();
+  await expect(window.locator(`[data-swg-page="${pageName("Recipes/Soup")}"]`)).toBeVisible();
+  await expect(window.locator(`[data-swg-page="${pageName("Garage/Car")}"]`)).toHaveCount(0);
+  await expect(window.locator(".swg-shown")).toContainText("1 checked hidden by the search");
+  await expect(window.locator(".swg-detail-name")).toHaveText(pageName("Projects/Alpha"));
+  // A folder's box checks the pages of it shown only
+  await window.getByLabel("Untagged").uncheck();
+  await search.fill("#todo -#decision");
+  await window.locator(`[data-swg-page="${pageName("Meetings")}"] > .swg-tree-row .swg-tree-box`).check();
+  await expect(window.locator(".swg-detail-name")).toHaveText("2 pages picked");
+  await search.fill("#todo");
+  await expect(window.locator(`[data-swg-page="${pageName("Meetings/2026-10-15")}"] .swg-tree-box`)).toBeChecked();
+  await expect(window.locator(`[data-swg-page="${pageName("Meetings/2026-10-01")}"] .swg-tree-box`)).not.toBeChecked();
+});
+
 test("Page tags: the window by page with the page open picked, its tags changed", async ({ page }) => {
   await openPage(page, "Projects/Alpha/Plan");
   await command(page, "Silverware Tags: Page tags");

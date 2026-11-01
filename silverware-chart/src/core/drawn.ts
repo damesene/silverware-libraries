@@ -6,6 +6,7 @@
 // element when it scrolls far out of view or the page changes. A chart whose
 // element is gone is destroyed (Chart.js keeps listeners and a resize
 // observer otherwise).
+import type { ChartFormat } from "./format.ts";
 import type { ChartModel } from "./model.ts";
 import type { ChartConfig } from "./type.ts";
 
@@ -24,6 +25,10 @@ export type Drawn = {
   // The page it is on, and its model as its block has it (its source not read yet)
   readonly page: string;
   readonly model: ChartModel;
+  // Its block (its language and text, which find it in the page) and the format it was read by
+  readonly language: string;
+  readonly body: string;
+  readonly format: ChartFormat;
   // Made at (ms), and whether it was seen in the document since
   readonly made: number;
   seen: boolean;

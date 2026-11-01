@@ -26,15 +26,15 @@ function imports(file: string): string[] {
 }
 
 const of = (folder: string) => files(join(SRC, folder)).map((file) => [relative(SRC, file).replace(/\\/g, "/"), imports(file)] as const);
-// The core's shapes a format or a type is written against
-const SHAPES = ["core/model.ts", "core/format.ts", "core/type.ts"];
+// The core's shapes a format, a type or a source's reading is written against
+const SHAPES = ["core/model.ts", "core/format.ts", "core/type.ts", "core/blocks.ts"];
 
 describe("isolation", () => {
-  it("keeps formats and types to the core's shapes", () => {
-    for (const [file, list] of [...of("formats"), ...of("types")]) expect(list.filter((path) => !SHAPES.includes(path) && path.split("/")[0] !== file.split("/")[0]), file).toEqual([]);
+  it("keeps formats, types and the sources' reading to the core's shapes", () => {
+    for (const [file, list] of [...of("formats"), ...of("types"), ...of("sources")]) expect(list.filter((path) => !SHAPES.includes(path) && path.split("/")[0] !== file.split("/")[0]), file).toEqual([]);
   });
   it("keeps the core off the modules, formats, types and SilverBullet", () => {
-    for (const [file, list] of of("core")) expect(list.filter((path) => /^(modules|formats|types)\//.test(path) || path === "bridge.ts" || path === "modules.ts"), file).toEqual([]);
+    for (const [file, list] of of("core")) expect(list.filter((path) => /^(modules|formats|types|sources)\//.test(path) || path === "bridge.ts" || path === "modules.ts"), file).toEqual([]);
   });
   it("keeps the modules off each other and SilverBullet", () => {
     for (const [file, list] of of("modules")) expect(list.filter((path) => path.startsWith("modules/") || path === "bridge.ts"), file).toEqual([]);

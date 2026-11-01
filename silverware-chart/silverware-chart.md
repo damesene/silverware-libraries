@@ -1,14 +1,14 @@
 ---
 name: Library/damesene/silverware-chart
 tags: meta/library
-description: "Silverware Chart: charts written as Mermaid, which GitHub draws too, drawn in SilverBullet with Chart.js; their data from your blocks or from a named table of Silverware Table, followed as you edit it."
+description: "Silverware Chart: charts written as Mermaid, which GitHub draws too, drawn in SilverBullet with Chart.js; their data from your blocks or from a markdown table, followed as you edit it."
 files:
 - silverware-chart.js
 - silverware-chart-chartjs.js
 ---
 # Silverware Chart
 
-Charts in your pages, written so other tools draw them too. A chart is a ` ```mermaid ` block, as Mermaid writes charts (GitHub and other Mermaid renderers draw it as well); in SilverBullet it is drawn with [Chart.js](https://www.chartjs.org): more types, colors that follow your theme, and its data can come from a table of [[Library/damesene/silverware-table|Silverware Table]], the chart changing as you edit the table.
+Charts in your pages, written so other tools draw them too. A chart is a ` ```mermaid ` block, as Mermaid writes charts (GitHub and other Mermaid renderers draw it as well); in SilverBullet it is drawn with [Chart.js](https://www.chartjs.org): more types, colors that follow your theme, and its data can come from a markdown table of your page, the chart changing as you edit the table. With [[Library/damesene/silverware-table|Silverware Table]] it can also draw a table you named, and the chart's numbers are written with your edits of the table.
 
 ## At a glance
 
@@ -58,14 +58,13 @@ A setting it does not know is kept as you wrote it.
 
 ## Data from a table
 
-Name a table with Silverware Table (the pencil in its ⋯ menu), then say it in the chart: `source` the table's name (`[[Page]]sales` for a table on another page), `x` the column of the labels, `series` the columns of the values, by their names as formulas write them.
+A chart may draw a markdown table instead of the numbers in its block: say which table with `source`, the column of the labels with `x` and the columns of the values with `series` (by their names as they show, or as SilverBullet's index keys them: `Unit price` or `unit_price`).
 
 ````markdown
 | Month | Revenue | Cost |
 |---|--:|--:|
 | Oct | 120 | 80 |
 | Nov | 140 | 85 |
-| <meta core.table core.name='sales'> |
 
 ```mermaid
 xychart-beta
@@ -73,20 +72,30 @@ xychart-beta
   x-axis ["Oct", "Nov"]
   bar "revenue" [120, 140]
   line "cost" [80, 85]
-%% chart.source: sales
+%% chart.source: above
 %% chart.x: month
 %% chart.series: revenue, cost
 ```
 ````
 
-In SilverBullet the chart draws the table as it is: edit a cell and the chart changes. The numbers in the block are what other tools draw; keep them as they are or update them when you like. The block's series keep their kind (`bar`, `line`) and their names in the table's columns' order.
+| `source` | The table |
+|---|---|
+| `above` | the nearest table above the chart |
+| `below` | the nearest table below it |
+| `#Sales` | the first table under the heading *Sales*; `[[Page]]#Sales` on another page |
+| `sales` | the table you named *sales* with [[Library/damesene/silverware-table\|Silverware Table]] (the pencil in its ⋯ menu), `[[Page]]sales` on another page; needs Silverware Table |
+
+* In SilverBullet the chart draws the table as it is: edit a cell and the chart changes.
+* The numbers in the block are what other tools (GitHub) draw. With Silverware Table, an edit of a table you make with it writes them anew in the same edit, so one Ctrl+Z takes back both.
+* Where they are behind the table (you edited its markdown by hand, or Silverware Table is not installed), the chart says **Stale: update data** in its corner: click it to write the table's numbers into the block.
+* The block's series keep their kind (`bar`, `line`) and their names, in the order of the `series` columns.
 
 ## Settings
 
 | Setting | Default | What it does |
 |---|---|---|
 | `silverware.chart.height` | `300px` | A chart's height where its block says none |
-| `silverware.chart.modules.<name>.enabled` | `true` | Turns a part off (applies on reload): `mermaid` (charts written as Mermaid), `types` (the built-in types of charts), `tables` (tables as sources) |
+| `silverware.chart.modules.<name>.enabled` | `true` | Turns a part off (applies on reload): `mermaid` (charts written as Mermaid), `types` (the built-in types of charts), `tables` (markdown tables as sources), `silverwareTable` (tables named by Silverware Table, and the chart's data written with the table's edits) |
 
 ## Custom formats
 
@@ -172,7 +181,8 @@ config.define("silverware.chart", {
       properties = {
         mermaid = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Charts written as Mermaid (```mermaid blocks of xychart-beta and pie), which GitHub and other Mermaid renderers draw too.", ui = { category = "Silverware Chart", label = "Mermaid", priority = 0.9 } } } },
         types = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "The built-in types of charts: bar, line, area, scatter, pie, doughnut, polar area, radar.", ui = { category = "Silverware Chart", label = "Chart types", priority = 0.8 } } } },
-        tables = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "A named table of Silverware Table as a chart's data, followed as the table is edited.", ui = { category = "Silverware Chart", label = "Tables as sources", priority = 0.7 } } } },
+        tables = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "A markdown table as a chart's data, found by its place (above or below the chart, under a heading), followed as it is edited.", ui = { category = "Silverware Chart", label = "Tables as sources", priority = 0.7 } } } },
+        silverwareTable = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Where Silverware Table is installed: a table it named as a chart's data, and the chart's data written into its block with each edit of the table.", ui = { category = "Silverware Chart", label = "Silverware Table", priority = 0.6 } } } },
       },
     },
   },
@@ -185,12 +195,13 @@ if js and js.window then
     getText = editor.getText,
     getCurrentPage = editor.getCurrentPage,
     readPage = space.readPage,
+    replaceRange = editor.replaceRange,
     getConfig = config.get,
   }
-  if silverware.table and silverware.table.evaluate then
-    bridge.evaluate = function(formula, text, page)
-      return silverware.table.evaluate(formula, text, page)
-    end
+  -- Silverware Table's API, where it is installed (its API page has priority 50: defined before this block)
+  if silverware.table and silverware.table.tables and silverware.table.onWrite then
+    bridge.tables = silverware.table.tables
+    bridge.onWrite = silverware.table.onWrite
   end
   silverwareChartJs.init(bridge)
   -- A code widget for each language a format reads; a block that is no chart goes to what drew that language before
@@ -239,6 +250,24 @@ end
   border-radius: 6px;
   color: var(--editor-error-color, #d33);
   font-size: 0.9em;
+}
+
+.swc-stale {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--editor-warning-color, #c80);
+  border-radius: 4px;
+  background: var(--root-background-color, #fff);
+  color: var(--editor-warning-color, #c80);
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.swc-stale:hover {
+  opacity: 1;
 }
 
 .swc-code {

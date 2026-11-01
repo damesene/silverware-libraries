@@ -1,4 +1,4 @@
-import { charts, expect, test } from "./helpers.ts";
+import { charts, expect, savedText, test } from "./helpers.ts";
 
 const SALES = `| Month | Revenue | Cost |
 |---|--:|--:|
@@ -43,28 +43,43 @@ test("says why it cannot draw a chart", async ({ page, open }) => {
   await expect(page.locator(".swc-problem")).toHaveText('Silverware Chart: no chart type "sunburst"');
 });
 
-test("draws a named table and follows it as a cell is edited", async ({ page, open }) => {
-  await open(`# Sales
-
-${SALES}
-\`\`\`mermaid
+const block = (source: string, values: string) => `\`\`\`mermaid
 xychart-beta
   x-axis ["Oct", "Nov"]
-  bar "revenue" [1, 2]
-%% chart.source: sales
+  bar "revenue" [${values}]
+%% chart.source: ${source}
 %% chart.x: month
 %% chart.series: revenue
-\`\`\`
-`);
-  await expect.poll(() => charts(page)).toEqual([{ type: "bar", labels: ["Oct", "Nov"], data: [[120, 140]] }]);
+\`\`\``;
+
+test("draws a named table and the table above, follows them and writes their numbers with a cell's edit", async ({ page, open }) => {
+  await open(`# Sales\n\n${SALES}\n${block("sales", "120, 140")}\n\n${block("above", "120, 140")}\n`);
+  await expect.poll(() => charts(page)).toEqual([
+    { type: "bar", labels: ["Oct", "Nov"], data: [[120, 140]] },
+    { type: "bar", labels: ["Oct", "Nov"], data: [[120, 140]] },
+  ]);
+  await expect(page.locator(".swc-stale")).toHaveCount(0);
   // Edit mode (a click edits the cell), as the table's tests set it
   await page.evaluate(() => localStorage.setItem("silverware.table.editMode", "on"));
   await page.reload();
-  await expect.poll(() => charts(page)).toHaveLength(1);
+  await expect.poll(() => charts(page)).toHaveLength(2);
   // (The first row: Enter on the last one adds a row)
   await page.locator(".sb-table-widget td", { hasText: /^120$/ }).click();
   await page.keyboard.press("Control+A");
   await page.keyboard.type("300");
   await page.keyboard.press("Enter");
-  await expect.poll(() => charts(page)).toEqual([{ type: "bar", labels: ["Oct", "Nov"], data: [[300, 140]] }]);
+  await expect.poll(() => charts(page)).toEqual([
+    { type: "bar", labels: ["Oct", "Nov"], data: [[300, 140]] },
+    { type: "bar", labels: ["Oct", "Nov"], data: [[300, 140]] },
+  ]);
+  // Both blocks written in the table's edit (Silverware Table's onWrite)
+  await expect.poll(() => savedText(page)).toContain(`${block("sales", "300, 140")}\n\n${block("above", "300, 140")}`);
+});
+
+test("says a block's numbers are behind its table, and writes them on request", async ({ page, open }) => {
+  await open(`# Sales\n\n${SALES}\n${block("#Sales", "1, 2")}\n`);
+  await expect.poll(() => charts(page)).toEqual([{ type: "bar", labels: ["Oct", "Nov"], data: [[120, 140]] }]);
+  await page.locator(".swc-stale").click();
+  await expect.poll(() => savedText(page)).toContain(block("#Sales", "120, 140"));
+  await expect(page.locator(".swc-stale")).toHaveCount(0);
 });

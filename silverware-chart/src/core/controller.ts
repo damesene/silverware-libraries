@@ -1,21 +1,27 @@
 // The core: a code block read by the formats of its language into a chart's
 // model, its source's data read in, drawn by Chart.js with the type's
 // configuration; the charts drawn follow their sources as the page is edited
-// and the theme as it is switched. Knows no module, format, type or source by
-// name: the modules give them (and the user's definitions, custom.ts).
+// and the theme as it is switched. Where the block's data are behind its
+// source's, the chart says so (Stale) and writes them on request (Update
+// data); a module may have them written with an edit of the source
+// (`dataEdits`). Knows no module, format, type or source by name: the modules
+// give them (and the user's definitions, custom.ts).
 import { customFormats } from "../custom.ts";
+import { type Block, blockOf, blocksOf } from "./blocks.ts";
 import { type ChartConstructor, type Drawn, DrawnCharts } from "./drawn.ts";
 import type { ChartFormat } from "./format.ts";
 import { type ChartModel, isUnreadable, type Unreadable } from "./model.ts";
-import type { ChartModule, ChartSource, ModuleHost, SourceData, TableApi } from "./module.ts";
+import type { ChartModule, ChartSource, ModuleHost, SourceData, TableApi, TextEdit } from "./module.ts";
 import { themeOf, watchTheme } from "./theme.ts";
 import type { ChartType } from "./type.ts";
 
-/** What the core needs of its host (SilverBullet through the bridge, or the playground) */
+/** What the core needs of its host (SilverBullet through the bridge, or a test's) */
 export type ControllerEnv = {
   readonly getText: () => Promise<string>;
   readonly getCurrentPage: () => Promise<string>;
   readonly readPage: (name: string) => Promise<string>;
+  // One edit of the page open (one undo step): Update data
+  readonly replaceRange?: (from: number, to: number, text: string) => Promise<void>;
   // Chart.js, loaded the first time a chart is drawn
   readonly loadChart: () => Promise<ChartConstructor>;
   readonly table?: TableApi;
@@ -25,6 +31,34 @@ export type ControllerEnv = {
 
 // The edits of a page come one per key: the charts read their sources once they pause
 const FOLLOW_MS = 120;
+
+/** The model with a source's data in place of its block's: the series named and drawn as the block has them, else by their columns */
+function withData(model: ChartModel, data: SourceData): ChartModel {
+  const names = model.source?.series ?? [];
+  return {
+    ...model,
+    labels: [...data.labels],
+    series: data.series.map((values, i) => ({
+      ...(model.series[i]?.name ?? names[i] ? { name: model.series[i]?.name ?? names[i] } : {}),
+      ...(model.series[i]?.kind ? { kind: model.series[i]!.kind } : {}),
+      values: [...values],
+    })),
+  };
+}
+
+/** Whether the block's data are its source's (no value and 0 alike: a format may write no value as 0) */
+function sameData(model: ChartModel, data: SourceData): boolean {
+  const value = (v: number | null | undefined) => v ?? 0;
+  return (
+    model.labels.length === data.labels.length &&
+    model.labels.every((label, i) => label === data.labels[i]) &&
+    model.series.length === data.series.length &&
+    data.series.every((values, i) => {
+      const own = model.series[i]?.values ?? [];
+      return own.length === values.length && values.every((v, j) => value(v) === value(own[j]));
+    })
+  );
+}
 
 export class Controller {
   private modules: readonly ChartModule[] = [];
@@ -44,6 +78,8 @@ export class Controller {
   hostFor(name: string): ModuleHost {
     return {
       table: this.env.table,
+      readPage: (page) => this.env.readPage(page),
+      dataEdits: (text) => this.dataEdits(text),
       offer: (api) => void this.offers.set(name, api),
       offered: <T>(module: string) => this.offers.get(module) as T | undefined,
     };
@@ -101,8 +137,14 @@ export class Controller {
     const model = read.model;
     const type = this.types().find((t) => t.name === model.type);
     if (!type) return this.problem(`no chart type "${model.type}"`);
-    const shown = model.source ? await this.withSource(model, page, await this.pageText(page, text)) : model;
-    if (isUnreadable(shown)) return this.problem(shown.problem);
+    let data: SourceData | undefined;
+    if (model.source) {
+      const pageText = await this.pageText(page, text);
+      const found = await this.sourceData(model, page, pageText, blockOf(pageText, language, text));
+      if (!found) return this.problem(`nothing reads the source "${model.source.table}"`);
+      if (isUnreadable(found)) return this.problem(found.problem);
+      data = found;
+    }
     let Chart: ChartConstructor;
     try {
       Chart = await (this.chart ??= this.env.loadChart());
@@ -116,12 +158,15 @@ export class Controller {
     box.style.height = model.height ?? this.env.height ?? "300px";
     const canvas = this.doc.createElement("canvas");
     box.append(canvas);
+    let entry: Drawn;
     try {
-      const chart = new Chart(canvas, type.config(shown, themeOf(this.doc)));
-      this.drawn.add({ box, chart, page, model, made: Date.now(), seen: false });
+      const chart = new Chart(canvas, type.config(data ? withData(model, data) : model, themeOf(this.doc)));
+      entry = { box, chart, page, model, language, body: text, format: read.format, made: Date.now(), seen: false };
+      this.drawn.add(entry);
     } catch (e) {
       return this.problem(`the chart could not be drawn: ${e instanceof Error ? e.message : String(e)}`);
     }
+    this.markStale(entry, data);
     return box;
   }
 
@@ -137,9 +182,11 @@ export class Controller {
   private async follow(text: string, page: string): Promise<void> {
     for (const entry of this.drawn.shown()) {
       if (entry.page !== page || !entry.model.source) continue;
-      const shown = await this.withSource(entry.model, page, text);
+      const data = await this.sourceData(entry.model, page, text, blockOf(text, entry.language, entry.body));
       // A source that cannot be read now (a table being renamed): the chart stays as it was until it can
-      if (!isUnreadable(shown)) this.redraw(entry, shown);
+      if (!data || isUnreadable(data)) continue;
+      this.redraw(entry, withData(entry.model, data));
+      this.markStale(entry, data);
     }
   }
 
@@ -164,6 +211,77 @@ export class Controller {
     if (type) DrawnCharts.redraw(entry, type.config(model, themeOf(this.doc)));
   }
 
+  /** The chart marked Stale where its block's data are not its source's, with Update data; unmarked where they are */
+  private markStale(entry: Drawn, data: SourceData | undefined): void {
+    const stale = !!data && !sameData(entry.model, data);
+    let mark = entry.box.querySelector<HTMLButtonElement>(".swc-stale");
+    if (!stale) {
+      mark?.remove();
+      return;
+    }
+    if (mark || !this.env.replaceRange) return;
+    mark = this.doc.createElement("button");
+    mark.type = "button";
+    mark.className = "swc-stale";
+    mark.textContent = "Stale: update data";
+    mark.title = "The data written in the block are not its source's (other tools draw the block's): write the source's into it";
+    mark.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      void this.updateData(entry);
+    });
+    // (A press on it is not a press on the widget, which would move SilverBullet's cursor into the block)
+    mark.addEventListener("mousedown", (e) => e.stopPropagation());
+    entry.box.append(mark);
+  }
+
+  /** Update data: the chart's block written with its source's data, by its format, as one edit */
+  private async updateData(entry: Drawn): Promise<void> {
+    const text = await this.env.getText();
+    const block = blockOf(text, entry.language, entry.body);
+    if (!block) return;
+    const edit = await this.blockEdit(block, entry.page, text);
+    if (edit) await this.env.replaceRange?.(edit.from, edit.to, edit.text);
+  }
+
+  /** The edit that writes a block's data as its source has them, by the block's format; none where they are */
+  private async blockEdit(block: Block, page: string, text: string): Promise<TextEdit | undefined> {
+    const read = this.read(block.language, block.body);
+    if (!read || isUnreadable(read.model) || !read.model.source) return undefined;
+    const data = await this.sourceData(read.model, page, text, block);
+    if (!data || isUnreadable(data) || sameData(read.model, data)) return undefined;
+    const written = read.format.write(withData(read.model, data), block.body);
+    return written === block.body ? undefined : { from: block.bodyFrom, to: block.bodyTo, text: written };
+  }
+
+  /**
+   * The edits bringing every chart of the text up to its source (a module
+   * has them written with an edit of a table); a source on another page is
+   * left out (that page is not what is written)
+   */
+  private async dataEdits(text: string): Promise<TextEdit[]> {
+    let page = "";
+    try {
+      page = await this.env.getCurrentPage();
+    } catch {
+      // Without its name, the page's own sources are still read from the text
+    }
+    const languages = new Set(this.languages());
+    const edits: TextEdit[] = [];
+    for (const block of blocksOf(text)) {
+      if (!languages.has(block.language)) continue;
+      const read = this.read(block.language, block.body);
+      if (!read || isUnreadable(read.model) || !read.model.source || read.model.source.table.startsWith("[[")) continue;
+      try {
+        const edit = await this.blockEdit(block, page, text);
+        if (edit) edits.push(edit);
+      } catch (e) {
+        console.error("Silverware Chart: a chart's data could not be written", e);
+      }
+    }
+    return edits;
+  }
+
   /** The page's text: the editor's while it holds the page (a block of it in there), else the page as saved */
   private async pageText(page: string, block: string): Promise<string> {
     try {
@@ -178,30 +296,19 @@ export class Controller {
     }
   }
 
-  /** The model with its source's data in place of its block's: the series named as the block names them, else by their columns */
-  private async withSource(model: ChartModel, page: string, text: string): Promise<ChartModel | Unreadable> {
+  /** The model's source's data, by the first source that reads its reference; undefined where none does (the block's own data drawn) */
+  private async sourceData(model: ChartModel, page: string, text: string, block: Block | undefined): Promise<SourceData | Unreadable | undefined> {
     const source = model.source!;
     for (const reader of this.sources()) {
       let data: SourceData | Unreadable | undefined;
       try {
-        data = await reader.read(source, page, text);
+        data = await reader.read(source, { page, text, block });
       } catch (e) {
         data = { problem: e instanceof Error ? e.message : String(e) };
       }
-      if (!data) continue;
-      if (isUnreadable(data)) return data;
-      return {
-        ...model,
-        labels: data.labels,
-        series: data.series.map((values, i) => ({
-          name: model.series[i]?.name ?? source.series[i],
-          ...(model.series[i]?.kind ? { kind: model.series[i].kind } : {}),
-          values,
-        })),
-      };
+      if (data) return data;
     }
-    // No source reads it (Silverware Table not installed): the block's own data
-    return model;
+    return undefined;
   }
 
   private problem(text: string): HTMLElement {

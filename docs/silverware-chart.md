@@ -215,10 +215,14 @@ bars, an area, a pie and a doughnut, a chart of a named table, a flowchart.
 Started on 2026-11-01. Done: step 1 (the frame, the core, the model and the
 format registry, the Mermaid format, the built-in types, Chart.js loaded beside
 the bundle, other Mermaid blocks handed on to what drew them before, custom
-formats) and step 2 (a named table as the source, followed live as the page is
-edited; the table's `silverware.table.evaluate` takes the page's text for it).
-Tested: unit tests (the format, the core, custom formats, isolation) and
-Playwright against SilverBullet. Next: step 3 as decided on 2026-11-01
-(decisions 7 to 9: charts without Silverware Table, its `tables(text)` and
-`onWrite(fn)` used by a module of their own, *Stale*), then step 4 (the
-toolbar and its menus).
+formats), step 2 and step 3 as decided (decisions 7 to 9: the `tables` module
+reads markdown tables by place and heading; Silverware Table's
+`silverware.table.tables(text)` and `onWrite(fn)`, used by the
+`silverwareTable` module for named tables and for writing the charts' data
+with each write of a table, one undo step; *Stale: update data*). Tested: unit
+tests (the format, the markdown reading, blocks, the core, custom formats,
+isolation; Silverware Table's `tables` and `onWrite`) and Playwright against
+SilverBullet (drawing, a flowchart handed on, a problem said, a named table
+and the table above followed and written with a cell's edit, Stale and
+Update data). Not done of step 2: a formula as a series (later). Next: step 4
+(the toolbar and its menus).

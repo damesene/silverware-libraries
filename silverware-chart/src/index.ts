@@ -2,9 +2,10 @@
 //   js.importFromSpace("Library/damesene/silverware-chart.js").init({ ... the bridge ... })
 // then a code widget defined for each of `languages()`, rendering `render(…)`,
 // and the page's edits told to `pageModified(…)`.
-import { type Bridge, missingBridgeFunctions, readSettings, type Settings } from "./bridge.ts";
+import { type Bridge, listOf, missingBridgeFunctions, readSettings, type Settings } from "./bridge.ts";
 import { Controller } from "./core/controller.ts";
 import type { ChartConstructor } from "./core/drawn.ts";
+import type { NamedTable, TableApi } from "./core/module.ts";
 import { customFormatsAnew, defineCustomFormats, formatsOf } from "./custom.ts";
 import { createModules } from "./modules.ts";
 
@@ -23,14 +24,29 @@ export async function init(bridge: Bridge): Promise<void> {
     console.error(`Silverware Chart: the library page did not hand over ${missing.join(", ")}`);
     return;
   }
-  const evaluate = bridge.evaluate;
+  const { replaceRange } = bridge;
   start(document, await readSettings(bridge), {
     getText: async () => String(await bridge.getText()),
     getCurrentPage: async () => String(await bridge.getCurrentPage()),
     readPage: async (name) => String(await bridge.readPage(name)),
+    replaceRange: replaceRange ? async (from, to, text) => void (await replaceRange(from, to, text)) : undefined,
     loadChart,
-    table: evaluate ? { evaluate: async (formula, text, page) => String(await evaluate(formula, text, page)) } : undefined,
+    table: tableApi(bridge),
   });
+}
+
+/** Silverware Table's API as the bridge hands it over (its tables as lists from Lua too), where it is installed */
+function tableApi(bridge: Bridge): TableApi | undefined {
+  const { tables, onWrite } = bridge;
+  if (!tables || !onWrite) return undefined;
+  return {
+    tables: async (text) =>
+      listOf(await tables(text)).map((t) => {
+        const table = t as NamedTable;
+        return { ...table, columns: listOf(table.columns) as NamedTable["columns"], rows: listOf(table.rows).map((row) => listOf(row).map(String)) };
+      }),
+    onWrite: (listener) => void onWrite(listener),
+  };
 }
 
 /** The core and the modules on, over a host's API (SilverBullet's, or the playground's) */

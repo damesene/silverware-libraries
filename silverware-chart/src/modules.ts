@@ -3,6 +3,7 @@
 import type { ModuleName, Settings } from "./bridge.ts";
 import type { ChartModule, ModuleHost } from "./core/module.ts";
 import { mermaidModule } from "./modules/mermaid.ts";
+import { silverwareTableModule } from "./modules/silverwareTable.ts";
 import { tablesModule } from "./modules/tables.ts";
 import { typesModule } from "./modules/types.ts";
 
@@ -10,6 +11,7 @@ const FACTORIES: readonly (readonly [ModuleName, (host: ModuleHost, settings: Se
   ["mermaid", mermaidModule],
   ["types", typesModule],
   ["tables", tablesModule],
+  ["silverwareTable", silverwareTableModule],
 ];
 
 /** The modules turned on, each made with its own host */

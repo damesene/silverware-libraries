@@ -80,6 +80,11 @@ test("by page: a folder picks its pages, their tags shown with counts, a tag add
   // Their own tags: #meeting on both, #project/alpha on one
   await expect(window.locator('.swg-their-tags [data-swg-chip="meeting"]')).toBeVisible();
   await expect(window.locator('.swg-their-tags [data-swg-chip="project/alpha"] .swg-chip-count')).toHaveText("1/2");
+  // The tags only in their text apart, with no × (this view does not change them)
+  await expect(window.locator('.swg-text-tags [data-swg-chip="todo"]')).toBeVisible();
+  await expect(window.locator('.swg-text-tags [data-swg-chip="decision"] .swg-chip-count')).toHaveText("1/2");
+  await expect(window.locator(".swg-text-tags .swg-chip-remove")).toHaveCount(0);
+  await expect(window.locator('.swg-text-tags [data-swg-chip="meeting"]')).toHaveCount(0);
   await window.locator('.swg-their-tags [data-swg-chip="meeting"] .swg-chip-remove').click();
   await expect(window.locator('.swg-their-tags [data-swg-chip="meeting"]')).toHaveClass(/swg-removing/);
   const add = window.locator('.swg-chips[data-swg-kind="add"] input');

@@ -15,7 +15,7 @@ import { metaPages } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule, WorkspaceHost } from "../core/module.ts";
 import { counted, type Operation } from "../core/operation.ts";
 import { each } from "../core/plan.ts";
-import { addPageTags, pageTags, removePageTags } from "../tags/edit.ts";
+import { addPageTags, removePageTags, tagUses } from "../tags/edit.ts";
 import type { FrontmatterForm } from "../tags/frontmatter.ts";
 import { hashtagOf, isMetaTag } from "../tags/names.ts";
 import { isEmptyQuery, pageMatches, parsePageQuery } from "../tags/query.ts";
@@ -66,8 +66,9 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
   const { doc, catalog } = host;
   let state = stateOf(given);
   const names = [...catalog.tags.keys()];
-  // Each page's own tags as read (its frontmatter's and its tag lines'), for this showing of the view
-  const tagsOf = new Map<string, readonly string[]>();
+  // Each page's tags as read, for this showing of the view: its own (its frontmatter's and its tag lines'), and
+  // those only in its text (a paragraph's, an item's…: shown apart, as this view does not change them)
+  const tagsOf = new Map<string, { readonly own: readonly string[]; readonly text: readonly string[] }>();
   const keep = (next: Partial<State>) => {
     state = { ...state, ...next };
     host.remember(state);
@@ -114,6 +115,8 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
   // Those dropped so, said until the pages picked change
   let dropped: readonly string[] = [];
   const theirs = el(doc, "div", { class: "swg-chips swg-their-tags", attrs: { "aria-label": "Their tags" } });
+  const inText = el(doc, "div", { class: "swg-chips swg-text-tags", attrs: { "aria-label": "In their text" } });
+  const inTextRow = el(doc, "div", "swg-form-row", el(doc, "span", { class: "swg-form-label", text: "In their text" }), inText, el(doc, "span", { class: "swg-form-hint", text: "Not changed here: Remove tag (By tag) takes them off the text." }));
   const add = chipsField(doc, { values: state.add, placeholder: "Add a tag to them", suggest: (typed) => suggestions(names, typed), changed: () => (keep({ add: add.chosen() }), update()), kind: "add" });
   const reviewButton = el(doc, "button", {
     class: "swg-button swg-primary swg-review-changes",
@@ -131,6 +134,7 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
     "swg-detail swg-form",
     heading,
     el(doc, "div", "swg-form-row", el(doc, "span", { class: "swg-form-label", text: "Their tags" }), theirs),
+    inTextRow,
     el(doc, "div", "swg-form-row", el(doc, "span", { class: "swg-form-label", text: "Add" }), add.element),
     el(doc, "div", "swg-actions", reviewButton),
     said,
@@ -151,9 +155,12 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
       // (A few at a time, as a plan reads them)
       await each(missing, async (page) => {
         try {
-          tagsOf.set(page, pageTags(await module.space.read(page)));
+          const uses = tagUses(await module.space.read(page));
+          const own = [...new Set(uses.filter((use) => use.context === "page").map((use) => use.name))];
+          const text = [...new Set(uses.map((use) => use.name))].filter((name) => !own.includes(name));
+          tagsOf.set(page, { own, text });
         } catch {
-          tagsOf.set(page, []);
+          tagsOf.set(page, { own: [], text: [] });
         }
       });
       if (read === reading) update();
@@ -166,7 +173,10 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
     const read = pages.filter((page) => tagsOf.has(page));
     const counts = new Map<string, number>();
     // (SilverBullet's own tags not offered to take off: a library's meta/library is how it is installed)
-    for (const page of read) for (const tag of tagsOf.get(page)!) if (!isMetaTag(tag)) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    for (const page of read) for (const tag of tagsOf.get(page)!.own) if (!isMetaTag(tag)) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    // Those only in their text, on the pages not having them as their own
+    const textCounts = new Map<string, number>();
+    for (const page of read) for (const tag of tagsOf.get(page)!.text) if (!isMetaTag(tag)) textCounts.set(tag, (textCounts.get(tag) ?? 0) + 1);
     // A tag to take off that none of them has as its own (only in their text, a paragraph's hashtag) is no change: said, and dropped
     const notOwn = read.length === pages.length ? state.remove.filter((tag) => !counts.has(tag)) : [];
     if (notOwn.length) {
@@ -194,6 +204,18 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
         }),
       );
     });
+    inTextRow.hidden = !textCounts.size;
+    inText.replaceChildren(
+      ...[...textCounts].sort(([a], [b]) => a.localeCompare(b)).map(([tag, count]) =>
+        el(
+          doc,
+          "span",
+          { class: "swg-chip swg-chip-text", attrs: { "data-swg-chip": tag } },
+          el(doc, "span", { class: "swg-chip-name", text: hashtagOf(tag) }),
+          count < pages.length ? el(doc, "span", { class: "swg-chip-count", text: `${count}/${pages.length}`, title: `In the text of ${count} of the ${counted(pages.length, "page")}` }) : null,
+        ),
+      ),
+    );
     theirs.replaceChildren(
       ...(chips.length ? chips : [el(doc, "span", { class: "swg-empty", text: !pages.length ? "Pick pages on the left: a folder picks every page under it." : read.length < pages.length ? "Reading their tags…" : "They have no tags of their own." })]),
     );

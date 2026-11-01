@@ -1026,13 +1026,18 @@ end
   align-items: center;
   gap: 4px 10px;
 }
+/* (How many are shown on a line of its own under them: beside them it wrapped word by word) */
 .swg-page-filters .swg-shown {
-  flex: 1;
+  order: 1;
+  flex: 1 0 100%;
   margin: 0;
+  font-size: 12px;
 }
 .swg-check-shown {
+  margin-left: auto;
   padding: 2px 8px;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 /* By page: the pages' tree in a box of its own, scrolled */

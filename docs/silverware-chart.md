@@ -103,6 +103,17 @@ typed.
      check is left out and logged, never failing the table's write. `fn` is
      fast and writes nothing itself. The chart gives its blocks reading that
      table their data anew, written by the block's format.
+   - The context of a write (decided 2026-11-02): `onWrite`'s function gets
+     `fn(text, context)`, the context functions, not data, so Silverware Table
+     may keep it as it likes: `renamed()` (a table or a column renamed: most
+     writes rename nothing), `table(nameBefore)`, `tableAt(offset)`, each with
+     `.name` now and `.column(nameBefore or key)` now (nil: deleted). The chart
+     follows its references with it (`source`, `x`, `series`; a series named as
+     its column renamed with it), in the same edit. A list of all changes
+     (`changes()`) only once one needs it.
+   - A reference that finds no column (a rename in the markdown by hand): the
+     chart says so with the table's columns to pick, one written into the
+     block.
    - A formula as a series (`=sales![revenue] * 1.21`) through
      `silverware.table.evaluate`, later.
 9. **The data in the block behind the source**: where the block's data are not

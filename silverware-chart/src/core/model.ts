@@ -53,8 +53,13 @@ export type ChartModel = {
   readonly extra?: Readonly<Record<string, string>>;
 };
 
-/** A block a format knows as its chart but cannot read: why, shown in its place */
-export type Unreadable = { readonly problem: string };
+/**
+ * A block a format knows as its chart but cannot read, or a source that
+ * cannot be read: why, shown in its place; `choices` the sources the chart
+ * could have instead (a column renamed by hand: the table's columns), offered
+ * there to write into the block
+ */
+export type Unreadable = { readonly problem: string; readonly choices?: readonly { readonly label: string; readonly source: Source }[] };
 
 export function isUnreadable(value: unknown): value is Unreadable {
   return !!value && typeof value === "object" && typeof (value as Unreadable).problem === "string";

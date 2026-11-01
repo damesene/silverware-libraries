@@ -2,6 +2,7 @@
 // plugin needed): the tables of a text (outside code blocks), its headings,
 // columns found by their names as SilverBullet's index keys them. Pure.
 import type { Block } from "../core/blocks.ts";
+import type { Source, Unreadable } from "../core/model.ts";
 
 /** A table as the sources read it: where it is, its columns, its body's cells as they show */
 export type TextTable = {
@@ -133,12 +134,23 @@ export function numberOf(text: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** A table's columns as a chart's data: the labels' (else 1, 2, …) and each series'; or what is missing */
-export function dataOf(table: Pick<TextTable, "columns" | "rows">, x: string | undefined, series: readonly string[], what: string): { labels: string[]; series: (number | null)[][] } | { problem: string } {
+/**
+ * A table's columns as a chart's data: the labels' (else 1, 2, …) and each
+ * series'; or what is missing, with the table's columns offered in its place
+ */
+export function dataOf(table: Pick<TextTable, "columns" | "rows">, source: Source, what: string): { labels: string[]; series: (number | null)[][] } | Unreadable {
+  const { x, series } = source;
   if (!series.length) return { problem: `${what}: say the columns to draw with series` };
   const index = (name: string) => columnIndex(table.columns, name);
   const missing = [...(x ? [x] : []), ...series].filter((name) => index(name) < 0);
-  if (missing.length) return { problem: `${what} has no column ${missing.join(", ")} (it has ${table.columns.map((c) => c.name).join(", ")})` };
+  if (missing.length) {
+    const first = missing[0]!;
+    // The first reference that finds no column, each column of the table in its place (a column renamed by hand)
+    const choices = table.columns
+      .filter((c) => c.name !== "")
+      .map((c) => ({ label: c.name, source: { ...source, ...(x === first ? { x: c.name } : {}), series: series.map((name) => (name === first && x !== first ? c.name : name)) } }));
+    return { problem: `${what} has no column ${missing.join(", ")} (it has ${table.columns.map((c) => c.name).join(", ")})`, choices };
+  }
   const xi = x ? index(x) : -1;
   return {
     labels: table.rows.map((row, i) => (xi >= 0 ? (row[xi] ?? "") : String(i + 1))),

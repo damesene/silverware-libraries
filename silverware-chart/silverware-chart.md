@@ -89,6 +89,8 @@ xychart-beta
 * The numbers in the block are what other tools (GitHub) draw. With Silverware Table, an edit of a table you make with it writes them anew in the same edit, so one Ctrl+Z takes back both.
 * Where they are behind the table (you edited its markdown by hand, or Silverware Table is not installed), the chart says **Stale: update data** in its corner: click it to write the table's numbers into the block.
 * The block's series keep their kind (`bar`, `line`) and their names, in the order of the `series` columns.
+* Rename a column or the table with Silverware Table and the chart follows: its `source`, `x` and `series` are written with the new names in the same edit (a series named as its column takes the new name too).
+* A column the chart names that the table does not have (renamed in the markdown by hand) is said in the chart's place, with the table's columns to pick from: click one and it is written into the block.
 
 ## Settings
 
@@ -237,7 +239,9 @@ end
 
 ```space-style
 /* Silverware Chart: a chart's box, and what shows where one cannot be drawn */
+/* (An element of its own: swc-chart) */
 .swc-chart {
+  display: block;
   position: relative;
   width: 100%;
   box-sizing: border-box;
@@ -268,6 +272,26 @@ end
 
 .swc-stale:hover {
   opacity: 1;
+}
+
+.swc-choices {
+  margin-top: 6px;
+  color: var(--root-color, inherit);
+}
+
+.swc-choice {
+  margin: 2px 4px 2px 0;
+  padding: 1px 8px;
+  border: 1px solid var(--subtle-color, #999);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.swc-choice:hover {
+  border-color: var(--ui-accent-color, #4e79a7);
 }
 
 .swc-code {

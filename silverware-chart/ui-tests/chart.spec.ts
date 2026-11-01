@@ -83,3 +83,26 @@ test("says a block's numbers are behind its table, and writes them on request", 
   await expect.poll(() => savedText(page)).toContain(block("#Sales", "120, 140"));
   await expect(page.locator(".swc-stale")).toHaveCount(0);
 });
+
+test("follows a column renamed with Silverware Table", async ({ page, open }) => {
+  await open(`# Sales\n\n${SALES}\n${block("sales", "120, 140")}\n`);
+  await expect.poll(() => charts(page)).toHaveLength(1);
+  await page.evaluate(() => localStorage.setItem("silverware.table.editMode", "on"));
+  await page.reload();
+  await expect.poll(() => charts(page)).toHaveLength(1);
+  // The header renamed in its cell
+  await page.locator(".sb-table-widget tr").first().locator("td, th").nth(1).click();
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("Income");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => savedText(page)).toContain("%% chart.series: Income");
+  await expect.poll(() => charts(page)).toEqual([{ type: "bar", labels: ["Oct", "Nov"], data: [[120, 140]] }]);
+});
+
+test("offers the table's columns where a reference finds none, one picked written into the block", async ({ page, open }) => {
+  await open(`# Sales\n\n${SALES}\n${block("above", "120, 140").replace("chart.series: revenue", "chart.series: income")}\n`);
+  await expect(page.locator(".swc-problem")).toContainText("the table above has no column income");
+  await page.locator(".swc-choice", { hasText: "Revenue" }).click();
+  await expect.poll(() => savedText(page)).toContain("%% chart.series: Revenue");
+  await expect.poll(() => charts(page)).toEqual([{ type: "bar", labels: ["Oct", "Nov"], data: [[120, 140]] }]);
+});

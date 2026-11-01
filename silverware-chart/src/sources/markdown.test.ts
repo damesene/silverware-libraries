@@ -56,9 +56,22 @@ describe("markdown tables", () => {
   it("finds columns by name in any case or by key, and gives a table's data", () => {
     const costs = tablesOf(TEXT)[0]!;
     expect([columnIndex(costs.columns, "month"), columnIndex(costs.columns, "unit_price"), columnIndex(costs.columns, "Unit price"), columnIndex(costs.columns, "none")]).toEqual([0, 1, 1, -1]);
-    expect(dataOf(costs, "Month", ["unit_price"], "costs")).toEqual({ labels: ["Oct", "Nov"], series: [[1.5, 3]] });
-    expect(dataOf(costs, undefined, ["Množství"], "costs")).toEqual({ labels: ["1", "2"], series: [[2, null]] });
-    expect(dataOf(costs, "Month", [], "costs")).toEqual({ problem: "costs: say the columns to draw with series" });
+    expect(dataOf(costs, { table: "above", x: "Month", series: ["unit_price"] }, "costs")).toEqual({ labels: ["Oct", "Nov"], series: [[1.5, 3]] });
+    expect(dataOf(costs, { table: "above", series: ["Množství"] }, "costs")).toEqual({ labels: ["1", "2"], series: [[2, null]] });
+    expect(dataOf(costs, { table: "above", x: "Month", series: [] }, "costs")).toEqual({ problem: "costs: say the columns to draw with series" });
+  });
+
+  it("offers the table's columns in place of the first reference that finds none", () => {
+    const costs = tablesOf(TEXT)[0]!;
+    const missing = dataOf(costs, { table: "above", x: "Month", series: ["price", "Množství"] }, "costs");
+    expect(missing).toMatchObject({ problem: "costs has no column price (it has Month, Unit price, Množství)" });
+    expect("choices" in missing && missing.choices?.map((c) => [c.label, c.source.series])).toEqual([
+      ["Month", ["Month", "Množství"]],
+      ["Unit price", ["Unit price", "Množství"]],
+      ["Množství", ["Množství", "Množství"]],
+    ]);
+    const noX = dataOf(costs, { table: "above", x: "Mnth", series: ["Množství"] }, "costs");
+    expect("choices" in noX && noX.choices?.[0]?.source).toEqual({ table: "above", x: "Month", series: ["Množství"] });
   });
 
   it("reads numbers with units and a decimal comma, and references to other pages", () => {

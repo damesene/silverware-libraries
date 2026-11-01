@@ -18,7 +18,7 @@ async function read(host: ModuleHost, source: Source, context: SourceContext): P
   if (text === undefined) return { problem: `no page ${page}` };
   const table = tableByPlace(text, rest, page && page !== context.page ? undefined : context.block);
   if (!table) return { problem: rest === "above" ? "no table above the chart" : rest === "below" ? "no table below the chart" : `no table under the heading ${source.table}` };
-  return dataOf(table, source.x, source.series, `the table ${source.table}`);
+  return dataOf(table, source, `the table ${source.table}`);
 }
 
 export function tablesModule(host: ModuleHost): ChartModule {

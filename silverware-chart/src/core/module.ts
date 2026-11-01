@@ -49,13 +49,29 @@ export type NamedTable = {
   readonly rows: readonly (readonly string[])[];
 };
 
+/** A table one of Silverware Table's writes wrote, as its context tells it: its name now, a column's name now */
+export type WrittenTable = {
+  readonly name: string | undefined;
+  column(before: string): string | undefined;
+};
+
+/** What one of Silverware Table's writes did, as its listeners may ask */
+export type WriteContext = {
+  renamed(): boolean;
+  table(before: string): WrittenTable | undefined;
+  tableAt(at: number): WrittenTable | undefined;
+};
+
 /** Silverware Table's public API, where it is installed */
 export type TableApi = {
   /** The tables of a markdown text, with their names */
   readonly tables: (text: string) => Promise<readonly NamedTable[]>;
-  /** A function told of each of its writes, the page's text as the write leaves it, its edits written with it */
-  readonly onWrite: (listener: (text: string) => Promise<readonly TextEdit[]>) => void;
+  /** A function told of each of its writes, the page's text as the write leaves it and what the write did, its edits written with it */
+  readonly onWrite: (listener: (text: string, context: WriteContext) => Promise<readonly TextEdit[]>) => void;
 };
+
+/** A source reference as an edit made it (a table or a column renamed): the same where it is none of its business */
+export type FollowSource = (source: Source, block: Block, text: string) => Source;
 
 export type ModuleHost = {
   /** Silverware Table, where it is installed (else undefined) */
@@ -65,9 +81,10 @@ export type ModuleHost = {
   /**
    * The edits that bring the data of every chart of a page's text up to its
    * source's, each block written by its format (none where all are): what a
-   * write of a table writes with it
+   * write of a table writes with it; `follow` the references to what the
+   * write renamed, written with them
    */
-  dataEdits(text: string): Promise<TextEdit[]>;
+  dataEdits(text: string, follow?: FollowSource): Promise<TextEdit[]>;
   /** What this module offers the others, under its own name (a module uses another's only so: none imports another) */
   offer(api: unknown): void;
   /** What the module of that name offers; undefined while it is off or offers nothing */

@@ -45,7 +45,7 @@ function tableApi(bridge: Bridge): TableApi | undefined {
         const table = t as NamedTable;
         return { ...table, columns: listOf(table.columns) as NamedTable["columns"], rows: listOf(table.rows).map((row) => listOf(row).map(String)) };
       }),
-    onWrite: (listener) => void onWrite(listener),
+    onWrite: (listener) => void onWrite(listener as (text: string, context: never) => unknown),
   };
 }
 

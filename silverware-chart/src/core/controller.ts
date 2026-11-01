@@ -8,10 +8,10 @@
 // give them (and the user's definitions, custom.ts).
 import { customFormats } from "../custom.ts";
 import { type Block, blockOf, blocksOf } from "./blocks.ts";
-import { type ChartConstructor, type Drawn, DrawnCharts } from "./drawn.ts";
+import { type ChartConstructor, chartBox, type Drawn, DrawnCharts } from "./drawn.ts";
 import type { ChartFormat } from "./format.ts";
-import { type ChartModel, isUnreadable, type Unreadable } from "./model.ts";
-import type { ChartModule, ChartSource, ModuleHost, SourceData, TableApi, TextEdit } from "./module.ts";
+import { type ChartModel, isUnreadable, type Source, type Unreadable } from "./model.ts";
+import type { ChartModule, ChartSource, FollowSource, ModuleHost, SourceData, TableApi, TextEdit } from "./module.ts";
 import { themeOf, watchTheme } from "./theme.ts";
 import type { ChartType } from "./type.ts";
 
@@ -43,6 +43,24 @@ function withData(model: ChartModel, data: SourceData): ChartModel {
       ...(model.series[i]?.kind ? { kind: model.series[i]!.kind } : {}),
       values: [...values],
     })),
+  };
+}
+
+/** Whether two references say the same: the table, its labels' column and its values' columns */
+function sameReference(a: Source, b: Source): boolean {
+  return a.table === b.table && a.x === b.x && a.series.length === b.series.length && a.series.every((name, i) => name === b.series[i]);
+}
+
+/**
+ * The model with another reference: a series named as its column was (it
+ * followed the column) named as the column is now
+ */
+function withSource(model: ChartModel, source: Source): ChartModel {
+  const was = model.source?.series ?? [];
+  return {
+    ...model,
+    source,
+    series: model.series.map((series, i) => (series.name !== undefined && was[i] !== undefined && series.name.toLowerCase() === was[i]!.toLowerCase() && source.series[i] !== undefined ? { ...series, name: source.series[i] } : series)),
   };
 }
 
@@ -84,7 +102,7 @@ export class Controller {
     return {
       table: this.env.table,
       readPage: (page) => this.env.readPage(page),
-      dataEdits: (text) => this.dataEdits(text),
+      dataEdits: (text, follow) => this.dataEdits(text, follow),
       offer: (api) => void this.offers.set(name, api),
       offered: <T>(module: string) => this.offers.get(module) as T | undefined,
     };
@@ -147,7 +165,7 @@ export class Controller {
       const pageText = await this.pageText(page, text);
       const found = await this.sourceData(model, page, pageText, blockOf(pageText, language, text));
       if (!found) return this.problem(`nothing reads the source "${model.source.table}"`);
-      if (isUnreadable(found)) return this.problem(found.problem);
+      if (isUnreadable(found)) return this.problem(found.problem, found.choices, { language, body: text, page });
       data = found;
     }
     let Chart: ChartConstructor;
@@ -157,17 +175,20 @@ export class Controller {
       this.chart = undefined;
       return this.problem(`Chart.js could not be loaded (${e instanceof Error ? e.message : String(e)})`);
     }
-    const box = this.doc.createElement("div");
+    const box = chartBox(this.doc);
     box.className = "swc-chart";
     box.dataset.swcType = model.type;
     box.style.height = model.height ?? this.env.height ?? "300px";
     const canvas = this.doc.createElement("canvas");
     box.append(canvas);
-    let entry: Drawn;
+    const entry: Drawn = { box, page, model, language, body: text, format: read.format, data };
     try {
-      const chart = new Chart(canvas, type.config(data ? withData(model, data) : model, themeOf(this.doc)));
-      entry = { box, chart, page, model, language, body: text, format: read.format, data, made: Date.now(), seen: false };
-      this.drawn.add(entry);
+      // Made now, and again where the box comes back after its chart was let go: with the data as last drawn
+      box.setUp(
+        () => new Chart(canvas, type.config(entry.data ? withData(model, entry.data) : model, themeOf(this.doc))),
+        () => this.drawn.add(entry),
+        () => this.drawn.remove(entry),
+      );
     } catch (e) {
       return this.problem(`the chart could not be drawn: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -203,13 +224,13 @@ export class Controller {
   private drawAnew(): void {
     for (const entry of this.drawn.shown()) {
       const type = this.types().find((t) => t.name === entry.model.type);
-      const current = entry.chart.data as { labels?: unknown[]; datasets?: { data: unknown }[] };
+      const current = entry.box.chart?.data as { labels?: unknown[]; datasets?: { data: unknown }[] } | undefined;
       if (!type) continue;
       const config = type.config(entry.model, themeOf(this.doc));
       // The data as shown (a source's), in the new colors
-      config.data.labels = current.labels ?? config.data.labels;
+      config.data.labels = current?.labels ?? config.data.labels;
       config.data.datasets.forEach((dataset, i) => {
-        if (current.datasets?.[i]) dataset.data = current.datasets[i].data;
+        if (current?.datasets?.[i]) dataset.data = current.datasets[i].data;
       });
       DrawnCharts.redraw(entry, config);
     }
@@ -253,22 +274,30 @@ export class Controller {
     if (edit) await this.env.replaceRange?.(edit.from, edit.to, edit.text);
   }
 
-  /** The edit that writes a block's data as its source has them, by the block's format; none where they are */
-  private async blockEdit(block: Block, page: string, text: string): Promise<TextEdit | undefined> {
+  /**
+   * The edit that writes a block's data as its source has them, by the
+   * block's format; `source` another reference for it (a rename followed, a
+   * column picked), written with them; none where nothing changes
+   */
+  private async blockEdit(block: Block, page: string, text: string, source?: Source): Promise<TextEdit | undefined> {
     const read = this.read(block.language, block.body);
     if (!read || isUnreadable(read.model) || !read.model.source) return undefined;
-    const data = await this.sourceData(read.model, page, text, block);
-    if (!data || isUnreadable(data) || sameData(read.model, data)) return undefined;
-    const written = read.format.write(withData(read.model, data), block.body);
+    const model = source ? withSource(read.model, source) : read.model;
+    const data = await this.sourceData(model, page, text, block);
+    const readable = data && !isUnreadable(data) ? data : undefined;
+    // Its data written where they can be read; a reference changed, written whatever its data
+    if (model === read.model && (!readable || sameData(model, readable))) return undefined;
+    const written = read.format.write(readable ? withData(model, readable) : model, block.body);
     return written === block.body ? undefined : { from: block.bodyFrom, to: block.bodyTo, text: written };
   }
 
   /**
    * The edits bringing every chart of the text up to its source (a module
-   * has them written with an edit of a table); a source on another page is
-   * left out (that page is not what is written)
+   * has them written with an edit of a table), `follow` its references to
+   * what the edit renamed; a source on another page is left out (that page is
+   * not what is written)
    */
-  private async dataEdits(text: string): Promise<TextEdit[]> {
+  private async dataEdits(text: string, follow?: FollowSource): Promise<TextEdit[]> {
     let page = "";
     try {
       page = await this.env.getCurrentPage();
@@ -282,13 +311,23 @@ export class Controller {
       const read = this.read(block.language, block.body);
       if (!read || isUnreadable(read.model) || !read.model.source || read.model.source.table.startsWith("[[")) continue;
       try {
-        const edit = await this.blockEdit(block, page, text);
+        const followed = follow?.(read.model.source, block, text);
+        const edit = await this.blockEdit(block, page, text, followed && !sameReference(followed, read.model.source) ? followed : undefined);
         if (edit) edits.push(edit);
       } catch (e) {
         console.error("Silverware Chart: a chart's data could not be written", e);
       }
     }
     return edits;
+  }
+
+  /** A block's source written anew (a column picked where its reference found none), with its data where they can be read */
+  private async pick(language: string, body: string, page: string, source: Source): Promise<void> {
+    const text = await this.env.getText();
+    const block = blockOf(text, language, body);
+    if (!block) return;
+    const edit = await this.blockEdit(block, page, text, source);
+    if (edit) await this.env.replaceRange?.(edit.from, edit.to, edit.text);
   }
 
   /** The page's text: the editor's while it holds the page (a block of it in there), else the page as saved */
@@ -320,10 +359,29 @@ export class Controller {
     return undefined;
   }
 
-  private problem(text: string): HTMLElement {
+  /** What shows where a chart cannot be drawn: why, and the sources it could have instead (`choices`), a click writing one into its block */
+  private problem(text: string, choices?: Unreadable["choices"], block?: { language: string; body: string; page: string }): HTMLElement {
     const box = this.doc.createElement("div");
     box.className = "swc-chart swc-problem";
-    box.textContent = `Silverware Chart: ${text}`;
+    box.append(`Silverware Chart: ${text}`);
+    if (choices?.length && block && this.env.replaceRange) {
+      const row = box.appendChild(this.doc.createElement("div"));
+      row.className = "swc-choices";
+      row.append("Use: ");
+      for (const choice of choices) {
+        const button = row.appendChild(this.doc.createElement("button"));
+        button.type = "button";
+        button.className = "swc-choice";
+        button.textContent = choice.label;
+        // (A press on it is not a press on the widget, which would move SilverBullet's cursor into the block)
+        button.addEventListener("mousedown", (e) => e.stopPropagation());
+        button.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          void this.pick(block.language, block.body, block.page, choice.source);
+        });
+      }
+    }
     return box;
   }
 }

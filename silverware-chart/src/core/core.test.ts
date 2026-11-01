@@ -5,7 +5,7 @@ import { customFormatsAnew, defineCustomFormats, formatsOf } from "../custom.ts"
 import { start } from "../index.ts";
 import { tablesOf } from "../sources/markdown.ts";
 import type { Controller } from "./controller.ts";
-import type { NamedTable, TableApi, TextEdit } from "./module.ts";
+import type { NamedTable, TableApi, TextEdit, WriteContext, WrittenTable } from "./module.ts";
 import type { ChartConfig } from "./type.ts";
 
 // Chart.js stood in for: what it was made with, and each update
@@ -46,7 +46,7 @@ const chart = (source: string, values = "120, 140") => `xychart-beta
 const page = (block: string, table = SALES) => `# Sales\n\n${table}\n\n\`\`\`mermaid\n${block}\n\`\`\`\n`;
 
 // Silverware Table stood in for: its tables of a text (names from its metadata row, as it reads them), the write listener given
-let listener: ((text: string) => Promise<readonly TextEdit[]>) | undefined;
+let listener: ((text: string, context: WriteContext) => Promise<readonly TextEdit[]>) | undefined;
 const TABLE_API: TableApi = {
   tables: async (text) =>
     tablesOf(text).map((t): NamedTable => {
@@ -55,6 +55,9 @@ const TABLE_API: TableApi = {
     }),
   onWrite: (fn) => void (listener = fn),
 };
+
+// A write that renamed nothing
+const NOTHING_RENAMED: WriteContext = { renamed: () => false, table: () => undefined, tableAt: () => undefined };
 
 const writes: TextEdit[] = [];
 function controller(text: string, modules: readonly ModuleName[] = MODULE_NAMES, table: TableApi | null = TABLE_API): Controller {
@@ -112,13 +115,24 @@ describe("the core", () => {
     const shown = await core.render("mermaid", block, "Sales");
     await core.render("mermaid", block, "Sales");
     document.body.append(shown!);
-    core.pageModified(page(block), "Sales");
-    await vi.advanceTimersByTimeAsync(200);
+    // Taken out and put back (CodeMirror drawing the page anew): kept; the one never shown let go after a while
     shown!.remove();
-    vi.setSystemTime(Date.now() + 20_000);
-    core.pageModified(page(block), "Sales");
-    await vi.advanceTimersByTimeAsync(200);
+    await vi.advanceTimersByTimeAsync(5_000);
+    document.body.append(shown!);
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(made.map((m) => m.destroyed)).toEqual([false, true]);
+    // Out for good: destroyed once it has been out a while
+    shown!.remove();
+    await vi.advanceTimersByTimeAsync(20_000);
     expect(made.map((m) => m.destroyed)).toEqual([true, true]);
+    // Back after all (scrolled into view again): drawn anew, with the data last drawn, and followed again
+    document.body.append(shown!);
+    expect(made).toHaveLength(3);
+    expect(made[2]?.config.data.datasets[0]?.data).toEqual([120, 140]);
+    core.pageModified(page(block, SALES.replace("| 140 |", "| 300 |")), "Sales");
+    await vi.advanceTimersByTimeAsync(200);
+    expect(made[2]?.updates).toBe(1);
+    shown!.remove();
   });
 });
 
@@ -142,7 +156,7 @@ describe("a markdown table as the source (the tables module)", () => {
     const core = controller(`# Sales\n\n\`\`\`mermaid\n${chart("above")}\n\`\`\`\n`);
     expect((await core.render("mermaid", chart("above"), "Sales"))?.textContent).toBe("Silverware Chart: no table above the chart");
     const missing = chart("below").replace("chart.series: revenue", "chart.series: profit");
-    expect((await controller(`\`\`\`mermaid\n${missing}\n\`\`\`\n\n${SALES}`).render("mermaid", missing, "Sales"))?.textContent).toBe("Silverware Chart: the table below has no column profit (it has Month, Revenue)");
+    expect((await controller(`\`\`\`mermaid\n${missing}\n\`\`\`\n\n${SALES}`).render("mermaid", missing, "Sales"))?.firstChild?.textContent).toBe("Silverware Chart: the table below has no column profit (it has Month, Revenue)");
   });
 
   it("follows its table as the page is edited, once the edits pause, drawn in place", async () => {
@@ -213,12 +227,44 @@ describe("Silverware Table (the silverwareTable module)", () => {
   it("gives the edits that bring the page's charts up to their sources with each of its writes", async () => {
     controller("");
     const text = page(chart("sales", "1, 2")) + `\n\`\`\`mermaid\n${chart("above")}\n\`\`\`\n\n\`\`\`mermaid\n${chart("[[Other]]#Costs")}\n\`\`\`\n`;
-    const edits = await listener!(text);
+    const edits = await listener!(text, NOTHING_RENAMED);
     // The first behind its table; the second as its table is; the third on another page, left out
     expect(edits).toHaveLength(1);
     const written = text.slice(0, edits[0]!.from) + edits[0]!.text + text.slice(edits[0]!.to);
     expect(written).toContain(chart("sales"));
     expect(written).not.toContain('bar "revenue" [1, 2]');
+  });
+
+  it("follows what a write renamed: the table and its columns, for a chart by its name or by its place", async () => {
+    controller("");
+    // The table as the write left it: renamed costs, its column Revenue now Income
+    const renamed = SALES.replace("Revenue", "Income").replace("'sales'", "'costs'");
+    const text = page(chart("sales"), renamed) + `\n\`\`\`mermaid\n${chart("above")}\n\`\`\`\n`;
+    const written: WrittenTable = { name: "costs", column: (name) => ({ revenue: "Income", month: "Month" })[name.toLowerCase()] };
+    const context: WriteContext = { renamed: () => true, table: (name) => (name === "sales" ? written : undefined), tableAt: (at) => (at < 100 ? written : undefined) };
+    const edits = await listener!(text, context);
+    let after = text;
+    for (const edit of [...edits].sort((a, b) => b.from - a.from)) after = after.slice(0, edit.from) + edit.text + after.slice(edit.to);
+    // A series named as its column was follows it; the references follow; the data stay what they are
+    const followed = (source: string) => `xychart-beta\n  x-axis ["Oct", "Nov"]\n  bar "Income" [120, 140]\n%% chart.source: ${source}\n%% chart.x: Month\n%% chart.series: Income`;
+    expect(after).toContain(followed("costs"));
+    expect(after).toContain(followed("above"));
+  });
+});
+
+describe("a reference finding no column", () => {
+  it("offers the table's columns, one clicked written into the block", async () => {
+    const block = chart("above").replace("chart.series: revenue", "chart.series: income");
+    const text = page(block);
+    const box = await controller(text).render("mermaid", block, "Sales");
+    expect(box?.textContent).toContain("the table above has no column income (it has Month, Revenue)");
+    const choices = [...(box?.querySelectorAll<HTMLButtonElement>(".swc-choice") ?? [])];
+    expect(choices.map((b) => b.textContent)).toEqual(["Month", "Revenue"]);
+    choices[1]!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    const after = text.slice(0, writes[0]!.from) + writes[0]!.text + text.slice(writes[0]!.to);
+    expect(after).toContain("%% chart.series: Revenue");
+    expect(after).toContain('bar "revenue" [120, 140]');
   });
 });
 

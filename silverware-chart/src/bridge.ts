@@ -13,7 +13,7 @@ export type Bridge = {
   readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
   // Optional, Silverware Table's (silverware.table.tables and onWrite), where it is installed
   readonly tables?: (text: string) => unknown;
-  readonly onWrite?: (listener: (text: string) => unknown) => unknown;
+  readonly onWrite?: (listener: (text: string, context: never) => unknown) => unknown;
 };
 
 /** The bridge's functions it cannot work without, missing from what the library page gave */

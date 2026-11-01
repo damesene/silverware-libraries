@@ -91,18 +91,22 @@ if js and js.window then
   --- A table formula calculated on the page, outside any table: what it reads it names by a table's name
   --- (beans!B2, beans![price], beans!vat, [[Prices]]beans!B2). A ${…} showing it follows the tables.
   --- @param formula string the formula, its = optional, e.g. "=SUM(beans![price])"
+  --- @param text string? the page's text to calculate it on (left out: the page's, as below)
+  --- @param page string? the page's name (left out: the page it is on, else the page shown)
   --- @return string one value as its text, several as a list ["a","b"], an error as its code (#REF!)
   --- @see Library/damesene/silverware-table#Formulas from Space Lua
-  function silverware.table.evaluate(formula)
+  function silverware.table.evaluate(formula, text, page)
     -- On the page it is on (a ${…}'s, else the page shown). The page and the other pages it reads are read
     -- through SilverBullet, so a ${…} showing it is shown anew as they change. The editor's text only while
     -- it holds that page: a ${…} of a page being opened is evaluated before the editor has its text (the
     -- page's name already the new one), so the text must hold the formula itself, else the page is read
-    -- (as saved)
-    local page = _CTX and _CTX.currentPage and _CTX.currentPage.name
-    local text = editor.getText()
-    if page and (page ~= editor.getCurrentPage() or not string.find(text, formula, 1, true)) then
-      text = space.readPage(page)
+    -- (as saved). A caller that has the text (Silverware Chart, as the page is edited) gives it
+    page = page or (_CTX and _CTX.currentPage and _CTX.currentPage.name)
+    if text == nil then
+      text = editor.getText()
+      if page and (page ~= editor.getCurrentPage() or not string.find(text, formula, 1, true)) then
+        text = space.readPage(page)
+      end
     end
     local result = silverwareTableJs.evaluated(formula, text, page)
     for _, other in ipairs(result.pages) do

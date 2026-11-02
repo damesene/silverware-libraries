@@ -61,6 +61,8 @@ function tableApi(bridge: Bridge): TableApi | undefined {
 
 /** The core and the modules on, over a host's API (SilverBullet's, or the playground's) */
 export function start(doc: Document, settings: Settings, env: Omit<ConstructorParameters<typeof Controller>[1], "height">): Controller {
+  // (The one before it, of a load of Space Lua before, let go)
+  slot[GLOBAL_KEY]?.stop();
   const controller = new Controller(doc, { ...env, height: settings.height });
   controller.setModules(createModules(settings, (name) => controller.hostFor(name)));
   slot[GLOBAL_KEY] = controller;

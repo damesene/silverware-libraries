@@ -5,6 +5,8 @@
 // menu holds is given as data (MenuView) by the core, which knows what each
 // item does; this file only shows and runs them.
 
+import { IterableWeakSet } from "./weakset.ts";
+
 /** An item of a menu: an action, or a submenu opened in the menu's place */
 export type MenuItem = {
   readonly label: string;
@@ -38,26 +40,6 @@ const CLOSE_ICON =
 const GAP = 4;
 const LEAVE_MS = 300;
 
-/** A set of elements held weakly that can be gone through (WeakRefs; a gone one is dropped as it is met) */
-class IterableWeakSet<T extends object> {
-  private readonly refs = new Set<WeakRef<T>>();
-  private readonly known = new WeakSet<T>();
-
-  add(value: T): void {
-    if (this.known.has(value)) return;
-    this.known.add(value);
-    this.refs.add(new WeakRef(value));
-  }
-
-  *[Symbol.iterator](): Iterator<T> {
-    for (const ref of this.refs) {
-      const value = ref.deref();
-      if (value) yield value;
-      else this.refs.delete(ref);
-    }
-  }
-}
-
 export class ChartToolbar {
   private readonly bar: HTMLElement;
   private readonly menu: HTMLElement;
@@ -69,6 +51,8 @@ export class ChartToolbar {
   private following = false;
   // Placed again every frame while shown: the chart moves without a scroll as the text above it is edited
   private tracking = false;
+  // Its listeners on the page, ended by `stop`
+  private readonly listening = new AbortController();
 
   constructor(
     private readonly doc: Document,
@@ -101,19 +85,30 @@ export class ChartToolbar {
       // A press on them is not a press in the page (SilverBullet would move its cursor)
       element.addEventListener("mousedown", (e) => e.stopPropagation());
     }
+    const { signal } = this.listening;
     doc.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && this.menu.classList.contains("swc-visible")) {
         e.preventDefault();
         e.stopPropagation();
         this.close();
       }
-    }, true);
+    }, { capture: true, signal });
     // (The page scrolled: the bar and the menu go with the chart)
-    doc.addEventListener("scroll", () => this.place(), true);
+    doc.addEventListener("scroll", () => this.place(), { capture: true, signal });
     doc.addEventListener("pointerdown", (e) => {
       const target = e.target as Node;
       if (this.menu.classList.contains("swc-visible") && !this.menu.contains(target) && !this.bar.contains(target)) this.close();
-    }, true);
+    }, { capture: true, signal });
+  }
+
+  /** Gone from the page: its listeners ended, its elements out (the controller started anew) */
+  stop(): void {
+    this.listening.abort();
+    clearTimeout(this.hiding);
+    // (Not shown: its frames' placing ends)
+    this.bar.classList.remove("swc-visible");
+    this.bar.remove();
+    this.menu.remove();
   }
 
   /** A chart's box: its toolbar shown while the pointer is over it or the band above it, where the toolbar is */
@@ -137,7 +132,7 @@ export class ChartToolbar {
           this.pointerAt(x, y);
         });
       },
-      { passive: true },
+      { passive: true, signal: this.listening.signal },
     );
   }
 

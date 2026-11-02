@@ -302,3 +302,65 @@ describe("custom formats", () => {
     expect((await controller("").render("csvchart", "", "Sales"))?.textContent).toBe("Silverware Chart: the format csv gave labels that are not a list");
   });
 });
+
+describe("following the page", () => {
+  const TWO = SALES.replace("| Month | Revenue |\n|---|--:|", "| Month | Revenue | Cost |\n|---|--:|--:|").replace("| 120 |", "| 120 | 80 |").replace("| 140 |", "| 140 | 90 |");
+  const switchTheme = async (theme: string) => {
+    document.documentElement.setAttribute("data-theme", theme);
+    await vi.advanceTimersByTimeAsync(50);
+  };
+  afterEach(() => document.documentElement.removeAttribute("data-theme"));
+
+  it("draws a chart in the theme switched to with its source's data, all its series", async () => {
+    const block = chart("above").replace("%% chart.series: revenue", "%% chart.series: revenue, cost");
+    const box = await controller(page(block, TWO)).render("mermaid", block, "Sales");
+    document.body.append(box!);
+    expect(dataOf()).toEqual([[120, 140], [80, 90]]);
+    await switchTheme("dark");
+    expect(made[0]?.updates).toBe(1);
+    expect((made[0]?.data as { datasets: { data: unknown }[] }).datasets.map((d) => d.data)).toEqual([[120, 140], [80, 90]]);
+    box!.remove();
+  });
+
+  it("draws the chart in place of why it could not, once its source can be read", async () => {
+    const block = chart("#Later");
+    const core = controller(page(block));
+    const box = await core.render("mermaid", block, "Sales");
+    expect(box?.textContent).toBe("Silverware Chart: no table under the heading #Later");
+    document.body.append(box!);
+    core.pageModified(`${page(block)}\n## Later\n\n${SALES}\n`, "Sales");
+    await vi.advanceTimersByTimeAsync(200);
+    expect(document.querySelector(".swc-problem")).toBeNull();
+    const drawn = document.querySelector(".swc-chart");
+    expect(drawn).not.toBeNull();
+    expect(dataOf(made.length - 1)).toEqual([[120, 140]]);
+    drawn!.remove();
+  });
+
+  it("keeps the data of the later edit where an earlier one's source is read after it", async () => {
+    // Silverware Table slow to give the tables of the first edit's text
+    const slow: TableApi = { ...TABLE_API, tables: async (text) => (await new Promise((done) => setTimeout(done, text.includes("| 1 |") ? 500 : 0)), TABLE_API.tables(text)) };
+    const block = chart("sales");
+    const core = controller(page(block), MODULE_NAMES, slow);
+    const rendering = core.render("mermaid", block, "Sales");
+    await vi.advanceTimersByTimeAsync(0);
+    const box = await rendering;
+    document.body.append(box!);
+    core.pageModified(page(block, SALES.replace("| 120 |", "| 1 |")), "Sales");
+    await vi.advanceTimersByTimeAsync(200);
+    core.pageModified(page(block, SALES.replace("| 120 |", "| 7 |")), "Sales");
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect((made[0]?.data as { datasets: { data: unknown }[] }).datasets[0]?.data).toEqual([7, 140]);
+    box!.remove();
+  });
+
+  it("lets the controller before go as another starts (Space Lua loaded again)", async () => {
+    const block = chart("above");
+    const box = await controller(page(block)).render("mermaid", block, "Sales");
+    document.body.append(box!);
+    controller(page(block));
+    await switchTheme("dark");
+    expect(made[0]?.updates).toBe(0);
+    box!.remove();
+  });
+});

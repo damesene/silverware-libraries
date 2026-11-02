@@ -16,6 +16,7 @@ import type { Candidate, ChartModule, ChartSource, Command, FollowSource, Module
 import type { Setting } from "./setting.ts";
 import { openSettings } from "./settingsdialog.ts";
 import { ChartToolbar } from "./toolbar.ts";
+import { IterableWeakSet } from "./weakset.ts";
 import { themeOf, watchTheme } from "./theme.ts";
 import type { ChartType } from "./type.ts";
 
@@ -123,18 +124,31 @@ export class Controller {
   private readonly toolbar: ChartToolbar | undefined;
   private chart: Promise<ChartConstructor> | undefined;
   private following: ReturnType<typeof setTimeout> | undefined;
+  private readonly unwatchTheme: () => void;
+  // Each run of following the page's edits: a run that a later one started meanwhile writes nothing it read
+  private followRun = 0;
+  // What shows where a chart's source could not be read, with its block: drawn in its place once it can be
+  private readonly waiting = new IterableWeakSet<HTMLElement>();
+  private readonly waitingFor = new WeakMap<HTMLElement, { readonly language: string; readonly body: string }>();
 
   constructor(
     private readonly doc: Document,
     private readonly env: ControllerEnv,
   ) {
-    watchTheme(doc, () => void this.drawAnew());
+    this.unwatchTheme = watchTheme(doc, () => void this.drawAnew());
     if (env.replaceRange) {
       this.toolbar = new ChartToolbar(doc, (box) => {
         const entry = this.boxes.get(box);
         return entry ? chartMenu(this.menuHost(), entry) : undefined;
       });
     }
+  }
+
+  /** Gone from the page (another started in its place, Space Lua loaded again): its watching ended, its toolbar out */
+  stop(): void {
+    this.unwatchTheme();
+    this.toolbar?.stop();
+    clearTimeout(this.following);
   }
 
   /** The host a module gets: the core's, with what it offers kept under its name */
@@ -236,9 +250,10 @@ export class Controller {
   /**
    * The element a code block shows: its chart, or why it cannot be drawn;
    * undefined where no format reads it as a chart (the library page hands
-   * it on to what drew such blocks before)
+   * it on to what drew such blocks before); `pageText` the page's text where
+   * it is known (an edit followed), else read
    */
-  async render(language: string, text: string, page: string): Promise<HTMLElement | undefined> {
+  async render(language: string, text: string, page: string, pageText?: string): Promise<HTMLElement | undefined> {
     const read = this.read(language, text);
     if (!read) return undefined;
     if (isUnreadable(read.model)) return this.problem(read.model.problem);
@@ -247,10 +262,10 @@ export class Controller {
     if (!type) return this.problem(`no chart type "${model.type}"`);
     let data: SourceData | undefined;
     if (model.source) {
-      const pageText = await this.pageText(page, text);
-      const found = await this.sourceData(model, page, pageText, blockOf(pageText, language, text));
+      const known = pageText ?? (await this.pageText(page, text));
+      const found = await this.sourceData(model, page, known, blockOf(known, language, text));
       if (!found) return this.problem(`nothing reads the source "${model.source.table}"`);
-      if (isUnreadable(found)) return this.problem(found.problem, found.choices, { language, body: text, page });
+      if (isUnreadable(found)) return this.waitFor(this.problem(found.problem, found.choices, { language, body: text, page }), language, text);
       data = found;
     }
     let Chart: ChartConstructor;
@@ -293,9 +308,12 @@ export class Controller {
   }
 
   private async follow(text: string, page: string): Promise<void> {
+    const run = ++this.followRun;
     for (const entry of this.drawn.shown()) {
       if (entry.page !== page || !entry.model.source) continue;
       const data = await this.sourceData(entry.model, page, text, blockOf(text, entry.language, entry.body));
+      // (Edits after it read meanwhile: the later run draws them, this one's would be older)
+      if (run !== this.followRun) return;
       // A source that cannot be read now (a table being renamed): the chart stays as it was until it can
       if (!data || isUnreadable(data)) continue;
       // Drawn anew only where its data changed: an edit elsewhere on the page would start its animation with each key
@@ -305,22 +323,29 @@ export class Controller {
       }
       this.markStale(entry, data);
     }
+    // A chart whose source could not be read (a table not named yet, a column renamed): drawn once it can be
+    for (const box of this.waiting) {
+      const block = this.waitingFor.get(box);
+      if (!block || !box.isConnected || !blockOf(text, block.language, block.body)) continue;
+      const shown = await this.render(block.language, block.body, page, text);
+      if (run !== this.followRun) return;
+      if (!shown || shown.classList.contains("swc-problem") || !box.isConnected) continue;
+      this.waiting.delete(box);
+      box.replaceWith(shown);
+    }
+  }
+
+  /** A source's problem shown: drawn as the chart in its place once the page's edits let its source be read */
+  private waitFor(box: HTMLElement, language: string, body: string): HTMLElement {
+    this.waitingFor.set(box, { language, body });
+    this.waiting.add(box);
+    return box;
   }
 
   /** The theme switched: every chart shown drawn in its colors (their data as last drawn) */
   private drawAnew(): void {
-    for (const entry of this.drawn.shown()) {
-      const type = this.types().find((t) => t.name === entry.model.type);
-      const current = entry.box.chart?.data as { labels?: unknown[]; datasets?: { data: unknown }[] } | undefined;
-      if (!type) continue;
-      const config = type.config(entry.model, themeOf(this.doc));
-      // The data as shown (a source's), in the new colors
-      config.data.labels = current?.labels ?? config.data.labels;
-      config.data.datasets.forEach((dataset, i) => {
-        if (current?.datasets?.[i]) dataset.data = current.datasets[i].data;
-      });
-      DrawnCharts.redraw(entry, config);
-    }
+    // The data as shown (a source's, its series as many as it has), in the new colors
+    for (const entry of this.drawn.shown()) this.redraw(entry, entry.data ? withData(entry.model, entry.data) : entry.model);
   }
 
   private redraw(entry: Drawn, model: ChartModel): void {

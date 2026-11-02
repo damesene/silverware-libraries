@@ -182,6 +182,12 @@ test("SilverBullet's own controls of a chart's block are left out; Reload draws 
   // (SilverBullet's widget menu and the block's Copy button are there, not shown)
   await expect(page.locator(".swc-widget .sb-widget-menu-bar")).toBeHidden();
   await expect(page.locator(".cm-line:has(.swc-widget) .sb-code-copy-button")).toBeHidden();
+  // The band above the chart, where its toolbar is, shows it too; away from both it goes
+  await page.mouse.move(0, 0);
+  await expect(page.locator(".swc-bar.swc-visible")).toHaveCount(0);
+  const box = (await chart.boundingBox())!;
+  await page.mouse.move(box.x + 20, box.y - 12);
+  await expect(page.locator(".swc-bar.swc-visible")).toHaveCount(1);
   await chartMenu(page);
   await page.locator(".swc-menu-item", { hasText: "Reload" }).click();
   await expect.poll(() => charts(page)).toEqual([{ type: "bar", labels: ["Oct", "Nov"], data: [[120, 140]] }]);

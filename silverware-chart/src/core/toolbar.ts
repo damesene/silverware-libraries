@@ -38,12 +38,35 @@ const CLOSE_ICON =
 const GAP = 4;
 const LEAVE_MS = 300;
 
+/** A set of elements held weakly that can be gone through (WeakRefs; a gone one is dropped as it is met) */
+class IterableWeakSet<T extends object> {
+  private readonly refs = new Set<WeakRef<T>>();
+  private readonly known = new WeakSet<T>();
+
+  add(value: T): void {
+    if (this.known.has(value)) return;
+    this.known.add(value);
+    this.refs.add(new WeakRef(value));
+  }
+
+  *[Symbol.iterator](): Iterator<T> {
+    for (const ref of this.refs) {
+      const value = ref.deref();
+      if (value) yield value;
+      else this.refs.delete(ref);
+    }
+  }
+}
+
 export class ChartToolbar {
   private readonly bar: HTMLElement;
   private readonly menu: HTMLElement;
   private box: HTMLElement | undefined;
   private views: MenuView[] = [];
   private hiding: ReturnType<typeof setTimeout> | undefined;
+  // The charts' boxes the pointer is followed over (held weakly: a box gone is let go with its chart)
+  private readonly watched = new IterableWeakSet<HTMLElement>();
+  private following = false;
 
   constructor(
     private readonly doc: Document,
@@ -68,7 +91,10 @@ export class ChartToolbar {
     this.menu.className = "swc-floating swc-menu";
     this.menu.setAttribute("role", "menu");
     for (const element of [this.bar, this.menu]) {
-      element.addEventListener("mouseenter", () => clearTimeout(this.hiding));
+      element.addEventListener("mouseenter", () => {
+        clearTimeout(this.hiding);
+        this.hiding = undefined;
+      });
       element.addEventListener("mouseleave", () => this.leaveSoon());
       // A press on them is not a press in the page (SilverBullet would move its cursor)
       element.addEventListener("mousedown", (e) => e.stopPropagation());
@@ -88,14 +114,53 @@ export class ChartToolbar {
     }, true);
   }
 
-  /** A chart's box: its toolbar shown while the pointer is over it */
+  /** A chart's box: its toolbar shown while the pointer is over it or the band above it, where the toolbar is */
   watch(box: HTMLElement): void {
-    box.addEventListener("mouseenter", () => this.show(box));
-    box.addEventListener("mouseleave", () => this.leaveSoon());
+    this.watched.add(box);
+    if (this.following) return;
+    this.following = true;
+    let queued = false;
+    let x = 0;
+    let y = 0;
+    // (Once a frame: the boxes are measured, so not on every move)
+    this.doc.addEventListener(
+      "mousemove",
+      (e) => {
+        x = e.clientX;
+        y = e.clientY;
+        if (queued) return;
+        queued = true;
+        this.doc.defaultView?.requestAnimationFrame(() => {
+          queued = false;
+          this.pointerAt(x, y);
+        });
+      },
+      { passive: true },
+    );
+  }
+
+  /** The pointer moved: the chart under it (or under the band above it) shows its toolbar, else the toolbar goes */
+  private pointerAt(x: number, y: number): void {
+    const band = (this.bar.offsetHeight || 26) + 2 * GAP;
+    let over: HTMLElement | undefined;
+    for (const box of this.watched) {
+      if (!box.isConnected) {
+        // Kept while it may come back (CodeMirror puts a widget's element back), measured only while in the page
+        continue;
+      }
+      const rect = box.getBoundingClientRect();
+      if (x >= rect.left && x <= rect.right && y >= rect.top - band && y <= rect.bottom) {
+        over = box;
+        break;
+      }
+    }
+    if (over) this.show(over);
+    else if (this.box && !this.hiding) this.leaveSoon();
   }
 
   private show(box: HTMLElement): void {
     clearTimeout(this.hiding);
+    this.hiding = undefined;
     if (this.box !== box) this.close();
     this.box = box;
     if (!this.bar.isConnected) this.doc.body.append(this.bar, this.menu);
@@ -106,6 +171,7 @@ export class ChartToolbar {
   private leaveSoon(): void {
     clearTimeout(this.hiding);
     this.hiding = setTimeout(() => {
+      this.hiding = undefined;
       // Kept while its menu is open: the pointer goes there through what lies between
       if (this.menu.classList.contains("swc-visible")) return;
       this.bar.classList.remove("swc-visible");

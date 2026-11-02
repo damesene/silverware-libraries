@@ -29,7 +29,7 @@ uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-tags/
 
 ```#meta/library/remote
 name: Silverware Chart
-description: "Charts written as Mermaid (GitHub draws them too), drawn in SilverBullet with Chart.js: bar, line, area, pie, doughnut, radar and more, colors from your theme; their data from the block or from a named table of Silverware Table, the chart following the table as you edit it."
+description: "Charts written as Mermaid (so other Mermaid renderers can draw them too), drawn in SilverBullet with Chart.js: bar, line, area, pie, doughnut, radar and more, colors from your theme; their data from the block or from any markdown table of the page (above, below, under a heading, or one named in Silverware Table), only some of its rows if you like, the chart following the table as you edit it."
 author: damesene
 website: https://github.com/damesene/silverware-libraries/tree/main/silverware-chart
 uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-chart/silverware-chart.md

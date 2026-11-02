@@ -36,7 +36,7 @@ export type FormulasOffer = {
 export type PageLinksOffer = { readonly readFor: (formulas: readonly string[], tables: readonly import("../markdown.ts").Table[]) => Promise<readonly string[]> };
 export { type Area, areaText, callsCustomFunctions, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredTableNames, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";
-export { type Calculation, evaluateFormula, formulaErrors, type NamedCell, recalculate, scalarText, type TableSource, totalRows } from "./evaluate.ts";
+export { type Calculation, evaluateFormula, formulaErrors, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows } from "./evaluate.ts";
 export { type Node as FormulaNode, parse as parseFormula } from "./parser.ts";
 export { parseDate, toUnit, type Unit } from "./dates.ts";
 export { ERROR_CODES, FormulaError, parseClock, type Scalar, type Value } from "./values.ts";

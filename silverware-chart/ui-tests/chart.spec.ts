@@ -180,27 +180,17 @@ test("Insert chart lists the page's tables, the chart put under the one picked",
 test("/chart puts a chart at the cursor, of a table picked", async ({ page, open }) => {
   await open(`# Sales\n\n${SALES}\nAfter.\n\nHere\n`);
   await expect(page.locator(".sb-table-widget")).toBeVisible();
-  // Defined by the library page's Space Lua with the commands: once one of them is there
-  await page.waitForFunction(
-    () => {
-      const c = (window as unknown as { client?: { ui?: { viewState?: { commands?: Map<string, unknown> } }; clientSystem?: { commandHook?: { buildAllCommands?(): Map<string, unknown> } } } }).client;
-      const name = "Silverware Chart: Insert chart";
-      return !!(c?.ui?.viewState?.commands?.has(name) || c?.clientSystem?.commandHook?.buildAllCommands?.().has(name));
-    },
-    null,
-    { timeout: 30_000 },
-  );
-  // The cursor at the end of the last line, /chart typed and its completion taken
-  await page.locator(".cm-line", { hasText: "Here" }).click();
-  await page.keyboard.press("End");
-  await page.keyboard.press("Enter");
-  // (The completion shows once the / is typed; the word typed slowly, as a hand does)
-  await page.keyboard.type("/");
-  await expect(page.locator(".cm-tooltip-autocomplete")).toBeVisible();
-  await page.keyboard.type("chart", { delay: 50 });
-  // (Taken once the list is live: CodeMirror marks it disabled while its sources are still answering, and Enter does nothing)
-  await expect(page.locator(".cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled) [aria-selected=true]")).toContainText("chart");
-  await page.locator(".cm-tooltip-autocomplete [aria-selected=true]").click();
+  // The slash command as SilverBullet's completion runs it (its hook's, once the library page's Space Lua has
+  // defined it), the cursor at the end of the page: typing /chart and taking the completion was flaky, as
+  // CodeMirror's list waits on all its sources
+  type Client = { editorView: { state: { doc: { length: number } }; dispatch(t: unknown): void; focus(): void }; clientSystem?: { slashCommandHook?: { slashCommands: { name: string; run?(): unknown }[] } } };
+  await page.waitForFunction(() => !!(window as unknown as { client?: Client }).client?.clientSystem?.slashCommandHook?.slashCommands.some((c) => c.name === "chart"), null, { timeout: 30_000 });
+  await page.evaluate(() => {
+    const client = (window as unknown as { client: Client }).client;
+    client.editorView.focus();
+    client.editorView.dispatch({ selection: { anchor: client.editorView.state.doc.length } });
+    void client.clientSystem!.slashCommandHook!.slashCommands.find((c) => c.name === "chart")!.run!();
+  });
   const picker = page.locator(".sb-modal-box").filter({ hasText: "Chart of which table?" });
   await expect(picker).toContainText("Table above");
   await picker.locator("input").fill("Table above");

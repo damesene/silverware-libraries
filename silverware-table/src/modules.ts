@@ -7,6 +7,7 @@ import { AutoFill } from "./features/autofill.ts";
 import { Autoscroll } from "./core/silverbullet/modules/autoscroll.ts";
 import { ColumnTypes } from "./features/columntypes.ts";
 import { Excel } from "./features/excel.ts";
+import { Pivot } from "./features/pivot.ts";
 import { Export } from "./features/export.ts";
 import { Expressions } from "./core/silverbullet/modules/expressions.ts";
 import { Filters } from "./features/filters.ts";
@@ -54,6 +55,8 @@ export function featureEntries(metadata: Feature): readonly FeatureEntry[] {
     // Recalculate first in the toolbar
     optional("formulas", (host) => new Formulas(host)),
     optional("pageLinks", (host) => new PageLinks(host)),
+    // After formulas: a pivot is calculated from its source as formulas left it
+    optional("pivot", (host) => new Pivot(host)),
     // Before types: Filter right after the sorting in the column menu
     optional("filters", (host) => new Filters(host)),
     // After formulas: a formula's result is shown in its column's type

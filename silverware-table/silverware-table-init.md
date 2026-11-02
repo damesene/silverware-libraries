@@ -269,6 +269,18 @@ config.define("silverware.table", {
             },
           },
         },
+        pivot = {
+          type = "object",
+          additionalProperties = false,
+          properties = {
+            enabled = {
+              type = "boolean",
+              default = true,
+              description = "Tables that summarize another (pivot.source in their metadata row), calculated anew with each of its edits.",
+              ui = { category = "Silverware Table: Modules", label = "Pivot tables", priority = 4.95 },
+            },
+          },
+        },
         excel = {
           type = "object",
           additionalProperties = false,

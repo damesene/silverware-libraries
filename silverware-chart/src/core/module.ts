@@ -4,6 +4,8 @@
 import type { Block } from "./blocks.ts";
 import type { ChartFormat } from "./format.ts";
 import type { ChartModel, Source, Unreadable } from "./model.ts";
+import type { Setting } from "./setting.ts";
+import type { MenuItem } from "./toolbar.ts";
 import type { ChartType } from "./type.ts";
 
 /** A source's data: labels, and a series of values for each of its columns, in their order */
@@ -49,9 +51,27 @@ export type Command = {
 
 export type ChartModule = {
   readonly commands?: () => readonly Command[];
+  // Settings of every chart, for the settings dialog (a type of chart gives its own: ChartType.settings)
+  readonly settings?: () => readonly Setting[];
+  // Entries of the chart's ⋯ menu (each in its group: MENU_GROUPS)
+  readonly menuEntries?: (chart: ChartHandle) => readonly MenuEntry[];
   readonly formats?: () => readonly ChartFormat[];
   readonly types?: () => readonly ChartType[];
   readonly sources?: () => readonly ChartSource[];
+};
+
+/** The groups of the chart's ⋯ menu, in their order: what the chart is, its data, its source, copies, how it is shown */
+export const MENU_GROUPS = ["chart", "data", "source", "copy", "view"] as const;
+export type MenuGroup = (typeof MENU_GROUPS)[number];
+
+/** An entry of the chart's menu: its item, in a group (by `order` within it, less first) */
+export type MenuEntry = { readonly group: MenuGroup; readonly order?: number; readonly item: MenuItem };
+
+/** The chart a menu is about, as a module's entries see it: its model as its block has it, the block written anew */
+export type ChartHandle = {
+  readonly model: ChartModel;
+  readonly type: ChartType | undefined;
+  rewrite(change: (model: ChartModel) => ChartModel): Promise<void>;
 };
 
 /** An edit of a page's text */
@@ -103,6 +123,8 @@ export type ModuleHost = {
   flash(message: string, type?: "info" | "error"): void;
   /** A chart's whole block (its fences too) in the format new charts are written in */
   newBlock(model: ChartModel): string;
+  /** The color of the series (or slice) at an index where the chart says none (the theme's palette) */
+  palette(index: number): string;
   /**
    * The edits that bring the data of every chart of a page's text up to its
    * source's, each block written by its format (none where all are): what a

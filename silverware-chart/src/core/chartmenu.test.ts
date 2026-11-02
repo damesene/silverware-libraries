@@ -14,7 +14,8 @@ function host(over: Partial<ChartMenuHost> = {}): ChartMenuHost {
     doc: document,
     types: () => BUILTIN_TYPES,
     formats: () => [MERMAID_FORMAT],
-    palette: () => ["#111111", "#222222"],
+    settings: vi.fn(async () => {}),
+    entries: () => [],
     candidates: async () => [],
     rewrite: vi.fn(async () => {}),
     pick: vi.fn(async () => {}),
@@ -28,11 +29,14 @@ function host(over: Partial<ChartMenuHost> = {}): ChartMenuHost {
 }
 
 describe("the chart's menu", () => {
-  it("offers Type, Data, Edit source and Copy as image; Convert only where there is another format", () => {
-    expect(chartMenu(host(), entry).items?.map((i) => i.label)).toEqual(["Type", "Series", "Data", "Edit source", "Copy source", "Copy as image", "Reload"]);
+  it("offers the core's entries by their groups, the modules' among them; Convert only where there is another format", () => {
+    expect(chartMenu(host(), entry).items?.map((i) => i.label)).toEqual(["Type", "Settings…", "Data", "Edit source", "Copy source", "Copy as image", "Reload"]);
     expect(chartMenu(host(), entry).items?.find((i) => i.label === "Copy as image")?.disabled).toBeTruthy();
     const other = { ...MERMAID_FORMAT, name: "obsidian", label: "Obsidian Charts" };
     expect(chartMenu(host({ formats: () => [MERMAID_FORMAT, other] }), entry).items?.map((i) => i.label)).toContain("Convert to Obsidian Charts");
+    // A module's entry in its group: after the core's Data, before Edit source
+    const added = chartMenu(host({ entries: () => [{ group: "data", item: { label: "Refresh data" } }] }), entry).items?.map((i) => i.label);
+    expect(added?.slice(2, 4)).toEqual(["Data", "Refresh data"]);
   });
 
   it("shows the types and their variants, the chart's marked, and writes the one picked with its flags", async () => {
@@ -47,26 +51,6 @@ describe("the chart's menu", () => {
     await type.items!.find((i) => i.label === "Line")!.run!();
     const toLine = (h.rewrite as ReturnType<typeof vi.fn>).mock.calls[1]![1] as (model: ChartModel) => ChartModel;
     expect(toLine({ ...MODEL, series: [{ kind: "bar", values: [1] }, { kind: "line", values: [2] }] }).series).toEqual([{ values: [1] }, { values: [2] }]);
-  });
-
-  it("sets each series' name, kind and color; a kind the chart's type has is written as none", async () => {
-    const h = host();
-    const model: ChartModel = { type: "bar", labels: ["a"], series: [{ name: "one", values: [1] }, { name: "two", kind: "line", values: [2] }] };
-    const view = chartMenu(h, { ...entry, model } as Drawn).items!.find((i) => i.label === "Series")!.open!();
-    const form = view.element!({ close: vi.fn(), open: vi.fn() });
-    const [first, second] = [...form.querySelectorAll(".swc-menu-series")];
-    expect([...form.querySelectorAll<HTMLSelectElement>("select")].map((s) => s.value)).toEqual(["bar", "line"]);
-    first!.querySelector<HTMLSelectElement>("select")!.value = "line";
-    second!.querySelector<HTMLSelectElement>("select")!.value = "bar";
-    second!.querySelector<HTMLInputElement>("input[type=text]")!.value = "Two";
-    form.querySelector<HTMLButtonElement>(".swc-menu-apply")!.click();
-    const change = (h.rewrite as ReturnType<typeof vi.fn>).mock.calls[0]![1] as (model: ChartModel) => ChartModel;
-    expect(change(model)).toEqual({ ...model, series: [{ name: "one", kind: "line", values: [1] }, { name: "Two", values: [2] }] });
-    // A color picked: every series' color written
-    first!.querySelector<HTMLInputElement>("input[type=color]")!.value = "#ff0000";
-    form.querySelector<HTMLButtonElement>(".swc-menu-apply")!.click();
-    const colored = (h.rewrite as ReturnType<typeof vi.fn>).mock.calls[1]![1] as (model: ChartModel) => ChartModel;
-    expect(colored(model).colors).toEqual(["#ff0000", "#222222"]);
   });
 
   it("lists the page's tables, then their columns: the text one as labels, the number ones ticked", async () => {

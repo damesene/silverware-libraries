@@ -159,6 +159,21 @@ typed.
     chart's menu as it comes (the toolbar), so the block stays readable and
     every format can say it.
 
+14. **A settings dialog, its settings a registry** (decided 2026-11-02):
+    *Settings…* in the chart's menu opens a dialog of the chart's settings on
+    tabs (General, Axes, Series, Slices), written in one edit on Save. The
+    dialog knows no setting by name: a setting is data (its key, label, tab,
+    control, how it reads and writes the model), given by modules (the
+    settings module: the common ones) and by a type of chart (its own); it
+    shows where the chart's type has what it `needs` (`ChartType.capabilities`)
+    and its `when` agrees, and is offered where the block's format can write it
+    (`ChartFormat.supports`, else shown disabled). The menu is a registry too:
+    the core's entries and the modules', in groups. Rather than a menu of each
+    type's own: the common settings once for all, a type's own beside them, a
+    new type (the user's too) given the dialog by what it declares. A setting
+    of its own control (`render`), and `defineSettings` / `defineTypes` for the
+    user, once one needs them.
+
 ## Open
 
 - GitHub's Mermaid and `xychart-beta`: not verified that GitHub draws it (a

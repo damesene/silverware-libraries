@@ -13,6 +13,8 @@ import type { ChartFormat } from "./format.ts";
 import { type ChartModel, isUnreadable, type Source, type Unreadable } from "./model.ts";
 import { type ChartMenuHost, chartMenu } from "./chartmenu.ts";
 import type { Candidate, ChartModule, ChartSource, Command, FollowSource, ModuleHost, SourceData, TableApi, TextEdit } from "./module.ts";
+import type { Setting } from "./setting.ts";
+import { openSettings } from "./settingsdialog.ts";
 import { ChartToolbar } from "./toolbar.ts";
 import { themeOf, watchTheme } from "./theme.ts";
 import type { ChartType } from "./type.ts";
@@ -140,6 +142,10 @@ export class Controller {
       replaceRange: async (from, to, text) => void (await this.env.replaceRange?.(from, to, text)),
       flash: (message, type) => this.env.flash?.(message, type),
       newBlock: (model) => this.newBlock(model),
+      palette: (index) => {
+        const palette = themeOf(this.doc).palette;
+        return palette[index % palette.length] ?? "#888888";
+      },
       dataEdits: (text, follow) => this.dataEdits(text, follow),
       offer: (api) => void this.offers.set(name, api),
       offered: <T>(module: string) => this.offers.get(module) as T | undefined,
@@ -161,6 +167,11 @@ export class Controller {
   /** The modules' commands (the library page defines them) */
   commands(): Command[] {
     return this.modules.flatMap((module) => module.commands?.() ?? []);
+  }
+
+  /** The settings every chart has (the modules'), for its settings dialog */
+  settings(): Setting[] {
+    return this.modules.flatMap((module) => module.settings?.() ?? []);
   }
 
   types(): ChartType[] {
@@ -404,7 +415,36 @@ export class Controller {
       doc: this.doc,
       types: () => this.types(),
       formats: () => this.formats(),
-      palette: () => themeOf(this.doc).palette,
+      settings: async (entry) => {
+        const type = this.types().find((t) => t.name === entry.model.type);
+        if (!type) return;
+        openSettings(this.doc, {
+          model: entry.model,
+          type,
+          format: entry.format,
+          settings: this.settings(),
+          save: async (change) => {
+            const at = await located(entry);
+            if (!at) return;
+            const written = at.format.write(change(at.model), at.block.body);
+            if (written !== at.block.body) await this.env.replaceRange?.(at.block.bodyFrom, at.block.bodyTo, written);
+          },
+        });
+      },
+      entries: (entry) =>
+        this.modules.flatMap(
+          (module) =>
+            module.menuEntries?.({
+              model: entry.model,
+              type: this.types().find((t) => t.name === entry.model.type),
+              rewrite: async (change) => {
+                const at = await located(entry);
+                if (!at) return;
+                const written = at.format.write(change(at.model), at.block.body);
+                if (written !== at.block.body) await this.env.replaceRange?.(at.block.bodyFrom, at.block.bodyTo, written);
+              },
+            }) ?? [],
+        ),
       candidates: async (entry) => {
         const text = await this.pageText(entry.page, entry.body);
         const context = { page: entry.page, text, block: blockOf(text, entry.language, entry.body) };

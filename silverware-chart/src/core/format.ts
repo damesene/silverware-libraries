@@ -20,4 +20,10 @@ export type ChartFormat = {
    * what the model does not hold is kept where the format can
    */
   readonly write: (model: ChartModel, previous?: string) => string;
+  /**
+   * Whether it can write a setting (its key: "smooth", "series.kind"); left
+   * out, it writes every one. One it cannot is shown, not offered, in the
+   * settings dialog, rather than lost as the block is written
+   */
+  readonly supports?: (key: string) => boolean;
 };

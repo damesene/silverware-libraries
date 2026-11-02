@@ -1,11 +1,12 @@
-// The chart's ⋯ menu, as data for the toolbar (core/toolbar.ts): Type (a
-// gallery of the types and their variants), Data (the tables the sources
-// offer, then their columns to pick), Convert to (the other formats), Edit
-// source, Copy as image. What each does is the host's (the controller's).
+// The chart's ⋯ menu, as data for the toolbar (core/toolbar.ts): the core's
+// entries (Type, a gallery of the types and their variants; Settings…; Data,
+// the tables the sources offer, then their columns to pick; Edit source,
+// Convert to; Copy source, Copy as image; Reload) and the modules', each in
+// its group. What each does is the host's (the controller's).
 import type { Drawn } from "./drawn.ts";
 import type { ChartFormat } from "./format.ts";
-import { baseKind, type ChartModel, SERIES_KINDS, type SeriesKind, type Source } from "./model.ts";
-import type { Candidate } from "./module.ts";
+import type { ChartModel, Source } from "./model.ts";
+import { type Candidate, MENU_GROUPS, type MenuEntry } from "./module.ts";
 import type { MenuItem, MenuView } from "./toolbar.ts";
 import type { ChartType } from "./type.ts";
 
@@ -13,8 +14,10 @@ export type ChartMenuHost = {
   readonly doc: Document;
   types(): readonly ChartType[];
   formats(): readonly ChartFormat[];
-  /** The colors series take where the chart says none (the theme's) */
-  palette(): readonly string[];
+  /** The chart's settings dialog */
+  settings(entry: Drawn): Promise<void>;
+  /** The modules' entries of the chart's menu */
+  entries(entry: Drawn): readonly MenuEntry[];
   /** The tables the chart's page offers as its source */
   candidates(entry: Drawn): Promise<readonly Candidate[]>;
   /** The chart's block written anew with the model changed so */
@@ -38,7 +41,7 @@ const icon = (paths: string): string =>
 const ICONS = {
   type: icon('<path d="M6 20V10M12 20V4M18 20v-7"/>'),
   data: icon('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/>'),
-  series: icon('<circle cx="6" cy="7" r="2"/><circle cx="6" cy="17" r="2"/><path d="M11 7h10M11 17h10"/>'),
+  settings: icon('<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>'),
   convert: icon('<path d="M4 7h13l-3-3M20 17H7l3 3"/>'),
   source: icon('<path d="M8 6l-6 6 6 6M16 6l6 6-6 6"/>'),
   image: icon('<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>'),
@@ -60,77 +63,6 @@ function typed(model: ChartModel, type: string, flags: { stacked?: boolean; hori
     series: model.series.map(({ kind: _kind, ...series }) => series),
     ...(flags.stacked ? { stacked: true } : {}),
     ...(flags.horizontal ? { horizontal: true } : {}),
-  };
-}
-
-// How each kind of series is offered
-const KIND_LABELS: Readonly<Record<SeriesKind, string>> = { bar: "Bars", line: "Line", area: "Area", points: "Points", step: "Steps" };
-// Types drawing one series as slices, a color each
-const ROUND = new Set(["pie", "doughnut", "polarArea"]);
-
-/** Each series (a slice of a round chart): its color, its name, and where the type takes one, its kind (bars, a line, an area…) */
-function seriesView(host: ChartMenuHost, entry: Drawn): MenuView {
-  const model = entry.model;
-  const round = ROUND.has(model.type);
-  const base = baseKind(model.type);
-  const palette = host.palette();
-  const colorAt = (i: number) => model.colors?.[i] ?? palette[i % palette.length] ?? "#888888";
-  const items = round
-    ? model.labels.map((label) => ({ name: label, kind: undefined as SeriesKind | undefined }))
-    : model.series.map((series, i) => ({ name: series.name ?? model.source?.series[i] ?? `Series ${i + 1}`, kind: series.kind }));
-  return {
-    title: round ? "Slices" : "Series",
-    element: (menu) => {
-      const doc = host.doc;
-      const form = doc.createElement("div");
-      form.className = "swc-menu-form";
-      const rows = items.map((item, i) => {
-        const row = form.appendChild(doc.createElement("div"));
-        row.className = "swc-menu-series";
-        const color = row.appendChild(doc.createElement("input"));
-        color.type = "color";
-        color.title = "Color";
-        // (A color input takes #rrggbb only: a color written otherwise shows as black until one is picked)
-        color.value = /^#[0-9a-f]{6}$/i.test(colorAt(i)) ? colorAt(i) : "#000000";
-        const name = row.appendChild(doc.createElement("input"));
-        name.type = "text";
-        name.value = item.name;
-        name.disabled = round;
-        name.setAttribute("aria-label", "Name");
-        let kind: HTMLSelectElement | undefined;
-        if (base) {
-          kind = row.appendChild(doc.createElement("select"));
-          kind.setAttribute("aria-label", "Drawn as");
-          for (const k of SERIES_KINDS) kind.append(new Option(KIND_LABELS[k], k));
-          kind.value = item.kind ?? base;
-        }
-        return { color, name, kind, colorWas: color.value };
-      });
-      const apply = form.appendChild(doc.createElement("button"));
-      apply.type = "button";
-      apply.className = "swc-menu-apply";
-      apply.textContent = "Save";
-      apply.addEventListener("click", () => {
-        menu.close();
-        // Colors written only once one is picked (else the theme's palette stays), the ones written before kept
-        const picked = rows.some((row) => row.color.value !== row.colorWas);
-        void host.rewrite(entry, (m) => ({
-          ...m,
-          series: round
-            ? m.series
-            : m.series.map((series, i) => {
-                const row = rows[i];
-                if (!row) return series;
-                const { kind: _kind, name: _name, ...rest } = series;
-                const written = row.kind?.value as SeriesKind | undefined;
-                const name = row.name.value.trim();
-                return { ...rest, ...(name ? { name } : {}), ...(written && written !== base ? { kind: written } : {}) };
-              }),
-          ...(picked || m.colors ? { colors: rows.map((row) => row.color.value) } : {}),
-        }));
-      });
-      return form;
-    },
   };
 }
 
@@ -244,19 +176,21 @@ function dataView(host: ChartMenuHost, entry: Drawn): MenuView {
   };
 }
 
-/** The chart's menu */
+/** The chart's menu: the core's entries and the modules', by their groups (MENU_GROUPS), by order within one */
 export function chartMenu(host: ChartMenuHost, entry: Drawn): MenuView {
   const others = host.formats().filter((format) => format.name !== entry.format.name);
   const copy = host.copyImage(entry);
-  const items: MenuItem[] = [
-    { label: "Type", icon: ICONS.type, open: () => typeView(host, entry) },
-    { label: ROUND.has(entry.model.type) ? "Slices" : "Series", icon: ICONS.series, open: () => seriesView(host, entry) },
-    { label: "Data", icon: ICONS.data, open: () => dataView(host, entry) },
-    ...others.map((format) => ({ label: `Convert to ${format.label}`, icon: ICONS.convert, run: () => host.convert(entry, format) })),
-    { label: "Edit source", icon: ICONS.source, run: () => host.editSource(entry) },
-    { label: "Copy source", icon: ICONS.copy, run: () => host.copySource(entry) },
-    { label: "Copy as image", icon: ICONS.image, ...(copy ? { run: copy } : { disabled: "This page cannot copy images (no Clipboard API: a page over http)" }) },
-    { label: "Reload", icon: ICONS.reload, run: () => host.reload(entry) },
+  const own: MenuEntry[] = [
+    { group: "chart", order: 0, item: { label: "Type", icon: ICONS.type, open: () => typeView(host, entry) } },
+    { group: "chart", order: 10, item: { label: "Settings…", icon: ICONS.settings, run: () => host.settings(entry) } },
+    { group: "data", order: 0, item: { label: "Data", icon: ICONS.data, open: () => dataView(host, entry) } },
+    ...others.map((format, i): MenuEntry => ({ group: "source", order: 10 + i, item: { label: `Convert to ${format.label}`, icon: ICONS.convert, run: () => host.convert(entry, format) } })),
+    { group: "source", order: 0, item: { label: "Edit source", icon: ICONS.source, run: () => host.editSource(entry) } },
+    { group: "copy", order: 0, item: { label: "Copy source", icon: ICONS.copy, run: () => host.copySource(entry) } },
+    { group: "copy", order: 10, item: { label: "Copy as image", icon: ICONS.image, ...(copy ? { run: copy } : { disabled: "This page cannot copy images (no Clipboard API: a page over http)" }) } },
+    { group: "view", order: 0, item: { label: "Reload", icon: ICONS.reload, run: () => host.reload(entry) } },
   ];
-  return { title: "Chart", items };
+  const entries = [...own, ...host.entries(entry)];
+  const rank = (e: MenuEntry) => MENU_GROUPS.indexOf(e.group) * 1000 + (e.order ?? 500);
+  return { title: "Chart", items: [...entries].sort((a, b) => rank(a) - rank(b)).map((e) => e.item) };
 }

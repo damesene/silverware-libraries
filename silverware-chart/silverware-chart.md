@@ -98,7 +98,7 @@ xychart-beta
 Point at a chart and a small toolbar shows above its top left corner; its **⋯** opens the chart's menu:
 
 * **Type**: every type of chart as a gallery (bars, stacked bars, horizontal bars, lines, areas, stacked areas, scatter, pie, doughnut, polar area, radar); click one and the chart is written so, every series drawn that way.
-* **Series** (**Slices** for a pie): each series' color and name, and for bars, lines and areas how it is drawn among the others: *Bars*, *Line*, *Area*, *Points* (no line) or *Steps*. Mermaid knows bars and lines (`bar "…" [ ]`, `line "…" [ ]`): an area, points and steps are a `line` there, their kinds said in `chart.kinds`.
+* **Settings…**: the chart's settings in a dialog, on tabs, each shown where the chart's type has it: *General* (title, height, legend, stacked, horizontal, smooth lines), *Axes* (the axes' titles, the y axis' range), *Series* (each series' color, name and how it is drawn among the others: *Bars*, *Line*, *Area*, *Points* or *Steps*), *Slices* for a pie (each slice's color). Nothing is written until *Save*, then in one edit. Mermaid knows bars and lines (`bar "…" [ ]`, `line "…" [ ]`): an area, points and steps are a `line` there, their kinds said in `chart.kinds`.
 * **Data**: the tables of the page the chart can draw (the table above it, below it, each first table under a heading, and with Silverware Table those you named); pick one, then the column of the labels and the columns of the values, and *Draw these*. *No table* goes back to the block's own numbers.
 * **Edit source**: the block's markdown, to edit it by hand.
 * **Copy source**: the block's markdown on your clipboard.
@@ -114,7 +114,7 @@ Every change is one edit of the block you can undo.
 | Setting | Default | What it does |
 |---|---|---|
 | `silverware.chart.height` | `300px` | A chart's height where its block says none |
-| `silverware.chart.modules.<name>.enabled` | `true` | Turns a part off (applies on reload): `mermaid` (charts written as Mermaid), `types` (the built-in types of charts), `tables` (markdown tables as sources), `silverwareTable` (tables named by Silverware Table, and the chart's data written with the table's edits) |
+| `silverware.chart.modules.<name>.enabled` | `true` | Turns a part off (applies on reload): `mermaid` (charts written as Mermaid), `types` (the built-in types of charts), `settings` (the common settings of the settings dialog), `tables` (markdown tables as sources), `silverwareTable` (tables named by Silverware Table, and the chart's data written with the table's edits) |
 
 ## Custom formats
 
@@ -200,6 +200,7 @@ config.define("silverware.chart", {
       properties = {
         mermaid = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Charts written as Mermaid (```mermaid blocks of xychart-beta and pie), which GitHub and other Mermaid renderers draw too.", ui = { category = "Silverware Chart", label = "Mermaid", priority = 0.9 } } } },
         types = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "The built-in types of charts: bar, line, area, scatter, pie, doughnut, polar area, radar.", ui = { category = "Silverware Chart", label = "Chart types", priority = 0.8 } } } },
+        settings = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "The settings every chart has, in its settings dialog: title, height, legend, stacked, smooth lines, the axes, each series' name, color and how it is drawn.", ui = { category = "Silverware Chart", label = "Chart settings", priority = 0.75 } } } },
         tables = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "A markdown table as a chart's data, found by its place (above or below the chart, under a heading), followed as it is edited.", ui = { category = "Silverware Chart", label = "Tables as sources", priority = 0.7 } } } },
         silverwareTable = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Where Silverware Table is installed: a table it named as a chart's data, and the chart's data written into its block with each edit of the table.", ui = { category = "Silverware Chart", label = "Silverware Table", priority = 0.6 } } } },
       },
@@ -587,6 +588,348 @@ end
 }
 
 .swc-menu-apply:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* The chart's settings dialog: the look of Silverware Tags' settings (shared/dialog.ts, its classes by the base swc-settings) */
+.swc-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  top: var(--sw-view-top, 0);
+  bottom: auto;
+  height: var(--sw-view-height, 100%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--modal-backdrop-color, rgba(0, 0, 0, 0.35));
+  font-family: var(--ui-font, system-ui, sans-serif);
+}
+.swc-settings {
+  --swc-settings-line: var(--button-border-color, rgba(128, 128, 128, 0.3));
+  --swc-settings-card: color-mix(in srgb, var(--root-color) 4%, var(--root-background-color));
+  /* Of one height whatever its tab shows (switching tabs moves nothing), 720px where the window has room;
+     its body scrolls (a phone: the whole screen, below) */
+  display: flex;
+  flex-direction: column;
+  /* (Its border within the height: SilverBullet sets no box-sizing, the playground border-box) */
+  box-sizing: border-box;
+  width: min(600px, calc(100vw - 24px));
+  height: min(560px, calc(100vh - 32px));
+  height: min(560px, calc(var(--sw-view-height, 100dvh) - 32px));
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border: 1px solid var(--swc-settings-line);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+  font-size: 14px;
+  overflow: hidden;
+}
+.swc-settings:focus {
+  outline: none;
+}
+.swc-settings button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.swc-settings-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 16px 8px;
+}
+.swc-settings-titles {
+  flex: 1;
+  min-width: 0;
+}
+.swc-settings-title {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.3;
+}
+.swc-settings-subtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  opacity: 0.65;
+}
+.swc-settings-close {
+  display: inline-flex;
+  padding: 5px;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  opacity: 0.65;
+}
+.swc-settings-close:hover {
+  opacity: 1;
+  background: var(--swc-settings-card);
+}
+.swc-settings-close svg {
+  width: 16px;
+  height: 16px;
+}
+/* One row however many tabs: too wide for the dialog (a phone), it scrolls sideways */
+.swc-settings-tabs {
+  /* Never shrunk by a tall body (it scrolls sideways, so a column's flex would squeeze it: on a phone it slid under the body) */
+  flex: none;
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: 2px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--swc-settings-line);
+}
+.swc-settings-tab {
+  flex: none;
+  white-space: nowrap;
+  padding: 7px 10px;
+  margin-bottom: -1px;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  opacity: 0.7;
+}
+.swc-settings-tab:hover {
+  opacity: 1;
+}
+.swc-settings-tab[aria-selected="true"] {
+  opacity: 1;
+  font-weight: 600;
+  border-bottom-color: var(--ui-accent-color);
+}
+.swc-settings-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 16px 12px;
+}
+.swc-settings-panel[hidden] {
+  display: none;
+}
+.swc-settings-group {
+  margin: 14px 2px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.6;
+}
+.swc-settings-panel > .swc-settings-card:first-child {
+  margin-top: 12px;
+}
+.swc-settings-card {
+  background: var(--swc-settings-card);
+  border: 1px solid var(--swc-settings-line);
+  border-radius: 8px;
+}
+.swc-settings-card > :not(:first-child) {
+  border-top: 1px solid var(--swc-settings-line);
+}
+.swc-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+}
+.swc-settings-label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.swc-settings-module-name,
+.swc-settings-name {
+  font-weight: 500;
+}
+.swc-settings-hint {
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0.62;
+}
+.swc-settings-row select,
+.swc-settings-row input[type="number"] {
+  flex: none;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swc-settings-line);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.swc-settings-row select {
+  max-width: 55%;
+}
+.swc-settings-row input[type="number"] {
+  width: 6.5em;
+}
+.swc-settings-row input.swc-settings-invalid {
+  border-color: var(--danger-color, #c62828);
+}
+/* A switch: the checkbox (invisible, still focusable) drawn as a track and a knob */
+.swc-settings-switch {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+}
+.swc-settings-switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.swc-settings-knob {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--root-color) 22%, var(--root-background-color));
+  transition: background 0.15s;
+  pointer-events: none;
+}
+.swc-settings-knob::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s;
+}
+.swc-settings-switch input:checked + .swc-settings-knob {
+  background: var(--ui-accent-color);
+}
+.swc-settings-switch input:checked + .swc-settings-knob::after {
+  transform: translateX(14px);
+}
+.swc-settings-switch input:focus-visible + .swc-settings-knob {
+  outline: 2px solid var(--ui-accent-color);
+  outline-offset: 2px;
+}
+.swc-settings-switch input:disabled + .swc-settings-knob {
+  opacity: 0.5;
+}
+/* A module's own settings: under it, indented, while it is on */
+.swc-settings-module-settings {
+  margin: 0 12px 10px 24px;
+  border-left: 2px solid var(--swc-settings-line);
+}
+.swc-settings-module-settings .swc-settings-row {
+  padding: 6px 0 6px 12px;
+}
+.swc-settings-module-settings[hidden] {
+  display: none;
+}
+.swc-settings-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--swc-settings-line);
+}
+.swc-settings-note {
+  flex: 1;
+  font-size: 12px;
+  opacity: 0.75;
+}
+.swc-settings-cancel,
+.swc-settings-save {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--swc-settings-line);
+  background: var(--root-background-color);
+}
+.swc-settings-save {
+  color: #fff !important;
+  background: var(--ui-accent-color);
+  border-color: var(--ui-accent-color);
+}
+.swc-settings-save:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+@media (max-width: 480px), (pointer: coarse) and (max-height: 600px) {
+  .swc-settings {
+    width: 100vw;
+    height: 100vh;
+    height: var(--sw-view-height, 100dvh);
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+  .swc-settings-body {
+    flex: 1 1 auto;
+  }
+  .swc-settings-tab {
+    padding: 10px 12px;
+  }
+  .swc-settings-row {
+    min-height: 44px;
+  }
+  .swc-settings-cancel,
+  .swc-settings-save {
+    padding: 10px 18px;
+  }
+  .swc-settings-row {
+    flex-wrap: wrap;
+  }
+  /* The name keeps room to be read; a control that does not fit beside it goes under it, the row's width */
+  .swc-settings-label {
+    flex: 1 1 14em;
+  }
+  .swc-settings-row select {
+    flex: 1 1 auto;
+    max-width: 100%;
+  }
+  .swc-settings-row select,
+  .swc-settings-row input[type="number"] {
+    font-size: 16px;
+  }
+}
+
+/* A row of each series (or slice): its number or label, then a control per setting */
+.swc-settings-item {
+  gap: 8px;
+}
+.swc-settings-item-name {
+  flex: 0 0 auto;
+  min-width: 1.5em;
+  max-width: 8em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  opacity: 0.65;
+}
+.swc-settings-item input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+.swc-settings-row input[type="text"] {
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swc-settings-line);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.swc-settings-row input[type="color"] {
+  flex: none;
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.swc-settings-row :disabled {
   opacity: 0.5;
   cursor: default;
 }

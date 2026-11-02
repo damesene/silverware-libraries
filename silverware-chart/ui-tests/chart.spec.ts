@@ -214,22 +214,44 @@ test("the toolbar stays on its chart as the text above it grows", async ({ page,
     .toBe(4);
 });
 
-test("a type picked draws every series so; Series draws one as a line over the bars", async ({ page, open }) => {
+/** The chart's settings dialog opened from its menu */
+async function chartSettings(page: import("@playwright/test").Page): Promise<import("@playwright/test").Locator> {
+  await chartMenu(page);
+  await page.locator(".swc-menu-item", { hasText: "Settings" }).click();
+  const dialog = page.locator(".swc-settings");
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+test("a type picked draws every series so; the settings draw one as a line over the bars, another as steps", async ({ page, open }) => {
   await open('# Mixed\n\n```mermaid\nxychart-beta\n  x-axis ["a", "b"]\n  bar "one" [1, 2]\n  line "two" [3, 4]\n```\n');
   await expect.poll(() => charts(page)).toHaveLength(1);
   await chartMenu(page);
   await page.locator(".swc-menu-item", { hasText: "Type" }).click();
   await page.locator(".swc-menu-tile", { hasText: /^Line/ }).click();
   await expect.poll(() => savedText(page)).toContain('  line "one" [1, 2]\n  line "two" [3, 4]\n```');
-  await chartMenu(page);
-  await page.locator(".swc-menu-item", { hasText: "Series" }).click();
-  await page.locator(".swc-menu-series").first().locator("select").selectOption("bar");
-  await page.locator(".swc-menu-apply").click();
+  let dialog = await chartSettings(page);
+  await dialog.locator(".swc-settings-tab", { hasText: "Series" }).click();
+  await dialog.locator(".swc-settings-item select").first().selectOption("bar");
+  await dialog.locator(".swc-settings-save").click();
   await expect.poll(() => savedText(page)).toContain('  bar "one" [1, 2]\n  line "two" [3, 4]\n%% chart.type: line\n```');
-  // Steps, which Mermaid has no word for: a line there, its kind said in chart.kinds
-  await chartMenu(page);
-  await page.locator(".swc-menu-item", { hasText: "Series" }).click();
-  await page.locator(".swc-menu-series").nth(1).locator("select").selectOption("step");
-  await page.locator(".swc-menu-apply").click();
-  await expect.poll(() => savedText(page)).toContain('  bar "one" [1, 2]\n  line "two" [3, 4]\n%% chart.type: line\n%% chart.kinds: bar, step\n```');
+  // Steps, which Mermaid has no word for: a line there, its kind said in chart.kinds; smooth lines on General
+  dialog = await chartSettings(page);
+  await dialog.locator(".swc-settings-row", { hasText: "Smooth lines" }).locator("input").check();
+  await dialog.locator(".swc-settings-tab", { hasText: "Series" }).click();
+  await dialog.locator(".swc-settings-item select").nth(1).selectOption("step");
+  await dialog.locator(".swc-settings-save").click();
+  await expect.poll(() => savedText(page)).toContain('  bar "one" [1, 2]\n  line "two" [3, 4]\n%% chart.type: line\n%% chart.kinds: bar, step\n%% chart.smooth: true\n```');
+});
+
+test("the settings show what the chart's type has: a pie no axes, its slices' colors", async ({ page, open }) => {
+  await open('# Pets\n\n```mermaid\npie title Pets\n  "Dogs" : 3\n  "Cats" : 1\n```\n');
+  await expect.poll(() => charts(page)).toHaveLength(1);
+  const dialog = await chartSettings(page);
+  await expect(dialog.locator(".swc-settings-tab")).toHaveText(["General", "Slices"]);
+  await dialog.locator(".swc-settings-tab", { hasText: "Slices" }).click();
+  await expect(dialog.locator(".swc-settings-item-name")).toHaveText(["Dogs", "Cats"]);
+  // Esc closes it, nothing written
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
 });

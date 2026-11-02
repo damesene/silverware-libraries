@@ -1,6 +1,7 @@
 // A type of chart (bar, line, pie…): how Chart.js draws a model of it. The
 // built-in ones are a module's (types/), the core knows none of them.
-import type { ChartModel } from "./model.ts";
+import type { ChartModel, SeriesKind } from "./model.ts";
+import type { Setting } from "./setting.ts";
 
 /** What a chart's colors and text are drawn with: SilverBullet's look, read as the chart is made */
 export type Theme = {
@@ -27,4 +28,10 @@ export type ChartType = {
   readonly config: (model: ChartModel, theme: Theme) => ChartConfig;
   // Its kinds the menu offers apart (stacked bars, horizontal bars): the model's flags set for each
   readonly variants?: readonly { readonly label: string; readonly icon: string; readonly stacked?: boolean; readonly horizontal?: boolean }[];
+  // What it has, which settings ask for (`needs`): series, slices, axes, stacked, horizontal, lines
+  readonly capabilities?: readonly string[];
+  // How its series may be drawn among each other (its own kind first); left out: as it draws them
+  readonly kinds?: readonly SeriesKind[];
+  // Settings of its own, shown with the common ones
+  readonly settings?: readonly Setting[];
 };

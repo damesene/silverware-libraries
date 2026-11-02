@@ -33,6 +33,7 @@ export const PIE: ChartType = {
   label: "Pie",
   icon: icon('<path d="M12 3v9h9"/><circle cx="12" cy="12" r="9"/>'),
   config: (model, theme) => roundConfig(model, theme, "pie"),
+  capabilities: ["slices"],
 };
 
 export const DOUGHNUT: ChartType = {
@@ -40,6 +41,7 @@ export const DOUGHNUT: ChartType = {
   label: "Doughnut",
   icon: icon('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5"/>'),
   config: (model, theme) => roundConfig(model, theme, "doughnut"),
+  capabilities: ["slices"],
 };
 
 export const POLAR_AREA: ChartType = {
@@ -47,12 +49,14 @@ export const POLAR_AREA: ChartType = {
   label: "Polar area",
   icon: icon('<circle cx="12" cy="12" r="9"/><path d="M12 12l6-6M12 12l-4 7M12 12H4"/>'),
   config: (model, theme) => roundConfig(model, theme, "polarArea"),
+  capabilities: ["slices"],
 };
 
 export const RADAR: ChartType = {
   name: "radar",
   label: "Radar",
   icon: icon('<path d="M12 3l8 6-3 10H7L4 9z"/><path d="M12 8l4 3-1 4H9l-1-4z"/>'),
+  capabilities: ["series", "lines"],
   // Each series a closed line round the labels
   config: (model, theme) => ({
     type: "radar",

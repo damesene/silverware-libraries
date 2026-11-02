@@ -18,7 +18,7 @@ function host(over: Partial<ChartMenuHost> = {}): ChartMenuHost {
     entries: () => [],
     candidates: async () => [],
     rewrite: vi.fn(async () => {}),
-    pick: vi.fn(async () => {}),
+    pick: vi.fn(async (e: Drawn) => e),
     convert: vi.fn(async () => {}),
     editSource: vi.fn(async () => {}),
     copySource: vi.fn(async () => {}),
@@ -53,29 +53,13 @@ describe("the chart's menu", () => {
     expect(toLine({ ...MODEL, series: [{ kind: "bar", values: [1] }, { kind: "line", values: [2] }] }).series).toEqual([{ values: [1] }, { values: [2] }]);
   });
 
-  it("lists the page's tables, then their columns: the text one as labels, the number ones ticked", async () => {
+  it("lists the page's tables: one picked drawn at once (its text column the labels, its numbers the values), the settings' Data open", async () => {
     const h = host({ candidates: async () => [{ label: "Table above", table: "above", at: 0, columns: [{ name: "Month", numeric: false }, { name: "Qty", numeric: true }] }] });
-    const opened: unknown[] = [];
-    const menu = { close: vi.fn(), open: (view: unknown) => opened.push(view) };
+    const menu = { close: vi.fn(), open: vi.fn() };
     const list = chartMenu(h, entry).items!.find((i) => i.label === "Data")!.open!().element!(menu);
     await vi.waitFor(() => expect(list.querySelectorAll("button")).toHaveLength(1));
     list.querySelector("button")!.click();
-    const form = (opened[0] as { element(m: typeof menu): HTMLElement }).element(menu);
-    expect(form.querySelector("select")!.value).toBe("Month");
-    expect([...form.querySelectorAll<HTMLInputElement>("input[type=checkbox]")].map((box) => box.checked)).toEqual([false, true]);
-    form.querySelector<HTMLButtonElement>(".swc-menu-apply")!.click();
+    await vi.waitFor(() => expect(h.settings).toHaveBeenCalledWith(entry, "Data"));
     expect(h.pick).toHaveBeenCalledWith(entry, { table: "above", x: "Month", series: ["Qty"] });
-    // The last 3 rows of those where Qty > 5
-    const again = (opened[0] as { element(m: typeof menu): HTMLElement }).element(menu);
-    const [, rowsFrom] = [...again.querySelectorAll<HTMLSelectElement>(".swc-menu-field select")];
-    rowsFrom!.value = "last";
-    again.querySelector<HTMLInputElement>(".swc-menu-count")!.value = "3";
-    again.querySelector<HTMLButtonElement>(".swc-menu-add")!.click();
-    const [column, op] = [...again.querySelectorAll<HTMLSelectElement>(".swc-menu-condition select")];
-    column!.value = "Qty";
-    op!.value = ">";
-    again.querySelector<HTMLInputElement>(".swc-menu-condition input")!.value = "5";
-    again.querySelector<HTMLButtonElement>(".swc-menu-apply")!.click();
-    expect(h.pick).toHaveBeenLastCalledWith(entry, { table: "above", x: "Month", series: ["Qty"], where: [{ column: "Qty", criterion: "> 5" }], rows: { from: "last", count: 3 } });
   });
 });

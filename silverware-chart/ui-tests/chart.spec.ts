@@ -129,16 +129,27 @@ test("the menu's Type gallery writes the type picked", async ({ page, open }) =>
   await expect.poll(async () => (await charts(page))[0]?.type).toBe("doughnut");
 });
 
-test("the menu's Data draws a table of the page, its columns picked", async ({ page, open }) => {
+test("the menu's Data draws a table picked at once; the settings' Data and Series take only some rows and columns", async ({ page, open }) => {
   await open(`# Sales\n\n${SALES}\n\`\`\`mermaid\nxychart-beta\n  x-axis ["a"]\n  bar [1]\n\`\`\`\n`);
   await expect.poll(() => charts(page)).toHaveLength(1);
   await chartMenu(page);
   await page.locator(".swc-menu-item", { hasText: "Data" }).click();
   await page.locator(".swc-menu-item", { hasText: "Table above" }).click();
-  await page.locator(".swc-menu-check", { hasText: "Cost" }).locator("input").check();
-  await page.locator(".swc-menu-apply").click();
+  // Drawn at once: its text column the labels, its columns of numbers the values; the settings open at Data
   await expect.poll(() => savedText(page)).toContain("%% chart.source: above\n%% chart.x: Month\n%% chart.series: Revenue, Cost");
-  await expect.poll(() => charts(page)).toEqual([{ type: "bar", labels: ["Oct", "Nov"], data: [[120, 140], [80, 85]] }]);
+  const dialog = page.locator(".swc-settings");
+  await expect(dialog.locator('.swc-settings-tab[aria-selected="true"]')).toHaveText("Data");
+  // The rows where Revenue > 130, of Revenue alone
+  await dialog.locator(".swc-settings-add").click();
+  const condition = dialog.locator(".swc-settings-condition");
+  await condition.locator("select").first().selectOption("Revenue");
+  await condition.locator("select").nth(1).selectOption(">");
+  await condition.locator("input").fill("130");
+  await dialog.locator(".swc-settings-tab", { hasText: "Series" }).click();
+  await dialog.locator(".swc-settings-item", { hasText: "Cost" }).locator(".swc-settings-switch input").click();
+  await dialog.locator(".swc-settings-save").click();
+  await expect.poll(() => savedText(page)).toContain("%% chart.series: Revenue\n%% chart.where: Revenue > 130");
+  await expect.poll(() => charts(page)).toEqual([{ type: "bar", labels: ["Nov"], data: [[140]] }]);
 });
 
 test("the menu's Edit source shows the block's markdown", async ({ page, open }) => {

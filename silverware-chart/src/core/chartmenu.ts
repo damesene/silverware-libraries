@@ -14,16 +14,16 @@ export type ChartMenuHost = {
   readonly doc: Document;
   types(): readonly ChartType[];
   formats(): readonly ChartFormat[];
-  /** The chart's settings dialog */
-  settings(entry: Drawn): Promise<void>;
+  /** The chart's settings dialog (at a tab of it) */
+  settings(entry: Drawn, tab?: string): Promise<void>;
   /** The modules' entries of the chart's menu */
   entries(entry: Drawn): readonly MenuEntry[];
   /** The tables the chart's page offers as its source */
   candidates(entry: Drawn): Promise<readonly Candidate[]>;
   /** The chart's block written anew with the model changed so */
   rewrite(entry: Drawn, change: (model: ChartModel) => ChartModel): Promise<void>;
-  /** The chart's source set (its data written with it) */
-  pick(entry: Drawn, source: Source): Promise<void>;
+  /** The chart's source set (its data written with it): the chart as its block is then */
+  pick(entry: Drawn, source: Source): Promise<Drawn | undefined>;
   /** The chart's block written in another format */
   convert(entry: Drawn, format: ChartFormat): Promise<void>;
   /** The chart's markdown shown (the cursor put into its block) */
@@ -83,113 +83,11 @@ function typeView(host: ChartMenuHost, entry: Drawn): MenuView {
   return { title: "Type", items, tiles: true };
 }
 
-/** A table's columns to pick: the labels' column, the values' columns */
-function columnsView(host: ChartMenuHost, entry: Drawn, candidate: Candidate): MenuView {
-  return {
-    title: candidate.label,
-    element: (menu) => {
-      const doc = host.doc;
-      const form = doc.createElement("div");
-      form.className = "swc-menu-form";
-      const current = entry.model.source?.table === candidate.table ? entry.model.source : undefined;
-      const same = (a: string, b: string | undefined) => a.toLowerCase() === (b ?? "").toLowerCase();
-      // The labels: a column, or none (1, 2, …)
-      const xLabel = form.appendChild(doc.createElement("label"));
-      xLabel.className = "swc-menu-field";
-      xLabel.append("Labels");
-      const x = xLabel.appendChild(doc.createElement("select"));
-      x.append(new Option("(none: 1, 2, …)", ""));
-      for (const column of candidate.columns) x.append(new Option(column.name, column.name));
-      const firstText = candidate.columns.find((c) => !c.numeric)?.name ?? "";
-      x.value = current ? (candidate.columns.find((c) => same(c.name, current.x))?.name ?? "") : firstText;
-      // The values: the columns ticked
-      const seriesTitle = form.appendChild(doc.createElement("div"));
-      seriesTitle.className = "swc-menu-field-title";
-      seriesTitle.textContent = "Values";
-      const boxes = candidate.columns.map((column) => {
-        const label = form.appendChild(doc.createElement("label"));
-        label.className = "swc-menu-check";
-        const box = label.appendChild(doc.createElement("input"));
-        box.type = "checkbox";
-        box.value = column.name;
-        box.checked = current ? current.series.some((s) => same(column.name, s)) : column.numeric && column.name !== x.value;
-        label.append(column.name);
-        return box;
-      });
-      // The rows: all, or the first or last so many (of those the conditions keep)
-      const rowsLabel = form.appendChild(doc.createElement("label"));
-      rowsLabel.className = "swc-menu-field";
-      rowsLabel.append("Rows");
-      const rowsFrom = rowsLabel.appendChild(doc.createElement("select"));
-      rowsFrom.append(new Option("All", ""), new Option("First", "first"), new Option("Last", "last"));
-      rowsFrom.value = current?.rows?.from ?? "";
-      const rowsCount = rowsLabel.appendChild(doc.createElement("input"));
-      rowsCount.type = "number";
-      rowsCount.min = "1";
-      rowsCount.className = "swc-menu-count";
-      rowsCount.value = String(current?.rows?.count ?? 10);
-      rowsCount.setAttribute("aria-label", "How many rows");
-      const showCount = () => (rowsCount.hidden = rowsFrom.value === "");
-      rowsFrom.addEventListener("change", showCount);
-      showCount();
-      // Only the rows where each condition holds: a column, an operator, a value
-      const whereTitle = form.appendChild(doc.createElement("div"));
-      whereTitle.className = "swc-menu-field-title";
-      whereTitle.textContent = "Only where";
-      const conditions = form.appendChild(doc.createElement("div"));
-      conditions.className = "swc-menu-conditions";
-      const OPS: readonly (readonly [string, string])[] = [["=", "is"], ["<>", "is not"], [">", ">"], [">=", "≥"], ["<", "<"], ["<=", "≤"]];
-      const addCondition = (column = candidate.columns[0]?.name ?? "", criterion = "=") => {
-        const row = conditions.appendChild(doc.createElement("div"));
-        row.className = "swc-menu-condition";
-        const col = row.appendChild(doc.createElement("select"));
-        for (const c of candidate.columns) col.append(new Option(c.name, c.name));
-        col.value = candidate.columns.find((c) => same(c.name, column))?.name ?? candidate.columns[0]?.name ?? "";
-        const op = row.appendChild(doc.createElement("select"));
-        for (const [value, label] of OPS) op.append(new Option(label, value));
-        const written = OPS.map(([o]) => o).sort((a, b) => b.length - a.length).find((o) => criterion.trim().startsWith(o)) ?? "=";
-        op.value = written;
-        const value = row.appendChild(doc.createElement("input"));
-        value.type = "text";
-        value.placeholder = "value, app*";
-        value.value = criterion.trim().startsWith(written) ? criterion.trim().slice(written.length).trim() : criterion.trim();
-        const remove = row.appendChild(doc.createElement("button"));
-        remove.type = "button";
-        remove.className = "swc-menu-remove";
-        remove.textContent = "×";
-        remove.title = "Remove this condition";
-        remove.addEventListener("click", () => row.remove());
-      };
-      for (const condition of current?.where ?? []) addCondition(condition.column, condition.criterion);
-      const add = form.appendChild(doc.createElement("button"));
-      add.type = "button";
-      add.className = "swc-menu-add";
-      add.textContent = "+ Add a condition";
-      add.addEventListener("click", () => addCondition());
-      const apply = form.appendChild(doc.createElement("button"));
-      apply.type = "button";
-      apply.className = "swc-menu-apply";
-      apply.textContent = "Draw these";
-      const refresh = () => {
-        apply.disabled = !boxes.some((box) => box.checked);
-      };
-      for (const box of boxes) box.addEventListener("change", refresh);
-      refresh();
-      apply.addEventListener("click", () => {
-        const series = boxes.filter((box) => box.checked).map((box) => box.value);
-        const where = [...conditions.querySelectorAll(".swc-menu-condition")].map((row) => {
-          const [col, op] = [...row.querySelectorAll("select")] as HTMLSelectElement[];
-          const value = row.querySelector("input")!.value.trim();
-          return { column: col!.value, criterion: `${op!.value} ${value}`.trim() };
-        });
-        const count = Math.floor(Number(rowsCount.value));
-        const rows = rowsFrom.value && count > 0 ? { from: rowsFrom.value as "first" | "last", count } : undefined;
-        menu.close();
-        void host.pick(entry, { table: candidate.table, ...(x.value ? { x: x.value } : {}), series, ...(where.length ? { where } : {}), ...(rows ? { rows } : {}) });
-      });
-      return form;
-    },
-  };
+/** A table's columns as a source: its first other column the labels, its columns of numbers the values (all of them where it has no such) */
+function sourceOf(candidate: Candidate): Source {
+  const x = candidate.columns.find((c) => !c.numeric)?.name;
+  const numbers = candidate.columns.filter((c) => c.numeric && c.name !== x).map((c) => c.name);
+  return { table: candidate.table, ...(x ? { x } : {}), series: numbers.length ? numbers : candidate.columns.filter((c) => c.name !== x).map((c) => c.name) };
 }
 
 /** The tables the page offers, the current one marked; read as the view opens */
@@ -206,13 +104,20 @@ function dataView(host: ChartMenuHost, entry: Drawn): MenuView {
         for (const candidate of candidates) {
           const button = list.appendChild(host.doc.createElement("button"));
           button.type = "button";
-          button.className = "swc-menu-item swc-menu-sub";
+          button.className = "swc-menu-item";
           if (entry.model.source?.table === candidate.table) button.setAttribute("aria-checked", "true");
           button.innerHTML = ICONS.data;
           const label = button.appendChild(host.doc.createElement("span"));
           label.className = "swc-label";
           label.textContent = candidate.label;
-          button.addEventListener("click", () => menu.open(columnsView(host, entry, candidate)));
+          // Picked: drawn at once (its text column the labels, its columns of numbers the values), the settings' Data open to change that
+          button.addEventListener("click", () => {
+            menu.close();
+            void (async () => {
+              const chart = entry.model.source?.table === candidate.table ? entry : await host.pick(entry, sourceOf(candidate));
+              if (chart) await host.settings(chart, "Data");
+            })();
+          });
         }
         if (entry.model.source) {
           const off = list.appendChild(host.doc.createElement("button"));

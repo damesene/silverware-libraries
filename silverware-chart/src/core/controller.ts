@@ -446,19 +446,29 @@ export class Controller {
       doc: this.doc,
       types: () => this.types(),
       formats: () => this.formats(),
-      settings: async (entry) => {
-        const type = this.types().find((t) => t.name === entry.model.type);
+      settings: async (entry, tab) => {
+        const at = await located(entry);
+        if (!at) return;
+        const type = this.types().find((t) => t.name === at.model.type);
         if (!type) return;
+        // The source's columns, as the page's sources offer its table (one on another page: none, its series as the block has them)
+        const source = at.model.source;
+        const candidate = source && (await this.candidates({ page: entry.page, text: at.text, block: at.block })).find((c) => c.table === source.table);
         openSettings(this.doc, {
-          model: entry.model,
+          model: at.model,
           type,
-          format: entry.format,
+          format: at.format,
           settings: this.settings(),
+          ...(candidate ? { columns: candidate.columns } : {}),
+          ...(tab ? { tab } : {}),
           save: async (change) => {
-            const at = await located(entry);
-            if (!at) return;
-            const written = at.format.write(change(at.model), at.block.body);
-            if (written !== at.block.body) await this.env.replaceRange?.(at.block.bodyFrom, at.block.bodyTo, written);
+            const now = await located(entry);
+            if (!now) return;
+            const model = change(now.model);
+            // With a source, its data as the settings now read it (other columns, rows, conditions)
+            const data = model.source ? await this.sourceData(model, entry.page, now.text, now.block) : undefined;
+            const written = now.format.write(data && !isUnreadable(data) ? withData(model, data) : model, now.block.body);
+            if (written !== now.block.body) await this.env.replaceRange?.(now.block.bodyFrom, now.block.bodyTo, written);
           },
         });
       },
@@ -488,9 +498,13 @@ export class Controller {
       },
       pick: async (entry, source) => {
         const at = await located(entry);
-        if (!at) return;
+        if (!at) return undefined;
         const edit = await this.blockEdit(at.block, entry.page, at.text, source);
-        if (edit) await this.env.replaceRange?.(edit.from, edit.to, edit.text);
+        if (!edit) return entry;
+        await this.env.replaceRange?.(edit.from, edit.to, edit.text);
+        // The chart as its block is now (what comes next finds the block by its text)
+        const read = this.read(entry.language, edit.text);
+        return read && !isUnreadable(read.model) ? { ...entry, body: edit.text, model: read.model } : undefined;
       },
       convert: async (entry, format) => {
         const at = await located(entry);

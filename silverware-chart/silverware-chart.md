@@ -91,7 +91,7 @@ xychart-beta
 * The numbers in the block are what other tools (GitHub) draw. With Silverware Table, an edit of a table you make with it writes them anew in the same edit, so one Ctrl+Z takes back both.
 * Where they are behind the table (you edited its markdown by hand, or Silverware Table is not installed), the chart says **Stale: update data** in its corner: click it to write the table's numbers into the block.
 * The block's series keep their kind (`bar`, `line`) and their names, in the order of the `series` columns.
-* **Only some rows**: `%% chart.where: Status = done` keeps the rows where the condition holds (a line each, every one must hold), written as spreadsheets write the conditions of `SUMIFS`: `= done` (or just `done`, any case), `<> done`, `> 100`, `<= 5`, `app*` and `?at` (wildcards), `=` (empty), `<>` (not empty). `%% chart.rows: first 10` or `last 12` then keeps the first or last so many of them. The menu's *Data* sets both under the columns: *Rows* and *Only where*.
+* **Only some rows**: `%% chart.where: Status = done` keeps the rows where the condition holds (a line each, every one must hold), written as spreadsheets write the conditions of `SUMIFS`: `= done` (or just `done`, any case), `<> done`, `> 100`, `<= 5`, `app*` and `?at` (wildcards), `=` (empty), `<>` (not empty). `%% chart.rows: first 10` or `last 12` then keeps the first or last so many of them. The settings' *Data* sets both: *Rows* and *Only where*.
 * Rename a column or the table with Silverware Table and the chart follows: its `source`, `x` and `series` are written with the new names in the same edit (a series named as its column takes the new name too).
 * A column the chart names that the table does not have (renamed in the markdown by hand) is said in the chart's place, with the table's columns to pick from: click one and it is written into the block.
 
@@ -100,8 +100,8 @@ xychart-beta
 Point at a chart and a small toolbar shows above its top left corner; its **⋯** opens the chart's menu:
 
 * **Type**: every type of chart as a gallery (bars, stacked bars, horizontal bars, lines, areas, stacked areas, scatter, pie, doughnut, polar area, radar); click one and the chart is written so, every series drawn that way.
-* **Settings…**: the chart's settings in a dialog, on tabs, each shown where the chart's type has it: *General* (title, height, legend, stacked, horizontal, smooth lines), *Axes* (the axes' titles, the y axis' range), *Series* (each series' color, name and how it is drawn among the others: *Bars*, *Line*, *Area*, *Points* or *Steps*), *Slices* for a pie (each slice's color). Nothing is written until *Save*, then in one edit. Mermaid knows bars and lines (`bar "…" [ ]`, `line "…" [ ]`): an area, points and steps are a `line` there, their kinds said in `chart.kinds`.
-* **Data**: the tables of the page the chart can draw (the table above it, below it, each first table under a heading, and with Silverware Table those you named); pick one, then the column of the labels and the columns of the values, and *Draw these*. *No table* goes back to the block's own numbers.
+* **Settings…**: the chart's settings in a dialog, on tabs, each shown where the chart's type has it: *General* (title, height, legend, stacked, horizontal, smooth lines), *Data* for a chart of a table (the column of the labels; all rows, or the first or last so many; only the rows where conditions hold), *Axes* (the axes' titles, the y axis' range), *Series* (each series' color, name and how it is drawn among the others: *Bars*, *Line*, *Area*, *Points* or *Steps*; for a chart of a table every column of it, each switched on or off), *Slices* for a pie (each slice's color). Nothing is written until *Save*, then in one edit. Mermaid knows bars and lines (`bar "…" [ ]`, `line "…" [ ]`): an area, points and steps are a `line` there, their kinds said in `chart.kinds`.
+* **Data**: the tables of the page the chart can draw (the table above it, below it, each first table under a heading, and with Silverware Table those you named). Pick one and the chart draws it at once (its first text column the labels, its columns of numbers the values), the settings opening at *Data* to change that. *No table* goes back to the block's own numbers.
 * **Edit source**: the block's markdown, to edit it by hand.
 * **Copy source**: the block's markdown on your clipboard.
 * **Copy as image**: the chart as a picture on your clipboard (where the browser allows it: SilverBullet over https or on your own computer).
@@ -526,41 +526,10 @@ end
   display: inline-flex;
 }
 
-.swc-menu-form {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 4px 8px 6px;
-}
 
-.swc-menu-field {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
 
-.swc-menu-field select {
-  flex: 1;
-  font: inherit;
-  color: inherit;
-  background: var(--root-background-color);
-  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
-  border-radius: 4px;
-}
 
-.swc-menu-field-title {
-  margin-top: 6px;
-  font-size: 12px;
-  opacity: 0.7;
-}
 
-.swc-menu-check {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-}
 
 .swc-menu-series {
   display: flex;
@@ -592,84 +561,16 @@ end
   padding: 2px 4px;
 }
 
-.swc-menu-field .swc-menu-count {
-  width: 4.5em;
-  font: inherit;
-  color: inherit;
-  background: var(--root-background-color);
-  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
-  border-radius: 4px;
-}
 
-.swc-menu-field .swc-menu-count[hidden] {
-  display: none;
-}
 
-.swc-menu-conditions {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
 
-.swc-menu-condition {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
 
-.swc-menu-condition select,
-.swc-menu-condition input {
-  min-width: 0;
-  font: inherit;
-  color: inherit;
-  background: var(--root-background-color);
-  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
-  border-radius: 4px;
-}
 
-.swc-menu-condition input {
-  flex: 1;
-  padding: 1px 4px;
-}
 
-.swc-menu-remove,
-.swc-menu-add {
-  padding: 2px 6px;
-  font: inherit;
-  color: inherit;
-  background: none;
-  border: 0;
-  border-radius: 4px;
-  cursor: pointer;
-  opacity: 0.75;
-}
 
-.swc-menu-add {
-  align-self: flex-start;
-  font-size: 12px;
-}
 
-.swc-menu-remove:hover,
-.swc-menu-add:hover {
-  opacity: 1;
-  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
-}
 
-.swc-menu-apply {
-  margin-top: 8px;
-  padding: 4px 10px;
-  font: inherit;
-  color: var(--ui-accent-contrast-color, #fff);
-  background: var(--ui-accent-color, #4e79a7);
-  border: 0;
-  border-radius: 5px;
-  cursor: pointer;
-}
 
-.swc-menu-apply:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
 
 /* The chart's settings dialog: the look of Silverware Tags' settings (shared/dialog.ts, its classes by the base swc-settings) */
 .swc-settings-backdrop {
@@ -979,6 +880,8 @@ end
 }
 .swc-settings-item-name {
   flex: 0 0 auto;
+  /* (One width for all: the controls after it under each other) */
+  width: 5.5em;
   min-width: 1.5em;
   max-width: 8em;
   overflow: hidden;
@@ -1011,6 +914,57 @@ end
 .swc-settings-row :disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* The settings' conditions: a row each, a column, an operator, a value and ×, then + another */
+.swc-settings-row-wide {
+  flex-wrap: wrap;
+}
+.swc-settings-conditions {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.swc-settings-conditions > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.swc-settings-condition {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.swc-settings-condition select,
+.swc-settings-condition input {
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swc-settings-line);
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+.swc-settings-condition input {
+  flex: 1;
+}
+.swc-settings-remove,
+.swc-settings-add {
+  padding: 3px 8px;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  opacity: 0.75;
+}
+.swc-settings-add {
+  align-self: flex-start;
+  font-size: 12px;
+}
+.swc-settings-remove:hover,
+.swc-settings-add:hover {
+  opacity: 1;
+  background: var(--swc-settings-card);
 }
 
 .swc-code {

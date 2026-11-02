@@ -73,6 +73,50 @@ describe("the settings dialog", () => {
     expect((await saved()).colors).toEqual(["#ff0000", "#222222"]);
   });
 
+  it("shows a chart of a table its source on Data and every column on Series, drawn or not", async () => {
+    const model: ChartModel = { ...BARS, series: [{ name: "Revenue", values: [1, 2] }], source: { table: "above", x: "Month", series: ["Revenue"] } };
+    const columns = [{ name: "Month", numeric: false }, { name: "Revenue", numeric: true }, { name: "Cost", numeric: true }];
+    const save = vi.fn(async (_change: (model: ChartModel) => ChartModel) => {});
+    openSettings(document, { model, type: BAR, format: MERMAID_FORMAT, settings: SETTINGS, columns, tab: "Data", save });
+    const dialog = document.querySelector<HTMLElement>(".swc-settings")!;
+    expect([...dialog.querySelectorAll(".swc-settings-tab")].map((t) => t.textContent)).toEqual(["General", "Data", "Axes", "Series"]);
+    expect(dialog.querySelector<HTMLElement>('[data-swc-panel="Data"]')!.hidden).toBe(false);
+    expect([...dialog.querySelectorAll('[data-swc-panel="Data"] .swc-settings-name')].map((n) => n.textContent)).toEqual(["Labels", "Rows", "How many rows", "Only where"]);
+    // Every column a row: Revenue drawn, the others not
+    const rows = [...dialog.querySelectorAll<HTMLElement>(".swc-settings-item")];
+    expect(rows.map((r) => r.querySelector(".swc-settings-item-name")!.textContent)).toEqual(["Month", "Revenue", "Cost"]);
+    expect(rows.map((r) => r.querySelector<HTMLInputElement>(".swc-settings-switch input")!.checked)).toEqual([false, true, false]);
+    // Cost drawn too, as a line; the last 2 rows where Cost > 80
+    rows[2]!.querySelector<HTMLInputElement>(".swc-settings-switch input")!.click();
+    const kind = rows[2]!.querySelector<HTMLSelectElement>("select")!;
+    kind.value = "line";
+    kind.dispatchEvent(new Event("change"));
+    const data = dialog.querySelector('[data-swc-panel="Data"]')!;
+    const [, rowsFrom] = [...data.querySelectorAll<HTMLSelectElement>(".swc-settings-row > select")];
+    rowsFrom!.value = "last";
+    rowsFrom!.dispatchEvent(new Event("change"));
+    const count = data.querySelector<HTMLInputElement>("input[type=number]")!;
+    count.value = "2";
+    count.dispatchEvent(new Event("input"));
+    data.querySelector<HTMLButtonElement>(".swc-settings-add")!.click();
+    const [column, op] = [...data.querySelectorAll<HTMLSelectElement>(".swc-settings-condition select")];
+    column!.value = "Cost";
+    column!.dispatchEvent(new Event("change"));
+    op!.value = ">";
+    op!.dispatchEvent(new Event("change"));
+    const value = data.querySelector<HTMLInputElement>(".swc-settings-condition input")!;
+    value.value = "80";
+    value.dispatchEvent(new Event("input"));
+    dialog.querySelector<HTMLButtonElement>(".swc-settings-save")!.click();
+    await vi.waitFor(() => expect(save).toHaveBeenCalled());
+    const after = save.mock.calls[0]![0](model);
+    expect(after.source).toEqual({ table: "above", x: "Month", series: ["Revenue", "Cost"], where: [{ column: "Cost", criterion: "> 80" }], rows: { from: "last", count: 2 } });
+    expect(after.series.map((s) => [s.name, s.kind])).toEqual([
+      ["Revenue", undefined],
+      ["Cost", "line"],
+    ]);
+  });
+
   it("shows, not offers, what the block's format cannot write", () => {
     const { dialog } = open(BARS, BAR, { ...MERMAID_FORMAT, label: "Plain", supports: (key) => key !== "stacked" });
     const row = [...dialog.querySelectorAll(".swc-settings-row")].find((r) => r.textContent?.includes("Stacked"))!;

@@ -62,8 +62,20 @@ describe("the chart's menu", () => {
     list.querySelector("button")!.click();
     const form = (opened[0] as { element(m: typeof menu): HTMLElement }).element(menu);
     expect(form.querySelector("select")!.value).toBe("Month");
-    expect([...form.querySelectorAll<HTMLInputElement>("input")].map((box) => box.checked)).toEqual([false, true]);
+    expect([...form.querySelectorAll<HTMLInputElement>("input[type=checkbox]")].map((box) => box.checked)).toEqual([false, true]);
     form.querySelector<HTMLButtonElement>(".swc-menu-apply")!.click();
     expect(h.pick).toHaveBeenCalledWith(entry, { table: "above", x: "Month", series: ["Qty"] });
+    // The last 3 rows of those where Qty > 5
+    const again = (opened[0] as { element(m: typeof menu): HTMLElement }).element(menu);
+    const [, rowsFrom] = [...again.querySelectorAll<HTMLSelectElement>(".swc-menu-field select")];
+    rowsFrom!.value = "last";
+    again.querySelector<HTMLInputElement>(".swc-menu-count")!.value = "3";
+    again.querySelector<HTMLButtonElement>(".swc-menu-add")!.click();
+    const [column, op] = [...again.querySelectorAll<HTMLSelectElement>(".swc-menu-condition select")];
+    column!.value = "Qty";
+    op!.value = ">";
+    again.querySelector<HTMLInputElement>(".swc-menu-condition input")!.value = "5";
+    again.querySelector<HTMLButtonElement>(".swc-menu-apply")!.click();
+    expect(h.pick).toHaveBeenLastCalledWith(entry, { table: "above", x: "Month", series: ["Qty"], where: [{ column: "Qty", criterion: "> 5" }], rows: { from: "last", count: 3 } });
   });
 });

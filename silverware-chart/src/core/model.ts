@@ -34,7 +34,14 @@ export type Source = {
   readonly table: string;
   readonly x?: string;
   readonly series: readonly string[];
+  // Only the rows where every condition holds (a column, and a criterion as Excel's -IFS functions write it: "> 100", "done", "<>", "app*")
+  readonly where?: readonly Condition[];
+  // Of those, only the first or the last so many
+  readonly rows?: RowsTaken;
 };
+
+export type Condition = { readonly column: string; readonly criterion: string };
+export type RowsTaken = { readonly from: "first" | "last"; readonly count: number };
 
 export const LEGEND_PLACES = ["top", "bottom", "left", "right", "none"] as const;
 export type LegendPlace = (typeof LEGEND_PLACES)[number];

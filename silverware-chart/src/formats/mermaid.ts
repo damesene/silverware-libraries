@@ -3,7 +3,7 @@
 // (a type it has not, colors, a table as the source…) in its comments, one key
 // a line: `%% chart.<key>: <value>`. Pure: text in, model out, and back.
 import type { ChartFormat } from "../core/format.ts";
-import { type Axis, baseKind, type ChartModel, LEGEND_PLACES, type LegendPlace, type Series, SERIES_KINDS, type SeriesKind, type Source, type Unreadable } from "../core/model.ts";
+import { type Axis, baseKind, type ChartModel, type Condition, type RowsTaken, LEGEND_PLACES, type LegendPlace, type Series, SERIES_KINDS, type SeriesKind, type Source, type Unreadable } from "../core/model.ts";
 
 // Our comments: `%% chart.<key>: <value>`
 const META_RE = /^\s*%%\s*chart\.([A-Za-z][\w.-]*)\s*:\s*(.*?)\s*$/;
@@ -67,8 +67,22 @@ function impliedKind(word: "bar" | "line", base: SeriesKind | undefined): Series
   return word === (own === "bar" ? "bar" : "line") ? own : word;
 }
 
-/** Our keys read into the model's fields; the keys it has no field for kept */
-function metaOf(meta: ReadonlyMap<string, string>): Partial<ChartModel> {
+/** A condition as written after `chart.where:`: a column, then its criterion (from the first <, > or =; none: equal to what follows a space) */
+export function conditionOf(text: string): Condition | undefined {
+  const t = text.trim();
+  const at = t.search(/[<>=]/);
+  if (at > 0) return { column: t.slice(0, at).trim(), criterion: t.slice(at).trim() };
+  return undefined;
+}
+
+/** `first 10` / `last 12` */
+function rowsOf(text: string): RowsTaken | undefined {
+  const m = /^(first|last)\s+(\d+)$/i.exec(text.trim());
+  return m ? { from: group(m, 1).toLowerCase() as RowsTaken["from"], count: Number(group(m, 2)) } : undefined;
+}
+
+/** Our keys read into the model's fields (`where` a line each), the keys it has no field for kept */
+function metaOf(meta: ReadonlyMap<string, string>, wheres: readonly string[] = []): Partial<ChartModel> {
   const out: { -readonly [K in keyof ChartModel]?: ChartModel[K] } = {};
   const extra: Record<string, string> = {};
   for (const [key, value] of meta) {
@@ -97,12 +111,24 @@ function metaOf(meta: ReadonlyMap<string, string>): Partial<ChartModel> {
       case "series":
       case "kinds":
         break;
+      case "rows":
+        if (!rowsOf(value)) extra[key] = value;
+        break;
       default:
         extra[key] = value;
     }
   }
   const table = meta.get("source");
-  if (table) out.source = { table, ...(meta.get("x") ? { x: meta.get("x") } : {}), series: commaList(meta.get("series") ?? "") } satisfies Source;
+  const where = wheres.map(conditionOf).filter((c): c is Condition => !!c);
+  const rows = rowsOf(meta.get("rows") ?? "");
+  if (table)
+    out.source = {
+      table,
+      ...(meta.get("x") ? { x: meta.get("x") } : {}),
+      series: commaList(meta.get("series") ?? ""),
+      ...(where.length ? { where } : {}),
+      ...(rows ? { rows } : {}),
+    } satisfies Source;
   if (Object.keys(extra).length) out.extra = extra;
   return out;
 }
@@ -110,15 +136,18 @@ function metaOf(meta: ReadonlyMap<string, string>): Partial<ChartModel> {
 /** A block's text as a chart: undefined where it is another diagram (a flowchart) */
 export function readMermaid(text: string): ChartModel | Unreadable | undefined {
   const meta = new Map<string, string>();
+  const wheres: string[] = [];
   const lines: string[] = [];
   for (const line of text.split("\n")) {
     const m = META_RE.exec(line);
-    if (m) meta.set(group(m, 1), group(m, 2));
+    // (where a line each, as many as there are conditions)
+    if (m && group(m, 1) === "where") wheres.push(group(m, 2));
+    else if (m) meta.set(group(m, 1), group(m, 2));
     else if (!/^\s*%%/.test(line) && line.trim() !== "") lines.push(line.trim());
   }
   const head = lines[0];
   if (head === undefined) return undefined;
-  const own = metaOf(meta);
+  const own = metaOf(meta, wheres);
   if (/^xychart(-beta)?(\s|$)/.test(head)) {
     let title: string | undefined;
     let x: Axis | undefined;
@@ -230,6 +259,8 @@ export function writeMermaid(model: ChartModel, previous?: string): string {
     meta.push(["source", model.source.table]);
     if (model.source.x) meta.push(["x", model.source.x]);
     if (model.source.series.length) meta.push(["series", model.source.series.join(", ")]);
+    for (const condition of model.source.where ?? []) meta.push(["where", `${condition.column} ${condition.criterion}`]);
+    if (model.source.rows) meta.push(["rows", `${model.source.rows.from} ${model.source.rows.count}`]);
   }
   for (const [key, value] of Object.entries(model.extra ?? {})) meta.push([key, value]);
   // Mermaid's directives (`%%{init: …}%%`) before the diagram, the other comments after it, as they were

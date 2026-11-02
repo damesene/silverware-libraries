@@ -54,6 +54,7 @@ xychart-beta
 | `legend` | Where the legend is: `top`, `bottom`, `left`, `right`, or `none` |
 | `height` | The chart's height: `400px`, `20em` |
 | `source`, `x`, `series` | The data from a table: see below |
+| `where`, `rows` | Only some of the table's rows: see below |
 
 A setting it does not know is kept as you wrote it.
 
@@ -90,6 +91,7 @@ xychart-beta
 * The numbers in the block are what other tools (GitHub) draw. With Silverware Table, an edit of a table you make with it writes them anew in the same edit, so one Ctrl+Z takes back both.
 * Where they are behind the table (you edited its markdown by hand, or Silverware Table is not installed), the chart says **Stale: update data** in its corner: click it to write the table's numbers into the block.
 * The block's series keep their kind (`bar`, `line`) and their names, in the order of the `series` columns.
+* **Only some rows**: `%% chart.where: Status = done` keeps the rows where the condition holds (a line each, every one must hold), written as spreadsheets write the conditions of `SUMIFS`: `= done` (or just `done`, any case), `<> done`, `> 100`, `<= 5`, `app*` and `?at` (wildcards), `=` (empty), `<>` (not empty). `%% chart.rows: first 10` or `last 12` then keeps the first or last so many of them. The menu's *Data* sets both under the columns: *Rows* and *Only where*.
 * Rename a column or the table with Silverware Table and the chart follows: its `source`, `x` and `series` are written with the new names in the same edit (a series named as its column takes the new name too).
 * A column the chart names that the table does not have (renamed in the markdown by hand) is said in the chart's place, with the table's columns to pick from: click one and it is written into the block.
 
@@ -588,6 +590,69 @@ end
 .swc-menu-series input[type="text"] {
   flex: 1;
   padding: 2px 4px;
+}
+
+.swc-menu-field .swc-menu-count {
+  width: 4.5em;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 4px;
+}
+
+.swc-menu-field .swc-menu-count[hidden] {
+  display: none;
+}
+
+.swc-menu-conditions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.swc-menu-condition {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.swc-menu-condition select,
+.swc-menu-condition input {
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 4px;
+}
+
+.swc-menu-condition input {
+  flex: 1;
+  padding: 1px 4px;
+}
+
+.swc-menu-remove,
+.swc-menu-add {
+  padding: 2px 6px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.swc-menu-add {
+  align-self: flex-start;
+  font-size: 12px;
+}
+
+.swc-menu-remove:hover,
+.swc-menu-add:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
 }
 
 .swc-menu-apply {

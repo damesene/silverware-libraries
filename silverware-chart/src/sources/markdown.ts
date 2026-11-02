@@ -2,6 +2,10 @@
 // plugin needed): the tables of a text (outside code blocks), its headings,
 // columns found by their names as SilverBullet's index keys them. Pure.
 import type { Block } from "../core/blocks.ts";
+import { meets } from "./criteria.ts";
+import { numberOf } from "./values.ts";
+
+export { numberOf };
 import type { Source, Unreadable } from "../core/model.ts";
 
 /** A table as the sources read it: where it is, its columns, its body's cells as they show */
@@ -130,21 +134,12 @@ export function columnIndex(columns: TextTable["columns"], wanted: string): numb
   return columns.findIndex((c) => c.key === w || c.key === key);
 }
 
-/** A cell's text as a number: as written, or with its unit and spaces left out (12,99 € is 12.99); else no value */
-export function numberOf(text: string): number | null {
-  const plain = Number(text);
-  if (text.trim() !== "" && Number.isFinite(plain)) return plain;
-  let digits = text.replace(/[^\d.,-]/g, "");
-  if (!/\d/.test(digits)) return null;
-  // A comma alone the decimal one, as written in much of Europe
-  if (digits.includes(",") && !digits.includes(".")) digits = digits.replace(",", ".");
-  const n = Number(digits.replace(/,/g, ""));
-  return Number.isFinite(n) ? n : null;
-}
 
 /**
- * A table's columns as a chart's data: the labels' (else 1, 2, …) and each
- * series'; or what is missing, with the table's columns offered in its place
+ * A table's columns as a chart's data, of the rows the source keeps (where
+ * its conditions hold, the first or last so many): the labels' (else 1, 2, …)
+ * and each series'; or what is missing, with the table's columns offered in
+ * its place
  */
 export function dataOf(table: Pick<TextTable, "columns" | "rows">, source: Source, what: string): { labels: string[]; series: (number | null)[][] } | Unreadable {
   const { x, series } = source;
@@ -159,12 +154,18 @@ export function dataOf(table: Pick<TextTable, "columns" | "rows">, source: Sourc
       .map((c) => ({ label: c.name, source: { ...source, ...(x === first ? { x: c.name } : {}), series: series.map((name) => (name === first && x !== first ? c.name : name)) } }));
     return { problem: `${what} has no column ${missing.join(", ")} (it has ${table.columns.map((c) => c.name).join(", ")})`, choices };
   }
+  const where = source.where ?? [];
+  const lost = where.filter((c) => index(c.column) < 0).map((c) => c.column);
+  if (lost.length) return { problem: `${what} has no column ${lost.join(", ")} to filter by (it has ${table.columns.map((c) => c.name).join(", ")})` };
+  // The rows where every condition holds, then the first or the last so many of them
+  let rows = table.rows.filter((row) => where.every((c) => meets(row[index(c.column)] ?? "", c.criterion)));
+  if (source.rows) rows = source.rows.from === "first" ? rows.slice(0, source.rows.count) : rows.slice(Math.max(0, rows.length - source.rows.count));
   const xi = x ? index(x) : -1;
   return {
-    labels: table.rows.map((row, i) => (xi >= 0 ? (row[xi] ?? "") : String(i + 1))),
+    labels: rows.map((row, i) => (xi >= 0 ? (row[xi] ?? "") : String(i + 1))),
     series: series.map((name) => {
       const i = index(name);
-      return table.rows.map((row) => numberOf(row[i] ?? ""));
+      return rows.map((row) => numberOf(row[i] ?? ""));
     }),
   };
 }

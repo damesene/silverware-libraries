@@ -116,6 +116,56 @@ function columnsView(host: ChartMenuHost, entry: Drawn, candidate: Candidate): M
         label.append(column.name);
         return box;
       });
+      // The rows: all, or the first or last so many (of those the conditions keep)
+      const rowsLabel = form.appendChild(doc.createElement("label"));
+      rowsLabel.className = "swc-menu-field";
+      rowsLabel.append("Rows");
+      const rowsFrom = rowsLabel.appendChild(doc.createElement("select"));
+      rowsFrom.append(new Option("All", ""), new Option("First", "first"), new Option("Last", "last"));
+      rowsFrom.value = current?.rows?.from ?? "";
+      const rowsCount = rowsLabel.appendChild(doc.createElement("input"));
+      rowsCount.type = "number";
+      rowsCount.min = "1";
+      rowsCount.className = "swc-menu-count";
+      rowsCount.value = String(current?.rows?.count ?? 10);
+      rowsCount.setAttribute("aria-label", "How many rows");
+      const showCount = () => (rowsCount.hidden = rowsFrom.value === "");
+      rowsFrom.addEventListener("change", showCount);
+      showCount();
+      // Only the rows where each condition holds: a column, an operator, a value
+      const whereTitle = form.appendChild(doc.createElement("div"));
+      whereTitle.className = "swc-menu-field-title";
+      whereTitle.textContent = "Only where";
+      const conditions = form.appendChild(doc.createElement("div"));
+      conditions.className = "swc-menu-conditions";
+      const OPS: readonly (readonly [string, string])[] = [["=", "is"], ["<>", "is not"], [">", ">"], [">=", "≥"], ["<", "<"], ["<=", "≤"]];
+      const addCondition = (column = candidate.columns[0]?.name ?? "", criterion = "=") => {
+        const row = conditions.appendChild(doc.createElement("div"));
+        row.className = "swc-menu-condition";
+        const col = row.appendChild(doc.createElement("select"));
+        for (const c of candidate.columns) col.append(new Option(c.name, c.name));
+        col.value = candidate.columns.find((c) => same(c.name, column))?.name ?? candidate.columns[0]?.name ?? "";
+        const op = row.appendChild(doc.createElement("select"));
+        for (const [value, label] of OPS) op.append(new Option(label, value));
+        const written = OPS.map(([o]) => o).sort((a, b) => b.length - a.length).find((o) => criterion.trim().startsWith(o)) ?? "=";
+        op.value = written;
+        const value = row.appendChild(doc.createElement("input"));
+        value.type = "text";
+        value.placeholder = "value, app*";
+        value.value = criterion.trim().startsWith(written) ? criterion.trim().slice(written.length).trim() : criterion.trim();
+        const remove = row.appendChild(doc.createElement("button"));
+        remove.type = "button";
+        remove.className = "swc-menu-remove";
+        remove.textContent = "×";
+        remove.title = "Remove this condition";
+        remove.addEventListener("click", () => row.remove());
+      };
+      for (const condition of current?.where ?? []) addCondition(condition.column, condition.criterion);
+      const add = form.appendChild(doc.createElement("button"));
+      add.type = "button";
+      add.className = "swc-menu-add";
+      add.textContent = "+ Add a condition";
+      add.addEventListener("click", () => addCondition());
       const apply = form.appendChild(doc.createElement("button"));
       apply.type = "button";
       apply.className = "swc-menu-apply";
@@ -127,8 +177,15 @@ function columnsView(host: ChartMenuHost, entry: Drawn, candidate: Candidate): M
       refresh();
       apply.addEventListener("click", () => {
         const series = boxes.filter((box) => box.checked).map((box) => box.value);
+        const where = [...conditions.querySelectorAll(".swc-menu-condition")].map((row) => {
+          const [col, op] = [...row.querySelectorAll("select")] as HTMLSelectElement[];
+          const value = row.querySelector("input")!.value.trim();
+          return { column: col!.value, criterion: `${op!.value} ${value}`.trim() };
+        });
+        const count = Math.floor(Number(rowsCount.value));
+        const rows = rowsFrom.value && count > 0 ? { from: rowsFrom.value as "first" | "last", count } : undefined;
         menu.close();
-        void host.pick(entry, { table: candidate.table, ...(x.value ? { x: x.value } : {}), series });
+        void host.pick(entry, { table: candidate.table, ...(x.value ? { x: x.value } : {}), series, ...(where.length ? { where } : {}), ...(rows ? { rows } : {}) });
       });
       return form;
     },

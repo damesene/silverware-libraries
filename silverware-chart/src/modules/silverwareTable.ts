@@ -50,6 +50,8 @@ function followed(context: WriteContext, source: Source, block: Block, text: str
     table: byName ? (written.name ?? rest) : source.table,
     ...(source.x !== undefined ? { x: column(source.x) } : {}),
     series: source.series.map(column),
+    ...(source.where ? { where: source.where.map((c) => ({ column: column(c.column), criterion: c.criterion })) } : {}),
+    ...(source.rows ? { rows: source.rows } : {}),
   };
 }
 

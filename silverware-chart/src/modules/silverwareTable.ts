@@ -67,7 +67,7 @@ export function silverwareTableModule(host: ModuleHost): ChartModule {
         candidates: async (context) =>
           (await table.tables(context.text)).flatMap((t) =>
             t.name
-              ? [{ label: `${t.name} (${t.columns.map((c) => c.name).join(", ")})`, table: t.name, columns: t.columns.map((c, i) => ({ name: c.name, numeric: numeric(t.rows.map((row) => row[i] ?? "")) })) }]
+              ? [{ label: `${t.name} (${t.columns.map((c) => c.name).join(", ")})`, table: t.name, at: t.from, columns: t.columns.map((c, i) => ({ name: c.name, numeric: numeric(t.rows.map((row) => row[i] ?? "")) })) }]
               : [],
           ),
       },

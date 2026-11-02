@@ -168,10 +168,13 @@ test("Insert chart lists the page's tables, the chart put under the one picked",
   await page.evaluate((name) => void (window as unknown as { client: { runCommandByName(name: string): Promise<void> } }).client.runCommandByName(name), name);
   // SilverBullet's own picker: the tables by their columns, the second picked
   const picker = page.locator(".sb-modal-box").filter({ hasText: "Chart of which table?" });
-  await expect(picker).toContainText("Month, Revenue, Cost");
+  await expect(picker).toContainText("sales (Month, Revenue, Cost) under Sales");
   await picker.locator("input").fill("Revenue");
+  // (Picked once the list shows that table alone)
+  await expect(picker).not.toContainText("(A, B)");
   await page.keyboard.press("Enter");
-  await expect.poll(() => savedText(page)).toContain(`<meta core.table core.name='sales'> |\n\n${CHART_OF_SALES}\n\nAfter.`);
+  // Named with Silverware Table: drawn by its name
+  await expect.poll(() => savedText(page)).toContain(`<meta core.table core.name='sales'> |\n\n${CHART_OF_SALES.replace("source: above", "source: sales")}\n\nAfter.`);
 });
 
 test("/chart puts a chart at the cursor, of a table picked", async ({ page, open }) => {
@@ -195,11 +198,13 @@ test("/chart puts a chart at the cursor, of a table picked", async ({ page, open
   await page.keyboard.type("/");
   await expect(page.locator(".cm-tooltip-autocomplete")).toBeVisible();
   await page.keyboard.type("chart", { delay: 50 });
-  await expect(page.locator(".cm-tooltip-autocomplete")).toContainText("chart");
-  await page.keyboard.press("Enter");
+  // (Taken once the list is live: CodeMirror marks it disabled while its sources are still answering, and Enter does nothing)
+  await expect(page.locator(".cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled) [aria-selected=true]")).toContainText("chart");
+  await page.locator(".cm-tooltip-autocomplete [aria-selected=true]").click();
   const picker = page.locator(".sb-modal-box").filter({ hasText: "Chart of which table?" });
   await expect(picker).toContainText("Table above");
   await picker.locator("input").fill("Table above");
+  await expect(picker).not.toContainText("example");
   await page.keyboard.press("Enter");
   await expect.poll(() => savedText(page)).toContain(`Here\n\n${CHART_OF_SALES}`);
 });

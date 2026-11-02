@@ -54,7 +54,7 @@ describe("the chart's menu", () => {
   });
 
   it("lists the page's tables, then their columns: the text one as labels, the number ones ticked", async () => {
-    const h = host({ candidates: async () => [{ label: "Table above", table: "above", columns: [{ name: "Month", numeric: false }, { name: "Qty", numeric: true }] }] });
+    const h = host({ candidates: async () => [{ label: "Table above", table: "above", at: 0, columns: [{ name: "Month", numeric: false }, { name: "Qty", numeric: true }] }] });
     const opened: unknown[] = [];
     const menu = { close: vi.fn(), open: (view: unknown) => opened.push(view) };
     const list = chartMenu(h, entry).items!.find((i) => i.label === "Data")!.open!().element!(menu);

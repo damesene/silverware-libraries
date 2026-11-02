@@ -26,6 +26,8 @@ export type SourceContext = {
 export type Candidate = {
   readonly label: string;
   readonly table: string;
+  // Where the table starts in the page's text (one table offered by several sources: by its place and by its name)
+  readonly at: number;
   // Each column's name, and whether its cells are numbers (a series' column offered ticked)
   readonly columns: readonly { readonly name: string; readonly numeric: boolean }[];
 };

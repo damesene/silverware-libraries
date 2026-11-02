@@ -28,7 +28,7 @@ function candidates(context: SourceContext): Candidate[] {
   const describe = (table: TextTable) => table.columns.map((c) => c.name).join(", ");
   const out: Candidate[] = [];
   const at = (table: TextTable | undefined, reference: string, label: string) => {
-    if (table && !out.some((c) => c.table === reference)) out.push({ label: `${label} (${describe(table)})`, table: reference, columns: columnsOf(table) });
+    if (table && !out.some((c) => c.table === reference)) out.push({ label: `${label} (${describe(table)})`, table: reference, at: table.from, columns: columnsOf(table) });
   };
   if (context.block) {
     at(tables.filter((t) => t.to <= context.block!.from).at(-1), "above", "Table above");

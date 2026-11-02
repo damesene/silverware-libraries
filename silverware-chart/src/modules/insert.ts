@@ -48,7 +48,7 @@ async function chartAt(host: ModuleHost, source: Source, page: string, text: str
   return model;
 }
 
-/** The command: a table of the page picked, the chart put under it */
+/** The command: a table of the page picked (by its name where it has one, the heading it is under), the chart put under it */
 async function insertUnderTable(host: ModuleHost): Promise<void> {
   const { name, text } = await host.page();
   const tables = tablesOf(text);
@@ -57,17 +57,20 @@ async function insertUnderTable(host: ModuleHost): Promise<void> {
     return;
   }
   const headings = headingsOf(text);
-  const lineOf = (at: number) => text.slice(0, at).split("\n").length;
+  // The tables the sources name (Silverware Table's, by their names): a table named is drawn by its name
+  const end = { language: "", from: text.length, to: text.length, bodyFrom: text.length, bodyTo: text.length, body: "" };
+  const named = (await host.candidates({ page: name, text, block: end })).filter((c) => c.table !== "above" && c.table !== "below" && !c.table.startsWith("#"));
   const picked = await host.pick(
     "Chart of which table?",
-    tables.map((table) => ({
-      label: table.columns.map((c) => c.name).join(", "),
-      hint: [headings.filter((h) => h.end < table.from).at(-1)?.title, `line ${lineOf(table.from)}`].filter(Boolean).join(" · "),
-    })),
+    tables.map((table) => {
+      const own = named.find((c) => c.at === table.from)?.table;
+      const under = headings.filter((h) => h.end < table.from).at(-1)?.title;
+      return { label: [own, `(${table.columns.map((c) => c.name).join(", ")})`, under ? `under ${under}` : undefined].filter(Boolean).join(" ") };
+    }),
   );
   const table = picked === undefined ? undefined : tables[picked];
   if (!table) return;
-  const source = sourceOf("above", columnsOf(table));
+  const source = sourceOf(named.find((c) => c.at === table.from)?.table ?? "above", columnsOf(table));
   if (!source) {
     host.flash("Silverware Chart: the table has no column of numbers to draw", "error");
     return;
@@ -82,10 +85,7 @@ async function insertAtCursor(host: ModuleHost): Promise<void> {
   const { name, text, cursor } = await host.page();
   const block = { language: "", from: cursor, to: cursor, bodyFrom: cursor, bodyTo: cursor, body: "" };
   const candidates = await host.candidates({ page: name, text, block });
-  const picked = await host.pick("Chart of which table?", [
-    ...candidates.map((candidate) => ({ label: candidate.label, hint: `source: ${candidate.table}` })),
-    { label: "An example of its own numbers", hint: "no table" },
-  ]);
+  const picked = await host.pick("Chart of which table?", [...candidates.map((candidate) => ({ label: candidate.label })), { label: "An example of its own numbers" }]);
   if (picked === undefined) return;
   const candidate = candidates[picked];
   if (!candidate) {

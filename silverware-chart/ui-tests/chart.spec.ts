@@ -226,4 +226,10 @@ test("a type picked draws every series so; Series draws one as a line over the b
   await page.locator(".swc-menu-series").first().locator("select").selectOption("bar");
   await page.locator(".swc-menu-apply").click();
   await expect.poll(() => savedText(page)).toContain('  bar "one" [1, 2]\n  line "two" [3, 4]\n%% chart.type: line\n```');
+  // Steps, which Mermaid has no word for: a line there, its kind said in chart.kinds
+  await chartMenu(page);
+  await page.locator(".swc-menu-item", { hasText: "Series" }).click();
+  await page.locator(".swc-menu-series").nth(1).locator("select").selectOption("step");
+  await page.locator(".swc-menu-apply").click();
+  await expect.poll(() => savedText(page)).toContain('  bar "one" [1, 2]\n  line "two" [3, 4]\n%% chart.type: line\n%% chart.kinds: bar, step\n```');
 });

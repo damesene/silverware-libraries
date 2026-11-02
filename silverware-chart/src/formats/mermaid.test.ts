@@ -16,8 +16,8 @@ describe("readMermaid", () => {
       title: "An Example Chart",
       labels: ["90d", "60d", "30d"],
       series: [
-        { name: "avg", kind: "line", values: [48.1, 41.5, 45.7] },
-        { name: "p95", kind: "line", values: [112.2, 75.3, 103] },
+        { name: "avg", values: [48.1, 41.5, 45.7] },
+        { name: "p95", values: [112.2, 75.3, 103] },
       ],
       y: { title: "Seconds", min: 0, max: 198.2 },
     });
@@ -29,9 +29,17 @@ describe("readMermaid", () => {
     expect(model.horizontal).toBe(true);
     expect(model.labels).toEqual(["a", "b"]);
     expect(model.series.map((s) => [s.name, s.kind])).toEqual([
-      [undefined, "bar"],
+      [undefined, undefined],
       [undefined, "line"],
     ]);
+  });
+
+  it("reads each series' kind from chart.kinds where Mermaid has no word for it, none where it is the type's own", () => {
+    const model = readMermaid('xychart-beta\n  x-axis [a]\n  bar "s" [1]\n  line "t" [2]\n  line "u" [3]\n  line "v" [4]\n%% chart.kinds: bar, area, points, sunburst') as ChartModel;
+    expect(model.series.map((s) => s.kind)).toEqual([undefined, "area", "points", "line"]);
+    // An area chart's lines are its areas
+    const area = readMermaid('xychart-beta\n  x-axis [a]\n  line [1]\n  bar [2]\n%% chart.type: area') as ChartModel;
+    expect(area.series.map((s) => s.kind)).toEqual([undefined, "bar"]);
   });
 
   it("reads a pie, its title on its head or a line of its own", () => {
@@ -88,6 +96,15 @@ describe("writeMermaid", () => {
     const area: ChartModel = { type: "area", labels: ["a"], series: [{ values: [1] }] };
     expect(writeMermaid(area)).toBe('xychart-beta\n  x-axis ["a"]\n  line [1]\n%% chart.type: area');
     expect(writeMermaid({ ...area, type: "line" })).toBe('xychart-beta\n  x-axis ["a"]\n  line [1]');
+  });
+
+  it("writes an area, points and steps as lines, their kinds in chart.kinds, read back as they were", () => {
+    const model: ChartModel = { type: "bar", labels: ["a"], series: [{ name: "s", values: [1] }, { name: "t", kind: "area", values: [2] }, { name: "u", kind: "step", values: [3] }] };
+    const written = writeMermaid(model);
+    expect(written).toBe('xychart-beta\n  x-axis ["a"]\n  bar "s" [1]\n  line "t" [2]\n  line "u" [3]\n%% chart.kinds: bar, area, step');
+    expect(readMermaid(written)).toEqual(model);
+    // Bars and lines alone need none
+    expect(writeMermaid({ ...model, series: [{ values: [1] }, { kind: "line", values: [2] }] })).not.toContain("kinds");
   });
 
   it("keeps the previous block's own comments: directives first, the others after", () => {

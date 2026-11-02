@@ -48,6 +48,7 @@ xychart-beta
 |---|---|
 | `type` | The type of chart: `bar`, `line`, `area`, `scatter`, `pie`, `doughnut`, `polarArea`, `radar` (Mermaid itself draws bars, lines and pies) |
 | `stacked` | `true`: the series stacked on each other |
+| `kinds` | How each series is drawn, in their order: `bar`, `line`, `area`, `points` or `step` (Mermaid draws an area, points and steps as a line) |
 | `smooth` | `true`: lines curved through their points |
 | `colors` | The series' colors (a pie's slices'), comma separated: `#4e79a7, #f28e2b` |
 | `legend` | Where the legend is: `top`, `bottom`, `left`, `right`, or `none` |
@@ -97,7 +98,7 @@ xychart-beta
 Point at a chart and a small toolbar shows above its top left corner; its **⋯** opens the chart's menu:
 
 * **Type**: every type of chart as a gallery (bars, stacked bars, horizontal bars, lines, areas, stacked areas, scatter, pie, doughnut, polar area, radar); click one and the chart is written so, every series drawn that way.
-* **Series** (**Slices** for a pie): each series' color and name, and for bars, lines and areas whether it is drawn as bars or a line: a line over bars, as Mermaid writes it (`bar "…" [ ]` and `line "…" [ ]` in one chart).
+* **Series** (**Slices** for a pie): each series' color and name, and for bars, lines and areas how it is drawn among the others: *Bars*, *Line*, *Area*, *Points* (no line) or *Steps*. Mermaid knows bars and lines (`bar "…" [ ]`, `line "…" [ ]`): an area, points and steps are a `line` there, their kinds said in `chart.kinds`.
 * **Data**: the tables of the page the chart can draw (the table above it, below it, each first table under a heading, and with Silverware Table those you named); pick one, then the column of the labels and the columns of the values, and *Draw these*. *No table* goes back to the block's own numbers.
 * **Edit source**: the block's markdown, to edit it by hand.
 * **Copy source**: the block's markdown on your clipboard.

@@ -2,13 +2,22 @@
 // and what everything else (drawing, sources, the menu) works on. It knows no
 // format: Mermaid's comments and Obsidian Charts' keys are their formats' own.
 
+/** How a series is drawn among others on the same axes: bars, a line, an area, points alone, steps */
+export const SERIES_KINDS = ["bar", "line", "area", "points", "step"] as const;
+export type SeriesKind = (typeof SERIES_KINDS)[number];
+
 /** One series of values, by the labels' order (null: no value there) */
 export type Series = {
   readonly name?: string;
-  // Within a chart of bars and lines, this series drawn as bars or a line (left out: the chart's type)
-  readonly kind?: "bar" | "line";
+  // Drawn so among the chart's other series (left out: as the chart's type draws its series)
+  readonly kind?: SeriesKind;
   readonly values: readonly (number | null)[];
 };
+
+/** How a type of chart draws a series that says no kind of its own (undefined: a type that has no kinds, a pie) */
+export function baseKind(type: string): SeriesKind | undefined {
+  return type === "bar" || type === "line" || type === "area" ? type : undefined;
+}
 
 export type Axis = {
   readonly title?: string;

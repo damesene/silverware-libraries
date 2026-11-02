@@ -4,7 +4,7 @@
 // source, Copy as image. What each does is the host's (the controller's).
 import type { Drawn } from "./drawn.ts";
 import type { ChartFormat } from "./format.ts";
-import type { ChartModel, Source } from "./model.ts";
+import { baseKind, type ChartModel, SERIES_KINDS, type SeriesKind, type Source } from "./model.ts";
 import type { Candidate } from "./module.ts";
 import type { MenuItem, MenuView } from "./toolbar.ts";
 import type { ChartType } from "./type.ts";
@@ -63,20 +63,20 @@ function typed(model: ChartModel, type: string, flags: { stacked?: boolean; hori
   };
 }
 
-// Types whose series each have their own kind (bars or a line), as Mermaid's xychart has them
-const KINDS = new Set(["bar", "line", "area"]);
+// How each kind of series is offered
+const KIND_LABELS: Readonly<Record<SeriesKind, string>> = { bar: "Bars", line: "Line", area: "Area", points: "Points", step: "Steps" };
 // Types drawing one series as slices, a color each
 const ROUND = new Set(["pie", "doughnut", "polarArea"]);
 
-/** Each series (a slice of a round chart): its color, its name, and where the type takes one, bars or a line */
+/** Each series (a slice of a round chart): its color, its name, and where the type takes one, its kind (bars, a line, an area…) */
 function seriesView(host: ChartMenuHost, entry: Drawn): MenuView {
   const model = entry.model;
   const round = ROUND.has(model.type);
-  const kinds = KINDS.has(model.type);
+  const base = baseKind(model.type);
   const palette = host.palette();
   const colorAt = (i: number) => model.colors?.[i] ?? palette[i % palette.length] ?? "#888888";
   const items = round
-    ? model.labels.map((label) => ({ name: label, kind: undefined as "bar" | "line" | undefined }))
+    ? model.labels.map((label) => ({ name: label, kind: undefined as SeriesKind | undefined }))
     : model.series.map((series, i) => ({ name: series.name ?? model.source?.series[i] ?? `Series ${i + 1}`, kind: series.kind }));
   return {
     title: round ? "Slices" : "Series",
@@ -98,11 +98,11 @@ function seriesView(host: ChartMenuHost, entry: Drawn): MenuView {
         name.disabled = round;
         name.setAttribute("aria-label", "Name");
         let kind: HTMLSelectElement | undefined;
-        if (kinds) {
+        if (base) {
           kind = row.appendChild(doc.createElement("select"));
           kind.setAttribute("aria-label", "Drawn as");
-          kind.append(new Option("Bars", "bar"), new Option(model.type === "area" ? "Area" : "Line", "line"));
-          kind.value = item.kind ?? (model.type === "bar" ? "bar" : "line");
+          for (const k of SERIES_KINDS) kind.append(new Option(KIND_LABELS[k], k));
+          kind.value = item.kind ?? base;
         }
         return { color, name, kind, colorWas: color.value };
       });
@@ -112,7 +112,6 @@ function seriesView(host: ChartMenuHost, entry: Drawn): MenuView {
       apply.textContent = "Save";
       apply.addEventListener("click", () => {
         menu.close();
-        const base = model.type === "bar" ? "bar" : "line";
         // Colors written only once one is picked (else the theme's palette stays), the ones written before kept
         const picked = rows.some((row) => row.color.value !== row.colorWas);
         void host.rewrite(entry, (m) => ({
@@ -123,7 +122,7 @@ function seriesView(host: ChartMenuHost, entry: Drawn): MenuView {
                 const row = rows[i];
                 if (!row) return series;
                 const { kind: _kind, name: _name, ...rest } = series;
-                const written = row.kind?.value as "bar" | "line" | undefined;
+                const written = row.kind?.value as SeriesKind | undefined;
                 const name = row.name.value.trim();
                 return { ...rest, ...(name ? { name } : {}), ...(written && written !== base ? { kind: written } : {}) };
               }),

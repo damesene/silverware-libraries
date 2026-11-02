@@ -79,7 +79,7 @@ async function insertChart(host: ModuleHost): Promise<void> {
     host.flash(`Silverware Chart: ${data.problem}`, "error");
     return;
   }
-  const model: ChartModel = { type: "bar", labels: data.labels, series: data.series.map((values, i) => ({ name: series[i], kind: "bar", values })), source };
+  const model: ChartModel = { type: "bar", labels: data.labels, series: data.series.map((values, i) => ({ name: series[i], values })), source };
   let block: string;
   try {
     block = host.newBlock(model);

@@ -3,7 +3,7 @@
 // (a type it has not, colors, a table as the source…) in its comments, one key
 // a line: `%% chart.<key>: <value>`. Pure: text in, model out, and back.
 import type { ChartFormat } from "../core/format.ts";
-import { type Axis, type ChartModel, LEGEND_PLACES, type LegendPlace, type Series, type Source, type Unreadable } from "../core/model.ts";
+import { type Axis, baseKind, type ChartModel, LEGEND_PLACES, type LegendPlace, type Series, SERIES_KINDS, type SeriesKind, type Source, type Unreadable } from "../core/model.ts";
 
 // Our comments: `%% chart.<key>: <value>`
 const META_RE = /^\s*%%\s*chart\.([A-Za-z][\w.-]*)\s*:\s*(.*?)\s*$/;
@@ -61,6 +61,12 @@ const commaList = (value: string): string[] =>
     .map((item) => item.trim())
     .filter(Boolean);
 
+/** The kind Mermaid's bar or line is in a type: its own where that is the type's word (an area chart's line is its area) */
+function impliedKind(word: "bar" | "line", base: SeriesKind | undefined): SeriesKind {
+  const own = base ?? "line";
+  return word === (own === "bar" ? "bar" : "line") ? own : word;
+}
+
 /** Our keys read into the model's fields; the keys it has no field for kept */
 function metaOf(meta: ReadonlyMap<string, string>): Partial<ChartModel> {
   const out: { -readonly [K in keyof ChartModel]?: ChartModel[K] } = {};
@@ -89,6 +95,7 @@ function metaOf(meta: ReadonlyMap<string, string>): Partial<ChartModel> {
       case "source":
       case "x":
       case "series":
+      case "kinds":
         break;
       default:
         extra[key] = value;
@@ -134,11 +141,21 @@ export function readMermaid(text: string): ChartModel | Unreadable | undefined {
       }
     }
     const kinds = new Set(series.map((s) => s.kind));
+    const type = own.type ?? (kinds.has("bar") || kinds.size === 0 ? "bar" : "line");
+    // A series' own kind: what chart.kinds says (what Mermaid has no word for), else what its bar or line says
+    // in this type (impliedKind: an area chart's line is its area); none where it is the type's own
+    const said = commaList(meta.get("kinds") ?? "");
+    const base = baseKind(type);
+    const drawn = series.map((s, i) => {
+      const kind = (SERIES_KINDS as readonly string[]).includes(said[i] ?? "") ? (said[i] as SeriesKind) : impliedKind((s.kind as "bar" | "line" | undefined) ?? "line", base);
+      const { kind: _kind, ...rest } = s;
+      return kind !== (base ?? "line") ? { ...rest, kind } : rest;
+    });
     return {
-      type: own.type ?? (kinds.has("bar") || kinds.size === 0 ? "bar" : "line"),
+      type,
       ...(title ? { title } : {}),
       labels,
-      series,
+      series: drawn,
       ...(x && Object.keys(x).length ? { x } : {}),
       ...(y && Object.keys(y).length ? { y } : {}),
       ...(/\bhorizontal\b/.test(head) ? { horizontal: true } : {}),
@@ -193,12 +210,16 @@ export function writeMermaid(model: ChartModel, previous?: string): string {
     // Mermaid's y axis takes a range only with both ends
     const yRange = model.y?.min !== undefined && model.y?.max !== undefined ? ` ${model.y.min} --> ${model.y.max}` : "";
     if (model.y?.title || yRange) lines.push(`  y-axis${model.y?.title ? ` ${quote(model.y.title)}` : ""}${yRange}`);
-    // A series without its own kind as the chart draws it: bars for a bar chart, else a line
-    const base = model.type === "bar" ? "bar" : "line";
-    for (const series of model.series) lines.push(`  ${series.kind ?? base}${series.name ? ` ${quote(series.name)}` : ""} [${series.values.map(numberText).join(", ")}]`);
-    const kinds = new Set(model.series.map((s) => s.kind ?? base));
+    // A series as Mermaid draws it: bars, else a line (an area, points, steps: a line there, its kind in chart.kinds)
+    const base = baseKind(model.type) ?? "line";
+    const kindOf = (series: Series) => series.kind ?? base;
+    const mermaidKind = (series: Series) => (kindOf(series) === "bar" ? "bar" : "line");
+    for (const series of model.series) lines.push(`  ${mermaidKind(series)}${series.name ? ` ${quote(series.name)}` : ""} [${series.values.map(numberText).join(", ")}]`);
+    const kinds = new Set(model.series.map(mermaidKind));
     const read = kinds.has("bar") || kinds.size === 0 ? "bar" : "line";
     if (model.type !== read) meta.push(["type", model.type]);
+    // The kinds said where Mermaid's word would be read back as another (an area, points, steps; a line in an area chart)
+    if (model.series.some((s) => impliedKind(mermaidKind(s), baseKind(model.type)) !== kindOf(s))) meta.push(["kinds", model.series.map(kindOf).join(", ")]);
   }
   if (model.stacked) meta.push(["stacked", "true"]);
   if (model.smooth) meta.push(["smooth", "true"]);

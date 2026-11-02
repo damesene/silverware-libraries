@@ -99,7 +99,9 @@ Point at a chart and a small toolbar shows above its top left corner; its **⋯*
 * **Type**: every type of chart as a gallery (bars, stacked bars, horizontal bars, lines, areas, stacked areas, scatter, pie, doughnut, polar area, radar); click one and the chart is written so.
 * **Data**: the tables of the page the chart can draw (the table above it, below it, each first table under a heading, and with Silverware Table those you named); pick one, then the column of the labels and the columns of the values, and *Draw these*. *No table* goes back to the block's own numbers.
 * **Edit source**: the block's markdown, to edit it by hand.
+* **Copy source**: the block's markdown on your clipboard.
 * **Copy as image**: the chart as a picture on your clipboard (where the browser allows it: SilverBullet over https or on your own computer).
+* **Reload**: the chart drawn anew, its table read again.
 
 Every change is one edit of the block you can undo.
 
@@ -266,6 +268,15 @@ end
 
 ```space-style
 /* Silverware Chart: a chart's box, and what shows where one cannot be drawn */
+/* What Silverware Chart assumes about SilverBullet's DOM, all of it here: its own controls of a chart's block
+   (its widget menu, .sb-widget-menu-bar: Edit source, Reload; the block's Copy button, .sb-code-copy-button in
+   the block's first line, .cm-line > .sb-actions) left out, as the chart's toolbar has them; .swc-widget is the
+   class the library page gives the chart's widget */
+.swc-widget .sb-widget-menu-bar,
+.cm-line:has(.swc-widget) > .sb-actions .sb-code-copy-button {
+  display: none !important;
+}
+
 /* (An element of its own: swc-chart) */
 .swc-chart {
   display: block;

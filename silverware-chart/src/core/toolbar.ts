@@ -1,10 +1,9 @@
 // The toolbar of the chart hovered and its ⋯ menu, as Silverware Table's
 // look them (floating elements in the page's body, its colors): the bar above
-// the chart's top right corner, left of SilverBullet's Copy button there, the
-// menu under the ⋯ button, a submenu in its place with a back arrow. What the
+// the chart's top right corner (where SilverBullet's own controls of a block,
+// left out by the library page's CSS, would be), the menu under the ⋯ button, a submenu in its place with a back arrow. What the
 // menu holds is given as data (MenuView) by the core, which knows what each
 // item does; this file only shows and runs them.
-import { copyButtonOf } from "./dom.ts";
 
 /** An item of a menu: an action, or a submenu opened in the menu's place */
 export type MenuItem = {
@@ -114,15 +113,14 @@ export class ChartToolbar {
     }, LEAVE_MS);
   }
 
-  /** The bar above the chart's top right corner, left of SilverBullet's Copy button (inside the chart where there is no room above), the menu under it, their right edges at one */
+  /** The bar above the chart's top right corner (inside the chart where there is no room above), the menu under it, their right edges at one */
   private place(): void {
     const box = this.box;
     if (!box) return;
     const rect = box.getBoundingClientRect();
     const height = this.bar.offsetHeight || 26;
     const top = rect.top - height - GAP >= 0 ? rect.top - height - GAP : rect.top + GAP;
-    const copy = copyButtonOf(box)?.getBoundingClientRect();
-    const right = copy && copy.width > 0 ? copy.left - GAP : rect.right;
+    const right = rect.right;
     const width = this.doc.documentElement.clientWidth;
     this.bar.style.left = "auto";
     this.bar.style.right = `${Math.max(0, width - right)}px`;

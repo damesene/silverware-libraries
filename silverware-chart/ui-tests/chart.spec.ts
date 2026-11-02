@@ -173,3 +173,16 @@ test("Insert chart of the table puts a chart of it under the table", async ({ pa
     .poll(() => savedText(page))
     .toContain('```mermaid\nxychart-beta\n  x-axis ["Oct", "Nov"]\n  bar "Revenue" [120, 140]\n  bar "Cost" [80, 85]\n%% chart.source: above\n%% chart.x: Month\n%% chart.series: Revenue, Cost\n```');
 });
+
+test("SilverBullet's own controls of a chart's block are left out; Reload draws the chart anew", async ({ page, open }) => {
+  await open(`# Sales\n\n${block("above", "120, 140")}\n`.replace("%% chart.source: above\n%% chart.x: month\n%% chart.series: revenue\n", ""));
+  await expect.poll(() => charts(page)).toHaveLength(1);
+  const chart = page.locator(".swc-chart").first();
+  await chart.hover({ position: { x: 200, y: 100 } });
+  // (SilverBullet's widget menu and the block's Copy button are there, not shown)
+  await expect(page.locator(".swc-widget .sb-widget-menu-bar")).toBeHidden();
+  await expect(page.locator(".cm-line:has(.swc-widget) .sb-code-copy-button")).toBeHidden();
+  await chartMenu(page);
+  await page.locator(".swc-menu-item", { hasText: "Reload" }).click();
+  await expect.poll(() => charts(page)).toEqual([{ type: "bar", labels: ["Oct", "Nov"], data: [[120, 140]] }]);
+});

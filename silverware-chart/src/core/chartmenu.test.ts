@@ -19,6 +19,8 @@ function host(over: Partial<ChartMenuHost> = {}): ChartMenuHost {
     pick: vi.fn(async () => {}),
     convert: vi.fn(async () => {}),
     editSource: vi.fn(async () => {}),
+    copySource: vi.fn(async () => {}),
+    reload: vi.fn(async () => {}),
     copyImage: () => undefined,
     ...over,
   };
@@ -26,7 +28,7 @@ function host(over: Partial<ChartMenuHost> = {}): ChartMenuHost {
 
 describe("the chart's menu", () => {
   it("offers Type, Data, Edit source and Copy as image; Convert only where there is another format", () => {
-    expect(chartMenu(host(), entry).items?.map((i) => i.label)).toEqual(["Type", "Data", "Edit source", "Copy as image"]);
+    expect(chartMenu(host(), entry).items?.map((i) => i.label)).toEqual(["Type", "Data", "Edit source", "Copy source", "Copy as image", "Reload"]);
     expect(chartMenu(host(), entry).items?.find((i) => i.label === "Copy as image")?.disabled).toBeTruthy();
     const other = { ...MERMAID_FORMAT, name: "obsidian", label: "Obsidian Charts" };
     expect(chartMenu(host({ formats: () => [MERMAID_FORMAT, other] }), entry).items?.map((i) => i.label)).toContain("Convert to Obsidian Charts");

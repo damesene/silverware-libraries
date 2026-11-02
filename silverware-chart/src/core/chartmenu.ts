@@ -23,6 +23,10 @@ export type ChartMenuHost = {
   convert(entry: Drawn, format: ChartFormat): Promise<void>;
   /** The chart's markdown shown (the cursor put into its block) */
   editSource(entry: Drawn): Promise<void>;
+  /** The chart's block (its fences too) copied as text */
+  copySource(entry: Drawn): Promise<void>;
+  /** The chart drawn anew, its source read again */
+  reload(entry: Drawn): Promise<void>;
   /** The chart copied as an image; undefined where the page cannot (no Clipboard API for images) */
   copyImage(entry: Drawn): (() => Promise<void>) | undefined;
 };
@@ -35,6 +39,8 @@ const ICONS = {
   convert: icon('<path d="M4 7h13l-3-3M20 17H7l3 3"/>'),
   source: icon('<path d="M8 6l-6 6 6 6M16 6l6 6-6 6"/>'),
   image: icon('<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>'),
+  copy: icon('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'),
+  reload: icon('<path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/>'),
   none: icon('<path d="M18 6L6 18M6 6l12 12"/>'),
 };
 
@@ -163,7 +169,9 @@ export function chartMenu(host: ChartMenuHost, entry: Drawn): MenuView {
     { label: "Data", icon: ICONS.data, open: () => dataView(host, entry) },
     ...others.map((format) => ({ label: `Convert to ${format.label}`, icon: ICONS.convert, run: () => host.convert(entry, format) })),
     { label: "Edit source", icon: ICONS.source, run: () => host.editSource(entry) },
+    { label: "Copy source", icon: ICONS.copy, run: () => host.copySource(entry) },
     { label: "Copy as image", icon: ICONS.image, ...(copy ? { run: copy } : { disabled: "This page cannot copy images (no Clipboard API: a page over http)" }) },
+    { label: "Reload", icon: ICONS.reload, run: () => host.reload(entry) },
   ];
   return { title: "Chart", items };
 }

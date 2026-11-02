@@ -45,6 +45,8 @@ export interface ChartBox extends HTMLElement {
   readonly chart: ChartInstance | undefined;
   /** Its chart made (now, and again as it comes back) by `make`; `entered`/`left` told as it is drawn or destroyed */
   setUp(make: () => ChartInstance, entered: () => void, left: () => void): void;
+  /** Its chart made anew (Reload) */
+  remake(): void;
 }
 
 const TAG = "swc-chart";
@@ -77,6 +79,12 @@ export function chartBox(doc: Document): ChartBox {
           entered();
           // (One never put in the document: SilverBullet's spare rendering)
           if (!this.isConnected) this.#outLater();
+        }
+
+        remake(): void {
+          if (!this.#make) return;
+          this.#chart?.destroy();
+          this.#chart = this.#make();
         }
 
         connectedCallback(): void {

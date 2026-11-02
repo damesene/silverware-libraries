@@ -52,6 +52,19 @@ function withData(model: ChartModel, data: SourceData): ChartModel {
   };
 }
 
+/** Text copied where the page has no Clipboard API (a page over http): the copy command on a field selected, as Silverware Table does */
+function copyByCommand(doc: Document, text: string): void {
+  const field = doc.createElement("textarea");
+  field.value = text;
+  field.setAttribute("readonly", "");
+  field.style.cssText = "position: fixed; top: 0; left: 0; opacity: 0;";
+  doc.body.append(field);
+  field.select();
+  const done = doc.execCommand("copy");
+  field.remove();
+  if (!done) throw new Error("the browser refused to copy");
+}
+
 /** A chart's whole block: its text in fences, the language its format reads first */
 function fenced(format: ChartFormat, text: string): string {
   return "```" + (format.languages[0] ?? format.name) + "\n" + text + "\n```";
@@ -425,6 +438,30 @@ export class Controller {
       editSource: async (entry) => {
         const at = await located(entry);
         if (at) await this.env.moveCursor?.(at.block.bodyFrom);
+      },
+      copySource: async (entry) => {
+        const at = await located(entry);
+        if (!at) return;
+        const text = at.text.slice(at.block.from, at.block.to);
+        const clipboard = this.doc.defaultView?.navigator.clipboard;
+        try {
+          if (clipboard?.writeText) await clipboard.writeText(text);
+          else copyByCommand(this.doc, text);
+          this.env.flash?.("Chart's source copied");
+        } catch (e) {
+          this.env.flash?.(`Silverware Chart: the source could not be copied (${e instanceof Error ? e.message : String(e)})`, "error");
+        }
+      },
+      reload: async (entry) => {
+        if (entry.model.source) {
+          const text = await this.pageText(entry.page, entry.body);
+          const data = await this.sourceData(entry.model, entry.page, text, blockOf(text, entry.language, entry.body));
+          if (data && !isUnreadable(data)) {
+            entry.data = data;
+            this.markStale(entry, data);
+          }
+        }
+        entry.box.remake();
       },
       copyImage: (entry) => {
         const view = this.doc.defaultView as (Window & { ClipboardItem?: typeof ClipboardItem }) | null;

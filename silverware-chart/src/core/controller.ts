@@ -12,7 +12,7 @@ import { type ChartConstructor, chartBox, type Drawn, DrawnCharts } from "./draw
 import type { ChartFormat } from "./format.ts";
 import { type ChartModel, isUnreadable, type Source, type Unreadable } from "./model.ts";
 import { type ChartMenuHost, chartMenu } from "./chartmenu.ts";
-import type { Candidate, ChartModule, ChartSource, Command, FollowSource, ModuleHost, SourceData, TableApi, TextEdit } from "./module.ts";
+import type { Candidate, ChartModule, ChartSource, Command, FollowSource, ModuleHost, SourceContext, SourceData, TableApi, TextEdit } from "./module.ts";
 import type { Setting } from "./setting.ts";
 import { openSettings } from "./settingsdialog.ts";
 import { ChartToolbar } from "./toolbar.ts";
@@ -30,6 +30,8 @@ export type ControllerEnv = {
   readonly getCursor?: () => Promise<number>;
   readonly moveCursor?: (at: number) => Promise<void>;
   readonly flash?: (message: string, type?: "info" | "error") => void;
+  // One of options picked in the host's own picker (SilverBullet's filter box): its index
+  readonly pick?: (label: string, options: readonly { readonly label: string; readonly hint?: string }[]) => Promise<number | undefined>;
   // Chart.js, loaded the first time a chart is drawn
   readonly loadChart: () => Promise<ChartConstructor>;
   readonly table?: TableApi;
@@ -142,6 +144,14 @@ export class Controller {
       replaceRange: async (from, to, text) => void (await this.env.replaceRange?.(from, to, text)),
       flash: (message, type) => this.env.flash?.(message, type),
       newBlock: (model) => this.newBlock(model),
+      pick: async (label, options) => this.env.pick?.(label, options),
+      candidates: (context) => this.candidates(context),
+      chartOf: async (source, context) => {
+        const model: ChartModel = { type: "bar", labels: [], series: [], source };
+        const data = await this.sourceData(model, context.page, context.text, context.block);
+        if (!data) return { problem: `nothing reads the source "${source.table}"` };
+        return isUnreadable(data) ? data : withData(model, data);
+      },
       palette: (index) => {
         const palette = themeOf(this.doc).palette;
         return palette[index % palette.length] ?? "#888888";
@@ -167,6 +177,25 @@ export class Controller {
   /** The modules' commands (the library page defines them) */
   commands(): Command[] {
     return this.modules.flatMap((module) => module.commands?.() ?? []);
+  }
+
+  /** The modules' slash commands (the library page defines them) */
+  slashCommands(): Command[] {
+    return this.modules.flatMap((module) => module.slashCommands?.() ?? []);
+  }
+
+  /** The tables every source offers for a chart at a place of a page's text, each once */
+  private async candidates(context: SourceContext): Promise<Candidate[]> {
+    const seen = new Set<string>();
+    const out: Candidate[] = [];
+    for (const source of this.sources()) {
+      for (const candidate of (await source.candidates?.(context).catch(() => [])) ?? []) {
+        if (seen.has(candidate.table)) continue;
+        seen.add(candidate.table);
+        out.push(candidate);
+      }
+    }
+    return out;
   }
 
   /** The settings every chart has (the modules'), for its settings dialog */
@@ -447,17 +476,7 @@ export class Controller {
         ),
       candidates: async (entry) => {
         const text = await this.pageText(entry.page, entry.body);
-        const context = { page: entry.page, text, block: blockOf(text, entry.language, entry.body) };
-        const seen = new Set<string>();
-        const out: Candidate[] = [];
-        for (const source of this.sources()) {
-          for (const candidate of (await source.candidates?.(context).catch(() => [])) ?? []) {
-            if (seen.has(candidate.table)) continue;
-            seen.add(candidate.table);
-            out.push(candidate);
-          }
-        }
-        return out;
+        return this.candidates({ page: entry.page, text, block: blockOf(text, entry.language, entry.body) });
       },
       rewrite: async (entry, change) => {
         const at = await located(entry);

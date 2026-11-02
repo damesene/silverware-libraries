@@ -107,14 +107,14 @@ Point at a chart and a small toolbar shows above its top left corner; its **⋯*
 
 Every change is one edit of the block you can undo.
 
-**Silverware Chart: Insert chart of the table** (a command) puts a chart of the table your cursor is in (or the nearest above it) right under it: bars of its columns of numbers over its first other column, drawn from the table (`source: above`).
+**Insert a chart**: the command **Silverware Chart: Insert chart** lists the tables of the page; pick one and a chart of it goes right under it (`source: above`). Type **/chart** where you write: pick a table the chart can name from there (the one above, below, under a heading, one you named with Silverware Table) or *An example of its own numbers*, and the chart goes there. Either is bars of the table's columns of numbers over its first other column; *Type* and *Settings…* change it.
 
 ## Settings
 
 | Setting | Default | What it does |
 |---|---|---|
 | `silverware.chart.height` | `300px` | A chart's height where its block says none |
-| `silverware.chart.modules.<name>.enabled` | `true` | Turns a part off (applies on reload): `mermaid` (charts written as Mermaid), `types` (the built-in types of charts), `settings` (the common settings of the settings dialog), `tables` (markdown tables as sources), `silverwareTable` (tables named by Silverware Table, and the chart's data written with the table's edits) |
+| `silverware.chart.modules.<name>.enabled` | `true` | Turns a part off (applies on reload): `mermaid` (charts written as Mermaid), `types` (the built-in types of charts), `settings` (the common settings of the settings dialog), `tables` (markdown tables as sources), `silverwareTable` (tables named by Silverware Table, and the chart's data written with the table's edits), `insert` (the command and `/chart`) |
 
 ## Custom formats
 
@@ -203,6 +203,7 @@ config.define("silverware.chart", {
         settings = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "The settings every chart has, in its settings dialog: title, height, legend, stacked, smooth lines, the axes, each series' name, color and how it is drawn.", ui = { category = "Silverware Chart", label = "Chart settings", priority = 0.75 } } } },
         tables = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "A markdown table as a chart's data, found by its place (above or below the chart, under a heading), followed as it is edited.", ui = { category = "Silverware Chart", label = "Tables as sources", priority = 0.7 } } } },
         silverwareTable = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Where Silverware Table is installed: a table it named as a chart's data, and the chart's data written into its block with each edit of the table.", ui = { category = "Silverware Chart", label = "Silverware Table", priority = 0.6 } } } },
+        insert = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "The command Silverware Chart: Insert chart (a chart under a table of the page) and the slash command /chart (a chart at the cursor), the table picked from a list.", ui = { category = "Silverware Chart", label = "Insert a chart", priority = 0.5 } } } },
       },
     },
   },
@@ -221,6 +222,9 @@ if js and js.window then
     flash = function(message, type)
       editor.flashNotification(message, type)
     end,
+    filterBox = function(label, options)
+      return editor.filterBox(label, options, "", "Type to find a table")
+    end,
     getConfig = config.get,
   }
   -- Silverware Table's API, where it is installed (its API page has priority 50: defined before this block)
@@ -229,12 +233,22 @@ if js and js.window then
     bridge.onWrite = silverware.table.onWrite
   end
   silverwareChartJs.init(bridge)
-  -- The commands of the modules turned on
+  -- The commands and slash commands of the modules turned on
   for _, name in ipairs(silverwareChartJs.commandNames()) do
     command.define {
       name = name,
       run = function()
         silverwareChartJs.runCommand(name)
+      end,
+    }
+  end
+  for _, slash in ipairs(silverwareChartJs.slashCommandNames()) do
+    local name = slash.name
+    slashCommand.define {
+      name = name,
+      description = slash.description,
+      run = function()
+        silverwareChartJs.runSlashCommand(name)
       end,
     }
   end

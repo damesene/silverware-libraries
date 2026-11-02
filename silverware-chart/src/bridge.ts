@@ -13,6 +13,8 @@ export type Bridge = {
   readonly getCursor?: () => unknown;
   readonly moveCursor?: (at: number) => unknown;
   readonly flash?: (message: string, type?: "info" | "error") => unknown;
+  // Optional: SilverBullet's filter box (editor.filterBox), the option picked or nothing
+  readonly filterBox?: (label: string, options: readonly Record<string, unknown>[]) => unknown;
   // Optional: without it, settings keep their defaults
   readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
   // Optional, Silverware Table's (silverware.table.tables and onWrite), where it is installed
@@ -26,17 +28,18 @@ export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
 }
 
 /** The modules: the parts that can be turned off with `silverware.chart.modules.<name>.enabled` (default on) */
-export const MODULE_NAMES = ["mermaid", "types", "settings", "tables", "silverwareTable"] as const;
+export const MODULE_NAMES = ["mermaid", "types", "settings", "tables", "silverwareTable", "insert"] as const;
 export type ModuleName = (typeof MODULE_NAMES)[number];
 
 /** A module's name and what it does (the library page's config.define says the same) */
-export const MODULE_LABELS: Readonly<Record<ModuleName, string>> = { mermaid: "Mermaid", types: "Chart types", settings: "Chart settings", tables: "Tables as sources", silverwareTable: "Silverware Table" };
+export const MODULE_LABELS: Readonly<Record<ModuleName, string>> = { mermaid: "Mermaid", types: "Chart types", settings: "Chart settings", tables: "Tables as sources", silverwareTable: "Silverware Table", insert: "Insert a chart" };
 export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
   mermaid: "Charts written as Mermaid (```mermaid blocks of xychart-beta and pie), which GitHub and other Mermaid renderers draw too.",
   types: "The built-in types of charts: bar, line, area, scatter, pie, doughnut, polar area, radar.",
   settings: "The settings every chart has, in its settings dialog: title, height, legend, stacked, smooth lines, the axes, each series' name, color and how it is drawn.",
   tables: "A markdown table as a chart's data, found by its place (above or below the chart, under a heading), followed as it is edited.",
   silverwareTable: "Where Silverware Table is installed: a table it named as a chart's data, and the chart's data written into its block with each edit of the table.",
+  insert: "The command Silverware Chart: Insert chart (a chart under a table of the page) and the slash command /chart (a chart at the cursor), the table picked from a list.",
 };
 
 /** Where each setting is in SilverBullet's configuration */

@@ -2,6 +2,7 @@
 // core creates only those turned on, and knows none of them.
 import type { ModuleName, Settings } from "./bridge.ts";
 import type { ChartModule, ModuleHost } from "./core/module.ts";
+import { insertModule } from "./modules/insert.ts";
 import { mermaidModule } from "./modules/mermaid.ts";
 import { settingsModule } from "./modules/settings.ts";
 import { silverwareTableModule } from "./modules/silverwareTable.ts";
@@ -14,6 +15,7 @@ const FACTORIES: readonly (readonly [ModuleName, (host: ModuleHost, settings: Se
   ["settings", settingsModule],
   ["tables", tablesModule],
   ["silverwareTable", silverwareTableModule],
+  ["insert", insertModule],
 ];
 
 /** The modules turned on, each made with its own host */

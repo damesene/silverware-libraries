@@ -24,7 +24,7 @@ export async function init(bridge: Bridge): Promise<void> {
     console.error(`Silverware Chart: the library page did not hand over ${missing.join(", ")}`);
     return;
   }
-  const { replaceRange, getCursor, moveCursor, flash } = bridge;
+  const { replaceRange, getCursor, moveCursor, flash, filterBox } = bridge;
   start(document, await readSettings(bridge), {
     getText: async () => String(await bridge.getText()),
     getCurrentPage: async () => String(await bridge.getCurrentPage()),
@@ -33,6 +33,13 @@ export async function init(bridge: Bridge): Promise<void> {
     getCursor: getCursor ? async () => Number(await getCursor()) : undefined,
     moveCursor: moveCursor ? async (at) => void (await moveCursor(at)) : undefined,
     flash: flash ? (message, type) => void flash(message, type) : undefined,
+    // SilverBullet's filter box gives back the option picked: found by the index it was given
+    pick: filterBox
+      ? async (label, options) => {
+          const picked = (await filterBox(label, options.map((option, i) => ({ name: option.label, ...(option.hint ? { hint: option.hint } : {}), index: i })))) as { index?: unknown } | undefined;
+          return typeof picked?.index === "number" ? picked.index : undefined;
+        }
+      : undefined,
     loadChart,
     table: tableApi(bridge),
   });
@@ -78,6 +85,16 @@ export function commandNames(): string[] {
 /** A command run (the library page's commands call it) */
 export async function runCommand(name: string): Promise<void> {
   await slot[GLOBAL_KEY]?.commands().find((command) => command.name === name)?.run();
+}
+
+/** The slash commands' words, for the library page to define them */
+export function slashCommandNames(): { name: string; description: string }[] {
+  return slot[GLOBAL_KEY]?.slashCommands().map((command) => ({ name: command.name, description: command.description ?? "" })) ?? [];
+}
+
+/** A slash command run (the library page's slash commands call it) */
+export async function runSlashCommand(name: string): Promise<void> {
+  await slot[GLOBAL_KEY]?.slashCommands().find((command) => command.name === name)?.run();
 }
 
 /** A block shown as code, where it is no chart and nothing drew its language before */

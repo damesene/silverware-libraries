@@ -150,11 +150,13 @@ test("the menu's Edit source shows the block's markdown", async ({ page, open })
   await expect(page.locator(".cm-content")).toContainText("xychart-beta");
 });
 
-test("Insert chart of the table puts a chart of it under the table", async ({ page, open }) => {
-  await open(`# Sales\n\n${SALES}\nAfter.\n`);
-  await expect(page.locator(".sb-table-widget")).toBeVisible();
-  // The cursor on the line after the table, the command run as SilverBullet's palette runs it (once its Space Lua has defined it)
-  const name = "Silverware Chart: Insert chart of the table";
+const CHART_OF_SALES = '```mermaid\nxychart-beta\n  x-axis ["Oct", "Nov"]\n  bar "Revenue" [120, 140]\n  bar "Cost" [80, 85]\n%% chart.source: above\n%% chart.x: Month\n%% chart.series: Revenue, Cost\n```';
+
+test("Insert chart lists the page's tables, the chart put under the one picked", async ({ page, open }) => {
+  await open(`# Sales\n\n| A | B |\n|---|--:|\n| x | 1 |\n\nBetween.\n\n${SALES}\nAfter.\n`);
+  await expect(page.locator(".sb-table-widget")).toHaveCount(2);
+  // The command run as SilverBullet's palette runs it (once its Space Lua has defined it)
+  const name = "Silverware Chart: Insert chart";
   await page.waitForFunction(
     (name) => {
       const c = (window as unknown as { client?: { ui?: { viewState?: { commands?: Map<string, unknown> } }; clientSystem?: { commandHook?: { buildAllCommands?(): Map<string, unknown> } } } }).client;
@@ -163,15 +165,43 @@ test("Insert chart of the table puts a chart of it under the table", async ({ pa
     name,
     { timeout: 30_000 },
   );
-  await page.evaluate((name) => {
-    const client = (window as unknown as { client: { editorView: { state: { doc: { toString(): string } }; dispatch(t: unknown): void }; runCommandByName(name: string): Promise<void> } }).client;
-    const text = client.editorView.state.doc.toString();
-    client.editorView.dispatch({ selection: { anchor: text.indexOf("After.") } });
-    void client.runCommandByName(name);
-  }, name);
-  await expect
-    .poll(() => savedText(page))
-    .toContain('```mermaid\nxychart-beta\n  x-axis ["Oct", "Nov"]\n  bar "Revenue" [120, 140]\n  bar "Cost" [80, 85]\n%% chart.source: above\n%% chart.x: Month\n%% chart.series: Revenue, Cost\n```');
+  await page.evaluate((name) => void (window as unknown as { client: { runCommandByName(name: string): Promise<void> } }).client.runCommandByName(name), name);
+  // SilverBullet's own picker: the tables by their columns, the second picked
+  const picker = page.locator(".sb-modal-box").filter({ hasText: "Chart of which table?" });
+  await expect(picker).toContainText("Month, Revenue, Cost");
+  await picker.locator("input").fill("Revenue");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => savedText(page)).toContain(`<meta core.table core.name='sales'> |\n\n${CHART_OF_SALES}\n\nAfter.`);
+});
+
+test("/chart puts a chart at the cursor, of a table picked", async ({ page, open }) => {
+  await open(`# Sales\n\n${SALES}\nAfter.\n\nHere\n`);
+  await expect(page.locator(".sb-table-widget")).toBeVisible();
+  // Defined by the library page's Space Lua with the commands: once one of them is there
+  await page.waitForFunction(
+    () => {
+      const c = (window as unknown as { client?: { ui?: { viewState?: { commands?: Map<string, unknown> } }; clientSystem?: { commandHook?: { buildAllCommands?(): Map<string, unknown> } } } }).client;
+      const name = "Silverware Chart: Insert chart";
+      return !!(c?.ui?.viewState?.commands?.has(name) || c?.clientSystem?.commandHook?.buildAllCommands?.().has(name));
+    },
+    null,
+    { timeout: 30_000 },
+  );
+  // The cursor at the end of the last line, /chart typed and its completion taken
+  await page.locator(".cm-line", { hasText: "Here" }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  // (The completion shows once the / is typed; the word typed slowly, as a hand does)
+  await page.keyboard.type("/");
+  await expect(page.locator(".cm-tooltip-autocomplete")).toBeVisible();
+  await page.keyboard.type("chart", { delay: 50 });
+  await expect(page.locator(".cm-tooltip-autocomplete")).toContainText("chart");
+  await page.keyboard.press("Enter");
+  const picker = page.locator(".sb-modal-box").filter({ hasText: "Chart of which table?" });
+  await expect(picker).toContainText("Table above");
+  await picker.locator("input").fill("Table above");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => savedText(page)).toContain(`Here\n\n${CHART_OF_SALES}`);
 });
 
 test("SilverBullet's own controls of a chart's block are left out; Reload draws the chart anew", async ({ page, open }) => {

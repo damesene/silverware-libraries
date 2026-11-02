@@ -43,14 +43,16 @@ export type ChartSource = {
   readonly read: (source: Source, context: SourceContext) => Promise<SourceData | Unreadable | undefined>;
 };
 
-/** A command of a module's (as SilverBullet lists it: "Silverware Chart: Insert chart") */
+/** A command of a module's (as SilverBullet lists it: "Silverware Chart: Insert chart"; a slash command by its word: "chart") */
 export type Command = {
   readonly name: string;
+  readonly description?: string;
   readonly run: () => unknown;
 };
 
 export type ChartModule = {
   readonly commands?: () => readonly Command[];
+  readonly slashCommands?: () => readonly Command[];
   // Settings of every chart, for the settings dialog (a type of chart gives its own: ChartType.settings)
   readonly settings?: () => readonly Setting[];
   // Entries of the chart's ⋯ menu (each in its group: MENU_GROUPS)
@@ -125,6 +127,12 @@ export type ModuleHost = {
   newBlock(model: ChartModel): string;
   /** The color of the series (or slice) at an index where the chart says none (the theme's palette) */
   palette(index: number): string;
+  /** One of options picked in the host's own picker (SilverBullet's); its index, undefined where none was */
+  pick(label: string, options: readonly { readonly label: string; readonly hint?: string }[]): Promise<number | undefined>;
+  /** The tables every source offers for a chart at a place of a page's text */
+  candidates(context: SourceContext): Promise<readonly Candidate[]>;
+  /** A bar chart of a source's data, read at a place of a page's text (the series named by their columns), or why it cannot be */
+  chartOf(source: Source, context: SourceContext): Promise<ChartModel | Unreadable>;
   /**
    * The edits that bring the data of every chart of a page's text up to its
    * source's, each block written by its format (none where all are): what a

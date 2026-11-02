@@ -113,6 +113,14 @@ export function tableByPlace(text: string, reference: string, block: Pick<Block,
   return undefined;
 }
 
+/** A table's columns, each with whether its cells are numbers (most of those not empty) */
+export function columnsOf(table: Pick<TextTable, "columns" | "rows">): { name: string; numeric: boolean }[] {
+  return table.columns.map((column, i) => {
+    const cells = table.rows.map((row) => row[i] ?? "").filter((cell) => cell !== "");
+    return { name: column.name, numeric: cells.length > 0 && cells.filter((cell) => numberOf(cell) !== null).length * 2 > cells.length };
+  });
+}
+
 /** The column a name says: its name (any case) or its key */
 export function columnIndex(columns: TextTable["columns"], wanted: string): number {
   const w = wanted.trim();

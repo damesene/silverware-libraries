@@ -3,9 +3,9 @@
 // columns found by their names as SilverBullet's index keys them. Pure.
 import type { Block } from "../core/blocks.ts";
 import { meets } from "./criteria.ts";
-import { numberOf } from "./values.ts";
+import { numberOf, plainNumberOf } from "./values.ts";
 
-export { numberOf };
+export { numberOf, plainNumberOf };
 import type { Source, Unreadable } from "../core/model.ts";
 
 /** A table as the sources read it: where it is, its columns, its body's cells as they show */
@@ -121,7 +121,7 @@ export function tableByPlace(text: string, reference: string, block: Pick<Block,
 export function columnsOf(table: Pick<TextTable, "columns" | "rows">): { name: string; numeric: boolean }[] {
   return table.columns.map((column, i) => {
     const cells = table.rows.map((row) => row[i] ?? "").filter((cell) => cell !== "");
-    return { name: column.name, numeric: cells.length > 0 && cells.filter((cell) => numberOf(cell) !== null).length * 2 > cells.length };
+    return { name: column.name, numeric: cells.length > 0 && cells.filter((cell) => plainNumberOf(cell) !== null).length * 2 > cells.length };
   });
 }
 

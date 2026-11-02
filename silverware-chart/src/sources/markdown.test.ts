@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { blockOf, blocksOf } from "../core/blocks.ts";
-import { cellsOf, columnIndex, columnKey, dataOf, numberOf, pageOf, tableByPlace, tablesOf } from "./markdown.ts";
+import { cellsOf, columnIndex, columnKey, dataOf, numberOf, pageOf, plainNumberOf, tableByPlace, tablesOf } from "./markdown.ts";
 
 const TEXT = `# Costs
 
@@ -76,6 +76,10 @@ describe("markdown tables", () => {
 
   it("reads numbers with units and a decimal comma, and references to other pages", () => {
     expect([numberOf("12"), numberOf("12,99 €"), numberOf("1,234.5"), numberOf("$ -3"), numberOf("n/a"), numberOf("")]).toEqual([12, 12.99, 1234.5, -3, null, null]);
+    // A value drawn takes any digits; a number compared or a column of numbers only one around its unit or currency
+    expect(numberOf("~120 (est.)")).toBe(120);
+    const plain = ["12", "12,99 €", "-€12", "USD 1 200", "3kg", "5 %", "A1", "Q1", "ABC1", "v2.1", "2026-11-02", "n/a", ""].map(plainNumberOf);
+    expect(plain).toEqual([12, 12.99, -12, 1200, 3, 5, null, null, null, null, null, null, null]);
     expect(pageOf("[[Data/2026]]#Sales")).toEqual({ page: "Data/2026", rest: "#Sales" });
     expect(pageOf("above")).toEqual({ rest: "above" });
   });

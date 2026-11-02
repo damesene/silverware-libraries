@@ -10,6 +10,8 @@ describe("criteria as the -IFS functions write them", () => {
     expect([meets("Done", "done"), meets("done", "= Done"), meets("open", "<>done"), meets("apple", "app*"), meets("cat", "?at"), meets("a*b", "a~*b"), meets("axb", "a~*b")]).toEqual([true, true, true, true, true, true, false]);
     expect([meets("", ""), meets("x", "="), meets("x", "<>"), meets("", "<>")]).toEqual([true, false, true, false]);
     expect([meets("b", "> a"), meets("", "> a")]).toEqual([true, false]);
+    // A code with digits in it is a text: A1 is not B1, Q1 not 1, Room 12 not over 5
+    expect([meets("B1", "= A1"), meets("A1", "= A1"), meets("Q1", "= 1"), meets("Room 12", "> 5")]).toEqual([false, true, false, false]);
   });
 });
 

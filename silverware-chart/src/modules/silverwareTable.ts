@@ -10,7 +10,7 @@
 import type { Block } from "../core/blocks.ts";
 import type { Source, Unreadable } from "../core/model.ts";
 import type { ChartModule, ModuleHost, SourceContext, SourceData, TableApi, WriteContext } from "../core/module.ts";
-import { dataOf, numberOf, pageOf, tableByPlace } from "../sources/markdown.ts";
+import { dataOf, pageOf, plainNumberOf, tableByPlace } from "../sources/markdown.ts";
 
 // A table's name as Silverware Table allows it: what is not a place (above, below) nor a heading
 const NAME_RE = /^[A-Za-z_][\w.-]*$/;
@@ -30,7 +30,7 @@ async function read(host: ModuleHost, table: TableApi, source: Source, context: 
 /** Whether a column's cells are numbers (most of those not empty) */
 function numeric(cells: readonly string[]): boolean {
   const filled = cells.filter((cell) => cell !== "");
-  return filled.length > 0 && filled.filter((cell) => numberOf(cell) !== null).length * 2 > filled.length;
+  return filled.length > 0 && filled.filter((cell) => plainNumberOf(cell) !== null).length * 2 > filled.length;
 }
 
 /**

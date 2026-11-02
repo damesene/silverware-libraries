@@ -12,7 +12,7 @@ import { counted, type Operation } from "../core/operation.ts";
 import { renameTags } from "../tags/edit.ts";
 import { cleanName, hashtagOf, isWithin, nameProblem, renamedTag } from "../tags/names.ts";
 import { suggestions, tagField } from "../ui/chips.ts";
-import { el } from "../ui/elements.ts";
+import { el } from "../../../shared/elements.ts";
 import { note } from "../ui/form.ts";
 
 export function renameOperation(from: string, to: string, children: boolean, subtags = 0): Operation {

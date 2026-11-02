@@ -132,7 +132,7 @@ silverware-tags/
       module.ts        TagsModule: what a module gives (commands, a tag's actions in the manager); ModuleHost: what the core gives it
       diff.ts          a page's change as lines before and after (the preview)
     ui/                the dialogs (shared/dialog.ts, base swg-dialog), made of Silverware Tags' own elements
-      elements.ts      el()
+      (elements)       el() of shared/elements.ts
       manager.ts       the Tag manager: a tree of tags with counts and a search, the tag picked: where it is used, the modules' actions
       preview.ts       a plan shown, Apply / Cancel, the progress
       chips.ts         tags typed as chips, with completion from the catalog

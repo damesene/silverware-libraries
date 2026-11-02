@@ -21,7 +21,7 @@ import { hashtagOf, isMetaTag } from "../tags/names.ts";
 import { isEmptyQuery, pageMatches, parsePageQuery } from "../tags/query.ts";
 import { chipsField, suggestions, tagSearchField } from "../ui/chips.ts";
 import { checkbox } from "../ui/form.ts";
-import { el } from "../ui/elements.ts";
+import { el } from "../../../shared/elements.ts";
 import { ICONS } from "../ui/icons.ts";
 import { pageTree } from "../ui/pagetree.ts";
 

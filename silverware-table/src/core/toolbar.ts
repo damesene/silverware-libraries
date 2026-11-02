@@ -7,7 +7,7 @@
 // each change, placed above the header (or over its right end) in the next
 // frame after a change: placing it measures the table.
 import { cellText, renderedTable } from "../dom.ts";
-import { el, pressed } from "../elements.ts";
+import { el, pressed } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
 import type { MenuEntry } from "../menu.ts";
 import { hasPins, NO_PINS, withoutSort } from "../view.ts";

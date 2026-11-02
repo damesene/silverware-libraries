@@ -14,7 +14,7 @@ import type { Applied, Plan, Progress } from "../core/plan.ts";
 import { hashtagOf, isMetaTag, nameProblem } from "../tags/names.ts";
 import { filterTree, type TagNode, tagTree } from "../tags/tree.ts";
 import { buttons, openDialog } from "./dialog.ts";
-import { el } from "./elements.ts";
+import { el } from "../../../shared/elements.ts";
 import { ICONS } from "./icons.ts";
 import { suggestions, tagField } from "./chips.ts";
 import { checkbox, choice, labelled, note } from "./form.ts";

@@ -4,7 +4,7 @@
 // between where some are. A filter (a search) shows the pages it keeps, with
 // the folders above them open; a folder's box then checks those shown only. Folders open as they are clicked; only those
 // open are in the document (a space of thousands of pages).
-import { el } from "./elements.ts";
+import { el } from "../../../shared/elements.ts";
 import { ICONS } from "./icons.ts";
 
 type Node = {

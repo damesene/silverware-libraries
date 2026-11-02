@@ -10,7 +10,7 @@ import { counted } from "../core/operation.ts";
 import { RENAME_OFFER, type RenameOffer } from "../core/offers.ts";
 import { hashtagOf, isMetaTag } from "../tags/names.ts";
 import { type SimilarReason, similarTags } from "../tags/similar.ts";
-import { el } from "../ui/elements.ts";
+import { el } from "../../../shared/elements.ts";
 
 export const VIEW = "cleanup";
 

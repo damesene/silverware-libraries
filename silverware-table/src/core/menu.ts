@@ -3,7 +3,7 @@
 // a caption under each icon (the clipboard's), operable with the mouse or the
 // keyboard (arrows, Home/End, Enter). The core's: modules give its entries
 // (src/menu.ts) and get it through TableHost.floatingMenu.
-import { el, pressed, type ElementChild, type ElementProps } from "../elements.ts";
+import { el, pressed, type ElementChild, type ElementProps } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
 import type { MenuBack, MenuDetail, MenuEntry, MenuNaming } from "../menu.ts";
 

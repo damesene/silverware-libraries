@@ -1,6 +1,6 @@
 // The parts the modules' dialogs are made of: a field with its label, a check
 // box, a line saying what will happen or what is wrong.
-import { el } from "./elements.ts";
+import { el } from "../../../shared/elements.ts";
 
 /** A field with its label above it */
 export function labelled(doc: Document, label: string, control: HTMLElement, hint?: string): HTMLElement {

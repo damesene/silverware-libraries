@@ -77,7 +77,7 @@ import { addAffected, affectedBy, isAffected, type NamedOtherPages, type NamedPa
 import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
 import { FunctionDialog } from "./functiondialog.ts";
-import { el } from "../elements.ts";
+import { el } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
 import { escapeCell, locateBySource, type OtherPages, type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";

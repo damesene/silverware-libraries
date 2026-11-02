@@ -4,7 +4,7 @@
 import { diffLines } from "../core/diff.ts";
 import { counted } from "../core/operation.ts";
 import type { Plan } from "../core/plan.ts";
-import { el } from "./elements.ts";
+import { el } from "../../../shared/elements.ts";
 
 // Pages shown open at the start
 const OPEN = 3;

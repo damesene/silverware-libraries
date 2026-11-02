@@ -4,7 +4,7 @@
 // space that start with, or hold, what is typed (↑ ↓ to pick, Enter or a
 // click to take it, Tab the one picked or the first, Esc to close the list:
 // the dialog stays).
-import { el } from "./elements.ts";
+import { el } from "../../../shared/elements.ts";
 import { ICONS } from "./icons.ts";
 import { cleanName, hashtagOf, nameProblem } from "../tags/names.ts";
 import { tagAtCaret } from "../tags/query.ts";

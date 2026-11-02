@@ -31,7 +31,7 @@ import {
   type TableInfo,
   tablePartsOf,
 } from "../core/feature.ts";
-import { el } from "../elements.ts";
+import { el } from "../../../shared/elements.ts";
 import { type FilterOptions, normalizeForFilter, parseFilter } from "../filter.ts";
 import { ICONS } from "../icons.ts";
 import { parseTable } from "../markdown.ts";

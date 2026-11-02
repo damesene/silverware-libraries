@@ -32,7 +32,7 @@ import { CELL_MENU_ORDER, type AdapterFeature, type AddressFrame, type AlsoChang
 import { oncePerFrame } from "../../frame.ts";
 import { claimWindow, releaseWindow } from "../../overwindow.ts";
 import { DRAWN_CLASS, STAND_IN_CLASS, UI_CLASS } from "../../../dom.ts";
-import { el } from "../../../elements.ts";
+import { el } from "../../../../../shared/elements.ts";
 import { columnLetters, isFormulaInput } from "../../../formulas/index.ts";
 import { ICONS } from "../../../icons.ts";
 import { escapeCell, findTables, parseTable, type Table, type TableRange } from "../../../markdown.ts";

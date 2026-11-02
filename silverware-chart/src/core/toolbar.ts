@@ -1,9 +1,10 @@
 // The toolbar of the chart hovered and its ⋯ menu, as Silverware Table's
 // look them (floating elements in the page's body, its colors): the bar above
-// the chart's top left corner (SilverBullet's own widget menu is at its top
-// right), the menu under the ⋯ button, a submenu in its place with a back
-// arrow. What the menu holds is given as data (MenuView) by the core, which
-// knows what each item does; this file only shows and runs them.
+// the chart's top right corner, left of SilverBullet's Copy button there, the
+// menu under the ⋯ button, a submenu in its place with a back arrow. What the
+// menu holds is given as data (MenuView) by the core, which knows what each
+// item does; this file only shows and runs them.
+import { copyButtonOf } from "./dom.ts";
 
 /** An item of a menu: an action, or a submenu opened in the menu's place */
 export type MenuItem = {
@@ -113,17 +114,22 @@ export class ChartToolbar {
     }, LEAVE_MS);
   }
 
-  /** The bar above the chart's top left corner (inside it where there is no room above), the menu under the bar */
+  /** The bar above the chart's top right corner, left of SilverBullet's Copy button (inside the chart where there is no room above), the menu under it, their right edges at one */
   private place(): void {
     const box = this.box;
     if (!box) return;
     const rect = box.getBoundingClientRect();
     const height = this.bar.offsetHeight || 26;
     const top = rect.top - height - GAP >= 0 ? rect.top - height - GAP : rect.top + GAP;
-    this.bar.style.left = `${Math.max(0, rect.left)}px`;
+    const copy = copyButtonOf(box)?.getBoundingClientRect();
+    const right = copy && copy.width > 0 ? copy.left - GAP : rect.right;
+    const width = this.doc.documentElement.clientWidth;
+    this.bar.style.left = "auto";
+    this.bar.style.right = `${Math.max(0, width - right)}px`;
     this.bar.style.top = `${top}px`;
     const bar = this.bar.getBoundingClientRect();
-    this.menu.style.left = `${Math.max(0, bar.left)}px`;
+    this.menu.style.left = "auto";
+    this.menu.style.right = `${Math.max(0, width - bar.right)}px`;
     this.menu.style.top = `${bar.bottom + GAP}px`;
   }
 

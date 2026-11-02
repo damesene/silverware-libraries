@@ -13,6 +13,8 @@ export type ChartMenuHost = {
   readonly doc: Document;
   types(): readonly ChartType[];
   formats(): readonly ChartFormat[];
+  /** The colors series take where the chart says none (the theme's) */
+  palette(): readonly string[];
   /** The tables the chart's page offers as its source */
   candidates(entry: Drawn): Promise<readonly Candidate[]>;
   /** The chart's block written anew with the model changed so */
@@ -36,6 +38,7 @@ const icon = (paths: string): string =>
 const ICONS = {
   type: icon('<path d="M6 20V10M12 20V4M18 20v-7"/>'),
   data: icon('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/>'),
+  series: icon('<circle cx="6" cy="7" r="2"/><circle cx="6" cy="17" r="2"/><path d="M11 7h10M11 17h10"/>'),
   convert: icon('<path d="M4 7h13l-3-3M20 17H7l3 3"/>'),
   source: icon('<path d="M8 6l-6 6 6 6M16 6l6 6-6 6"/>'),
   image: icon('<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>'),
@@ -44,10 +47,92 @@ const ICONS = {
   none: icon('<path d="M18 6L6 18M6 6l12 12"/>'),
 };
 
-/** The model with a type and its variant's flags (the others taken off) */
+/**
+ * The model with a type and its variant's flags (the others taken off), its
+ * series all drawn as the type draws them: a kind of their own (a line over
+ * bars) would keep the chart as it was (Series sets one apart again)
+ */
 function typed(model: ChartModel, type: string, flags: { stacked?: boolean; horizontal?: boolean }): ChartModel {
   const { stacked: _stacked, horizontal: _horizontal, ...rest } = model;
-  return { ...rest, type, ...(flags.stacked ? { stacked: true } : {}), ...(flags.horizontal ? { horizontal: true } : {}) };
+  return {
+    ...rest,
+    type,
+    series: model.series.map(({ kind: _kind, ...series }) => series),
+    ...(flags.stacked ? { stacked: true } : {}),
+    ...(flags.horizontal ? { horizontal: true } : {}),
+  };
+}
+
+// Types whose series each have their own kind (bars or a line), as Mermaid's xychart has them
+const KINDS = new Set(["bar", "line", "area"]);
+// Types drawing one series as slices, a color each
+const ROUND = new Set(["pie", "doughnut", "polarArea"]);
+
+/** Each series (a slice of a round chart): its color, its name, and where the type takes one, bars or a line */
+function seriesView(host: ChartMenuHost, entry: Drawn): MenuView {
+  const model = entry.model;
+  const round = ROUND.has(model.type);
+  const kinds = KINDS.has(model.type);
+  const palette = host.palette();
+  const colorAt = (i: number) => model.colors?.[i] ?? palette[i % palette.length] ?? "#888888";
+  const items = round
+    ? model.labels.map((label) => ({ name: label, kind: undefined as "bar" | "line" | undefined }))
+    : model.series.map((series, i) => ({ name: series.name ?? model.source?.series[i] ?? `Series ${i + 1}`, kind: series.kind }));
+  return {
+    title: round ? "Slices" : "Series",
+    element: (menu) => {
+      const doc = host.doc;
+      const form = doc.createElement("div");
+      form.className = "swc-menu-form";
+      const rows = items.map((item, i) => {
+        const row = form.appendChild(doc.createElement("div"));
+        row.className = "swc-menu-series";
+        const color = row.appendChild(doc.createElement("input"));
+        color.type = "color";
+        color.title = "Color";
+        // (A color input takes #rrggbb only: a color written otherwise shows as black until one is picked)
+        color.value = /^#[0-9a-f]{6}$/i.test(colorAt(i)) ? colorAt(i) : "#000000";
+        const name = row.appendChild(doc.createElement("input"));
+        name.type = "text";
+        name.value = item.name;
+        name.disabled = round;
+        name.setAttribute("aria-label", "Name");
+        let kind: HTMLSelectElement | undefined;
+        if (kinds) {
+          kind = row.appendChild(doc.createElement("select"));
+          kind.setAttribute("aria-label", "Drawn as");
+          kind.append(new Option("Bars", "bar"), new Option(model.type === "area" ? "Area" : "Line", "line"));
+          kind.value = item.kind ?? (model.type === "bar" ? "bar" : "line");
+        }
+        return { color, name, kind, colorWas: color.value };
+      });
+      const apply = form.appendChild(doc.createElement("button"));
+      apply.type = "button";
+      apply.className = "swc-menu-apply";
+      apply.textContent = "Save";
+      apply.addEventListener("click", () => {
+        menu.close();
+        const base = model.type === "bar" ? "bar" : "line";
+        // Colors written only once one is picked (else the theme's palette stays), the ones written before kept
+        const picked = rows.some((row) => row.color.value !== row.colorWas);
+        void host.rewrite(entry, (m) => ({
+          ...m,
+          series: round
+            ? m.series
+            : m.series.map((series, i) => {
+                const row = rows[i];
+                if (!row) return series;
+                const { kind: _kind, name: _name, ...rest } = series;
+                const written = row.kind?.value as "bar" | "line" | undefined;
+                const name = row.name.value.trim();
+                return { ...rest, ...(name ? { name } : {}), ...(written && written !== base ? { kind: written } : {}) };
+              }),
+          ...(picked || m.colors ? { colors: rows.map((row) => row.color.value) } : {}),
+        }));
+      });
+      return form;
+    },
+  };
 }
 
 /** The gallery: each type, then its variants */
@@ -166,6 +251,7 @@ export function chartMenu(host: ChartMenuHost, entry: Drawn): MenuView {
   const copy = host.copyImage(entry);
   const items: MenuItem[] = [
     { label: "Type", icon: ICONS.type, open: () => typeView(host, entry) },
+    { label: ROUND.has(entry.model.type) ? "Slices" : "Series", icon: ICONS.series, open: () => seriesView(host, entry) },
     { label: "Data", icon: ICONS.data, open: () => dataView(host, entry) },
     ...others.map((format) => ({ label: `Convert to ${format.label}`, icon: ICONS.convert, run: () => host.convert(entry, format) })),
     { label: "Edit source", icon: ICONS.source, run: () => host.editSource(entry) },

@@ -96,7 +96,8 @@ xychart-beta
 
 Point at a chart and a small toolbar shows above its top left corner; its **⋯** opens the chart's menu:
 
-* **Type**: every type of chart as a gallery (bars, stacked bars, horizontal bars, lines, areas, stacked areas, scatter, pie, doughnut, polar area, radar); click one and the chart is written so.
+* **Type**: every type of chart as a gallery (bars, stacked bars, horizontal bars, lines, areas, stacked areas, scatter, pie, doughnut, polar area, radar); click one and the chart is written so, every series drawn that way.
+* **Series** (**Slices** for a pie): each series' color and name, and for bars, lines and areas whether it is drawn as bars or a line: a line over bars, as Mermaid writes it (`bar "…" [ ]` and `line "…" [ ]` in one chart).
 * **Data**: the tables of the page the chart can draw (the table above it, below it, each first table under a heading, and with Silverware Table those you named); pick one, then the column of the labels and the columns of the values, and *Draw these*. *No table* goes back to the block's own numbers.
 * **Edit source**: the block's markdown, to edit it by hand.
 * **Copy source**: the block's markdown on your clipboard.
@@ -541,6 +542,36 @@ end
   align-items: center;
   gap: 6px;
   cursor: pointer;
+}
+
+.swc-menu-series {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swc-menu-series input[type="color"] {
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.swc-menu-series input[type="text"],
+.swc-menu-series select {
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 4px;
+}
+
+.swc-menu-series input[type="text"] {
+  flex: 1;
+  padding: 2px 4px;
 }
 
 .swc-menu-apply {

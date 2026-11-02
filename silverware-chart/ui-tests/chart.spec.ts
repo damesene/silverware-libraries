@@ -213,3 +213,17 @@ test("the toolbar stays on its chart as the text above it grows", async ({ page,
     })
     .toBe(4);
 });
+
+test("a type picked draws every series so; Series draws one as a line over the bars", async ({ page, open }) => {
+  await open('# Mixed\n\n```mermaid\nxychart-beta\n  x-axis ["a", "b"]\n  bar "one" [1, 2]\n  line "two" [3, 4]\n```\n');
+  await expect.poll(() => charts(page)).toHaveLength(1);
+  await chartMenu(page);
+  await page.locator(".swc-menu-item", { hasText: "Type" }).click();
+  await page.locator(".swc-menu-tile", { hasText: /^Line/ }).click();
+  await expect.poll(() => savedText(page)).toContain('  line "one" [1, 2]\n  line "two" [3, 4]\n```');
+  await chartMenu(page);
+  await page.locator(".swc-menu-item", { hasText: "Series" }).click();
+  await page.locator(".swc-menu-series").first().locator("select").selectOption("bar");
+  await page.locator(".swc-menu-apply").click();
+  await expect.poll(() => savedText(page)).toContain('  bar "one" [1, 2]\n  line "two" [3, 4]\n%% chart.type: line\n```');
+});

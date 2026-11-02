@@ -404,6 +404,7 @@ export class Controller {
       doc: this.doc,
       types: () => this.types(),
       formats: () => this.formats(),
+      palette: () => themeOf(this.doc).palette,
       candidates: async (entry) => {
         const text = await this.pageText(entry.page, entry.body);
         const context = { page: entry.page, text, block: blockOf(text, entry.language, entry.body) };

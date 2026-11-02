@@ -5,6 +5,8 @@
 // menu holds is given as data (MenuView) by the core, which knows what each
 // item does; this file only shows and runs them.
 
+import { el } from "../../../shared/elements.ts";
+import { focusMenu, type MenuEntry, type MenuLook, onMenuClose, renderMenu } from "../../../shared/menu.ts";
 import { IterableWeakSet } from "./weakset.ts";
 
 /** An item of a menu: an action, or a submenu opened in the menu's place */
@@ -20,13 +22,16 @@ export type MenuItem = {
   readonly open?: () => MenuView;
 };
 
-/** What a menu shows: a title, items, or an element of its own (a form) */
+/** What a menu shows: a title and items (or items read as it opens) */
 export type MenuView = {
   readonly title: string;
   readonly items?: readonly MenuItem[];
+  // Its items read as it opens (the page's tables), in place of `items`
+  readonly load?: () => Promise<readonly MenuItem[]>;
+  // What it says where it has no items
+  readonly empty?: string;
   // Items laid out as tiles, icons over labels (a gallery)
   readonly tiles?: boolean;
-  readonly element?: (menu: { close(): void; open(view: MenuView): void }) => HTMLElement;
 };
 
 const MORE_ICON =
@@ -35,6 +40,8 @@ const BACK_ICON =
   '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>';
 const CLOSE_ICON =
   '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+// Its menus in the chart's look (shared/menu.ts, classes swc-…)
+const LOOK: MenuLook = { base: "swc", closeIcon: CLOSE_ICON };
 
 // The bar's gap above the chart, and how long it stays once the pointer has left the chart and the bar
 const GAP = 4;
@@ -45,6 +52,8 @@ export class ChartToolbar {
   private readonly menu: HTMLElement;
   private box: HTMLElement | undefined;
   private views: MenuView[] = [];
+  // The items of the views read as they opened (held while they are open)
+  private readonly loaded = new WeakMap<MenuView, readonly MenuItem[]>();
   private hiding: ReturnType<typeof setTimeout> | undefined;
   // The charts' boxes the pointer is followed over (held weakly: a box gone is let go with its chart)
   private readonly watched = new IterableWeakSet<HTMLElement>();
@@ -243,69 +252,7 @@ export class ChartToolbar {
     const view = this.views.at(-1);
     if (!view) return;
     const doc = this.doc;
-    const title = doc.createElement("div");
-    title.className = "swc-menu-title";
-    const back = doc.createElement("button");
-    back.type = "button";
-    back.className = "swc-menu-back";
-    back.title = "Back";
-    back.setAttribute("aria-label", "Back");
-    back.innerHTML = BACK_ICON;
-    back.hidden = this.views.length < 2;
-    back.addEventListener("click", () => {
-      this.views.pop();
-      this.render();
-    });
-    const text = doc.createElement("span");
-    text.className = "swc-menu-title-text";
-    text.textContent = view.title;
-    const close = doc.createElement("button");
-    close.type = "button";
-    close.className = "swc-menu-close";
-    close.title = "Close";
-    close.setAttribute("aria-label", "Close");
-    close.innerHTML = CLOSE_ICON;
-    close.addEventListener("click", () => this.close());
-    title.append(back, text, close);
-    const body = doc.createElement("div");
-    body.className = view.tiles ? "swc-menu-tiles" : "swc-menu-items";
-    for (const item of view.items ?? []) body.append(this.itemElement(item, view.tiles ?? false));
-    if (view.element)
-      body.append(
-        view.element({
-          close: () => this.close(),
-          open: (next) => {
-            this.views.push(next);
-            this.render();
-          },
-        }),
-      );
-    this.menu.replaceChildren(title, body);
-    this.place();
-  }
-
-  private itemElement(item: MenuItem, tile: boolean): HTMLElement {
-    const button = this.doc.createElement("button");
-    button.type = "button";
-    button.className = tile ? "swc-menu-tile" : "swc-menu-item";
-    button.setAttribute("role", "menuitem");
-    if (item.checked) button.setAttribute("aria-checked", "true");
-    if (item.disabled) {
-      button.setAttribute("aria-disabled", "true");
-      button.title = item.disabled;
-    }
-    if (item.icon) {
-      const icon = button.appendChild(this.doc.createElement("span"));
-      icon.className = "swc-icon";
-      icon.innerHTML = item.icon;
-    }
-    const label = button.appendChild(this.doc.createElement("span"));
-    label.className = "swc-label";
-    label.textContent = item.label;
-    if (item.open) button.classList.add("swc-menu-sub");
-    button.addEventListener("click", (e) => {
-      e.preventDefault();
-      if (item.disabled) return;
+    const run = (item: MenuItem) => () => {
       if (item.open) {
         this.views.push(item.open());
         this.render();
@@ -313,7 +260,38 @@ export class ChartToolbar {
       }
       this.close();
       void item.run?.();
-    });
-    return button;
+    };
+    const items = view.items ?? [];
+    // Read as the view opens (the page's tables): a line meanwhile, the items once read
+    const loading = view.load && !this.loaded.has(view);
+    if (loading) {
+      void view.load!().then((read) => {
+        this.loaded.set(view, read);
+        if (this.views.at(-1) === view) this.render();
+      });
+    }
+    const shown = this.loaded.get(view) ?? items;
+    const line = (text: string): MenuEntry => ({ kind: "element", element: el(doc, "div", { class: "swc-menu-line", text }) });
+    const entries: MenuEntry[] = loading
+      ? [line("Reading the page…")]
+      : !shown.length && view.empty
+        ? [line(view.empty)]
+        : view.tiles
+          ? [{ kind: "tiles", options: shown.map((item) => ({ label: item.label, icon: item.icon ?? "", ...(item.checked !== undefined ? { checked: item.checked } : {}), ...(item.disabled ? { disabled: item.disabled } : {}), run: run(item) })) }]
+          : shown.map((item) => ({
+              kind: "item",
+              label: item.label,
+              ...(item.icon ? { icon: item.icon } : {}),
+              ...(item.checked !== undefined ? { checked: item.checked } : {}),
+              ...(item.disabled ? { disabled: item.disabled } : {}),
+              ...(item.open ? { submenu: true } : {}),
+              run: run(item),
+            }));
+    const back = this.views.length > 1 ? { icon: BACK_ICON, run: () => (this.views.pop(), this.render()) } : undefined;
+    const menu = renderMenu(doc, LOOK, view.title, entries, back);
+    onMenuClose(menu, LOOK, () => this.close());
+    this.menu.replaceChildren(menu);
+    this.place();
+    focusMenu(menu, LOOK);
   }
 }

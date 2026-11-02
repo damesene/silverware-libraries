@@ -90,46 +90,21 @@ function typeView(host: ChartMenuHost, entry: Drawn): MenuView {
 function dataView(host: ChartMenuHost, entry: Drawn): MenuView {
   return {
     title: "Data",
-    element: (menu) => {
-      const list = host.doc.createElement("div");
-      list.className = "swc-menu-items";
-      list.textContent = "Reading the page…";
-      void host.candidates(entry).then((candidates) => {
-        list.replaceChildren();
-        if (!candidates.length) list.textContent = "No table on this page";
-        for (const candidate of candidates) {
-          const button = list.appendChild(host.doc.createElement("button"));
-          button.type = "button";
-          button.className = "swc-menu-item";
-          if (entry.model.source?.table === candidate.table) button.setAttribute("aria-checked", "true");
-          button.innerHTML = ICONS.data;
-          const label = button.appendChild(host.doc.createElement("span"));
-          label.className = "swc-label";
-          label.textContent = candidate.label;
-          // Picked: drawn at once (its text column the labels, its columns of numbers the values), the settings' Data open to change that
-          button.addEventListener("click", () => {
-            menu.close();
-            void (async () => {
-              const chart = entry.model.source?.table === candidate.table ? entry : await host.pick(entry, sourceOfColumns(candidate.table, candidate.columns));
-              if (chart) await host.settings(chart, "Data");
-            })();
-          });
-        }
-        if (entry.model.source) {
-          const off = list.appendChild(host.doc.createElement("button"));
-          off.type = "button";
-          off.className = "swc-menu-item";
-          off.innerHTML = ICONS.none;
-          const label = off.appendChild(host.doc.createElement("span"));
-          label.className = "swc-label";
-          label.textContent = "No table: the block's own numbers";
-          off.addEventListener("click", () => {
-            menu.close();
-            void host.rewrite(entry, ({ source: _source, ...model }) => model);
-          });
-        }
-      });
-      return list;
+    empty: "No table on this page",
+    load: async () => {
+      const candidates = await host.candidates(entry);
+      const items: MenuItem[] = candidates.map((candidate) => ({
+        label: candidate.label,
+        icon: ICONS.data,
+        ...(entry.model.source?.table === candidate.table ? { checked: true } : {}),
+        // Picked: drawn at once (its text column the labels, its columns of numbers the values), the settings' Data open to change that
+        run: async () => {
+          const chart = entry.model.source?.table === candidate.table ? entry : await host.pick(entry, sourceOfColumns(candidate.table, candidate.columns));
+          if (chart) await host.settings(chart, "Data");
+        },
+      }));
+      if (entry.model.source) items.push({ label: "No table: the block's own numbers", icon: ICONS.none, run: () => host.rewrite(entry, ({ source: _source, ...model }) => model) });
+      return items;
     },
   };
 }

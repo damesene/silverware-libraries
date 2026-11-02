@@ -55,11 +55,10 @@ describe("the chart's menu", () => {
 
   it("lists the page's tables: one picked drawn at once (its text column the labels, its numbers the values), the settings' Data open", async () => {
     const h = host({ candidates: async () => [{ label: "Table above", table: "above", at: 0, columns: [{ name: "Month", numeric: false }, { name: "Qty", numeric: true }] }] });
-    const menu = { close: vi.fn(), open: vi.fn() };
-    const list = chartMenu(h, entry).items!.find((i) => i.label === "Data")!.open!().element!(menu);
-    await vi.waitFor(() => expect(list.querySelectorAll("button")).toHaveLength(1));
-    list.querySelector("button")!.click();
-    await vi.waitFor(() => expect(h.settings).toHaveBeenCalledWith(entry, "Data"));
+    const items = await chartMenu(h, entry).items!.find((i) => i.label === "Data")!.open!().load!();
+    expect(items.map((i) => i.label)).toEqual(["Table above"]);
+    await items[0]!.run!();
+    expect(h.settings).toHaveBeenCalledWith(entry, "Data");
     expect(h.pick).toHaveBeenCalledWith(entry, { table: "above", x: "Month", series: ["Qty"] });
   });
 });

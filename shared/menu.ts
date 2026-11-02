@@ -12,8 +12,8 @@ import { el, pressed, type ElementChild, type ElementProps } from "./elements.ts
 /** How a plugin's menus look: its classes' base, its icons */
 export type MenuLook = {
   readonly base: string;
-  // The pencil naming what the menu is about
-  readonly renameIcon: string;
+  // The pencil naming what the menu is about (a menu that names nothing needs none)
+  readonly renameIcon?: string;
   // The × closing it (else a plain one)
   readonly closeIcon?: string;
 };
@@ -376,7 +376,7 @@ function addNaming(doc: Document, look: MenuLook, menu: HTMLElement, heading: HT
   const p = look.base;
   const pencil = el(doc, "button", {
     class: `${p}-menu-rename`,
-    html: look.renameIcon,
+    html: look.renameIcon ?? "",
     title: naming.disabled ? `${naming.label}: ${naming.disabled}` : naming.label,
     attrs: { "aria-label": naming.label, "aria-disabled": naming.disabled ? "true" : undefined },
   });

@@ -433,9 +433,15 @@ end
   opacity: 0.7;
 }
 
-.swc-menu-back[hidden] {
-  visibility: hidden;
-  display: inline-flex;
+/* (The title in the middle column, the × right, whether a back arrow is there or not) */
+.swc-menu-title-text {
+  grid-column: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swc-menu-close {
+  grid-column: 3;
 }
 
 .swc-menu-back:hover,
@@ -444,9 +450,17 @@ end
   background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
 }
 
-.swc-menu-items {
+/* The menu (shared/menu.ts): its title, then its items one under another */
+.swc-menu > [role="menu"] {
   display: flex;
   flex-direction: column;
+  outline: none;
+}
+
+/* What a view says without items (Reading the page…, No table on this page) */
+.swc-menu-line {
+  padding: 5px 8px;
+  opacity: 0.7;
 }
 
 .swc-menu-item {
@@ -524,6 +538,9 @@ end
 
 .swc-icon {
   display: inline-flex;
+}
+.swc-icon:empty {
+  display: none;
 }
 
 

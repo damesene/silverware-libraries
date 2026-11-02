@@ -51,6 +51,11 @@ describe("markdown tables", () => {
     expect(tableByPlace(TEXT, "#other", undefined)?.columns[0]?.name).toBe("A");
     expect(tableByPlace(TEXT, "#Nowhere", undefined)).toBeUndefined();
     expect(tableByPlace(TEXT, "above", undefined)).toBeUndefined();
+    // Its section's only: under a subheading of it, not under the next heading of its level
+    const sections = "## Sales\n\n### 2026\n\n| A |\n|---|\n| 1 |\n\n## Empty\n\nNo table.\n\n## Costs\n\n| B |\n|---|\n| 2 |\n";
+    expect(tableByPlace(sections, "#Sales", undefined)?.columns[0]?.name).toBe("A");
+    expect(tableByPlace(sections, "#Empty", undefined)).toBeUndefined();
+    expect(tableByPlace(sections, "#Costs", undefined)?.columns[0]?.name).toBe("B");
   });
 
   it("finds columns by name in any case or by key, and gives a table's data", () => {

@@ -111,8 +111,13 @@ export function tableByPlace(text: string, reference: string, block: Pick<Block,
   if (reference === "below") return block ? tables.find((t) => t.from >= block.to) : undefined;
   if (reference.startsWith("#")) {
     const title = reference.slice(1).trim().toLowerCase();
-    const heading = headingsOf(text).find((h) => h.title.toLowerCase() === title);
-    return heading ? tables.find((t) => t.from > heading.end) : undefined;
+    const headings = headingsOf(text);
+    const at = headings.findIndex((h) => h.title.toLowerCase() === title);
+    if (at < 0) return undefined;
+    // Its section's: up to the next heading of its level or above (a table under a subheading of it is its)
+    const heading = headings[at]!;
+    const end = headings.slice(at + 1).find((h) => h.level <= heading.level)?.end ?? Infinity;
+    return tables.find((t) => t.from > heading.end && t.from < end);
   }
   return undefined;
 }

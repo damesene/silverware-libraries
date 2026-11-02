@@ -84,7 +84,7 @@ xychart-beta
 |---|---|
 | `above` | the nearest table above the chart |
 | `below` | the nearest table below it |
-| `#Sales` | the first table under the heading *Sales*; `[[Page]]#Sales` on another page |
+| `#Sales` | the first table in the section of the heading *Sales* (under its subheadings too, not past the next heading of its level); `[[Page]]#Sales` on another page |
 | `sales` | the table you named *sales* with [[Library/damesene/silverware-table\|Silverware Table]] (the pencil in its ⋯ menu), `[[Page]]sales` on another page; needs Silverware Table |
 
 * In SilverBullet the chart draws the table as it is: edit a cell and the chart changes.

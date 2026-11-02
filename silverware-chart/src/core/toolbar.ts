@@ -67,6 +67,8 @@ export class ChartToolbar {
   // The charts' boxes the pointer is followed over (held weakly: a box gone is let go with its chart)
   private readonly watched = new IterableWeakSet<HTMLElement>();
   private following = false;
+  // Placed again every frame while shown: the chart moves without a scroll as the text above it is edited
+  private tracking = false;
 
   constructor(
     private readonly doc: Document,
@@ -166,6 +168,7 @@ export class ChartToolbar {
     if (!this.bar.isConnected) this.doc.body.append(this.bar, this.menu);
     this.bar.classList.add("swc-visible");
     this.place();
+    this.track();
   }
 
   private leaveSoon(): void {
@@ -177,6 +180,27 @@ export class ChartToolbar {
       this.bar.classList.remove("swc-visible");
       this.box = undefined;
     }, LEAVE_MS);
+  }
+
+  /** Placed once a frame while shown (one measure of the chart), so it stays on it as the page above it changes */
+  private track(): void {
+    if (this.tracking) return;
+    this.tracking = true;
+    const frame = () => {
+      if (!this.bar.classList.contains("swc-visible")) {
+        this.tracking = false;
+        return;
+      }
+      // Its chart drawn anew (its block written): no toolbar until the pointer moves over the new one
+      if (!this.box?.isConnected) {
+        this.tracking = false;
+        this.hide();
+        return;
+      }
+      this.place();
+      this.doc.defaultView?.requestAnimationFrame(frame);
+    };
+    this.doc.defaultView?.requestAnimationFrame(frame);
   }
 
   /** The bar above the chart's top right corner (inside the chart where there is no room above), the menu under it, their right edges at one */

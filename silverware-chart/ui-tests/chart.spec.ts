@@ -192,3 +192,24 @@ test("SilverBullet's own controls of a chart's block are left out; Reload draws 
   await page.locator(".swc-menu-item", { hasText: "Reload" }).click();
   await expect.poll(() => charts(page)).toEqual([{ type: "bar", labels: ["Oct", "Nov"], data: [[120, 140]] }]);
 });
+
+test("the toolbar stays on its chart as the text above it grows", async ({ page, open }) => {
+  await open(`# Sales\n\nText above.\n\n${block("above", "120, 140")}\n`.replace("%% chart.source: above\n%% chart.x: month\n%% chart.series: revenue\n", ""));
+  await expect.poll(() => charts(page)).toHaveLength(1);
+  const chart = page.locator(".swc-chart").first();
+  await chart.hover({ position: { x: 200, y: 100 } });
+  const bar = page.locator(".swc-bar.swc-visible");
+  await expect(bar).toHaveCount(1);
+  // Lines typed above the chart (the pointer still): the chart moves down, its toolbar with it
+  await page.evaluate(() => {
+    const view = (window as unknown as { client: { editorView: { state: { doc: { toString(): string } }; dispatch(t: unknown): void } } }).client.editorView;
+    const at = view.state.doc.toString().indexOf("Text above.") + "Text above.".length;
+    view.dispatch({ changes: { from: at, insert: "\n\nMore.\n\nAnd more." } });
+  });
+  await expect
+    .poll(async () => {
+      const [b, c] = [await bar.boundingBox(), await chart.boundingBox()];
+      return b && c ? Math.round(c.y - (b.y + b.height)) : undefined;
+    })
+    .toBe(4);
+});

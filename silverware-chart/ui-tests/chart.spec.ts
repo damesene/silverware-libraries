@@ -291,3 +291,22 @@ test("the settings show what the chart's type has: a pie no axes, its slices' co
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
 });
+
+test("a pie of a table of several columns draws one, not stale, the one picked on Series", async ({ page, open }) => {
+  await open(`# Sales\n\n${SALES}\n${block("sales", "120, 140")}\n`);
+  await expect.poll(() => charts(page)).toHaveLength(1);
+  await chartMenu(page);
+  await page.locator(".swc-menu-item", { hasText: "Type" }).click();
+  await page.locator(".swc-menu-tile", { hasText: /^Pie/ }).click();
+  await expect.poll(() => charts(page)).toEqual([{ type: "pie", labels: ["Oct", "Nov"], data: [[120, 140]] }]);
+  await expect(page.locator(".swc-stale")).toHaveCount(0);
+  const dialog = await chartSettings(page);
+  await dialog.locator(".swc-settings-tab", { hasText: "Series" }).click();
+  const cost = dialog.locator(".swc-settings-item", { hasText: "Cost" }).locator("input[type=radio]");
+  await cost.check();
+  await expect(dialog.locator(".swc-settings-item", { hasText: "Revenue" }).locator("input[type=radio]")).not.toBeChecked();
+  await dialog.locator(".swc-settings-save").click();
+  await expect.poll(() => charts(page)).toEqual([{ type: "pie", labels: ["Oct", "Nov"], data: [[80, 85]] }]);
+  await expect.poll(() => savedText(page)).toContain("%% chart.series: Cost");
+  await expect(page.locator(".swc-stale")).toHaveCount(0);
+});

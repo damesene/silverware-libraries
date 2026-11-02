@@ -214,17 +214,20 @@ export function commonSettings(palette: (i: number) => string): readonly Setting
     { key: "y.title", label: "Y axis title", tab: "Axes", control: "text", needs: "axes", get: (m) => m.y?.title ?? "", set: (m, v) => withAxis(m, "y", "title", text(v)) },
     { key: "y.min", label: "Y axis from", hint: "Empty: as the values need", tab: "Axes", control: "number", needs: "axes", get: (m) => m.y?.min, set: (m, v) => withAxis(m, "y", "min", number(v)) },
     { key: "y.max", label: "Y axis to", hint: "Empty: as the values need", tab: "Axes", control: "number", needs: "axes", get: (m) => m.y?.max, set: (m, v) => withAxis(m, "y", "max", number(v)) },
-    // Each column of the source's table: drawn or not first (the others apply to the series it is then)
-    {
-      key: "series.on",
-      label: "Drawn",
-      tab: "Series",
-      control: "switch",
-      each: "columns",
-      // (Any type's: a pie draws one column of its table, the one switched on)
-      get: (m, i, context) => seriesOf(m, columnName(context, i)) >= 0,
-      set: (m, i, v, context) => withColumnDrawn(m, columnName(context, i) ?? "", !!v, context, palette),
-    },
+    // Each column of the source's table: drawn or not first (the others apply to the series it is then);
+    // of a type of one series (a pie) the one drawn picked, in place of the other
+    ...(["switch", "radio"] as const).map(
+      (control): ItemSetting => ({
+        key: "series.on",
+        label: "Drawn",
+        tab: "Series",
+        control,
+        each: "columns",
+        when: (_m, context) => (context.type.seriesLimit === 1) === (control === "radio"),
+        get: (m, i, context) => seriesOf(m, columnName(context, i)) >= 0,
+        set: (m, i, v, context) => withColumnDrawn(m, columnName(context, i) ?? "", !!v, context, palette),
+      }),
+    ),
     color("columns"),
     name("columns"),
     kind("columns"),

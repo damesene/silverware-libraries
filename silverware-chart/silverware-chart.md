@@ -894,6 +894,11 @@ end
   flex: 1;
   min-width: 0;
 }
+.swc-settings-item input[type="radio"] {
+  flex: none;
+  margin: 0 8px;
+  accent-color: var(--ui-accent-color);
+}
 .swc-settings-row input[type="text"] {
   font: inherit;
   color: inherit;

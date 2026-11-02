@@ -125,7 +125,13 @@ describe("the settings dialog", () => {
     const dialog = document.querySelector<HTMLElement>(".swc-settings")!;
     const rows = [...dialog.querySelectorAll<HTMLElement>('[data-swc-panel="Series"] .swc-settings-item')];
     expect(rows.map((r) => r.querySelector(".swc-settings-item-name")!.textContent)).toEqual(["Month", "Revenue", "Cost"]);
-    rows[2]!.querySelector<HTMLInputElement>(".swc-settings-switch input")!.click();
+    // One of them picked: radios, Revenue's on
+    const radios = rows.map((r) => r.querySelector<HTMLInputElement>("input[type=radio]")!);
+    expect(radios.map((r) => r.checked)).toEqual([false, true, false]);
+    expect(rows[0]!.querySelector(".swc-settings-switch")).toBeNull();
+    radios[0]!.click();
+    radios[2]!.click();
+    expect(radios.map((r) => r.checked)).toEqual([false, false, true]);
     dialog.querySelector<HTMLButtonElement>(".swc-settings-save")!.click();
     await vi.waitFor(() => expect(save).toHaveBeenCalled());
     const after = save.mock.calls[0]![0](model);

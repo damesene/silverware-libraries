@@ -13,9 +13,10 @@ export type SettingValue = string | number | boolean | undefined | readonly Cond
 /**
  * How a setting is set: a switch, a text, a number, one of choices, a color,
  * a list of conditions (a column, an operator, a value each: its choices the
- * source's columns)
+ * source's columns), one item of all picked (a setting of each item: the
+ * item picked set true, the others as that leaves them)
  */
-export type SettingControl = "switch" | "text" | "number" | "choice" | "color" | "conditions";
+export type SettingControl = "switch" | "text" | "number" | "choice" | "color" | "conditions" | "radio";
 
 export type SettingChoice = { readonly value: string; readonly label: string };
 

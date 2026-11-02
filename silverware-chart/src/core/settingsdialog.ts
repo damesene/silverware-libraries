@@ -101,6 +101,15 @@ function control(doc: Document, setting: Setting, value: SettingValue, context: 
   switch (setting.control) {
     case "switch":
       return switchControl(doc, BASE, !!value, (on: boolean) => changed(on));
+    case "radio": {
+      // (One of a setting's items: its radios share a name, the dialog's alone)
+      const input = doc.createElement("input");
+      input.type = "radio";
+      input.name = `${BASE}-${setting.key}`;
+      input.checked = !!value;
+      input.addEventListener("change", () => input.checked && changed(true));
+      return input;
+    }
     case "choice": {
       const select = doc.createElement("select");
       for (const choice of choicesOf(setting, context, model)) select.append(new Option(choice.label, choice.value));
@@ -182,7 +191,8 @@ export function openSettings(doc: Document, options: SettingsDialogOptions): voi
   // The changes by setting and item, applied in the settings' order when saved
   const changes = new Map<Setting, Map<number, Change>>();
   const changed = (setting: Setting, index: number, change: Change) => {
-    const own = changes.get(setting) ?? new Map<number, Change>();
+    // (An item picked of all: the one picked last the change, not each picked before it)
+    const own = (setting.control !== "radio" && changes.get(setting)) || new Map<number, Change>();
     own.set(index, change);
     changes.set(setting, own);
   };

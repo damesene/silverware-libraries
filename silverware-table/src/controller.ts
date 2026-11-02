@@ -5,7 +5,7 @@ import { type Bridge, type FeatureName, formatRule, moduleOnByDefault, SETTINGS,
 import { type AdapterFeature, type AddressFrame, type AlsoChanged, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type TableHost, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
-import { withWriteListeners } from "./core/writelisteners.ts";
+import { mapPosition, type TextEdit, withWriteListeners } from "./core/writelisteners.ts";
 import { placeAtEnd, TableRows } from "./core/rows.ts";
 import { CellEditing } from "./core/editor.ts";
 import { InsertControls, type PointerAt } from "./core/insert.ts";
@@ -715,14 +715,16 @@ export class Controller implements TableHost {
       let written = text;
       for (const update of [...updates].sort((a, b) => b.from - a.from)) written = written.slice(0, update.from) + update.markdown + written.slice(update.to);
       // What other plugins write with it (silverware.table.onWrite), in the same edit
-      written = await withWriteListeners(written);
+      const listened = await withWriteListeners(written);
+      written = listened.text;
+      const moved = movedBy([updates.map((u): TextEdit => ({ from: u.from, to: u.to, text: u.markdown })), ...listened.edits]);
       const replace = minimalEdit(text, written);
       // The span the features see: the tables written, the deleted one's own (not the blank line after it: what is
       // placed after it, the history marker, would be in the next table)
       const spans = [{ from: range.from, to: range.to }, ...[...others.values()].map((o) => o.range)];
       const spanFrom = Math.min(...spans.map((s) => s.from));
       const spanTo = Math.max(...spans.map((s) => s.to));
-      const after: ((editFrom: number, lengthChange: number) => void)[] = [];
+      const after: ((editFrom: number, lengthChange: number, moved: (pos: number, after: boolean) => number) => void)[] = [];
       for (const feature of this.features) {
         const then = await feature.beforeWrite?.(text, spanFrom, spanTo, replace);
         if (then) after.push(then);
@@ -731,7 +733,7 @@ export class Controller implements TableHost {
       await this.bridge.replaceRange(replace.from, replace.to, replace.insert);
       this.pageText = written;
       for (const pending of held) pending.written();
-      for (const then of after) then(replace.from, written.length - text.length);
+      for (const then of after) then(replace.from, written.length - text.length, moved);
       return "written";
     } catch (e) {
       console.error("Silverware Table: could not delete the table", e);
@@ -2376,9 +2378,11 @@ export class Controller implements TableHost {
       let written = text;
       for (const update of [...updates].sort((a, b) => b.from - a.from)) written = written.slice(0, update.from) + update.text + written.slice(update.to);
       // What other plugins write with it (silverware.table.onWrite), in the same edit
-      written = await withWriteListeners(written);
+      const listened = await withWriteListeners(written);
+      written = listened.text;
+      const moved = movedBy([updates, ...listened.edits]);
       const replace = minimalEdit(text, written);
-      const thens: ((editFrom: number, lengthChange: number) => void)[] = [];
+      const thens: ((editFrom: number, lengthChange: number, moved: (pos: number, after: boolean) => number) => void)[] = [];
       // The span the features see: the tables written and the one it goes after (the history marker goes outside them)
       const spanFrom = Math.min(range ? range.from : at, ...(changed ? [changed.from] : []));
       const spanTo = Math.max(at, ...(changed ? [changed.to] : []));
@@ -2388,7 +2392,7 @@ export class Controller implements TableHost {
       }
       await this.bridge.replaceRange(replace.from, replace.to, replace.insert);
       this.pageText = written;
-      for (const then of thens) then(replace.from, written.length - text.length);
+      for (const then of thens) then(replace.from, written.length - text.length, moved);
       return "written";
     } catch (e) {
       console.error("Silverware Table: could not write the table", e);
@@ -2542,7 +2546,9 @@ export class Controller implements TableHost {
         written = written.slice(0, update.range.from) + update.markdown + written.slice(update.range.to);
       }
       // What other plugins write with it (silverware.table.onWrite), in the same edit, told what it did to the table
-      written = await withWriteListeners(written, [{ before, after: changed, markdown, columnMap }]);
+      const listened = await withWriteListeners(written, [{ before, after: changed, markdown, columnMap }]);
+      written = listened.text;
+      const moved = movedBy([updates.map((u): TextEdit => ({ from: u.range.from, to: u.range.to, text: u.markdown })), ...listened.edits]);
       const replace = minimalEdit(text, written);
       // The edit spans all the tables written: features see that span, so what
       // they place after it (the history marker) is outside every one of them.
@@ -2552,7 +2558,7 @@ export class Controller implements TableHost {
       const tableSpan = updates.slice(0, tablesWritten);
       const spanFrom = Math.min(...tableSpan.map((update) => update.range.from));
       const spanTo = Math.max(...tableSpan.map((update) => update.range.to));
-      const after: ((editFrom: number, lengthChange: number) => void)[] = [];
+      const after: ((editFrom: number, lengthChange: number, moved: (pos: number, after: boolean) => number) => void)[] = [];
       for (const feature of this.features) {
         const then = await feature.beforeWrite?.(text, spanFrom, spanTo, replace);
         if (then) after.push(then);
@@ -2560,14 +2566,15 @@ export class Controller implements TableHost {
       // (A table Silverware Table draws is its feature's to place, in a box whose scroll the write does not move)
       if (widget && !widget.classList.contains(DRAWN_CLASS)) this.anchor.set(widget, info.key);
       // Where the table is in the text written: moved by the tables before it written in the same edit
-      const at = range.from + updates.filter((u) => u.range.from < range.from).reduce((sum, u) => sum + u.markdown.length - (u.range.to - u.range.from), 0);
+      // (Moved by the tables before it written in the same edit, and by what other plugins wrote before it)
+      const at = moved(range.from, false);
       const last = this.writtenAs.get(info.key);
       const replaced = new Set(last?.source === range.text ? last.replaced : []).add(range.text);
       this.writtenAs.set(info.key, { source: markdown, hint: at, pins: metaPins(parseTable(markdown)), replaced });
       await this.bridge.replaceRange(replace.from, replace.to, replace.insert);
       this.pageText = written;
       for (const pending of held) pending.written();
-      for (const then of after) then(replace.from, written.length - text.length);
+      for (const then of after) then(replace.from, written.length - text.length, moved);
       this.sayTaken(taken);
       return "written";
     } catch (e) {
@@ -2911,4 +2918,9 @@ export class Controller implements TableHost {
   shownRect(widget: HTMLElement, info: WidgetInfo): Rect {
     return shownRect(widget, info);
   }
+}
+
+/** Where a place of the text read is in the text a write left: through the tables written, then each listener's edits */
+function movedBy(batches: readonly (readonly TextEdit[])[]): (pos: number, after: boolean) => number {
+  return (pos, after) => mapPosition(pos, after, batches);
 }

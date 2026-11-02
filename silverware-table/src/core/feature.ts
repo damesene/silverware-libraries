@@ -1087,14 +1087,16 @@ export interface Feature {
   /**
    * Before a write replaces a table (from..to of the page's text), with the
    * edit `change` (the part of the text it replaces); may return what to do
-   * after it, given where the change started and how much longer the text got
+   * after it, given where the change started, how much longer the text got,
+   * and where a place of the text before is in the text after (`moved`: the
+   * edit may change text apart from the table, other plugins' writes with it)
    */
   beforeWrite?(
     text: string,
     from: number,
     to: number,
     change: { readonly from: number; readonly to: number },
-  ): Promise<((editFrom: number, lengthChange: number) => void) | undefined>;
+  ): Promise<((editFrom: number, lengthChange: number, moved: (pos: number, after: boolean) => number) => void) | undefined>;
   /** Another page whose tables formulas refer to was changed: results may be out of date */
   tablesChanged?(): void;
   /** The page or a table scrolled, or tables moved: floating elements follow */

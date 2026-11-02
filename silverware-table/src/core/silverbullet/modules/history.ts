@@ -22,7 +22,7 @@ export class History implements AdapterFeature {
     from: number,
     to: number,
     change: { readonly from: number; readonly to: number },
-  ): Promise<((editFrom: number, lengthChange: number) => void) | undefined> {
+  ): Promise<((editFrom: number, lengthChange: number, moved: (pos: number, after: boolean) => number) => void) | undefined> {
     const { bridge } = this.host;
     if (!bridge.setSelection) return undefined;
     // Right after the table, else right before it; one the edit does not reach first
@@ -34,11 +34,12 @@ export class History implements AdapterFeature {
     // None it does not reach (a table at the page's start, a row added at its end): after the edit, after what it inserted
     const moveAfter = reached(marker);
     if (!moveAfter) this.remember(marker);
-    // Redo restores the cursor where the edit left it: the marker, moved by the edit
-    return (editFrom, lengthChange) => {
-      const moved = marker + (moveAfter || marker > editFrom ? lengthChange : 0);
-      if (moveAfter) void bridge.setSelection!(moved, moved);
-      this.remember(moved);
+    // Redo restores the cursor where the edit left it: the marker, moved by the edit (past what it inserted
+    // where it reached it), by its own parts only: other plugins' edits with it are elsewhere in the page
+    return (_editFrom, _lengthChange, moved) => {
+      const at = moved(marker, moveAfter);
+      if (moveAfter) void bridge.setSelection!(at, at);
+      this.remember(at);
     };
   }
 

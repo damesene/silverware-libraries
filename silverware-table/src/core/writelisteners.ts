@@ -112,13 +112,38 @@ function editOf(value: unknown): TextEdit | undefined {
 }
 
 /**
+ * Where a place of a text is once edits are made, edits after edits (each
+ * batch in the coordinates of the text the ones before it left): before an
+ * edit it stays, past it it moves by what it changed, in it it goes to its
+ * start, or with `after` past what it inserted
+ */
+export function mapPosition(pos: number, after: boolean, batches: readonly (readonly TextEdit[])[]): number {
+  let at = pos;
+  for (const batch of batches) {
+    let shift = 0;
+    for (const edit of [...batch].sort((a, b) => a.from - b.from)) {
+      if (at < edit.from || (at === edit.from && !after && edit.to > edit.from)) break;
+      if (at > edit.to || (at === edit.to && after)) shift += edit.text.length - (edit.to - edit.from);
+      else {
+        shift += (after ? edit.from + edit.text.length : edit.from) - at;
+        break;
+      }
+    }
+    at += shift;
+  }
+  return at;
+}
+
+/**
  * The text a write leaves with the listeners' edits in it: each told the
  * text as the tables were written (in turn, each seeing the edits of those
  * before it) and what the write did to them, its edits checked against that
- * text and its tables
+ * text and its tables; the edits made, a batch per listener, so places can be
+ * followed through them (`mapPosition`)
  */
-export async function withWriteListeners(written: string, tablesWritten: readonly TableWritten[] = []): Promise<string> {
+export async function withWriteListeners(written: string, tablesWritten: readonly TableWritten[] = []): Promise<{ text: string; edits: TextEdit[][] }> {
   let text = written;
+  const made: TextEdit[][] = [];
   const context = writeContext(tablesWritten, () => text);
   for (const listener of listeners) {
     let given: unknown;
@@ -145,6 +170,7 @@ export async function withWriteListeners(written: string, tablesWritten: readonl
       else edits.push(edit!);
     }
     for (const edit of [...edits].sort((a, b) => b.from - a.from)) text = text.slice(0, edit.from) + edit.text + text.slice(edit.to);
+    if (edits.length) made.push(edits);
   }
-  return text;
+  return { text, edits: made };
 }

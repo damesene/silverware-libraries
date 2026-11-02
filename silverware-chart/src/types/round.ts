@@ -34,6 +34,7 @@ export const PIE: ChartType = {
   icon: icon('<path d="M12 3v9h9"/><circle cx="12" cy="12" r="9"/>'),
   config: (model, theme) => roundConfig(model, theme, "pie"),
   capabilities: ["slices"],
+  seriesLimit: 1,
 };
 
 export const DOUGHNUT: ChartType = {
@@ -42,6 +43,7 @@ export const DOUGHNUT: ChartType = {
   icon: icon('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5"/>'),
   config: (model, theme) => roundConfig(model, theme, "doughnut"),
   capabilities: ["slices"],
+  seriesLimit: 1,
 };
 
 export const POLAR_AREA: ChartType = {
@@ -50,6 +52,7 @@ export const POLAR_AREA: ChartType = {
   icon: icon('<circle cx="12" cy="12" r="9"/><path d="M12 12l6-6M12 12l-4 7M12 12H4"/>'),
   config: (model, theme) => roundConfig(model, theme, "polarArea"),
   capabilities: ["slices"],
+  seriesLimit: 1,
 };
 
 export const RADAR: ChartType = {

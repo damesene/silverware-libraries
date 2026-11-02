@@ -57,13 +57,19 @@ function withColumnDrawn(model: ChartModel, column: string, on: boolean, context
   const source = model.source;
   if (!source || !context.columns) return model;
   const was = source.series;
-  const drawn = context.columns.map((c) => c.name).filter((name) => (same(name, column) ? on : was.some((s) => same(s, name))));
+  const all = context.columns.map((c) => c.name).filter((name) => (same(name, column) ? on : was.some((s) => same(s, name))));
+  // A type of fewer series (a pie): the column switched on in place of others, the first of them kept where there is room
+  const limit = context.type.seriesLimit ?? Infinity;
+  const kept = new Set([...(on ? all.filter((name) => same(name, column)) : []), ...all.filter((name) => !same(name, column))].slice(0, limit));
+  const drawn = all.filter((name) => kept.has(name));
   const old = (name: string) => was.findIndex((s) => same(s, name));
+  // (A type of slices colors them, not its series: its colors stay)
+  const seriesColors = (context.type.capabilities ?? []).includes("series");
   return {
     ...model,
     source: { ...source, series: drawn },
     series: drawn.map((name) => model.series[old(name)] ?? { name, values: [] }),
-    ...(model.colors ? { colors: drawn.map((name, i) => (old(name) >= 0 ? (model.colors?.[old(name)] ?? palette(i)) : palette(i))) } : {}),
+    ...(model.colors && seriesColors ? { colors: drawn.map((name, i) => (old(name) >= 0 ? (model.colors?.[old(name)] ?? palette(i)) : palette(i))) } : {}),
   };
 }
 
@@ -215,7 +221,7 @@ export function commonSettings(palette: (i: number) => string): readonly Setting
       tab: "Series",
       control: "switch",
       each: "columns",
-      needs: "series",
+      // (Any type's: a pie draws one column of its table, the one switched on)
       get: (m, i, context) => seriesOf(m, columnName(context, i)) >= 0,
       set: (m, i, v, context) => withColumnDrawn(m, columnName(context, i) ?? "", !!v, context, palette),
     },

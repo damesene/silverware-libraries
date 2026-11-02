@@ -213,6 +213,15 @@ describe("Stale and Update data", () => {
     expect(box?.querySelector(".swc-stale")).toBeNull();
     box!.remove();
   });
+
+  // A pie draws one series: of a table of several columns its first, and its block holds that one
+  it("is not marked on a pie of a table of several columns", async () => {
+    const table = SALES.replace("| Month | Revenue |\n|---|--:|", "| Month | Revenue | Costs |\n|---|--:|--:|").replace("| 120 |", "| 120 | 80 |").replace("| 140 |", "| 140 | 90 |");
+    const block = 'pie\n  "Oct" : 120\n  "Nov" : 140\n%% chart.source: above\n%% chart.x: month\n%% chart.series: revenue, costs';
+    const box = await controller(page(block, table)).render("mermaid", block, "Sales");
+    expect(box?.querySelector(".swc-stale")).toBeNull();
+    expect(dataOf()).toEqual([[120, 140]]);
+  });
 });
 
 describe("Silverware Table (the silverwareTable module)", () => {

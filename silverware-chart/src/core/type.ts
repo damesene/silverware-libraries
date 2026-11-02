@@ -30,6 +30,8 @@ export type ChartType = {
   readonly variants?: readonly { readonly label: string; readonly icon: string; readonly stacked?: boolean; readonly horizontal?: boolean }[];
   // What it has, which settings ask for (`needs`): series, slices, axes, stacked, horizontal, lines
   readonly capabilities?: readonly string[];
+  // How many series it draws (a pie one): of a source's columns the first so many; left out: any
+  readonly seriesLimit?: number;
   // How its series may be drawn among each other (its own kind first); left out: as it draws them
   readonly kinds?: readonly SeriesKind[];
   // Settings of its own, shown with the common ones

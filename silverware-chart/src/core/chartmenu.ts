@@ -55,12 +55,15 @@ const ICONS = {
  * series all drawn as the type draws them: a kind of their own (a line over
  * bars) would keep the chart as it was (Series sets one apart again)
  */
-function typed(model: ChartModel, type: string, flags: { stacked?: boolean; horizontal?: boolean }): ChartModel {
-  const { stacked: _stacked, horizontal: _horizontal, ...rest } = model;
+function typed(model: ChartModel, type: ChartType, flags: { stacked?: boolean; horizontal?: boolean }): ChartModel {
+  const { stacked: _stacked, horizontal: _horizontal, source, ...rest } = model;
+  // A type of fewer series (a pie): its first so many kept, of its source's columns those drawn as them
+  const limit = type.seriesLimit ?? Infinity;
   return {
     ...rest,
-    type,
-    series: model.series.map(({ kind: _kind, ...series }) => series),
+    type: type.name,
+    ...(source ? { source: source.series.length > limit ? { ...source, series: source.series.slice(0, limit) } : source } : {}),
+    series: model.series.slice(0, limit).map(({ kind: _kind, ...series }) => series),
     ...(flags.stacked ? { stacked: true } : {}),
     ...(flags.horizontal ? { horizontal: true } : {}),
   };
@@ -76,7 +79,7 @@ function typeView(host: ChartMenuHost, entry: Drawn): MenuView {
         label: variant.label,
         icon: variant.icon,
         checked: model.type === type.name && !!model.stacked === !!flags.stacked && !!model.horizontal === !!flags.horizontal,
-        run: () => host.rewrite(entry, (m) => typed(m, type.name, flags)),
+        run: () => host.rewrite(entry, (m) => typed(m, type, flags)),
       };
     }),
   );

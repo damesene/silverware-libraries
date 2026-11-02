@@ -117,6 +117,23 @@ describe("the settings dialog", () => {
     ]);
   });
 
+  it("lets a pie of a table pick the column it draws: the one switched on in place of the other", async () => {
+    const model: ChartModel = { type: "pie", labels: ["Oct", "Nov"], series: [{ values: [1, 2] }], colors: ["#aa0000", "#00aa00"], source: { table: "above", x: "Month", series: ["Revenue"] } };
+    const columns = [{ name: "Month", numeric: false }, { name: "Revenue", numeric: true }, { name: "Cost", numeric: true }];
+    const save = vi.fn(async (_change: (model: ChartModel) => ChartModel) => {});
+    openSettings(document, { model, type: PIE, format: MERMAID_FORMAT, settings: SETTINGS, columns, save });
+    const dialog = document.querySelector<HTMLElement>(".swc-settings")!;
+    const rows = [...dialog.querySelectorAll<HTMLElement>('[data-swc-panel="Series"] .swc-settings-item')];
+    expect(rows.map((r) => r.querySelector(".swc-settings-item-name")!.textContent)).toEqual(["Month", "Revenue", "Cost"]);
+    rows[2]!.querySelector<HTMLInputElement>(".swc-settings-switch input")!.click();
+    dialog.querySelector<HTMLButtonElement>(".swc-settings-save")!.click();
+    await vi.waitFor(() => expect(save).toHaveBeenCalled());
+    const after = save.mock.calls[0]![0](model);
+    expect(after.source?.series).toEqual(["Cost"]);
+    // The slices' colors kept
+    expect(after.colors).toEqual(["#aa0000", "#00aa00"]);
+  });
+
   it("shows, not offers, what the block's format cannot write", () => {
     const { dialog } = open(BARS, BAR, { ...MERMAID_FORMAT, label: "Plain", supports: (key) => key !== "stacked" });
     const row = [...dialog.querySelectorAll(".swc-settings-row")].find((r) => r.textContent?.includes("Stacked"))!;

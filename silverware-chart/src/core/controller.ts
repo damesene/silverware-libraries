@@ -330,7 +330,9 @@ export class Controller {
 
   /** The chart marked Stale where its block's data are not its source's, with Update data; unmarked where they are */
   private markStale(entry: Drawn, data: SourceData | undefined): void {
-    const stale = !!data && !sameData(entry.model, data);
+    // (Not where its format would write the block as it is: data it cannot hold, a label it writes otherwise)
+    const read = data && !sameData(entry.model, data) ? this.read(entry.language, entry.body) : undefined;
+    const stale = !!read && !isUnreadable(read.model) && read.format.write(withData(read.model, data!), entry.body) !== entry.body;
     let mark = entry.box.querySelector<HTMLButtonElement>(".swc-stale");
     if (!stale) {
       mark?.remove();
@@ -583,9 +585,15 @@ export class Controller {
       } catch (e) {
         data = { problem: e instanceof Error ? e.message : String(e) };
       }
-      if (data) return data;
+      if (data) return isUnreadable(data) ? data : this.drawable(model, data);
     }
     return undefined;
+  }
+
+  /** A source's data as the chart's type draws them: as many series as it has (a pie one), so its block can hold them all */
+  private drawable(model: ChartModel, data: SourceData): SourceData {
+    const limit = this.types().find((t) => t.name === model.type)?.seriesLimit;
+    return limit === undefined || data.series.length <= limit ? data : { ...data, series: data.series.slice(0, limit) };
   }
 
   /** What shows where a chart cannot be drawn: why, and the sources it could have instead (`choices`), a click writing one into its block */

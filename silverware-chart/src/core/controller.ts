@@ -469,6 +469,11 @@ export class Controller {
       }
       return { text, block, model: read.model, format: read.format };
     };
+    // A located block written with a model, where that changes it
+    const write = async (at: NonNullable<Awaited<ReturnType<typeof located>>>, model: ChartModel) => {
+      const written = at.format.write(model, at.block.body);
+      if (written !== at.block.body) await this.env.replaceRange?.(at.block.bodyFrom, at.block.bodyTo, written);
+    };
     return {
       doc: this.doc,
       types: () => this.types(),
@@ -494,8 +499,7 @@ export class Controller {
             const model = change(now.model);
             // With a source, its data as the settings now read it (other columns, rows, conditions)
             const data = model.source ? await this.sourceData(model, entry.page, now.text, now.block) : undefined;
-            const written = now.format.write(data && !isUnreadable(data) ? withData(model, data) : model, now.block.body);
-            if (written !== now.block.body) await this.env.replaceRange?.(now.block.bodyFrom, now.block.bodyTo, written);
+            await write(now, data && !isUnreadable(data) ? withData(model, data) : model);
           },
         });
       },
@@ -507,9 +511,7 @@ export class Controller {
               type: this.types().find((t) => t.name === entry.model.type),
               rewrite: async (change) => {
                 const at = await located(entry);
-                if (!at) return;
-                const written = at.format.write(change(at.model), at.block.body);
-                if (written !== at.block.body) await this.env.replaceRange?.(at.block.bodyFrom, at.block.bodyTo, written);
+                if (at) await write(at, change(at.model));
               },
             }) ?? [],
         ),
@@ -519,9 +521,7 @@ export class Controller {
       },
       rewrite: async (entry, change) => {
         const at = await located(entry);
-        if (!at) return;
-        const written = at.format.write(change(at.model), at.block.body);
-        if (written !== at.block.body) await this.env.replaceRange?.(at.block.bodyFrom, at.block.bodyTo, written);
+        if (at) await write(at, change(at.model));
       },
       pick: async (entry, source) => {
         const at = await located(entry);

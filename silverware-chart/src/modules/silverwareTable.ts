@@ -10,7 +10,7 @@
 import type { Block } from "../core/blocks.ts";
 import type { Source, Unreadable } from "../core/model.ts";
 import type { ChartModule, ModuleHost, SourceContext, SourceData, TableApi, WriteContext } from "../core/module.ts";
-import { dataOf, pageOf, plainNumberOf, tableByPlace } from "../sources/markdown.ts";
+import { columnsOf, dataOf, pageOf, tableByPlace } from "../sources/markdown.ts";
 
 // A table's name as Silverware Table allows it: what is not a place (above, below) nor a heading
 const NAME_RE = /^[A-Za-z_][\w.-]*$/;
@@ -25,12 +25,6 @@ async function read(host: ModuleHost, table: TableApi, source: Source, context: 
   const found = (await table.tables(text)).find((t) => t.name?.toLowerCase() === rest.toLowerCase());
   if (!found) return { problem: `no table named ${rest}${page ? ` on ${page}` : ""} (named in Silverware Table's ⋯ menu)` };
   return dataOf(found, source, `the table ${source.table}`);
-}
-
-/** Whether a column's cells are numbers (most of those not empty) */
-function numeric(cells: readonly string[]): boolean {
-  const filled = cells.filter((cell) => cell !== "");
-  return filled.length > 0 && filled.filter((cell) => plainNumberOf(cell) !== null).length * 2 > filled.length;
 }
 
 /**
@@ -56,8 +50,21 @@ function followed(context: WriteContext, source: Source, block: Block, text: str
 }
 
 export function silverwareTableModule(host: ModuleHost): ChartModule {
-  const table = host.table;
-  if (!table) return {};
+  const api = host.table;
+  if (!api) return {};
+  // The tables of the text read last, once for all its charts (each reads them as the page is followed)
+  let last: { text: string; tables: ReturnType<TableApi["tables"]> } | undefined;
+  const table: TableApi = {
+    ...api,
+    tables: (text) => {
+      if (last?.text !== text) {
+        const tables = api.tables(text);
+        last = { text, tables };
+        tables.catch(() => last?.tables === tables && (last = undefined));
+      }
+      return last.tables;
+    },
+  };
   // (Most writes rename nothing: the references are looked at only where one did)
   table.onWrite((text, context) => host.dataEdits(text, context.renamed() ? (source, block, at) => followed(context, source, block, at) : undefined));
   return {
@@ -69,7 +76,7 @@ export function silverwareTableModule(host: ModuleHost): ChartModule {
         candidates: async (context) =>
           (await table.tables(context.text)).flatMap((t) =>
             t.name
-              ? [{ label: `${t.name} (${t.columns.map((c) => c.name).join(", ")})`, table: t.name, at: t.from, columns: t.columns.map((c, i) => ({ name: c.name, numeric: numeric(t.rows.map((row) => row[i] ?? "")) })) }]
+              ? [{ label: `${t.name} (${t.columns.map((c) => c.name).join(", ")})`, table: t.name, at: t.from, columns: columnsOf(t) }]
               : [],
           ),
       },

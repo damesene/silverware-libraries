@@ -7,7 +7,7 @@
 //   own numbers, the chart put at the cursor.
 // Bars of the table's columns of numbers over its first other column.
 import { isUnreadable, type ChartModel, type Source } from "../core/model.ts";
-import type { Candidate, ChartModule, ModuleHost } from "../core/module.ts";
+import { type Candidate, type ChartModule, type ModuleHost, sourceOfColumns } from "../core/module.ts";
 import { columnsOf, headingsOf, tablesOf } from "../sources/markdown.ts";
 
 export const INSERT_COMMAND = "Silverware Chart: Insert chart";
@@ -15,11 +15,9 @@ export const SLASH_COMMAND = "chart";
 
 const EXAMPLE: ChartModel = { type: "bar", title: "Example", labels: ["A", "B", "C"], series: [{ name: "Values", values: [3, 5, 2] }] };
 
-/** A table's columns as a source: its first other column the labels, its columns of numbers the values */
+/** A table's columns as the chart's source, where it has a column of numbers to draw */
 function sourceOf(table: string, columns: Candidate["columns"]): Source | undefined {
-  const x = columns.find((c) => !c.numeric)?.name;
-  const series = columns.filter((c) => c.numeric && c.name !== x).map((c) => c.name);
-  return series.length ? { table, ...(x ? { x } : {}), series } : undefined;
+  return columns.some((c) => c.numeric) ? sourceOfColumns(table, columns) : undefined;
 }
 
 /** A chart's block written into the page at `at`, apart from what is around it by a blank line */

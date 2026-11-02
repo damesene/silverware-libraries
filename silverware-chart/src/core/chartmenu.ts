@@ -6,7 +6,7 @@
 import type { Drawn } from "./drawn.ts";
 import type { ChartFormat } from "./format.ts";
 import type { ChartModel, Source } from "./model.ts";
-import { type Candidate, MENU_GROUPS, type MenuEntry } from "./module.ts";
+import { type Candidate, MENU_GROUPS, type MenuEntry, sourceOfColumns } from "./module.ts";
 import type { MenuItem, MenuView } from "./toolbar.ts";
 import type { ChartType } from "./type.ts";
 
@@ -86,13 +86,6 @@ function typeView(host: ChartMenuHost, entry: Drawn): MenuView {
   return { title: "Type", items, tiles: true };
 }
 
-/** A table's columns as a source: its first other column the labels, its columns of numbers the values (all of them where it has no such) */
-function sourceOf(candidate: Candidate): Source {
-  const x = candidate.columns.find((c) => !c.numeric)?.name;
-  const numbers = candidate.columns.filter((c) => c.numeric && c.name !== x).map((c) => c.name);
-  return { table: candidate.table, ...(x ? { x } : {}), series: numbers.length ? numbers : candidate.columns.filter((c) => c.name !== x).map((c) => c.name) };
-}
-
 /** The tables the page offers, the current one marked; read as the view opens */
 function dataView(host: ChartMenuHost, entry: Drawn): MenuView {
   return {
@@ -117,7 +110,7 @@ function dataView(host: ChartMenuHost, entry: Drawn): MenuView {
           button.addEventListener("click", () => {
             menu.close();
             void (async () => {
-              const chart = entry.model.source?.table === candidate.table ? entry : await host.pick(entry, sourceOf(candidate));
+              const chart = entry.model.source?.table === candidate.table ? entry : await host.pick(entry, sourceOfColumns(candidate.table, candidate.columns));
               if (chart) await host.settings(chart, "Data");
             })();
           });

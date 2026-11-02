@@ -32,6 +32,17 @@ export type Candidate = {
   readonly columns: readonly { readonly name: string; readonly numeric: boolean }[];
 };
 
+/**
+ * A table's columns as a chart's source: its first column of no numbers the
+ * labels, its other columns of numbers the values (where it has none: all its
+ * other columns); what Data, Insert chart and /chart draw a table picked as
+ */
+export function sourceOfColumns(table: string, columns: Candidate["columns"]): Source {
+  const x = columns.find((c) => !c.numeric)?.name;
+  const numbers = columns.filter((c) => c.numeric && c.name !== x).map((c) => c.name);
+  return { table, ...(x ? { x } : {}), series: numbers.length ? numbers : columns.filter((c) => c.name !== x).map((c) => c.name) };
+}
+
 /** Where a chart's data come from instead of its block (a table) */
 export type ChartSource = {
   readonly id: string;

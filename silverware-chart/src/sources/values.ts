@@ -6,9 +6,13 @@ export function numberOf(text: string): number | null {
   if (text.trim() !== "" && Number.isFinite(plain)) return plain;
   let digits = text.replace(/[^\d.,-]/g, "");
   if (!/\d/.test(digits)) return null;
-  // A comma alone the decimal one, as written in much of Europe
-  if (digits.includes(",") && !digits.includes(".")) digits = digits.replace(",", ".");
-  const n = Number(digits.replace(/,/g, ""));
+  // The decimal separator: of both, the last (1,234.5 and 1.234,5); of one, where it is there once (a comma
+  // alone too, as written in much of Europe and as Silverware Table reads it: 12,5); repeated, it groups thousands
+  const last = Math.max(digits.lastIndexOf(","), digits.lastIndexOf("."));
+  const both = digits.includes(",") && digits.includes(".");
+  const once = last >= 0 && digits.split(digits[last]!).length === 2;
+  const whole = (both || once ? digits.slice(0, last) : digits).replace(/[.,]/g, "");
+  const n = Number(both || once ? `${whole}.${digits.slice(last + 1)}` : whole);
   return Number.isFinite(n) ? n : null;
 }
 

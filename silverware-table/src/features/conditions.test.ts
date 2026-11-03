@@ -123,6 +123,25 @@ describe("Conditional formatting", () => {
     expect(text).toBe(TABLE);
   });
 
+  it("opens the table's rules from the cell menu where it has some, a first rule for the cell's column where it has none", async () => {
+    const rightClick = (target: Element) => target.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 }));
+    await setup(TABLE + META('[{"format":"dataBar"}]'), { "silverware.table.metadata": true });
+    await flush();
+    rightClick(at(2, 1));
+    item("Conditional formatting…")!.click();
+    expect(dialog()!.querySelectorAll(".swt-cf-line")).toHaveLength(1);
+    expect(dialog()!.querySelector(".swt-cf-editor")).toBeNull();
+    Array.from(dialog()!.querySelectorAll<HTMLButtonElement>("button")).find((b) => b.textContent === "Cancel")!.click();
+    controller.stop();
+    document.body.replaceChildren();
+    await setup(TABLE, { "silverware.table.metadata": true });
+    await flush();
+    rightClick(at(2, 1));
+    item("Conditional formatting…")!.click();
+    expect(dialog()!.querySelectorAll(".swt-cf-line")).toHaveLength(1);
+    expect(dialog()!.querySelector<HTMLSelectElement>('select[aria-label="Applies to"]')!.selectedOptions[0]!.textContent).toBe("Column Score");
+  });
+
   it("clears a column's rules from its menu", async () => {
     await setup(TABLE + META('[{"format":"dataBar"}]'), { "silverware.table.metadata": true });
     await flush();

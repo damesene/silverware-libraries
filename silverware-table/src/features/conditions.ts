@@ -335,7 +335,8 @@ export class Conditions implements Feature {
           kind: "item",
           label: "Conditional formatting…",
           icon: ICONS.conditions,
-          run: () => this.openDialog(info, { scope, when: { name: "greater", params: {} }, format: { name: "redFill", params: {} } }),
+          // A table with rules: they are shown (a rule is added in the dialog); without: a first one for the cells' column
+          run: () => (this.rulesIn(table).length ? this.openDialog(info) : this.openDialog(info, { scope, when: { name: "greater", params: {} }, format: { name: "redFill", params: {} } })),
           ...(this.canStore(table) ? {} : { disabled: NEEDS_METADATA }),
         },
       ],

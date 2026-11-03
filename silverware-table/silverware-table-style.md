@@ -3776,6 +3776,9 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
 /* The rules' dialog */
 .swt-cf-dialog {
   width: min(820px, calc(100vw - 24px));
+  /* A height of its own where the window has room: a rule opened or closed does not move the dialog's foot */
+  min-height: min(560px, calc(100vh - 32px));
+  min-height: min(560px, calc(var(--sw-view-height, 100dvh) - 32px));
 }
 .swt-cf-list {
   display: flex;

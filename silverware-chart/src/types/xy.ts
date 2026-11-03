@@ -91,7 +91,8 @@ export const SCATTER: ChartType = {
   name: "scatter",
   label: "Scatter",
   icon: icon('<circle cx="7" cy="15" r="1.5"/><circle cx="11" cy="9" r="1.5"/><circle cx="16" cy="13" r="1.5"/><circle cx="19" cy="6" r="1.5"/>'),
-  capabilities: ["series", "axes"],
+  // (xRange: numbers on its x axis, so a range of it)
+  capabilities: ["series", "axes", "xRange"],
   // The labels as numbers on the x axis, each series' values the points' y
   config: (model, theme) => {
     const xs = model.labels.map(Number);

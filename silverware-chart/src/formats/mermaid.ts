@@ -81,6 +81,19 @@ function rowsOf(text: string): RowsTaken | undefined {
   return m ? { from: group(m, 1).toLowerCase() as RowsTaken["from"], count: Number(group(m, 2)) } : undefined;
 }
 
+/** An axis' end as a comment says it: a number, else none */
+function endOf(text: string | undefined): number | undefined {
+  return text !== undefined && /^\s*-?\d+(\.\d+)?\s*$/.test(text) ? Number(text) : undefined;
+}
+
+/** An axis with the ends the comments say (`chart.yFrom` / `chart.yTo`): where Mermaid's line could not say them */
+function withEnds(axis: Axis | undefined, from: string | undefined, to: string | undefined): Axis | undefined {
+  const min = endOf(from);
+  const max = endOf(to);
+  if (min === undefined && max === undefined) return axis;
+  return { ...axis, ...(min !== undefined ? { min } : {}), ...(max !== undefined ? { max } : {}) };
+}
+
 /** Our keys read into the model's fields (`where` a line each), the keys it has no field for kept */
 function metaOf(meta: ReadonlyMap<string, string>, wheres: readonly string[] = []): Partial<ChartModel> {
   const out: { -readonly [K in keyof ChartModel]?: ChartModel[K] } = {};
@@ -113,6 +126,13 @@ function metaOf(meta: ReadonlyMap<string, string>, wheres: readonly string[] = [
         break;
       case "rows":
         if (!rowsOf(value)) extra[key] = value;
+        break;
+      // An axis' end Mermaid cannot say (its range only with both ends): read with the axes, a value no number kept as written
+      case "xFrom":
+      case "xTo":
+      case "yFrom":
+      case "yTo":
+        if (endOf(value) === undefined) extra[key] = value;
         break;
       default:
         extra[key] = value;
@@ -169,6 +189,8 @@ export function readMermaid(text: string): ChartModel | Unreadable | undefined {
         series.push({ ...(name ? { name } : {}), kind: group(m, 1) as "bar" | "line", values: listItems(group(list, 1)).map(numberOf) });
       }
     }
+    x = withEnds(x, meta.get("xFrom"), meta.get("xTo"));
+    y = withEnds(y, meta.get("yFrom"), meta.get("yTo"));
     const kinds = new Set(series.map((s) => s.kind));
     const type = own.type ?? (kinds.has("bar") || kinds.size === 0 ? "bar" : "line");
     // A series' own kind: what chart.kinds says (what Mermaid has no word for), else what its bar or line says
@@ -239,6 +261,12 @@ export function writeMermaid(model: ChartModel, previous?: string): string {
     // Mermaid's y axis takes a range only with both ends
     const yRange = model.y?.min !== undefined && model.y?.max !== undefined ? ` ${model.y.min} --> ${model.y.max}` : "";
     if (model.y?.title || yRange) lines.push(`  y-axis${model.y?.title ? ` ${quote(model.y.title)}` : ""}${yRange}`);
+    // What Mermaid cannot say of a range, in our comments: one end alone (Mermaid's syntax error else), an x range beside the labels
+    if (!yRange && model.y?.min !== undefined) meta.push(["yFrom", String(model.y.min)]);
+    if (!yRange && model.y?.max !== undefined) meta.push(["yTo", String(model.y.max)]);
+    const xNative = model.x?.min !== undefined && model.x?.max !== undefined && !model.labels.length;
+    if (!xNative && model.x?.min !== undefined) meta.push(["xFrom", String(model.x.min)]);
+    if (!xNative && model.x?.max !== undefined) meta.push(["xTo", String(model.x.max)]);
     // A series as Mermaid draws it: bars, else a line (an area, points, steps: a line there, its kind in chart.kinds)
     const base = baseKind(model.type) ?? "line";
     const kindOf = (series: Series) => series.kind ?? base;

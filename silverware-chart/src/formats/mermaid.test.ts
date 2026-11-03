@@ -114,4 +114,27 @@ describe("writeMermaid", () => {
     expect(written.endsWith("%% chart.type: area\n%% a note")).toBe(true);
   });
 
+  it("writes an axis' range in Mermaid's y-axis with both ends, one end alone in a comment (a syntax error there), read back so", () => {
+    const bars: ChartModel = { type: "bar", labels: ["a"], series: [{ values: [1] }] };
+    const both = writeMermaid({ ...bars, y: { title: "EUR", min: 0, max: 200 } });
+    expect(both).toContain('  y-axis "EUR" 0 --> 200');
+    expect(both).not.toContain("chart.y");
+    const from = writeMermaid({ ...bars, y: { title: "EUR", min: 0 } });
+    expect(from).toContain('  y-axis "EUR"\n');
+    expect(from).toContain("%% chart.yFrom: 0");
+    expect((readMermaid(from) as ChartModel).y).toEqual({ title: "EUR", min: 0 });
+    const to = writeMermaid({ ...bars, y: { max: 50 } });
+    expect(to).not.toContain("y-axis");
+    expect((readMermaid(to) as ChartModel).y).toEqual({ max: 50 });
+  });
+
+  it("writes a scatter's x range in comments (its x axis has the labels in Mermaid), read back so; an end no number kept as written", () => {
+    const scatter: ChartModel = { type: "scatter", labels: ["1", "4"], series: [{ values: [2, 3] }], x: { min: 0, max: 10 } };
+    const written = writeMermaid(scatter);
+    expect(written).toContain("%% chart.xFrom: 0\n%% chart.xTo: 10");
+    expect((readMermaid(written) as ChartModel).x).toEqual({ min: 0, max: 10 });
+    const odd = readMermaid(`${EXAMPLE}\n%% chart.yFrom: zero`) as ChartModel;
+    expect(odd.y).toEqual({ title: "Seconds", min: 0, max: 198.2 });
+    expect(odd.extra).toEqual({ yFrom: "zero" });
+  });
 });

@@ -53,6 +53,8 @@ xychart-beta
 | `colors` | The series' colors (a pie's slices'), comma separated: `#4e79a7, #f28e2b` |
 | `legend` | Where the legend is: `top`, `bottom`, `left`, `right`, or `none` |
 | `height` | The chart's height: `400px`, `20em` |
+| `yFrom`, `yTo` | One end of the y axis alone: `%% chart.yFrom: 0` starts it at 0. Both ends go where Mermaid has them, `y-axis "EUR" 0 --> 200`; Mermaid takes no range with one end (it would be its syntax error) |
+| `xFrom`, `xTo` | The x axis' range of a scatter chart (its x axis has numbers; Mermaid's has the labels there) |
 | `source`, `labels`, `series` | The data from a table: see below |
 | `where`, `rows` | Only some of the table's rows: see below |
 
@@ -100,7 +102,7 @@ xychart-beta
 Point at a chart and a small toolbar shows above its top right corner; its **⋯** opens the chart's menu:
 
 * **Type**: every type of chart as a gallery (bars, stacked bars, horizontal bars, lines, areas, stacked areas, scatter, pie, doughnut, polar area, radar); click one and the chart is written so, every series drawn that way.
-* **Settings…**: the chart's settings in a dialog, on tabs, each shown where the chart's type has it: *General* (title, height, legend, stacked, horizontal, smooth lines), *Data* for a chart of a table (the column of the labels; all rows, or the first or last so many; only the rows where conditions hold), *Axes* (the axes' titles, the y axis' range), *Series* (each series' color, name and how it is drawn among the others: *Bars*, *Line*, *Area*, *Points* or *Steps*; for a chart of a table every column of it, each switched on or off), *Slices* for a pie (each slice's color). Nothing is written until *Save*, then in one edit. Mermaid knows bars and lines (`bar "…" [ ]`, `line "…" [ ]`): an area, points and steps are a `line` there, their kinds said in `chart.kinds`.
+* **Settings…**: the chart's settings in a dialog, on tabs, each shown where the chart's type has it: *General* (title, height, legend, stacked, horizontal, smooth lines), *Data* for a chart of a table (the column of the labels; all rows, or the first or last so many; only the rows where conditions hold), *Axes* (the axes' titles, the y axis' range, a scatter's x axis' range), *Series* (each series' color, name and how it is drawn among the others: *Bars*, *Line*, *Area*, *Points* or *Steps*; for a chart of a table every column of it, each switched on or off), *Slices* for a pie (each slice's color). Nothing is written until *Save*, then in one edit. Mermaid knows bars and lines (`bar "…" [ ]`, `line "…" [ ]`): an area, points and steps are a `line` there, their kinds said in `chart.kinds`.
 * **Data**: the tables of the page the chart can draw (the table above it, below it, each first table under a heading, and with Silverware Table those you named). Pick one and the chart draws it at once (its first text column the labels, its columns of numbers the values), the settings opening at *Data* to change that. *No table* goes back to the block's own numbers.
 * **Edit source**: the block's markdown, to edit it by hand.
 * **Copy source**: the block's markdown on your clipboard.

@@ -212,6 +212,8 @@ export function commonSettings(palette: (i: number) => string): readonly Setting
     },
     { key: "x.title", label: "X axis title", tab: "Axes", control: "text", needs: "axes", get: (m) => m.x?.title ?? "", set: (m, v) => withAxis(m, "x", "title", text(v)) },
     { key: "y.title", label: "Y axis title", tab: "Axes", control: "text", needs: "axes", get: (m) => m.y?.title ?? "", set: (m, v) => withAxis(m, "y", "title", text(v)) },
+    { key: "x.min", label: "X axis from", hint: "Empty: as the values need", tab: "Axes", control: "number", needs: "xRange", get: (m) => m.x?.min, set: (m, v) => withAxis(m, "x", "min", number(v)) },
+    { key: "x.max", label: "X axis to", hint: "Empty: as the values need", tab: "Axes", control: "number", needs: "xRange", get: (m) => m.x?.max, set: (m, v) => withAxis(m, "x", "max", number(v)) },
     { key: "y.min", label: "Y axis from", hint: "Empty: as the values need", tab: "Axes", control: "number", needs: "axes", get: (m) => m.y?.min, set: (m, v) => withAxis(m, "y", "min", number(v)) },
     { key: "y.max", label: "Y axis to", hint: "Empty: as the values need", tab: "Axes", control: "number", needs: "axes", get: (m) => m.y?.max, set: (m, v) => withAxis(m, "y", "max", number(v)) },
     // Each column of the source's table: drawn or not first (the others apply to the series it is then);

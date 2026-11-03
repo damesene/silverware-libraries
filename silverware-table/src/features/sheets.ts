@@ -16,7 +16,7 @@
 // tables' places (`at`) as sheet/layout.ts has them (refusesWrite where it
 // cannot).
 import type { Feature, ModelHost, TableInfo, ToolbarButton, WriteEdit } from "../core/feature.ts";
-import { locateBySource, type PageTable, parseTable, type Table } from "../markdown.ts";
+import { locateBySource, type PageTable, pageTablesOf, parseTable, type Table } from "../markdown.ts";
 import { type Room, roomFor } from "../sheet/layout.ts";
 import {
   AT_KEY,
@@ -152,7 +152,7 @@ export class Sheets implements Feature {
 
   /** A table of a sheet that would grow into another it overlaps already (sheet/layout.ts): not written */
   refusesWrite(before: Table, after: Table, edit: WriteEdit): string | undefined {
-    const room = roomOnSheet(this.host, before, after, edit);
+    const room = roomOnSheet(this.host, before, after, edit, edit.page.from);
     return room && "refused" in room ? `the table cannot grow into ${room.refused}, which overlaps it on the sheet already: check their places (at)` : undefined;
   }
 
@@ -172,8 +172,16 @@ export class Sheets implements Feature {
       change(move.from, (t) => move.data.reduce((out, [name]) => this.host.setMeta(out, name, undefined), t));
       change(move.to, (t) => move.data.reduce((out, [name, value]) => this.host.setMeta(out, name, value), t));
     }
-    const room = after && roomOnSheet(this.host, before, after, edit);
+    const room = after && roomOnSheet(this.host, before, after, edit, edit.page.from);
     if (room && "moved" in room) for (const [from, at] of room.moved) change(from, (t) => this.host.setMeta(t, AT_KEY, formatAt(at)));
+    // Other tables of a sheet the write grows (another module's in the same edit: a pivot of the table edited) make room too
+    const read = new Map(pageTablesOf(edit.page.text).map((t) => [t.range.from, t.table]));
+    for (const other of edit.page.tables) {
+      const was = read.get(other.range.from);
+      if (other.range.from === edit.page.from || !was || was === other.table) continue;
+      const grown = roomOnSheet(this.host, was, other.table, { ...edit, claims: undefined }, other.range.from);
+      if (grown && "moved" in grown) for (const [from, at] of grown.moved) change(from, (t) => this.host.setMeta(t, AT_KEY, formatAt(at)));
+    }
     return [...written.values()];
   }
 }
@@ -182,8 +190,7 @@ export class Sheets implements Feature {
  * The room a table of a sheet that grows in the write makes on it (it stays
  * on its sheet, at its place); undefined: it is on none, or does not grow there
  */
-function roomOnSheet(meta: SheetMeta, before: Table, after: Table, edit: WriteEdit): Room | undefined {
-  const at = edit.page.from;
+function roomOnSheet(meta: SheetMeta, before: Table, after: Table, edit: WriteEdit, at: number): Room | undefined {
   const tables = sheetTablesOf(meta, edit.page.tables.map((t) => (t.range.from === at ? { range: t.range, table: before } : t)));
   const mine = tables.find((t) => t.range.from === at);
   // After the write still on its sheet, at its place

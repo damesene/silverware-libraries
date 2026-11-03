@@ -74,6 +74,17 @@ describe("Pivot tables", () => {
     expect(cellMenuItem(cell(1, 1), /^Cut$/)).toBeDefined();
   });
 
+  it("on a sheet, grown by an edit of its source, moves the table under it as a table grown by hand does", async () => {
+    const onSheet = PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |").replace("pivot.source=", "sheet.name='S' sheet.at='A1' pivot.source=");
+    const under = "| Note |\n|---|\n| x |\n| <meta core.table sheet.name='S' sheet.at='A6'> |";
+    await setup(`${ORDERS}\n\n${onSheet}\n\n${under}\n`, { "silverware.table.editor.enterKey": "save", "silverware.table.metadata": true });
+    clickOn(cell(1, 0));
+    await type("North");
+    // A row more (North): the table under it one row lower
+    expect(text).toContain("| North | 100 |");
+    expect(text).toContain("sheet.at='A7'");
+  });
+
   it("follows its source's new name", async () => {
     await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
     const info = controller.shownTables()[0]!;

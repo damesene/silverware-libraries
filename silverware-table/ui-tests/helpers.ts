@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { LONG_PRESS_MS } from "../src/core/press.ts";
 
@@ -90,6 +91,7 @@ export const test = base.extend({
     let failed = false;
     try {
       if (target === "silverbullet") {
+        await watchReloads(page);
         await writePage(name, sample);
         // There before `setSettings` writes it: SilverBullet reads a page before writing it, a missing one a 404 in the console
         await writePage(SETTINGS_PAGE, "");
@@ -112,6 +114,7 @@ export const test = base.extend({
         await page.close();
         await rm(join(server().space, `${name}.md`), { force: true });
         await rm(join(server().space, `${SETTINGS_PAGE}.md`), { force: true });
+        for (const other of otherPagesOf.get(page) ?? []) await rm(join(server().space, `${other}.md`), { force: true });
       }
     }
   },
@@ -129,7 +132,7 @@ async function ready(page: Page): Promise<void> {
   if (target === "silverbullet") {
     await expect(page.locator("#sb-editor .cm-editor")).toBeVisible();
     await page.waitForFunction(() => !!(window as unknown as { client?: Client }).client);
-    await page.evaluate(() => (window as unknown as { client: Client }).client.widgetsReady);
+    await loaded(page);
   }
   await expect(table(page)).toBeVisible();
 }
@@ -220,6 +223,38 @@ export async function setSettings(page: Page, values: Record<string, Setting>): 
   }
   await reload(page);
 }
+
+/**
+ * Writes another page of the space (what formulas and pivots read of other
+ * pages): in the playground into its store of pages, in SilverBullet into
+ * the space, indexed, gone after the test
+ */
+export async function setOtherPage(page: Page, name: string, text: string): Promise<void> {
+  if (target === "silverbullet") {
+    otherPagesOf.set(page, [...(otherPagesOf.get(page) ?? []), name]);
+    // There before SilverBullet writes it: it reads a page before writing it, a missing one a 404 in the console (as the settings' page)
+    await writePage(name, "");
+    await page.evaluate(
+      async ({ name, text }) => {
+        const { client } = window as unknown as { client: Client };
+        const syscall = (call: string, ...args: unknown[]) => client.clientSystem.localSyscall(call, args);
+        await syscall("space.writePage", name, text);
+        await syscall("mq.send", "indexQueue", `${name}.md`);
+        await syscall("mq.awaitEmptyQueue", "indexQueue");
+      },
+      { name, text },
+    );
+  } else {
+    await page.evaluate(
+      ({ name, text }) => {
+        const pages = JSON.parse(localStorage.getItem("silverwarePlayground.pages") ?? "{}");
+        localStorage.setItem("silverwarePlayground.pages", JSON.stringify({ ...pages, [name]: text }));
+      },
+      { name, text },
+    );
+  }
+}
+const otherPagesOf = new WeakMap<Page, string[]>();
 
 /** A table enhanced by Silverware Table, by its place on the page (0: Fruit) */
 export const table = (page: Page, index = 0): Locator => page.locator(".sb-table-widget.swt-table").nth(index);

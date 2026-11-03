@@ -5,7 +5,7 @@ import { buttonLabel, cell, clickOn, controller, editor, edits, flush, key, menu
 
 describe("silverware.table.evaluate: a formula calculated on the page shown", () => {
   useTablePage();
-  // The controller as the library page's init leaves it, for the entry's functions to find
+  // The controller as the init page's init leaves it, for the entry's functions to find
   const started = () => ((globalThis as Record<string, unknown>).__silverwareTable = controller);
   afterEach(() => delete (globalThis as Record<string, unknown>).__silverwareTable);
 
@@ -50,7 +50,7 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
     expect(await evaluated("=fruit!B1")).toEqual({ value: "3", pages: [] });
   });
 
-  it("calculates on the text it is given (the page as the library page's Lua reads it)", async () => {
+  it("calculates on the text it is given (the page as the init page's Lua reads it)", async () => {
     await setup(PAGE);
     started();
     expect((await evaluated("=fruit!B1", PAGE.replace("| 3 |", "| 30 |"))).value).toBe("30");

@@ -1,6 +1,6 @@
 // Custom actions: the user's own, with code of their own (not a format),
 // defined in a JS file of the space and given from Space Lua
-// (silverware.toolbar.defineActions on the library page), as formats are: a
+// (silverware.toolbar.defineActions on the API page), as formats are: a
 // definition, a function given HELPERS returning one or a list, or a list.
 // An action's `edit` gets the selection's context and gives the text replacing a part
 // of the page (`helpers.cursor()` marking the selection after it); what it

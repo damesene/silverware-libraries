@@ -123,6 +123,7 @@ describe("Controller", () => {
       "Full screen",
       "Sheet view",
       "—",
+      "Insert pivot table…",
       "Theme: Native (global)",
       "Copy as CSV",
       "Copy as Markdown",

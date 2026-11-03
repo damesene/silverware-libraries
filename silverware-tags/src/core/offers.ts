@@ -47,7 +47,7 @@ export type PanelActionInfo = { readonly id: string; readonly icon: string; read
 
 /**
  * `panel` (the panel module): the tags as a panel beside the page shows them,
- * whatever draws it (SilverBullet's navigator, through the library page; the
+ * whatever draws it (SilverBullet's navigator, through the init page; the
  * playground's list). Its row actions are the modules' (`panelActions`),
  * the panel's own among them: it knows none of the others
  */

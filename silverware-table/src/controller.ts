@@ -2,7 +2,7 @@
 // inline cell editing and row/column editing. Every change to the markdown is
 // one `editor.replaceRange`, so undo works as for any other edit.
 import { type Bridge, type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
-import { type AdapterFeature, type AddressFrame, type AlsoChanged, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type TableHost, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget } from "./core/feature.ts";
+import { type AdapterFeature, type AddressFrame, type AlsoChanged, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type TextPosition, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
 import { mapPosition, type TextEdit, withWriteListeners } from "./core/writelisteners.ts";
@@ -47,6 +47,7 @@ import {
   cellSourceOffset,
   findTables,
   locateBySource,
+  tablePlace,
   locateByShape,
   locateWithEmptyHeaders,
   minimalEdit,
@@ -61,7 +62,7 @@ import {
 } from "./markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "./menu.ts";
 import { floatingMenu, focusMenu } from "./core/menu.ts";
-import { CORE, attributeName, metadataAfterEdit, metaName, metaPins, metaSort, withMetaSort, writtenName } from "./meta.ts";
+import { CORE, attributeName, metadataAfterEdit, metaName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
 import { CELL_NAME, type CellNameAt, cellNameOf, cellNamesIn, LINE_NAME, columnNameIn, type RowName, rowNameIn, rowNamesIn, withCellNameIn, withColumnNameIn, withRowNameIn } from "./names.ts";
 import { ownMeta } from "./core/metaaccess.ts";
 import { withoutNewTagValues } from "./tagvalues.ts";
@@ -70,6 +71,7 @@ import { nameEmptyHeaders, reorderRows } from "./ops.ts";
 import {
   cycleSort,
   DEFAULT_VIEW,
+  type Pins,
   withPins,
   remapColumns,
   type ViewState,
@@ -79,6 +81,7 @@ import {
 } from "./view.ts";
 import { type TableKey, TableRegister } from "./core/tables.ts";
 import { Parts } from "./core/parts.ts";
+import { underWindow } from "./core/overwindow.ts";
 
 // The cell editor as features see it, and what it takes to put the cell back
 
@@ -100,6 +103,9 @@ const SORT_GLYPH = { asc: "▲", desc: "▼", none: "⇅" } as const;
 
 // A sorting is stored (metadata setting) once the clicks have settled
 const STORE_SORT_DELAY_MS = 400;
+
+// Just above a table's header, as far: still the table hovered (its tab is there, and the pointer comes in from above)
+const HOVER_ABOVE = 20;
 
 const NOT_SAVED = "Silverware Table: the table changed in the meantime, nothing was saved";
 
@@ -158,9 +164,10 @@ export class Controller implements TableHost {
   private navigating = false;
   private navigatingAt: HTMLElement | undefined;
   private hideTimer: ReturnType<typeof setTimeout> | undefined;
-  // Once per frame (oncePerFrame): looking for tables rendered; what follows scrolling
+  // Once per frame (oncePerFrame): looking for tables rendered; what follows scrolling; the features' layout alone
   private readonly queueScan: () => void;
   private readonly queueStickyUpdate: () => void;
+  private readonly queueFeaturesLayout: () => void;
   // Set by stop(): work already scheduled then does nothing
   private stopped = false;
   // Rows are being rearranged: a cell editor losing its focus to that is not left
@@ -310,6 +317,9 @@ export class Controller implements TableHost {
       this.queueSettingsRefresh();
     });
     this.queueStickyUpdate = oncePerFrame(doc, () => this.followLayout());
+    this.queueFeaturesLayout = oncePerFrame(doc, () => {
+      if (!this.stopped) for (const feature of this.features) feature.layoutChanged?.();
+    });
   }
 
   setBridge(bridge: Bridge): void {
@@ -587,6 +597,16 @@ export class Controller implements TableHost {
     return this.coreMeta.canStoreMeta(table, `pin-${edge}`);
   }
 
+  pinsOf(table: Table): Pins {
+    return metaPins(table);
+  }
+
+  withPins(table: Table, pins: Pins): Table {
+    const was = metaPins(table);
+    const edge = (side: keyof Pins) => (pins[side] === was[side] || this.canPin(table, side) ? pins[side] : was[side]);
+    return withMetaPins(table, { top: edge("top"), bottom: edge("bottom"), left: edge("left"), right: edge("right") });
+  }
+
   /**
    * The last step of a write with the metadata setting off: the hidden values
    * it would add to a table's cells (withoutNewTagValues) are taken off,
@@ -612,6 +632,10 @@ export class Controller implements TableHost {
 
   tableName(table: Table): string | undefined {
     return metaName(table);
+  }
+
+  tableBadges(info: TableInfo): readonly TableBadge[] {
+    return this.features.flatMap((feature) => feature.tableBadges?.(info) ?? []);
   }
 
   writtenTableName(table: Table): string | undefined {
@@ -764,6 +788,9 @@ export class Controller implements TableHost {
 
   toolbarChanged(): void {
     this.toolbar.changed();
+    // The tables' tabs too, next frame: what the features say a table is (Out of date) changes with it. Only the
+    // features' layout: following the hover again (followScroll) hid the toolbar of a table the sheet had just drawn anew
+    this.queueFeaturesLayout();
   }
 
   /**
@@ -1130,6 +1157,10 @@ export class Controller implements TableHost {
   }
 
   menuNaming(info: WidgetInfo, target: NamingTarget): MenuNaming | undefined {
+    // A row's or a cell's name is a tag in its cells: none offered where they are not changed by hand (a pivot's)
+    const table = this.tableOf(info);
+    const cells = target.kind === "cell" ? [{ row: target.row, column: target.column }] : target.kind === "row" ? table.align.map((_, column) => ({ row: target.row, column })) : [];
+    if (cells.length && this.readOnly(table, cells)) return undefined;
     for (const feature of this.features) {
       const naming = feature.menuNaming?.(info, target);
       if (naming) return naming;
@@ -1164,6 +1195,57 @@ export class Controller implements TableHost {
       if (reason) return reason;
     }
     return undefined;
+  }
+
+  readOnly(table: Table, cells: readonly CellRef[]): string | undefined {
+    for (const cell of cells) {
+      for (const feature of this.features) {
+        const reason = feature.readOnly?.(table, cell);
+        if (reason) return reason;
+      }
+    }
+    return undefined;
+  }
+
+  editRefused(info: TableInfo, cell: CellRef): void {
+    for (const feature of this.features) feature.editRefused?.(info, cell);
+  }
+
+  readOnlyBody(table: Table): string | undefined {
+    let reason: string | undefined;
+    for (let row = 1; row < table.rows.length; row++) {
+      for (let column = 0; column < table.align.length; column++) {
+        // (The first cell that may be changed ends it: a usual table asks one)
+        reason = this.readOnly(table, [{ row, column }]);
+        if (!reason) return undefined;
+      }
+    }
+    return reason;
+  }
+
+  fixedShape(table: Table): string | undefined {
+    for (const feature of this.features) {
+      const reason = feature.fixedShape?.(table);
+      if (reason) return reason;
+    }
+    return undefined;
+  }
+
+  /**
+   * Why an edit must not be written: it changes a cell not changed by hand
+   * (Feature.readOnly), or adds, deletes or moves rows or columns of a table
+   * whose shape is fixed (Feature.fixedShape); whatever offered it (a key, a
+   * menu, a paste, a drag): what offers edits asks first, this is what holds
+   */
+  private changesFixed(before: Table, edited: Table, options: WriteOptions): string | undefined {
+    const shape = this.fixedShape(before);
+    if (shape) {
+      const moved = (map: ((at: number) => number | undefined) | undefined, count: number) => !!map && Array.from({ length: count }, (_, i) => i).some((i) => map(i) !== i);
+      if (edited.rows.length !== before.rows.length || edited.align.length !== before.align.length || moved(options.rowMap, before.rows.length) || moved(options.columnMap, before.align.length)) return shape;
+    }
+    const changed: CellRef[] = [];
+    edited.rows.forEach((row, r) => row.cells.forEach((cell, c) => (cell !== before.rows[r]?.cells[c] ? changed.push({ row: r, column: c }) : undefined)));
+    return changed.length ? this.readOnly(before, changed) : undefined;
   }
 
   viewChanged(widget: HTMLElement, info: WidgetInfo): void {
@@ -2246,7 +2328,9 @@ export class Controller implements TableHost {
       this.cancelHide();
       return;
     }
-    const hit = this.enhancedWidgetOf(target);
+    // Over the table, or just above its header (where its tab is, and the pointer comes in from above)
+    const above = this.enhancedWidgetOf(target) ? undefined : this.aboveHeader(e);
+    const hit = above ? ([above.widget, above.info] as const) : this.enhancedWidgetOf(target);
     if (!hit) {
       if (!busy && !overScrollbar(e)) this.scheduleHide();
       return;
@@ -2261,8 +2345,8 @@ export class Controller implements TableHost {
     }
     // The grips stay with the edited cell (hoverEdited)
     if (this.cellEditor.active) return;
-    // Not over a cell (e.g. the table's own scrollbar): the grips stay on the last cell
-    const cell = this.tableCellOf(info, target);
+    // Not over a cell (e.g. the table's own scrollbar): the grips stay on the last cell; above the header, its cell there
+    const cell = above ? above.cell : this.tableCellOf(info, target);
     if (cell && cell !== this.hoverCell) {
       this.hoverCell = cell;
       this.cellHovered(widget, info, cell);
@@ -2352,28 +2436,34 @@ export class Controller implements TableHost {
     return this.register.reserve(this.currentPage);
   }
 
-  async insertTable(table: Table, after?: TableTarget, also?: AlsoChanged, key?: TableKey): Promise<WriteResult> {
+  /** The features' commands, once they started: a module turned off gives none */
+  async commands(): Promise<readonly PageCommand[]> {
+    await this.featuresStarted;
+    return this.features.flatMap((feature) => feature.commands?.() ?? []);
+  }
+
+  async insertTable(table: Table, after?: TableTarget | TextPosition, also?: AlsoChanged, key?: TableKey): Promise<WriteResult> {
     const result = await this.insertTableNow(table, after, also, key);
     // Not written: no table gets the key made for it
     if (key && result !== "written") this.register.release(key);
     return result;
   }
 
-  private async insertTableNow(table: Table, after: TableTarget | undefined, also: AlsoChanged | undefined, key: TableKey | undefined): Promise<WriteResult> {
+  private async insertTableNow(table: Table, after: TableTarget | TextPosition | undefined, also: AlsoChanged | undefined, key: TableKey | undefined): Promise<WriteResult> {
     try {
       const text = await this.bridge.getText();
-      const range = after && locateBySource(text, after.hint, after.source);
+      const range = after && !("position" in after) ? locateBySource(text, after.hint, after.source) : undefined;
       const changed = also && locateBySource(text, also.target.hint, also.target.source);
       if (also && !changed) {
         void this.bridge.flash(NOT_SAVED, "error");
         return "failed";
       }
-      const at = range ? range.to : text.length;
+      // After the table, at the position, else at the page's end; an empty line around it
+      const { at, before, after: trail } = tablePlace(text, range ? { after: range } : after && "position" in after ? after : undefined);
       const serialize = await this.serializer();
       // The new table's text: its key's once it is in the page
       if (key) this.register.writing(key, serialize(table).trimEnd());
-      // An empty line before it, and after it where text follows
-      const insert = `${at > 0 ? "\n\n" : ""}${serialize(table)}${text.slice(at).startsWith("\n") || at === text.length ? "" : "\n\n"}`;
+      const insert = `${before}${serialize(table)}${trail}`;
       const updates = [{ from: at, to: at, text: insert }, ...(changed ? [{ from: changed.from, to: changed.to, text: serialize(also!.change(parseTable(changed.text))) }] : [])];
       let written = text;
       for (const update of [...updates].sort((a, b) => b.from - a.from)) written = written.slice(0, update.from) + update.text + written.slice(update.to);
@@ -2472,6 +2562,11 @@ export class Controller implements TableHost {
       const edited = change(before);
       if (!edited) {
         void this.bridge.flash(NOT_SAVED, "error");
+        return "failed";
+      }
+      const fixed = this.changesFixed(before, edited, options);
+      if (fixed) {
+        void this.bridge.flash(`Silverware Table: ${fixed}`, "info");
         return "failed";
       }
       const page: WritePage = { text, tables: pageTablesOf(text), from: range.from };
@@ -2600,6 +2695,28 @@ export class Controller implements TableHost {
   /** What holds the pointer, if anything (Feature.pointerBusy): a drag, a menu open */
   private pointerBusy(): "drag" | "menu" | "pick" | undefined {
     return this.features.map((f) => f.pointerBusy?.()).find(Boolean);
+  }
+
+  /**
+   * The table whose header the pointer is just above (HOVER_ABOVE), across
+   * the table's width, and the header's cell under it; not a table under what
+   * is over the window
+   */
+  private aboveHeader(e: MouseEvent): { widget: HTMLElement; info: WidgetInfo; cell: HTMLTableCellElement | undefined } | undefined {
+    for (const info of this.shownTables()) {
+      const widget = this.widgetOf(info);
+      const header = info.table.rows[0];
+      if (!header || !widget.isConnected || underWindow(widget)) continue;
+      const top = header.getBoundingClientRect().top;
+      const { left, right } = info.table.getBoundingClientRect();
+      if (e.clientY < top - HOVER_ABOVE || e.clientY >= top || e.clientX < left || e.clientX >= right) continue;
+      const cell = Array.from(header.cells).find((c) => {
+        const r = c.getBoundingClientRect();
+        return e.clientX >= r.left && e.clientX < r.right;
+      });
+      return { widget, info, cell };
+    }
+    return undefined;
   }
 
   /** As if the pointer were over this cell: the grips go to its row and column */
@@ -2802,9 +2919,11 @@ export class Controller implements TableHost {
         break;
       }
     }
+    // Cells not changed by hand (a pivot's): nothing that changes them offered
+    const fixed = this.readOnly(this.tableOf(info), cells);
     const groups = this.features
       .flatMap((f) => [f.cellMenuEntries?.(info, cells) ?? []].flat())
-      .filter((group) => group.entries.length > 0)
+      .filter((group) => group.entries.length > 0 && !(fixed && CELL_MENU_CHANGES.has(group.order)))
       .sort((a, b) => a.order - b.order);
     if (groups.length === 0) return false;
     const entries = groups.flatMap((group, i): MenuEntry[] => [...(i ? [{ kind: "separator" as const }] : []), ...group.entries]);

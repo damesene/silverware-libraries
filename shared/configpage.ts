@@ -91,7 +91,7 @@ export function withConfigSettings(text: string, values: Readonly<Record<string,
   return `${text.slice(0, block.start)}\`\`\`space-lua${eol}${kept.join(eol)}${eol}\`\`\`${text.slice(block.end)}`;
 }
 
-/** What saving into the configuration page needs of SilverBullet (the library page's Lua hands it over) */
+/** What saving into the configuration page needs of SilverBullet (the init page's Lua hands it over) */
 export type ConfigPageAccess = {
   readPage(name: string): string | undefined | Promise<string | undefined>;
   // Written, synced and indexed, the configuration loaded again (as the Configuration Manager saves)

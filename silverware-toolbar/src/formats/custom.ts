@@ -1,6 +1,6 @@
 // Definitions of formats checked and made formats the engines use: the
 // built-in ones (builtin/) and the user's (silverware.toolbar.defineFormats on
-// the library page) alike. A definition is an object, a function given
+// the API page) alike. A definition is an object, a function given
 // HELPERS that returns one or a list, or a list of them (a module's default
 // export too). What a format's function gives or throws is checked when it is
 // called: a mistake is the action failing, shown, never a page written wrong.

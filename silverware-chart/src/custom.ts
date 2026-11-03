@@ -1,6 +1,6 @@
 // Custom formats: the user's own ways of writing a chart in a code block,
 // defined in a JS file of the space and given from Space Lua
-// (silverware.chart.defineFormats on the library page), as the toolbar's
+// (silverware.chart.defineFormats on the API page), as the toolbar's
 // formats are: a definition, a function given HELPERS returning one or a list,
 // or a list. Each is a format as the built-in ones: `read` a block's text as a
 // chart's model, `write` the model as its text. What they give or throw is

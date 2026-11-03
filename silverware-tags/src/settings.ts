@@ -2,7 +2,7 @@
 // the window's foot. Tabs General (Hide and protect meta pages) and Modules
 // (each one's switch, with what it does). It reads the configuration when it
 // opens and writes nothing until Save, then reloads (Save and reload): modules
-// are created, and the library page defines their commands and the panel (its
+// are created, and the init page defines their commands and the panel (its
 // Meta segment by the protection of meta pages), as Silverware Tags starts. Of
 // one height whatever its tab shows.
 // The shared dialog, tabs and controls (shared/), in the toolbar's settings'

@@ -1,6 +1,6 @@
 // Custom operations: the user's own things done with a tag, defined in a JS
 // file of the space and given from Space Lua (silverware.tags.defineOperations
-// on the library page), as the toolbar's custom actions are: a definition, a
+// on the API page), as the toolbar's custom actions are: a definition, a
 // function given HELPERS returning one or a list, or a list. Each is an action
 // on a tag (a button of the tag picked, as the built-in ones): its `edit` gets
 // each page's text and gives the text it should have, which the core plans,

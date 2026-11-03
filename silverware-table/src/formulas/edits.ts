@@ -277,6 +277,17 @@ export function followFormula(formula: string, before: Table, after: Table, foll
 }
 
 /**
+ * A formula read against the edited table as its own, outside it (its
+ * references named by no table: a pivot's definition over its source), its
+ * references following the edit as shiftReferences' do
+ */
+export function followOwnFormula(formula: string, before: Table, after: Table, following: Following): string {
+  const edit: TableEdit = { ...following, before, after };
+  const own = following.names?.before?.trim();
+  return renameIn(rewriteReferences(formula, (ref) => !ref.table || isTo(ref, own), edit), own, newName(edit));
+}
+
+/**
  * A formula copied `rows` rows and `columns` columns away (AutoFill), as a
  * spreadsheet copies it: each cell reference's edges move with it but those
  * fixed with $ ($A$1, A$1, $A1); one moved off the table (`size`: its body

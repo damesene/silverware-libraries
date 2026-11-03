@@ -215,7 +215,9 @@ export class Selection implements Feature {
   }
 
   /** Edit mode, a switch in the toolbar (left of its menu): a click edits a cell; off, a click selects it */
-  toolbarButtons(): ToolbarButton[] {
+  toolbarButtons(info: TableInfo): ToolbarButton[] {
+    // A table none of whose cells is edited by hand (a pivot's): no mode of editing them
+    if (this.host.readOnlyBody(parseTable(info.source))) return [];
     return [
       {
         label: "Edit mode",
@@ -798,7 +800,7 @@ export class Selection implements Feature {
 
   // ---- moving the cells selected ---------------------------------------------
 
-  /** The cells selected as a block that can move: body cells of a table shown as written */
+  /** The cells selected as a block that can move: body cells of a table shown as written, changed by hand (not a pivot's) */
   private block(): Block | undefined {
     const area = this.area();
     if (!area || this.host.rearranged(area.info)) return undefined;
@@ -807,6 +809,7 @@ export class Selection implements Feature {
     if (top < 1) return undefined;
     const width = area.right - area.left + 1;
     const cells = area.rows.map((row) => Array.from({ length: width }, (_, j) => ({ row, column: area.left + j })));
+    if (this.host.readOnly(parseTable(area.info.source), cells.flat())) return undefined;
     return { ...area, order, top, height: area.rows.length, width, cells };
   }
 

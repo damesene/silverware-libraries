@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import libraryPage from "../silverware-table.md?raw";
+import stylePage from "../silverware-table-style.md?raw";
 
-// The rules of the library page's space-style block: [selectors, declarations],
+// The rules of the style page's space-style block: [selectors, declarations],
 // the innermost blocks (rules inside @media too)
 function rules(): [string[], string][] {
-  const css = /```space-style\r?\n([\s\S]*?)```/.exec(libraryPage)![1]!.replace(/\/\*[\s\S]*?\*\//g, "");
+  const css = /```space-style\r?\n([\s\S]*?)```/.exec(stylePage)![1]!.replace(/\/\*[\s\S]*?\*\//g, "");
   return Array.from(css.matchAll(/([^{}]+)\{([^{}]*)\}/g), (m) => [m[1]!.split(",").map((s) => s.trim()), m[2]!]);
 }
 
-describe("The library page's CSS", () => {
+describe("The style page's CSS", () => {
   it("decorates a body cell's text on its content box too, which a decoration on the cell does not reach (an inline block)", () => {
     const decorating = rules().filter(([, body]) => /(^|;)\s*text-decoration(-line)?\s*:/.test(body));
     expect(decorating.length).toBeGreaterThan(0);

@@ -1,7 +1,7 @@
 // The toolbar by a selection (or at the caret) and the popup of every action under it
 import { bar, barButton, caret, expect, lineBox, onSilverBullet, popup, select, selected, test, text } from "./helpers.ts";
 
-// The command's key, as the playground binds it (SilverBullet binds the library page's command so)
+// The command's key, as the playground binds it (SilverBullet binds the init page's command so)
 const KEY = "Control+Shift+Q";
 
 test.describe("The toolbar's defaults", () => {

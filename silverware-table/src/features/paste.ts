@@ -266,6 +266,8 @@ export class Paste implements Feature {
         ...(rowsCut ? (this.host.rearranged(info) ? { disabled: PASTE_BLOCKED } : {}) : !clipboard?.readText ? { disabled: NO_CLIPBOARD } : disabled && !cut ? { disabled } : {}),
       });
     }
+    // Cells not changed by hand (a pivot's): copied, nothing cut or pasted into them
+    if (this.host.readOnly(this.host.tableOf(info), o.copied)) return { kind: "actions", options: options.slice(0, 1) };
     return { kind: "actions", options };
   }
 

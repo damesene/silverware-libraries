@@ -74,6 +74,8 @@ export const EXCEL_FUNCTIONS: Readonly<Record<string, ExcelCall>> = {
   FLOOR: (args) => call("FLOOR.MATH", texts(args)),
   // Excel reads TEXT's format codes in its own language (a Czech Excel's year is "rrrr")
   TEXT: () => ({ reason: "Excel reads TEXT's format codes in its own language" }),
+  // Excel 365's since 2024 (an older Excel shows #NAME?), and its patterns are PCRE2's, not JavaScript's
+  REGEXTEST: () => ({ reason: "REGEXTEST is in Excel 365 only, its patterns read otherwise" }),
   DATEADD: ([date, amount, unit]) => {
     const d = `(${date!.text})`;
     const n = `(${amount!.text})`;

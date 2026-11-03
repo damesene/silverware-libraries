@@ -61,22 +61,22 @@ describe("markdown tables", () => {
   it("finds columns by name in any case or by key, and gives a table's data", () => {
     const costs = tablesOf(TEXT)[0]!;
     expect([columnIndex(costs.columns, "month"), columnIndex(costs.columns, "unit_price"), columnIndex(costs.columns, "Unit price"), columnIndex(costs.columns, "none")]).toEqual([0, 1, 1, -1]);
-    expect(dataOf(costs, { table: "above", x: "Month", series: ["unit_price"] }, "costs")).toEqual({ labels: ["Oct", "Nov"], series: [[1.5, 3]] });
+    expect(dataOf(costs, { table: "above", labels: "Month", series: ["unit_price"] }, "costs")).toEqual({ labels: ["Oct", "Nov"], series: [[1.5, 3]] });
     expect(dataOf(costs, { table: "above", series: ["Množství"] }, "costs")).toEqual({ labels: ["1", "2"], series: [[2, null]] });
-    expect(dataOf(costs, { table: "above", x: "Month", series: [] }, "costs")).toEqual({ problem: "costs: say the columns to draw with series" });
+    expect(dataOf(costs, { table: "above", labels: "Month", series: [] }, "costs")).toEqual({ problem: "costs: say the columns to draw with series" });
   });
 
   it("offers the table's columns in place of the first reference that finds none", () => {
     const costs = tablesOf(TEXT)[0]!;
-    const missing = dataOf(costs, { table: "above", x: "Month", series: ["price", "Množství"] }, "costs");
+    const missing = dataOf(costs, { table: "above", labels: "Month", series: ["price", "Množství"] }, "costs");
     expect(missing).toMatchObject({ problem: "costs has no column price (it has Month, Unit price, Množství)" });
     expect("choices" in missing && missing.choices?.map((c) => [c.label, c.source.series])).toEqual([
       ["Month", ["Month", "Množství"]],
       ["Unit price", ["Unit price", "Množství"]],
       ["Množství", ["Množství", "Množství"]],
     ]);
-    const noX = dataOf(costs, { table: "above", x: "Mnth", series: ["Množství"] }, "costs");
-    expect("choices" in noX && noX.choices?.[0]?.source).toEqual({ table: "above", x: "Month", series: ["Množství"] });
+    const noX = dataOf(costs, { table: "above", labels: "Mnth", series: ["Množství"] }, "costs");
+    expect("choices" in noX && noX.choices?.[0]?.source).toEqual({ table: "above", labels: "Month", series: ["Množství"] });
   });
 
   it("reads numbers with units and a decimal comma, and references to other pages", () => {
@@ -87,7 +87,9 @@ describe("markdown tables", () => {
     expect(["1.234,56", "1,234,567", "1.234.567", "12,5", "12,000", "-1 200,5 Kč"].map(numberOf)).toEqual([1234.56, 1234567, 1234567, 12.5, 12, -1200.5]);
     const plain = ["12", "12,99 €", "-€12", "USD 1 200", "3kg", "5 %", "A1", "Q1", "ABC1", "v2.1", "2026-11-02", "n/a", ""].map(plainNumberOf);
     expect(plain).toEqual([12, 12.99, -12, 1200, 3, 5, null, null, null, null, null, null, null]);
-    expect(pageOf("[[Data/2026]]#Sales")).toEqual({ page: "Data/2026", rest: "#Sales" });
+    // A heading of another page as SilverBullet links to one; a named table after the link
+    expect(pageOf("[[Data/2026#Sales]]")).toEqual({ page: "Data/2026", rest: "#Sales" });
+    expect(pageOf("[[Data/2026]]sales")).toEqual({ page: "Data/2026", rest: "sales" });
     expect(pageOf("above")).toEqual({ rest: "above" });
   });
 });

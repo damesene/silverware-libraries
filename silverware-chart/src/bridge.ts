@@ -22,7 +22,7 @@ export type Bridge = {
   readonly onWrite?: (listener: (text: string, context: never) => unknown) => unknown;
 };
 
-/** The bridge's functions it cannot work without, missing from what the library page gave */
+/** The bridge's functions it cannot work without, missing from what the init page gave */
 export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
   return (["getText", "getCurrentPage", "readPage"] as const).filter((name) => typeof bridge[name] !== "function");
 }
@@ -31,7 +31,7 @@ export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
 export const MODULE_NAMES = ["mermaid", "types", "settings", "tables", "silverwareTable", "insert"] as const;
 export type ModuleName = (typeof MODULE_NAMES)[number];
 
-/** A module's name and what it does (the library page's config.define says the same) */
+/** A module's name and what it does (the init page's config.define says the same) */
 export const MODULE_LABELS: Readonly<Record<ModuleName, string>> = { mermaid: "Mermaid", types: "Chart types", settings: "Chart settings", tables: "Tables as sources", silverwareTable: "Silverware Table", insert: "Insert a chart" };
 export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
   mermaid: "Charts written as Mermaid (```mermaid blocks of xychart-beta and pie), which GitHub and other Mermaid renderers draw too.",

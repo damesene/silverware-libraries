@@ -356,6 +356,23 @@ export interface Panel {
   remove(): void;
 }
 
+/** A command a feature gives SilverBullet (Silverware Table: <name>), and a slash command (/<slash>) where it has one */
+export type PageCommand = {
+  readonly name: string;
+  readonly description: string;
+  readonly slash?: string;
+  readonly run: () => void | Promise<void>;
+};
+
+/** What a feature says a table is, shown with its name where the table's name shows (a pivot: Pivot of orders) */
+export type TableBadge = {
+  readonly text: string;
+  // Its icon's markup (icons.ts), before the text
+  readonly icon?: string;
+  // Asks for attention, as a toolbar button's `attention` (its data out of date): shown so, in the toolbar's color for it
+  readonly attention?: boolean;
+};
+
 /** A button a feature adds to a table's toolbar */
 export type ToolbarButton = {
   readonly label: string;
@@ -396,6 +413,9 @@ export type ToolbarButton = {
 };
 
 /** Another table a write changes in the same edit: where it is, and how */
+/** A place in the page's text (the cursor's), as an offset */
+export type TextPosition = { readonly position: number };
+
 export type AlsoChanged = { readonly target: TableTarget; readonly change: (table: Table) => Table };
 
 export type WriteOptions = {
@@ -460,6 +480,9 @@ export const PAGE_ROWS = 10;
 
 export const CELL_MENU_ORDER = { clipboard: -1, naming: 0, editing: 1, inserting: 1.2, filling: 1.5, viewing: 2, deleting: 9 } as const;
 
+/** The cell menu's slots whose entries change the cells: left out where the cells are not changed by hand (Feature.readOnly) */
+export const CELL_MENU_CHANGES: ReadonlySet<number> = new Set([CELL_MENU_ORDER.editing, CELL_MENU_ORDER.inserting, CELL_MENU_ORDER.filling, CELL_MENU_ORDER.deleting]);
+
 /** A group of entries in the cell menu, between separators (CELL_MENU_ORDER) */
 export type CellMenuGroup = { readonly order: number; readonly entries: readonly MenuEntry[] };
 
@@ -500,12 +523,13 @@ export interface ModelHost {
   writeTable(target: TableTarget, change: (table: Table) => Table | undefined, options?: WriteOptions): Promise<WriteResult>;
   /**
    * A new table written into the page, in one edit: after the table `after`
-   * (an empty line between), else at the page's end; `also`: a table of the
+   * (an empty line between), or where a position is (after its line, or the
+   * table it is in: the cursor's), else at the page's end; `also`: a table of the
    * page changed in the same edit (put on a sheet with it); `key`: the new
    * table's, made before it is written (newTableKey), for what the caller
    * keeps for it meanwhile. No other table's key changes, wherever it goes.
    */
-  insertTable(table: Table, after?: TableTarget, also?: AlsoChanged, key?: TableKey): Promise<WriteResult>;
+  insertTable(table: Table, after?: TableTarget | TextPosition, also?: AlsoChanged, key?: TableKey): Promise<WriteResult>;
   /**
    * Deletes a table from the page in one edit, as Delete table in its ⋯ menu
    * does; `unasked`: no question, unless something goes with it (formulas
@@ -726,6 +750,8 @@ export interface ModelHost {
   // What every part reads and the core keeps: the names of tables, columns, rows and cells
   /** A table's name, if it has a valid one */
   tableName(table: Table): string | undefined;
+  /** What the features say the table is (Feature.tableBadges), in their order */
+  tableBadges(info: TableInfo): readonly TableBadge[];
   /** A table's name as written, valid or not */
   writtenTableName(table: Table): string | undefined;
   /** The table named so (undefined: unnamed) */
@@ -743,6 +769,10 @@ export interface ModelHost {
   canName(table: Table, target: NamingTarget): boolean;
   /** Whether rows (columns) may be pinned at that edge: the metadata setting on, or the table has pins there already */
   canPin(table: Table, edge: "top" | "bottom" | "left" | "right"): boolean;
+  /** The rows and columns pinned at each edge of a table, as its metadata row has them */
+  pinsOf(table: Table): Pins;
+  /** The table with these pins (an edge that cannot be pinned, canPin, as it was): a module's table made whole (a pivot's totals) */
+  withPins(table: Table, pins: Pins): Table;
   /** A table's named rows, in their order */
   rowNames(table: Table): readonly RowName[];
   /** A table's named body cells, in their order */
@@ -772,6 +802,14 @@ export interface ModelHost {
   keepTags(value: string, from: string): string;
   /** Why a cell's value is a feature's (Feature.keepsCell): pasting leaves it */
   cellKeptBy(cell: string): string | undefined;
+  /** Why one of these cells of the table is not changed by hand (Feature.readOnly), the first said; undefined: none is */
+  readOnly(table: Table, cells: readonly CellRef[]): string | undefined;
+  /** Why the table's rows and columns are not added, deleted or moved by hand (Feature.fixedShape); undefined: they may be */
+  fixedShape(table: Table): string | undefined;
+  /** Why no cell of the table's body is changed by hand (a pivot's: none to edit, hold or switch editing for); undefined: some may be */
+  readOnlyBody(table: Table): string | undefined;
+  /** The user tried to edit a cell not changed by hand: the features' ways to change it instead (Feature.editRefused) */
+  editRefused(info: TableInfo, cell: CellRef): void;
   /** A feature's copy of a cell for another cell (Feature.fillCell), or undefined: copied as its value */
   fillCell(info: TableInfo, cell: string, from: CellRef, to: CellRef): string | undefined;
   /** Keyboard and input events from a field of a feature must not reach SilverBullet's editor */
@@ -1016,6 +1054,10 @@ export interface Feature {
   lineMenuEndEntries?(info: TableInfo, axis: "row" | "column", lines: readonly number[]): MenuEntry[];
   /** Buttons for the table's toolbar, shown while the pointer is over the table */
   toolbarButtons?(info: TableInfo): ToolbarButton[];
+  /** Its commands (SilverBullet's command palette, and slash commands), a module's while it is on */
+  commands?(): readonly PageCommand[];
+  /** What the table is, shown with its name at a glance (the tableLabels module's tab): a pivot's "Pivot of orders" */
+  tableBadges?(info: TableInfo): readonly TableBadge[];
   /** Before a write reads the page's text: what it needs read first (other pages the tables written refer to) */
   prepareWrite?(info: TableTarget): Promise<void>;
   /**
@@ -1140,6 +1182,21 @@ export interface Feature {
    * (formulas: "formula cell", the formula computes it); undefined: it is not
    */
   keepsCell?(cell: string): string | undefined;
+  /**
+   * Why a cell of the table (its markdown's row, the header 0) is not changed
+   * by hand, said to the user (a pivot's: calculated from its source); the
+   * core writes no edit that changes it, the features offering edits ask
+   * first (ModelHost.readOnly); undefined: it may be changed
+   */
+  readOnly?(table: Table, cell: CellRef): string | undefined;
+  /** Why the table's rows and columns are not added, deleted or moved by hand (a pivot's: its calculation's); undefined: they may be */
+  fixedShape?(table: Table): string | undefined;
+  /**
+   * The user tried to edit a cell that is not changed by hand (readOnly), told
+   * why: the feature's own way to change it instead, if it has one (a pivot's
+   * settings)
+   */
+  editRefused?(info: TableInfo, cell: CellRef): void;
   /**
    * A copy of a cell the feature makes for another cell of the table (`to`;
    * AutoFill), a cell of the markdown's table, the header 0: formulas, their

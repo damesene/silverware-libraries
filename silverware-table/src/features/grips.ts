@@ -102,6 +102,7 @@ export class Grips implements Feature {
     if (!target) return;
     const selects = this.host.clickSelects();
     const rearranged = this.host.rearranged(target.info);
+    const fixed = !!this.host.fixedShape(parseTable(target.info.source));
     if (this.linesSelected?.key !== target.info.key) {
       this.linesSelected = {
         key: target.info.key,
@@ -117,7 +118,8 @@ export class Grips implements Feature {
       grip.classList.toggle("swt-line-selected", selects && selected);
       const name = axis === "row" ? "Row" : "Column";
       const click = selects && !selected ? "click to select, again (or right-click) for actions" : "click for actions";
-      const drag = axis === "row" && rearranged ? ` (${MOVE_BLOCKED.toLowerCase()})` : ", drag to move";
+      // (A table of a fixed shape, a pivot's: its lines are not moved, its grips a menu only)
+      const drag = fixed ? "" : axis === "row" && rearranged ? ` (${MOVE_BLOCKED.toLowerCase()})` : ", drag to move";
       grip.title = `${name}: ${click}${drag}`;
       grip.setAttribute("aria-label", grip.title);
     }
@@ -184,10 +186,12 @@ export class Grips implements Feature {
     const shown = this.host.rectOf(info, "table");
     if (!shown) return;
     const rearranged = this.host.rearranged(info);
+    const fixed = !!this.host.fixedShape(parseTable(info.source));
+    this.columnGrip.classList.toggle("swt-no-drag", fixed);
 
     const rowRect = ref.row > 0 ? this.host.rectOf(info, { row: ref.row }) : undefined;
     if (rowRect) {
-      this.rowGrip.classList.toggle("swt-no-drag", rearranged);
+      this.rowGrip.classList.toggle("swt-no-drag", rearranged || fixed);
       const height = rowRect.bottom - rowRect.top;
       const length = Math.max(GRIP_THICKNESS, Math.min(height - 8, ROW_GRIP_LENGTH));
       Object.assign(this.rowGrip.style, { width: `${GRIP_THICKNESS}px`, height: `${length}px` });
@@ -281,7 +285,7 @@ export class Grips implements Feature {
             this.openMenu(target, axis);
           }, LONG_PRESS_MS)
         : undefined;
-    const canDrag = axis === "column" || !this.host.rearranged(target.info);
+    const canDrag = !this.host.fixedShape(parseTable(target.info.source)) && (axis === "column" || !this.host.rearranged(target.info));
     const win = this.host.doc.defaultView!;
     const startX = e.clientX;
     const startY = e.clientY;
@@ -672,10 +676,13 @@ export class Grips implements Feature {
         : zone === "top"
           ? "Rows pinned to the top stay at the top"
           : "Rows pinned to the bottom stay at the bottom";
+    // Rows that come from a calculation (a pivot's): none inserted, duplicated, moved, pinned (it moves them) or deleted
+    const fixed = !!host.fixedShape(parseTable(info.source));
+    const shape = (entries: MenuEntry[]) => (fixed ? [] : entries);
     // In the order every menu keeps (cell, row, column): the clipboard and clearing, inserting, moving and pinning, naming, deleting
     return [
       ...this.lineSections(info, "row", row),
-      {
+      ...shape([{
         kind: "segmented",
         label: "Insert",
         options: [
@@ -732,10 +739,10 @@ export class Grips implements Feature {
             disabled: pinBlocked("bottom"),
           },
         ],
-      },
+      }]),
       { kind: "separator" },
       ...this.section([...this.host.rowMenuEntries(info, row, column), ...this.host.lineMenuEndEntries(info, "row", this.selectedLines(info, "row", row))]),
-      this.deleteEntry(info, "row", row),
+      ...shape([this.deleteEntry(info, "row", row)]),
     ];
   }
 
@@ -758,8 +765,13 @@ export class Grips implements Feature {
 
   /** The features' entries for the lines a grip acts on: the clipboard's bar, then the others (Clear), each a section as in the cell menu */
   private lineSections(info: TableInfo, axis: Axis, line: number): MenuEntry[] {
-    const entries = this.host.lineMenuEntries(info, axis, this.selectedLines(info, axis, line));
-    return [...this.section(entries.filter((e) => e.kind === "actions")), ...this.section(entries.filter((e) => e.kind !== "actions"))];
+    const lines = this.selectedLines(info, axis, line);
+    const entries = this.host.lineMenuEntries(info, axis, lines);
+    // Cells not changed by hand (a pivot's): the clipboard's bar alone (which then copies), no Clear
+    const table = parseTable(info.source);
+    const cells = axis === "row" ? lines.flatMap((row) => table.align.map((_, column) => ({ row, column }))) : lines.flatMap((column) => table.rows.map((_, row) => ({ row, column })));
+    const fixed = !!this.host.readOnly(table, cells);
+    return [...this.section(entries.filter((e) => e.kind === "actions")), ...(fixed ? [] : this.section(entries.filter((e) => e.kind !== "actions")))];
   }
 
   /** The features' entries as a section of the menu: run, they close it; a separator after them */
@@ -809,10 +821,13 @@ export class Grips implements Feature {
         : zone === "left"
           ? "Columns pinned to the left stay at the left"
           : "Columns pinned to the right stay at the right";
+    // Columns that come from a calculation (a pivot's): none inserted, moved, pinned (it moves them), aligned (it aligns them) or deleted
+    const fixed = !!host.fixedShape(parseTable(info.source));
+    const shape = (entries: MenuEntry[]) => (fixed ? [] : entries);
     // In the order every menu keeps (cell, row, column): the clipboard and clearing, inserting, moving and pinning, viewing, naming, deleting
     const entries: MenuEntry[] = [
       ...this.lineSections(info, "column", column),
-      {
+      ...shape([{
         kind: "segmented",
         label: "Insert",
         options: [
@@ -860,7 +875,7 @@ export class Grips implements Feature {
             disabled: pinBlocked("right"),
           },
         ],
-      },
+      }]),
       { kind: "separator" },
       ...this.featureColumnEntries(info, column, true),
       {
@@ -878,7 +893,7 @@ export class Grips implements Feature {
         ],
       },
       ...this.featureColumnEntries(info, column),
-      {
+      ...shape([{
         kind: "segmented",
         label: "Align",
         options: [
@@ -886,10 +901,10 @@ export class Grips implements Feature {
           { icon: ICONS.alignCenter, title: "Align center", active: align === "center", run: alignTo("center") },
           { icon: ICONS.alignRight, title: "Align right", active: align === "right", run: alignTo("right") },
         ],
-      },
+      }]),
       { kind: "separator" },
       ...this.section([...host.columnMenuTopEntries(info, column), ...host.lineMenuEndEntries(info, "column", this.selectedLines(info, "column", column))]),
-      this.deleteEntry(info, "column", column),
+      ...shape([this.deleteEntry(info, "column", column)]),
     ];
     return entries;
   }

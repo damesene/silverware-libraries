@@ -1,6 +1,6 @@
 // A Space over a map of pages, its index made by the scanner as SilverBullet's
 // would have it (a tag once per page and context; a hashtag in a paragraph is
-// the page's; a table row's and a heading's are theirs, as the library page's
+// the page's; a table row's and a heading's are theirs, as the init page's
 // Lua reads them): the unit tests and the playground work with it.
 import { tagUses } from "../tags/edit.ts";
 import type { TagContext } from "../tags/scan.ts";

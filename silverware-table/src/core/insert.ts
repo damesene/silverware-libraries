@@ -10,6 +10,7 @@
 // markdown), and the mouseup and click ending a press that inserted are
 // swallowed: the table rendered anew puts something else under the pointer (a
 // link the click would follow).
+import { parseTable } from "../markdown.ts";
 import { ICONS } from "../icons.ts";
 import { renderedTable, WIDGET_SELECTOR } from "../dom.ts";
 import { coveredAt, underWindow } from "./overwindow.ts";
@@ -206,6 +207,8 @@ export class InsertControls {
     const { widget, cell: hoverCell } = this.context.hovered();
     const info = widget && host.infoOf(widget);
     if (e.pointerType === "touch" || e.buttons !== 0 || !widget || !info || renderedTable(widget) !== info.table) return this.hide();
+    // Rows and columns that come from a calculation (a pivot's): none inserted
+    if (host.fixedShape(parseTable(info.source))) return this.hide();
     if (e.target instanceof Node && this.mark.contains(e.target)) return true;
     if (e.target instanceof Node && host.isFloating(e.target)) return this.hide();
     // Over another table (it is hovered next), or over what is laid over the window above this one (the sheet's board)
@@ -385,7 +388,7 @@ export class InsertControls {
     const target = this.quietTarget();
     for (const axis of ["row", "column"] as const) {
       const mark = this.quietMarks[axis];
-      if (!target || !target[axis] || this.at?.axis === axis) {
+      if (!target || !target[axis] || this.at?.axis === axis || this.context.host.fixedShape(parseTable(target.info.source))) {
         mark.classList.remove("swt-visible");
         continue;
       }

@@ -373,7 +373,7 @@ test.describe("The settings dialog", () => {
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await page.waitForTimeout(100);
     await expect(bar(page)).toBeVisible();
-    // Its height, by which SilverBullet's editor is padded (the library page's CSS)
+    // Its height, by which SilverBullet's editor is padded (the style page's CSS)
     const height = (await bar(page).boundingBox())!.height;
     const room = await page.evaluate(() => document.documentElement.style.getPropertyValue("--swb-docked-bottom"));
     expect(Math.abs(parseFloat(room) - height)).toBeLessThan(1);

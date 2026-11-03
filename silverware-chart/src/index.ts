@@ -1,4 +1,4 @@
-// Silverware Chart entry point, loaded by the library page's Space Lua:
+// Silverware Chart entry point, loaded by the init page's Space Lua:
 //   js.importFromSpace("Library/damesene/silverware-chart.js").init({ ... the bridge ... })
 // then a code widget defined for each of `languages()`, rendering `render(…)`,
 // and the page's edits told to `pageModified(…)`.
@@ -21,7 +21,7 @@ const loadChart = (): Promise<ChartConstructor> => import(new URL("./silverware-
 export async function init(bridge: Bridge): Promise<void> {
   const missing = missingBridgeFunctions(bridge);
   if (missing.length) {
-    console.error(`Silverware Chart: the library page did not hand over ${missing.join(", ")}`);
+    console.error(`Silverware Chart: the init page did not hand over ${missing.join(", ")}`);
     return;
   }
   const { replaceRange, getCursor, moveCursor, flash, filterBox } = bridge;
@@ -69,7 +69,7 @@ export function start(doc: Document, settings: Settings, env: Omit<ConstructorPa
   return controller;
 }
 
-/** The code blocks' languages charts are written in (the library page defines a code widget for each) */
+/** The code blocks' languages charts are written in (the init page defines a code widget for each) */
 export function languages(): string[] {
   return slot[GLOBAL_KEY]?.languages() ?? [];
 }
@@ -79,22 +79,22 @@ export function render(language: string, text: string, page: string): Promise<HT
   return slot[GLOBAL_KEY]?.render(String(language), String(text), String(page)) ?? Promise.resolve(undefined);
 }
 
-/** The commands' names, for the library page to define them (the modules' on) */
+/** The commands' names, for the init page to define them (the modules' on) */
 export function commandNames(): string[] {
   return slot[GLOBAL_KEY]?.commands().map((command) => command.name) ?? [];
 }
 
-/** A command run (the library page's commands call it) */
+/** A command run (the init page's commands call it) */
 export async function runCommand(name: string): Promise<void> {
   await slot[GLOBAL_KEY]?.commands().find((command) => command.name === name)?.run();
 }
 
-/** The slash commands' words, for the library page to define them */
+/** The slash commands' words, for the init page to define them */
 export function slashCommandNames(): { name: string; description: string }[] {
   return slot[GLOBAL_KEY]?.slashCommands().map((command) => ({ name: command.name, description: command.description ?? "" })) ?? [];
 }
 
-/** A slash command run (the library page's slash commands call it) */
+/** A slash command run (the init page's slash commands call it) */
 export async function runSlashCommand(name: string): Promise<void> {
   await slot[GLOBAL_KEY]?.slashCommands().find((command) => command.name === name)?.run();
 }
@@ -109,16 +109,16 @@ export function codeBlock(language: string, text: string): HTMLElement {
   return pre;
 }
 
-/** The page open was edited (the library page's editor:pageModified listener): the charts on it follow their sources */
+/** The page open was edited (the init page's editor:pageModified listener): the charts on it follow their sources */
 export function pageModified(text: string, page: string): void {
   slot[GLOBAL_KEY]?.pageModified(String(text), String(page));
 }
 
 /**
- * `silverware.chart.defineFormats` (the library page's Space Lua): custom
+ * `silverware.chart.defineFormats` (the init page's Space Lua): custom
  * formats, a definition, a list, or a function given the helpers that returns
  * them, usually a JS module of the space. The others defined; what is wrong
- * with any of them, which the library page shows as a notification.
+ * with any of them, which the API page shows as a notification.
  */
 export function defineFormats(definitions: unknown): string | undefined {
   const { formats, problems } = formatsOf(definitions);

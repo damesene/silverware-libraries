@@ -1,4 +1,4 @@
-// The SilverBullet API Silverware Table uses, handed over by the library page's
+// The SilverBullet API Silverware Table uses, handed over by the init page's
 // Space Lua (`editor.*` and `config.get`), so no SilverBullet internals are needed.
 import type { FormatRule } from "./markdown.ts";
 import { BUILT_IN_THEMES, NATIVE_THEME, STRIPES, type Stripes, stripesLabel, stripesName, themeLabel, themeName, themesInStyles } from "./themes.ts";
@@ -23,6 +23,9 @@ export type Bridge = {
   readonly confirm?: (message: string, options?: { destructive?: boolean }) => boolean | Promise<boolean>;
   // Optional: reads another page's markdown, for formulas that refer to its tables ([[Page]]prices!B2)
   readonly readPage?: (name: string) => string | Promise<string>;
+  // Optional: the space's pages by name, offered where a page is picked (a pivot's source on another page);
+  // from Space Lua a Lua table, which may come as an object with its items under 1, 2, … (read with `listOf`)
+  readonly listPages?: () => unknown;
   // Optional: writes a page's markdown (with readPage), e.g. edits held for a page no longer in the editor
   readonly writePage?: (name: string, text: string) => unknown;
   // Optional, for the settings dialog: writes the space's configuration page
@@ -43,7 +46,7 @@ export type Bridge = {
 
 type Setting<T> = {
   readonly path: string;
-  // Its name in the settings dialog (as in config.define's ui label on the library page), and what it does in a few words
+  // Its name in the settings dialog (as in config.define's ui label on the init page), and what it does in a few words
   readonly label: string;
   readonly hint: string;
   readonly default: T;
@@ -83,6 +86,7 @@ export const FEATURE_NAMES = [
   "themes",
   "export",
   "excel",
+  "pivot",
   "paste",
   "handles",
   "widths",
@@ -96,7 +100,7 @@ export const FEATURE_NAMES = [
 ] as const;
 export type FeatureName = (typeof FEATURE_NAMES)[number];
 
-// Modules off until turned on (as config.define on the library page says)
+// Modules off until turned on (as config.define on the init page says)
 const MODULES_OFF_BY_DEFAULT: ReadonlySet<FeatureName> = new Set(["largeTables"]);
 
 /** Whether a module is on when its setting is not set */
@@ -104,7 +108,7 @@ export function moduleOnByDefault(name: FeatureName): boolean {
   return !MODULES_OFF_BY_DEFAULT.has(name);
 }
 
-// The modules' names in the settings dialog (as in config.define's ui labels on the library page)
+// The modules' names in the settings dialog (as in config.define's ui labels on the init page)
 export const MODULE_LABELS: Readonly<Record<FeatureName, string>> = {
   formulas: "Formulas",
   names: "Names",
@@ -117,6 +121,7 @@ export const MODULE_LABELS: Readonly<Record<FeatureName, string>> = {
   themes: "Themes",
   export: "Export",
   excel: "Excel",
+  pivot: "Pivot tables",
   paste: "Copy, cut and paste",
   handles: "Row and column handles",
   widths: "Column widths",
@@ -146,6 +151,7 @@ export const MODULE_CATEGORY: Readonly<Record<FeatureName, ModuleCategory>> = {
   themes: "look",
   export: "export",
   excel: "export",
+  pivot: "data",
   paste: "editing",
   handles: "editing",
   widths: "look",
@@ -171,6 +177,7 @@ export const MODULE_DESCRIPTIONS: Readonly<Record<FeatureName, string>> = {
   themes: "How tables look (header, lines, stripes, spacing): a theme for every table, another one for a table from its ⋯ menu",
   export: "Copy as CSV and Copy as Markdown in a table's ⋯ menu",
   excel: "Export to Excel… in a table's ⋯ menu: copy for Excel (numbers and dates as Excel's), or download an .xlsx file with the formulas",
+  pivot: "Tables that summarize another (pivot.source in their metadata row), calculated anew with each of its edits",
   paste: "Copy, Cut and Paste in the cell menu; Ctrl+X cuts cells (they move where they are pasted); Ctrl+V pastes cells copied from a spreadsheet over the table, Ctrl+Shift+V as new rows",
   handles: "Handles beside rows and above columns: drag to move them, click for their menu",
   widths: "Drag the right edge of a header to set its column's width",
@@ -184,7 +191,7 @@ export const MODULE_DESCRIPTIONS: Readonly<Record<FeatureName, string>> = {
 };
 
 /**
- * Settings, registered with `config.define` on the library page: those of
+ * Settings, registered with `config.define` on the init page: those of
  * whole tables as `silverware.table.<setting>`, those of a part of Silverware Table as
  * `silverware.table.<part>.<setting>` and a module's as
  * `silverware.table.modules.<module>.<setting>`, so a part is set with one
@@ -401,4 +408,12 @@ const REQUIRED: readonly (keyof Bridge)[] = [
 
 export function missingBridgeFunctions(bridge: Partial<Bridge> | undefined): string[] {
   return REQUIRED.filter((name) => typeof bridge?.[name] !== "function");
+}
+
+/** A list as handed over from Space Lua: an array, or a Lua table as an object with its items under 1, 2, … */
+export function listOf(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== "object") return [];
+  const entries = Object.entries(value as Record<string, unknown>);
+  return entries.every(([key], i) => key === String(i + 1)) ? entries.map(([, item]) => item) : [];
 }

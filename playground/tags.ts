@@ -2,20 +2,20 @@
 // over a space of pages in memory (space/memory.ts, its index made by the
 // scanner), kept in the browser. The page open is the one whose text shows
 // on the right (the editor: a write of it changes the text there); the
-// library page's space-style block is applied as SilverBullet would, and its
+// style page's space-style block is applied as SilverBullet would, and its
 // commands are the header's buttons.
 import { readSettings } from "../silverware-tags/src/bridge.ts";
 import { defineOperations, panelActionList, panelClicked, panelMove, panelPageFirst, panelRows, panelRun, start } from "../silverware-tags/src/index.ts";
 import type { SettingsStore } from "../silverware-tags/src/settings.ts";
 import { memorySpace } from "../silverware-tags/src/space/memory.ts";
-import libraryPage from "../silverware-tags/silverware-tags.md";
+import stylePage from "../silverware-tags/silverware-tags-style.md";
 import { flash, setUpTheme } from "./common.ts";
 import { SAMPLE_PAGES } from "./tags-sample.ts";
 
 setUpTheme();
 
 const style = document.createElement("style");
-style.textContent = /```space-style\r?\n([\s\S]*?)```/.exec(libraryPage)?.[1] ?? "";
+style.textContent = /```space-style\r?\n([\s\S]*?)```/.exec(stylePage)?.[1] ?? "";
 document.head.append(style);
 
 const STORE = "silverware.tags.playground.pages";
@@ -82,7 +82,7 @@ function showPage(): void {
 const ICON_TEXT: Readonly<Record<string, string>> = { plus: "+", minus: "−", "edit-2": "✎", "external-link": "↗" };
 
 /**
- * The tags' panel as SilverBullet's navigator shows the rows the library page
+ * The tags' panel as SilverBullet's navigator shows the rows the init page
  * hands it: a tree by "/" (a level of tags a folder row), every module's row
  * actions as its buttons where the row offers them (`can`) and their keys, a
  * row dropped on a level moves it there (the navigator's onMove: the level

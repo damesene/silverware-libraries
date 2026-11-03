@@ -3,7 +3,7 @@
 // format: Mermaid's comments and Obsidian Charts' keys are their formats' own.
 
 /** How a series is drawn among others on the same axes: bars, a line, an area, points alone, steps */
-export const SERIES_KINDS = ["bar", "line", "area", "points", "step"] as const;
+export const SERIES_KINDS = ["bar", "line", "area", "point", "step"] as const;
 export type SeriesKind = (typeof SERIES_KINDS)[number];
 
 /** One series of values, by the labels' order (null: no value there) */
@@ -32,7 +32,8 @@ export type Axis = {
  */
 export type Source = {
   readonly table: string;
-  readonly x?: string;
+  // The column whose cells label the values (not an axis: horizontal bars have them on y)
+  readonly labels?: string;
   readonly series: readonly string[];
   // Only the rows where every condition holds (a column, and a criterion as Excel's -IFS functions write it: "> 100", "done", "<>", "app*")
   readonly where?: readonly Condition[];

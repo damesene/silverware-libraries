@@ -33,6 +33,8 @@ export const ICONS = {
   rename: svg('<path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/>'),
   // A table: its header row and a column's line (the table's name in the toolbar, full screen)
   table: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14.5h18M10 9v11"/>'),
+  // A table summed up: its rows grouped into a smaller one
+  pivot: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18M13 14h5M15.5 11.5L18 14l-2.5 2.5"/>'),
   rowAbove: svg('<rect x="3" y="13" width="18" height="7" rx="1"/><path d="M12 3v7M8.5 6.5h7"/>'),
   rowBelow: svg('<rect x="3" y="4" width="18" height="7" rx="1"/><path d="M12 14v7M8.5 17.5h7"/>'),
   columnLeft: svg('<rect x="13" y="3" width="7" height="18" rx="1"/><path d="M3 12h7M6.5 8.5v7"/>'),

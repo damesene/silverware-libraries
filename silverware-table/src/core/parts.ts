@@ -17,6 +17,7 @@ import type { TableKey } from "./tables.ts";
 export const TABLE_HOOKS = {
   hovered: 0,
   cellMenu: 0,
+  editRefused: 0,
   beforeCellPress: 0,
   afterCellPress: 0,
   enhanced: 0,
@@ -33,6 +34,7 @@ export const TABLE_HOOKS = {
   lineMenuEntries: 0,
   lineMenuEndEntries: 0,
   toolbarButtons: 0,
+  tableBadges: 0,
   prepareWrite: 0,
   holdCellEdit: 0,
   pendingEdits: 0,

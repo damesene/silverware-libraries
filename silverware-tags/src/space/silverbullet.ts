@@ -1,4 +1,4 @@
-// The Space and the Notifier made of SilverBullet's API, as the library page
+// The Space and the Notifier made of SilverBullet's API, as the init page
 // hands it over (bridge.ts). The page open in the editor is read and written
 // through the editor (its text, one replaceRange: an undo step there), never
 // by writing its file, which SilverBullet would take for a change made

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Bridge, DEFAULT_SHORTCUT, missingBridgeFunctions, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, readSettings, readShortcut } from "./bridge.ts";
-import libraryPage from "../silverware-toolbar.md?raw";
+import initPage from "../silverware-toolbar-init.md?raw";
 import { DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES } from "./core/favorites.ts";
 
 const bridge = (config: Record<string, unknown>, extra: Partial<Bridge> = {}): Bridge => ({
@@ -101,13 +101,13 @@ describe("Settings", () => {
     expect((await readSettings(without)).favorites).toEqual(DEFAULT_FAVORITES);
   });
 
-  it("names what the library page did not hand over", () => {
+  it("names what the init page did not hand over", () => {
     expect(missingBridgeFunctions({ getText: () => "" })).toEqual(["getSelection", "setSelection", "replaceRange", "flash"]);
   });
 });
 
-describe("The library page", () => {
-  const page = libraryPage;
+describe("The init page", () => {
+  const page = initPage;
 
   it("defines no default for the favourites, and the same key and modules as the code", () => {
     // The favourites have no default in config.define (left out, the toolbar's own apply: SilverBullet would copy a
@@ -122,7 +122,7 @@ describe("The library page", () => {
     for (const name of MODULE_NAMES) expect(page).toContain(`${name} = { type = "object"`);
   });
 
-  it("names and describes each module as the library page's config.define does (the settings dialog shows them)", () => {
+  it("names and describes each module as the init page's config.define does (the settings dialog shows them)", () => {
     for (const name of MODULE_NAMES) {
       const line = page.split("\n").find((l) => l.trimStart().startsWith(`${name} = { type = "object"`)) ?? "";
       expect(line).toContain(`description = "${MODULE_DESCRIPTIONS[name]}"`);

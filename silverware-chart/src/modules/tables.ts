@@ -1,7 +1,7 @@
 // The tables module: a markdown table as a chart's source, found by its
 // place and read by the chart itself (no other plugin needed): `above` /
-// `below` the chart, `#Heading` (the first table under it), `[[Page]]#Heading`
-// on another page. Columns by their names or keys (sources/markdown.ts). It
+// `below` the chart, `#Heading` (the first table under it), `[[Page#Heading]]`
+// on another page, as SilverBullet links to a heading. Columns by their names or keys (sources/markdown.ts). It
 // offers the page's tables to the Data menu (and to inserting a chart).
 import type { Source, Unreadable } from "../core/model.ts";
 import type { Candidate, ChartModule, ModuleHost, SourceContext, SourceData } from "../core/module.ts";
@@ -13,8 +13,9 @@ const byPlace = (rest: string) => rest === "above" || rest === "below" || rest.s
 async function read(host: ModuleHost, source: Source, context: SourceContext): Promise<SourceData | Unreadable | undefined> {
   const { page, rest } = pageOf(source.table);
   if (!byPlace(rest)) return undefined;
-  // Above and below are the chart's own page's
-  if (page && (rest === "above" || rest === "below")) return { problem: `${source.table}: above and below are this page's; on another page say a heading (#Title)` };
+  // Above and below are the chart's own page's; a heading of another page in the link, as SilverBullet writes it
+  if (page && (rest === "above" || rest === "below")) return { problem: `${source.table}: above and below are this page's; on another page say a heading ([[${page}#Title]])` };
+  if (page && /\]\]\s*#/.test(source.table)) return { problem: `${source.table}: a heading of another page goes in its link, [[${page}${rest}]]` };
   const text = page && page !== context.page ? await host.readPage(page).catch(() => undefined) : context.text;
   if (text === undefined) return { problem: `no page ${page}` };
   const table = tableByPlace(text, rest, page && page !== context.page ? undefined : context.block);

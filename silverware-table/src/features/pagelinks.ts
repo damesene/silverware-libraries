@@ -3,7 +3,9 @@
 // the pages those pages' tables refer to. A page is read when a table referring
 // to it shows, again for every write that recalculates such a table (so the
 // results written are up to date), and again when SilverBullet indexes it (it
-// changed): then the formulas module checks the tables shown again.
+// changed): then the formulas module checks the tables shown again. Other
+// modules have pages read through its offer (readPages: a pivot's source),
+// read again as they change too.
 // Turned off, no page is read, and formulas referring to one keep their
 // results (formula/page.ts: pages not read are `unread`).
 import type { Feature, ModelHost, TableTarget, TableInfo, WritePage } from "../core/feature.ts";
@@ -22,7 +24,7 @@ export class PageLinks implements Feature {
   private version = 0;
 
   constructor(private readonly host: ModelHost) {
-    host.offer({ readFor: (formulas, tables) => this.readFor(formulas, tables) } satisfies PageLinksOffer);
+    host.offer({ readFor: (formulas, tables) => this.readFor(formulas, tables), readPages: (pages, fresh) => this.load([], fresh, pages).then(() => undefined) } satisfies PageLinksOffer);
   }
 
   /** The pages these formulas and tables refer to (and theirs, in turn), read anew: a formula calculated in no table */
@@ -62,8 +64,8 @@ export class PageLinks implements Feature {
   }
 
   /**
-   * Another page formulas read was changed: read it again, and the tables
-   * shown are checked again. When it is the page shown now (it was read from
+   * Another page read was changed: read it again (whoever it was read for),
+   * and the tables shown are checked again. When it is the page shown now (it was read from
    * another page before), it is forgotten, so going back there does not use it
    * as it was.
    */
@@ -73,7 +75,7 @@ export class PageLinks implements Feature {
       this.pages.delete(name);
       return;
     }
-    await this.load(this.tablesShown(), new Set([name]));
+    await this.load(this.tablesShown(), new Set([name]), [name]);
     this.host.tablesChanged();
   }
 
@@ -88,7 +90,7 @@ export class PageLinks implements Feature {
    * Whether a page was read.
    */
   private async load(tables: Iterable<Table>, fresh: boolean | ReadonlySet<string>, pages: readonly string[] = [], visited?: Set<string>): Promise<boolean> {
-    // Read for formulas only
+    // Read for formulas only (a pivot is calculated by them too)
     const cells = this.cells();
     if (!this.host.bridge.readPage || !cells) return false;
     const queue = new Set<string>(pages);

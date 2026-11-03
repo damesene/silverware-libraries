@@ -140,7 +140,7 @@ export class Controller {
     this.panel.remove();
   }
 
-  /** Space Lua loaded again (the library page's init with the same settings): the modules' actions read anew as the toolbar next shows */
+  /** Space Lua loaded again (the init page's init with the same settings): the modules' actions read anew as the toolbar next shows */
   reloaded(): void {
     this.stale = true;
   }
@@ -420,7 +420,7 @@ export class Controller {
     // it selected again by itself, which an action done on it (the keyboard hidden) then lost
     await new Promise((resolve) => this.doc.defaultView!.requestAnimationFrame(resolve));
     await bridge.setSelection(context.from, context.to);
-    const missing = (what: string) => new Error(`the library page did not hand over ${what}`);
+    const missing = (what: string) => new Error(`the init page did not hand over ${what}`);
     const editor: ActionEditor = {
       invokeCommand: async (name) => {
         if (!bridge.invokeCommand) throw missing("invokeCommand");

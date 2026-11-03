@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { SETTINGS_STORE } from "../../playground/toolbar-store.ts";
 import { withConfigSettings } from "../../shared/configpage.ts";
@@ -80,6 +81,7 @@ export const test = base.extend<{ favorites: Favorites | null }>({
           const { "silverware.toolbar.favorites-touch-enabled": enabled, ...tables } = favoriteSettings(favorites);
           await writeFile(config, withConfigSettings(withConfigSettings("", tables, OWN_MARKER), { "silverware.toolbar.favorites-touch-enabled": enabled }));
         }
+        await watchReloads(page);
         await page.goto(`/${name}`);
       } else {
         // In the playground's store before it starts, unless a test saved its own meanwhile (a reload)
@@ -113,7 +115,7 @@ export async function ready(page: Page): Promise<void> {
     const w = window as unknown as { playgroundView?: unknown; client?: { editorView?: unknown } };
     return !!(w.playgroundView ?? w.client?.editorView);
   });
-  if (target === "silverbullet") await page.evaluate(() => (window as unknown as { client: { widgetsReady?: Promise<unknown> } }).client.widgetsReady);
+  if (target === "silverbullet") await loaded(page);
 }
 
 /** The page's text */

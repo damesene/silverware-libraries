@@ -4,7 +4,7 @@ import type { Bridge } from "../silverware-table/src/bridge.ts";
 import { init, openSettings } from "../silverware-table/src/index.ts";
 import { findTables, parseTable } from "../silverware-table/src/markdown.ts";
 import { metaTagPattern } from "../silverware-table/src/tags.ts";
-import libraryPage from "../silverware-table/silverware-table.md";
+import stylePage from "../silverware-table/silverware-table-style.md";
 import { benchmarkPage, FORMULAS, type FormulaKind, ProfileLog, renderLog, TYPE_NAMES } from "./benchmark.ts";
 import { measure, profileSilverwareTable, setProfileSink } from "./profile.ts";
 import { flash, setUpTheme } from "./common.ts";
@@ -17,6 +17,15 @@ const BENCH_SHOWN_KEY = "silverwarePlayground.benchShown";
 const BENCH_OPTIONS_KEY = "silverwarePlayground.benchOptions";
 // The page before the first benchmark was generated, for Restore page
 const BEFORE_BENCH_KEY = "silverwarePlayground.beforeBenchmark";
+// Other pages of the space, by name: what formulas and pivots read of other pages (none unless written there)
+const PAGES_KEY = "silverwarePlayground.pages";
+const otherPages = (): Record<string, string> => {
+  try {
+    return JSON.parse(load(PAGES_KEY) ?? "{}") as Record<string, string>;
+  } catch {
+    return {};
+  }
+};
 
 const source = document.querySelector<HTMLTextAreaElement>("#source")!;
 const page = document.querySelector<HTMLElement>("#page")!;
@@ -36,8 +45,8 @@ function save(key: string, value: string): void {
   }
 }
 
-// The library page's space-style block, as SilverBullet would apply it
-const style = /```space-style\r?\n([\s\S]*?)```/.exec(libraryPage)?.[1] ?? "";
+// The style page's space-style block, as SilverBullet would apply it
+const style = /```space-style\r?\n([\s\S]*?)```/.exec(stylePage)?.[1] ?? "";
 document.head.append(Object.assign(document.createElement("style"), { textContent: style }));
 
 // --- Rendering, as SilverBullet does it --------------------------------------
@@ -346,6 +355,13 @@ const bridge: Bridge = {
     measure("editor · replaceRange (the page rendered again)", () => setText(text.slice(0, from) + insert + text.slice(to), from + insert.length)),
   moveCursor: (pos) => moveCursor(pos),
   getCurrentPage: () => "Playground",
+  // The space's other pages, as SilverBullet reads them (a missing one throws, as space.readPage does)
+  readPage: (name) => {
+    const text = otherPages()[name];
+    if (text === undefined) throw new Error(`Not found: ${name}`);
+    return text;
+  },
+  listPages: () => ["Playground", ...Object.keys(otherPages())],
   flash,
   getConfig: (path, defaultValue) => (path in settings ? settings[path] : defaultValue),
   setSelection: (from) => {

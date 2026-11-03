@@ -439,7 +439,7 @@ describe("Formulas", () => {
 
     it("calls a function defined from Space Lua; the tables are checked again when the definitions change", async () => {
       await setup("| Name | Price | Gross |\n|---|---|---|\n| Pear | 4 | |\n");
-      // As the library page's entry does: the controller is the window's
+      // As the init page's entry does: the controller is the window's
       (globalThis as Record<string, unknown>)[GLOBAL_KEY] = controller;
       defineFunctions([vat(1.5)]);
       clickOn(cell(1, 2));
@@ -610,9 +610,12 @@ describe("Formulas", () => {
         return document.querySelector<HTMLElement>('.swt-bar button[aria-label="Recalculate"]')!;
       };
       expect(recalc().classList.contains("swt-attention")).toBe(false);
+      expect(controller.tableBadges(controller.shownTables()[0]!)).toEqual([]);
       pages.Prices = OTHER.replace("| Fig | 3 |", "| Fig | 5 |");
       await controller.pageIndexed("Prices");
       expect(recalc().classList.contains("swt-attention")).toBe(true);
+      // Said by the table's tab too, without its toolbar
+      expect(controller.tableBadges(controller.shownTables()[0]!)).toMatchObject([{ text: "Out of date", attention: true }]);
       recalc().click();
       await flush();
       expect(text).toContain(`| Fig | 5 <meta formulas.f='=[[Prices]]fruit!B2'> |`);

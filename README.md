@@ -29,8 +29,10 @@ Then install a plugin with `Library: Install`.
 
 - `REPO.md`: the repository page (`#meta/repository`) listing every plugin.
 - One folder per plugin, named `silverware-<name>`: its library page `silverware-<name>.md` (installed as
-  `Library/damesene/silverware-<name>`), the built `silverware-<name>.js`, the TypeScript sources in `src/`
-  and its interaction tests in `ui-tests/`.
+  `Library/damesene/silverware-<name>`; its documentation only), the pages its `files:` install beside it
+  (`silverware-<name>-init.md`: settings, the JavaScript loaded, commands; `silverware-<name>-api.md`: the
+  Space Lua API; `silverware-<name>-style.md`: the CSS), the built `silverware-<name>.js`, the TypeScript
+  sources in `src/` and its interaction tests in `ui-tests/`.
 - Built `.js` files are committed, because SilverBullet installs them straight from the repo.
 - Settings and the Space Lua API of a plugin live under `silverware.<name>` (e.g. `silverware.table`), CSS
   classes, data attributes and CSS variables under a prefix of its own (`swt-` for the table).
@@ -38,8 +40,10 @@ Then install a plugin with `Library: Install`.
 
 ### Adding a plugin
 
-1. A folder `silverware-<name>/` with `silverware-<name>.md` (its library page, which loads
-   `Library/damesene/silverware-<name>.js`) and `src/index.ts`.
+1. A folder `silverware-<name>/` with `silverware-<name>.md` (its library page: the documentation, its
+   `files:` listing the bundle and the pages below), `silverware-<name>-init.md` (which loads
+   `Library/damesene/silverware-<name>.js`), `silverware-<name>-api.md` and `silverware-<name>-style.md` where
+   it has an API and CSS, and `src/index.ts`.
 2. Its name in the lists of `scripts/build.mjs` and `scripts/deploy.mjs`, and an entry in `REPO.md`.
 3. Its Space Lua API as a field of the shared global: `silverware = silverware or {}`, then
    `silverware.<name> = …`; its settings with `config.define("silverware.<name>", …)`.

@@ -39,6 +39,24 @@ test.describe("Table labels", () => {
     }
   });
 
+  test("a table wider than its box, scrolled sideways in it: the tab at the box's right edge, not the table's", async ({ page }) => {
+    const columns = Array.from({ length: 14 }, (_, i) => `A rather long column ${i + 1}`);
+    const row = (cells: string[]) => `| ${cells.join(" | ")} |`;
+    await setPage(page, `# T\n\n${row(columns)}\n${row(columns.map(() => "---"))}\n${row(columns.map((_, i) => String(i)))}\n| <meta core.table core.name='wide'> |\n`);
+    await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
+    await page.mouse.move(2, 2);
+    const widget = table(page);
+    expect(await widget.evaluate((w) => w.scrollWidth > w.clientWidth)).toBe(true);
+    const edge = () => widget.evaluate((w) => Math.round(w.getBoundingClientRect().left + w.clientLeft + w.clientWidth));
+    const right = async () => {
+      const box = (await label(page, "wide").boundingBox())!;
+      return Math.round(box.x + box.width);
+    };
+    await expect.poll(async () => Math.abs((await right()) - (await edge()))).toBeLessThanOrEqual(1);
+    await widget.evaluate((w) => (w.scrollLeft = 200));
+    await expect.poll(async () => Math.abs((await right()) - (await edge()))).toBeLessThanOrEqual(1);
+  });
+
   test("a named table shows its name at its top right corner, an unnamed one none; hovered, its toolbar shows instead", async ({ page }) => {
     await open(page);
     await page.evaluate(() => {
@@ -52,6 +70,36 @@ test.describe("Table labels", () => {
     await expect(labels(page)).toHaveText(["codes"]);
     await page.mouse.move(2, 2);
     await expect(label(page, "fruit")).toHaveCount(1);
+    await expect(labels(page)).toHaveCount(2);
+  });
+
+  test("just above its header, where its tab is, the table is hovered: its toolbar shows, the tab back once the pointer leaves", async ({ page }) => {
+    await open(page);
+    await page.evaluate(() => {
+      const scroller = document.querySelector(".cm-scroller")!;
+      const t = document.querySelector(".sb-table-widget.swt-table")!;
+      scroller.scrollTop += t.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 120;
+    });
+    const tab = label(page, "fruit");
+    await expect(tab).toHaveCount(1);
+    const box = (await tab.boundingBox())!;
+    const head = (await table(page, 0).locator("table tr").first().boundingBox())!;
+    const bar = page.locator(".swt-bar.swt-visible");
+    // Over the tab, then elsewhere where it was and along the header's width: the table stays hovered, no tab
+    for (const [x, y] of [
+      [box.x + box.width / 2, box.y + box.height / 2],
+      [box.x + 2, box.y + 2],
+      [head.x + 4, head.y - 4],
+    ] as const) {
+      await page.mouse.move(x, y);
+      await page.waitForTimeout(400);
+      await expect(bar).toHaveCount(1);
+      await expect(labels(page)).toHaveText(["codes"]);
+    }
+    // Further above: not the table's any more
+    await page.mouse.move(head.x + 4, head.y - 40);
+    await expect(bar).toHaveCount(0);
+    await expect(tab).toHaveCount(1);
     await expect(labels(page)).toHaveCount(2);
   });
 

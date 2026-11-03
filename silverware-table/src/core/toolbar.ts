@@ -9,6 +9,7 @@
 import { cellText, renderedTable } from "../dom.ts";
 import { el, pressed } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
+import { parseTable } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
 import { hasPins, NO_PINS, withoutSort } from "../view.ts";
 import { TOOLBAR_NAME_ORDER, type TableHost, type ToolbarButton, type ToolbarNameSlot, type WidgetInfo } from "./feature.ts";
@@ -235,8 +236,9 @@ export class Toolbar {
   private coreMenuItems(widget: HTMLElement, info: WidgetInfo): ToolbarButton[] {
     const { host } = this.context;
     return [
-      // Pinned rows and columns are at the edges already: unpinned, they stay where they are
-      ...(hasPins(info.pins)
+      // Pinned rows and columns are at the edges already: unpinned, they stay where they are.
+      // Not for a table of a fixed shape (a pivot's): its pins are its feature's, as its rows and columns are
+      ...(hasPins(info.pins) && !host.fixedShape(parseTable(info.source))
         ? [
             {
               label: "Unpin all",

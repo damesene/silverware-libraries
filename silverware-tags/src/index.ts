@@ -1,4 +1,4 @@
-// Silverware Tags entry point, loaded by the library page's Space Lua:
+// Silverware Tags entry point, loaded by the init page's Space Lua:
 //   js.importFromSpace("Library/damesene/silverware-tags.js").init({ ... the bridge ... })
 // then its commands defined by `commandNames()`, each running `runCommand(name)`.
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
@@ -20,7 +20,7 @@ const slot = globalThis as unknown as Record<string, Controller | undefined>;
 export async function init(bridge: Bridge): Promise<void> {
   const missing = missingBridgeFunctions(bridge);
   if (missing.length) {
-    console.error(`Silverware Tags: the library page did not hand over ${missing.join(", ")}`);
+    console.error(`Silverware Tags: the init page did not hand over ${missing.join(", ")}`);
     return;
   }
   const space = silverBulletSpace(bridge);
@@ -54,7 +54,7 @@ export async function start(space: Space, notifier: Notifier, settings: Settings
 // The settings Silverware Tags runs with
 let shown: Settings | undefined;
 
-/** Whether the panel shows the page open's tags first (the setting): the library page's view keeps folders among them then */
+/** Whether the panel shows the page open's tags first (the setting): the init page's view keeps folders among them then */
 export function panelPageFirst(): boolean {
   return shown?.pageFirst ?? false;
 }
@@ -64,21 +64,21 @@ export function panelMetaApart(): boolean {
   return !(shown?.protectMeta ?? true);
 }
 
-/** The commands' names, for the library page to define them (the core's and those of the modules on) */
+/** The commands' names, for the init page to define them (the core's and those of the modules on) */
 export function commandNames(): string[] {
   return slot[GLOBAL_KEY]?.commands().map((command) => command.name) ?? [];
 }
 
-/** A command run (the library page's commands call it) */
+/** A command run (the init page's commands call it) */
 export function runCommand(name: string): Promise<void> {
   return slot[GLOBAL_KEY]?.runCommand(name) ?? Promise.resolve();
 }
 
-// The tags' panel (the panel module's offer), for whatever draws it: the library page's Lua makes SilverBullet's
+// The tags' panel (the panel module's offer), for whatever draws it: the init page's Lua makes SilverBullet's
 // navigator view of these; the JS knows nothing of how it is drawn
 const panel = () => slot[GLOBAL_KEY]?.offered<PanelOffer>(PANEL_OFFER);
 
-/** Whether the panel module is on (the library page defines the view only then) */
+/** Whether the panel module is on (the init page defines the view only then) */
 export function panelOn(): boolean {
   return !!panel();
 }
@@ -88,7 +88,7 @@ export async function panelRows(): Promise<PanelRow[]> {
   return [...((await panel()?.rows()) ?? [])];
 }
 
-/** The panel's row actions, every module's (the library page defines them as the navigator's, each running `panelRun`) */
+/** The panel's row actions, every module's (the init page defines them as the navigator's, each running `panelRun`) */
 export function panelActionList(): PanelActionInfo[] {
   return [...(panel()?.actions() ?? [])];
 }
@@ -107,10 +107,10 @@ export function panelMove(tag: string, to: string): Promise<void> {
 }
 
 /**
- * `silverware.tags.defineOperations` (the library page's Space Lua): custom
+ * `silverware.tags.defineOperations` (the init page's Space Lua): custom
  * operations, a definition, a list, or a function given the helpers that
  * returns them, usually a JS module of the space. The others defined; what is
- * wrong with any of them (or a name defined twice), which the library page
+ * wrong with any of them (or a name defined twice), which the API page
  * shows as a notification (an error there would stop the rest of the user's
  * script).
  */

@@ -1,6 +1,6 @@
 // Table themes: a theme is CSS for tables marked data-swt-theme="<name>", which
-// sets --swt-* variables (the library page's CSS turns them into the table's
-// look, see "Themes" there). The built-in ones are on the library page; a
+// sets --swt-* variables (the style page's CSS turns them into the table's
+// look, see "Themes" there). The built-in ones are on the style page; a
 // space-style block of the user's adds more, without anything registered:
 // a theme is found by its selector in the page's styles.
 

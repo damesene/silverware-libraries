@@ -217,6 +217,11 @@ class Sheet {
     return result;
   }
 
+  /** A formula's value in no cell but with a body row as its own (`[@column]` that row's), one value; none of the cells' results kept by it */
+  atRow(tree: Node, row: number): Scalar {
+    return single(this.evaluate(tree, row, -1));
+  }
+
   /** A formula's value in none of the table's cells (evaluateFormula): a range stays one, no cell's result being one value */
   standalone(formula: string): Value {
     const tree = parse(formula);
@@ -521,6 +526,23 @@ const NO_TABLE: Table = { indent: "", align: [], rows: [{ cells: [] }], padded: 
  */
 export function evaluateFormula(formula: string, { cells, tables }: Calculation): Value {
   return new Sheet(NO_TABLE, new Book(cells, tables)).standalone(formula);
+}
+
+/**
+ * A formula of one row calculated for each body row of a table, as if in
+ * none of its cells (`[@column]` that row's): a pivot's groups and its
+ * condition, read row by row
+ */
+export function rowValues(table: Table, formula: string, { cells, tables, name }: Calculation): Scalar[] {
+  const tree = parse(formula);
+  const sheet = new Sheet(table, new Book(cells, tables), undefined, name);
+  return table.rows.slice(1).map((_, row) => (isError(tree) ? tree : sheet.atRow(tree, row)));
+}
+
+/** A formula calculated over a table as a whole, one value (`[qty]` all its rows): a pivot's value of a group's rows */
+export function tableValue(table: Table, formula: string, { cells, tables, name }: Calculation): Scalar {
+  const tree = parse(formula);
+  return isError(tree) ? tree : new Sheet(table, new Book(cells, tables), undefined, name).atRow(tree, 0);
 }
 
 /** A value as a cell shows it: an error by its code */

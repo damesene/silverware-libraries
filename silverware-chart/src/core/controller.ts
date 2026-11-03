@@ -79,7 +79,7 @@ function fenced(format: ChartFormat, text: string): string {
 function sameReference(a: Source, b: Source): boolean {
   const where = (s: Source) => (s.where ?? []).map((c) => `${c.column}\u0000${c.criterion}`).join("\u0001");
   const rows = (s: Source) => (s.rows ? `${s.rows.from} ${s.rows.count}` : "");
-  return a.table === b.table && a.x === b.x && a.series.length === b.series.length && a.series.every((name, i) => name === b.series[i]) && where(a) === where(b) && rows(a) === rows(b);
+  return a.table === b.table && a.labels === b.labels && a.series.length === b.series.length && a.series.every((name, i) => name === b.series[i]) && where(a) === where(b) && rows(a) === rows(b);
 }
 
 /**
@@ -190,12 +190,12 @@ export class Controller {
     return [...custom, ...builtIn.filter((format) => !names.has(format.name))];
   }
 
-  /** The modules' commands (the library page defines them) */
+  /** The modules' commands (the init page defines them) */
   commands(): Command[] {
     return this.modules.flatMap((module) => module.commands?.() ?? []);
   }
 
-  /** The modules' slash commands (the library page defines them) */
+  /** The modules' slash commands (the init page defines them) */
   slashCommands(): Command[] {
     return this.modules.flatMap((module) => module.slashCommands?.() ?? []);
   }
@@ -227,7 +227,7 @@ export class Controller {
     return this.modules.flatMap((module) => module.sources?.() ?? []);
   }
 
-  /** The code blocks' languages some format reads (the library page defines a code widget for each) */
+  /** The code blocks' languages some format reads (the init page defines a code widget for each) */
   languages(): string[] {
     return [...new Set(this.formats().flatMap((format) => format.languages))];
   }
@@ -249,7 +249,7 @@ export class Controller {
 
   /**
    * The element a code block shows: its chart, or why it cannot be drawn;
-   * undefined where no format reads it as a chart (the library page hands
+   * undefined where no format reads it as a chart (the init page hands
    * it on to what drew such blocks before); `pageText` the page's text where
    * it is known (an edit followed), else read
    */

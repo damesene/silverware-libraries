@@ -25,7 +25,7 @@ const TABLE = `| Month | Status | Revenue |
 
 describe("a source's rows", () => {
   const table = tablesOf(TABLE)[0]!;
-  const source = { table: "above", x: "Month", series: ["Revenue"] };
+  const source = { table: "above", labels: "Month", series: ["Revenue"] };
 
   it("are those where every condition holds, then the first or last so many", () => {
     expect(dataOf(table, { ...source, where: [{ column: "Status", criterion: "= done" }] }, "t")).toEqual({ labels: ["Jan", "Mar", "Apr"], series: [[10, 30, 40]] });
@@ -42,9 +42,9 @@ describe("a source's rows", () => {
 
 describe("rows and where in Mermaid's comments", () => {
   it("are read and written back, a where a line each", () => {
-    const block = 'xychart-beta\n  x-axis ["Mar"]\n  bar "Revenue" [30]\n%% chart.source: above\n%% chart.x: Month\n%% chart.series: Revenue\n%% chart.where: Status = done\n%% chart.where: Revenue > 15\n%% chart.rows: last 2';
+    const block = 'xychart-beta\n  x-axis ["Mar"]\n  bar "Revenue" [30]\n%% chart.source: above\n%% chart.labels: Month\n%% chart.series: Revenue\n%% chart.where: Status = done\n%% chart.where: Revenue > 15\n%% chart.rows: last 2';
     const model = readMermaid(block) as ChartModel;
-    expect(model.source).toEqual({ table: "above", x: "Month", series: ["Revenue"], where: [{ column: "Status", criterion: "= done" }, { column: "Revenue", criterion: "> 15" }], rows: { from: "last", count: 2 } });
+    expect(model.source).toEqual({ table: "above", labels: "Month", series: ["Revenue"], where: [{ column: "Status", criterion: "= done" }, { column: "Revenue", criterion: "> 15" }], rows: { from: "last", count: 2 } });
     expect(writeMermaid(model)).toBe(block);
   });
 

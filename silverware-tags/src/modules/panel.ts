@@ -1,6 +1,6 @@
 // The panel module: the tags as a panel beside the page, always at hand, as
 // rows a host draws as a tree by "/" (SilverBullet's navigator, wired by the
-// library page's Lua: this module knows nothing of it). Each row a tag with
+// init page's Lua: this module knows nothing of it). Each row a tag with
 // the pages using it and where (a page's tag, a task's, an item's), a level
 // above tags a row too, counting the pages of the tags under it. Its actions:
 // Add to the page open, or for one of its own tags Remove from the page open

@@ -35,8 +35,8 @@ describe("readMermaid", () => {
   });
 
   it("reads each series' kind from chart.kinds where Mermaid has no word for it, none where it is the type's own", () => {
-    const model = readMermaid('xychart-beta\n  x-axis [a]\n  bar "s" [1]\n  line "t" [2]\n  line "u" [3]\n  line "v" [4]\n%% chart.kinds: bar, area, points, sunburst') as ChartModel;
-    expect(model.series.map((s) => s.kind)).toEqual([undefined, "area", "points", "line"]);
+    const model = readMermaid('xychart-beta\n  x-axis [a]\n  bar "s" [1]\n  line "t" [2]\n  line "u" [3]\n  line "v" [4]\n%% chart.kinds: bar, area, point, sunburst') as ChartModel;
+    expect(model.series.map((s) => s.kind)).toEqual([undefined, "area", "point", "line"]);
     // An area chart's lines are its areas
     const area = readMermaid('xychart-beta\n  x-axis [a]\n  line [1]\n  bar [2]\n%% chart.type: area') as ChartModel;
     expect(area.series.map((s) => s.kind)).toEqual([undefined, "bar"]);
@@ -49,13 +49,13 @@ describe("readMermaid", () => {
   });
 
   it("reads our comments into the model, the keys it has no field for kept", () => {
-    const model = readMermaid(`${EXAMPLE}\n%% chart.type: area\n%% chart.stacked: true\n%% chart.colors: #111, #222\n%% chart.legend: bottom\n%% chart.source: [[Data]]sales\n%% chart.x: month\n%% chart.series: revenue, cost\n%% chart.later: 1`) as ChartModel;
+    const model = readMermaid(`${EXAMPLE}\n%% chart.type: area\n%% chart.stacked: true\n%% chart.colors: #111, #222\n%% chart.legend: bottom\n%% chart.source: [[Data]]sales\n%% chart.labels: month\n%% chart.series: revenue, cost\n%% chart.later: 1`) as ChartModel;
     expect(model).toMatchObject({
       type: "area",
       stacked: true,
       colors: ["#111", "#222"],
       legend: "bottom",
-      source: { table: "[[Data]]sales", x: "month", series: ["revenue", "cost"] },
+      source: { table: "[[Data]]sales", labels: "month", series: ["revenue", "cost"] },
       extra: { later: "1" },
     });
   });
@@ -81,14 +81,14 @@ describe("writeMermaid", () => {
   });
 
   it("says in comments what Mermaid cannot, a pie for round types", () => {
-    const model: ChartModel = { type: "doughnut", title: "Pets", labels: ["Dogs", "Cats"], series: [{ values: [3, null] }], legend: "right", source: { table: "pets", x: "kind", series: ["count"] } };
+    const model: ChartModel = { type: "doughnut", title: "Pets", labels: ["Dogs", "Cats"], series: [{ values: [3, null] }], legend: "right", source: { table: "pets", labels: "kind", series: ["count"] } };
     expect(writeMermaid(model)).toBe(`pie title Pets
   "Dogs" : 3
   "Cats" : 0
 %% chart.type: doughnut
 %% chart.legend: right
 %% chart.source: pets
-%% chart.x: kind
+%% chart.labels: kind
 %% chart.series: count`);
   });
 
@@ -112,5 +112,29 @@ describe("writeMermaid", () => {
     const written = writeMermaid(readMermaid(previous) as ChartModel, previous);
     expect(written.split("\n")[0]).toBe('%%{init: {"theme": "dark"}}%%');
     expect(written.endsWith("%% chart.type: area\n%% a note")).toBe(true);
+  });
+
+  it("writes an axis' range in Mermaid's y-axis with both ends, one end alone in a comment (a syntax error there), read back so", () => {
+    const bars: ChartModel = { type: "bar", labels: ["a"], series: [{ values: [1] }] };
+    const both = writeMermaid({ ...bars, y: { title: "EUR", min: 0, max: 200 } });
+    expect(both).toContain('  y-axis "EUR" 0 --> 200');
+    expect(both).not.toContain("chart.y");
+    const from = writeMermaid({ ...bars, y: { title: "EUR", min: 0 } });
+    expect(from).toContain('  y-axis "EUR"\n');
+    expect(from).toContain("%% chart.yFrom: 0");
+    expect((readMermaid(from) as ChartModel).y).toEqual({ title: "EUR", min: 0 });
+    const to = writeMermaid({ ...bars, y: { max: 50 } });
+    expect(to).not.toContain("y-axis");
+    expect((readMermaid(to) as ChartModel).y).toEqual({ max: 50 });
+  });
+
+  it("writes a scatter's x range in comments (its x axis has the labels in Mermaid), read back so; an end no number kept as written", () => {
+    const scatter: ChartModel = { type: "scatter", labels: ["1", "4"], series: [{ values: [2, 3] }], x: { min: 0, max: 10 } };
+    const written = writeMermaid(scatter);
+    expect(written).toContain("%% chart.xFrom: 0\n%% chart.xTo: 10");
+    expect((readMermaid(written) as ChartModel).x).toEqual({ min: 0, max: 10 });
+    const odd = readMermaid(`${EXAMPLE}\n%% chart.yFrom: zero`) as ChartModel;
+    expect(odd.y).toEqual({ title: "Seconds", min: 0, max: 198.2 });
+    expect(odd.extra).toEqual({ yFrom: "zero" });
   });
 });

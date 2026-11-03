@@ -4,7 +4,7 @@
 // renamed there renamed in the cells;
 // the table's lists under Choice in the Type menu, deleted there (one columns take asked first, those columns then without a type)
 import type { Page } from "@playwright/test";
-import { answerConfirm, bodyRows, columnCells, expect, header, markdown, menu, rendersAnew, setPage, settled, test } from "./helpers.ts";
+import { answerConfirm, bodyRows, drag, columnCells, expect, header, markdown, menu, rendersAnew, setPage, settled, test } from "./helpers.ts";
 
 const LIST = `| <meta core.table columntypes.choice.status='["open","in progress","done"]'> |`;
 const PAGE = ["| Task | Status #choice-status |", "|---|---|", "| A | done |", "| B | open |", "| C | later |", LIST, ""].join("\n");
@@ -43,6 +43,45 @@ test.describe("Choices", () => {
     expect(text).toContain(`columntypes.choice.status='["open","in progress","finished"]'`);
     expect(text).toMatch(/\| A +\| finished +\|/);
     expect(text).toMatch(/\| C +\| later +\|/);
+  });
+
+  test("a value is dragged by its grip to another place, the list saved in that order", async ({ page }) => {
+    await load(page);
+    await openChoices(page);
+    const rows = dialog(page).locator(".swt-choices-row");
+    await drag(page, rows.nth(2).locator(".swt-choices-grip"), rows.nth(0).locator(".swt-choices-grip"));
+    await expect(dialog(page).locator(".swt-choices-value").first()).toHaveValue("done");
+    await rendersAnew(page, () => dialog(page).getByRole("button", { name: "Save" }).click());
+    expect(await markdown(page)).toContain(`columntypes.choice.status='["done","open","in progress"]'`);
+  });
+
+  test("a long list scrolls while a value is held near its top: the last value dragged to the first place", async ({ page }) => {
+    const values = Array.from({ length: 40 }, (_, i) => `v${i + 1}`);
+    const list = `| <meta core.table columntypes.choice.many='${JSON.stringify(values)}'> |`;
+    await load(page, ["| Task | Status #choice-many |", "|---|---|", "| A | v1 |", list, ""].join("\n"), 1);
+    await openChoices(page);
+    const box = dialog(page).locator(".swt-choices-values");
+    await box.evaluate((e) => (e.scrollTop = e.scrollHeight));
+    const grip = dialog(page).locator(".swt-choices-row").last().locator(".swt-choices-grip");
+    const from = (await grip.boundingBox())!;
+    const top = (await box.boundingBox())!;
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + from.width / 2, top.y + 4, { steps: 8 });
+    await expect.poll(() => box.evaluate((e) => e.scrollTop)).toBe(0);
+    await page.mouse.move(from.x + from.width / 2, top.y + 2);
+    await page.mouse.up();
+    await expect(dialog(page).locator(".swt-choices-value").first()).toHaveValue("v40");
+  });
+
+  test("the dialog keeps its least height with the list's fields hidden", async ({ page }) => {
+    await load(page);
+    await openChoices(page);
+    await dialog(page).getByRole("radio", { name: /The column's values/ }).check();
+    await expect(dialog(page).locator(".swt-choices-list")).toBeHidden();
+    // min(520px, the window's height − 32px), as the style page says
+    const least = Math.min(520, page.viewportSize()!.height - 32);
+    expect((await dialog(page).boundingBox())!.height).toBeGreaterThanOrEqual(least - 1);
   });
 
   test("a #choice column opens on its values; A list of its own makes one from them, named after the column", async ({ page }) => {

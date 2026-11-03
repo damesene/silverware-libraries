@@ -1722,6 +1722,9 @@ body.swt-resizing * {
 /* The Choices dialog: a choice column's list, its name and its values one a line */
 .swt-choices-dialog {
   width: min(440px, calc(100vw - 24px));
+  /* Of one height whichever way is picked (the list's fields shown or not), the body taking what is left */
+  min-height: min(520px, calc(100vh - 32px));
+  min-height: min(520px, calc(var(--sw-view-height, 100dvh) - 32px));
 }
 .swt-choices-form {
   display: flex;

@@ -49,15 +49,15 @@ export default ({ palette, mix }: Helpers): FormatDefinition<ScaleParams> => ({
   description:
     "A fill along two or three colors: at the minpoint, the midpoint (or none) and the maxpoint, each the smallest or largest value, a number, a percent of the range or a percentile; a cell past a point has its color",
   params: {
+    minColor: { kind: "color", line: "Minpoint", label: "Minpoint's color", default: palette.red },
     minType: { kind: "choice", line: "Minpoint", label: "Minpoint", ...kinds("min"), default: "min" },
     minValue: { kind: "number", line: "Minpoint", label: "Minpoint's value", default: 0, visible: valued("minType") },
-    minColor: { kind: "color", line: "Minpoint", label: "Minpoint's color", default: palette.red },
+    midColor: { kind: "color", line: "Midpoint", label: "Midpoint's color", default: palette.yellow, visible: (p) => p.midType !== "none" },
     midType: { kind: "choice", line: "Midpoint", label: "Midpoint", ...kinds("none"), default: "percentile" },
     midValue: { kind: "number", line: "Midpoint", label: "Midpoint's value", default: 50, visible: valued("midType") },
-    midColor: { kind: "color", line: "Midpoint", label: "Midpoint's color", default: palette.yellow, visible: (p) => p.midType !== "none" },
+    maxColor: { kind: "color", line: "Maxpoint", label: "Maxpoint's color", default: palette.green },
     maxType: { kind: "choice", line: "Maxpoint", label: "Maxpoint", ...kinds("max"), default: "max" },
     maxValue: { kind: "number", line: "Maxpoint", label: "Maxpoint's value", default: 100, visible: valued("maxType") },
-    maxColor: { kind: "color", line: "Maxpoint", label: "Maxpoint's color", default: palette.green },
   },
   look: (cell, { scope, params }) => {
     const n = cell.number;

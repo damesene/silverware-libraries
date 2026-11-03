@@ -1,5 +1,6 @@
 // A pivot's definition as its table's metadata row keeps it, in the formulas'
-// language: `source` the table summarized, `rows` and `columns` what groups
+// language: `source` the table summarized (of this page, or of another as
+// formulas refer to it: [[Orders]]orders), `rows` and `columns` what groups
 // its rows (a column, or a formula of one row), `values` what each group
 // shows (a formula over its rows, or its share of a total), `where` which rows count (a formula of one
 // row), `sort` the rows' order, `totals` the totals shown. Pure: the module
@@ -50,10 +51,24 @@ export function splitList(text: string): string[] {
   return items.map((item) => item.trim()).filter((item) => item !== "");
 }
 
+/** The table a pivot summarizes: its name, and the page it is on where the source says one (`[[Orders]]orders`, as formulas refer to it) */
+export type SourceRef = { readonly name: string; readonly page?: string };
+
+export function sourceRef(source: string): SourceRef {
+  const m = /^\[\[([^\]]*)\]\]([\s\S]*)$/.exec(source.trim());
+  return m ? { page: m[1]!.trim(), name: m[2]!.trim() } : { name: source.trim() };
+}
+
+export function sourceText(ref: SourceRef): string {
+  return ref.page !== undefined ? `[[${ref.page}]]${ref.name}` : ref.name;
+}
+
 /** The definition of a table's attributes; undefined where it has no source (no pivot), else why it cannot be one */
 export function readDefinition(attribute: (key: Key) => string | undefined): PivotDefinition | { readonly problem: string } | undefined {
   const source = attribute("source")?.trim();
   if (!source) return undefined;
+  const ref = sourceRef(source);
+  if (!ref.name || ref.page === "") return { problem: "its source names no table (pivot.source: orders, or [[Page]]orders on another page)" };
   const values = splitList(attribute("values") ?? "");
   const rows = splitList(attribute("rows") ?? "");
   if (!values.length) return { problem: "it says no values (pivot.values: SUM([revenue]))" };

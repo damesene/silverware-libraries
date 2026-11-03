@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseTable } from "../markdown.ts";
 import { CELLS } from "../testing/formulas.ts";
-import { definitionAttributes, groupFormula, type Key, type PivotDefinition, readDefinition, splitList, valueItem, valueParts } from "./definition.ts";
+import { definitionAttributes, groupFormula, type Key, type PivotDefinition, readDefinition, sourceRef, sourceText, splitList, valueItem, valueParts } from "./definition.ts";
 import { pivotOf } from "./pivot.ts";
 
 const ORDERS = parseTable(`| Date | Region | Product | Category | Qty | Revenue |
@@ -45,6 +45,14 @@ describe("a pivot's definition", () => {
       ["values", "SUM([revenue])"],
       ["sort", "SUM([revenue]) desc, region"],
     ]);
+  });
+
+  it("reads a source on another page as formulas refer to it, and writes it so", () => {
+    expect(sourceRef("[[Sales/2026]] orders")).toEqual({ page: "Sales/2026", name: "orders" });
+    expect(sourceRef(" orders ")).toEqual({ name: "orders" });
+    expect(sourceText({ page: "Sales/2026", name: "orders" })).toBe("[[Sales/2026]]orders");
+    expect(readDefinition((key) => ({ source: "[[Orders]]", rows: "region", values: "SUM([qty])" })[key as "source"])).toEqual({ problem: "its source names no table (pivot.source: orders, or [[Page]]orders on another page)" });
+    expect(readDefinition((key) => ({ source: "[[]]orders", rows: "region", values: "SUM([qty])" })[key as "source"])).toHaveProperty("problem");
   });
 
   it("is none without a source, and says what is missing or wrong", () => {

@@ -52,6 +52,11 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
   const doc = host.doc;
   const e = <K extends keyof HTMLElementTagNameMap>(tag: K, props?: Parameters<typeof el>[2], ...children: ElementChild[]) => el(doc, tag, props, ...children);
   let fields: Fields = options.fields;
+  // The sources offered: a source none of them is (another page's not read, a table gone) offered as written, as a column is
+  const sourceNames = () => {
+    const names = options.sources.map((s) => s.name);
+    return names.some((n) => n.toLowerCase() === fields.source.toLowerCase()) || !fields.source ? names : [fields.source, ...names];
+  };
   const columnsOf = () => options.sources.find((s) => s.name.toLowerCase() === fields.source.toLowerCase())?.columns ?? [];
 
   const form = e("div", "swt-pivot-form");
@@ -166,7 +171,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
     const sortKeys = ["", ...fields.rows.map(groupText), ...fields.values.map(valueText)];
     const sort = fields.sort[0];
     form.replaceChildren(
-      section("Source", "The table summarized", select(options.sources.map((s) => s.name), (n) => n, fields.source, (source) => set({ source }), "Source")),
+      section("Source", "The table summarized", select(sourceNames(), (n) => n, fields.source, (source) => set({ source }), "Source")),
       section("Rows", "A row for each value of", ...groups("rows", "Row"), add("Group rows", () => set({ rows: [...fields.rows, { column: first, grouping: "" }] }))),
       section("Columns", "A column for each value of (optional)", ...groups("columns", "Column"), fields.columns.length ? null : add("Group columns", () => set({ columns: [{ column: first, grouping: "" }] }))),
       section("Values", "What each shows", ...fields.values.map((v, i) => valueRow(v, (f) => set({ values: f ? replaced(fields.values, i, f) : fields.values.filter((_, j) => j !== i) }), i)), add("Value", () => set({ values: [...fields.values, { fn: "SUM", column: columns.find((c) => c !== first) ?? first, show: "" }] }))),

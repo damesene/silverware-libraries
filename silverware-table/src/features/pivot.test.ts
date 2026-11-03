@@ -315,4 +315,87 @@ describe("Pivot tables", () => {
     await controller.scan();
     expect(text).toContain("pivot.source='sales'");
   });
+
+  describe("of another page's table", () => {
+    const OTHER = (body: string) => PIVOT(body).replace("pivot.source='orders'", "pivot.source='[[Orders]]orders'");
+    const refresh = () => {
+      cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      return document.querySelector<HTMLElement>('.swt-bar button[aria-label="Refresh pivot"]');
+    };
+    const shown = async (page: string, pages: Record<string, string>, settings: Record<string, unknown> = {}) => {
+      const read: string[] = [];
+      await setup(page, { "silverware.table.metadata": true, ...settings }, { readPage: (name) => (read.push(name), pages[name] ?? Promise.reject(new Error(`no page ${name}`))) });
+      // (The page read as the pivot shows, then checked)
+      await flush();
+      return read;
+    };
+
+    it("reads that page as it shows, Refresh writing it as calculated, the page read anew for it", async () => {
+      const read = await shown(`${OTHER("| East | 1 |")}\n`, { Orders: ORDERS });
+      expect(read).toEqual(["Orders"]);
+      expect(refresh()?.classList.contains("swt-attention")).toBe(true);
+      expect(refresh()?.title).toBe("Refresh pivot: it is out of date (its source on Orders was changed)");
+      refresh()!.click();
+      await flush();
+      await controller.scan();
+      expect(text).toContain("| Region | Sum of Revenue |\n|---|--:|\n| East | 120 |\n| West | 50 |\n| Total | 170 |");
+      expect(read).toEqual(["Orders", "Orders"]);
+      expect(refresh()?.classList.contains("swt-attention")).toBe(false);
+    });
+
+    it("is out of date once that page is indexed with changes", async () => {
+      const pages = { Orders: ORDERS };
+      await shown(`${OTHER("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, pages);
+      expect(refresh()?.classList.contains("swt-attention")).toBe(false);
+      pages.Orders = ORDERS.replace("| West | 50 |", "| West | 60 |");
+      await controller.pageIndexed("Orders");
+      expect(refresh()?.classList.contains("swt-attention")).toBe(true);
+    });
+
+    it("says why it cannot be calculated: no such page", async () => {
+      await shown(`${OTHER("| East | 1 |")}\n`, {});
+      expect(refresh()?.title).toBe("This pivot cannot be calculated: no page Orders");
+    });
+
+    it("says why it cannot be calculated: no such table there", async () => {
+      await shown(`${OTHER("| East | 1 |")}\n`, { Orders: "| A |\n|---|\n| 1 |\n" });
+      expect(refresh()?.title).toBe("This pivot cannot be calculated: no table named orders on Orders");
+    });
+
+    it("says why it cannot be calculated: pageLinks off", async () => {
+      const read = await shown(`${OTHER("| East | 1 |")}\n`, { Orders: ORDERS }, { "silverware.table.modules.pageLinks.enabled": false });
+      expect(read).toEqual([]);
+      expect(refresh()?.title).toBe("This pivot cannot be calculated: its source is on another page, which the pageLinks module reads: it is off");
+    });
+
+    it("is not written by an edit of a table of its source's name on this page", async () => {
+      await shown(`${ORDERS}\n\n${OTHER("| East | 1 |")}\n`, { Orders: ORDERS.replace("| East | 100 |", "| East | 900 |") });
+      await controller.writeTable(controller.shownTables()[0]!, (t) => setCell(t, 2, 1, "7"));
+      await controller.scan();
+      expect(text).toContain("| East | 1 |");
+    });
+
+    it("keeps its source in its settings, that page's columns to pick, its preview calculated from it", async () => {
+      await shown(`${OTHER("| East | 1 |")}\n`, { Orders: ORDERS });
+      cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      document.querySelector<HTMLElement>('.swt-bar button[aria-label="Pivot settings…"]')!.click();
+      const dialog = document.querySelector<HTMLElement>(".swt-pivot-dialog")!;
+      expect(dialog.querySelector<HTMLSelectElement>('select[aria-label="Source"]')!.value).toBe("[[Orders]]orders");
+      expect(Array.from(dialog.querySelector<HTMLSelectElement>('select[aria-label="Value 1 column"]')!.options, (o) => o.value)).toEqual(["Region", "Revenue"]);
+      expect(dialog.querySelectorAll(".swt-pivot-table tr")[1]?.textContent).toBe("East120");
+      dialog.querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
+      await flush();
+      await controller.scan();
+      expect(text).toContain("pivot.source='[[Orders]]orders'");
+      expect(text).toContain("| East | 120 |");
+    });
+
+    it("takes a source naming the page shown as of this page", async () => {
+      await shown(`${ORDERS}\n\n${PIVOT("| East | 1 |").replace("pivot.source='orders'", "pivot.source='[[Test]]orders'")}\n`, {});
+      await controller.writeTable(controller.shownTables()[0]!, (t) => controller.withTableName(t, "sales"));
+      await controller.scan();
+      expect(text).toContain("pivot.source='[[Test]]sales'");
+      expect(text).toContain("| East | 120 |");
+    });
+  });
 });

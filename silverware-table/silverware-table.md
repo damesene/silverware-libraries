@@ -676,7 +676,7 @@ It is a plain markdown table, its numbers written in it (it shows anywhere, as a
 
 | Attribute | What it says |
 |---|---|
-| `pivot.source` | The table summarized: a table of the page by its name (see [[#Table names]]) |
+| `pivot.source` | The table summarized: a table of the page by its name (see [[#Table names]]), or of another page as formulas refer to it: `[[Orders]]orders` |
 | `pivot.rows` | What groups the rows: a column (`region`), or a formula of one row (`TEXT([@date], "yyyy-mm")`, `YEAR([@date])`), several comma separated |
 | `pivot.columns` | What makes columns of the groups, the same way (optional): a cross table |
 | `pivot.values` | What each group shows: formulas over its rows, `SUM([revenue])`, `AVERAGE([qty])`, `COUNTA([date])`, `SUM([qty] * [price])`, comma separated; `SHARE(…)` around one shows it as a share of the grand total (`SHARE(SUM([revenue]))`), `SHARE(…, "row")` of its row's total, `SHARE(…, "column")` of its column's, its column typed `#percent-1`; SHARE is the pivot's, so it is the whole value or nothing (`SHARE(…) * 100` is `#NAME?`) |
@@ -686,6 +686,7 @@ It is a plain markdown table, its numbers written in it (it shows anywhere, as a
 
 * An edit of its source with Silverware Table writes the pivot anew in the same edit: one Ctrl+Z takes back both. Its source renamed, the pivot names it so.
 * Edited by hand (in its markdown) the source is ahead of the pivot: its **Refresh pivot** icon in the toolbar is highlighted; click it and the pivot is calculated anew.
+* A source on another page is as a formula's table there (see [[#Other tables]]): its edits do not write the pivot; once SilverBullet has indexed that page, **Refresh pivot** is highlighted where the pivot is out of date. Renamed there, the source (or its columns) is not followed: the pivot says what it cannot find, and its settings fix it. It needs the `pageLinks` module.
 * Its values are calculated, so its cells are not edited: the editor does not open on them, and its menus offer nothing that changes them or adds, moves or deletes its rows and columns. Rename a header as in any table: the pivot keeps your name (and a type's hashtag added to it) when it is calculated again.
 * Its totals are pinned: the Total row to the bottom, a cross table's Total column to the right, so they stay in view and out of a sort (with *Store table metadata*).
 * It needs the `formulas` module.

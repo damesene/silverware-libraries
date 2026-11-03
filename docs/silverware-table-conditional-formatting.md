@@ -2,7 +2,7 @@
 
 Conditional formatting as in Excel: cells of a column, a named row or the whole table look different where their values meet a condition (a fill, a text color, bold; later data bars, color scales and icons). Predefined conditions and formats, and the user's own registered without changing the plugin, as custom column types are. A module of its own, `conditions`, that the core knows nothing of.
 
-Status (2026-11-03): planned, nothing done. The research behind it is in *What the code has* below; what was decided with the user is in *Decisions*, what is still open at the end.
+Status (2026-11-03): phases 1 to 3 done on the branch `feat/conditional-formatting`: the core's `CellLook.vars`, the offers (`valueOf` of column types, `rowValues` of formulas, `ranges` of conditions), the domain `src/conditions/` with 20 conditions and 17 formats, the module with its dialog (a live preview in the table), quick rules in a column's menu, the cell menu, the toolbar's icon, `defineConditions` / `defineFormats`, the Excel file's conditional formatting (verified in Excel 16), the library page. Phase 4 in part: a named row's scope works in the dialog (and is evaluated, stored, exported); quick rules in a row's grip menu are not done. What was decided with the user is in *Decisions*, what is still open at the end.
 
 ## Goals and limits
 

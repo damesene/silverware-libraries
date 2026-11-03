@@ -56,21 +56,15 @@ describe("Conditional formatting", () => {
   });
 
   it("grades a whole table's rule column by column, or its columns as one range where it says so", async () => {
-    const page = "| A | B |
-|---|---|
-| 1 | 100 |
-| 9 | 900 |
-";
-    await setup(page + `| <meta core.table conditions.rules='[{"format":"colorScale"}]'> |
-`);
+    const page = "| A | B |\n|---|---|\n| 1 | 100 |\n| 9 | 900 |\n";
+    await setup(page + `| <meta core.table conditions.rules='[{"format":"colorScale"}]'> |\n`);
     await flush();
     // Each column on its own: 9 is its column's largest
     expect(fill(2, 0)).toBe("var(--swt-cf-green-fill)");
     expect(fill(1, 1)).toBe("var(--swt-cf-red-fill)");
     controller.stop();
     document.body.replaceChildren();
-    await setup(page + `| <meta core.table conditions.rules='[{"format":"colorScale","together":true}]'> |
-`);
+    await setup(page + `| <meta core.table conditions.rules='[{"format":"colorScale","together":true}]'> |\n`);
     await flush();
     // Together: 9 is near the smallest of all
     expect(fill(2, 0)).toMatch(/color-mix/);

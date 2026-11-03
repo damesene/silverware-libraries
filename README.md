@@ -20,6 +20,9 @@ Then install a plugin with `Library: Install`.
 
 - **Silverware Table** ([`silverware-table/`](silverware-table/silverware-table.md)): sort, filter and edit markdown tables
   in place, formulas, column types, and moving, adding or deleting rows and columns. Tables stay plain markdown.
+- **Silverware Toolbar** ([`silverware-toolbar/`](silverware-toolbar/silverware-toolbar.md)): a toolbar by the text you
+  select (docked over the keyboard on a phone) to format it, turn lines into lists, headings, quotes or code blocks, and
+  run any action or command, with gesture buttons, text snippets and an emoji picker.
 - **Silverware Tags** ([`silverware-tags/`](silverware-tags/silverware-tags.md)): a manager of the space's tags: rename and
   merge them everywhere, delete them, tag many pages at once (a folder's too), edit a page's tags; every change previewed.
 - **Silverware Chart** ([`silverware-chart/`](silverware-chart/silverware-chart.md)): charts written as Mermaid (other

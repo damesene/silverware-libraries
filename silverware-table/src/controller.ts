@@ -80,6 +80,7 @@ import {
 } from "./view.ts";
 import { type TableKey, TableRegister } from "./core/tables.ts";
 import { Parts } from "./core/parts.ts";
+import { underWindow } from "./core/overwindow.ts";
 
 // The cell editor as features see it, and what it takes to put the cell back
 
@@ -101,6 +102,9 @@ const SORT_GLYPH = { asc: "▲", desc: "▼", none: "⇅" } as const;
 
 // A sorting is stored (metadata setting) once the clicks have settled
 const STORE_SORT_DELAY_MS = 400;
+
+// Just above a table's header, as far: still the table hovered (its tab is there, and the pointer comes in from above)
+const HOVER_ABOVE = 20;
 
 const NOT_SAVED = "Silverware Table: the table changed in the meantime, nothing was saved";
 
@@ -2312,7 +2316,9 @@ export class Controller implements TableHost {
       this.cancelHide();
       return;
     }
-    const hit = this.enhancedWidgetOf(target);
+    // Over the table, or just above its header (where its tab is, and the pointer comes in from above)
+    const above = this.enhancedWidgetOf(target) ? undefined : this.aboveHeader(e);
+    const hit = above ? ([above.widget, above.info] as const) : this.enhancedWidgetOf(target);
     if (!hit) {
       if (!busy && !overScrollbar(e)) this.scheduleHide();
       return;
@@ -2327,8 +2333,8 @@ export class Controller implements TableHost {
     }
     // The grips stay with the edited cell (hoverEdited)
     if (this.cellEditor.active) return;
-    // Not over a cell (e.g. the table's own scrollbar): the grips stay on the last cell
-    const cell = this.tableCellOf(info, target);
+    // Not over a cell (e.g. the table's own scrollbar): the grips stay on the last cell; above the header, its cell there
+    const cell = above ? above.cell : this.tableCellOf(info, target);
     if (cell && cell !== this.hoverCell) {
       this.hoverCell = cell;
       this.cellHovered(widget, info, cell);
@@ -2671,6 +2677,28 @@ export class Controller implements TableHost {
   /** What holds the pointer, if anything (Feature.pointerBusy): a drag, a menu open */
   private pointerBusy(): "drag" | "menu" | "pick" | undefined {
     return this.features.map((f) => f.pointerBusy?.()).find(Boolean);
+  }
+
+  /**
+   * The table whose header the pointer is just above (HOVER_ABOVE), across
+   * the table's width, and the header's cell under it; not a table under what
+   * is over the window
+   */
+  private aboveHeader(e: MouseEvent): { widget: HTMLElement; info: WidgetInfo; cell: HTMLTableCellElement | undefined } | undefined {
+    for (const info of this.shownTables()) {
+      const widget = this.widgetOf(info);
+      const header = info.table.rows[0];
+      if (!header || !widget.isConnected || underWindow(widget)) continue;
+      const top = header.getBoundingClientRect().top;
+      const { left, right } = info.table.getBoundingClientRect();
+      if (e.clientY < top - HOVER_ABOVE || e.clientY >= top || e.clientX < left || e.clientX >= right) continue;
+      const cell = Array.from(header.cells).find((c) => {
+        const r = c.getBoundingClientRect();
+        return e.clientX >= r.left && e.clientX < r.right;
+      });
+      return { widget, info, cell };
+    }
+    return undefined;
   }
 
   /** As if the pointer were over this cell: the grips go to its row and column */

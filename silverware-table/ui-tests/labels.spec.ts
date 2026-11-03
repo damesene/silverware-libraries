@@ -55,6 +55,36 @@ test.describe("Table labels", () => {
     await expect(labels(page)).toHaveCount(2);
   });
 
+  test("just above its header, where its tab is, the table is hovered: its toolbar shows, the tab back once the pointer leaves", async ({ page }) => {
+    await open(page);
+    await page.evaluate(() => {
+      const scroller = document.querySelector(".cm-scroller")!;
+      const t = document.querySelector(".sb-table-widget.swt-table")!;
+      scroller.scrollTop += t.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 120;
+    });
+    const tab = label(page, "fruit");
+    await expect(tab).toHaveCount(1);
+    const box = (await tab.boundingBox())!;
+    const head = (await table(page, 0).locator("table tr").first().boundingBox())!;
+    const bar = page.locator(".swt-bar.swt-visible");
+    // Over the tab, then elsewhere where it was and along the header's width: the table stays hovered, no tab
+    for (const [x, y] of [
+      [box.x + box.width / 2, box.y + box.height / 2],
+      [box.x + 2, box.y + 2],
+      [head.x + 4, head.y - 4],
+    ] as const) {
+      await page.mouse.move(x, y);
+      await page.waitForTimeout(400);
+      await expect(bar).toHaveCount(1);
+      await expect(labels(page)).toHaveText(["codes"]);
+    }
+    // Further above: not the table's any more
+    await page.mouse.move(head.x + 4, head.y - 40);
+    await expect(bar).toHaveCount(0);
+    await expect(tab).toHaveCount(1);
+    await expect(labels(page)).toHaveCount(2);
+  });
+
   test("scrolling the page: the tab stays on its table's corner, and on its header held; it goes with the header", async ({ page }) => {
     await open(page);
     const scroll = (by: number) =>

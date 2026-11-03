@@ -243,8 +243,8 @@ describe("Rules as stored", () => {
     expect(rules[0]).toEqual({ scope: { kind: "column", column: 1 }, when: { name: "greater", params: { value: 100 } }, format: { name: "redFill", params: {} } });
     expect(isUnread(rules[2]!)).toBe(true);
     expect(rulesText(rules)).toBe(text);
-    expect(rulesOf('[{"format":"bold","together":true}]', { kind: "table" })[0]).toMatchObject({ together: true });
-    expect(rulesText(rulesOf('[{"format":"bold","together":true}]', { kind: "table" }))).toBe('[{"format":"bold","together":true}]');
+    expect(rulesOf('[{"format":"bold","perColumn":true}]', { kind: "table" })[0]).toMatchObject({ perColumn: true });
+    expect(rulesText(rulesOf('[{"format":"bold","perColumn":true}]', { kind: "table" }))).toBe('[{"format":"bold","perColumn":true}]');
     const table = rulesOf('[{"row":"pear","format":"bold"}]', { kind: "table" });
     expect(table[0]).toMatchObject({ scope: { kind: "row", name: "pear" } });
     expect(rulesOf("not json", { kind: "table" }).map(isUnread)).toEqual([true]);

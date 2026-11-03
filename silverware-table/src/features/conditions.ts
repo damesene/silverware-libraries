@@ -95,8 +95,8 @@ export class Conditions implements Feature {
         const row = named.get(rule.scope.name.toLowerCase());
         return row !== undefined && row >= rows[0] && row <= rows[1] ? [{ rule, rows: [row, row] as const, columns: all }] : [];
       }
-      // Each column on its own, as the table shows it, unless its columns go together
-      if (!rule.together) return Array.from({ length: Math.max(0, all[1] - all[0] + 1) }, (_, i) => ({ rule, rows, columns: [all[0] + i, all[0] + i] as const }));
+      // Each column on its own where the rule says so, else the columns as one range
+      if (rule.perColumn) return Array.from({ length: Math.max(0, all[1] - all[0] + 1) }, (_, i) => ({ rule, rows, columns: [all[0] + i, all[0] + i] as const }));
       return [{ rule, rows, columns: all }];
     });
   }
@@ -193,9 +193,9 @@ export class Conditions implements Feature {
       }
       return bodyRows.flatMap((r) => bodyColumns.map((c) => placed(r, c)));
     };
-    // A whole table's rule applies to each column on its own (its scale, its top values), unless its columns go together
+    // A whole table's rule applies to its columns as one range (as a spreadsheet's), or to each on its own where it says so
     const inputs: RuleCells[] = rules.flatMap((rule) =>
-      rule.scope.kind === "table" && !rule.together ? bodyColumns.map((c) => ({ rule, cells: cellsOf({ kind: "column", column: c }) })) : [{ rule, cells: cellsOf(rule.scope) }],
+      rule.scope.kind === "table" && rule.perColumn ? bodyColumns.map((c) => ({ rule, cells: cellsOf({ kind: "column", column: c }) })) : [{ rule, cells: cellsOf(rule.scope) }],
     );
     const { styles, problems } = evaluateRules(inputs, this.rowFormula(table));
     for (const problem of problems) {

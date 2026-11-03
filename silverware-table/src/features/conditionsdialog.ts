@@ -241,7 +241,7 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
       (v) => scopes.find((s) => s.value === v)?.label ?? v,
       scopeValue,
       (v) => {
-        const { together: _, ...rest } = rule;
+        const { perColumn: _, ...rest } = rule;
         const next = scopes.find((s) => s.value === v)!.scope;
         set(i, { ...(next.kind === "table" ? rule : rest), scope: next });
       },
@@ -317,12 +317,12 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
       return e("div", "swt-cf-params", ...children);
     };
     const describe = (text: string | undefined) => (text ? e("p", { class: "swt-cf-description", text }) : null);
-    // A whole table's rule: each column on its own (its own scale, its own top values), or its columns as one range
-    const together = e("input", { attrs: { type: "checkbox", "data-focus": `rule ${i} together` } });
-    together.checked = !!rule.together;
-    together.addEventListener("change", () => {
-      const { together: _, ...rest } = rule;
-      set(i, together.checked ? { ...rest, together: true } : rest);
+    // A whole table's rule: its cells as one range (as a spreadsheet's), or each column on its own
+    const perColumn = e("input", { attrs: { type: "checkbox", "data-focus": `rule ${i} perColumn` } });
+    perColumn.checked = !!rule.perColumn;
+    perColumn.addEventListener("change", () => {
+      const { perColumn: _, ...rest } = rule;
+      set(i, perColumn.checked ? { ...rest, perColumn: true } : rest);
     });
     const stop = e("input", { attrs: { type: "checkbox", "data-focus": `rule ${i} stop` } });
     stop.checked = !!rule.stop;
@@ -336,7 +336,7 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
       section(
         "Applies to",
         scope,
-        rule.scope.kind === "table" ? e("label", "swt-pivot-toggle", together, "All columns as one range (else each column on its own: its own scale, its own top values)") : null,
+        rule.scope.kind === "table" ? e("label", "swt-pivot-toggle", perColumn, "Each column on its own: its own scale, its own top values (else the table's cells as one range)") : null,
       ),
       section("Which cells", when, describe(condition?.description), rule.when ? refFields(rule.when, condition?.params, "when") : null),
       section("Format", format, describe(formatDefinition?.description), refFields(rule.format, formatDefinition?.params, "format")),

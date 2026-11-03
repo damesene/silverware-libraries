@@ -55,20 +55,20 @@ describe("Conditional formatting", () => {
     expect(formatted(1, 0)).toBe(false);
   });
 
-  it("grades a whole table's rule column by column, or its columns as one range where it says so", async () => {
+  it("grades a whole table's rule over its cells as one range, as a spreadsheet's; column by column where it says so", async () => {
     const page = "| A | B |\n|---|---|\n| 1 | 100 |\n| 9 | 900 |\n";
     await setup(page + `| <meta core.table conditions.rules='[{"format":"colorScale"}]'> |\n`);
+    await flush();
+    // As one range: 9 is near the smallest of all
+    expect(fill(2, 0)).toMatch(/color-mix/);
+    expect(fill(2, 1)).toBe("var(--swt-cf-green-fill)");
+    controller.stop();
+    document.body.replaceChildren();
+    await setup(page + `| <meta core.table conditions.rules='[{"format":"colorScale","perColumn":true}]'> |\n`);
     await flush();
     // Each column on its own: 9 is its column's largest
     expect(fill(2, 0)).toBe("var(--swt-cf-green-fill)");
     expect(fill(1, 1)).toBe("var(--swt-cf-red-fill)");
-    controller.stop();
-    document.body.replaceChildren();
-    await setup(page + `| <meta core.table conditions.rules='[{"format":"colorScale","together":true}]'> |\n`);
-    await flush();
-    // Together: 9 is near the smallest of all
-    expect(fill(2, 0)).toMatch(/color-mix/);
-    expect(fill(2, 1)).toBe("var(--swt-cf-green-fill)");
   });
 
   it("shows its icon in the toolbar of a table with rules; Conditional formatting… in the ⋯ menu always", async () => {

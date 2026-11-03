@@ -672,7 +672,7 @@ export class Grips implements Feature {
         : zone === "top"
           ? "Rows pinned to the top stay at the top"
           : "Rows pinned to the bottom stay at the bottom";
-    // Rows that come from a calculation (a pivot's): none inserted, duplicated, moved or deleted
+    // Rows that come from a calculation (a pivot's): none inserted, duplicated, moved, pinned (it moves them) or deleted
     const fixed = !!host.fixedShape(parseTable(info.source));
     const shape = (entries: MenuEntry[]) => (fixed ? [] : entries);
     // In the order every menu keeps (cell, row, column): the clipboard and clearing, inserting, moving and pinning, naming, deleting
@@ -715,7 +715,7 @@ export class Grips implements Feature {
             disabled: moveBlocked(block.first + 1),
           },
         ],
-      }]),
+      },
       {
         kind: "segmented",
         label: "Pin",
@@ -735,7 +735,7 @@ export class Grips implements Feature {
             disabled: pinBlocked("bottom"),
           },
         ],
-      },
+      }]),
       { kind: "separator" },
       ...this.section([...this.host.rowMenuEntries(info, row, column), ...this.host.lineMenuEndEntries(info, "row", this.selectedLines(info, "row", row))]),
       ...shape([this.deleteEntry(info, "row", row)]),
@@ -817,7 +817,7 @@ export class Grips implements Feature {
         : zone === "left"
           ? "Columns pinned to the left stay at the left"
           : "Columns pinned to the right stay at the right";
-    // Columns that come from a calculation (a pivot's): none inserted, moved, aligned (it aligns them) or deleted
+    // Columns that come from a calculation (a pivot's): none inserted, moved, pinned (it moves them), aligned (it aligns them) or deleted
     const fixed = !!host.fixedShape(parseTable(info.source));
     const shape = (entries: MenuEntry[]) => (fixed ? [] : entries);
     // In the order every menu keeps (cell, row, column): the clipboard and clearing, inserting, moving and pinning, viewing, naming, deleting
@@ -851,7 +851,7 @@ export class Grips implements Feature {
             disabled: columnMoveBlocked(block.first + 1),
           },
         ],
-      }]),
+      },
       {
         kind: "segmented",
         label: "Pin",
@@ -871,7 +871,7 @@ export class Grips implements Feature {
             disabled: pinBlocked("right"),
           },
         ],
-      },
+      }]),
       { kind: "separator" },
       ...this.featureColumnEntries(info, column, true),
       {

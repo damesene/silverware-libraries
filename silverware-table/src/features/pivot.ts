@@ -13,7 +13,7 @@ import { followOwnFormula, type FormulaCells, type FormulasOffer } from "../form
 import { columnName } from "../columns.ts";
 import { ICONS } from "../icons.ts";
 import { escapeCell, type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
-import { definitionAttributes, groupFormula, KEYS, type Key, type PivotDefinition, readDefinition } from "../pivot/definition.ts";
+import { definitionAttributes, groupFormula, KEYS, type Key, looseDefinition, type PivotDefinition, readDefinition } from "../pivot/definition.ts";
 import { type Fields, fieldsOf } from "../pivot/fields.ts";
 import { type Pivot as Calculated, pivotOf } from "../pivot/pivot.ts";
 import { asNumber } from "../view.ts";
@@ -99,6 +99,9 @@ export class Pivot implements Feature {
     const oldName = this.host.tableName(before)?.trim().toLowerCase();
     const newName = this.host.tableName(after)?.trim();
     if (!oldName && !newName) return [];
+    // A table of that name after another (a copy in the markdown) is not the pivots' source: they read the first
+    const first = (name: string | undefined) => !!name && edit.page.tables.find((t) => this.host.tableName(t.table)?.trim().toLowerCase() === name.toLowerCase())?.range.from === edit.page.from;
+    if (!first(oldName) && !first(newName)) return [];
     const out: PageTable[] = [];
     for (const { range, table } of edit.page.tables) {
       if (range.from === edit.page.from) continue;
@@ -169,6 +172,26 @@ export class Pivot implements Feature {
   enhanced(info: TableInfo): void {
     const table = parseTable(info.source);
     const definition = this.definitionOf(table);
+    if (!definition) {
+      this.stale.delete(info);
+      // A source rendered anew (edited by hand, which renders it alone): its pivots shown may be out of date now
+      const name = this.host.tableName(table)?.trim().toLowerCase();
+      if (!name) return;
+      for (const other of this.host.shownTables()) {
+        const of = other.key !== info.key && this.definitionOf(parseTable(other.source));
+        if (of && !("problem" in of) && of.source.trim().toLowerCase() === name) this.check(other);
+      }
+      this.host.toolbarChanged();
+      return;
+    }
+    this.check(info);
+    this.host.toolbarChanged();
+  }
+
+  /** Whether a pivot shown is as its source makes it now, or why it cannot be calculated */
+  private check(info: TableInfo): void {
+    const table = parseTable(info.source);
+    const definition = this.definitionOf(table);
     if (!definition) return void this.stale.delete(info);
     if ("problem" in definition) return void this.stale.set(info, `This pivot cannot be calculated: ${definition.problem}`);
     const tables = pageTablesOf(this.host.pageText);
@@ -177,7 +200,17 @@ export class Pivot implements Feature {
     if (typeof pivot === "string") return void this.stale.set(info, `This pivot cannot be calculated: ${pivot}`);
     const now = this.written(table, pivot, this.renamesOf(table));
     this.stale.set(info, JSON.stringify(now.rows.map((r) => r.cells)) !== JSON.stringify(table.rows.map((r) => r.cells)));
-    this.host.toolbarChanged();
+  }
+
+  /** Deleting a table: its pivots on the page keep their numbers, calculated no more */
+  tableDeleteWarning(info: TableInfo): string | undefined {
+    const name = this.host.tableName(parseTable(info.source))?.trim().toLowerCase();
+    if (!name) return undefined;
+    const pivots = pageTablesOf(this.host.pageText).filter(({ table }) => {
+      const of = this.definitionOf(table);
+      return of && !("problem" in of) && of.source.trim().toLowerCase() === name;
+    }).length;
+    return pivots ? `${pivots === 1 ? "a pivot table of it keeps its numbers" : `${pivots} pivot tables of it keep their numbers`}, calculated no more` : undefined;
   }
 
   /** A pivot's cells are calculated: its header alone is the user's (its names) */
@@ -244,15 +277,18 @@ export class Pivot implements Feature {
       const pivot = this.calculate(definition, sources.find((s) => s.name.toLowerCase() === definition.source.trim().toLowerCase())?.table);
       if (typeof pivot === "string") return void this.host.bridge.flash(`Silverware Table: ${pivot}`, "error");
       const made = this.written(this.withDefinition({ indent: table.indent, align: [], rows: [{ cells: [""] }], padded: false }, definition), pivot, {});
-      void this.host.insertTable(made, info, own ? undefined : { target: info, change: (t) => this.host.withTableName(t, name) });
+      const names = !own && definition.source.trim().toLowerCase() === name.toLowerCase();
+      void this.host.insertTable(made, info, names ? { target: info, change: (t) => this.host.withTableName(t, name) } : undefined);
     }, blocked);
   }
 
   /** Pivot settings…: the pivot's definition in the dialog, saved into its metadata row (the write calculates it: writeStep) */
   private settings(info: TableInfo): void {
     const table = parseTable(info.source);
-    const definition = this.definitionOf(table);
-    if (!definition || "problem" in definition) return void this.host.bridge.flash(`Silverware Table: this pivot cannot be read: ${definition ? definition.problem : "no source"}`, "error");
+    const read = this.definitionOf(table);
+    if (!read) return;
+    // One with a problem (no values, wrong totals): as far as it reads, for the dialog to fix
+    const definition = "problem" in read ? looseDefinition((key) => this.host.getMeta(table, key)) : read;
     this.dialog(this.sources(), fieldsOf(definition), "Save", (changed) => {
       void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.withDefinition(t, changed));
     });

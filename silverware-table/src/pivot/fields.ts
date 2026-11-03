@@ -134,9 +134,10 @@ export function definitionOf(fields: Fields): PivotDefinition {
   const where = fields.where ?? (parts.length > 1 ? `${fields.any ? "OR" : "AND"}(${parts.join(", ")})` : parts[0]);
   return {
     source: fields.source,
-    rows: fields.rows.map(groupText),
-    columns: fields.columns.map(groupText),
-    values: fields.values.map(valueText),
+    // (A formula left empty is no item: else its list would be read without it, and the headers named by its items lost)
+    rows: fields.rows.map(groupText).filter((t) => t.trim() !== ""),
+    columns: fields.columns.map(groupText).filter((t) => t.trim() !== ""),
+    values: fields.values.map(valueText).filter((t) => t.trim() !== ""),
     ...(where ? { where } : {}),
     sort: fields.sort,
     totals: fields.totals,

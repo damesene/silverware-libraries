@@ -78,13 +78,13 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
   const replaced = <T>(list: readonly T[], i: number, item: T) => list.map((x, j) => (j === i ? item : x));
 
   // A group: a column and how it is grouped, or its formula as text
-  const groupRow = (field: GroupField, change: (f: GroupField | undefined) => void, aria: string) => {
+  // (`typed`: its formula as typed, kept without making the form anew, which would leave the field)
+  const groupRow = (field: GroupField, change: (f: GroupField | undefined) => void, typed: (f: GroupField) => void, aria: string) => {
     if ("formula" in field) {
       const text = e("input", { attrs: { type: "text", "aria-label": `${aria} formula`, "data-focus": `${aria} formula` } });
       text.value = field.formula;
       text.addEventListener("input", () => {
-        fields = updated(fields, field, { formula: text.value });
-        field = { formula: text.value };
+        typed({ formula: text.value });
         previewSoon();
       });
       return e("div", "swt-pivot-row", text, remove(() => change(undefined)));
@@ -147,7 +147,12 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
     const first = columns[0] ?? "";
     const groups = (key: "rows" | "columns", aria: string) =>
       fields[key].map((field, i) =>
-        groupRow(field, (f) => set({ [key]: f ? replaced(fields[key], i, f) : fields[key].filter((_, j) => j !== i) } as Partial<Fields>), `${aria} ${i + 1}`),
+        groupRow(
+          field,
+          (f) => set({ [key]: f ? replaced(fields[key], i, f) : fields[key].filter((_, j) => j !== i) } as Partial<Fields>),
+          (f) => (fields = { ...fields, [key]: replaced(fields[key], i, f) }),
+          `${aria} ${i + 1}`,
+        ),
       );
     const sortKeys = ["", ...fields.rows.map(groupText), ...fields.values.map(valueText)];
     const sort = fields.sort[0];
@@ -271,8 +276,3 @@ const hasRow = (t: Totals) => t === "both" || t === "rows";
 const hasColumn = (t: Totals) => t === "both" || t === "columns";
 const totals = (row: boolean, column: boolean): Totals => (row && column ? "both" : row ? "rows" : column ? "columns" : "none");
 
-/** The fields with a group's formula typed (its row's or column's, wherever it is) */
-function updated(fields: Fields, was: GroupField, now: GroupField): Fields {
-  const swap = (list: readonly GroupField[]) => list.map((f) => (f === was ? now : f));
-  return { ...fields, rows: swap(fields.rows), columns: swap(fields.columns) };
-}

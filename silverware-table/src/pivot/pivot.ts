@@ -44,7 +44,7 @@ function headerOf(item: string, headers: readonly string[], value: boolean): str
   const name = m[1]!.toUpperCase();
   const verb = name === "COUNTA" || name === "COUNT" ? "Count" : name[0] + name.slice(1).toLowerCase();
   // A column's type (its hashtag: #euro) where the value keeps its unit: a sum, not a count
-  const tags = verb === "Count" ? "" : (unescapeHeader(header).match(/(^|\s)#[^\s#]+/g) ?? []).join("");
+  const tags = verb === "Count" ? "" : (unescapeHeader(header).match(/(^|\s)#[^\s#]+/g) ?? []).map((tag) => ` ${tag.trim()}`).join("");
   return `${verb} of ${columnName(header)}${tags}`;
 }
 

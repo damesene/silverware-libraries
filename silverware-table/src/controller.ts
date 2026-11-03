@@ -1130,6 +1130,10 @@ export class Controller implements TableHost {
   }
 
   menuNaming(info: WidgetInfo, target: NamingTarget): MenuNaming | undefined {
+    // A row's or a cell's name is a tag in its cells: none offered where they are not changed by hand (a pivot's)
+    const table = this.tableOf(info);
+    const cells = target.kind === "cell" ? [{ row: target.row, column: target.column }] : target.kind === "row" ? table.align.map((_, column) => ({ row: target.row, column })) : [];
+    if (cells.length && this.readOnly(table, cells)) return undefined;
     for (const feature of this.features) {
       const naming = feature.menuNaming?.(info, target);
       if (naming) return naming;

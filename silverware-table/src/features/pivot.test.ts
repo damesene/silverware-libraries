@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { insertRowWith } from "../core/structure.ts";
 import { setCell } from "../ops.ts";
-import { cell, cellMenuItem, clickOn, controller, editor, flashes, flush, key, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
+import { cell, cellMenuItem, clickOn, controller, cursorMoves, editor, flashes, flush, key, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 
 const ORDERS = [
   "| Region | Revenue |",
@@ -85,6 +85,20 @@ describe("Pivot tables", () => {
     expect(text).toContain("sheet.at='A7'");
   });
 
+  it("on a sheet under its source, both grown by one edit: the table under them moved by both", async () => {
+    const source = ORDERS.replace("core.name='orders'", "core.name='orders' sheet.name='S' sheet.at='A1'");
+    const pivot = PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |").replace("pivot.source=", "sheet.name='S' sheet.at='A6' pivot.source=");
+    const under = "| Note |\n|---|\n| x |\n| <meta core.table sheet.name='S' sheet.at='A11'> |";
+    await setup(`${source}\n\n${pivot}\n\n${under}\n`, { "silverware.table.metadata": true });
+    const info = controller.shownTables()[0]!;
+    await controller.writeTable(info, (t) => ({ ...t, rows: [...t.rows, { cells: ["North", "5"] }] }));
+    await controller.scan();
+    // The source a row longer: the pivot one lower; the pivot a row longer (North): the note two lower
+    expect(text).toContain("sheet.at='A7' pivot.source=");
+    expect(text).toContain("| North | 5 |");
+    expect(text).toContain("sheet.at='A13'");
+  });
+
   it("follows its source's columns renamed, its definition written with them in the same edit", async () => {
     await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |").replace("pivot.values='SUM([revenue])'", "pivot.values='SUM([revenue])' pivot.sort='SUM([revenue]) desc'")}\n`, { "silverware.table.editor.enterKey": "save", "silverware.table.metadata": true });
     clickOn(cell(0, 0));
@@ -154,6 +168,86 @@ describe("Pivot tables", () => {
       await controller.scan();
       expect(text).toContain("pivot.values='MAX([revenue])'");
       expect(text).toContain("| East | 100 |");
+    });
+  });
+
+  describe("as reviewed", () => {
+    const dialog = () => document.querySelector<HTMLElement>(".swt-pivot-dialog")!;
+    const refresh = () => {
+      second(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      return document.querySelector<HTMLElement>('.swt-bar button[aria-label="Refresh pivot"]');
+    };
+
+    it("keeps every key of a group's formula typed in its dialog", async () => {
+      await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
+      tableMenuItem(/^Pivot settings…$/, 1)!.click();
+      dialog().querySelector<HTMLButtonElement>(".swt-pivot-formula")!.click();
+      const field = dialog().querySelector<HTMLInputElement>('input[aria-label="Row 1 formula"]')!;
+      for (const typed of ["L", "LO", "LOWER([@region])"]) {
+        field.value = typed;
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      dialog().querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
+      await flush();
+      await controller.scan();
+      expect(text).toContain("pivot.rows='LOWER([@region])'");
+      expect(text).toContain("| east | 120 |");
+    });
+
+    it("opens its settings where its definition has a problem, to fix it", async () => {
+      await setup(`${ORDERS}\n\n${PIVOT("| East | 1 |").replace("pivot.values='SUM([revenue])'", "pivot.values=''")}\n`, { "silverware.table.metadata": true });
+      tableMenuItem(/^Pivot settings…$/, 1)!.click();
+      expect(dialog()).not.toBeNull();
+    });
+
+    it("is out of date once its source is shown anew as edited by hand", async () => {
+      await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
+      expect(refresh()?.classList.contains("swt-attention")).toBe(false);
+      const edited = text.replace("| West | 50 |", "| West | 51 |");
+      setText(edited);
+      renderPage(edited, editor, cursorMoves);
+      await controller.scan();
+      expect(refresh()?.classList.contains("swt-attention")).toBe(true);
+    });
+
+    it("is not calculated from a second table of its source's name", async () => {
+      const copy = ORDERS.replace("| East | 100 |", "| East | 9 |");
+      await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n\n${copy}\n`, { "silverware.table.metadata": true });
+      await controller.writeTable(controller.shownTables()[2]!, (t) => setCell(t, 2, 1, "7"));
+      await controller.scan();
+      expect(text).toContain("| East | 120 |\n| West | 50 |\n| Total | 170 |");
+    });
+
+    it("is said to lose its source when that is deleted", async () => {
+      await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
+      const questions: string[] = [];
+      (controller as unknown as { bridge: Record<string, unknown> }).bridge.confirm = (message: string) => {
+        questions.push(message);
+        return false;
+      };
+      tableMenuItem(/^Delete table$/)!.click();
+      await flush();
+      expect(questions[0]).toContain("A pivot table of it keeps its numbers, calculated no more.");
+    });
+
+    it("names the table it is inserted from only where that is its source", async () => {
+      const unnamed = ORDERS.replace("| <meta core.table core.name='orders'> |", "");
+      await setup(`${unnamed}\n${ORDERS.replace("orders", "prices")}\n`, { "silverware.table.metadata": true });
+      tableMenuItem(/^Insert pivot table…$/)!.click();
+      const source = dialog().querySelector<HTMLSelectElement>('select[aria-label="Source"]')!;
+      source.value = "prices";
+      source.dispatchEvent(new Event("change", { bubbles: true }));
+      dialog().querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
+      await flush();
+      await controller.scan();
+      expect(text).toContain("pivot.source='prices'");
+      expect(text).not.toContain("core.name='table1'");
+    });
+
+    it("offers no name for its body's cells and rows, nor pins", async () => {
+      await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
+      second(1, 1).dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2, clientX: 10, clientY: 10 }));
+      expect(document.querySelector(".swt-menu .swt-menu-rename")).toBeNull();
     });
   });
 

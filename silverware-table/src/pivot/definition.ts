@@ -75,6 +75,21 @@ export function readDefinition(attribute: (key: Key) => string | undefined): Piv
   };
 }
 
+/** A definition read as far as it goes (one with a problem: for its dialog to fix it), what it says wrong left out */
+export function looseDefinition(attribute: (key: Key) => string | undefined): PivotDefinition {
+  const totals = attribute("totals")?.trim() as Totals | undefined;
+  const where = attribute("where")?.trim();
+  return {
+    source: attribute("source")?.trim() ?? "",
+    rows: splitList(attribute("rows") ?? ""),
+    columns: splitList(attribute("columns") ?? ""),
+    values: splitList(attribute("values") ?? ""),
+    ...(where ? { where } : {}),
+    sort: [],
+    totals: totals && TOTALS.includes(totals) ? totals : "both",
+  };
+}
+
 /** The attributes writing a definition (what it leaves out, as it was by default, not written) */
 export function definitionAttributes(definition: PivotDefinition): [Key, string][] {
   const list = (items: readonly string[]) => items.join(", ");

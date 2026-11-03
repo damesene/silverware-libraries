@@ -37,6 +37,13 @@ describe("a pivot's fields", () => {
     expect(definitionOf(fieldsOf(definition({ rows: "region", values: "SUM([revenue])", where: nested }))).where).toBe(nested);
   });
 
+  it("leave a formula emptied out of their definition", () => {
+    const fields = fieldsOf(definition({ rows: "region, x", values: "SUM([revenue])" }));
+    const made = definitionOf({ ...fields, rows: [fields.rows[0]!, { formula: " " }], values: [{ formula: "" }] });
+    expect(made.rows).toEqual(["region"]);
+    expect(made.values).toEqual([]);
+  });
+
   it("give back the definition they were read from", () => {
     const read = definition({ rows: 'region, TEXT([@date], "yyyy-mm")', columns: "YEAR([@date])", values: "SUM([revenue]), SUM([qty] * [price])", where: '[@category] = "Hardware"', sort: "SUM([revenue]) desc", totals: "rows" });
     expect(definitionOf(fieldsOf(read))).toEqual(read);

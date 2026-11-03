@@ -126,6 +126,11 @@ describe("a pivot calculated", () => {
     expect(body[0]).toEqual(["a", "4", "2"]);
   });
 
+  it("keeps a type's hashtag apart from the value's name, wherever the source's header had it", () => {
+    const rated = parseTable("| Item | #stars Rating |\n|---|---|\n| a | 4 |\n| a | 2 |");
+    expect(pivotOf(rated, definition({ rows: "item", values: "AVERAGE([rating])" }), { cells: CELLS }).columns.map((c) => c.header)).toEqual(["Item", "Average of Rating #stars"]);
+  });
+
   it("gives each column an id that stays as its data change", () => {
     expect(pivot({ rows: "region", columns: 'TEXT([@date], "mm")', values: "SUM([revenue])" }).columns.map((c) => c.id)).toEqual([
       "row:region",

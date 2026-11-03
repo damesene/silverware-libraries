@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import { loaded, watchReloads } from "../../scripts/silverbullet-loaded.ts";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 import { LONG_PRESS_MS } from "../src/core/press.ts";
 
@@ -45,15 +46,6 @@ const SETTINGS_PAGE = `${TEST_FOLDER}/Settings`;
  * why it is not a failure.
  */
 const SILVERBULLET_CONSOLE_NOISE: readonly RegExp[] = [];
-
-/**
- * How long no table may be rendered for the page to count as loaded in
- * SilverBullet: it renders the page's tables anew once more right after its
- * widgets are ready (20 to 60 ms after `widgetsReady` in the local 2.12.1,
- * seen on 2026-11-03), so a test began on tables about to be replaced (one
- * measured had no box, a style set on one was gone)
- */
-const TABLES_QUIET_MS = 300;
 
 /** The settings a test gave, by its page: a later `setSettings` adds to them */
 const settingsOf = new WeakMap<Page, Record<string, Setting>>();
@@ -99,15 +91,7 @@ export const test = base.extend({
     let failed = false;
     try {
       if (target === "silverbullet") {
-        // When SilverBullet last rendered a table, for `ready`
-        await page.addInitScript(() => {
-          const at = window as unknown as { silverwareTestTableAt: number };
-          at.silverwareTestTableAt = 0;
-          new MutationObserver((records) => {
-            const table = (node: Node) => node instanceof Element && (node.matches(".sb-table-widget") || !!node.querySelector(".sb-table-widget"));
-            if (records.some((r) => Array.from(r.addedNodes).some(table))) at.silverwareTestTableAt = performance.now();
-          }).observe(document, { childList: true, subtree: true });
-        });
+        await watchReloads(page);
         await writePage(name, sample);
         // There before `setSettings` writes it: SilverBullet reads a page before writing it, a missing one a 404 in the console
         await writePage(SETTINGS_PAGE, "");
@@ -148,9 +132,7 @@ async function ready(page: Page): Promise<void> {
   if (target === "silverbullet") {
     await expect(page.locator("#sb-editor .cm-editor")).toBeVisible();
     await page.waitForFunction(() => !!(window as unknown as { client?: Client }).client);
-    await page.evaluate(() => (window as unknown as { client: Client }).client.widgetsReady);
-    // Its tables rendered for the last time
-    await page.waitForFunction((quiet) => performance.now() - (window as unknown as { silverwareTestTableAt: number }).silverwareTestTableAt >= quiet, TABLES_QUIET_MS);
+    await loaded(page);
   }
   await expect(table(page)).toBeVisible();
 }

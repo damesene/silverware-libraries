@@ -783,6 +783,8 @@ export class Controller implements TableHost {
 
   toolbarChanged(): void {
     this.toolbar.changed();
+    // The tables' tabs too, next frame: what the features say a table is (Out of date) changes with it
+    this.queueStickyUpdate();
   }
 
   /**

@@ -24,8 +24,15 @@ test.describe("Pivot tables", () => {
     await expect(cell(page, 1, 0, 1)).toHaveText("East");
     await page.mouse.move(2, 2);
     const tabs = page.locator(".swt-table-label.swt-visible");
+    // Its body as written is not what its source makes: out of date, said in its tab
+    await expect(tabs).toHaveText(["orders", "Pivot of orders · Out of date"]);
+    await expect(tabs.nth(1).locator(".swt-table-badge svg")).toHaveCount(2);
+    await expect(tabs.nth(1).locator(".swt-table-badge.swt-attention")).toHaveText("Out of date");
+    // Refreshed: no longer
+    await hoverCell(page, cell(page, 1, 0, 1));
+    await rendersAnew(page, () => page.locator('.swt-bar.swt-visible button[aria-label="Refresh pivot"]').click(), 1);
+    await page.mouse.move(2, 2);
     await expect(tabs).toHaveText(["orders", "Pivot of orders"]);
-    await expect(tabs.nth(1).locator(".swt-table-badge svg")).toHaveCount(1);
     // Hovered: its toolbar instead
     await hoverCell(page, cell(page, 1, 0, 1));
     await expect(tabs).toHaveText(["orders"]);

@@ -353,8 +353,18 @@ describe("Pivot tables", () => {
     await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |")}\n\n${PIVOT("| East | 1 |").replace("pivot.source='orders'", "pivot.source='[[Orders]]orders' core.name='byregion'")}\n`, { "silverware.table.metadata": true });
     const [source, here, other] = controller.shownTables();
     expect(controller.tableBadges(source!)).toEqual([]);
-    expect(controller.tableBadges(here!).map((b) => b.text)).toEqual(["Pivot of orders"]);
-    expect(controller.tableBadges(other!).map((b) => b.text)).toEqual(["Pivot of [[Orders]]orders"]);
+    expect(controller.tableBadges(here!)[0]!.text).toBe("Pivot of orders");
+    expect(controller.tableBadges(other!)[0]!.text).toBe("Pivot of [[Orders]]orders");
+  });
+
+  it("says it is out of date, or cannot be calculated, by a badge asking for attention; up to date, only what it is", async () => {
+    const current = PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |", " core.pin-bottom='1'");
+    const broken = PIVOT("| East | 1 |").replace("pivot.source='orders'", "pivot.source='nowhere'");
+    await setup(`${ORDERS}\n\n${current}\n\n${PIVOT("| East | 1 |")}\n\n${broken}\n`, { "silverware.table.metadata": true });
+    const [, upToDate, stale, notCalculated] = controller.shownTables();
+    expect(controller.tableBadges(upToDate!).map((b) => b.text)).toEqual(["Pivot of orders"]);
+    expect(controller.tableBadges(stale!).map((b) => [b.text, b.attention])).toEqual([["Pivot of orders", undefined], ["Out of date", true]]);
+    expect(controller.tableBadges(notCalculated!)[1]).toMatchObject({ text: "Cannot be calculated", attention: true });
   });
 
   it("follows its source's new name", async () => {

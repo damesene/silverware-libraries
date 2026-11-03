@@ -361,6 +361,8 @@ export type TableBadge = {
   readonly text: string;
   // Its icon's markup (icons.ts), before the text
   readonly icon?: string;
+  // Asks for attention, as a toolbar button's `attention` (its data out of date): shown so, in the toolbar's color for it
+  readonly attention?: boolean;
 };
 
 /** A button a feature adds to a table's toolbar */

@@ -2,7 +2,8 @@
 // top right corner (its toolbar's place, clear of the grips and the + at the
 // left), so which table is which reads at a glance, in the page and on the
 // sheet; before it, what the features say the table is (TableHost.tableBadges:
-// a pivot's "Pivot of orders"), a table with no name shown so too. Not while the table is hovered: its toolbar then shows, and its ⋯
+// a pivot's "Pivot of orders"; its data out of date, "Out of date" asking for
+// attention: seen without the toolbar's Refresh), a table with no name shown so too. Not while the table is hovered: its toolbar then shows, and its ⋯
 // menu has the name. The tab sits above the table's header, held or not, so
 // it goes along with the header held at the view's top (on the sheet, for a
 // table on its first row, over the columns' letters: rather them than the
@@ -96,7 +97,11 @@ export class TableLabels implements AdapterFeature {
     if (tab.dataset.content === content) return;
     tab.dataset.content = content;
     const doc = tab.ownerDocument;
-    const parts = badges.map((badge) => el(doc, "span", "swt-table-badge", badge.icon ? el(doc, "span", { class: "swt-table-badge-icon", html: badge.icon }) : null, badge.text));
+    // (One badge of a text: two features saying a table is out of date say it once)
+    const shown = badges.filter((badge, i) => badges.findIndex((b) => b.text === badge.text) === i);
+    const parts = shown.map((badge) =>
+      el(doc, "span", badge.attention ? "swt-table-badge swt-attention" : "swt-table-badge", badge.icon ? el(doc, "span", { class: "swt-table-badge-icon", html: badge.icon }) : null, badge.text),
+    );
     tab.replaceChildren(...parts.flatMap((part, i) => (i ? [" · ", part] : [part])), ...(name ? [parts.length ? " · " : "", name] : []));
   }
 

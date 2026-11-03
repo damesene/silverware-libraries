@@ -610,9 +610,12 @@ describe("Formulas", () => {
         return document.querySelector<HTMLElement>('.swt-bar button[aria-label="Recalculate"]')!;
       };
       expect(recalc().classList.contains("swt-attention")).toBe(false);
+      expect(controller.tableBadges(controller.shownTables()[0]!)).toEqual([]);
       pages.Prices = OTHER.replace("| Fig | 3 |", "| Fig | 5 |");
       await controller.pageIndexed("Prices");
       expect(recalc().classList.contains("swt-attention")).toBe(true);
+      // Said by the table's tab too, without its toolbar
+      expect(controller.tableBadges(controller.shownTables()[0]!)).toMatchObject([{ text: "Out of date", attention: true }]);
       recalc().click();
       await flush();
       expect(text).toContain(`| Fig | 5 <meta formulas.f='=[[Prices]]fruit!B2'> |`);

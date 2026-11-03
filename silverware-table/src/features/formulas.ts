@@ -21,6 +21,7 @@ import type {
   Panel,
   Rect,
   ModelHost,
+  TableBadge,
   TableLooks,
   ToolbarButton,
   TableInfo,
@@ -730,6 +731,11 @@ export class Formulas implements Feature {
       this.host.looksChanged(info, cells);
     }
     this.host.toolbarChanged();
+  }
+
+  /** Results out of date: said by the table's tab too, without its toolbar shown */
+  tableBadges(info: TableInfo): TableBadge[] {
+    return this.stale.get(info) ? [{ icon: ICONS.recalculate, text: "Out of date", attention: true }] : [];
   }
 
   /** Recalculate, first in the toolbar of a table with formulas; highlighted when results are out of date */

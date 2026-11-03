@@ -292,7 +292,7 @@ With the *Store table metadata* setting on (see [[#Settings]]), type a formula i
 * Saving a formula fixes mistakes that have only one possible fix, and says what it changed: missing `)` at the end are added (`=SUM(A1:A3` becomes `=SUM(A1:A3)`), a text in quotes or a `[column]` left open at the end is closed, and extra `)` at the very end are dropped. Anything else stays as typed and shows `#ERROR!`.
 * **Calculated columns**: when every row of a column holds the same formula, such as `=[@qty]*[@price]`, a new row (the **+** on a border, Ctrl+Enter, Tab on the last cell, *Insert row*) gets it too. Total rows (with a formula over a whole column, such as `=SUM([qty])`) do not count.
 * Click the cell to edit its formula. Typing a plain value removes the formula. To type a text that starts with `=`, start it with `'=`; such a text opens with the `'` again, so it stays text.
-* Results are written whenever Silverware Table edits the table, in the same edit (one Ctrl+Z undoes both). Viewing a table never changes it. The toolbar of a table with formulas has *Recalculate* (the ↻ icon), which writes the current results; it is highlighted when some are out of date, e.g. after the table was changed outside Silverware Table (by typing in the markdown).
+* Results are written whenever Silverware Table edits the table, in the same edit (one Ctrl+Z undoes both). Viewing a table never changes it. The toolbar of a table with formulas has *Recalculate* (the ↻ icon), which writes the current results; it is highlighted when some are out of date, e.g. after the table was changed outside Silverware Table (by typing in the markdown), and the table's tab says *Out of date* without hovering it (with the `tableLabels` module).
 * A formula's result has a dotted underline; hover it to see its formula, or why it shows an error.
 * Numbers are read as for sorting (`12,99 €`, `1 000`, `15 %`). Results use a decimal comma when most numbers in the table do. A text that is not read as a number (e.g. `1,234.50`, with a thousands comma) is skipped by `SUM` and the other number functions.
 
@@ -685,7 +685,7 @@ It is a plain markdown table, its numbers written in it (it shows anywhere, as a
 | `pivot.totals` | `both` (the default): a Total row and, with columns, a Total column; `rows`: the row; `columns`: the column; `none` |
 
 * An edit of its source with Silverware Table writes the pivot anew in the same edit: one Ctrl+Z takes back both. Its source renamed, the pivot names it so.
-* Edited by hand (in its markdown) the source is ahead of the pivot: its **Refresh pivot** icon in the toolbar is highlighted; click it and the pivot is calculated anew.
+* Edited by hand (in its markdown) the source is ahead of the pivot: its **Refresh pivot** icon in the toolbar is highlighted, and its tab says *Out of date* (*Cannot be calculated* where it cannot be); click Refresh pivot and the pivot is calculated anew.
 * A source on another page is as a formula's table there (see [[#Other tables]]): its edits do not write the pivot; once SilverBullet has indexed that page, **Refresh pivot** is highlighted where the pivot is out of date. Renamed there, the source (or its columns) is not followed: the pivot says what it cannot find, and its settings fix it. It needs the `pageLinks` module.
 * Its values are calculated, so its cells are not edited: the editor does not open on them, and its menus offer nothing that changes them or adds, moves or deletes its rows and columns (nor *Unpin all*: its totals are pinned by it). Its grips open their menus but do not drag, and its cells selected have no edge to drag them by. The order of its groups and values is set in its dialog (↑ ↓ beside each). Rename a header as in any table: the pivot keeps your name (and a type's hashtag added to it) when it is calculated again.
 * It says what it is at a glance: *Pivot of orders* in a small tab at its top right corner (with the `tableLabels` module), `Pivot of [[Orders]]orders` for a source on another page, as its definition writes it.
@@ -954,7 +954,7 @@ Each module can be turned off with `enabled = false`, e.g. `config.set("silverwa
 | `autoscroll` | The middle mouse button over a table scrolls it. |
 | `fullScreen` | The table's icon (in the first row of its ⋯ menu, or in its toolbar while you hold Shift) shows the table over the whole window (not the browser's full screen), with its toolbar, menus and editing as in the page, the columns' letters above the header and the rows' numbers left of them, as formulas refer to them (`B3`); the same icon (*Exit full screen*) or Esc closes it. |
 | `sheet` | The sheet's name in the table's ⋯ menu (a table is put on a sheet, moved and taken off it there) and the sheet icon, which shows the table's sheet as a spreadsheet over the whole window, as `fullScreen` does, with empty rows and columns around its tables (more as you scroll on), their letters and numbers too. Type into the empty cell right under or next to a table: Enter or Tab saves it, and the table grows by that row or column, a new column named *Column 4*; farther from the tables, a value makes a table of its own. A cell left empty adds nothing; Esc drops it. The same icon (*Exit sheet view*) or Esc closes it. See [[#Sheet view]]. |
-| `tableLabels` | A named table shows its name in a small tab at its top right corner, so you can tell tables apart at a glance, in the page and on the sheet; a pivot shows *Pivot of* its source there, named or not. The tab stays on the header while the header is held at the top, and it hides while you hover the table (or just above its header, where the tab is), where the toolbar shows instead. |
+| `tableLabels` | A named table shows its name in a small tab at its top right corner, so you can tell tables apart at a glance, in the page and on the sheet; a pivot shows *Pivot of* its source there, named or not, and a table whose data are out of date (formulas' results, a pivot) says *Out of date* there, highlighted, so you see it without hovering the table. The tab stays on the header while the header is held at the top, and it hides while you hover the table (or just above its header, where the tab is), where the toolbar shows instead. |
 | `largeTables` | Off by default. A table with many rows (setting `minRows`, default `200`) scrolls in a box of its own: as tall as *Maximum table height*, else the window. Only the rows in and around the box's view are in the page, so editing, sorting and filtering a table of thousands of rows stays quick. The browser's find (Ctrl+F) finds only those rows. Off: every row is in the page, the table as tall as its rows (unless *Maximum table height* is set). |
 
 ## Table names
@@ -1840,6 +1840,14 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
 /* (A box of the icon's size: an inline svg sits on the text's baseline, above its middle) */
 .swt-table-label .swt-table-badge-icon {
   display: flex;
+}
+/* Its data out of date (Out of date): as the toolbar's button asking for attention, Refresh or Recalculate */
+.swt-table-label .swt-table-badge.swt-attention {
+  padding: 0 4px;
+  margin: 0 -3px;
+  color: var(--ui-accent-color);
+  background: color-mix(in srgb, var(--ui-accent-color) 16%, transparent);
+  border-radius: 4px;
 }
 .swt-table-label .swt-table-badge-icon svg {
   display: block;

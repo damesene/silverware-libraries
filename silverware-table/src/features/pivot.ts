@@ -297,11 +297,15 @@ export class Pivot implements Feature {
     this.stale.set(info, JSON.stringify(now.rows.map((r) => r.cells)) !== JSON.stringify(table.rows.map((r) => r.cells)));
   }
 
-  /** What a pivot is, at a glance: Pivot of its source as the definition writes it (another page's: Pivot of [[Orders]]orders), one with a problem too */
+  /** What a pivot is, at a glance: Pivot of its source as the definition writes it (another page's: Pivot of [[Orders]]orders), one with a problem too; out of date, said so */
   tableBadges(info: TableInfo): TableBadge[] {
     const table = parseTable(info.source);
     if (!this.definitionOf(table)) return [];
-    return [{ icon: ICONS.pivot, text: `Pivot of ${this.host.getMeta(table, "source")?.trim() ?? ""}` }];
+    const what = { icon: ICONS.pivot, text: `Pivot of ${this.host.getMeta(table, "source")?.trim() ?? ""}` };
+    // Out of date, or not calculated at all: said without its toolbar's Refresh shown
+    const state = this.stale.get(info);
+    if (!state) return [what];
+    return [what, { icon: ICONS.recalculate, text: typeof state === "string" ? "Cannot be calculated" : "Out of date", attention: true }];
   }
 
   /** Deleting a table: its pivots on the page keep their numbers, calculated no more */

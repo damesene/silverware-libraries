@@ -1,7 +1,7 @@
 // The toolbar playground: Silverware Toolbar on a CodeMirror editor of
 // markdown, as SilverBullet's (its sources, not the committed bundle). The
 // bridge is SilverBullet's editor API in short, over this editor; the
-// library page's space-style block is applied as SilverBullet would, and the
+// style page's space-style block is applied as SilverBullet would, and the
 // command's key bound as SilverBullet binds a command's (a keymap of the editor).
 // Settings are the playground's own store (no CONFIG page here), which the
 // settings dialog writes through `saveSettings`.
@@ -12,14 +12,14 @@ import { EditorView, keymap } from "@codemirror/view";
 import { DEFAULT_SHORTCUT, PATHS } from "../silverware-toolbar/src/bridge.ts";
 import { init, openSettings, showActions } from "../silverware-toolbar/src/index.ts";
 import { SETTINGS_STORE } from "./toolbar-store.ts";
-import libraryPage from "../silverware-toolbar/silverware-toolbar.md";
+import stylePage from "../silverware-toolbar/silverware-toolbar-style.md";
 import { flash, setUpTheme } from "./common.ts";
 import sample from "./toolbar-sample.md";
 
 setUpTheme();
 
 const style = document.createElement("style");
-style.textContent = /```space-style\r?\n([\s\S]*?)```/.exec(libraryPage)?.[1] ?? "";
+style.textContent = /```space-style\r?\n([\s\S]*?)```/.exec(stylePage)?.[1] ?? "";
 document.head.append(style);
 
 const STORE = "silverware.toolbar.playground.text";

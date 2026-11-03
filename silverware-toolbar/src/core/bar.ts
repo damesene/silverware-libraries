@@ -171,7 +171,7 @@ export class Bar {
 
   /**
    * Room kept for it docked, or none: its height as `--swb-docked-top` or
-   * `--swb-docked-bottom` on html, by which the library page's CSS pads
+   * `--swb-docked-bottom` on html, by which the style page's CSS pads
    * SilverBullet's editor, so it covers no text and the editor keeps its
    * cursor clear of it; off, it lies over the editor
    */

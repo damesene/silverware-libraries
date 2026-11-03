@@ -112,7 +112,7 @@ export type ToolbarModule = {
   readonly refresh?: () => Promise<void>;
 };
 
-/** What a module may ask of the editor beyond the page's text: SilverBullet's commands (each optional: the library page hands them over) */
+/** What a module may ask of the editor beyond the page's text: SilverBullet's commands (each optional: the init page hands them over) */
 export type ModuleHost = {
   readonly listCommands?: () => unknown;
   readonly invokeCommand?: (name: string) => unknown;

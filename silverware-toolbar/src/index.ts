@@ -1,4 +1,4 @@
-// Silverware Toolbar entry point, loaded by the library page's Space Lua:
+// Silverware Toolbar entry point, loaded by the init page's Space Lua:
 //   js.importFromSpace("Library/damesene/silverware-toolbar.js").init({ ... editor functions ... })
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { actionsOf, customActionsAnew, defineCustomActions } from "./actions.ts";
@@ -24,7 +24,7 @@ let settingsDialog: SettingsDialog | undefined;
 export async function init(bridge: Bridge): Promise<void> {
   const missing = missingBridgeFunctions(bridge);
   if (missing.length) {
-    console.error(`Silverware Toolbar: the library page did not hand over ${missing.join(", ")}`);
+    console.error(`Silverware Toolbar: the init page did not hand over ${missing.join(", ")}`);
     return;
   }
   const settings = await readSettings(bridge);
@@ -84,7 +84,7 @@ function sameSettings(running: Controller, settings: Settings): boolean {
   );
 }
 
-/** SilverBullet ready, its Space Lua loaded (`system:ready`, the library page's listener): the actions read anew, a script's commands among them */
+/** SilverBullet ready, its Space Lua loaded (`system:ready`, the init page's listener): the actions read anew, a script's commands among them */
 export function scriptsLoaded(): void {
   slot[GLOBAL_KEY]?.refreshActions();
 }
@@ -133,10 +133,10 @@ async function saveSettings(bridge: Bridge, values: Readonly<Record<string, unkn
 }
 
 /**
- * `silverware.toolbar.defineFormats` (the library page's Space Lua): custom
+ * `silverware.toolbar.defineFormats` (the init page's Space Lua): custom
  * formats, a definition, a list, or a function given the helpers that returns
  * them, usually a JS module of the space. The others defined; what is wrong
- * with any of them (or a name defined twice), which the library page shows as
+ * with any of them (or a name defined twice), which the API page shows as
  * a notification (an error there would stop the rest of the user's script).
  */
 export function defineFormats(definitions: unknown): string | undefined {

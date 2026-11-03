@@ -34,7 +34,7 @@ export type Bridge = {
 
 export type Selection = { readonly from: number; readonly to: number; readonly text: string };
 
-/** The bridge's functions it cannot work without, missing from what the library page gave */
+/** The bridge's functions it cannot work without, missing from what the init page gave */
 export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
   return (["getSelection", "setSelection", "replaceRange", "getText", "flash"] as const).filter((name) => typeof bridge[name] !== "function");
 }
@@ -43,7 +43,7 @@ export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
 export const MODULE_NAMES = ["inline", "blocks", "clear", "commands", "keyboard", "gestures", "snippets", "emoji"] as const;
 export type ModuleName = (typeof MODULE_NAMES)[number];
 
-/** A module's name and what it does, as the settings dialog shows them (the library page's config.define says the same) */
+/** A module's name and what it does, as the settings dialog shows them (the init page's config.define says the same) */
 export const MODULE_LABELS: Readonly<Record<ModuleName, string>> = { inline: "Inline formats", blocks: "Turn into", clear: "Clear formatting", commands: "Commands", keyboard: "Hide the keyboard", gestures: "Gestures", snippets: "Snippets", emoji: "Emoji" };
 export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
   inline: "Bold, italic, strikethrough, highlight, code, links and wiki links.",
@@ -56,7 +56,7 @@ export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
   snippets: "A text snippet among the favourites: a button of your own character (an emoji too) and label writing your text at the cursor, {s} in it the text selected, {c} where the cursor goes.",
 };
 
-// The key of the command showing every action (the library page gives it to the command: SilverBullet handles it)
+// The key of the command showing every action (the init page gives it to the command: SilverBullet handles it)
 export const DEFAULT_SHORTCUT = "Ctrl-Shift-q";
 
 /** A device as the settings tell them apart: worked by a finger (`byTouch` in core/favorites.ts) or not */
@@ -170,7 +170,7 @@ export async function readSettings(bridge: Bridge): Promise<Settings> {
   };
 }
 
-/** The key as configured (the command's: SilverBullet takes it as the library page defines the command) */
+/** The key as configured (the command's: SilverBullet takes it as the init page defines the command) */
 export async function readShortcut(bridge: Bridge): Promise<string> {
   try {
     const key = await bridge.getConfig?.(PATHS.shortcut, DEFAULT_SHORTCUT);

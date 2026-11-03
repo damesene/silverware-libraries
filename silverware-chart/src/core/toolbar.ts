@@ -1,7 +1,7 @@
 // The toolbar of the chart hovered and its ⋯ menu, as Silverware Table's
 // look them (floating elements in the page's body, its colors): the bar above
 // the chart's top right corner (where SilverBullet's own controls of a block,
-// left out by the library page's CSS, would be), the menu under the ⋯ button, a submenu in its place with a back arrow. What the
+// left out by the style page's CSS, would be), the menu under the ⋯ button, a submenu in its place with a back arrow. What the
 // menu holds is given as data (MenuView) by the core, which knows what each
 // item does; this file only shows and runs them.
 

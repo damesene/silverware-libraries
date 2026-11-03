@@ -191,7 +191,7 @@ test("Insert chart lists the page's tables, the chart put under the one picked",
 test("/chart puts a chart at the cursor, of a table picked", async ({ page, open }) => {
   await open(`# Sales\n\n${SALES}\nAfter.\n\nHere\n`);
   await expect(page.locator(".sb-table-widget")).toBeVisible();
-  // The slash command as SilverBullet's completion runs it (its hook's, once the library page's Space Lua has
+  // The slash command as SilverBullet's completion runs it (its hook's, once the init page's Space Lua has
   // defined it), the cursor at the end of the page: typing /chart and taking the completion was flaky, as
   // CodeMirror's list waits on all its sources
   type Client = { editorView: { state: { doc: { length: number } }; dispatch(t: unknown): void; focus(): void }; clientSystem?: { slashCommandHook?: { slashCommands: { name: string; run?(): unknown }[] } } };

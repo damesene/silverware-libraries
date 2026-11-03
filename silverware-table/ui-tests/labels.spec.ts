@@ -39,6 +39,24 @@ test.describe("Table labels", () => {
     }
   });
 
+  test("a table wider than its box, scrolled sideways in it: the tab at the box's right edge, not the table's", async ({ page }) => {
+    const columns = Array.from({ length: 14 }, (_, i) => `A rather long column ${i + 1}`);
+    const row = (cells: string[]) => `| ${cells.join(" | ")} |`;
+    await setPage(page, `# T\n\n${row(columns)}\n${row(columns.map(() => "---"))}\n${row(columns.map((_, i) => String(i)))}\n| <meta core.table core.name='wide'> |\n`);
+    await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
+    await page.mouse.move(2, 2);
+    const widget = table(page);
+    expect(await widget.evaluate((w) => w.scrollWidth > w.clientWidth)).toBe(true);
+    const edge = () => widget.evaluate((w) => Math.round(w.getBoundingClientRect().left + w.clientLeft + w.clientWidth));
+    const right = async () => {
+      const box = (await label(page, "wide").boundingBox())!;
+      return Math.round(box.x + box.width);
+    };
+    await expect.poll(async () => Math.abs((await right()) - (await edge()))).toBeLessThanOrEqual(1);
+    await widget.evaluate((w) => (w.scrollLeft = 200));
+    await expect.poll(async () => Math.abs((await right()) - (await edge()))).toBeLessThanOrEqual(1);
+  });
+
   test("a named table shows its name at its top right corner, an unnamed one none; hovered, its toolbar shows instead", async ({ page }) => {
     await open(page);
     await page.evaluate(() => {

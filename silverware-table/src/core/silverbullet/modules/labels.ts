@@ -67,8 +67,10 @@ export class TableLabels implements AdapterFeature {
     const box = info.table.getBoundingClientRect();
     const head = (info.table.tHead ?? info.table.rows[0])?.getBoundingClientRect();
     if (!head) return false;
-    // (Where the header is held, its top; the table's sides)
-    const table = { left: box.left, right: box.right, top: head.top };
+    // (Where the header is held, its top; the table's sides as its box shows them: a table wider than its box scrolls
+    // sideways in it, its right end out of view)
+    const inner = this.host.innerBox(widget);
+    const table = { left: Math.max(box.left, inner.left), right: Math.min(box.right, inner.right), top: head.top };
     const { view, room } = this.view(widget);
     const left = Math.max(table.left, view.left);
     const right = Math.min(table.right, view.right);

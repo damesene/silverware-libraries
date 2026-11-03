@@ -71,6 +71,18 @@ describe("Conditional formatting", () => {
     expect(fill(1, 1)).toBe("var(--swt-cf-red-fill)");
   });
 
+  it("takes a whole table's condition over its cells as one range too, column by column where it says so: the top values", async () => {
+    const page = "| A | B |\n|---|---|\n| 1 | 100 |\n| 9 | 900 |\n";
+    await setup(page + `| <meta core.table conditions.rules='[{"when":["top",{"count":1}],"format":"bold"}]'> |\n`);
+    await flush();
+    expect([formatted(1, 0), formatted(2, 0), formatted(1, 1), formatted(2, 1)]).toEqual([false, false, false, true]);
+    controller.stop();
+    document.body.replaceChildren();
+    await setup(page + `| <meta core.table conditions.rules='[{"when":["top",{"count":1}],"format":"bold","perColumn":true}]'> |\n`);
+    await flush();
+    expect([formatted(1, 0), formatted(2, 0), formatted(1, 1), formatted(2, 1)]).toEqual([false, true, false, true]);
+  });
+
   it("shows its icon in the toolbar of a table with rules; Conditional formatting… in the ⋯ menu always", async () => {
     await setup(TABLE, { "silverware.table.metadata": true });
     await flush();

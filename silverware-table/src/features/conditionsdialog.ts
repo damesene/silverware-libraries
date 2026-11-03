@@ -336,7 +336,7 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
       section(
         "Applies to",
         scope,
-        rule.scope.kind === "table" ? e("label", "swt-pivot-toggle", perColumn, "Each column on its own: its own scale, its own top values (else the table's cells as one range)") : null,
+        rule.scope.kind === "table" ? e("label", "swt-pivot-toggle", perColumn, "Each column on its own: its own scale, levels, bars and icons, its own top values, average and duplicates (else the table's cells as one range)") : null,
       ),
       section("Which cells", when, describe(condition?.description), rule.when ? refFields(rule.when, condition?.params, "when") : null),
       section("Format", format, describe(formatDefinition?.description), refFields(rule.format, formatDefinition?.params, "format")),

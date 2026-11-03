@@ -95,13 +95,21 @@ export function pivotOf(source: Table, definition: PivotDefinition, calculation:
     if (!totals.has(id)) totals.set(id, calculated(formula, column === undefined ? indexes : indexes.filter((i) => columnKey_(i) === column)));
     return totals.get(id)!;
   };
+  // A pivot's row's whole (its rows' list the same for each of its columns), calculated once for a value
+  const rowWholes = new WeakMap<readonly number[], Map<string, Scalar>>();
+  const rowWholeOf = (formula: string, row: readonly number[]): Scalar => {
+    let wholes = rowWholes.get(row);
+    if (!wholes) rowWholes.set(row, (wholes = new Map()));
+    if (!wholes.has(formula)) wholes.set(formula, calculated(formula, row));
+    return wholes.get(formula)!;
+  };
   // A value of some rows (`own`) of a pivot's row (`row`: all its rows), in a column of the column groups' or not: as calculated, or its share
   const valueOf = (item: string, own: readonly number[], row: readonly number[], column?: string): string => {
     if (!own.length) return "";
     const { formula, show } = valueParts(item);
     const part = calculated(formula, own);
     if (!show || typeof part !== "number") return keyOf(part);
-    const whole = show === "row" ? calculated(formula, row) : totalOf(formula, show === "column" ? column : undefined);
+    const whole = show === "row" ? rowWholeOf(formula, row) : totalOf(formula, show === "column" ? column : undefined);
     if (typeof whole !== "number") return isErrorText(keyOf(whole)) ? keyOf(whole) : "#VALUE!";
     // (Rounded as the percentage shows it, and a little past: what the markdown holds stays readable)
     return whole === 0 ? "#DIV/0!" : keyOf(Math.round((part / whole) * SHARE_DIGITS) / SHARE_DIGITS);

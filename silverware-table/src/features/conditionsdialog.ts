@@ -38,6 +38,15 @@ import { parseFilter } from "../filter.ts";
 /** A column a rule may apply to: its place and its name */
 export type ScopeColumn = { readonly column: number; readonly name: string };
 
+/** A rule on the table's own cells: a line of a sample for each of its ranges, how many cells it formats of how many */
+export type RuleSample = {
+  readonly lines: readonly { readonly label?: string; readonly cells: readonly { readonly text: string; readonly style?: Style }[] }[];
+  // Ranges past those shown (columns)
+  readonly more: number;
+  readonly formatted: number;
+  readonly total: number;
+};
+
 export type ConditionsDialogOptions = {
   readonly title: string;
   readonly columns: readonly ScopeColumn[];
@@ -49,6 +58,8 @@ export type ConditionsDialogOptions = {
   // The rules shown in the table as they are now; undefined: as written again
   readonly preview: (rules: readonly StoredRule[] | undefined) => void;
   readonly save: (rules: readonly StoredRule[]) => void;
+  // How a rule looks on the table's own cells (the rule alone): the preview under its editor
+  readonly sample?: (rule: Rule) => RuleSample | undefined;
   // Why it cannot be saved (the metadata setting off)
   readonly blocked?: string;
 };
@@ -91,6 +102,49 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
     rules = rules.map((r, j) => (j === i ? rule : r));
     previewSoon();
     refreshLine(i);
+    sampleSoon();
+  };
+
+  // ---- the open rule's preview on the table's own cells ----------------------------------------
+  const sampleBox = e("div", { class: "swt-cf-preview", attrs: { "aria-live": "polite" } });
+  const fillSample = () => {
+    const rule = rules[open];
+    const made = rule && !isUnread(rule) ? options.sample?.(rule) : undefined;
+    if (!made) {
+      sampleBox.replaceChildren(e("span", { class: "swt-cf-description", text: "No cells to show" }));
+      return;
+    }
+    const count = (n: number) => n.toLocaleString();
+    sampleBox.replaceChildren(
+      ...made.lines.map((line) =>
+        e(
+          "div",
+          "swt-cf-preview-line",
+          line.label !== undefined ? e("span", { class: "swt-cf-preview-label", text: line.label, title: line.label }) : null,
+          ...(line.cells.length ? line.cells.map((cell) => sampleCell(cell.text, cell.style)) : [e("span", { class: "swt-cf-description", text: "No values" })]),
+        ),
+      ),
+      e(
+        "p",
+        { class: "swt-cf-description" },
+        `Formats ${count(made.formatted)} of ${count(made.total)} ${made.total === 1 ? "cell" : "cells"}${made.more ? ` · ${made.more} more ${made.more === 1 ? "column" : "columns"} not shown` : ""}`,
+      ),
+    );
+  };
+  let sampling: ReturnType<typeof setTimeout> | undefined;
+  const sampleSoon = () => {
+    clearTimeout(sampling);
+    sampling = setTimeout(fillSample, 150);
+  };
+  // A cell of the sample: its text, its look (none: as the table shows it)
+  const sampleCell = (text: string, style: Style | undefined) => {
+    const span = e("span", { class: "swt-cf-sample swt-cf-preview-cell", text: text === "" ? "\u00a0" : text, title: text });
+    if (style) {
+      const look = styleLook(style);
+      for (const mark of look.marks) span.classList.add(`swt-${mark}`);
+      for (const [name, value] of Object.entries(look.vars)) span.style.setProperty(name, value);
+    }
+    return span;
   };
 
   // ---- labels ---------------------------------------------------------------------------
@@ -214,6 +268,7 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
     );
     const again = focused ? Array.from(list.querySelectorAll<HTMLElement>("[data-focus]")).find((f) => f.dataset.focus === focused) : undefined;
     if (again) again.focus();
+    if (open >= 0 && options.sample) fillSample();
     else if (list.isConnected && !list.closest("[role=dialog], dialog, .swt-dialog")?.contains(doc.activeElement)) list.focus({ preventScroll: true });
     const problem = options.blocked;
     submit.disabled = !!problem;
@@ -341,6 +396,7 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
       section("Which cells", when, describe(condition?.description), rule.when ? refFields(rule.when, condition?.params, "when") : null),
       section("Format", format, describe(formatDefinition?.description), refFields(rule.format, formatDefinition?.params, "format")),
       section("", e("label", "swt-pivot-toggle", stop, "Stop: the rules after this one leave the cells it formats alone")),
+      ...(options.sample ? [section("Preview", sampleBox)] : []),
     );
   }
 
@@ -531,6 +587,7 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
     footer,
     closed: () => {
       clearTimeout(previewing);
+      clearTimeout(sampling);
       if (!saved) options.preview(undefined);
     },
   });

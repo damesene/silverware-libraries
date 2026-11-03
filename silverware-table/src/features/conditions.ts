@@ -19,6 +19,7 @@ import type { ColumnTypesOffer } from "../columntypes/index.ts";
 import {
   cellOf,
   type ConditionsOffer,
+  sampleOf,
   definitionsVersion,
   evaluateRules,
   inOrder,
@@ -38,7 +39,10 @@ import { ICONS } from "../icons.ts";
 import { parseTable, type Table, unescapeCell } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
 import { withoutTags } from "../tags.ts";
-import { openConditionsDialog, type ScopeColumn } from "./conditionsdialog.ts";
+import { openConditionsDialog, type RuleSample, type ScopeColumn } from "./conditionsdialog.ts";
+
+// The lines of a rule's preview (a whole table's rule column by column: one a column)
+const PREVIEW_LINES = 6;
 
 // The attribute the rules are stored in (the module's: conditions.rules, conditions.-c-<column>.rules)
 const RULES = "rules";
@@ -150,6 +154,29 @@ export class Conditions implements Feature {
   private evaluate(info: TableInfo, table: Table, stored: readonly StoredRule[]): TableLooks | undefined {
     const rules = stored.filter((r): r is Rule => !isUnread(r));
     if (!rules.length) return undefined;
+    const { inputsOf } = this.reader(info, table);
+    const { styles, problems } = evaluateRules(rules.flatMap(inputsOf), this.rowFormula(table));
+    for (const problem of problems) {
+      const said = `${info.key}\u0000${problem}`;
+      if (this.said.has(said)) continue;
+      this.said.add(said);
+      void this.host.bridge.flash(`Silverware Table: conditional formatting: ${problem}`, "error");
+    }
+    if (!styles.size) return undefined;
+    const looks: (CellRef & CellLook)[] = [];
+    for (const [key, style] of styles) {
+      const [row, column] = key.split(":").map(Number) as [number, number];
+      const look = styleLook(style);
+      looks.push({ row, column, marks: look.marks, vars: look.vars });
+    }
+    return { cells: looks };
+  }
+
+  /**
+   * A table's cells as rules read them, each read once: `inputsOf` a rule's cells (body only, pinned rows and
+   * columns out; a whole table's as one range, or a range for each column where the rule says so)
+   */
+  private reader(info: TableInfo, table: Table): { readonly inputsOf: (rule: Rule) => RuleCells[]; readonly columnLabel: (column: number) => string } {
     const rowCount = table.rows.length;
     const header = table.rows[0]?.cells ?? [];
     const pins = this.host.pinsOf(table);
@@ -194,24 +221,31 @@ export class Conditions implements Feature {
       return bodyRows.flatMap((r) => bodyColumns.map((c) => placed(r, c)));
     };
     // A whole table's rule applies to its columns as one range (as a spreadsheet's), or to each on its own where it says so
-    const inputs: RuleCells[] = rules.flatMap((rule) =>
-      rule.scope.kind === "table" && rule.perColumn ? bodyColumns.map((c) => ({ rule, cells: cellsOf({ kind: "column", column: c }) })) : [{ rule, cells: cellsOf(rule.scope) }],
-    );
-    const { styles, problems } = evaluateRules(inputs, this.rowFormula(table));
-    for (const problem of problems) {
-      const said = `${info.key}\u0000${problem}`;
-      if (this.said.has(said)) continue;
-      this.said.add(said);
-      void this.host.bridge.flash(`Silverware Table: conditional formatting: ${problem}`, "error");
-    }
-    if (!styles.size) return undefined;
-    const looks: (CellRef & CellLook)[] = [];
-    for (const [key, style] of styles) {
-      const [row, column] = key.split(":").map(Number) as [number, number];
-      const look = styleLook(style);
-      looks.push({ row, column, marks: look.marks, vars: look.vars });
-    }
-    return { cells: looks };
+    const inputsOf = (rule: Rule): RuleCells[] =>
+      rule.scope.kind === "table" && rule.perColumn ? bodyColumns.map((c) => ({ rule, cells: cellsOf({ kind: "column", column: c }) })) : [{ rule, cells: cellsOf(rule.scope) }];
+    return { inputsOf, columnLabel: (column) => columnName(unescapeCell(header[column] ?? "")) || `${column + 1}` };
+  }
+
+  /**
+   * How a rule looks on the table's own cells, for the dialog's preview: a sample of each of its ranges (a line
+   * each, at most PREVIEW_LINES), how many cells it formats of how many; the rule alone, as no other is before it
+   */
+  private ruleSample(shownInfo: TableInfo, rule: Rule): RuleSample {
+    const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
+    const table = this.host.tableOf(info);
+    const { inputsOf, columnLabel } = this.reader(info, table);
+    const inputs = inputsOf(rule);
+    const { styles } = evaluateRules(inputs, this.rowFormula(table));
+    const several = inputs.length > 1;
+    return {
+      lines: inputs.slice(0, PREVIEW_LINES).map((input) => ({
+        ...(several ? { label: columnLabel(input.cells[0]?.column ?? 0) } : {}),
+        cells: sampleOf(input.cells, styles),
+      })),
+      more: Math.max(0, inputs.length - PREVIEW_LINES),
+      formatted: inputs.reduce((n, input) => n + input.cells.filter((p) => styles.has(`${p.row}:${p.column}`)).length, 0),
+      total: inputs.reduce((n, input) => n + input.cells.length, 0),
+    };
   }
 
   /** A formula of one row for a row of the table, through the formulas module (off: none) */
@@ -256,6 +290,7 @@ export class Conditions implements Feature {
         this.host.looksChanged(shown());
       },
       save: (rules) => void this.save(shown(), rules),
+      sample: (rule) => this.ruleSample(shown(), rule),
       ...(this.canStore(table) ? {} : { blocked: NEEDS_METADATA }),
     });
   }

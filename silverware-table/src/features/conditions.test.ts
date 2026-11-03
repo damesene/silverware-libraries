@@ -154,6 +154,28 @@ describe("Conditional formatting", () => {
     expect(dialog()!.querySelector<HTMLSelectElement>('select[aria-label="Applies to"]')!.selectedOptions[0]!.textContent).toBe("Column Score");
   });
 
+  it("previews the rule edited on the table's own cells, across their values, and says how many it formats; anew as it changes", async () => {
+    await setup(TABLE + META('[{"when":["greater",{"value":50}],"format":"redFill"}]'), { "silverware.table.metadata": true });
+    await flush();
+    at(2, 1).dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 }));
+    item("Conditional formatting…")!.click();
+    dialog()!.querySelector<HTMLElement>(".swt-cf-summary")!.click();
+    const cells = () => Array.from(dialog()!.querySelectorAll<HTMLElement>(".swt-cf-preview-cell")).map((c) => [c.textContent, c.classList.contains("swt-cf-fill")]);
+    const count = () => dialog()!.querySelector(".swt-cf-preview > .swt-cf-description")!.textContent;
+    expect(cells()).toEqual([
+      ["10", false],
+      ["60", true],
+      ["90", true],
+    ]);
+    expect(count()).toBe("Formats 2 of 3 cells");
+    const value = dialog()!.querySelector<HTMLInputElement>('input[aria-label="Value"]')!;
+    value.value = "70";
+    value.dispatchEvent(new Event("input", { bubbles: true }));
+    await wait(200);
+    expect(cells().map(([, on]) => on)).toEqual([false, false, true]);
+    expect(count()).toBe("Formats 1 of 3 cells");
+  });
+
   it("clears a column's rules from its menu", async () => {
     await setup(TABLE + META('[{"format":"dataBar"}]'), { "silverware.table.metadata": true });
     await flush();

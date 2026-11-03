@@ -22,6 +22,7 @@ export {
 export { checkedConditions, checkedFormats } from "./custom.ts";
 export { inOrder, isUnread, numbered, type Ref, type Rule, type RuleScope, rulesOf, rulesText, type StoredRule, type UnreadRule } from "./rule.ts";
 export { cellOf, scopeOf } from "./scope.ts";
+export { type SampleCell, sampleOf } from "./sample.ts";
 export { checkStyle, colorProblem, styleLook } from "./style.ts";
 
 /**

@@ -4055,6 +4055,40 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   gap: 8px;
   min-width: 0;
 }
+/* A rule's preview: its cells across their values, a line for each range (a column), each cell in its look */
+.swt-cf-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+.swt-cf-preview-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+}
+.swt-cf-preview-label {
+  width: 7em;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0.75;
+}
+.swt-cf-sample.swt-cf-preview-cell {
+  min-width: 3.5em;
+  max-width: 9em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: right;
+  font-size: 13px;
+}
+.swt-cf-sample.swt-cf-preview-cell.swt-cf-icon::before {
+  margin-right: 0.3em;
+}
 .swt-cf-none {
   margin: 4px 0;
   font-size: 12px;

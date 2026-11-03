@@ -3,6 +3,7 @@ import type { ConditionDefinition, Helpers } from "../../api.ts";
 export default ({ normalize, excelText }: Helpers): ConditionDefinition<{ value: string }> => ({
   name: "equal",
   label: "Equal to",
+  category: "Text",
   description: "Cells that are a value: as numbers where both are, else as text, case ignored",
   params: { value: { kind: "text", label: "Value", default: "" } },
   test: (cell, { params }) => {

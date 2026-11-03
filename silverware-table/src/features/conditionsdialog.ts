@@ -54,6 +54,8 @@ export type ConditionsDialogOptions = {
 };
 
 const NONE = "";
+// The group of a definition without a category
+const OTHER = "Other";
 
 /** A swatch's text: what a sample shows */
 const SAMPLE = "Aa 12";
@@ -246,7 +248,7 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
       `rule ${i} scope`,
       "Applies to",
     );
-    const conditions = allConditions();
+    const conditions = lastWithout(allConditions());
     const when = select(
       [NONE, ...conditions.map((c) => c.name), ...(rule.when && !conditionNamed(rule.when.name) ? [rule.when.name] : [])],
       (v) => (v === NONE ? "All cells" : (conditionNamed(v)?.label ?? `${v} (not defined)`)),
@@ -257,14 +259,16 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
       },
       `rule ${i} condition`,
       "Which cells",
+      (v) => (v === NONE ? undefined : (conditionNamed(v)?.category ?? OTHER)),
     );
     const format = select(
-      [...allFormats().map((f) => f.name), ...(formatNamed(rule.format.name) ? [] : [rule.format.name])],
+      [...lastWithout(allFormats()).map((f) => f.name), ...(formatNamed(rule.format.name) ? [] : [rule.format.name])],
       (v) => formatNamed(v)?.label ?? `${v} (not defined)`,
       rule.format.name,
       (v) => set(i, { ...rule, format: { name: v, params: {} } }),
       `rule ${i} format`,
       "Format",
+      (v) => formatNamed(v)?.category ?? OTHER,
     );
     const condition = rule.when ? conditionNamed(rule.when.name) : undefined;
     const formatDefinition = formatNamed(rule.format.name);
@@ -343,9 +347,32 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
   const section = (title: string, ...children: ElementChild[]) =>
     e("div", "swt-cf-section", e("div", { class: "swt-cf-label", text: title }), e("div", "swt-cf-fields", ...children));
 
-  const select = (values: readonly string[], label: (v: string) => string, value: string, changed: (v: string) => void, focus: string, aria: string): HTMLSelectElement => {
+  const select = (
+    values: readonly string[],
+    label: (v: string) => string,
+    value: string,
+    changed: (v: string) => void,
+    focus: string,
+    aria: string,
+    // A value's group (an optgroup), in the order the groups first come; undefined: none
+    group?: (v: string) => string | undefined,
+  ): HTMLSelectElement => {
     const s = e("select", { attrs: { "aria-label": aria, "data-focus": focus } });
-    for (const v of values) s.append(new Option(label(v), v));
+    const groups = new Map<string, HTMLOptGroupElement>();
+    for (const v of values) {
+      const name = group?.(v);
+      if (name === undefined) {
+        s.append(new Option(label(v), v));
+        continue;
+      }
+      let optgroup = groups.get(name);
+      if (!optgroup) {
+        optgroup = e("optgroup", { attrs: { label: name } });
+        groups.set(name, optgroup);
+        s.append(optgroup);
+      }
+      optgroup.append(new Option(label(v), v));
+    }
     s.value = value;
     s.addEventListener("change", () => changed(s.value));
     return s;
@@ -516,6 +543,11 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
     options.save(rules);
   });
   return dialog;
+}
+
+/** Definitions with their categories first, in their order, then those without one (Other) */
+function lastWithout<T extends { readonly category?: string }>(list: readonly T[]): T[] {
+  return [...list.filter((d) => d.category !== undefined), ...list.filter((d) => d.category === undefined)];
 }
 
 /** A param's value as a rule's line shows it */

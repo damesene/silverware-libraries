@@ -3,6 +3,7 @@ import type { FormatDefinition, Helpers } from "../../api.ts";
 export default ({ palette, icons, levels }: Helpers): FormatDefinition => ({
   name: "arrows",
   label: "Arrows",
+  category: "Icons",
   description: "An arrow before each number: down in red, right in yellow, up in green, in three equal ranges",
   look: levels([
     { icon: icons.down, iconColor: palette.red },

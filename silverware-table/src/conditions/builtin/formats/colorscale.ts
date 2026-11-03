@@ -46,6 +46,7 @@ const valued = (key: string) => (params: Params) => params[key] === "number" || 
 export default ({ palette, mix }: Helpers): FormatDefinition<ScaleParams> => ({
   name: "colorScale",
   label: "Color scale",
+  category: "Scales",
   description:
     "A fill along two or three colors: at the minpoint, the midpoint (or none) and the maxpoint, each the smallest or largest value, a number, a percent of the range or a percentile; a cell past a point has its color",
   params: {

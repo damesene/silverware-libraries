@@ -7,6 +7,7 @@ const LABELS = ["Today", "Yesterday", "Tomorrow", "In the last 7 days", "In the 
 export default ({ today, DAY }: Helpers): ConditionDefinition<{ period: string }> => ({
   name: "dateIn",
   label: "Date occurring",
+  category: "Dates",
   description: "Cells whose date is in a period around today (weeks start on Monday)",
   params: { period: { kind: "choice", label: "When", values: PERIODS, labels: LABELS, default: "today" } },
   test: (cell, { params }) => {

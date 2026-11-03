@@ -1,8 +1,9 @@
 import type { FormatDefinition, Helpers, Style } from "../../api.ts";
 
-export default ({ matches, palette, excelText, plainPattern }: Helpers): FormatDefinition<{ rows: readonly { pattern: string; style: Style }[] }> => ({
+export default ({ matches, palette, excelText, excelFilter, plainPattern }: Helpers): FormatDefinition<{ rows: readonly { pattern: string; style: Style }[] }> => ({
   name: "byPattern",
   label: "By keywords",
+  category: "By values",
   description: "A style for each keyword or pattern (as a filter takes them: words found anywhere, /regular expression/, =a|b); the first that matches a cell styles it",
   params: {
     rows: {
@@ -16,15 +17,16 @@ export default ({ matches, palette, excelText, plainPattern }: Helpers): FormatD
     },
   },
   look: (cell, { params }) => params.rows.find((row) => row.pattern.trim() !== "" && matches(row.pattern)(cell.text))?.style,
-  excel: (params, at) => {
-    const rows = params.rows.filter((row) => row.pattern.trim() !== "");
-    if (rows.some((row) => !plainPattern(row.pattern))) return "a keyword written as a pattern (a regular expression, =a|b, >10, !…) has no Excel form";
-    return {
-      kind: "rules",
-      rules: rows.map((row) => ({
-        test: { type: "containsText", attrs: { operator: "containsText", text: row.pattern.trim() }, formulas: [`NOT(ISERROR(SEARCH(${excelText(row.pattern.trim())},${at})))`] },
-        style: row.style,
-      })),
-    };
-  },
+  // A rule for each keyword: plain words as Excel's own "contains", the rest of a filter's syntax as a formula
+  excel: (params, at) => ({
+    kind: "rules",
+    rules: params.rows.flatMap((row) => {
+      const pattern = row.pattern.trim();
+      if (plainPattern(pattern)) {
+        return [{ test: { type: "containsText", attrs: { operator: "containsText", text: pattern }, formulas: [`NOT(ISERROR(SEARCH(${excelText(pattern)},${at})))`] }, style: row.style }];
+      }
+      const formula = excelFilter(pattern, at);
+      return formula ? [{ test: { type: "expression", formulas: [formula] }, style: row.style }] : [];
+    }),
+  }),
 });

@@ -31,6 +31,7 @@ function definitionProblem(d: unknown, kind: "condition" | "format"): string | u
   const name = d.name;
   if (typeof d.label !== "string" || !d.label.trim()) return `${name}: has no label`;
   if (d.description !== undefined && typeof d.description !== "string") return `${name}: its description is no text`;
+  if (d.category !== undefined && typeof d.category !== "string") return `${name}: its category is no text`;
   const params = specsProblem(d.params);
   if (params) return `${name}: ${params}`;
   if (d.excel !== undefined && typeof d.excel !== "function") return `${name}: its excel is no function (params, at)`;

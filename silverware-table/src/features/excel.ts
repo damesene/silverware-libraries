@@ -99,6 +99,8 @@ type Workbook = {
   // Rules of conditional formatting: how many, and those Excel cannot have, with why
   readonly rules: number;
   readonly skippedRules: readonly SkippedRule[];
+  // Rules written that need a newer Excel (a regular expression), with what that means
+  readonly ruleNotes: readonly SkippedRule[];
 };
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -213,10 +215,23 @@ export class Excel implements Feature {
     // Conditional formatting: kept as Excel's, or the rules Excel cannot have, with why
     const rulesNote = el("div", "swt-excel-formulas");
     if (workbook.rules) {
-      const { skippedRules } = workbook;
+      const { skippedRules, ruleNotes } = workbook;
+      // Written, but needing a newer Excel: said under it
+      const needs = () => {
+        if (!ruleNotes.length) return null;
+        const list = el("div", "swt-excel-skipped");
+        for (const r of ruleNotes.slice(0, SHOWN_GROUPS)) {
+          const item = el("div", "swt-excel-skipped-item");
+          item.append(el("code", "swt-excel-skipped-formula", r.rule), el("span", "swt-excel-skipped-reason", r.reason));
+          list.append(item);
+        }
+        return list;
+      };
       if (!skippedRules.length) {
         rulesNote.classList.add("swt-excel-ok");
-        rulesNote.textContent = `All ${plural(workbook.rules, "rule", "rules")} of conditional formatting will be Excel's.`;
+        rulesNote.textContent = `All ${plural(workbook.rules, "rule", "rules")} of conditional formatting will be Excel's${ruleNotes.length ? "; some need Microsoft 365:" : "."}`;
+        const list = needs();
+        if (list) rulesNote.append(list);
       } else {
         rulesNote.append(el("div", "swt-excel-formulas-title", `${plural(skippedRules.length, "rule", "rules")} of conditional formatting of ${workbook.rules} will not be in the file:`));
         const list = el("div", "swt-excel-skipped");
@@ -226,6 +241,8 @@ export class Excel implements Feature {
           list.append(item);
         }
         rulesNote.append(list);
+        const more = needs();
+        if (more) rulesNote.append(el("div", "swt-excel-formulas-title", "Written, needing Microsoft 365:"), more);
       }
     }
     // The file's name, the table's to start with, edited in place: the field as wide as its text, .xlsx right after it
@@ -336,9 +353,9 @@ export class Excel implements Feature {
     const table = bodyRows > 0 ? { table: { name: tableName, totalsRow, calculated } } : {};
     // Conditional formatting as Excel's, where the conditions module is on
     const ranges = this.host.offered<ConditionsOffer>("conditions")?.ranges(model) ?? [];
-    const { conditional, skipped: skippedRules } = excelConditional(ranges);
+    const { conditional, skipped: skippedRules, notes: ruleNotes } = excelConditional(ranges);
     const formatted = conditional.xml ? { conditional } : {};
-    return { name, make: () => xlsxFile({ name, header: columns, rows, widths, ...table, ...formatted }), formulas, skipped, rules: ranges.length, skippedRules };
+    return { name, make: () => xlsxFile({ name, header: columns, rows, widths, ...table, ...formatted }), formulas, skipped, rules: new Set(ranges.map((r) => r.rule)).size, skippedRules, ruleNotes };
   }
 
   /** The file made and given to the browser to download */

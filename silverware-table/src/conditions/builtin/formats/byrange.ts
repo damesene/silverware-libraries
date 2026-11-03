@@ -3,6 +3,7 @@ import type { FormatDefinition, Helpers, Style } from "../../api.ts";
 export default ({ palette }: Helpers): FormatDefinition<{ rows: readonly { from?: number; to?: number; style: Style }[] }> => ({
   name: "byRange",
   label: "By number ranges",
+  category: "By values",
   description: "A style for each range of numbers (from, up to but not including to; either end left open); the first range a cell's number is in styles it",
   params: {
     rows: {

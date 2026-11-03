@@ -3,6 +3,7 @@ import type { Color, FormatDefinition, Helpers } from "../../api.ts";
 export default ({ palette, gradient, levels }: Helpers): FormatDefinition<{ count: number; low: Color; high: Color; split: "equal" | "quantiles" }> => ({
   name: "levels",
   label: "Levels",
+  category: "Scales",
   description: "The numbers split into levels, each a color between two: as many cells in each, or equal ranges between the smallest and the largest (one far larger number leaves the others in the first levels)",
   params: {
     count: { kind: "number", label: "Levels", integer: true, min: 2, max: 10, default: 5 },

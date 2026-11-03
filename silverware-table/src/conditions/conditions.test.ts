@@ -53,6 +53,15 @@ const stylesOf = (rules: Rule[], cells: Placed[]) => {
 afterEach(() => clearCustomDefinitions());
 
 describe("Built-in definitions", () => {
+  it("each have a category, the dialog's groups, the groups one after another", () => {
+    for (const list of [allConditions(), allFormats()]) {
+      const categories = list.map((d) => d.category);
+      expect(categories.every(Boolean), categories.join()).toBe(true);
+      // A group's definitions together: a category, once left, does not come back
+      expect(categories.filter((c, i) => c !== categories[i - 1]).length).toBe(new Set(categories).size);
+    }
+  });
+
   it("are all made through the checks a user's are, none refused", () => {
     expect(BUILT_IN_PROBLEMS).toEqual([]);
     expect(allConditions().length).toBe(readdirSync(join(here, "builtin/conditions")).length);

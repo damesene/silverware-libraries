@@ -38,6 +38,6 @@ import f_databar from "./formats/databar.ts";
 import f_arrows from "./formats/arrows.ts";
 import f_dots from "./formats/dots.ts";
 
-export const BUILT_IN_CONDITIONS = [c_greater, c_less, c_between, c_equal, c_notequal, c_contains, c_notcontains, c_startswith, c_endswith, c_matches, c_empty, c_notempty, c_duplicate, c_unique, c_top, c_bottom, c_aboveaverage, c_belowaverage, c_datein, c_formula] as readonly Defined<ConditionDefinition>[];
+export const BUILT_IN_CONDITIONS = [c_greater, c_less, c_between, c_top, c_bottom, c_aboveaverage, c_belowaverage, c_equal, c_notequal, c_contains, c_notcontains, c_startswith, c_endswith, c_matches, c_empty, c_notempty, c_duplicate, c_unique, c_datein, c_formula] as readonly Defined<ConditionDefinition>[];
 
 export const BUILT_IN_FORMATS = [f_redfill, f_yellowfill, f_greenfill, f_bluefill, f_redtext, f_bold, f_custom, f_bypattern, f_byrange, f_colorscale, f_levels, f_heatmap, f_traffic, f_databar, f_arrows, f_dots] as readonly Defined<FormatDefinition>[];

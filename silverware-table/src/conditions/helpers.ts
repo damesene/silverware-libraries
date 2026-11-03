@@ -2,7 +2,7 @@
 // user's. Pure: colors are CSS text (a palette's names resolved to the style
 // page's variables, mixed by the browser's color-mix), nothing is parsed.
 import type { Cell, Color, Context, Scope, Style } from "./api.ts";
-import { filterMatcher, normalizeForFilter } from "../filter.ts";
+import { filterExcelFormula, filterMatcher, normalizeForFilter } from "../filter.ts";
 import { now } from "../formulas/dates.ts";
 
 /** The palette's colors, by name: each a tint, a text shade and a strong shade, light and dark (the style page's --swt-cf-<name>-…) */
@@ -128,6 +128,14 @@ function plainPattern(pattern: unknown): boolean {
   return typeof pattern === "string" && pattern.trim() !== "" && !/^[=!<>/]|\|/.test(pattern.trim());
 }
 
+/**
+ * A filter's pattern as an Excel formula true for the cells it matches (`at` the cell, B2): words by SEARCH,
+ * =a|b, >10, !…, a regular expression by REGEXTEST (Microsoft 365's); undefined: an empty pattern
+ */
+function excelFilter(pattern: string, at: string): string | undefined {
+  return filterExcelFormula(pattern, at);
+}
+
 /** A day's length in milliseconds, for dates' arithmetic */
 const DAY = 86_400_000;
 
@@ -149,4 +157,4 @@ const icons = {
   exclamation: "!",
 } as const;
 
-export const HELPERS = { palette, mix, gradient, levels, matches, normalize, today, DAY, icons, excelText, plainPattern } as const;
+export const HELPERS = { palette, mix, gradient, levels, matches, normalize, today, DAY, icons, excelText, excelFilter, plainPattern } as const;

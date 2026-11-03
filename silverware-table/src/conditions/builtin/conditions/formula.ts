@@ -3,6 +3,7 @@ import type { ConditionDefinition } from "../../api.ts";
 export default (): ConditionDefinition<{ formula: string }> => ({
   name: "formula",
   label: "Formula",
+  category: "Formula",
   description: "Cells of the rows a formula of one row is true for (=[@due] < TODAY()); needs the formulas module",
   params: { formula: { kind: "text", label: "Formula", default: "" } },
   test: (cell, { params, formula }) => {

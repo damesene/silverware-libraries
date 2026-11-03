@@ -92,10 +92,23 @@ describe("Conditional formatting in Excel", () => {
     expect(conditional.xml).toContain('<colorScale><cfvo type="num" val="10"/><cfvo type="percent" val="90"/><color rgb="FF000000"/><color rgb="FFFFFFFF"/></colorScale>');
   });
 
-  it("lists what Excel cannot have, with why: a regular expression, levels, a formula, a look over a condition's cells; your own style is written", () => {
+  it("writes a filter's syntax as a formula, a regular expression by REGEXTEST, said to need Microsoft 365", () => {
+    const { conditional, skipped, notes } = excelConditional([
+      range("redFill", ["matches", { pattern: "/^bl/" }]),
+      range("bold", ["matches", { pattern: "=done|closed" }]),
+      range(["byPattern", { rows: [{ pattern: "!open", style: { bold: true } }, { pattern: ">10", style: { italic: true } }] }]),
+    ]);
+    expect(skipped).toEqual([]);
+    expect(conditional.xml).toContain("<formula>_xlfn.REGEXTEST(B2,&quot;^bl&quot;,1)</formula>");
+    expect(conditional.xml).toContain("<formula>OR(TRIM(B2)=&quot;done&quot;,TRIM(B2)=&quot;closed&quot;)</formula>");
+    expect(conditional.xml).toContain("<formula>NOT(ISNUMBER(SEARCH(&quot;open&quot;,B2)))</formula>");
+    expect(conditional.xml).toContain("<formula>AND(ISNUMBER(B2),B2&gt;10)</formula>");
+    expect(notes).toEqual([{ rule: "Matches → Light red fill with dark red text", reason: "a regular expression needs Microsoft 365 (REGEXTEST): an older Excel leaves its cells as they are" }]);
+  });
+
+  it("lists what Excel cannot have, with why: levels, a formula, a look over a condition's cells; your own style is written", () => {
     defineCustomFormats([{ name: "mine", label: "Mine", style: { bold: true } }]);
     const { conditional, skipped } = excelConditional([
-      range("redFill", ["matches", { pattern: "/^a/" }]),
       range("heatMap"),
       range("bold", ["formula", { formula: "=[@x]" }]),
       range("mine"),
@@ -103,7 +116,6 @@ describe("Conditional formatting in Excel", () => {
     ]);
     expect(conditional.xml).toBe('<conditionalFormatting sqref="B2:B5"><cfRule type="expression" dxfId="0" priority="1"><formula>TRUE</formula></cfRule></conditionalFormatting>');
     expect(skipped.map((s) => s.reason)).toEqual([
-      "a pattern of a filter's syntax (a regular expression, =a|b, >10, !…) has no Excel form",
       "levels have no Excel form",
       "a formula condition reads columns by name, which Excel's conditional formatting cannot",
       "a look of its own (a scale, a bar, icons, keywords, ranges) over the cells a condition picks has no Excel form",

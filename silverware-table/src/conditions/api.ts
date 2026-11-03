@@ -138,6 +138,8 @@ type Definition = {
   readonly name: string;
   readonly label: string;
   readonly description?: string;
+  // Its group in the dialog's lists (Numbers, Text, Scales…; one of its own is a group too); none: Other, last
+  readonly category?: string;
   readonly params?: ParamSpecs;
 };
 

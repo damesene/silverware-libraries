@@ -16,8 +16,13 @@ export type RuleRange = { readonly rule: Rule; readonly rows: readonly [number, 
 /** What the sheet gets: its <conditionalFormatting> elements, the differential formats they use (styles.xml's dxfs) */
 export type ExcelConditional = { readonly xml: string; readonly dxfs: readonly string[] };
 
-/** A rule not written, and why */
+/** A rule not written, and why; or written, and what it needs (a regular expression: Microsoft 365) */
 export type SkippedRule = { readonly rule: string; readonly reason: string };
+
+// Functions a rule's formulas may use that only Microsoft 365 has, and what that means
+const NEWER_FUNCTIONS: readonly { readonly name: string; readonly note: string }[] = [
+  { name: "_xlfn.REGEXTEST", note: "a regular expression needs Microsoft 365 (REGEXTEST): an older Excel leaves its cells as they are" },
+];
 
 // The palette's light colors (the style page's --swt-cf-<name>-fill / -text / -solid: a test keeps them in step)
 export const PALETTE_HEX: Readonly<Record<string, { readonly fill: string; readonly text: string; readonly solid: string }>> = {
@@ -108,10 +113,12 @@ function formOf<T>(name: string, excel: ((params: Params, at: string) => T | str
  * Excel cannot have, with why. A definition gives its own form (`excel`), the
  * built-in ones and the user's alike; a format of a style is its cell format.
  */
-export function excelConditional(ranges: readonly RuleRange[]): { readonly conditional: ExcelConditional; readonly skipped: readonly SkippedRule[] } {
+export function excelConditional(ranges: readonly RuleRange[]): { readonly conditional: ExcelConditional; readonly skipped: readonly SkippedRule[]; readonly notes: readonly SkippedRule[] } {
   const dxfs: string[] = [];
   const parts: string[] = [];
   const skipped: SkippedRule[] = [];
+  const notes: SkippedRule[] = [];
+  const noted = new Set<Rule>();
   // A rule skipped once, though it applies to several ranges (each column of a table's rule)
   const said = new Set<Rule>();
   let priority = 1;
@@ -197,6 +204,11 @@ export function excelConditional(ranges: readonly RuleRange[]): { readonly condi
       }
     }
     if (rules.length) parts.push(`<conditionalFormatting sqref="${sqref}">${rules.join("")}</conditionalFormatting>`);
+    const newer = NEWER_FUNCTIONS.find((f) => rules.some((r) => r.includes(f.name)));
+    if (newer && !noted.has(rule)) {
+      noted.add(rule);
+      notes.push({ rule: ruleName(rule), reason: newer.note });
+    }
   }
-  return { conditional: { xml: parts.join(""), dxfs }, skipped };
+  return { conditional: { xml: parts.join(""), dxfs }, skipped, notes };
 }

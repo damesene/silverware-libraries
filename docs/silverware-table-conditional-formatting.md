@@ -238,4 +238,6 @@ Estimates are rough, from the parts above, not from a prototype.
 
 ## Open questions
 
-None now. To decide in phase 1: the exact names of `Style`'s properties and the palette's colors (checked in light and dark, with the built-in themes and Tiniri).
+1. **A saved format in a rule: a copy of its params or its name** (see *Formats put together in the dialog*). Proposed: the copy.
+
+To decide in phase 1: the exact names of `Style`'s properties and the palette's colors (checked in light and dark, with the built-in themes and Tiniri).

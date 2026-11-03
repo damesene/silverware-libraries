@@ -352,6 +352,12 @@ export class Excel implements Feature {
     }
     this.host.download(file, bytes, XLSX_TYPE);
     const values = workbook.skipped.length;
-    return { text: `Downloaded ${file}${values ? `, ${plural(values, "formula", "formulas")} as values` : ""}.`, ok: true };
+    const rules = workbook.skippedRules.length;
+    // What the file lacks, said again once it is made (the list above stays)
+    const lacks = [
+      ...(values ? [`${plural(values, "formula", "formulas")} as values`] : []),
+      ...(rules ? [`${plural(rules, "rule", "rules")} of conditional formatting not in it (listed above)`] : []),
+    ];
+    return { text: `Downloaded ${file}${lacks.length ? `, ${lacks.join("; ")}` : ""}.`, ok: true };
   }
 }

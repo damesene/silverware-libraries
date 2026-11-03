@@ -190,11 +190,15 @@ export async function answerConfirm(page: Page, yes: boolean, action: () => Prom
   await asked;
 }
 
-/** Where a line of the page's text is on screen, once the editor shows it (boundingBox alone does not wait) */
+/**
+ * Where a line of the page's text is on screen, once the editor shows it (boundingBox alone does not wait; the
+ * editor may draw the line anew between the two, as SilverBullet does as a page loads: no box then)
+ */
 export async function lineBox(page: Page, hasText: string): Promise<{ x: number; y: number; width: number; height: number }> {
   const line = page.locator(".cm-line", { hasText });
-  await expect(line).toBeVisible();
-  return (await line.boundingBox())!;
+  let box: { x: number; y: number; width: number; height: number } | null = null;
+  await expect.poll(async () => (box = await line.boundingBox()) !== null).toBe(true);
+  return box!;
 }
 
 export const bar = (page: Page): Locator => page.locator(".swb-bar.swb-visible");

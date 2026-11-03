@@ -48,7 +48,7 @@ xychart-beta
   x-axis ["Oct", "Nov"]
   bar "revenue" [${values}]
 %% chart.source: ${source}
-%% chart.x: month
+%% chart.labels: month
 %% chart.series: revenue
 \`\`\``;
 
@@ -115,7 +115,7 @@ async function chartMenu(page: import("@playwright/test").Page, index = 0): Prom
 }
 
 test("the menu's Type gallery writes the type picked", async ({ page, open }) => {
-  await open(`# Sales\n\n${block("above", "120, 140")}\n`.replace("%% chart.source: above\n%% chart.x: month\n%% chart.series: revenue\n", ""));
+  await open(`# Sales\n\n${block("above", "120, 140")}\n`.replace("%% chart.source: above\n%% chart.labels: month\n%% chart.series: revenue\n", ""));
   await expect.poll(() => charts(page)).toHaveLength(1);
   await chartMenu(page);
   await page.locator(".swc-menu-item", { hasText: "Type" }).click();
@@ -136,7 +136,7 @@ test("the menu's Data draws a table picked at once; the settings' Data and Serie
   await page.locator(".swc-menu-item", { hasText: "Data" }).click();
   await page.locator(".swc-menu-item", { hasText: "Table above" }).click();
   // Drawn at once: its text column the labels, its columns of numbers the values; the settings open at Data
-  await expect.poll(() => savedText(page)).toContain("%% chart.source: above\n%% chart.x: Month\n%% chart.series: Revenue, Cost");
+  await expect.poll(() => savedText(page)).toContain("%% chart.source: above\n%% chart.labels: Month\n%% chart.series: Revenue, Cost");
   const dialog = page.locator(".swc-settings");
   await expect(dialog.locator('.swc-settings-tab[aria-selected="true"]')).toHaveText("Data");
   // The rows where Revenue > 130, of Revenue alone
@@ -153,7 +153,7 @@ test("the menu's Data draws a table picked at once; the settings' Data and Serie
 });
 
 test("the menu's Edit source shows the block's markdown", async ({ page, open }) => {
-  await open(`# Sales\n\n${block("above", "120, 140")}\n`.replace("%% chart.source: above\n%% chart.x: month\n%% chart.series: revenue\n", ""));
+  await open(`# Sales\n\n${block("above", "120, 140")}\n`.replace("%% chart.source: above\n%% chart.labels: month\n%% chart.series: revenue\n", ""));
   await expect.poll(() => charts(page)).toHaveLength(1);
   await chartMenu(page);
   await page.locator(".swc-menu-item", { hasText: "Edit source" }).click();
@@ -161,7 +161,7 @@ test("the menu's Edit source shows the block's markdown", async ({ page, open })
   await expect(page.locator(".cm-content")).toContainText("xychart-beta");
 });
 
-const CHART_OF_SALES = '```mermaid\nxychart-beta\n  x-axis ["Oct", "Nov"]\n  bar "Revenue" [120, 140]\n  bar "Cost" [80, 85]\n%% chart.source: above\n%% chart.x: Month\n%% chart.series: Revenue, Cost\n```';
+const CHART_OF_SALES = '```mermaid\nxychart-beta\n  x-axis ["Oct", "Nov"]\n  bar "Revenue" [120, 140]\n  bar "Cost" [80, 85]\n%% chart.source: above\n%% chart.labels: Month\n%% chart.series: Revenue, Cost\n```';
 
 test("Insert chart lists the page's tables, the chart put under the one picked", async ({ page, open }) => {
   await open(`# Sales\n\n| A | B |\n|---|--:|\n| x | 1 |\n\nBetween.\n\n${SALES}\nAfter.\n`);
@@ -211,7 +211,7 @@ test("/chart puts a chart at the cursor, of a table picked", async ({ page, open
 });
 
 test("SilverBullet's own controls of a chart's block are left out; Reload draws the chart anew", async ({ page, open }) => {
-  await open(`# Sales\n\n${block("above", "120, 140")}\n`.replace("%% chart.source: above\n%% chart.x: month\n%% chart.series: revenue\n", ""));
+  await open(`# Sales\n\n${block("above", "120, 140")}\n`.replace("%% chart.source: above\n%% chart.labels: month\n%% chart.series: revenue\n", ""));
   await expect.poll(() => charts(page)).toHaveLength(1);
   const chart = page.locator(".swc-chart").first();
   await chart.hover({ position: { x: 200, y: 100 } });
@@ -230,7 +230,7 @@ test("SilverBullet's own controls of a chart's block are left out; Reload draws 
 });
 
 test("the toolbar stays on its chart as the text above it grows", async ({ page, open }) => {
-  await open(`# Sales\n\nText above.\n\n${block("above", "120, 140")}\n`.replace("%% chart.source: above\n%% chart.x: month\n%% chart.series: revenue\n", ""));
+  await open(`# Sales\n\nText above.\n\n${block("above", "120, 140")}\n`.replace("%% chart.source: above\n%% chart.labels: month\n%% chart.series: revenue\n", ""));
   await expect.poll(() => charts(page)).toHaveLength(1);
   const chart = page.locator(".swc-chart").first();
   await chart.hover({ position: { x: 200, y: 100 } });

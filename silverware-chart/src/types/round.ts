@@ -47,9 +47,10 @@ export const DOUGHNUT: ChartType = {
 };
 
 export const POLAR_AREA: ChartType = {
-  name: "polarArea",
+  name: "polar",
   label: "Polar area",
   icon: icon('<circle cx="12" cy="12" r="9"/><path d="M12 12l6-6M12 12l-4 7M12 12H4"/>'),
+  // (Chart.js's name for it)
   config: (model, theme) => roundConfig(model, theme, "polarArea"),
   capabilities: ["slices"],
   seriesLimit: 1,

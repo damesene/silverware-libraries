@@ -59,6 +59,6 @@ describe("the chart's menu", () => {
     expect(items.map((i) => i.label)).toEqual(["Table above"]);
     await items[0]!.run!();
     expect(h.settings).toHaveBeenCalledWith(entry, "Data");
-    expect(h.pick).toHaveBeenCalledWith(entry, { table: "above", x: "Month", series: ["Qty"] });
+    expect(h.pick).toHaveBeenCalledWith(entry, { table: "above", labels: "Month", series: ["Qty"] });
   });
 });

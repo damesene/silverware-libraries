@@ -46,21 +46,21 @@ xychart-beta
 
 | Setting | What it does |
 |---|---|
-| `type` | The type of chart: `bar`, `line`, `area`, `scatter`, `pie`, `doughnut`, `polarArea`, `radar` (Mermaid itself draws bars, lines and pies) |
+| `type` | The type of chart: `bar`, `line`, `area`, `scatter`, `pie`, `doughnut`, `polar`, `radar` (Mermaid itself draws bars, lines and pies) |
 | `stacked` | `true`: the series stacked on each other |
-| `kinds` | How each series is drawn, in their order: `bar`, `line`, `area`, `points` or `step` (Mermaid draws an area, points and steps as a line) |
+| `kinds` | How each series is drawn, in their order: `bar`, `line`, `area`, `point` or `step` (Mermaid draws an area, points and steps as a line) |
 | `smooth` | `true`: lines curved through their points |
 | `colors` | The series' colors (a pie's slices'), comma separated: `#4e79a7, #f28e2b` |
 | `legend` | Where the legend is: `top`, `bottom`, `left`, `right`, or `none` |
 | `height` | The chart's height: `400px`, `20em` |
-| `source`, `x`, `series` | The data from a table: see below |
+| `source`, `labels`, `series` | The data from a table: see below |
 | `where`, `rows` | Only some of the table's rows: see below |
 
 A setting it does not know is kept as you wrote it.
 
 ## Data from a table
 
-A chart may draw a markdown table instead of the numbers in its block: say which table with `source`, the column of the labels with `x` and the columns of the values with `series` (by their names as they show, or as SilverBullet's index keys them: `Unit price` or `unit_price`).
+A chart may draw a markdown table instead of the numbers in its block: say which table with `source`, the column of the labels with `labels` and the columns of the values with `series` (by their names as they show, or as SilverBullet's index keys them: `Unit price` or `unit_price`).
 
 ````markdown
 | Month | Revenue | Cost |
@@ -75,7 +75,7 @@ xychart-beta
   bar "revenue" [120, 140]
   line "cost" [80, 85]
 %% chart.source: above
-%% chart.x: month
+%% chart.labels: month
 %% chart.series: revenue, cost
 ```
 ````
@@ -84,15 +84,15 @@ xychart-beta
 |---|---|
 | `above` | the nearest table above the chart |
 | `below` | the nearest table below it |
-| `#Sales` | the first table in the section of the heading *Sales* (under its subheadings too, not past the next heading of its level); `[[Page]]#Sales` on another page |
-| `sales` | the table you named *sales* with [[Library/damesene/silverware-table\|Silverware Table]] (the pencil in its ⋯ menu), `[[Page]]sales` on another page; needs Silverware Table |
+| `#Sales` | the first table in the section of the heading *Sales* (under its subheadings too, not past the next heading of its level); `[[Page#Sales]]` on another page, as SilverBullet links to a heading |
+| `sales` | the table you named *sales* with [[Library/damesene/silverware-table\|Silverware Table]] (the pencil in its ⋯ menu), `[[Page]]sales` on another page, as formulas name it; needs Silverware Table. A table named `above` or `below` is not found so: those words are the places |
 
 * In SilverBullet the chart draws the table as it is: edit a cell and the chart changes.
 * The numbers in the block are what other tools that draw Mermaid show. With Silverware Table, an edit of a table you make with it writes them anew in the same edit, so one Ctrl+Z takes back both.
 * Where they are behind the table (you edited its markdown by hand, or Silverware Table is not installed), the chart says **Stale: update data** in its corner: click it to write the table's numbers into the block.
 * The block's series keep their kind (`bar`, `line`) and their names, in the order of the `series` columns.
 * **Only some rows**: `%% chart.where: Status = done` keeps the rows where the condition holds (a line each, every one must hold), written as spreadsheets write the conditions of `SUMIFS`: `= done` (or just `done`, any case), `<> done`, `> 100`, `<= 5`, `app*` and `?at` (wildcards), `=` (empty), `<>` (not empty). A number compares with cells that are numbers (`12,99 €` and `3 kg` are; `A1`, `Q1` and `Room 12` are text): `> 100` keeps no text. `%% chart.rows: first 10` or `last 12` then keeps the first or last so many of them. The settings' *Data* sets both: *Rows* and *Only where*.
-* Rename a column or the table with Silverware Table and the chart follows: its `source`, `x` and `series` are written with the new names in the same edit (a series named as its column takes the new name too).
+* Rename a column or the table with Silverware Table and the chart follows: its `source`, `labels` and `series` are written with the new names in the same edit (a series named as its column takes the new name too).
 * A column the chart names that the table does not have (renamed in the markdown by hand) is said in the chart's place, with the table's columns to pick from: click one and it is written into the block.
 
 ## The chart's menu

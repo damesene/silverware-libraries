@@ -40,7 +40,7 @@ const chart = (source: string, values = "120, 140") => `xychart-beta
   x-axis ["Oct", "Nov"]
   bar "revenue" [${values}]
 %% chart.source: ${source}
-%% chart.x: month
+%% chart.labels: month
 %% chart.series: revenue`;
 
 const page = (block: string, table = SALES) => `# Sales\n\n${table}\n\n\`\`\`mermaid\n${block}\n\`\`\`\n`;
@@ -147,7 +147,7 @@ describe("a markdown table as the source (the tables module)", () => {
     const heading = chart("#Sales");
     await controller(page(heading)).render("mermaid", heading, "Sales");
     expect(dataOf(2)).toEqual([[120, 140]]);
-    const other = chart("[[Other]]#Costs").replace("revenue\n", "revenue\n").replace("chart.series: revenue", "chart.series: cost");
+    const other = chart("[[Other#Costs]]").replace("revenue\n", "revenue\n").replace("chart.series: revenue", "chart.series: cost");
     await controller(page(other)).render("mermaid", other, "Sales");
     expect(made[3]?.config.data).toMatchObject({ labels: ["Oct"], datasets: [{ data: [5] }] });
   });
@@ -155,6 +155,9 @@ describe("a markdown table as the source (the tables module)", () => {
   it("says what it cannot find", async () => {
     const core = controller(`# Sales\n\n\`\`\`mermaid\n${chart("above")}\n\`\`\`\n`);
     expect((await core.render("mermaid", chart("above"), "Sales"))?.textContent).toBe("Silverware Chart: no table above the chart");
+    // A heading of another page after its link, not in it: how it is written instead
+    const outside = chart("[[Other]]#Costs");
+    expect((await controller(page(outside)).render("mermaid", outside, "Sales"))?.textContent).toBe("Silverware Chart: [[Other]]#Costs: a heading of another page goes in its link, [[Other#Costs]]");
     const missing = chart("below").replace("chart.series: revenue", "chart.series: profit");
     expect((await controller(`\`\`\`mermaid\n${missing}\n\`\`\`\n\n${SALES}`).render("mermaid", missing, "Sales"))?.firstChild?.textContent).toBe("Silverware Chart: the table below has no column profit (it has Month, Revenue)");
   });
@@ -217,7 +220,7 @@ describe("Stale and Update data", () => {
   // A pie draws one series: of a table of several columns its first, and its block holds that one
   it("is not marked on a pie of a table of several columns", async () => {
     const table = SALES.replace("| Month | Revenue |\n|---|--:|", "| Month | Revenue | Costs |\n|---|--:|--:|").replace("| 120 |", "| 120 | 80 |").replace("| 140 |", "| 140 | 90 |");
-    const block = 'pie\n  "Oct" : 120\n  "Nov" : 140\n%% chart.source: above\n%% chart.x: month\n%% chart.series: revenue, costs';
+    const block = 'pie\n  "Oct" : 120\n  "Nov" : 140\n%% chart.source: above\n%% chart.labels: month\n%% chart.series: revenue, costs';
     const box = await controller(page(block, table)).render("mermaid", block, "Sales");
     expect(box?.querySelector(".swc-stale")).toBeNull();
     expect(dataOf()).toEqual([[120, 140]]);
@@ -235,7 +238,7 @@ describe("Silverware Table (the silverwareTable module)", () => {
 
   it("gives the edits that bring the page's charts up to their sources with each of its writes", async () => {
     controller("");
-    const text = page(chart("sales", "1, 2")) + `\n\`\`\`mermaid\n${chart("above")}\n\`\`\`\n\n\`\`\`mermaid\n${chart("[[Other]]#Costs")}\n\`\`\`\n`;
+    const text = page(chart("sales", "1, 2")) + `\n\`\`\`mermaid\n${chart("above")}\n\`\`\`\n\n\`\`\`mermaid\n${chart("[[Other#Costs]]")}\n\`\`\`\n`;
     const edits = await listener!(text, NOTHING_RENAMED);
     // The first behind its table; the second as its table is; the third on another page, left out
     expect(edits).toHaveLength(1);
@@ -255,7 +258,7 @@ describe("Silverware Table (the silverwareTable module)", () => {
     let after = text;
     for (const edit of [...edits].sort((a, b) => b.from - a.from)) after = after.slice(0, edit.from) + edit.text + after.slice(edit.to);
     // A series named as its column was follows it; the references follow; the data stay what they are
-    const followed = (source: string) => `xychart-beta\n  x-axis ["Oct", "Nov"]\n  bar "Income" [120, 140]\n%% chart.source: ${source}\n%% chart.x: Month\n%% chart.series: Income`;
+    const followed = (source: string) => `xychart-beta\n  x-axis ["Oct", "Nov"]\n  bar "Income" [120, 140]\n%% chart.source: ${source}\n%% chart.labels: Month\n%% chart.series: Income`;
     expect(after).toContain(followed("costs"));
     expect(after).toContain(followed("above"));
   });

@@ -147,16 +147,16 @@ export function columnIndex(columns: TextTable["columns"], wanted: string): numb
  * its place
  */
 export function dataOf(table: Pick<TextTable, "columns" | "rows">, source: Source, what: string): { labels: string[]; series: (number | null)[][] } | Unreadable {
-  const { x, series } = source;
+  const { labels, series } = source;
   if (!series.length) return { problem: `${what}: say the columns to draw with series` };
   const index = (name: string) => columnIndex(table.columns, name);
-  const missing = [...(x ? [x] : []), ...series].filter((name) => index(name) < 0);
+  const missing = [...(labels ? [labels] : []), ...series].filter((name) => index(name) < 0);
   if (missing.length) {
     const first = missing[0]!;
     // The first reference that finds no column, each column of the table in its place (a column renamed by hand)
     const choices = table.columns
       .filter((c) => c.name !== "")
-      .map((c) => ({ label: c.name, source: { ...source, ...(x === first ? { x: c.name } : {}), series: series.map((name) => (name === first && x !== first ? c.name : name)) } }));
+      .map((c) => ({ label: c.name, source: { ...source, ...(labels === first ? { labels: c.name } : {}), series: series.map((name) => (name === first && labels !== first ? c.name : name)) } }));
     return { problem: `${what} has no column ${missing.join(", ")} (it has ${table.columns.map((c) => c.name).join(", ")})`, choices };
   }
   const where = source.where ?? [];
@@ -165,7 +165,7 @@ export function dataOf(table: Pick<TextTable, "columns" | "rows">, source: Sourc
   // The rows where every condition holds, then the first or the last so many of them
   let rows = table.rows.filter((row) => where.every((c) => meets(row[index(c.column)] ?? "", c.criterion)));
   if (source.rows) rows = source.rows.from === "first" ? rows.slice(0, source.rows.count) : rows.slice(Math.max(0, rows.length - source.rows.count));
-  const xi = x ? index(x) : -1;
+  const xi = labels ? index(labels) : -1;
   return {
     labels: rows.map((row, i) => (xi >= 0 ? (row[xi] ?? "") : String(i + 1))),
     series: series.map((name) => {
@@ -178,5 +178,8 @@ export function dataOf(table: Pick<TextTable, "columns" | "rows">, source: Sourc
 /** A reference to another page's: `[[Page]]rest` as the page and the rest; else the rest alone */
 export function pageOf(reference: string): { readonly page?: string; readonly rest: string } {
   const m = /^\[\[([^\]]+)\]\](.*)$/.exec(reference.trim());
-  return m ? { page: m[1]!.trim(), rest: (m[2] ?? "").trim() } : { rest: reference.trim() };
+  if (!m) return { rest: reference.trim() };
+  // A heading of the page as SilverBullet links to one, [[Page#Heading]]: its rest #Heading
+  const [page, heading] = m[1]!.split(/#(.*)/s);
+  return heading !== undefined ? { page: page!.trim(), rest: `#${heading.trim()}${(m[2] ?? "").trim()}` } : { page: m[1]!.trim(), rest: (m[2] ?? "").trim() };
 }

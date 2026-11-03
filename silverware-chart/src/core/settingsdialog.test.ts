@@ -74,7 +74,7 @@ describe("the settings dialog", () => {
   });
 
   it("shows a chart of a table its source on Data and every column on Series, drawn or not", async () => {
-    const model: ChartModel = { ...BARS, series: [{ name: "Revenue", values: [1, 2] }], source: { table: "above", x: "Month", series: ["Revenue"] } };
+    const model: ChartModel = { ...BARS, series: [{ name: "Revenue", values: [1, 2] }], source: { table: "above", labels: "Month", series: ["Revenue"] } };
     const columns = [{ name: "Month", numeric: false }, { name: "Revenue", numeric: true }, { name: "Cost", numeric: true }];
     const save = vi.fn(async (_change: (model: ChartModel) => ChartModel) => {});
     openSettings(document, { model, type: BAR, format: MERMAID_FORMAT, settings: SETTINGS, columns, tab: "Data", save });
@@ -110,7 +110,7 @@ describe("the settings dialog", () => {
     dialog.querySelector<HTMLButtonElement>(".swc-settings-save")!.click();
     await vi.waitFor(() => expect(save).toHaveBeenCalled());
     const after = save.mock.calls[0]![0](model);
-    expect(after.source).toEqual({ table: "above", x: "Month", series: ["Revenue", "Cost"], where: [{ column: "Cost", criterion: "> 80" }], rows: { from: "last", count: 2 } });
+    expect(after.source).toEqual({ table: "above", labels: "Month", series: ["Revenue", "Cost"], where: [{ column: "Cost", criterion: "> 80" }], rows: { from: "last", count: 2 } });
     expect(after.series.map((s) => [s.name, s.kind])).toEqual([
       ["Revenue", undefined],
       ["Cost", "line"],
@@ -118,7 +118,7 @@ describe("the settings dialog", () => {
   });
 
   it("lets a pie of a table pick the column it draws: the one switched on in place of the other", async () => {
-    const model: ChartModel = { type: "pie", labels: ["Oct", "Nov"], series: [{ values: [1, 2] }], colors: ["#aa0000", "#00aa00"], source: { table: "above", x: "Month", series: ["Revenue"] } };
+    const model: ChartModel = { type: "pie", labels: ["Oct", "Nov"], series: [{ values: [1, 2] }], colors: ["#aa0000", "#00aa00"], source: { table: "above", labels: "Month", series: ["Revenue"] } };
     const columns = [{ name: "Month", numeric: false }, { name: "Revenue", numeric: true }, { name: "Cost", numeric: true }];
     const save = vi.fn(async (_change: (model: ChartModel) => ChartModel) => {});
     openSettings(document, { model, type: PIE, format: MERMAID_FORMAT, settings: SETTINGS, columns, save });

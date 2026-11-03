@@ -44,7 +44,7 @@ typed.
      after the diagram: `%% chart.<key>: <value>` (Mermaid leaves `%%` lines
      out; not `%%{…}%%`, which Mermaid reads as its directive). Keys: `type`
      (where Mermaid has none: area, scatter, doughnut, radar, stacked bar…),
-     `source`, `x`, `series`, `colors`, `legend`, `format`, `stacked`, `y2`. A
+     `source`, `labels` (`x` before 2026-11-03), `series`, `colors`, `legend`, `format`, `stacked`, `y2`. A
      key we do not know is kept as written.
    - **Obsidian Charts** (` ```chart `): YAML (`type`, `labels`, `series` of
      `title` and `data`, its own keys for colors, legend, stacking…), Chart.js
@@ -79,7 +79,7 @@ typed.
    index keys them (`Unit price` is `unit_price`), live as the page is edited
    (see the proof of concept). `source:` says which table:
    - `above` / `below`: the nearest table above / below the chart;
-   - `#Sales`: the first table under the heading "Sales" (`[[Page]]#Sales` on
+   - `#Sales`: the first table under the heading "Sales" (`[[Page#Sales]]`, SilverBullet's link to a heading, `[[Page]]#Sales` before 2026-11-03, on
      another page);
    - `sales`: a table named by Silverware Table (`[[Page]]sales` on another
      page): only where Silverware Table is installed, through its API (below);
@@ -108,7 +108,7 @@ typed.
      may keep it as it likes: `renamed()` (a table or a column renamed: most
      writes rename nothing), `table(nameBefore)`, `tableAt(offset)`, each with
      `.name` now and `.column(nameBefore or key)` now (nil: deleted). The chart
-     follows its references with it (`source`, `x`, `series`; a series named as
+     follows its references with it (`source`, `labels`, `series`; a series named as
      its column renamed with it), in the same edit. A list of all changes
      (`changes()`) only once one needs it.
    - A reference that finds no column (a rename in the markdown by hand): the

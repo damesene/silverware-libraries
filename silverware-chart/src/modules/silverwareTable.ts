@@ -42,7 +42,7 @@ function followed(context: WriteContext, source: Source, block: Block, text: str
   const column = (name: string) => written.column(name) ?? name;
   return {
     table: byName ? (written.name ?? rest) : source.table,
-    ...(source.x !== undefined ? { x: column(source.x) } : {}),
+    ...(source.labels !== undefined ? { labels: column(source.labels) } : {}),
     series: source.series.map(column),
     ...(source.where ? { where: source.where.map((c) => ({ column: column(c.column), criterion: c.criterion })) } : {}),
     ...(source.rows ? { rows: source.rows } : {}),

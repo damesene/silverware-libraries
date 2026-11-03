@@ -35,7 +35,7 @@ function withSource(model: ChartModel, change: (source: Source) => Source): Char
   return model.source ? { ...model, source: change(model.source) } : model;
 }
 
-const KIND_LABELS: Readonly<Record<SeriesKind, string>> = { bar: "Bars", line: "Line", area: "Area", points: "Points", step: "Steps" };
+const KIND_LABELS: Readonly<Record<SeriesKind, string>> = { bar: "Bars", line: "Line", area: "Area", point: "Points", step: "Steps" };
 
 /** A color written for the series (or slice) at `index`, the others as they show (the palette's) where none was written */
 function withColor(model: ChartModel, index: number, value: SettingValue, count: number, palette: (i: number) => string): ChartModel {
@@ -156,18 +156,18 @@ export function commonSettings(palette: (i: number) => string): readonly Setting
       set: (m, v) => withField(m, "smooth", v ? true : undefined),
     },
     {
-      key: "x",
+      key: "labels",
       label: "Labels",
       hint: "The column whose cells name the values",
       tab: "Data",
       control: "choice",
       when: hasSource,
       choices: (context) => [{ value: "", label: "None: 1, 2, …" }, ...(context.columns ?? []).map((c) => ({ value: c.name, label: c.name }))],
-      get: (m, context) => context.columns?.find((c) => same(c.name, m.source?.x))?.name ?? "",
+      get: (m, context) => context.columns?.find((c) => same(c.name, m.source?.labels))?.name ?? "",
       set: (m, v) =>
-        withSource(m, ({ x: _x, ...source }) => {
-          const x = text(v);
-          return x ? { ...source, x } : source;
+        withSource(m, ({ labels: _labels, ...source }) => {
+          const labels = text(v);
+          return labels ? { ...source, labels } : source;
         }),
     },
     {

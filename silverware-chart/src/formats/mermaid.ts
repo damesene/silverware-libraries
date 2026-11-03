@@ -8,7 +8,7 @@ import { type Axis, baseKind, type ChartModel, type Condition, type RowsTaken, L
 // Our comments: `%% chart.<key>: <value>`
 const META_RE = /^\s*%%\s*chart\.([A-Za-z][\w.-]*)\s*:\s*(.*?)\s*$/;
 // Chart types Mermaid draws as they are: the others are said in `chart.type`
-const ROUND = new Set(["pie", "doughnut", "polarArea"]);
+const ROUND = new Set(["pie", "doughnut", "polar"]);
 
 /** The items of a list as Mermaid writes them, `["a", b, "c, d"]` (a quoted item may hold a comma) */
 export function listItems(text: string): string[] {
@@ -107,7 +107,7 @@ function metaOf(meta: ReadonlyMap<string, string>, wheres: readonly string[] = [
         out.height = value;
         break;
       case "source":
-      case "x":
+      case "labels":
       case "series":
       case "kinds":
         break;
@@ -124,7 +124,7 @@ function metaOf(meta: ReadonlyMap<string, string>, wheres: readonly string[] = [
   if (table)
     out.source = {
       table,
-      ...(meta.get("x") ? { x: meta.get("x") } : {}),
+      ...(meta.get("labels") ? { labels: meta.get("labels") } : {}),
       series: commaList(meta.get("series") ?? ""),
       ...(where.length ? { where } : {}),
       ...(rows ? { rows } : {}),
@@ -257,7 +257,7 @@ export function writeMermaid(model: ChartModel, previous?: string): string {
   if (model.height) meta.push(["height", model.height]);
   if (model.source) {
     meta.push(["source", model.source.table]);
-    if (model.source.x) meta.push(["x", model.source.x]);
+    if (model.source.labels) meta.push(["labels", model.source.labels]);
     if (model.source.series.length) meta.push(["series", model.source.series.join(", ")]);
     for (const condition of model.source.where ?? []) meta.push(["where", `${condition.column} ${condition.criterion}`]);
     if (model.source.rows) meta.push(["rows", `${model.source.rows.from} ${model.source.rows.count}`]);

@@ -79,7 +79,7 @@ function fenced(format: ChartFormat, text: string): string {
 function sameReference(a: Source, b: Source): boolean {
   const where = (s: Source) => (s.where ?? []).map((c) => `${c.column}\u0000${c.criterion}`).join("\u0001");
   const rows = (s: Source) => (s.rows ? `${s.rows.from} ${s.rows.count}` : "");
-  return a.table === b.table && a.x === b.x && a.series.length === b.series.length && a.series.every((name, i) => name === b.series[i]) && where(a) === where(b) && rows(a) === rows(b);
+  return a.table === b.table && a.labels === b.labels && a.series.length === b.series.length && a.series.every((name, i) => name === b.series[i]) && where(a) === where(b) && rows(a) === rows(b);
 }
 
 /**

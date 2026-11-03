@@ -113,8 +113,10 @@ export function formulaChoices(
   own?: string,
   // The columns of the table the formula is of (columnChoicesOf): offered in [ ] and [@ ] by their names, put in by their ids
   columns: readonly ColumnChoice[] = [],
+  // The text was just typed there (else the caret only moved): a column's name typed in a reference closed already counts
+  typing = false,
 ): FormulaChoices | undefined {
-  const column = columnTyped(text, start, end);
+  const column = columnTyped(text, start, end, typing);
   if (column) {
     // Another table's column (prices![qu): its columns are not these, nothing offered; this table's own name's, they are
     const open = text.lastIndexOf("[", column.from);
@@ -168,12 +170,14 @@ export function choiceText(choice: FormulaChoice): string {
 /**
  * A column's name typed right before the caret, in a column reference not
  * closed yet (`[qu`, `[@qu`, `prices![qu`): from after its "[" (and "@") to the
- * caret; undefined in a reference closed after the caret (`[@q|uality]`: the
- * caret moved into it, not typing it; Tab there moves on, as in the middle of a
- * function's name), in a
- * text in quotes, in a link to a page ([[Page]]), or where nothing is open
+ * caret. In a reference closed after the caret only while `typing` (`[@|]`, the
+ * name selected and deleted, then typed): to past its "]", the choice being the
+ * whole name and closing it; not where the caret only moved into it
+ * (`[@q|uality]`: Tab there moves on, as in the middle of a function's name).
+ * Undefined in a text in quotes, in a link to a page ([[Page]]), or where
+ * nothing is open
  */
-export function columnTyped(text: string, start: number, end: number): { from: number; to: number } | undefined {
+export function columnTyped(text: string, start: number, end: number, typing = false): { from: number; to: number } | undefined {
   if (start !== end || !text.trimStart().startsWith("=")) return undefined;
   const before = text.slice(0, start);
   const open = before.lastIndexOf("[");
@@ -184,8 +188,9 @@ export function columnTyped(text: string, start: number, end: number): { from: n
   if (tokenize(before.slice(0, open)).error) return undefined;
   const from = open + 1 + (before[open + 1] === "@" ? 1 : 0);
   if (/["'\[]/.test(before.slice(from))) return undefined;
-  if (/^[^\["'\]]*\]/.test(text.slice(start))) return undefined;
-  return { from, to: start };
+  const closed = /^[^\["'\]]*\]/.exec(text.slice(start));
+  if (closed && !typing) return undefined;
+  return { from, to: start + (closed?.[0].length ?? 0) };
 }
 
 /**

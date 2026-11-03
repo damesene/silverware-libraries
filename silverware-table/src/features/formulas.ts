@@ -186,6 +186,8 @@ export class Formulas implements Feature {
   // The page's names offered while a name is typed (its tables and cells), as of the page's text
   private pageNames: { readonly text: string; readonly choices: readonly FormulaChoice[] } | undefined;
   private dismissed: string | undefined;
+  // Where the editor's text was last typed (its text, the caret after it): a name typed there, not one the caret moved into
+  private typedAt: { readonly editor: CellEditor; readonly text: string; readonly at: number } | undefined;
   // Every function, to find one by what it does and insert it (fx, Shift+F3, Insert function…)
   private readonly functions: FunctionDialog;
   // Tables (by key, as of their markdown) whose formula cells show results from before a change made outside Silverware Table
@@ -215,8 +217,8 @@ export class Formulas implements Feature {
       evaluate: (formula, text, page) => this.evaluate(formula, text, page),
       complete: (formula, caret, text, table) =>
         table
-          ? formulaChoices(formula, caret, caret, this.namesOf(table, text), this.nameOf(table), columnChoicesOf(table.rows[0]?.cells ?? []))
-          : formulaChoices(formula, caret, caret, pageNameChoices(this.cells, this.named(pageTablesOf(text)))),
+          ? formulaChoices(formula, caret, caret, this.namesOf(table, text), this.nameOf(table), columnChoicesOf(table.rows[0]?.cells ?? []), true)
+          : formulaChoices(formula, caret, caret, pageNameChoices(this.cells, this.named(pageTablesOf(text))), undefined, [], true),
       help: (formula, caret) => functionHelp(formula, caret),
       problem: (formula) => {
         const tree = parseFormula(withEquals(formula).formula.trim());
@@ -447,6 +449,8 @@ export class Formulas implements Feature {
   }
 
   editorInput(editor: CellEditor): void {
+    // Where the text was typed: the caret still there (its keyup), a name is being typed
+    this.typedAt = { editor, text: editor.text, at: editor.selection[1] };
     if (this.host.editing === editor && !this.stopReferenceDrag) this.updateFormulaUi();
   }
 
@@ -961,10 +965,11 @@ export class Formulas implements Feature {
     const own = info ? this.nameOf(this.host.tableOf(info)) : undefined;
     // The table's columns too, in a column reference ([qu, [@qu): shown by their headers' names, put in by their ids
     const columns = info ? columnChoicesOf(this.host.tableOf(info).rows[0]?.cells ?? []) : [];
-    const choices = formulaChoices(text, from, to, info ? this.namesFor(info) : [], own, columns);
+    const typed = this.typedAt;
+    const typing = typed?.editor === active && typed.text === text && typed.at === to;
+    const choices = formulaChoices(text, from, to, info ? this.namesFor(info) : [], own, columns, typing);
     if (!choices) return undefined;
-    const typed = text.slice(choices.from, choices.to);
-    const key = `${choices.from}:${typed}`;
+    const key = `${choices.from}:${text.slice(choices.from, choices.to)}`;
     if (this.dismissed === key) return undefined;
     if (this.choosing?.key !== key) this.choosing = { key, index: 0 };
     // The same name typed, fewer choices (the page read anew meanwhile): the pick stays in the list

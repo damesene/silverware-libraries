@@ -526,6 +526,10 @@ describe("formulaChoices of functions", () => {
     expect(formulaChoices("=[q]", 3, 3, [], undefined, columns)).toBeUndefined();
     expect(formulaChoices("=[@q|uality]*2".replace("|", ""), 4, 4, [], undefined, columns)).toBeUndefined();
     expect(formulaChoices("=[@Pri ce] > 1", 6, 6, [], undefined, columns)).toBeUndefined();
+    // Typed there (the name selected and deleted, then typed): offered, the choice the whole name up to and with its "]"
+    expect(choiceNames(formulaChoices("=[@] > 1", 3, 3, [], undefined, columns, true))).toEqual({ from: 3, to: 4, names: ["Qty", "Price", "quality", "Unit price", "Qty (2)"] });
+    expect(choiceNames(formulaChoices("=[@Pr] > 1", 5, 5, [], undefined, columns, true))).toEqual({ from: 3, to: 6, names: ["Price"] });
+    expect(choiceNames(formulaChoices("=[@q|uality]".replace("|", ""), 4, 4, [], undefined, columns, true))).toEqual({ from: 3, to: 11, names: ["Qty", "quality", "Qty (2)"] });
     expect(choiceNames(formulaChoices("=[@", 3, 3, [], undefined, columns))!.names).toEqual(["Qty", "Price", "quality", "Unit price", "Qty (2)"]);
     expect(choiceText({ kind: "column", name: "Unit price", id: "unit_price" })).toBe("unit_price]");
     // Not in a text, a page's link, a reference closed before the caret

@@ -32,6 +32,23 @@ test.describe("Conditional formatting", () => {
     await expect(scores(page).nth(0)).not.toHaveClass(/swt-cf/);
   });
 
+  test("a formula's column name selected and deleted: what is typed there offers the columns, the one picked closing it", async ({ page }) => {
+    await load(page, PAGE + `| <meta core.table conditions.rules='[{"when":["formula",{"formula":"[@Score] &gt; 50"}],"format":"bold"}]'> |
+`);
+    await hoverCell(page, scores(page).nth(0));
+    await page.locator('.swt-bar button[aria-label="Conditional formatting"]').click();
+    await dialog(page).locator(".swt-cf-summary").first().click();
+    const field = dialog(page).locator(".swt-cf-formula");
+    await field.click();
+    await field.evaluate((input: HTMLInputElement) => input.setSelectionRange(2, 7));
+    await page.keyboard.press("Backspace");
+    await expect(field).toHaveValue("[@] > 50");
+    await page.keyboard.type("S");
+    await expect(page.locator(".swt-cf-choice .swt-cf-choice-name")).toHaveText(["Score"]);
+    await page.keyboard.press("Enter");
+    await expect(field).toHaveValue("[@score] > 50");
+  });
+
   test("the toolbar's icon of a table with rules opens them; a change shows at once, Esc leaves the table as it was", async ({ page }) => {
     await load(page, PAGE + `| <meta core.table conditions.-c-score.rules='[{"format":"dataBar"}]'> |\n`);
     await expect(scores(page).nth(2)).toHaveClass(/swt-cf-bar/);

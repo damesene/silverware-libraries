@@ -7,5 +7,6 @@ export default (): ConditionDefinition<{ value: number }> => ({
   description: "Cells whose number is greater than a value",
   params: { value: { kind: "number", label: "Value", default: 0 } },
   test: (cell, { params }) => cell.number !== undefined && cell.number > params.value,
-  excel: (params) => ({ type: "cellIs", attrs: { operator: "greaterThan" }, formulas: [String(params.value)] }),
+  // Numbers only, as the table compares (Excel's cellIs takes text as greater than any number, an empty cell as 0)
+  excel: (params, at) => ({ type: "expression", formulas: [`AND(ISNUMBER(${at}),${at}>${params.value})`] }),
 });

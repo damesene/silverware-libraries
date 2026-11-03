@@ -64,7 +64,7 @@ describe("Conditional formatting in Excel", () => {
     const { conditional, skipped } = excelConditional([range("redFill", ["greater", { value: 50 }]), range("bold", "duplicate", { rule: { ...range("bold").rule, stop: true } as Rule })]);
     expect(skipped).toEqual([]);
     expect(conditional.xml).toBe(
-      '<conditionalFormatting sqref="B2:B5"><cfRule type="cellIs" dxfId="0" priority="1" operator="greaterThan"><formula>50</formula></cfRule></conditionalFormatting>' +
+      '<conditionalFormatting sqref="B2:B5"><cfRule type="expression" dxfId="0" priority="1"><formula>AND(ISNUMBER(B2),B2&gt;50)</formula></cfRule></conditionalFormatting>' +
         '<conditionalFormatting sqref="B2:B5"><cfRule type="expression" dxfId="1" priority="2" stopIfTrue="1"><formula>TRUE</formula></cfRule></conditionalFormatting>',
     );
     expect(conditional.dxfs).toEqual(['<dxf><font><color rgb="FF9C0006"/></font><fill><patternFill><bgColor rgb="FFFFC7CE"/></patternFill></fill></dxf>', "<dxf><font><b/></font></dxf>"]);

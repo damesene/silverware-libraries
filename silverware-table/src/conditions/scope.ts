@@ -11,7 +11,10 @@ export function cellOf(text: string, value: string, column: string): Cell {
   return { text, value, column, ...(number !== undefined ? { number } : {}), ...(date !== undefined ? { date } : {}) };
 }
 
-const sameValue = (value: string) => value.trim().toLowerCase();
+// What makes two cells the same value: a number by its value and its unit (1 and 1.0 alike, as Excel counts
+// duplicates; 3 kg and 3 m not), text case ignored
+const sameValue = (cell: Cell) =>
+  cell.number !== undefined ? `\u0000${cell.number}\u0000${cell.value.replace(/[-+\d.,\s ]/g, "").toLowerCase()}` : cell.value.trim().toLowerCase();
 
 /** The statistics of these cells, each computed the first time it is asked for */
 export function scopeOf(cells: readonly Cell[]): Scope {
@@ -92,9 +95,9 @@ export function scopeOf(cells: readonly Cell[]): Scope {
     count(cell) {
       if (!counts) {
         counts = new Map();
-        for (const c of cells) counts.set(sameValue(c.value), (counts.get(sameValue(c.value)) ?? 0) + 1);
+        for (const c of cells) counts.set(sameValue(c), (counts.get(sameValue(c)) ?? 0) + 1);
       }
-      return counts.get(sameValue(cell.value)) ?? 0;
+      return counts.get(sameValue(cell)) ?? 0;
     },
   };
   return scope;

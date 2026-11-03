@@ -78,10 +78,12 @@ describe("Built-in conditions", () => {
     expect(picks("notEmpty", {}, ["", "  ", "x", "0"])).toEqual([false, false, true, true]);
   });
 
-  it("duplicate and unique values: among the rule's cells, case ignored, empty cells never", () => {
+  it("duplicate and unique values: among the rule's cells, case ignored, empty cells never; numbers by their value and unit", () => {
     const values = ["a", "A", "b", "", "", "c"];
     expect(picks("duplicate", {}, values)).toEqual([true, true, false, false, false, false]);
     expect(picks("unique", {}, values)).toEqual([false, false, true, false, false, true]);
+    // 1 and 1.0 one number, as Excel counts them (checked in Excel 16); 3 kg and 3 m not one value
+    expect(picks("duplicate", {}, ["1", "1.0", "3 kg", "3 m", "3 kg"])).toEqual([true, true, true, false, true]);
   });
 
   it("top and bottom values: a count, ties all in; a percent of the cells with numbers, at least one", () => {
@@ -256,10 +258,13 @@ describe("Built-in definitions in an Excel file", () => {
   };
 
   it("a condition as Excel's rule: the same cells as the table picks", () => {
-    expect(condition("greater", { value: 10 })).toEqual({ type: "cellIs", attrs: { operator: "greaterThan" }, formulas: ["10"] });
-    expect(condition("less", { value: -1.5 })).toEqual({ type: "cellIs", attrs: { operator: "lessThan" }, formulas: ["-1.5"] });
-    expect(condition("between", { from: 20, to: 10 })).toEqual({ type: "cellIs", attrs: { operator: "between" }, formulas: ["10", "20"] });
-    expect(condition("equal", { value: "10,5" })).toEqual({ type: "cellIs", attrs: { operator: "equal" }, formulas: ["10.5"] });
+    // Numbers only (Excel's cellIs would take text as greater than any number, an empty cell as 0: checked in Excel 16)
+    expect(condition("greater", { value: 10 })).toEqual({ type: "expression", formulas: ["AND(ISNUMBER(B2),B2>10)"] });
+    expect(condition("less", { value: -1.5 })).toEqual({ type: "expression", formulas: ["AND(ISNUMBER(B2),B2<-1.5)"] });
+    expect(condition("between", { from: 20, to: 10 })).toEqual({ type: "expression", formulas: ["AND(ISNUMBER(B2),B2>=10,B2<=20)"] });
+    expect(condition("equal", { value: "10,5" })).toEqual({ type: "expression", formulas: ["AND(ISNUMBER(B2),B2=10.5)"] });
+    expect(condition("notEqual", { value: "0" })).toEqual({ type: "expression", formulas: ["NOT(AND(ISNUMBER(B2),B2=0))"] });
+    expect(condition("notEqual", { value: "open" })).toEqual({ type: "cellIs", attrs: { operator: "notEqual" }, formulas: ['"open"'] });
     expect(condition("equal", { value: 'a"b' })).toEqual({ type: "cellIs", attrs: { operator: "equal" }, formulas: ['"a""b"'] });
     expect(condition("contains", { text: "kun" })).toEqual({ type: "containsText", attrs: { operator: "containsText", text: "kun" }, formulas: ['NOT(ISERROR(SEARCH("kun",B2)))'] });
     expect(condition("startsWith", { text: "ab" })).toEqual({ type: "beginsWith", attrs: { operator: "beginsWith", text: "ab" }, formulas: ['LEFT(B2,LEN("ab"))="ab"'] });

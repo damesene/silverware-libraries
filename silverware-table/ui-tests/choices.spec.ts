@@ -1,5 +1,7 @@
-// The choice column type: Choices… in a column's menu sets up its list (a new
-// one from the column's values), a value renamed there renamed in the cells;
+// The choice column type: Choice picked in the Type menu opens the Choices
+// dialog (as the pencil of the column's Type row does): the column's values
+// (#choice) or a list of its own (a new one from the column's values), a value
+// renamed there renamed in the cells;
 // the table's lists under Choice in the Type menu, deleted there (one columns take asked first, those columns then without a type)
 import type { Page } from "@playwright/test";
 import { answerConfirm, bodyRows, columnCells, expect, header, markdown, menu, rendersAnew, setPage, settled, test } from "./helpers.ts";
@@ -16,7 +18,14 @@ const dialog = (page: Page) => page.locator(".swt-choices-dialog");
 
 async function openChoices(page: Page): Promise<void> {
   await header(page, 1).click({ button: "right" });
-  await menu(page).locator(".swt-menu-item", { hasText: "Choices…" }).click();
+  await menu(page).getByTitle("Edit the column's choices").click();
+  await expect(dialog(page)).toBeVisible();
+}
+
+async function pickChoice(page: Page): Promise<void> {
+  await header(page, 1).click({ button: "right" });
+  await menu(page).getByTitle(/Change the column's type|Choose how the column's cells show/).click();
+  await menu(page).locator(".swt-menu-item", { hasText: /^Choice$/ }).click();
   await expect(dialog(page)).toBeVisible();
 }
 
@@ -36,9 +45,11 @@ test.describe("Choices", () => {
     expect(text).toMatch(/\| C +\| later +\|/);
   });
 
-  test("a #choice column without a list gets one from its values, named after the column", async ({ page }) => {
+  test("a #choice column opens on its values; A list of its own makes one from them, named after the column", async ({ page }) => {
     await load(page, ["| Task | Stav úkolu #choice |", "|---|---|", "| A | done |", "| B | open |", "| C | done |", ""].join("\n"));
     await openChoices(page);
+    await expect(dialog(page).getByRole("radio", { name: /The column's values/ })).toBeChecked();
+    await dialog(page).getByRole("radio", { name: /A list of its own/ }).check();
     await expect(dialog(page).locator(".swt-choices-name")).toHaveValue("stav-ukolu");
     await expect(dialog(page).locator(".swt-choices-value")).toHaveCount(2);
     await rendersAnew(page, () => dialog(page).getByRole("button", { name: "Save" }).click());
@@ -78,16 +89,35 @@ test.describe("Choices", () => {
     expect(text).toMatch(/\| C +\| later +\|/);
   });
 
-  test("Choice in the Type menu is #choice alone: a column of a list goes to none, the list's row marked while it took it", async ({ page }) => {
+  test("Choice in the Type menu opens the dialog: a column of a list made #choice by The column's values; Cancel changes nothing", async ({ page }) => {
     await load(page);
     await header(page, 1).click({ button: "right" });
     await menu(page).getByTitle(/Change the column's type/).click();
-    const choice = menu(page).locator(".swt-menu-item", { hasText: /^Choice$/ });
-    await expect(choice).toHaveAttribute("aria-checked", "false");
+    await expect(menu(page).locator(".swt-menu-item", { hasText: /^Choice$/ })).toHaveAttribute("aria-checked", "false");
     await expect(menu(page).locator(".swt-menu-segmented", { hasText: "Choice: status" }).getByTitle("Take the list status for this column")).toHaveAttribute("aria-checked", "true");
-    await rendersAnew(page, () => choice.click());
+    await page.keyboard.press("Escape");
+    await pickChoice(page);
+    await expect(dialog(page).getByRole("radio", { name: /A list of its own/ })).toBeChecked();
+    await dialog(page).getByRole("button", { name: "Cancel" }).click();
+    await settled(page);
+    expect(await markdown(page)).toContain("#choice-status");
+    await pickChoice(page);
+    await dialog(page).getByRole("radio", { name: /The column's values/ }).check();
+    await expect(dialog(page).locator(".swt-choices-list")).toBeHidden();
+    await rendersAnew(page, () => dialog(page).getByRole("button", { name: "Save" }).click());
     const text = await markdown(page);
     expect(text).toMatch(/\| Task +\| Status #choice +\|/);
     expect(text).toContain("columntypes.choice.status");
+  });
+
+  test("Choice picked for a column of no type opens the dialog on a list of its own, saved as the column's", async ({ page }) => {
+    await load(page, ["| Task | Status |", "|---|---|", "| A | open |", "| B | done |", ""].join("\n"), 2);
+    await pickChoice(page);
+    await expect(dialog(page).getByRole("radio", { name: /A list of its own/ })).toBeChecked();
+    await expect(dialog(page).locator(".swt-choices-value")).toHaveCount(2);
+    await rendersAnew(page, () => dialog(page).getByRole("button", { name: "Save" }).click());
+    const text = await markdown(page);
+    expect(text).toMatch(/\| Task +\| Status #choice-status +\|/);
+    expect(text).toContain(`columntypes.choice.status='["done","open"]'`);
   });
 });

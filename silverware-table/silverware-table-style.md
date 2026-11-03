@@ -1728,6 +1728,47 @@ body.swt-resizing * {
   flex-direction: column;
   gap: 8px;
 }
+.swt-choices-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.swt-choices-list[hidden] {
+  display: none;
+}
+/* The two ways: the column's values or a list of its own */
+.swt-choices-ways {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.swt-choices-way {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swt-choices-way:has(input:checked) {
+  border-color: var(--ui-accent-color);
+}
+.swt-choices-way:has(input:disabled) {
+  opacity: 0.6;
+  cursor: default;
+}
+.swt-choices-way input {
+  margin-top: 3px;
+}
+.swt-choices-way > span {
+  display: flex;
+  flex-direction: column;
+}
+.swt-choices-way-text {
+  font-size: 12px;
+  opacity: 0.75;
+}
 .swt-choices-label {
   display: flex;
   align-items: center;

@@ -1,11 +1,12 @@
-// The column types module's Choices dialog: the list of values a choice
-// column takes (`#choice-<name>`), kept in the table's metadata row by its
-// name. A value renamed is renamed in the cells of every column taking the
+// The column types module's Choices dialog, opened as a column's type is set
+// to Choice and by the pencil of its Type row: whether the column offers the
+// values it has (`#choice`, nothing checked) or takes a list of its own
+// (`#choice-<name>`), kept in the table's metadata row by its name. A value renamed is renamed in the cells of every column taking the
 // list, the list renamed in their headers, all in one write; a value deleted
 // leaves its cells, marked as not of the list. In the core's dialog
 // (ModelHost.openDialog).
 import { el } from "../../../shared/elements.ts";
-import { choiceListOf, distinctValues, LIST_NAME_RE, listKey, listNameFor, listNames, readChoiceList, withColumnType, writeChoiceList } from "../columntypes/index.ts";
+import { choiceListOf, columnTypeOf, distinctValues, isChoice, LIST_NAME_RE, listKey, listNameFor, listNames, readChoiceList, withColumnType, writeChoiceList } from "../columntypes/index.ts";
 import type { Dialog, ModelHost, TableInfo } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
 import { escapeCell, parseTable, type Table, unescapeCell } from "../markdown.ts";
@@ -27,7 +28,7 @@ export class ChoicesDialog {
     this.dialog?.close();
   }
 
-  /** Opens the dialog for a choice column's list (one made for it where it has none) */
+  /** Opens the dialog for a column: a choice column's, or one to become one (nothing written until Save) */
   open(info: TableInfo, column: number): void {
     const { doc } = this.host;
     const table = parseTable((this.host.tableFor(info.key) ?? info).source);
@@ -47,6 +48,11 @@ export class ChoicesDialog {
     const note = el(doc, "span", "swt-dialog-note");
     const nameField = el(doc, "input", { class: "swt-choices-name", attrs: { spellcheck: "false", "aria-label": "Name of the list" } });
     nameField.value = was ?? listNameFor(columnName, taken);
+    // A list of its own needs the metadata setting, but where the column's is kept already
+    const storable = kept || this.host.canStoreMeta(table, listKey(nameField.value));
+    // A column of a list (or one becoming a choice column, where a list can be kept) starts on its list, `#choice` on the column's values
+    const plainChoice = was === undefined && isChoice(columnTypeOf(unescapeCell(header)));
+    let own = storable && !plainChoice;
     const tagHint = el(doc, "span", "swt-choices-tag");
     const showTag = () => (tagHint.textContent = `#choice-${nameField.value.trim().toLowerCase()}`);
     nameField.addEventListener("input", showTag);
@@ -111,6 +117,11 @@ export class ChoicesDialog {
     });
 
     const save = () => {
+      if (!own) {
+        this.dialog?.close();
+        void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => setCell(t, 0, column, withColumnType(t.rows[0]?.cells[column] ?? "", "choice")));
+        return;
+      }
       const name = nameField.value.trim().toLowerCase();
       const problem = this.problem(table, name, taken, rows);
       if (problem) {
@@ -128,17 +139,41 @@ export class ChoicesDialog {
     };
     const saveButton = el(doc, "button", { class: "swt-dialog-primary", text: "Save", run: save });
     const cancel = el(doc, "button", { class: "swt-dialog-button", text: "Cancel", run: () => this.close() });
-    note.textContent = "Renaming a value renames it in the cells; a value removed leaves its cells marked.";
 
-    const content = el(
+    // The two ways, as radio buttons; the list's fields only for a list of its own
+    const listPart = el(
       doc,
       "div",
-      "swt-choices-form",
+      "swt-choices-list",
       el(doc, "label", "swt-choices-label", el(doc, "span", "", "Name"), nameField, tagHint),
       el(doc, "div", "swt-choices-label", "Values"),
       values,
       el(doc, "div", "swt-choices-actions", addButton, takeButton),
     );
+    const way = (value: boolean, title: string, text: string, disabled?: string) => {
+      const radio = el(doc, "input", { attrs: { type: "radio", name: "swt-choices-way", value: value ? "list" : "column" } });
+      radio.checked = own === value;
+      radio.disabled = disabled !== undefined;
+      radio.addEventListener("change", () => {
+        own = value;
+        show();
+      });
+      return el(doc, "label", { class: "swt-choices-way", ...(disabled ? { title: disabled } : {}) }, radio, el(doc, "span", "", el(doc, "b", "", title), el(doc, "span", "swt-choices-way-text", disabled ?? text)));
+    };
+    const ways = el(
+      doc,
+      "div",
+      { class: "swt-choices-ways", attrs: { role: "radiogroup", "aria-label": "Values" } },
+      way(false, "The column's values", "The editor offers the values the column has; nothing is checked. #choice"),
+      way(true, "A list of its own", "Only the list's values; others are marked, and the column sorts in the list's order.", storable ? undefined : "Lists are kept in the table's metadata: turn on Store table metadata in the settings."),
+    );
+    const show = () => {
+      listPart.hidden = !own;
+      note.classList.remove("swt-choices-problem");
+      note.textContent = own ? "Renaming a value renames it in the cells; a value removed leaves its cells marked." : "";
+    };
+    show();
+    const content = el(doc, "div", "swt-choices-form", ways, listPart);
     const footer = el(doc, "div", "swt-choices-foot", note, cancel, saveButton);
     this.dialog = this.host.openDialog({
       title: "Choices",
@@ -146,7 +181,7 @@ export class ChoicesDialog {
       className: "swt-choices-dialog",
       content,
       footer,
-      focus: rows[0]?.field ?? nameField,
+      focus: own ? (rows[0]?.field ?? nameField) : ways.querySelector<HTMLInputElement>("input:checked") ?? undefined,
       closed: () => {
         this.dialog = undefined;
       },

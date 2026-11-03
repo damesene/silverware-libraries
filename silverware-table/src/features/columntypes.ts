@@ -156,7 +156,8 @@ export class ColumnTypes implements Feature {
         // custom type's syntax is free text), else its name; the same type keeps its parameters
         const first = type.syntax.split(",")[0]!.trim().replace(/^#/, "");
         const tag = typeOfTag(first)?.type === type ? first : type.name;
-        // Choice alone is #choice, no list: a column's list is picked in the rows under it, which mark it
+        // Choice opens the Choices dialog, the column's values or a list of its own; a list of the table is
+        // picked in the rows under it, which mark it (Choice checked for #choice alone)
         const choice = isChoice({ type });
         const same = current?.type === type && !(choice && current.params.name !== undefined);
         const item: MenuEntry = {
@@ -165,24 +166,13 @@ export class ColumnTypes implements Feature {
           icon: iconOf(type),
           checked: same,
           detail: typeDetail(type),
-          run: setType(current?.type === type && !choice ? current.tag : tag),
+          run: choice ? () => this.choicesDialog.open(info, column) : setType(current?.type === type ? current.tag : tag),
         };
         return choice ? [item, ...this.listEntries(info, table, column, type)] : [item];
       }),
     ];
     // As Filter: the type's name after Type, its icon opening the list of types, a × removing it
     return [
-      ...(isChoice(current)
-        ? [
-            {
-              kind: "item",
-              label: "Choices…",
-              icon: columnIcon(current),
-              hint: "The values the column's cells may have",
-              run: () => this.choicesDialog.open(info, column),
-            } satisfies MenuEntry,
-          ]
-        : []),
       {
         kind: "segmented",
         label: current ? `Type: ${typeLabel(current.type.name)}` : "Type",
@@ -192,6 +182,8 @@ export class ColumnTypes implements Feature {
             title: current ? `Change the column's type (${typeLabel(current.type.name)})` : "Choose how the column's cells show",
             run: () => open("Column type", choices),
           },
+          // A choice column's values: its own list or the column's (the Choices dialog)
+          ...(isChoice(current) ? [{ icon: ICONS.rename, title: "Edit the column's choices", run: () => this.choicesDialog.open(info, column) }] : []),
           {
             icon: ICONS.clear,
             title: "Remove the column's type",

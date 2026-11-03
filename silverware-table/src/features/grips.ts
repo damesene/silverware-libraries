@@ -102,6 +102,7 @@ export class Grips implements Feature {
     if (!target) return;
     const selects = this.host.clickSelects();
     const rearranged = this.host.rearranged(target.info);
+    const fixed = !!this.host.fixedShape(parseTable(target.info.source));
     if (this.linesSelected?.key !== target.info.key) {
       this.linesSelected = {
         key: target.info.key,
@@ -117,7 +118,8 @@ export class Grips implements Feature {
       grip.classList.toggle("swt-line-selected", selects && selected);
       const name = axis === "row" ? "Row" : "Column";
       const click = selects && !selected ? "click to select, again (or right-click) for actions" : "click for actions";
-      const drag = axis === "row" && rearranged ? ` (${MOVE_BLOCKED.toLowerCase()})` : ", drag to move";
+      // (A table of a fixed shape, a pivot's: its lines are not moved, its grips a menu only)
+      const drag = fixed ? "" : axis === "row" && rearranged ? ` (${MOVE_BLOCKED.toLowerCase()})` : ", drag to move";
       grip.title = `${name}: ${click}${drag}`;
       grip.setAttribute("aria-label", grip.title);
     }
@@ -184,10 +186,12 @@ export class Grips implements Feature {
     const shown = this.host.rectOf(info, "table");
     if (!shown) return;
     const rearranged = this.host.rearranged(info);
+    const fixed = !!this.host.fixedShape(parseTable(info.source));
+    this.columnGrip.classList.toggle("swt-no-drag", fixed);
 
     const rowRect = ref.row > 0 ? this.host.rectOf(info, { row: ref.row }) : undefined;
     if (rowRect) {
-      this.rowGrip.classList.toggle("swt-no-drag", rearranged);
+      this.rowGrip.classList.toggle("swt-no-drag", rearranged || fixed);
       const height = rowRect.bottom - rowRect.top;
       const length = Math.max(GRIP_THICKNESS, Math.min(height - 8, ROW_GRIP_LENGTH));
       Object.assign(this.rowGrip.style, { width: `${GRIP_THICKNESS}px`, height: `${length}px` });
@@ -281,7 +285,7 @@ export class Grips implements Feature {
             this.openMenu(target, axis);
           }, LONG_PRESS_MS)
         : undefined;
-    const canDrag = axis === "column" || !this.host.rearranged(target.info);
+    const canDrag = !this.host.fixedShape(parseTable(target.info.source)) && (axis === "column" || !this.host.rearranged(target.info));
     const win = this.host.doc.defaultView!;
     const startX = e.clientX;
     const startY = e.clientY;

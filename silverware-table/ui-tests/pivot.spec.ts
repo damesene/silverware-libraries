@@ -1,4 +1,4 @@
-import { cell, expect, hoverCell, markdown, notification, rendersAnew, setOtherPage, setPage, table, tableIcon, test } from "./helpers.ts";
+import { cell, drag, expect, hoverCell, markdown, notification, rendersAnew, setOtherPage, setPage, table, tableIcon, test } from "./helpers.ts";
 
 const PAGE = `# Pivots
 
@@ -29,6 +29,26 @@ test.describe("Pivot tables", () => {
     // Hovered: its toolbar instead
     await hoverCell(page, cell(page, 1, 0, 1));
     await expect(tabs).toHaveText(["orders"]);
+  });
+
+  test("a pivot's cells and lines are not moved: its grips a menu only, no edge to drag its cells by", async ({ page }) => {
+    await hoverCell(page, cell(page, 1, 0, 1));
+    await rendersAnew(page, () => page.locator('.swt-bar.swt-visible button[aria-label="Refresh pivot"]').click(), 1);
+    await expect(cell(page, 1, 1, 1)).toHaveText("120");
+    const before = await markdown(page);
+    // Its grips: no drag (nothing moves, nothing written)
+    await hoverCell(page, cell(page, 1, 0, 1));
+    const grip = page.locator(".swt-grip.swt-visible:not(.swt-grip-column)");
+    await expect(grip).toHaveClass(/swt-no-drag/);
+    await expect(page.locator(".swt-grip-column.swt-visible")).toHaveClass(/swt-no-drag/);
+    await drag(page, grip, cell(page, 2, 0, 1));
+    expect(await markdown(page)).toBe(before);
+    // Its cells selected: no edge to drag them by; its source's have one
+    await page.keyboard.press("Escape");
+    await cell(page, 1, 1, 1).click();
+    await expect(page.locator(".swt-select-edge")).toHaveCount(0);
+    await cell(page, 1, 1).click();
+    await expect(page.locator(".swt-select-edge").first()).toBeAttached();
   });
 
   test("Refresh calculates a pivot, an edit of its source writes it anew, its cells are not edited by hand", async ({ page }) => {

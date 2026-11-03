@@ -772,6 +772,7 @@ Formats you set up in the dialog, without code:
 
 * **By keywords**: as many rows as you add, each a keyword or a pattern and its look. A pattern is written as a filter takes it: a word found anywhere in the cell (case and diacritics ignored), `/regular expression/flags`, `=done|closed` (whole cells), `>10`, `!word` (not). The first row that matches a cell styles it.
 * **By number ranges**: as many rows as you add, each a range (*From*, up to but not including *To*; either may be left empty) and its look.
+* **Color scale**: as Google Sheets has it, a *Minpoint*, a *Midpoint* and a *Maxpoint*, each its color and where it is: *Min value* / *Max value* (the smallest or largest number), a *Number*, a *Percent* of the range from the smallest to the largest, or a *Percentile* (50: the middle number, so one far larger number does not crowd the others at one end); the midpoint can be *None* (a scale of two colors). By default: red at the smallest, yellow at the 50th percentile, green at the largest. A number before the minpoint or past the maxpoint has that point's color.
 * **Levels**: how many levels (2 to 10), the lowest and the highest color (the ones between are mixed), and how the numbers are split: as many cells in each level (the default: the smallest number in the first level, the largest in the last, the others spread between), or equal ranges between the smallest and the largest number (one far larger number then leaves all the others in the first levels).
 * **Own style**: a fill, a text color, bold, italic, underline or strikethrough. Colors are picked from the palette (each has a light and a dark look, and follows SilverBullet's mode) or any color.
 
@@ -809,8 +810,7 @@ Formats you set up in the dialog, without code:
 | Own style | A fill, a text color, bold, italic, underline or strikethrough of your choice |
 | By keywords | A style for each keyword or pattern (as a filter takes them: words found anywhere, /regular expression/, =a\|b); the first that matches a cell styles it |
 | By number ranges | A style for each range of numbers (from, up to but not including to; either end left open); the first range a cell's number is in styles it |
-| Color scale | A fill from one color at the smallest number to another at the largest |
-| Color scale of three colors | A fill from one color at the smallest number through a second in the middle to a third at the largest |
+| Color scale | A fill along two or three colors: at the minpoint, the midpoint (or none) and the maxpoint, each the smallest or largest value, a number, a percent of the range or a percentile; a cell past a point has its color |
 | Levels | The numbers split into levels, each a color between two: as many cells in each, or equal ranges between the smallest and the largest (one far larger number leaves the others in the first levels) |
 | Heat map | Ten levels from blue to red, as many cells in each |
 | Traffic light | The numbers in three equal ranges: red, yellow, green from the smallest |

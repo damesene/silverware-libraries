@@ -76,6 +76,13 @@ export function scopeOf(cells: readonly Cell[]): Scope {
       if (cell.number === undefined) return undefined;
       return 1 + (ascending ? below(cell.number) : above(cell.number));
     },
+    percentile(p) {
+      const list = sorted();
+      if (!list.length || !Number.isFinite(p)) return undefined;
+      const at = (Math.min(100, Math.max(0, p)) / 100) * (list.length - 1);
+      const i = Math.floor(at);
+      return i + 1 < list.length ? list[i]! + (list[i + 1]! - list[i]!) * (at - i) : list[i];
+    },
     quantile(cell) {
       if (cell.number === undefined) return undefined;
       // From 0 (the smallest) to 1 (the largest), by the cells' places: the first and last levels always taken

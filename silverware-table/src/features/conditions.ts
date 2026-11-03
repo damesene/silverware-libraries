@@ -59,7 +59,7 @@ const QUICK: readonly { readonly label: string; readonly when?: string; readonly
   { label: "Above average", when: "aboveAverage", format: "greenFill" },
   { label: "By keywords…", format: "byPattern" },
   { label: "By number ranges…", format: "byRange" },
-  { label: "Color scale", format: "colorScale3" },
+  { label: "Color scale", format: "colorScale" },
   { label: "Levels…", format: "levels" },
   { label: "Data bar", format: "dataBar" },
   { label: "Arrows", format: "arrows" },

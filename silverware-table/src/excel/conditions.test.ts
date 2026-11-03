@@ -55,7 +55,7 @@ describe("Conditional formatting in Excel", () => {
 
   it("writes scales, bars, icons and ranges as Excel's own; texts with quotes; dates relative to the first cell", () => {
     const { conditional } = excelConditional([
-      range("colorScale3"),
+      range("colorScale"),
       range("dataBar"),
       range("arrows"),
       range(["byRange", { rows: [{ to: 50, style: { fill: "red" } }, { from: 50, style: { fill: "green" } }] }]),
@@ -68,6 +68,11 @@ describe("Conditional formatting in Excel", () => {
     expect(conditional.xml).toContain('<cfRule type="expression" dxfId="0" priority="4" stopIfTrue="1"><formula>AND(ISNUMBER(B2),B2&lt;50)</formula></cfRule>');
     expect(conditional.xml).toContain('text="say &quot;hi&quot;"><formula>NOT(ISERROR(SEARCH(&quot;say &quot;&quot;hi&quot;&quot;&quot;,B2)))</formula>');
     expect(conditional.xml).toContain("<formula>AND(ISNUMBER(B2),FLOOR(B2,1)&lt;TODAY())</formula>");
+  });
+
+  it("writes a scale's points as set: a number, a percent, no midpoint", () => {
+    const { conditional } = excelConditional([range(["colorScale", { minType: "number", minValue: 10, midType: "none", maxType: "percent", maxValue: 90, minColor: "#000000", maxColor: "#ffffff" }])]);
+    expect(conditional.xml).toContain('<colorScale><cfvo type="num" val="10"/><cfvo type="percent" val="90"/><color rgb="FF000000"/><color rgb="FFFFFFFF"/></colorScale>');
   });
 
   it("lists what Excel cannot have, with why: a regular expression, levels, a formula, your own", () => {

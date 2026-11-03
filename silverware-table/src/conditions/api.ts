@@ -64,6 +64,8 @@ export type Scope = {
   share(cell: Cell): number | undefined;
   /** The cell's place by its number, 1 the largest (`ascending`: 1 the smallest); undefined: no number */
   rank(cell: Cell, ascending?: boolean): number | undefined;
+  /** The number at a percentile (0 to 100) of the numbers, between two of them where it falls between (as PERCENTILE.INC) */
+  percentile(p: number): number | undefined;
   /** The cell's place among the numbers, from 0 (the smallest) to 1 (the largest): equal counts */
   quantile(cell: Cell): number | undefined;
   /** How many cells have the cell's value (case ignored) */
@@ -86,19 +88,25 @@ export type Context<P = Params> = {
 /**
  * A parameter of a definition: what the dialog asks for (its field built from
  * this), what the rule stores, what the definition gets. `label` names it in
- * the dialog (else its key); no `default`: undefined until set.
+ * the dialog (else its key); no `default`: undefined until set. `line`: the
+ * params of one line, side by side under its name (a point of a scale: its
+ * kind, its value, its color); `visible`: whether the dialog shows it, by the
+ * params as set (a point's value only for a number).
  */
-export type ParamSpec =
-  | { readonly kind: "number"; readonly label?: string; readonly integer?: boolean; readonly min?: number; readonly max?: number; readonly default?: number }
-  | { readonly kind: "choice"; readonly label?: string; readonly values: readonly string[]; readonly labels?: readonly string[]; readonly default?: string }
-  | { readonly kind: "text"; readonly label?: string; readonly default?: string }
-  // Text in the filter row's syntax: plain words found anywhere, /regex/flags, =a|b, >10, !…
-  | { readonly kind: "pattern"; readonly label?: string; readonly default?: string }
-  | { readonly kind: "color"; readonly label?: string; readonly default?: Color }
-  | { readonly kind: "boolean"; readonly label?: string; readonly default?: boolean }
-  | { readonly kind: "style"; readonly label?: string; readonly default?: Style }
-  // Rows of fields of their own, as many as the user adds (keywords and their styles)
-  | { readonly kind: "list"; readonly label?: string; readonly of: ParamSpecs; readonly default?: readonly Readonly<Record<string, unknown>>[] };
+type ParamCommon = { readonly label?: string; readonly line?: string; readonly visible?: (params: Params) => boolean };
+export type ParamSpec = ParamCommon &
+  (
+    | { readonly kind: "number"; readonly integer?: boolean; readonly min?: number; readonly max?: number; readonly default?: number }
+    | { readonly kind: "choice"; readonly values: readonly string[]; readonly labels?: readonly string[]; readonly default?: string }
+    | { readonly kind: "text"; readonly default?: string }
+    // Text in the filter row's syntax: plain words found anywhere, /regex/flags, =a|b, >10, !…
+    | { readonly kind: "pattern"; readonly default?: string }
+    | { readonly kind: "color"; readonly default?: Color }
+    | { readonly kind: "boolean"; readonly default?: boolean }
+    | { readonly kind: "style"; readonly default?: Style }
+    // Rows of fields of their own, as many as the user adds (keywords and their styles)
+    | { readonly kind: "list"; readonly of: ParamSpecs; readonly default?: readonly Readonly<Record<string, unknown>>[] }
+  );
 
 export type ParamSpecs = Readonly<Record<string, ParamSpec>>;
 

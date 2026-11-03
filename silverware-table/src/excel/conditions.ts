@@ -147,10 +147,16 @@ type FormatInExcel =
   | { readonly kind: "none"; readonly reason: string };
 
 const cfvo = (type: string, val?: string) => `<cfvo type="${type}"${val !== undefined ? ` val="${val}"` : ""}/>`;
-const scale = (colors: readonly (Color | undefined)[]) => {
-  const argb = colors.map((c) => excelColor(c, "fill"));
+// A scale's point as Excel's: its kind, its value
+const POINT_TYPES: Readonly<Record<string, string>> = { min: "min", max: "max", number: "num", percent: "percent", percentile: "percentile" };
+const scale = (p: Params) => {
+  const points = (["min", "mid", "max"] as const).filter((k) => p[`${k}Type`] !== "none");
+  const argb = points.map((k) => excelColor(p[`${k}Color`], "fill"));
   if (argb.some((c) => !c)) return { reason: "a color Excel cannot take (only the palette's and #rrggbb)" };
-  const stops = colors.length === 3 ? [cfvo("min"), cfvo("percentile", "50"), cfvo("max")] : [cfvo("min"), cfvo("max")];
+  const stops = points.map((k) => {
+    const type = POINT_TYPES[p[`${k}Type`]] ?? (k === "max" ? "max" : "min");
+    return type === "min" || type === "max" ? cfvo(type) : cfvo(type, String(p[`${k}Value`] ?? 0));
+  });
   return `<colorScale>${stops.join("")}${argb.map((c) => `<color rgb="${c}"/>`).join("")}</colorScale>`;
 };
 const icons = (set: string) => `<iconSet iconSet="${set}">${cfvo("percent", "0")}${cfvo("percent", "33")}${cfvo("percent", "67")}</iconSet>`;
@@ -180,8 +186,7 @@ export const FORMATS_IN_EXCEL: Readonly<Record<string, FormatInExcel>> = {
         style: r.style,
       })),
   },
-  colorScale: { kind: "drawn", rule: (p) => scale([p.low, p.high]) },
-  colorScale3: { kind: "drawn", rule: (p) => scale([p.low, p.middle, p.high]) },
+  colorScale: { kind: "drawn", rule: (p) => scale(p) },
   dataBar: {
     kind: "drawn",
     rule: (p) => {

@@ -3784,9 +3784,32 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   border: 1px solid var(--swt-dialog-line);
   border-radius: 4px;
 }
-.swt-cf-samples {
+/* How a rule's format looks: a strip of its colors (a scale's, levels'), as Google Sheets previews one */
+.swt-cf-strip {
   display: inline-flex;
-  gap: 2px;
+  flex: none;
+  width: 84px;
+  height: 20px;
+  overflow: hidden;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 4px;
+}
+.swt-cf-strip > .swt-cf-sample.swt-cf-part {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+}
+.swt-cf-strip > .swt-cf-sample.swt-cf-icon::before {
+  margin-right: 0;
+}
+.swt-cf-param-line {
+  gap: 8px;
 }
 .swt-cf-sample {
   display: inline-block;

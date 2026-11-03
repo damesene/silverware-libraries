@@ -17,6 +17,8 @@ export function specsProblem(specs: unknown, depth = 0): string | undefined {
     const kind = (spec as Record<string, unknown>).kind;
     if (typeof kind !== "string" || !KINDS.has(kind)) return `the parameter ${key} has no kind of ${[...KINDS].join(", ")}`;
     const s = spec as ParamSpec;
+    if (s.line !== undefined && typeof s.line !== "string") return `the parameter ${key}'s line is no text`;
+    if (s.visible !== undefined && typeof s.visible !== "function") return `the parameter ${key}'s visible is no function of the params`;
     if (s.kind === "choice" && (!Array.isArray(s.values) || !s.values.length || s.values.some((v) => typeof v !== "string"))) return `the parameter ${key}'s values are a list of texts`;
     if (s.kind === "list") {
       if (depth > 0) return `the parameter ${key}: a list within a list`;

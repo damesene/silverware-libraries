@@ -111,12 +111,27 @@ describe("Evaluation", () => {
     expect(styles).toEqual([undefined, { fill: "red", color: "red" }, { fill: "red", color: "red" }]);
   });
 
-  it("formats every cell where a rule has no condition: a color scale from the smallest to the largest", () => {
-    const { styles } = stylesOf([rule("colorScale")], column(["0", "50", "100", "x"]));
+  it("formats every cell where a rule has no condition: a color scale from the smallest through the 50th percentile to the largest", () => {
+    const { styles } = stylesOf([rule("colorScale")], column(["0", "10", "20", "1000", "x"]));
     expect(styles[0]).toEqual({ fill: "var(--swt-cf-red-fill)" });
-    expect(styles[1]!.fill).toMatch(/^color-mix\(in oklab, var\(--swt-cf-red-fill\) 50%, var\(--swt-cf-green-fill\)\)$/);
-    expect(styles[2]).toEqual({ fill: "var(--swt-cf-green-fill)" });
-    expect(styles[3]).toBeUndefined();
+    // The midpoint the 50th percentile (15), not half the range: 20 is past it, toward the largest
+    expect(styles[1]!.fill).toMatch(/^color-mix\(in oklab, var\(--swt-cf-red-fill\) 33\.3%, var\(--swt-cf-yellow-fill\)\)$/);
+    expect(styles[2]!.fill).toMatch(/var\(--swt-cf-yellow-fill\) 99\.5%, var\(--swt-cf-green-fill\)/);
+    expect(styles[3]).toEqual({ fill: "var(--swt-cf-green-fill)" });
+    expect(styles[4]).toBeUndefined();
+  });
+
+  it("places a scale's points as set: a number, a percent of the range, no midpoint; a cell past a point takes its color", () => {
+    const fills = (params: Record<string, unknown>) => stylesOf([rule(["colorScale", params])], column(["0", "40", "60", "100"])).styles.map((s) => s?.fill);
+    const byNumbers = fills({ minType: "number", minValue: 40, midType: "none", maxType: "number", maxValue: 60, minColor: "#000000", maxColor: "#ffffff" });
+    expect(byNumbers).toEqual(["#000000", "#000000", "#ffffff", "#ffffff"]);
+    const byPercent = fills({ midType: "percent", midValue: 40 });
+    expect(byPercent[1]).toBe("var(--swt-cf-yellow-fill)");
+  });
+
+  it("reads a percentile between two numbers, as PERCENTILE.INC", () => {
+    const scope = scopeOf(["1", "2", "3", "4"].map((v) => cellOf(v, v, "x")));
+    expect([scope.percentile(0), scope.percentile(50), scope.percentile(100), scope.percentile(25)]).toEqual([1, 2.5, 4, 1.75]);
   });
 
   it("styles by number ranges and by keywords, the first row that fits", () => {

@@ -58,6 +58,9 @@ const NONE = "";
 /** A swatch's text: what a sample shows */
 const SAMPLE = "Aa 12";
 
+// The numbers a strip samples a format at (0 to 100): a part for each run of the same look
+const STRIP_STEPS = 11;
+
 export function openConditionsDialog(host: ModelHost, options: ConditionsDialogOptions): Dialog {
   const doc = host.doc;
   const e = <K extends keyof HTMLElementTagNameMap>(tag: K, props?: Parameters<typeof el>[2], ...children: ElementChild[]) => el(doc, tag, props, ...children);
@@ -103,27 +106,32 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
   };
   const formatLabel = (rule: Rule): string => formatNamed(rule.format.name)?.label ?? `${rule.format.name} (not defined)`;
 
-  // A sample of how a rule's format looks: three cells of low, middle and high numbers (a keyword's: its rows' styles)
+  // How a rule's format looks, as a strip (as Google Sheets previews a scale): its looks of the numbers from 0 to
+  // 100 in order, one part each where they differ (a scale's colors, levels); a keyword's or a range's rows' styles
   const sample = (rule: Rule): HTMLElement => {
     const format = formatNamed(rule.format.name);
-    const box = e("span", "swt-cf-samples");
-    if (!format) return box;
+    const strip = e("span", { class: "swt-cf-strip", title: formatLabel(rule) });
+    if (!format) return strip;
     const params = readParams(format.params, rule.format.params);
-    const cells = ["10", "55", "100"].map((v, i) => ({ row: i + 1, column: 0, cell: cellOf(v, v, "x"), rowCells: {} }));
+    const values = Array.from({ length: STRIP_STEPS }, (_, i) => String(Math.round((i * 100) / (STRIP_STEPS - 1))));
+    const cells = values.map((v, i) => ({ row: i + 1, column: 0, cell: cellOf(v, v, "x"), rowCells: {} }));
     const { styles } = evaluateRules([{ rule: { scope: { kind: "column", column: 0 }, format: rule.format }, cells }]);
     let shown: (Style | undefined)[] = cells.map((c) => styles.get(`${c.row}:0`));
     if (shown.every((s) => s === undefined)) {
       // Keywords' or ranges' rows: each row's own style
       const rows = Object.entries(format.params ?? {}).find(([, spec]) => spec.kind === "list");
       const list = rows ? ((params[rows[0]] as readonly Record<string, unknown>[] | undefined) ?? []) : [];
-      shown = list.slice(0, 3).map((row) => Object.values(row).find((v): v is Style => typeof v === "object" && v !== null && !Array.isArray(v)));
+      shown = list.map((row) => Object.values(row).find((v): v is Style => typeof v === "object" && v !== null && !Array.isArray(v)));
     }
-    const distinct = shown.filter((s, i) => s && shown.findIndex((t) => JSON.stringify(t) === JSON.stringify(s)) === i);
-    for (const style of distinct.length ? distinct : [undefined]) box.append(swatch(style));
-    return box;
+    // One part for each run of the same look
+    const parts = shown.filter((s, i) => s && (i === 0 || JSON.stringify(s) !== JSON.stringify(shown[i - 1])));
+    for (const style of (parts.length ? parts : [undefined]).slice(0, STRIP_STEPS)) strip.append(swatch(style, true));
+    return strip;
   };
-  const swatch = (style: Style | undefined): HTMLElement => {
-    const span = e("span", { class: "swt-cf-sample", text: SAMPLE });
+  // A sample of a style: in a strip a part (Aa where the text's look is set), else a cell's text
+  const swatch = (style: Style | undefined, part = false): HTMLElement => {
+    const textShown = !part || (style !== undefined && (style.color !== undefined || style.bold || style.italic || style.underline || style.strike));
+    const span = e("span", { class: part ? "swt-cf-sample swt-cf-part" : "swt-cf-sample", text: textShown ? (part ? "Aa" : SAMPLE) : "" });
     if (style) {
       const look = styleLook(style);
       for (const mark of look.marks) span.classList.add(`swt-${mark}`);
@@ -274,11 +282,35 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
           typed(i, updated);
         } else set(i, updated);
       };
-      return e(
-        "div",
-        "swt-cf-params",
-        ...Object.entries(specs).map(([key, spec]) => field(spec, params[key], (v, typing) => changed(key, v, typing), `rule ${i} ${which} ${key}`, spec.label ?? key)),
-      );
+      // A param's `visible` is the user's code too: one that throws shows it
+      const shownNow = (spec: ParamSpec) => {
+        try {
+          return !spec.visible || spec.visible(params) !== false;
+        } catch {
+          return true;
+        }
+      };
+      const fieldOf = ([key, spec]: [string, ParamSpec], compact: boolean) =>
+        field(spec, params[key], (v, typing) => changed(key, v, typing), `rule ${i} ${which} ${key}`, spec.label ?? key, compact);
+      // Params of one line side by side under its name, in the order of their first
+      const children: ElementChild[] = [];
+      const lines = new Map<string, HTMLElement>();
+      for (const entry of Object.entries(specs)) {
+        const line = entry[1].line;
+        if (!shownNow(entry[1])) continue;
+        if (line === undefined) {
+          children.push(fieldOf(entry, false));
+          continue;
+        }
+        let box = lines.get(line);
+        if (!box) {
+          box = e("div", "swt-cf-param swt-cf-param-line", e("span", { class: "swt-cf-param-name", text: line }));
+          lines.set(line, box);
+          children.push(box);
+        }
+        box.append(fieldOf(entry, true));
+      }
+      return e("div", "swt-cf-params", ...children);
     };
     const describe = (text: string | undefined) => (text ? e("p", { class: "swt-cf-description", text }) : null);
     // A whole table's rule: each column on its own (its own scale, its own top values), or its columns as one range
@@ -321,8 +353,10 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
 
   // ---- fields made of params ------------------------------------------------------------
   /** A param's field: `changed(value, typing)`, typing true while text is typed (the form not made anew) */
-  function field(spec: ParamSpec, value: unknown, changed: (value: unknown, typing: boolean) => void, focus: string, label: string): HTMLElement {
-    const labelled = (...children: ElementChild[]) => e("label", "swt-cf-param", e("span", { class: "swt-cf-param-name", text: label }), ...children);
+  function field(spec: ParamSpec, value: unknown, changed: (value: unknown, typing: boolean) => void, focus: string, label: string, compact = false): HTMLElement {
+    // On a line of its own, its name before it; on a line of several, the line's name stands for it (its own the field's)
+    const labelled = (...children: ElementChild[]) =>
+      compact ? e("span", "swt-cf-param", ...children) : e("label", "swt-cf-param", e("span", { class: "swt-cf-param-name", text: label }), ...children);
     switch (spec.kind) {
       case "number": {
         const input = e("input", { attrs: { type: "number", "aria-label": label, "data-focus": focus, ...(spec.min !== undefined ? { min: String(spec.min) } : {}), ...(spec.max !== undefined ? { max: String(spec.max) } : {}) } });

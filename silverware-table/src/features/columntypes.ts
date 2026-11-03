@@ -220,11 +220,28 @@ export class ColumnTypes implements Feature {
           {
             icon: ICONS.trash,
             title: `Delete the list ${name}`,
-            run: () => write((t) => this.host.setMeta(t, listKey(name), undefined)),
-            ...(used ? { disabled: `Used by ${used.join(", ")}` } : {}),
+            run: () => void this.deleteList(info, name, used),
           },
         ],
       };
+    });
+  }
+
+  /**
+   * Deletes a list of the table; one columns take asked first, those columns
+   * then left without a type, in the same write (their cells stay as written)
+   */
+  private async deleteList(info: TableInfo, name: string, used: readonly string[] | undefined): Promise<void> {
+    if (used) {
+      const columns = used.length === 1 ? `the column ${used[0]}` : `the columns ${used.join(", ")}`;
+      if (!(await this.host.ask(`Delete the list ${name}? ${columns[0]!.toUpperCase()}${columns.slice(1)} take${used.length === 1 ? "s" : ""} it and will have no type; the cells stay as written.`))) return;
+    }
+    void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => {
+      let table = this.host.setMeta(t, listKey(name), undefined);
+      table.rows[0]?.cells.forEach((cell, c) => {
+        if (choiceListOf(unescapeCell(cell)) === name) table = setCell(table, 0, c, withColumnType(cell, undefined));
+      });
+      return table;
     });
   }
 

@@ -1,8 +1,8 @@
 // The choice column type: Choices… in a column's menu sets up its list (a new
 // one from the column's values), a value renamed there renamed in the cells;
-// the table's lists under Choice in the Type menu, one no column takes deleted there
+// the table's lists under Choice in the Type menu, deleted there (one columns take asked first, those columns then without a type)
 import type { Page } from "@playwright/test";
-import { bodyRows, columnCells, expect, header, markdown, menu, rendersAnew, setPage, test } from "./helpers.ts";
+import { answerConfirm, bodyRows, columnCells, expect, header, markdown, menu, rendersAnew, setPage, settled, test } from "./helpers.ts";
 
 const LIST = `| <meta core.table columntypes.choice.status='["open","in progress","done"]'> |`;
 const PAGE = ["| Task | Status #choice-status |", "|---|---|", "| A | done |", "| B | open |", "| C | later |", LIST, ""].join("\n");
@@ -55,5 +55,26 @@ test.describe("Choices", () => {
     await expect(row).toBeVisible();
     await rendersAnew(page, () => row.getByTitle("Delete the list status").click());
     expect(await markdown(page)).not.toContain("columntypes.choice");
+  });
+
+  test("a list a column takes is deleted after a question, the column left without a type; No keeps both", async ({ page }) => {
+    await load(page);
+    const openTypes = async () => {
+      await header(page, 1).click({ button: "right" });
+      await menu(page).getByTitle(/Change the column's type/).click();
+    };
+    const trash = () => menu(page).locator(".swt-menu-segmented", { hasText: "Choice: status" }).getByTitle("Delete the list status");
+    await openTypes();
+    const question = await answerConfirm(page, false, () => trash().click());
+    expect(question).toContain("The column Status takes it and will have no type");
+    await settled(page);
+    expect(await markdown(page)).toContain("columntypes.choice.status");
+    await page.keyboard.press("Escape");
+    await openTypes();
+    await rendersAnew(page, () => answerConfirm(page, true, () => trash().click()));
+    const text = await markdown(page);
+    expect(text).not.toContain("columntypes.choice");
+    expect(text).not.toContain("#choice");
+    expect(text).toMatch(/\| C +\| later +\|/);
   });
 });

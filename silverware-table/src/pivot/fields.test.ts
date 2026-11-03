@@ -57,7 +57,7 @@ describe("a pivot's fields", () => {
   });
 
   it("give back the definition they were read from", () => {
-    const read = definition({ rows: 'region, TEXT([@date], "yyyy-mm")', columns: "YEAR([@date])", values: 'SUM([revenue]), SHARE(SUM([qty] * [price]), "column")', where: '[@category] = "Hardware"', sort: "SUM([revenue]) desc", totals: "rows" });
+    const read = definition({ rows: 'region, TEXT([@date], "yyyy-mm")', columns: "YEAR([@date])", values: 'SUM([revenue]), SHARE(SUM([qty] * [price]), "column")', where: '[@category] = "Hardware"', sort: "SUM([revenue]) desc", totals: "row" });
     expect(definitionOf(fieldsOf(read))).toEqual(read);
   });
 });

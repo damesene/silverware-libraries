@@ -7,8 +7,10 @@
 // reads and writes the attributes, this reads and writes their values.
 import { type Token, tokenize } from "../formulas/tokens.ts";
 
-export type Totals = "both" | "rows" | "columns" | "none";
-export const TOTALS: readonly Totals[] = ["both", "rows", "columns", "none"];
+// The totals shown: the Total row and (a cross table's) the Total column, the row alone, the column alone, none.
+// The row and the column by what they are, not as Excel's "grand totals for rows", which is the Total column
+export type Totals = "both" | "row" | "column" | "none";
+export const TOTALS: readonly Totals[] = ["both", "row", "column", "none"];
 
 /** A key the rows are sorted by: a row's group (`region`) or a value (`SUM([revenue])`), as the definition writes it */
 export type SortKey = { readonly by: string; readonly descending: boolean };
@@ -74,7 +76,7 @@ export function readDefinition(attribute: (key: Key) => string | undefined): Piv
   if (!values.length) return { problem: "it says no values (pivot.values: SUM([revenue]))" };
   if (!rows.length && !splitList(attribute("columns") ?? "").length) return { problem: "it says no rows or columns to group by (pivot.rows: region)" };
   const totals = (attribute("totals")?.trim() || "both") as Totals;
-  if (!TOTALS.includes(totals)) return { problem: `its totals are "${totals}" (both, rows, columns or none)` };
+  if (!TOTALS.includes(totals)) return { problem: `its totals are "${totals}" (both, row, column or none)` };
   const where = attribute("where")?.trim();
   return {
     source,

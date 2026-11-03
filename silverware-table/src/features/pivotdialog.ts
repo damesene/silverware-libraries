@@ -275,7 +275,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
       section(
         "Totals",
         "",
-        e("div", "swt-pivot-row", toggle("Total row", fields.totals === "both" || fields.totals === "rows", (on) => set({ totals: totals(on, hasColumn(fields.totals)) })), fields.columns.length ? toggle("Total column", hasColumn(fields.totals), (on) => set({ totals: totals(hasRow(fields.totals), on) })) : null),
+        e("div", "swt-pivot-row", toggle("Total row", hasRow(fields.totals), (on) => set({ totals: totals(on, hasColumn(fields.totals)) })), fields.columns.length ? toggle("Total column", hasColumn(fields.totals), (on) => set({ totals: totals(hasRow(fields.totals), on) })) : null),
       ),
     );
     if (focused) form.querySelector<HTMLElement>(`[data-focus="${focused}"]`)?.focus();
@@ -403,7 +403,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
   return dialog;
 }
 
-const hasRow = (t: Totals) => t === "both" || t === "rows";
-const hasColumn = (t: Totals) => t === "both" || t === "columns";
-const totals = (row: boolean, column: boolean): Totals => (row && column ? "both" : row ? "rows" : column ? "columns" : "none");
+const hasRow = (t: Totals) => t === "both" || t === "row";
+const hasColumn = (t: Totals) => t === "both" || t === "column";
+const totals = (row: boolean, column: boolean): Totals => (row && column ? "both" : row ? "row" : column ? "column" : "none");
 

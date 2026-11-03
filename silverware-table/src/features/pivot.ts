@@ -509,8 +509,8 @@ export class Pivot implements Feature {
 /** A source as found: its table, why there is none, or the page it is on, not read yet */
 type Found = { readonly table: Table } | { readonly problem: string } | { readonly unread: string };
 
-/** A column's id (PivotColumn.id: row:<group>, value:<value>, column:<key>|<value>, total|<value>) with its items as they are written now */
+/** A column's id (PivotColumn.id: row:<group>, value:<value>, column:<key>|<value>, total:<value>) with its items as they are written now */
 function movedId(id: string, moved: ReadonlyMap<string, string>): string {
-  const m = /^(row:|value:|total\||column:[^|]*\|)(.*)$/.exec(id);
+  const m = /^(row:|value:|total:|column:[^|]*\|)(.*)$/.exec(id);
   return m ? m[1]! + (moved.get(m[2]!) ?? m[2]!) : id;
 }

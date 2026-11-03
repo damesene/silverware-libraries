@@ -58,7 +58,7 @@ describe("a pivot's definition", () => {
   it("is none without a source, and says what is missing or wrong", () => {
     expect(readDefinition(() => undefined)).toBeUndefined();
     expect(readDefinition((key) => ({ source: "orders", rows: "region" })[key as "source"])).toEqual({ problem: "it says no values (pivot.values: SUM([revenue]))" });
-    expect(readDefinition((key) => ({ source: "orders", rows: "region", values: "SUM([qty])", totals: "all" })[key as "source"])).toEqual({ problem: 'its totals are "all" (both, rows, columns or none)' });
+    expect(readDefinition((key) => ({ source: "orders", rows: "region", values: "SUM([qty])", totals: "all" })[key as "source"])).toEqual({ problem: 'its totals are "all" (both, row, column or none)' });
   });
 
   it("reads a value's share as a call of SHARE, the whole value only, of the total where it says no other", () => {
@@ -203,7 +203,7 @@ describe("a pivot calculated", () => {
       "column:01|SUM([revenue])",
       "column:02|SUM([revenue])",
       "column:03|SUM([revenue])",
-      "total|SUM([revenue])",
+      "total:SUM([revenue])",
     ]);
   });
 });

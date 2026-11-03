@@ -115,8 +115,8 @@ export function pivotOf(source: Table, definition: PivotDefinition, calculation:
     return whole === 0 ? "#DIV/0!" : keyOf(Math.round((part / whole) * SHARE_DIGITS) / SHARE_DIGITS);
   };
   const across = definition.columns.length > 0;
-  const showRowTotals = across && (definition.totals === "both" || definition.totals === "columns");
-  const showTotalRow = definition.totals === "both" || definition.totals === "rows";
+  const showRowTotals = across && (definition.totals === "both" || definition.totals === "column");
+  const showTotalRow = definition.totals === "both" || definition.totals === "row";
   const valueLabel = (value: string) => {
     const { formula, show } = valueParts(value);
     return show ? `${headerOf(formula, headers, true, false)} (% of ${show}) ${PERCENT}` : headerOf(formula, headers, true);
@@ -137,7 +137,7 @@ export function pivotOf(source: Table, definition: PivotDefinition, calculation:
     // (A column of shares named by its group alone still says its type)
     const named = (column: string, value: string) => (definition.values.length > 1 ? `${column} ${valueLabel(value)}` : valueParts(value).show ? `${column} ${PERCENT}` : column);
     for (const column of columnList) for (const value of definition.values) out.push({ id: `column:${column}|${value}`, header: named(column, value), numeric: true });
-    if (showRowTotals) for (const value of definition.values) out.push({ id: `total|${value}`, header: named(TOTAL, value), numeric: true });
+    if (showRowTotals) for (const value of definition.values) out.push({ id: `total:${value}`, header: named(TOTAL, value), numeric: true });
   }
 
   // The rows: by the sort's keys, else by their groups as numbers, dates or texts sort

@@ -682,7 +682,7 @@ It is a plain markdown table, its numbers written in it (it shows anywhere, as a
 | `pivot.values` | What each group shows: formulas over its rows, `SUM([revenue])`, `AVERAGE([qty])`, `COUNTA([date])`, `SUM([qty] * [price])`, comma separated; `SHARE(…)` around one shows it as a share of the grand total (`SHARE(SUM([revenue]))`), `SHARE(…, "row")` of its row's total, `SHARE(…, "column")` of its column's, its column typed `#percent-1`; SHARE is the pivot's, so it is the whole value or nothing (`SHARE(…) * 100` is `#NAME?`) |
 | `pivot.where` | Which rows count: a formula of one row, true for those (`[@category] = "Hardware"`, `AND([@qty] > 5, [@region] <> "West")`, a regular expression: `REGEXTEST([@code], "^EU-")`) |
 | `pivot.sort` | The rows' order: groups or values as the definition writes them, each with `desc` where it goes down (`SUM([revenue]) desc, region`); by default the groups, as numbers, dates or texts sort |
-| `pivot.totals` | `both` (the default): a Total row and, with columns, a Total column; `rows`: the row; `columns`: the column; `none` |
+| `pivot.totals` | `both` (the default): the Total row and, with columns, the Total column; `row`: the Total row alone; `column`: the Total column alone; `none` |
 
 * An edit of its source with Silverware Table writes the pivot anew in the same edit: one Ctrl+Z takes back both. Its source renamed, the pivot names it so.
 * Edited by hand (in its markdown) the source is ahead of the pivot: its **Refresh pivot** icon in the toolbar is highlighted, and its tab says *Out of date* (*Cannot be calculated* where it cannot be); click Refresh pivot and the pivot is calculated anew.

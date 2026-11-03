@@ -25,6 +25,24 @@ export const EDITOR_SELECTOR = ".cm-content";
 // while the page is too short to scroll
 export const SCROLLER_SELECTOR = ".cm-scroller";
 
+// The lines of a table's markdown follow its widget in SilverBullet's editor,
+// hidden (`hideBlockSource` in client/codemirror/util.ts; the first, which it
+// keeps showing as an empty line, by the style page). A press on an empty line
+// under a table may put the cursor into it, which then shows its markdown: the
+// first line where it shows, the top of the line after the table too, where
+// CodeMirror's heights put a band of a few pixels in the table (seen under a
+// table of four rows, not under one of twenty)
+const LINE_SELECTOR = ".cm-line";
+
+/** The widget of the table right above an empty line the target is in, its hidden lines between */
+export function widgetOfLineBelow(target: Element): HTMLElement | undefined {
+  const line = target.closest(LINE_SELECTOR);
+  if (!line || line.textContent !== "") return undefined;
+  let before = line.previousElementSibling;
+  while (before?.matches(LINE_SELECTOR) && before.getClientRects().length === 0) before = before.previousElementSibling;
+  return before instanceof HTMLElement && before.matches(WIDGET_SELECTOR) ? before : undefined;
+}
+
 // Elements inside a table with SilverBullet's own click behaviour (links,
 // mentions, command buttons, extended task states); their clicks are left alone
 export const NATIVE_ACTION_SELECTOR =

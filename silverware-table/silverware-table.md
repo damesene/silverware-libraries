@@ -443,6 +443,7 @@ The *Functions* dialog shows them all: **Functions…** (fx) under a formula bei
 | `LEN(text)` | How many characters the text has. |
 | `MID(text, start, count)` | The given count of characters of the text, from the start (1 is the first character). |
 | `SEARCH(find_text, within_text, [start])` | Where find_text first is in within_text, from the start (default 1, the first character), ignoring case; * any text, ? one character, ~ before either for itself. Not found: `#VALUE!`. |
+| `REGEXTEST(text, pattern, [case_sensitivity])` | Whether text matches the regular expression pattern anywhere in it (^ and $ for its start and end), as Excel 365's: TRUE or FALSE; case_sensitivity 0 (the default) tells upper and lower case apart, 1 does not. A pattern that is no regular expression: `#VALUE!`. |
 | `SUBSTITUTE(text, old_text, new_text, [instance])` | The text with old_text (matching case) replaced by new_text: everywhere, or only its instance-th occurrence. |
 | `UPPER(text)` | The text in capital letters. |
 | `LOWER(text)` | The text in small letters. |

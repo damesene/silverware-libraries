@@ -61,6 +61,7 @@ import proper from "./proper.ts";
 import trim from "./trim.ts";
 import substitute from "./substitute.ts";
 import search from "./search.ts";
+import regextest from "./regextest.ts";
 import textjoin from "./textjoin.ts";
 import isnumber from "./isnumber.ts";
 import networkdays from "./networkdays.ts";
@@ -127,6 +128,7 @@ const ALL: readonly FormulaFunction[] = [
   trim,
   substitute,
   search,
+  regextest,
   textjoin,
   isnumber,
   networkdays,

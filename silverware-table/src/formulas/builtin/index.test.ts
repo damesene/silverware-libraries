@@ -320,6 +320,15 @@ describe("text", () => {
     expect(call("TRIM", "  a   b  ")).toBe("a b");
   });
 
+  it("tests text against a regular expression, telling case apart unless asked not to", () => {
+    expect(call("REGEXTEST", "EU-123", "^[A-Z]{2}-\\d+$")).toBe(true);
+    expect(call("REGEXTEST", "eu-123", "^[A-Z]{2}-\\d+$")).toBe(false);
+    expect(call("REGEXTEST", "eu-123", "^[A-Z]{2}-\\d+$", 1)).toBe(true);
+    expect(call("REGEXTEST", "call asap", "urgent|asap")).toBe(true);
+    expect(call("REGEXTEST", "x", "(")).toBeInstanceOf(FormulaError);
+    expect(call("REGEXTEST", "x", "x", 2)).toBeInstanceOf(FormulaError);
+  });
+
   it("replaces and finds text", () => {
     expect(call("SUBSTITUTE", "a-b-c", "-", "+")).toBe("a+b+c");
     expect(call("SUBSTITUTE", "a-b-c", "-", "+", 2)).toBe("a-b+c");

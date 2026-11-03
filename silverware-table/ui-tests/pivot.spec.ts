@@ -20,6 +20,17 @@ test.describe("Pivot tables", () => {
     await setPage(page, PAGE);
   });
 
+  test("a pivot says what it is at a glance: Pivot of its source in its tab, beside its source's name", async ({ page }) => {
+    await expect(cell(page, 1, 0, 1)).toHaveText("East");
+    await page.mouse.move(2, 2);
+    const tabs = page.locator(".swt-table-label.swt-visible");
+    await expect(tabs).toHaveText(["orders", "Pivot of orders"]);
+    await expect(tabs.nth(1).locator(".swt-table-badge svg")).toHaveCount(1);
+    // Hovered: its toolbar instead
+    await hoverCell(page, cell(page, 1, 0, 1));
+    await expect(tabs).toHaveText(["orders"]);
+  });
+
   test("Refresh calculates a pivot, an edit of its source writes it anew, its cells are not edited by hand", async ({ page }) => {
     // Out of date as written: its Refresh asks to be used
     await hoverCell(page, cell(page, 1, 0, 1));

@@ -1,13 +1,15 @@
 // The tableLabels module: a named table shows its name in a small tab at its
 // top right corner (its toolbar's place, clear of the grips and the + at the
 // left), so which table is which reads at a glance, in the page and on the
-// sheet. Not while the table is hovered: its toolbar then shows, and its ⋯
+// sheet; before it, what the features say the table is (TableHost.tableBadges:
+// a pivot's "Pivot of orders"), a table with no name shown so too. Not while the table is hovered: its toolbar then shows, and its ⋯
 // menu has the name. The tab sits above the table's header, held or not, so
 // it goes along with the header held at the view's top (on the sheet, for a
 // table on its first row, over the columns' letters: rather them than the
 // header), or, where the view leaves no room there (a table at the page's
 // top), in the header's corner. It takes no presses.
-import type { AdapterFeature, TableHost, WidgetInfo } from "../../feature.ts";
+import { el } from "../../../../../shared/elements.ts";
+import type { AdapterFeature, TableBadge, TableHost, WidgetInfo } from "../../feature.ts";
 import type { Rect } from "../../geometry.ts";
 import { underWindow } from "../../overwindow.ts";
 import { parseTable } from "../../../markdown.ts";
@@ -40,15 +42,17 @@ export class TableLabels implements AdapterFeature {
     this.layoutChanged();
   }
 
-  /** Each named table in view gets its tab, placed by where its top is now; the others' go */
+  /** Each table in view that is named or said what it is gets its tab, placed by where its top is now; the others' go */
   layoutChanged(): void {
     const kept = new Set<HTMLElement>();
     for (const info of this.host.shownTables()) {
       const widget = this.host.widgetOf(info);
-      const name = this.host.tableName(parseTable(info.source));
       // (Under what is over the window, a full screen table or the sheet's board: out of sight)
-      if (!name || widget === this.underPointer || !widget.isConnected || underWindow(widget)) continue;
-      if (this.place(widget, info, name)) kept.add(widget);
+      if (widget === this.underPointer || !widget.isConnected || underWindow(widget)) continue;
+      const name = this.host.tableName(parseTable(info.source));
+      const badges = this.host.tableBadges(info);
+      if (!name && !badges.length) continue;
+      if (this.place(widget, info, name, badges)) kept.add(widget);
     }
     for (const [widget, tab] of this.tabs) {
       if (kept.has(widget)) continue;
@@ -58,7 +62,7 @@ export class TableLabels implements AdapterFeature {
   }
 
   /** The table's tab at its header's top right corner, if the header's top is in view: above it, else in its corner */
-  private place(widget: HTMLElement, info: WidgetInfo, name: string): boolean {
+  private place(widget: HTMLElement, info: WidgetInfo, name: string | undefined, badges: readonly TableBadge[]): boolean {
     const box = info.table.getBoundingClientRect();
     const head = (info.table.tHead ?? info.table.rows[0])?.getBoundingClientRect();
     if (!head) return false;
@@ -74,7 +78,7 @@ export class TableLabels implements AdapterFeature {
       tab.setAttribute("aria-hidden", "true");
       this.tabs.set(widget, tab);
     }
-    if (tab.textContent !== name) tab.textContent = name;
+    this.fill(tab, name, badges);
     tab.style.maxWidth = `${right - left}px`;
     const height = TAB_HEIGHT;
     const above = table.top - height >= room;
@@ -84,6 +88,16 @@ export class TableLabels implements AdapterFeature {
     tab.style.left = "0px";
     this.host.place(tab, right - tab.offsetWidth, above ? table.top - height : table.top);
     return true;
+  }
+
+  /** A tab's content: each badge, its icon before its text, then the name; made anew only as it changes (it is placed after every scroll) */
+  private fill(tab: HTMLElement, name: string | undefined, badges: readonly TableBadge[]): void {
+    const content = JSON.stringify([name, badges]);
+    if (tab.dataset.content === content) return;
+    tab.dataset.content = content;
+    const doc = tab.ownerDocument;
+    const parts = badges.map((badge) => el(doc, "span", "swt-table-badge", badge.icon ? el(doc, "span", { class: "swt-table-badge-icon", html: badge.icon }) : null, badge.text));
+    tab.replaceChildren(...parts.flatMap((part, i) => (i ? [" · ", part] : [part])), ...(name ? [parts.length ? " · " : "", name] : []));
   }
 
   /**

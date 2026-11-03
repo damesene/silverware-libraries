@@ -11,7 +11,7 @@
 // stands for, as the core follows a column's attributes by place, not by
 // what a pivot's column is). Formulas are calculated by the formulas
 // module's cells; without it, nothing is.
-import type { Feature, ModelHost, TableInfo, TableTarget, ToolbarButton, WriteEdit } from "../core/feature.ts";
+import type { Feature, ModelHost, TableBadge, TableInfo, TableTarget, ToolbarButton, WriteEdit } from "../core/feature.ts";
 import { followOwnFormula, type FormulaCells, type FormulasOffer, type PageLinksOffer } from "../formulas/index.ts";
 import { listOf } from "../bridge.ts";
 import { columnName } from "../columns.ts";
@@ -295,6 +295,13 @@ export class Pivot implements Feature {
     if (typeof pivot === "string") return void this.stale.set(info, `This pivot cannot be calculated: ${pivot}`);
     const now = this.written(table, pivot, this.renamesOf(table));
     this.stale.set(info, JSON.stringify(now.rows.map((r) => r.cells)) !== JSON.stringify(table.rows.map((r) => r.cells)));
+  }
+
+  /** What a pivot is, at a glance: Pivot of its source as the definition writes it (another page's: Pivot of [[Orders]]orders), one with a problem too */
+  tableBadges(info: TableInfo): TableBadge[] {
+    const table = parseTable(info.source);
+    if (!this.definitionOf(table)) return [];
+    return [{ icon: ICONS.pivot, text: `Pivot of ${this.host.getMeta(table, "source")?.trim() ?? ""}` }];
   }
 
   /** Deleting a table: its pivots on the page keep their numbers, calculated no more */

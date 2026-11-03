@@ -688,6 +688,7 @@ It is a plain markdown table, its numbers written in it (it shows anywhere, as a
 * Edited by hand (in its markdown) the source is ahead of the pivot: its **Refresh pivot** icon in the toolbar is highlighted; click it and the pivot is calculated anew.
 * A source on another page is as a formula's table there (see [[#Other tables]]): its edits do not write the pivot; once SilverBullet has indexed that page, **Refresh pivot** is highlighted where the pivot is out of date. Renamed there, the source (or its columns) is not followed: the pivot says what it cannot find, and its settings fix it. It needs the `pageLinks` module.
 * Its values are calculated, so its cells are not edited: the editor does not open on them, and its menus offer nothing that changes them or adds, moves or deletes its rows and columns. Rename a header as in any table: the pivot keeps your name (and a type's hashtag added to it) when it is calculated again.
+* It says what it is at a glance: *Pivot of orders* in a small tab at its top right corner (with the `tableLabels` module), `Pivot of [[Orders]]orders` for a source on another page, as its definition writes it.
 * Its totals are pinned: the Total row to the bottom, a cross table's Total column to the right, so they stay in view and out of a sort (with *Store table metadata*).
 * It needs the `formulas` module.
 
@@ -953,7 +954,7 @@ Each module can be turned off with `enabled = false`, e.g. `config.set("silverwa
 | `autoscroll` | The middle mouse button over a table scrolls it. |
 | `fullScreen` | The table's icon (in the first row of its ⋯ menu, or in its toolbar while you hold Shift) shows the table over the whole window (not the browser's full screen), with its toolbar, menus and editing as in the page, the columns' letters above the header and the rows' numbers left of them, as formulas refer to them (`B3`); the same icon (*Exit full screen*) or Esc closes it. |
 | `sheet` | The sheet's name in the table's ⋯ menu (a table is put on a sheet, moved and taken off it there) and the sheet icon, which shows the table's sheet as a spreadsheet over the whole window, as `fullScreen` does, with empty rows and columns around its tables (more as you scroll on), their letters and numbers too. Type into the empty cell right under or next to a table: Enter or Tab saves it, and the table grows by that row or column, a new column named *Column 4*; farther from the tables, a value makes a table of its own. A cell left empty adds nothing; Esc drops it. The same icon (*Exit sheet view*) or Esc closes it. See [[#Sheet view]]. |
-| `tableLabels` | A named table shows its name in a small tab at its top right corner, so you can tell tables apart at a glance, in the page and on the sheet. The tab stays on the header while the header is held at the top, and it hides while you hover the table, where the toolbar shows instead. |
+| `tableLabels` | A named table shows its name in a small tab at its top right corner, so you can tell tables apart at a glance, in the page and on the sheet; a pivot shows *Pivot of* its source there, named or not. The tab stays on the header while the header is held at the top, and it hides while you hover the table, where the toolbar shows instead. |
 | `largeTables` | Off by default. A table with many rows (setting `minRows`, default `200`) scrolls in a box of its own: as tall as *Maximum table height*, else the window. Only the rows in and around the box's view are in the page, so editing, sorting and filtering a table of thousands of rows stays quick. The browser's find (Ctrl+F) finds only those rows. Off: every row is in the page, the table as tall as its rows (unless *Maximum table height* is set). |
 
 ## Table names
@@ -1827,6 +1828,23 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
 .swt-floating.swt-table-label.swt-inside {
   border-radius: 0 0 0 5px;
   opacity: 0.9;
+}
+/* What a feature says the table is (a pivot's "Pivot of orders"): as the name, its icon before it */
+.swt-table-label .swt-table-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 16px;
+  vertical-align: top;
+}
+/* (A box of the icon's size: an inline svg sits on the text's baseline, above its middle) */
+.swt-table-label .swt-table-badge-icon {
+  display: flex;
+}
+.swt-table-label .swt-table-badge-icon svg {
+  display: block;
+  width: 11px;
+  height: 11px;
 }
 
 /* The expand button of a cell whose text does not fit: opens its popup */

@@ -33,6 +33,7 @@ export const TABLE_HOOKS = {
   lineMenuEntries: 0,
   lineMenuEndEntries: 0,
   toolbarButtons: 0,
+  tableBadges: 0,
   prepareWrite: 0,
   holdCellEdit: 0,
   pendingEdits: 0,

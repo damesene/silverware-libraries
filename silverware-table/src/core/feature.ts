@@ -356,6 +356,13 @@ export interface Panel {
   remove(): void;
 }
 
+/** What a feature says a table is, shown with its name where the table's name shows (a pivot: Pivot of orders) */
+export type TableBadge = {
+  readonly text: string;
+  // Its icon's markup (icons.ts), before the text
+  readonly icon?: string;
+};
+
 /** A button a feature adds to a table's toolbar */
 export type ToolbarButton = {
   readonly label: string;
@@ -729,6 +736,8 @@ export interface ModelHost {
   // What every part reads and the core keeps: the names of tables, columns, rows and cells
   /** A table's name, if it has a valid one */
   tableName(table: Table): string | undefined;
+  /** What the features say the table is (Feature.tableBadges), in their order */
+  tableBadges(info: TableInfo): readonly TableBadge[];
   /** A table's name as written, valid or not */
   writtenTableName(table: Table): string | undefined;
   /** The table named so (undefined: unnamed) */
@@ -1029,6 +1038,8 @@ export interface Feature {
   lineMenuEndEntries?(info: TableInfo, axis: "row" | "column", lines: readonly number[]): MenuEntry[];
   /** Buttons for the table's toolbar, shown while the pointer is over the table */
   toolbarButtons?(info: TableInfo): ToolbarButton[];
+  /** What the table is, shown with its name at a glance (the tableLabels module's tab): a pivot's "Pivot of orders" */
+  tableBadges?(info: TableInfo): readonly TableBadge[];
   /** Before a write reads the page's text: what it needs read first (other pages the tables written refer to) */
   prepareWrite?(info: TableTarget): Promise<void>;
   /**

@@ -318,6 +318,14 @@ describe("Pivot tables", () => {
     expect(text).toContain("core.pin-right='1'");
   });
 
+  it("says what it is: Pivot of its source, another page's with its page, a named pivot's name apart", async () => {
+    await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |")}\n\n${PIVOT("| East | 1 |").replace("pivot.source='orders'", "pivot.source='[[Orders]]orders' core.name='byregion'")}\n`, { "silverware.table.metadata": true });
+    const [source, here, other] = controller.shownTables();
+    expect(controller.tableBadges(source!)).toEqual([]);
+    expect(controller.tableBadges(here!).map((b) => b.text)).toEqual(["Pivot of orders"]);
+    expect(controller.tableBadges(other!).map((b) => b.text)).toEqual(["Pivot of [[Orders]]orders"]);
+  });
+
   it("follows its source's new name", async () => {
     await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
     const info = controller.shownTables()[0]!;

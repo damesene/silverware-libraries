@@ -43,6 +43,8 @@ export type DialogOptions = {
   readonly closed?: () => void;
   // A button to look at the page under it for a moment (what the dialog changes there, shown as it changes)
   readonly peek?: boolean;
+  // Held from the top of the window, not centered: what grows in it grows downwards (`${base}-backdrop-top`)
+  readonly anchor?: "top";
 };
 
 export type Dialog = {
@@ -126,7 +128,7 @@ export class Dialogs {
       if (text !== undefined) e.textContent = text;
       return e;
     };
-    const backdrop = el("div", `${this.look.backdropClass ? `${this.look.backdropClass} ` : ""}${base}-backdrop`);
+    const backdrop = el("div", `${this.look.backdropClass ? `${this.look.backdropClass} ` : ""}${base}-backdrop${options.anchor === "top" ? ` ${base}-backdrop-top` : ""}`);
     const dialog = el("div", `${base}${options.className ? ` ${options.className}` : ""}`);
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   choiceText,
+  functionHelp,
   columnChoicesOf,
   areaText,
   autofixFormula,
@@ -627,6 +628,13 @@ describe("formulaHelp", () => {
     expect(marked('=IF(A1>1, "a", "b", ')).toBe("IF(condition, value_if_true, [value_if_false])"); // too many: none
     // Commas in a text or a call inside are not this call's
     expect(marked('=CONCAT("a,b", ROUND(1, 2), ')).toBe("CONCAT(text1, <[text2]>, …)");
+  });
+
+  it("gives a function's help alone (functionHelp), how references are written out of any (formulaHelp)", () => {
+    expect(functionHelp("=ROUND(", 7)!.syntax).toBe("ROUND(number, [digits])");
+    expect(functionHelp("=A1+", 4)).toBeUndefined();
+    expect(formulaHelp("=A1+", 4)).toBe(REFERENCE_HELP);
+    expect(functionHelp("text", 2)).toBeUndefined();
   });
 
   it("explains references otherwise, and nothing outside formulas", () => {

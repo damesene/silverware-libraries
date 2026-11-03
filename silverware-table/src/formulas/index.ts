@@ -34,7 +34,7 @@ export type FormulasOffer = {
    * and [@ ] by their names, put in by their ids
    */
   readonly complete: (formula: string, caret: number, text: string, headers?: readonly string[]) => import("./help.ts").FormulaChoices | undefined;
-  /** The function the caret is in, its syntax with the argument at the caret (else how references are written) */
+  /** The function the caret is in, its syntax with the argument at the caret; undefined out of any */
   readonly help: (formula: string, caret: number) => import("./help.ts").FormulaHelp | undefined;
   /** Why a formula does not read (a ")" missing); undefined: it does */
   readonly problem: (formula: string) => string | undefined;
@@ -57,7 +57,7 @@ export { ERROR_CODES, FormulaError, parseClock, type Scalar, type Value } from "
 export { withAreasWritten, type WrittenArea, writtenArea } from "./frame.ts";
 export { REF_ERROR } from "./tokens.ts";
 export { calculatedFormula, filledFormula, followFormula, followOwnFormula, followTable, type Following, formulasAfterEdit, shiftReferences, withCalculatedCells, withoutFormulas } from "./edits.ts";
-export { argumentSpan, type ColumnChoice, columnChoicesOf, type FormulaChoice, type FormulaChoices, choiceText, cycleFixed, findFunctions, type FormulaHelp, formulaChoices, formulaHelp, nameTyped, needsOperator, type PointedSpan, REFERENCE_HELP, referenceSlot } from "./help.ts";
+export { argumentSpan, type ColumnChoice, columnChoicesOf, type FormulaChoice, type FormulaChoices, choiceText, cycleFixed, findFunctions, type FormulaHelp, formulaChoices, formulaHelp, functionHelp, nameTyped, needsOperator, type PointedSpan, REFERENCE_HELP, referenceSlot } from "./help.ts";
 export { FUNCTION_CATEGORIES, type FormulaFunction, type FunctionCategory } from "./function.ts";
 export { functionNamed, isCustomFunction } from "./registry.ts";
 export type { IndexMap } from "../ops.ts";

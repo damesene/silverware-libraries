@@ -210,6 +210,12 @@ export function nameTyped(text: string, start: number, end: number): { from: num
  */
 export function formulaHelp(text: string, caret: number): FormulaHelp | undefined {
   if (!text.trimStart().startsWith("=")) return undefined;
+  return functionHelp(text, caret) ?? REFERENCE_HELP;
+}
+
+/** The function whose arguments the caret is in, the one it is in marked; undefined out of any (or no formula) */
+export function functionHelp(text: string, caret: number): FormulaHelp | undefined {
+  if (!text.trimStart().startsWith("=")) return undefined;
   // The calls whose parenthesis is still open before the caret, innermost last, with the arguments passed so far
   const { tokens } = tokenize(text.slice(0, caret));
   const open: { name: string | undefined; argument: number }[] = [];
@@ -229,7 +235,7 @@ export function formulaHelp(text: string, caret: number): FormulaHelp | undefine
     const argument = i === open.length - 1 ? argumentSpan(f.syntax, call.argument) : undefined;
     return { syntax: f.syntax, description: f.description, ...(argument ? { argument } : {}) };
   }
-  return REFERENCE_HELP;
+  return undefined;
 }
 
 /**

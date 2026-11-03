@@ -41,6 +41,9 @@ import type { MenuEntry } from "../menu.ts";
 import { withoutTags } from "../tags.ts";
 import { type FormulaHelpers, openConditionsDialog, type RuleSample, type ScopeColumn } from "./conditionsdialog.ts";
 
+// How a formula condition refers to cells, under its field out of a function: one line
+const CONDITION_REFERENCES = { syntax: "[@column] · [column] · table![column] · cell_name", description: "The row's cell of a column, a whole column, another table's column, a named cell." };
+
 // What each kind of choice is, beside it in a formula's list
 const CHOICE_KINDS: Readonly<Record<string, string>> = { function: "function", column: "column", cell: "named cell", row: "named row", table: "table" };
 
@@ -324,9 +327,10 @@ export class Conditions implements Feature {
           choices: made.choices.map((choice) => ({ label: choice.kind === "column" ? choice.name : choiceText(choice).replace(/[([!]$/, ""), insert: choiceText(choice), kind: CHOICE_KINDS[choice.kind] ?? choice.kind })),
         };
       },
+      // Out of a function, how a condition refers to cells, in a line (the cell editor's longer help is of pointing in the table)
       help: (text, caret) => {
         const { formula, shift } = asFormula(text);
-        return formulas.help(formula, caret + shift);
+        return formulas.help(formula, caret + shift) ?? CONDITION_REFERENCES;
       },
       problem: (text) => formulas.problem(text),
     };

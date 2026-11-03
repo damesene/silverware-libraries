@@ -1343,6 +1343,16 @@ body.swt-resizing * {
   outline: 2px solid var(--root-color, #000);
   outline-offset: 2px;
 }
+/* A dialog held from the top (DialogOptions' anchor): what grows in it grows downwards; a gap above it */
+.swt-dialog-backdrop.swt-dialog-backdrop-top {
+  align-items: flex-start;
+  box-sizing: border-box;
+  padding-top: min(6vh, 48px);
+}
+.swt-dialog-backdrop-top > .swt-dialog {
+  max-height: calc(100vh - min(6vh, 48px) - 16px);
+  max-height: calc(var(--sw-view-height, 100dvh) - min(6vh, 48px) - 16px);
+}
 /* What does not fit scrolls, its head and its foot (Save) staying in view */
 .swt-dialog-body {
   display: flex;
@@ -1372,6 +1382,13 @@ body.swt-resizing * {
   }
   .swt-dialog-foot {
     padding: 8px 12px 10px;
+  }
+  .swt-dialog-backdrop.swt-dialog-backdrop-top {
+    padding-top: 6px;
+  }
+  .swt-dialog-backdrop-top > .swt-dialog {
+    max-height: calc(100vh - 12px);
+    max-height: calc(var(--sw-view-height, 100dvh) - 12px);
   }
   .swt-pivot-section,
   .swt-cf-section {

@@ -589,8 +589,8 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
       );
       list.hidden = !offered;
     };
-    const showHelp = () => {
-      const h = helpers.help(input.value, caret());
+    const showHelp = (at = caret()) => {
+      const h = helpers.help(input.value, at);
       if (!h) {
         help.replaceChildren();
         return;
@@ -599,7 +599,7 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
       if (h.argument) {
         syntax.append(h.syntax.slice(0, h.argument.from), e("b", { text: h.syntax.slice(h.argument.from, h.argument.to) }), h.syntax.slice(h.argument.to));
       } else syntax.textContent = h.syntax;
-      help.replaceChildren(syntax, e("span", { class: "swt-cf-description", text: h.description }));
+      help.replaceChildren(syntax, ...(h.description ? [e("span", { class: "swt-cf-description", text: h.description })] : []));
     };
     // `typing`: the text changed (else only the caret moved: the list closes, it opens as a name is typed)
     const update = (typing: boolean) => {
@@ -619,7 +619,9 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
     // was the input's (its keyup leaves the list as typing made it)
     const MOVES = new Set(["ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"]);
     input.addEventListener("keyup", (ev) => (MOVES.has(ev.key) ? update(false) : showHelp()));
-    for (const event of ["click", "focus"]) input.addEventListener(event, () => update(false));
+    // (Not on focus: a press focuses the field before it puts the caret where it pressed, so the help would show for
+    // the formula's start first and then for where the press was, the dialog jumping between them)
+    input.addEventListener("click", () => update(false));
     input.addEventListener("blur", () => {
       offered = undefined;
       showList();
@@ -642,6 +644,8 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
     });
     list.hidden = true;
     problem.textContent = value.trim() === "" ? "" : (helpers.problem(value) ?? "");
+    // The help from the start, as for the caret at the formula's end: a press into the field changes it, not the dialog's height from nothing
+    showHelp(value.length);
     // The list under the field itself, not under the help after it
     return e("span", "swt-cf-formula-box", e("span", "swt-cf-formula-input", input, list), problem, help);
   }
@@ -703,6 +707,8 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
     className: "swt-cf-dialog",
     // The table under it, shown as the rules change, a look away
     peek: true,
+    // A rule opened, a formula's help: the dialog grows downwards, nothing above them moving
+    anchor: "top",
     content: e("div", "swt-pivot swt-cf", list),
     footer,
     closed: () => {

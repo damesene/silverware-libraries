@@ -75,7 +75,7 @@ import {
   withColumnKeys,
   writtenArea,
 } from "../formulas/index.ts";
-import { columnChoicesOf, FormulaError, parseFormula } from "../formulas/index.ts";
+import { columnChoicesOf, FormulaError, functionHelp, parseFormula } from "../formulas/index.ts";
 import { addAffected, affectedBy, isAffected, type NamedOtherPages, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
 import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
@@ -214,7 +214,7 @@ export class Formulas implements Feature {
       cells: this.cells,
       evaluate: (formula, text, page) => this.evaluate(formula, text, page),
       complete: (formula, caret, text, headers) => formulaChoices(formula, caret, caret, pageNameChoices(this.cells, this.named(pageTablesOf(text))), undefined, columnChoicesOf(headers ?? [])),
-      help: (formula, caret) => formulaHelp(formula, caret),
+      help: (formula, caret) => functionHelp(formula, caret),
       problem: (formula) => {
         const tree = parseFormula(formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`);
         return tree instanceof FormulaError ? tree.detail : undefined;

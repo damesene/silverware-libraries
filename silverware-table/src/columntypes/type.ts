@@ -67,6 +67,8 @@ export type ColumnType<P extends Params = Params> = {
   // The type's icon, in the column menu and in its columns' headers: an SVG,
   // 24x24 and drawn with currentColor (lineIcon draws one); none: a tag
   readonly icon?: string;
+  // The icon of a column of these parameters, where it is not `icon` (a choice of a list of the table's); undefined: `icon`
+  iconFor?(params: P): string | undefined;
   // The parameters it takes; none: a hashtag with a dash is not this type's
   readonly params?: ParamSpecs;
   // Other hashtags that mean this type, with its parameters as written after

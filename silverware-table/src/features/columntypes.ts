@@ -31,6 +31,15 @@ function iconOf(type: ColumnType): string {
   return type.icon ?? ICONS.columnType;
 }
 
+/** A column's icon: its type's for its parameters (a choice of a list), else its type's */
+function columnIcon(typed: TypedColumn): string {
+  try {
+    return typed.type.iconFor?.(typed.params) ?? iconOf(typed.type);
+  } catch {
+    return iconOf(typed.type);
+  }
+}
+
 /** A type's name for menus: stars is Stars */
 function typeLabel(name: string): string {
   return name[0]!.toUpperCase() + name.slice(1);
@@ -168,7 +177,7 @@ export class ColumnTypes implements Feature {
             {
               kind: "item",
               label: "Choices…",
-              icon: iconOf(current.type),
+              icon: columnIcon(current),
               hint: "The values the column's cells may have",
               run: () => this.choicesDialog.open(info, column),
             } satisfies MenuEntry,
@@ -179,7 +188,7 @@ export class ColumnTypes implements Feature {
         label: current ? `Type: ${typeLabel(current.type.name)}` : "Type",
         options: [
           {
-            icon: current ? iconOf(current.type) : ICONS.columnType,
+            icon: current ? columnIcon(current) : ICONS.columnType,
             title: current ? `Change the column's type (${typeLabel(current.type.name)})` : "Choose how the column's cells show",
             run: () => open("Column type", choices),
           },
@@ -215,7 +224,7 @@ export class ColumnTypes implements Feature {
         hint: used ? `Used by ${used.join(", ")}` : "Used by no column",
         options: [
           {
-            icon: iconOf(choice),
+            icon: choice.iconFor?.({ name }) ?? iconOf(choice),
             title: `Take the list ${name} for this column`,
             active: taken === name,
             run: () => write((t) => setCell(t, 0, column, withColumnType(t.rows[0]?.cells[column] ?? "", `choice-${name}`))),
@@ -396,7 +405,7 @@ export class ColumnTypes implements Feature {
       headers.push({
         column,
         hidesTag: (tag) => !!typeOfTag(tag),
-        icons: [{ svg: iconOf(typed.type), title: `${typeLabel(typed.type.name)} (#${typed.tag}): ${typed.type.description}`, className: "swt-type-icon", order: HEADER_ICON_ORDER.kind }],
+        icons: [{ svg: columnIcon(typed), title: `${typeLabel(typed.type.name)} (#${typed.tag}): ${typed.type.description}`, className: "swt-type-icon", order: HEADER_ICON_ORDER.kind }],
       });
       table.rows.forEach((r, row) => {
         const raw = r.cells[column];

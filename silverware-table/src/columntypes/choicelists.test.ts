@@ -59,6 +59,13 @@ describe("#choice", () => {
     expect(choice.check("later", paramsOf("choice-status"))).toBeUndefined();
   });
 
+  it("has an icon of its own for a column of a list, its type's for #choice alone", () => {
+    expect(choice.iconFor!(paramsOf("choice"))).toBeUndefined();
+    const listed = choice.iconFor!(paramsOf("choice-status"))!;
+    expect(listed).toMatch(/^<svg viewBox="0 0 24 24"[^>]*>.+<\/svg>$/);
+    expect(listed).not.toBe(choice.icon);
+  });
+
   it("ranks a value by its place in the list, one not in it after them all; without a list none", () => {
     expect(["done", "open", "in progress", "later"].map((v) => choice.rank!(v, paramsOf("choice-status"), STATUS))).toEqual([2, 0, 1, 3]);
     expect(choice.rank!("done", paramsOf("choice"), STATUS)).toBeUndefined();

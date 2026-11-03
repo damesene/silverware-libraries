@@ -2,7 +2,7 @@
 
 Conditional formatting as in Excel: cells of a column, a named row or the whole table look different where their values meet a condition (a fill, a text color, bold; later data bars, color scales and icons). Predefined conditions and formats, and the user's own registered without changing the plugin, as custom column types are. A module of its own, `conditions`, that the core knows nothing of.
 
-Status (2026-11-03): planned, nothing done. The research behind it is in *What the code has* below; the open questions are at the end.
+Status (2026-11-03): planned, nothing done. The research behind it is in *What the code has* below; what was decided with the user is in *Decisions*, what is still open at the end.
 
 ## Goals and limits
 
@@ -77,7 +77,7 @@ Pure, as `columntypes/` and `autofill/` are; `index.ts` its API.
 - **Column menu → Conditional formatting**: a submenu with quick rules as Excel's ribbon has them (Greater than…, Less than…, Between…, Equal to…, Text contains…, Duplicate values, Top 10, Above average, Data bar, Color scale), each asking only its parameters and a format in a small form in the menu's place (as a filter is set in its bubble), then *Manage rules…* and *Clear rules of this column*.
 - **Table ⋯ menu → Conditional formatting…**: the dialog of all the table's rules: a list in priority order (↑ ↓ and drag), each row its scope, condition and format as a preview cell; a rule edited in place under its row (no dialog over the dialog: the tags' first version of stacked dialogs was abandoned for that); scope picked as This table, a column, a named row. Nothing written until Save, one write.
 - **Cell menu** on a selection: the same quick rules for the selection's columns.
-- A column with rules gets no header icon by default (headers are crowded); the dialog is where they are seen. Open question below.
+- **Where a table's rules are seen** (decided 2026-11-03): not in headers (a rule need not be a column's). *Conditional formatting…* is always an item of the table's ⋯ menu; a table with at least one rule (any scope, active or not) also gets an icon in its toolbar (`toolbarButtons`, `place: "icon"`, shown pressed as Edit mode is), opening the same dialog. A table without rules shows no icon: the toolbar stays as it is.
 
 ### Elsewhere
 
@@ -88,21 +88,26 @@ Pure, as `columntypes/` and `autofill/` are; `index.ts` its API.
 ## Phases
 
 1. **Core and the simplest rules** (about 3 to 4 days): `CellLook.vars` with tests; the column types' offer; the domain with column and table scopes, the cell conditions (compare, between, equal, contains, empty) and the predefined formats; the module's looks and storage; quick rules in the column menu; CSS; library page; a ui-test (a rule added from the menu, a cell edited into and out of it, a sort keeping colors with values).
-2. **The dialog and the rest of the conditions** (about 4 to 5 days): Manage rules; conditions over the scope (duplicates, top / bottom, averages, dates); formula conditions; named rows; own colors; custom conditions (`defineConditions`) and custom formats found in the styles; the cell menu.
+2. **The dialog and the rest of the conditions** (about 4 to 5 days): Manage rules; conditions over the scope (duplicates, top / bottom, averages, dates); formula conditions; own colors; custom conditions (`defineConditions`) and custom formats found in the styles; the cell menu.
 3. **Scales and export** (about 3 days): data bars and color scales, icon sets (`CellLook.icon`), Excel's conditional formatting.
+4. **Named rows as a scope** (later, about 1 to 2 days): the scope `row` in the dialog and the quick rules of a row's grip menu. Nothing before it may need changing for it: the rule's `scope` has `row` from phase 1 (read, kept, inactive until this phase), table and row rules share the table attribute, and the evaluation takes a scope as a set of cells, not as a column.
 
 Estimates are rough, from the parts above, not from a prototype.
 
 ## Risks
 
-- **Specificity against themes**: themes set backgrounds through SilverBullet's variables; a user's theme with `!important` would win over a fill. Checked against the built-in themes and Tiniri in step 1.
+- **Specificity against themes** (decided 2026-11-03): the module's CSS never uses `!important`; a user's theme that does wins over a fill, and that is accepted. Checked against the built-in themes and Tiniri in step 1, so that a theme without `!important` never hides a format.
 - **Cost on large tables**: a rule over the scope (top N, scales) reads the column's values on every view; cached by the table's text, so it is paid once per write. Formula conditions build a `Book` per table, cached the same way.
 - **The values compared**: depends on the column types' offer being exactly what sorting compares; one function for both, so they cannot drift.
 - **JSON in metadata**: readable but long; kept compact (short keys, defaults left out). A rule written by hand wrong is kept and reported, never dropped.
 
+## Decisions (2026-11-03, with the user)
+
+1. **Pinned rows and columns are always left out**, with the header. No option per rule.
+2. **A table's rules are seen from its toolbar**, not from headers: the ⋯ menu always has *Conditional formatting…*, a table with rules gets an active icon in the toolbar too (see *UX*).
+3. **Named rows come later** (phase 4), but the design counts on them from phase 1 (see *Phases*).
+4. **No `!important`** in the module's CSS; a theme that uses it wins (see *Risks*).
+
 ## Open questions
 
-1. Pinned rows and columns always left out, or an option per rule (Excel has none: it formats what the range covers)? Proposed: always left out, as asked.
-2. A column's rules shown in its header (a small mark), or only in the dialog?
-3. A named row as a scope in phase 2, or left for later (a formula condition on the table covers most uses: `[@status]="late"` formats rows)?
-4. Custom formats keyed by class or by a data attribute (a class per format is simpler CSS; an attribute avoids clashes with other classes)?
+1. **How a custom format is written in CSS**: as a class (`td.swt-cf-urgent { … }`: the core's marks are classes already, nothing to add) or as a data attribute (`td[data-swt-cf~="urgent"] { … }`, as themes are `data-swt-theme`: no clash with the plugin's own classes, but the core would have to set attributes too). Proposed: the class, names checked against the built-in formats' so a user's cannot take an internal one.

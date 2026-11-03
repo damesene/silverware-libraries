@@ -1197,6 +1197,11 @@ body.swt-resizing * {
 .swt-dialog-backdrop {
   position: fixed;
   inset: 0;
+  /* Over the part of the window in view (an on-screen keyboard leaves the rest): the shared dialog's --sw-view-* */
+  top: var(--sw-view-top, 0);
+  bottom: auto;
+  height: 100vh;
+  height: var(--sw-view-height, 100dvh);
   z-index: 100;
   display: flex;
   align-items: center;
@@ -1211,7 +1216,9 @@ body.swt-resizing * {
   flex-direction: column;
   width: min(640px, calc(100vw - 24px));
   max-height: calc(100vh - 32px);
-  max-height: calc(100dvh - 32px);
+  max-height: calc(var(--sw-view-height, 100dvh) - 32px);
+  /* (Its border within the height: SilverBullet sets no box-sizing) */
+  box-sizing: border-box;
   color: var(--root-color);
   background: var(--root-background-color);
   border: 1px solid var(--swt-dialog-line);
@@ -1268,11 +1275,52 @@ body.swt-resizing * {
   width: 16px;
   height: 16px;
 }
+/* What does not fit scrolls, its head and its foot (Save) staying in view */
 .swt-dialog-body {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-height: 0;
   padding: 0 16px 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.swt-dialog-head,
+.swt-dialog-foot {
+  flex: none;
+}
+/* A phone: the dialog nearly the whole screen, a section's name over its fields */
+@media (max-width: 600px) {
+  .swt-dialog {
+    width: calc(100vw - 12px);
+    max-height: calc(100vh - 12px);
+    max-height: calc(var(--sw-view-height, 100dvh) - 12px);
+  }
+  .swt-dialog-head {
+    padding: 10px 12px 6px;
+  }
+  .swt-dialog-body {
+    padding: 0 12px 10px;
+  }
+  .swt-dialog-foot {
+    padding: 8px 12px 10px;
+  }
+  .swt-pivot-section,
+  .swt-cf-section {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .swt-pivot-label,
+  .swt-cf-label {
+    padding-top: 0;
+  }
+  .swt-cf-editor {
+    margin-left: 4px;
+    padding: 6px 6px 6px 8px;
+  }
+  .swt-cf-line {
+    flex-wrap: wrap;
+  }
 }
 .swt-dialog-foot {
   padding: 10px 16px 12px;

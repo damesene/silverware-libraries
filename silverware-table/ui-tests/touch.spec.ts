@@ -1,4 +1,5 @@
 // On a touch screen (the "touch" project: a phone's viewport, touch events)
+import type { Locator, Page } from "@playwright/test";
 import { cell, expect, longPress, markdown, menu, menuTitle, setPage, table, tableIcon, tap, test } from "./helpers.ts";
 
 test.describe("Touch", () => {
@@ -99,5 +100,46 @@ test.describe("Touch: moving a table on the sheet", () => {
     await tap(page, page.locator(".swt-menu .swt-menu-item", { hasText: "Code" }));
     await expect.poll(() => markdown(page)).toMatch(/<meta core.table core.name='\w+' sheet.name='Plan' sheet.at='A5'>/);
     await expect(page.locator(".swt-cell-editor")).toHaveCount(0);
+  });
+});
+
+test.describe("Touch: a dialog taller than the screen", () => {
+  // What a dialog must show on a phone: within the window, its Save in view, what does not fit scrolling in its body
+  async function fitsTheScreen(page: Page, dialog: Locator): Promise<void> {
+    const view = page.viewportSize()!;
+    const box = (await dialog.boundingBox())!;
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(view.height + 1);
+    expect(box.x + box.width).toBeLessThanOrEqual(view.width + 1);
+    await expect(dialog.locator(".swt-dialog-primary")).toBeInViewport();
+    const body = dialog.locator(".swt-dialog-body");
+    const scrolls = await body.evaluate((b) => b.scrollHeight > b.clientHeight);
+    expect(scrolls).toBe(true);
+    await body.evaluate((b) => (b.scrollTop = b.scrollHeight));
+    expect(await body.evaluate((b) => b.scrollTop)).toBeGreaterThan(0);
+  }
+
+  test("the rules of conditional formatting: a rule of many keywords edited, Save in view, the rest scrolled to", async ({ page }) => {
+    const rows = Array.from({ length: 8 }, (_, i) => `{"pattern":"word${i}","style":{"fill":"green"}}`).join(",");
+    await setPage(page, `| Item | Status |\n|---|---|\n| Pear | word1 |\n| Fig | word2 |\n| <meta core.table conditions.-c-status.rules='[{"format":["byPattern",{"rows":[${rows}]}]}]'> |\n`);
+    await tap(page, cell(page, 1, 0));
+    // (Its icon in the toolbar of a table with rules, the bar shown once placed)
+    await tap(page, page.locator('.swt-bar.swt-visible button[aria-label="Conditional formatting"]'));
+    const dialog = page.locator(".swt-cf-dialog");
+    await expect(dialog).toBeVisible();
+    await tap(page, dialog.locator(".swt-cf-summary").first());
+    await expect(dialog.locator(".swt-cf-list-row")).toHaveCount(8);
+    await fitsTheScreen(page, dialog);
+  });
+
+  test("a pivot's settings with its preview: Save in view, the rest scrolled to", async ({ page }) => {
+    const source = Array.from({ length: 30 }, (_, i) => `| R${i} | ${i} |`).join("\n");
+    await setPage(page, `| Region | Revenue |\n|---|--:|\n${source}\n| <meta core.table core.name='orders'> |\n\n| Region | Sum of Revenue |\n|---|--:|\n| R0 | 0 |\n| <meta core.table pivot.source='orders' pivot.rows='region' pivot.values='SUM([revenue])'> |\n`);
+    await cell(page, 1, 0, 1).scrollIntoViewIfNeeded();
+    await tap(page, cell(page, 1, 0, 1));
+    await tap(page, page.locator('.swt-bar.swt-visible button[aria-label="Pivot settings…"]'));
+    const dialog = page.locator(".swt-pivot-dialog");
+    await expect(dialog.locator(".swt-pivot-table")).toBeVisible();
+    await fitsTheScreen(page, dialog);
   });
 });

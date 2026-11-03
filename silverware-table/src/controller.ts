@@ -164,9 +164,10 @@ export class Controller implements TableHost {
   private navigating = false;
   private navigatingAt: HTMLElement | undefined;
   private hideTimer: ReturnType<typeof setTimeout> | undefined;
-  // Once per frame (oncePerFrame): looking for tables rendered; what follows scrolling
+  // Once per frame (oncePerFrame): looking for tables rendered; what follows scrolling; the features' layout alone
   private readonly queueScan: () => void;
   private readonly queueStickyUpdate: () => void;
+  private readonly queueFeaturesLayout: () => void;
   // Set by stop(): work already scheduled then does nothing
   private stopped = false;
   // Rows are being rearranged: a cell editor losing its focus to that is not left
@@ -316,6 +317,9 @@ export class Controller implements TableHost {
       this.queueSettingsRefresh();
     });
     this.queueStickyUpdate = oncePerFrame(doc, () => this.followLayout());
+    this.queueFeaturesLayout = oncePerFrame(doc, () => {
+      if (!this.stopped) for (const feature of this.features) feature.layoutChanged?.();
+    });
   }
 
   setBridge(bridge: Bridge): void {
@@ -784,8 +788,9 @@ export class Controller implements TableHost {
 
   toolbarChanged(): void {
     this.toolbar.changed();
-    // The tables' tabs too, next frame: what the features say a table is (Out of date) changes with it
-    this.queueStickyUpdate();
+    // The tables' tabs too, next frame: what the features say a table is (Out of date) changes with it. Only the
+    // features' layout: following the hover again (followScroll) hid the toolbar of a table the sheet had just drawn anew
+    this.queueFeaturesLayout();
   }
 
   /**

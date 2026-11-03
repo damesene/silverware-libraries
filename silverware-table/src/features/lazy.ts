@@ -65,7 +65,9 @@ class LazyTable {
   ) {}
 
   /** The switch: on, cells edited are written later; off, what is held is written at once */
-  toolbarButtons(): ToolbarButton[] {
+  toolbarButtons(info: TableInfo): ToolbarButton[] {
+    // A table none of whose cells is edited by hand (a pivot's): nothing to hold
+    if (!this.on && this.host.readOnlyBody(parseTable(info.source))) return [];
     const unsaved = this.held?.edits.size ?? 0;
     return [
       {

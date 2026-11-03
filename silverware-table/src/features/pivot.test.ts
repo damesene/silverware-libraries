@@ -244,6 +244,19 @@ describe("Pivot tables", () => {
       expect(text).not.toContain("core.name='table1'");
     });
 
+    it("shows no Edit mode nor Lazy saving in its toolbar, its source both", async () => {
+      await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
+      const icons = (target: Element) => {
+        target.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+        return Array.from(document.querySelectorAll(".swt-bar button"), (b) => b.getAttribute("aria-label"));
+      };
+      const pivotIcons = icons(second(1, 0));
+      expect(pivotIcons).toContain("Refresh pivot");
+      expect(pivotIcons).not.toContain("Edit mode");
+      expect(pivotIcons).not.toContain("Lazy saving");
+      expect(icons(cell(1, 0))).toEqual(expect.arrayContaining(["Edit mode", "Lazy saving"]));
+    });
+
     it("offers no name for its body's cells and rows, nor pins", async () => {
       await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
       second(1, 1).dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2, clientX: 10, clientY: 10 }));

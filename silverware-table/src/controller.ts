@@ -1180,6 +1180,18 @@ export class Controller implements TableHost {
     return undefined;
   }
 
+  readOnlyBody(table: Table): string | undefined {
+    let reason: string | undefined;
+    for (let row = 1; row < table.rows.length; row++) {
+      for (let column = 0; column < table.align.length; column++) {
+        // (The first cell that may be changed ends it: a usual table asks one)
+        reason = this.readOnly(table, [{ row, column }]);
+        if (!reason) return undefined;
+      }
+    }
+    return reason;
+  }
+
   fixedShape(table: Table): string | undefined {
     for (const feature of this.features) {
       const reason = feature.fixedShape?.(table);

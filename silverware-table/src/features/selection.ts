@@ -215,7 +215,9 @@ export class Selection implements Feature {
   }
 
   /** Edit mode, a switch in the toolbar (left of its menu): a click edits a cell; off, a click selects it */
-  toolbarButtons(): ToolbarButton[] {
+  toolbarButtons(info: TableInfo): ToolbarButton[] {
+    // A table none of whose cells is edited by hand (a pivot's): no mode of editing them
+    if (this.host.readOnlyBody(parseTable(info.source))) return [];
     return [
       {
         label: "Edit mode",

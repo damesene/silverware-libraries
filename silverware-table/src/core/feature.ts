@@ -779,6 +779,8 @@ export interface ModelHost {
   readOnly(table: Table, cells: readonly CellRef[]): string | undefined;
   /** Why the table's rows and columns are not added, deleted or moved by hand (Feature.fixedShape); undefined: they may be */
   fixedShape(table: Table): string | undefined;
+  /** Why no cell of the table's body is changed by hand (a pivot's: none to edit, hold or switch editing for); undefined: some may be */
+  readOnlyBody(table: Table): string | undefined;
   /** A feature's copy of a cell for another cell (Feature.fillCell), or undefined: copied as its value */
   fillCell(info: TableInfo, cell: string, from: CellRef, to: CellRef): string | undefined;
   /** Keyboard and input events from a field of a feature must not reach SilverBullet's editor */

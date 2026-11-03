@@ -25,7 +25,7 @@ Not in scope: arbitrary address ranges (`B2:D9`) as a scope (they break on every
 - **Pins**: `host.pinsOf(table)` gives the pinned rows and columns.
 - **CSS layering** (style page): pinned cells and held rows paint `background` (a tint over the page color); column stripes paint `background-image` on body cells; a selected or edited cell is an inset `box-shadow` over the background; an invalid typed value is `color: var(--danger-color)`. So a fill set as `background-color` sits under the selection and over the stripes, as wanted.
 - **Custom definitions**: `defineTypes` / `defineSeries` in `index.ts`, the API page's priority-50 block, a domain's `registry.ts` and `custom.ts` (definitions checked, HELPERS, a mistake a notification, replaced as Space Lua loads again, `tablesChanged` telling modules). A test requires the built-in ones' syntax and description in the library page.
-- **Custom styles found at run time**: `themesInStyles` walks the style sheets for `data-swt-theme="…"` selectors. Not used here: formats are JS (see *Formats*).
+- **Custom styles found at run time**: `themesInStyles` walks the style sheets for `data-swt-theme="…"` selectors. Not used here: formats are JS (see *The API*).
 - **Filter syntax** (`filter.ts parseFilter`, pure): `>10`, `=a|b`, `/regex/flags`, `!…`, what a filter field accepts. One condition can take it whole, so a user writes a condition as they filter.
 - **Menus and dialogs**: `columnMenuEntries`, `cellMenuEntries`, `toolbarButtons` with `place: "menu"` (the ⋯ menu), `host.openDialog`, `host.previewTable` (a small table looking as the page's, used for the themes' previews).
 - **A module turned off is not loaded** (`FEATURE_NAMES`, `MODULE_CATEGORY`, `MODULE_LABELS`, `MODULE_DESCRIPTIONS` in bridge.ts): its rules stay in the tables, unused.
@@ -47,49 +47,121 @@ Nothing else in the core: no rule, scope, condition or format is its concept.
 
 Pure, as `columntypes/` and `autofill/` are; `index.ts` its API.
 
-- `rule.ts`: a rule: `{ scope, when?: { condition, params }, format: { name, params }, stop? }`; no `when`: every cell of the scope (a color scale over a column). `scope` is `table`, `column` (the rule is stored on its column) or `row` (a row's name). Reading and writing rules (`rulesOf`, `withRules`), lenient: a rule it cannot read is kept as written and reported, never dropped.
-- `condition.ts`: *which* cells. The shape, as `ColumnType`: `name`, `label`, `syntax`, `description`, `icon`, `params: ParamSpecs` (the column types' `ParamSpec` reused, extended where needed: a value compared, a date range), and one of
-  - `match(value, params, context) → boolean` (a cell alone: greater than, between, contains, empty, a regular expression), or
-  - `prepare(values, params) → (value) => boolean` (needs the scope's values: top N, above average, duplicates).
-  `context`: the cell's row values by column key, for a condition that reads its row.
-- `format.ts`: *how* they look; `style.ts`: a `Style` as data and how it becomes the core's `vars` (both in *Formats* below).
-- `registry.ts`, `custom.ts`, `builtin/conditions/` and `builtin/formats/` (one per file, a test requiring each in the library page's tables). Conditions: greater, less, between, equal, notEqual, contains, startsWith, matches (`/pattern/flags`), filter (the filter row's syntax whole), empty, notEmpty, duplicate, unique, top, bottom, aboveAverage, belowAverage, dateIn (today, yesterday, last 7 days, this month…), formula (`=[@due] < TODAY()`, through `rowValues`; only while the formulas module is on, else the rule is inactive and says so).
-- `evaluate.ts`: a table's looks from its rules: each scope's cells (body only, pinned rows and columns out), the condition (`prepare` over the scope's values), then the format over the cells that matched (its levels, or its `prepare` over their values; hidden rows included, so filtering does not reshuffle the colors), the rules in order, `stop` ending a cell's, styles combined (a later rule does not override a property an earlier rule set, as in Excel). Cached by the table's text and the rules (looks run on every view).
+- `rule.ts`: a rule: `{ scope, when?, format, stop? }`; no `when`: every cell of the scope (a color scale over a column). `scope` is `table`, `column` (the rule is stored on its column) or `row` (a row's name). Reading and writing rules (`rulesOf`, `withRules`), lenient: a rule it cannot read is kept as written and reported, never dropped.
+- `api.ts`: the public API, the one thing built-in and custom definitions use: the types (`FormatDefinition`, `ConditionDefinition`, `Cell`, `Context`, `Scope`, `Style`, `Helpers`) and `HELPERS` (see *The API* below).
+- `cell.ts`: a cell as definitions get it, and `scope.ts`: the statistics of a rule's cells, lazy (see *The API*).
+- `style.ts`: a `Style` checked, combined with others, and turned into the core's `vars`.
+- `registry.ts`, `custom.ts`, `builtin/conditions/` and `builtin/formats/` (one per file, a test requiring each in the library page's tables). Conditions: greater, less, between, equal, notEqual, contains, startsWith, matches (`/pattern/flags`), filter (the filter row's syntax whole), empty, notEmpty, duplicate, unique, top, bottom, aboveAverage, belowAverage, dateIn (today, yesterday, last 7 days, this month…), formula (`=[@due] < TODAY()`, through `rowValues`; only while the formulas module is on, else the rule is inactive and says so). Formats: Excel's highlights (light red fill with dark red text, yellow, green, red text, bold), own colors, color scales of 2 and 3 colors, a heat map of 10 levels, traffic light (3), data bar; icon sets in phase 3.
+- `evaluate.ts`: a table's looks from its rules (see *How a rule is evaluated*). Cached by the table's text and the rules (looks run on every view).
 
-### Formats (decided 2026-11-03: JS, not CSS)
+### The API (decided 2026-11-03)
 
-A format is a definition as a column type is: `name`, `label`, `description`, `icon`, `params: ParamSpecs` (with a new kind `color`, shown as a color picker), and one of three forms, from the simplest:
+One API for the built-in definitions and the user's: what a built-in format can do, a user's can, and a built-in one copied into the space works there unchanged.
+
+**A definition** is a function that gets `HELPERS` and gives the definition (a user's file gives a list of them, or a function giving the list, as `defineTypes` takes). A user's file cannot import from the plugin (its sources are bundled), so the helpers come only as that argument, for the built-in ones too:
+
+```ts
+// src/conditions/builtin/formats/colorscale.ts
+import type { FormatDefinition, Helpers } from "../../api.ts";   // types only: nothing of it is left in the bundle
+
+export default ({ palette, mix }: Helpers): FormatDefinition => ({
+  name: "colorScale",
+  label: "Color scale",
+  params: {
+    low: { kind: "color", default: palette.red.fill },
+    mid: { kind: "color" },                       // none: a scale of two colors
+    high: { kind: "color", default: palette.green.fill },
+  },
+  look: (cell, { scope, params }) => {
+    const t = scope.position(cell);               // 0 at the minimum, 1 at the maximum; undefined: no number
+    return t === undefined ? undefined : { fill: mix([params.low, params.mid, params.high], t) };
+  },
+});
+```
 
 ```js
-export default ({ palette, gradient, split, asNumber }) => [
-  // One look for every cell the condition picked
-  { name: "warning", label: "Warning", style: { fill: palette.yellow.fill, color: palette.yellow.text } },
-
-  // Levels: the cells graded by a distribution, a style each (3 for a traffic light, 10 for a heat map)
-  { name: "traffic", label: "Traffic light",
-    levels: { split: split.equalRanges(), styles: [palette.green, palette.yellow, palette.red].map((c) => ({ fill: c.fill })) } },
-  { name: "heat", label: "Heat map", params: { from: { kind: "color" }, to: { kind: "color" } },
-    levels: (params) => ({ split: split.quantiles(), styles: gradient(params.from, params.to, 10).map((fill) => ({ fill })) }) },
-
-  // Full control: a look from the cell's value (and, with prepare, from the values of every cell the rule applies to)
-  { name: "byPattern", label: "By pattern",
-    look: (value) => /^urgent/i.test(value) ? { color: palette.red.text, bold: true }
-      : /^done/i.test(value) ? { strike: true } : undefined },
-  { name: "bar", label: "Data bar",
-    prepare: (values) => { const max = Math.max(...values.map(asNumber)); return (value) => ({ bar: { share: asNumber(value) / max, color: palette.blue.fill } }); } },
+// Library/me/formats.js, a file of the space
+export default ({ palette, levels }) => [
+  // Colors by the user's own regular expressions
+  {
+    name: "status",
+    label: "Status colors",
+    look: (cell) =>
+      /^(done|hotovo)$/i.test(cell.text) ? { color: palette.green.text, strike: true }
+      : /^blocked/i.test(cell.text) ? { fill: palette.red.fill, bold: true }
+      : undefined,
+  },
+  // Five levels, own colors, fixed thresholds
+  {
+    name: "grade",
+    label: "School grades",
+    look: levels(["#1a9850", "#91cf60", "#fee08b", "#fc8d59", "#d73027"].map((fill) => ({ fill })), [1.5, 2.5, 3.5, 4.5]),
+  },
+  // A color of its own for light and dark
+  { name: "brand", label: "Brand", style: { fill: { light: "#e8f0ff", dark: "#1d2b4a" }, bold: true } },
 ];
 ```
 
-- **`Style`** (data, never CSS text): `fill`, `color`, `bold`, `italic`, `underline`, `strike`, `bar` (`{ share, color }`: a data bar under the content), and in phase 3 `icon`. A color is any CSS color (checked once, with `CSS.supports`, as the definition is given), `{ light, dark }` for the two looks, or a palette token.
-- **Helpers** (HELPERS, given to a definition that is a function, as the column types' are): `palette` (named colors, each with `fill` and `text`, theme-aware: they resolve to the style page's variables, so a user's format follows light and dark without saying so), `gradient(from, to, n)` and `gradient([a, b, c], n)` (colors between, as `color-mix(in oklab, …)`: no color parsing in JS), `split` (distributions: `equalRanges()` of min..max, `quantiles()` equal counts, `thresholds([10, 50])` fixed, `percent([33, 66])`, or a function of the values giving thresholds; as many levels as styles), `asNumber`, `asDate`, `matches(pattern)` (the filter row's reading of `/…/flags`).
-- **How it reaches the cell**: the module turns a `Style` into the core's `CellLook.vars` (`--swt-cf-fill`, `--swt-cf-fill-dark`, `--swt-cf-color`, `--swt-cf-weight`, `--swt-cf-bar`, …) and one mark, `cf`. A single CSS rule on the style page reads them; no CSS per format, so a format of any number of levels and any colors needs no stylesheet.
-- **Built-in formats** in this same form, one per file: Excel's highlights (light red fill with dark red text, yellow, green, red text, bold), own colors (`fill`, `color`, `bold` as params), color scales of 2 and 3 colors, a heat map of 10 levels, traffic light (3), data bar; icon sets in phase 3. Writing them through the public form is what proves that form sufficient.
-- A format whose `look` / `prepare` throws, or gives what is no `Style`: no look for that rule, logged once per rule, never breaking the table (as a custom type's `attempt`).
+```lua
+silverware.table.defineFormats(js.importFromSpace("Library/me/formats.js"))
+```
+
+What holds the built-in ones to it:
+- The registry calls each built-in definition with `HELPERS` and checks what it gives with the same code as a user's (`custom.ts`): the checks and their messages are exercised by the built-in ones too.
+- A test: files in `builtin/` import nothing but types from `api.ts` (`import type`).
+- A test: each built-in definition, its types stripped by esbuild, read through `custom.ts` as a user's file is, gives the same looks.
+
+**A format** has `name`, `label`, `description`, `icon`, `params` (the column types' `ParamSpec`, with two new kinds: `color`, shown as a color picker, and `boolean`, a switch), and one of:
+- `style`: one look for every cell (`style: X` is `look: () => X`), or a function of the params giving one;
+- `look(cell, ctx) → Style | undefined`: the look of one cell; `undefined` leaves the cell as it is.
+
+**A condition** has the same fields and `test(cell, ctx) → boolean`:
+
+```ts
+// builtin/conditions/greater.ts
+export default (): ConditionDefinition => ({
+  name: "greater",
+  label: "Greater than",
+  params: { value: { kind: "number" } },
+  test: (cell, { params }) => cell.number !== undefined && cell.number > params.value,
+});
+// duplicate: (cell, { scope }) => scope.count(cell) > 1;  top: (cell, { scope, params }) => (scope.rank(cell) ?? Infinity) <= params.count
+```
+
+**`cell`**: the cell's value as sorting sees it (a column type's value, a formula's result), read already: `{ text, number?, date?, column }`; `number` and `date` only where the text reads as one (`view.ts asNumber`, the formulas' dates).
+
+**`ctx`**:
+- `params`: the rule's parameters, typed by `params` (a color as a color, a number as a number);
+- `scope`: statistics of the cells the definition is applied to (a condition's: the rule's scope; a format's: the cells that passed the condition, all of the scope without one): `min`, `max`, `average`, `size`, `position(cell)` (0..1 from min to max), `share(cell)` (0..1 from min(0, min) to max: a data bar), `rank(cell)` (from the largest), `count(cell)` (how many cells have its value). Lazy: computed only when asked, once per table and rule, kept while the table's text is the same; so a definition never keeps a cache of its own;
+- `row`: the other cells of its row by column key (`row.due.date`), of the same shape as `cell`.
+
+**`Style`** (data, never CSS text): `fill`, `color`, `bold`, `italic`, `underline`, `strike`, `bar` (`{ share, color }`: a data bar under the content), and in phase 3 `icon`. Only what changes is given. A color is any CSS color (checked once, with `CSS.supports`, as the definition is given), `{ light, dark }` for the two looks, or a palette color.
+
+**`HELPERS`**:
+- `palette`: named colors, each with `fill` and `text`, theme-aware (they resolve to the style page's variables, so a format follows light and dark without saying so);
+- `mix(colors, t)`: the color at `t` (0..1) along two or more colors, as `color-mix(in oklab, …)` (no color parsing in JS); `gradient(colors, n)`: n colors along them;
+- `levels(styles, split)`: a `look` grading the cells into as many levels as styles, by `split`: `"equal"` (equal ranges between min and max), `"quantiles"` (equal counts), fixed thresholds (`[1.5, 2.5]`), `{ percent: [33, 67] }`, or a function of the scope giving thresholds; it reads the level from `scope`, so it is no form of its own;
+- `icons` (phase 3), `matches(pattern)` (the filter row's reading of `/…/flags`).
+
+### How a rule is evaluated
+
+For each rule, in the order of the dialog, on every view (from the cache while the table's text is the same):
+
+1. **Scope**: the cells of its scope (a column, the table, later a named row); the header and pinned rows and columns left out. Hidden rows count, so filtering does not reshuffle colors.
+2. **Condition**: where the rule has one, the cells its `test` is true for.
+3. **Scope of the format**: the statistics of the cells left (lazy).
+4. **Look**: `look` called for each of them; what it gives is the cell's look.
+
+Several rules on a cell combine: a property an earlier rule set is not overridden by a later one (as in Excel); `stop` on a rule ends the rules after it for the cells it formatted. A `test` or `look` that throws, or gives what is not a boolean or a `Style`: that rule formats no cell, logged once per rule, the table never broken (as a custom type's `attempt`).
+
+### How a style reaches the cell
+
+The module turns a `Style` into the core's `CellLook.vars` (`--swt-cf-fill`, `--swt-cf-fill-dark`, `--swt-cf-color`, `--swt-cf-weight`, `--swt-cf-bar`, …) and one mark, `cf`. A single CSS rule on the style page reads them; no CSS per format, so a format of any number of levels and any colors needs no stylesheet.
 
 ### The module: `features/conditions.ts`
 
 - `looks`: the domain's evaluation with values from the column types' offer; the mark `cf` and the `--swt-cf-*` vars of the styles.
-- Storage: a column's rules as a column attribute (`conditions.-c-<column>.rules`, so the core keeps them with their column, also while the module is off); the table's and named rows' rules as a table attribute (`conditions.rules`). JSON in apostrophes (`metaAttribute`), compact. A named row's rule whose row is gone stays inactive, shown so in the dialog.
+- Storage: a column's rules as a column attribute (`conditions.-c-<column>.rules`, so the core keeps them with their column, also while the module is off); the table's and named rows' rules as a table attribute (`conditions.rules`). JSON in apostrophes (`metaAttribute`), compact: a condition or format by its name, or `[name, params]` where it has params: `conditions.-c-score.rules='[{"when":["greater",{"value":100}],"format":"lightRed"},{"format":["colorScale",{"high":"green"}]}]'`. A named row's rule whose row is gone stays inactive, shown so in the dialog.
 - `tablesChanged`: custom conditions or formats defined anew: looks of tables with rules applied again.
 - Without the metadata setting: the menu entries are disabled with why, as naming is.
 
@@ -99,7 +171,7 @@ One rule for every format, `td.swt-cf`, under the theme engine's specificity (`:
 
 ### Custom conditions and formats
 
-`silverware.table.defineConditions(js.importFromSpace("…"))` and `silverware.table.defineFormats(js.importFromSpace("…"))`, the same API block and lifecycle as `defineTypes` (a list, or a function given HELPERS that returns one; checked; a mistake a notification; replaced as Space Lua loads again; a name of a built-in one replacing it in its place). A condition's `match` that throws marks no cell and is logged once per rule.
+`silverware.table.defineConditions(js.importFromSpace("…"))` and `silverware.table.defineFormats(js.importFromSpace("…"))`, the same API block and lifecycle as `defineTypes` (a list, or a function given HELPERS that returns one; checked by the same code as the built-in ones; a mistake a notification; replaced as Space Lua loads again; a name of a built-in one replacing it in its place). See *The API*.
 
 ### UX
 
@@ -116,8 +188,8 @@ One rule for every format, `td.swt-cf`, under the theme engine's specificity (`:
 
 ## Phases
 
-1. **Core and the simplest rules** (about 3 to 4 days): `CellLook.vars` with tests; the column types' offer; the domain with column and table scopes, the cell conditions (compare, between, equal, contains, matches, filter, empty), `Style` and its one CSS rule, the formats of one style (Excel's highlights) in the JS form; the module's looks and storage; quick rules in the column menu; CSS; library page; a ui-test (a rule added from the menu, a cell edited into and out of it, a sort keeping colors with values).
-2. **The dialog and the rest of the conditions** (about 4 to 5 days): Manage rules; conditions over the scope (duplicates, top / bottom, averages, dates); formula conditions; own colors (the `color` parameter kind); levels and distributions (`split`, `gradient`), color scales and the heat map; custom conditions and formats (`defineConditions`, `defineFormats`); the cell menu.
+1. **Core and the simplest rules** (about 3 to 4 days): `CellLook.vars` with tests; the column types' offer; the domain with column and table scopes, the cell conditions (compare, between, equal, contains, matches, filter, empty), `api.ts` with `HELPERS`, the lazy `scope`, `Style` and its one CSS rule, the formats of one style (Excel's highlights) as definitions of `HELPERS`, the tests holding the built-in ones to the API; the module's looks and storage; quick rules in the column menu; CSS; library page; a ui-test (a rule added from the menu, a cell edited into and out of it, a sort keeping colors with values).
+2. **The dialog and the rest of the conditions** (about 4 to 5 days): Manage rules; conditions over the scope (duplicates, top / bottom, averages, dates); formula conditions; own colors (the `color` parameter kind); `levels`, `mix` and `gradient`, color scales and the heat map; custom conditions and formats (`defineConditions`, `defineFormats`); the cell menu.
 3. **Bars, icons and export** (about 3 days): data bars, icon sets (`CellLook.icon`, `Style.icon`), Excel's conditional formatting (what maps to Excel's: highlights, 2 and 3 color scales, data bars; a format with `look` written as values only, listed).
 4. **Named rows as a scope** (later, about 1 to 2 days): the scope `row` in the dialog and the quick rules of a row's grip menu. Nothing before it may need changing for it: the rule's `scope` has `row` from phase 1 (read, kept, inactive until this phase), table and row rules share the table attribute, and the evaluation takes a scope as a set of cells, not as a column.
 
@@ -137,7 +209,8 @@ Estimates are rough, from the parts above, not from a prototype.
 2. **A table's rules are seen from its toolbar**, not from headers: the ⋯ menu always has *Conditional formatting…*, a table with rules gets an active icon in the toolbar too (see *UX*).
 3. **Named rows come later** (phase 4), but the design counts on them from phase 1 (see *Phases*).
 4. **No `!important`** in the module's CSS; a theme that uses it wins (see *Risks*).
-5. **Formats are JS, not CSS**: defined as column types are, with helpers for palettes, gradients and distributions; any number of levels; regular expressions as a condition and inside a format's `look` (see *Formats*).
+5. **Formats are JS, not CSS**: defined as column types are, with helpers for palettes, gradients and distributions; any number of levels; regular expressions as a condition and inside a format's `look` (see *The API*).
+6. **One API for built-in and custom definitions**: a definition is a function of `HELPERS`, the built-in ones importing only types; a format is `style` or `look(cell, ctx)`, levels a helper giving a `look`; a condition `test(cell, ctx)`; `ctx.scope` the lazy statistics (see *The API*).
 
 ## Open questions
 

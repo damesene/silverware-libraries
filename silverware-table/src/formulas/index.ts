@@ -33,7 +33,11 @@ export type FormulasOffer = {
 };
 
 /** What the pageLinks module offers: the other pages these formulas and tables refer to (and theirs, in turn) read anew; which they are */
-export type PageLinksOffer = { readonly readFor: (formulas: readonly string[], tables: readonly import("../markdown.ts").Table[]) => Promise<readonly string[]> };
+export type PageLinksOffer = {
+  readonly readFor: (formulas: readonly string[], tables: readonly import("../markdown.ts").Table[]) => Promise<readonly string[]>;
+  // Pages read for another module (a pivot's source), as `otherPages` then gives them; `fresh`: read again those read before
+  readonly readPages: (pages: readonly string[], fresh: boolean) => Promise<void>;
+};
 export { type Area, areaText, callsCustomFunctions, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredTableNames, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";
 export { type Calculation, evaluateFormula, formulaErrors, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows } from "./evaluate.ts";

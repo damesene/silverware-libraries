@@ -6,6 +6,15 @@ tags: meta
 The look of [Silverware Table](silverware-table.md): its controls, menus and dialogs, and the built-in themes. It is installed with the library; your own themes go in a `space-style` block of your own (see *Themes* on the library's page).
 
 ```space-style
+/* The table's first line of markdown, emptied, that SilverBullet's editor keeps
+   right under the table's widget (its other lines hidden so): it looked like an
+   empty line under the table, and a press there showed the table's markdown.
+   Every table's, not only one enhanced: hidden as the widget is put in,
+   CodeMirror measures it so; hidden later, it kept its height for a while and
+   presses under the table landed a line off */
+.sb-table-widget + .cm-line {
+  display: none;
+}
 .sb-table-widget.swt-table td {
   cursor: text;
 }

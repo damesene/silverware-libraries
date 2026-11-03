@@ -37,6 +37,12 @@ describe("a pivot's fields", () => {
     expect(definitionOf(fieldsOf(definition({ rows: "region", values: "SUM([revenue])", where: nested }))).where).toBe(nested);
   });
 
+  it("make a condition of a regular expression (REGEXTEST) and read it back", () => {
+    const fields = fieldsOf(definition({ rows: "region", values: "SUM([revenue])", where: 'AND(REGEXTEST([@code], "^EU-\\d+"), [@qty] > 1)' }));
+    expect(fields.conditions[0]).toEqual({ column: "code", op: "matches", value: "^EU-\\d+" });
+    expect(definitionOf(fields).where).toBe('AND(REGEXTEST([@code], "^EU-\\d+"), [@qty] > 1)');
+  });
+
   it("leave a formula emptied out of their definition", () => {
     const fields = fieldsOf(definition({ rows: "region, x", values: "SUM([revenue])" }));
     const made = definitionOf({ ...fields, rows: [fields.rows[0]!, { formula: " " }], values: [{ formula: "" }] });

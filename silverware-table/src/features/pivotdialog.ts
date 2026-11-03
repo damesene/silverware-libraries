@@ -20,6 +20,7 @@ import {
   GROUPINGS,
   type Grouping,
   groupText,
+  OPERATOR_LABELS,
   OPERATORS,
   type Operator,
   type ValueField,
@@ -122,7 +123,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
   };
   // A condition: a column, an operator, a value typed
   const conditionRow = (condition: Condition, i: number) => {
-    const value = e("input", { attrs: { type: "text", placeholder: "value", "aria-label": `Condition ${i + 1} value`, "data-focus": `condition ${i} value` } });
+    const value = e("input", { attrs: { type: "text", placeholder: condition.op === "matches" ? "a pattern: ^EU-\\d+" : "value", "aria-label": `Condition ${i + 1} value`, "data-focus": `condition ${i} value` } });
     value.value = condition.value;
     value.addEventListener("input", () => {
       fields = { ...fields, conditions: replaced(fields.conditions, i, { ...condition, value: value.value }) };
@@ -133,7 +134,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
       "div",
       "swt-pivot-row",
       columnSelect(condition.column, (column) => set({ conditions: replaced(fields.conditions, i, { ...condition, column }) }), `Condition ${i + 1} column`),
-      select(OPERATORS, (o) => o, condition.op, (op: Operator) => set({ conditions: replaced(fields.conditions, i, { ...condition, op }) }), `Condition ${i + 1} operator`),
+      select(OPERATORS, (o) => OPERATOR_LABELS[o], condition.op, (op: Operator) => set({ conditions: replaced(fields.conditions, i, { ...condition, op }) }), `Condition ${i + 1} operator`),
       value,
       remove(() => set({ conditions: fields.conditions.filter((_, j) => j !== i) })),
     );

@@ -14,8 +14,9 @@ export const FUNCTIONS = ["SUM", "AVERAGE", "COUNTA", "MIN", "MAX"] as const;
 export type Fn = (typeof FUNCTIONS)[number];
 export const FUNCTION_LABELS: Readonly<Record<Fn, string>> = { SUM: "Sum", AVERAGE: "Average", COUNTA: "Count", MIN: "Min", MAX: "Max" };
 
-export const OPERATORS = ["=", "<>", ">", ">=", "<", "<="] as const;
+export const OPERATORS = ["=", "<>", ">", ">=", "<", "<=", "matches"] as const;
 export type Operator = (typeof OPERATORS)[number];
+export const OPERATOR_LABELS: Readonly<Record<Operator, string>> = { "=": "=", "<>": "≠", ">": ">", ">=": "≥", "<": "<", "<=": "≤", matches: "matches (regex)" };
 
 export type GroupField = { readonly column: string; readonly grouping: Grouping } | { readonly formula: string };
 export type ValueField = { readonly fn: Fn; readonly column: string } | { readonly formula: string };
@@ -84,14 +85,18 @@ export function readValue(text: string): ValueField {
   return m ? { fn: m[1]!.toUpperCase() as Fn, column: m[2]! } : { formula: text.trim() };
 }
 
-/** A condition's formula: its value a number as it is, else a text in quotes */
+/** A condition's formula: its value a number as it is, else a text in quotes; `matches` a regular expression (REGEXTEST) */
 export function conditionText(condition: Condition): string {
   const value = condition.value.trim();
-  const literal = /^-?\d+(\.\d+)?$/.test(value) ? value : `"${value.replace(/"/g, '""')}"`;
+  const quoted = `"${value.replace(/"/g, '""')}"`;
+  if (condition.op === "matches") return `REGEXTEST(${cellOf(condition.column)}, ${quoted})`;
+  const literal = /^-?\d+(\.\d+)?$/.test(value) ? value : quoted;
   return `${cellOf(condition.column)} ${condition.op} ${literal}`;
 }
 
 function readCondition(text: string): Condition | undefined {
+  const regex = /^REGEXTEST\(\s*\[@([^\]]+)\]\s*,\s*"((?:[^"]|"")*)"\s*\)$/i.exec(text.trim());
+  if (regex) return { column: regex[1]!, op: "matches", value: regex[2]!.replace(/""/g, '"') };
   const m = /^\[@([^\]]+)\]\s*(<>|>=|<=|=|>|<)\s*(.+)$/.exec(text.trim());
   if (!m) return undefined;
   const raw = m[3]!.trim();

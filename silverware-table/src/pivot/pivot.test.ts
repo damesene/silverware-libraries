@@ -126,6 +126,14 @@ describe("a pivot calculated", () => {
     expect(body[0]).toEqual(["a", "4", "2"]);
   });
 
+  it("counts the rows a regular expression matches (REGEXTEST)", () => {
+    expect(table({ rows: "product", values: "SUM([qty])", where: 'REGEXTEST([@product], "^(laptop|mouse)$", 1)', totals: "none" })).toEqual([
+      ["Product", "Sum of Qty"],
+      ["Laptop", "7"],
+      ["Mouse", "23"],
+    ]);
+  });
+
   it("keeps a type's hashtag apart from the value's name, wherever the source's header had it", () => {
     const rated = parseTable("| Item | #stars Rating |\n|---|---|\n| a | 4 |\n| a | 2 |");
     expect(pivotOf(rated, definition({ rows: "item", values: "AVERAGE([rating])" }), { cells: CELLS }).columns.map((c) => c.header)).toEqual(["Item", "Average of Rating #stars"]);

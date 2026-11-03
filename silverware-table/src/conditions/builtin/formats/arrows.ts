@@ -9,4 +9,5 @@ export default ({ palette, icons, levels }: Helpers): FormatDefinition => ({
     { icon: icons.right, iconColor: palette.yellow },
     { icon: icons.up, iconColor: palette.green },
   ]),
+  excel: () => ({ kind: "iconSet", set: "3Arrows" }),
 });

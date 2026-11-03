@@ -11,4 +11,5 @@ export default ({ palette, gradient, levels }: Helpers): FormatDefinition<{ coun
     split: { kind: "choice", label: "Split", values: ["quantiles", "equal"], labels: ["As many cells in each", "Equal ranges of the numbers"], default: "quantiles" },
   },
   look: (cell, context) => levels(gradient([context.params.low, context.params.high], context.params.count).map((fill) => ({ fill })), context.params.split)(cell, context),
+  excel: () => "levels have no Excel form",
 });

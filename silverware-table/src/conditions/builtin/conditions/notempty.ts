@@ -5,4 +5,5 @@ export default (): ConditionDefinition => ({
   label: "Not empty",
   description: "Cells that are not empty",
   test: (cell) => cell.text.trim() !== "",
+  excel: (_, at) => ({ type: "notContainsBlanks", formulas: [`LEN(TRIM(${at}))>0`] }),
 });

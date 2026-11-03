@@ -10,4 +10,5 @@ export default (): ConditionDefinition<{ formula: string }> => ({
     const value = formula(params.formula);
     return value === true || (typeof value === "number" && value !== 0) || (typeof value === "string" && value.toUpperCase() === "TRUE");
   },
+  excel: () => "a formula condition reads columns by name, which Excel's conditional formatting cannot",
 });

@@ -1,7 +1,7 @@
 // Conditional formatting's domain, its API for the rest of Silverware Table:
 // rules (rule.ts), the definitions there are (registry.ts, custom.ts), their
 // evaluation (evaluate.ts), styles as the core's looks (style.ts). Pure.
-export type { Cell, Color, ConditionDefinition, Context, FormatDefinition, ParamSpec, ParamSpecs, Params, Scope, Style } from "./api.ts";
+export type { Cell, Color, ConditionDefinition, Context, ExcelLook, ExcelPoint, ExcelTest, FormatDefinition, ParamSpec, ParamSpecs, Params, Scope, Style } from "./api.ts";
 export { evaluateRules, type Evaluated, type Placed, type RowFormula, type RuleCells } from "./evaluate.ts";
 export { cssColor, HELPERS, isPaletteName, PALETTE_NAMES, type PaletteName } from "./helpers.ts";
 export { readParams, storedParams } from "./params.ts";

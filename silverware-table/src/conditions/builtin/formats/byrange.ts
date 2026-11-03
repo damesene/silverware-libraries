@@ -21,4 +21,11 @@ export default ({ palette }: Helpers): FormatDefinition<{ rows: readonly { from?
     if (n === undefined) return undefined;
     return params.rows.find((row) => (row.from === undefined || n >= row.from) && (row.to === undefined || n < row.to))?.style;
   },
+  excel: (params, at) => ({
+    kind: "rules",
+    rules: params.rows.map((row) => ({
+      test: { type: "expression", formulas: [`AND(ISNUMBER(${at})${row.from !== undefined ? `,${at}>=${row.from}` : ""}${row.to !== undefined ? `,${at}<${row.to}` : ""})`] },
+      style: row.style,
+    })),
+  }),
 });

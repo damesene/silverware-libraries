@@ -1,4 +1,4 @@
-import type { Color, FormatDefinition, Helpers, Params, Scope } from "../../api.ts";
+import type { Color, ExcelPoint, FormatDefinition, Helpers, Params, Scope } from "../../api.ts";
 
 // What a point of the scale is: the smallest or largest value, a number, a percent of the range, a percentile; the midpoint none
 type Point = "min" | "max" | "none" | "number" | "percent" | "percentile";
@@ -70,4 +70,14 @@ export default ({ palette, mix }: Helpers): FormatDefinition<ScaleParams> => ({
     if (mid === undefined || mid <= low || mid >= high) return { fill: mix([params.minColor, params.maxColor], along(low, high)) };
     return n <= mid ? { fill: mix([params.minColor, params.midColor], along(low, mid)) } : { fill: mix([params.midColor, params.maxColor], along(mid, high)) };
   },
+  excel: (params) => ({
+    kind: "colorScale",
+    points: (["min", "mid", "max"] as const).flatMap((point): ExcelPoint[] => {
+      const type = params[`${point}Type`];
+      const color = params[`${point}Color`];
+      if (type === "none") return [];
+      if (type === "min" || type === "max") return [{ type, color }];
+      return [{ type: type === "number" ? "num" : type, value: params[`${point}Value`], color }];
+    }),
+  }),
 });

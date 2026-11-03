@@ -95,9 +95,17 @@ function levels(styles: readonly Style[], split: Split = "equal"): (cell: Cell, 
 }
 
 /** A test of text in the filter row's syntax: plain words found anywhere (case and diacritics ignored), /regex/flags, =a|b, >10, !… */
+// Patterns read once each: a look calls matches for every cell (By keywords: every row of it), a filter's reading is not free
+const MATCHERS = new Map<string, (text: string) => boolean>();
+const MATCHERS_KEPT = 500;
 function matches(pattern: string): (text: string) => boolean {
-  const match = filterMatcher(pattern);
-  return match ?? (() => false);
+  let match = MATCHERS.get(pattern);
+  if (!match) {
+    match = filterMatcher(pattern) ?? (() => false);
+    if (MATCHERS.size >= MATCHERS_KEPT) MATCHERS.clear();
+    MATCHERS.set(pattern, match);
+  }
+  return match;
 }
 
 /** Text as compared ignoring case and diacritics (Český is cesky), trimmed */
@@ -108,6 +116,16 @@ function normalize(text: string): string {
 /** Today, as a cell's `date` is: milliseconds of its midnight on a clock without time zone */
 function today(): number {
   return now(false).ms;
+}
+
+/** A text as a string of Excel's formulas: in quotes, its quotes doubled */
+function excelText(text: unknown): string {
+  return `"${String(text ?? "").replace(/"/g, '""')}"`;
+}
+
+/** Whether a filter's pattern is plain words (found anywhere), as Excel's "contains" can have it */
+function plainPattern(pattern: unknown): boolean {
+  return typeof pattern === "string" && pattern.trim() !== "" && !/^[=!<>/]|\|/.test(pattern.trim());
 }
 
 /** A day's length in milliseconds, for dates' arithmetic */
@@ -131,4 +149,4 @@ const icons = {
   exclamation: "!",
 } as const;
 
-export const HELPERS = { palette, mix, gradient, levels, matches, normalize, today, DAY, icons } as const;
+export const HELPERS = { palette, mix, gradient, levels, matches, normalize, today, DAY, icons, excelText, plainPattern } as const;

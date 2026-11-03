@@ -5,4 +5,5 @@ export default ({ palette, levels }: Helpers): FormatDefinition => ({
   label: "Traffic light",
   description: "The numbers in three equal ranges: red, yellow, green from the smallest",
   look: levels([{ fill: palette.red }, { fill: palette.yellow }, { fill: palette.green }]),
+  excel: () => "levels have no Excel form",
 });

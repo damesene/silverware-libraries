@@ -113,6 +113,25 @@ export type ParamSpecs = Readonly<Record<string, ParamSpec>>;
 /** The parameters a definition gets, by key, read as their specs say */
 export type Params = Readonly<Record<string, any>>;
 
+/**
+ * How Excel writes a condition (its .xlsx file's cfRule): its type, attributes and formulas, in Excel's
+ * English, relative to the first cell of the rule's range (`at`, B2)
+ */
+export type ExcelTest = { readonly type: string; readonly attrs?: Readonly<Record<string, string>>; readonly formulas?: readonly string[] };
+
+/** A point of a color scale in Excel: the smallest or largest value, a number, a percent of the range, a percentile */
+export type ExcelPoint = { readonly type: "min" | "max" | "num" | "percent" | "percentile"; readonly value?: number; readonly color: Color };
+
+/**
+ * How Excel shows a format that has a look of its own (one with a `style` needs none: its style is the cell
+ * format): tests of its own each with a style (keywords, ranges), a color scale, a data bar, an icon set
+ */
+export type ExcelLook =
+  | { readonly kind: "rules"; readonly rules: readonly { readonly test: ExcelTest; readonly style: Style }[] }
+  | { readonly kind: "colorScale"; readonly points: readonly ExcelPoint[] }
+  | { readonly kind: "dataBar"; readonly color: Color }
+  | { readonly kind: "iconSet"; readonly set: string };
+
 /** What a condition and a format have in common */
 type Definition = {
   // Letters, digits and _, starting with a letter: how rules store it
@@ -125,6 +144,8 @@ type Definition = {
 /** Which cells a rule formats */
 export type ConditionDefinition<P = Params> = Definition & {
   test(cell: Cell, context: Context<P>): boolean;
+  /** Its form in an Excel file, or why it has none (none given: not written) */
+  excel?(params: P, at: string): ExcelTest | string;
 };
 
 /**
@@ -133,8 +154,13 @@ export type ConditionDefinition<P = Params> = Definition & {
  */
 export type FormatDefinition<P = Params> = Definition &
   (
-    | { readonly style: Style | ((params: P) => Style); readonly look?: undefined }
-    | { readonly look: (cell: Cell, context: Context<P>) => Style | undefined; readonly style?: undefined }
+    | { readonly style: Style | ((params: P) => Style); readonly look?: undefined; readonly excel?: undefined }
+    | {
+        readonly look: (cell: Cell, context: Context<P>) => Style | undefined;
+        readonly style?: undefined;
+        /** Its form in an Excel file, or why it has none (none given: not written) */
+        readonly excel?: (params: P, at: string) => ExcelLook | string;
+      }
   );
 
 /** The helpers every definition gets (HELPERS in helpers.ts) */

@@ -6,4 +6,5 @@ export default (): ConditionDefinition<{ value: number }> => ({
   description: "Cells whose number is less than a value",
   params: { value: { kind: "number", label: "Value", default: 0 } },
   test: (cell, { params }) => cell.number !== undefined && cell.number < params.value,
+  excel: (params) => ({ type: "cellIs", attrs: { operator: "lessThan" }, formulas: [String(params.value)] }),
 });

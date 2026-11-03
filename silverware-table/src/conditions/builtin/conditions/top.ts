@@ -10,4 +10,5 @@ export default (): ConditionDefinition<{ count: number; percent: boolean }> => (
     const limit = params.percent ? Math.max(1, Math.floor((scope.numbers.length * params.count) / 100)) : params.count;
     return rank !== undefined && rank <= limit;
   },
+  excel: (params) => ({ type: "top10", attrs: { rank: String(params.count), ...(params.percent ? { percent: "1" } : {}) } }),
 });

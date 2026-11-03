@@ -9,4 +9,5 @@ export default ({ palette }: Helpers): FormatDefinition<{ color: Color }> => ({
     const share = scope.share(cell);
     return share === undefined ? undefined : { bar: { share, color: params.color } };
   },
+  excel: (params) => ({ kind: "dataBar", color: params.color }),
 });

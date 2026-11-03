@@ -33,8 +33,7 @@ import {
   type StoredRule,
   styleLook,
 } from "../conditions/index.ts";
-import { type FormulasOffer, isErrorText, scalarText } from "../formulas/index.ts";
-import { isError } from "../formulas/values.ts";
+import { FormulaError, type FormulasOffer, isErrorText, type Scalar, scalarText } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import { parseTable, type Table, unescapeCell } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
@@ -218,7 +217,7 @@ export class Conditions implements Feature {
   /** A formula of one row for a row of the table, through the formulas module (off: none) */
   private rowFormula(table: Table): (row: number, formula: string) => string | number | boolean | undefined {
     const formulas = this.host.offered<FormulasOffer>("formulas");
-    const values = new Map<string, readonly unknown[]>();
+    const values = new Map<string, readonly Scalar[]>();
     return (row, formula) => {
       if (!formulas) return undefined;
       let list = values.get(formula);
@@ -226,8 +225,8 @@ export class Conditions implements Feature {
         list = formulas.rowValues(table, formula);
         values.set(formula, list);
       }
-      const value = list[row - 1] as Parameters<typeof scalarText>[0] | undefined;
-      if (value === undefined || value === null || isError(value)) return undefined;
+      const value = list[row - 1];
+      if (value === undefined || value === null || value instanceof FormulaError) return undefined;
       if (typeof value === "boolean" || typeof value === "number") return value;
       const text = scalarText(value);
       return isErrorText(text) ? undefined : text;

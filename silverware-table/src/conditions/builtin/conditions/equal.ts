@@ -1,6 +1,6 @@
 import type { ConditionDefinition, Helpers } from "../../api.ts";
 
-export default ({ normalize }: Helpers): ConditionDefinition<{ value: string }> => ({
+export default ({ normalize, excelText }: Helpers): ConditionDefinition<{ value: string }> => ({
   name: "equal",
   label: "Equal to",
   description: "Cells that are a value: as numbers where both are, else as text, case ignored",
@@ -9,5 +9,9 @@ export default ({ normalize }: Helpers): ConditionDefinition<{ value: string }> 
     const n = params.value.trim() === "" ? NaN : Number(params.value.replace(",", "."));
     if (cell.number !== undefined && Number.isFinite(n)) return cell.number === n;
     return normalize(cell.text) === normalize(params.value) || normalize(cell.value) === normalize(params.value);
+  },
+  excel: (params) => {
+    const n = params.value.trim() === "" ? NaN : Number(params.value.replace(",", "."));
+    return { type: "cellIs", attrs: { operator: "equal" }, formulas: [Number.isFinite(n) ? String(n) : excelText(params.value)] };
   },
 });

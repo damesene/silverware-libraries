@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { allConditions, allFormats, clearCustomDefinitions, defineCustomFormats, type Rule } from "../conditions/index.ts";
-import { CONDITIONS_IN_EXCEL, excelColor, excelConditional, FORMATS_IN_EXCEL, PALETTE_HEX, type RuleRange } from "./conditions.ts";
+import { allConditions, allFormats, checkedFormats, clearCustomDefinitions, defineCustomFormats, type Rule } from "../conditions/index.ts";
+import { excelColor, excelConditional, PALETTE_HEX, type RuleRange } from "./conditions.ts";
 import { xlsxParts } from "./xlsx.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -22,9 +22,26 @@ const range = (format: string | [string, Record<string, unknown>], when?: string
 afterEach(() => clearCustomDefinitions());
 
 describe("Conditional formatting in Excel", () => {
-  it("has a decision for every built-in condition and format", () => {
-    for (const c of allConditions()) expect(CONDITIONS_IN_EXCEL, c.name).toHaveProperty(c.name);
-    for (const f of allFormats()) expect(FORMATS_IN_EXCEL, f.name).toHaveProperty(f.name);
+  it("has a decision for every built-in condition and format of a look: its Excel form, or why it has none", () => {
+    for (const c of allConditions()) expect(typeof c.excel, c.name).toBe("function");
+    for (const f of allFormats()) if (f.look) expect(typeof f.excel, f.name).toBe("function");
+  });
+
+  it("writes your own format by its own Excel form, as a built-in one's", () => {
+    defineCustomFormats(
+      checkedFormats([
+        {
+          name: "hot",
+          label: "Hot",
+          look: () => ({ fill: "red" }),
+          excel: (_: unknown, at: string) => ({ kind: "rules", rules: [{ test: { type: "expression", formulas: [`${at}>100`] }, style: { fill: "#ff0000" } }] }),
+        },
+        { name: "plain", label: "Plain", look: () => undefined },
+      ]).list,
+    );
+    const { conditional, skipped } = excelConditional([range("hot"), range("plain")]);
+    expect(conditional.xml).toBe('<conditionalFormatting sqref="B2:B5"><cfRule type="expression" dxfId="0" priority="1" stopIfTrue="1"><formula>B2&gt;100</formula></cfRule></conditionalFormatting>');
+    expect(skipped).toEqual([{ rule: "All cells → Plain", reason: "Plain has no Excel form" }]);
   });
 
   it("knows the palette's light colors as the style page has them", () => {
@@ -75,7 +92,7 @@ describe("Conditional formatting in Excel", () => {
     expect(conditional.xml).toContain('<colorScale><cfvo type="num" val="10"/><cfvo type="percent" val="90"/><color rgb="FF000000"/><color rgb="FFFFFFFF"/></colorScale>');
   });
 
-  it("lists what Excel cannot have, with why: a regular expression, levels, a formula, your own", () => {
+  it("lists what Excel cannot have, with why: a regular expression, levels, a formula, a look over a condition's cells; your own style is written", () => {
     defineCustomFormats([{ name: "mine", label: "Mine", style: { bold: true } }]);
     const { conditional, skipped } = excelConditional([
       range("redFill", ["matches", { pattern: "/^a/" }]),
@@ -84,13 +101,12 @@ describe("Conditional formatting in Excel", () => {
       range("mine"),
       range("colorScale", "duplicate"),
     ]);
-    expect(conditional.xml).toBe("");
+    expect(conditional.xml).toBe('<conditionalFormatting sqref="B2:B5"><cfRule type="expression" dxfId="0" priority="1"><formula>TRUE</formula></cfRule></conditionalFormatting>');
     expect(skipped.map((s) => s.reason)).toEqual([
       "a pattern of a filter's syntax (a regular expression, =a|b, >10, !…) has no Excel form",
       "levels have no Excel form",
       "a formula condition reads columns by name, which Excel's conditional formatting cannot",
-      "a format of your own has no Excel form",
-      "a scale, a bar or icons over the cells a condition picks has no Excel form",
+      "a look of its own (a scale, a bar, icons, keywords, ranges) over the cells a condition picks has no Excel form",
     ]);
   });
 

@@ -305,7 +305,7 @@ export class Pivot implements Feature {
     }
     const problem = typeof state === "string" ? state : undefined;
     return [
-      { label: "Pivot settings…", place: "menu", icon: ICONS.pivot, title: "What the pivot shows", run: () => this.settings(info) },
+      { label: "Pivot settings…", place: "icon", icon: ICONS.pivot, title: "What the pivot shows", run: () => this.settings(info) },
       {
         label: "Refresh pivot",
         place: "icon",

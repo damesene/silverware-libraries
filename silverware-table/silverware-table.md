@@ -659,7 +659,7 @@ Then `| Outside #temp |` and `| Oven #temp-f |` show their cells so, the *Type* 
 
 ## Pivot tables
 
-A pivot table summarizes another table: its rows grouped by a column, a value for each group, totals. **Insert pivot table…** in a table's ⋯ menu opens a dialog: pick what groups the rows (a column, a date by year, quarter or month), what makes columns, the values (sum, average, count, min, max of a column), which rows count and the order, and the pivot they make shows under the fields as you change them; *Insert* writes it under the table (a table without a name gets one: a pivot names its source). A pivot's **Pivot settings…** opens the same dialog to change it. A field the dialog has no choice for can be written as a formula (its **fx**).
+A pivot table summarizes another table: its rows grouped by a column, a value for each group, totals. **Insert pivot table…** in a table's ⋯ menu opens a dialog: pick what groups the rows (a column, a date by year, quarter or month), what makes columns, the values (sum, average, count, min, max of a column), which rows count and the order, and the pivot they make shows under the fields as you change them; *Insert* writes it under the table (a table without a name gets one: a pivot names its source). The **Pivot settings…** icon in a pivot's toolbar opens the same dialog to change it. A field the dialog has no choice for can be written as a formula (its **fx**).
 
 It is a plain markdown table, its numbers written in it (it shows anywhere, as any table), and its definition is in its metadata row, in the language of formulas:
 

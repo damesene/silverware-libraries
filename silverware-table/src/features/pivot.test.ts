@@ -27,6 +27,11 @@ describe("Pivot tables", () => {
   };
   const pivotOf = (page: string) => page.slice(page.indexOf("| Region | Sum"));
   const second = (row: number, column: number) => editor.querySelectorAll("table")[1]!.rows[row]!.cells[column]!;
+  // Pivot settings…, an icon of the pivot's toolbar
+  const pivotSettings = () => {
+    second(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+    document.querySelector<HTMLElement>('.swt-bar button[aria-label="Pivot settings…"]')!.click();
+  };
 
   it("calculates a pivot of its source anew with each edit of it, in the same edit", async () => {
     await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.editor.enterKey": "save" });
@@ -160,7 +165,7 @@ describe("Pivot tables", () => {
 
     it("shows a pivot's definition, saved into it with its values calculated anew", async () => {
       await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
-      tableMenuItem(/^Pivot settings…$/, 1)!.click();
+      pivotSettings();
       expect((dialog().querySelector<HTMLSelectElement>('select[aria-label="Value 1 function"]')!).value).toBe("SUM");
       pick("Value 1 function", "MAX");
       dialog().querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
@@ -180,7 +185,7 @@ describe("Pivot tables", () => {
 
     it("keeps every key of a group's formula typed in its dialog", async () => {
       await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
-      tableMenuItem(/^Pivot settings…$/, 1)!.click();
+      pivotSettings();
       dialog().querySelector<HTMLButtonElement>(".swt-pivot-formula")!.click();
       const field = dialog().querySelector<HTMLInputElement>('input[aria-label="Row 1 formula"]')!;
       for (const typed of ["L", "LO", "LOWER([@region])"]) {
@@ -196,7 +201,7 @@ describe("Pivot tables", () => {
 
     it("opens its settings where its definition has a problem, to fix it", async () => {
       await setup(`${ORDERS}\n\n${PIVOT("| East | 1 |").replace("pivot.values='SUM([revenue])'", "pivot.values=''")}\n`, { "silverware.table.metadata": true });
-      tableMenuItem(/^Pivot settings…$/, 1)!.click();
+      pivotSettings();
       expect(dialog()).not.toBeNull();
     });
 

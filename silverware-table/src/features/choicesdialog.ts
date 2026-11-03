@@ -5,6 +5,7 @@
 // list, the list renamed in their headers, all in one write; a value deleted
 // leaves its cells, marked as not of the list. In the core's dialog
 // (ModelHost.openDialog).
+import { reorder } from "../../../shared/drag.ts";
 import { el } from "../../../shared/elements.ts";
 import { choiceListOf, columnTypeOf, distinctValues, isChoice, LIST_NAME_RE, listKey, listNameFor, listNames, readChoiceList, withColumnType, writeChoiceList } from "../columntypes/index.ts";
 import type { Dialog, ModelHost, TableInfo } from "../core/feature.ts";
@@ -61,20 +62,48 @@ export class ChoicesDialog {
     const addRow = (value: string, original: string | undefined, after?: ValueRow): ValueRow => {
       const field = el(doc, "input", { class: "swt-choices-value", attrs: { spellcheck: "false", "aria-label": "Value" } });
       field.value = value;
-      const element = el(doc, "div", "swt-choices-row", field);
+      // Dragged by its grip, left of its field (the field stays a field to type in)
+      const grip = el(doc, "button", { class: "swt-choices-icon swt-choices-grip", html: ICONS.grip, title: "Move (drag, or Alt+↑ ↓)" });
+      const element = el(doc, "div", "swt-choices-row", grip, field);
       const row: ValueRow = { original, field, element };
-      const move = (by: number) => {
+      const move = (by: number, focus: HTMLElement) => {
         const i = rows.indexOf(row);
         const j = i + by;
         if (j < 0 || j >= rows.length) return;
         rows.splice(i, 1);
         rows.splice(j, 0, row);
         values.replaceChildren(...rows.map((r) => r.element));
-        field.focus();
+        focus.focus();
       };
+      grip.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0) return;
+        // (No text selected by the drag; the grip focused, so Alt+↑ ↓ then moves its value)
+        e.preventDefault();
+        grip.focus();
+        reorder(e, {
+          element,
+          base: "swt-choices",
+          layer: this.dialog?.element,
+          flow: "block",
+          containers: () => [values],
+          items: (container) => Array.from(container.querySelectorAll<HTMLElement>(":scope > .swt-choices-row")),
+          // Let go: the value at its new place; cancelled (or let go where it was): the rows as the values are
+          done: (to) => {
+            if (to) {
+              rows.splice(rows.indexOf(row), 1);
+              rows.splice(to.index, 0, row);
+            }
+            if (rows.some((r, i) => values.children[i] !== r.element)) values.replaceChildren(...rows.map((r) => r.element));
+          },
+        });
+      });
+      // Alt+↑ ↓ moves the value, from its field or its grip
+      element.addEventListener("keydown", (e) => {
+        if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+        e.preventDefault();
+        move(e.key === "ArrowUp" ? -1 : 1, e.target as HTMLElement);
+      });
       element.append(
-        el(doc, "button", { class: "swt-choices-icon", html: ICONS.arrowUp, title: "Move up", run: () => move(-1) }),
-        el(doc, "button", { class: "swt-choices-icon", html: ICONS.arrowDown, title: "Move down", run: () => move(1) }),
         el(doc, "button", {
           class: "swt-choices-icon",
           html: ICONS.clear,
@@ -87,14 +116,11 @@ export class ChoicesDialog {
           },
         }),
       );
-      // Enter adds a value after this one, Alt+↑ ↓ moves it
+      // Enter adds a value after this one
       field.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.altKey) {
           e.preventDefault();
           addRow("", undefined, row).field.focus();
-        } else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
-          e.preventDefault();
-          move(e.key === "ArrowUp" ? -1 : 1);
         }
       });
       const at = after ? rows.indexOf(after) + 1 : rows.length;

@@ -1827,6 +1827,26 @@ body.swt-resizing * {
   align-items: center;
   gap: 8px;
 }
+.swt-choices-grip {
+  cursor: grab;
+  touch-action: none;
+}
+/* A value dragged: its place held, dimmed, the others sliding aside; a copy following the pointer */
+.swt-choices-placeholder {
+  opacity: 0.3;
+}
+.swt-choices-ghost {
+  position: fixed;
+  z-index: 101;
+  margin: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+  background: var(--root-background-color);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  cursor: grabbing;
+  opacity: 0.95;
+}
 .swt-choices-problem {
   color: var(--danger-color, #c62828);
   opacity: 1;

@@ -1,10 +1,12 @@
-// Reordering by dragging, live, for the settings' favourites (items within and
-// across rows, and the rows themselves): once the pointer has moved a little,
+// Reordering by dragging, live, for any plugin's lists (the toolbar's
+// settings' favourites, items within and across rows and the rows themselves;
+// the values of Silverware Table's Choices dialog): once the pointer has moved a little,
 // the element dragged moves in the document to where it would go, so it holds
 // its place (dimmed) and the others slide aside (each animated from where it
 // was: FLIP), while a copy of it follows the pointer. Where it goes is the gap
 // nearest the pointer in the container under it (or the nearest container),
-// not only over another element. Esc cancels. Let go, the caller is told the
+// not only over another element; a container that scrolls scrolls near its
+// top or bottom. Esc cancels. Let go, the caller is told the
 // container and the index it ended at, and draws the list anew from its values.
 
 export type Reorder = {
@@ -28,6 +30,9 @@ export type Reorder = {
 
 // How far the pointer goes before it is a drag (a press without it is a click or a focus)
 const THRESHOLD = 4;
+// Near a scrolling container's top or bottom (px), it scrolls, by up to SCROLL_STEP a frame
+const SCROLL_EDGE = 28;
+const SCROLL_STEP = 12;
 // The others sliding aside
 const SLIDE_MS = 150;
 
@@ -47,6 +52,9 @@ export function reorder(e: PointerEvent, options: Reorder): void {
       ghost = element.cloneNode(true) as HTMLElement;
       ghost.classList.add(`${base}-ghost`);
       ghost.removeAttribute("id");
+      // A picture of it: no second field or button for a screen reader, nor for what counts them
+      ghost.setAttribute("aria-hidden", "true");
+      ghost.inert = true;
       ghost.style.width = `${box.width}px`;
       ghost.style.height = `${box.height}px`;
       (options.layer ?? doc.body).append(ghost);
@@ -55,7 +63,28 @@ export function reorder(e: PointerEvent, options: Reorder): void {
     m.preventDefault();
     ghost.style.left = `${m.clientX - grab.x}px`;
     ghost.style.top = `${m.clientY - grab.y}px`;
+    last = { x: m.clientX, y: m.clientY };
     place(m.clientX, m.clientY);
+    if (!scrolling) scroll();
+  };
+
+  // A container that scrolls (a long list in a box) scrolls while the pointer is near its top or bottom
+  let last = start;
+  let scrolling = 0;
+  const scroll = () => {
+    scrolling = 0;
+    if (!ghost) return;
+    const container = containerAt(options.containers(), last.x, last.y);
+    if (!container || container.scrollHeight <= container.clientHeight) return;
+    const r = container.getBoundingClientRect();
+    const by = last.y < r.top + SCROLL_EDGE ? -1 : last.y > r.bottom - SCROLL_EDGE ? 1 : 0;
+    if (!by) return;
+    const edge = by < 0 ? r.top + SCROLL_EDGE - last.y : last.y - (r.bottom - SCROLL_EDGE);
+    const before = container.scrollTop;
+    container.scrollTop += by * Math.ceil((SCROLL_STEP * Math.min(edge, SCROLL_EDGE)) / SCROLL_EDGE);
+    if (container.scrollTop === before) return;
+    place(last.x, last.y);
+    scrolling = win.requestAnimationFrame(scroll);
   };
 
   /** The element moved in the document to the gap nearest the point, the others sliding there from where they were */
@@ -81,6 +110,10 @@ export function reorder(e: PointerEvent, options: Reorder): void {
       win.requestAnimationFrame(() => {
         item.style.transition = `transform ${SLIDE_MS}ms ease`;
         item.style.transform = "";
+        // Its slide over, nothing of it left on the element
+        win.setTimeout(() => {
+          if (!item.style.transform) item.style.transition = "";
+        }, SLIDE_MS);
       });
     }
   };
@@ -90,6 +123,7 @@ export function reorder(e: PointerEvent, options: Reorder): void {
     win.removeEventListener("pointerup", up, true);
     win.removeEventListener("pointercancel", cancel, true);
     win.removeEventListener("keydown", key, true);
+    win.cancelAnimationFrame(scrolling);
     const moved = !!ghost;
     ghost?.remove();
     element.classList.remove(`${base}-placeholder`);

@@ -75,7 +75,7 @@ import {
   withColumnKeys,
   writtenArea,
 } from "../formulas/index.ts";
-import { columnChoicesOf, FormulaError, functionHelp, parseFormula } from "../formulas/index.ts";
+import { columnChoicesOf, FormulaError, functionHelp, parseFormula, withEquals } from "../formulas/index.ts";
 import { addAffected, affectedBy, isAffected, type NamedOtherPages, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
 import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
@@ -213,13 +213,16 @@ export class Formulas implements Feature {
     host.offer({
       cells: this.cells,
       evaluate: (formula, text, page) => this.evaluate(formula, text, page),
-      complete: (formula, caret, text, headers) => formulaChoices(formula, caret, caret, pageNameChoices(this.cells, this.named(pageTablesOf(text))), undefined, columnChoicesOf(headers ?? [])),
+      complete: (formula, caret, text, table) =>
+        table
+          ? formulaChoices(formula, caret, caret, this.namesOf(table, text), this.nameOf(table), columnChoicesOf(table.rows[0]?.cells ?? []))
+          : formulaChoices(formula, caret, caret, pageNameChoices(this.cells, this.named(pageTablesOf(text)))),
       help: (formula, caret) => functionHelp(formula, caret),
       problem: (formula) => {
-        const tree = parseFormula(formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`);
+        const tree = parseFormula(withEquals(formula).formula.trim());
         return tree instanceof FormulaError ? tree.detail : undefined;
       },
-      rowValues: (table, formula) => rowValues(table, formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`, { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) }),
+      rowValues: (table, formula) => rowValues(table, withEquals(formula).formula.trim(), { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) }),
     } satisfies FormulasOffer);
   }
 
@@ -975,9 +978,12 @@ export class Formulas implements Feature {
    * names as edited (the table only, so cheap whatever edits a feature holds)
    */
   private namesFor(info: TableInfo): readonly FormulaChoice[] {
-    const text = this.host.pageText;
+    return this.namesOf(this.host.tableOf(info), this.host.pageText);
+  }
+
+  /** The names a formula of `table` is offered on the page's `text`: the other tables' and the page's, the table's own */
+  private namesOf(table: Table, text: string): readonly FormulaChoice[] {
     if (this.pageNames?.text !== text) this.pageNames = { text, choices: pageNameChoices(this.cells, this.named(pageTablesOf(text))) };
-    const table = this.host.tableOf(info);
     const own = this.nameOf(table)?.toLowerCase();
     const others = this.pageNames.choices.filter((choice) => !(choice.table && choice.table.toLowerCase() === own));
     return [...others, ...ownNameChoices(this.cells, table)];

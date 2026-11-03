@@ -34,7 +34,7 @@ import {
   type StoredRule,
   styleLook,
 } from "../conditions/index.ts";
-import { choiceText, FormulaError, type FormulasOffer, isErrorText, type Scalar, scalarText } from "../formulas/index.ts";
+import { choiceText, FormulaError, type FormulasOffer, isErrorText, type Scalar, scalarText, withEquals } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import { parseTable, type Table, unescapeCell } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
@@ -285,6 +285,7 @@ export class Conditions implements Feature {
       .map((h, column) => ({ column, name: columnName(unescapeCell(h)) || `${column + 1}` }))
       .filter(({ column }) => column >= pins.left && column < header.length - pins.right);
     const shown = () => this.host.tableFor(info.key) ?? info;
+    const formulas = this.formulaHelpers(info);
     // The table in view, so a look under the dialog finds it
     this.host.revealCell(info, { row: Math.min(1, Math.max(0, info.rows - 1)), column: columns[0]?.column ?? 0 });
     openConditionsDialog(this.host, {
@@ -299,7 +300,7 @@ export class Conditions implements Feature {
       },
       save: (rules) => void this.save(shown(), rules),
       sample: (rule) => this.ruleSample(shown(), rule),
-      ...(this.formulaHelpers(info) ? { formulas: this.formulaHelpers(info)! } : {}),
+      ...(formulas ? { formulas } : {}),
       ...(this.canStore(table) ? {} : { blocked: NEEDS_METADATA }),
     });
   }
@@ -311,14 +312,12 @@ export class Conditions implements Feature {
   private formulaHelpers(shownInfo: TableInfo): FormulaHelpers | undefined {
     const formulas = this.host.offered<FormulasOffer>("formulas");
     if (!formulas) return undefined;
-    const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    const headers = this.host.tableOf(info).rows[0]?.cells ?? [];
-    // The formula as the formulas module reads it, and how far its places moved
-    const asFormula = (text: string) => (text.trimStart().startsWith("=") ? { formula: text, shift: 0 } : { formula: `=${text}`, shift: 1 });
+    // The table as it is now (the dialog put aside, its columns may have been renamed meanwhile)
+    const table = () => this.host.tableOf(this.host.tableFor(shownInfo.key) ?? shownInfo);
     return {
       complete: (text, caret) => {
-        const { formula, shift } = asFormula(text);
-        const made = formulas.complete(formula, caret + shift, this.host.pageText, headers);
+        const { formula, shift } = withEquals(text);
+        const made = formulas.complete(formula, caret + shift, this.host.pageText, table());
         if (!made) return undefined;
         return {
           from: made.from - shift,
@@ -329,7 +328,7 @@ export class Conditions implements Feature {
       },
       // Out of a function, how a condition refers to cells, in a line (the cell editor's longer help is of pointing in the table)
       help: (text, caret) => {
-        const { formula, shift } = asFormula(text);
+        const { formula, shift } = withEquals(text);
         return formulas.help(formula, caret + shift) ?? CONDITION_REFERENCES;
       },
       problem: (text) => formulas.problem(text),

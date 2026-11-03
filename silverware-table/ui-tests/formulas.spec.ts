@@ -19,6 +19,26 @@ test.describe("Formulas", () => {
     await expect(cell(page, 1, 3)).toHaveText("few");
   });
 
+  test("the table's columns offered after [@ by their names, put in by their keys; none once the caret is moved into a reference", async ({ page }) => {
+    const field = page.locator(".swt-cell-editor");
+    const choices = page.locator(".swt-formula-choice code");
+    await cell(page, 1, 3).dblclick();
+    await page.keyboard.press("Control+a");
+    await page.keyboard.type("=[@p");
+    await expect(choices).toHaveText(["Price"]);
+    await page.keyboard.press("Tab");
+    await expect(field).toHaveValue("=[@price]");
+    await expect(choices).toHaveCount(0);
+    // The caret moved back into the reference: nothing offered, Tab moves on, the reference as it was
+    for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowLeft");
+    await expect(choices).toHaveCount(0);
+    await rendersAnew(page, async () => {
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Escape");
+    });
+    expect(await markdown(page)).toContain(`<meta formulas.f='=[@price]'>`);
+  });
+
   test("the list of names typed: Tab inserts the one picked, Enter saves the formula as typed", async ({ page }) => {
     const field = page.locator(".swt-cell-editor");
     const choices = page.locator(".swt-formula-choice code");

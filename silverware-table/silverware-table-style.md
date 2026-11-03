@@ -4165,15 +4165,14 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   max-width: 100%;
   font-family: var(--editor-font, monospace);
 }
+/* Over the dialog (fixed: its body scrolls and would cut it), placed under the field by the script */
 .swt-cf-choices {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 1;
+  position: fixed;
+  z-index: 2;
   min-width: 16em;
+  max-width: min(32em, calc(100vw - 24px));
   max-height: 14em;
   overflow: auto;
-  margin-top: 2px;
   padding: 3px;
   background: var(--root-background-color);
   border: 1px solid var(--swt-dialog-line);

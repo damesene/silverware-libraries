@@ -87,7 +87,9 @@ export function columnChoicesOf(headers: readonly string[]): ColumnChoice[] {
   return headers.flatMap((header, column) => {
     const ref = columnRefText(columnIdOf(headers, column), false);
     const name = columnName(unescapeCell(header));
-    return ref && name ? [{ name, id: ref.slice(1, -1) }] : [];
+    const id = ref?.slice(1, -1);
+    const nth = id && /:(\d+)$/.exec(id)?.[1];
+    return id && name ? [{ name: nth ? `${name} (${nth})` : name, id }] : [];
   });
 }
 
@@ -166,8 +168,9 @@ export function choiceText(choice: FormulaChoice): string {
 /**
  * A column's name typed right before the caret, in a column reference not
  * closed yet (`[qu`, `[@qu`, `prices![qu`): from after its "[" (and "@") to the
- * caret, and on past the rest of the name to its "]" where it has one (the
- * choice is the whole name and closes it); undefined in a
+ * caret; undefined in a reference closed after the caret (`[@q|uality]`: the
+ * caret moved into it, not typing it; Tab there moves on, as in the middle of a
+ * function's name), in a
  * text in quotes, in a link to a page ([[Page]]), or where nothing is open
  */
 export function columnTyped(text: string, start: number, end: number): { from: number; to: number } | undefined {
@@ -181,9 +184,8 @@ export function columnTyped(text: string, start: number, end: number): { from: n
   if (tokenize(before.slice(0, open)).error) return undefined;
   const from = open + 1 + (before[open + 1] === "@" ? 1 : 0);
   if (/["'\[]/.test(before.slice(from))) return undefined;
-  // Up to its "]" (the name's rest after the caret too: the choice is the whole name), else to the caret
-  const close = /^[^\["'\]]*\]/.exec(text.slice(start));
-  return { from, to: close ? start + close[0].length : start };
+  if (/^[^\["'\]]*\]/.test(text.slice(start))) return undefined;
+  return { from, to: start };
 }
 
 /**

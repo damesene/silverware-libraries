@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { allConditions, allFormats, clearCustomDefinitions } from "../conditions/index.ts";
 import { defineFormats } from "../index.ts";
-import { cell, controller, flashes, flush, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
+import { cell, controller, cursorMoves, editor, flashes, flush, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -217,6 +217,25 @@ describe("Conditional formatting", () => {
     expect(dialog()!.querySelector(".swt-cf-formula-box .swt-cf-problem")!.textContent).toBe("");
     await wait(200);
     expect([1, 2, 3].map((r) => formatted(r))).toEqual([false, true, true]);
+  });
+
+  it("shows a formula condition's formula in its rule's line; offers the columns as the table has them now (renamed while the dialog was aside)", async () => {
+    await setup(TABLE + META('[{"when":["formula",{"formula":"[@score] &gt; 50"}],"format":"bold"}]'), { "silverware.table.metadata": true });
+    await flush();
+    at(2, 1).dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 }));
+    item("Conditional formatting…")!.click();
+    expect(dialog()!.querySelector(".swt-cf-when")!.textContent).toBe("Formula: [@score] > 50");
+    dialog()!.querySelector<HTMLElement>(".swt-cf-summary")!.click();
+    // The table's header renamed meanwhile (the dialog put aside): what is offered is its column now
+    setText(text.replace("| Name | Score |", "| Name | Points |"));
+    renderPage(text, editor, cursorMoves);
+    await controller.scan();
+    const field = dialog()!.querySelector<HTMLInputElement>("input.swt-cf-formula")!;
+    field.focus();
+    field.value = "[@p";
+    field.setSelectionRange(3, 3);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(Array.from(dialog()!.querySelectorAll(".swt-cf-choice .swt-cf-choice-name")).map((c) => c.textContent)).toEqual(["Points"]);
   });
 
   it("clears a column's rules from its menu", async () => {

@@ -21,6 +21,14 @@
 export { type CellNameAt, cellsByName, type FormulaCells, formulaCount, forFormulas, hasFormulas, isErrorText, isFormulaInput, type RowName, rowsByName, type StoredFormula } from "./cell.ts";
 
 /**
+ * A formula as written where its "=" may be left out (a condition's, Space
+ * Lua's): the formula with it, and how far its places moved (1 where it was added)
+ */
+export function withEquals(text: string): { readonly formula: string; readonly shift: number } {
+  return text.trimStart().startsWith("=") ? { formula: text, shift: 0 } : { formula: `=${text}`, shift: 1 };
+}
+
+/**
  * What the formulas module offers other modules (ModelHost.offered("formulas")): its cells as the formulas read them;
  * `evaluate`: a formula calculated in no table, on the page's text (the Space Lua API's), a range as its values,
  * and the other pages it read
@@ -30,10 +38,10 @@ export type FormulasOffer = {
   readonly evaluate: (formula: string, text: string, page?: string) => Promise<{ readonly value: import("./values.ts").Value; readonly pages: readonly string[] }>;
   /**
    * What the name typed before `caret` in `formula` may be, on the page's `text`: its place in `formula` and the
-   * choices; `headers`, the header's cells (as written) of the table the formula is of: its columns offered in [ ]
-   * and [@ ] by their names, put in by their ids
+   * choices; `table`, the table the formula is of (as a cell's formula is): its columns in [ ] and [@ ], its named
+   * rows and cells, its own name's prefix, as a cell's formula has them
    */
-  readonly complete: (formula: string, caret: number, text: string, headers?: readonly string[]) => import("./help.ts").FormulaChoices | undefined;
+  readonly complete: (formula: string, caret: number, text: string, table?: import("../markdown.ts").Table) => import("./help.ts").FormulaChoices | undefined;
   /** The function the caret is in, its syntax with the argument at the caret; undefined out of any */
   readonly help: (formula: string, caret: number) => import("./help.ts").FormulaHelp | undefined;
   /** Why a formula does not read (a ")" missing); undefined: it does */

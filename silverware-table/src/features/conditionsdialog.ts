@@ -588,7 +588,21 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
         ),
       );
       list.hidden = !offered;
+      if (!offered) return;
+      // Over the dialog, under the field (the dialog's body scrolls and would cut a list in it)
+      const box = input.getBoundingClientRect();
+      list.style.left = `${box.left}px`;
+      list.style.top = `${box.bottom + 2}px`;
+      list.style.minWidth = `${Math.max(box.width / 2, 200)}px`;
+      list.querySelector<HTMLElement>(".swt-cf-choice-active")?.scrollIntoView?.({ block: "nearest" });
     };
+    // The list stays under the field as the dialog's body scrolls: closed (it opens again as a name is typed)
+    const closeOnScroll = () => {
+      if (!offered) return;
+      offered = undefined;
+      list.hidden = true;
+    };
+    input.addEventListener("focus", () => input.closest(".swt-dialog-body")?.addEventListener("scroll", closeOnScroll, { passive: true }));
     const showHelp = (at = caret()) => {
       const h = helpers.help(input.value, at);
       if (!h) {
@@ -738,6 +752,6 @@ function valueText(spec: ParamSpec, value: unknown): string {
   if (value === undefined || value === "") return "";
   if (spec.kind === "choice") return spec.labels?.[spec.values.indexOf(String(value))] ?? String(value);
   if (spec.kind === "boolean") return value ? (spec.label ?? "yes") : "";
-  if (spec.kind === "number" || spec.kind === "text" || spec.kind === "pattern") return String(value);
+  if (spec.kind === "number" || spec.kind === "text" || spec.kind === "pattern" || spec.kind === "formula") return String(value);
   return "";
 }

@@ -23,6 +23,8 @@ export type XlsxSheet = {
   // The columns' widths, in characters
   readonly widths?: readonly number[];
   readonly table?: XlsxTable;
+  // Conditional formatting: its elements in the sheet, the differential formats they use
+  readonly conditional?: { readonly xml: string; readonly dxfs: readonly string[] };
 };
 
 /** The sheet's cells as an Excel table */
@@ -140,12 +142,13 @@ function sheetXml(sheet: XlsxSheet): string {
     '<sheetFormatPr defaultRowHeight="15"/>' +
     (cols ? `<cols>${cols}</cols>` : "") +
     `<sheetData>${header}${rows}</sheetData>` +
+    (sheet.conditional?.xml ?? "") +
     (sheet.table ? '<tableParts count="1"><tablePart r:id="rId1"/></tableParts>' : "") +
     "</worksheet>"
   );
 }
 
-function stylesXml(): string {
+function stylesXml(dxfs: readonly string[] = []): string {
   const custom = FORMAT_STYLES.map((f) => FORMAT_CODES[f]).filter((f) => f.code);
   const numFmts = custom.map((f) => `<numFmt numFmtId="${f.id}" formatCode="${xmlText(f.code!)}"/>`).join("");
   const xfs = [
@@ -163,6 +166,7 @@ function stylesXml(): string {
     '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
     `<cellXfs count="${xfs.length}">${xfs.join("")}</cellXfs>` +
     '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+    (dxfs.length ? `<dxfs count="${dxfs.length}">${dxfs.join("")}</dxfs>` : "") +
     "</styleSheet>"
   );
 }
@@ -234,7 +238,7 @@ export function xlsxParts(sheet: XlsxSheet): [string, string][] {
         '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
         "</Relationships>",
     ],
-    ["xl/styles.xml", stylesXml()],
+    ["xl/styles.xml", stylesXml(sheet.conditional?.dxfs)],
     ["xl/worksheets/sheet1.xml", sheetXml(sheet)],
     ...(sheet.table
       ? ([

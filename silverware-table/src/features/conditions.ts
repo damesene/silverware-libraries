@@ -18,6 +18,7 @@ import { CELL_MENU_ORDER, type CellLook, type CellMenuGroup, type CellRef, type 
 import type { ColumnTypesOffer } from "../columntypes/index.ts";
 import {
   cellOf,
+  type ConditionsOffer,
   definitionsVersion,
   evaluateRules,
   inOrder,
@@ -74,7 +75,30 @@ export class Conditions implements Feature {
   // What went wrong, said once per page visit
   private readonly said = new Set<string>();
 
-  constructor(private readonly host: ModelHost) {}
+  constructor(private readonly host: ModelHost) {
+    host.offer({ ranges: (table) => this.ranges(table) } satisfies ConditionsOffer);
+  }
+
+  /** A table's rules with the cells each applies to: body rows and columns, the pinned ones left out (ConditionsOffer) */
+  private ranges(table: Table): ReturnType<ConditionsOffer["ranges"]> {
+    const pins = this.host.pinsOf(table);
+    const columns = table.rows[0]?.cells.length ?? 0;
+    const rows: readonly [number, number] = [1 + pins.top, table.rows.length - 1 - pins.bottom];
+    const all: readonly [number, number] = [pins.left, columns - 1 - pins.right];
+    const named = new Map(this.host.rowNames(table).map((r) => [r.name.toLowerCase(), r.row]));
+    return this.rulesIn(table).flatMap((rule) => {
+      if (isUnread(rule)) return [];
+      if (rule.scope.kind === "column") {
+        const c = rule.scope.column;
+        return c >= all[0] && c <= all[1] ? [{ rule, rows, columns: [c, c] as const }] : [];
+      }
+      if (rule.scope.kind === "row") {
+        const row = named.get(rule.scope.name.toLowerCase());
+        return row !== undefined && row >= rows[0] && row <= rows[1] ? [{ rule, rows: [row, row] as const, columns: all }] : [];
+      }
+      return [{ rule, rows, columns: all }];
+    });
+  }
 
   /** Custom conditions or formats defined anew: tables with rules look as they say now */
   tablesChanged(): void {

@@ -113,6 +113,8 @@ config.set("silverware.table.modules.excel.functions", {
 })
 ```
 
+Conditional formatting in the file (with the `conditions` module, see [[#Conditional formatting]]): the table's rules become Excel's, on the same cells (the header and pinned rows and columns left out), in the same order: the conditions as Excel's own (greater than, between, text contains, duplicates, top values, above average, dates; *Matches* where its pattern is plain words), fills, text colors, bold, italic, underline and strikethrough as Excel's formats, color scales, data bars, *Arrows* and *Traffic light dots* as Excel's, *By keywords* (plain words) and *By number ranges* as a rule for each row. Excel has no form of a regular expression, of a *Formula* condition (it reads columns by name), of *Levels*, *Heat map* and *Traffic light*, of a scale, bar or icons over the cells a condition picks, nor of your own conditions and formats: the dialog lists such rules, with why, under *Download .xlsx*; they are not in the file. Colors are the palette's light ones, or yours written `#rrggbb`.
+
 ## AutoFill
 
 Select cells and drag the small square at the bottom right corner of the selection (the fill handle) down, up, right or left: the cells you drag over go on from the selected ones, as in a spreadsheet. While you drag, the cells are outlined and the value the last one will get shows by the pointer; let go to fill them (one edit, one Ctrl+Z), Esc cancels. Double-click the square to fill down as far as the column beside the selection (left, else right) has values.

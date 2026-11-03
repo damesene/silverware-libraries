@@ -16,8 +16,19 @@ export {
   defineCustomFormats,
   definitionsVersion,
   formatNamed,
+  isBuiltInCondition,
+  isBuiltInFormat,
 } from "./registry.ts";
 export { checkedConditions, checkedFormats } from "./custom.ts";
 export { inOrder, isUnread, numbered, type Ref, type Rule, type RuleScope, rulesOf, rulesText, type StoredRule, type UnreadRule } from "./rule.ts";
 export { cellOf, scopeOf } from "./scope.ts";
 export { checkStyle, colorProblem, styleLook } from "./style.ts";
+
+/**
+ * What the conditional formatting module offers other modules (ModelHost.offered("conditions")): a table's rules
+ * in their order, each with the cells it applies to (the markdown's body rows, first to last, and columns), pinned
+ * rows and columns left out; rules that do not read, and those whose row is gone, left out
+ */
+export type ConditionsOffer = {
+  readonly ranges: (table: import("../markdown.ts").Table) => readonly { readonly rule: import("./rule.ts").Rule; readonly rows: readonly [number, number]; readonly columns: readonly [number, number] }[];
+};

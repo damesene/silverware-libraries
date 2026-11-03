@@ -686,6 +686,7 @@ It is a plain markdown table, its numbers written in it (it shows anywhere, as a
 * An edit of its source with Silverware Table writes the pivot anew in the same edit: one Ctrl+Z takes back both. Its source renamed, the pivot names it so.
 * Edited by hand (in its markdown) the source is ahead of the pivot: its **Refresh pivot** icon in the toolbar is highlighted; click it and the pivot is calculated anew.
 * Its values are calculated, so its cells are not edited: the editor does not open on them, and its menus offer nothing that changes them or adds, moves or deletes its rows and columns. Rename a header as in any table: the pivot keeps your name (and a type's hashtag added to it) when it is calculated again.
+* Its totals are pinned: the Total row to the bottom, a cross table's Total column to the right, so they stay in view and out of a sort (with *Store table metadata*).
 * It needs the `formulas` module.
 
 ## Rows and columns

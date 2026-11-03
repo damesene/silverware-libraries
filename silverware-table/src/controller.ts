@@ -61,7 +61,7 @@ import {
 } from "./markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "./menu.ts";
 import { floatingMenu, focusMenu } from "./core/menu.ts";
-import { CORE, attributeName, metadataAfterEdit, metaName, metaPins, metaSort, withMetaSort, writtenName } from "./meta.ts";
+import { CORE, attributeName, metadataAfterEdit, metaName, metaPins, metaSort, withMetaPins, withMetaSort, writtenName } from "./meta.ts";
 import { CELL_NAME, type CellNameAt, cellNameOf, cellNamesIn, LINE_NAME, columnNameIn, type RowName, rowNameIn, rowNamesIn, withCellNameIn, withColumnNameIn, withRowNameIn } from "./names.ts";
 import { ownMeta } from "./core/metaaccess.ts";
 import { withoutNewTagValues } from "./tagvalues.ts";
@@ -70,6 +70,7 @@ import { nameEmptyHeaders, reorderRows } from "./ops.ts";
 import {
   cycleSort,
   DEFAULT_VIEW,
+  type Pins,
   withPins,
   remapColumns,
   type ViewState,
@@ -585,6 +586,16 @@ export class Controller implements TableHost {
 
   canPin(table: Table, edge: "top" | "bottom" | "left" | "right"): boolean {
     return this.coreMeta.canStoreMeta(table, `pin-${edge}`);
+  }
+
+  pinsOf(table: Table): Pins {
+    return metaPins(table);
+  }
+
+  withPins(table: Table, pins: Pins): Table {
+    const was = metaPins(table);
+    const edge = (side: keyof Pins) => (pins[side] === was[side] || this.canPin(table, side) ? pins[side] : was[side]);
+    return withMetaPins(table, { top: edge("top"), bottom: edge("bottom"), left: edge("left"), right: edge("right") });
   }
 
   /**

@@ -57,10 +57,13 @@ export class Pivot implements Feature {
     const kept = Object.fromEntries(Object.entries(renames).filter(([id]) => pivot.columns.some((column) => column.id === id)));
     const rows = [{ cells: header }, ...pivot.body.map((cells) => ({ cells: cells.map(escapeCell) }))];
     const align = pivot.columns.map((column): Table["align"][number] => (column.numeric ? "right" : ""));
+    // Its totals pinned (the row at the bottom, the columns at the right): they stay in view, out of a sort; other pins as they were
+    const totals = { bottom: pivot.totalRow ? 1 : 0, right: pivot.totalColumns };
     // (Its delimiter row as written where its columns are aligned as before)
     const same = align.length === table.align.length && align.every((a, i) => a === table.align[i]);
     const made: Table = same ? { ...table, rows } : { ...table, rows, align, delimiterSource: undefined, alignSource: undefined };
-    return this.host.setMeta(made, "headers", Object.keys(kept).length ? JSON.stringify(kept) : undefined);
+    const pinned = this.host.withPins(made, { ...this.host.pinsOf(made), ...totals });
+    return this.host.setMeta(pinned, "headers", Object.keys(kept).length ? JSON.stringify(kept) : undefined);
   }
 
   /** The pivot calculated from a source, or why it cannot be */

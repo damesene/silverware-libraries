@@ -746,6 +746,10 @@ export interface ModelHost {
   canName(table: Table, target: NamingTarget): boolean;
   /** Whether rows (columns) may be pinned at that edge: the metadata setting on, or the table has pins there already */
   canPin(table: Table, edge: "top" | "bottom" | "left" | "right"): boolean;
+  /** The rows and columns pinned at each edge of a table, as its metadata row has them */
+  pinsOf(table: Table): Pins;
+  /** The table with these pins (an edge that cannot be pinned, canPin, as it was): a module's table made whole (a pivot's totals) */
+  withPins(table: Table, pins: Pins): Table;
   /** A table's named rows, in their order */
   rowNames(table: Table): readonly RowName[];
   /** A table's named body cells, in their order */

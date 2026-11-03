@@ -17,6 +17,9 @@ export type Pivot = {
   readonly columns: readonly PivotColumn[];
   // The body's cells as written (texts), the totals' row last where it has one
   readonly body: readonly (readonly string[])[];
+  // Whether its last row is the totals', and how many of its last columns are totals
+  readonly totalRow: boolean;
+  readonly totalColumns: number;
 };
 
 const TOTAL = "Total";
@@ -126,5 +129,5 @@ export function pivotOf(source: Table, definition: PivotDefinition, calculation:
     const label = definition.rows.map((_, i) => (i === 0 ? TOTAL : ""));
     body.push([...label, ...cellsOf(indexes)]);
   }
-  return { columns: out, body };
+  return { columns: out, body, totalRow: showTotalRow && list.length > 0, totalColumns: showRowTotals ? definition.values.length : 0 };
 }

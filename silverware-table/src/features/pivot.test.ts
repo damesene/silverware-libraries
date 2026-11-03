@@ -45,7 +45,8 @@ describe("Pivot tables", () => {
     const info = controller.shownTables()[1]!;
     await controller.writeTable(info, (t) => t);
     await controller.scan();
-    expect(pivotOf(text)).toBe(`${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`);
+    // Its total row pinned to the bottom
+    expect(pivotOf(text)).toBe(`${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |", " core.pin-bottom='1'")}\n`);
     // A header renamed: kept by what its column is
     clickOn(second(0, 1));
     await type("Revenue");
@@ -150,7 +151,7 @@ describe("Pivot tables", () => {
       dialog().querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
       await flush();
       await controller.scan();
-      expect(text).toContain("| Region | Average of Revenue |\n|---|---:|\n| East | 60 |\n| West | 50 |\n| Total | 56.666666666667 |\n| <meta core.table pivot.source='orders' pivot.rows='Region' pivot.values='AVERAGE([Revenue])'> |\n\nEnd.");
+      expect(text).toContain("| Region | Average of Revenue |\n|---|---:|\n| East | 60 |\n| West | 50 |\n| Total | 56.666666666667 |\n| <meta core.table pivot.source='orders' pivot.rows='Region' pivot.values='AVERAGE([Revenue])' core.pin-bottom='1'> |\n\nEnd.");
     });
 
     it("names a table without a name in the same edit, as a pivot names its source", async () => {
@@ -267,6 +268,16 @@ describe("Pivot tables", () => {
       second(1, 1).dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2, clientX: 10, clientY: 10 }));
       expect(document.querySelector(".swt-menu .swt-menu-rename")).toBeNull();
     });
+  });
+
+  it("pins its totals: the row to the bottom, a cross table's total columns to the right", async () => {
+    const cross = PIVOT("| East | 0 |").replace("pivot.values=", "pivot.columns='region' pivot.values=");
+    await setup(`${ORDERS}\n\n${cross}\n`, { "silverware.table.metadata": true });
+    await controller.writeTable(controller.shownTables()[1]!, (t) => t);
+    await controller.scan();
+    expect(text).toContain("| Region | East | West | Total |");
+    expect(text).toContain("core.pin-bottom='1'");
+    expect(text).toContain("core.pin-right='1'");
   });
 
   it("follows its source's new name", async () => {

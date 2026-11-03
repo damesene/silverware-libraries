@@ -30,6 +30,8 @@ export type FormulasOffer = {
   readonly evaluate: (formula: string, text: string, page?: string) => Promise<{ readonly value: import("./values.ts").Value; readonly pages: readonly string[] }>;
   /** What the name typed before `caret` in `formula` may be, on the page's `text`: its place in `formula` and the choices */
   readonly complete: (formula: string, caret: number, text: string) => import("./help.ts").FormulaChoices | undefined;
+  /** A formula of one row (`[@due] < TODAY()`) calculated for each body row of a table of the page shown (values[0]: row 1), as a cell of none */
+  readonly rowValues: (table: import("../markdown.ts").Table, formula: string) => readonly import("./values.ts").Scalar[];
 };
 
 /** What the pageLinks module offers: the other pages these formulas and tables refer to (and theirs, in turn) read anew; which they are */

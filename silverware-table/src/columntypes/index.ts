@@ -4,3 +4,10 @@
 // which exist in registry.ts.
 export { allTypes, columnTypeOf, type TypedColumn, typeNamed, typeOfTag, typeTagPatterns, withColumnType } from "./registry.ts";
 export type { Choice, ColumnType, Params, Shown } from "./type.ts";
+
+/**
+ * What the column types module offers other modules (ModelHost.offered("columnTypes")): a cell's value as its
+ * column's type compares it (sorting, filters), from the column's header and the cell's text as shown; the text
+ * where the column has no type or the text is not a value of it
+ */
+export type ColumnTypesOffer = { readonly valueOf: (header: string, text: string) => string };

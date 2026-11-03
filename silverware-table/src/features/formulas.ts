@@ -37,6 +37,7 @@ import {
   columnRefText,
   cycleFixed,
   evaluateFormula,
+  rowValues,
   filledFormula,
   type FormulaCells,
   formulaCount,
@@ -209,6 +210,7 @@ export class Formulas implements Feature {
       cells: this.cells,
       evaluate: (formula, text, page) => this.evaluate(formula, text, page),
       complete: (formula, caret, text) => formulaChoices(formula, caret, caret, pageNameChoices(this.cells, this.named(pageTablesOf(text)))),
+      rowValues: (table, formula) => rowValues(table, formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`, { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) }),
     } satisfies FormulasOffer);
   }
 

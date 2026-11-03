@@ -15,6 +15,7 @@ import {
   type TypedColumn,
   typeOfTag,
   allTypes,
+  type ColumnTypesOffer,
   typeTagPatterns,
   withColumnType,
 } from "../columntypes/index.ts";
@@ -72,6 +73,21 @@ export class ColumnTypes implements Feature {
     host.hideHeaderTags("types", typeTagPatterns());
     this.picker = host.panel("swt-choices");
     this.picker.element.setAttribute("role", "listbox");
+    host.offer({ valueOf: (header, text) => this.valueOf(header, text) } satisfies ColumnTypesOffer);
+  }
+
+  /** A cell's value as its column's type compares it, as its looks give it (`value`): the text where it is none of the type's */
+  private valueOf(header: string, text: string): string {
+    const typed = columnTypeOf(unescapeCell(header));
+    if (!typed || text === "") return text;
+    // A custom type's method that throws: the text, as its cell shows marked
+    try {
+      if (typed.type.check(text, typed.params) !== undefined) return text;
+      const value = typed.type.sortValue?.(text, typed.params);
+      return typeof value === "string" ? value : text;
+    } catch {
+      return text;
+    }
   }
 
   stop(): void {

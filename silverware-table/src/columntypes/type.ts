@@ -37,6 +37,18 @@ export type ParamsOf<S extends ParamSpecs> = {
 };
 
 /**
+ * What a type reads of the table its column is in: the column types' data
+ * there, which its metadata row keeps (`columntypes.<type>.<key>`: a choice's
+ * lists, `choice.<name>`), and the column's values
+ */
+export type TypeTable = {
+  // The column types' data in the table, by key (`<type>.<key>`)
+  readonly stored: ReadonlyMap<string, string>;
+  // The column's body values as written (a formula's result), empty ones left out, in the rows' order
+  values(): readonly string[];
+};
+
+/**
  * A column type: the built-in ones one per file in builtin/. A column gets it
  * with a hashtag in its header, `| Price #currency-usd |`: the type's name,
  * and after a "-" its parameters if it takes any (`params`), which the
@@ -62,13 +74,16 @@ export type ColumnType<P extends Params = Params> = {
   readonly aliases?: Readonly<Record<string, string>>;
   // Methods, not function properties: a type of its own parameters is still a ColumnType
   /** Why a cell's text is not a value of this type; undefined when it is (empty cells are never checked) */
-  check(text: string, params: P): string | undefined;
+  // (`table`: none where a value is read without its table; a choice is then taken as one of its list)
+  check(text: string, params: P, table?: TypeTable): string | undefined;
   /** What a valid cell shows; `locale` for numbers and dates (undefined: the browser's) */
   format(text: string, params: P, locale?: string): Shown;
   /** What sorting and filters compare instead of the text, e.g. 1 / 0 for a check mark */
   sortValue?(text: string, params: P): string;
+  /** Where sorting alone puts a value, by this number first, then by its value (a choice by its place in its list, one not in it after them); undefined: by its value. Asked of values not of the type too */
+  rank?(text: string, params: P, table?: TypeTable): number | undefined;
   /** The values the cell editor offers */
-  choices?(params: P): readonly Choice[];
+  choices?(params: P, table?: TypeTable): readonly Choice[];
 };
 
 /** A type with the parameters it declares typed for its methods (`params: { max: { kind: "number", default: 5 } }` gives `max` as a number) */

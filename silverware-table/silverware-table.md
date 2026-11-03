@@ -615,6 +615,7 @@ shows `$12.99`, `★★★★☆` and `☑`.
 | `#unit-kg` | A number with a unit: the unit after the dash. |
 | `#stars, #stars-10` | A rating as stars: a whole number from 0 to the most stars after the dash (default 5). |
 | `#check` | Yes or no as a check box: yes, true, x, ☑ or a number above 0 shows ☑; no, false, ☐, 0 or a number below it shows ☐. |
+| `#choice, #choice-name` | One of a list's values: the list named after the dash, kept in the table (Choices… in the column's menu). A value not in the list is marked, and the column sorts in the list's order. Without a list the editor offers the values the column has. |
 | `#date, #date-long` | A date written as 2025-11-06 (with a time: 2025-11-06 14:30), shown as the locale writes it: short, medium (default) or long after the dash. |
 | `#time` | A time of day written as 14:30 or 14:30:15 (or as a fraction of a day, 0.5 is 12:00), shown as the locale writes times. |
 | `#trend` | A trend as an arrow: + or a number above 0 shows ↑, - or one below 0 shows ↓, = or 0 shows =. |
@@ -622,6 +623,26 @@ shows `$12.99`, `★★★★☆` and `☑`.
 | `#link` | A web address as a link, shown without its https://. |
 
 Numbers and dates are written as your browser's language writes them.
+
+### Choices
+
+A `#choice` column takes one of a list of values, as a status column (open, in progress, done). The list is kept in the table and named; the column names it after the dash:
+
+```
+| Task       | Status #choice-status |
+| ---------- | --------------------- |
+| Write docs | in progress           |
+| Release    | open                  |
+| <meta core.table columntypes.choice.status='["open","in progress","done"]'> |
+```
+
+* *Choices…* in the column's menu sets the list up: its name, and its values one a line (↑ ↓ or Alt+↑ ↓ to order them, Enter for a new one, *Take values from the column* to add those the column has). A new list starts with the column's values and is named after the column. Lists are kept in the table's metadata, so saving one needs the *Store table metadata* setting.
+* Renaming a value in *Choices…* renames it in the cells of every column that takes the list; renaming the list renames it in their headers. A value removed from the list stays in its cells, marked.
+* The cell editor offers the list's values; a value not in the list is kept as typed and marked in red. Values match whatever their case.
+* Sorting by the column puts the values in the list's order (open, in progress, done), not the alphabet's.
+* Every list of the table shows under *Choice* in the *Type* menu, where a column takes one, and where a list no column takes is deleted (🗑). A list is not deleted by itself when no column takes it any more.
+* A list's name is lower case letters (a to z) and digits, words joined by dashes: `status`, `task-status`.
+* `#choice` alone, or a list the table does not have, checks nothing: the editor offers the values the column has.
 
 ### Custom column types
 

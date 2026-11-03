@@ -9,7 +9,7 @@ export type MergedLooks = {
   readonly cells: ReadonlyMap<string, MergedCell>;
   readonly headers: ReadonlyMap<number, MergedHeader>;
 };
-export type MergedCell = { display?: CellDisplay; value?: string; marks: string[]; titles: string[]; vars?: Record<string, string> };
+export type MergedCell = { display?: CellDisplay; value?: string; sortKey?: string; marks: string[]; titles: string[]; vars?: Record<string, string> };
 export type MergedHeader = { icons: HeaderIcon[]; marks: string[]; titles: string[]; hidesTag: ((name: string) => boolean)[] };
 
 export const refKey = (ref: CellRef): string => `${ref.row}:${ref.column}`;
@@ -36,6 +36,7 @@ export function mergeLooks(all: readonly (TableLooks | undefined)[]): MergedLook
 function mergeCell(merged: MergedCell, look: CellLook): void {
   if (look.display !== undefined) merged.display = look.display;
   if (look.value !== undefined) merged.value = look.value;
+  if (look.sortKey !== undefined) merged.sortKey = look.sortKey;
   if (look.marks) merged.marks.push(...look.marks);
   if (look.title) merged.titles.push(look.title);
   // Only Silverware Table's own properties: a feature sets what its CSS reads, never a style of its own

@@ -3,7 +3,9 @@
 // Silverware Table; the types are in builtin/ (only types), custom types in custom.ts,
 // which exist in registry.ts.
 export { allTypes, columnTypeOf, type TypedColumn, typeNamed, typeOfTag, typeTagPatterns, withColumnType } from "./registry.ts";
-export type { Choice, ColumnType, Params, Shown } from "./type.ts";
+export { type Choice, type ColumnType, type Params, type Shown, type TypeTable } from "./type.ts";
+export { choiceListOf, isChoice } from "./choicecolumn.ts";
+export { choiceIndex, distinctValues, LIST_NAME_RE, listKey, listNameFor, listNames, readChoiceList, writeChoiceList } from "./choicelists.ts";
 
 /**
  * What the column types module offers other modules (ModelHost.offered("columnTypes")): a cell's value as its

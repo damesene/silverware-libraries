@@ -30,6 +30,7 @@ import {
   caretTextOffset,
   cellText,
   cellValue,
+  sortKeyOf,
   DRAWN_CLASS,
   EDITOR_SELECTOR,
   STAND_IN_CLASS,
@@ -115,6 +116,14 @@ const NAVIGATING_CLASS = "swt-navigating-here";
 /** A table of its metadata only (read from a rendering, before the table is): what features read of it as a whole */
 function metadataOnly(meta: TableMeta | undefined): Table {
   return { indent: "", align: [], rows: [], padded: false, ...(meta ? { meta } : {}) };
+}
+
+/** What sorting compares of body rows' cells, by row and column: a look's key of its own (data-swt-sort), else the value */
+function sortKeys(rows: readonly HTMLTableRowElement[], values: readonly (readonly string[])[]): (row: number, column: number) => string {
+  return (row, column) => {
+    const cell = rows[row]?.cells[column];
+    return cell ? sortKeyOf(cell, values[row]![column]!) : "";
+  };
 }
 
 export class Controller implements TableHost {
@@ -813,7 +822,7 @@ export class Controller implements TableHost {
     const rows = this.bodyRows(info);
     const values = rows.map((tr) => Array.from(tr.cells).map(cellValue));
     const { top, bottom } = info.pins;
-    const middle = visibleRows(values, withPins(view, info.pins));
+    const middle = visibleRows(values, withPins(view, info.pins), undefined, sortKeys(rows, values));
     const order = [
       ...rows.slice(0, top).map((_, i) => i + 1),
       ...middle.map((i) => i + 1),
@@ -1885,7 +1894,7 @@ export class Controller implements TableHost {
     // The rows features hide (filters)
     const hidden = new Set<number>();
     for (const feature of this.features) for (const i of feature.hiddenRows?.(info, values) ?? []) hidden.add(i);
-    const order = this.withHeldRow(info, visibleRows(values, withPins(view, info.pins), hidden), rows.length);
+    const order = this.withHeldRow(info, visibleRows(values, withPins(view, info.pins), hidden, sortKeys(rows, values)), rows.length);
     const shown = new Set(order);
     const body = info.table.tBodies[0] ?? info.table;
     rows.forEach((tr, i) => {

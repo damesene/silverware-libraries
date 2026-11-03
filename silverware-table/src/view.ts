@@ -96,6 +96,8 @@ export function visibleRows(
   values: readonly (readonly string[])[],
   view: ViewState,
   hidden: ReadonlySet<number> = new Set(),
+  // What sorting compares of a row's cell, where it is not its value
+  sortKey: (row: number, column: number) => string = (row, column) => values[row]![column] ?? "",
 ): number[] {
   const { top, bottom } = pinsOf(view);
   const indexes = values
@@ -105,8 +107,8 @@ export function visibleRows(
   if (!sort) return indexes;
   const sign = sort.direction === "asc" ? 1 : -1;
   return indexes.sort((a, b) => {
-    const va = values[a]![sort.column] ?? "";
-    const vb = values[b]![sort.column] ?? "";
+    const va = sortKey(a, sort.column);
+    const vb = sortKey(b, sort.column);
     const ea = va.trim() === "";
     const eb = vb.trim() === "";
     if (ea !== eb) return ea ? 1 : -1;

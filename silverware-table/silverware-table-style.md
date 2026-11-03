@@ -1719,6 +1719,77 @@ body.swt-resizing * {
   align-items: center;
   gap: 8px;
 }
+/* The Choices dialog: a choice column's list, its name and its values one a line */
+.swt-choices-dialog {
+  width: min(440px, calc(100vw - 24px));
+}
+.swt-choices-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.swt-choices-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.swt-choices-name,
+.swt-choices-value {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font: inherit;
+  font-weight: normal;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+}
+.swt-choices-tag {
+  font-weight: normal;
+  font-family: var(--editor-font, monospace);
+  opacity: 0.7;
+}
+.swt-choices-values {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.swt-choices-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.swt-choices-icon {
+  display: inline-flex;
+  padding: 4px;
+  color: inherit;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  opacity: 0.7;
+}
+.swt-choices-icon:hover {
+  opacity: 1;
+  background: var(--swt-dialog-line);
+}
+.swt-choices-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.swt-choices-actions,
+.swt-choices-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.swt-choices-problem {
+  color: var(--danger-color, #c62828);
+  opacity: 1;
+}
 /* The Excel dialog: the formulas written as values, each with its cell and why */
 .swt-excel {
   display: flex;

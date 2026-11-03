@@ -100,6 +100,8 @@ export type CellDisplay = string | { readonly text: string; readonly href: strin
 export type CellLook = {
   readonly display?: CellDisplay;
   readonly value?: string;
+  // What sorting compares instead of `value` (a choice by its place in its list), where it differs: filters and copying keep `value`
+  readonly sortKey?: string;
   readonly marks?: readonly string[];
   readonly title?: string;
   // CSS custom properties set on the cell, by name (only names starting --swt-: what the feature's CSS reads; a later feature's

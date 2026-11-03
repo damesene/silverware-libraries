@@ -192,6 +192,23 @@ describe("Pivot tables", () => {
       expect(text).toContain("| East | 0.7059 |");
     });
 
+    it("moves values (and groups) up and down: the pivot's columns in that order", async () => {
+      await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |").replace("pivot.values='SUM([revenue])'", "pivot.values='SUM([revenue]), COUNTA([region])'")}\n`, { "silverware.table.metadata": true });
+      pivotSettings();
+      const button = (label: string) => dialog().querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+      // One group: nothing to order; two values: the first up and the last down dimmed
+      expect(button("Row 1 move up")).toBeNull();
+      expect(button("Value 1 move up")!.disabled).toBe(true);
+      expect(button("Value 2 move down")!.disabled).toBe(true);
+      button("Value 1 move down")!.click();
+      expect(previewCells()[0]).toEqual(["Region", "Count of Region", "Sum of Revenue"]);
+      dialog().querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
+      await flush();
+      await controller.scan();
+      expect(text).toContain("pivot.values='COUNTA([region]), SUM([revenue])'");
+      expect(text).toContain("| Region | Count of Region | Sum of Revenue |");
+    });
+
     it("keeps the rows sorted by a value as that value is changed", async () => {
       await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |").replace("pivot.values='SUM([revenue])'", "pivot.values='SUM([revenue])' pivot.sort='SUM([revenue]) desc'")}\n`, { "silverware.table.metadata": true });
       pivotSettings();

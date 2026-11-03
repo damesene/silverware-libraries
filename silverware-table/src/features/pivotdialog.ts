@@ -118,6 +118,24 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
     render();
   };
   const replaced = <T>(list: readonly T[], i: number, item: T) => list.map((x, j) => (j === i ? item : x));
+  // A list's item i moved one place up (-1) or down (1): what groups the rows, the columns, the values in that order
+  const moved = <T>(list: readonly T[], i: number, by: -1 | 1): T[] => {
+    const out = [...list];
+    [out[i], out[i + by]] = [out[i + by]!, out[i]!];
+    return out;
+  };
+  const orderButtons = (key: "rows" | "columns" | "values", i: number, aria: string) => {
+    const list: readonly unknown[] = fields[key];
+    const count = list.length;
+    if (count < 2) return null;
+    const step = (by: -1 | 1, text: string, title: string) =>
+      e("button", { class: "swt-pivot-move", text, title, attrs: { "aria-label": `${aria} ${title.toLowerCase()}`, "data-focus": `${aria} ${title}` }, run: () => set({ [key]: moved(list, i, by) } as Partial<Fields>) });
+    const up = step(-1, "↑", "Move up");
+    const down = step(1, "↓", "Move down");
+    up.disabled = i === 0;
+    down.disabled = i === count - 1;
+    return e("span", "swt-pivot-order", up, down);
+  };
   // A value changed or removed; the rows sorted by it still sorted by it, as it is written now (a function, a column, a share changed)
   const valueChanged = (i: number, f: ValueField | undefined): Partial<Fields> => {
     const was = valueText(fields.values[i]!).trim().toLowerCase();
@@ -130,7 +148,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
 
   // A group: a column and how it is grouped, or its formula as text
   // (`typed`: its formula as typed, kept without making the form anew, which would leave the field)
-  const groupRow = (field: GroupField, change: (f: GroupField | undefined) => void, typed: (f: GroupField) => void, aria: string) => {
+  const groupRow = (field: GroupField, change: (f: GroupField | undefined) => void, typed: (f: GroupField) => void, aria: string, order: ElementChild) => {
     if ("formula" in field) {
       const text = e("input", { attrs: { type: "text", "aria-label": `${aria} formula`, "data-focus": `${aria} formula` } });
       text.value = field.formula;
@@ -138,7 +156,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
         typed({ formula: text.value });
         previewSoon();
       });
-      return e("div", "swt-pivot-row", text, remove(() => change(undefined)));
+      return e("div", "swt-pivot-row", text, order, remove(() => change(undefined)));
     }
     const group = field;
     return e(
@@ -147,6 +165,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
       columnSelect(group.column, (column) => change({ column, grouping: group.grouping }), `${aria} column`),
       select(GROUPINGS, (g) => GROUPING_LABELS[g], group.grouping, (grouping: Grouping) => change({ column: group.column, grouping }), `${aria} grouping`),
       e("button", { class: "swt-pivot-formula", text: "fx", title: "Write it as a formula", run: () => change({ formula: groupText(group) }) }),
+      order,
       remove(() => change(undefined)),
     );
   };
@@ -157,6 +176,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
   };
   // A value: a function of a column, or its formula as text; as calculated or its share of a total
   const valueRow = (field: ValueField, change: (f: ValueField | undefined) => void, i: number) => {
+    const order = orderButtons("values", i, `Value ${i + 1}`);
     if ("formula" in field) {
       const text = e("input", { attrs: { type: "text", "aria-label": "Value formula", "data-focus": `value ${i} formula` } });
       text.value = field.formula;
@@ -164,7 +184,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
         fields = { ...fields, ...valueChanged(i, { ...fields.values[i]!, formula: text.value }) };
         previewSoon();
       });
-      return e("div", "swt-pivot-row", text, showSelect(field, (f) => change({ ...f, formula: text.value }), i), remove(() => change(undefined)));
+      return e("div", "swt-pivot-row", text, showSelect(field, (f) => change({ ...f, formula: text.value }), i), order, remove(() => change(undefined)));
     }
     return e(
       "div",
@@ -174,6 +194,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
       columnSelect(field.column, (column) => change({ ...field, column }), `Value ${i + 1} column`),
       showSelect(field, change, i),
       e("button", { class: "swt-pivot-formula", text: "fx", title: "Write it as a formula", run: () => change({ formula: valueFormula(field), show: field.show }) }),
+      order,
       remove(() => change(undefined)),
     );
   };
@@ -209,6 +230,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
           (f) => set({ [key]: f ? replaced(fields[key], i, f) : fields[key].filter((_, j) => j !== i) } as Partial<Fields>),
           (f) => (fields = { ...fields, [key]: replaced(fields[key], i, f) }),
           `${aria} ${i + 1}`,
+          orderButtons(key, i, `${aria} ${i + 1}`),
         ),
       );
     const sortKeys = ["", ...fields.rows.map(groupText), ...fields.values.map(valueText)];

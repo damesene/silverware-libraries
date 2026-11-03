@@ -10,7 +10,7 @@
 // formula/; this is the module around it.) Turned off, nothing is
 // recalculated: results stay as written.
 
-import { columnIdOf, columnName } from "../columns.ts";
+import { columnIdOf } from "../columns.ts";
 import { CELL_MENU_ORDER } from "../core/feature.ts";
 import type {
   AddressFrame,
@@ -75,7 +75,7 @@ import {
   withColumnKeys,
   writtenArea,
 } from "../formulas/index.ts";
-import { FormulaError, parseFormula } from "../formulas/index.ts";
+import { columnChoicesOf, FormulaError, parseFormula } from "../formulas/index.ts";
 import { addAffected, affectedBy, isAffected, type NamedOtherPages, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
 import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
@@ -213,7 +213,7 @@ export class Formulas implements Feature {
     host.offer({
       cells: this.cells,
       evaluate: (formula, text, page) => this.evaluate(formula, text, page),
-      complete: (formula, caret, text, columns) => formulaChoices(formula, caret, caret, pageNameChoices(this.cells, this.named(pageTablesOf(text))), undefined, columns ?? []),
+      complete: (formula, caret, text, headers) => formulaChoices(formula, caret, caret, pageNameChoices(this.cells, this.named(pageTablesOf(text))), undefined, columnChoicesOf(headers ?? [])),
       help: (formula, caret) => formulaHelp(formula, caret),
       problem: (formula) => {
         const tree = parseFormula(formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`);
@@ -956,8 +956,8 @@ export class Formulas implements Feature {
     const [from, to] = active.selection;
     const info = this.host.tableFor(active.key);
     const own = info ? this.nameOf(this.host.tableOf(info)) : undefined;
-    // The table's columns too, in a column reference ([qu, [@qu): by their headers' names
-    const columns = info ? (this.host.tableOf(info).rows[0]?.cells ?? []).map((h) => columnName(unescapeCell(h))) : [];
+    // The table's columns too, in a column reference ([qu, [@qu): shown by their headers' names, put in by their ids
+    const columns = info ? columnChoicesOf(this.host.tableOf(info).rows[0]?.cells ?? []) : [];
     const choices = formulaChoices(text, from, to, info ? this.namesFor(info) : [], own, columns);
     if (!choices) return undefined;
     const typed = text.slice(choices.from, choices.to);
@@ -1092,7 +1092,8 @@ export class Formulas implements Feature {
               if (this.host.editing === active) this.insertChoice(active, choices, i);
             },
           },
-          el(doc, "code", { text: choiceText(choice).replace(/[([!\]]$/, "") }),
+          // (A column by its header's name: what is put in is its id)
+          el(doc, "code", { text: choice.kind === "column" ? choice.name : choiceText(choice).replace(/[([!]$/, "") }),
           // A function: its first sentence (the rest shows under the list for the one picked); a name: what it names
           el(doc, "span", {
             text:

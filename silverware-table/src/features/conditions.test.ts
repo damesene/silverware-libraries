@@ -183,17 +183,24 @@ describe("Conditional formatting", () => {
     item("Conditional formatting…")!.click();
     dialog()!.querySelector<HTMLElement>(".swt-cf-summary")!.click();
     const field = dialog()!.querySelector<HTMLInputElement>("input.swt-cf-formula")!;
+    // As a key types: its input, then its keyup (which must leave the list open)
     const type = (text: string) => {
       field.focus();
       field.value = text;
       field.setSelectionRange(text.length, text.length);
       field.dispatchEvent(new Event("input", { bubbles: true }));
+      field.dispatchEvent(new KeyboardEvent("keyup", { key: text[text.length - 1] ?? "", bubbles: true }));
     };
     const offered = () => Array.from(dialog()!.querySelectorAll(".swt-cf-choice .swt-cf-choice-name")).map((c) => c.textContent);
     type("[@S");
     expect(offered()).toEqual(["Score"]);
+    // The caret moved by an arrow: the list closes; typing opens it again
+    field.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowLeft", bubbles: true }));
+    expect(offered()).toEqual([]);
+    type("[@S");
+    expect(offered()).toEqual(["Score"]);
     field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
-    expect(field.value).toBe("[@Score]");
+    expect(field.value).toBe("[@score]");
     // The dialog stays open (Enter was the list's), the list closed
     expect(dialog()).not.toBeNull();
     expect(offered()).toEqual([]);

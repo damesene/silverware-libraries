@@ -601,10 +601,10 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
       } else syntax.textContent = h.syntax;
       help.replaceChildren(syntax, e("span", { class: "swt-cf-description", text: h.description }));
     };
-    // `typing`: the text changed (else only the caret moved)
+    // `typing`: the text changed (else only the caret moved: the list closes, it opens as a name is typed)
     const update = (typing: boolean) => {
       const at = caret();
-      const made = input.selectionStart === input.selectionEnd ? helpers.complete(input.value, at) : undefined;
+      const made = typing && input.selectionStart === input.selectionEnd ? helpers.complete(input.value, at) : undefined;
       const key = made ? `${made.from}:${input.value.slice(made.from, at)}` : undefined;
       if (typing && key !== closedAt) closedAt = undefined;
       offered = made && key !== closedAt ? made : undefined;
@@ -615,10 +615,11 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
       if (typing) changed(input.value);
     };
     input.addEventListener("input", () => update(true));
-    for (const event of ["keyup", "click", "focus"]) input.addEventListener(event, (ev) => {
-      if (ev instanceof KeyboardEvent && ["ArrowUp", "ArrowDown", "Enter", "Tab", "Escape"].includes(ev.key)) return;
-      update(false);
-    });
+    // The caret moved (a click, an arrow, Home, End): the list closes, the help follows the caret; a key that typed
+    // was the input's (its keyup leaves the list as typing made it)
+    const MOVES = new Set(["ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"]);
+    input.addEventListener("keyup", (ev) => (MOVES.has(ev.key) ? update(false) : showHelp()));
+    for (const event of ["click", "focus"]) input.addEventListener(event, () => update(false));
     input.addEventListener("blur", () => {
       offered = undefined;
       showList();
@@ -641,7 +642,8 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
     });
     list.hidden = true;
     problem.textContent = value.trim() === "" ? "" : (helpers.problem(value) ?? "");
-    return e("span", "swt-cf-formula-box", input, list, problem, help);
+    // The list under the field itself, not under the help after it
+    return e("span", "swt-cf-formula-box", e("span", "swt-cf-formula-input", input, list), problem, help);
   }
 
   const swap = <T>(list: readonly T[], i: number, by: -1 | 1): T[] => {

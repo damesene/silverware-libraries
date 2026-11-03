@@ -309,18 +309,19 @@ export class Conditions implements Feature {
     const formulas = this.host.offered<FormulasOffer>("formulas");
     if (!formulas) return undefined;
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    const columns = (this.host.tableOf(info).rows[0]?.cells ?? []).map((h) => columnName(unescapeCell(h)));
+    const headers = this.host.tableOf(info).rows[0]?.cells ?? [];
     // The formula as the formulas module reads it, and how far its places moved
     const asFormula = (text: string) => (text.trimStart().startsWith("=") ? { formula: text, shift: 0 } : { formula: `=${text}`, shift: 1 });
     return {
       complete: (text, caret) => {
         const { formula, shift } = asFormula(text);
-        const made = formulas.complete(formula, caret + shift, this.host.pageText, columns);
+        const made = formulas.complete(formula, caret + shift, this.host.pageText, headers);
         if (!made) return undefined;
         return {
           from: made.from - shift,
           to: made.to - shift,
-          choices: made.choices.map((choice) => ({ label: choiceText(choice).replace(/[([!\]]$/, ""), insert: choiceText(choice), kind: CHOICE_KINDS[choice.kind] ?? choice.kind })),
+          // A column shown by its header's name, put in by its id
+          choices: made.choices.map((choice) => ({ label: choice.kind === "column" ? choice.name : choiceText(choice).replace(/[([!]$/, ""), insert: choiceText(choice), kind: CHOICE_KINDS[choice.kind] ?? choice.kind })),
         };
       },
       help: (text, caret) => {

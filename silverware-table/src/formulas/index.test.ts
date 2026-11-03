@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   choiceText,
+  columnChoicesOf,
   areaText,
   autofixFormula,
   columnLetters,
@@ -510,13 +511,19 @@ describe("formulaChoices of functions", () => {
   });
 
   it("offers the table's columns in a column reference not closed yet: [ ], [@ ], another table's [ ], past a ] after the caret", () => {
-    const columns = ["Qty", "Price", "quality", "Unit price", "Qty"];
-    expect(choiceNames(formulaChoices("=[q", 3, 3, [], undefined, columns))).toEqual({ from: 2, to: 3, names: ["Qty", "quality"] });
+    // Shown by their headers' names, put in by their ids (a second Qty: qty:2), as a click on a header writes them
+    const columns = columnChoicesOf(["Qty #number", "Price", "quality", "Unit price", "Qty"]);
+    expect(columns.map((c) => c.id)).toEqual(["qty", "price", "quality", "unit_price", "qty:2"]);
+    expect(choiceNames(formulaChoices("=[q", 3, 3, [], undefined, columns))).toEqual({ from: 2, to: 3, names: ["Qty", "quality", "Qty"] });
+    expect(formulaChoices("=[@unit p", 9, 9, [], undefined, columns)!.choices.map(choiceText)).toEqual(["unit_price]"]);
+    expect(formulaChoices("=[@unit_", 8, 8, [], undefined, columns)!.choices.map((c) => c.name)).toEqual(["Unit price"]);
     expect(choiceNames(formulaChoices("=SUM([@Pr", 9, 9, [], undefined, columns))).toEqual({ from: 7, to: 9, names: ["Price"] });
     expect(choiceNames(formulaChoices("=[unit p", 8, 8, [], undefined, columns))!.names).toEqual(["Unit price"]);
-    expect(choiceNames(formulaChoices("=[q]", 3, 3, [], undefined, columns))).toEqual({ from: 2, to: 4, names: ["Qty", "quality"] });
-    expect(choiceNames(formulaChoices("=[@", 3, 3, [], undefined, columns))!.names).toEqual(["Qty", "Price", "quality", "Unit price"]);
-    expect(choiceText({ kind: "column", name: "Unit price" })).toBe("Unit price]");
+    expect(choiceNames(formulaChoices("=[q]", 3, 3, [], undefined, columns))).toEqual({ from: 2, to: 4, names: ["Qty", "quality", "Qty"] });
+    // In the middle of a name: the whole name to its "]" is what a choice replaces
+    expect(choiceNames(formulaChoices("=[@Pri ce] > 1", 6, 6, [], undefined, columns))).toEqual({ from: 3, to: 10, names: ["Price"] });
+    expect(choiceNames(formulaChoices("=[@", 3, 3, [], undefined, columns))!.names).toEqual(["Qty", "Price", "quality", "Unit price", "Qty"]);
+    expect(choiceText({ kind: "column", name: "Unit price", id: "unit_price" })).toBe("unit_price]");
     // Not in a text, a page's link, a reference closed before the caret
     expect(formulaChoices('="[q', 4, 4, [], undefined, columns)).toBeUndefined();
     expect(formulaChoices("=[[Pa", 5, 5, [], undefined, columns)).toBeUndefined();
@@ -524,7 +531,7 @@ describe("formulaChoices of functions", () => {
     expect(formulaChoices("=[xyz", 5, 5, [], undefined, columns)).toBeUndefined();
     // Another table's columns are not these; the table's own name's and a named row's are
     expect(formulaChoices("=prices![q", 10, 10, [], "orders", columns)).toBeUndefined();
-    expect(choiceNames(formulaChoices("=orders![q", 10, 10, [], "orders", columns))!.names).toEqual(["Qty", "quality"]);
+    expect(choiceNames(formulaChoices("=orders![q", 10, 10, [], "orders", columns))!.names).toEqual(["Qty", "quality", "Qty"]);
     expect(choiceNames(formulaChoices("=pear[pr", 8, 8, [], "orders", columns))!.names).toEqual(["Price"]);
   });
 });

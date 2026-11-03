@@ -30,9 +30,10 @@ export type FormulasOffer = {
   readonly evaluate: (formula: string, text: string, page?: string) => Promise<{ readonly value: import("./values.ts").Value; readonly pages: readonly string[] }>;
   /**
    * What the name typed before `caret` in `formula` may be, on the page's `text`: its place in `formula` and the
-   * choices; `columns`, the table's the formula is of (as its headers name them), offered in [ ] and [@ ]
+   * choices; `headers`, the header's cells (as written) of the table the formula is of: its columns offered in [ ]
+   * and [@ ] by their names, put in by their ids
    */
-  readonly complete: (formula: string, caret: number, text: string, columns?: readonly string[]) => import("./help.ts").FormulaChoices | undefined;
+  readonly complete: (formula: string, caret: number, text: string, headers?: readonly string[]) => import("./help.ts").FormulaChoices | undefined;
   /** The function the caret is in, its syntax with the argument at the caret (else how references are written) */
   readonly help: (formula: string, caret: number) => import("./help.ts").FormulaHelp | undefined;
   /** Why a formula does not read (a ")" missing); undefined: it does */
@@ -56,7 +57,7 @@ export { ERROR_CODES, FormulaError, parseClock, type Scalar, type Value } from "
 export { withAreasWritten, type WrittenArea, writtenArea } from "./frame.ts";
 export { REF_ERROR } from "./tokens.ts";
 export { calculatedFormula, filledFormula, followFormula, followOwnFormula, followTable, type Following, formulasAfterEdit, shiftReferences, withCalculatedCells, withoutFormulas } from "./edits.ts";
-export { argumentSpan, type FormulaChoice, type FormulaChoices, choiceText, cycleFixed, findFunctions, type FormulaHelp, formulaChoices, formulaHelp, nameTyped, needsOperator, type PointedSpan, REFERENCE_HELP, referenceSlot } from "./help.ts";
+export { argumentSpan, type ColumnChoice, columnChoicesOf, type FormulaChoice, type FormulaChoices, choiceText, cycleFixed, findFunctions, type FormulaHelp, formulaChoices, formulaHelp, nameTyped, needsOperator, type PointedSpan, REFERENCE_HELP, referenceSlot } from "./help.ts";
 export { FUNCTION_CATEGORIES, type FormulaFunction, type FunctionCategory } from "./function.ts";
 export { functionNamed, isCustomFunction } from "./registry.ts";
 export type { IndexMap } from "../ops.ts";

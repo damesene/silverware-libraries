@@ -4132,10 +4132,15 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   padding-top: 6px;
 }
 .swt-cf-formula-box {
-  position: relative;
   display: inline-flex;
   flex-direction: column;
   gap: 4px;
+  max-width: 100%;
+}
+/* The field and its list, the list right under the field */
+.swt-cf-formula-input {
+  position: relative;
+  display: inline-flex;
   max-width: 100%;
 }
 .swt-cf input.swt-cf-formula {

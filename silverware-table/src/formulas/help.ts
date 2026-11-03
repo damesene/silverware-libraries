@@ -2,10 +2,12 @@
 // function's syntax (the argument typed marked) and description, where a
 // pointed reference goes; and the functions found by what they are or do
 // (the Functions dialog).
+import { columnIdOf, columnName } from "../columns.ts";
+import { unescapeCell } from "../markdown.ts";
 import { CELL_RE } from "../namerules.ts";
 import type { FormulaFunction, FunctionCategory } from "./function.ts";
 import { functionNamed, functionNames } from "./registry.ts";
-import { cellName, references } from "./references.ts";
+import { cellName, columnRefText, references } from "./references.ts";
 import { tokenize } from "./tokens.ts";
 
 /** What a formula's help says: a function's syntax and what it does, with the argument the caret is in (its span in `syntax`) */
@@ -68,7 +70,26 @@ export function needsOperator(formula: string, at: number): boolean {
  * (a named cell of the table edited, or of another table: `table`, written
  * table!name; a named row of the table edited; a named table)
  */
-export type FormulaChoice = { readonly kind: "function" | "cell" | "row" | "table" | "column"; readonly name: string; readonly table?: string };
+export type FormulaChoice = {
+  readonly kind: "function" | "cell" | "row" | "table" | "column";
+  // What the list shows (a column: its header's name)
+  readonly name: string;
+  readonly table?: string;
+  // A column: how a reference writes it (its key, its occurrence where several share it: unit_price, qty:2)
+  readonly id?: string;
+};
+
+/** A column of the table a formula is of: its header's name, what a reference writes for it */
+export type ColumnChoice = { readonly name: string; readonly id: string };
+
+/** A table's columns as completion offers them (`headers`: its header's cells as written): each its name and its id, as a click on its header writes it */
+export function columnChoicesOf(headers: readonly string[]): ColumnChoice[] {
+  return headers.flatMap((header, column) => {
+    const ref = columnRefText(columnIdOf(headers, column), false);
+    const name = columnName(unescapeCell(header));
+    return ref && name ? [{ name, id: ref.slice(1, -1) }] : [];
+  });
+}
 
 /** The choices a name typed right before the caret may be, and where the name is (from..to) */
 export type FormulaChoices = { readonly from: number; readonly to: number; readonly choices: readonly FormulaChoice[] };
@@ -88,8 +109,8 @@ export function formulaChoices(
   names: readonly FormulaChoice[] = [],
   // The name of the table edited: after its own name and ! (prices!va in prices), its own cells (offered bare)
   own?: string,
-  // The columns of the table the formula is of, as their headers name them: offered in [ ] and [@ ]
-  columns: readonly string[] = [],
+  // The columns of the table the formula is of (columnChoicesOf): offered in [ ] and [@ ] by their names, put in by their ids
+  columns: readonly ColumnChoice[] = [],
 ): FormulaChoices | undefined {
   const column = columnTyped(text, start, end);
   if (column) {
@@ -98,9 +119,10 @@ export function formulaChoices(
     const table = /([A-Za-z_][A-Za-z0-9_]*)!$/.exec(text.slice(0, open))?.[1];
     if (table !== undefined && table.toLowerCase() !== own?.toLowerCase()) return undefined;
     const prefix = text.slice(column.from, start).toLowerCase();
+    // By the name shown or the id written (unit_ finds Unit price too)
     const choices = columns
-      .filter((name, i) => name !== "" && columns.indexOf(name) === i && name.toLowerCase().startsWith(prefix))
-      .map((name): FormulaChoice => ({ kind: "column", name }));
+      .filter((c) => c.name.toLowerCase().startsWith(prefix) || c.id.toLowerCase().startsWith(prefix))
+      .map((c): FormulaChoice => ({ kind: "column", name: c.name, id: c.id }));
     return choices.length ? { ...column, choices } : undefined;
   }
   const typed = nameTyped(text, start, end);
@@ -137,14 +159,15 @@ export function choiceText(choice: FormulaChoice): string {
     case "cell":
       return choice.table ? `${choice.table}!${choice.name}` : choice.name;
     case "column":
-      return `${choice.name}]`;
+      return `${choice.id ?? choice.name}]`;
   }
 }
 
 /**
  * A column's name typed right before the caret, in a column reference not
  * closed yet (`[qu`, `[@qu`, `prices![qu`): from after its "[" (and "@") to the
- * caret, and past a "]" right after it (the choice closes it); undefined in a
+ * caret, and on past the rest of the name to its "]" where it has one (the
+ * choice is the whole name and closes it); undefined in a
  * text in quotes, in a link to a page ([[Page]]), or where nothing is open
  */
 export function columnTyped(text: string, start: number, end: number): { from: number; to: number } | undefined {
@@ -158,7 +181,9 @@ export function columnTyped(text: string, start: number, end: number): { from: n
   if (tokenize(before.slice(0, open)).error) return undefined;
   const from = open + 1 + (before[open + 1] === "@" ? 1 : 0);
   if (/["'\[]/.test(before.slice(from))) return undefined;
-  return { from, to: text[start] === "]" ? start + 1 : start };
+  // Up to its "]" (the name's rest after the caret too: the choice is the whole name), else to the caret
+  const close = /^[^\["'\]]*\]/.exec(text.slice(start));
+  return { from, to: close ? start + close[0].length : start };
 }
 
 /**

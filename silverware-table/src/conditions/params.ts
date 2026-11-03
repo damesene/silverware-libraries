@@ -4,7 +4,7 @@
 import type { ParamSpec, ParamSpecs, Params } from "./api.ts";
 import { checkStyle, colorProblem } from "./style.ts";
 
-const KINDS: ReadonlySet<string> = new Set(["number", "choice", "text", "pattern", "color", "boolean", "style", "list"]);
+const KINDS: ReadonlySet<string> = new Set(["number", "choice", "text", "pattern", "formula", "color", "boolean", "style", "list"]);
 const KEY_RE = /^[a-z][a-z0-9_]*$/i;
 
 /** Why specs are not ones; undefined: they are */
@@ -42,6 +42,7 @@ function valueOf(spec: ParamSpec, stored: unknown): unknown {
       return typeof stored === "string" ? spec.values.find((v) => v.toLowerCase() === stored.toLowerCase()) : undefined;
     case "text":
     case "pattern":
+    case "formula":
       return typeof stored === "string" ? stored : typeof stored === "number" ? String(stored) : undefined;
     case "color":
       return stored !== undefined && colorProblem(stored) === undefined ? stored : undefined;

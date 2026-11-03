@@ -68,7 +68,7 @@ export function needsOperator(formula: string, at: number): boolean {
  * (a named cell of the table edited, or of another table: `table`, written
  * table!name; a named row of the table edited; a named table)
  */
-export type FormulaChoice = { readonly kind: "function" | "cell" | "row" | "table"; readonly name: string; readonly table?: string };
+export type FormulaChoice = { readonly kind: "function" | "cell" | "row" | "table" | "column"; readonly name: string; readonly table?: string };
 
 /** The choices a name typed right before the caret may be, and where the name is (from..to) */
 export type FormulaChoices = { readonly from: number; readonly to: number; readonly choices: readonly FormulaChoice[] };
@@ -88,7 +88,21 @@ export function formulaChoices(
   names: readonly FormulaChoice[] = [],
   // The name of the table edited: after its own name and ! (prices!va in prices), its own cells (offered bare)
   own?: string,
+  // The columns of the table the formula is of, as their headers name them: offered in [ ] and [@ ]
+  columns: readonly string[] = [],
 ): FormulaChoices | undefined {
+  const column = columnTyped(text, start, end);
+  if (column) {
+    // Another table's column (prices![qu): its columns are not these, nothing offered; this table's own name's, they are
+    const open = text.lastIndexOf("[", column.from);
+    const table = /([A-Za-z_][A-Za-z0-9_]*)!$/.exec(text.slice(0, open))?.[1];
+    if (table !== undefined && table.toLowerCase() !== own?.toLowerCase()) return undefined;
+    const prefix = text.slice(column.from, start).toLowerCase();
+    const choices = columns
+      .filter((name, i) => name !== "" && columns.indexOf(name) === i && name.toLowerCase().startsWith(prefix))
+      .map((name): FormulaChoice => ({ kind: "column", name }));
+    return choices.length ? { ...column, choices } : undefined;
+  }
   const typed = nameTyped(text, start, end);
   if (!typed) return undefined;
   const prefix = text.slice(typed.from, typed.to).toLowerCase();
@@ -122,7 +136,29 @@ export function choiceText(choice: FormulaChoice): string {
       return `${choice.name}!`;
     case "cell":
       return choice.table ? `${choice.table}!${choice.name}` : choice.name;
+    case "column":
+      return `${choice.name}]`;
   }
+}
+
+/**
+ * A column's name typed right before the caret, in a column reference not
+ * closed yet (`[qu`, `[@qu`, `prices![qu`): from after its "[" (and "@") to the
+ * caret, and past a "]" right after it (the choice closes it); undefined in a
+ * text in quotes, in a link to a page ([[Page]]), or where nothing is open
+ */
+export function columnTyped(text: string, start: number, end: number): { from: number; to: number } | undefined {
+  if (start !== end || !text.trimStart().startsWith("=")) return undefined;
+  const before = text.slice(0, start);
+  const open = before.lastIndexOf("[");
+  if (open < 0 || before.indexOf("]", open) >= 0) return undefined;
+  // [[Page]]: a page's link, not a column
+  if (before[open - 1] === "[" || text[open + 1] === "[") return undefined;
+  // In a text in quotes the bracket is text
+  if (tokenize(before.slice(0, open)).error) return undefined;
+  const from = open + 1 + (before[open + 1] === "@" ? 1 : 0);
+  if (/["'\[]/.test(before.slice(from))) return undefined;
+  return { from, to: text[start] === "]" ? start + 1 : start };
 }
 
 /**

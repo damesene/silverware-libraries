@@ -34,12 +34,15 @@ import {
   type StoredRule,
   styleLook,
 } from "../conditions/index.ts";
-import { FormulaError, type FormulasOffer, isErrorText, type Scalar, scalarText } from "../formulas/index.ts";
+import { choiceText, FormulaError, type FormulasOffer, isErrorText, type Scalar, scalarText } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import { parseTable, type Table, unescapeCell } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
 import { withoutTags } from "../tags.ts";
-import { openConditionsDialog, type RuleSample, type ScopeColumn } from "./conditionsdialog.ts";
+import { type FormulaHelpers, openConditionsDialog, type RuleSample, type ScopeColumn } from "./conditionsdialog.ts";
+
+// What each kind of choice is, beside it in a formula's list
+const CHOICE_KINDS: Readonly<Record<string, string>> = { function: "function", column: "column", cell: "named cell", row: "named row", table: "table" };
 
 // The lines of a rule's preview (a whole table's rule column by column: one a column)
 const PREVIEW_LINES = 6;
@@ -293,8 +296,39 @@ export class Conditions implements Feature {
       },
       save: (rules) => void this.save(shown(), rules),
       sample: (rule) => this.ruleSample(shown(), rule),
+      ...(this.formulaHelpers(info) ? { formulas: this.formulaHelpers(info)! } : {}),
       ...(this.canStore(table) ? {} : { blocked: NEEDS_METADATA }),
     });
+  }
+
+  /**
+   * What the dialog offers while a formula is typed, through the formulas module (off: none): the functions,
+   * the page's names and the table's columns; a formula written without its "=" read as one with it
+   */
+  private formulaHelpers(shownInfo: TableInfo): FormulaHelpers | undefined {
+    const formulas = this.host.offered<FormulasOffer>("formulas");
+    if (!formulas) return undefined;
+    const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
+    const columns = (this.host.tableOf(info).rows[0]?.cells ?? []).map((h) => columnName(unescapeCell(h)));
+    // The formula as the formulas module reads it, and how far its places moved
+    const asFormula = (text: string) => (text.trimStart().startsWith("=") ? { formula: text, shift: 0 } : { formula: `=${text}`, shift: 1 });
+    return {
+      complete: (text, caret) => {
+        const { formula, shift } = asFormula(text);
+        const made = formulas.complete(formula, caret + shift, this.host.pageText, columns);
+        if (!made) return undefined;
+        return {
+          from: made.from - shift,
+          to: made.to - shift,
+          choices: made.choices.map((choice) => ({ label: choiceText(choice).replace(/[([!\]]$/, ""), insert: choiceText(choice), kind: CHOICE_KINDS[choice.kind] ?? choice.kind })),
+        };
+      },
+      help: (text, caret) => {
+        const { formula, shift } = asFormula(text);
+        return formulas.help(formula, caret + shift);
+      },
+      problem: (text) => formulas.problem(text),
+    };
   }
 
   private async save(info: TableInfo, rules: readonly StoredRule[]): Promise<void> {

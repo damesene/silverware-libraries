@@ -4123,6 +4123,78 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   gap: 8px;
   min-width: 0;
 }
+/* A formula's field: the choices for the name typed in a list under it, the syntax of the function the caret is in */
+/* A formula's name by its field, not by the middle of its help under it */
+.swt-cf-param:has(> .swt-cf-formula-box) {
+  align-items: flex-start;
+}
+.swt-cf-param:has(> .swt-cf-formula-box) > .swt-cf-param-name {
+  padding-top: 6px;
+}
+.swt-cf-formula-box {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+}
+.swt-cf input.swt-cf-formula {
+  width: 28em;
+  max-width: 100%;
+  font-family: var(--editor-font, monospace);
+}
+.swt-cf-choices {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1;
+  min-width: 16em;
+  max-height: 14em;
+  overflow: auto;
+  margin-top: 2px;
+  padding: 3px;
+  background: var(--root-background-color);
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+.swt-cf-choices[hidden] {
+  display: none;
+}
+.swt-cf-choice {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swt-cf-choice:hover,
+.swt-cf-choice-active {
+  background: color-mix(in srgb, var(--ui-accent-color) 18%, transparent);
+}
+.swt-cf-choice-name {
+  font-family: var(--editor-font, monospace);
+}
+.swt-cf-choice-kind {
+  font-size: 11px;
+  opacity: 0.6;
+}
+.swt-cf-formula-help {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 34em;
+}
+.swt-cf-formula-help:empty {
+  display: none;
+}
+.swt-cf-formula-syntax {
+  font-size: 12px;
+}
+.swt-cf-formula-syntax b {
+  color: var(--ui-accent-color);
+}
 /* A rule's preview: its cells across their values, a line for each range (a column), each cell in its look */
 .swt-cf-preview {
   display: flex;

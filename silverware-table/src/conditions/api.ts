@@ -101,6 +101,9 @@ export type ParamSpec = ParamCommon &
     | { readonly kind: "text"; readonly default?: string }
     // Text in the filter row's syntax: plain words found anywhere, /regex/flags, =a|b, >10, !…
     | { readonly kind: "pattern"; readonly default?: string }
+    // A formula of one row ([@due] < TODAY()): the dialog offers the functions and the table's columns as it is
+    // typed, the function's syntax, and says where it does not read
+    | { readonly kind: "formula"; readonly default?: string }
     | { readonly kind: "color"; readonly default?: Color }
     | { readonly kind: "boolean"; readonly default?: boolean }
     | { readonly kind: "style"; readonly default?: Style }

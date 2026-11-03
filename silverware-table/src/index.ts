@@ -80,7 +80,7 @@ export async function evaluated(formula: string, text?: string, page?: string): 
 /** A name a formula typed so far may go on with: the text it inserts, what it is, and for a function its syntax and description */
 export type FormulaCompletion = {
   readonly text: string;
-  readonly kind: "function" | "cell" | "row" | "table";
+  readonly kind: "function" | "cell" | "row" | "table" | "column";
   readonly syntax?: string;
   readonly description?: string;
 };

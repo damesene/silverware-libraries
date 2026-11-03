@@ -176,6 +176,42 @@ describe("Conditional formatting", () => {
     expect(count()).toBe("Formats 1 of 3 cells");
   });
 
+  it("helps a formula condition as it is typed: the table's columns and the functions offered, a function's syntax, why it does not read", async () => {
+    await setup(TABLE + META('[{"when":["formula",{"formula":""}],"format":"bold"}]'), { "silverware.table.metadata": true });
+    await flush();
+    at(2, 1).dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 }));
+    item("Conditional formatting…")!.click();
+    dialog()!.querySelector<HTMLElement>(".swt-cf-summary")!.click();
+    const field = dialog()!.querySelector<HTMLInputElement>("input.swt-cf-formula")!;
+    const type = (text: string) => {
+      field.focus();
+      field.value = text;
+      field.setSelectionRange(text.length, text.length);
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    const offered = () => Array.from(dialog()!.querySelectorAll(".swt-cf-choice .swt-cf-choice-name")).map((c) => c.textContent);
+    type("[@S");
+    expect(offered()).toEqual(["Score"]);
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    expect(field.value).toBe("[@Score]");
+    // The dialog stays open (Enter was the list's), the list closed
+    expect(dialog()).not.toBeNull();
+    expect(offered()).toEqual([]);
+    type("[@Score] > AVE");
+    expect(offered()).toEqual(["AVERAGE", "AVERAGEIFS"]);
+    // Esc closes the list, not the dialog
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    expect(offered()).toEqual([]);
+    expect(dialog()).not.toBeNull();
+    type("[@Score] > ROUND(");
+    expect(dialog()!.querySelector(".swt-cf-formula-syntax b")!.textContent).toBe("number");
+    expect(dialog()!.querySelector(".swt-cf-formula-box .swt-cf-problem")!.textContent).not.toBe("");
+    type("[@Score] > 50");
+    expect(dialog()!.querySelector(".swt-cf-formula-box .swt-cf-problem")!.textContent).toBe("");
+    await wait(200);
+    expect([1, 2, 3].map((r) => formatted(r))).toEqual([false, true, true]);
+  });
+
   it("clears a column's rules from its menu", async () => {
     await setup(TABLE + META('[{"format":"dataBar"}]'), { "silverware.table.metadata": true });
     await flush();

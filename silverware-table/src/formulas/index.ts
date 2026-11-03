@@ -28,8 +28,15 @@ export { type CellNameAt, cellsByName, type FormulaCells, formulaCount, forFormu
 export type FormulasOffer = {
   readonly cells: import("./cell.ts").FormulaCells;
   readonly evaluate: (formula: string, text: string, page?: string) => Promise<{ readonly value: import("./values.ts").Value; readonly pages: readonly string[] }>;
-  /** What the name typed before `caret` in `formula` may be, on the page's `text`: its place in `formula` and the choices */
-  readonly complete: (formula: string, caret: number, text: string) => import("./help.ts").FormulaChoices | undefined;
+  /**
+   * What the name typed before `caret` in `formula` may be, on the page's `text`: its place in `formula` and the
+   * choices; `columns`, the table's the formula is of (as its headers name them), offered in [ ] and [@ ]
+   */
+  readonly complete: (formula: string, caret: number, text: string, columns?: readonly string[]) => import("./help.ts").FormulaChoices | undefined;
+  /** The function the caret is in, its syntax with the argument at the caret (else how references are written) */
+  readonly help: (formula: string, caret: number) => import("./help.ts").FormulaHelp | undefined;
+  /** Why a formula does not read (a ")" missing); undefined: it does */
+  readonly problem: (formula: string) => string | undefined;
   /** A formula of one row (`[@due] < TODAY()`) calculated for each body row of a table of the page shown (values[0]: row 1), as a cell of none */
   readonly rowValues: (table: import("../markdown.ts").Table, formula: string) => readonly import("./values.ts").Scalar[];
 };

@@ -5,7 +5,7 @@ export default (): ConditionDefinition<{ formula: string }> => ({
   label: "Formula",
   category: "Formula",
   description: "Cells of the rows a formula of one row is true for (=[@due] < TODAY()); needs the formulas module",
-  params: { formula: { kind: "text", label: "Formula", default: "" } },
+  params: { formula: { kind: "formula", label: "Formula", default: "" } },
   test: (cell, { params, formula }) => {
     if (!params.formula.trim()) return false;
     const value = formula(params.formula);

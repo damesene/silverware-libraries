@@ -10,7 +10,7 @@
 // formula/; this is the module around it.) Turned off, nothing is
 // recalculated: results stay as written.
 
-import { columnIdOf } from "../columns.ts";
+import { columnIdOf, columnName } from "../columns.ts";
 import { CELL_MENU_ORDER } from "../core/feature.ts";
 import type {
   AddressFrame,
@@ -75,6 +75,7 @@ import {
   withColumnKeys,
   writtenArea,
 } from "../formulas/index.ts";
+import { FormulaError, parseFormula } from "../formulas/index.ts";
 import { addAffected, affectedBy, isAffected, type NamedOtherPages, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
 import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
@@ -98,6 +99,7 @@ const NAME_KINDS: Readonly<Record<Exclude<FormulaChoice["kind"], "function">, st
   cell: "Named cell of this table",
   row: "Named row of this table",
   table: "Named table",
+  column: "Column of this table",
 };
 
 /** The help under the list for the choice picked: a function's syntax and description, a name's use */
@@ -115,6 +117,8 @@ function choiceHelp(choice: FormulaChoice): FormulaHelp {
       return { syntax: `${choice.name}[column]`, description: "A named row of this table: its cell in a column, e.g. pear[price]." };
     case "table":
       return { syntax: `${choice.name}!A1 · ${choice.name}![column]`, description: "A named table of the page: a cell, range or column of it." };
+    case "column":
+      return { syntax: `[${choice.name}] · [@${choice.name}]`, description: "A column of this table: all of it, or (with @) its cell in the formula's row." };
   }
 }
 
@@ -209,7 +213,12 @@ export class Formulas implements Feature {
     host.offer({
       cells: this.cells,
       evaluate: (formula, text, page) => this.evaluate(formula, text, page),
-      complete: (formula, caret, text) => formulaChoices(formula, caret, caret, pageNameChoices(this.cells, this.named(pageTablesOf(text)))),
+      complete: (formula, caret, text, columns) => formulaChoices(formula, caret, caret, pageNameChoices(this.cells, this.named(pageTablesOf(text))), undefined, columns ?? []),
+      help: (formula, caret) => formulaHelp(formula, caret),
+      problem: (formula) => {
+        const tree = parseFormula(formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`);
+        return tree instanceof FormulaError ? tree.detail : undefined;
+      },
       rowValues: (table, formula) => rowValues(table, formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`, { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) }),
     } satisfies FormulasOffer);
   }
@@ -947,7 +956,9 @@ export class Formulas implements Feature {
     const [from, to] = active.selection;
     const info = this.host.tableFor(active.key);
     const own = info ? this.nameOf(this.host.tableOf(info)) : undefined;
-    const choices = formulaChoices(text, from, to, info ? this.namesFor(info) : [], own);
+    // The table's columns too, in a column reference ([qu, [@qu): by their headers' names
+    const columns = info ? (this.host.tableOf(info).rows[0]?.cells ?? []).map((h) => columnName(unescapeCell(h))) : [];
+    const choices = formulaChoices(text, from, to, info ? this.namesFor(info) : [], own, columns);
     if (!choices) return undefined;
     const typed = text.slice(choices.from, choices.to);
     const key = `${choices.from}:${typed}`;
@@ -1081,7 +1092,7 @@ export class Formulas implements Feature {
               if (this.host.editing === active) this.insertChoice(active, choices, i);
             },
           },
-          el(doc, "code", { text: choiceText(choice).replace(/[([!]$/, "") }),
+          el(doc, "code", { text: choiceText(choice).replace(/[([!\]]$/, "") }),
           // A function: its first sentence (the rest shows under the list for the one picked); a name: what it names
           el(doc, "span", {
             text:

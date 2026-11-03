@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  choiceText,
   areaText,
   autofixFormula,
   columnLetters,
@@ -506,6 +507,25 @@ describe("formulaChoices of functions", () => {
     expect(choiceNames(formulaChoices("=AVERAGE", 4, 4))).toBeUndefined(); // in the middle of a name
     expect(choiceNames(formulaChoices("=AVE", 2, 4))).toBeUndefined(); // a selection
     expect(choiceNames(formulaChoices("AVE", 3, 3))).toBeUndefined();
+  });
+
+  it("offers the table's columns in a column reference not closed yet: [ ], [@ ], another table's [ ], past a ] after the caret", () => {
+    const columns = ["Qty", "Price", "quality", "Unit price", "Qty"];
+    expect(choiceNames(formulaChoices("=[q", 3, 3, [], undefined, columns))).toEqual({ from: 2, to: 3, names: ["Qty", "quality"] });
+    expect(choiceNames(formulaChoices("=SUM([@Pr", 9, 9, [], undefined, columns))).toEqual({ from: 7, to: 9, names: ["Price"] });
+    expect(choiceNames(formulaChoices("=[unit p", 8, 8, [], undefined, columns))!.names).toEqual(["Unit price"]);
+    expect(choiceNames(formulaChoices("=[q]", 3, 3, [], undefined, columns))).toEqual({ from: 2, to: 4, names: ["Qty", "quality"] });
+    expect(choiceNames(formulaChoices("=[@", 3, 3, [], undefined, columns))!.names).toEqual(["Qty", "Price", "quality", "Unit price"]);
+    expect(choiceText({ kind: "column", name: "Unit price" })).toBe("Unit price]");
+    // Not in a text, a page's link, a reference closed before the caret
+    expect(formulaChoices('="[q', 4, 4, [], undefined, columns)).toBeUndefined();
+    expect(formulaChoices("=[[Pa", 5, 5, [], undefined, columns)).toBeUndefined();
+    expect(choiceNames(formulaChoices("=[Qty]+pr", 9, 9, [], undefined, columns))!.names).toEqual(["PRODUCT", "PROPER"]);
+    expect(formulaChoices("=[xyz", 5, 5, [], undefined, columns)).toBeUndefined();
+    // Another table's columns are not these; the table's own name's and a named row's are
+    expect(formulaChoices("=prices![q", 10, 10, [], "orders", columns)).toBeUndefined();
+    expect(choiceNames(formulaChoices("=orders![q", 10, 10, [], "orders", columns))!.names).toEqual(["Qty", "quality"]);
+    expect(choiceNames(formulaChoices("=pear[pr", 8, 8, [], "orders", columns))!.names).toEqual(["Price"]);
   });
 });
 

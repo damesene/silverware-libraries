@@ -21,6 +21,14 @@
 export { type CellNameAt, cellsByName, type FormulaCells, formulaCount, forFormulas, hasFormulas, isErrorText, isFormulaInput, type RowName, rowsByName, type StoredFormula } from "./cell.ts";
 
 /**
+ * A formula as written where its "=" may be left out (a condition's, Space
+ * Lua's): the formula with it, and how far its places moved (1 where it was added)
+ */
+export function withEquals(text: string): { readonly formula: string; readonly shift: number } {
+  return text.trimStart().startsWith("=") ? { formula: text, shift: 0 } : { formula: `=${text}`, shift: 1 };
+}
+
+/**
  * What the formulas module offers other modules (ModelHost.offered("formulas")): its cells as the formulas read them;
  * `evaluate`: a formula calculated in no table, on the page's text (the Space Lua API's), a range as its values,
  * and the other pages it read
@@ -28,8 +36,18 @@ export { type CellNameAt, cellsByName, type FormulaCells, formulaCount, forFormu
 export type FormulasOffer = {
   readonly cells: import("./cell.ts").FormulaCells;
   readonly evaluate: (formula: string, text: string, page?: string) => Promise<{ readonly value: import("./values.ts").Value; readonly pages: readonly string[] }>;
-  /** What the name typed before `caret` in `formula` may be, on the page's `text`: its place in `formula` and the choices */
-  readonly complete: (formula: string, caret: number, text: string) => import("./help.ts").FormulaChoices | undefined;
+  /**
+   * What the name typed before `caret` in `formula` may be, on the page's `text`: its place in `formula` and the
+   * choices; `table`, the table the formula is of (as a cell's formula is): its columns in [ ] and [@ ], its named
+   * rows and cells, its own name's prefix, as a cell's formula has them
+   */
+  readonly complete: (formula: string, caret: number, text: string, table?: import("../markdown.ts").Table) => import("./help.ts").FormulaChoices | undefined;
+  /** The function the caret is in, its syntax with the argument at the caret; undefined out of any */
+  readonly help: (formula: string, caret: number) => import("./help.ts").FormulaHelp | undefined;
+  /** Why a formula does not read (a ")" missing); undefined: it does */
+  readonly problem: (formula: string) => string | undefined;
+  /** A formula of one row (`[@due] < TODAY()`) calculated for each body row of a table of the page shown (values[0]: row 1), as a cell of none */
+  readonly rowValues: (table: import("../markdown.ts").Table, formula: string) => readonly import("./values.ts").Scalar[];
 };
 
 /** What the pageLinks module offers: the other pages these formulas and tables refer to (and theirs, in turn) read anew; which they are */
@@ -47,7 +65,7 @@ export { ERROR_CODES, FormulaError, parseClock, type Scalar, type Value } from "
 export { withAreasWritten, type WrittenArea, writtenArea } from "./frame.ts";
 export { REF_ERROR } from "./tokens.ts";
 export { calculatedFormula, filledFormula, followFormula, followOwnFormula, followTable, type Following, formulasAfterEdit, shiftReferences, withCalculatedCells, withoutFormulas } from "./edits.ts";
-export { argumentSpan, type FormulaChoice, type FormulaChoices, choiceText, cycleFixed, findFunctions, type FormulaHelp, formulaChoices, formulaHelp, nameTyped, needsOperator, type PointedSpan, REFERENCE_HELP, referenceSlot } from "./help.ts";
+export { argumentSpan, type ColumnChoice, columnChoicesOf, type FormulaChoice, type FormulaChoices, choiceText, cycleFixed, findFunctions, type FormulaHelp, formulaChoices, formulaHelp, functionHelp, nameTyped, needsOperator, type PointedSpan, REFERENCE_HELP, referenceSlot } from "./help.ts";
 export { FUNCTION_CATEGORIES, type FormulaFunction, type FunctionCategory } from "./function.ts";
 export { functionNamed, isCustomFunction } from "./registry.ts";
 export type { IndexMap } from "../ops.ts";

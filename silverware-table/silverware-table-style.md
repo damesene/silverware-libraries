@@ -1197,6 +1197,11 @@ body.swt-resizing * {
 .swt-dialog-backdrop {
   position: fixed;
   inset: 0;
+  /* Over the part of the window in view (an on-screen keyboard leaves the rest): the shared dialog's --sw-view-* */
+  top: var(--sw-view-top, 0);
+  bottom: auto;
+  height: 100vh;
+  height: var(--sw-view-height, 100dvh);
   z-index: 100;
   display: flex;
   align-items: center;
@@ -1211,7 +1216,9 @@ body.swt-resizing * {
   flex-direction: column;
   width: min(640px, calc(100vw - 24px));
   max-height: calc(100vh - 32px);
-  max-height: calc(100dvh - 32px);
+  max-height: calc(var(--sw-view-height, 100dvh) - 32px);
+  /* (Its border within the height: SilverBullet sets no box-sizing) */
+  box-sizing: border-box;
   color: var(--root-color);
   background: var(--root-background-color);
   border: 1px solid var(--swt-dialog-line);
@@ -1268,11 +1275,137 @@ body.swt-resizing * {
   width: 16px;
   height: 16px;
 }
+/* The look at the page under the dialog: its button by the ×, the dialog gone meanwhile, a way back on a touch screen */
+.swt-dialog-peek {
+  display: inline-flex;
+  padding: 5px;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  opacity: 0.65;
+  touch-action: none;
+}
+.swt-dialog-peek:hover,
+.swt-dialog-peek[aria-pressed="true"] {
+  opacity: 1;
+  background: var(--swt-dialog-card);
+}
+.swt-dialog-peek svg {
+  width: 16px;
+  height: 16px;
+}
+/* The page under it is the user's meanwhile (presses, scrolling): its way back alone takes presses */
+.swt-dialog-backdrop.swt-dialog-peeking {
+  background: transparent;
+  pointer-events: none;
+}
+.swt-dialog-peeking > .swt-dialog-peek-back {
+  pointer-events: auto;
+}
+.swt-dialog-peeking > .swt-dialog {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.swt-dialog-peek-back {
+  display: none;
+}
+.swt-dialog-peeking > .swt-dialog-peek-back {
+  display: block;
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  padding: 10px 18px;
+  font: inherit;
+  white-space: nowrap;
+  color: #fff;
+  background: var(--ui-accent-color, #4a7cf0);
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition:
+    background-color 0.12s,
+    box-shadow 0.12s,
+    transform 0.12s;
+}
+/* Hovered: darker, lifted, as a button that takes a click */
+.swt-dialog-peeking > .swt-dialog-peek-back:hover {
+  background: color-mix(in srgb, var(--ui-accent-color, #4a7cf0) 80%, #000);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4);
+  transform: translateX(-50%) translateY(-2px);
+}
+.swt-dialog-peeking > .swt-dialog-peek-back:active {
+  transform: translateX(-50%);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.swt-dialog-peeking > .swt-dialog-peek-back:focus-visible {
+  outline: 2px solid var(--root-color, #000);
+  outline-offset: 2px;
+}
+/* A dialog held from the top (DialogOptions' anchor): what grows in it grows downwards; a gap above it */
+.swt-dialog-backdrop.swt-dialog-backdrop-top {
+  align-items: flex-start;
+  box-sizing: border-box;
+  padding-top: min(6vh, 48px);
+}
+.swt-dialog-backdrop-top > .swt-dialog {
+  max-height: calc(100vh - min(6vh, 48px) - 16px);
+  max-height: calc(var(--sw-view-height, 100dvh) - min(6vh, 48px) - 16px);
+}
+/* What does not fit scrolls, its head and its foot (Save) staying in view */
 .swt-dialog-body {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-height: 0;
   padding: 0 16px 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.swt-dialog-head,
+.swt-dialog-foot {
+  flex: none;
+}
+/* A phone: the dialog nearly the whole screen, a section's name over its fields */
+@media (max-width: 600px) {
+  .swt-dialog {
+    width: calc(100vw - 12px);
+    max-height: calc(100vh - 12px);
+    max-height: calc(var(--sw-view-height, 100dvh) - 12px);
+  }
+  .swt-dialog-head {
+    padding: 10px 12px 6px;
+  }
+  .swt-dialog-body {
+    padding: 0 12px 10px;
+  }
+  .swt-dialog-foot {
+    padding: 8px 12px 10px;
+  }
+  .swt-dialog-backdrop.swt-dialog-backdrop-top {
+    padding-top: 6px;
+  }
+  .swt-dialog-backdrop-top > .swt-dialog {
+    max-height: calc(100vh - 12px);
+    max-height: calc(var(--sw-view-height, 100dvh) - 12px);
+  }
+  .swt-pivot-section,
+  .swt-cf-section {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .swt-pivot-label,
+  .swt-cf-label {
+    padding-top: 0;
+  }
+  .swt-cf-editor {
+    margin-left: 4px;
+    padding: 6px 6px 6px 8px;
+  }
+  .swt-cf-line {
+    flex-wrap: wrap;
+  }
 }
 .swt-dialog-foot {
   padding: 10px 16px 12px;
@@ -1585,6 +1718,141 @@ body.swt-resizing * {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+/* The Choices dialog: a choice column's list, its name and its values one a line */
+.swt-choices-dialog {
+  width: min(440px, calc(100vw - 24px));
+  /* Of one height whichever way is picked (the list's fields shown or not), the body taking what is left */
+  min-height: min(520px, calc(100vh - 32px));
+  min-height: min(520px, calc(var(--sw-view-height, 100dvh) - 32px));
+}
+.swt-choices-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.swt-choices-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.swt-choices-list[hidden] {
+  display: none;
+}
+/* The two ways: the column's values or a list of its own */
+.swt-choices-ways {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.swt-choices-way {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swt-choices-way:has(input:checked) {
+  border-color: var(--ui-accent-color);
+}
+.swt-choices-way:has(input:disabled) {
+  opacity: 0.6;
+  cursor: default;
+}
+.swt-choices-way input {
+  margin-top: 3px;
+}
+.swt-choices-way > span {
+  display: flex;
+  flex-direction: column;
+}
+.swt-choices-way-text {
+  font-size: 12px;
+  opacity: 0.75;
+}
+.swt-choices-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.swt-choices-name,
+.swt-choices-value {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font: inherit;
+  font-weight: normal;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+}
+.swt-choices-tag {
+  font-weight: normal;
+  font-family: var(--editor-font, monospace);
+  opacity: 0.7;
+}
+.swt-choices-values {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.swt-choices-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.swt-choices-icon {
+  display: inline-flex;
+  padding: 4px;
+  color: inherit;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  opacity: 0.7;
+}
+.swt-choices-icon:hover {
+  opacity: 1;
+  background: var(--swt-dialog-line);
+}
+.swt-choices-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.swt-choices-actions,
+.swt-choices-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.swt-choices-grip {
+  cursor: grab;
+  touch-action: none;
+}
+/* A value dragged: its place held, dimmed, the others sliding aside; a copy following the pointer */
+.swt-choices-placeholder {
+  opacity: 0.3;
+}
+.swt-choices-ghost {
+  position: fixed;
+  z-index: 101;
+  margin: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+  background: var(--root-background-color);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  cursor: grabbing;
+  opacity: 0.95;
+}
+.swt-choices-problem {
+  color: var(--danger-color, #c62828);
+  opacity: 1;
 }
 /* The Excel dialog: the formulas written as values, each with its cell and why */
 .swt-excel {
@@ -3605,5 +3873,521 @@ html[data-theme="dark"] .sb-table-widget[data-swt-theme="ledger"] {
   --swt-border: #166534;
   --swt-hover: rgba(74, 222, 128, 0.1);
   --swt-accent: #4ade80;
+}
+
+/* ---- Conditional formatting (the conditions module) ----
+   A cell a rule formats has the mark swt-cf and custom properties of its
+   style (--swt-cf-fill, --swt-cf-color, …, each with its -dark value): these
+   rules read them, one set for every format, so a format of any colors and
+   levels needs no CSS of its own. No !important: a theme that uses it wins. */
+
+/* The palette: a tint to fill a cell, a shade for its text, a strong color for bars and icons; light and dark */
+:root {
+  --swt-cf-red-fill: #ffc7ce;
+  --swt-cf-red-text: #9c0006;
+  --swt-cf-red-solid: #e5534b;
+  --swt-cf-orange-fill: #fdd9b5;
+  --swt-cf-orange-text: #8a4300;
+  --swt-cf-orange-solid: #f08c2e;
+  --swt-cf-yellow-fill: #ffeb9c;
+  --swt-cf-yellow-text: #9c5700;
+  --swt-cf-yellow-solid: #e0b000;
+  --swt-cf-green-fill: #c6efce;
+  --swt-cf-green-text: #006100;
+  --swt-cf-green-solid: #3fa34d;
+  --swt-cf-teal-fill: #c3ece8;
+  --swt-cf-teal-text: #0b5c55;
+  --swt-cf-teal-solid: #1aa39a;
+  --swt-cf-blue-fill: #cfe2ff;
+  --swt-cf-blue-text: #0b3d91;
+  --swt-cf-blue-solid: #4a7cf0;
+  --swt-cf-purple-fill: #e3d5f7;
+  --swt-cf-purple-text: #4b2a85;
+  --swt-cf-purple-solid: #8a63d2;
+  --swt-cf-pink-fill: #fbd3e9;
+  --swt-cf-pink-text: #8a1d55;
+  --swt-cf-pink-solid: #d9488f;
+  --swt-cf-gray-fill: #e3e3e3;
+  --swt-cf-gray-text: #3d3d3d;
+  --swt-cf-gray-solid: #8a8a8a;
+}
+html[data-theme="dark"] {
+  --swt-cf-red-fill: #5c1f24;
+  --swt-cf-red-text: #ffb3b8;
+  --swt-cf-red-solid: #f0716a;
+  --swt-cf-orange-fill: #5c3514;
+  --swt-cf-orange-text: #ffc58f;
+  --swt-cf-orange-solid: #f5a052;
+  --swt-cf-yellow-fill: #5a4a12;
+  --swt-cf-yellow-text: #ffe08a;
+  --swt-cf-yellow-solid: #f0c63a;
+  --swt-cf-green-fill: #1e4d2b;
+  --swt-cf-green-text: #a7e3b3;
+  --swt-cf-green-solid: #5cc26b;
+  --swt-cf-teal-fill: #134542;
+  --swt-cf-teal-text: #9fe3dc;
+  --swt-cf-teal-solid: #3cc4ba;
+  --swt-cf-blue-fill: #1d3461;
+  --swt-cf-blue-text: #b3cdfd;
+  --swt-cf-blue-solid: #6f97f5;
+  --swt-cf-purple-fill: #3a2a5c;
+  --swt-cf-purple-text: #d4c2f5;
+  --swt-cf-purple-solid: #a585e3;
+  --swt-cf-pink-fill: #5a1f3d;
+  --swt-cf-pink-text: #f7b5d6;
+  --swt-cf-pink-solid: #e870a9;
+  --swt-cf-gray-fill: #3a3a3a;
+  --swt-cf-gray-text: #d6d6d6;
+  --swt-cf-gray-solid: #a0a0a0;
+}
+
+/* The value of each look, picked by the page's: the rules below read these */
+:is(td, .swt-cf-sample).swt-cf {
+  --swt-cf-fill-now: var(--swt-cf-fill);
+  --swt-cf-color-now: var(--swt-cf-color);
+  --swt-cf-bar-color-now: var(--swt-cf-bar-color);
+  --swt-cf-icon-color-now: var(--swt-cf-icon-color);
+}
+html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
+  --swt-cf-fill-now: var(--swt-cf-fill-dark, var(--swt-cf-fill));
+  --swt-cf-color-now: var(--swt-cf-color-dark, var(--swt-cf-color));
+  --swt-cf-bar-color-now: var(--swt-cf-bar-color-dark, var(--swt-cf-bar-color));
+  --swt-cf-icon-color-now: var(--swt-cf-icon-color-dark, var(--swt-cf-icon-color));
+}
+/* A fill over the stripes and the row's hover tint; a selected or edited cell's tint (an inset shadow) over it */
+:is(#sb-main, html) .sb-table-widget td.swt-cf-fill,
+.swt-cf-sample.swt-cf-fill {
+  background-color: var(--swt-cf-fill-now);
+}
+/* A text color: not over a typed cell's invalid mark, which is told first */
+:is(#sb-main, html) .sb-table-widget td.swt-cf-color:not(.swt-type-invalid),
+:is(#sb-main, html) .sb-table-widget td.swt-cf-color:not(.swt-type-invalid) a,
+.swt-cf-sample.swt-cf-color {
+  color: var(--swt-cf-color-now);
+}
+.sb-table-widget td.swt-cf-text,
+.sb-table-widget td.swt-cf-text > .swt-cell-content,
+.swt-cf-sample.swt-cf-text {
+  font-weight: var(--swt-cf-weight, inherit);
+  font-style: var(--swt-cf-style, inherit);
+  text-decoration-line: var(--swt-cf-line, none);
+}
+/* A data bar: under the content, from the cell's left edge, the fill (if any) around it */
+:is(#sb-main, html) .sb-table-widget td.swt-cf-bar,
+.swt-cf-sample.swt-cf-bar {
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--swt-cf-bar-color-now) 45%, transparent) var(--swt-cf-bar),
+    transparent var(--swt-cf-bar)
+  );
+  background-repeat: no-repeat;
+}
+/* An icon before the content (an arrow, a dot) */
+:is(#sb-main, html) .sb-table-widget td.swt-cf-icon > .swt-cell-content::before,
+.swt-cf-sample.swt-cf-icon::before {
+  content: var(--swt-cf-icon);
+  color: var(--swt-cf-icon-color-now);
+  margin-right: 0.35em;
+  font-weight: normal;
+  text-decoration: none;
+  display: inline-block;
+}
+
+/* The rules' dialog */
+.swt-cf-dialog {
+  width: min(820px, calc(100vw - 24px));
+  /* A height of its own where the window has room: a rule opened or closed does not move the dialog's foot */
+  min-height: min(560px, calc(100vh - 32px));
+  min-height: min(560px, calc(var(--sw-view-height, 100dvh) - 32px));
+}
+.swt-cf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.swt-cf-list:focus {
+  outline: none;
+}
+.swt-cf-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+}
+.swt-cf-line.swt-cf-open {
+  border-color: var(--ui-accent-color);
+}
+.swt-cf-unread {
+  opacity: 0.75;
+  font-size: 12px;
+}
+.swt-cf-summary {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 4px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swt-cf-summary:hover {
+  background: var(--swt-dialog-card);
+}
+.swt-cf-scope {
+  font-weight: 600;
+}
+.swt-cf-arrow,
+.swt-cf-stop {
+  opacity: 0.6;
+}
+.swt-cf-stop {
+  font-size: 11px;
+  padding: 0 4px;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 4px;
+}
+/* How a rule's format looks: a strip of its colors (a scale's, levels'), as Google Sheets previews one */
+.swt-cf-strip {
+  display: inline-flex;
+  flex: none;
+  width: 84px;
+  height: 20px;
+  overflow: hidden;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 4px;
+}
+.swt-cf-strip > .swt-cf-sample.swt-cf-part {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+}
+.swt-cf-strip > .swt-cf-sample.swt-cf-icon::before {
+  margin-right: 0;
+}
+.swt-cf-param-line {
+  gap: 8px;
+}
+.swt-cf-sample {
+  display: inline-block;
+  min-width: 3.2em;
+  padding: 1px 6px;
+  font-size: 12px;
+  text-align: center;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 3px;
+}
+.swt-cf-tools {
+  display: inline-flex;
+}
+.swt-cf-tool {
+  padding: 2px 6px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.65;
+}
+.swt-cf-tool:hover:not(:disabled) {
+  background: var(--swt-dialog-card);
+  opacity: 1;
+}
+.swt-cf-tool:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.swt-cf-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 6px 12px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--ui-accent-color);
+}
+.swt-cf-section {
+  display: grid;
+  grid-template-columns: 8em 1fr;
+  gap: 4px 12px;
+  align-items: start;
+}
+.swt-cf-label {
+  font-weight: 600;
+  padding-top: 5px;
+}
+.swt-cf-fields,
+.swt-cf-params {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.swt-cf-description {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.swt-cf-param {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.swt-cf-param-list {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.swt-cf-param-name {
+  font-size: 12px;
+  opacity: 0.75;
+  min-width: 5em;
+}
+.swt-cf-list-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px dashed var(--swt-dialog-line);
+  border-radius: 6px;
+}
+.swt-cf select,
+.swt-cf input[type="text"],
+.swt-cf input[type="number"] {
+  padding: 4px 6px;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  min-width: 0;
+}
+.swt-cf input[type="text"] {
+  width: 16em;
+  max-width: 100%;
+}
+.swt-cf input[type="number"] {
+  width: 6em;
+}
+.swt-cf-problem {
+  font-size: 12px;
+  color: var(--danger-color, #c62828);
+}
+.swt-cf-problem:empty {
+  display: none;
+}
+.swt-cf-colors {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+}
+.swt-cf-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swt-cf-swatch[aria-pressed="true"] {
+  outline: 2px solid var(--ui-accent-color);
+  outline-offset: 1px;
+}
+.swt-cf-swatch-none {
+  background: linear-gradient(to top right, transparent 45%, var(--danger-color, #c62828) 45% 55%, transparent 55%);
+}
+.swt-cf-colors input[type="color"] {
+  width: 26px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+.swt-cf-colors input[type="color"].swt-cf-picked {
+  outline: 2px solid var(--ui-accent-color);
+  outline-offset: 1px;
+}
+.swt-cf-style {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.swt-cf-style-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.swt-cf-style-name {
+  font-size: 12px;
+  opacity: 0.75;
+  min-width: 2.6em;
+}
+.swt-cf-flag {
+  min-width: 24px;
+  padding: 1px 6px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swt-cf-flag[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--ui-accent-color) 22%, transparent);
+  border-color: var(--ui-accent-color);
+}
+.swt-cf-flag-bold {
+  font-weight: bold;
+}
+.swt-cf-flag-italic {
+  font-style: italic;
+}
+.swt-cf-flag-underline {
+  text-decoration: underline;
+}
+.swt-cf-flag-strike {
+  text-decoration: line-through;
+}
+.swt-cf-list-fields {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+/* A formula's field: the choices for the name typed in a list under it, the syntax of the function the caret is in */
+/* A formula's name by its field, not by the middle of its help under it */
+.swt-cf-param:has(> .swt-cf-formula-box) {
+  align-items: flex-start;
+}
+.swt-cf-param:has(> .swt-cf-formula-box) > .swt-cf-param-name {
+  padding-top: 6px;
+}
+.swt-cf-formula-box {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+}
+/* The field and its list, the list right under the field */
+.swt-cf-formula-input {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+}
+.swt-cf input.swt-cf-formula {
+  width: 28em;
+  max-width: 100%;
+  font-family: var(--editor-font, monospace);
+}
+/* Over the dialog (fixed: its body scrolls and would cut it), placed under the field by the script */
+.swt-cf-choices {
+  position: fixed;
+  z-index: 2;
+  min-width: 16em;
+  max-width: min(32em, calc(100vw - 24px));
+  max-height: 14em;
+  overflow: auto;
+  padding: 3px;
+  background: var(--root-background-color);
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+.swt-cf-choices[hidden] {
+  display: none;
+}
+.swt-cf-choice {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swt-cf-choice:hover,
+.swt-cf-choice-active {
+  background: color-mix(in srgb, var(--ui-accent-color) 18%, transparent);
+}
+.swt-cf-choice-name {
+  font-family: var(--editor-font, monospace);
+}
+.swt-cf-choice-kind {
+  font-size: 11px;
+  opacity: 0.6;
+}
+.swt-cf-formula-help {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 34em;
+}
+.swt-cf-formula-help:empty {
+  display: none;
+}
+.swt-cf-formula-syntax {
+  font-size: 12px;
+}
+.swt-cf-formula-syntax b {
+  color: var(--ui-accent-color);
+}
+/* A rule's preview: its cells across their values, a line for each range (a column), each cell in its look */
+.swt-cf-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+.swt-cf-preview-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+}
+.swt-cf-preview-label {
+  width: 7em;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0.75;
+}
+.swt-cf-sample.swt-cf-preview-cell {
+  min-width: 3.5em;
+  max-width: 9em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: right;
+  font-size: 13px;
+}
+.swt-cf-sample.swt-cf-preview-cell.swt-cf-icon::before {
+  margin-right: 0.3em;
+}
+.swt-cf-none {
+  margin: 4px 0;
+  font-size: 12px;
+  opacity: 0.7;
 }
 ```

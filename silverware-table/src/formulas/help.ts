@@ -2,10 +2,12 @@
 // function's syntax (the argument typed marked) and description, where a
 // pointed reference goes; and the functions found by what they are or do
 // (the Functions dialog).
+import { columnIdOf, columnName } from "../columns.ts";
+import { unescapeCell } from "../markdown.ts";
 import { CELL_RE } from "../namerules.ts";
 import type { FormulaFunction, FunctionCategory } from "./function.ts";
 import { functionNamed, functionNames } from "./registry.ts";
-import { cellName, references } from "./references.ts";
+import { cellName, columnRefText, references } from "./references.ts";
 import { tokenize } from "./tokens.ts";
 
 /** What a formula's help says: a function's syntax and what it does, with the argument the caret is in (its span in `syntax`) */
@@ -68,7 +70,28 @@ export function needsOperator(formula: string, at: number): boolean {
  * (a named cell of the table edited, or of another table: `table`, written
  * table!name; a named row of the table edited; a named table)
  */
-export type FormulaChoice = { readonly kind: "function" | "cell" | "row" | "table"; readonly name: string; readonly table?: string };
+export type FormulaChoice = {
+  readonly kind: "function" | "cell" | "row" | "table" | "column";
+  // What the list shows (a column: its header's name)
+  readonly name: string;
+  readonly table?: string;
+  // A column: how a reference writes it (its key, its occurrence where several share it: unit_price, qty:2)
+  readonly id?: string;
+};
+
+/** A column of the table a formula is of: its header's name, what a reference writes for it */
+export type ColumnChoice = { readonly name: string; readonly id: string };
+
+/** A table's columns as completion offers them (`headers`: its header's cells as written): each its name and its id, as a click on its header writes it */
+export function columnChoicesOf(headers: readonly string[]): ColumnChoice[] {
+  return headers.flatMap((header, column) => {
+    const ref = columnRefText(columnIdOf(headers, column), false);
+    const name = columnName(unescapeCell(header));
+    const id = ref?.slice(1, -1);
+    const nth = id && /:(\d+)$/.exec(id)?.[1];
+    return id && name ? [{ name: nth ? `${name} (${nth})` : name, id }] : [];
+  });
+}
 
 /** The choices a name typed right before the caret may be, and where the name is (from..to) */
 export type FormulaChoices = { readonly from: number; readonly to: number; readonly choices: readonly FormulaChoice[] };
@@ -88,7 +111,24 @@ export function formulaChoices(
   names: readonly FormulaChoice[] = [],
   // The name of the table edited: after its own name and ! (prices!va in prices), its own cells (offered bare)
   own?: string,
+  // The columns of the table the formula is of (columnChoicesOf): offered in [ ] and [@ ] by their names, put in by their ids
+  columns: readonly ColumnChoice[] = [],
+  // The text was just typed there (else the caret only moved): a column's name typed in a reference closed already counts
+  typing = false,
 ): FormulaChoices | undefined {
+  const column = columnTyped(text, start, end, typing);
+  if (column) {
+    // Another table's column (prices![qu): its columns are not these, nothing offered; this table's own name's, they are
+    const open = text.lastIndexOf("[", column.from);
+    const table = /([A-Za-z_][A-Za-z0-9_]*)!$/.exec(text.slice(0, open))?.[1];
+    if (table !== undefined && table.toLowerCase() !== own?.toLowerCase()) return undefined;
+    const prefix = text.slice(column.from, start).toLowerCase();
+    // By the name shown or the id written (unit_ finds Unit price too)
+    const choices = columns
+      .filter((c) => c.name.toLowerCase().startsWith(prefix) || c.id.toLowerCase().startsWith(prefix))
+      .map((c): FormulaChoice => ({ kind: "column", name: c.name, id: c.id }));
+    return choices.length ? { ...column, choices } : undefined;
+  }
   const typed = nameTyped(text, start, end);
   if (!typed) return undefined;
   const prefix = text.slice(typed.from, typed.to).toLowerCase();
@@ -122,7 +162,35 @@ export function choiceText(choice: FormulaChoice): string {
       return `${choice.name}!`;
     case "cell":
       return choice.table ? `${choice.table}!${choice.name}` : choice.name;
+    case "column":
+      return `${choice.id ?? choice.name}]`;
   }
+}
+
+/**
+ * A column's name typed right before the caret, in a column reference not
+ * closed yet (`[qu`, `[@qu`, `prices![qu`): from after its "[" (and "@") to the
+ * caret. In a reference closed after the caret only while `typing` (`[@|]`, the
+ * name selected and deleted, then typed): to past its "]", the choice being the
+ * whole name and closing it; not where the caret only moved into it
+ * (`[@q|uality]`: Tab there moves on, as in the middle of a function's name).
+ * Undefined in a text in quotes, in a link to a page ([[Page]]), or where
+ * nothing is open
+ */
+export function columnTyped(text: string, start: number, end: number, typing = false): { from: number; to: number } | undefined {
+  if (start !== end || !text.trimStart().startsWith("=")) return undefined;
+  const before = text.slice(0, start);
+  const open = before.lastIndexOf("[");
+  if (open < 0 || before.indexOf("]", open) >= 0) return undefined;
+  // [[Page]]: a page's link, not a column
+  if (before[open - 1] === "[" || text[open + 1] === "[") return undefined;
+  // In a text in quotes the bracket is text
+  if (tokenize(before.slice(0, open)).error) return undefined;
+  const from = open + 1 + (before[open + 1] === "@" ? 1 : 0);
+  if (/["'\[]/.test(before.slice(from))) return undefined;
+  const closed = /^[^\["'\]]*\]/.exec(text.slice(start));
+  if (closed && !typing) return undefined;
+  return { from, to: start + (closed?.[0].length ?? 0) };
 }
 
 /**
@@ -149,6 +217,12 @@ export function nameTyped(text: string, start: number, end: number): { from: num
  */
 export function formulaHelp(text: string, caret: number): FormulaHelp | undefined {
   if (!text.trimStart().startsWith("=")) return undefined;
+  return functionHelp(text, caret) ?? REFERENCE_HELP;
+}
+
+/** The function whose arguments the caret is in, the one it is in marked; undefined out of any (or no formula) */
+export function functionHelp(text: string, caret: number): FormulaHelp | undefined {
+  if (!text.trimStart().startsWith("=")) return undefined;
   // The calls whose parenthesis is still open before the caret, innermost last, with the arguments passed so far
   const { tokens } = tokenize(text.slice(0, caret));
   const open: { name: string | undefined; argument: number }[] = [];
@@ -168,7 +242,7 @@ export function formulaHelp(text: string, caret: number): FormulaHelp | undefine
     const argument = i === open.length - 1 ? argumentSpan(f.syntax, call.argument) : undefined;
     return { syntax: f.syntax, description: f.description, ...(argument ? { argument } : {}) };
   }
-  return REFERENCE_HELP;
+  return undefined;
 }
 
 /**

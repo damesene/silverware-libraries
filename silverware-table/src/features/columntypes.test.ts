@@ -68,6 +68,28 @@ describe("Column types", () => {
     expect(cell(4, 2).classList.contains("swt-type-invalid")).toBe(false);
   });
 
+  it("sorts a #choice column in its list's order, filters by its values as written, marks a value not in its list", async () => {
+    await setup(
+      [
+        "| Task | Status #choice-status |",
+        "|---|---|",
+        "| A | done |",
+        "| B | Open |",
+        "| C | later |",
+        "| D | in progress |",
+        "| E | 1 |",
+        `| <meta core.table columntypes.choice.status='["open","in progress","done"]'> |`,
+        "",
+      ].join("\n"),
+    );
+    expect(cell(3, 1).classList.contains("swt-type-invalid")).toBe(true);
+    expect(cell(3, 1).title).toBe('"later" is not one of the choices of status');
+    expect(cell(1, 1).dataset.swtValue).toBe("done");
+    clickOn(cell(0, 1).querySelector(".swt-sort")!);
+    // Values not in the list after it, a number among them too
+    expect(bodyTexts()).toEqual(["B", "D", "A", "E", "C"]);
+  });
+
   it("sorts by the values, not by what the cells show", async () => {
     await setup(PAGE);
     clickOn(cell(0, 2).querySelector(".swt-sort")!); // Rating ascending

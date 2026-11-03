@@ -7,7 +7,11 @@
 // `${base}-body` and an optional `${base}-foot`. Its keys and presses are its
 // own (no key reaches the page), Tab stays in it, Esc, × or a press on the
 // backdrop close it once `dismiss` agrees (the settings ask where changes
-// would be lost), and the focus goes back where it was.
+// would be lost), and the focus goes back where it was. With `peek`, a button
+// by the × (`${base}-peek`) puts the dialog aside until `${base}-peek-back`
+// brings it back: the page under it is the user's meanwhile (presses, keys,
+// scrolling), the dialog kept as it was, its changes shown in the page;
+// `${base}-peeking` on the backdrop meanwhile (`isPeeking`).
 
 export type DialogLook = {
   // The classes' base
@@ -16,6 +20,8 @@ export type DialogLook = {
   readonly backdropClass?: string;
   // The × button's icon (an SVG's markup)
   readonly closeIcon: string;
+  // The peek button's icon (an SVG's markup): dialogs that ask for `peek` have it only where the look gives one
+  readonly peekIcon?: string;
 };
 
 export type DialogOptions = {
@@ -35,6 +41,10 @@ export type DialogOptions = {
   readonly dismiss?: () => boolean | Promise<boolean>;
   // Closed, whichever way
   readonly closed?: () => void;
+  // A button to look at the page under it for a moment (what the dialog changes there, shown as it changes)
+  readonly peek?: boolean;
+  // Held from the top of the window, not centered: what grows in it grows downwards (`${base}-backdrop-top`)
+  readonly anchor?: "top";
 };
 
 export type Dialog = {
@@ -45,7 +55,15 @@ export type Dialog = {
   close(): void;
 };
 
-type Shown = { readonly backdrop: HTMLElement; readonly returnFocus: Element | null; readonly options: DialogOptions; readonly unfollow: () => void };
+type Shown = {
+  readonly backdrop: HTMLElement;
+  readonly returnFocus: Element | null;
+  readonly options: DialogOptions;
+  readonly unfollow: () => void;
+  // Whether it is hidden for a look at the page, and how to end that
+  peeking: boolean;
+  setPeek: (on: boolean, kept?: boolean) => void;
+};
 
 /**
  * The part of the window the visual viewport shows (what an on-screen keyboard
@@ -90,6 +108,11 @@ export class Dialogs {
     return !!this.shown?.backdrop.isConnected;
   }
 
+  /** Whether the open dialog is put aside (peek): the page under it is the user's meanwhile */
+  get isPeeking(): boolean {
+    return !!this.shown?.peeking;
+  }
+
   /** Whether a node is the open dialog's */
   contains(node: Node): boolean {
     return !!this.shown?.backdrop.contains(node);
@@ -105,7 +128,7 @@ export class Dialogs {
       if (text !== undefined) e.textContent = text;
       return e;
     };
-    const backdrop = el("div", `${this.look.backdropClass ? `${this.look.backdropClass} ` : ""}${base}-backdrop`);
+    const backdrop = el("div", `${this.look.backdropClass ? `${this.look.backdropClass} ` : ""}${base}-backdrop${options.anchor === "top" ? ` ${base}-backdrop-top` : ""}`);
     const dialog = el("div", `${base}${options.className ? ` ${options.className}` : ""}`);
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");
@@ -115,13 +138,38 @@ export class Dialogs {
     const titles = el("div", `${base}-titles`);
     titles.append(el("h2", `${base}-title`, options.title));
     if (options.subtitle) titles.append(el("p", `${base}-subtitle`, options.subtitle));
+    // The look at the page under it: the backdrop marked, the button pressed, a way back on a touch screen
+    const peekButton = options.peek && this.look.peekIcon ? el("button", `${base}-peek`) : undefined;
+    const back = peekButton ? el("button", `${base}-peek-back`, "Back to the dialog") : undefined;
+    const setPeek = (on: boolean) => {
+      if (shown.peeking === on) return;
+      shown.peeking = on;
+      backdrop.classList.toggle(`${base}-peeking`, on);
+      peekButton?.setAttribute("aria-pressed", String(on));
+    };
+    if (peekButton && back) {
+      peekButton.type = "button";
+      peekButton.title = "Put the dialog aside to work in the page under it; Back to the dialog brings it back";
+      peekButton.setAttribute("aria-label", "Put the dialog aside, to the page under it");
+      peekButton.setAttribute("aria-pressed", "false");
+      peekButton.innerHTML = this.look.peekIcon!;
+      peekButton.addEventListener("click", () => {
+        setPeek(true);
+        back.focus({ preventScroll: true });
+      });
+      back.type = "button";
+      back.addEventListener("click", () => {
+        setPeek(false);
+        peekButton.focus({ preventScroll: true });
+      });
+    }
     const close = el("button", `${base}-close`);
     close.type = "button";
     close.title = "Close (Esc)";
     close.setAttribute("aria-label", close.title);
     close.innerHTML = this.look.closeIcon;
     close.addEventListener("click", () => void this.dismiss());
-    head.append(titles, close);
+    head.append(titles, ...(peekButton ? [peekButton] : []), close);
     dialog.append(head);
     if (options.bar) dialog.append(options.bar);
     const body = el("div", `${base}-body`);
@@ -133,15 +181,16 @@ export class Dialogs {
       dialog.append(foot);
     }
     backdrop.append(dialog);
+    if (back) backdrop.append(back);
     backdrop.addEventListener("keydown", (e) => this.onKeyDown(e, dialog));
-    // A press beside the dialog closes it; one in it stays in it
+    // A press beside the dialog closes it; one in it stays in it (while the page is looked at, presses reach the page)
     backdrop.addEventListener("mousedown", (e) => {
-      if (e.target === backdrop) {
+      if (e.target === backdrop && !shown.peeking) {
         e.preventDefault();
         void this.dismiss();
       }
     });
-    const shown: Shown = { backdrop, returnFocus: doc.activeElement, options, unfollow: followView(backdrop) };
+    const shown: Shown = { backdrop, returnFocus: doc.activeElement, options, unfollow: followView(backdrop), peeking: false, setPeek };
     this.shown = shown;
     doc.body.append(backdrop);
     (options.focus ?? dialog).focus({ preventScroll: true });
@@ -175,6 +224,13 @@ export class Dialogs {
   // Esc closes; Tab stays in the dialog; no key goes on to the page
   private onKeyDown(e: KeyboardEvent, dialog: HTMLElement): void {
     e.stopPropagation();
+    const shown = this.shown;
+    // Esc on the way back (the dialog aside): back to the dialog, not closed
+    if (shown?.peeking && e.key === "Escape") {
+      e.preventDefault();
+      shown.setPeek(false);
+      return;
+    }
     if (e.key === "Escape") {
       e.preventDefault();
       void this.dismiss();

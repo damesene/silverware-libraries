@@ -16,7 +16,7 @@ import { byTouch, DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type FavoriteItem,
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
-import { reorder } from "./drag.ts";
+import { reorder } from "../../../shared/drag.ts";
 import { addItem, type At, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setSlotOwn, splitPins, stepOf } from "./favorites.ts";
 
 const BASE = "swb-settings";

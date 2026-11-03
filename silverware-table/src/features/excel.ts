@@ -15,7 +15,9 @@
 // ({1}, {2}… their arguments; false: as their values).
 import { writeClipboard } from "../clipboard.ts";
 import type { Feature, ModelHost, ToolbarButton, TableInfo } from "../core/feature.ts";
+import type { ConditionsOffer } from "../conditions/index.ts";
 import { excelHtml, excelText } from "../excel/clipboard.ts";
+import { excelConditional, type SkippedRule } from "../excel/conditions.ts";
 import { excelCell, excelFormula } from "../excel/formulas.ts";
 import type { ExcelTemplates } from "../excel/functions.ts";
 import { excelValue } from "../excel/values.ts";
@@ -94,6 +96,11 @@ type Workbook = {
   readonly make: () => Uint8Array;
   readonly formulas: number;
   readonly skipped: readonly Skipped[];
+  // Rules of conditional formatting: how many, and those Excel cannot have, with why
+  readonly rules: number;
+  readonly skippedRules: readonly SkippedRule[];
+  // Rules written that need a newer Excel (a regular expression), with what that means
+  readonly ruleNotes: readonly SkippedRule[];
 };
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -205,6 +212,39 @@ export class Excel implements Feature {
       if (groups.length > SHOWN_GROUPS) list.append(el("div", "swt-excel-skipped-more", `… and ${groups.length - SHOWN_GROUPS} more`));
       formulaNote.append(list);
     }
+    // Conditional formatting: kept as Excel's, or the rules Excel cannot have, with why
+    const rulesNote = el("div", "swt-excel-formulas");
+    if (workbook.rules) {
+      const { skippedRules, ruleNotes } = workbook;
+      // Written, but needing a newer Excel: said under it
+      const needs = () => {
+        if (!ruleNotes.length) return null;
+        const list = el("div", "swt-excel-skipped");
+        for (const r of ruleNotes.slice(0, SHOWN_GROUPS)) {
+          const item = el("div", "swt-excel-skipped-item");
+          item.append(el("code", "swt-excel-skipped-formula", r.rule), el("span", "swt-excel-skipped-reason", r.reason));
+          list.append(item);
+        }
+        return list;
+      };
+      if (!skippedRules.length) {
+        rulesNote.classList.add("swt-excel-ok");
+        rulesNote.textContent = `All ${plural(workbook.rules, "rule", "rules")} of conditional formatting will be Excel's${ruleNotes.length ? "; some need Microsoft 365:" : "."}`;
+        const list = needs();
+        if (list) rulesNote.append(list);
+      } else {
+        rulesNote.append(el("div", "swt-excel-formulas-title", `${plural(skippedRules.length, "rule", "rules")} of conditional formatting of ${workbook.rules} will not be in the file:`));
+        const list = el("div", "swt-excel-skipped");
+        for (const r of skippedRules.slice(0, SHOWN_GROUPS)) {
+          const item = el("div", "swt-excel-skipped-item");
+          item.append(el("code", "swt-excel-skipped-formula", r.rule), el("span", "swt-excel-skipped-reason", r.reason));
+          list.append(item);
+        }
+        rulesNote.append(list);
+        const more = needs();
+        if (more) rulesNote.append(el("div", "swt-excel-formulas-title", "Written, needing Microsoft 365:"), more);
+      }
+    }
     // The file's name, the table's to start with, edited in place: the field as wide as its text, .xlsx right after it
     const nameField = el("label", "swt-excel-file");
     nameField.append(el("span", "swt-excel-file-label", "File name:"));
@@ -225,6 +265,7 @@ export class Excel implements Feature {
       ],
       [nameField, download],
       formulaNote,
+      ...(workbook.rules ? [rulesNote] : []),
     );
 
     const content = el("div", "swt-excel");
@@ -310,7 +351,11 @@ export class Excel implements Feature {
     });
     // (An Excel table needs a row under its header)
     const table = bodyRows > 0 ? { table: { name: tableName, totalsRow, calculated } } : {};
-    return { name, make: () => xlsxFile({ name, header: columns, rows, widths, ...table }), formulas, skipped };
+    // Conditional formatting as Excel's, where the conditions module is on
+    const ranges = this.host.offered<ConditionsOffer>("conditions")?.ranges(model) ?? [];
+    const { conditional, skipped: skippedRules, notes: ruleNotes } = excelConditional(ranges);
+    const formatted = conditional.xml ? { conditional } : {};
+    return { name, make: () => xlsxFile({ name, header: columns, rows, widths, ...table, ...formatted }), formulas, skipped, rules: new Set(ranges.map((r) => r.rule)).size, skippedRules, ruleNotes };
   }
 
   /** The file made and given to the browser to download */
@@ -324,6 +369,12 @@ export class Excel implements Feature {
     }
     this.host.download(file, bytes, XLSX_TYPE);
     const values = workbook.skipped.length;
-    return { text: `Downloaded ${file}${values ? `, ${plural(values, "formula", "formulas")} as values` : ""}.`, ok: true };
+    const rules = workbook.skippedRules.length;
+    // What the file lacks, said again once it is made (the list above stays)
+    const lacks = [
+      ...(values ? [`${plural(values, "formula", "formulas")} as values`] : []),
+      ...(rules ? [`${plural(rules, "rule", "rules")} of conditional formatting not in it (listed above)`] : []),
+    ];
+    return { text: `Downloaded ${file}${lacks.length ? `, ${lacks.join("; ")}` : ""}.`, ok: true };
   }
 }

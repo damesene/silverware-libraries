@@ -95,13 +95,18 @@ export type CellDisplay = string | { readonly text: string; readonly href: strin
  * renderer applies it. `display` replaces what the cell shows (the last
  * feature's wins), `value` is what sorting, filters and copying compare (the
  * last's wins), `marks` are added (CSS keys on them: `swt-<mark>`), `title`s
- * are joined.
+ * are joined, `vars` merged (a later feature's value of a name wins).
  */
 export type CellLook = {
   readonly display?: CellDisplay;
   readonly value?: string;
+  // What sorting compares instead of `value` (a choice by its place in its list), where it differs: filters and copying keep `value`
+  readonly sortKey?: string;
   readonly marks?: readonly string[];
   readonly title?: string;
+  // CSS custom properties set on the cell, by name (only names starting --swt-: what the feature's CSS reads; a later feature's
+  // value of a name wins): what a class cannot say, a color picked or a share of a bar
+  readonly vars?: Readonly<Record<string, string>>;
 };
 
 /**

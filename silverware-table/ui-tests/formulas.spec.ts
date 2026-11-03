@@ -19,6 +19,41 @@ test.describe("Formulas", () => {
     await expect(cell(page, 1, 3)).toHaveText("few");
   });
 
+  test("the table's columns offered after [@ by their names, put in by their keys; none once the caret is moved into a reference", async ({ page }) => {
+    const field = page.locator(".swt-cell-editor");
+    const choices = page.locator(".swt-formula-choice code");
+    await cell(page, 1, 3).dblclick();
+    await page.keyboard.press("Control+a");
+    await page.keyboard.type("=[@p");
+    await expect(choices).toHaveText(["Price"]);
+    await page.keyboard.press("Tab");
+    await expect(field).toHaveValue("=[@price]");
+    await expect(choices).toHaveCount(0);
+    // The caret moved back into the reference: nothing offered, Tab moves on, the reference as it was
+    for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowLeft");
+    await expect(choices).toHaveCount(0);
+    await rendersAnew(page, async () => {
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Escape");
+    });
+    expect(await markdown(page)).toContain(`<meta formulas.f='=[@price]'>`);
+  });
+
+  test("a column's name selected in a reference and deleted: what is typed there offers the columns, the one picked closing it", async ({ page }) => {
+    const field = page.locator(".swt-cell-editor");
+    const choices = page.locator(".swt-formula-choice code");
+    await cell(page, 1, 3).dblclick();
+    await page.keyboard.press("Control+a");
+    await page.keyboard.type("=[@price]*2");
+    await field.evaluate((input: HTMLInputElement) => input.setSelectionRange(3, 8));
+    await page.keyboard.press("Backspace");
+    await expect(field).toHaveValue("=[@]*2");
+    await page.keyboard.type("p");
+    await expect(choices).toHaveText(["Price"]);
+    await page.keyboard.press("Tab");
+    await expect(field).toHaveValue("=[@price]*2");
+  });
+
   test("the list of names typed: Tab inserts the one picked, Enter saves the formula as typed", async ({ page }) => {
     const field = page.locator(".swt-cell-editor");
     const choices = page.locator(".swt-formula-choice code");

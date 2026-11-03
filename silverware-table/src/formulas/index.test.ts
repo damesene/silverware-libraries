@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  choiceText,
+  functionHelp,
+  withEquals,
+  columnChoicesOf,
   areaText,
   autofixFormula,
   columnLetters,
@@ -507,6 +511,37 @@ describe("formulaChoices of functions", () => {
     expect(choiceNames(formulaChoices("=AVE", 2, 4))).toBeUndefined(); // a selection
     expect(choiceNames(formulaChoices("AVE", 3, 3))).toBeUndefined();
   });
+
+  it("offers the table's columns in a column reference not closed yet: [ ], [@ ], the table's own name's; none in one closed", () => {
+    // Shown by their headers' names, put in by their ids (a second Qty: qty:2), as a click on a header writes them
+    const columns = columnChoicesOf(["Qty #number", "Price", "quality", "Unit price", "Qty"]);
+    expect(columns.map((c) => c.id)).toEqual(["qty", "price", "quality", "unit_price", "qty:2"]);
+    // Two columns of one name told apart by their occurrence, as their ids are
+    expect(choiceNames(formulaChoices("=[q", 3, 3, [], undefined, columns))).toEqual({ from: 2, to: 3, names: ["Qty", "quality", "Qty (2)"] });
+    expect(formulaChoices("=[@unit p", 9, 9, [], undefined, columns)!.choices.map(choiceText)).toEqual(["unit_price]"]);
+    expect(formulaChoices("=[@unit_", 8, 8, [], undefined, columns)!.choices.map((c) => c.name)).toEqual(["Unit price"]);
+    expect(choiceNames(formulaChoices("=SUM([@Pr", 9, 9, [], undefined, columns))).toEqual({ from: 7, to: 9, names: ["Price"] });
+    expect(choiceNames(formulaChoices("=[unit p", 8, 8, [], undefined, columns))!.names).toEqual(["Unit price"]);
+    // A reference closed after the caret: the caret moved into it, nothing offered (Tab there would rewrite it)
+    expect(formulaChoices("=[q]", 3, 3, [], undefined, columns)).toBeUndefined();
+    expect(formulaChoices("=[@q|uality]*2".replace("|", ""), 4, 4, [], undefined, columns)).toBeUndefined();
+    expect(formulaChoices("=[@Pri ce] > 1", 6, 6, [], undefined, columns)).toBeUndefined();
+    // Typed there (the name selected and deleted, then typed): offered, the choice the whole name up to and with its "]"
+    expect(choiceNames(formulaChoices("=[@] > 1", 3, 3, [], undefined, columns, true))).toEqual({ from: 3, to: 4, names: ["Qty", "Price", "quality", "Unit price", "Qty (2)"] });
+    expect(choiceNames(formulaChoices("=[@Pr] > 1", 5, 5, [], undefined, columns, true))).toEqual({ from: 3, to: 6, names: ["Price"] });
+    expect(choiceNames(formulaChoices("=[@q|uality]".replace("|", ""), 4, 4, [], undefined, columns, true))).toEqual({ from: 3, to: 11, names: ["Qty", "quality", "Qty (2)"] });
+    expect(choiceNames(formulaChoices("=[@", 3, 3, [], undefined, columns))!.names).toEqual(["Qty", "Price", "quality", "Unit price", "Qty (2)"]);
+    expect(choiceText({ kind: "column", name: "Unit price", id: "unit_price" })).toBe("unit_price]");
+    // Not in a text, a page's link, a reference closed before the caret
+    expect(formulaChoices('="[q', 4, 4, [], undefined, columns)).toBeUndefined();
+    expect(formulaChoices("=[[Pa", 5, 5, [], undefined, columns)).toBeUndefined();
+    expect(choiceNames(formulaChoices("=[Qty]+pr", 9, 9, [], undefined, columns))!.names).toEqual(["PRODUCT", "PROPER"]);
+    expect(formulaChoices("=[xyz", 5, 5, [], undefined, columns)).toBeUndefined();
+    // Another table's columns are not these; the table's own name's and a named row's are
+    expect(formulaChoices("=prices![q", 10, 10, [], "orders", columns)).toBeUndefined();
+    expect(choiceNames(formulaChoices("=orders![q", 10, 10, [], "orders", columns))!.names).toEqual(["Qty", "quality", "Qty (2)"]);
+    expect(choiceNames(formulaChoices("=pear[pr", 8, 8, [], "orders", columns))!.names).toEqual(["Price"]);
+  });
 });
 
 describe("autofixFormula", () => {
@@ -600,6 +635,18 @@ describe("formulaHelp", () => {
     expect(marked('=IF(A1>1, "a", "b", ')).toBe("IF(condition, value_if_true, [value_if_false])"); // too many: none
     // Commas in a text or a call inside are not this call's
     expect(marked('=CONCAT("a,b", ROUND(1, 2), ')).toBe("CONCAT(text1, <[text2]>, …)");
+  });
+
+  it("reads a formula written without its = as one with it, saying how far its places moved", () => {
+    expect(withEquals("[@a] > 1")).toEqual({ formula: "=[@a] > 1", shift: 1 });
+    expect(withEquals("  =[@a]")).toEqual({ formula: "  =[@a]", shift: 0 });
+  });
+
+  it("gives a function's help alone (functionHelp), how references are written out of any (formulaHelp)", () => {
+    expect(functionHelp("=ROUND(", 7)!.syntax).toBe("ROUND(number, [digits])");
+    expect(functionHelp("=A1+", 4)).toBeUndefined();
+    expect(formulaHelp("=A1+", 4)).toBe(REFERENCE_HELP);
+    expect(functionHelp("text", 2)).toBeUndefined();
   });
 
   it("explains references otherwise, and nothing outside formulas", () => {

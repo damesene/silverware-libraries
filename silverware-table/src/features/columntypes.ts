@@ -15,13 +15,29 @@ import {
   type TypedColumn,
   typeOfTag,
   allTypes,
+  type ColumnTypesOffer,
+  listKey,
+  listNames,
+  choiceListOf,
+  isChoice,
   typeTagPatterns,
+  type TypeTable,
   withColumnType,
 } from "../columntypes/index.ts";
+import { ChoicesDialog } from "./choicesdialog.ts";
 
 /** A type's icon, or a tag for a type without one */
 function iconOf(type: ColumnType): string {
   return type.icon ?? ICONS.columnType;
+}
+
+/** A column's icon: its type's for its parameters (a choice of a list), else its type's */
+function columnIcon(typed: TypedColumn): string {
+  try {
+    return typed.type.iconFor?.(typed.params) ?? iconOf(typed.type);
+  } catch {
+    return iconOf(typed.type);
+  }
 }
 
 /** A type's name for menus: stars is Stars */
@@ -66,16 +82,53 @@ export class ColumnTypes implements Feature {
   // only the values that start with what the field holds: none to change to)
   private readonly picker: Panel;
   private picking: Picking | undefined;
+  private readonly choicesDialog: ChoicesDialog;
 
   constructor(private readonly host: ModelHost) {
+    this.choicesDialog = new ChoicesDialog(host);
     // The type hashtags of headers hidden from the start (a table shows before its looks apply)
     host.hideHeaderTags("types", typeTagPatterns());
     this.picker = host.panel("swt-choices");
     this.picker.element.setAttribute("role", "listbox");
+    host.offer({ valueOf: (header, text) => this.valueOf(header, text) } satisfies ColumnTypesOffer);
+  }
+
+  /** A cell's value as its column's type compares it, as its looks give it (`value`): the text where it is none of the type's */
+  private valueOf(header: string, text: string): string {
+    const typed = columnTypeOf(unescapeCell(header));
+    if (!typed || text === "") return text;
+    // A custom type's method that throws: the text, as its cell shows marked
+    try {
+      // Its table unknown: a value whose check needs the table (a choice's list) is taken as one, its value its text
+      if (typed.type.check(text, typed.params) !== undefined) return text;
+      const value = typed.type.sortValue?.(text, typed.params);
+      return typeof value === "string" ? value : text;
+    } catch {
+      return text;
+    }
   }
 
   stop(): void {
     this.picker.remove();
+    this.choicesDialog.close();
+  }
+
+  /** What a column's type reads of its table: the column types' data there, the column's values */
+  private typeTable(table: Table, column: number): TypeTable {
+    let values: string[] | undefined;
+    let stored: ReadonlyMap<string, string> | undefined;
+    const host = this.host;
+    // Read only by a type that asks (a choice's list): most types never do
+    return {
+      get stored() {
+        return (stored ??= host.metaOf(table));
+      },
+      values: () =>
+        (values ??= table.rows
+          .slice(1)
+          .map((r) => unescapeCell(withoutTags(r.cells[column] ?? "")).trim())
+          .filter((text) => text !== "")),
+    };
   }
 
   /** Custom types were defined anew: their hashtags are hidden too (tables rendered from now on show them typed) */
@@ -90,26 +143,32 @@ export class ColumnTypes implements Feature {
     column: number,
     open: (title: string, entries: readonly MenuEntry[]) => void,
   ): MenuEntry[] {
-    const header = parseTable(info.source).rows[0]?.cells[column] ?? "";
+    const table = parseTable(info.source);
+    const header = table.rows[0]?.cells[column] ?? "";
     const current = columnTypeOf(unescapeCell(header));
     const setType = (tag: string | undefined) => () =>
       void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => setCell(t, 0, column, withColumnType(t.rows[0]?.cells[column] ?? "", tag)));
     const choices: MenuEntry[] = [
       { kind: "item", label: "No type", icon: ICONS.clear, checked: !current, run: setType(undefined) },
       { kind: "separator" },
-      ...allTypes().map((type): MenuEntry => {
+      ...allTypes().flatMap((type): MenuEntry[] => {
         // The type's first form where it names the type (#unit-kg: #unit needs its unit; a
         // custom type's syntax is free text), else its name; the same type keeps its parameters
         const first = type.syntax.split(",")[0]!.trim().replace(/^#/, "");
         const tag = typeOfTag(first)?.type === type ? first : type.name;
-        return {
+        // Choice opens the Choices dialog, the column's values or a list of its own; a list of the table is
+        // picked in the rows under it, which mark it (Choice checked for #choice alone)
+        const choice = isChoice({ type });
+        const same = current?.type === type && !(choice && current.params.name !== undefined);
+        const item: MenuEntry = {
           kind: "item",
           label: typeLabel(type.name),
           icon: iconOf(type),
-          checked: current?.type === type,
+          checked: same,
           detail: typeDetail(type),
-          run: setType(current?.type === type ? current.tag : tag),
+          run: choice ? () => this.choicesDialog.open(info, column) : setType(current?.type === type ? current.tag : tag),
         };
+        return choice ? [item, ...this.listEntries(info, table, column, type)] : [item];
       }),
     ];
     // As Filter: the type's name after Type, its icon opening the list of types, a × removing it
@@ -119,10 +178,12 @@ export class ColumnTypes implements Feature {
         label: current ? `Type: ${typeLabel(current.type.name)}` : "Type",
         options: [
           {
-            icon: current ? iconOf(current.type) : ICONS.columnType,
+            icon: current ? columnIcon(current) : ICONS.columnType,
             title: current ? `Change the column's type (${typeLabel(current.type.name)})` : "Choose how the column's cells show",
             run: () => open("Column type", choices),
           },
+          // A choice column's values: its own list or the column's (the Choices dialog)
+          ...(isChoice(current) ? [{ icon: ICONS.rename, title: "Edit the column's choices", run: () => this.choicesDialog.open(info, column) }] : []),
           {
             icon: ICONS.clear,
             title: "Remove the column's type",
@@ -134,6 +195,60 @@ export class ColumnTypes implements Feature {
     ];
   }
 
+  /**
+   * The lists of choices the table keeps, under the Choice type in the Type
+   * menu: each taken for the column, or deleted where no column takes it (a
+   * list no column takes stays until deleted so)
+   */
+  private listEntries(info: TableInfo, table: Table, column: number, choice: ColumnType): MenuEntry[] {
+    const users = new Map<string, string[]>();
+    table.rows[0]?.cells.forEach((cell) => {
+      const name = choiceListOf(unescapeCell(cell));
+      if (name !== undefined) users.set(name, [...(users.get(name) ?? []), unescapeCell(withoutTags(withColumnType(cell, undefined))) || "(no name)"]);
+    });
+    const taken = choiceListOf(unescapeCell(table.rows[0]?.cells[column] ?? ""));
+    const write = (change: (t: Table) => Table) => void this.host.writeTable(this.host.tableFor(info.key) ?? info, change);
+    return listNames(this.host.metaOf(table)).map((name): MenuEntry => {
+      const used = users.get(name);
+      return {
+        kind: "segmented",
+        label: `Choice: ${name}`,
+        hint: used ? `Used by ${used.join(", ")}` : "Used by no column",
+        options: [
+          {
+            icon: choice.iconFor?.({ name }) ?? iconOf(choice),
+            title: `Take the list ${name} for this column`,
+            active: taken === name,
+            run: () => write((t) => setCell(t, 0, column, withColumnType(t.rows[0]?.cells[column] ?? "", `choice-${name}`))),
+          },
+          {
+            icon: ICONS.trash,
+            title: `Delete the list ${name}`,
+            run: () => void this.deleteList(info, name, used),
+          },
+        ],
+      };
+    });
+  }
+
+  /**
+   * Deletes a list of the table; one columns take asked first, those columns
+   * then left without a type, in the same write (their cells stay as written)
+   */
+  private async deleteList(info: TableInfo, name: string, used: readonly string[] | undefined): Promise<void> {
+    if (used) {
+      const columns = used.length === 1 ? `the column ${used[0]}` : `the columns ${used.join(", ")}`;
+      if (!(await this.host.ask(`Delete the list ${name}? ${columns[0]!.toUpperCase()}${columns.slice(1)} take${used.length === 1 ? "s" : ""} it and will have no type; the cells stay as written.`))) return;
+    }
+    void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => {
+      let table = this.host.setMeta(t, listKey(name), undefined);
+      table.rows[0]?.cells.forEach((cell, c) => {
+        if (choiceListOf(unescapeCell(cell)) === name) table = setCell(table, 0, c, withColumnType(cell, undefined));
+      });
+      return table;
+    });
+  }
+
   // ---- the cell editor ------------------------------------------------------------
 
   /** A header is edited as the column's name: its type's hashtag is the menu's business */
@@ -142,17 +257,19 @@ export class ColumnTypes implements Feature {
     return unescapeCell(withoutTags(withColumnType(original, undefined)));
   }
 
-  /** The type of the edited cell's column, if any (header cells have none) */
-  private typeOfEdited(editor: CellEditor): TypedColumn | undefined {
+  /** The type of the edited cell's column, if any (header cells have none), and what it reads of its table */
+  private typeOfEdited(editor: CellEditor): (TypedColumn & { readonly table: TypeTable }) | undefined {
     if (editor.row === 0) return undefined;
-    const header = parseTable(this.host.tableFor(editor.key)?.source ?? "").rows[0]?.cells[editor.column];
-    return header === undefined ? undefined : columnTypeOf(unescapeCell(header));
+    const table = parseTable(this.host.tableFor(editor.key)?.source ?? "");
+    const header = table.rows[0]?.cells[editor.column];
+    const typed = header === undefined ? undefined : columnTypeOf(unescapeCell(header));
+    return typed && { ...typed, table: this.typeTable(table, editor.column) };
   }
 
   /** A type with values to offer: a list of them under the cell, picked with the mouse or the arrows and Enter */
   editorOpened(editor: CellEditor): void {
     const typed = this.typeOfEdited(editor);
-    const choices = typed && attempt(typed, () => typed.type.choices?.(typed.params));
+    const choices = typed && attempt(typed, () => typed.type.choices?.(typed.params, typed.table));
     if (!choices || typeof choices === "string" || !choices.length) return;
     this.picking = { editor, choices, shown: [], active: -1 };
     this.showChoices();
@@ -254,7 +371,7 @@ export class ColumnTypes implements Feature {
     const column = this.typeOfEdited(editor);
     const text = typed.trim();
     if (!column || text === "" || text.startsWith("=")) return undefined;
-    const error = attempt(column, () => column.type.check(text, column.params));
+    const error = attempt(column, () => column.type.check(text, column.params, column.table));
     if (error) void this.host.bridge.flash(`Silverware Table: ${error} (#${column.tag}); saved as typed`, "info");
     return undefined;
   }
@@ -276,10 +393,11 @@ export class ColumnTypes implements Feature {
     table.rows[0]?.cells.forEach((name, column) => {
       const typed = columnTypeOf(unescapeCell(name));
       if (!typed) return;
+      const typeTable = this.typeTable(table, column);
       headers.push({
         column,
         hidesTag: (tag) => !!typeOfTag(tag),
-        icons: [{ svg: iconOf(typed.type), title: `${typeLabel(typed.type.name)} (#${typed.tag}): ${typed.type.description}`, className: "swt-type-icon", order: HEADER_ICON_ORDER.kind }],
+        icons: [{ svg: columnIcon(typed), title: `${typeLabel(typed.type.name)} (#${typed.tag}): ${typed.type.description}`, className: "swt-type-icon", order: HEADER_ICON_ORDER.kind }],
       });
       table.rows.forEach((r, row) => {
         const raw = r.cells[column];
@@ -291,11 +409,15 @@ export class ColumnTypes implements Feature {
         const { type, params } = typed;
         // What the cell shows, or why it is not a value of the type (or why the type failed on it)
         const shown = attempt(typed, () => {
-          const error = type.check(text, params);
+          const error = type.check(text, params, typeTable);
           return error === undefined ? { value: type.sortValue?.(text, params) ?? text, shown: type.format(text, params) } : error;
         });
-        if (typeof shown === "string") cells.push({ row, column, value: text, marks: ["type-invalid"], title: shown });
-        else cells.push({ row, column, value: shown.value, display: shown.shown });
+        // Where sorting puts it: its rank first (numbers of one width, so they compare as text does), then its value
+        const rank = attempt(typed, () => type.rank?.(text, params, typeTable));
+        const value = typeof shown === "string" ? text : shown.value;
+        const sortKey = typeof rank === "number" ? { sortKey: `${String(rank).padStart(6, "0")} ${value}` } : {};
+        if (typeof shown === "string") cells.push({ row, column, value: text, marks: ["type-invalid"], title: shown, ...sortKey });
+        else cells.push({ row, column, value: shown.value, display: shown.shown, ...sortKey });
       });
     });
     return headers.length ? { headers, cells } : undefined;

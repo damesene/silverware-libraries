@@ -118,6 +118,11 @@ export function cellValue(cell: HTMLElement): string {
   return cell.dataset.swtValue ?? cellText(cell);
 }
 
+/** What sorting compares of a cell: a look's key of its own for it (data-swt-sort: a choice by its place in its list), else its value */
+export function sortKeyOf(cell: HTMLElement, value: string): string {
+  return cell.dataset.swtSort ?? value;
+}
+
 /**
  * How many characters of a cell's shown text (whitespace collapsed, as in
  * `cellText`) lie before the point (x, y), or undefined if unknown.

@@ -1,6 +1,6 @@
 // The looks of a table's cells and headers (core/looks.ts) applied to the
 // table SilverBullet rendered: what a cell shows in place of its content, its
-// value for sorting (data-swt-value), marks (classes swt-<mark>), titles, a
+// value for sorting and filtering (data-swt-value, sorting's own data-swt-sort), marks (classes swt-<mark>), titles, a
 // header's icons and hashtags hidden. Applied again (a feature's looks
 // changed) it first takes back what it applied before, so a cell whose look is
 // gone shows its content as rendered again.
@@ -13,6 +13,9 @@ type Applied = {
   readonly marks: readonly string[];
   readonly title: string | null;
   readonly value: boolean;
+  readonly sortKey?: boolean;
+  // CSS custom properties set, each with the value the cell had before (null: none)
+  readonly vars?: ReadonlyMap<string, string | null>;
   // The cell's content as rendered, taken out for the display shown instead (in `box`)
   readonly content?: { readonly box: Element; readonly nodes: readonly Node[]; readonly shown: Node };
   // A header's icons and hashtags hidden
@@ -40,6 +43,11 @@ function takeBack(cell: HTMLTableCellElement): void {
   if (was.title === null) cell.removeAttribute("title");
   else cell.title = was.title;
   if (was.value) delete cell.dataset.swtValue;
+  if (was.sortKey) delete cell.dataset.swtSort;
+  for (const [name, before] of was.vars ?? []) {
+    if (before === null) cell.style.removeProperty(name);
+    else cell.style.setProperty(name, before);
+  }
   if (was.content) {
     // Where the display is now (the core may have moved it into the cell's content box), else where it was put
     const { box, nodes, shown } = was.content;
@@ -90,6 +98,12 @@ export function applyCellLook(cell: HTMLTableCellElement, look: MergedCell | und
   for (const mark of marks) cell.classList.add(mark);
   if (look.titles.length) cell.title = [title, ...look.titles].filter(Boolean).join("\n");
   if (look.value !== undefined) cell.dataset.swtValue = look.value;
+  if (look.sortKey !== undefined) cell.dataset.swtSort = look.sortKey;
+  let vars: Map<string, string | null> | undefined;
+  for (const [name, value] of Object.entries(look.vars ?? {})) {
+    (vars ??= new Map()).set(name, cell.style.getPropertyValue(name) || null);
+    cell.style.setProperty(name, value);
+  }
   let content: Applied["content"];
   // The cell being edited shows its field: what it shows comes back as the editor closes (the table rendered anew)
   if (look.display !== undefined && !editing) {
@@ -100,7 +114,7 @@ export function applyCellLook(cell: HTMLTableCellElement, look: MergedCell | und
     for (const node of nodes) node.parentNode?.removeChild(node);
     content = { box, nodes, shown };
   }
-  applied.set(cell, { marks, title, value: look.value !== undefined, ...(content ? { content } : {}) });
+  applied.set(cell, { marks, title, value: look.value !== undefined, ...(look.sortKey !== undefined ? { sortKey: true } : {}), ...(vars ? { vars } : {}), ...(content ? { content } : {}) });
 }
 
 /** Applies a header's look: its icons before the sorting control (else last), marks, title, hashtags hidden */

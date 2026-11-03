@@ -6,6 +6,7 @@
 // if it needs them), made with columnType (its parameters typed), import it here and add it to the list. Then add its syntax and
 // description to the Column types table in silverware-table.md (a test checks that).
 import check from "./check.ts";
+import choice from "./choice.ts";
 import currency from "./currency.ts";
 import date from "./date.ts";
 import link from "./link.ts";
@@ -19,4 +20,4 @@ import type { ColumnType } from "../type.ts";
 import unit from "./unit.ts";
 
 /** The built-in column types, in the order the Type menu lists them */
-export const BUILT_IN_TYPES: readonly ColumnType[] = [currency, number, percent, unit, stars, check, date, time, trend, progress, link];
+export const BUILT_IN_TYPES: readonly ColumnType[] = [currency, number, percent, unit, stars, check, choice, date, time, trend, progress, link];

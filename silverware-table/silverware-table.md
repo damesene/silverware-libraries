@@ -23,11 +23,12 @@ Makes the markdown tables in your pages interactive: edit cells in place, sort, 
 * **Add, move or delete rows and columns**: click the ⠿ grip next to a row or above a column. See [[#Rows and columns]].
 * **Copy or empty cells**: drag across cells to select them; Ctrl+C copies them for Excel or Google Sheets, Delete empties them. See [[#Copying cells]].
 * **Paste from a spreadsheet**: copy cells in Excel or Google Sheets, click a cell, Ctrl+V; Ctrl+Shift+V adds them as new rows. See [[#Pasting from a spreadsheet]].
-* **Column types**: `| Price #currency |` shows `12.99` as `€12.99`, `#stars` a rating as stars, `#check` yes / no as ☑ / ☐. See [[#Column types]].
+* **Column types**: `| Price #currency |` shows `12.99` as `€12.99`, `#stars` a rating as stars, `#check` yes / no as ☑ / ☐, `#choice` one of a list of values (a status: open, in progress, done). See [[#Column types]] and [[#Choices]].
 * **Formulas**: type `=SUM(B1:B3)` or `=SUM([qty])` into a cell; the result is written into the markdown. See [[#Formulas]].
 * **The table's names**: the title of a table's ⋯ menu is its name (the pencil after it names it); under *Full screen* and *Sheet view*, the row *Sheet* says the sheet it is on (*Sheet: Budget*), its pencil to type another sheet's name, its × to take the table off it. Hold Shift and the toolbar shows both names too, left of its icons (above them where both do not fit); the *Names in the toolbar* setting shows them always, or never.
 * **Sheet view** (in a table's ⋯ menu) shows the table like a spreadsheet over the whole window, with empty rows and columns around it; type into one to grow the table. See [[#Sheet view]].
 * **Pin rows and columns** to the edges, where they stay in view (needs *Store table metadata*). See [[#Pinning]].
+* **Conditional formatting**: cells in colors by their values (over a limit, a color scale, data bars, keywords), from a column's menu or the table's ⋯ menu. See [[#Conditional formatting]].
 * **Themes**: how tables look (header, lines, stripes, spacing), for all tables in the settings or for one in its ⋯ menu; your own in a `space-style` block. See [[#Themes]].
 * **Change how Enter or filters work**: *Configuration: Open*, category *Silverware Table*. See [[#Settings]].
 
@@ -111,6 +112,8 @@ config.set("silverware.table.modules.excel.functions", {
   SLUG = false,
 })
 ```
+
+Conditional formatting in the file (with the `conditions` module, see [[#Conditional formatting]]): the table's rules become Excel's, on the same cells (the header and pinned rows and columns left out), in the same order: the conditions as Excel's own (greater than, between, text contains, duplicates, top values, above average, dates), fills, text colors, bold, italic, underline and strikethrough as Excel's formats, color scales, data bars, *Arrows* and *Traffic light dots* as Excel's, *By keywords* and *By number ranges* as a rule for each row. A pattern of *Matches* or *By keywords* is Excel's "contains" where it is plain words, else a formula (`=a|b`, `>10`, `!…`); a regular expression is Excel's `REGEXTEST`, which only Microsoft 365 has: an older Excel leaves those cells as they are, and the dialog says which rules need it. Excel has no form of a *Formula* condition (it reads columns by name), of *Levels*, *Heat map* and *Traffic light*, nor of a scale, bar or icons over the cells a condition picks; your own conditions and formats are written as they say (their `excel`, see [[#Custom conditions and formats]]), a format of a style always: the dialog lists the rules not written, with why, under *Download .xlsx*; they are not in the file. Colors are the palette's light ones, or yours written `#rrggbb`. One difference stays: the table ignores diacritics when it compares text (*kun* finds *kůň*, as filters do), Excel does not, so a text condition may pick fewer cells there. Otherwise the file picks the cells the table does: compared rule by rule with Excel 16 (numbers only for number conditions, wildcards taken as themselves, duplicates of numbers by their value, percents of the cells with numbers, a color scale's ends and a midpoint at an end as Excel colors them). A data bar runs from 0 (or the smallest number below 0) in both.
 
 ## AutoFill
 
@@ -318,7 +321,7 @@ With the *Store table metadata* setting on (see [[#Settings]]), type a formula i
 * **Point instead of typing**: where the formula expects a reference (after `=`, `(`, `,` or an operator, not inside a text in quotes), the pointer over the table becomes a move cursor: click a cell to insert it, drag across cells for a range, or click a column's header for `[Name]`. Pointing again right away replaces that reference, Shift+click extends its range. After a typed reference or another complete operand, a click ends editing as usual.
 * While you edit a formula, each reference is outlined in the table in its own color. Drag an outline's edge to move the reference, a range's corner to resize it; Esc while dragging puts it back.
 * Under the cell, the formula shows with its references in the same colors, and help for the function the cursor is in: its syntax, with the argument being typed underlined (`ROUND(number, `**`[digits]`**`)` after `=ROUND(A1, `), and what it does.
-* **Functions and names as you type them**: `=A` lists the functions whose names start so (`ABS`, `AND`, `AVERAGE`; your custom functions too) and the names of the page that do: named cells, named rows of the table and named tables, marked as such. A name typed in full comes first, the page's names before the functions. Under the list is the picked one's syntax and description. ↑ / ↓ pick another, Tab or a click inserts it: a function with its `(` (`=AVERAGE(`), a row with its `[` (`=pear[`), a table with its `!` (`=prices!`), a cell as its name. Enter always saves the formula as typed, as in a spreadsheet, so `=day` saves a reference to a cell named `day` even though `DAY` is a function. Esc closes the list and leaves what is typed. Elsewhere Tab moves to the next cell, as usual.
+* **Functions and names as you type them**: `=A` lists the functions whose names start so (`ABS`, `AND`, `AVERAGE`; your custom functions too) and the names of the page that do: named cells, named rows of the table and named tables, marked as such. After `[` or `[@` it lists the table's columns (`=[@Qu` offers `Qty`), and puts one in with its `]`. A name typed in full comes first, the page's names before the functions. Under the list is the picked one's syntax and description. ↑ / ↓ pick another, Tab or a click inserts it: a function with its `(` (`=AVERAGE(`), a row with its `[` (`=pear[`), a table with its `!` (`=prices!`), a cell as its name. Enter always saves the formula as typed, as in a spreadsheet, so `=day` saves a reference to a cell named `day` even though `DAY` is a function. Esc closes the list and leaves what is typed. Elsewhere Tab moves to the next cell, as usual.
 
 ### Named columns
 
@@ -612,6 +615,7 @@ shows `$12.99`, `★★★★☆` and `☑`.
 | `#unit-kg` | A number with a unit: the unit after the dash. |
 | `#stars, #stars-10` | A rating as stars: a whole number from 0 to the most stars after the dash (default 5). |
 | `#check` | Yes or no as a check box: yes, true, x, ☑ or a number above 0 shows ☑; no, false, ☐, 0 or a number below it shows ☐. |
+| `#choice, #choice-name` | One of a list's values: the list named after the dash, kept in the table (picking Choice opens a dialog to set it up). A value not in the list is marked, and the column sorts in the list's order. Without a list the editor offers the values the column has. |
 | `#date, #date-long` | A date written as 2025-11-06 (with a time: 2025-11-06 14:30), shown as the locale writes it: short, medium (default) or long after the dash. |
 | `#time` | A time of day written as 14:30 or 14:30:15 (or as a fraction of a day, 0.5 is 12:00), shown as the locale writes times. |
 | `#trend` | A trend as an arrow: + or a number above 0 shows ↑, - or one below 0 shows ↓, = or 0 shows =. |
@@ -619,6 +623,27 @@ shows `$12.99`, `★★★★☆` and `☑`.
 | `#link` | A web address as a link, shown without its https://. |
 
 Numbers and dates are written as your browser's language writes them.
+
+### Choices
+
+A `#choice` column takes one of a list of values, as a status column (open, in progress, done). The list is kept in the table and named; the column names it after the dash:
+
+```
+| Task       | Status #choice-status |
+| ---------- | --------------------- |
+| Write docs | in progress           |
+| Release    | open                  |
+| <meta core.table columntypes.choice.status='["open","in progress","done"]'> |
+```
+
+* Picking *Choice* in the *Type* menu opens the *Choices* dialog (so does the pencil in the column's *Type: Choice* row): *The column's values* makes it `#choice`, which offers the values the column has and checks nothing; *A list of its own* sets up a list: its name, and its values one a line (dragged by the ⠿ left of each, or Alt+↑ ↓, to order them, Enter for a new one, *Take values from the column* to add those the column has). A new list starts with the column's values and is named after the column. Lists are kept in the table's metadata, so saving one needs the *Store table metadata* setting. Nothing changes until Save.
+* Renaming a value in the *Choices* dialog renames it in the cells of every column that takes the list; renaming the list renames it in their headers. A value removed from the list stays in its cells, marked.
+* The cell editor offers the list's values; a value not in the list is kept as typed and marked in red. Values match whatever their case.
+* Sorting by the column puts the values in the list's order (open, in progress, done), not the alphabet's.
+* Every list of the table shows under *Choice* in the *Type* menu, where a column takes one (*Choice* itself opens the dialog, and is checked for `#choice` without a list), and where a list is deleted (🗑). Deleting a list columns take asks first; those columns are then left without a type, their cells as written. A list is not deleted by itself when no column takes it any more.
+* A list's name is lower case letters (a to z) and digits, words joined by dashes: `status`, `task-status`.
+* A column of a list shows the list in a box as its icon, `#choice` alone a plain list.
+* `#choice` alone, or a list the table does not have, checks nothing: the editor offers the values the column has.
 
 ### Custom column types
 
@@ -750,6 +775,139 @@ Every edit rewrites the whole table in your page, which takes a moment in a larg
 * Until they are saved, a cell shows its text as typed (a link or a formula's result shows once saved), and sorting, filters and formulas use the values saved.
 * Leaving the page saves them: opening another page writes them into this page; switching to another tab or app saves them at once; closing the tab saves them, and the browser asks whether to leave.
 * A cell changed elsewhere meanwhile (in the markdown, on another device) keeps that change, and a message says the edit there was not saved.
+
+## Conditional formatting
+
+Cells can look different where their values meet a condition, as in a spreadsheet: numbers over a limit in red, a color scale from the smallest to the largest, a bar under each number, an arrow by its size, words like *done* or *blocked* in their colors.
+
+* **A column's rules**: *Conditional formatting* in a column's menu offers quick rules (*Greater than…*, *Between…*, *Text contains…*, *Duplicate values*, *Top 10*, *By keywords…*, *By number ranges…*, *Color scale*, *Data bar*…). Each opens the rules' dialog with the new rule ready: set its values and its look, and *Save*. *Clear rules of this column* removes them.
+* **All of a table's rules**: *Conditional formatting…* in the table's ⋯ menu (or the cell menu) opens the dialog. A table with rules shows its icon in the toolbar too, which opens the same dialog.
+* **The dialog** lists the rules in the order they apply. Click a rule to edit it under its line: what it applies to (*Whole table*, a column, a named row), which cells (*All cells* or a condition and its values), and its format (and the format's settings). Under the rule edited, *Preview* shows it on the table's own cells: a few of them across their values (the smallest, the largest and those between, so a scale or levels show whole however large the table; a cell it formats and one it does not), a line for each column where it applies to each on its own, and how many cells it formats of how many. Every change shows there and in the table at once; *Save* writes them, *Cancel* or Esc leaves the table as it was. ↑ ↓ change the order, × removes a rule. The eye by the × puts the dialog aside: the table is yours meanwhile (scroll to another part of it, select, edit), the rules being edited shown in it; *Back to the dialog* brings the dialog back as it was. Another dialog opened meanwhile closes it, its changes not saved.
+* **Several rules on a cell**: they apply from the first; a look an earlier rule set (a fill, a text color) stays, a later rule adds what it does not set. *Stop* on a rule leaves the cells it formats to it alone.
+* **The cell menu**'s *Conditional formatting…* shows the table's rules where it has some, else starts a first rule for the cell's column.
+* **A rule of the whole table** takes its cells as one range, as a spreadsheet's range does: whatever a rule works out from all its cells is of all of them (a scale, levels, a data bar, icons; the top and bottom values, the average, the duplicates). *Each column on its own*, under *Applies to* in the dialog, works each of those out for each column apart (so a column of quantities is not graded against a column of prices); the Excel file has a rule for each column then.
+* **A formula condition** (*Formula*) is typed with help, as a formula in a cell is: the table's columns offered after `[` or `[@` (also when a column's name is retyped inside one, `[@due]`), the functions and the page's names as a name is typed (↑ ↓ to pick, Enter or Tab to put it in, Esc to close the list), the syntax of the function the caret is in, and what is wrong while it does not read.
+* **What is compared**: the value as sorting compares it: a typed column's value (`12,99 €` as 12.99, a date as a date), a formula's result.
+* **Never formatted**: the header, and pinned rows and columns (totals pinned to the bottom do not change a scale or the top values).
+* Rules are stored in the table's metadata row (they need *Store table metadata*, see [[#Table metadata]]): a column's on its column, so they follow it when it is renamed or moved, the whole table's on the table. Viewing never changes the table.
+* The `conditions` module can be turned off (see [[#Modules]]): cells look as they are, the rules stay in the table.
+
+Formats you set up in the dialog, without code:
+
+* **By keywords**: as many rows as you add, each a keyword or a pattern and its look. A pattern is written as a filter takes it: a word found anywhere in the cell (case and diacritics ignored), `/regular expression/flags`, `=done|closed` (whole cells), `>10`, `!word` (not). The first row that matches a cell styles it.
+* **By number ranges**: as many rows as you add, each a range (*From*, up to but not including *To*; either may be left empty) and its look.
+* **Color scale**: as Google Sheets has it, a *Minpoint*, a *Midpoint* and a *Maxpoint*, each its color and where it is: *Min value* / *Max value* (the smallest or largest number), a *Number*, a *Percent* of the range from the smallest to the largest, or a *Percentile* (50: the middle number, so one far larger number does not crowd the others at one end); the midpoint can be *None* (a scale of two colors). By default: red at the smallest, yellow at the 50th percentile, green at the largest. A number before the minpoint or past the maxpoint has that point's color.
+* **Levels**: how many levels (2 to 10), the lowest and the highest color (the ones between are mixed), and how the numbers are split: as many cells in each level (the default: the smallest number in the first level, the largest in the last, the others spread between), or equal ranges between the smallest and the largest number (one far larger number then leaves all the others in the first levels).
+* **Own style**: a fill, a text color, bold, italic, underline or strikethrough. Colors are picked from the palette (each has a light and a dark look, and follows SilverBullet's mode) or any color.
+
+| Condition | Which cells |
+|---|---|
+| Greater than | Cells whose number is greater than a value |
+| Less than | Cells whose number is less than a value |
+| Between | Cells whose number is between two values, both included |
+| Equal to | Cells that are a value: as numbers where both are, else as text, case ignored |
+| Not equal to | Cells that are not a value (as Equal to compares them) |
+| Text contains | Cells whose text contains a text, case and diacritics ignored |
+| Text does not contain | Cells whose text does not contain a text, case and diacritics ignored |
+| Text starts with | Cells whose text starts with a text, case and diacritics ignored |
+| Text ends with | Cells whose text ends with a text, case and diacritics ignored |
+| Matches | Cells a filter would show: words found anywhere, /regular expression/flags, =a\|b (whole cells), >10, !… (not) |
+| Empty | Empty cells |
+| Not empty | Cells that are not empty |
+| Duplicate values | Cells whose value another of the rule's cells has too (case ignored); empty cells left out |
+| Unique values | Cells whose value no other of the rule's cells has (case ignored); empty cells left out |
+| Top values | The cells of the largest numbers: a count of them, or a percentage of the cells with numbers |
+| Bottom values | The cells of the smallest numbers: a count of them, or a percentage of the cells with numbers |
+| Above average | Cells whose number is above the average of the rule's cells |
+| Below average | Cells whose number is below the average of the rule's cells |
+| Date occurring | Cells whose date is in a period around today (weeks start on Monday) |
+| Formula | Cells of the rows a formula of one row is true for (=[@due] < TODAY()); needs the formulas module |
+
+| Format | How the cells look |
+|---|---|
+| Light red fill with dark red text | A light red fill, dark red text |
+| Yellow fill with dark yellow text | A yellow fill, dark yellow text |
+| Green fill with dark green text | A green fill, dark green text |
+| Blue fill with dark blue text | A blue fill, dark blue text |
+| Red text | Red text |
+| Bold text | Bold text |
+| Own style | A fill, a text color, bold, italic, underline or strikethrough of your choice |
+| By keywords | A style for each keyword or pattern (as a filter takes them: words found anywhere, /regular expression/, =a\|b); the first that matches a cell styles it |
+| By number ranges | A style for each range of numbers (from, up to but not including to; either end left open); the first range a cell's number is in styles it |
+| Color scale | A fill along two or three colors: at the minpoint, the midpoint (or none) and the maxpoint, each the smallest or largest value, a number, a percent of the range or a percentile; a cell past a point has its color |
+| Levels | The numbers split into levels, each a color between two: as many cells in each, or equal ranges between the smallest and the largest (one far larger number leaves the others in the first levels) |
+| Heat map | Ten levels from blue to red, as many cells in each |
+| Traffic light | The numbers in three equal ranges: red, yellow, green from the smallest |
+| Data bar | A bar under each number, as long as its share of the largest |
+| Arrows | An arrow before each number: down in red, right in yellow, up in green: below 33 %, below 67 % and from 67 % of the range, as Excel's icon sets |
+| Traffic light dots | A dot before each number: red, yellow, green: below 33 %, below 67 % and from 67 % of the range, as Excel's icon sets |
+
+A rule as the table stores it (in its metadata row), here a column's rule coloring its scores by ranges:
+
+```
+| <meta core.table conditions.-c-score.rules='[{"format":["byRange",{"rows":[{"to":50,"style":{"fill":"red"}},{"from":50,"style":{"fill":"green"}}]}]}]'> |
+```
+
+### Custom conditions and formats
+
+Your own conditions and formats are written in JavaScript in a file of your space, in the form the built-in ones are written in (each built-in one could be copied into your file as it is), and given in a `space-lua` block of any page:
+
+```js
+// Library/me/formats.js
+export default ({ palette, levels, mix }) => [
+  // Colors by your own regular expressions
+  {
+    name: "status",
+    label: "Status colors",
+    look: (cell) =>
+      /^(done|hotovo)$/i.test(cell.text) ? { color: palette.green, strike: true }
+      : /^blocked/i.test(cell.text) ? { fill: palette.red, bold: true }
+      : undefined,
+  },
+  // Five levels of your colors, at your thresholds
+  {
+    name: "grade",
+    label: "School grades",
+    look: levels(["#1a9850", "#91cf60", "#fee08b", "#fc8d59", "#d73027"].map((fill) => ({ fill })), [1.5, 2.5, 3.5, 4.5]),
+  },
+  // A setting the dialog asks for: a color of each look
+  {
+    name: "brand",
+    label: "Brand",
+    params: { strong: { kind: "boolean", label: "Bold", default: true } },
+    style: ({ strong }) => ({ fill: { light: "#e8f0ff", dark: "#1d2b4a" }, bold: strong }),
+  },
+];
+```
+
+```js
+// Library/me/conditions.js
+export default ({ normalize }) => [
+  {
+    name: "overdue",
+    label: "Overdue",
+    description: "Rows whose due date has passed and that are not done",
+    test: (cell, { row }) => row.due?.date !== undefined && row.due.date < Date.now() && normalize(row.status?.text ?? "") !== "done",
+  },
+];
+```
+
+```lua
+silverware.table.defineFormats(js.importFromSpace("Library/me/formats.js"))
+silverware.table.defineConditions(js.importFromSpace("Library/me/conditions.js"))
+```
+
+* The file's default export is the list, or a function that gets the helpers (below) and returns it; an item of the list may also be such a function. Each has a `name` (letters, digits and `_`, starting with a letter: how rules store it), a `label` (what the dialog shows), optionally a `description` and `params`.
+* **A condition** has `test(cell, context)`: true for the cells the rule formats.
+* **A format** has a `style` (one look for every cell, or a function of the params giving one) or a `look(cell, context)` (the look of one cell, or nothing to leave it as it is).
+* A **style** is data: `fill`, `color` (the text's), `bold`, `italic`, `underline`, `strike`, `bar` (`{ share, color }`: a bar under the content, `share` from 0 to 1), `icon` (a short text before the content, such as ▲ or ●) and `iconColor`. A color is a palette's name (`red`, `orange`, `yellow`, `green`, `teal`, `blue`, `purple`, `pink`, `gray`: a light tint as a fill, a dark shade as text, a strong one for bars and icons, each with its dark look), any CSS color, or `{ light, dark }`.
+* **`cell`**: `text` (what it shows), `value` (what sorting compares), `number` and `date` (milliseconds) where the value is one, `column` (its column's key).
+* **`context`**: `params` (the rule's settings, as `params` declares them), `scope` (the cells the rule applies to together: `min`, `max`, `average`, `sum`, `size`, `numbers`, `position(cell)` from 0 at the smallest to 1 at the largest, `share(cell)` a bar's length, `rank(cell)` 1 the largest, `rank(cell, true)` 1 the smallest, `quantile(cell)` its place among the numbers from 0 to 1, `count(cell)` how many have its value; a format's are the cells its condition picked), `row` (the cells of its row by their column's key) and `formula(text)` (a formula of one row calculated for the cell's row, with the `formulas` module).
+* **`params`**: what the dialog asks for, each `{ kind, label, default }`: `number` (with `integer`, `min`, `max`), `choice` (`values`, `labels`), `text`, `pattern` (a filter's syntax, checked as typed), `formula` (a formula of one row: the dialog offers the functions, the page's names and the table's columns as it is typed, shows the syntax of the function the caret is in and says where it does not read), `color`, `boolean`, `style` (the style editor) or `list` (rows of the fields in its `of`, as many as the user adds). `line`: params of the same line show side by side under its name (a color scale's *Minpoint*: its color, its kind, its value); `visible(params)`: whether the dialog shows the field, by the params as set (a point's value only for a number).
+* **The helpers**: `palette` (the names above), `mix(colors, t)` (the color at `t` from 0 to 1 along two or more colors), `gradient(colors, n)` (n colors along them), `levels(styles, split)` (a `look` grading numbers into as many levels as styles: `"equal"` ranges, `"quantiles"`, thresholds `[1.5, 2.5]`, `{ percent: [33, 67] }`), `matches(pattern)` (a test of text in the filter's syntax), `normalize(text)` (case and diacritics taken off), `today()` and `DAY` (dates' milliseconds), `icons` (`up`, `down`, `right`, `dot`, `check`, `cross`, `star`…), `number(text)` (a text as a number, as a cell is read), `excelText(text)`, `excelSearchText(text)` (for Excel's SEARCH: its wildcards `* ? ~` taken as themselves), `excelFilter(pattern, at)` (a filter's pattern as an Excel formula: a regular expression by `REGEXTEST`) and `plainPattern(pattern)` (whether a filter's pattern is plain words, as Excel's "contains" has them).
+* `category`: its group in the dialog's lists (*Numbers*, *Text*, *Cells*, *Dates*, *Formula* for the built-in conditions; *Styles*, *By values*, *Scales*, *Icons* for the formats; a name of your own is a group of its own); without one it is under *Other*, last.
+* **In an Excel file** (*Export to Excel…*, *Download .xlsx*): a format with a `style` is written as Excel's cell format by itself. A condition, or a format with a `look`, gives its Excel form with `excel(params, at)`, as the built-in ones do (`at` the first cell of the rule's range, `B2`, which its formulas refer to): a condition `{ type, attrs, formulas }` as Excel's file writes a rule (`{ type: "cellIs", attrs: { operator: "greaterThan" }, formulas: ["50"] }`; `excelText(text)` puts a text in Excel's quotes), a format `{ kind: "rules", rules: [{ formula, style }] }` (a formula true for the cells each style is for, the first that holds styling a cell: no rule after it is stopped), `{ kind: "colorScale", points: [{ type, value, color }] }` (`min`, `max`, `num`, `percent`, `percentile`), `{ kind: "dataBar", color }` or `{ kind: "iconSet", set }` (Excel's name: `3Arrows`, `3TrafficLights1`…); a text instead says why it has none. Without `excel` the rule is listed as not written.
+* A definition with a built-in one's name replaces it. A mistake in a definition is shown in a notification, the others are defined; a `test` or `look` that throws, or gives something else, formats nothing for that rule, and a notification says why once.
 
 ## Themes
 
@@ -940,6 +1098,7 @@ Each module can be turned off with `enabled = false`, e.g. `config.set("silverwa
 | `pageLinks` | Formulas can refer to tables and named cells on other pages (`[[Prices]]fruit!B2`), which Silverware Table reads for them. Off: it reads no other page; formulas that refer to one keep the results they have (the formulas using them too), a new one shows `#REF!`. It needs the `formulas` module. See [[#Tables on other pages]]. |
 | `filters` | Rows can be filtered: the toolbar's filter icon shows a filter field under each header, *Filter* in a column menu opens that column's filter, *Filter: = value* in the cell menu filters by a cell's value; with *Store table metadata* the filters are stored in the table. Its setting `smart` (default `true`): fields understand `>10`, `/pattern/`, `=text`, `a\|b` and `!filter`; `false`: everything typed is text to find. Off: no filtering; filters stored in a table are kept but not used. See [[#Filtering]]. |
 | `columnTypes` | A header's type hashtag formats its column, the cell editor offers the type's values, and the column menu has *Type*. Off: cells show as written. See [[#Column types]]. |
+| `conditions` | Conditional formatting: rules that color cells by their values, from a column's menu and the table's ⋯ menu; a table with rules shows their icon in its toolbar. Off: cells look as they are; rules stored in tables are kept but not used. See [[#Conditional formatting]]. |
 | `selection` | Dragging across cells, Shift+click and Shift+arrows select them; Ctrl+C copies them, Delete empties them (whole rows, columns or a whole table already empty: deletes them); *Copy*, *Clear* and *Delete N rows / columns* in the cell menu. A click selects a cell, a second one edits it; the toolbar's *Edit mode* button edits on the first click. Off: a click always edits; Shift+click opens the cell as Shift+Enter does. |
 | `themes` | Tables look as their theme sets: the *Theme* setting (`theme`, default `native`), or a table's own from *Theme* in its ⋯ menu; stripes from *Stripes* (`stripes`: `rows`, the default, `columns` or `none`), or as the icons in *Theme* in a table's ⋯ menu say. See [[#Themes]]. Off: tables look as SilverBullet shows them (striped); a theme stored in a table is kept but not used. |
 | `lazy` | The toolbar's lazy saving icon (a clock) switches a table to saving its cells edited together, a moment after editing stops. Setting `delay` (milliseconds, default `500`). See [[#Lazy saving]]. Off: every cell is saved as you leave it. |

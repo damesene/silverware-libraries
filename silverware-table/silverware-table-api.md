@@ -3,13 +3,14 @@ tags: meta
 ---
 # Silverware Table API
 
-The Space Lua API of [Silverware Table](silverware-table.md): `silverware.table.defineFunctions`, `defineTypes` and `defineSeries` (your own functions, column types and AutoFill series) `silverware.table.evaluate` (a formula calculated from Space Lua), with `silverware.table.evaluateAlias` giving it a shorter name, and for other plugins `silverware.table.tables` (a text's tables as data) and `silverware.table.onWrite` (edits of the page written with the tables' writes). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [silverware-table-init](silverware-table-init.md) for what starts Silverware Table.
+The Space Lua API of [Silverware Table](silverware-table.md): `silverware.table.defineFunctions`, `defineTypes`, `defineSeries`, `defineConditions` and `defineFormats` (your own functions, column types, AutoFill series, and conditions and formats of conditional formatting) `silverware.table.evaluate` (a formula calculated from Space Lua), with `silverware.table.evaluateAlias` giving it a shorter name, and for other plugins `silverware.table.tables` (a text's tables as data) and `silverware.table.onWrite` (edits of the page written with the tables' writes). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [silverware-table-init](silverware-table-init.md) for what starts Silverware Table.
 
 ```space-lua
 -- priority: 50
 -- Silverware Table's Space Lua API, loaded before your scripts (they have priority 0
 -- unless they say otherwise): silverware.table.defineFunctions, silverware.table.defineTypes and
 -- silverware.table.defineSeries, see "Custom functions", "Custom column types" and "Custom series";
+-- silverware.table.defineConditions and silverware.table.defineFormats, see "Custom conditions and formats";
 -- silverware.table.evaluate and silverware.table.evaluateAlias, see "Formulas from Space Lua";
 -- silverware.table.tables and silverware.table.onWrite, see "For other plugins"
 silverware = silverware or {}
@@ -88,6 +89,20 @@ if js and js.window then
   --- @see Library/damesene/silverware-table#Custom series
   function silverware.table.defineSeries(definitions)
     shown(silverwareTableJs.defineSeries(definitions), "defineSeries")
+  end
+  --- Your own conditions for conditional formatting (which cells a rule formats), written in JavaScript in
+  --- your space; they replace those defined before. A mistake in one is shown in a notification.
+  --- @param definitions table a JS module's conditions, e.g. js.importFromSpace("Library/me/conditions.js")
+  --- @see Library/damesene/silverware-table#Custom conditions and formats
+  function silverware.table.defineConditions(definitions)
+    shown(silverwareTableJs.defineConditions(definitions), "defineConditions")
+  end
+  --- Your own formats for conditional formatting (how the cells a rule picks look: one style, levels, a
+  --- look of each cell), written in JavaScript in your space; they replace those defined before.
+  --- @param definitions table a JS module's formats, e.g. js.importFromSpace("Library/me/formats.js")
+  --- @see Library/damesene/silverware-table#Custom conditions and formats
+  function silverware.table.defineFormats(definitions)
+    shown(silverwareTableJs.defineFormats(definitions), "defineFormats")
   end
   --- A table formula calculated on the page, outside any table: what it reads it names by a table's name
   --- (beans!B2, beans![price], beans!vat, [[Prices]]beans!B2). A ${…} showing it follows the tables.
@@ -169,6 +184,8 @@ else
   function silverware.table.defineFunctions() end
   function silverware.table.defineTypes() end
   function silverware.table.defineSeries() end
+  function silverware.table.defineConditions() end
+  function silverware.table.defineFormats() end
   function silverware.table.evaluate() return "#N/A" end
   function silverware.table.evaluateAlias() end
   function silverware.table.tables() return {} end

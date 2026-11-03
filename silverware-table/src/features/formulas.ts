@@ -37,6 +37,7 @@ import {
   columnRefText,
   cycleFixed,
   evaluateFormula,
+  rowValues,
   filledFormula,
   type FormulaCells,
   formulaCount,
@@ -74,6 +75,7 @@ import {
   withColumnKeys,
   writtenArea,
 } from "../formulas/index.ts";
+import { columnChoicesOf, FormulaError, functionHelp, parseFormula, withEquals } from "../formulas/index.ts";
 import { addAffected, affectedBy, isAffected, type NamedOtherPages, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
 import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
@@ -97,6 +99,7 @@ const NAME_KINDS: Readonly<Record<Exclude<FormulaChoice["kind"], "function">, st
   cell: "Named cell of this table",
   row: "Named row of this table",
   table: "Named table",
+  column: "Column of this table",
 };
 
 /** The help under the list for the choice picked: a function's syntax and description, a name's use */
@@ -114,6 +117,8 @@ function choiceHelp(choice: FormulaChoice): FormulaHelp {
       return { syntax: `${choice.name}[column]`, description: "A named row of this table: its cell in a column, e.g. pear[price]." };
     case "table":
       return { syntax: `${choice.name}!A1 · ${choice.name}![column]`, description: "A named table of the page: a cell, range or column of it." };
+    case "column":
+      return { syntax: `[${choice.name}] · [@${choice.name}]`, description: "A column of this table: all of it, or (with @) its cell in the formula's row." };
   }
 }
 
@@ -181,6 +186,8 @@ export class Formulas implements Feature {
   // The page's names offered while a name is typed (its tables and cells), as of the page's text
   private pageNames: { readonly text: string; readonly choices: readonly FormulaChoice[] } | undefined;
   private dismissed: string | undefined;
+  // Where the editor's text was last typed (its text, the caret after it): a name typed there, not one the caret moved into
+  private typedAt: { readonly editor: CellEditor; readonly text: string; readonly at: number } | undefined;
   // Every function, to find one by what it does and insert it (fx, Shift+F3, Insert function…)
   private readonly functions: FunctionDialog;
   // Tables (by key, as of their markdown) whose formula cells show results from before a change made outside Silverware Table
@@ -208,7 +215,16 @@ export class Formulas implements Feature {
     host.offer({
       cells: this.cells,
       evaluate: (formula, text, page) => this.evaluate(formula, text, page),
-      complete: (formula, caret, text) => formulaChoices(formula, caret, caret, pageNameChoices(this.cells, this.named(pageTablesOf(text)))),
+      complete: (formula, caret, text, table) =>
+        table
+          ? formulaChoices(formula, caret, caret, this.namesOf(table, text), this.nameOf(table), columnChoicesOf(table.rows[0]?.cells ?? []), true)
+          : formulaChoices(formula, caret, caret, pageNameChoices(this.cells, this.named(pageTablesOf(text))), undefined, [], true),
+      help: (formula, caret) => functionHelp(formula, caret),
+      problem: (formula) => {
+        const tree = parseFormula(withEquals(formula).formula.trim());
+        return tree instanceof FormulaError ? tree.detail : undefined;
+      },
+      rowValues: (table, formula) => rowValues(table, withEquals(formula).formula.trim(), { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) }),
     } satisfies FormulasOffer);
   }
 
@@ -433,6 +449,8 @@ export class Formulas implements Feature {
   }
 
   editorInput(editor: CellEditor): void {
+    // Where the text was typed: the caret still there (its keyup), a name is being typed
+    this.typedAt = { editor, text: editor.text, at: editor.selection[1] };
     if (this.host.editing === editor && !this.stopReferenceDrag) this.updateFormulaUi();
   }
 
@@ -945,10 +963,13 @@ export class Formulas implements Feature {
     const [from, to] = active.selection;
     const info = this.host.tableFor(active.key);
     const own = info ? this.nameOf(this.host.tableOf(info)) : undefined;
-    const choices = formulaChoices(text, from, to, info ? this.namesFor(info) : [], own);
+    // The table's columns too, in a column reference ([qu, [@qu): shown by their headers' names, put in by their ids
+    const columns = info ? columnChoicesOf(this.host.tableOf(info).rows[0]?.cells ?? []) : [];
+    const typed = this.typedAt;
+    const typing = typed?.editor === active && typed.text === text && typed.at === to;
+    const choices = formulaChoices(text, from, to, info ? this.namesFor(info) : [], own, columns, typing);
     if (!choices) return undefined;
-    const typed = text.slice(choices.from, choices.to);
-    const key = `${choices.from}:${typed}`;
+    const key = `${choices.from}:${text.slice(choices.from, choices.to)}`;
     if (this.dismissed === key) return undefined;
     if (this.choosing?.key !== key) this.choosing = { key, index: 0 };
     // The same name typed, fewer choices (the page read anew meanwhile): the pick stays in the list
@@ -962,9 +983,12 @@ export class Formulas implements Feature {
    * names as edited (the table only, so cheap whatever edits a feature holds)
    */
   private namesFor(info: TableInfo): readonly FormulaChoice[] {
-    const text = this.host.pageText;
+    return this.namesOf(this.host.tableOf(info), this.host.pageText);
+  }
+
+  /** The names a formula of `table` is offered on the page's `text`: the other tables' and the page's, the table's own */
+  private namesOf(table: Table, text: string): readonly FormulaChoice[] {
     if (this.pageNames?.text !== text) this.pageNames = { text, choices: pageNameChoices(this.cells, this.named(pageTablesOf(text))) };
-    const table = this.host.tableOf(info);
     const own = this.nameOf(table)?.toLowerCase();
     const others = this.pageNames.choices.filter((choice) => !(choice.table && choice.table.toLowerCase() === own));
     return [...others, ...ownNameChoices(this.cells, table)];
@@ -1079,7 +1103,8 @@ export class Formulas implements Feature {
               if (this.host.editing === active) this.insertChoice(active, choices, i);
             },
           },
-          el(doc, "code", { text: choiceText(choice).replace(/[([!]$/, "") }),
+          // (A column by its header's name: what is put in is its id)
+          el(doc, "code", { text: choice.kind === "column" ? choice.name : choiceText(choice).replace(/[([!]$/, "") }),
           // A function: its first sentence (the rest shows under the list for the one picked); a name: what it names
           el(doc, "span", {
             text:

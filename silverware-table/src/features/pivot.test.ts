@@ -318,6 +318,20 @@ describe("Pivot tables", () => {
     expect(text).toContain("core.pin-right='1'");
   });
 
+  describe("Unpin all", () => {
+    const page = `${ORDERS.replace("core.name='orders'", "core.name='orders' core.pin-bottom='1'")}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |", " core.pin-bottom='1'")}\n`;
+
+    it("is not in a pivot's ⋯ menu: its pins are its own", async () => {
+      await setup(page, { "silverware.table.metadata": true });
+      expect(tableMenuItem(/^Unpin all$/, 1)).toBeUndefined();
+    });
+
+    it("is in its source's, pinned too", async () => {
+      await setup(page, { "silverware.table.metadata": true });
+      expect(tableMenuItem(/^Unpin all$/, 0)).toBeDefined();
+    });
+  });
+
   it("says what it is: Pivot of its source, another page's with its page, a named pivot's name apart", async () => {
     await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |")}\n\n${PIVOT("| East | 1 |").replace("pivot.source='orders'", "pivot.source='[[Orders]]orders' core.name='byregion'")}\n`, { "silverware.table.metadata": true });
     const [source, here, other] = controller.shownTables();

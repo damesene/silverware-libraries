@@ -308,11 +308,28 @@ export class Pivot implements Feature {
 
   /** The page's tables a pivot can summarize (named ones, not pivots), `also` one more first (a table to be named so, another page's source) */
   private sources(also?: { readonly name: string; readonly table: Table }): { name: string; columns: string[]; table: Table }[] {
-    const named = pageTablesOf(this.host.pageText).flatMap(({ table }) => {
+    return [...(also ? [also] : []), ...this.namedIn(pageTablesOf(this.host.pageText))].map(({ name, table }) => ({ name, table, columns: (table.rows[0]?.cells ?? []).map(columnName) }));
+  }
+
+  /** The tables of a page a pivot can summarize: named ones, not pivots */
+  private namedIn(tables: readonly PageTable[]): { name: string; table: Table }[] {
+    return tables.flatMap(({ table }) => {
       const name = this.host.tableName(table)?.trim();
       return name && !this.definitionOf(table) ? [{ name, table }] : [];
     });
-    return [...(also ? [also] : []), ...named].map(({ name, table }) => ({ name, table, columns: (table.rows[0]?.cells ?? []).map(columnName) }));
+  }
+
+  /** Another page's tables a pivot can summarize, by their names and their columns' (read through pageLinks), or why there are none */
+  private async pageSources(page: string): Promise<readonly { name: string; columns: string[] }[] | string> {
+    if (page === this.host.currentPage) return this.sources();
+    const offer = this.host.offered<PageLinksOffer>("pageLinks");
+    if (!offer || !this.host.bridge.readPage || !this.cells()) return "Other pages are read by the pageLinks module, which is off";
+    await offer.readPages([page], false);
+    const tables = this.host.otherPages()?.tables(page);
+    if (tables === null) return `There is no page ${page}`;
+    if (!tables) return `${page} could not be read`;
+    const named = this.namedIn(tables).map(({ name, table }) => ({ name, columns: (table.rows[0]?.cells ?? []).map(columnName) }));
+    return named.length ? named : `No table of ${page} has a name: a pivot names the table it summarizes`;
   }
 
   /** The source of a definition the dialog makes: one of its sources of this page (a table to be named so among them), else as found */
@@ -331,6 +348,8 @@ export class Pivot implements Feature {
       submit,
       ...(blocked ? { blocked } : {}),
       preview: (definition) => this.calculate(definition, this.sourceFor(definition, sources)),
+      readPage: (page) => this.pageSources(page),
+      ...(this.host.bridge.listPages ? { pages: async () => (await this.host.bridge.listPages!()).filter((page) => page !== this.host.currentPage) } : {}),
     });
   }
 
@@ -378,9 +397,7 @@ export class Pivot implements Feature {
     if (!read) return;
     // One with a problem (no values, wrong totals): as far as it reads, for the dialog to fix
     const definition = "problem" in read ? looseDefinition((key) => this.host.getMeta(table, key)) : read;
-    // A source on another page, as read: among the sources as the definition names it, its columns to pick
-    const found = this.pageOf(definition) === undefined ? undefined : this.find(definition, [], -1);
-    this.dialog(this.sources(found && "table" in found ? { name: definition.source, table: found.table } : undefined), fieldsOf(definition), "Save", (changed) => {
+    this.dialog(this.sources(), fieldsOf(definition), "Save", (changed) => {
       void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.withDefinition(t, changed));
     });
   }

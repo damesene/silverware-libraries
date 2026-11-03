@@ -23,6 +23,8 @@ export type Bridge = {
   readonly confirm?: (message: string, options?: { destructive?: boolean }) => boolean | Promise<boolean>;
   // Optional: reads another page's markdown, for formulas that refer to its tables ([[Page]]prices!B2)
   readonly readPage?: (name: string) => string | Promise<string>;
+  // Optional: the space's pages by name, offered where a page is picked (a pivot's source on another page)
+  readonly listPages?: () => readonly string[] | Promise<readonly string[]>;
   // Optional: writes a page's markdown (with readPage), e.g. edits held for a page no longer in the editor
   readonly writePage?: (name: string, text: string) => unknown;
   // Optional, for the settings dialog: writes the space's configuration page

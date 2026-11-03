@@ -112,6 +112,7 @@ export const test = base.extend({
         await page.close();
         await rm(join(server().space, `${name}.md`), { force: true });
         await rm(join(server().space, `${SETTINGS_PAGE}.md`), { force: true });
+        for (const other of otherPagesOf.get(page) ?? []) await rm(join(server().space, `${other}.md`), { force: true });
       }
     }
   },
@@ -220,6 +221,36 @@ export async function setSettings(page: Page, values: Record<string, Setting>): 
   }
   await reload(page);
 }
+
+/**
+ * Writes another page of the space (what formulas and pivots read of other
+ * pages): in the playground into its store of pages, in SilverBullet into
+ * the space, indexed, gone after the test
+ */
+export async function setOtherPage(page: Page, name: string, text: string): Promise<void> {
+  if (target === "silverbullet") {
+    otherPagesOf.set(page, [...(otherPagesOf.get(page) ?? []), name]);
+    await page.evaluate(
+      async ({ name, text }) => {
+        const { client } = window as unknown as { client: Client };
+        const syscall = (call: string, ...args: unknown[]) => client.clientSystem.localSyscall(call, args);
+        await syscall("space.writePage", name, text);
+        await syscall("mq.send", "indexQueue", `${name}.md`);
+        await syscall("mq.awaitEmptyQueue", "indexQueue");
+      },
+      { name, text },
+    );
+  } else {
+    await page.evaluate(
+      ({ name, text }) => {
+        const pages = JSON.parse(localStorage.getItem("silverwarePlayground.pages") ?? "{}");
+        localStorage.setItem("silverwarePlayground.pages", JSON.stringify({ ...pages, [name]: text }));
+      },
+      { name, text },
+    );
+  }
+}
+const otherPagesOf = new WeakMap<Page, string[]>();
 
 /** A table enhanced by Silverware Table, by its place on the page (0: Fruit) */
 export const table = (page: Page, index = 0): Locator => page.locator(".sb-table-widget.swt-table").nth(index);

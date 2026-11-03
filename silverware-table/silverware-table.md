@@ -660,7 +660,7 @@ Then `| Outside #temp |` and `| Oven #temp-f |` show their cells so, the *Type* 
 
 ## Pivot tables
 
-A pivot table summarizes another table: its rows grouped by a column, a value for each group, totals. **Insert pivot table…** in a table's ⋯ menu opens a dialog: pick what groups the rows (a column, a date by year, quarter or month), what makes columns, the values (sum, average, count, min, max of a column, each as it is or as a percentage of the total, of its row's total or of its column's), which rows count (a column compared with a value, or matching a regular expression) and the order, and the pivot they make shows under the fields as you change them; *Insert* writes it under the table (a table without a name gets one: a pivot names its source). The **Pivot settings…** icon in a pivot's toolbar opens the same dialog to change it. A field the dialog has no choice for can be written as a formula (its **fx**).
+A pivot table summarizes another table: its rows grouped by a column, a value for each group, totals. **Insert pivot table…** in a table's ⋯ menu opens a dialog: pick what groups the rows (a column, a date by year, quarter or month), what makes columns, the values (sum, average, count, min, max of a column, each as it is or as a percentage of the total, of its row's total or of its column's), which rows count (a column compared with a value, or matching a regular expression) and the order, and the pivot they make shows under the fields as you change them; *Insert* writes it under the table (a table without a name gets one: a pivot names its source). The **Pivot settings…** icon in a pivot's toolbar opens the same dialog to change it. Its source may be a table of another page: pick *Another page…*, type the page (its name is offered as you type) and pick one of its named tables; the dialog says what such a pivot does not do (see below). A field the dialog has no choice for can be written as a formula (its **fx**).
 
 It is a plain markdown table, its numbers written in it (it shows anywhere, as any table), and its definition is in its metadata row, in the language of formulas:
 
@@ -2410,6 +2410,14 @@ body.swt-resizing * {
   font-size: 12px;
   border-radius: 6px;
   background: color-mix(in srgb, #d9822b 18%, transparent);
+}
+/* What a source on another page does not do: said, not warned of */
+.swt-pivot-info {
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ui-accent-color, #4a7cf0) 12%, transparent);
 }
 .swt-pivot-foot {
   display: flex;

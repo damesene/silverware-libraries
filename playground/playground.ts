@@ -17,6 +17,15 @@ const BENCH_SHOWN_KEY = "silverwarePlayground.benchShown";
 const BENCH_OPTIONS_KEY = "silverwarePlayground.benchOptions";
 // The page before the first benchmark was generated, for Restore page
 const BEFORE_BENCH_KEY = "silverwarePlayground.beforeBenchmark";
+// Other pages of the space, by name: what formulas and pivots read of other pages (none unless written there)
+const PAGES_KEY = "silverwarePlayground.pages";
+const otherPages = (): Record<string, string> => {
+  try {
+    return JSON.parse(load(PAGES_KEY) ?? "{}") as Record<string, string>;
+  } catch {
+    return {};
+  }
+};
 
 const source = document.querySelector<HTMLTextAreaElement>("#source")!;
 const page = document.querySelector<HTMLElement>("#page")!;
@@ -346,6 +355,13 @@ const bridge: Bridge = {
     measure("editor · replaceRange (the page rendered again)", () => setText(text.slice(0, from) + insert + text.slice(to), from + insert.length)),
   moveCursor: (pos) => moveCursor(pos),
   getCurrentPage: () => "Playground",
+  // The space's other pages, as SilverBullet reads them (a missing one throws, as space.readPage does)
+  readPage: (name) => {
+    const text = otherPages()[name];
+    if (text === undefined) throw new Error(`Not found: ${name}`);
+    return text;
+  },
+  listPages: () => ["Playground", ...Object.keys(otherPages())],
   flash,
   getConfig: (path, defaultValue) => (path in settings ? settings[path] : defaultValue),
   setSelection: (from) => {

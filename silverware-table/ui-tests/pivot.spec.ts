@@ -1,4 +1,4 @@
-import { cell, expect, hoverCell, markdown, notification, rendersAnew, setPage, table, tableIcon, test } from "./helpers.ts";
+import { cell, expect, hoverCell, markdown, notification, rendersAnew, setOtherPage, setPage, table, tableIcon, test } from "./helpers.ts";
 
 const PAGE = `# Pivots
 
@@ -58,6 +58,33 @@ test.describe("The pivot dialog", () => {
     await dialog.locator(".swt-dialog-primary").click();
     await expect(dialog).toHaveCount(0);
     await expect.poll(() => markdown(page)).toContain("pivot.values='MAX([Revenue])'");
+  });
+
+  test("Another page… makes a pivot of that page's table, Refresh reading it anew", async ({ page }) => {
+    await setOtherPage(page, "Sales data", "| Region | Revenue |\n|---|--:|\n| East | 100 |\n| West | 50 |\n| East | 20 |\n| <meta core.table core.name='orders'> |\n");
+    await setPage(page, "# Pivots\n\n| Note |\n|---|\n| Sales by region |\n");
+    await expect(cell(page, 1, 0)).toHaveText("Sales by region");
+    await hoverCell(page, cell(page, 1, 0));
+    await (await tableIcon(page, "Insert pivot table…")).click();
+    const dialog = page.locator(".swt-pivot-dialog");
+    await dialog.locator('select[aria-label="Source"]').selectOption({ label: "Another page…" });
+    await expect(dialog.locator(".swt-pivot-info")).toContainText("On another page");
+    await dialog.locator('input[aria-label="Source page"]').fill("Sales data");
+    await dialog.locator('input[aria-label="Source page"]').press("Tab");
+    await expect(dialog.locator('select[aria-label="Source table"]')).toHaveValue("orders");
+    await dialog.locator('select[aria-label="Row 1 column"]').selectOption("Region");
+    await dialog.locator('select[aria-label="Value 1 column"]').selectOption("Revenue");
+    // (The fields started from this page's table: a count of its texts)
+    await dialog.locator('select[aria-label="Value 1 function"]').selectOption("SUM");
+    await expect(dialog.locator(".swt-pivot-table tr").nth(1)).toHaveText(/East\s*120/);
+    await dialog.locator(".swt-dialog-primary").click();
+    await expect.poll(() => markdown(page)).toContain("pivot.source='[[Sales data]]orders'");
+    await expect(cell(page, 1, 1, 1)).toHaveText("120");
+    // That page changed: Refresh reads it anew
+    await setOtherPage(page, "Sales data", "| Region | Revenue |\n|---|--:|\n| East | 300 |\n| West | 50 |\n| <meta core.table core.name='orders'> |\n");
+    await hoverCell(page, cell(page, 1, 0, 1));
+    await rendersAnew(page, () => page.locator('.swt-bar.swt-visible button[aria-label="Refresh pivot"]').click(), 1);
+    await expect(cell(page, 1, 1, 1)).toHaveText("300");
   });
 
   test("Pivot settings… shows a value as its share of the total, as a percentage", async ({ page }) => {

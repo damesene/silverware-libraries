@@ -1,13 +1,15 @@
 // The pivot module's dialog: a pivot's fields picked (its source, what
 // groups its rows and columns, its values, which rows count, its order, its
 // totals) with the pivot it makes shown under them as they change, from the
-// same calculation that writes it (the module's `preview`). It edits Fields
+// same calculation that writes it (the module's `preview`). A source on
+// another page is picked by its page, whose tables the module reads
+// (`readPage`), and the dialog says what such a pivot does not do. It edits Fields
 // (pivot/fields.ts) and knows nothing of tables or writing: Insert (Save)
 // hands the module the definition. The dialog is the core's (ModelHost.openDialog).
 import { el, type ElementChild } from "../../../shared/elements.ts";
 import { columnKey } from "../columns.ts";
 import type { Dialog, ModelHost } from "../core/feature.ts";
-import { type PivotDefinition, type Show, SHOWS, type Totals } from "../pivot/definition.ts";
+import { type PivotDefinition, type Show, SHOWS, sourceRef, sourceText, type Totals } from "../pivot/definition.ts";
 import {
   type Condition,
   definitionOf,
@@ -30,9 +32,16 @@ import {
 } from "../pivot/fields.ts";
 import type { Pivot } from "../pivot/pivot.ts";
 
+/** A table a pivot can summarize, by its name, its columns' names */
+type Source = { readonly name: string; readonly columns: readonly string[] };
+
 export type PivotDialogOptions = {
-  // The tables a pivot can summarize, by their names, their columns' names
-  readonly sources: readonly { readonly name: string; readonly columns: readonly string[] }[];
+  // The page's tables a pivot can summarize
+  readonly sources: readonly Source[];
+  // Another page's, read, or why there are none; without it no other page is offered
+  readonly readPage?: (page: string) => Promise<readonly Source[] | string>;
+  // The space's other pages, offered as one is typed
+  readonly pages?: () => Promise<readonly string[]>;
   readonly fields: Fields;
   // The pivot the definition makes, or why it makes none
   readonly preview: (definition: PivotDefinition) => Pivot | string;
@@ -48,16 +57,41 @@ const PREVIEW_COLUMNS = 8;
 const LARGE_COLUMNS = 30;
 const LARGE_ROWS = 500;
 
+// The Source's choice of another page, apart from the page's tables' names
+const ANOTHER = "\u0000another";
+const ANOTHER_NOTE = "On another page: the pivot is not written anew as that page changes. Once SilverBullet has indexed it, Refresh pivot in the pivot's toolbar is highlighted where the pivot is out of date.";
+
 export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): Dialog {
   const doc = host.doc;
   const e = <K extends keyof HTMLElementTagNameMap>(tag: K, props?: Parameters<typeof el>[2], ...children: ElementChild[]) => el(doc, tag, props, ...children);
   let fields: Fields = options.fields;
-  // The sources offered: a source none of them is (another page's not read, a table gone) offered as written, as a column is
-  const sourceNames = () => {
-    const names = options.sources.map((s) => s.name);
-    return names.some((n) => n.toLowerCase() === fields.source.toLowerCase()) || !fields.source ? names : [fields.source, ...names];
+  // The page of a source on another page, as picked ("" while none is typed yet); undefined: a source of this page
+  let otherPage = options.readPage ? sourceRef(fields.source).page : undefined;
+  // Other pages' sources as read (or why there are none), those being read
+  const read = new Map<string, readonly Source[] | string>();
+  const reading = new Set<string>();
+  const readOther = (page: string) => {
+    if (!page || read.has(page) || reading.has(page) || !options.readPage) return;
+    reading.add(page);
+    void options.readPage(page).then((sources) => {
+      reading.delete(page);
+      read.set(page, sources);
+      // A page picked: its first table, until another is picked
+      if (otherPage === page && !fields.source && typeof sources !== "string" && sources[0]) fields = { ...fields, source: sourceText({ page, name: sources[0].name }) };
+      render();
+    });
   };
-  const columnsOf = () => options.sources.find((s) => s.name.toLowerCase() === fields.source.toLowerCase())?.columns ?? [];
+  // A list's source by its name, ignoring case
+  const named = (list: readonly Source[] | string | undefined, name: string) => (typeof list === "object" ? list.find((s) => s.name.toLowerCase() === name.toLowerCase()) : undefined);
+  const columnsOf = () => {
+    const ref = sourceRef(fields.source);
+    return named(ref.page === undefined ? options.sources : read.get(ref.page), ref.name)?.columns ?? [];
+  };
+  // A list's names, the one written first where none of them is (a table gone, renamed), as a column is offered
+  const withWritten = (names: readonly string[], written: string) => (!written || names.some((n) => n.toLowerCase() === written.toLowerCase()) ? names : [written, ...names]);
+  // The space's pages, as the page is typed (read once)
+  const pageList = e("datalist", { attrs: { id: "swt-pivot-pages" } });
+  let pagesRead = false;
 
   const form = e("div", "swt-pivot-form");
   const preview = e("div", "swt-pivot-preview");
@@ -171,7 +205,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
     const sortKeys = ["", ...fields.rows.map(groupText), ...fields.values.map(valueText)];
     const sort = fields.sort[0];
     form.replaceChildren(
-      section("Source", "The table summarized", select(sourceNames(), (n) => n, fields.source, (source) => set({ source }), "Source")),
+      sourceSection(),
       section("Rows", "A row for each value of", ...groups("rows", "Row"), add("Group rows", () => set({ rows: [...fields.rows, { column: first, grouping: "" }] }))),
       section("Columns", "A column for each value of (optional)", ...groups("columns", "Column"), fields.columns.length ? null : add("Group columns", () => set({ columns: [{ column: first, grouping: "" }] }))),
       section("Values", "What each shows", ...fields.values.map((v, i) => valueRow(v, (f) => set({ values: f ? replaced(fields.values, i, f) : fields.values.filter((_, j) => j !== i) }), i)), add("Value", () => set({ values: [...fields.values, { fn: "SUM", column: columns.find((c) => c !== first) ?? first, show: "" }] }))),
@@ -214,6 +248,45 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
     showPreview();
   }
 
+  // The table summarized: one of the page's, or of another page (its page typed, then one of its tables), said what that does not do
+  function sourceSection(): HTMLElement {
+    const names = otherPage === undefined ? withWritten(options.sources.map((s) => s.name), fields.source) : options.sources.map((s) => s.name);
+    const picked = select(
+      [...names, ...(options.readPage ? [ANOTHER] : [])],
+      (n) => (n === ANOTHER ? "Another page…" : n),
+      otherPage === undefined ? fields.source : ANOTHER,
+      (value) => {
+        otherPage = value === ANOTHER ? "" : undefined;
+        set({ source: value === ANOTHER ? "" : value });
+        if (value === ANOTHER) form.querySelector<HTMLElement>('[data-focus="source page"]')?.focus();
+      },
+      "Source",
+    );
+    if (otherPage === undefined) return section("Source", "The table summarized", picked);
+    const page = otherPage;
+    if (!pagesRead && options.pages) {
+      pagesRead = true;
+      void options.pages().then((pages) => pageList.replaceChildren(...pages.map((p) => e("option", { attrs: { value: p } }))));
+    }
+    const pageField = e("input", { attrs: { type: "text", list: "swt-pivot-pages", placeholder: "Page", "aria-label": "Source page", "data-focus": "source page" } });
+    pageField.value = page;
+    pageField.addEventListener("change", () => {
+      const typed = pageField.value.trim();
+      if (typed === otherPage) return;
+      otherPage = typed;
+      readOther(typed);
+      set({ source: "" });
+    });
+    const sources = read.get(page);
+    const table = !page
+      ? null
+      : typeof sources === "object"
+        ? select(withWritten(sources.map((s) => s.name), sourceRef(fields.source).name), (n) => n, sourceRef(fields.source).name, (name) => set({ source: sourceText({ page, name }) }), "Source table")
+        : e("span", { class: "swt-pivot-hint", text: sources ?? "Reading…" });
+    readOther(page);
+    return section("Source", "The table summarized", picked, e("div", "swt-pivot-row", pageField, pageList, table), e("p", { class: "swt-pivot-info", text: ANOTHER_NOTE }));
+  }
+
   const toggle = (label: string, on: boolean, changed: (on: boolean) => void) => {
     const box = e("input", { attrs: { type: "checkbox", "data-focus": label } });
     box.checked = on;
@@ -224,7 +297,11 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
   // The pivot as it would be written, its first rows and columns; why there is none; where it would be large
   function showPreview(): void {
     const definition = definitionOf(fields);
-    const made = definition.values.length && (definition.rows.length || definition.columns.length) ? options.preview(definition) : "Pick what groups the rows and a value";
+    const made = !definition.source.trim()
+      ? "Pick the table summarized"
+      : definition.values.length && (definition.rows.length || definition.columns.length)
+        ? options.preview(definition)
+        : "Pick what groups the rows and a value";
     const problem = options.blocked ?? (typeof made === "string" ? made : undefined);
     submit.disabled = !!problem;
     submit.title = problem ?? "";

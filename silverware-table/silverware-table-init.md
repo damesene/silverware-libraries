@@ -454,6 +454,13 @@ if js and js.window then
     confirm = editor.confirm,
     readPage = space.readPage,
     writePage = space.writePage,
+    listPages = function()
+      local names = {}
+      for _, page in ipairs(space.listPages()) do
+        table.insert(names, page.name)
+      end
+      return names
+    end,
     -- Tables Silverware Table draws itself (the sheet): cells rendered as SilverBullet's
     -- tables render them, `${…}` evaluated; their links followed by SilverBullet
     markdownToHtml = function(text)

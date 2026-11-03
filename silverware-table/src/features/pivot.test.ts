@@ -380,7 +380,11 @@ describe("Pivot tables", () => {
       cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
       document.querySelector<HTMLElement>('.swt-bar button[aria-label="Pivot settings…"]')!.click();
       const dialog = document.querySelector<HTMLElement>(".swt-pivot-dialog")!;
-      expect(dialog.querySelector<HTMLSelectElement>('select[aria-label="Source"]')!.value).toBe("[[Orders]]orders");
+      await flush();
+      expect(dialog.querySelector<HTMLSelectElement>('select[aria-label="Source"]')!.selectedOptions[0]!.textContent).toBe("Another page…");
+      expect(dialog.querySelector<HTMLInputElement>('input[aria-label="Source page"]')!.value).toBe("Orders");
+      expect(dialog.querySelector<HTMLSelectElement>('select[aria-label="Source table"]')!.value).toBe("orders");
+      expect(dialog.querySelector(".swt-pivot-info")?.textContent).toMatch(/^On another page: the pivot is not written anew/);
       expect(Array.from(dialog.querySelector<HTMLSelectElement>('select[aria-label="Value 1 column"]')!.options, (o) => o.value)).toEqual(["Region", "Revenue"]);
       expect(dialog.querySelectorAll(".swt-pivot-table tr")[1]?.textContent).toBe("East120");
       dialog.querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
@@ -388,6 +392,81 @@ describe("Pivot tables", () => {
       await controller.scan();
       expect(text).toContain("pivot.source='[[Orders]]orders'");
       expect(text).toContain("| East | 120 |");
+    });
+
+    describe("picked in its dialog", () => {
+      const dialog = () => document.querySelector<HTMLElement>(".swt-pivot-dialog")!;
+      const pick = (label: string, value: string) => {
+        const s = dialog().querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!;
+        s.value = value;
+        s.dispatchEvent(new Event("change", { bubbles: true }));
+      };
+      const anotherPage = () => pick("Source", Array.from(dialog().querySelector<HTMLSelectElement>('select[aria-label="Source"]')!.options).find((o) => o.textContent === "Another page…")!.value);
+      const typePage = async (name: string) => {
+        const field = dialog().querySelector<HTMLInputElement>('input[aria-label="Source page"]')!;
+        field.value = name;
+        field.dispatchEvent(new Event("change", { bubbles: true }));
+        await flush();
+      };
+      const previewCells = () => Array.from(dialog().querySelectorAll(".swt-pivot-table tr"), (tr) => Array.from(tr.children, (c) => c.textContent));
+      const LOCAL = "| Item | Qty |\n|---|--:|\n| Fig | 3 |\n";
+
+      it("is of the page typed: its first named table, the pivot shown from it, said what such a pivot does not do, inserted so", async () => {
+        await shown(`${LOCAL}\nEnd.\n`, { Orders: `| Note |\n|---|\n| x |\n\n${ORDERS}` });
+        tableMenuItem(/^Insert pivot table…$/)!.click();
+        expect(dialog().querySelector(".swt-pivot-info")).toBeNull();
+        anotherPage();
+        expect(dialog().querySelector(".swt-pivot-info")).not.toBeNull();
+        expect(dialog().querySelector(".swt-pivot-none")?.textContent).toBe("Pick the table summarized");
+        expect(dialog().querySelector<HTMLButtonElement>(".swt-dialog-primary")!.disabled).toBe(true);
+        await typePage("Orders");
+        // The page's named table only (its other has no name)
+        expect(Array.from(dialog().querySelector<HTMLSelectElement>('select[aria-label="Source table"]')!.options, (o) => o.value)).toEqual(["orders"]);
+        pick("Row 1 column", "Region");
+        pick("Value 1 column", "Revenue");
+        expect(previewCells()[1]).toEqual(["East", "120"]);
+        dialog().querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
+        await flush();
+        await controller.scan();
+        expect(text).toContain("pivot.source='[[Orders]]orders' pivot.rows='Region' pivot.values='SUM([Revenue])'");
+        expect(text).toContain("| East | 120 |");
+      });
+
+      it("says why a page gives no source: none of its tables named, no such page", async () => {
+        await shown(`${LOCAL}`, { Notes: "| A |\n|---|\n| 1 |\n" });
+        tableMenuItem(/^Insert pivot table…$/)!.click();
+        anotherPage();
+        await typePage("Notes");
+        expect(dialog().querySelector(".swt-pivot-hint:not(.swt-pivot-label *)")?.textContent).toBe("No table of Notes has a name: a pivot names the table it summarizes");
+        await typePage("Nowhere");
+        expect(dialog().querySelector(".swt-pivot-hint:not(.swt-pivot-label *)")?.textContent).toBe("There is no page Nowhere");
+      });
+
+      it("offers the space's other pages as one is typed, and none with pageLinks off", async () => {
+        await setup(`${LOCAL}`, { "silverware.table.metadata": true }, { readPage: () => ORDERS, listPages: () => ["Test", "Orders", "Notes"] });
+        tableMenuItem(/^Insert pivot table…$/)!.click();
+        anotherPage();
+        await flush();
+        expect(Array.from(dialog().querySelectorAll("#swt-pivot-pages option"), (o) => o.getAttribute("value"))).toEqual(["Orders", "Notes"]);
+        dialog().querySelector<HTMLButtonElement>(".swt-dialog-button")!.click();
+        await shown(`${LOCAL}`, { Orders: ORDERS }, { "silverware.table.modules.pageLinks.enabled": false });
+        tableMenuItem(/^Insert pivot table…$/)!.click();
+        anotherPage();
+        await typePage("Orders");
+        expect(dialog().querySelector(".swt-pivot-hint:not(.swt-pivot-label *)")?.textContent).toBe("Other pages are read by the pageLinks module, which is off");
+      });
+
+      it("goes back to a table of this page", async () => {
+        await shown(`${ORDERS}\n\n${OTHER("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { Orders: ORDERS });
+        second(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+        document.querySelector<HTMLElement>('.swt-bar button[aria-label="Pivot settings…"]')!.click();
+        pick("Source", "orders");
+        expect(dialog().querySelector('input[aria-label="Source page"]')).toBeNull();
+        dialog().querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
+        await flush();
+        await controller.scan();
+        expect(text).toContain("pivot.source='orders'");
+      });
     });
 
     it("takes a source naming the page shown as of this page", async () => {

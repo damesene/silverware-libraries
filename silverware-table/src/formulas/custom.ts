@@ -1,5 +1,5 @@
 // Custom functions: the user's own, defined in a JS file of the space and given
-// to Silverware Table from Space Lua (silverware.table.defineFunctions, on the library page).
+// to Silverware Table from Space Lua (silverware.table.defineFunctions, on the API page).
 // They have the built-in functions' form (function.ts) and get the conversions
 // those use (HELPERS); what one gives or throws is checked here, so a mistake
 // in it shows as the formula's error, never breaks the calculation.

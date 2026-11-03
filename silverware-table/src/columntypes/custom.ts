@@ -1,5 +1,5 @@
 // Custom column types: the user's own, defined in a JS file of the space and
-// given to Silverware Table from Space Lua (silverware.table.defineTypes, on the library
+// given to Silverware Table from Space Lua (silverware.table.defineTypes, on the API
 // page). They have the built-in types' form (type.ts): they declare their
 // parameters, which the registry reads, and get the helpers those use
 // (HELPERS). Definitions are checked here; what a type's method gives is

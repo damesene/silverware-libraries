@@ -1,5 +1,5 @@
 // Custom series: the user's own, defined in a JS file of the space and given
-// to Silverware Table from Space Lua (silverware.table.defineSeries, on the library page).
+// to Silverware Table from Space Lua (silverware.table.defineSeries, on the API page).
 // A definition is a list of words AutoFill goes round (data: quarters,
 // statuses, sprints), or a series in the built-in ones' form (series.ts).
 // Definitions are checked here; what a series gives is checked as it is

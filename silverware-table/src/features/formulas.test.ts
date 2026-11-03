@@ -439,7 +439,7 @@ describe("Formulas", () => {
 
     it("calls a function defined from Space Lua; the tables are checked again when the definitions change", async () => {
       await setup("| Name | Price | Gross |\n|---|---|---|\n| Pear | 4 | |\n");
-      // As the library page's entry does: the controller is the window's
+      // As the init page's entry does: the controller is the window's
       (globalThis as Record<string, unknown>)[GLOBAL_KEY] = controller;
       defineFunctions([vat(1.5)]);
       clickOn(cell(1, 2));

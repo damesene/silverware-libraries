@@ -4,7 +4,7 @@ import type { Bridge } from "../silverware-table/src/bridge.ts";
 import { init, openSettings } from "../silverware-table/src/index.ts";
 import { findTables, parseTable } from "../silverware-table/src/markdown.ts";
 import { metaTagPattern } from "../silverware-table/src/tags.ts";
-import libraryPage from "../silverware-table/silverware-table.md";
+import stylePage from "../silverware-table/silverware-table-style.md";
 import { benchmarkPage, FORMULAS, type FormulaKind, ProfileLog, renderLog, TYPE_NAMES } from "./benchmark.ts";
 import { measure, profileSilverwareTable, setProfileSink } from "./profile.ts";
 import { flash, setUpTheme } from "./common.ts";
@@ -45,8 +45,8 @@ function save(key: string, value: string): void {
   }
 }
 
-// The library page's space-style block, as SilverBullet would apply it
-const style = /```space-style\r?\n([\s\S]*?)```/.exec(libraryPage)?.[1] ?? "";
+// The style page's space-style block, as SilverBullet would apply it
+const style = /```space-style\r?\n([\s\S]*?)```/.exec(stylePage)?.[1] ?? "";
 document.head.append(Object.assign(document.createElement("style"), { textContent: style }));
 
 // --- Rendering, as SilverBullet does it --------------------------------------

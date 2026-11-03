@@ -1,4 +1,4 @@
-// Silverware Table entry point, loaded by the library page's Space Lua:
+// Silverware Table entry point, loaded by the init page's Space Lua:
 //   js.importFromSpace("Library/damesene/silverware-table.js").init({ ... editor functions ... })
 import { customSeries, customSeriesAnew, defineCustomSeries } from "./autofill/index.ts";
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
@@ -22,13 +22,13 @@ export const version = "0.1.0";
 // One controller per window, even if the module is loaded again (e.g. after an update)
 const GLOBAL_KEY = "__silverwareTable";
 
-/** Called by the library page on SilverBullet's `page:index` event */
+/** Called by the init page on SilverBullet's `page:index` event */
 export function pageIndexed(name: string): void {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
   void controller?.pageIndexed(name);
 }
 
-/** Called by the library page on SilverBullet's `editor:pageLoaded` event */
+/** Called by the init page on SilverBullet's `editor:pageLoaded` event */
 export function pageLoaded(): void {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
   void controller?.pageLoaded();
@@ -175,7 +175,7 @@ export async function evaluate(formula: string): Promise<string> {
 }
 
 /**
- * What a notification says of definitions refused: which and why (the library
+ * What a notification says of definitions refused: which and why (the API
  * page's Lua adds where they come from: the definitions do not say)
  */
 function notDefined(what: string, problems: readonly string[]): string | undefined {
@@ -183,10 +183,10 @@ function notDefined(what: string, problems: readonly string[]): string | undefin
 }
 
 /**
- * `silverware.table.defineFunctions` (the library page's Space Lua): custom functions
+ * `silverware.table.defineFunctions` (the init page's Space Lua): custom functions
  * for formulas, a list (or a function given the helpers that
  * returns one), usually a JS module of the space. The others defined, what is
- * wrong with any of them, which the library page shows as a notification (an
+ * wrong with any of them, which the API page shows as a notification (an
  * error there would stop the rest of the user's script).
  */
 export function defineFunctions(definitions: unknown): string | undefined {

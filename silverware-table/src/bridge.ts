@@ -1,4 +1,4 @@
-// The SilverBullet API Silverware Table uses, handed over by the library page's
+// The SilverBullet API Silverware Table uses, handed over by the init page's
 // Space Lua (`editor.*` and `config.get`), so no SilverBullet internals are needed.
 import type { FormatRule } from "./markdown.ts";
 import { BUILT_IN_THEMES, NATIVE_THEME, STRIPES, type Stripes, stripesLabel, stripesName, themeLabel, themeName, themesInStyles } from "./themes.ts";
@@ -46,7 +46,7 @@ export type Bridge = {
 
 type Setting<T> = {
   readonly path: string;
-  // Its name in the settings dialog (as in config.define's ui label on the library page), and what it does in a few words
+  // Its name in the settings dialog (as in config.define's ui label on the init page), and what it does in a few words
   readonly label: string;
   readonly hint: string;
   readonly default: T;
@@ -100,7 +100,7 @@ export const FEATURE_NAMES = [
 ] as const;
 export type FeatureName = (typeof FEATURE_NAMES)[number];
 
-// Modules off until turned on (as config.define on the library page says)
+// Modules off until turned on (as config.define on the init page says)
 const MODULES_OFF_BY_DEFAULT: ReadonlySet<FeatureName> = new Set(["largeTables"]);
 
 /** Whether a module is on when its setting is not set */
@@ -108,7 +108,7 @@ export function moduleOnByDefault(name: FeatureName): boolean {
   return !MODULES_OFF_BY_DEFAULT.has(name);
 }
 
-// The modules' names in the settings dialog (as in config.define's ui labels on the library page)
+// The modules' names in the settings dialog (as in config.define's ui labels on the init page)
 export const MODULE_LABELS: Readonly<Record<FeatureName, string>> = {
   formulas: "Formulas",
   names: "Names",
@@ -191,7 +191,7 @@ export const MODULE_DESCRIPTIONS: Readonly<Record<FeatureName, string>> = {
 };
 
 /**
- * Settings, registered with `config.define` on the library page: those of
+ * Settings, registered with `config.define` on the init page: those of
  * whole tables as `silverware.table.<setting>`, those of a part of Silverware Table as
  * `silverware.table.<part>.<setting>` and a module's as
  * `silverware.table.modules.<module>.<setting>`, so a part is set with one

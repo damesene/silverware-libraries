@@ -264,7 +264,7 @@ export class Controller implements TableHost {
       isolate: (element) => this.isolate(element),
       endHover: () => this.hoverEdited(),
       movingRows: () => this.movingRows,
-      dialogOpen: () => this.dialogs.isOpen,
+      dialogOpen: () => this.dialogs.isOpen && !this.dialogs.isPeeking,
       holdRow: (widget, info, row) => this.holdRow(widget, info, row),
       releaseRow: () => this.releaseRow(),
       editingEnded: (widget) => this.editingEnded(widget),
@@ -2010,7 +2010,19 @@ export class Controller implements TableHost {
     return row?.contains(UI_CLASS) || row?.contains("swt-meta-row") ? undefined : cell;
   }
 
+  /**
+   * A press on the page while a feature's dialog is open over it: it selects, edits or opens nothing (the dialog's
+   * backdrop takes presses, but not every one reaches it); put aside (peek), the page is the user's again
+   */
+  private besideDialog(e: Event): boolean {
+    if (!this.dialogs.isOpen || this.dialogs.isPeeking || (e.target instanceof Node && this.dialogs.contains(e.target))) return false;
+    if (e.cancelable && e.type !== "pointerdown") e.preventDefault();
+    e.stopPropagation();
+    return true;
+  }
+
   private onMouseDown = (e: MouseEvent): void => {
+    if (this.besideDialog(e)) return;
     this.anchor.drop();
     this.insert.pressStarted();
     // The mouse events of a press taken, as a touch screen fires them after a tap (they would close the menu it opened, or select or edit the cell)
@@ -2098,6 +2110,7 @@ export class Controller implements TableHost {
   };
 
   private onClick = (e: MouseEvent): void => {
+    if (this.besideDialog(e)) return;
     // The click of a press taken: it would run the menu item that opened under the finger, follow a link, tick a task, sort
     if (e.detail !== 0 && this.pressTaken()) {
       e.preventDefault();
@@ -2968,6 +2981,7 @@ export class Controller implements TableHost {
 
   /** Right click (Shift+right click: the browser's menu) */
   private onContextMenu = (e: MouseEvent): void => {
+    if (this.besideDialog(e)) return;
     if (e.shiftKey) return;
     // A long press opened it already (Android fires this too)
     if (this.pressTaken()) {
@@ -3000,6 +3014,8 @@ export class Controller implements TableHost {
 
   /** What pressed (pressedWith); a long press on a touch screen: the cell menu, where no right click is (iOS fires no contextmenu) */
   private onPointerDown = (e: PointerEvent): void => {
+    // (Not prevented: a touch scrolls the page under the dialog looked under)
+    if (this.besideDialog(e)) return;
     this.stopLongPress?.();
     // What pressed, for CSS (set only when it changes: the page's style is worked out again)
     const root = this.doc.documentElement;

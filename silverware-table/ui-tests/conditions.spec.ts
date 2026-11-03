@@ -47,4 +47,26 @@ test.describe("Conditional formatting", () => {
     await expect(scores(page).nth(0)).toHaveClass(/swt-cf-bar/);
     await expect(scores(page).nth(0)).not.toHaveClass(/swt-cf-fill/);
   });
+
+  test("the eye puts the dialog aside: the table is worked in meanwhile, the rules kept; Back to the dialog brings it back", async ({ page }) => {
+    await load(page, PAGE + `| <meta core.table conditions.-c-score.rules='[{"format":"dataBar"}]'> |\n`);
+    await hoverCell(page, scores(page).nth(0));
+    await page.locator('.swt-bar button[aria-label="Conditional formatting"]').click();
+    await dialog(page).locator(".swt-cf-summary").first().click();
+    await dialog(page).getByLabel("Format", { exact: true }).selectOption("redFill");
+    await page.getByRole("button", { name: "Put the dialog aside, to the page under it" }).click();
+    const back = page.getByRole("button", { name: "Back to the dialog" });
+    await expect(back).toBeVisible();
+    await expect(dialog(page)).toHaveCSS("opacity", "0");
+    // The table is the user's: a cell selected; the rule being edited still shown in it
+    await scores(page).nth(1).click();
+    await expect(page.locator(".swt-selected")).toHaveCount(1);
+    await expect(scores(page).nth(1)).toHaveClass(/swt-cf-fill/);
+    await back.click();
+    await expect(back).toBeHidden();
+    await expect(dialog(page)).toHaveCSS("opacity", "1");
+    await expect(dialog(page).getByLabel("Format", { exact: true })).toHaveValue("redFill");
+    await page.keyboard.press("Escape");
+    await expect(dialog(page)).toHaveCount(0);
+  });
 });

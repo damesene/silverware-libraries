@@ -279,6 +279,8 @@ export class Conditions implements Feature {
       .map((h, column) => ({ column, name: columnName(unescapeCell(h)) || `${column + 1}` }))
       .filter(({ column }) => column >= pins.left && column < header.length - pins.right);
     const shown = () => this.host.tableFor(info.key) ?? info;
+    // The table in view, so a look under the dialog finds it
+    this.host.revealCell(info, { row: Math.min(1, Math.max(0, info.rows - 1)), column: columns[0]?.column ?? 0 });
     openConditionsDialog(this.host, {
       title: this.host.tableName(table) ? `Conditional formatting: ${this.host.tableName(table)}` : "Conditional formatting",
       columns,

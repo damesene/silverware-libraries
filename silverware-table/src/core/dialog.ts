@@ -13,6 +13,6 @@ export type { Dialog, DialogOptions } from "../../../shared/dialog.ts";
 
 export class Dialogs extends SharedDialogs {
   constructor(doc: Document) {
-    super(doc, { base: "swt-dialog", backdropClass: UI_CLASS, closeIcon: ICONS.clear });
+    super(doc, { base: "swt-dialog", backdropClass: UI_CLASS, closeIcon: ICONS.clear, peekIcon: ICONS.peek });
   }
 }

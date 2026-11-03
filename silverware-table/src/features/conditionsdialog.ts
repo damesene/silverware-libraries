@@ -583,6 +583,8 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
     title: options.title,
     subtitle: "Cells that look different by their values; the rules apply in this order",
     className: "swt-cf-dialog",
+    // The table under it, shown as the rules change, a look away
+    peek: true,
     content: e("div", "swt-pivot swt-cf", list),
     footer,
     closed: () => {

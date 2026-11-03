@@ -1275,6 +1275,74 @@ body.swt-resizing * {
   width: 16px;
   height: 16px;
 }
+/* The look at the page under the dialog: its button by the ×, the dialog gone meanwhile, a way back on a touch screen */
+.swt-dialog-peek {
+  display: inline-flex;
+  padding: 5px;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  opacity: 0.65;
+  touch-action: none;
+}
+.swt-dialog-peek:hover,
+.swt-dialog-peek[aria-pressed="true"] {
+  opacity: 1;
+  background: var(--swt-dialog-card);
+}
+.swt-dialog-peek svg {
+  width: 16px;
+  height: 16px;
+}
+/* The page under it is the user's meanwhile (presses, scrolling): its way back alone takes presses */
+.swt-dialog-backdrop.swt-dialog-peeking {
+  background: transparent;
+  pointer-events: none;
+}
+.swt-dialog-peeking > .swt-dialog-peek-back {
+  pointer-events: auto;
+}
+.swt-dialog-peeking > .swt-dialog {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.swt-dialog-peek-back {
+  display: none;
+}
+.swt-dialog-peeking > .swt-dialog-peek-back {
+  display: block;
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  padding: 10px 18px;
+  font: inherit;
+  white-space: nowrap;
+  color: #fff;
+  background: var(--ui-accent-color, #4a7cf0);
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition:
+    background-color 0.12s,
+    box-shadow 0.12s,
+    transform 0.12s;
+}
+/* Hovered: darker, lifted, as a button that takes a click */
+.swt-dialog-peeking > .swt-dialog-peek-back:hover {
+  background: color-mix(in srgb, var(--ui-accent-color, #4a7cf0) 80%, #000);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4);
+  transform: translateX(-50%) translateY(-2px);
+}
+.swt-dialog-peeking > .swt-dialog-peek-back:active {
+  transform: translateX(-50%);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.swt-dialog-peeking > .swt-dialog-peek-back:focus-visible {
+  outline: 2px solid var(--root-color, #000);
+  outline-offset: 2px;
+}
 /* What does not fit scrolls, its head and its foot (Save) staying in view */
 .swt-dialog-body {
   display: flex;

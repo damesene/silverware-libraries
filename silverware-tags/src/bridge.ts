@@ -1,4 +1,4 @@
-// The SilverBullet API Silverware Tags uses, handed over by the library page's
+// The SilverBullet API Silverware Tags uses, handed over by the init page's
 // Space Lua (`editor.*`, `space.*`, `config.get`, the index queried there), so
 // no SilverBullet internals are needed. Only space/silverbullet.ts reads it,
 // making the Space the rest works with.
@@ -29,7 +29,7 @@ export type Bridge = {
   readonly reloadUI?: () => unknown;
 };
 
-/** The bridge's functions it cannot work without, missing from what the library page gave */
+/** The bridge's functions it cannot work without, missing from what the init page gave */
 export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
   return (["listPages", "queryTags", "readPage", "writePage", "getCurrentPage", "getText", "replaceRange", "navigate", "flash"] as const).filter((name) => typeof bridge[name] !== "function");
 }
@@ -38,7 +38,7 @@ export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
 export const MODULE_NAMES = ["rename", "pages", "remove", "cleanup", "panel", "custom"] as const;
 export type ModuleName = (typeof MODULE_NAMES)[number];
 
-/** A module's name and what it does, as the settings dialog shows them (the library page's config.define says the same) */
+/** A module's name and what it does, as the settings dialog shows them (the init page's config.define says the same) */
 export const MODULE_LABELS: Readonly<Record<ModuleName, string>> = { rename: "Rename", pages: "By page", remove: "Delete a tag", cleanup: "Cleanup", panel: "Tags panel", custom: "Custom operations" };
 export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
   rename: "Rename a tag everywhere it is used; into a tag that exists, the two merge.",

@@ -119,7 +119,7 @@ export class Controller {
     this.modules = modules;
   }
 
-  /** What the module of that name offers (index.ts hands the panel's to the library page) */
+  /** What the module of that name offers (index.ts hands the panel's to the init page) */
   offered<T>(name: string): T | undefined {
     return this.offers.get(name) as T | undefined;
   }
@@ -134,7 +134,7 @@ export class Controller {
     ];
   }
 
-  /** A command run by its name (the library page's commands call it) */
+  /** A command run by its name (the init page's commands call it) */
   async runCommand(name: string): Promise<void> {
     const command = this.commands().find((c) => c.name === name);
     if (!command) {

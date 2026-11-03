@@ -2,7 +2,7 @@
 // inline cell editing and row/column editing. Every change to the markdown is
 // one `editor.replaceRange`, so undo works as for any other edit.
 import { type Bridge, type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
-import { type AdapterFeature, type AddressFrame, type AlsoChanged, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type TableHost, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget } from "./core/feature.ts";
+import { type AdapterFeature, type AddressFrame, type AlsoChanged, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type TableHost, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
 import { mapPosition, type TextEdit, withWriteListeners } from "./core/writelisteners.ts";
@@ -1164,6 +1164,41 @@ export class Controller implements TableHost {
       if (reason) return reason;
     }
     return undefined;
+  }
+
+  readOnly(table: Table, cells: readonly CellRef[]): string | undefined {
+    for (const cell of cells) {
+      for (const feature of this.features) {
+        const reason = feature.readOnly?.(table, cell);
+        if (reason) return reason;
+      }
+    }
+    return undefined;
+  }
+
+  fixedShape(table: Table): string | undefined {
+    for (const feature of this.features) {
+      const reason = feature.fixedShape?.(table);
+      if (reason) return reason;
+    }
+    return undefined;
+  }
+
+  /**
+   * Why an edit must not be written: it changes a cell not changed by hand
+   * (Feature.readOnly), or adds, deletes or moves rows or columns of a table
+   * whose shape is fixed (Feature.fixedShape); whatever offered it (a key, a
+   * menu, a paste, a drag): what offers edits asks first, this is what holds
+   */
+  private changesFixed(before: Table, edited: Table, options: WriteOptions): string | undefined {
+    const shape = this.fixedShape(before);
+    if (shape) {
+      const moved = (map: ((at: number) => number | undefined) | undefined, count: number) => !!map && Array.from({ length: count }, (_, i) => i).some((i) => map(i) !== i);
+      if (edited.rows.length !== before.rows.length || edited.align.length !== before.align.length || moved(options.rowMap, before.rows.length) || moved(options.columnMap, before.align.length)) return shape;
+    }
+    const changed: CellRef[] = [];
+    edited.rows.forEach((row, r) => row.cells.forEach((cell, c) => (cell !== before.rows[r]?.cells[c] ? changed.push({ row: r, column: c }) : undefined)));
+    return changed.length ? this.readOnly(before, changed) : undefined;
   }
 
   viewChanged(widget: HTMLElement, info: WidgetInfo): void {
@@ -2474,6 +2509,11 @@ export class Controller implements TableHost {
         void this.bridge.flash(NOT_SAVED, "error");
         return "failed";
       }
+      const fixed = this.changesFixed(before, edited, options);
+      if (fixed) {
+        void this.bridge.flash(`Silverware Table: ${fixed}`, "info");
+        return "failed";
+      }
       const page: WritePage = { text, tables: pageTablesOf(text), from: range.from };
       for (const feature of this.features) await feature.prepareEdit?.(edited, page);
       // The features' write steps (formulas), then the core's (metadata)
@@ -2802,9 +2842,11 @@ export class Controller implements TableHost {
         break;
       }
     }
+    // Cells not changed by hand (a pivot's): nothing that changes them offered
+    const fixed = this.readOnly(this.tableOf(info), cells);
     const groups = this.features
       .flatMap((f) => [f.cellMenuEntries?.(info, cells) ?? []].flat())
-      .filter((group) => group.entries.length > 0)
+      .filter((group) => group.entries.length > 0 && !(fixed && CELL_MENU_CHANGES.has(group.order)))
       .sort((a, b) => a.order - b.order);
     if (groups.length === 0) return false;
     const entries = groups.flatMap((group, i): MenuEntry[] => [...(i ? [{ kind: "separator" as const }] : []), ...group.entries]);

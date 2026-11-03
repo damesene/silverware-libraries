@@ -460,6 +460,9 @@ export const PAGE_ROWS = 10;
 
 export const CELL_MENU_ORDER = { clipboard: -1, naming: 0, editing: 1, inserting: 1.2, filling: 1.5, viewing: 2, deleting: 9 } as const;
 
+/** The cell menu's slots whose entries change the cells: left out where the cells are not changed by hand (Feature.readOnly) */
+export const CELL_MENU_CHANGES: ReadonlySet<number> = new Set([CELL_MENU_ORDER.editing, CELL_MENU_ORDER.inserting, CELL_MENU_ORDER.filling, CELL_MENU_ORDER.deleting]);
+
 /** A group of entries in the cell menu, between separators (CELL_MENU_ORDER) */
 export type CellMenuGroup = { readonly order: number; readonly entries: readonly MenuEntry[] };
 
@@ -772,6 +775,10 @@ export interface ModelHost {
   keepTags(value: string, from: string): string;
   /** Why a cell's value is a feature's (Feature.keepsCell): pasting leaves it */
   cellKeptBy(cell: string): string | undefined;
+  /** Why one of these cells of the table is not changed by hand (Feature.readOnly), the first said; undefined: none is */
+  readOnly(table: Table, cells: readonly CellRef[]): string | undefined;
+  /** Why the table's rows and columns are not added, deleted or moved by hand (Feature.fixedShape); undefined: they may be */
+  fixedShape(table: Table): string | undefined;
   /** A feature's copy of a cell for another cell (Feature.fillCell), or undefined: copied as its value */
   fillCell(info: TableInfo, cell: string, from: CellRef, to: CellRef): string | undefined;
   /** Keyboard and input events from a field of a feature must not reach SilverBullet's editor */
@@ -1140,6 +1147,15 @@ export interface Feature {
    * (formulas: "formula cell", the formula computes it); undefined: it is not
    */
   keepsCell?(cell: string): string | undefined;
+  /**
+   * Why a cell of the table (its markdown's row, the header 0) is not changed
+   * by hand, said to the user (a pivot's: calculated from its source); the
+   * core writes no edit that changes it, the features offering edits ask
+   * first (ModelHost.readOnly); undefined: it may be changed
+   */
+  readOnly?(table: Table, cell: CellRef): string | undefined;
+  /** Why the table's rows and columns are not added, deleted or moved by hand (a pivot's: its calculation's); undefined: they may be */
+  fixedShape?(table: Table): string | undefined;
   /**
    * A copy of a cell the feature makes for another cell of the table (`to`;
    * AutoFill), a cell of the markdown's table, the header 0: formulas, their

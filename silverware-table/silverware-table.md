@@ -657,6 +657,35 @@ Then `| Outside #temp |` and `| Oven #temp-f |` show their cells so, the *Type* 
 * The helpers are those the built-in types use: `numberOf` (a cell's text as a number, as sorting reads it: `12,99`, `1 000`, `15 %`; else `undefined`), `notANumber` (a `check` for numbers), `formatNumber(n, locale, options)`, `numberFormat` and `dateTimeFormat` (`Intl` formatters, made once), `parseDate` (a date written as `2025-11-06` as `{ ms, time }`) and `lineIcon`.
 * Types are defined while SilverBullet loads Space Lua, before the page's tables show. A change of the file shows after reloading the page. A mistake in a definition is shown in a notification until you close it, with the pages whose `space-lua` blocks call `silverware.table.defineTypes` and a button opening each; the other types are defined.
 
+## Pivot tables
+
+A pivot table summarizes another table: its rows grouped by a column, a value for each group, totals. It is a plain markdown table, its numbers written in it (it shows anywhere, as any table), and its definition is in its metadata row, in the language of formulas:
+
+````markdown
+| Region | Sum of Revenue |
+|---|--:|
+| East | 6125 |
+| North | 2300 |
+| West | 5500 |
+| Total | 13925 |
+| <meta core.table pivot.source='orders' pivot.rows='region' pivot.values='SUM([revenue])'> |
+````
+
+| Attribute | What it says |
+|---|---|
+| `pivot.source` | The table summarized: a table of the page by its name (see [[#Table names]]) |
+| `pivot.rows` | What groups the rows: a column (`region`), or a formula of one row (`TEXT([@date], "yyyy-mm")`, `YEAR([@date])`), several comma separated |
+| `pivot.columns` | What makes columns of the groups, the same way (optional): a cross table |
+| `pivot.values` | What each group shows: formulas over its rows, `SUM([revenue])`, `AVERAGE([qty])`, `COUNTA([date])`, `SUM([qty] * [price])`, comma separated |
+| `pivot.where` | Which rows count: a formula of one row, true for those (`[@category] = "Hardware"`, `AND([@qty] > 5, [@region] <> "West")`) |
+| `pivot.sort` | The rows' order: groups or values as the definition writes them, each with `desc` where it goes down (`SUM([revenue]) desc, region`); by default the groups, as numbers, dates or texts sort |
+| `pivot.totals` | `both` (the default): a Total row and, with columns, a Total column; `rows`: the row; `columns`: the column; `none` |
+
+* An edit of its source with Silverware Table writes the pivot anew in the same edit: one Ctrl+Z takes back both. Its source renamed, the pivot names it so.
+* Edited by hand (in its markdown) the source is ahead of the pivot: its **Refresh pivot** icon in the toolbar is highlighted; click it and the pivot is calculated anew.
+* Its values are calculated, so its cells are not edited: the editor does not open on them, and its menus offer nothing that changes them or adds, moves or deletes its rows and columns. Rename a header as in any table: the pivot keeps your name (and a type's hashtag added to it) when it is calculated again.
+* It needs the `formulas` module.
+
 ## Rows and columns
 
 Hover a cell to show two grips: ⠿ left of its row, and ⠿ above its column; moving the pointer along the left of the table (above it) takes them from row to row (column to column). Hovering a grip tints its row or column. While a cell is edited, they stay with it.
@@ -909,6 +938,7 @@ Each module can be turned off with `enabled = false`, e.g. `config.set("silverwa
 | `lazy` | The toolbar's lazy saving icon (a clock) switches a table to saving its cells edited together, a moment after editing stops. Setting `delay` (milliseconds, default `500`). See [[#Lazy saving]]. Off: every cell is saved as you leave it. |
 | `export` | *Copy as CSV* and *Copy as Markdown* in the table's ⋯ menu copy the whole table. |
 | `autofill` | The fill handle at the corner of the cells selected: drag it to fill the cells after them, double-click it to fill down. See [[#AutoFill]]. Needs `selection`. Off: no handle. |
+| `pivot` | Pivot tables: a table defined in its metadata row as a summary of another, calculated anew with each edit of it, *Refresh pivot* in its toolbar. Needs `formulas`. Off: pivots stay as written, their cells edited as any table's. See [[#Pivot tables]]. |
 | `excel` | *Export to Excel…* in the table's ⋯ menu: copy for Excel, or download an .xlsx file with the formulas. Setting `functions`: templates for your custom functions in the file. See [[#Excel]]. |
 | `paste` | Copy, Cut and Paste in the cell menu; Ctrl+X cuts cells (they move where they are pasted); Ctrl+V pastes cells copied from a spreadsheet over the table, Ctrl+Shift+V as new rows. Off: a paste goes into the cell editor as text, no Cut or Paste in the cell menu (Copy and Ctrl+C stay, with the `selection` module). |
 | `handles` | The handles beside rows and above columns: drag them to move rows and columns, click them for the row and column menus. Off: rows and columns still move with Ctrl+Alt+arrows, and the **+** on a border still inserts them. |

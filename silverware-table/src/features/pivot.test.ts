@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { cell, clickOn, controller, editor, flush, key, setup, text, useTablePage } from "../testing/page.ts";
+import { insertRowWith } from "../core/structure.ts";
+import { setCell } from "../ops.ts";
+import { cell, cellMenuItem, clickOn, controller, editor, flashes, flush, key, setup, text, useTablePage } from "../testing/page.ts";
 
 const ORDERS = [
   "| Region | Revenue |",
@@ -48,6 +50,28 @@ describe("Pivot tables", () => {
     await type("10");
     expect(text).toContain("| Region | Revenue |");
     expect(text).toContain("| Total | 130 |");
+  });
+
+  it("is changed by its source only: no cell of its body edited, no row added, its menus offering neither", async () => {
+    await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
+    const page = text;
+    // The editor does not open on a body cell, and says why
+    clickOn(second(1, 1));
+    expect(editor.querySelector(".swt-cell-editor")).toBeNull();
+    expect(flashes.at(-1)).toContain("is a pivot of orders");
+    // An edit that would change one (a paste, a key, a feature's) is not written, nor a row added
+    const info = controller.shownTables()[1]!;
+    expect(await controller.writeTable(info, (t) => setCell(t, 1, 1, "999"))).toBe("failed");
+    expect(await insertRowWith(controller, info, 2, 0)).toBe("failed");
+    expect(text).toBe(page);
+    // Its cell menu: copied, not cut, pasted or cleared
+    const menuOf = (label: RegExp) => cellMenuItem(second(1, 1), label);
+    expect(menuOf(/^Copy$/)).toBeDefined();
+    expect(menuOf(/^Cut$/)).toBeUndefined();
+    expect(menuOf(/^Paste$/)).toBeUndefined();
+    expect(menuOf(/^Clear/)).toBeUndefined();
+    // Its source's cells as any table's
+    expect(cellMenuItem(cell(1, 1), /^Cut$/)).toBeDefined();
   });
 
   it("follows its source's new name", async () => {

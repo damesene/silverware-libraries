@@ -127,6 +127,17 @@ export class Pivot implements Feature {
     this.host.toolbarChanged();
   }
 
+  /** A pivot's cells are calculated: its header alone is the user's (its names) */
+  readOnly(table: Table, cell: { readonly row: number }): string | undefined {
+    if (cell.row === 0 || !this.definitionOf(table)) return undefined;
+    return `this table is a pivot of ${this.host.getMeta(table, "source")}: its values are calculated. Edit ${this.host.getMeta(table, "source")}, or what the pivot shows in its definition`;
+  }
+
+  /** A pivot's rows and columns are its calculation's */
+  fixedShape(table: Table): string | undefined {
+    return this.definitionOf(table) ? `this table is a pivot of ${this.host.getMeta(table, "source")}: its rows and columns come from it` : undefined;
+  }
+
   /** Refresh, in a pivot's toolbar: highlighted where it is out of date */
   toolbarButtons(info: TableInfo): ToolbarButton[] {
     const state = this.stale.get(info);

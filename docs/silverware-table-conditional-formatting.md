@@ -107,11 +107,13 @@ silverware.table.defineFormats(js.importFromSpace("Library/me/formats.js"))
 ```
 
 What holds the built-in ones to it:
+
 - The registry calls each built-in definition with `HELPERS` and checks what it gives with the same code as a user's (`custom.ts`): the checks and their messages are exercised by the built-in ones too.
 - A test: files in `builtin/` import nothing but types from `api.ts` (`import type`).
 - A test: each built-in definition, its types stripped by esbuild, read through `custom.ts` as a user's file is, gives the same looks.
 
 **A format** has `name`, `label`, `description`, `icon`, `params` (the column types' `ParamSpec`, with two new kinds: `color`, shown as a color picker, and `boolean`, a switch), and one of:
+
 - `style`: one look for every cell (`style: X` is `look: () => X`), or a function of the params giving one;
 - `look(cell, ctx) → Style | undefined`: the look of one cell; `undefined` leaves the cell as it is.
 
@@ -131,6 +133,7 @@ export default (): ConditionDefinition => ({
 **`cell`**: the cell's value as sorting sees it (a column type's value, a formula's result), read already: `{ text, number?, date?, column }`; `number` and `date` only where the text reads as one (`view.ts asNumber`, the formulas' dates).
 
 **`ctx`**:
+
 - `params`: the rule's parameters, typed by `params` (a color as a color, a number as a number);
 - `scope`: statistics of the cells the definition is applied to (a condition's: the rule's scope; a format's: the cells that passed the condition, all of the scope without one): `min`, `max`, `average`, `size`, `position(cell)` (0..1 from min to max), `share(cell)` (0..1 from min(0, min) to max: a data bar), `rank(cell)` (from the largest), `count(cell)` (how many cells have its value). Lazy: computed only when asked, once per table and rule, kept while the table's text is the same; so a definition never keeps a cache of its own;
 - `row`: the other cells of its row by column key (`row.due.date`), of the same shape as `cell`.
@@ -138,6 +141,7 @@ export default (): ConditionDefinition => ({
 **`Style`** (data, never CSS text): `fill`, `color`, `bold`, `italic`, `underline`, `strike`, `bar` (`{ share, color }`: a data bar under the content), and in phase 3 `icon`. Only what changes is given. A color is any CSS color (checked once, with `CSS.supports`, as the definition is given), `{ light, dark }` for the two looks, or a palette color.
 
 **`HELPERS`**:
+
 - `palette`: named colors, each with `fill` and `text`, theme-aware (they resolve to the style page's variables, so a format follows light and dark without saying so);
 - `mix(colors, t)`: the color at `t` (0..1) along two or more colors, as `color-mix(in oklab, …)` (no color parsing in JS); `gradient(colors, n)`: n colors along them;
 - `levels(styles, split)`: a `look` grading the cells into as many levels as styles, by `split`: `"equal"` (equal ranges between min and max), `"quantiles"` (equal counts), fixed thresholds (`[1.5, 2.5]`), `{ percent: [33, 67] }`, or a function of the scope giving thresholds; it reads the level from `scope`, so it is no form of its own;
@@ -155,6 +159,7 @@ A user makes basic formats of their own without code: they are built-in formats 
 Every style is edited by one small editor: swatches of the palette (theme-aware) and an own color, toggles for bold, italic, underline and strike, a live preview of a cell.
 
 New kinds of `params`, which the dialog builds its fields from, and which a user's JS format gets too (a custom format with a `list` parameter gets the same editor for free):
+
 - `color`, `boolean`;
 - `style`: the style editor;
 - `pattern`: text in the filter row's syntax, checked as typed;

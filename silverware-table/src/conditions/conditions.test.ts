@@ -167,6 +167,21 @@ describe("Evaluation", () => {
     expect(fills[3]).toBe("#ffffff");
   });
 
+  it("puts as many numbers in each level, the ends alike; fewer numbers than levels spread from the first to the last", () => {
+    const levelsOf = (values: string[], count: number) => {
+      const fills = stylesOf([rule(["levels", { count, low: "#000000", high: "#ffffff" }])], column(values)).styles.map((s) => s?.fill);
+      const distinct = [...new Set(fills)];
+      return fills.map((f) => distinct.indexOf(f));
+    };
+    expect(levelsOf(["1", "2", "3", "4"], 3)).toEqual([0, 1, 1, 2]);
+    expect(levelsOf(["1", "2", "3", "4", "5"], 3)).toEqual([0, 0, 1, 2, 2]);
+    expect(levelsOf(["1", "2", "3", "4", "5", "6"], 3)).toEqual([0, 0, 1, 1, 2, 2]);
+    expect(levelsOf(["5", "5", "9"], 3)).toEqual([0, 0, 1]);
+    // Two numbers, ten levels: the first and the last
+    const two = stylesOf([rule(["levels", { count: 10, low: "#000000", high: "#ffffff" }])], column(["1", "2"])).styles.map((s) => s?.fill);
+    expect(two).toEqual(["#000000", "#ffffff"]);
+  });
+
   it("keeps a property an earlier rule set; stop leaves the cells it picked to it", () => {
     const cells = column(["10", "90"]);
     const both = stylesOf([rule("redText", ["greater", { value: 50 }]), rule("greenFill")], cells).styles;

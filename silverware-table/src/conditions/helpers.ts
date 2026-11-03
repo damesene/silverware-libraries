@@ -78,7 +78,14 @@ export function levelOf(cell: Cell, scope: Scope, split: Split, levels: number):
   }
   if (split === "quantiles") {
     const q = scope.quantile(cell);
-    return q === undefined ? undefined : clamp(Math.floor(q * levels));
+    if (q === undefined) return undefined;
+    // The cell's place among the numbers (0 the smallest; equal numbers one place), each place in the level its
+    // middle falls in: as many in each, the ends alike (4 numbers in 3 levels: 1, 2, 1), the smallest in the first
+    // and the largest in the last; fewer numbers than levels spread from the first level to the last
+    const count = scope.numbers.length;
+    const place = Math.round(q * (count - 1));
+    if (count >= levels) return clamp(Math.floor(((place + 0.5) * levels) / count));
+    return clamp(count === 1 ? 0 : Math.round((place * (levels - 1)) / (count - 1)));
   }
   if (typeof split === "function") return clamp(split(scope).filter((x) => n >= x).length);
   if (Array.isArray(split)) return clamp((split as readonly number[]).filter((x) => n >= x).length);

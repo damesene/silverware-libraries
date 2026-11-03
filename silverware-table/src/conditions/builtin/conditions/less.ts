@@ -1,0 +1,9 @@
+import type { ConditionDefinition } from "../../api.ts";
+
+export default (): ConditionDefinition<{ value: number }> => ({
+  name: "less",
+  label: "Less than",
+  description: "Cells whose number is less than a value",
+  params: { value: { kind: "number", label: "Value", default: 0 } },
+  test: (cell, { params }) => cell.number !== undefined && cell.number < params.value,
+});

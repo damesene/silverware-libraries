@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Tags API
 
-The Space Lua API of [[Library/damesene/silverware-tags|Silverware Tags]]: `silverware.tags.defineOperations` (your own operations). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how it is used, and [[Library/damesene/silverware-tags-init]] for what starts Silverware Tags.
+The Space Lua API of [Silverware Tags](silverware-tags.md): `silverware.tags.defineOperations` (your own operations). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how it is used, and [silverware-tags-init](silverware-tags-init.md) for what starts Silverware Tags.
 
 ```space-lua
 -- priority: 50

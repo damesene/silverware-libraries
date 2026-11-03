@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Table style
 
-The look of [[Library/damesene/silverware-table|Silverware Table]]: its controls, menus and dialogs, and the built-in themes. It is installed with the library; your own themes go in a `space-style` block of your own (see *Themes* on the library's page).
+The look of [Silverware Table](silverware-table.md): its controls, menus and dialogs, and the built-in themes. It is installed with the library; your own themes go in a `space-style` block of your own (see *Themes* on the library's page).
 
 ```space-style
 .sb-table-widget.swt-table td {

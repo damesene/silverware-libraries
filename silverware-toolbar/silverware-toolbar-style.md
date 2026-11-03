@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Toolbar style
 
-The look of [[Library/damesene/silverware-toolbar|Silverware Toolbar]]: the toolbar, the list of every action and the settings. It is installed with the library.
+The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list of every action and the settings. It is installed with the library.
 
 ```space-style
 /* Silverware Toolbar (prefix swb-): the toolbar by the selection, the list

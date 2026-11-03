@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Tags style
 
-The look of [[Library/damesene/silverware-tags|Silverware Tags]]: its window, the review of a change and the settings. It is installed with the library.
+The look of [Silverware Tags](silverware-tags.md): its window, the review of a change and the settings. It is installed with the library.
 
 ```space-style
 /* Silverware Tags (prefix swg-): its dialogs, one over another (the preview

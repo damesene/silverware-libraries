@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Table init
 
-What starts [[Library/damesene/silverware-table|Silverware Table]] in SilverBullet: its settings (shown in the Configuration Manager), the JavaScript loaded and handed SilverBullet's editor and config API, the events it follows, its commands, and completion in a formula given to `silverware.table.evaluate`. It is installed with the library; its Space Lua API is [[Library/damesene/silverware-table-api]].
+What starts [Silverware Table](silverware-table.md) in SilverBullet: its settings (shown in the Configuration Manager), the JavaScript loaded and handed SilverBullet's editor and config API, the events it follows, its commands, and completion in a formula given to `silverware.table.evaluate`. It is installed with the library; its Space Lua API is [silverware-table-api](silverware-table-api.md).
 
 ```space-lua
 -- Settings, shown in the Configuration Manager (Configuration: Open)

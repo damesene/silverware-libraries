@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Chart API
 
-The Space Lua API of [[Library/damesene/silverware-chart|Silverware Chart]]: `silverware.chart.defineFormats` (your own formats). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how it is used, and [[Library/damesene/silverware-chart-init]] for what starts Silverware Chart.
+The Space Lua API of [Silverware Chart](silverware-chart.md): `silverware.chart.defineFormats` (your own formats). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how it is used, and [silverware-chart-init](silverware-chart-init.md) for what starts Silverware Chart.
 
 ```space-lua
 -- priority: 50

@@ -102,4 +102,4 @@ A mistake in a definition is a notification; a page an operation's `edit` fails 
 
 ## Implementation
 
-Silverware Tags is started by [[Library/damesene/silverware-tags-init]] (its settings, commands and the Tags panel), its Space Lua API is [[Library/damesene/silverware-tags-api]] and its look [[Library/damesene/silverware-tags-style]]. All three are installed with this page.
+Silverware Tags is started by [silverware-tags-init](silverware-tags-init.md) (its settings, commands and the Tags panel), its Space Lua API is [silverware-tags-api](silverware-tags-api.md) and its look [silverware-tags-style](silverware-tags-style.md). All three are installed with this page.

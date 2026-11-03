@@ -212,4 +212,4 @@ export default (helpers) => [
 
 ## Implementation
 
-Silverware Toolbar is started by [[Library/damesene/silverware-toolbar-init]] (its settings and commands), its Space Lua API is [[Library/damesene/silverware-toolbar-api]] and its look [[Library/damesene/silverware-toolbar-style]]. All three are installed with this page.
+Silverware Toolbar is started by [silverware-toolbar-init](silverware-toolbar-init.md) (its settings and commands), its Space Lua API is [silverware-toolbar-api](silverware-toolbar-api.md) and its look [silverware-toolbar-style](silverware-toolbar-style.md). All three are installed with this page.

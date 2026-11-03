@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Toolbar API
 
-The Space Lua API of [[Library/damesene/silverware-toolbar|Silverware Toolbar]]: `silverware.toolbar.defineFormats` and `silverware.toolbar.defineActions` (your own formats and actions). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [[Library/damesene/silverware-toolbar-init]] for what starts Silverware Toolbar.
+The Space Lua API of [Silverware Toolbar](silverware-toolbar.md): `silverware.toolbar.defineFormats` and `silverware.toolbar.defineActions` (your own formats and actions). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [silverware-toolbar-init](silverware-toolbar-init.md) for what starts Silverware Toolbar.
 
 ```space-lua
 -- priority: 50

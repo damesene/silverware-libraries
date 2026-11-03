@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Chart style
 
-The look of [[Library/damesene/silverware-chart|Silverware Chart]]: a chart's box, its toolbar, menu and settings. It is installed with the library.
+The look of [Silverware Chart](silverware-chart.md): a chart's box, its toolbar, menu and settings. It is installed with the library.
 
 ```space-style
 /* Silverware Chart: a chart's box, and what shows where one cannot be drawn */

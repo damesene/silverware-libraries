@@ -157,4 +157,4 @@ A function given the helpers may stand in for the list (`function(helpers) retur
 
 ## Implementation
 
-Silverware Chart is started by [[Library/damesene/silverware-chart-init]] (its settings, code widgets and commands), its Space Lua API is [[Library/damesene/silverware-chart-api]] and its look [[Library/damesene/silverware-chart-style]]. All three are installed with this page.
+Silverware Chart is started by [silverware-chart-init](silverware-chart-init.md) (its settings, code widgets and commands), its Space Lua API is [silverware-chart-api](silverware-chart-api.md) and its look [silverware-chart-style](silverware-chart-style.md). All three are installed with this page.

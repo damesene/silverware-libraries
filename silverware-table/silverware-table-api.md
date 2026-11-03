@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Table API
 
-The Space Lua API of [[Library/damesene/silverware-table|Silverware Table]]: `silverware.table.defineFunctions`, `defineTypes` and `defineSeries` (your own functions, column types and AutoFill series) `silverware.table.evaluate` (a formula calculated from Space Lua), with `silverware.table.evaluateAlias` giving it a shorter name, and for other plugins `silverware.table.tables` (a text's tables as data) and `silverware.table.onWrite` (edits of the page written with the tables' writes). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [[Library/damesene/silverware-table-init]] for what starts Silverware Table.
+The Space Lua API of [Silverware Table](silverware-table.md): `silverware.table.defineFunctions`, `defineTypes` and `defineSeries` (your own functions, column types and AutoFill series) `silverware.table.evaluate` (a formula calculated from Space Lua), with `silverware.table.evaluateAlias` giving it a shorter name, and for other plugins `silverware.table.tables` (a text's tables as data) and `silverware.table.onWrite` (edits of the page written with the tables' writes). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [silverware-table-init](silverware-table-init.md) for what starts Silverware Table.
 
 ```space-lua
 -- priority: 50

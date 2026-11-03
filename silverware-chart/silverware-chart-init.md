@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Chart init
 
-What starts [[Library/damesene/silverware-chart|Silverware Chart]] in SilverBullet: its settings (shown in the Configuration Manager), the JavaScript loaded and handed SilverBullet's editor and space API, a code widget for each language charts are written in, its commands and the events it follows. It is installed with the library; its Space Lua API is [[Library/damesene/silverware-chart-api]].
+What starts [Silverware Chart](silverware-chart.md) in SilverBullet: its settings (shown in the Configuration Manager), the JavaScript loaded and handed SilverBullet's editor and space API, a code widget for each language charts are written in, its commands and the events it follows. It is installed with the library; its Space Lua API is [silverware-chart-api](silverware-chart-api.md).
 
 ```space-lua
 -- priority: -10

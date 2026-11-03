@@ -1006,4 +1006,4 @@ With the *Store table metadata* setting on, Silverware Table stores a table's se
 
 ## Implementation
 
-Silverware Table is started by [[Library/damesene/silverware-table-init]] (its settings, events and commands), its Space Lua API is [[Library/damesene/silverware-table-api]] and its look [[Library/damesene/silverware-table-style]]. All three are installed with this page.
+Silverware Table is started by [silverware-table-init](silverware-table-init.md) (its settings, events and commands), its Space Lua API is [silverware-table-api](silverware-table-api.md) and its look [silverware-table-style](silverware-table-style.md). All three are installed with this page.

@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Toolbar init
 
-What starts [[Library/damesene/silverware-toolbar|Silverware Toolbar]] in SilverBullet: its settings (shown in the Configuration Manager), the JavaScript loaded and handed SilverBullet's editor and config API, and its commands. It is installed with the library; its Space Lua API is [[Library/damesene/silverware-toolbar-api]].
+What starts [Silverware Toolbar](silverware-toolbar.md) in SilverBullet: its settings (shown in the Configuration Manager), the JavaScript loaded and handed SilverBullet's editor and config API, and its commands. It is installed with the library; its Space Lua API is [silverware-toolbar-api](silverware-toolbar-api.md).
 
 ```space-lua
 -- Settings, shown in the Configuration Manager (Configuration: Open)

@@ -89,6 +89,9 @@ export class InsertControls {
     this.line = context.host.floating("div", "swt-insert-line");
     // A click without a press (the keyboard); a press is taken in mouseDown
     this.mark.addEventListener("click", () => this.insertHere());
+    // Quiet, its line too, until the pointer is on it (the CSS): only a press on it inserts
+    this.mark.addEventListener("pointerenter", () => this.line.classList.add("swt-lit"));
+    this.mark.addEventListener("pointerleave", () => this.line.classList.remove("swt-lit"));
     for (const axis of ["row", "column"] as const) {
       const mark = this.quietMarks[axis];
       mark.addEventListener("click", () => this.insertAtEnd(axis));
@@ -96,9 +99,11 @@ export class InsertControls {
       mark.addEventListener("pointerenter", () => {
         this.quietHovered = axis;
         this.lineAtEnd(axis);
+        this.line.classList.add("swt-lit");
       });
       mark.addEventListener("pointerleave", () => {
         if (this.quietHovered === axis) this.quietHovered = undefined;
+        this.line.classList.remove("swt-lit");
         if (!this.at) this.line.classList.remove("swt-visible");
       });
     }
@@ -133,7 +138,10 @@ export class InsertControls {
     if (onMark || (this.inBand && !(e.target instanceof Node && this.context.host.isFloating(e.target)))) {
       e.preventDefault();
       e.stopPropagation();
-      if (this.at) {
+      // Only a press on the + inserts: one beside it, in the band, is taken
+      // (SilverBullet would show the table's markdown) and does nothing, as a
+      // row or column inserted by a press near the + was mostly not meant
+      if (onMark && this.at) {
         this.pressAt = Date.now();
         this.insertHere();
       }
@@ -179,7 +187,7 @@ export class InsertControls {
   /** The table's controls are hidden: the pointer's + too (a selected cell's quiet + stays) */
   hidePointers(): void {
     this.mark.classList.remove("swt-visible");
-    this.line.classList.remove("swt-visible");
+    this.line.classList.remove("swt-visible", "swt-lit");
     this.at = undefined;
   }
 
@@ -249,7 +257,7 @@ export class InsertControls {
         // Above the row shown below the border; under the last one, at the end (above rows pinned to the bottom)
         const at = below !== undefined && below > 0 ? below : appendRowAt(info.pins, info.rows);
         const beside: RowHold = below !== undefined && below > 0 ? { before: below } : above !== undefined ? { after: above } : {};
-        this.markAt(info, { key: info.key, axis: "row", at, beside }, edge, shown);
+        this.markAt(info, { key: info.key, axis: "row", at, beside }, edge, shown, x, y);
         return true;
       }
       return this.hide(true);
@@ -282,7 +290,7 @@ export class InsertControls {
       if (mark && y <= header.top - INSERT_LANE_FROM && edges.length) {
         const { edge, i } = edges.reduce((best, e) => (Math.abs(x - e.edge) < Math.abs(x - best.edge) ? e : best));
         const at = i < cells.length ? i : appendColumnAt(info.pins, info.columns);
-        this.markAt(info, { key: info.key, axis: "column", at, beside: {} }, edge, shown);
+        this.markAt(info, { key: info.key, axis: "column", at, beside: {} }, edge, shown, x, y);
         return true;
       }
       return this.hide(true);
@@ -290,13 +298,16 @@ export class InsertControls {
     return this.hide();
   }
 
-  private markAt(info: WidgetInfo, at: InsertTarget, edge: number, shown: Rect): void {
+  private markAt(info: WidgetInfo, at: InsertTarget, edge: number, shown: Rect, x: number, y: number): void {
     this.at = at;
     const mark = this.mark;
     mark.title = at.axis === "row" ? "Insert a row here" : "Insert a column here";
     mark.setAttribute("aria-label", mark.title);
     mark.classList.add("swt-visible");
     this.place(mark, info, at.axis, edge, shown);
+    // Placed under the pointer (it came to the + from the side): its line lit, as the + is (no pointerenter tells it)
+    const r = mark.getBoundingClientRect();
+    this.line.classList.toggle("swt-lit", x >= r.left && x <= r.right && y >= r.top && y <= r.bottom);
     // The quiet + on its axis gives way
     this.showQuiet();
   }
@@ -338,6 +349,8 @@ export class InsertControls {
     this.at = undefined;
     this.mark.classList.remove("swt-visible");
     this.line.classList.remove("swt-visible");
+    // The line lit for a quiet + under the pointer only
+    this.line.classList.toggle("swt-lit", this.quietHovered !== undefined);
     this.showQuiet();
     return inBand;
   }

@@ -15,6 +15,33 @@ test.describe("Inserting rows with a +", () => {
     expect(await markdown(page)).toMatch(/\| Pear[^\n]*\n\| +\| +\| +\| +\|\n\| apple/);
   });
 
+  test("the + shows quiet until the pointer is on it, and a press near it inserts nothing", async ({ page }) => {
+    await hoverCell(page, cell(page, 1, 0));
+    const first = (await cell(page, 1, 0).boundingBox())!;
+    // In the band left of the row grips, on the border under the first row, left of the + there
+    await page.mouse.move(first.x - 30, first.y + first.height - 1, { steps: 4 });
+    const plus = page.locator(".swt-insert:not(.swt-quiet).swt-visible");
+    await expect(plus).toHaveCount(1);
+    const box = (await plus.boundingBox())!;
+    // Not on the + itself
+    expect(first.x - 30).toBeLessThan(box.x);
+    const look = () => plus.evaluate((el) => getComputedStyle(el).borderStyle);
+    const line = page.locator(".swt-insert-line.swt-visible");
+    expect(await look()).toBe("dashed");
+    await expect(line).not.toHaveClass(/swt-lit/);
+    const before = await markdown(page);
+    await markTable(page);
+    await page.mouse.down();
+    await page.mouse.up();
+    await settled(page);
+    await expect(page.locator("table[data-test-old]")).toHaveCount(1);
+    expect(await markdown(page)).toBe(before);
+    // On the +: lit, its line too
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 2 });
+    await expect.poll(look).not.toBe("dashed");
+    await expect(line).toHaveClass(/swt-lit/);
+  });
+
   test("the quiet + under the last row adds a row at the end", async ({ page }) => {
     await hoverCell(page, bodyRows(page).last().locator("td").first());
     const quiet = page.locator(".swt-insert.swt-quiet.swt-visible");

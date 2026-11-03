@@ -250,7 +250,7 @@ describe("Controller", () => {
     });
   });
 
-  it("keeps a press beside the table that misses the + from SilverBullet, and hides the + when the pointer leaves the window", async () => {
+  it("keeps a press beside the table that misses the + from SilverBullet without inserting, inserts on the +, and hides the + when the pointer leaves the window", async () => {
     await setup(PAGE);
     const mark = document.querySelector<HTMLElement>(".swt-insert")!;
     // The band beside the table, a + shown (jsdom has no layout to hover it: set as the pointer would)
@@ -259,6 +259,16 @@ describe("Controller", () => {
     const down = new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 });
     editor.querySelector(".sb-table-widget")!.dispatchEvent(down);
     expect(down.defaultPrevented).toBe(true);
+    await flush();
+    // Near the + is not on it: nothing inserted
+    expect(text).toBe(PAGE);
+    expect(cursorMoves).toEqual([]);
+    // On the +: a row inserted there (set again: a frame meanwhile placed the + where jsdom's pointer is, nowhere)
+    pointInsert({ key: tableKey(), axis: "row", at: 4, beside: { after: 3 } }, true);
+    mark.classList.add("swt-visible");
+    const onMark = new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 });
+    mark.dispatchEvent(onMark);
+    expect(onMark.defaultPrevented).toBe(true);
     await flush();
     expect(text).toBe(PAGE.replace("| Fig | 2 |\n", "| Fig | 2 |\n| | |\n"));
     expect(cursorMoves).toEqual([]);

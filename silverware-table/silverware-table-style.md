@@ -2524,19 +2524,23 @@ html[data-theme="dark"] .swt-excel-error {
   width: 12px;
   height: 12px;
 }
-/* Under the last row while it is hovered, selected or edited: quiet (grey,
-   see-through, a dashed outline) until the pointer is on it */
-.swt-insert.swt-quiet:not(:hover) {
+/* Every +: quiet (grey, a dashed outline) until the pointer is on it, as only
+   a press on it inserts; opaque, as its line runs under it */
+.swt-insert:not(:hover):not(:focus-visible) {
   box-sizing: border-box;
   color: color-mix(in srgb, var(--root-color) 45%, transparent);
-  background: color-mix(in srgb, var(--root-color) 6%, transparent);
+  background: color-mix(in srgb, var(--root-color) 6%, var(--root-background-color));
   border: 1px dashed color-mix(in srgb, var(--root-color) 40%, transparent);
   box-shadow: none;
 }
-/* The border a row (column) goes to: over the table, not taking the pointer */
+/* The border a row (column) goes to: over the table, not taking the pointer;
+   faint until the pointer is on its + */
 .swt-insert-line {
-  background: var(--ui-accent-color);
+  background: color-mix(in srgb, var(--ui-accent-color) 35%, transparent);
   pointer-events: none;
+}
+.swt-insert-line.swt-lit {
+  background: var(--ui-accent-color);
 }
 
 /* Row and column menus */

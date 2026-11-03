@@ -65,7 +65,8 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
   let open = options.added ? rules.length - 1 : -1;
   let saved = false;
 
-  const list = e("div", "swt-cf-list");
+  // Focusable itself: where the focus goes when what had it is made anew without it (the dialog's keys stay its)
+  const list = e("div", { class: "swt-cf-list", attrs: { tabindex: "-1" } });
   const submit = e("button", { class: "swt-dialog-primary", text: "Save" });
 
   // ---- shown in the table as it changes ----------------------------------------------
@@ -135,7 +136,7 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
   const lines = new Map<number, HTMLElement>();
   const lineOf = (rule: StoredRule, i: number): HTMLElement => {
     const button = (text: string, title: string, run: () => void, disabled = false) => {
-      const b = e("button", { class: "swt-cf-tool", text, title, attrs: { "aria-label": title }, run });
+      const b = e("button", { class: "swt-cf-tool", text, title, attrs: { "aria-label": title, "data-focus": `rule ${i} ${title}` }, run });
       b.disabled = disabled;
       return b;
     };
@@ -151,7 +152,7 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
     }
     const summary = e(
       "button",
-      { class: "swt-cf-summary", attrs: { "aria-expanded": String(open === i) }, title: open === i ? "Close the rule's settings" : "Edit the rule", run: () => toggle(i) },
+      { class: "swt-cf-summary", attrs: { "aria-expanded": String(open === i), "data-focus": `rule ${i} summary` }, title: open === i ? "Close the rule's settings" : "Edit the rule", run: () => toggle(i) },
       e("span", { class: "swt-cf-scope", text: scopeLabel(rule.scope) }),
       e("span", { class: "swt-cf-when", text: conditionLabel(rule) }),
       e("span", { class: "swt-cf-arrow", text: "→" }),
@@ -201,7 +202,9 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
       ...(rules.length ? [] : [e("p", { class: "swt-cf-none", text: "No rules yet: cells look as they are." })]),
       e("button", { class: "swt-pivot-add", text: "+ Rule", run: add }),
     );
-    if (focused) Array.from(list.querySelectorAll<HTMLElement>("[data-focus]")).find((f) => f.dataset.focus === focused)?.focus();
+    const again = focused ? Array.from(list.querySelectorAll<HTMLElement>("[data-focus]")).find((f) => f.dataset.focus === focused) : undefined;
+    if (again) again.focus();
+    else if (list.isConnected && !list.closest("[role=dialog], dialog, .swt-dialog")?.contains(doc.activeElement)) list.focus({ preventScroll: true });
     const problem = options.blocked;
     submit.disabled = !!problem;
     submit.title = problem ?? "";
@@ -354,7 +357,10 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
           return e(
             "div",
             "swt-cf-list-row",
-            ...Object.entries(spec.of).map(([key, inner]) =>
+            e(
+              "div",
+              "swt-cf-list-fields",
+              ...Object.entries(spec.of).map(([key, inner]) =>
               field(
                 inner,
                 row[key],
@@ -368,10 +374,15 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
                 `${focus} ${r} ${key}`,
                 inner.label ?? key,
               ),
+              ),
             ),
-            tool("↑", "Move up", () => setRows(swap(rows, r, -1)), r === 0),
-            tool("↓", "Move down", () => setRows(swap(rows, r, 1)), r === rows.length - 1),
-            tool("×", "Remove", () => setRows(rows.filter((_, j) => j !== r))),
+            e(
+              "span",
+              "swt-cf-tools",
+              tool("↑", "Move up", () => setRows(swap(rows, r, -1)), r === 0),
+              tool("↓", "Move down", () => setRows(swap(rows, r, 1)), r === rows.length - 1),
+              tool("×", "Remove", () => setRows(rows.filter((_, j) => j !== r))),
+            ),
           );
         };
         return e(
@@ -438,7 +449,7 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
   const footer = e("div", "swt-pivot-foot", e("span", { class: "swt-pivot-note", text: options.blocked ?? "Changes show in the table as you make them" }), cancel, submit);
   const dialog = host.openDialog({
     title: options.title,
-    subtitle: "Cells that look different where their values meet a condition; rules apply from the first, an earlier rule's look kept",
+    subtitle: "Cells that look different by their values; the rules apply in this order",
     className: "swt-cf-dialog",
     content: e("div", "swt-pivot swt-cf", list),
     footer,

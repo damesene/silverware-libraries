@@ -3709,7 +3709,7 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
 .swt-cf-sample.swt-cf-bar {
   background-image: linear-gradient(
     to right,
-    color-mix(in srgb, var(--swt-cf-bar-color-now) 60%, transparent) var(--swt-cf-bar),
+    color-mix(in srgb, var(--swt-cf-bar-color-now) 45%, transparent) var(--swt-cf-bar),
     transparent var(--swt-cf-bar)
   );
   background-repeat: no-repeat;
@@ -3733,6 +3733,9 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+.swt-cf-list:focus {
+  outline: none;
 }
 .swt-cf-line {
   display: flex;
@@ -3863,8 +3866,7 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
 }
 .swt-cf-list-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   padding: 4px 6px;
   border: 1px dashed var(--swt-dialog-line);
@@ -3970,6 +3972,14 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
 }
 .swt-cf-flag-strike {
   text-decoration: line-through;
+}
+.swt-cf-list-fields {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 .swt-cf-none {
   margin: 4px 0;

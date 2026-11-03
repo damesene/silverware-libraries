@@ -4,6 +4,7 @@
 import type { Cell, Color, Context, Scope, Style } from "./api.ts";
 import { filterExcelFormula, filterMatcher, normalizeForFilter } from "../filter.ts";
 import { now } from "../formulas/dates.ts";
+import { asNumber } from "../view.ts";
 
 /** The palette's colors, by name: each a tint, a text shade and a strong shade, light and dark (the style page's --swt-cf-<name>-…) */
 export const PALETTE_NAMES = ["red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "gray"] as const;
@@ -134,6 +135,16 @@ function excelText(text: unknown): string {
   return `"${String(text ?? "").replace(/"/g, '""')}"`;
 }
 
+/** A text in Excel's quotes for SEARCH, its wildcards (* ? ~) taken as themselves, as the table finds text */
+function excelSearchText(text: unknown): string {
+  return excelText(String(text ?? "").replace(/[~*?]/g, (c) => `~${c}`));
+}
+
+/** A text as a number, as a cell is read (12,99 €, 1 000, 15 %); undefined: none */
+function number(text: unknown): number | undefined {
+  return typeof text === "number" ? (Number.isFinite(text) ? text : undefined) : asNumber(String(text ?? ""));
+}
+
 /** Whether a filter's pattern is plain words (found anywhere), as Excel's "contains" can have it */
 function plainPattern(pattern: unknown): boolean {
   return typeof pattern === "string" && pattern.trim() !== "" && !/^[=!<>/]|\|/.test(pattern.trim());
@@ -168,4 +179,4 @@ const icons = {
   exclamation: "!",
 } as const;
 
-export const HELPERS = { palette, mix, gradient, levels, matches, normalize, today, DAY, icons, excelText, excelFilter, plainPattern } as const;
+export const HELPERS = { palette, mix, gradient, levels, matches, normalize, today, DAY, icons, number, excelText, excelSearchText, excelFilter, plainPattern } as const;

@@ -1,6 +1,6 @@
 import type { ConditionDefinition, Helpers } from "../../api.ts";
 
-export default ({ matches, excelText, excelFilter, plainPattern }: Helpers): ConditionDefinition<{ pattern: string }> => ({
+export default ({ matches, excelFilter, plainPattern, excelSearchText }: Helpers): ConditionDefinition<{ pattern: string }> => ({
   name: "matches",
   label: "Matches",
   category: "Text",
@@ -10,7 +10,7 @@ export default ({ matches, excelText, excelFilter, plainPattern }: Helpers): Con
   // Plain words as Excel's own "contains" (its dialog shows it so), the rest of a filter's syntax as a formula
   excel: (params, at) => {
     if (plainPattern(params.pattern)) {
-      return { type: "containsText", attrs: { operator: "containsText", text: params.pattern.trim() }, formulas: [`NOT(ISERROR(SEARCH(${excelText(params.pattern.trim())},${at})))`] };
+      return { type: "containsText", attrs: { operator: "containsText", text: params.pattern.trim() }, formulas: [`NOT(ISERROR(SEARCH(${excelSearchText(params.pattern.trim())},${at})))`] };
     }
     const formula = excelFilter(params.pattern, at);
     return formula ? { type: "expression", formulas: [formula] } : "an empty pattern";

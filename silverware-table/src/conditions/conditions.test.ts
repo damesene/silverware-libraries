@@ -122,11 +122,11 @@ describe("Evaluation", () => {
 
   it("formats every cell where a rule has no condition: a color scale from the smallest through the 50th percentile to the largest", () => {
     const { styles } = stylesOf([rule("colorScale")], column(["0", "10", "20", "1000", "x"]));
-    expect(styles[0]).toEqual({ fill: "var(--swt-cf-red-fill)" });
+    expect(styles[0]).toEqual({ fill: "red" });
     // The midpoint the 50th percentile (15), not half the range: 20 is past it, toward the largest
     expect(styles[1]!.fill).toMatch(/^color-mix\(in oklab, var\(--swt-cf-red-fill\) 33\.3%, var\(--swt-cf-yellow-fill\)\)$/);
     expect(styles[2]!.fill).toMatch(/var\(--swt-cf-yellow-fill\) 99\.5%, var\(--swt-cf-green-fill\)/);
-    expect(styles[3]).toEqual({ fill: "var(--swt-cf-green-fill)" });
+    expect(styles[3]).toEqual({ fill: "green" });
     expect(styles[4]).toBeUndefined();
   });
 
@@ -195,6 +195,13 @@ describe("Evaluation", () => {
     expect(stylesOf([rule("bold", "duplicate")], cells).styles.map(Boolean)).toEqual([true, false, true, false, false]);
     expect(stylesOf([rule("bold", ["top", { count: 2 }])], cells).styles.map(Boolean)).toEqual([true, false, true, true, false]);
     expect(stylesOf([rule("bold", "aboveAverage")], cells).styles.map(Boolean)).toEqual([true, false, true, true, false]);
+  });
+
+  it("takes a format's statistics over every cell its condition picks, those an earlier rule stopped too, as a spreadsheet's range", () => {
+    // 100 stopped by the first rule: the scale still runs to it, so 50 is half way, not the largest
+    const { styles } = stylesOf([rule("bold", ["greater", { value: 90 }], { stop: true }), rule(["colorScale", { midType: "none", minColor: "#000000", maxColor: "#ffffff" }])], column(["0", "50", "100"]));
+    expect(styles.map((s) => s?.fill)).toEqual(["#000000", "color-mix(in oklab, #000000 50%, #ffffff)", undefined]);
+    expect(styles[2]).toEqual({ bold: true });
   });
 
   it("asks a formula condition for each cell's row", () => {

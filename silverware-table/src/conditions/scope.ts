@@ -2,6 +2,7 @@
 // the cells a definition applies to (Scope), each computed only when asked.
 import type { Cell, Scope } from "./api.ts";
 import { parseDate } from "../formulas/dates.ts";
+import { normalizeForFilter } from "../filter.ts";
 import { asNumber } from "../view.ts";
 
 /** A cell from what it shows and what sorting compares (a column type's value, else the text) */
@@ -12,9 +13,9 @@ export function cellOf(text: string, value: string, column: string): Cell {
 }
 
 // What makes two cells the same value: a number by its value and its unit (1 and 1.0 alike, as Excel counts
-// duplicates; 3 kg and 3 m not), text case ignored
+// duplicates; 3 kg and 3 m not), text as the text conditions compare it (case and diacritics ignored)
 const sameValue = (cell: Cell) =>
-  cell.number !== undefined ? `\u0000${cell.number}\u0000${cell.value.replace(/[-+\d.,\s ]/g, "").toLowerCase()}` : cell.value.trim().toLowerCase();
+  cell.number !== undefined ? `\u0000${cell.number}\u0000${cell.value.replace(/[-+\d.,\s ]/g, "").toLowerCase()}` : normalizeForFilter(cell.value).trim();
 
 /** The statistics of these cells, each computed the first time it is asked for */
 export function scopeOf(cells: readonly Cell[]): Scope {

@@ -149,5 +149,6 @@ export function filterExcelFormula(filter: string, ref: string): string | undefi
     const limit = asNumber(rest);
     if (limit !== undefined) return `AND(ISNUMBER(${ref}),${ref}${operator}${limit})`;
   }
-  return `ISNUMBER(SEARCH(${quoted(text)},${ref}))`;
+  // Its wildcards (* ? ~) taken as themselves, as the filter finds text
+  return `ISNUMBER(SEARCH(${quoted(text.replace(/[~*?]/g, (c) => `~${c}`))},${ref}))`;
 }

@@ -48,12 +48,14 @@ export function evaluateRules(rules: readonly RuleCells[], formula: RowFormula =
       row: p.rowCells,
       formula: (text) => formula(p.row, text),
     });
-    let picked: readonly Placed[] = open;
+    // Every cell the condition picks, those an earlier rule stopped too: what the format's statistics are of (as a
+    // spreadsheet's are of the rule's whole range); the look goes on those not stopped
+    let all: readonly Placed[] = cells;
     if (condition) {
       const params = readParams(condition.params, rule.when!.params);
       const scope = scopeOf(cells.map((p) => p.cell));
       try {
-        picked = open.filter((p) => {
+        all = cells.filter((p) => {
           const result = condition.test(p.cell, context(p, params, scope));
           if (typeof result !== "boolean") throw new Error(`its test gave ${typeof result}, not true or false`);
           return result;
@@ -63,8 +65,9 @@ export function evaluateRules(rules: readonly RuleCells[], formula: RowFormula =
         continue;
       }
     }
+    const picked = all.filter((p) => open.includes(p));
     const params = readParams(format.params, rule.format.params);
-    const scope = scopeOf(picked.map((p) => p.cell));
+    const scope = scopeOf(all.map((p) => p.cell));
     let fixed: Style | undefined;
     try {
       if (format.style !== undefined) {

@@ -52,6 +52,9 @@ describe("Built-in conditions", () => {
     expect(picks("equal", { value: "Česko" }, ["česko", "CESKO", "Česko ", "Slovensko", ""])).toEqual([true, true, true, false, false]);
     expect(picks("notEqual", { value: "open" }, ["open", "Open", "done", ""])).toEqual([false, false, true, true]);
     expect(picks("notEqual", { value: "5" }, ["5", "5.0", "6", "x"])).toEqual([false, false, true, true]);
+    // The value read as a cell is: 1 000 a thousand (as Excel 16 has it, checked); 1e3 no number, its text
+    expect(picks("equal", { value: "1 000" }, ["1000", "1 000", "100"])).toEqual([true, true, false]);
+    expect(picks("equal", { value: "1e3" }, ["1000", "1e3"])).toEqual([false, true]);
   });
 
   it("text contains, does not contain, starts with, ends with: case and diacritics ignored; an empty text picks nothing", () => {
@@ -84,6 +87,8 @@ describe("Built-in conditions", () => {
     expect(picks("unique", {}, values)).toEqual([false, false, true, false, false, true]);
     // 1 and 1.0 one number, as Excel counts them (checked in Excel 16); 3 kg and 3 m not one value
     expect(picks("duplicate", {}, ["1", "1.0", "3 kg", "3 m", "3 kg"])).toEqual([true, true, true, false, true]);
+    // Text as the text conditions compare it: diacritics ignored too
+    expect(picks("duplicate", {}, ["Česko", "cesko", "Slovensko"])).toEqual([true, true, false]);
   });
 
   it("top and bottom values: a count, ties all in; a percent of the cells with numbers, at least one", () => {
@@ -91,6 +96,9 @@ describe("Built-in conditions", () => {
     expect(picks("top", { count: 2 }, values)).toEqual([true, false, true, true, false, false]);
     expect(picks("top", { count: 1 }, values)).toEqual([false, false, false, true, false, false]);
     expect(picks("bottom", { count: 2 }, values)).toEqual([false, true, false, false, true, false]);
+    // A percent of the cells with numbers, blanks and text not counted, as Excel counts them (checked in Excel 16)
+    const ten = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "", "", "a", "b"];
+    expect(picks("top", { count: 30, percent: true }, ten)).toEqual([...Array(7).fill(false), true, true, true, false, false, false, false]);
     // 40 % of 5 numbers: 2; 10 %: still 1
     expect(picks("top", { count: 40, percent: true }, values)).toEqual([true, false, true, true, false, false]);
     expect(picks("bottom", { count: 10, percent: true }, values)).toEqual([false, false, false, false, true, false]);
@@ -173,10 +181,10 @@ describe("Built-in formats", () => {
     const fills = looks("colorScale", {}, ["0", "10", "20", "1000", "x"]).map((s) => s?.fill);
     // The midpoint: the 50th percentile of 0, 10, 20, 1000 is 15
     expect(fills).toEqual([
-      "var(--swt-cf-red-fill)",
+      "red",
       "color-mix(in oklab, var(--swt-cf-red-fill) 33.3%, var(--swt-cf-yellow-fill))",
       "color-mix(in oklab, var(--swt-cf-yellow-fill) 99.5%, var(--swt-cf-green-fill))",
-      "var(--swt-cf-green-fill)",
+      "green",
       undefined,
     ]);
   });
@@ -195,8 +203,11 @@ describe("Built-in formats", () => {
     expect(looks("colorScale", { ...two, minType: "number", minValue: 100, maxType: "number", maxValue: 0 }, ["0", "100"]).map((s) => s?.fill)).toEqual(["#ffffff", "#000000"]);
   });
 
-  it("color scale of numbers all alike: the largest's color", () => {
-    expect(looks("colorScale", {}, ["5", "5"]).map((s) => s?.fill)).toEqual(["var(--swt-cf-green-fill)", "var(--swt-cf-green-fill)"]);
+  it("color scale as Excel colors it: numbers all alike the largest's color; a midpoint on the minimum, cells there the minimum's", () => {
+    // Both checked in Excel 16
+    expect(looks("colorScale", {}, ["5", "5"]).map((s) => s?.fill)).toEqual(["green", "green"]);
+    const fills = looks("colorScale", {}, ["0", "0", "0", "5", "10"]).map((s) => s?.fill);
+    expect(fills).toEqual(["red", "red", "red", "color-mix(in oklab, var(--swt-cf-yellow-fill) 50%, var(--swt-cf-green-fill))", "green"]);
   });
 
   it("levels of equal counts: as many in each, the ends alike, equal numbers together", () => {
@@ -231,13 +242,17 @@ describe("Built-in formats", () => {
     expect(looks("traffic", {}, ["0", "34", "67", "100", "x"]).map((s) => s?.fill)).toEqual(["red", "yellow", "green", "green", undefined]);
   });
 
-  it("data bar: a share of the largest from 0 (or the smallest below 0); negative numbers no bar; all zero no bar", () => {
+  it("data bar: a share of the largest from 0, or from the smallest where it is below 0 (that one no bar); all zero no bar", () => {
     expect(looks("dataBar", {}, ["0", "25", "100", "x"]).map((s) => s?.bar?.share)).toEqual([0, 0.25, 1, undefined]);
     expect(looks("dataBar", {}, ["-50", "0", "50"]).map((s) => s?.bar?.share)).toEqual([0, 0.5, 1]);
     expect(looks("dataBar", {}, ["0", "0"]).map((s) => s?.bar?.share)).toEqual([0, 0]);
   });
 
-  it("arrows and dots: three equal ranges, down red, right yellow, up green", () => {
+  it("arrows and dots: at 33 % and 67 % of the range, as Excel's icon sets and the file have them", () => {
+    expect(looks("arrows", {}, ["0", "32.9", "33", "66.9", "67", "100"]).map((s) => s?.icon)).toEqual(["▼", "▼", "▶", "▶", "▲", "▲"]);
+  });
+
+  it("arrows and dots: down red, right yellow, up green", () => {
     expect(looks("arrows", {}, ["0", "50", "100"]).map((s) => [s?.icon, s?.iconColor])).toEqual([
       ["▼", "red"],
       ["▶", "yellow"],
@@ -280,6 +295,8 @@ describe("Built-in definitions in an Excel file", () => {
 
   it("an empty text, an empty pattern, a formula: no Excel form, said why (Excel would pick every cell, or cannot)", () => {
     for (const name of ["contains", "startsWith", "endsWith"]) expect(condition(name, { text: "" }), name).toBe("an empty text picks no cells");
+    // Excel's wildcards taken as themselves in SEARCH, as the table finds text (checked in Excel 16)
+    expect(condition("contains", { text: "a*b?~" })).toMatchObject({ formulas: ['NOT(ISERROR(SEARCH("a~*b~?~~",B2)))'] });
     expect(condition("matches", { pattern: "" })).toBe("an empty pattern");
     expect(typeof condition("formula", { formula: "=[@x]" })).toBe("string");
   });
@@ -287,7 +304,7 @@ describe("Built-in definitions in an Excel file", () => {
   it("a format of its own look as Excel's: ranges as their tests, a scale's points, a bar, icons; levels none", () => {
     expect(format("byRange", { rows: [{ from: 1, to: 5, style: { bold: true } }] })).toEqual({
       kind: "rules",
-      rules: [{ test: { type: "expression", formulas: ["AND(ISNUMBER(B2),B2>=1,B2<5)"] }, style: { bold: true } }],
+      rules: [{ formula: "AND(ISNUMBER(B2),B2>=1,B2<5)", style: { bold: true } }],
     });
     expect(format("colorScale")).toEqual({
       kind: "colorScale",

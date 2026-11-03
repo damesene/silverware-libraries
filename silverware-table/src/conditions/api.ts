@@ -127,7 +127,8 @@ export type ExcelPoint = { readonly type: "min" | "max" | "num" | "percent" | "p
  * format): tests of its own each with a style (keywords, ranges), a color scale, a data bar, an icon set
  */
 export type ExcelLook =
-  | { readonly kind: "rules"; readonly rules: readonly { readonly test: ExcelTest; readonly style: Style }[] }
+  // A style of each formula (true for the cells it styles, relative to `at`): the first that holds styles a cell
+  | { readonly kind: "rules"; readonly rules: readonly { readonly formula: string; readonly style: Style }[] }
   | { readonly kind: "colorScale"; readonly points: readonly ExcelPoint[] }
   | { readonly kind: "dataBar"; readonly color: Color }
   | { readonly kind: "iconSet"; readonly set: string };

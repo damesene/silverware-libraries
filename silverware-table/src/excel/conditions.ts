@@ -64,7 +64,7 @@ const cfvo = (type: string, val?: number) => `<cfvo type="${type}"${val !== unde
 const NO_COLOR = "a color Excel cannot take (only the palette's and #rrggbb)";
 
 /** A look of Excel's own drawing the cells (a scale, a bar, icons): its rule's type and what is in it; or why it has none */
-function drawn(look: Exclude<ExcelLook, { readonly kind: "rules" }>): { readonly type: string; readonly inner: string } | { readonly reason: string } {
+function drawn(look: Exclude<ExcelLook, { readonly kind: "rules" }>, range: string): { readonly type: string; readonly inner: string } | { readonly reason: string } {
   if (look.kind === "colorScale") {
     const colors = look.points.map((p) => excelColor(p.color, "fill"));
     if (look.points.length < 2 || look.points.length > 3) return { reason: "a color scale of Excel has two or three points" };
@@ -74,7 +74,9 @@ function drawn(look: Exclude<ExcelLook, { readonly kind: "rules" }>): { readonly
   }
   if (look.kind === "dataBar") {
     const color = excelColor(look.color, "solid");
-    return color ? { type: "dataBar", inner: `<dataBar>${cfvo("min")}${cfvo("max")}<color rgb="${color}"/></dataBar>` } : { reason: NO_COLOR };
+    // From 0, or from the smallest below 0, as the table draws it (Excel's "lowest value" would give the smallest no bar)
+    const from = `<cfvo type="formula" val="${xmlText(`MIN(0,MIN(${range}))`)}"/>`;
+    return color ? { type: "dataBar", inner: `<dataBar>${from}${cfvo("max")}<color rgb="${color}"/></dataBar>` } : { reason: NO_COLOR };
   }
   // As many thresholds as the set has icons (3Arrows: 3), in equal percents of the range
   const count = Number(/^\d+/.exec(look.set)?.[0] ?? 3);
@@ -193,9 +195,15 @@ export function excelConditional(ranges: readonly RuleRange[]): { readonly condi
           skip(bad.reason);
           continue;
         }
-        look.rules.forEach((r, i) => rules.push(ruleXml(r.test, priority++, ids[i] as number, true)));
+        // The first that holds styles a cell: each with the ones before it not holding, so no rule after is stopped
+        look.rules.forEach((r, i) => {
+          const before = look.rules.slice(0, i).map((b) => b.formula);
+          const formula = before.length ? `AND(NOT(OR(${before.join(",")})),${r.formula})` : r.formula;
+          rules.push(ruleXml({ type: "expression", formulas: [formula] }, priority++, ids[i] as number, !!rule.stop));
+        });
       } else {
-        const made = drawn(look);
+        const absolute = `$${columnLetters(columns[0])}$${rows[0] + 1}:$${columnLetters(columns[1])}$${rows[1] + 1}`;
+        const made = drawn(look, absolute);
         if ("reason" in made) {
           skip(made.reason);
           continue;

@@ -34,13 +34,13 @@ describe("Conditional formatting in Excel", () => {
           name: "hot",
           label: "Hot",
           look: () => ({ fill: "red" }),
-          excel: (_: unknown, at: string) => ({ kind: "rules", rules: [{ test: { type: "expression", formulas: [`${at}>100`] }, style: { fill: "#ff0000" } }] }),
+          excel: (_: unknown, at: string) => ({ kind: "rules", rules: [{ formula: `${at}>100`, style: { fill: "#ff0000" } }] }),
         },
         { name: "plain", label: "Plain", look: () => undefined },
       ]).list,
     );
     const { conditional, skipped } = excelConditional([range("hot"), range("plain")]);
-    expect(conditional.xml).toBe('<conditionalFormatting sqref="B2:B5"><cfRule type="expression" dxfId="0" priority="1" stopIfTrue="1"><formula>B2&gt;100</formula></cfRule></conditionalFormatting>');
+    expect(conditional.xml).toBe('<conditionalFormatting sqref="B2:B5"><cfRule type="expression" dxfId="0" priority="1"><formula>B2&gt;100</formula></cfRule></conditionalFormatting>');
     expect(skipped).toEqual([{ rule: "All cells → Plain", reason: "Plain has no Excel form" }]);
   });
 
@@ -80,9 +80,12 @@ describe("Conditional formatting in Excel", () => {
       range("redText", ["dateIn", { period: "past" }]),
     ]);
     expect(conditional.xml).toContain('<colorScale><cfvo type="min"/><cfvo type="percentile" val="50"/><cfvo type="max"/><color rgb="FFFFC7CE"/><color rgb="FFFFEB9C"/><color rgb="FFC6EFCE"/></colorScale>');
-    expect(conditional.xml).toContain('<dataBar><cfvo type="min"/><cfvo type="max"/><color rgb="FF4A7CF0"/></dataBar>');
+    // From 0 (or the smallest below it), as the table draws it
+    expect(conditional.xml).toContain('<dataBar><cfvo type="formula" val="MIN(0,MIN($B$2:$B$5))"/><cfvo type="max"/><color rgb="FF4A7CF0"/></dataBar>');
     expect(conditional.xml).toContain('<iconSet iconSet="3Arrows">');
-    expect(conditional.xml).toContain('<cfRule type="expression" dxfId="0" priority="4" stopIfTrue="1"><formula>AND(ISNUMBER(B2),B2&lt;50)</formula></cfRule>');
+    // A range's rows: the first that holds styles a cell, no rule after it stopped
+    expect(conditional.xml).toContain('<cfRule type="expression" dxfId="0" priority="4"><formula>AND(ISNUMBER(B2),B2&lt;50)</formula></cfRule>');
+    expect(conditional.xml).toContain('<cfRule type="expression" dxfId="1" priority="5"><formula>AND(NOT(OR(AND(ISNUMBER(B2),B2&lt;50))),AND(ISNUMBER(B2),B2&gt;=50))</formula></cfRule>');
     expect(conditional.xml).toContain('text="say &quot;hi&quot;"><formula>NOT(ISERROR(SEARCH(&quot;say &quot;&quot;hi&quot;&quot;&quot;,B2)))</formula>');
     expect(conditional.xml).toContain("<formula>AND(ISNUMBER(B2),FLOOR(B2,1)&lt;TODAY())</formula>");
   });
@@ -102,7 +105,7 @@ describe("Conditional formatting in Excel", () => {
     expect(conditional.xml).toContain("<formula>_xlfn.REGEXTEST(B2,&quot;^bl&quot;,1)</formula>");
     expect(conditional.xml).toContain("<formula>OR(TRIM(B2)=&quot;done&quot;,TRIM(B2)=&quot;closed&quot;)</formula>");
     expect(conditional.xml).toContain("<formula>NOT(ISNUMBER(SEARCH(&quot;open&quot;,B2)))</formula>");
-    expect(conditional.xml).toContain("<formula>AND(ISNUMBER(B2),B2&gt;10)</formula>");
+    expect(conditional.xml).toContain("AND(ISNUMBER(B2),B2&gt;10))</formula>");
     expect(notes).toEqual([{ rule: "Matches → Light red fill with dark red text", reason: "a regular expression needs Microsoft 365 (REGEXTEST): an older Excel leaves its cells as they are" }]);
   });
 

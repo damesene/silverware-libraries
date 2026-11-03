@@ -1,6 +1,6 @@
 import type { FormatDefinition, Helpers, Style } from "../../api.ts";
 
-export default ({ matches, palette, excelText, excelFilter, plainPattern }: Helpers): FormatDefinition<{ rows: readonly { pattern: string; style: Style }[] }> => ({
+export default ({ matches, palette, excelFilter }: Helpers): FormatDefinition<{ rows: readonly { pattern: string; style: Style }[] }> => ({
   name: "byPattern",
   label: "By keywords",
   category: "By values",
@@ -17,16 +17,13 @@ export default ({ matches, palette, excelText, excelFilter, plainPattern }: Help
     },
   },
   look: (cell, { params }) => params.rows.find((row) => row.pattern.trim() !== "" && matches(row.pattern)(cell.text))?.style,
-  // A rule for each keyword: plain words as Excel's own "contains", the rest of a filter's syntax as a formula
+  // A rule for each keyword: its filter syntax as a formula (plain words by SEARCH, a regular expression by REGEXTEST)
   excel: (params, at) => ({
     kind: "rules",
     rules: params.rows.flatMap((row) => {
       const pattern = row.pattern.trim();
-      if (plainPattern(pattern)) {
-        return [{ test: { type: "containsText", attrs: { operator: "containsText", text: pattern }, formulas: [`NOT(ISERROR(SEARCH(${excelText(pattern)},${at})))`] }, style: row.style }];
-      }
       const formula = excelFilter(pattern, at);
-      return formula ? [{ test: { type: "expression", formulas: [formula] }, style: row.style }] : [];
+      return formula ? [{ formula, style: row.style }] : [];
     }),
   }),
 });

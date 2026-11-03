@@ -65,10 +65,17 @@ export default ({ palette, mix }: Helpers): FormatDefinition<ScaleParams> => ({
     const low = pointAt(scope, params.minType, params.minValue);
     const high = pointAt(scope, params.maxType, params.maxValue);
     if (n === undefined || low === undefined || high === undefined) return undefined;
-    const mid = params.midType === "none" ? undefined : pointAt(scope, params.midType, params.midValue);
     // How far n is from a to b, 0 to 1 (past either end: that end)
     const along = (a: number, b: number) => (b === a ? (n >= b ? 1 : 0) : Math.min(1, Math.max(0, (n - a) / (b - a))));
-    if (mid === undefined || mid <= low || mid >= high) return { fill: mix([params.minColor, params.maxColor], along(low, high)) };
+    // Ends the wrong way round: the scale inverted, two colors
+    if (low > high) return { fill: mix([params.minColor, params.maxColor], along(low, high)) };
+    // As Excel colors them (checked in Excel 16): at or past the maxpoint its color (all numbers alike too), at or
+    // before the minpoint its color; a midpoint at or past an end is at that end, the scale on from it
+    if (n >= high) return { fill: params.maxColor };
+    if (n <= low) return { fill: params.minColor };
+    const at = params.midType === "none" ? undefined : pointAt(scope, params.midType, params.midValue);
+    const mid = at === undefined ? undefined : Math.min(Math.max(at, low), high);
+    if (mid === undefined) return { fill: mix([params.minColor, params.maxColor], along(low, high)) };
     return n <= mid ? { fill: mix([params.minColor, params.midColor], along(low, mid)) } : { fill: mix([params.midColor, params.maxColor], along(mid, high)) };
   },
   excel: (params) => ({

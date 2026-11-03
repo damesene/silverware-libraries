@@ -25,7 +25,7 @@ export default ({ palette }: Helpers): FormatDefinition<{ rows: readonly { from?
   excel: (params, at) => ({
     kind: "rules",
     rules: params.rows.map((row) => ({
-      test: { type: "expression", formulas: [`AND(ISNUMBER(${at})${row.from !== undefined ? `,${at}>=${row.from}` : ""}${row.to !== undefined ? `,${at}<${row.to}` : ""})`] },
+      formula: `AND(ISNUMBER(${at})${row.from !== undefined ? `,${at}>=${row.from}` : ""}${row.to !== undefined ? `,${at}<${row.to}` : ""})`,
       style: row.style,
     })),
   }),

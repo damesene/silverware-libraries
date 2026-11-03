@@ -37,7 +37,7 @@ describe("Cell menu", () => {
     expect(menu()!.querySelector(".swt-menu-title")!.textContent).toBe("Cell: Qty, row 1");
     expect(entries()).toEqual([
       ...["Copy", "Cut", "Paste", "Paste as new rows", "—"],
-      ...["Clear", "Move to…", "—", "Insert function…", "—", "AutoFill to…", "—", "Filter: = 3", "Filter: ≠ 3"],
+      ...["Clear", "Move to…", "—", "Insert function…", "—", "AutoFill to…", "—", "Filter: = 3", "Filter: ≠ 3", "—", "Conditional formatting…"],
     ]);
     // Named by the pencil in its title
     expect(menu()!.querySelector(".swt-menu-rename")!.getAttribute("aria-label")).toMatch(/^Name this cell/);
@@ -150,7 +150,7 @@ describe("Cell menu", () => {
     await flush();
     rightClick(cell(2, 1));
     expect(menu()!.querySelector(".swt-menu-title")!.textContent).toBe("2 cells");
-    expect(entries()).toEqual(["Copy 2 cells", "Cut 2 cells", "Paste", "Paste as new rows", "—", "Clear 2 cells", "Move 2 cells to…", "—", "AutoFill to…", "—", "Filter: = 3, 10", "Filter: ≠ 3, 10", "—", "Delete 2 rows", "Delete column"]);
+    expect(entries()).toEqual(["Copy 2 cells", "Cut 2 cells", "Paste", "Paste as new rows", "—", "Clear 2 cells", "Move 2 cells to…", "—", "AutoFill to…", "—", "Filter: = 3, 10", "Filter: ≠ 3, 10", "—", "Conditional formatting…", "—", "Delete 2 rows", "Delete column"]);
     cellMenuItem(cell(2, 1), /^Copy 2 cells$/)!.click();
     await flush();
     expect(copied).toBe("3\n10");

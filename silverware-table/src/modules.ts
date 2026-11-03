@@ -6,6 +6,7 @@ import type { AdapterFeature, Feature, TableHost } from "./core/feature.ts";
 import { AutoFill } from "./features/autofill.ts";
 import { Autoscroll } from "./core/silverbullet/modules/autoscroll.ts";
 import { ColumnTypes } from "./features/columntypes.ts";
+import { Conditions } from "./features/conditions.ts";
 import { Excel } from "./features/excel.ts";
 import { Pivot } from "./features/pivot.ts";
 import { Export } from "./features/export.ts";
@@ -61,6 +62,8 @@ export function featureEntries(metadata: Feature): readonly FeatureEntry[] {
     optional("filters", (host) => new Filters(host)),
     // After formulas: a formula's result is shown in its column's type
     optional("columnTypes", (host) => new ColumnTypes(host)),
+    // After types: their values are what conditions compare (an offer); its looks over theirs
+    optional("conditions", (host) => new Conditions(host)),
     optional("names", (host) => new Names(host)),
     always(() => metadata),
     optional("paste", (host) => new Paste(host)),

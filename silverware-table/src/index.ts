@@ -5,6 +5,7 @@ import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { Controller } from "./controller.ts";
 import { customTypes } from "./columntypes/custom.ts";
 import { customTypesAnew, defineCustomTypes } from "./columntypes/registry.ts";
+import { checkedConditions, checkedFormats, customDefinitionsAnew, defineCustomConditions, defineCustomFormats } from "./conditions/index.ts";
 import { customFunctions } from "./formulas/custom.ts";
 import { choiceText, type FormulasOffer, functionNamed, scalarText } from "./formulas/index.ts";
 import { defineFormulaPlaces as defineFormulaPlacesIn, type FormulaPlaces } from "./formulas/places.ts";
@@ -220,11 +221,31 @@ export function defineSeries(definitions: unknown): string | undefined {
   return notDefined("custom series", problems);
 }
 
+/**
+ * `silverware.table.defineConditions`: custom conditions of conditional formatting, as `defineTypes` takes
+ * types; tables with rules look as they say at once; what is wrong with any of them, for a notification
+ */
+export function defineConditions(definitions: unknown): string | undefined {
+  const { list, problems } = checkedConditions(definitions);
+  defineCustomConditions(list);
+  definitionsChanged();
+  return notDefined("custom conditions", problems);
+}
+
+/** `silverware.table.defineFormats`: custom formats of conditional formatting, as `defineConditions` */
+export function defineFormats(definitions: unknown): string | undefined {
+  const { list, problems } = checkedFormats(definitions);
+  defineCustomFormats(list);
+  definitionsChanged();
+  return notDefined("custom formats", problems);
+}
+
 /** Space Lua is loaded (again): the custom definitions are made anew, replacing those of before */
 export function resetDefinitions(): void {
   customFunctionsAnew();
   customTypesAnew();
   customSeriesAnew();
+  customDefinitionsAnew();
   writeListenersAnew();
 }
 

@@ -124,6 +124,7 @@ describe("Controller", () => {
       "Sheet view",
       "—",
       "Insert pivot table…",
+      "Conditional formatting…",
       "Theme: Native (global)",
       "Copy as CSV",
       "Copy as Markdown",

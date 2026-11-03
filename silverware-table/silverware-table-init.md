@@ -281,6 +281,18 @@ config.define("silverware.table", {
             },
           },
         },
+        conditions = {
+          type = "object",
+          additionalProperties = false,
+          properties = {
+            enabled = {
+              type = "boolean",
+              default = true,
+              description = "Cells look different where their values meet a condition (colors, bars, icons): rules for a column or the whole table, from a column's menu or the table's ⋯ menu.",
+              ui = { category = "Silverware Table: Modules", label = "Conditional formatting", priority = 3.55 },
+            },
+          },
+        },
         excel = {
           type = "object",
           additionalProperties = false,

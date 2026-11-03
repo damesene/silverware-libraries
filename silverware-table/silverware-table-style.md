@@ -3606,4 +3606,374 @@ html[data-theme="dark"] .sb-table-widget[data-swt-theme="ledger"] {
   --swt-hover: rgba(74, 222, 128, 0.1);
   --swt-accent: #4ade80;
 }
+
+/* ---- Conditional formatting (the conditions module) ----
+   A cell a rule formats has the mark swt-cf and custom properties of its
+   style (--swt-cf-fill, --swt-cf-color, …, each with its -dark value): these
+   rules read them, one set for every format, so a format of any colors and
+   levels needs no CSS of its own. No !important: a theme that uses it wins. */
+
+/* The palette: a tint to fill a cell, a shade for its text, a strong color for bars and icons; light and dark */
+:root {
+  --swt-cf-red-fill: #ffc7ce;
+  --swt-cf-red-text: #9c0006;
+  --swt-cf-red-solid: #e5534b;
+  --swt-cf-orange-fill: #fdd9b5;
+  --swt-cf-orange-text: #8a4300;
+  --swt-cf-orange-solid: #f08c2e;
+  --swt-cf-yellow-fill: #ffeb9c;
+  --swt-cf-yellow-text: #9c5700;
+  --swt-cf-yellow-solid: #e0b000;
+  --swt-cf-green-fill: #c6efce;
+  --swt-cf-green-text: #006100;
+  --swt-cf-green-solid: #3fa34d;
+  --swt-cf-teal-fill: #c3ece8;
+  --swt-cf-teal-text: #0b5c55;
+  --swt-cf-teal-solid: #1aa39a;
+  --swt-cf-blue-fill: #cfe2ff;
+  --swt-cf-blue-text: #0b3d91;
+  --swt-cf-blue-solid: #4a7cf0;
+  --swt-cf-purple-fill: #e3d5f7;
+  --swt-cf-purple-text: #4b2a85;
+  --swt-cf-purple-solid: #8a63d2;
+  --swt-cf-pink-fill: #fbd3e9;
+  --swt-cf-pink-text: #8a1d55;
+  --swt-cf-pink-solid: #d9488f;
+  --swt-cf-gray-fill: #e3e3e3;
+  --swt-cf-gray-text: #3d3d3d;
+  --swt-cf-gray-solid: #8a8a8a;
+}
+html[data-theme="dark"] {
+  --swt-cf-red-fill: #5c1f24;
+  --swt-cf-red-text: #ffb3b8;
+  --swt-cf-red-solid: #f0716a;
+  --swt-cf-orange-fill: #5c3514;
+  --swt-cf-orange-text: #ffc58f;
+  --swt-cf-orange-solid: #f5a052;
+  --swt-cf-yellow-fill: #5a4a12;
+  --swt-cf-yellow-text: #ffe08a;
+  --swt-cf-yellow-solid: #f0c63a;
+  --swt-cf-green-fill: #1e4d2b;
+  --swt-cf-green-text: #a7e3b3;
+  --swt-cf-green-solid: #5cc26b;
+  --swt-cf-teal-fill: #134542;
+  --swt-cf-teal-text: #9fe3dc;
+  --swt-cf-teal-solid: #3cc4ba;
+  --swt-cf-blue-fill: #1d3461;
+  --swt-cf-blue-text: #b3cdfd;
+  --swt-cf-blue-solid: #6f97f5;
+  --swt-cf-purple-fill: #3a2a5c;
+  --swt-cf-purple-text: #d4c2f5;
+  --swt-cf-purple-solid: #a585e3;
+  --swt-cf-pink-fill: #5a1f3d;
+  --swt-cf-pink-text: #f7b5d6;
+  --swt-cf-pink-solid: #e870a9;
+  --swt-cf-gray-fill: #3a3a3a;
+  --swt-cf-gray-text: #d6d6d6;
+  --swt-cf-gray-solid: #a0a0a0;
+}
+
+/* The value of each look, picked by the page's: the rules below read these */
+:is(td, .swt-cf-sample).swt-cf {
+  --swt-cf-fill-now: var(--swt-cf-fill);
+  --swt-cf-color-now: var(--swt-cf-color);
+  --swt-cf-bar-color-now: var(--swt-cf-bar-color);
+  --swt-cf-icon-color-now: var(--swt-cf-icon-color);
+}
+html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
+  --swt-cf-fill-now: var(--swt-cf-fill-dark, var(--swt-cf-fill));
+  --swt-cf-color-now: var(--swt-cf-color-dark, var(--swt-cf-color));
+  --swt-cf-bar-color-now: var(--swt-cf-bar-color-dark, var(--swt-cf-bar-color));
+  --swt-cf-icon-color-now: var(--swt-cf-icon-color-dark, var(--swt-cf-icon-color));
+}
+/* A fill over the stripes and the row's hover tint; a selected or edited cell's tint (an inset shadow) over it */
+:is(#sb-main, html) .sb-table-widget td.swt-cf-fill,
+.swt-cf-sample.swt-cf-fill {
+  background-color: var(--swt-cf-fill-now);
+}
+/* A text color: not over a typed cell's invalid mark, which is told first */
+:is(#sb-main, html) .sb-table-widget td.swt-cf-color:not(.swt-type-invalid),
+:is(#sb-main, html) .sb-table-widget td.swt-cf-color:not(.swt-type-invalid) a,
+.swt-cf-sample.swt-cf-color {
+  color: var(--swt-cf-color-now);
+}
+.sb-table-widget td.swt-cf-text,
+.sb-table-widget td.swt-cf-text > .swt-cell-content,
+.swt-cf-sample.swt-cf-text {
+  font-weight: var(--swt-cf-weight, inherit);
+  font-style: var(--swt-cf-style, inherit);
+  text-decoration-line: var(--swt-cf-line, none);
+}
+/* A data bar: under the content, from the cell's left edge, the fill (if any) around it */
+:is(#sb-main, html) .sb-table-widget td.swt-cf-bar,
+.swt-cf-sample.swt-cf-bar {
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--swt-cf-bar-color-now) 60%, transparent) var(--swt-cf-bar),
+    transparent var(--swt-cf-bar)
+  );
+  background-repeat: no-repeat;
+}
+/* An icon before the content (an arrow, a dot) */
+:is(#sb-main, html) .sb-table-widget td.swt-cf-icon > .swt-cell-content::before,
+.swt-cf-sample.swt-cf-icon::before {
+  content: var(--swt-cf-icon);
+  color: var(--swt-cf-icon-color-now);
+  margin-right: 0.35em;
+  font-weight: normal;
+  text-decoration: none;
+  display: inline-block;
+}
+
+/* The rules' dialog */
+.swt-cf-dialog {
+  width: min(820px, calc(100vw - 24px));
+}
+.swt-cf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.swt-cf-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+}
+.swt-cf-line.swt-cf-open {
+  border-color: var(--ui-accent-color);
+}
+.swt-cf-unread {
+  opacity: 0.75;
+  font-size: 12px;
+}
+.swt-cf-summary {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 4px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swt-cf-summary:hover {
+  background: var(--swt-dialog-card);
+}
+.swt-cf-scope {
+  font-weight: 600;
+}
+.swt-cf-arrow,
+.swt-cf-stop {
+  opacity: 0.6;
+}
+.swt-cf-stop {
+  font-size: 11px;
+  padding: 0 4px;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 4px;
+}
+.swt-cf-samples {
+  display: inline-flex;
+  gap: 2px;
+}
+.swt-cf-sample {
+  display: inline-block;
+  min-width: 3.2em;
+  padding: 1px 6px;
+  font-size: 12px;
+  text-align: center;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 3px;
+}
+.swt-cf-tools {
+  display: inline-flex;
+}
+.swt-cf-tool {
+  padding: 2px 6px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.65;
+}
+.swt-cf-tool:hover:not(:disabled) {
+  background: var(--swt-dialog-card);
+  opacity: 1;
+}
+.swt-cf-tool:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.swt-cf-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 6px 12px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--ui-accent-color);
+}
+.swt-cf-section {
+  display: grid;
+  grid-template-columns: 8em 1fr;
+  gap: 4px 12px;
+  align-items: start;
+}
+.swt-cf-label {
+  font-weight: 600;
+  padding-top: 5px;
+}
+.swt-cf-fields,
+.swt-cf-params {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.swt-cf-description {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.swt-cf-param {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.swt-cf-param-list {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.swt-cf-param-name {
+  font-size: 12px;
+  opacity: 0.75;
+  min-width: 5em;
+}
+.swt-cf-list-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px dashed var(--swt-dialog-line);
+  border-radius: 6px;
+}
+.swt-cf select,
+.swt-cf input[type="text"],
+.swt-cf input[type="number"] {
+  padding: 4px 6px;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  min-width: 0;
+}
+.swt-cf input[type="text"] {
+  width: 16em;
+  max-width: 100%;
+}
+.swt-cf input[type="number"] {
+  width: 6em;
+}
+.swt-cf-problem {
+  font-size: 12px;
+  color: var(--danger-color, #c62828);
+}
+.swt-cf-problem:empty {
+  display: none;
+}
+.swt-cf-colors {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+}
+.swt-cf-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swt-cf-swatch[aria-pressed="true"] {
+  outline: 2px solid var(--ui-accent-color);
+  outline-offset: 1px;
+}
+.swt-cf-swatch-none {
+  background: linear-gradient(to top right, transparent 45%, var(--danger-color, #c62828) 45% 55%, transparent 55%);
+}
+.swt-cf-colors input[type="color"] {
+  width: 26px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+.swt-cf-colors input[type="color"].swt-cf-picked {
+  outline: 2px solid var(--ui-accent-color);
+  outline-offset: 1px;
+}
+.swt-cf-style {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.swt-cf-style-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.swt-cf-style-name {
+  font-size: 12px;
+  opacity: 0.75;
+  min-width: 2.6em;
+}
+.swt-cf-flag {
+  min-width: 24px;
+  padding: 1px 6px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swt-cf-flag[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--ui-accent-color) 22%, transparent);
+  border-color: var(--ui-accent-color);
+}
+.swt-cf-flag-bold {
+  font-weight: bold;
+}
+.swt-cf-flag-italic {
+  font-style: italic;
+}
+.swt-cf-flag-underline {
+  text-decoration: underline;
+}
+.swt-cf-flag-strike {
+  text-decoration: line-through;
+}
+.swt-cf-none {
+  margin: 4px 0;
+  font-size: 12px;
+  opacity: 0.7;
+}
 ```

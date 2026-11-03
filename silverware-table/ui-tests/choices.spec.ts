@@ -77,4 +77,17 @@ test.describe("Choices", () => {
     expect(text).not.toContain("#choice");
     expect(text).toMatch(/\| C +\| later +\|/);
   });
+
+  test("Choice in the Type menu is #choice alone: a column of a list goes to none, the list's row marked while it took it", async ({ page }) => {
+    await load(page);
+    await header(page, 1).click({ button: "right" });
+    await menu(page).getByTitle(/Change the column's type/).click();
+    const choice = menu(page).locator(".swt-menu-item", { hasText: /^Choice$/ });
+    await expect(choice).toHaveAttribute("aria-checked", "false");
+    await expect(menu(page).locator(".swt-menu-segmented", { hasText: "Choice: status" }).getByTitle("Take the list status for this column")).toHaveAttribute("aria-checked", "true");
+    await rendersAnew(page, () => choice.click());
+    const text = await markdown(page);
+    expect(text).toMatch(/\| Task +\| Status #choice +\|/);
+    expect(text).toContain("columntypes.choice.status");
+  });
 });

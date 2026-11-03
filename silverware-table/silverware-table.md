@@ -640,7 +640,7 @@ A `#choice` column takes one of a list of values, as a status column (open, in p
 * Renaming a value in *Choices…* renames it in the cells of every column that takes the list; renaming the list renames it in their headers. A value removed from the list stays in its cells, marked.
 * The cell editor offers the list's values; a value not in the list is kept as typed and marked in red. Values match whatever their case.
 * Sorting by the column puts the values in the list's order (open, in progress, done), not the alphabet's.
-* Every list of the table shows under *Choice* in the *Type* menu, where a column takes one, and where a list is deleted (🗑). Deleting a list columns take asks first; those columns are then left without a type, their cells as written. A list is not deleted by itself when no column takes it any more.
+* Every list of the table shows under *Choice* in the *Type* menu, where a column takes one (*Choice* itself is `#choice` without a list), and where a list is deleted (🗑). Deleting a list columns take asks first; those columns are then left without a type, their cells as written. A list is not deleted by itself when no column takes it any more.
 * A list's name is lower case letters (a to z) and digits, words joined by dashes: `status`, `task-status`.
 * `#choice` alone, or a list the table does not have, checks nothing: the editor offers the values the column has.
 

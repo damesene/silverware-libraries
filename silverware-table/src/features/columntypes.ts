@@ -147,15 +147,18 @@ export class ColumnTypes implements Feature {
         // custom type's syntax is free text), else its name; the same type keeps its parameters
         const first = type.syntax.split(",")[0]!.trim().replace(/^#/, "");
         const tag = typeOfTag(first)?.type === type ? first : type.name;
+        // Choice alone is #choice, no list: a column's list is picked in the rows under it, which mark it
+        const choice = isChoice({ type });
+        const same = current?.type === type && !(choice && current.params.name !== undefined);
         const item: MenuEntry = {
           kind: "item",
           label: typeLabel(type.name),
           icon: iconOf(type),
-          checked: current?.type === type,
+          checked: same,
           detail: typeDetail(type),
-          run: setType(current?.type === type ? current.tag : tag),
+          run: setType(current?.type === type && !choice ? current.tag : tag),
         };
-        return isChoice({ type }) ? [item, ...this.listEntries(info, table, column, type)] : [item];
+        return choice ? [item, ...this.listEntries(info, table, column, type)] : [item];
       }),
     ];
     // As Filter: the type's name after Type, its icon opening the list of types, a × removing it

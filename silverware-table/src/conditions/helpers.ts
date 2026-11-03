@@ -66,6 +66,9 @@ function gradient(colors: readonly (Color | undefined)[], n: number): Color[] {
  */
 export type Split = "equal" | "quantiles" | readonly number[] | { readonly percent: readonly number[] } | ((scope: Scope) => readonly number[]);
 
+// What a share of a range computed in binary may miss a bound by
+const BOUND_SLACK = 1e-9;
+
 /** The level (0 to levels - 1) a cell is at, by a split; undefined: no number */
 export function levelOf(cell: Cell, scope: Scope, split: Split, levels: number): number | undefined {
   const n = cell.number;
@@ -74,7 +77,8 @@ export function levelOf(cell: Cell, scope: Scope, split: Split, levels: number):
   const clamp = (i: number) => Math.min(last, Math.max(0, i));
   if (split === "equal") {
     const t = scope.position(cell);
-    return t === undefined ? undefined : clamp(Math.floor(t * levels));
+    // A number on a bound in the level above it, though the division leaves it a hair under (0.3 / 0.4 * 4)
+    return t === undefined ? undefined : clamp(Math.floor(t * levels + BOUND_SLACK));
   }
   if (split === "quantiles") {
     const q = scope.quantile(cell);
@@ -90,7 +94,7 @@ export function levelOf(cell: Cell, scope: Scope, split: Split, levels: number):
   if (typeof split === "function") return clamp(split(scope).filter((x) => n >= x).length);
   if (Array.isArray(split)) return clamp((split as readonly number[]).filter((x) => n >= x).length);
   const t = scope.position(cell);
-  return t === undefined ? undefined : clamp((split as { readonly percent: readonly number[] }).percent.filter((p) => t * 100 >= p).length);
+  return t === undefined ? undefined : clamp((split as { readonly percent: readonly number[] }).percent.filter((p) => t * 100 + BOUND_SLACK >= p).length);
 }
 
 /** A `look` grading the cells into as many levels as styles (the first the lowest), by `split` */

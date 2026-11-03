@@ -11,7 +11,7 @@
 // stands for, as the core follows a column's attributes by place, not by
 // what a pivot's column is). Formulas are calculated by the formulas
 // module's cells; without it, nothing is.
-import type { Feature, ModelHost, TableBadge, TableInfo, TableTarget, ToolbarButton, WriteEdit } from "../core/feature.ts";
+import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, TableTarget, ToolbarButton, WriteEdit } from "../core/feature.ts";
 import { followOwnFormula, type FormulaCells, type FormulasOffer, type PageLinksOffer } from "../formulas/index.ts";
 import { listOf } from "../bridge.ts";
 import { columnName } from "../columns.ts";
@@ -22,6 +22,9 @@ import { type Fields, fieldsOf } from "../pivot/fields.ts";
 import { type Pivot as Calculated, pivotOf } from "../pivot/pivot.ts";
 import { asNumber } from "../view.ts";
 import { openPivotDialog } from "./pivotdialog.ts";
+
+// What a pivot's dialog says first while the formulas module, which calculates pivots, is off
+const FORMULAS_OFF = "A pivot is calculated by the formulas module, which is off: turn it on in Silverware Table's settings (the Silverware Table: Settings command), then reload.";
 
 /** The headers the user named, by what each column stands for (PivotColumn.id) */
 type Renames = Readonly<Record<string, string>>;
@@ -371,12 +374,15 @@ export class Pivot implements Feature {
   /** The dialog: a pivot's fields picked, its preview calculated from the source as the page has it */
   private dialog(sources: ReturnType<Pivot["sources"]>, fields: Fields, submitLabel: string, submit: (definition: PivotDefinition) => void, blocked?: string): void {
     const { listPages } = this.host.bridge;
+    // Without the formulas module nothing is calculated: the dialog says so first, and inserts or saves nothing
+    const off = this.cells() ? undefined : FORMULAS_OFF;
     openPivotDialog(this.host, {
       sources,
       fields,
       submitLabel,
       submit,
-      ...(blocked ? { blocked } : {}),
+      ...(off ? { notice: off } : {}),
+      ...(off || blocked ? { blocked: off ?? blocked } : {}),
       preview: (definition) => this.calculate(definition, this.sourceFor(definition, sources)),
       readPage: (page) => this.pageSources(page),
       ...(listPages ? { pages: async () => listOf(await listPages()).filter((page): page is string => typeof page === "string" && page !== this.host.currentPage) } : {}),
@@ -395,11 +401,25 @@ export class Pivot implements Feature {
     let n = 1;
     while (taken.has(`table${n}`)) n++;
     const name = own ?? `table${n}`;
+    const fields = this.firstFields(name, table);
+    const blocked = this.blocked({ ...table, meta: undefined });
+    this.dialog(this.sources(own ? undefined : { name, table }), fields, "Insert", (definition) => {
+      const sources = this.sources(own ? undefined : { name, table });
+      const pivot = this.calculate(definition, this.sourceFor(definition, sources));
+      if (typeof pivot === "string") return void this.host.bridge.flash(`Silverware Table: ${pivot}`, "error");
+      const made = this.written(this.withDefinition({ indent: table.indent, align: [], rows: [{ cells: [""] }], padded: false }, definition), pivot, {});
+      const names = !own && definition.source.trim().toLowerCase() === name.toLowerCase();
+      void this.host.insertTable(made, info, names ? { target: info, change: (t) => this.host.withTableName(t, name) } : undefined);
+    }, blocked);
+  }
+
+  /** A pivot of a table to start from: its text column by its numbers' sum (else a count of its rows) */
+  private firstFields(name: string, table: Table): Fields {
     const columns = (table.rows[0]?.cells ?? []).map(columnName);
     const numeric = (c: number) => table.rows.slice(1).filter((r) => asNumber(unescapeCell(r.cells[c] ?? "").trim()) !== undefined).length * 2 > table.rows.length - 1;
     const label = columns.findIndex((_, c) => !numeric(c));
     const value = columns.findIndex((_, c) => c !== label && numeric(c));
-    const fields: Fields = {
+    return {
       source: name,
       rows: label >= 0 ? [{ column: columns[label]!, grouping: "" }] : [],
       columns: [],
@@ -409,15 +429,33 @@ export class Pivot implements Feature {
       sort: [],
       totals: "both",
     };
-    const blocked = this.host.canStoreMeta({ ...table, meta: undefined }, "source") ? undefined : "A pivot is kept in its table's metadata: turn on Store table metadata in the settings";
-    this.dialog(this.sources(own ? undefined : { name, table }), fields, "Insert", (definition) => {
-      const sources = this.sources(own ? undefined : { name, table });
-      const pivot = this.calculate(definition, this.sourceFor(definition, sources));
+  }
+
+  /** Why no pivot can be inserted (a table's metadata not stored), if so */
+  private blocked(table: Table): string | undefined {
+    return this.host.canStoreMeta(table, "source") ? undefined : "A pivot is kept in its table's metadata: turn on Store table metadata in the settings";
+  }
+
+  /** Insert pivot table, the command (and /pivot): the dialog for a pivot of the page's first named table (none: of another page), inserted at the cursor */
+  commands(): PageCommand[] {
+    return [{ name: "Silverware Table: Insert pivot table", slash: "pivot", description: "A pivot table at the cursor: a summary of a table of this page or another", run: () => this.insertAtCursor() }];
+  }
+
+  private insertAtCursor(): void {
+    const empty: Table = { indent: "", align: [], rows: [{ cells: [""] }], padded: false };
+    const sources = this.sources();
+    const first = sources[0];
+    const fields: Fields = first ? this.firstFields(first.name, first.table) : { source: "", rows: [], columns: [], values: [{ fn: "COUNTA", column: "", show: "" }], conditions: [], any: false, sort: [], totals: "both" };
+    this.dialog(sources, fields, "Insert", (definition) => {
+      const pivot = this.calculate(definition, this.sourceFor(definition, this.sources()));
       if (typeof pivot === "string") return void this.host.bridge.flash(`Silverware Table: ${pivot}`, "error");
-      const made = this.written(this.withDefinition({ indent: table.indent, align: [], rows: [{ cells: [""] }], padded: false }, definition), pivot, {});
-      const names = !own && definition.source.trim().toLowerCase() === name.toLowerCase();
-      void this.host.insertTable(made, info, names ? { target: info, change: (t) => this.host.withTableName(t, name) } : undefined);
-    }, blocked);
+      const made = this.written(this.withDefinition(empty, definition), pivot, {});
+      // The cursor as it is now: the editor moved it with any edit made while the dialog was open
+      void (async () => {
+        const position = (await this.host.bridge.getCursor?.()) ?? (await this.host.bridge.getText()).length;
+        await this.host.insertTable(made, { position });
+      })();
+    }, this.blocked(empty));
   }
 
   /** Pivot settings…: the pivot's definition in the dialog, saved into its metadata row (the write calculates it: writeStep) */
@@ -448,7 +486,8 @@ export class Pivot implements Feature {
     if (state === undefined) {
       // Any other table with rows: a pivot of it, made in the dialog
       const table = parseTable(info.source);
-      if (table.rows.length < 2 || this.definitionOf(table) || !this.cells()) return [];
+      // (Also with the formulas module off: its dialog says it is needed)
+      if (table.rows.length < 2 || this.definitionOf(table)) return [];
       return [{ label: "Insert pivot table…", place: "menu", icon: ICONS.pivot, title: "A summary of this table under it, calculated anew as it changes", run: () => this.insert(info) }];
     }
     const problem = typeof state === "string" ? state : undefined;

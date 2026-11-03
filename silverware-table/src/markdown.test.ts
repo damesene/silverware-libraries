@@ -9,6 +9,7 @@ import {
   parseTable,
   serializeTable,
   splitRow,
+  tablePlace,
   unescapeCell,
 } from "./markdown.ts";
 import { setCell } from "./ops.ts";
@@ -97,6 +98,45 @@ describe("findTables", () => {
     const text = "| A |\r\n|---|\r\n| 1 |\r\n";
     const [table] = findTables(text);
     expect(table?.text).toBe("| A |\r\n|---|\r\n| 1 |");
+  });
+});
+
+describe("tablePlace", () => {
+  const TABLE = "| A |\n|---|\n| 1 |";
+  // The text with a new table "T" placed so
+  const placed = (text: string, place?: Parameters<typeof tablePlace>[1]) => {
+    const { at, before, after } = tablePlace(text, place);
+    return text.slice(0, at) + before + "T" + after + text.slice(at);
+  };
+
+  it("goes after a table, an empty line between, one after it where text follows", () => {
+    const text = `${TABLE}\n\nNext.\n`;
+    expect(placed(text, { after: findTables(text)[0]! })).toBe(`${TABLE}\n\nT\n\nNext.\n`);
+    expect(placed(TABLE, { after: findTables(TABLE)[0]! })).toBe(`${TABLE}\n\nT`);
+  });
+
+  it("goes at the page's end without a place, at its start alone", () => {
+    expect(placed("Text.")).toBe("Text.\n\nT");
+    expect(placed("")).toBe("T");
+  });
+
+  it("goes after the line of a position, one empty line before and after it", () => {
+    const text = "First.\nSecond.\n";
+    expect(placed(text, { position: 2 })).toBe("First.\n\nT\n\nSecond.\n");
+    expect(placed("One.\n\nTwo.\n", { position: 1 })).toBe("One.\n\nT\n\nTwo.\n");
+    // At the page's last line, and its end
+    expect(placed("Only.", { position: 5 })).toBe("Only.\n\nT");
+    expect(placed("Only.\n", { position: 6 })).toBe("Only.\n\nT");
+  });
+
+  it("goes on an empty line (what a slash command leaves) between empty lines it counts", () => {
+    expect(placed("Text.\n\n\nMore.\n", { position: 7 })).toBe("Text.\n\nT\n\nMore.\n");
+    expect(placed("\nMore.\n", { position: 0 })).toBe("T\n\nMore.\n");
+  });
+
+  it("goes after the table a position is in, never into it", () => {
+    const text = `Intro.\n\n${TABLE}\nAfter.\n`;
+    expect(placed(text, { position: text.indexOf("| 1") + 2 })).toBe(`Intro.\n\n${TABLE}\n\nT\n\nAfter.\n`);
   });
 });
 

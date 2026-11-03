@@ -179,6 +179,29 @@ export function findTables(text: string): TableRange[] {
   return tables;
 }
 
+/**
+ * Where a new table goes in a page's text and what goes around it: after a
+ * table (`after`: an empty line between), or where a position is (the
+ * cursor's: after its line, or after the table it is in; the line breaks
+ * there counted, so one empty line is before and after it), else at the end;
+ * an empty line after it where text follows
+ */
+export function tablePlace(text: string, place?: { readonly after: TableRange } | { readonly position: number }): { readonly at: number; readonly before: string; readonly after: string } {
+  if (place && "position" in place) {
+    const position = Math.max(0, Math.min(place.position, text.length));
+    const within = findTables(text).find((range) => position >= range.from && position <= range.to);
+    const end = text.indexOf("\n", position);
+    const at = within ? within.to : end < 0 ? text.length : end;
+    const head = text.slice(0, at);
+    const rest = text.slice(at);
+    const before = at === 0 ? "" : head.endsWith("\n\n") ? "" : head.endsWith("\n") ? "\n" : "\n\n";
+    const after = at === text.length || rest.startsWith("\n\n") ? "" : rest.startsWith("\n") ? "\n" : "\n\n";
+    return { at, before, after };
+  }
+  const at = place ? place.after.to : text.length;
+  return { at, before: at > 0 ? "\n\n" : "", after: text.slice(at).startsWith("\n") || at === text.length ? "" : "\n\n" };
+}
+
 // The tables parsed last, by their text: many parts read the table shown (its
 // metadata, its names, its cells) on every view and toolbar, and a table is
 // never changed once parsed (edits make new ones)

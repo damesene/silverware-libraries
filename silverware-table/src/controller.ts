@@ -2,7 +2,7 @@
 // inline cell editing and row/column editing. Every change to the markdown is
 // one `editor.replaceRange`, so undo works as for any other edit.
 import { type Bridge, type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
-import { type AdapterFeature, type AddressFrame, type AlsoChanged, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type TableBadge, type TableHost, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget } from "./core/feature.ts";
+import { type AdapterFeature, type AddressFrame, type AlsoChanged, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type TextPosition, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
 import { mapPosition, type TextEdit, withWriteListeners } from "./core/writelisteners.ts";
@@ -47,6 +47,7 @@ import {
   cellSourceOffset,
   findTables,
   locateBySource,
+  tablePlace,
   locateByShape,
   locateWithEmptyHeaders,
   minimalEdit,
@@ -2430,28 +2431,34 @@ export class Controller implements TableHost {
     return this.register.reserve(this.currentPage);
   }
 
-  async insertTable(table: Table, after?: TableTarget, also?: AlsoChanged, key?: TableKey): Promise<WriteResult> {
+  /** The features' commands, once they started: a module turned off gives none */
+  async commands(): Promise<readonly PageCommand[]> {
+    await this.featuresStarted;
+    return this.features.flatMap((feature) => feature.commands?.() ?? []);
+  }
+
+  async insertTable(table: Table, after?: TableTarget | TextPosition, also?: AlsoChanged, key?: TableKey): Promise<WriteResult> {
     const result = await this.insertTableNow(table, after, also, key);
     // Not written: no table gets the key made for it
     if (key && result !== "written") this.register.release(key);
     return result;
   }
 
-  private async insertTableNow(table: Table, after: TableTarget | undefined, also: AlsoChanged | undefined, key: TableKey | undefined): Promise<WriteResult> {
+  private async insertTableNow(table: Table, after: TableTarget | TextPosition | undefined, also: AlsoChanged | undefined, key: TableKey | undefined): Promise<WriteResult> {
     try {
       const text = await this.bridge.getText();
-      const range = after && locateBySource(text, after.hint, after.source);
+      const range = after && !("position" in after) ? locateBySource(text, after.hint, after.source) : undefined;
       const changed = also && locateBySource(text, also.target.hint, also.target.source);
       if (also && !changed) {
         void this.bridge.flash(NOT_SAVED, "error");
         return "failed";
       }
-      const at = range ? range.to : text.length;
+      // After the table, at the position, else at the page's end; an empty line around it
+      const { at, before, after: trail } = tablePlace(text, range ? { after: range } : after && "position" in after ? after : undefined);
       const serialize = await this.serializer();
       // The new table's text: its key's once it is in the page
       if (key) this.register.writing(key, serialize(table).trimEnd());
-      // An empty line before it, and after it where text follows
-      const insert = `${at > 0 ? "\n\n" : ""}${serialize(table)}${text.slice(at).startsWith("\n") || at === text.length ? "" : "\n\n"}`;
+      const insert = `${before}${serialize(table)}${trail}`;
       const updates = [{ from: at, to: at, text: insert }, ...(changed ? [{ from: changed.from, to: changed.to, text: serialize(also!.change(parseTable(changed.text))) }] : [])];
       let written = text;
       for (const update of [...updates].sort((a, b) => b.from - a.from)) written = written.slice(0, update.from) + update.text + written.slice(update.to);

@@ -49,6 +49,8 @@ export type PivotDialogOptions = {
   readonly submitLabel: string;
   // Why it cannot be submitted at all (the metadata setting off)
   readonly blocked?: string;
+  // What it says first, above its fields (a module it needs off)
+  readonly notice?: string;
 };
 
 // What the preview shows of a pivot, and where it is too large to be read as a table
@@ -66,7 +68,8 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
   const e = <K extends keyof HTMLElementTagNameMap>(tag: K, props?: Parameters<typeof el>[2], ...children: ElementChild[]) => el(doc, tag, props, ...children);
   let fields: Fields = options.fields;
   // The page of a source on another page, as picked ("" while none is typed yet); undefined: a source of this page
-  let otherPage = options.readPage ? sourceRef(fields.source).page : undefined;
+  // (No source and none of this page to pick: one of another page's)
+  let otherPage = options.readPage ? (sourceRef(fields.source).page ?? (!fields.source && !options.sources.length ? "" : undefined)) : undefined;
   // Other pages' sources as read (or why there are none), those being read
   const read = new Map<string, readonly Source[] | string>();
   const reading = new Set<string>();
@@ -384,7 +387,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
     title: "Pivot table",
     subtitle: "A summary of a table, written into the page and calculated anew as the table changes",
     className: "swt-pivot-dialog",
-    content: e("div", "swt-pivot", form, e("div", { class: "swt-pivot-label swt-pivot-preview-title", text: "Preview" }), preview),
+    content: e("div", "swt-pivot", options.notice ? e("p", { class: "swt-pivot-warning", text: options.notice }) : null, form, e("div", { class: "swt-pivot-label swt-pivot-preview-title", text: "Preview" }), preview),
     footer,
     closed: () => clearTimeout(typing),
   });

@@ -511,6 +511,25 @@ if js and js.window then
       silverwareTableJs.removeAllMetadata()
     end,
   }
+  -- The modules' commands (of those turned on, known once they started: commandList waits for them), by their whole names, and their slash commands
+  for _, module_command in ipairs(silverwareTableJs.commandList()) do
+    local name = module_command.name
+    command.define {
+      name = name,
+      run = function()
+        silverwareTableJs.runCommand(name)
+      end,
+    }
+    if module_command.slash then
+      slashCommand.define {
+        name = module_command.slash,
+        description = module_command.description,
+        run = function()
+          silverwareTableJs.runCommand(name)
+        end,
+      }
+    end
+  end
   -- Formulas written in a page's text, in a call of silverware.table.evaluate or an alias of it: their places
   -- found by the finder made for those names (the JS's Lua side, host/lua.ts), so their references follow the
   -- edits of tables made with Silverware Table, in the same edit. Made again when an alias is added (the API

@@ -572,4 +572,76 @@ describe("Pivot tables", () => {
       expect(text).toContain("| East | 120 |");
     });
   });
+
+  describe("Insert pivot table, the command (and /pivot)", () => {
+    const dialog = () => document.querySelector<HTMLElement>(".swt-pivot-dialog");
+    // The cursor where the editor has it, as it is asked (moved meanwhile: cursorAt)
+    let cursorAt = 0;
+    const run = async (page: string, cursor: number, settings: Record<string, unknown> = {}) => {
+      cursorAt = cursor;
+      await setup(page, { "silverware.table.metadata": true, ...settings }, { getCursor: () => cursorAt, readPage: () => ORDERS });
+      const command = (await controller.commands()).find((c) => c.name === "Silverware Table: Insert pivot table");
+      await command?.run();
+      return command;
+    };
+    const insert = async () => {
+      dialog()!.querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
+      // (The cursor asked, then the table written)
+      await flush();
+      await flush();
+    };
+    const PIVOTED = "| Region | Sum of Revenue |\n|---|---:|\n| East | 120 |\n| West | 50 |\n| Total | 170 |\n| <meta core.table pivot.source='orders' pivot.rows='Region' pivot.values='SUM([Revenue])' core.pin-bottom='1'> |";
+
+    it("is a command of the module, its slash command /pivot", async () => {
+      const command = await run(`${ORDERS}\n`, 0);
+      expect(command).toMatchObject({ name: "Silverware Table: Insert pivot table", slash: "pivot" });
+      expect(dialog()).not.toBeNull();
+    });
+
+    it("is no command with the pivot module off", async () => {
+      expect(await run(`${ORDERS}\n`, 0, { "silverware.table.modules.pivot.enabled": false })).toBeUndefined();
+    });
+
+    it("makes a pivot of the page's first named table, inserted after the cursor's line, an empty line around it", async () => {
+      const page = `Intro.\n\n${ORDERS}\n\nFirst line.\nSecond line.\n`;
+      await run(page, page.indexOf("First") + 2);
+      await insert();
+      expect(text).toBe(`Intro.\n\n${ORDERS}\n\nFirst line.\n\n${PIVOTED}\n\nSecond line.\n`);
+    });
+
+    it("goes on the cursor's empty line (what /pivot leaves), after the table the cursor is in", async () => {
+      const empty = `${ORDERS}\n\nText.\n\n\nMore.\n`;
+      await run(empty, empty.indexOf("Text.") + 7);
+      await insert();
+      expect(text).toBe(`${ORDERS}\n\nText.\n\n${PIVOTED}\n\nMore.\n`);
+      const inTable = `${ORDERS}\n\nText.\n`;
+      await run(inTable, 5);
+      await insert();
+      expect(text).toBe(`${ORDERS}\n\n${PIVOTED}\n\nText.\n`);
+    });
+
+    it("goes where the cursor is as it is inserted (the text before it edited meanwhile)", async () => {
+      const page = `${ORDERS}\n\nFirst line.\nSecond line.\n`;
+      await run(page, page.indexOf("First"));
+      setText(`Added.\n\n${page}`);
+      cursorAt = text.indexOf("First");
+      await insert();
+      expect(text).toBe(`Added.\n\n${ORDERS}\n\nFirst line.\n\n${PIVOTED}\n\nSecond line.\n`);
+    });
+
+    it("with the formulas module off: its dialog says so first and inserts nothing; the ⋯ menu offers it as well", async () => {
+      await run(`${ORDERS}\n`, 0, { "silverware.table.modules.formulas.enabled": false });
+      expect(dialog()!.querySelector(".swt-pivot-warning")?.textContent).toMatch(/^A pivot is calculated by the formulas module, which is off/);
+      expect(dialog()!.querySelector<HTMLButtonElement>(".swt-dialog-primary")!.disabled).toBe(true);
+      dialog()!.querySelector<HTMLButtonElement>(".swt-dialog-button")!.click();
+      tableMenuItem(/^Insert pivot table…$/)!.click();
+      expect(dialog()!.querySelector(".swt-pivot-warning")).not.toBeNull();
+    });
+
+    it("on a page with no named table: of another page's, picked as in the dialog", async () => {
+      await run("Text.\n", 5);
+      expect(dialog()!.querySelector('input[aria-label="Source page"]')).not.toBeNull();
+      expect(dialog()!.querySelector<HTMLButtonElement>(".swt-dialog-primary")!.disabled).toBe(true);
+    });
+  });
 });

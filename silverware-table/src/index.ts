@@ -40,6 +40,18 @@ export function openSettings(): void {
   void controller?.openSettings();
 }
 
+/** The modules' commands (those turned on), for the init page to define them and their slash commands, once the modules started */
+export async function commandList(): Promise<{ name: string; description: string; slash?: string }[]> {
+  const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
+  return ((await controller?.commands()) ?? []).map(({ name, description, slash }) => ({ name, description, ...(slash ? { slash } : {}) }));
+}
+
+/** A module's command run (its command or slash command) */
+export async function runCommand(name: string): Promise<void> {
+  const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
+  await (await controller?.commands())?.find((command) => command.name === name)?.run();
+}
+
 /** The "Silverware Table: Remove table metadata" command */
 export function removeAllMetadata(): void {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];

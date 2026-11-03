@@ -356,6 +356,14 @@ export interface Panel {
   remove(): void;
 }
 
+/** A command a feature gives SilverBullet (Silverware Table: <name>), and a slash command (/<slash>) where it has one */
+export type PageCommand = {
+  readonly name: string;
+  readonly description: string;
+  readonly slash?: string;
+  readonly run: () => void | Promise<void>;
+};
+
 /** What a feature says a table is, shown with its name where the table's name shows (a pivot: Pivot of orders) */
 export type TableBadge = {
   readonly text: string;
@@ -405,6 +413,9 @@ export type ToolbarButton = {
 };
 
 /** Another table a write changes in the same edit: where it is, and how */
+/** A place in the page's text (the cursor's), as an offset */
+export type TextPosition = { readonly position: number };
+
 export type AlsoChanged = { readonly target: TableTarget; readonly change: (table: Table) => Table };
 
 export type WriteOptions = {
@@ -512,12 +523,13 @@ export interface ModelHost {
   writeTable(target: TableTarget, change: (table: Table) => Table | undefined, options?: WriteOptions): Promise<WriteResult>;
   /**
    * A new table written into the page, in one edit: after the table `after`
-   * (an empty line between), else at the page's end; `also`: a table of the
+   * (an empty line between), or where a position is (after its line, or the
+   * table it is in: the cursor's), else at the page's end; `also`: a table of the
    * page changed in the same edit (put on a sheet with it); `key`: the new
    * table's, made before it is written (newTableKey), for what the caller
    * keeps for it meanwhile. No other table's key changes, wherever it goes.
    */
-  insertTable(table: Table, after?: TableTarget, also?: AlsoChanged, key?: TableKey): Promise<WriteResult>;
+  insertTable(table: Table, after?: TableTarget | TextPosition, also?: AlsoChanged, key?: TableKey): Promise<WriteResult>;
   /**
    * Deletes a table from the page in one edit, as Delete table in its ⋯ menu
    * does; `unasked`: no question, unless something goes with it (formulas
@@ -1042,6 +1054,8 @@ export interface Feature {
   lineMenuEndEntries?(info: TableInfo, axis: "row" | "column", lines: readonly number[]): MenuEntry[];
   /** Buttons for the table's toolbar, shown while the pointer is over the table */
   toolbarButtons?(info: TableInfo): ToolbarButton[];
+  /** Its commands (SilverBullet's command palette, and slash commands), a module's while it is on */
+  commands?(): readonly PageCommand[];
   /** What the table is, shown with its name at a glance (the tableLabels module's tab): a pivot's "Pivot of orders" */
   tableBadges?(info: TableInfo): readonly TableBadge[];
   /** Before a write reads the page's text: what it needs read first (other pages the tables written refer to) */

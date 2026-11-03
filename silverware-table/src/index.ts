@@ -183,7 +183,7 @@ function notDefined(what: string, problems: readonly string[]): string | undefin
 }
 
 /**
- * `silverware.table.defineFunctions` (the init page's Space Lua): custom functions
+ * `silverware.table.defineFunctions` (the API page's Space Lua): custom functions
  * for formulas, a list (or a function given the helpers that
  * returns one), usually a JS module of the space. The others defined, what is
  * wrong with any of them, which the API page shows as a notification (an

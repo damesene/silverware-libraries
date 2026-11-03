@@ -107,7 +107,7 @@ export function panelMove(tag: string, to: string): Promise<void> {
 }
 
 /**
- * `silverware.tags.defineOperations` (the init page's Space Lua): custom
+ * `silverware.tags.defineOperations` (the API page's Space Lua): custom
  * operations, a definition, a list, or a function given the helpers that
  * returns them, usually a JS module of the space. The others defined; what is
  * wrong with any of them (or a name defined twice), which the API page

@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { insertRowWith } from "../core/structure.ts";
 import { setCell } from "../ops.ts";
-import { cell, cellMenuItem, clickOn, controller, editor, flashes, flush, key, setup, text, useTablePage } from "../testing/page.ts";
+import { cell, cellMenuItem, clickOn, controller, editor, flashes, flush, key, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 
 const ORDERS = [
   "| Region | Revenue |",
@@ -105,6 +105,56 @@ describe("Pivot tables", () => {
     await type("Sales");
     expect(text).toContain("| Region | Money |");
     expect(text).toContain(`pivot.headers='{"value:SUM([sales])":"Money"}'`);
+  });
+
+  describe("its dialog", () => {
+    const dialog = () => document.querySelector<HTMLElement>(".swt-pivot-dialog")!;
+    const previewCells = () => Array.from(dialog().querySelectorAll(".swt-pivot-table tr"), (tr) => Array.from(tr.children, (c) => c.textContent));
+    const pick = (label: string, value: string) => {
+      const s = dialog().querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!;
+      s.value = value;
+      s.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+
+    it("makes a pivot of a table, its preview as the fields are picked, inserted under it", async () => {
+      await setup(`${ORDERS}\n\nEnd.\n`, { "silverware.table.metadata": true });
+      tableMenuItem(/^Insert pivot table…$/)!.click();
+      // Its text column by its numbers' sum, to start with
+      expect(previewCells()).toEqual([
+        ["Region", "Sum of Revenue"],
+        ["East", "120"],
+        ["West", "50"],
+        ["Total", "170"],
+      ]);
+      pick("Value 1 function", "AVERAGE");
+      expect(previewCells()[1]).toEqual(["East", "60"]);
+      dialog().querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
+      await flush();
+      await controller.scan();
+      expect(text).toContain("| Region | Average of Revenue |\n|---|---:|\n| East | 60 |\n| West | 50 |\n| Total | 56.666666666667 |\n| <meta core.table pivot.source='orders' pivot.rows='Region' pivot.values='AVERAGE([Revenue])'> |\n\nEnd.");
+    });
+
+    it("names a table without a name in the same edit, as a pivot names its source", async () => {
+      await setup(`${ORDERS.replace("| <meta core.table core.name='orders'> |", "")}\nEnd.\n`, { "silverware.table.metadata": true });
+      tableMenuItem(/^Insert pivot table…$/)!.click();
+      dialog().querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
+      await flush();
+      await controller.scan();
+      expect(text).toContain("<meta core.table core.name='table1'>");
+      expect(text).toContain("pivot.source='table1'");
+    });
+
+    it("shows a pivot's definition, saved into it with its values calculated anew", async () => {
+      await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
+      tableMenuItem(/^Pivot settings…$/, 1)!.click();
+      expect((dialog().querySelector<HTMLSelectElement>('select[aria-label="Value 1 function"]')!).value).toBe("SUM");
+      pick("Value 1 function", "MAX");
+      dialog().querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
+      await flush();
+      await controller.scan();
+      expect(text).toContain("pivot.values='MAX([revenue])'");
+      expect(text).toContain("| East | 100 |");
+    });
   });
 
   it("follows its source's new name", async () => {

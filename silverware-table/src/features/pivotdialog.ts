@@ -1,0 +1,278 @@
+// The pivot module's dialog: a pivot's fields picked (its source, what
+// groups its rows and columns, its values, which rows count, its order, its
+// totals) with the pivot it makes shown under them as they change, from the
+// same calculation that writes it (the module's `preview`). It edits Fields
+// (pivot/fields.ts) and knows nothing of tables or writing: Insert (Save)
+// hands the module the definition. The dialog is the core's (ModelHost.openDialog).
+import { el, type ElementChild } from "../../../shared/elements.ts";
+import { columnKey } from "../columns.ts";
+import type { Dialog, ModelHost } from "../core/feature.ts";
+import type { PivotDefinition, Totals } from "../pivot/definition.ts";
+import {
+  type Condition,
+  definitionOf,
+  type Fields,
+  FUNCTION_LABELS,
+  FUNCTIONS,
+  type Fn,
+  type GroupField,
+  GROUPING_LABELS,
+  GROUPINGS,
+  type Grouping,
+  groupText,
+  OPERATORS,
+  type Operator,
+  type ValueField,
+  valueText,
+} from "../pivot/fields.ts";
+import type { Pivot } from "../pivot/pivot.ts";
+
+export type PivotDialogOptions = {
+  // The tables a pivot can summarize, by their names, their columns' names
+  readonly sources: readonly { readonly name: string; readonly columns: readonly string[] }[];
+  readonly fields: Fields;
+  // The pivot the definition makes, or why it makes none
+  readonly preview: (definition: PivotDefinition) => Pivot | string;
+  readonly submit: (definition: PivotDefinition) => void;
+  readonly submitLabel: string;
+  // Why it cannot be submitted at all (the metadata setting off)
+  readonly blocked?: string;
+};
+
+// What the preview shows of a pivot, and where it is too large to be read as a table
+const PREVIEW_ROWS = 20;
+const PREVIEW_COLUMNS = 8;
+const LARGE_COLUMNS = 30;
+const LARGE_ROWS = 500;
+
+export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): Dialog {
+  const doc = host.doc;
+  const e = <K extends keyof HTMLElementTagNameMap>(tag: K, props?: Parameters<typeof el>[2], ...children: ElementChild[]) => el(doc, tag, props, ...children);
+  let fields: Fields = options.fields;
+  const columnsOf = () => options.sources.find((s) => s.name.toLowerCase() === fields.source.toLowerCase())?.columns ?? [];
+
+  const form = e("div", "swt-pivot-form");
+  const preview = e("div", "swt-pivot-preview");
+  const submit = e("button", { class: "swt-dialog-primary", text: options.submitLabel });
+
+  const select = <T extends string>(values: readonly T[], label: (v: T) => string, value: string, changed: (v: T) => void, aria: string): HTMLSelectElement => {
+    const s = e("select", { attrs: { "aria-label": aria, "data-focus": aria } });
+    for (const v of values) s.append(new Option(label(v), v));
+    s.value = value;
+    s.addEventListener("change", () => changed(s.value as T));
+    return s;
+  };
+  // A column of the source, as the definition writes it (its name or its key, as formulas write them): picked by its header's name;
+  // one the source has not (renamed in its markdown) offered as it is written
+  const columnSelect = (value: string, changed: (column: string) => void, aria: string): HTMLSelectElement => {
+    const columns = columnsOf();
+    const shown = columns.find((c) => c === value) ?? columns.find((c) => columnKey(c) === columnKey(value));
+    return select(shown ? columns : [value, ...columns], (c) => c, shown ?? value, changed, aria);
+  };
+  const remove = (run: () => void) => e("button", { class: "swt-pivot-remove", text: "×", title: "Remove", attrs: { "aria-label": "Remove" }, run });
+  const add = (label: string, run: () => void) => e("button", { class: "swt-pivot-add", text: `+ ${label}`, run });
+  const set = (next: Partial<Fields>) => {
+    fields = { ...fields, ...next };
+    render();
+  };
+  const replaced = <T>(list: readonly T[], i: number, item: T) => list.map((x, j) => (j === i ? item : x));
+
+  // A group: a column and how it is grouped, or its formula as text
+  const groupRow = (field: GroupField, change: (f: GroupField | undefined) => void, aria: string) => {
+    if ("formula" in field) {
+      const text = e("input", { attrs: { type: "text", "aria-label": `${aria} formula`, "data-focus": `${aria} formula` } });
+      text.value = field.formula;
+      text.addEventListener("input", () => {
+        fields = updated(fields, field, { formula: text.value });
+        field = { formula: text.value };
+        previewSoon();
+      });
+      return e("div", "swt-pivot-row", text, remove(() => change(undefined)));
+    }
+    const group = field;
+    return e(
+      "div",
+      "swt-pivot-row",
+      columnSelect(group.column, (column) => change({ column, grouping: group.grouping }), `${aria} column`),
+      select(GROUPINGS, (g) => GROUPING_LABELS[g], group.grouping, (grouping: Grouping) => change({ column: group.column, grouping }), `${aria} grouping`),
+      e("button", { class: "swt-pivot-formula", text: "fx", title: "Write it as a formula", run: () => change({ formula: groupText(group) }) }),
+      remove(() => change(undefined)),
+    );
+  };
+  // A value: a function of a column, or its formula as text
+  const valueRow = (field: ValueField, change: (f: ValueField | undefined) => void, i: number) => {
+    if ("formula" in field) {
+      const text = e("input", { attrs: { type: "text", "aria-label": "Value formula", "data-focus": `value ${i} formula` } });
+      text.value = field.formula;
+      text.addEventListener("input", () => {
+        fields = { ...fields, values: replaced(fields.values, i, { formula: text.value }) };
+        previewSoon();
+      });
+      return e("div", "swt-pivot-row", text, remove(() => change(undefined)));
+    }
+    return e(
+      "div",
+      "swt-pivot-row",
+      select(FUNCTIONS, (f) => FUNCTION_LABELS[f], field.fn, (fn: Fn) => change({ fn, column: field.column }), `Value ${i + 1} function`),
+      e("span", "swt-pivot-of", "of"),
+      columnSelect(field.column, (column) => change({ fn: field.fn, column }), `Value ${i + 1} column`),
+      e("button", { class: "swt-pivot-formula", text: "fx", title: "Write it as a formula", run: () => change({ formula: valueText(field) }) }),
+      remove(() => change(undefined)),
+    );
+  };
+  // A condition: a column, an operator, a value typed
+  const conditionRow = (condition: Condition, i: number) => {
+    const value = e("input", { attrs: { type: "text", placeholder: "value", "aria-label": `Condition ${i + 1} value`, "data-focus": `condition ${i} value` } });
+    value.value = condition.value;
+    value.addEventListener("input", () => {
+      fields = { ...fields, conditions: replaced(fields.conditions, i, { ...condition, value: value.value }) };
+      condition = fields.conditions[i]!;
+      previewSoon();
+    });
+    return e(
+      "div",
+      "swt-pivot-row",
+      columnSelect(condition.column, (column) => set({ conditions: replaced(fields.conditions, i, { ...condition, column }) }), `Condition ${i + 1} column`),
+      select(OPERATORS, (o) => o, condition.op, (op: Operator) => set({ conditions: replaced(fields.conditions, i, { ...condition, op }) }), `Condition ${i + 1} operator`),
+      value,
+      remove(() => set({ conditions: fields.conditions.filter((_, j) => j !== i) })),
+    );
+  };
+  const section = (title: string, hint: string, ...children: ElementChild[]) => e("div", "swt-pivot-section", e("div", "swt-pivot-label", e("span", { class: "swt-pivot-name", text: title }), e("span", { class: "swt-pivot-hint", text: hint })), e("div", "swt-pivot-fields", ...children));
+
+  function render(): void {
+    // The field focused stays focused as the form is made anew (a select changed)
+    const focused = (doc.activeElement as HTMLElement | null)?.dataset?.focus;
+    const columns = columnsOf();
+    const first = columns[0] ?? "";
+    const groups = (key: "rows" | "columns", aria: string) =>
+      fields[key].map((field, i) =>
+        groupRow(field, (f) => set({ [key]: f ? replaced(fields[key], i, f) : fields[key].filter((_, j) => j !== i) } as Partial<Fields>), `${aria} ${i + 1}`),
+      );
+    const sortKeys = ["", ...fields.rows.map(groupText), ...fields.values.map(valueText)];
+    const sort = fields.sort[0];
+    form.replaceChildren(
+      section("Source", "The table summarized", select(options.sources.map((s) => s.name), (n) => n, fields.source, (source) => set({ source }), "Source")),
+      section("Rows", "A row for each value of", ...groups("rows", "Row"), add("Group rows", () => set({ rows: [...fields.rows, { column: first, grouping: "" }] }))),
+      section("Columns", "A column for each value of (optional)", ...groups("columns", "Column"), fields.columns.length ? null : add("Group columns", () => set({ columns: [{ column: first, grouping: "" }] }))),
+      section("Values", "What each shows", ...fields.values.map((v, i) => valueRow(v, (f) => set({ values: f ? replaced(fields.values, i, f) : fields.values.filter((_, j) => j !== i) }), i)), add("Value", () => set({ values: [...fields.values, { fn: "SUM", column: columns.find((c) => c !== first) ?? first }] }))),
+      section(
+        "Only rows where",
+        fields.where ? "A formula of one row" : "Its conditions",
+        ...(fields.where
+          ? [
+              (() => {
+                const text = e("input", { attrs: { type: "text", "aria-label": "Condition formula", "data-focus": "where" } });
+                text.value = fields.where;
+                text.addEventListener("input", () => {
+                  fields = { ...fields, where: text.value };
+                  previewSoon();
+                });
+                return e("div", "swt-pivot-row", text, remove(() => set({ where: undefined })));
+              })(),
+            ]
+          : fields.conditions.map(conditionRow)),
+        fields.conditions.length > 1 ? select(["all", "any"], (m) => (m === "all" ? "All of them hold" : "Any of them holds"), fields.any ? "any" : "all", (m) => set({ any: m === "any" }), "Conditions") : null,
+        fields.where ? null : add("Condition", () => set({ conditions: [...fields.conditions, { column: first, op: "=", value: "" }] })),
+      ),
+      section(
+        "Order",
+        "The rows sorted by",
+        e(
+          "div",
+          "swt-pivot-row",
+          select(sortKeys, (k) => k || "their groups", sort?.by ?? "", (by) => set({ sort: by ? [{ by, descending: sort?.descending ?? false }] : [] }), "Sort by"),
+          sort ? select(["asc", "desc"], (d) => (d === "asc" ? "ascending" : "descending"), sort.descending ? "desc" : "asc", (d) => set({ sort: [{ by: sort.by, descending: d === "desc" }] }), "Sort direction") : null,
+        ),
+      ),
+      section(
+        "Totals",
+        "",
+        e("div", "swt-pivot-row", toggle("Total row", fields.totals === "both" || fields.totals === "rows", (on) => set({ totals: totals(on, hasColumn(fields.totals)) })), fields.columns.length ? toggle("Total column", hasColumn(fields.totals), (on) => set({ totals: totals(hasRow(fields.totals), on) })) : null),
+      ),
+    );
+    if (focused) form.querySelector<HTMLElement>(`[data-focus="${focused}"]`)?.focus();
+    showPreview();
+  }
+
+  const toggle = (label: string, on: boolean, changed: (on: boolean) => void) => {
+    const box = e("input", { attrs: { type: "checkbox", "data-focus": label } });
+    box.checked = on;
+    box.addEventListener("change", () => changed(box.checked));
+    return e("label", "swt-pivot-toggle", box, label);
+  };
+
+  // The pivot as it would be written, its first rows and columns; why there is none; where it would be large
+  function showPreview(): void {
+    const definition = definitionOf(fields);
+    const made = definition.values.length && (definition.rows.length || definition.columns.length) ? options.preview(definition) : "Pick what groups the rows and a value";
+    const problem = options.blocked ?? (typeof made === "string" ? made : undefined);
+    submit.disabled = !!problem;
+    submit.title = problem ?? "";
+    if (typeof made === "string") {
+      preview.replaceChildren(e("p", { class: "swt-pivot-none", text: made }));
+      return;
+    }
+    const rows = made.body.length;
+    const columns = made.columns.length;
+    const shown = made.columns.slice(0, PREVIEW_COLUMNS);
+    const table = e(
+      "table",
+      "swt-pivot-table",
+      e("thead", undefined, e("tr", undefined, ...shown.map((c) => e("th", { text: c.header })))),
+      e("tbody", undefined, ...made.body.slice(0, PREVIEW_ROWS).map((row) => e("tr", undefined, ...row.slice(0, PREVIEW_COLUMNS).map((cell, i) => e("td", { text: cell, ...(made.columns[i]?.numeric ? { class: "swt-pivot-number" } : {}) }))))),
+    );
+    const size = e("p", { class: "swt-pivot-size", text: `${rows} ${rows === 1 ? "row" : "rows"} × ${columns} ${columns === 1 ? "column" : "columns"}${rows > PREVIEW_ROWS || columns > PREVIEW_COLUMNS ? ", the first shown" : ""}` });
+    // A grouping that makes too many columns (dates as they are): what would help
+    const date = fields.columns.find((f): f is { column: string; grouping: Grouping } => "column" in f && f.grouping === "");
+    const large = columns > LARGE_COLUMNS || rows > LARGE_ROWS;
+    const warning = large
+      ? e(
+          "p",
+          "swt-pivot-warning",
+          `A pivot of ${columns} columns and ${rows} rows: large to write into the page, and written anew with each edit of its source.`,
+          date && columns > LARGE_COLUMNS ? e("button", { class: "swt-pivot-add", text: `Group ${date.column} by month`, run: () => set({ columns: [{ column: date.column, grouping: "yearMonth" }] }) }) : null,
+        )
+      : null;
+    preview.replaceChildren(...(warning ? [warning] : []), e("div", "swt-pivot-scroll", table), size);
+  }
+
+  // A formula typed: the preview once typing pauses
+  let typing: ReturnType<typeof setTimeout> | undefined;
+  const previewSoon = () => {
+    clearTimeout(typing);
+    typing = setTimeout(showPreview, 150);
+  };
+
+  render();
+  const cancel = e("button", { class: "swt-dialog-button", text: "Cancel" });
+  const footer = e("div", "swt-pivot-foot", e("span", { class: "swt-pivot-note", text: options.blocked ?? "" }), cancel, submit);
+  const dialog = host.openDialog({
+    title: "Pivot table",
+    subtitle: "A summary of a table, written into the page and calculated anew as the table changes",
+    className: "swt-pivot-dialog",
+    content: e("div", "swt-pivot", form, e("div", { class: "swt-pivot-label swt-pivot-preview-title", text: "Preview" }), preview),
+    footer,
+    closed: () => clearTimeout(typing),
+  });
+  cancel.addEventListener("click", () => dialog.close());
+  submit.addEventListener("click", () => {
+    const definition = definitionOf(fields);
+    if (submit.disabled) return;
+    const made = options.preview(definition);
+    if (typeof made !== "string" && (made.columns.length > LARGE_COLUMNS || made.body.length > LARGE_ROWS) && !doc.defaultView?.confirm(`The pivot has ${made.columns.length} columns and ${made.body.length} rows. Write it into the page all the same?`)) return;
+    dialog.close();
+    options.submit(definition);
+  });
+  return dialog;
+}
+
+const hasRow = (t: Totals) => t === "both" || t === "rows";
+const hasColumn = (t: Totals) => t === "both" || t === "columns";
+const totals = (row: boolean, column: boolean): Totals => (row && column ? "both" : row ? "rows" : column ? "columns" : "none");
+
+/** The fields with a group's formula typed (its row's or column's, wherever it is) */
+function updated(fields: Fields, was: GroupField, now: GroupField): Fields {
+  const swap = (list: readonly GroupField[]) => list.map((f) => (f === was ? now : f));
+  return { ...fields, rows: swap(fields.rows), columns: swap(fields.columns) };
+}

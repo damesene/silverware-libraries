@@ -659,7 +659,9 @@ Then `| Outside #temp |` and `| Oven #temp-f |` show their cells so, the *Type* 
 
 ## Pivot tables
 
-A pivot table summarizes another table: its rows grouped by a column, a value for each group, totals. It is a plain markdown table, its numbers written in it (it shows anywhere, as any table), and its definition is in its metadata row, in the language of formulas:
+A pivot table summarizes another table: its rows grouped by a column, a value for each group, totals. **Insert pivot table…** in a table's ⋯ menu opens a dialog: pick what groups the rows (a column, a date by year, quarter or month), what makes columns, the values (sum, average, count, min, max of a column), which rows count and the order, and the pivot they make shows under the fields as you change them; *Insert* writes it under the table (a table without a name gets one: a pivot names its source). A pivot's **Pivot settings…** opens the same dialog to change it. A field the dialog has no choice for can be written as a formula (its **fx**).
+
+It is a plain markdown table, its numbers written in it (it shows anywhere, as any table), and its definition is in its metadata row, in the language of formulas:
 
 ````markdown
 | Region | Sum of Revenue |
@@ -2269,6 +2271,157 @@ body.swt-resizing * {
   flex: 1;
   font-size: 12px;
   opacity: 0.75;
+}
+/* The pivot dialog: its fields, a section a line, then the pivot they make */
+.swt-pivot-dialog {
+  width: min(760px, calc(100vw - 24px));
+}
+.swt-pivot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.swt-pivot-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.swt-pivot-section {
+  display: grid;
+  grid-template-columns: 9em 1fr;
+  gap: 4px 12px;
+  align-items: start;
+}
+.swt-pivot-label {
+  display: flex;
+  flex-direction: column;
+  padding-top: 5px;
+}
+.swt-pivot-name {
+  font-weight: 600;
+}
+.swt-pivot-hint {
+  font-size: 11px;
+  opacity: 0.65;
+}
+.swt-pivot-fields {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+.swt-pivot-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+.swt-pivot select,
+.swt-pivot input[type="text"] {
+  padding: 4px 6px;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  min-width: 0;
+}
+.swt-pivot input[type="text"] {
+  width: 22em;
+  max-width: 100%;
+}
+.swt-pivot-of {
+  opacity: 0.7;
+}
+.swt-pivot-add,
+.swt-pivot-remove,
+.swt-pivot-formula {
+  padding: 2px 8px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swt-pivot-add {
+  color: var(--ui-accent-color) !important;
+}
+.swt-pivot-remove,
+.swt-pivot-formula {
+  opacity: 0.65;
+}
+.swt-pivot-add:hover,
+.swt-pivot-remove:hover,
+.swt-pivot-formula:hover {
+  background: var(--swt-dialog-card);
+  opacity: 1;
+}
+.swt-pivot-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 12px;
+}
+.swt-pivot-preview-title {
+  font-weight: 600;
+  padding-top: 4px;
+  border-top: 1px solid var(--swt-dialog-line);
+}
+.swt-pivot-scroll {
+  overflow: auto;
+  max-height: 260px;
+}
+.swt-pivot-table {
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.swt-pivot-table th,
+.swt-pivot-table td {
+  padding: 3px 10px;
+  border-bottom: 1px solid var(--swt-dialog-line);
+  text-align: left;
+  white-space: nowrap;
+}
+.swt-pivot-table th {
+  position: sticky;
+  top: 0;
+  /* (Not SilverBullet's table header's colors: this is no table of the page) */
+  color: var(--root-color);
+  background: var(--swt-dialog-card);
+}
+.swt-pivot-table td.swt-pivot-number {
+  text-align: right;
+}
+.swt-pivot-size,
+.swt-pivot-none {
+  margin: 4px 0 0;
+  font-size: 12px;
+  opacity: 0.75;
+}
+.swt-pivot-warning {
+  margin: 0 0 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, #d9822b 18%, transparent);
+}
+.swt-pivot-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.swt-pivot-note {
+  flex: 1;
+  font-size: 12px;
+  opacity: 0.75;
+}
+@media (max-width: 600px) {
+  .swt-pivot-section {
+    grid-template-columns: 1fr;
+  }
 }
 /* The Functions dialog: a search, the groups, the list beside the one picked */
 .swt-functions {

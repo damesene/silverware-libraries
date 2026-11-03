@@ -10,10 +10,14 @@
 // module's cells; without it, nothing is.
 import type { Feature, ModelHost, TableInfo, ToolbarButton, WriteEdit } from "../core/feature.ts";
 import { followOwnFormula, type FormulaCells, type FormulasOffer } from "../formulas/index.ts";
+import { columnName } from "../columns.ts";
 import { ICONS } from "../icons.ts";
 import { escapeCell, type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
 import { definitionAttributes, groupFormula, KEYS, type Key, type PivotDefinition, readDefinition } from "../pivot/definition.ts";
+import { type Fields, fieldsOf } from "../pivot/fields.ts";
 import { type Pivot as Calculated, pivotOf } from "../pivot/pivot.ts";
+import { asNumber } from "../view.ts";
+import { openPivotDialog } from "./pivotdialog.ts";
 
 /** The headers the user named, by what each column stands for (PivotColumn.id) */
 type Renames = Readonly<Record<string, string>>;
@@ -187,12 +191,85 @@ export class Pivot implements Feature {
     return this.definitionOf(table) ? `this table is a pivot of ${this.host.getMeta(table, "source")}: its rows and columns come from it` : undefined;
   }
 
+  /** The page's tables a pivot can summarize (named ones, not pivots), `also` one more first (a table to be named so) */
+  private sources(also?: { readonly name: string; readonly table: Table }): { name: string; columns: string[]; table: Table }[] {
+    const named = pageTablesOf(this.host.pageText).flatMap(({ table }) => {
+      const name = this.host.tableName(table)?.trim();
+      return name && !this.definitionOf(table) ? [{ name, table }] : [];
+    });
+    return [...(also ? [also] : []), ...named].map(({ name, table }) => ({ name, table, columns: (table.rows[0]?.cells ?? []).map(columnName) }));
+  }
+
+  /** The dialog: a pivot's fields picked, its preview calculated from the source as the page has it */
+  private dialog(sources: ReturnType<Pivot["sources"]>, fields: Fields, submitLabel: string, submit: (definition: PivotDefinition) => void, blocked?: string): void {
+    openPivotDialog(this.host, {
+      sources,
+      fields,
+      submitLabel,
+      submit,
+      ...(blocked ? { blocked } : {}),
+      preview: (definition) => this.calculate(definition, sources.find((s) => s.name.toLowerCase() === definition.source.trim().toLowerCase())?.table),
+    });
+  }
+
+  /**
+   * Insert pivot table…: a pivot of the table, first its text column by its
+   * numbers' sum; inserted under it, the table named in the same edit where
+   * it has no name (a pivot names its source)
+   */
+  private insert(info: TableInfo): void {
+    const table = parseTable(info.source);
+    const own = this.host.tableName(table)?.trim();
+    const taken = new Set(pageTablesOf(this.host.pageText).map((t) => this.host.tableName(t.table)?.toLowerCase()));
+    let n = 1;
+    while (taken.has(`table${n}`)) n++;
+    const name = own ?? `table${n}`;
+    const columns = (table.rows[0]?.cells ?? []).map(columnName);
+    const numeric = (c: number) => table.rows.slice(1).filter((r) => asNumber(unescapeCell(r.cells[c] ?? "").trim()) !== undefined).length * 2 > table.rows.length - 1;
+    const label = columns.findIndex((_, c) => !numeric(c));
+    const value = columns.findIndex((_, c) => c !== label && numeric(c));
+    const fields: Fields = {
+      source: name,
+      rows: label >= 0 ? [{ column: columns[label]!, grouping: "" }] : [],
+      columns: [],
+      values: value >= 0 ? [{ fn: "SUM", column: columns[value]! }] : [{ fn: "COUNTA", column: columns[0] ?? "" }],
+      conditions: [],
+      any: false,
+      sort: [],
+      totals: "both",
+    };
+    const blocked = this.host.canStoreMeta({ ...table, meta: undefined }, "source") ? undefined : "A pivot is kept in its table's metadata: turn on Store table metadata in the settings";
+    this.dialog(this.sources(own ? undefined : { name, table }), fields, "Insert", (definition) => {
+      const sources = this.sources(own ? undefined : { name, table });
+      const pivot = this.calculate(definition, sources.find((s) => s.name.toLowerCase() === definition.source.trim().toLowerCase())?.table);
+      if (typeof pivot === "string") return void this.host.bridge.flash(`Silverware Table: ${pivot}`, "error");
+      const made = this.written(this.withDefinition({ indent: table.indent, align: [], rows: [{ cells: [""] }], padded: false }, definition), pivot, {});
+      void this.host.insertTable(made, info, own ? undefined : { target: info, change: (t) => this.host.withTableName(t, name) });
+    }, blocked);
+  }
+
+  /** Pivot settings…: the pivot's definition in the dialog, saved into its metadata row (the write calculates it: writeStep) */
+  private settings(info: TableInfo): void {
+    const table = parseTable(info.source);
+    const definition = this.definitionOf(table);
+    if (!definition || "problem" in definition) return void this.host.bridge.flash(`Silverware Table: this pivot cannot be read: ${definition ? definition.problem : "no source"}`, "error");
+    this.dialog(this.sources(), fieldsOf(definition), "Save", (changed) => {
+      void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.withDefinition(t, changed));
+    });
+  }
+
   /** Refresh, in a pivot's toolbar: highlighted where it is out of date */
   toolbarButtons(info: TableInfo): ToolbarButton[] {
     const state = this.stale.get(info);
-    if (state === undefined) return [];
+    if (state === undefined) {
+      // Any other table with rows: a pivot of it, made in the dialog
+      const table = parseTable(info.source);
+      if (table.rows.length < 2 || this.definitionOf(table) || !this.cells()) return [];
+      return [{ label: "Insert pivot table…", place: "menu", title: "A summary of this table under it, calculated anew as it changes", run: () => this.insert(info) }];
+    }
     const problem = typeof state === "string" ? state : undefined;
     return [
+      { label: "Pivot settings…", place: "menu", title: "What the pivot shows", run: () => this.settings(info) },
       {
         label: "Refresh pivot",
         place: "icon",

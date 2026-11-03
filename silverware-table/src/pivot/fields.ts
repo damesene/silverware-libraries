@@ -4,7 +4,7 @@
 // an operator, a value) all or any of which must hold, else a formula of its
 // own. What the dialog cannot show as such stays a formula, written as it was.
 // Pure.
-import { splitList, type PivotDefinition, type SortKey, type Totals } from "./definition.ts";
+import { type PivotDefinition, type Show, type SortKey, splitList, type Totals, valueItem, valueParts } from "./definition.ts";
 
 export const GROUPINGS = ["", "year", "quarter", "yearMonth", "month", "day"] as const;
 export type Grouping = (typeof GROUPINGS)[number];
@@ -14,12 +14,15 @@ export const FUNCTIONS = ["SUM", "AVERAGE", "COUNTA", "MIN", "MAX"] as const;
 export type Fn = (typeof FUNCTIONS)[number];
 export const FUNCTION_LABELS: Readonly<Record<Fn, string>> = { SUM: "Sum", AVERAGE: "Average", COUNTA: "Count", MIN: "Min", MAX: "Max" };
 
+export const SHOW_LABELS: Readonly<Record<Show, string>> = { "": "as it is", total: "% of total", row: "% of row", column: "% of column" };
+
 export const OPERATORS = ["=", "<>", ">", ">=", "<", "<=", "matches"] as const;
 export type Operator = (typeof OPERATORS)[number];
 export const OPERATOR_LABELS: Readonly<Record<Operator, string>> = { "=": "=", "<>": "≠", ">": ">", ">=": "≥", "<": "<", "<=": "≤", matches: "matches (regex)" };
 
 export type GroupField = { readonly column: string; readonly grouping: Grouping } | { readonly formula: string };
-export type ValueField = { readonly fn: Fn; readonly column: string } | { readonly formula: string };
+// A value with how it shows: as calculated, or its share of a total
+export type ValueField = ({ readonly fn: Fn; readonly column: string } | { readonly formula: string }) & { readonly show: Show };
 export type Condition = { readonly column: string; readonly op: Operator; readonly value: string };
 
 export type Fields = {
@@ -76,13 +79,20 @@ export function readGroup(text: string): GroupField {
   return /^[\p{L}\p{N} _]+$/u.test(t) ? { column: t, grouping: "" } : { formula: t };
 }
 
-export function valueText(field: ValueField): string {
+/** A value's formula alone (`fx` turns the field into it), and the value as the definition writes it, its share with it */
+export function valueFormula(field: ValueField): string {
   return "formula" in field ? field.formula : `${field.fn}([${field.column}])`;
 }
 
+export function valueText(field: ValueField): string {
+  const formula = valueFormula(field);
+  return formula.trim() ? valueItem(formula, field.show) : "";
+}
+
 export function readValue(text: string): ValueField {
-  const m = /^\s*(SUM|AVERAGE|COUNTA|MIN|MAX)\(\s*\[([^\]@]+)\]\s*\)\s*$/i.exec(text);
-  return m ? { fn: m[1]!.toUpperCase() as Fn, column: m[2]! } : { formula: text.trim() };
+  const { formula, show } = valueParts(text);
+  const m = /^\s*(SUM|AVERAGE|COUNTA|MIN|MAX)\(\s*\[([^\]@]+)\]\s*\)\s*$/i.exec(formula);
+  return m ? { fn: m[1]!.toUpperCase() as Fn, column: m[2]!, show } : { formula, show };
 }
 
 /** A condition's formula: its value a number as it is, else a text in quotes; `matches` a regular expression (REGEXTEST) */

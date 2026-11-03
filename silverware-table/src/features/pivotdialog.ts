@@ -7,7 +7,7 @@
 import { el, type ElementChild } from "../../../shared/elements.ts";
 import { columnKey } from "../columns.ts";
 import type { Dialog, ModelHost } from "../core/feature.ts";
-import type { PivotDefinition, Totals } from "../pivot/definition.ts";
+import { type PivotDefinition, type Show, SHOWS, type Totals } from "../pivot/definition.ts";
 import {
   type Condition,
   definitionOf,
@@ -23,7 +23,9 @@ import {
   OPERATOR_LABELS,
   OPERATORS,
   type Operator,
+  SHOW_LABELS,
   type ValueField,
+  valueFormula,
   valueText,
 } from "../pivot/fields.ts";
 import type { Pivot } from "../pivot/pivot.ts";
@@ -100,24 +102,30 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
       remove(() => change(undefined)),
     );
   };
-  // A value: a function of a column, or its formula as text
+  // How a value shows: a share of a row's or a column's total only where columns are grouped (else the row's is the value itself, the column's all rows')
+  const showSelect = (field: ValueField, change: (f: ValueField) => void, i: number) => {
+    const shows = fields.columns.length ? SHOWS : SHOWS.filter((s) => s === "" || s === "total" || s === field.show);
+    return select(shows, (s) => SHOW_LABELS[s], field.show, (show: Show) => change({ ...field, show }), `Value ${i + 1} shown`);
+  };
+  // A value: a function of a column, or its formula as text; as calculated or its share of a total
   const valueRow = (field: ValueField, change: (f: ValueField | undefined) => void, i: number) => {
     if ("formula" in field) {
       const text = e("input", { attrs: { type: "text", "aria-label": "Value formula", "data-focus": `value ${i} formula` } });
       text.value = field.formula;
       text.addEventListener("input", () => {
-        fields = { ...fields, values: replaced(fields.values, i, { formula: text.value }) };
+        fields = { ...fields, values: replaced(fields.values, i, { ...fields.values[i]!, formula: text.value }) };
         previewSoon();
       });
-      return e("div", "swt-pivot-row", text, remove(() => change(undefined)));
+      return e("div", "swt-pivot-row", text, showSelect(field, (f) => change({ ...f, formula: text.value }), i), remove(() => change(undefined)));
     }
     return e(
       "div",
       "swt-pivot-row",
-      select(FUNCTIONS, (f) => FUNCTION_LABELS[f], field.fn, (fn: Fn) => change({ fn, column: field.column }), `Value ${i + 1} function`),
+      select(FUNCTIONS, (f) => FUNCTION_LABELS[f], field.fn, (fn: Fn) => change({ ...field, fn }), `Value ${i + 1} function`),
       e("span", "swt-pivot-of", "of"),
-      columnSelect(field.column, (column) => change({ fn: field.fn, column }), `Value ${i + 1} column`),
-      e("button", { class: "swt-pivot-formula", text: "fx", title: "Write it as a formula", run: () => change({ formula: valueText(field) }) }),
+      columnSelect(field.column, (column) => change({ ...field, column }), `Value ${i + 1} column`),
+      showSelect(field, change, i),
+      e("button", { class: "swt-pivot-formula", text: "fx", title: "Write it as a formula", run: () => change({ formula: valueFormula(field), show: field.show }) }),
       remove(() => change(undefined)),
     );
   };
@@ -161,7 +169,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
       section("Source", "The table summarized", select(options.sources.map((s) => s.name), (n) => n, fields.source, (source) => set({ source }), "Source")),
       section("Rows", "A row for each value of", ...groups("rows", "Row"), add("Group rows", () => set({ rows: [...fields.rows, { column: first, grouping: "" }] }))),
       section("Columns", "A column for each value of (optional)", ...groups("columns", "Column"), fields.columns.length ? null : add("Group columns", () => set({ columns: [{ column: first, grouping: "" }] }))),
-      section("Values", "What each shows", ...fields.values.map((v, i) => valueRow(v, (f) => set({ values: f ? replaced(fields.values, i, f) : fields.values.filter((_, j) => j !== i) }), i)), add("Value", () => set({ values: [...fields.values, { fn: "SUM", column: columns.find((c) => c !== first) ?? first }] }))),
+      section("Values", "What each shows", ...fields.values.map((v, i) => valueRow(v, (f) => set({ values: f ? replaced(fields.values, i, f) : fields.values.filter((_, j) => j !== i) }), i)), add("Value", () => set({ values: [...fields.values, { fn: "SUM", column: columns.find((c) => c !== first) ?? first, show: "" }] }))),
       section(
         "Only rows where",
         fields.where ? "A formula of one row" : "Its conditions",

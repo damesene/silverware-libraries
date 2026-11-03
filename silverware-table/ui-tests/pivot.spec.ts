@@ -59,4 +59,17 @@ test.describe("The pivot dialog", () => {
     await expect(dialog).toHaveCount(0);
     await expect.poll(() => markdown(page)).toContain("pivot.values='MAX([Revenue])'");
   });
+
+  test("Pivot settings… shows a value as its share of the total, as a percentage", async ({ page }) => {
+    await hoverCell(page, cell(page, 1, 0, 1));
+    // (An icon of a pivot's toolbar, the bar shown once placed)
+    await page.locator('.swt-bar.swt-visible button[aria-label="Pivot settings…"]').click();
+    const dialog = page.locator(".swt-pivot-dialog");
+    await dialog.locator('select[aria-label="Value 1 shown"]').selectOption("total");
+    await expect(dialog.locator(".swt-pivot-table tr").nth(1)).toHaveText(/East\s*0\.7059/);
+    await rendersAnew(page, () => dialog.locator(".swt-dialog-primary").click(), 1);
+    expect(await markdown(page)).toContain("pivot.values='SHARE(SUM([revenue]))'");
+    // The column's type shows the fraction written as a percentage
+    await expect(cell(page, 1, 1, 1)).toHaveText(/70[.,]6\s?%/);
+  });
 });

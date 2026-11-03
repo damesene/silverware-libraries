@@ -1,14 +1,15 @@
 // A pivot calculated: a source table's rows grouped by its definition's rows
 // and columns, each group's values calculated by the formulas over its rows,
-// totals over the rows of a row, of a column and of all. Pure: the module
+// totals over the rows of a row, of a column and of all; a value shown as a
+// share divided by the total it is a share of. Pure: the module
 // gives the source and how formulas read it, this gives the table's cells.
 // The rows are read as they show (a formula cell by its result), so a group's
 // own formulas are not calculated again in it.
 import { columnKey, columnName } from "../columns.ts";
-import { type Calculation, rowValues, type Scalar, scalarText, tableValue } from "../formulas/index.ts";
+import { type Calculation, isErrorText, rowValues, type Scalar, scalarText, tableValue } from "../formulas/index.ts";
 import type { Table } from "../markdown.ts";
 import { compareValues } from "../view.ts";
-import { groupFormula, type PivotDefinition } from "./definition.ts";
+import { groupFormula, type PivotDefinition, valueParts } from "./definition.ts";
 
 /** A column of the pivot: what it stands for (kept through a refresh, its header named by the user), its header as made, its alignment */
 export type PivotColumn = { readonly id: string; readonly header: string; readonly numeric: boolean };
@@ -23,6 +24,9 @@ export type Pivot = {
 };
 
 const TOTAL = "Total";
+// The type of a column of shares: a fraction shown as a percentage
+const PERCENT = "#percent-1";
+const SHARE_DIGITS = 10_000;
 
 /** A cell's value as a group's key: its text, as the cell shows it */
 const keyOf = (value: Scalar): string => scalarText(value);
@@ -35,7 +39,7 @@ const holds = (value: Scalar): boolean => value === true || (typeof value === "n
  * (or the column a formula of one row reads first: `TEXT([@date], "yyyy-mm")`
  * is Date's), "Sum of Revenue" for `SUM([revenue])`, else the formula
  */
-function headerOf(item: string, headers: readonly string[], value: boolean): string {
+function headerOf(item: string, headers: readonly string[], value: boolean, typed = true): string {
   const named = (key: string) => headers.find((h) => columnKey(h) === columnKey(key) || columnName(h).toLowerCase() === key.trim().toLowerCase());
   if (!value) {
     const column = /\[@([^\]]+)\]/.exec(groupFormula(item))?.[1];
@@ -47,7 +51,7 @@ function headerOf(item: string, headers: readonly string[], value: boolean): str
   const name = m[1]!.toUpperCase();
   const verb = name === "COUNTA" || name === "COUNT" ? "Count" : name[0] + name.slice(1).toLowerCase();
   // A column's type (its hashtag: #euro) where the value keeps its unit: a sum, not a count
-  const tags = verb === "Count" ? "" : (unescapeHeader(header).match(/(^|\s)#[^\s#]+/g) ?? []).map((tag) => ` ${tag.trim()}`).join("");
+  const tags = verb === "Count" || !typed ? "" : (unescapeHeader(header).match(/(^|\s)#[^\s#]+/g) ?? []).map((tag) => ` ${tag.trim()}`).join("");
   return `${verb} of ${columnName(header)}${tags}`;
 }
 
@@ -82,27 +86,48 @@ export function pivotOf(source: Table, definition: PivotDefinition, calculation:
     if (definition.columns.length) columns.add(columnKey_(i));
   }
   const columnList = [...columns].sort(compareValues);
-  // A value over some of the rows: the formula over a table of those alone
-  const valueOf = (formula: string, rows: readonly number[]): string =>
-    rows.length ? keyOf(tableValue({ ...table, rows: [table.rows[0]!, ...rows.map((i) => table.rows[i + 1]!)] }, formula, calculation)) : "";
+  // A formula over some of the rows: over a table of those alone
+  const calculated = (formula: string, rows: readonly number[]): Scalar => tableValue({ ...table, rows: [table.rows[0]!, ...rows.map((i) => table.rows[i + 1]!)] }, formula, calculation);
+  // The totals shares are of (all rows', a column's), calculated once for a value
+  const totals = new Map<string, Scalar>();
+  const totalOf = (formula: string, column: string | undefined): Scalar => {
+    const id = JSON.stringify([formula, column ?? null]);
+    if (!totals.has(id)) totals.set(id, calculated(formula, column === undefined ? indexes : indexes.filter((i) => columnKey_(i) === column)));
+    return totals.get(id)!;
+  };
+  // A value of some rows (`own`) of a pivot's row (`row`: all its rows), in a column of the column groups' or not: as calculated, or its share
+  const valueOf = (item: string, own: readonly number[], row: readonly number[], column?: string): string => {
+    if (!own.length) return "";
+    const { formula, show } = valueParts(item);
+    const part = calculated(formula, own);
+    if (!show || typeof part !== "number") return keyOf(part);
+    const whole = show === "row" ? calculated(formula, row) : totalOf(formula, show === "column" ? column : undefined);
+    if (typeof whole !== "number") return isErrorText(keyOf(whole)) ? keyOf(whole) : "#VALUE!";
+    // (Rounded as the percentage shows it, and a little past: what the markdown holds stays readable)
+    return whole === 0 ? "#DIV/0!" : keyOf(Math.round((part / whole) * SHARE_DIGITS) / SHARE_DIGITS);
+  };
   const across = definition.columns.length > 0;
   const showRowTotals = across && (definition.totals === "both" || definition.totals === "columns");
   const showTotalRow = definition.totals === "both" || definition.totals === "rows";
-  const valueLabel = (value: string) => headerOf(value, headers, true);
+  const valueLabel = (value: string) => {
+    const { formula, show } = valueParts(value);
+    return show ? `${headerOf(formula, headers, true, false)} (% of ${show}) ${PERCENT}` : headerOf(formula, headers, true);
+  };
 
   // The columns: the groups', then each column key's values (or the values alone), then the rows' totals
   const out: PivotColumn[] = definition.rows.map((item) => ({ id: `row:${item}`, header: headerOf(item, headers, false), numeric: false }));
   const cellsOf = (rows: readonly number[]): string[] => {
-    if (!across) return definition.values.map((value) => valueOf(value, rows));
+    if (!across) return definition.values.map((value) => valueOf(value, rows, rows));
     const byColumn = columnList.flatMap((column) => {
       const own = rows.filter((i) => columnKey_(i) === column);
-      return definition.values.map((value) => valueOf(value, own));
+      return definition.values.map((value) => valueOf(value, own, rows, column));
     });
-    return showRowTotals ? [...byColumn, ...definition.values.map((value) => valueOf(value, rows))] : byColumn;
+    return showRowTotals ? [...byColumn, ...definition.values.map((value) => valueOf(value, rows, rows))] : byColumn;
   };
   if (!across) out.push(...definition.values.map((value) => ({ id: `value:${value}`, header: valueLabel(value), numeric: true })));
   else {
-    const named = (column: string, value: string) => (definition.values.length > 1 ? `${column} ${valueLabel(value)}` : column);
+    // (A column of shares named by its group alone still says its type)
+    const named = (column: string, value: string) => (definition.values.length > 1 ? `${column} ${valueLabel(value)}` : valueParts(value).show ? `${column} ${PERCENT}` : column);
     for (const column of columnList) for (const value of definition.values) out.push({ id: `column:${column}|${value}`, header: named(column, value), numeric: true });
     if (showRowTotals) for (const value of definition.values) out.push({ id: `total|${value}`, header: named(TOTAL, value), numeric: true });
   }
@@ -112,9 +137,9 @@ export function pivotOf(source: Table, definition: PivotDefinition, calculation:
   const sortValue = (row: (typeof list)[number], by: string): string => {
     const at = definition.rows.findIndex((item) => item.trim().toLowerCase() === by.trim().toLowerCase());
     if (at >= 0) return row.key[at]!;
-    // A value: the row's over all its rows (across columns: its total)
+    // A value: the row's over all its rows (across columns: its total), a share by what it is a share of
     const value = definition.values.find((v) => v.trim().toLowerCase() === by.trim().toLowerCase());
-    return value ? valueOf(value, row.rows) : "";
+    return value ? keyOf(calculated(valueParts(value).formula, row.rows)) : "";
   };
   const keys = definition.sort.length ? definition.sort : definition.rows.map((by) => ({ by, descending: false }));
   list.sort((a, b) => {

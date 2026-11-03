@@ -13,7 +13,7 @@ import { followOwnFormula, type FormulaCells, type FormulasOffer } from "../form
 import { columnName } from "../columns.ts";
 import { ICONS } from "../icons.ts";
 import { escapeCell, type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
-import { definitionAttributes, groupFormula, KEYS, type Key, looseDefinition, type PivotDefinition, readDefinition } from "../pivot/definition.ts";
+import { definitionAttributes, groupFormula, KEYS, type Key, looseDefinition, type PivotDefinition, readDefinition, valueItem, valueParts } from "../pivot/definition.ts";
 import { type Fields, fieldsOf } from "../pivot/fields.ts";
 import { type Pivot as Calculated, pivotOf } from "../pivot/pivot.ts";
 import { asNumber } from "../view.ts";
@@ -151,7 +151,11 @@ export class Pivot implements Feature {
       });
     const rows = each(definition.rows, group);
     const columns = each(definition.columns, group);
-    const values = each(definition.values, formula);
+    // (A value's share kept as it says it)
+    const values = each(definition.values, (item) => {
+      const { formula: made, show } = valueParts(item);
+      return valueItem(formula(made), show);
+    });
     return {
       definition: {
         ...definition,
@@ -268,7 +272,7 @@ export class Pivot implements Feature {
       source: name,
       rows: label >= 0 ? [{ column: columns[label]!, grouping: "" }] : [],
       columns: [],
-      values: value >= 0 ? [{ fn: "SUM", column: columns[value]! }] : [{ fn: "COUNTA", column: columns[0] ?? "" }],
+      values: value >= 0 ? [{ fn: "SUM", column: columns[value]!, show: "" }] : [{ fn: "COUNTA", column: columns[0] ?? "", show: "" }],
       conditions: [],
       any: false,
       sort: [],

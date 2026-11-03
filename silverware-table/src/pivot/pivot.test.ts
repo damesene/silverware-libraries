@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseTable } from "../markdown.ts";
 import { CELLS } from "../testing/formulas.ts";
-import { definitionAttributes, groupFormula, type Key, type PivotDefinition, readDefinition, splitList } from "./definition.ts";
+import { definitionAttributes, groupFormula, type Key, type PivotDefinition, readDefinition, splitList, valueItem, valueParts } from "./definition.ts";
 import { pivotOf } from "./pivot.ts";
 
 const ORDERS = parseTable(`| Date | Region | Product | Category | Qty | Revenue |
@@ -51,6 +51,21 @@ describe("a pivot's definition", () => {
     expect(readDefinition(() => undefined)).toBeUndefined();
     expect(readDefinition((key) => ({ source: "orders", rows: "region" })[key as "source"])).toEqual({ problem: "it says no values (pivot.values: SUM([revenue]))" });
     expect(readDefinition((key) => ({ source: "orders", rows: "region", values: "SUM([qty])", totals: "all" })[key as "source"])).toEqual({ problem: 'its totals are "all" (both, rows, columns or none)' });
+  });
+
+  it("reads a value's share as a call of SHARE, the whole value only, of the total where it says no other", () => {
+    expect(valueParts("SHARE(SUM([revenue]))")).toEqual({ formula: "SUM([revenue])", show: "total" });
+    expect(valueParts('share( SUM([qty] * 2), "Row" )')).toEqual({ formula: "SUM([qty] * 2)", show: "row" });
+    expect(valueParts("SUM([revenue])")).toEqual({ formula: "SUM([revenue])", show: "" });
+    // Not a share: SHARE within a formula, of something else, with an argument it does not take
+    for (const item of ["SHARE(SUM([a])) + SHARE(SUM([b]))", "SHARE(SUM([a])) * 100", 'SHARE(SUM([a]), "page")', 'SHARE(SUM([a]), "row", 1)', "SHARE()"]) expect(valueParts(item)).toEqual({ formula: item, show: "" });
+    expect(valueItem("SUM([qty])", "column")).toBe('SHARE(SUM([qty]), "column")');
+    expect(valueItem("SUM([qty])", "total")).toBe("SHARE(SUM([qty]))");
+    expect(splitList('SHARE(SUM([revenue]), "row"), COUNTA([date])')).toEqual(['SHARE(SUM([revenue]), "row")', "COUNTA([date])"]);
+  });
+
+  it("is not a share where SHARE is not the whole value: an unknown function there", () => {
+    expect(table({ rows: "region", values: "SHARE(SUM([revenue])) * 100", totals: "none" })[1]).toEqual(["East", "#NAME?"]);
   });
 
   it("takes a column's name for its cell in the row, a formula as it is", () => {
@@ -137,6 +152,41 @@ describe("a pivot calculated", () => {
   it("keeps a type's hashtag apart from the value's name, wherever the source's header had it", () => {
     const rated = parseTable("| Item | #stars Rating |\n|---|---|\n| a | 4 |\n| a | 2 |");
     expect(pivotOf(rated, definition({ rows: "item", values: "AVERAGE([rating])" }), { cells: CELLS }).columns.map((c) => c.header)).toEqual(["Item", "Average of Rating #stars"]);
+  });
+
+  it("shows a value as its share of the grand total, beside the value itself, as a percentage", () => {
+    expect(table({ rows: "region", values: "SUM([revenue]), SHARE(SUM([revenue]))" })).toEqual([
+      ["Region", "Sum of Revenue", "Sum of Revenue (% of total) #percent-1"],
+      ["East", "6125", "0.4399"],
+      ["North", "2300", "0.1652"],
+      ["West", "5500", "0.395"],
+      ["Total", "13925", "1"],
+    ]);
+  });
+
+  it("shows a cross table's values as shares of their row's total or of their column's, a column of one value typed too", () => {
+    expect(table({ rows: "region", columns: "category", values: 'SHARE(SUM([revenue]), "row")' })).toEqual([
+      ["Region", "Hardware #percent-1", "Services #percent-1", "Total #percent-1"],
+      ["East", "0.6082", "0.3918", "1"],
+      ["North", "0.6087", "0.3913", "1"],
+      ["West", "0.7", "0.3", "1"],
+      ["Total", "0.6445", "0.3555", "1"],
+    ]);
+    expect(table({ rows: "region", columns: "category", values: 'SHARE(SUM([revenue]), "column")' }).slice(1)).toEqual([
+      ["East", "0.415", "0.4848", "0.4399"],
+      ["North", "0.156", "0.1818", "0.1652"],
+      ["West", "0.429", "0.3333", "0.395"],
+      ["Total", "1", "1", "1"],
+    ]);
+  });
+
+  it("sorts by a share as by its value, says a share of nothing #DIV/0!", () => {
+    expect(table({ rows: "region", values: "SHARE(SUM([revenue]))", sort: "SHARE(SUM([revenue])) desc", totals: "none" }).map((r) => r[0])).toEqual(["Region", "East", "West", "North"]);
+    expect(table({ rows: "region", values: "SHARE(SUM([revenue] * 0))", totals: "none" })[1]).toEqual(["East", "#DIV/0!"]);
+  });
+
+  it("keeps a share's own id, apart from the value's", () => {
+    expect(pivot({ rows: "region", values: "SUM([revenue]), SHARE(SUM([revenue]))" }).columns.map((c) => c.id)).toEqual(["row:region", "value:SUM([revenue])", "value:SHARE(SUM([revenue]))"]);
   });
 
   it("gives each column an id that stays as its data change", () => {

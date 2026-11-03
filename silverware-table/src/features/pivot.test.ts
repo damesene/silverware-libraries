@@ -117,6 +117,15 @@ describe("Pivot tables", () => {
     expect(text).toContain("| Area | Sum of Sales |\n|---|--:|\n| East | 120 |\n| West | 50 |\n| Total | 170 |");
   });
 
+  it("follows its source's column renamed in a value shown as a share", async () => {
+    await setup(`${ORDERS}\n\n${PIVOT("| East | 0.8571 |\n| West | 0.1429 |\n| Total | 1 |").replace("pivot.values='SUM([revenue])'", "pivot.values='SHARE(SUM([revenue]))'")}\n`, { "silverware.table.editor.enterKey": "save", "silverware.table.metadata": true });
+    clickOn(cell(0, 1));
+    await type("Sales");
+    expect(text).toContain("pivot.values='SHARE(SUM([sales]))'");
+    expect(text).toContain("| Region | Sum of Sales (% of total) #percent-1 |");
+    expect(text).toContain("| East | 0.7059 |\n| West | 0.2941 |\n| Total | 1 |");
+  });
+
   it("keeps a header the user named as its source's column is renamed", async () => {
     await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.editor.enterKey": "save", "silverware.table.metadata": true });
     clickOn(second(0, 1));
@@ -162,6 +171,25 @@ describe("Pivot tables", () => {
       await controller.scan();
       expect(text).toContain("<meta core.table core.name='table1'>");
       expect(text).toContain("pivot.source='table1'");
+    });
+
+    it("shows a value as its share of the total, offering a row's and a column's only with columns grouped", async () => {
+      await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
+      pivotSettings();
+      const shown = () => Array.from(dialog().querySelector<HTMLSelectElement>('select[aria-label="Value 1 shown"]')!.options, (o) => o.value);
+      expect(shown()).toEqual(["", "total"]);
+      pick("Value 1 shown", "total");
+      expect(previewCells()).toEqual([
+        ["Region", "Sum of Revenue (% of total) #percent-1"],
+        ["East", "0.7059"],
+        ["West", "0.2941"],
+        ["Total", "1"],
+      ]);
+      dialog().querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
+      await flush();
+      await controller.scan();
+      expect(text).toContain("pivot.values='SHARE(SUM([revenue]))'");
+      expect(text).toContain("| East | 0.7059 |");
     });
 
     it("shows a pivot's definition, saved into it with its values calculated anew", async () => {

@@ -660,7 +660,7 @@ Then `| Outside #temp |` and `| Oven #temp-f |` show their cells so, the *Type* 
 
 ## Pivot tables
 
-A pivot table summarizes another table: its rows grouped by a column, a value for each group, totals. **Insert pivot table…** in a table's ⋯ menu opens a dialog: pick what groups the rows (a column, a date by year, quarter or month), what makes columns, the values (sum, average, count, min, max of a column), which rows count (a column compared with a value, or matching a regular expression) and the order, and the pivot they make shows under the fields as you change them; *Insert* writes it under the table (a table without a name gets one: a pivot names its source). The **Pivot settings…** icon in a pivot's toolbar opens the same dialog to change it. A field the dialog has no choice for can be written as a formula (its **fx**).
+A pivot table summarizes another table: its rows grouped by a column, a value for each group, totals. **Insert pivot table…** in a table's ⋯ menu opens a dialog: pick what groups the rows (a column, a date by year, quarter or month), what makes columns, the values (sum, average, count, min, max of a column, each as it is or as a percentage of the total, of its row's total or of its column's), which rows count (a column compared with a value, or matching a regular expression) and the order, and the pivot they make shows under the fields as you change them; *Insert* writes it under the table (a table without a name gets one: a pivot names its source). The **Pivot settings…** icon in a pivot's toolbar opens the same dialog to change it. A field the dialog has no choice for can be written as a formula (its **fx**).
 
 It is a plain markdown table, its numbers written in it (it shows anywhere, as any table), and its definition is in its metadata row, in the language of formulas:
 
@@ -679,7 +679,7 @@ It is a plain markdown table, its numbers written in it (it shows anywhere, as a
 | `pivot.source` | The table summarized: a table of the page by its name (see [[#Table names]]) |
 | `pivot.rows` | What groups the rows: a column (`region`), or a formula of one row (`TEXT([@date], "yyyy-mm")`, `YEAR([@date])`), several comma separated |
 | `pivot.columns` | What makes columns of the groups, the same way (optional): a cross table |
-| `pivot.values` | What each group shows: formulas over its rows, `SUM([revenue])`, `AVERAGE([qty])`, `COUNTA([date])`, `SUM([qty] * [price])`, comma separated |
+| `pivot.values` | What each group shows: formulas over its rows, `SUM([revenue])`, `AVERAGE([qty])`, `COUNTA([date])`, `SUM([qty] * [price])`, comma separated; `SHARE(…)` around one shows it as a share of the grand total (`SHARE(SUM([revenue]))`), `SHARE(…, "row")` of its row's total, `SHARE(…, "column")` of its column's, its column typed `#percent-1`; SHARE is the pivot's, so it is the whole value or nothing (`SHARE(…) * 100` is `#NAME?`) |
 | `pivot.where` | Which rows count: a formula of one row, true for those (`[@category] = "Hardware"`, `AND([@qty] > 5, [@region] <> "West")`, a regular expression: `REGEXTEST([@code], "^EU-")`) |
 | `pivot.sort` | The rows' order: groups or values as the definition writes them, each with `desc` where it goes down (`SUM([revenue]) desc, region`); by default the groups, as numbers, dates or texts sort |
 | `pivot.totals` | `both` (the default): a Total row and, with columns, a Total column; `rows`: the row; `columns`: the column; `none` |

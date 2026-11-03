@@ -1,10 +1,10 @@
 // A pivot's definition as its table's metadata row keeps it, in the formulas'
 // language: `source` the table summarized, `rows` and `columns` what groups
 // its rows (a column, or a formula of one row), `values` what each group
-// shows (a formula over its rows), `where` which rows count (a formula of one
+// shows (a formula over its rows, or its share of a total), `where` which rows count (a formula of one
 // row), `sort` the rows' order, `totals` the totals shown. Pure: the module
 // reads and writes the attributes, this reads and writes their values.
-import { tokenize } from "../formulas/tokens.ts";
+import { type Token, tokenize } from "../formulas/tokens.ts";
 
 export type Totals = "both" | "rows" | "columns" | "none";
 export const TOTALS: readonly Totals[] = ["both", "rows", "columns", "none"];
@@ -101,6 +101,44 @@ export function definitionAttributes(definition: PivotDefinition): [Key, string]
   if (definition.sort.length) out.push(["sort", list(definition.sort.map((key) => (key.descending ? `${key.by} desc` : key.by)))]);
   if (definition.totals !== "both") out.push(["totals", definition.totals]);
   return out;
+}
+
+/** How a value shows: as calculated, or as a share of the grand total, of its row's total or of its column's */
+export type Show = "" | "total" | "row" | "column";
+export const SHOWS: readonly Show[] = ["", "total", "row", "column"];
+
+/**
+ * A value's formula and how it shows, as the definition writes it: the
+ * formula, or a share of it, `SHARE(SUM([revenue]))` of the grand total,
+ * `SHARE(SUM([revenue]), "row")` of its row's ("column": its column's).
+ * SHARE is the pivot's, not a function of the formulas: only the whole value
+ * is one (in a formula it is an unknown name). The item as written stays
+ * what the pivot knows it by (its column, a sort's key).
+ */
+export function valueParts(item: string): { readonly formula: string; readonly show: Show } {
+  const plain = { formula: item.trim(), show: "" as Show };
+  const call = /^SHARE\s*\(([\s\S]*)\)$/i.exec(plain.formula);
+  if (!call || !closesLast(plain.formula)) return plain;
+  const [formula, of, ...more] = splitList(call[1]!);
+  const show = of === undefined ? "total" : /^"(total|row|column)"$/i.exec(of)?.[1]?.toLowerCase();
+  return formula && show && !more.length ? { formula, show: show as Show } : plain;
+}
+
+/** Whether a call's parenthesis is closed by the text's last one (`SHARE(a) + SHARE(b)` is no call of SHARE alone) */
+function closesLast(text: string): boolean {
+  const { tokens, error } = tokenize(text);
+  if (error) return false;
+  let depth = 0;
+  const parens = tokens.filter((t): t is Extract<Token, { kind: "op" }> => t.kind === "op" && (t.text === "(" || t.text === ")"));
+  return parens.every((t, i) => {
+    depth += t.text === "(" ? 1 : -1;
+    return depth > 0 || i === parens.length - 1;
+  });
+}
+
+export function valueItem(formula: string, show: Show): string {
+  if (!show) return formula;
+  return show === "total" ? `SHARE(${formula})` : `SHARE(${formula}, "${show}")`;
 }
 
 /** A group as a formula of one row: a column's name stands for its cell in the row (`region` is `[@region]`) */

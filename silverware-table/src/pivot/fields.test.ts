@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readDefinition } from "./definition.ts";
-import { definitionOf, fieldsOf, groupText, readGroup, readValue } from "./fields.ts";
+import { definitionOf, fieldsOf, groupText, readGroup, readValue, valueText } from "./fields.ts";
 
 const definition = (attributes: Record<string, string>) => {
   const all: Record<string, string> = { source: "orders", ...attributes };
@@ -19,8 +19,14 @@ describe("a pivot's fields", () => {
   });
 
   it("make a value of a function of a column, a formula as it is", () => {
-    expect(readValue("sum([Revenue])")).toEqual({ fn: "SUM", column: "Revenue" });
-    expect(readValue("SUM([qty] * [price])")).toEqual({ formula: "SUM([qty] * [price])" });
+    expect(readValue("sum([Revenue])")).toEqual({ fn: "SUM", column: "Revenue", show: "" });
+    expect(readValue("SUM([qty] * [price])")).toEqual({ formula: "SUM([qty] * [price])", show: "" });
+  });
+
+  it("make a value's share of a total, of a function or a formula, and read it back", () => {
+    expect(readValue('SHARE(SUM([revenue]), "row")')).toEqual({ fn: "SUM", column: "revenue", show: "row" });
+    expect(valueText({ formula: "SUM([qty] * [price])", show: "total" })).toBe("SHARE(SUM([qty] * [price]))");
+    expect(valueText({ formula: " ", show: "total" })).toBe("");
   });
 
   it("read conditions all or any of which hold, and write them so (a text in quotes, a number not)", () => {
@@ -45,13 +51,13 @@ describe("a pivot's fields", () => {
 
   it("leave a formula emptied out of their definition", () => {
     const fields = fieldsOf(definition({ rows: "region, x", values: "SUM([revenue])" }));
-    const made = definitionOf({ ...fields, rows: [fields.rows[0]!, { formula: " " }], values: [{ formula: "" }] });
+    const made = definitionOf({ ...fields, rows: [fields.rows[0]!, { formula: " " }], values: [{ formula: "", show: "" }] });
     expect(made.rows).toEqual(["region"]);
     expect(made.values).toEqual([]);
   });
 
   it("give back the definition they were read from", () => {
-    const read = definition({ rows: 'region, TEXT([@date], "yyyy-mm")', columns: "YEAR([@date])", values: "SUM([revenue]), SUM([qty] * [price])", where: '[@category] = "Hardware"', sort: "SUM([revenue]) desc", totals: "rows" });
+    const read = definition({ rows: 'region, TEXT([@date], "yyyy-mm")', columns: "YEAR([@date])", values: 'SUM([revenue]), SHARE(SUM([qty] * [price]), "column")', where: '[@category] = "Hardware"', sort: "SUM([revenue]) desc", totals: "rows" });
     expect(definitionOf(fieldsOf(read))).toEqual(read);
   });
 });

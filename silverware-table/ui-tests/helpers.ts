@@ -230,6 +230,8 @@ export async function setSettings(page: Page, values: Record<string, Setting>): 
 export async function setOtherPage(page: Page, name: string, text: string): Promise<void> {
   if (target === "silverbullet") {
     otherPagesOf.set(page, [...(otherPagesOf.get(page) ?? []), name]);
+    // There before SilverBullet writes it: it reads a page before writing it, a missing one a 404 in the console (as the settings' page)
+    await writePage(name, "");
     await page.evaluate(
       async ({ name, text }) => {
         const { client } = window as unknown as { client: Client };

@@ -130,10 +130,17 @@ describe("Evaluation", () => {
   });
 
   it("grades numbers into levels: as many colors as asked, equal ranges or equal counts", () => {
-    const five = stylesOf([rule(["levels", { count: 3, low: "#000000", high: "#ffffff" }])], column(["0", "40", "100"])).styles.map((s) => s?.fill);
+    const five = stylesOf([rule(["levels", { count: 3, low: "#000000", high: "#ffffff", split: "equal" }])], column(["0", "40", "100"])).styles.map((s) => s?.fill);
     expect(five[0]).toBe("#000000");
     expect(five[1]).toMatch(/color-mix/);
     expect(five[2]).toBe("#ffffff");
+  });
+
+  it("grades by equal counts by default: one far larger number does not leave the others in the first level", () => {
+    const fills = stylesOf([rule(["levels", { count: 3, low: "#000000", high: "#ffffff" }])], column(["1", "2", "3", "1000"])).styles.map((s) => s?.fill);
+    expect(fills[0]).toBe("#000000");
+    expect(fills[1]).toMatch(/color-mix/);
+    expect(fills[3]).toBe("#ffffff");
   });
 
   it("keeps a property an earlier rule set; stop leaves the cells it picked to it", () => {
@@ -190,6 +197,8 @@ describe("Rules as stored", () => {
     expect(rules[0]).toEqual({ scope: { kind: "column", column: 1 }, when: { name: "greater", params: { value: 100 } }, format: { name: "redFill", params: {} } });
     expect(isUnread(rules[2]!)).toBe(true);
     expect(rulesText(rules)).toBe(text);
+    expect(rulesOf('[{"format":"bold","together":true}]', { kind: "table" })[0]).toMatchObject({ together: true });
+    expect(rulesText(rulesOf('[{"format":"bold","together":true}]', { kind: "table" }))).toBe('[{"format":"bold","together":true}]');
     const table = rulesOf('[{"row":"pear","format":"bold"}]', { kind: "table" });
     expect(table[0]).toMatchObject({ scope: { kind: "row", name: "pear" } });
     expect(rulesOf("not json", { kind: "table" }).map(isUnread)).toEqual([true]);
@@ -205,8 +214,8 @@ describe("Rules as stored", () => {
 
   it("reads params by their specs, a value that does not fit its default; stores only what differs", () => {
     const specs = formatNamed("levels")!.params;
-    expect(readParams(specs, { count: "12", low: "#000", split: "nope" })).toEqual({ count: 10, low: "#000", high: "red", split: "equal" });
-    expect(storedParams(specs, { count: 5, low: "green", high: "blue", split: "equal" })).toEqual({ high: "blue" });
+    expect(readParams(specs, { count: "12", low: "#000", split: "nope" })).toEqual({ count: 10, low: "#000", high: "red", split: "quantiles" });
+    expect(storedParams(specs, { count: 5, low: "green", high: "blue", split: "quantiles" })).toEqual({ high: "blue" });
   });
 });
 

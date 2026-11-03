@@ -20,6 +20,8 @@ export type Rule = {
   readonly format: Ref;
   // The rules after it leave the cells it formats alone
   readonly stop?: boolean;
+  // A rule of the whole table: its columns as one range (as a spreadsheet's range); else each column on its own
+  readonly together?: boolean;
   // Its place among the table's rules (the order of the dialog), as stored; rules without one after those with
   readonly at?: number;
 };
@@ -57,6 +59,7 @@ function ruleOf(stored: unknown, scope: RuleScope): StoredRule {
     format,
     ...(when ? { when } : {}),
     ...(s.stop === true ? { stop: true } : {}),
+    ...(s.together === true && scope.kind === "table" && typeof row !== "string" ? { together: true } : {}),
     ...(typeof s.at === "number" && Number.isFinite(s.at) ? { at: s.at } : {}),
   };
 }
@@ -81,6 +84,7 @@ function storedOf(rule: StoredRule): unknown {
     ...(rule.when ? { when: refText(rule.when) } : {}),
     format: refText(rule.format),
     ...(rule.stop ? { stop: true } : {}),
+    ...(rule.together && rule.scope.kind === "table" ? { together: true } : {}),
     ...(rule.at !== undefined ? { at: rule.at } : {}),
   };
 }

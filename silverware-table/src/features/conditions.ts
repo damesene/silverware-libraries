@@ -96,6 +96,8 @@ export class Conditions implements Feature {
         const row = named.get(rule.scope.name.toLowerCase());
         return row !== undefined && row >= rows[0] && row <= rows[1] ? [{ rule, rows: [row, row] as const, columns: all }] : [];
       }
+      // Each column on its own, as the table shows it, unless its columns go together
+      if (!rule.together) return Array.from({ length: Math.max(0, all[1] - all[0] + 1) }, (_, i) => ({ rule, rows, columns: [all[0] + i, all[0] + i] as const }));
       return [{ rule, rows, columns: all }];
     });
   }
@@ -192,7 +194,10 @@ export class Conditions implements Feature {
       }
       return bodyRows.flatMap((r) => bodyColumns.map((c) => placed(r, c)));
     };
-    const inputs: RuleCells[] = rules.map((rule) => ({ rule, cells: cellsOf(rule.scope) }));
+    // A whole table's rule applies to each column on its own (its scale, its top values), unless its columns go together
+    const inputs: RuleCells[] = rules.flatMap((rule) =>
+      rule.scope.kind === "table" && !rule.together ? bodyColumns.map((c) => ({ rule, cells: cellsOf({ kind: "column", column: c }) })) : [{ rule, cells: cellsOf(rule.scope) }],
+    );
     const { styles, problems } = evaluateRules(inputs, this.rowFormula(table));
     for (const problem of problems) {
       const said = `${info.key}\u0000${problem}`;

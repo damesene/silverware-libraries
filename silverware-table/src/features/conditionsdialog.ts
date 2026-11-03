@@ -230,7 +230,11 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
       scopes.map((s) => s.value),
       (v) => scopes.find((s) => s.value === v)?.label ?? v,
       scopeValue,
-      (v) => set(i, { ...rule, scope: scopes.find((s) => s.value === v)!.scope }),
+      (v) => {
+        const { together: _, ...rest } = rule;
+        const next = scopes.find((s) => s.value === v)!.scope;
+        set(i, { ...(next.kind === "table" ? rule : rest), scope: next });
+      },
       `rule ${i} scope`,
       "Applies to",
     );
@@ -277,6 +281,13 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
       );
     };
     const describe = (text: string | undefined) => (text ? e("p", { class: "swt-cf-description", text }) : null);
+    // A whole table's rule: each column on its own (its own scale, its own top values), or its columns as one range
+    const together = e("input", { attrs: { type: "checkbox", "data-focus": `rule ${i} together` } });
+    together.checked = !!rule.together;
+    together.addEventListener("change", () => {
+      const { together: _, ...rest } = rule;
+      set(i, together.checked ? { ...rest, together: true } : rest);
+    });
     const stop = e("input", { attrs: { type: "checkbox", "data-focus": `rule ${i} stop` } });
     stop.checked = !!rule.stop;
     stop.addEventListener("change", () => {
@@ -286,7 +297,11 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
     return e(
       "div",
       "swt-cf-editor",
-      section("Applies to", scope),
+      section(
+        "Applies to",
+        scope,
+        rule.scope.kind === "table" ? e("label", "swt-pivot-toggle", together, "All columns as one range (else each column on its own: its own scale, its own top values)") : null,
+      ),
       section("Which cells", when, describe(condition?.description), rule.when ? refFields(rule.when, condition?.params, "when") : null),
       section("Format", format, describe(formatDefinition?.description), refFields(rule.format, formatDefinition?.params, "format")),
       section("", e("label", "swt-pivot-toggle", stop, "Stop: the rules after this one leave the cells it formats alone")),

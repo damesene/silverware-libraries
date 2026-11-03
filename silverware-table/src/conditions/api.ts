@@ -64,7 +64,7 @@ export type Scope = {
   share(cell: Cell): number | undefined;
   /** The cell's place by its number, 1 the largest (`ascending`: 1 the smallest); undefined: no number */
   rank(cell: Cell, ascending?: boolean): number | undefined;
-  /** The share of the numbers smaller than the cell's (0 to just under 1): equal counts */
+  /** The cell's place among the numbers, from 0 (the smallest) to 1 (the largest): equal counts */
   quantile(cell: Cell): number | undefined;
   /** How many cells have the cell's value (case ignored) */
   count(cell: Cell): number;

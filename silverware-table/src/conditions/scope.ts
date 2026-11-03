@@ -78,8 +78,9 @@ export function scopeOf(cells: readonly Cell[]): Scope {
     },
     quantile(cell) {
       if (cell.number === undefined) return undefined;
+      // From 0 (the smallest) to 1 (the largest), by the cells' places: the first and last levels always taken
       const count = sorted().length;
-      return count ? below(cell.number) / count : undefined;
+      return count ? (count === 1 ? 0 : below(cell.number) / (count - 1)) : undefined;
     },
     count(cell) {
       if (!counts) {

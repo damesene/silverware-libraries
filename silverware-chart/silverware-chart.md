@@ -290,9 +290,11 @@ end
 ```space-style
 /* Silverware Chart: a chart's box, and what shows where one cannot be drawn */
 /* What Silverware Chart assumes about SilverBullet's DOM, all of it here: its own controls of a chart's block
-   (its widget menu, .sb-widget-menu-bar: Edit source, Reload; the block's Copy button, .sb-code-copy-button in
+   (its widget menu: Reload, Copy, Edit; .button-bar in the widget in the release 2.12.1, verified in its
+   container on 2026-11-03, .sb-widget-menu-bar in main; the block's Copy button, .sb-code-copy-button in
    the block's first line, .cm-line > .sb-actions) left out, as the chart's toolbar has them; .swc-widget is the
    class the library page gives the chart's widget */
+.swc-widget .button-bar,
 .swc-widget .sb-widget-menu-bar,
 .cm-line:has(.swc-widget) > .sb-actions .sb-code-copy-button {
   display: none !important;

@@ -301,11 +301,11 @@ export class Pivot implements Feature {
       // Any other table with rows: a pivot of it, made in the dialog
       const table = parseTable(info.source);
       if (table.rows.length < 2 || this.definitionOf(table) || !this.cells()) return [];
-      return [{ label: "Insert pivot table…", place: "menu", title: "A summary of this table under it, calculated anew as it changes", run: () => this.insert(info) }];
+      return [{ label: "Insert pivot table…", place: "menu", icon: ICONS.pivot, title: "A summary of this table under it, calculated anew as it changes", run: () => this.insert(info) }];
     }
     const problem = typeof state === "string" ? state : undefined;
     return [
-      { label: "Pivot settings…", place: "menu", title: "What the pivot shows", run: () => this.settings(info) },
+      { label: "Pivot settings…", place: "menu", icon: ICONS.pivot, title: "What the pivot shows", run: () => this.settings(info) },
       {
         label: "Refresh pivot",
         place: "icon",

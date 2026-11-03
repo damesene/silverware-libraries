@@ -1201,6 +1201,10 @@ export class Controller implements TableHost {
     return undefined;
   }
 
+  editRefused(info: TableInfo, cell: CellRef): void {
+    for (const feature of this.features) feature.editRefused?.(info, cell);
+  }
+
   readOnlyBody(table: Table): string | undefined {
     let reason: string | undefined;
     for (let row = 1; row < table.rows.length; row++) {

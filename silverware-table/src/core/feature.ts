@@ -796,6 +796,8 @@ export interface ModelHost {
   fixedShape(table: Table): string | undefined;
   /** Why no cell of the table's body is changed by hand (a pivot's: none to edit, hold or switch editing for); undefined: some may be */
   readOnlyBody(table: Table): string | undefined;
+  /** The user tried to edit a cell not changed by hand: the features' ways to change it instead (Feature.editRefused) */
+  editRefused(info: TableInfo, cell: CellRef): void;
   /** A feature's copy of a cell for another cell (Feature.fillCell), or undefined: copied as its value */
   fillCell(info: TableInfo, cell: string, from: CellRef, to: CellRef): string | undefined;
   /** Keyboard and input events from a field of a feature must not reach SilverBullet's editor */
@@ -1175,6 +1177,12 @@ export interface Feature {
   readOnly?(table: Table, cell: CellRef): string | undefined;
   /** Why the table's rows and columns are not added, deleted or moved by hand (a pivot's: its calculation's); undefined: they may be */
   fixedShape?(table: Table): string | undefined;
+  /**
+   * The user tried to edit a cell that is not changed by hand (readOnly), told
+   * why: the feature's own way to change it instead, if it has one (a pivot's
+   * settings)
+   */
+  editRefused?(info: TableInfo, cell: CellRef): void;
   /**
    * A copy of a cell the feature makes for another cell of the table (`to`;
    * AutoFill), a cell of the markdown's table, the header 0: formulas, their

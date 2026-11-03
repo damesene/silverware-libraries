@@ -325,6 +325,11 @@ export class Pivot implements Feature {
     return `this table is a pivot of ${this.host.getMeta(table, "source")}: its values are calculated. Edit ${this.host.getMeta(table, "source")}, or what the pivot shows in its definition`;
   }
 
+  /** A cell of a pivot edited: what it shows is changed in its settings, opened instead */
+  editRefused(info: TableInfo, cell: { readonly row: number }): void {
+    if (cell.row > 0 && this.definitionOf(parseTable(info.source))) this.settings(info);
+  }
+
   /** A pivot's rows and columns are its calculation's */
   fixedShape(table: Table): string | undefined {
     return this.definitionOf(table) ? `this table is a pivot of ${this.host.getMeta(table, "source")}: its rows and columns come from it` : undefined;

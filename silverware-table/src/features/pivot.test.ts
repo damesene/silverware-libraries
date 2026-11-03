@@ -61,10 +61,19 @@ describe("Pivot tables", () => {
   it("is changed by its source only: no cell of its body edited, no row added, its menus offering neither", async () => {
     await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
     const page = text;
-    // The editor does not open on a body cell, and says why
+    // The editor does not open on a body cell, and says why: its settings open instead, where what it shows is changed
     clickOn(second(1, 1));
     expect(editor.querySelector(".swt-cell-editor")).toBeNull();
     expect(flashes.at(-1)).toContain("is a pivot of orders");
+    const dialog = document.querySelector<HTMLElement>(".swt-pivot-dialog");
+    expect(dialog?.querySelector(".swt-dialog-primary")?.textContent).toBe("Save");
+    dialog!.querySelector<HTMLButtonElement>(".swt-dialog-button")!.click();
+    expect(document.querySelector(".swt-pivot-dialog")).toBeNull();
+    // Its header renamed as any table's: no settings
+    clickOn(second(0, 1));
+    expect(editor.querySelector(".swt-cell-editor")).not.toBeNull();
+    expect(document.querySelector(".swt-pivot-dialog")).toBeNull();
+    key(editor.querySelector(".swt-cell-editor")!, "Escape");
     // An edit that would change one (a paste, a key, a feature's) is not written, nor a row added
     const info = controller.shownTables()[1]!;
     expect(await controller.writeTable(info, (t) => setCell(t, 1, 1, "999"))).toBe("failed");

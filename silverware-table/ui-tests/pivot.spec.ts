@@ -72,10 +72,11 @@ test.describe("Pivot tables", () => {
     await rendersAnew(page, () => page.keyboard.press("Enter"), 1);
     await expect(table(page, 1).locator("tr").nth(2)).toContainText("80");
     expect(await markdown(page)).toContain("| Total  |            200 |");
-    // A cell of the pivot: no editor, said why
+    // A cell of the pivot: no editor, said why, its settings open instead
     await cell(page, 1, 1, 1).dblclick();
     await expect(page.locator(".swt-cell-editor")).toHaveCount(0);
     await expect(notification(page, /is a pivot of orders/)).toBeVisible();
+    await expect(page.locator(".swt-pivot-dialog")).toBeVisible();
   });
 });
 

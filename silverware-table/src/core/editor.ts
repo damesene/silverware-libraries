@@ -123,10 +123,11 @@ export class CellEditing {
   ): void {
     const ref = beyond ?? this.host.cellRef(info, cell);
     if (!ref || this.editor) return;
-    // A cell not changed by hand (a pivot's): said why, not opened
+    // A cell not changed by hand (a pivot's): said why, not opened; a feature's own way to change it instead (its settings)
     const fixed = beyond ? undefined : this.host.readOnly(this.host.tableOf(info), [ref]);
     if (fixed) {
       void this.host.bridge.flash(`Silverware Table: ${fixed}`, "info");
+      this.host.editRefused(info, ref);
       return;
     }
     // Measured below: in the document (a large table keeps only the rows in view there)

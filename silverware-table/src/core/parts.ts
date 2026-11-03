@@ -17,6 +17,7 @@ import type { TableKey } from "./tables.ts";
 export const TABLE_HOOKS = {
   hovered: 0,
   cellMenu: 0,
+  editRefused: 0,
   beforeCellPress: 0,
   afterCellPress: 0,
   enhanced: 0,

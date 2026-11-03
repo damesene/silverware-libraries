@@ -192,6 +192,16 @@ describe("Pivot tables", () => {
       expect(text).toContain("| East | 0.7059 |");
     });
 
+    it("keeps the rows sorted by a value as that value is changed", async () => {
+      await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |").replace("pivot.values='SUM([revenue])'", "pivot.values='SUM([revenue])' pivot.sort='SUM([revenue]) desc'")}\n`, { "silverware.table.metadata": true });
+      pivotSettings();
+      pick("Value 1 shown", "total");
+      dialog().querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
+      await flush();
+      await controller.scan();
+      expect(text).toContain("pivot.values='SHARE(SUM([revenue]))' pivot.sort='SHARE(SUM([revenue])) desc'");
+    });
+
     it("shows a pivot's definition, saved into it with its values calculated anew", async () => {
       await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
       pivotSettings();
@@ -454,6 +464,33 @@ describe("Pivot tables", () => {
         anotherPage();
         await typePage("Orders");
         expect(dialog().querySelector(".swt-pivot-hint:not(.swt-pivot-label *)")?.textContent).toBe("Other pages are read by the pageLinks module, which is off");
+      });
+
+      it("picks a page's first table again as that page is typed again", async () => {
+        await shown(`${LOCAL}`, { Orders: ORDERS, Notes: ORDERS.replace("core.name='orders'", "core.name='notes'") });
+        tableMenuItem(/^Insert pivot table…$/)!.click();
+        anotherPage();
+        await typePage("Orders");
+        await typePage("Notes");
+        await typePage("Orders");
+        expect(dialog().querySelector<HTMLSelectElement>('select[aria-label="Source table"]')!.value).toBe("orders");
+        expect(dialog().querySelector<HTMLButtonElement>(".swt-dialog-primary")!.disabled).toBe(false);
+      });
+
+      it("reads the page it is moved to anew as its settings are saved", async () => {
+        const pages: Record<string, string> = { Orders: ORDERS, Sales: ORDERS.replace("core.name='orders'", "core.name='sales'") };
+        await shown(`${OTHER("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, pages);
+        cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+        document.querySelector<HTMLElement>('.swt-bar button[aria-label="Pivot settings…"]')!.click();
+        await flush();
+        await typePage("Sales");
+        // Changed after the dialog read it
+        pages.Sales = pages.Sales!.replace("| East | 100 |", "| East | 900 |");
+        dialog().querySelector<HTMLButtonElement>(".swt-dialog-primary")!.click();
+        await flush();
+        await controller.scan();
+        expect(text).toContain("pivot.source='[[Sales]]sales'");
+        expect(text).toContain("| East | 920 |");
       });
 
       it("goes back to a table of this page", async () => {

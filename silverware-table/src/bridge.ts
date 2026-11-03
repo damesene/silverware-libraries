@@ -23,8 +23,9 @@ export type Bridge = {
   readonly confirm?: (message: string, options?: { destructive?: boolean }) => boolean | Promise<boolean>;
   // Optional: reads another page's markdown, for formulas that refer to its tables ([[Page]]prices!B2)
   readonly readPage?: (name: string) => string | Promise<string>;
-  // Optional: the space's pages by name, offered where a page is picked (a pivot's source on another page)
-  readonly listPages?: () => readonly string[] | Promise<readonly string[]>;
+  // Optional: the space's pages by name, offered where a page is picked (a pivot's source on another page);
+  // from Space Lua a Lua table, which may come as an object with its items under 1, 2, … (read with `listOf`)
+  readonly listPages?: () => unknown;
   // Optional: writes a page's markdown (with readPage), e.g. edits held for a page no longer in the editor
   readonly writePage?: (name: string, text: string) => unknown;
   // Optional, for the settings dialog: writes the space's configuration page
@@ -407,4 +408,12 @@ const REQUIRED: readonly (keyof Bridge)[] = [
 
 export function missingBridgeFunctions(bridge: Partial<Bridge> | undefined): string[] {
   return REQUIRED.filter((name) => typeof bridge?.[name] !== "function");
+}
+
+/** A list as handed over from Space Lua: an array, or a Lua table as an object with its items under 1, 2, … */
+export function listOf(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== "object") return [];
+  const entries = Object.entries(value as Record<string, unknown>);
+  return entries.every(([key], i) => key === String(i + 1)) ? entries.map(([, item]) => item) : [];
 }

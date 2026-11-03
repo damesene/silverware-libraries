@@ -73,7 +73,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
   const readOther = (page: string) => {
     if (!page || read.has(page) || reading.has(page) || !options.readPage) return;
     reading.add(page);
-    void options.readPage(page).then((sources) => {
+    void options.readPage(page).catch((): string => `${page} could not be read`).then((sources) => {
       reading.delete(page);
       read.set(page, sources);
       // A page picked: its first table, until another is picked
@@ -118,6 +118,15 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
     render();
   };
   const replaced = <T>(list: readonly T[], i: number, item: T) => list.map((x, j) => (j === i ? item : x));
+  // A value changed or removed; the rows sorted by it still sorted by it, as it is written now (a function, a column, a share changed)
+  const valueChanged = (i: number, f: ValueField | undefined): Partial<Fields> => {
+    const was = valueText(fields.values[i]!).trim().toLowerCase();
+    const now = f && valueText(f);
+    return {
+      values: f ? replaced(fields.values, i, f) : fields.values.filter((_, j) => j !== i),
+      sort: now ? fields.sort.map((key) => (key.by.trim().toLowerCase() === was ? { ...key, by: now } : key)) : fields.sort,
+    };
+  };
 
   // A group: a column and how it is grouped, or its formula as text
   // (`typed`: its formula as typed, kept without making the form anew, which would leave the field)
@@ -152,7 +161,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
       const text = e("input", { attrs: { type: "text", "aria-label": "Value formula", "data-focus": `value ${i} formula` } });
       text.value = field.formula;
       text.addEventListener("input", () => {
-        fields = { ...fields, values: replaced(fields.values, i, { ...fields.values[i]!, formula: text.value }) };
+        fields = { ...fields, ...valueChanged(i, { ...fields.values[i]!, formula: text.value }) };
         previewSoon();
       });
       return e("div", "swt-pivot-row", text, showSelect(field, (f) => change({ ...f, formula: text.value }), i), remove(() => change(undefined)));
@@ -208,7 +217,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
       sourceSection(),
       section("Rows", "A row for each value of", ...groups("rows", "Row"), add("Group rows", () => set({ rows: [...fields.rows, { column: first, grouping: "" }] }))),
       section("Columns", "A column for each value of (optional)", ...groups("columns", "Column"), fields.columns.length ? null : add("Group columns", () => set({ columns: [{ column: first, grouping: "" }] }))),
-      section("Values", "What each shows", ...fields.values.map((v, i) => valueRow(v, (f) => set({ values: f ? replaced(fields.values, i, f) : fields.values.filter((_, j) => j !== i) }), i)), add("Value", () => set({ values: [...fields.values, { fn: "SUM", column: columns.find((c) => c !== first) ?? first, show: "" }] }))),
+      section("Values", "What each shows", ...fields.values.map((v, i) => valueRow(v, (f) => set(valueChanged(i, f)), i)), add("Value", () => set({ values: [...fields.values, { fn: "SUM", column: columns.find((c) => c !== first) ?? first, show: "" }] }))),
       section(
         "Only rows where",
         fields.where ? "A formula of one row" : "Its conditions",
@@ -266,7 +275,11 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
     const page = otherPage;
     if (!pagesRead && options.pages) {
       pagesRead = true;
-      void options.pages().then((pages) => pageList.replaceChildren(...pages.map((p) => e("option", { attrs: { value: p } }))));
+      void options.pages().then(
+        (pages) => pageList.replaceChildren(...pages.map((p) => e("option", { attrs: { value: p } }))),
+        // (No list offered: the page is typed as it is)
+        () => undefined,
+      );
     }
     const pageField = e("input", { attrs: { type: "text", list: "swt-pivot-pages", placeholder: "Page", "aria-label": "Source page", "data-focus": "source page" } });
     pageField.value = page;
@@ -275,7 +288,9 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
       if (typed === otherPage) return;
       otherPage = typed;
       readOther(typed);
-      set({ source: "" });
+      // A page read before: its first table at once, as one read now gets it once read
+      const known = read.get(typed);
+      set({ source: typeof known === "object" && known[0] ? sourceText({ page: typed, name: known[0].name }) : "" });
     });
     const sources = read.get(page);
     const table = !page

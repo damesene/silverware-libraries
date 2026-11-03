@@ -13,6 +13,7 @@
 // module's cells; without it, nothing is.
 import type { Feature, ModelHost, TableInfo, TableTarget, ToolbarButton, WriteEdit } from "../core/feature.ts";
 import { followOwnFormula, type FormulaCells, type FormulasOffer, type PageLinksOffer } from "../formulas/index.ts";
+import { listOf } from "../bridge.ts";
 import { columnName } from "../columns.ts";
 import { ICONS } from "../icons.ts";
 import { escapeCell, type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
@@ -28,6 +29,8 @@ type Renames = Readonly<Record<string, string>>;
 export class Pivot implements Feature {
   // Whether a pivot shown is out of date (or why it cannot be calculated), as last read
   private readonly stale = new WeakMap<TableInfo, string | boolean>();
+  // Another page's tables (as pageLinks read them) a pivot of one of them was last checked from
+  private readonly checkedFrom = new WeakMap<TableInfo, readonly PageTable[] | null>();
 
   constructor(private readonly host: ModelHost) {}
 
@@ -248,7 +251,11 @@ export class Pivot implements Feature {
     let checked = false;
     for (const info of this.host.shownTables()) {
       const definition = this.definitionOf(parseTable(info.source));
-      if (!definition || "problem" in definition || this.pageOf(definition) === undefined) continue;
+      const page = definition && !("problem" in definition) ? this.pageOf(definition) : undefined;
+      if (page === undefined) continue;
+      // (Not where its page is as it was checked from: another page read, or definitions changed)
+      const tables = this.host.otherPages()?.tables(page);
+      if (tables !== undefined && this.checkedFrom.get(info) === tables) continue;
       this.check(info);
       checked = true;
     }
@@ -268,6 +275,12 @@ export class Pivot implements Feature {
     const tables = pageTablesOf(this.host.pageText);
     const own = tables.find((t) => t.table.rows[0]?.cells.join("|") === table.rows[0]?.cells.join("|") && this.host.getMeta(t.table, "source") === definition.source);
     const found = this.find(definition, tables, own?.range.from ?? -1);
+    const page = this.pageOf(definition);
+    if (page !== undefined) {
+      const from = this.host.otherPages()?.tables(page);
+      if (from === undefined) this.checkedFrom.delete(info);
+      else this.checkedFrom.set(info, from);
+    }
     if ("unread" in found && read && !this.unreadable() && this.cells()) {
       // Up to date as far as is known meanwhile: not highlighted for a moment
       this.stale.set(info, false);
@@ -341,6 +354,7 @@ export class Pivot implements Feature {
 
   /** The dialog: a pivot's fields picked, its preview calculated from the source as the page has it */
   private dialog(sources: ReturnType<Pivot["sources"]>, fields: Fields, submitLabel: string, submit: (definition: PivotDefinition) => void, blocked?: string): void {
+    const { listPages } = this.host.bridge;
     openPivotDialog(this.host, {
       sources,
       fields,
@@ -349,7 +363,7 @@ export class Pivot implements Feature {
       ...(blocked ? { blocked } : {}),
       preview: (definition) => this.calculate(definition, this.sourceFor(definition, sources)),
       readPage: (page) => this.pageSources(page),
-      ...(this.host.bridge.listPages ? { pages: async () => (await this.host.bridge.listPages!()).filter((page) => page !== this.host.currentPage) } : {}),
+      ...(listPages ? { pages: async () => listOf(await listPages()).filter((page): page is string => typeof page === "string" && page !== this.host.currentPage) } : {}),
     });
   }
 
@@ -398,7 +412,10 @@ export class Pivot implements Feature {
     // One with a problem (no values, wrong totals): as far as it reads, for the dialog to fix
     const definition = "problem" in read ? looseDefinition((key) => this.host.getMeta(table, key)) : read;
     this.dialog(this.sources(), fieldsOf(definition), "Save", (changed) => {
-      void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.withDefinition(t, changed));
+      // A source moved to another page: that page read anew before the write (prepareWrite reads the pivot's source as it was)
+      const page = this.pageOf(changed);
+      const read = page === undefined ? undefined : this.host.offered<PageLinksOffer>("pageLinks")?.readPages([page], true);
+      void Promise.resolve(read).then(() => this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.withDefinition(t, changed)));
     });
   }
 

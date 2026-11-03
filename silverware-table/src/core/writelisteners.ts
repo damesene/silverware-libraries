@@ -9,6 +9,7 @@
 // The context is functions, not data: what a listener may ask (a table's name
 // now, a column's name now) is the contract, how the write keeps it is not,
 // so it can change without breaking a listener.
+import { listOf } from "../bridge.ts";
 import { columnKey, columnName } from "../columns.ts";
 import { findTables, type Table } from "../markdown.ts";
 import { metaName } from "../meta.ts";
@@ -94,14 +95,6 @@ export function addWriteListener(listener: WriteListener): void {
 /** Space Lua loads (again): the listeners given anew, those of before kept until the first of them */
 export function writeListenersAnew(): void {
   fresh = true;
-}
-
-/** A list as handed over from Space Lua: an array, or a Lua table as an object with its items under 1, 2, … */
-function listOf(value: unknown): unknown[] {
-  if (Array.isArray(value)) return value;
-  if (!value || typeof value !== "object") return [];
-  const entries = Object.entries(value as Record<string, unknown>);
-  return entries.every(([key], i) => key === String(i + 1)) ? entries.map(([, item]) => item) : [];
 }
 
 function editOf(value: unknown): TextEdit | undefined {

@@ -9,10 +9,10 @@
 // what a pivot's column is). Formulas are calculated by the formulas
 // module's cells; without it, nothing is.
 import type { Feature, ModelHost, TableInfo, ToolbarButton, WriteEdit } from "../core/feature.ts";
-import type { FormulaCells, FormulasOffer } from "../formulas/index.ts";
+import { followOwnFormula, type FormulaCells, type FormulasOffer } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import { escapeCell, type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
-import { type Key, type PivotDefinition, readDefinition } from "../pivot/definition.ts";
+import { definitionAttributes, groupFormula, KEYS, type Key, type PivotDefinition, readDefinition } from "../pivot/definition.ts";
 import { type Pivot as Calculated, pivotOf } from "../pivot/pivot.ts";
 
 /** The headers the user named, by what each column stands for (PivotColumn.id) */
@@ -102,14 +102,63 @@ export class Pivot implements Feature {
       if (!definition || "problem" in definition) continue;
       const source = definition.source.trim().toLowerCase();
       if (source !== oldName && source !== newName?.toLowerCase()) continue;
-      // Renamed: the pivot names its source by the new name
-      const named = newName && source === oldName && oldName !== newName.toLowerCase() ? this.host.setMeta(table, "source", newName) : table;
-      const pivot = this.calculate({ ...definition, source: newName ?? definition.source }, after);
+      // Its definition following the edit: the source's new name, its columns renamed or moved
+      const { definition: followed, moved } = this.followed({ ...definition, source: newName ?? definition.source }, before, after, edit);
+      const named = this.withDefinition(table, followed);
+      const pivot = this.calculate(followed, after);
       if (typeof pivot === "string") continue;
-      const written = this.written(named, pivot, this.renamesOf(table));
+      // The headers the user named, by what their columns stand for now
+      const renames = Object.fromEntries(Object.entries(this.renamesOf(table)).map(([id, name]) => [movedId(id, moved), name]));
+      const written = this.written(named, pivot, renames);
       if (JSON.stringify(written.rows.map((r) => r.cells)) !== JSON.stringify(table.rows.map((r) => r.cells)) || written.meta !== table.meta) out.push({ range, table: written });
     }
     return out;
+  }
+
+  /**
+   * A definition after an edit of its source: its formulas' references to the
+   * source's columns following it (renamed, moved: followOwnFormula, as a
+   * table's own formulas follow its edits), a column named alone (`region`)
+   * still named alone, the sort's keys the items they were
+   */
+  private followed(definition: PivotDefinition, before: Table, after: Table, edit: WriteEdit): { definition: PivotDefinition; moved: ReadonlyMap<string, string> } {
+    const cells = this.cells();
+    if (!cells || (!edit.columnMap && before.rows[0]?.cells.join("|") === after.rows[0]?.cells.join("|"))) return { definition, moved: new Map() };
+    const following = { cells, ...(edit.rowMap ? { rowMap: edit.rowMap } : {}), ...(edit.columnMap ? { columnMap: edit.columnMap } : {}) };
+    const formula = (text: string) => followOwnFormula(`=${text}`, before, after, following).slice(1);
+    const group = (item: string) => {
+      const made = groupFormula(item);
+      const now = formula(made);
+      const alone = made !== item && /^\[@([^\]]+)\]$/.exec(now)?.[1];
+      return alone && /^[\p{L}\p{N} _]+$/u.test(alone) ? alone : now;
+    };
+    const moved = new Map<string, string>();
+    const each = (items: readonly string[], f: (item: string) => string) =>
+      items.map((item) => {
+        const now = f(item);
+        moved.set(item, now);
+        return now;
+      });
+    const rows = each(definition.rows, group);
+    const columns = each(definition.columns, group);
+    const values = each(definition.values, formula);
+    return {
+      definition: {
+        ...definition,
+        rows,
+        columns,
+        values,
+        ...(definition.where ? { where: formula(definition.where) } : {}),
+        sort: definition.sort.map((key) => ({ ...key, by: moved.get(key.by) ?? key.by })),
+      },
+      moved,
+    };
+  }
+
+  /** The table with a definition's attributes (those it leaves out taken off) */
+  private withDefinition(table: Table, definition: PivotDefinition): Table {
+    const written = new Map(definitionAttributes(definition));
+    return KEYS.reduce((t, key) => (this.host.getMeta(t, key) === written.get(key) ? t : this.host.setMeta(t, key, written.get(key))), table);
   }
 
   /** A pivot shown: whether it is as its source makes it now (its source edited by hand, on this page: not) */
@@ -155,4 +204,10 @@ export class Pivot implements Feature {
       },
     ];
   }
+}
+
+/** A column's id (PivotColumn.id: row:<group>, value:<value>, column:<key>|<value>, total|<value>) with its items as they are written now */
+function movedId(id: string, moved: ReadonlyMap<string, string>): string {
+  const m = /^(row:|value:|total\||column:[^|]*\|)(.*)$/.exec(id);
+  return m ? m[1]! + (moved.get(m[2]!) ?? m[2]!) : id;
 }

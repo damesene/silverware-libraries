@@ -85,6 +85,28 @@ describe("Pivot tables", () => {
     expect(text).toContain("sheet.at='A7'");
   });
 
+  it("follows its source's columns renamed, its definition written with them in the same edit", async () => {
+    await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |").replace("pivot.values='SUM([revenue])'", "pivot.values='SUM([revenue])' pivot.sort='SUM([revenue]) desc'")}\n`, { "silverware.table.editor.enterKey": "save", "silverware.table.metadata": true });
+    clickOn(cell(0, 0));
+    await type("Area");
+    clickOn(cell(0, 1));
+    await type("Sales");
+    // (Written by the columns' keys, as formulas write them)
+    expect(text).toContain("pivot.rows='area' pivot.values='SUM([sales])' pivot.sort='SUM([sales]) desc'");
+    // Calculated as before, its headers named by the source's columns now
+    expect(text).toContain("| Area | Sum of Sales |\n|---|--:|\n| East | 120 |\n| West | 50 |\n| Total | 170 |");
+  });
+
+  it("keeps a header the user named as its source's column is renamed", async () => {
+    await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.editor.enterKey": "save", "silverware.table.metadata": true });
+    clickOn(second(0, 1));
+    await type("Money");
+    clickOn(cell(0, 1));
+    await type("Sales");
+    expect(text).toContain("| Region | Money |");
+    expect(text).toContain(`pivot.headers='{"value:SUM([sales])":"Money"}'`);
+  });
+
   it("follows its source's new name", async () => {
     await setup(`${ORDERS}\n\n${PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |")}\n`, { "silverware.table.metadata": true });
     const info = controller.shownTables()[0]!;

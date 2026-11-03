@@ -143,6 +143,29 @@ export default (): ConditionDefinition => ({
 - `levels(styles, split)`: a `look` grading the cells into as many levels as styles, by `split`: `"equal"` (equal ranges between min and max), `"quantiles"` (equal counts), fixed thresholds (`[1.5, 2.5]`), `{ percent: [33, 67] }`, or a function of the scope giving thresholds; it reads the level from `scope`, so it is no form of its own;
 - `icons` (phase 3), `matches(pattern)` (the filter row's reading of `/…/flags`).
 
+### Formats put together in the dialog (decided 2026-11-03)
+
+A user makes basic formats of their own without code: they are built-in formats with richer `params`, filled in by the dialog, written through the same API as every other. No JS is made; a rule keeps the format's name and its params.
+
+- **By pattern** (`byPattern`): rows of a pattern and a style, the first row whose pattern matches giving the cell's look. A pattern is in the filter row's syntax (`/regex/flags`, `=a|b`, `>10`, `!…`), so it is learned once; one that does not read (a bad regular expression) is said at its field as it is typed.
+- **Levels** (`levels`): the number of levels (2 to 10), the colors (each picked, or from and to with the ones between made by `gradient`; reversed by one button), the split (equal ranges, quantiles, own thresholds as values or percent).
+- **Color scale** and **data bar**: their colors picked.
+- **Own style** (`custom`): one style.
+
+Every style is edited by one small editor: swatches of the palette (theme-aware) and an own color, toggles for bold, italic, underline and strike, a live preview of a cell.
+
+New kinds of `params`, which the dialog builds its fields from, and which a user's JS format gets too (a custom format with a `list` parameter gets the same editor for free):
+- `color`, `boolean`;
+- `style`: the style editor;
+- `pattern`: text in the filter row's syntax, checked as typed;
+- `list`: rows of fields of their own (`{ kind: "list", of: { pattern: { kind: "pattern" }, style: { kind: "style" } } }`), added, removed and ordered.
+
+**Saved formats** (*Save as format…* in the dialog): a format put together so is kept for the whole space, offered in the menus of every table: a name, the built-in format it is made of and its params. Kept in the CONFIG page in Silverware Table's own block (as the toolbar's favourites: the Configuration Manager reads no table back, shared/configpage.ts), written as the settings dialog writes.
+
+A rule using a saved format **copies its params** (proposed, to confirm with the user): the table keeps working in another space and without that CONFIG, and a saved format changed later does not change tables made before (as Excel's styles are copied). The other way, a rule keeping the saved format's name, would carry changes to every table, but a table without that CONFIG would lose its format.
+
+Regular expressions are the user's own and run on every view: one that takes long (catastrophic backtracking) is not guarded against beyond what the filter row does; noted, not solved.
+
 ### How a rule is evaluated
 
 For each rule, in the order of the dialog, on every view (from the cache while the table's text is the same):
@@ -189,8 +212,8 @@ One rule for every format, `td.swt-cf`, under the theme engine's specificity (`:
 ## Phases
 
 1. **Core and the simplest rules** (about 3 to 4 days): `CellLook.vars` with tests; the column types' offer; the domain with column and table scopes, the cell conditions (compare, between, equal, contains, matches, filter, empty), `api.ts` with `HELPERS`, the lazy `scope`, `Style` and its one CSS rule, the formats of one style (Excel's highlights) as definitions of `HELPERS`, the tests holding the built-in ones to the API; the module's looks and storage; quick rules in the column menu; CSS; library page; a ui-test (a rule added from the menu, a cell edited into and out of it, a sort keeping colors with values).
-2. **The dialog and the rest of the conditions** (about 4 to 5 days): Manage rules; conditions over the scope (duplicates, top / bottom, averages, dates); formula conditions; own colors (the `color` parameter kind); `levels`, `mix` and `gradient`, color scales and the heat map; custom conditions and formats (`defineConditions`, `defineFormats`); the cell menu.
-3. **Bars, icons and export** (about 3 days): data bars, icon sets (`CellLook.icon`, `Style.icon`), Excel's conditional formatting (what maps to Excel's: highlights, 2 and 3 color scales, data bars; a format with `look` written as values only, listed).
+2. **The dialog and the rest of the conditions** (about 4 to 5 days): Manage rules; conditions over the scope (duplicates, top / bottom, averages, dates); formula conditions; own colors (the `color` parameter kind); `levels`, `mix` and `gradient`, color scales and the heat map; custom conditions and formats (`defineConditions`, `defineFormats`); the formats put together in the dialog (`byPattern`, `levels`, the style editor, the `color`, `boolean`, `style`, `pattern` and `list` params); the cell menu.
+3. **Bars, icons, saved formats and export** (about 4 days): saved formats for the space (*Save as format…*, CONFIG); data bars, icon sets (`CellLook.icon`, `Style.icon`), Excel's conditional formatting (what maps to Excel's: highlights, 2 and 3 color scales, data bars; a format with `look` written as values only, listed).
 4. **Named rows as a scope** (later, about 1 to 2 days): the scope `row` in the dialog and the quick rules of a row's grip menu. Nothing before it may need changing for it: the rule's `scope` has `row` from phase 1 (read, kept, inactive until this phase), table and row rules share the table attribute, and the evaluation takes a scope as a set of cells, not as a column.
 
 Estimates are rough, from the parts above, not from a prototype.
@@ -211,6 +234,7 @@ Estimates are rough, from the parts above, not from a prototype.
 4. **No `!important`** in the module's CSS; a theme that uses it wins (see *Risks*).
 5. **Formats are JS, not CSS**: defined as column types are, with helpers for palettes, gradients and distributions; any number of levels; regular expressions as a condition and inside a format's `look` (see *The API*).
 6. **One API for built-in and custom definitions**: a definition is a function of `HELPERS`, the built-in ones importing only types; a format is `style` or `look(cell, ctx)`, levels a helper giving a `look`; a condition `test(cell, ctx)`; `ctx.scope` the lazy statistics (see *The API*).
+7. **Formats put together in the dialog**: by pattern, levels, color scale, data bar and an own style, as built-in formats with params the dialog fills in; saved for the space in CONFIG, a rule copying their params (the copy proposed, to confirm).
 
 ## Open questions
 

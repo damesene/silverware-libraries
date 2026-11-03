@@ -13,6 +13,8 @@ type Applied = {
   readonly marks: readonly string[];
   readonly title: string | null;
   readonly value: boolean;
+  // CSS custom properties set, each with the value the cell had before (null: none)
+  readonly vars?: ReadonlyMap<string, string | null>;
   // The cell's content as rendered, taken out for the display shown instead (in `box`)
   readonly content?: { readonly box: Element; readonly nodes: readonly Node[]; readonly shown: Node };
   // A header's icons and hashtags hidden
@@ -40,6 +42,10 @@ function takeBack(cell: HTMLTableCellElement): void {
   if (was.title === null) cell.removeAttribute("title");
   else cell.title = was.title;
   if (was.value) delete cell.dataset.swtValue;
+  for (const [name, before] of was.vars ?? []) {
+    if (before === null) cell.style.removeProperty(name);
+    else cell.style.setProperty(name, before);
+  }
   if (was.content) {
     // Where the display is now (the core may have moved it into the cell's content box), else where it was put
     const { box, nodes, shown } = was.content;
@@ -90,6 +96,11 @@ export function applyCellLook(cell: HTMLTableCellElement, look: MergedCell | und
   for (const mark of marks) cell.classList.add(mark);
   if (look.titles.length) cell.title = [title, ...look.titles].filter(Boolean).join("\n");
   if (look.value !== undefined) cell.dataset.swtValue = look.value;
+  let vars: Map<string, string | null> | undefined;
+  for (const [name, value] of Object.entries(look.vars ?? {})) {
+    (vars ??= new Map()).set(name, cell.style.getPropertyValue(name) || null);
+    cell.style.setProperty(name, value);
+  }
   let content: Applied["content"];
   // The cell being edited shows its field: what it shows comes back as the editor closes (the table rendered anew)
   if (look.display !== undefined && !editing) {
@@ -100,7 +111,7 @@ export function applyCellLook(cell: HTMLTableCellElement, look: MergedCell | und
     for (const node of nodes) node.parentNode?.removeChild(node);
     content = { box, nodes, shown };
   }
-  applied.set(cell, { marks, title, value: look.value !== undefined, ...(content ? { content } : {}) });
+  applied.set(cell, { marks, title, value: look.value !== undefined, ...(vars ? { vars } : {}), ...(content ? { content } : {}) });
 }
 
 /** Applies a header's look: its icons before the sorting control (else last), marks, title, hashtags hidden */

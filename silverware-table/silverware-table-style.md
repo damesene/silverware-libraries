@@ -1758,14 +1758,20 @@ body.swt-resizing * {
   overflow: hidden;
 }
 .swt-choices-way {
-  flex: 1;
+  /* Each as wide as its label, the room left shared: no label wraps, a narrow screen cuts it with … */
+  flex: 1 1 auto;
+  min-width: 0;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 8px;
-  text-align: center;
+  padding: 6px 10px;
+  white-space: nowrap;
   cursor: pointer;
+}
+.swt-choices-way > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .swt-choices-way + .swt-choices-way {
   border-left: 1px solid var(--swt-dialog-line);

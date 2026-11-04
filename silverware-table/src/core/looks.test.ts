@@ -23,4 +23,27 @@ describe("Looks' vars", () => {
     expect(td.style.getPropertyValue("--swt-kept")).toBe("before");
     expect(td.classList.contains("swt-x")).toBe(false);
   });
+
+  it("leaves a cell's look as it is when the same look comes again, changes it when it differs or what it shows is gone", () => {
+    const td = document.createElement("td");
+    td.textContent = "12.99";
+    const look = { display: "€12.99", marks: ["cf"], titles: [], vars: { "--swt-cf-fill": "red" } };
+    applyCellLook(td, look, false);
+    const shown = td.firstChild;
+    expect(td.textContent).toBe("€12.99");
+    // The same look (another object): nothing made anew
+    applyCellLook(td, { ...look, marks: ["cf"], vars: { "--swt-cf-fill": "red" } }, false);
+    expect(td.firstChild).toBe(shown);
+    // Another look: applied
+    applyCellLook(td, { ...look, vars: { "--swt-cf-fill": "green" } }, false);
+    expect(td.style.getPropertyValue("--swt-cf-fill")).toBe("green");
+    expect(td.firstChild).not.toBe(shown);
+    // What it shows taken out by someone else: the same look shows it again
+    td.firstChild!.remove();
+    applyCellLook(td, { ...look, vars: { "--swt-cf-fill": "green" } }, false);
+    expect(td.textContent).toBe("€12.99");
+    // None: taken back, its text as rendered
+    applyCellLook(td, undefined, false);
+    expect([td.textContent, td.classList.contains("swt-cf")]).toEqual(["12.99", false]);
+  });
 });

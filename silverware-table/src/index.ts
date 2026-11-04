@@ -11,12 +11,12 @@ import { choiceText, type FormulasOffer, functionNamed, scalarText } from "./for
 import { defineFormulaPlaces as defineFormulaPlacesIn, type FormulaPlaces } from "./formulas/places.ts";
 import { isRange, single } from "./formulas/values.ts";
 import { customFunctionsAnew, defineCustomFunctions } from "./formulas/registry.ts";
-import { columnKey, columnName } from "./columns.ts";
 import { addWriteListener, type WriteListener, writeListenersAnew } from "./core/writelisteners.ts";
-import { pageTablesOf, unescapeCell } from "./markdown.ts";
+import { pageTablesOf } from "./markdown.ts";
 import { metaName } from "./meta.ts";
 import { columnNameIn } from "./names.ts";
-import { withoutTags } from "./tags.ts";
+import { type TableData, tableData } from "./tabledata.ts";
+import { customMenuEntries, customMenuEntriesAnew, defineCustomMenuEntries } from "./menus/custom.ts";
 
 export const version = "0.1.0";
 
@@ -138,15 +138,7 @@ export function onWrite(listener: unknown): void {
 }
 
 /** One table of a text as `tables` gives it */
-export type TableOfText = {
-  readonly name?: string;
-  readonly from: number;
-  readonly to: number;
-  // Each column's name (its fixed one, else its header's) and the key SilverBullet's index gives it
-  readonly columns: readonly { readonly name: string; readonly key: string }[];
-  // The body's cells as they show (hidden tags left out), row by row; no metadata row
-  readonly rows: readonly (readonly string[])[];
-};
+export type TableOfText = TableData;
 
 /**
  * `silverware.table.tables`: the tables of a markdown text (a page's, as the
@@ -154,20 +146,7 @@ export type TableOfText = {
  * cells: what another plugin reads tables by, without reading their metadata
  */
 export function tables(text: string): TableOfText[] {
-  return pageTablesOf(String(text)).map(({ range, table }) => {
-    const name = metaName(table);
-    const header = table.rows[0]?.cells ?? [];
-    return {
-      ...(name ? { name } : {}),
-      from: range.from,
-      to: range.to,
-      columns: header.map((cell, i) => {
-        const shown = columnName(cell);
-        return { name: columnNameIn(table, i) ?? shown, key: columnKey(shown) };
-      }),
-      rows: table.rows.slice(1).map((row) => row.cells.map((cell) => unescapeCell(withoutTags(cell)).trim())),
-    };
-  });
+  return pageTablesOf(String(text)).map(({ range, table }) => tableData(table, range, metaName(table), (column) => columnNameIn(table, column)));
 }
 
 /** As `evaluated`, its value only */
@@ -240,8 +219,21 @@ export function defineFormats(definitions: unknown): string | undefined {
   return notDefined("custom formats", problems);
 }
 
+/**
+ * `silverware.table.defineMenuEntries`: entries of a user's or another plugin's in a row's or a column's
+ * menu, each definition a name and its lineMenu(context, menu) (menus/custom.ts); the calls of one load of
+ * Space Lua add up, a name given again replacing its definition. They show as a menu opens; what is wrong
+ * with any of them, for a notification
+ */
+export function defineMenuEntries(definitions: unknown): string | undefined {
+  const { list, problems } = customMenuEntries(definitions);
+  defineCustomMenuEntries(list);
+  return notDefined("menu entries", problems);
+}
+
 /** Space Lua is loaded (again): the custom definitions are made anew, replacing those of before */
 export function resetDefinitions(): void {
+  customMenuEntriesAnew();
   customFunctionsAnew();
   customTypesAnew();
   customSeriesAnew();

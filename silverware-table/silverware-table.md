@@ -555,9 +555,10 @@ VAT: ${te("=fruit!vat")}
 
 ### For other plugins
 
-Two functions let another plugin (or a script of yours) work with tables without reading their markdown itself. [[Library/damesene/silverware-chart|Silverware Chart]] uses them for charts of named tables.
+These functions let another plugin (or a script of yours) work with tables without reading their markdown itself. [[Library/damesene/silverware-chart|Silverware Chart]] uses them for charts of named tables.
 
 * `silverware.table.tables(text)` gives the tables of a markdown text (usually `editor.getText()`): each with its `name` (where you named it), its place `from` and `to` in the text, its `columns` (each `{ name, key }`, the key as SilverBullet's index has it) and its body's cells as they show, row by row, in `rows`.
+* `silverware.table.defineMenuEntries(definitions)` adds entries to a row's or a column's menu, in a section of the plugin's own or beside Silverware Table's of a kind: see [[#Custom menu entries]].
 * `silverware.table.onWrite(fn)` calls `fn(text, context)` whenever Silverware Table writes tables, `text` the page's text as the write leaves it. `fn` gives a list of edits of that text outside the tables, `{ from = 10, to = 14, text = "new" }`, which are written in the same edit: one Ctrl+Z undoes them with the table. An edit that touches a table, reaches past the text or overlaps another is left out. Keep `fn` quick and let it write nothing itself; give it again in each load of Space Lua (a `space-lua` block does).
 * `context` tells what the write did, so a reference to a table or a column can follow it:
   * `context.renamed()`: whether a table or a column was renamed (check it first: most writes rename nothing);
@@ -735,6 +736,48 @@ Hover a cell to show two grips: ⠿ left of its row, and ⠿ above its column; m
 * **Numbered column**: *Insert numbered column left* in a column's menu adds a column `#` with `=ROW()` in every row: it numbers the rows as written (sorting or filtering the view does not renumber them), rows added later get the formula too, and inserting, deleting or moving rows numbers them again. Add as many as you like. It needs the *Store table metadata* setting, as every new formula.
 * Rows can be moved only in the original order (no sorting, no filter), so a row always lands where you see it.
 * **Column width**: drag the right edge of a column's header (a faint dashed line shows there while the header cell is hovered, selected or edited; the pointer shows ↔ on it) to set its width; text wraps (or is cut) within it, see [[#Long text in cells (`silverware.table.modules.longText`)]]. Double-click that edge, or *Auto width* in the column's menu, for the automatic width again (as wide as the text, up to the maximum column width); *Reset column widths* in the ⋯ menu of the table's toolbar does it for every column. With the *Store table metadata* setting the width is stored in the table (`widths.-c-price.size='180'`, see [[#Table metadata]]) and follows the column when it is renamed or moved; without it, it holds until the page is opened again.
+
+### Custom menu entries
+
+Your own entries in a row's or a column's menu (or another plugin's) are written in JavaScript in a file of your space and given in a `space-lua` block of any page:
+
+```js
+// Library/me/menus.js
+export default [
+  {
+    name: "lists",
+    // Called as a row's or a column's menu opens: what to show in it
+    lineMenu(context, menu) {
+      if (context.axis !== "column") return [];
+      const column = context.table.columns[context.at];
+      const values = context.table.rows.map((row) => row[context.at]);
+      return [
+        // A section of its own, under Copy, Cut, Paste and Clear
+        menu.slot.custom({ name: "Lists", position: "top" }, [
+          menu.item({ label: `Copy ${column.name} as a list`, run: () => navigator.clipboard.writeText(values.map((v) => `- ${v}`).join("\n")) }),
+          menu.submenu({ label: "Count values" }, () =>
+            [...new Set(values)].map((value) => menu.item({ label: `${value}: ${values.filter((v) => v === value).length}`, run: () => {} })),
+          ),
+        ]),
+        // Or in a place of the menu's own: here with Filter and Auto width
+        menu.slot.view([menu.item({ label: "Log the values", run: () => console.log(values) })]),
+      ];
+    },
+  },
+];
+```
+
+```lua
+silverware.table.defineMenuEntries(js.importFromSpace("Library/me/menus.js"))
+```
+
+* `lineMenu(context, menu)` returns a list of groups of entries, each made by `menu.slot`, which says where they go by what they do:
+  * `clipboard`, `edit` (what changes the cells, as Clear), `insert` (as *Insert numbered column left*), `columnType` (as Type), `view` (as Filter), `look` (as Conditional formatting), `remove` (as Remove metadata): beside Silverware Table's own of that kind;
+  * `custom({ name, position, priority }, [...])`: a section of its own. Entries of one `name` (yours, or several plugins' giving that name) are one section, ordered by `priority` (a number, lower higher, decimals too; equal ones as they came); sections in the order their names first came. `position` is `"top"` (under Copy, Cut, Paste and Clear) or `"bottom"` (before Remove metadata and Delete, the default).
+* The entries: `menu.item({ label, icon, run, hint, disabled, danger, checked, value })`, `menu.submenu({ label, icon, value }, () => [...])` (its entries shown in the menu's place as it is chosen, made then), `menu.segmented({ label, options: [{ icon, title, run, active }] })` (a row of icon buttons, as Sort), `menu.separator()`. `icon` is an SVG's text, or left out. A `run` closes the menu; it may be `async`.
+* `context`: `axis` (`"row"` or `"column"`), `at` (the row's place in the markdown, the header 0, so its cells are `context.table.rows[at - 1]`; or the column's, the first 0), `lines` (the rows or columns its actions are for: those selected whole that hold it, else it alone), `page`, and `table`: the table as `silverware.table.tables` gives it (`name`, `columns` each `{ name, key }`, `rows` the body's cells as they show).
+* Calls add up: a plugin's and yours each add their own, a `name` given again replaces its entries. A mistake in a definition, or a `lineMenu` or a `run` that fails, is shown in a notification; the menu shows the rest.
+* Entries are shown on every table, a pivot's too: an entry that would change a pivot's cells is refused by the table as any edit there is.
 
 ## Pinning
 

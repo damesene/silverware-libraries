@@ -81,8 +81,13 @@ test("a press on the text right above a table, in the band of its +, is the text
   await setPage(page, "# Test\n\nText right above the table.\n| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 2 |\n");
   await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(2);
   const line = page.locator(".cm-line", { hasText: "Text right above the table." });
-  // The press reaches the line (nothing took it on its way)
-  await line.evaluate((l) => l.addEventListener("mousedown", () => l.setAttribute("data-test-pressed", ""), { once: true }));
+  // The press goes its way to the window, as one on text does: a press Silverware Table takes goes no further.
+  // (Seen at the window: the editor may draw the line anew as it puts its cursor there)
+  await page.evaluate(() => {
+    window.addEventListener("mousedown", (e) => {
+      if (e.target instanceof Element && e.target.closest(".cm-line")?.textContent?.includes("Text right above the table.")) document.body.setAttribute("data-test-pressed", "text");
+    });
+  });
   // Coming from the table: hovered, the band above its header is the +'s
   await hoverCell(page, cell(page, 1, 1));
   const head = (await header(page, 1).boundingBox())!;
@@ -91,5 +96,5 @@ test("a press on the text right above a table, in the band of its +, is the text
   await page.mouse.move(head.x + head.width / 2, Math.max(text.y + 2, head.y - 18), { steps: 4 });
   await page.mouse.down();
   await page.mouse.up();
-  await expect(line).toHaveAttribute("data-test-pressed", "");
+  await expect(page.locator("body")).toHaveAttribute("data-test-pressed", "text");
 });

@@ -34,6 +34,11 @@ export const SCROLLER_SELECTOR = ".cm-scroller";
 // table of four rows, not under one of twenty)
 const LINE_SELECTOR = ".cm-line";
 
+/** Whether the target is in a line of the page's text (a press there is the text's: CodeMirror puts the cursor in it) */
+export function inTextLine(target: EventTarget | null): boolean {
+  return target instanceof Element && !!target.closest(LINE_SELECTOR) && !target.closest(WIDGET_SELECTOR);
+}
+
 /** The widget of the table right above an empty line the target is in, its hidden lines between */
 export function widgetOfLineBelow(target: Element): HTMLElement | undefined {
   const line = target.closest(LINE_SELECTOR);

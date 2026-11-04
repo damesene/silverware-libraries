@@ -1,4 +1,4 @@
-import { bodyRows, cell, expect, header, hoverCell, markdown, markTable, rendersAnew, settled, test } from "./helpers.ts";
+import { bodyRows, cell, expect, header, hoverCell, markdown, markTable, rendersAnew, setPage, settled, table, test } from "./helpers.ts";
 
 test.describe("Inserting rows with a +", () => {
   test("the + left of the table inserts a row at the border nearest the pointer", async ({ page }) => {
@@ -74,4 +74,22 @@ test.describe("Inserting rows with a +", () => {
     await expect(page.locator("table[data-test-old]")).toHaveCount(1);
     expect(await markdown(page)).toBe(before);
   });
+});
+
+test("a press on the text right above a table, in the band of its +, is the text's", async ({ page }) => {
+  // No empty line between: the band above the header reaches over the text
+  await setPage(page, "# Test\n\nText right above the table.\n| Name | Qty |\n|---|---|\n| Pear | 3 |\n| Fig | 2 |\n");
+  await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(2);
+  const line = page.locator(".cm-line", { hasText: "Text right above the table." });
+  // The press reaches the line (nothing took it on its way)
+  await line.evaluate((l) => l.addEventListener("mousedown", () => l.setAttribute("data-test-pressed", ""), { once: true }));
+  // Coming from the table: hovered, the band above its header is the +'s
+  await hoverCell(page, cell(page, 1, 1));
+  const head = (await header(page, 1).boundingBox())!;
+  const text = (await line.boundingBox())!;
+  expect(text.y + text.height).toBeGreaterThan(head.y - 20);
+  await page.mouse.move(head.x + head.width / 2, Math.max(text.y + 2, head.y - 18), { steps: 4 });
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(line).toHaveAttribute("data-test-pressed", "");
 });

@@ -7,12 +7,13 @@
 //
 // A press on the + or in the band is taken on mousedown (SilverBullet's table
 // widget would move the cursor into the table on a click and show its
-// markdown), and the mouseup and click ending a press that inserted are
+// markdown), but one on a line of the page's text the band reaches over (text
+// right above the table), and the mouseup and click ending a press that inserted are
 // swallowed: the table rendered anew puts something else under the pointer (a
 // link the click would follow).
 import { parseTable } from "../markdown.ts";
 import { ICONS } from "../icons.ts";
-import { renderedTable, WIDGET_SELECTOR } from "../dom.ts";
+import { inTextLine, renderedTable, WIDGET_SELECTOR } from "../dom.ts";
 import { coveredAt, underWindow } from "./overwindow.ts";
 import { appendColumnAt, appendRowAt } from "../pins.ts";
 import type { RowHold, TableHost, WidgetInfo } from "./feature.ts";
@@ -136,7 +137,8 @@ export class InsertControls {
       return true;
     }
     const onMark = e.target instanceof Node && this.mark.contains(e.target);
-    if (onMark || (this.inBand && !(e.target instanceof Node && this.context.host.isFloating(e.target)))) {
+    // (Not one on a line of the page's text the band reaches over, text right above the table: it is the text's)
+    if (onMark || (this.inBand && !(e.target instanceof Node && this.context.host.isFloating(e.target)) && !inTextLine(e.target))) {
       e.preventDefault();
       e.stopPropagation();
       // Only a press on the + inserts: one beside it, in the band, is taken

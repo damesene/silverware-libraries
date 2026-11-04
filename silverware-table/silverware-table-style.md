@@ -1740,12 +1740,14 @@ body.swt-resizing * {
   flex-direction: column;
   gap: 8px;
 }
-.swt-choices-list {
+.swt-choices-list,
+.swt-choices-from-space {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.swt-choices-list[hidden] {
+.swt-choices-list[hidden],
+.swt-choices-from-space[hidden] {
   display: none;
 }
 /* The two ways: the column's values or a list of its own */
@@ -1788,6 +1790,7 @@ body.swt-resizing * {
   font-weight: 600;
 }
 .swt-choices-name,
+.swt-choices-space,
 .swt-choices-value {
   flex: 1;
   min-width: 0;
@@ -1798,6 +1801,11 @@ body.swt-resizing * {
   background: var(--root-background-color);
   border: 1px solid var(--swt-dialog-line);
   border-radius: 6px;
+}
+.swt-choices-space-values {
+  font-size: 13px;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
 }
 .swt-choices-tag {
   font-weight: normal;

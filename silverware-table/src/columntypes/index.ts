@@ -6,6 +6,7 @@ export { allTypes, columnTypeOf, type TypedColumn, typeNamed, typeOfTag, typeTag
 export { type Choice, type ColumnType, type Params, type Shown, type TypeTable } from "./type.ts";
 export { choiceListOf, isChoice } from "./choicecolumn.ts";
 export { choiceIndex, distinctValues, LIST_NAME_RE, listKey, listNameFor, listNames, readChoiceList, writeChoiceList } from "./choicelists.ts";
+export { spaceList, spaceListNames } from "./spacelists.ts";
 
 /**
  * What the column types module offers other modules (ModelHost.offered("columnTypes")): a cell's value as its

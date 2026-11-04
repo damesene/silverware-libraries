@@ -46,6 +46,8 @@ export type TypeTable = {
   readonly stored: ReadonlyMap<string, string>;
   // The column's body values as written (a formula's result), empty ones left out, in the rows' order
   values(): readonly string[];
+  // A choice list of the whole space by its name (lower case), as last read (Space Lua's); undefined: none
+  spaceList(name: string): readonly string[] | undefined;
 };
 
 /**

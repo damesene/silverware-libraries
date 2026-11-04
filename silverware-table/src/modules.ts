@@ -16,6 +16,8 @@ import { Formulas } from "./features/formulas.ts";
 import { FullScreen } from "./core/silverbullet/modules/fullscreen.ts";
 import { Grips } from "./features/grips.ts";
 import { History } from "./core/silverbullet/modules/history.ts";
+import { BesideTables } from "./core/silverbullet/modules/beside.ts";
+import { CustomMenus } from "./features/custommenus.ts";
 import { LargeTables } from "./core/silverbullet/modules/largetables.ts";
 import { Lazy } from "./features/lazy.ts";
 import { LongText } from "./core/silverbullet/modules/longtext.ts";
@@ -81,6 +83,9 @@ export function featureEntries(metadata: Feature): readonly FeatureEntry[] {
     optional("tableLabels", (host) => new TableLabels(host)),
     always((host) => new Expressions(host)),
     always((host) => new History(host)),
+    always((host) => new BesideTables(host)),
+    // Custom definitions' entries in a row's or a column's menu, after the modules'
+    always((host) => new CustomMenus(host)),
     always((host) => new CellPopup(host)),
   ];
 }

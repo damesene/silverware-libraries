@@ -4,11 +4,19 @@
 # request (.github/dependabot.yml), which these tests then run against: green, it
 # merges by itself (dependabot.yml in this folder); red, the repository's owner is
 # assigned to it, which GitHub tells them.
+# Each plugin's tests (<plugin>/ui-tests/) in a job of its own, and each area a
+# plugin keeps in a folder under it (silverware-table/ui-tests/sheet/: the sheet
+# view's) in one of its own (scripts/ui-test-groups.mjs), side by side on runners
+# of their own, each with the workers and SilverBullet servers a run had: the run
+# takes as long as its largest group, a new plugin or area gets its job by its
+# folder, and no runner is loaded more than one was (more workers on one made the
+# tests flaky). Tests (silverbullet), which main's rule requires, passes once
+# every group's does.
 # Run by hand (Actions > Integration tests > Run workflow), the target and the
 # image can be chosen (the playground, or another SilverBullet: ghcr.io/silverbulletmd/silverbullet:latest-slim).
-# Each run's job summary has the counts and the tests that failed; the HTML report
-# (each test's error, screenshot, trace and browser console) and SilverBullet's
-# log are artifacts of the run.
+# Each group's job summary has the counts and the tests that failed; its HTML
+# report (each test's error, screenshot, trace and browser console) and
+# SilverBullet's log are artifacts of the run, by the group's name.
 name: Integration tests
 
 on:
@@ -34,15 +42,47 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Tests (${{ inputs.target || 'silverbullet' }})
+  # What the groups share, made once: the groups, and Playwright's Chromium in the cache (put there here alone, the
+  # groups only reading it: they would race to put it there)
+  groups:
+    name: Groups of interaction tests
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.list.outputs.list }}
+      chromium: ${{ steps.key.outputs.key }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: list
+        run: echo "list=$(node scripts/ui-test-groups.mjs)" >> "$GITHUB_OUTPUT"
+
+      # The Chromium the version of Playwright in the lockfile pins (no npm ci needed to know it)
+      - id: key
+        run: echo "key=playwright-chromium-$RUNNER_OS-$(jq -r '.packages["node_modules/playwright"].version' package-lock.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Playwright's Chromium, kept
+        id: chromium
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.key.outputs.key }}
+          # Only whether it is there: the groups restore it
+          lookup-only: true
+
+      - name: Playwright's Chromium
+        if: steps.chromium.outputs.cache-hit != 'true'
+        run: npx --yes "playwright@$(jq -r '.packages["node_modules/playwright"].version' package-lock.json)" install chromium
+
+  group:
+    name: Tests (${{ inputs.target || 'silverbullet' }}) ${{ matrix.group.name }}
+    needs: groups
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
-      # To assign the owner to a Dependabot pull request the tests fail on
-      issues: write
-      pull-requests: write
+    strategy:
+      # Each group's outcome, whatever another's
+      fail-fast: false
+      matrix:
+        group: ${{ fromJSON(needs.groups.outputs.list) }}
     env:
       SW_TARGET: ${{ inputs.target || 'silverbullet' }}
       SB_IMAGE: ${{ inputs.image }}
@@ -57,8 +97,22 @@ jobs:
 
       - run: npm ci
 
+      # Playwright's Chromium as the groups job put it in the cache; the system's libraries it needs installed each run,
+      # as they are the runner's. Not in the cache (it could not be put there): installed here, as before
+      - name: Playwright's Chromium, kept
+        id: chromium
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ needs.groups.outputs.chromium }}
+
       - name: Playwright's Chromium
+        if: steps.chromium.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      - name: Chromium's system libraries
+        if: steps.chromium.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
 
       - name: SilverBullet image
         if: env.SW_TARGET == 'silverbullet'
@@ -68,14 +122,17 @@ jobs:
           version=$(docker run --rm --entrypoint /silverbullet "$image" --version)
           echo "Testing against \`$image\`: $version" >> "$GITHUB_STEP_SUMMARY"
 
+      # (Playwright takes the filter as a regular expression of the test files' paths; given through the environment, as the shell would read its $)
       - name: Interaction tests
-        run: node scripts/ui-tests.mjs "$SW_TARGET"
+        env:
+          FILTER: ${{ matrix.group.filter }}
+        run: node scripts/ui-tests.mjs "$SW_TARGET" "$FILTER"
 
       - name: HTML report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: report-${{ env.SW_TARGET }}
+          name: report-${{ env.SW_TARGET }}-${{ matrix.group.id }}
           path: playwright-report/
           retention-days: 14
 
@@ -83,12 +140,31 @@ jobs:
         if: ${{ !cancelled() && env.SW_TARGET == 'silverbullet' }}
         uses: actions/upload-artifact@v7
         with:
-          name: silverbullet-log
+          name: silverbullet-log-${{ matrix.group.id }}
           path: silverbullet-log/
           retention-days: 14
           if-no-files-found: ignore
 
-      # A new SilverBullet that breaks the tests: its pull request stays open, the owner assigned (GitHub tells them)
+  # The check main's rule requires (its name as it was before the tests were split): every group's tests passed
+  test:
+    name: Tests (${{ inputs.target || 'silverbullet' }})
+    needs: group
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # To assign the owner to a Dependabot pull request the tests fail on
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Every group's tests passed
+        env:
+          RESULT: ${{ needs.group.result }}
+        run: |
+          echo "The groups' tests: $RESULT"
+          test "$RESULT" = "success"
+
+      # A new SilverBullet that breaks the tests: its pull request stays open, the owner assigned (GitHub tells them), once
       - name: The owner assigned to the Dependabot pull request
         if: failure() && github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
         env:
@@ -98,4 +174,4 @@ jobs:
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           gh pr edit "$PR" --add-assignee "$OWNER"
-          gh pr comment "$PR" --body "The interaction tests fail against this SilverBullet: $RUN (the report and SilverBullet's log are its artifacts)."
+          gh pr comment "$PR" --body "The interaction tests fail against this SilverBullet: $RUN (each group's report and SilverBullet's log are its artifacts)."

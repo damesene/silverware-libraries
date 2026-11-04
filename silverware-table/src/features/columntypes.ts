@@ -3,6 +3,7 @@
 // hashtag, and marks the cells that are not values of the type. The markdown
 // keeps the values as written: sorting, filters and copying use them.
 import { type CellEditor, type CellLook, type CellRef, type Feature, HEADER_ICON_ORDER, type HeaderLook, type Panel, type ModelHost, type TableLooks, type TableInfo } from "../core/feature.ts";
+import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
 import type { MenuDetail, MenuEntry } from "../menu.ts";
 import { setCell } from "../ops.ts";
@@ -138,11 +139,9 @@ export class ColumnTypes implements Feature {
 
   // ---- the column menu ----------------------------------------------------------
 
-  /** "Type: …" in a column's menu (first in its section of sorting and filtering): picks the column's type, written as a hashtag in its header */
-  columnMenuLeadEntries(info: TableInfo,
-    column: number,
-    open: (title: string, entries: readonly MenuEntry[]) => void,
-  ): MenuEntry[] {
+  /** "Type: …" in a column's menu (what the column is): picks the column's type, written as a hashtag in its header */
+  lineMenu(info: TableInfo, { axis, at: column }: LineMenuTarget, menu: LineMenuBuilder): LineMenuGroup[] {
+    if (axis !== "column") return [];
     const table = parseTable(info.source);
     const header = table.rows[0]?.cells[column] ?? "";
     const current = columnTypeOf(unescapeCell(header));
@@ -173,25 +172,26 @@ export class ColumnTypes implements Feature {
     ];
     // As Filter: the type's name after Type, its icon opening the list of types, a × removing it
     return [
-      {
-        kind: "segmented",
-        label: current ? `Type: ${typeLabel(current.type.name)}` : "Type",
-        options: [
-          {
-            icon: current ? columnIcon(current) : ICONS.columnType,
-            title: current ? `Change the column's type (${typeLabel(current.type.name)})` : "Choose how the column's cells show",
-            run: () => open("Column type", choices),
-          },
-          // A choice column's values: its own list or the column's (the Choices dialog)
-          ...(isChoice(current) ? [{ icon: ICONS.rename, title: "Edit the column's choices", run: () => this.choicesDialog.open(info, column) }] : []),
-          {
-            icon: ICONS.clear,
-            title: "Remove the column's type",
-            run: setType(undefined),
-            ...(current ? {} : { disabled: "The column has no type" }),
-          },
-        ],
-      },
+      menu.slot.columnType([
+        menu.segmented({
+          label: current ? `Type: ${typeLabel(current.type.name)}` : "Type",
+          options: [
+            {
+              icon: current ? columnIcon(current) : ICONS.columnType,
+              title: current ? `Change the column's type (${typeLabel(current.type.name)})` : "Choose how the column's cells show",
+              run: () => menu.open("Column type", choices),
+            },
+            // A choice column's values: its own list or the column's (the Choices dialog)
+            ...(isChoice(current) ? [{ icon: ICONS.rename, title: "Edit the column's choices", run: () => this.choicesDialog.open(info, column) }] : []),
+            {
+              icon: ICONS.clear,
+              title: "Remove the column's type",
+              run: setType(undefined),
+              ...(current ? {} : { disabled: "The column has no type" }),
+            },
+          ],
+        }),
+      ]),
     ];
   }
 

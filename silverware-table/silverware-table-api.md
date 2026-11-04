@@ -10,6 +10,7 @@ The Space Lua API of [Silverware Table](silverware-table.md): `silverware.table.
 -- Silverware Table's Space Lua API, loaded before your scripts (they have priority 0
 -- unless they say otherwise): silverware.table.defineFunctions, silverware.table.defineTypes and
 -- silverware.table.defineSeries, see "Custom functions", "Custom column types" and "Custom series";
+-- silverware.table.defineMenuEntries, see "Custom menu entries";
 -- silverware.table.defineConditions and silverware.table.defineFormats, see "Custom conditions and formats";
 -- silverware.table.evaluate and silverware.table.evaluateAlias, see "Formulas from Space Lua";
 -- silverware.table.tables and silverware.table.onWrite, see "For other plugins"
@@ -104,6 +105,14 @@ if js and js.window then
   function silverware.table.defineFormats(definitions)
     shown(silverwareTableJs.defineFormats(definitions), "defineFormats")
   end
+  --- Your own entries in a row's or a column's menu (another plugin's too), written in JavaScript: each a
+  --- name and its lineMenu(context, menu), given the menu's line and its table as data and the menu's builder.
+  --- Calls add up (yours and a plugin's alike); a name given again replaces its entries. A mistake is shown.
+  --- @param definitions table a JS module's definitions, e.g. js.importFromSpace("Library/me/menus.js")
+  --- @see Library/damesene/silverware-table#Custom menu entries
+  function silverware.table.defineMenuEntries(definitions)
+    shown(silverwareTableJs.defineMenuEntries(definitions), "defineMenuEntries")
+  end
   --- A table formula calculated on the page, outside any table: what it reads it names by a table's name
   --- (beans!B2, beans![price], beans!vat, [[Prices]]beans!B2). A ${…} showing it follows the tables.
   --- @param formula string the formula, its = optional, e.g. "=SUM(beans![price])"
@@ -186,6 +195,7 @@ else
   function silverware.table.defineSeries() end
   function silverware.table.defineConditions() end
   function silverware.table.defineFormats() end
+  function silverware.table.defineMenuEntries() end
   function silverware.table.evaluate() return "#N/A" end
   function silverware.table.evaluateAlias() end
   function silverware.table.tables() return {} end

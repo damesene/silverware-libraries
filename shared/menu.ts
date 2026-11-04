@@ -99,6 +99,15 @@ export type MenuEntry =
   // An element of the caller's own, as it is (a line saying the items are being read)
   | { readonly kind: "element"; readonly element: HTMLElement };
 
+/** An entry of a kind, its fields without the kind */
+type EntryOf<K extends MenuEntry["kind"]> = Omit<Extract<MenuEntry, { readonly kind: K }>, "kind">;
+
+// Entries made without their kind written (what a menu's builder offers, Silverware Table's line menus')
+export const menuItem = (item: EntryOf<"item">): MenuEntry => ({ kind: "item", ...item });
+export const menuSegmented = (row: EntryOf<"segmented">): MenuEntry => ({ kind: "segmented", ...row });
+export const menuActions = (bar: EntryOf<"actions">): MenuEntry => ({ kind: "actions", ...bar });
+export const menuSeparator = (): MenuEntry => ({ kind: "separator" });
+
 /** The entries with every run wrapped (a menu closing before its entry runs): items', and the buttons' of rows and bars */
 export function wrapRuns(entries: readonly MenuEntry[], wrap: (run: () => void) => () => void): MenuEntry[] {
   return entries.map((entry): MenuEntry =>
@@ -228,7 +237,9 @@ export function renderMenu(doc: Document, look: MenuLook, title: string, entries
     );
   const icon = (svg: string | undefined) => el(doc, "span", { class: `${p}-icon`, html: svg ?? "" });
 
-  for (const entry of entries) {
+  // A separator only between entries: none at the ends nor after another (where the sections between were left out)
+  const shown = entries.filter((entry, i) => entry.kind !== "separator" || (i > 0 && entries[i - 1]!.kind !== "separator" && entries.slice(i + 1).some((e) => e.kind !== "separator")));
+  for (const entry of shown) {
     if (entry.kind === "separator") {
       menu.append(el(doc, "div", { class: `${p}-menu-separator`, attrs: { role: "separator" } }));
     } else if (entry.kind === "item") {

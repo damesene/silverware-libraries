@@ -555,9 +555,10 @@ VAT: ${te("=fruit!vat")}
 
 ### For other plugins
 
-Two functions let another plugin (or a script of yours) work with tables without reading their markdown itself. [[Library/damesene/silverware-chart|Silverware Chart]] uses them for charts of named tables.
+These functions let another plugin (or a script of yours) work with tables without reading their markdown itself. [[Library/damesene/silverware-chart|Silverware Chart]] uses them for charts of named tables.
 
 * `silverware.table.tables(text)` gives the tables of a markdown text (usually `editor.getText()`): each with its `name` (where you named it), its place `from` and `to` in the text, its `columns` (each `{ name, key }`, the key as SilverBullet's index has it) and its body's cells as they show, row by row, in `rows`.
+* `silverware.table.defineMenuEntries(definitions)` adds entries to a row's or a column's menu, in a section of the plugin's own or beside Silverware Table's of a kind: see [[#Custom menu entries]].
 * `silverware.table.onWrite(fn)` calls `fn(text, context)` whenever Silverware Table writes tables, `text` the page's text as the write leaves it. `fn` gives a list of edits of that text outside the tables, `{ from = 10, to = 14, text = "new" }`, which are written in the same edit: one Ctrl+Z undoes them with the table. An edit that touches a table, reaches past the text or overlaps another is left out. Keep `fn` quick and let it write nothing itself; give it again in each load of Space Lua (a `space-lua` block does).
 * `context` tells what the write did, so a reference to a table or a column can follow it:
   * `context.renamed()`: whether a table or a column was renamed (check it first: most writes rename nothing);
@@ -731,10 +732,52 @@ Hover a cell to show two grips: ⠿ left of its row, and ⠿ above its column; m
 * **Shift+click on a grip** selects at once the rows from the one selected with a click (else the first of the rows or cells selected) to that one; Shift+click another grip to change where they end. A click on the grip of a selected row then opens its menu with *Delete N rows*.
 * **Drag a grip** to move the row or column: a copy follows the pointer and the others move aside to show where it goes; near the top or bottom of the view the page scrolls. Esc cancels the drag.
 * **Several rows (columns) at once**: select them whole (a grip's click, then Shift+click another, or on a touch screen the dots at the selection's edges), then drag the grip of any of them: they move together, in their order, as one edit. *Move up* / *Move down* (*Move left* / *Move right*) in the menu of one of them move them all (*Move 3 rows down*). They must follow each other and be in one zone of pinned rows (columns).
-* **Insert with +**: with a mouse or a pen, hover just left of the row grips, or just above the column grips: a **+** shows on the border nearest the pointer and inserts a row (column) there. On the last border it adds one at the end; while a cell of the last row (column) is hovered, selected or edited, a faint **+** under the table (right of the header) adds one at the end. A new column is named *Column N*, ready to rename. On a touch screen, insert from the row's or column's menu.
+* **Insert with +**: with a mouse or a pen, hover just left of the row grips, or just above the column grips: a faint **+** shows on the border nearest the pointer; it lights up once the pointer is on it, and a click on it inserts a row (column) there (a click beside it does nothing). On the last border it adds one at the end; while a cell of the last row (column) is hovered, selected or edited, a faint **+** under the table (right of the header) adds one at the end. A new column is named *Column N*, ready to rename. On a touch screen, insert from the row's or column's menu.
 * **Numbered column**: *Insert numbered column left* in a column's menu adds a column `#` with `=ROW()` in every row: it numbers the rows as written (sorting or filtering the view does not renumber them), rows added later get the formula too, and inserting, deleting or moving rows numbers them again. Add as many as you like. It needs the *Store table metadata* setting, as every new formula.
 * Rows can be moved only in the original order (no sorting, no filter), so a row always lands where you see it.
 * **Column width**: drag the right edge of a column's header (a faint dashed line shows there while the header cell is hovered, selected or edited; the pointer shows ↔ on it) to set its width; text wraps (or is cut) within it, see [[#Long text in cells (`silverware.table.modules.longText`)]]. Double-click that edge, or *Auto width* in the column's menu, for the automatic width again (as wide as the text, up to the maximum column width); *Reset column widths* in the ⋯ menu of the table's toolbar does it for every column. With the *Store table metadata* setting the width is stored in the table (`widths.-c-price.size='180'`, see [[#Table metadata]]) and follows the column when it is renamed or moved; without it, it holds until the page is opened again.
+
+### Custom menu entries
+
+Your own entries in a row's or a column's menu (or another plugin's) are written in JavaScript in a file of your space and given in a `space-lua` block of any page:
+
+```js
+// Library/me/menus.js
+export default [
+  {
+    name: "lists",
+    // Called as a row's or a column's menu opens: what to show in it
+    lineMenu(context, menu) {
+      if (context.axis !== "column") return [];
+      const column = context.table.columns[context.at];
+      const values = context.table.rows.map((row) => row[context.at]);
+      return [
+        // A section of its own of primary actions, under Copy, Cut, Paste and Clear
+        menu.slot.custom({ name: "Lists", position: "primary" }, [
+          menu.item({ label: `Copy ${column.name} as a list`, run: () => navigator.clipboard.writeText(values.map((v) => `- ${v}`).join("\n")) }),
+          menu.submenu({ label: "Count values" }, () =>
+            [...new Set(values)].map((value) => menu.item({ label: `${value}: ${values.filter((v) => v === value).length}`, run: () => {} })),
+          ),
+        ]),
+        // Or in a place of the menu's own: here with Filter and Auto width
+        menu.slot.view([menu.item({ label: "Log the values", run: () => console.log(values) })]),
+      ];
+    },
+  },
+];
+```
+
+```lua
+silverware.table.defineMenuEntries(js.importFromSpace("Library/me/menus.js"))
+```
+
+* `lineMenu(context, menu)` returns a list of groups of entries (at once, as the menu opens: not `async`; an entry's `run` may be), each made by `menu.slot`, which says where they go by what they do:
+  * `clipboard`, `edit` (what changes the cells, as Clear), `insert` (as *Insert numbered column left*), `columnType` (as Type), `view` (as Filter), `look` (as Conditional formatting), `remove` (as Remove metadata): beside Silverware Table's own of that kind;
+  * `custom({ name, position, priority }, [...])`: a section of its own. Entries of one `name` (yours, or several plugins' giving that name) are one section, ordered by `priority` (a number, lower higher, decimals too; equal ones as they came); sections in the order their names first came. `position` says what its actions are among the menu's: `"primary"` (often used: under Copy, Cut, Paste and Clear) or `"secondary"` (the others: before Remove metadata and Delete, the default).
+* The entries: `menu.item({ label, icon, run, hint, disabled, danger, checked, value })`, `menu.submenu({ label, icon, value }, () => [...])` (its entries shown in the menu's place as it is chosen, made then), `menu.segmented({ label, options: [{ icon, title, run, active }] })` (a row of icon buttons, as Sort), `menu.separator()`. `icon` is an SVG's text, or left out. A `run` closes the menu; it may be `async`.
+* `context`: `axis` (`"row"` or `"column"`), `at` (the row's place in the markdown, the header 0, so its cells are `context.table.rows[at - 1]`; or the column's, the first 0), `lines` (the rows or columns its actions are for: those selected whole that hold it, else it alone), `page`, and `table`: the table as `silverware.table.tables` gives it (`name`, `columns` each `{ name, key }`, `rows` the body's cells as they show).
+* Calls add up: a plugin's and yours each add their own, a `name` given again replaces its entries. A mistake in a definition, or a `lineMenu` or a `run` that fails, is shown in a notification; the menu shows the rest.
+* Entries are shown on every table, a pivot's too: an entry that would change a pivot's cells is refused by the table as any edit there is.
 
 ## Pinning
 
@@ -782,7 +825,7 @@ Cells can look different where their values meet a condition, as in a spreadshee
 
 * **A column's rules**: *Conditional formatting* in a column's menu offers quick rules (*Greater than…*, *Between…*, *Text contains…*, *Duplicate values*, *Top 10*, *By keywords…*, *By number ranges…*, *Color scale*, *Data bar*…). Each opens the rules' dialog with the new rule ready: set its values and its look, and *Save*. *Clear rules of this column* removes them.
 * **All of a table's rules**: *Conditional formatting…* in the table's ⋯ menu (or the cell menu) opens the dialog. A table with rules shows its icon in the toolbar too, which opens the same dialog.
-* **The dialog** lists the rules in the order they apply. Click a rule to edit it under its line: what it applies to (*Whole table*, a column, a named row), which cells (*All cells* or a condition and its values), and its format (and the format's settings). Under the rule edited, *Preview* shows it on the table's own cells: a few of them across their values (the smallest, the largest and those between, so a scale or levels show whole however large the table; a cell it formats and one it does not), a line for each column where it applies to each on its own, and how many cells it formats of how many. Every change shows there and in the table at once; *Save* writes them, *Cancel* or Esc leaves the table as it was. ↑ ↓ change the order, × removes a rule. The eye by the × puts the dialog aside: the table is yours meanwhile (scroll to another part of it, select, edit), the rules being edited shown in it; *Back to the dialog* brings the dialog back as it was. Another dialog opened meanwhile closes it, its changes not saved.
+* **The dialog** lists the rules in the order they apply. Click a rule to edit it under its line: what it applies to (*Whole table*, a column, a named row), which cells (*All cells* or a condition and its values), and its format (and the format's settings). Under the rule edited, *Preview* shows it on the table's own cells: a few of them across their values (the smallest, the largest and those between, so a scale or levels show whole however large the table; a cell it formats and one it does not), a line for each column where it applies to each on its own, and how many cells it formats of how many. Every change shows there at once; the table itself stays as it is while you edit (repainting a large table on every change would be slow). The eye by the × puts the dialog aside and shows the rules being edited in the table: it is yours meanwhile (scroll to another part of it, select, edit); *Back to the dialog* brings the dialog back as it was, the table still showing them. *Save* writes them, *Cancel* or Esc leaves the table as it was. ↑ ↓ change the order, × removes a rule. Another dialog opened meanwhile closes it, its changes not saved.
 * **Several rules on a cell**: they apply from the first; a look an earlier rule set (a fill, a text color) stays, a later rule adds what it does not set. *Stop* on a rule leaves the cells it formats to it alone.
 * **The cell menu**'s *Conditional formatting…* shows the table's rules where it has some, else starts a first rule for the cell's column.
 * **A rule of the whole table** takes its cells as one range, as a spreadsheet's range does: whatever a rule works out from all its cells is of all of them (a scale, levels, a data bar, icons; the top and bottom values, the average, the duplicates). *Each column on its own*, under *Applies to* in the dialog, works each of those out for each column apart (so a column of quantities is not graded against a column of prices); the Excel file has a rule for each column then.
@@ -1063,6 +1106,7 @@ Setting a part replaces what an earlier `config.set` of the same part set: set e
 * **Enter in a cell editor** (`enterKey`), default `moveDown`
   * `save`: Enter saves the cell.
   * `moveDown`: Enter saves and edits the cell below (on the last row: a row added under it, edited); Shift+Enter too, opening it with its text selected (with *Click selects the cell's text*: with the cursor at the end).
+  * `moveDownOnly`: as `moveDown`, but on the last row Enter only saves the cell and leaves it selected, no row added (on a sheet too).
 * **Click selects the cell's text** (`selectOnClick`), default `false`
   * `false`: a click, Enter, Tab and Ctrl+arrows open a cell with the cursor at the end of its text; Shift+Enter opens the cell below with its whole text selected.
   * `true`: they open it with its whole text selected; Shift+Enter with the cursor at the end.

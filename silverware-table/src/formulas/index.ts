@@ -56,14 +56,15 @@ export type PageLinksOffer = {
   // Pages read for another module (a pivot's source), as `otherPages` then gives them; `fresh`: read again those read before
   readonly readPages: (pages: readonly string[], fresh: boolean) => Promise<void>;
 };
-export { type Area, areaText, callsCustomFunctions, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredTableNames, type TableRef, withColumnKeys } from "./references.ts";
+export { type Area, areaText, callsCustomFunctions, formulaPages, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredTableNames, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";
 export { type Calculation, evaluateFormula, formulaErrors, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows } from "./evaluate.ts";
 export { type Node as FormulaNode, parse as parseFormula } from "./parser.ts";
 export { parseDate, toUnit, type Unit } from "./dates.ts";
 export { ERROR_CODES, FormulaError, parseClock, type Scalar, type Value } from "./values.ts";
 export { withAreasWritten, type WrittenArea, writtenArea } from "./frame.ts";
-export { REF_ERROR } from "./tokens.ts";
+export { REF_ERROR, type Token, tokenize } from "./tokens.ts";
+export { tablesWritten } from "./page.ts";
 export { calculatedFormula, filledFormula, followFormula, followOwnFormula, followTable, type Following, formulasAfterEdit, shiftReferences, withCalculatedCells, withoutFormulas } from "./edits.ts";
 export { argumentSpan, type ColumnChoice, columnChoicesOf, type FormulaChoice, type FormulaChoices, choiceText, cycleFixed, findFunctions, type FormulaHelp, formulaChoices, formulaHelp, functionHelp, nameTyped, needsOperator, type PointedSpan, REFERENCE_HELP, referenceSlot } from "./help.ts";
 export { FUNCTION_CATEGORIES, type FormulaFunction, type FunctionCategory } from "./function.ts";

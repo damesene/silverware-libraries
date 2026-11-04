@@ -1,4 +1,4 @@
-import { cell, drag, expect, header, markdown, markTable, setPage, settled, test } from "./helpers.ts";
+import { cell, drag, expect, header, markdown, markTable, setPage, setSettings, settled, test } from "./helpers.ts";
 
 test.describe("Selecting cells", () => {
   test("a drag selects the cells, with a band on each side of the edge to drag them by", async ({ page }) => {
@@ -58,6 +58,22 @@ test.describe("Selecting cells", () => {
     await expect(rows).toHaveCount(count + 1);
     await expect(page.locator(".swt-cell-editor")).toBeFocused();
     expect(await page.locator(".swt-cell-editor").evaluate((f) => (f.closest("tr") as HTMLTableRowElement).dataset.swtRow)).toBe(String(count + 1));
+  });
+
+  test("Enter in the last row's cell editor with moveDownOnly only saves, the cell left selected", async ({ page }) => {
+    await setSettings(page, { "silverware.table.editor.enterKey": "moveDownOnly" });
+    const rows = page.locator(".sb-table-widget table").first().locator("tbody tr[data-swt-row]");
+    const count = 6;
+    await expect(rows).toHaveCount(count);
+    await rows.last().locator("td").nth(1).dblclick();
+    await expect(page.locator(".swt-cell-editor")).toBeFocused();
+    await page.keyboard.press("Control+a");
+    await page.keyboard.type("Last");
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".swt-cell-editor")).toHaveCount(0);
+    await expect.poll(() => markdown(page)).toContain("Last");
+    await expect(rows).toHaveCount(count);
+    await expect(rows.last().locator("td").nth(1)).toHaveClass(/swt-selected/);
   });
 
   test("copied cells are outlined until Esc", async ({ page }) => {

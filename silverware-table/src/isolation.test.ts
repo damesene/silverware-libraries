@@ -9,6 +9,8 @@ const features = import.meta.glob(["./features/*.ts", "!./features/*.test.ts"], 
 const core = import.meta.glob(["./controller.ts", "./core/**/*.ts", "!./core/**/*.test.ts"], { query: "?raw", import: "default", eager: true });
 // The domains the modules hand data to: their own pure code
 const domains = import.meta.glob(["./formulas/**/*.ts", "./sheet/**/*.ts", "./excel/**/*.ts", "./export/**/*.ts", "!./**/*.test.ts"], { query: "?raw", import: "default", eager: true });
+// The pivot module's domain
+const pivot = import.meta.glob(["./pivot/**/*.ts", "!./**/*.test.ts"], { query: "?raw", import: "default", eager: true });
 
 /** The lines of each file that match, as `file:line: text` */
 function matches(files: Record<string, string>, pattern: RegExp): string[] {
@@ -57,6 +59,13 @@ describe("isolation", () => {
     expect(matches(modules, /from "[./]*(meta|metanames|names|tagvalues)\.ts"/)).toEqual([]);
     expect(matches(modules, /\bmetaAttribute\b/)).toEqual([]);
     expect(matches(domains, /from "[./]*(meta|metanames|names|tagvalues)\.ts"|\bmetaAttribute\b|[\w)\]?]\.meta\b/)).toEqual([]);
+  });
+
+  it("the modules and the pivot's domain use the formulas through their API (formulas/index.ts), not their files", () => {
+    // (The formulas module is theirs: it uses their parts)
+    const users = Object.fromEntries(Object.entries({ ...features, ...pivot }).filter(([path]) => path !== "./features/formulas.ts"));
+    expect(Object.keys(users)).toContain("./pivot/definition.ts");
+    expect(matches(users, /from "[./]*formulas\/(?!index\.ts")/)).toEqual([]);
   });
 
   it("the core and the adapter name no module", () => {

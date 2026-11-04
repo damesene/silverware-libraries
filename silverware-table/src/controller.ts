@@ -2,7 +2,7 @@
 // inline cell editing and row/column editing. Every change to the markdown is
 // one `editor.replaceRange`, so undo works as for any other edit.
 import { type Bridge, type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
-import { type AdapterFeature, type AddressFrame, type AlsoChanged, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type TextPosition, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget } from "./core/feature.ts";
+import { type AdapterFeature, type AddressFrame, type AlsoChanged, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type TextPosition, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
 import { mapPosition, type TextEdit, withWriteListeners } from "./core/writelisteners.ts";
@@ -1622,32 +1622,8 @@ export class Controller implements TableHost {
     return this.doc.documentElement.dataset.swtPointer ?? "";
   }
 
-  columnMenuEntries(info: WidgetInfo, column: number, open: (title: string, entries: readonly MenuEntry[]) => void): MenuEntry[] {
-    return this.features.flatMap((f) => f.columnMenuEntries?.(info, column, open) ?? []);
-  }
-
-  columnMenuLeadEntries(info: WidgetInfo, column: number, open: (title: string, entries: readonly MenuEntry[]) => void): MenuEntry[] {
-    return this.features.flatMap((f) => f.columnMenuLeadEntries?.(info, column, open) ?? []);
-  }
-
-  columnMenuTopEntries(info: WidgetInfo, column: number): MenuEntry[] {
-    return this.features.flatMap((f) => f.columnMenuTopEntries?.(info, column) ?? []);
-  }
-
-  columnMenuInsertEntries(info: WidgetInfo, column: number): MenuEntry[] {
-    return this.features.flatMap((f) => f.columnMenuInsertEntries?.(info, column) ?? []);
-  }
-
-  rowMenuEntries(info: WidgetInfo, row: number, column: number): MenuEntry[] {
-    return this.features.flatMap((f) => f.rowMenuEntries?.(info, row, column) ?? []);
-  }
-
-  lineMenuEntries(info: WidgetInfo, axis: "row" | "column", lines: readonly number[]): MenuEntry[] {
-    return this.features.flatMap((f) => f.lineMenuEntries?.(info, axis, lines) ?? []);
-  }
-
-  lineMenuEndEntries(info: WidgetInfo, axis: "row" | "column", lines: readonly number[]): MenuEntry[] {
-    return this.features.flatMap((f) => f.lineMenuEndEntries?.(info, axis, lines) ?? []);
+  lineMenu(info: WidgetInfo, target: LineMenuTarget, menu: LineMenuBuilder): readonly LineMenuGroup[] {
+    return this.features.flatMap((f) => f.lineMenu?.(info, target, menu) ?? []);
   }
 
   /** The element a table's info was rendered in (the hooks that still take it: docs/silverware-table-isolation.md) */

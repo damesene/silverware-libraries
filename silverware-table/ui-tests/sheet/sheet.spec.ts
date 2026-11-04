@@ -1,6 +1,6 @@
 // The sheet view: the table over the window with empty cells past it, which grow it
 import type { Page } from "@playwright/test";
-import { cell, expect, expectNavigatedTo, hoverCell, markdown, notification, reload, rendersAnew, replaceInPage, setPage, setSettings, table, tableIcon, test } from "./helpers.ts";
+import { cell, expect, expectNavigatedTo, hoverCell, markdown, notification, reload, rendersAnew, replaceInPage, setPage, setSettings, table, tableIcon, test } from "../helpers.ts";
 
 /** The table the sheet shows: the one it drew itself (in SilverBullet's form), standing for the page's */
 const sheetTable = (page: Page) => page.locator(".sb-table-widget.swt-table.swt-drawn:not(.swt-stand-in)");

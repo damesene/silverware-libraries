@@ -55,7 +55,7 @@ type Setting = string | number | boolean;
 /** The SilverBullet client of the page, as SilverBullet's own end-to-end tests reach it */
 type Client = {
   editorView: {
-    state: { doc: { length: number; toString(): string } };
+    state: { doc: { length: number; toString(): string; lineAt(pos: number): { text: string } }; selection: { main: { head: number } } };
     dispatch(spec: { changes: { from: number; to: number; insert: string }; selection?: { anchor: number } }): void;
   };
   ui: { viewState: { unsavedChanges: boolean } };
@@ -278,6 +278,22 @@ export const markdown = (page: Page): Promise<string> =>
     ? page.evaluate(() => (window as unknown as { client: Client }).client.editorView.state.doc.toString())
     : page.locator("#source").inputValue();
 
+/** The line of the page's text the editor's cursor is on (in the playground, its textarea's) */
+export async function cursorLine(page: Page): Promise<string> {
+  if (target === "silverbullet") {
+    return page.evaluate(() => {
+      const view = (window as unknown as { client: Client }).client.editorView;
+      return view.state.doc.lineAt(view.state.selection.main.head).text;
+    });
+  }
+  return page.evaluate(() => {
+    const source = document.querySelector<HTMLTextAreaElement>("#source")!;
+    const start = source.value.lastIndexOf("\n", source.selectionStart - 1) + 1;
+    const end = source.value.indexOf("\n", source.selectionStart);
+    return source.value.slice(start, end < 0 ? undefined : end);
+  });
+}
+
 /** A notification shown (SilverBullet's flash notification, or the playground's) with this text */
 export const notification = (page: Page, hasText: string | RegExp): Locator =>
   page.locator(target === "silverbullet" ? ".sb-notifications > div" : "#flash > div", { hasText });
@@ -355,9 +371,9 @@ export async function boxOf(target: Locator): Promise<{ x: number; y: number; wi
   return box!;
 }
 
+/** An element's centre, once laid out (`boxOf`: drawn anew meanwhile, as the toolbar's buttons are as it is placed, it has none for a moment) */
 export async function center(target: Locator): Promise<{ x: number; y: number }> {
-  const box = await target.boundingBox();
-  if (!box) throw new Error("not laid out");
+  const box = await boxOf(target);
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 

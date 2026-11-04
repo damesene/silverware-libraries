@@ -51,7 +51,10 @@ Then install a plugin with `Library: Install`.
 2. Its name in the lists of `scripts/build.mjs` and `scripts/deploy.mjs`, and an entry in `REPO.md`.
 3. Its Space Lua API as a field of the shared global: `silverware = silverware or {}`, then
    `silverware.<name> = …`; its settings with `config.define("silverware.<name>", …)`.
-4. Unit tests (`src/**/*.test.ts`) and interaction tests (`ui-tests/*.spec.ts`) are found in every plugin folder.
+4. Unit tests (`src/**/*.test.ts`) and interaction tests in its own `ui-tests/` (`*.spec.ts`, with a `helpers.ts`
+   of its own: no plugin's tests use another's). CI runs each plugin's interaction tests in a job of its own
+   (`scripts/ui-test-groups.mjs`), found by the folder: nothing to register. A folder under `ui-tests/` (as
+   `silverware-table/ui-tests/sheet/`) is a job of its own too, for an area that would slow its plugin's job.
 
 ## Development
 

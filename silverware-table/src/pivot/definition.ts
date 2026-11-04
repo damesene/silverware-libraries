@@ -5,7 +5,7 @@
 // shows (a formula over its rows, or its share of a total), `where` which rows count (a formula of one
 // row), `sort` the rows' order, `totals` the totals shown. Pure: the module
 // reads and writes the attributes, this reads and writes their values.
-import { type Token, tokenize } from "../formulas/tokens.ts";
+import { type Token, tokenize } from "../formulas/index.ts";
 
 // The totals shown: the Total row and (a cross table's) the Total column, the row alone, the column alone, none.
 // The row and the column by what they are, not as Excel's "grand totals for rows", which is the Total column

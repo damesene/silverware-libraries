@@ -21,6 +21,8 @@ type Applied = {
   // A header's icons and hashtags hidden
   readonly icons?: readonly Element[];
   readonly tags?: readonly Element[];
+  // A body cell's look as applied (`lookKey`): the same look again changes nothing
+  readonly key?: string;
 };
 
 const applied = new WeakMap<HTMLTableCellElement, Applied>();
@@ -89,8 +91,20 @@ function displayNode(doc: Document, display: CellDisplay): Node {
   return link;
 }
 
-/** Applies a body cell's look (none: what was applied before is taken back) */
+/** What a body cell's look is, as one text: two looks alike apply alike */
+function lookKey(look: MergedCell, editing: boolean): string {
+  return JSON.stringify([look.display, look.value, look.sortKey, look.marks, look.titles, look.vars, look.display !== undefined && editing]);
+}
+
+/**
+ * Applies a body cell's look (none: what was applied before is taken back). The look it has already (and
+ * what it shows still in it) is left as it is: a look changed on a few cells of a large table (a rule's
+ * value typed) touches those cells only, not every cell's classes and styles (the browser restyling them all)
+ */
 export function applyCellLook(cell: HTMLTableCellElement, look: MergedCell | undefined, editing: boolean): void {
+  const was = applied.get(cell);
+  const key = look && lookKey(look, editing);
+  if (was ? was.key === key && (!was.content || cell.contains(was.content.shown)) : !look) return;
   takeBack(cell);
   if (!look) return;
   const title = cell.getAttribute("title");
@@ -114,7 +128,7 @@ export function applyCellLook(cell: HTMLTableCellElement, look: MergedCell | und
     for (const node of nodes) node.parentNode?.removeChild(node);
     content = { box, nodes, shown };
   }
-  applied.set(cell, { marks, title, value: look.value !== undefined, ...(look.sortKey !== undefined ? { sortKey: true } : {}), ...(vars ? { vars } : {}), ...(content ? { content } : {}) });
+  applied.set(cell, { marks, title, value: look.value !== undefined, key, ...(look.sortKey !== undefined ? { sortKey: true } : {}), ...(vars ? { vars } : {}), ...(content ? { content } : {}) });
 }
 
 /** Applies a header's look: its icons before the sorting control (else last), marks, title, hashtags hidden */

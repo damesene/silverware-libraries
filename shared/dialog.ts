@@ -10,8 +10,9 @@
 // would be lost), and the focus goes back where it was. With `peek`, a button
 // by the × (`${base}-peek`) puts the dialog aside until `${base}-peek-back`
 // brings it back: the page under it is the user's meanwhile (presses, keys,
-// scrolling), the dialog kept as it was, its changes shown in the page;
-// `${base}-peeking` on the backdrop meanwhile (`isPeeking`).
+// scrolling), the dialog kept as it was; `peeked(on)` tells the caller, which
+// shows its changes in the page then (the conditions dialog: its rules in the
+// table); `${base}-peeking` on the backdrop meanwhile (`isPeeking`).
 
 export type DialogLook = {
   // The classes' base
@@ -43,6 +44,8 @@ export type DialogOptions = {
   readonly closed?: () => void;
   // A button to look at the page under it for a moment (what the dialog changes there, shown as it changes)
   readonly peek?: boolean;
+  // Put aside (true) and back (false), whichever way (its button, Back to the dialog, Esc)
+  readonly peeked?: (on: boolean) => void;
   // Held from the top of the window, not centered: what grows in it grows downwards (`${base}-backdrop-top`)
   readonly anchor?: "top";
 };
@@ -146,6 +149,7 @@ export class Dialogs {
       shown.peeking = on;
       backdrop.classList.toggle(`${base}-peeking`, on);
       peekButton?.setAttribute("aria-pressed", String(on));
+      options.peeked?.(on);
     };
     if (peekButton && back) {
       peekButton.type = "button";

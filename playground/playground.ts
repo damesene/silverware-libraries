@@ -120,11 +120,15 @@ function renderTable(from: number, text: string): HTMLElement {
 }
 
 // As SilverBullet's CodeMirror does: one .cm-line per source line, an empty
-// line as tall as one with text, a heading's line in its larger type
-function renderLines(lines: readonly string[], into: DocumentFragment): void {
+// line as tall as one with text, a heading's line in its larger type; each
+// with where it starts in the text (`from`: the first line's), for a press on it
+function renderLines(lines: readonly string[], into: DocumentFragment, from: number): void {
+  let start = from;
   for (const line of lines) {
     const element = document.createElement("div");
     element.className = "cm-line";
+    element.dataset.from = String(start);
+    start += line.length + 1;
     const heading = /^(#{1,6})\s+(.*)$/.exec(line);
     if (heading) element.classList.add(`sb-line-h${heading[1]!.length}`);
     if (line.trim() === "") element.append(document.createElement("br"));
@@ -145,7 +149,7 @@ function renderNow(): void {
     const lines = text.slice(at, range.from).split("\n");
     if (at > 0) lines.shift();
     lines.pop();
-    renderLines(lines, fragment);
+    renderLines(lines, fragment, at > 0 ? at + 1 : 0);
     const line = document.createElement("div");
     line.className = "cm-line";
     line.append(renderTable(range.from, range.text));
@@ -154,7 +158,7 @@ function renderNow(): void {
   }
   const rest = text.slice(at).split("\n");
   if (at > 0) rest.shift();
-  renderLines(rest, fragment);
+  renderLines(rest, fragment, at > 0 ? at + 1 : 0);
   page.replaceChildren(fragment);
 }
 
@@ -220,6 +224,15 @@ source.addEventListener("keydown", (e) => {
   e.preventDefault();
   step(...((key === "z" && !e.shiftKey ? [undoStack, redoStack] : [redoStack, undoStack]) as [Snapshot[], Snapshot[]]));
 });
+// A press on a line of the text puts the cursor there, as CodeMirror does (at the line's start: enough for a mock);
+// a press Silverware Table takes (on a table, its controls) does not reach here
+page.addEventListener("mousedown", (e) => {
+  const line = e.target instanceof Element ? e.target.closest<HTMLElement>(".cm-line[data-from]") : null;
+  if (!line || e.button !== 0) return;
+  cursor = Math.min(Number(line.dataset.from), text.length);
+  source.setSelectionRange(cursor, cursor);
+});
+
 // Undo on the page when Silverware Table left the key alone (e.g. no table edit to undo)
 page.addEventListener("keydown", (e) => {
   const mod = e.ctrlKey || e.metaKey;

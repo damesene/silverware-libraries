@@ -86,6 +86,8 @@ export class ColumnTypes implements Feature {
   private readonly picker: Panel;
   private picking: Picking | undefined;
   private readonly choicesDialog: ChoicesDialog;
+  // The space's lists' names as tables last looked by them: a list gone repaints its columns too
+  private spaceNamesShown: readonly string[] = [];
 
   constructor(private readonly host: ModelHost) {
     this.choicesDialog = new ChoicesDialog(host);
@@ -142,8 +144,9 @@ export class ColumnTypes implements Feature {
    */
   tablesChanged(): void {
     this.host.hideHeaderTags("types", typeTagPatterns());
-    // Only a column of a list its table does not keep can show another list now
-    const space = spaceListNames();
+    // Only a column of a list its table does not keep can show another list now (one of the space's, or one gone)
+    const space = [...new Set([...spaceListNames(), ...this.spaceNamesShown])];
+    this.spaceNamesShown = spaceListNames();
     if (!space.length) return;
     for (const info of this.host.shownTables()) {
       const table = parseTable(info.source);

@@ -1750,36 +1750,52 @@ body.swt-resizing * {
 .swt-choices-from-space[hidden] {
   display: none;
 }
-/* The two ways: the column's values or a list of its own */
+/* The ways (the column's values, a list of its own, the space's) as one row of segments, the one picked's hint under it */
 .swt-choices-ways {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.swt-choices-way {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 6px 8px;
   border: 1px solid var(--swt-dialog-line);
   border-radius: 6px;
+  overflow: hidden;
+}
+.swt-choices-way {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  text-align: center;
   cursor: pointer;
 }
+.swt-choices-way + .swt-choices-way {
+  border-left: 1px solid var(--swt-dialog-line);
+}
 .swt-choices-way:has(input:checked) {
-  border-color: var(--ui-accent-color);
+  /* As the primary button: SilverBullet's --ui-accent-text-color is the accent itself */
+  color: #fff;
+  background: var(--ui-accent-color);
+  font-weight: 600;
+}
+.swt-choices-way:has(input:focus-visible) {
+  outline: 2px solid var(--ui-accent-color);
+  outline-offset: -4px;
 }
 .swt-choices-way:has(input:disabled) {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: default;
 }
+/* The radio itself unseen over the whole segment (a press on it picks it), kept for the keys and a screen reader */
 .swt-choices-way input {
-  margin-top: 3px;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
 }
-.swt-choices-way > span {
-  display: flex;
-  flex-direction: column;
-}
-.swt-choices-way-text {
+.swt-choices-hint {
+  margin: 0;
   font-size: 12px;
   opacity: 0.75;
 }
@@ -1803,9 +1819,26 @@ body.swt-resizing * {
   border-radius: 6px;
 }
 .swt-choices-space-values {
-  font-size: 13px;
-  opacity: 0.85;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+/* A value of the space's list: as a value's field, to read only */
+.swt-choices-readonly {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
   overflow-wrap: anywhere;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  opacity: 0.85;
+}
+.swt-choices-count,
+.swt-choices-empty {
+  font-weight: normal;
+  opacity: 0.7;
 }
 .swt-choices-tag {
   font-weight: normal;

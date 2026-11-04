@@ -477,7 +477,7 @@ describe("Row and column grips", () => {
 
 describe("A line menu's sections of their own", () => {
   const item = (label: string) => ({ kind: "item", label, run: () => undefined }) as const;
-  const custom = (name: string, labels: string[], more: { position?: "top" | "bottom"; priority?: number } = {}): LineMenuGroup => ({
+  const custom = (name: string, labels: string[], more: { position?: "primary" | "secondary"; priority?: number } = {}): LineMenuGroup => ({
     slot: "custom",
     custom: { name, ...more },
     entries: labels.map(item),
@@ -493,15 +493,15 @@ describe("A line menu's sections of their own", () => {
       custom("Git", ["log"], { priority: 2 }),
       custom("Export", ["json"], { priority: -1 }),
     ];
-    expect(labels(customSections(groups, "bottom"))).toEqual([
+    expect(labels(customSections(groups, "secondary"))).toEqual([
       ["history", "blame", "log"],
       ["json", "csv"],
     ]);
   });
 
-  it("go where they say, bottom by default; an empty one none", () => {
-    const groups: LineMenuGroup[] = [custom("Top", ["a"], { position: "top" }), custom("Bottom", ["b"]), custom("Empty", [], { position: "top" })];
-    expect(labels(customSections(groups, "top"))).toEqual([["a"]]);
-    expect(labels(customSections(groups, "bottom"))).toEqual([["b"]]);
+  it("are of the position they say, secondary by default; an empty one none", () => {
+    const groups: LineMenuGroup[] = [custom("Primary", ["a"], { position: "primary" }), custom("Secondary", ["b"]), custom("Empty", [], { position: "primary" })];
+    expect(labels(customSections(groups, "primary"))).toEqual([["a"]]);
+    expect(labels(customSections(groups, "secondary"))).toEqual([["b"]]);
   });
 });

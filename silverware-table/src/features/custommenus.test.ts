@@ -23,7 +23,7 @@ describe("Custom menu entries in a row's or a column's menu", () => {
   };
   const labels = (menu: Element) => menuButtons(menu).map(buttonLabel);
 
-  it("go where they say: a section of their own at the top or the bottom, or beside the table's own of a kind", async () => {
+  it("go where they say: a section of their own of primary or secondary actions, or beside the table's own of a kind", async () => {
     await define([
       {
         name: "mine",
@@ -31,7 +31,7 @@ describe("Custom menu entries in a row's or a column's menu", () => {
           context.axis !== "column"
             ? []
             : [
-                menu.slot.custom({ name: "Mine", position: "top" }, [menu.item({ label: "Top one", run: () => undefined })]),
+                menu.slot.custom({ name: "Mine", position: "primary" }, [menu.item({ label: "Top one", run: () => undefined })]),
                 menu.slot.view([menu.item({ label: "Viewed", run: () => undefined })]),
                 menu.slot.custom({ name: "Later" }, [menu.item({ label: "Bottom one", run: () => undefined })]),
               ],

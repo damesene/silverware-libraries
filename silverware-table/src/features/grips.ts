@@ -49,12 +49,12 @@ const COLUMN_GRIP_LENGTH = 44;
 const PIN_NEEDS_METADATA = "Pinning is stored in the table: turn on the Store table metadata setting (unpinning always works)";
 
 /**
- * The sections of their own (`custom`) at a position of a row's or a
+ * The sections of their own (`custom`) of a position (primary, secondary) in a row's or a
  * column's menu, each its entries: one per name, as the names first came;
  * a section's blocks by priority (lower first; equal: as they came)
  */
-export function customSections(groups: readonly LineMenuGroup[], position: "top" | "bottom"): MenuEntry[][] {
-  const blocks = groups.flatMap((group) => (group.slot === "custom" && (group.custom.position ?? "bottom") === position ? [group] : []));
+export function customSections(groups: readonly LineMenuGroup[], position: "primary" | "secondary"): MenuEntry[][] {
+  const blocks = groups.flatMap((group) => (group.slot === "custom" && (group.custom.position ?? "secondary") === position ? [group] : []));
   const names = [...new Set(blocks.map((block) => block.custom.name))];
   return names
     .map((name) =>
@@ -702,7 +702,8 @@ export class Grips implements Feature {
     const { slot, custom } = this.lineGroups(info, "row", row);
     return [
       ...this.lineSections(info, "row", row, slot),
-      ...custom("top"),
+      // Sections of their own of primary actions, with the clipboard's and Clear
+      ...custom("primary"),
       ...shape([{
         kind: "segmented",
         label: "Insert",
@@ -763,7 +764,8 @@ export class Grips implements Feature {
         ],
       }]),
       { kind: "separator" },
-      ...custom("bottom"),
+      // Of secondary ones, before Remove metadata and Delete
+      ...custom("secondary"),
       ...this.section(slot("remove")),
       ...shape([this.deleteEntry(info, "row", row)]),
     ];
@@ -799,13 +801,13 @@ export class Grips implements Feature {
   /**
    * The modules' entries for the menu of a row (column), made with the menu's
    * builder: `slot`, a slot's (LineMenuSlots); `custom`, the sections of their
-   * own at a position, each a section (LineMenuCustom)
+   * own of a position, each a section (LineMenuCustom)
    */
   private lineGroups(
     info: TableInfo,
     axis: Axis,
     at: number,
-  ): { readonly slot: (slot: LineMenuSlot) => MenuEntry[]; readonly custom: (position: "top" | "bottom") => MenuEntry[] } {
+  ): { readonly slot: (slot: LineMenuSlot) => MenuEntry[]; readonly custom: (position: "primary" | "secondary") => MenuEntry[] } {
     const groups = this.host.lineMenu(info, { axis, at, lines: this.selectedLines(info, axis, at) }, this.builder);
     return {
       slot: (slot) => groups.filter((group) => group.slot === slot).flatMap((group) => group.entries),
@@ -889,7 +891,8 @@ export class Grips implements Feature {
     const { slot, custom } = this.lineGroups(info, "column", column);
     const entries: MenuEntry[] = [
       ...this.lineSections(info, "column", column, slot),
-      ...custom("top"),
+      // Sections of their own of primary actions, with the clipboard's and Clear
+      ...custom("primary"),
       ...shape([{
         kind: "segmented",
         label: "Insert",
@@ -968,7 +971,8 @@ export class Grips implements Feature {
       // How its cells look, after their alignment: conditional formatting
       ...this.closingUnlessReplaced(slot("look")),
       { kind: "separator" },
-      ...custom("bottom"),
+      // Of secondary ones, before Remove metadata and Delete
+      ...custom("secondary"),
       ...this.section(slot("remove")),
       ...shape([this.deleteEntry(info, "column", column)]),
     ];

@@ -501,11 +501,11 @@ export type LineMenuSlot = "clipboard" | "edit" | "insert" | "columnType" | "vie
 /**
  * A section of its own in a row's or a column's menu, by its name: the
  * blocks of one name are one section, by `priority` (lower higher; equal: as
- * they came), the sections as their names first came; `position` top (under
- * the clipboard's and Clear) or bottom (before Remove metadata and Delete, the
- * default)
+ * they came), the sections as their names first came; `position`, what its
+ * actions are among the menu's: primary (often used, with the clipboard's and
+ * Clear) or secondary (the others', the default)
  */
-export type LineMenuCustom = { readonly name: string; readonly position?: "top" | "bottom"; readonly priority?: number };
+export type LineMenuCustom = { readonly name: string; readonly position?: "primary" | "secondary"; readonly priority?: number };
 
 /** A module's entries in a slot of a row's or a column's menu, or in a section of its own (`custom`) */
 export type LineMenuGroup =

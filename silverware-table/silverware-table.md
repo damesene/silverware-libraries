@@ -752,8 +752,8 @@ export default [
       const column = context.table.columns[context.at];
       const values = context.table.rows.map((row) => row[context.at]);
       return [
-        // A section of its own, under Copy, Cut, Paste and Clear
-        menu.slot.custom({ name: "Lists", position: "top" }, [
+        // A section of its own of primary actions, under Copy, Cut, Paste and Clear
+        menu.slot.custom({ name: "Lists", position: "primary" }, [
           menu.item({ label: `Copy ${column.name} as a list`, run: () => navigator.clipboard.writeText(values.map((v) => `- ${v}`).join("\n")) }),
           menu.submenu({ label: "Count values" }, () =>
             [...new Set(values)].map((value) => menu.item({ label: `${value}: ${values.filter((v) => v === value).length}`, run: () => {} })),
@@ -773,7 +773,7 @@ silverware.table.defineMenuEntries(js.importFromSpace("Library/me/menus.js"))
 
 * `lineMenu(context, menu)` returns a list of groups of entries, each made by `menu.slot`, which says where they go by what they do:
   * `clipboard`, `edit` (what changes the cells, as Clear), `insert` (as *Insert numbered column left*), `columnType` (as Type), `view` (as Filter), `look` (as Conditional formatting), `remove` (as Remove metadata): beside Silverware Table's own of that kind;
-  * `custom({ name, position, priority }, [...])`: a section of its own. Entries of one `name` (yours, or several plugins' giving that name) are one section, ordered by `priority` (a number, lower higher, decimals too; equal ones as they came); sections in the order their names first came. `position` is `"top"` (under Copy, Cut, Paste and Clear) or `"bottom"` (before Remove metadata and Delete, the default).
+  * `custom({ name, position, priority }, [...])`: a section of its own. Entries of one `name` (yours, or several plugins' giving that name) are one section, ordered by `priority` (a number, lower higher, decimals too; equal ones as they came); sections in the order their names first came. `position` says what its actions are among the menu's: `"primary"` (often used: under Copy, Cut, Paste and Clear) or `"secondary"` (the others: before Remove metadata and Delete, the default).
 * The entries: `menu.item({ label, icon, run, hint, disabled, danger, checked, value })`, `menu.submenu({ label, icon, value }, () => [...])` (its entries shown in the menu's place as it is chosen, made then), `menu.segmented({ label, options: [{ icon, title, run, active }] })` (a row of icon buttons, as Sort), `menu.separator()`. `icon` is an SVG's text, or left out. A `run` closes the menu; it may be `async`.
 * `context`: `axis` (`"row"` or `"column"`), `at` (the row's place in the markdown, the header 0, so its cells are `context.table.rows[at - 1]`; or the column's, the first 0), `lines` (the rows or columns its actions are for: those selected whole that hold it, else it alone), `page`, and `table`: the table as `silverware.table.tables` gives it (`name`, `columns` each `{ name, key }`, `rows` the body's cells as they show).
 * Calls add up: a plugin's and yours each add their own, a `name` given again replaces its entries. A mistake in a definition, or a `lineMenu` or a `run` that fails, is shown in a notification; the menu shows the rest.

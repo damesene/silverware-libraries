@@ -77,8 +77,26 @@ jobs:
 
       - run: npm ci
 
+      # Playwright's Chromium (the version Playwright pins) kept between runs by that version; the system's libraries
+      # it needs installed each run, as they are the runner's
+      - name: Playwright's version
+        id: playwright
+        run: echo "version=$(npx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Playwright's Chromium, kept
+        id: chromium
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
       - name: Playwright's Chromium
+        if: steps.chromium.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      - name: Chromium's system libraries
+        if: steps.chromium.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
 
       - name: SilverBullet image
         if: env.SW_TARGET == 'silverbullet'

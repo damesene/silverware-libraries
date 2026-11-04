@@ -14,7 +14,7 @@
 // with rules), a column's menu (quick rules, the column's rules cleared) and
 // the cell menu; every change shows in the table before it is saved.
 import { columnKey, columnName } from "../columns.ts";
-import { CELL_MENU_ORDER, type CellLook, type CellMenuGroup, type CellRef, type Feature, type ModelHost, type TableInfo, type TableKey, type TableLooks, type ToolbarButton } from "../core/feature.ts";
+import { CELL_MENU_ORDER, type CellLook, type CellMenuGroup, type CellRef, type Feature, type ModelHost, type TableInfo, type TableKey, type TableLooks, type ToolbarButton, type WriteResult } from "../core/feature.ts";
 import type { ColumnTypesOffer } from "../columntypes/index.ts";
 import {
   cellOf,
@@ -352,8 +352,17 @@ export class Conditions implements Feature {
   }
 
   private async save(info: TableInfo, rules: readonly StoredRule[]): Promise<void> {
-    await this.host.writeTable(info, (table) => this.withRules(table, rules));
-    if (this.preview?.key === info.key) this.preview = undefined;
+    let result: WriteResult = "failed";
+    try {
+      result = await this.host.writeTable(info, (table) => this.withRules(table, rules));
+    } finally {
+      // The rules the dialog showed in the table end with it: written, the table rendered anew shows them; not
+      // written (a write that failed), the table shows its own again
+      if (this.preview?.key === info.key) {
+        this.preview = undefined;
+        if (result === "failed") this.host.looksChanged(this.host.tableFor(info.key) ?? info);
+      }
+    }
     this.host.toolbarChanged();
   }
 

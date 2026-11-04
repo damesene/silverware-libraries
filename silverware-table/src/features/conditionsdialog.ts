@@ -4,8 +4,11 @@
 // fields are made from the definitions' params (ParamSpec): a number, a
 // choice, a text, a pattern (checked as typed), a color (the palette's
 // swatches or one picked), a switch, a style (fill, text color, bold, italic,
-// underline, strikethrough) and a list of rows of them. Every change is shown
-// in the table at once (`preview`); Save writes them, Cancel and Esc leave the
+// underline, strikethrough) and a list of rows of them. A change shows in the
+// open rule's sample (the table's own cells); the table shows the rules as
+// they are when the dialog is put aside (`preview`: repainting a large table
+// on every change cost more than the dialog over it showed of it), and keeps
+// them shown back in the dialog; Save writes them, Cancel and Esc leave the
 // table as it was. It knows nothing of tables or writing: the module gives it
 // the rules and takes them back.
 import { el, type ElementChild } from "../../../shared/elements.ts";
@@ -68,7 +71,7 @@ export type ConditionsDialogOptions = {
   readonly rules: readonly StoredRule[];
   // A rule added as the dialog opens, its editor open (a quick rule of a column's menu)
   readonly added?: Rule;
-  // The rules shown in the table as they are now; undefined: as written again
+  // The rules shown in the table as they are now (the dialog put aside); undefined: as written again
   readonly preview: (rules: readonly StoredRule[] | undefined) => void;
   readonly save: (rules: readonly StoredRule[]) => void;
   // How a rule looks on the table's own cells (the rule alone): the preview under its editor
@@ -93,6 +96,8 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
   const doc = host.doc;
   const e = <K extends keyof HTMLElementTagNameMap>(tag: K, props?: Parameters<typeof el>[2], ...children: ElementChild[]) => el(doc, tag, props, ...children);
   let rules: StoredRule[] = [...options.rules, ...(options.added ? [options.added] : [])];
+  // The rules as the dialog opened with them: every change makes a new list (so none, as long as it is this one)
+  const opened = rules;
   let open = options.added ? rules.length - 1 : -1;
   let saved = false;
 
@@ -100,22 +105,23 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
   const list = e("div", { class: "swt-cf-list", attrs: { tabindex: "-1" } });
   const submit = e("button", { class: "swt-dialog-primary", text: "Save" });
 
-  // ---- shown in the table as it changes ----------------------------------------------
-  let previewing: ReturnType<typeof setTimeout> | undefined;
-  const previewSoon = () => {
-    clearTimeout(previewing);
-    previewing = setTimeout(() => options.preview(rules), 120);
+  // ---- shown in the table: as the dialog is put aside ----------------------------------
+  // Whether the table shows the rules being edited (taken back unless they are saved)
+  let previewed = false;
+  const peeked = (on: boolean) => {
+    // Nothing changed (or added): the table shows the rules as written already, nothing to repaint now or on Cancel
+    if (!on || (rules === opened && !options.added && !previewed)) return;
+    options.preview(rules);
+    previewed = true;
   };
 
   const set = (i: number, rule: StoredRule) => {
     rules = rules.map((r, j) => (j === i ? rule : r));
     render();
-    previewSoon();
   };
   // A field typed in: the rule changed without making the list anew (the field keeps its focus)
   const typed = (i: number, rule: StoredRule) => {
     rules = rules.map((r, j) => (j === i ? rule : r));
-    previewSoon();
     refreshLine(i);
     sampleSoon();
   };
@@ -259,14 +265,12 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
     if (open === i) open = i + by;
     else if (open === i + by) open = i;
     render();
-    previewSoon();
   };
   const remove = (i: number) => {
     rules = rules.filter((_, j) => j !== i);
     if (open === i) open = -1;
     else if (open > i) open--;
     render();
-    previewSoon();
   };
 
   function render(): void {
@@ -295,7 +299,6 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
     rules = [...rules, { scope: first ? { kind: "column", column: first.column } : { kind: "table" }, when: { name: "greater", params: {} }, format: { name: "redFill", params: {} } }];
     open = rules.length - 1;
     render();
-    previewSoon();
   };
 
   // ---- a rule's editor ---------------------------------------------------------------------
@@ -711,31 +714,28 @@ export function openConditionsDialog(host: ModelHost, options: ConditionsDialogO
   }
 
   render();
-  // A rule added as it opens shows in the table at once
-  if (options.added) previewSoon();
   const cancel = e("button", { class: "swt-dialog-button", text: "Cancel" });
-  const footer = e("div", "swt-pivot-foot", e("span", { class: "swt-pivot-note", text: options.blocked ?? "Changes show in the table as you make them" }), cancel, submit);
+  const footer = e("div", "swt-pivot-foot", e("span", { class: "swt-pivot-note", text: options.blocked ?? "The eye shows the rules in the table; Save keeps them" }), cancel, submit);
   const dialog = host.openDialog({
     title: options.title,
     subtitle: "Cells that look different by their values; the rules apply in this order",
     className: "swt-cf-dialog",
-    // The table under it, shown as the rules change, a look away
+    // The table under it, shown with the rules as they are, a look away
     peek: true,
+    peeked,
     // A rule opened, a formula's help: the dialog grows downwards, nothing above them moving
     anchor: "top",
     content: e("div", "swt-pivot swt-cf", list),
     footer,
     closed: () => {
-      clearTimeout(previewing);
       clearTimeout(sampling);
-      if (!saved) options.preview(undefined);
+      if (!saved && previewed) options.preview(undefined);
     },
   });
   cancel.addEventListener("click", () => dialog.close());
   submit.addEventListener("click", () => {
     if (submit.disabled) return;
     saved = true;
-    clearTimeout(previewing);
     dialog.close();
     options.save(rules);
   });

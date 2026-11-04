@@ -244,6 +244,22 @@ Estimates are rough, from the parts above, not from a prototype.
 6. **One API for built-in and custom definitions**: a definition is a function of `HELPERS`, the built-in ones importing only types; a format is `style` or `look(cell, ctx)`, levels a helper giving a `look`; a condition `test(cell, ctx)`; `ctx.scope` the lazy statistics (see *The API*).
 7. **Formats set up in the dialog**: by keywords, by number ranges, levels (how many colors, which), color scale, data bar and an own style, as built-in formats whose params the dialog fills in for one rule; no formats saved apart (see *Formats set up in the dialog*).
 
+## Performance on large tables (2026-11-04, with the user)
+
+Measured on a table of 2000 rows and 10 columns (20 000 cells) with three rules (a color scale, greater than → bold, a data bar), in the playground: the main thread's long tasks after a change in the dialog, the change made in the page itself (Playwright's trace off: its DOM snapshots, and a locator over 20 000 cells, cost seconds of their own; the playground's profile.ts wrappers show in profiles too).
+
+Before: one change in the dialog kept the main thread busy for 0.8 to 1.1 s: the dialog drawn anew (about 120 + 70 ms), the table's preview (the rules evaluated, about 140 ms, of which about 90 ms built the cells' inputs; every cell's classes and vars taken off and put on again, about 180 ms; the browser restyling them all), and the open rule's sample (about 115 ms, building the same inputs again). The table's preview ran 120 ms after every change, under a modal dialog covering most of the table.
+
+Three changes, each its own commit:
+
+1. **The cells' inputs read once per table** (`readers` in features/conditions.ts, by the parsed table, emptied on `tablesChanged` as a column type defined anew may read a value otherwise; none kept for a table with `${…}` cells): the looks and the dialog's sample share them.
+2. **A cell's look applied again only where it changed** (core/silverbullet/looks.ts: the look applied kept as a key; the same look, and what it shows still in the cell, is left alone): generic, for every module's `looksChanged`.
+3. **The table shows the rules edited only as the dialog is put aside** (its eye; shared/dialog.ts `peeked`), kept shown back in the dialog (decided by the user: no repainting on the way back, the next look away showing them as they are then), taken back unless saved. While editing, the open rule's sample shows it on the table's own cells. No Apply button: the eye and Save cover it.
+
+After: a change in the dialog costs 70 to 200 ms (the dialog and its sample drawn anew). Putting the dialog aside costs about 0.75 s once, Cancel after it about 0.67 s (the table's looks applied as written again).
+
+Left for later, if needed: applying looks to the rows in view first and the rest in idle time (only looks without values: sorting and filters read `data-swt-value` and `data-swt-sort` of every cell); the largeTables module (rows far from the view out of the DOM) not verified with conditional formatting.
+
 ## Open questions
 
 None now. To decide in phase 1: the exact names of `Style`'s properties and the palette's colors (checked in light and dark, with the built-in themes and Tiniri).

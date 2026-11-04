@@ -25,6 +25,9 @@ const openColumnMenu = (column: number) => {
 };
 const dialog = () => document.querySelector<HTMLElement>(".swt-cf-dialog");
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+// The dialog put aside (its eye), and back
+const peek = () => document.querySelector<HTMLElement>(".swt-dialog-peek")!.click();
+const back = () => document.querySelector<HTMLElement>(".swt-dialog-peek-back")!.click();
 
 describe("Conditional formatting", () => {
   useTablePage();
@@ -98,18 +101,25 @@ describe("Conditional formatting", () => {
     expect(cell(1, 1).style.getPropertyValue("--swt-cf-bar")).toBe("11.1%");
   });
 
-  it("adds a quick rule from a column's menu: shown in the table as it is edited, written on Save", async () => {
+  it("adds a quick rule from a column's menu: the table as it is while it is edited, shown so as the dialog is put aside, written on Save", async () => {
     await setup(TABLE, { "silverware.table.metadata": true });
     await flush();
     openColumnMenu(1);
     item(/^Conditional formatting/)!.click();
     item("Greater than…")!.click();
     expect(dialog()).not.toBeNull();
-    // The new rule's value: typed in its field, the table shows it before it is saved
+    // The new rule's value typed in its field: the table as it was (the dialog's sample shows it)
     const value = dialog()!.querySelector<HTMLInputElement>('input[aria-label="Value"]')!;
     value.value = "50";
     value.dispatchEvent(new Event("input", { bubbles: true }));
     await wait(200);
+    await flush();
+    expect([1, 2, 3].map((r) => formatted(r))).toEqual([false, false, false]);
+    // Put aside: the table shows the rule before it is saved; back in the dialog, still
+    peek();
+    await flush();
+    expect([1, 2, 3].map((r) => formatted(r))).toEqual([false, true, true]);
+    back();
     await flush();
     expect([1, 2, 3].map((r) => formatted(r))).toEqual([false, true, true]);
     expect(text).toBe(TABLE);
@@ -128,11 +138,41 @@ describe("Conditional formatting", () => {
     item("Color scale")!.click();
     await wait(200);
     await flush();
+    expect(formatted(1)).toBe(false);
+    // Shown in the table by the eye, taken back with the dialog cancelled
+    peek();
+    await flush();
     expect(formatted(1)).toBe(true);
+    back();
     Array.from(dialog()!.querySelectorAll<HTMLButtonElement>("button")).find((b) => b.textContent === "Cancel")!.click();
     await flush();
     expect(formatted(1)).toBe(false);
     expect(text).toBe(TABLE);
+  });
+
+  it("shows the rules in the table as they are at each look away: an edit back in the dialog stays out of it until the next", async () => {
+    await setup(TABLE + META('[{"when":["greater",{"value":50}],"format":"redFill"}]'), { "silverware.table.metadata": true });
+    await flush();
+    at(2, 1).dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 }));
+    item("Conditional formatting…")!.click();
+    dialog()!.querySelector<HTMLElement>(".swt-cf-summary")!.click();
+    const value = dialog()!.querySelector<HTMLInputElement>('input[aria-label="Value"]')!;
+    const type = async (text: string) => {
+      value.value = text;
+      value.dispatchEvent(new Event("input", { bubbles: true }));
+      await flush();
+    };
+    await type("70");
+    expect([1, 2, 3].map((r) => formatted(r))).toEqual([false, true, true]);
+    peek();
+    await flush();
+    expect([1, 2, 3].map((r) => formatted(r))).toEqual([false, false, true]);
+    back();
+    await type("5");
+    expect([1, 2, 3].map((r) => formatted(r))).toEqual([false, false, true]);
+    peek();
+    await flush();
+    expect([1, 2, 3].map((r) => formatted(r))).toEqual([true, true, true]);
   });
 
   it("opens the table's rules from the cell menu where it has some, a first rule for the cell's column where it has none", async () => {
@@ -215,7 +255,8 @@ describe("Conditional formatting", () => {
     expect(dialog()!.querySelector(".swt-cf-formula-box .swt-cf-problem")!.textContent).not.toBe("");
     type("[@Score] > 50");
     expect(dialog()!.querySelector(".swt-cf-formula-box .swt-cf-problem")!.textContent).toBe("");
-    await wait(200);
+    peek();
+    await flush();
     expect([1, 2, 3].map((r) => formatted(r))).toEqual([false, true, true]);
   });
 

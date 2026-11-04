@@ -122,7 +122,8 @@ export class InsertControls {
 
   /**
    * A press (after the features'): on a +, or in the band beside the table that
-   * misses it (or where none shows), it is the +'s: it inserts at once. True: taken.
+   * misses it (or where none shows), it is the +'s: one on the + inserts at once,
+   * one beside it nothing. True: taken.
    */
   mouseDown(e: MouseEvent): boolean {
     if (e.button !== 0) return false;

@@ -75,12 +75,19 @@ const QUICK: readonly { readonly label: string; readonly when?: string; readonly
 ];
 
 type Evaluated = { readonly version: number; readonly preview: readonly StoredRule[] | undefined; readonly looks: TableLooks | undefined };
+type Reader = { readonly inputsOf: (rule: Rule) => RuleCells[]; readonly columnLabel: (column: number) => string };
+
+/** A table with `${…}` cells shows what its expressions give: nothing read of it is kept, they change without its text */
+const hasExpressions = (table: Table): boolean => table.rows.some((r) => r.cells.some((c) => c.includes("${")));
 
 export class Conditions implements Feature {
   // Rules shown in a table instead of its own while the dialog (one at a time: the page's) edits them
   private preview: { readonly key: TableKey; readonly rules: readonly StoredRule[] } | undefined;
   // What a table's rules made of it, by the table (parsed tables are kept, so a table's text is one object)
   private evaluated = new WeakMap<Table, Evaluated>();
+  // A table's cells as rules read them, by the table: the looks and the dialog's sample read them alike, each change of
+  // a rule in the dialog reading them again (20 000 cells: about 90 ms each time)
+  private readers = new WeakMap<Table, Reader>();
   // What went wrong, said once per page visit
   private readonly said = new Set<string>();
 
@@ -113,6 +120,8 @@ export class Conditions implements Feature {
 
   /** Custom conditions or formats defined anew: tables with rules look as they say now */
   tablesChanged(): void {
+    // (A column type defined anew may read a value otherwise)
+    this.readers = new WeakMap();
     for (const info of this.host.shownTables()) if (this.rulesIn(parseTable(info.source)).length) this.host.looksChanged(info);
   }
 
@@ -150,8 +159,7 @@ export class Conditions implements Feature {
     const preview = this.preview?.key === info.key ? this.preview.rules : undefined;
     const version = definitionsVersion();
     const known = this.evaluated.get(table);
-    // A table with `${…}` cells shows what its expressions give: not kept, they change without its text
-    if (known && known.version === version && known.preview === preview && !table.rows.some((r) => r.cells.some((c) => c.includes("${")))) return known.looks;
+    if (known && known.version === version && known.preview === preview && !hasExpressions(table)) return known.looks;
     const looks = this.evaluate(info, table, preview ?? this.rulesIn(table));
     this.evaluated.set(table, { version, preview, looks });
     return looks;
@@ -179,10 +187,18 @@ export class Conditions implements Feature {
   }
 
   /**
-   * A table's cells as rules read them, each read once: `inputsOf` a rule's cells (body only, pinned rows and
+   * A table's cells as rules read them, each read once (and kept for the table: `readers`): `inputsOf` a rule's cells (body only, pinned rows and
    * columns out; a whole table's as one range, or a range for each column where the rule says so)
    */
-  private reader(info: TableInfo, table: Table): { readonly inputsOf: (rule: Rule) => RuleCells[]; readonly columnLabel: (column: number) => string } {
+  private reader(info: TableInfo, table: Table): Reader {
+    const known = this.readers.get(table);
+    if (known) return known;
+    const reader = this.readerOf(info, table);
+    if (!hasExpressions(table)) this.readers.set(table, reader);
+    return reader;
+  }
+
+  private readerOf(info: TableInfo, table: Table): Reader {
     const rowCount = table.rows.length;
     const header = table.rows[0]?.cells ?? [];
     const pins = this.host.pinsOf(table);

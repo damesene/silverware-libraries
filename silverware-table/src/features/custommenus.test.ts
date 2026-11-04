@@ -105,4 +105,31 @@ describe("Custom menu entries in a row's or a column's menu", () => {
     menuButtons(menu).find((b) => buttonLabel(b) === "Fails")!.click();
     expect(flashes).toContain("Silverware Table: the menu entries fine failed: bad");
   });
+
+  it("a submenu that fails as it opens is said; a position or priority none, an async lineMenu, give none and are said", async () => {
+    await define([
+      { name: "sub", lineMenu: (_: MenuEntriesContext, menu: LineMenuBuilder) => [menu.slot.custom({ name: "Sub" }, [menu.submenu({ label: "Broken" }, () => { throw new Error("no entries"); })])] },
+      { name: "old", lineMenu: (_: MenuEntriesContext, menu: LineMenuBuilder) => [menu.slot.custom({ name: "Old", position: "top" as never }, [menu.item({ label: "Old one", run: () => undefined })])] },
+      { name: "nan", lineMenu: (_: MenuEntriesContext, menu: LineMenuBuilder) => [menu.slot.custom({ name: "Nan", priority: Number.NaN }, [menu.item({ label: "Nan one", run: () => undefined })])] },
+      { name: "later", lineMenu: async () => [] },
+    ]);
+    const menu = openMenu(1, "column");
+    expect(labels(menu)).not.toContain("Old one");
+    expect(labels(menu)).not.toContain("Nan one");
+    expect(flashes).toContain(`Silverware Table: the menu entries old are not shown: a custom section's position is "primary" or "secondary", not "top"`);
+    expect(flashes).toContain("Silverware Table: the menu entries nan are not shown: a custom section's priority is no number: NaN");
+    expect(flashes.some((f) => f.startsWith("Silverware Table: the menu entries later are not shown: its lineMenu gave a promise"))).toBe(true);
+    menuButtons(menu).find((b) => buttonLabel(b).startsWith("Broken"))!.click();
+    expect(flashes).toContain("Silverware Table: the menu entries sub failed: no entries");
+  });
+
+  it("each definition is given its own copy of the context: one changing it changes nothing the next sees", async () => {
+    const seen: string[][] = [];
+    await define([
+      { name: "first", lineMenu: (context: MenuEntriesContext) => { (context.table.rows as string[][]).reverse(); return []; } },
+      { name: "second", lineMenu: (context: MenuEntriesContext) => { seen.push(context.table.rows.map((row) => row[0]!)); return []; } },
+    ]);
+    openMenu(1, "column");
+    expect(seen).toEqual([["Pear", "apple", "Fig"]]);
+  });
 });

@@ -771,7 +771,7 @@ export default [
 silverware.table.defineMenuEntries(js.importFromSpace("Library/me/menus.js"))
 ```
 
-* `lineMenu(context, menu)` returns a list of groups of entries, each made by `menu.slot`, which says where they go by what they do:
+* `lineMenu(context, menu)` returns a list of groups of entries (at once, as the menu opens: not `async`; an entry's `run` may be), each made by `menu.slot`, which says where they go by what they do:
   * `clipboard`, `edit` (what changes the cells, as Clear), `insert` (as *Insert numbered column left*), `columnType` (as Type), `view` (as Filter), `look` (as Conditional formatting), `remove` (as Remove metadata): beside Silverware Table's own of that kind;
   * `custom({ name, position, priority }, [...])`: a section of its own. Entries of one `name` (yours, or several plugins' giving that name) are one section, ordered by `priority` (a number, lower higher, decimals too; equal ones as they came); sections in the order their names first came. `position` says what its actions are among the menu's: `"primary"` (often used: under Copy, Cut, Paste and Clear) or `"secondary"` (the others: before Remove metadata and Delete, the default).
 * The entries: `menu.item({ label, icon, run, hint, disabled, danger, checked, value })`, `menu.submenu({ label, icon, value }, () => [...])` (its entries shown in the menu's place as it is chosen, made then), `menu.segmented({ label, options: [{ icon, title, run, active }] })` (a row of icon buttons, as Sort), `menu.separator()`. `icon` is an SVG's text, or left out. A `run` closes the menu; it may be `async`.

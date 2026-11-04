@@ -9,14 +9,17 @@
 import type { Feature, LineMenuBuilder, LineMenuGroup, LineMenuTarget, ModelHost, TableInfo } from "../core/feature.ts";
 import { locateBySource, parseTable } from "../markdown.ts";
 import { type MenuEntry, wrapRuns } from "../menu.ts";
-import { type MenuEntriesDefinition, menuEntriesDefinitions } from "../menus/custom.ts";
+import { type MenuEntriesContext, type MenuEntriesDefinition, menuEntriesDefinitions } from "../menus/custom.ts";
 import { tableData } from "../tabledata.ts";
 
 const SLOTS = new Set(["clipboard", "edit", "insert", "columnType", "view", "look", "remove"]);
-const KINDS = new Set(["item", "separator", "segmented", "actions", "tiles", "element"]);
+// (No element of a definition's own: the builder makes none, and one that is no node would break the whole menu)
+const KINDS = new Set(["item", "separator", "segmented", "actions", "tiles"]);
+const POSITIONS = new Set(["primary", "secondary"]);
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const isThenable = (v: unknown): v is PromiseLike<unknown> => isObject(v) && typeof v.then === "function";
 
 /** Why an entry is none a menu can show; undefined: it is one (the builder's are) */
 function entryProblem(entry: unknown): string | undefined {
@@ -33,6 +36,9 @@ function groupsProblem(groups: unknown): string | undefined {
     if (!isObject(group) || !Array.isArray(group.entries)) return "a group is none (made with menu.slot)";
     if (group.slot === "custom") {
       if (!isObject(group.custom) || typeof group.custom.name !== "string") return "a custom section has no name";
+      const { position, priority } = group.custom;
+      if (position !== undefined && !POSITIONS.has(position as string)) return `a custom section's position is "primary" or "secondary", not ${JSON.stringify(position)}`;
+      if (priority !== undefined && !(typeof priority === "number" && Number.isFinite(priority))) return `a custom section's priority is no number: ${String(priority)}`;
     } else if (typeof group.slot !== "string" || !SLOTS.has(group.slot)) return `a group's slot is no slot: ${String(group.slot)}`;
     for (const entry of group.entries) {
       const problem = entryProblem(entry);
@@ -53,33 +59,46 @@ export class CustomMenus implements Feature {
     if (!definitions.length) return [];
     const table = parseTable(info.source);
     const place = locateBySource(this.host.pageText, info.hint, info.source) ?? { from: info.hint, to: info.hint + info.source.length };
-    const context = {
+    const data = tableData(table, place, this.host.tableName(table), (column) => this.host.columnName(table, column));
+    // Each definition its own copy: one changing it (sorting the rows) changes nothing the next is given
+    const contextOf = (): MenuEntriesContext => ({
       axis: target.axis,
       at: target.at,
-      lines: target.lines,
+      lines: [...target.lines],
       page: this.host.currentPage,
-      table: tableData(table, place, this.host.tableName(table), (column) => this.host.columnName(table, column)),
-    };
+      table: { ...data, columns: data.columns.map((c) => ({ ...c })), rows: data.rows.map((row) => [...row]) },
+    });
     return definitions.flatMap((definition) => {
       // Its submenus' entries, made as they open, checked and guarded as its own
       const own: LineMenuBuilder = {
         ...menu,
         submenu: (item, entries) =>
           menu.submenu(item, () => {
-            const made = entries();
+            let made: unknown;
+            try {
+              made = entries();
+            } catch (e) {
+              this.failed(definition, message(e), true);
+              return [];
+            }
             const problem = Array.isArray(made) ? made.map(entryProblem).find((p) => p) : "a submenu gave no list of entries";
             if (problem) {
               this.failed(definition, problem, true);
               return [];
             }
-            return this.guarded(definition, made);
+            return this.guarded(definition, made as readonly MenuEntry[]);
           }),
       };
       let groups: unknown;
       try {
-        groups = definition.lineMenu(context, own);
+        groups = definition.lineMenu(contextOf(), own);
       } catch (e) {
         this.failed(definition, message(e));
+        return [];
+      }
+      if (isThenable(groups)) {
+        Promise.resolve(groups).catch(() => undefined);
+        this.failed(definition, "its lineMenu gave a promise: it runs as the menu opens, which does not wait (async is for an entry's run)");
         return [];
       }
       const problem = groupsProblem(groups);
@@ -96,7 +115,7 @@ export class CustomMenus implements Feature {
     return wrapRuns(entries, (run) => () => {
       try {
         const result: unknown = run();
-        if (result instanceof Promise) result.catch((e: unknown) => this.failed(definition, message(e), true));
+        if (isThenable(result)) Promise.resolve(result).catch((e: unknown) => this.failed(definition, message(e), true));
       } catch (e) {
         this.failed(definition, message(e), true);
       }

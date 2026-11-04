@@ -143,7 +143,8 @@ describe("Column types", () => {
       document.querySelector<HTMLElement>('.swt-menu [title="Edit the column\'s choices"]')!.click();
       const dialog = document.querySelector<HTMLElement>(".swt-choices-dialog")!;
       expect(dialog.querySelector<HTMLInputElement>('input[value="space"]')!.checked).toBe(true);
-      expect(dialog.querySelector(".swt-choices-space-values")!.textContent).toBe("Alpha, Beta");
+      expect(Array.from(dialog.querySelectorAll(".swt-choices-space-values .swt-choices-readonly"), (v) => v.textContent)).toEqual(["Alpha", "Beta"]);
+      expect(dialog.querySelector(".swt-choices-hint")!.textContent).toMatch(/^From a Space Lua script/);
       expect(dialog.querySelector<HTMLElement>(".swt-choices-values")!.closest<HTMLElement>(".swt-choices-list")!.hidden).toBe(true);
     });
   });

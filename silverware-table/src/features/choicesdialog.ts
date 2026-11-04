@@ -34,7 +34,7 @@ import { withoutTags } from "../tags.ts";
 type Way = "column" | "list" | "space";
 
 /** How many of a space's list's values the dialog shows */
-const SPACE_SHOWN = 30;
+const SPACE_SHOWN = 200;
 
 /** A value's row in the dialog: the value it was (none: added here) and its field */
 type ValueRow = { readonly original: string | undefined; readonly field: HTMLInputElement; readonly element: HTMLElement };
@@ -173,12 +173,20 @@ export class ChoicesDialog {
     const spaceField = el(doc, "select", { class: "swt-choices-space", attrs: { "aria-label": "The space's list" } });
     for (const name of spaceNames) spaceField.append(el(doc, "option", { text: name, attrs: { value: name } }));
     if (fromSpace) spaceField.value = was!;
+    // As the list of its own shows its values, one a row, but to read only
     const spaceValues = el(doc, "div", "swt-choices-space-values");
+    const spaceCount = el(doc, "span", "swt-choices-count");
     const showSpace = () => {
-      const values = spaceList(spaceField.value) ?? [];
-      const more = values.length - SPACE_SHOWN;
       const read = spaceList(spaceField.value);
-      spaceValues.textContent = !read ? "Not read yet" : values.length ? values.slice(0, SPACE_SHOWN).join(", ") + (more > 0 ? `, … and ${more} more` : "") : "No values";
+      spaceCount.textContent = read ? `· ${read.length}` : "";
+      // A query's list may be long: the first SPACE_SHOWN, the rest counted
+      const more = (read?.length ?? 0) - SPACE_SHOWN;
+      spaceValues.replaceChildren(
+        ...(read?.length
+          ? read.slice(0, SPACE_SHOWN).map((value) => el(doc, "div", "swt-choices-row", el(doc, "span", "swt-choices-readonly", value)))
+          : [el(doc, "span", "swt-choices-empty", read ? "No values" : "Not read yet")]),
+        ...(more > 0 ? [el(doc, "span", "swt-choices-empty", `… and ${more} more`)] : []),
+      );
     };
     spaceField.addEventListener("change", showSpace);
     showSpace();
@@ -187,7 +195,7 @@ export class ChoicesDialog {
       "div",
       "swt-choices-from-space",
       el(doc, "label", "swt-choices-label", el(doc, "span", "", "List"), spaceField),
-      el(doc, "div", "swt-choices-label", "Values"),
+      el(doc, "div", "swt-choices-label", "Values", spaceCount),
       spaceValues,
     );
 
@@ -231,7 +239,19 @@ export class ChoicesDialog {
       values,
       el(doc, "div", "swt-choices-actions", addButton, takeButton),
     );
-    const wayOption = (value: Way, title: string, text: string, disabled?: string) => {
+    // The ways as one row of segments (radio buttons, so the keys and a screen reader know them), what the one
+    // picked does in a line under them
+    const HINTS: Record<Way, string> = {
+      column: "The editor offers the values the column has; nothing is checked. #choice",
+      list: "Kept in this table: values not in it are marked, the column sorts in its order. A value renamed is renamed in the cells; one removed leaves its cells marked.",
+      space: "From a Space Lua script (silverware.table.defineChoices), read anew as the space changes; changed in the script.",
+    };
+    const hint = el(doc, "p", "swt-choices-hint");
+    // Why Own list cannot be picked, shown (not only as a tooltip: a touch screen has none)
+    const unstorable = "Own list: lists are kept in the table's metadata; turn on Store table metadata in the settings.";
+    const reason = el(doc, "p", { class: "swt-choices-hint", text: unstorable });
+    reason.hidden = storable;
+    const wayOption = (value: Way, title: string, disabled?: string) => {
       const radio = el(doc, "input", { attrs: { type: "radio", name: "swt-choices-way", value } });
       radio.checked = way === value;
       radio.disabled = disabled !== undefined;
@@ -240,25 +260,26 @@ export class ChoicesDialog {
         own = value === "list";
         show();
       });
-      return el(doc, "label", { class: "swt-choices-way", ...(disabled ? { title: disabled } : {}) }, radio, el(doc, "span", "", el(doc, "b", "", title), el(doc, "span", "swt-choices-way-text", disabled ?? text)));
+      return el(doc, "label", { class: "swt-choices-way", title: disabled ?? HINTS[value] }, radio, el(doc, "span", "", title));
     };
     const ways = el(
       doc,
       "div",
       { class: "swt-choices-ways", attrs: { role: "radiogroup", "aria-label": "Values" } },
-      wayOption("column", "The column's values", "The editor offers the values the column has; nothing is checked. #choice"),
-      wayOption("list", "A list of its own", "Only the list's values; others are marked, and the column sorts in the list's order.", storable ? undefined : "Lists are kept in the table's metadata: turn on Store table metadata in the settings."),
-      ...(spaceNames.length ? [wayOption("space", "A list of the space", "Values a Space Lua script gives (silverware.table.defineChoices), read anew as the space changes.")] : []),
+      wayOption("column", "Column's values"),
+      wayOption("list", "Own list", storable ? undefined : unstorable),
+      // Only where Space Lua defines a list
+      ...(spaceNames.length ? [wayOption("space", "Space list")] : []),
     );
     const show = () => {
       listPart.hidden = way !== "list";
       spacePart.hidden = way !== "space";
+      hint.textContent = HINTS[way];
       note.classList.remove("swt-choices-problem");
-      note.textContent =
-        way === "list" ? "Renaming a value renames it in the cells; a value removed leaves its cells marked." : way === "space" ? "The list is changed in the script that defines it." : "";
+      note.textContent = "";
     };
     show();
-    const content = el(doc, "div", "swt-choices-form", ways, listPart, spacePart);
+    const content = el(doc, "div", "swt-choices-form", ways, hint, reason, listPart, spacePart);
     const footer = el(doc, "div", "swt-choices-foot", note, cancel, saveButton);
     this.dialog = this.host.openDialog({
       title: "Choices",

@@ -637,7 +637,7 @@ A `#choice` column takes one of a list of values, as a status column (open, in p
 | <meta core.table columntypes.choice.status='["open","in progress","done"]'> |
 ```
 
-* Picking *Choice* in the *Type* menu opens the *Choices* dialog (so does the pencil in the column's *Type: Choice* row): *The column's values* makes it `#choice`, which offers the values the column has and checks nothing; *A list of its own* sets up a list: its name, and its values one a line (dragged by the ⠿ left of each, or Alt+↑ ↓, to order them, Enter for a new one, *Take values from the column* to add those the column has). A new list starts with the column's values and is named after the column. Lists are kept in the table's metadata, so saving one needs the *Store table metadata* setting. Nothing changes until Save.
+* Picking *Choice* in the *Type* menu opens the *Choices* dialog (so does the pencil in the column's *Type: Choice* row). Its row at the top picks where the values come from, what each does in a line under it: *Column's values* makes it `#choice`, which offers the values the column has and checks nothing; *Own list* sets up a list: its name, and its values one a line (dragged by the ⠿ left of each, or Alt+↑ ↓, to order them, Enter for a new one, *Take values from the column* to add those the column has). A new list starts with the column's values and is named after the column. Lists are kept in the table's metadata, so saving one needs the *Store table metadata* setting. Nothing changes until Save.
 * Renaming a value in the *Choices* dialog renames it in the cells of every column that takes the list; renaming the list renames it in their headers. A value removed from the list stays in its cells, marked.
 * The cell editor offers the list's values; a value not in the list is kept as typed and marked in red. Values match whatever their case.
 * Sorting by the column puts the values in the list's order (open, in progress, done), not the alphabet's.
@@ -659,7 +659,7 @@ end)
 * Any table's column `#choice-projects` then takes it, as it would a list of its own: values not in it are marked, the column sorts in its order, the editor offers them. A list the table keeps under the same name comes first.
 * The function runs when Space Lua loads, and again a moment after SilverBullet indexes a page, so the list follows the space (a new project shows in the editor's choices about a second after its page is saved). Nothing is written into the tables.
 * It returns a list of texts (numbers are taken as texts); each value counts once, empty ones are left out.
-* The space's lists show under *Choice* in the *Type* menu, to take for a column, and in the *Choices* dialog as *A list of the space*, with their values. They are changed in the script, not there.
+* The space's lists show under *Choice* in the *Type* menu, to take for a column, and in the *Choices* dialog as *Space list*, with their values. They are changed in the script, not there.
 * A function that fails, or returns no list, is shown in a notification (once, until the problem changes); the list keeps the values it had. Until it has run once, the column checks nothing.
 
 ### Custom column types

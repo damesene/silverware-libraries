@@ -55,7 +55,7 @@ type Setting = string | number | boolean;
 /** The SilverBullet client of the page, as SilverBullet's own end-to-end tests reach it */
 type Client = {
   editorView: {
-    state: { doc: { length: number; toString(): string } };
+    state: { doc: { length: number; toString(): string; lineAt(pos: number): { text: string } }; selection: { main: { head: number } } };
     dispatch(spec: { changes: { from: number; to: number; insert: string }; selection?: { anchor: number } }): void;
   };
   ui: { viewState: { unsavedChanges: boolean } };
@@ -277,6 +277,22 @@ export const markdown = (page: Page): Promise<string> =>
   target === "silverbullet"
     ? page.evaluate(() => (window as unknown as { client: Client }).client.editorView.state.doc.toString())
     : page.locator("#source").inputValue();
+
+/** The line of the page's text the editor's cursor is on (in the playground, its textarea's) */
+export async function cursorLine(page: Page): Promise<string> {
+  if (target === "silverbullet") {
+    return page.evaluate(() => {
+      const view = (window as unknown as { client: Client }).client.editorView;
+      return view.state.doc.lineAt(view.state.selection.main.head).text;
+    });
+  }
+  return page.evaluate(() => {
+    const source = document.querySelector<HTMLTextAreaElement>("#source")!;
+    const start = source.value.lastIndexOf("\n", source.selectionStart - 1) + 1;
+    const end = source.value.indexOf("\n", source.selectionStart);
+    return source.value.slice(start, end < 0 ? undefined : end);
+  });
+}
 
 /** A notification shown (SilverBullet's flash notification, or the playground's) with this text */
 export const notification = (page: Page, hasText: string | RegExp): Locator =>

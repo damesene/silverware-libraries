@@ -33,6 +33,7 @@ import {
   type ToolbarButton,
   type TableInfo,
 } from "../core/feature.ts";
+import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
 import { watchPress } from "../core/press.ts";
 import { insertRowWith } from "../core/structure.ts";
 import { appendRowAt } from "../pins.ts";
@@ -540,20 +541,21 @@ export class Selection implements Feature {
     return this.selection?.key === info.key ? this.refs() : undefined;
   }
 
-  /** Clear in the menu of rows (columns): their cells (a column's header keeps its name), after the clipboard's entries */
-  lineMenuEntries(info: TableInfo, axis: "row" | "column", lines: readonly number[]): MenuEntry[] {
+  /** Clear in the menu of rows (columns): their cells (a column's header keeps its name) */
+  lineMenu(info: TableInfo, { axis, lines }: LineMenuTarget, menu: LineMenuBuilder): LineMenuGroup[] {
     const rows = axis === "row" ? lines : Array.from({ length: info.rows - 1 }, (_, i) => i + 1);
     const columns = axis === "row" ? Array.from({ length: info.columns }, (_, c) => c) : lines;
     const cells = rows.flatMap((row) => columns.map((column) => ({ row, column })));
     const name = `${lines.length > 1 ? `${lines.length} ` : ""}${axis}${lines.length > 1 ? "s" : ""}`;
     return [
-      {
-        kind: "item",
-        label: `Clear ${name}`,
-        icon: ICONS.clear,
-        hint: axis === "row" ? "Empty the cells, formulas included, as Delete does" : "Empty the cells under the header (it keeps its name), as Delete does",
-        run: () => void this.empty(info, cells),
-      },
+      menu.slot.edit(
+        menu.item({
+          label: `Clear ${name}`,
+          icon: ICONS.clear,
+          hint: axis === "row" ? "Empty the cells, formulas included, as Delete does" : "Empty the cells under the header (it keeps its name), as Delete does",
+          run: () => void this.empty(info, cells),
+        }),
+      ),
     ];
   }
 

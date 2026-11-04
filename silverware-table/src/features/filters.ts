@@ -37,7 +37,7 @@ import { ICONS } from "../icons.ts";
 import { parseTable } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
 import { asNumber } from "../view.ts";
-import type { TableKey } from "../core/feature.ts";
+import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget, TableKey } from "../core/feature.ts";
 
 // A column with at most this many different values offers them to tick
 const MAX_VALUES = 12;
@@ -269,23 +269,25 @@ class FilterTable {
     };
   }
 
-  /** "Filter" in a column's menu: its filter in a bubble under its header, and a × removing it */
-  columnMenuEntries(info: TableInfo, column: number): MenuEntry[] {
+  /** "Filter" in a column's menu (how it shows): its filter in a bubble under its header, and a × removing it */
+  lineMenu(info: TableInfo, { axis, at: column }: LineMenuTarget, menu: LineMenuBuilder): LineMenuGroup[] {
+    if (axis !== "column") return [];
     const filtered = (this.filtersOf(info)[column] ?? "").trim() !== "";
     return [
-      {
-        kind: "segmented",
-        label: "Filter",
-        options: [
-          { icon: ICONS.filter, title: "Filter this column", run: () => this.module.openFilter(info, column) },
-          {
-            icon: ICONS.clear,
-            title: "Remove this column's filter",
-            run: () => this.clear(column),
-            ...(filtered ? {} : { disabled: "This column is not filtered" }),
-          },
-        ],
-      },
+      menu.slot.view(
+        menu.segmented({
+          label: "Filter",
+          options: [
+            { icon: ICONS.filter, title: "Filter this column", run: () => this.module.openFilter(info, column) },
+            {
+              icon: ICONS.clear,
+              title: "Remove this column's filter",
+              run: () => this.clear(column),
+              ...(filtered ? {} : { disabled: "This column is not filtered" }),
+            },
+          ],
+        }),
+      ),
     ];
   }
 

@@ -488,6 +488,57 @@ export const CELL_MENU_ORDER = { clipboard: -1, naming: 0, editing: 1, inserting
 /** The cell menu's slots whose entries change the cells: left out where the cells are not changed by hand (Feature.readOnly) */
 export const CELL_MENU_CHANGES: ReadonlySet<number> = new Set([CELL_MENU_ORDER.editing, CELL_MENU_ORDER.inserting, CELL_MENU_ORDER.filling, CELL_MENU_ORDER.deleting]);
 
+/**
+ * What a row's or a column's menu is for: its line `at` (a markdown row or
+ * column), and `lines`, those its actions act on (the lines selected whole
+ * that hold it, else it)
+ */
+export type LineMenuTarget = { readonly axis: "row" | "column"; readonly at: number; readonly lines: readonly number[] };
+
+/** The slots of a row's or a column's menu, by what their entries do (LineMenuSlots says each) */
+export type LineMenuSlot = "clipboard" | "edit" | "insert" | "columnType" | "view" | "look" | "remove";
+
+/** A module's entries in a slot of a row's or a column's menu */
+export type LineMenuGroup = { readonly slot: LineMenuSlot; readonly entries: readonly MenuEntry[] };
+
+/** Entries put in a slot, by what they do; where each slot shows is the menu's */
+export type LineMenuSlots = {
+  /** Copying, cutting and pasting the lines (the clipboard's bar) */
+  readonly clipboard: (...entries: readonly MenuEntry[]) => LineMenuGroup;
+  /** What changes their cells (Clear); not shown where those are not changed by hand (a pivot's) */
+  readonly edit: (...entries: readonly MenuEntry[]) => LineMenuGroup;
+  /** What inserts lines beside them (a numbered column); not shown where the table's shape is fixed */
+  readonly insert: (...entries: readonly MenuEntry[]) => LineMenuGroup;
+  /** What a column is (its type); a column's menu only */
+  readonly columnType: (...entries: readonly MenuEntry[]) => LineMenuGroup;
+  /** How a column shows (its filter, its width); a column's menu only */
+  readonly view: (...entries: readonly MenuEntry[]) => LineMenuGroup;
+  /** How a column's cells look (conditional formatting); a column's menu only */
+  readonly look: (...entries: readonly MenuEntry[]) => LineMenuGroup;
+  /** What takes something off the lines (Remove metadata) */
+  readonly remove: (...entries: readonly MenuEntry[]) => LineMenuGroup;
+};
+
+type EntryOf<K extends MenuEntry["kind"]> = Omit<Extract<MenuEntry, { readonly kind: K }>, "kind">;
+
+/**
+ * What a row's or a column's menu gives the modules to make their entries
+ * with: the slots, the entries (values, as the menu shows them), a submenu
+ * in the menu's place. Given, not imported, so a definition outside
+ * Silverware Table's bundle could use it too
+ */
+export type LineMenuBuilder = {
+  readonly slot: LineMenuSlots;
+  readonly item: (item: EntryOf<"item">) => MenuEntry;
+  /** An item showing `entries` in the menu's place (titled by its label, a way back), made as it is chosen */
+  readonly submenu: (item: Omit<EntryOf<"item">, "run" | "submenu">, entries: () => readonly MenuEntry[]) => MenuEntry;
+  readonly segmented: (row: EntryOf<"segmented">) => MenuEntry;
+  readonly actions: (bar: EntryOf<"actions">) => MenuEntry;
+  readonly separator: () => MenuEntry;
+  /** Shows `entries` in the menu's place, titled `title` (a list a row's button opens) */
+  readonly open: (title: string, entries: readonly MenuEntry[]) => void;
+};
+
 /** A group of entries in the cell menu, between separators (CELL_MENU_ORDER) */
 export type CellMenuGroup = { readonly order: number; readonly entries: readonly MenuEntry[] };
 
@@ -819,23 +870,8 @@ export interface ModelHost {
   fillCell(info: TableInfo, cell: string, from: CellRef, to: CellRef): string | undefined;
   /** Keyboard and input events from a field of a feature must not reach SilverBullet's editor */
   isolate(element: HTMLElement): void;
-  /**
-   * The entries features add to a column's menu (see Feature.columnMenuEntries);
-   * `open` shows other entries in the menu's place, e.g. a list to pick from
-   */
-  columnMenuEntries(info: TableInfo, column: number, open: (title: string, entries: readonly MenuEntry[]) => void): MenuEntry[];
-  /** The entries features put first in a column's menu's section of sorting and filtering (see Feature.columnMenuLeadEntries) */
-  columnMenuLeadEntries(info: TableInfo, column: number, open: (title: string, entries: readonly MenuEntry[]) => void): MenuEntry[];
-  /** The entries features add at the top of a column's menu (see Feature.columnMenuTopEntries) */
-  columnMenuTopEntries(info: TableInfo, column: number): MenuEntry[];
-  /** The entries features add with inserting and moving a column (see Feature.columnMenuInsertEntries) */
-  columnMenuInsertEntries(info: TableInfo, column: number): MenuEntry[];
-  /** The entries features add to a row's menu, for the cell in `column` (see Feature.rowMenuEntries) */
-  rowMenuEntries(info: TableInfo, row: number, column: number): MenuEntry[];
-  /** The entries features add first to the menu of rows (columns) `lines` (see Feature.lineMenuEntries) */
-  lineMenuEntries(info: TableInfo, axis: "row" | "column", lines: readonly number[]): MenuEntry[];
-  /** The entries features add last to the menu of rows (columns) `lines`, before Delete (see Feature.lineMenuEndEntries) */
-  lineMenuEndEntries(info: TableInfo, axis: "row" | "column", lines: readonly number[]): MenuEntry[];
+  /** The entries features give a row's or a column's menu, in their slots (see Feature.lineMenu) */
+  lineMenu(info: TableInfo, target: LineMenuTarget, menu: LineMenuBuilder): readonly LineMenuGroup[];
   /** A setting's value, its default when unset or not valid */
   setting<K extends keyof typeof SETTINGS>(name: K): Promise<SettingValue<K>>;
   /** The metadata setting as last read */
@@ -1009,18 +1045,11 @@ export interface Feature {
    */
   tableLook?(table: Table): TableLook | undefined;
   /**
-   * Entries for a column's menu, after its sorting; `open` shows other
-   * entries in the menu's place (they close the menu when run)
+   * Entries for the menu of a row or a column (its grip's), each group in
+   * the slot of what its entries do (`menu.slot.look(…)`: LineMenuSlots);
+   * where a slot shows is the menu's. `menu` makes the groups and entries.
    */
-  columnMenuEntries?(info: TableInfo,
-    column: number,
-    open: (title: string, entries: readonly MenuEntry[]) => void,
-  ): MenuEntry[];
-  /** As columnMenuEntries, first in that section, before the sorting: what the column is (its type) */
-  columnMenuLeadEntries?(info: TableInfo,
-    column: number,
-    open: (title: string, entries: readonly MenuEntry[]) => void,
-  ): MenuEntry[];
+  lineMenu?(info: TableInfo, target: LineMenuTarget, menu: LineMenuBuilder): readonly LineMenuGroup[];
   /**
    * Entries for the menu of a cell, or of cells (selected), opened with a right
    * click, a long press or the Menu key, in groups; `order` places a group (0
@@ -1039,24 +1068,6 @@ export interface Feature {
   selectCells?(info: TableInfo, anchor: CellRef, focus: CellRef): void;
   /** The cells selected in the table (as shown), if any */
   selected?(info: TableInfo): readonly CellRef[] | undefined;
-  /** Entries at the top of a column's menu, before its sorting (naming the column); they close the menu when run */
-  columnMenuTopEntries?(info: TableInfo, column: number): MenuEntry[];
-  /** Entries with inserting and moving the column in its menu, after them (a numbered column); they close the menu when run */
-  columnMenuInsertEntries?(info: TableInfo, column: number): MenuEntry[];
-  /** Entries at the top of a row's menu, about its cell in `column` (the one under the pointer or edited); they close the menu when run */
-  rowMenuEntries?(info: TableInfo, row: number, column: number): MenuEntry[];
-  /**
-   * Entries first in the menu of rows (columns): `lines`, those its grip acts
-   * on (the lines selected whole that hold its own, else it), markdown rows or
-   * columns; they close the menu when run (the clipboard's: copy, cut, paste)
-   */
-  lineMenuEntries?(info: TableInfo, axis: "row" | "column", lines: readonly number[]): MenuEntry[];
-  /**
-   * Entries last in the menu of rows (columns) `lines` (as lineMenuEntries),
-   * in the section before Delete: what takes something off them (Remove
-   * metadata); they close the menu when run
-   */
-  lineMenuEndEntries?(info: TableInfo, axis: "row" | "column", lines: readonly number[]): MenuEntry[];
   /** Buttons for the table's toolbar, shown while the pointer is over the table */
   toolbarButtons?(info: TableInfo): ToolbarButton[];
   /** Its commands (SilverBullet's command palette, and slash commands), a module's while it is on */

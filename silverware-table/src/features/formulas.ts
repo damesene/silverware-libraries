@@ -12,6 +12,7 @@
 
 import { columnIdOf } from "../columns.ts";
 import { CELL_MENU_ORDER } from "../core/feature.ts";
+import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
 import type {
   AddressFrame,
   CellEditor,
@@ -83,7 +84,6 @@ import { FunctionDialog } from "./functiondialog.ts";
 import { el } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
 import { escapeCell, locateBySource, type OtherPages, type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
-import type { MenuEntry } from "../menu.ts";
 import { sameTableName } from "../namerules.ts";
 import { insertColumn, setCell } from "../ops.ts";
 import { insertColumnAt } from "../pins.ts";
@@ -372,7 +372,8 @@ export class Formulas implements Feature {
    * in every row, a calculated column (rows added later get it too). As many
    * as wanted. New formulas need the metadata setting.
    */
-  columnMenuInsertEntries(info: TableInfo, column: number): MenuEntry[] {
+  lineMenu(info: TableInfo, { axis, at: column }: LineMenuTarget, menu: LineMenuBuilder): LineMenuGroup[] {
+    if (axis !== "column") return [];
     const insert = insertColumnAt(info.pins, info.columns, column);
     // New formulas in new cells
     const blocked = !this.host.canStoreCellTag("", "f")
@@ -383,14 +384,15 @@ export class Formulas implements Feature {
           ? "Columns pinned to the right stay at the right"
           : undefined;
     return [
-      {
-        kind: "item",
-        label: "Insert numbered column left",
-        icon: ICONS.columnLeft,
-        hint: "A column numbering the rows: =ROW() in each",
-        disabled: blocked,
-        run: () => void this.insertNumbered(info, column),
-      },
+      menu.slot.insert(
+        menu.item({
+          label: "Insert numbered column left",
+          icon: ICONS.columnLeft,
+          hint: "A column numbering the rows: =ROW() in each",
+          disabled: blocked,
+          run: () => void this.insertNumbered(info, column),
+        }),
+      ),
     ];
   }
 

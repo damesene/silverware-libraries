@@ -27,7 +27,7 @@ Not in scope: arbitrary address ranges (`B2:D9`) as a scope (they break on every
 - **Custom definitions**: `defineTypes` / `defineSeries` in `index.ts`, the API page's priority-50 block, a domain's `registry.ts` and `custom.ts` (definitions checked, HELPERS, a mistake a notification, replaced as Space Lua loads again, `tablesChanged` telling modules). A test requires the built-in ones' syntax and description in the library page.
 - **Custom styles found at run time**: `themesInStyles` walks the style sheets for `data-swt-theme="…"` selectors. Not used here: formats are JS (see *The API*).
 - **Filter syntax** (`filter.ts parseFilter`, pure): `>10`, `=a|b`, `/regex/flags`, `!…`, what a filter field accepts. One condition can take it whole, so a user writes a condition as they filter.
-- **Menus and dialogs**: `columnMenuEntries`, `cellMenuEntries`, `toolbarButtons` with `place: "menu"` (the ⋯ menu), `host.openDialog`, `host.previewTable` (a small table looking as the page's, used for the themes' previews).
+- **Menus and dialogs**: `lineMenu` (its `look` slot, under a column's alignment), `cellMenuEntries`, `toolbarButtons` with `place: "menu"` (the ⋯ menu), `host.openDialog`, `host.previewTable` (a small table looking as the page's, used for the themes' previews).
 - **A module turned off is not loaded** (`FEATURE_NAMES`, `MODULE_CATEGORY`, `MODULE_LABELS`, `MODULE_DESCRIPTIONS` in bridge.ts): its rules stay in the tables, unused.
 
 ## Design

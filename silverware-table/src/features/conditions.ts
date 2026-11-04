@@ -15,6 +15,7 @@
 // the cell menu; every change shows in the table before it is saved.
 import { columnKey, columnName } from "../columns.ts";
 import { CELL_MENU_ORDER, type CellLook, type CellMenuGroup, type CellRef, type Feature, type ModelHost, type TableInfo, type TableKey, type TableLooks, type ToolbarButton, type WriteResult } from "../core/feature.ts";
+import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
 import type { ColumnTypesOffer } from "../columntypes/index.ts";
 import {
   cellOf,
@@ -377,8 +378,9 @@ export class Conditions implements Feature {
     return count ? [{ label: "Conditional formatting", title, icon: ICONS.conditions, place: "icon", pressed: true, run: () => this.openDialog(info) }, menu] : [menu];
   }
 
-  /** Conditional formatting in a column's menu: quick rules for the column, the table's rules, the column's cleared */
-  columnMenuEntries(info: TableInfo, column: number, open: (title: string, entries: readonly MenuEntry[]) => void): MenuEntry[] {
+  /** Conditional formatting in a column's menu (how its cells look): quick rules for the column, the table's rules, the column's cleared */
+  lineMenu(info: TableInfo, { axis, at: column }: LineMenuTarget, menu: LineMenuBuilder): LineMenuGroup[] {
+    if (axis !== "column") return [];
     const table = parseTable(info.source);
     const pins = this.host.pinsOf(table);
     const columns = table.rows[0]?.cells.length ?? 0;
@@ -408,15 +410,17 @@ export class Conditions implements Feature {
       },
     ];
     return [
-      {
-        kind: "item",
-        label: "Conditional formatting",
-        icon: ICONS.conditions,
-        submenu: true,
-        ...(own.length ? { value: { text: `${own.length}` } } : {}),
-        ...(blocked && !own.length ? { disabled: blocked } : {}),
-        run: () => open("Conditional formatting", entries()),
-      },
+      menu.slot.look(
+        menu.submenu(
+          {
+            label: "Conditional formatting",
+            icon: ICONS.conditions,
+            ...(own.length ? { value: { text: `${own.length}` } } : {}),
+            ...(blocked && !own.length ? { disabled: blocked } : {}),
+          },
+          entries,
+        ),
+      ),
     ];
   }
 

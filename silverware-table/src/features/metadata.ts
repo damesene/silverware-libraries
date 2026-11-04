@@ -8,6 +8,7 @@
 // columns from their menu (a column's attributes in the metadata row too).
 import { FEATURE_NAMES, MODULE_LABELS } from "../bridge.ts";
 import { CELL_MENU_ORDER, type CellMenuGroup, type CellRef, type Feature, type ModelHost, type ToolbarButton, type TableInfo } from "../core/feature.ts";
+import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
 import { findTables, minimalEdit, parseTable, serializeTable, type Table } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
@@ -126,12 +127,12 @@ export class Metadata implements Feature {
   }
 
   /** Remove metadata in the menu of rows (columns): their cells, a column's header too, and the columns' attributes */
-  lineMenuEndEntries(info: TableInfo, axis: "row" | "column", lines: readonly number[]): MenuEntry[] {
+  lineMenu(info: TableInfo, { axis, lines }: LineMenuTarget, menu: LineMenuBuilder): LineMenuGroup[] {
     const rows = axis === "row" ? lines : Array.from({ length: info.rows }, (_, row) => row);
     const columns = axis === "row" ? Array.from({ length: info.columns }, (_, column) => column) : lines;
     const part = { cells: rows.flatMap((row) => columns.map((column) => ({ row, column }))), columns: new Set(axis === "column" ? lines : []) };
     const entry = this.partEntry(info, part, lines.length === 1 ? `this ${axis}` : `these ${lines.length} ${axis}s`);
-    return entry ? [entry] : [];
+    return entry ? [menu.slot.remove(entry)] : [];
   }
 
   /** Remove metadata for a part of the table, where it has some */

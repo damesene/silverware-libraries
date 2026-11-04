@@ -21,6 +21,7 @@ import {
   type ModelHost,
   type TableInfo,
 } from "../core/feature.ts";
+import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
 import type { MenuEntry } from "../menu.ts";
 import { cellMoveRules, growTo, moveRowsTo } from "../core/structure.ts";
 import { ICONS } from "../icons.ts";
@@ -185,7 +186,7 @@ export class Paste implements Feature {
    * their first cell (a column's header: a column copied names it), rows also
    * as new rows.
    */
-  lineMenuEntries(info: TableInfo, axis: "row" | "column", lines: readonly number[]): MenuEntry[] {
+  lineMenu(info: TableInfo, { axis, lines }: LineMenuTarget, menu: LineMenuBuilder): LineMenuGroup[] {
     const first = Math.min(...lines);
     if (!Number.isFinite(first)) return [];
     const rows = axis === "row" ? lines : this.host.shownOrder(info);
@@ -196,15 +197,17 @@ export class Paste implements Feature {
     // A column's from its header: a column copied with it names it, anything else goes under it (pasteFromMenu)
     const at = axis === "row" ? { row: first, column: 0 } : { row: 0, column: first };
     return [
-      this.clipboardBar(info, {
-        copied: cells,
-        cut: body.length ? body : undefined,
-        cutBlocked: "No cells under the header to cut",
-        at,
-        name,
-        asRows: axis === "row",
-        fromHeader: axis === "column",
-      }),
+      menu.slot.clipboard(
+        this.clipboardBar(info, {
+          copied: cells,
+          cut: body.length ? body : undefined,
+          cutBlocked: "No cells under the header to cut",
+          at,
+          name,
+          asRows: axis === "row",
+          fromHeader: axis === "column",
+        }),
+      ),
     ];
   }
 

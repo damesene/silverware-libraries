@@ -14,10 +14,9 @@
 // table moving as it gets narrower, cannot feed back into it. The widths are
 // the module's (columnWidths); the core shows them, and the handles (a handle
 // layer per table, as every table's headers have them).
-import { type Feature, type HandleLayer, type ModelHost, type PartTable, type TableInfo, type TableKey, tablePartsOf, type ToolbarButton } from "../core/feature.ts";
+import { type Feature, type HandleLayer, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type ModelHost, type PartTable, type TableInfo, type TableKey, tablePartsOf, type ToolbarButton } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
 import { parseTable } from "../markdown.ts";
-import type { MenuEntry } from "../menu.ts";
 
 // The narrowest a column can be dragged to, in pixels
 const MIN_WIDTH = 40;
@@ -147,18 +146,21 @@ class TableWidths {
     ];
   }
 
-  columnMenuEntries(info: TableInfo, column: number): MenuEntry[] {
+  /** Auto width in a column's menu (how it shows), where its width is set */
+  lineMenu(info: TableInfo, { axis, at: column }: LineMenuTarget, menu: LineMenuBuilder): LineMenuGroup[] {
+    if (axis !== "column") return [];
     const grid = this.host.addressFrame(info);
     const width = grid ? grid.columnWidth(column) : this.widthsOf(info).get(column);
     if (width === undefined) return [];
     return [
-      {
-        kind: "item",
-        label: "Auto width",
-        icon: ICONS.columnWidth,
-        hint: `The column is ${width}px wide: make it as wide as its text`,
-        run: () => void this.set(this.table.current() ?? info, column, undefined),
-      },
+      menu.slot.view(
+        menu.item({
+          label: "Auto width",
+          icon: ICONS.columnWidth,
+          hint: `The column is ${width}px wide: make it as wide as its text`,
+          run: () => void this.set(this.table.current() ?? info, column, undefined),
+        }),
+      ),
     ];
   }
 }

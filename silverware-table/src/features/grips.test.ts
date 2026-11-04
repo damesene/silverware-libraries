@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
+import type { LineMenuGroup } from "../core/feature.ts";
 import { bodyTexts, buttonLabel, cell, clickOn, controller, editor, flush, key, menuButtons, PAGE, setup, text, useTablePage } from "../testing/page.ts";
+import { customSections } from "./grips.ts";
 
 describe("Row and column grips", () => {
   useTablePage();
@@ -470,5 +472,36 @@ describe("Row and column grips", () => {
         vi.restoreAllMocks();
       }
     });
+  });
+});
+
+describe("A line menu's sections of their own", () => {
+  const item = (label: string) => ({ kind: "item", label, run: () => undefined }) as const;
+  const custom = (name: string, labels: string[], more: { position?: "top" | "bottom"; priority?: number } = {}): LineMenuGroup => ({
+    slot: "custom",
+    custom: { name, ...more },
+    entries: labels.map(item),
+  });
+  const labels = (sections: ReturnType<typeof customSections>) => sections.map((entries) => entries.map((e) => (e.kind === "item" ? e.label : e.kind)));
+
+  it("are one section a name, as the names first came, a section's blocks by priority, equal ones as they came", () => {
+    const groups: LineMenuGroup[] = [
+      custom("Git", ["blame"], { priority: 2 }),
+      custom("Export", ["csv"]),
+      { slot: "look", entries: [item("Conditional formatting")] },
+      custom("Git", ["history"], { priority: 1 }),
+      custom("Git", ["log"], { priority: 2 }),
+      custom("Export", ["json"], { priority: -1 }),
+    ];
+    expect(labels(customSections(groups, "bottom"))).toEqual([
+      ["history", "blame", "log"],
+      ["json", "csv"],
+    ]);
+  });
+
+  it("go where they say, bottom by default; an empty one none", () => {
+    const groups: LineMenuGroup[] = [custom("Top", ["a"], { position: "top" }), custom("Bottom", ["b"]), custom("Empty", [], { position: "top" })];
+    expect(labels(customSections(groups, "top"))).toEqual([["a"]]);
+    expect(labels(customSections(groups, "bottom"))).toEqual([["b"]]);
   });
 });

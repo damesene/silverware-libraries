@@ -48,6 +48,25 @@ const COLUMN_GRIP_LENGTH = 44;
 
 const PIN_NEEDS_METADATA = "Pinning is stored in the table: turn on the Store table metadata setting (unpinning always works)";
 
+/**
+ * The sections of their own (`custom`) at a position of a row's or a
+ * column's menu, each its entries: one per name, as the names first came;
+ * a section's blocks by priority (lower first; equal: as they came)
+ */
+export function customSections(groups: readonly LineMenuGroup[], position: "top" | "bottom"): MenuEntry[][] {
+  const blocks = groups.flatMap((group) => (group.slot === "custom" && (group.custom.position ?? "bottom") === position ? [group] : []));
+  const names = [...new Set(blocks.map((block) => block.custom.name))];
+  return names
+    .map((name) =>
+      blocks
+        .filter((block) => block.custom.name === name)
+        // (A stable sort)
+        .sort((a, b) => (a.custom.priority ?? 0) - (b.custom.priority ?? 0))
+        .flatMap((block) => block.entries),
+    )
+    .filter((entries) => entries.length > 0);
+}
+
 export class Grips implements Feature {
   private readonly rowGrip: HTMLButtonElement;
   private readonly columnGrip: HTMLButtonElement;
@@ -680,9 +699,10 @@ export class Grips implements Feature {
     const fixed = !!host.fixedShape(parseTable(info.source));
     const shape = (entries: MenuEntry[]) => (fixed ? [] : entries);
     // In the order every menu keeps (cell, row, column): the clipboard and clearing, inserting, moving and pinning, naming, deleting
-    const slot = this.lineGroups(info, "row", row);
+    const { slot, custom } = this.lineGroups(info, "row", row);
     return [
       ...this.lineSections(info, "row", row, slot),
+      ...custom("top"),
       ...shape([{
         kind: "segmented",
         label: "Insert",
@@ -743,6 +763,7 @@ export class Grips implements Feature {
         ],
       }]),
       { kind: "separator" },
+      ...custom("bottom"),
       ...this.section(slot("remove")),
       ...shape([this.deleteEntry(info, "row", row)]),
     ];
@@ -775,10 +796,21 @@ export class Grips implements Feature {
     return [...this.section(slot("clipboard")), ...(fixed ? [] : this.section(slot("edit")))];
   }
 
-  /** The modules' entries for the menu of a row (column), by their slot (LineMenuSlots), made with the menu's builder */
-  private lineGroups(info: TableInfo, axis: Axis, at: number): (slot: LineMenuSlot) => MenuEntry[] {
+  /**
+   * The modules' entries for the menu of a row (column), made with the menu's
+   * builder: `slot`, a slot's (LineMenuSlots); `custom`, the sections of their
+   * own at a position, each a section (LineMenuCustom)
+   */
+  private lineGroups(
+    info: TableInfo,
+    axis: Axis,
+    at: number,
+  ): { readonly slot: (slot: LineMenuSlot) => MenuEntry[]; readonly custom: (position: "top" | "bottom") => MenuEntry[] } {
     const groups = this.host.lineMenu(info, { axis, at, lines: this.selectedLines(info, axis, at) }, this.builder);
-    return (slot) => groups.filter((group) => group.slot === slot).flatMap((group) => group.entries);
+    return {
+      slot: (slot) => groups.filter((group) => group.slot === slot).flatMap((group) => group.entries),
+      custom: (position) => customSections(groups, position).flatMap((entries) => [...this.closingUnlessReplaced(entries), { kind: "separator" } as const]),
+    };
   }
 
   /** What the modules make their entries with: values; a submenu shows in this menu's place */
@@ -786,7 +818,16 @@ export class Grips implements Feature {
     const open = (title: string, entries: readonly MenuEntry[]) => this.replaceMenu(title, entries);
     const slot = (name: LineMenuSlot) => (entries: readonly MenuEntry[]): LineMenuGroup => ({ slot: name, entries });
     return {
-      slot: { clipboard: slot("clipboard"), edit: slot("edit"), insert: slot("insert"), columnType: slot("columnType"), view: slot("view"), look: slot("look"), remove: slot("remove") },
+      slot: {
+        clipboard: slot("clipboard"),
+        edit: slot("edit"),
+        insert: slot("insert"),
+        columnType: slot("columnType"),
+        view: slot("view"),
+        look: slot("look"),
+        remove: slot("remove"),
+        custom: (custom, entries) => ({ slot: "custom", custom, entries }),
+      },
       item: menuItem,
       submenu: (item, entries) => menuItem({ ...item, submenu: true, run: () => open(item.label, entries()) }),
       segmented: menuSegmented,
@@ -845,9 +886,10 @@ export class Grips implements Feature {
     const fixed = !!host.fixedShape(parseTable(info.source));
     const shape = (entries: MenuEntry[]) => (fixed ? [] : entries);
     // In the order every menu keeps (cell, row, column): the clipboard and clearing, inserting, moving and pinning, viewing, naming, deleting
-    const slot = this.lineGroups(info, "column", column);
+    const { slot, custom } = this.lineGroups(info, "column", column);
     const entries: MenuEntry[] = [
       ...this.lineSections(info, "column", column, slot),
+      ...custom("top"),
       ...shape([{
         kind: "segmented",
         label: "Insert",
@@ -926,6 +968,7 @@ export class Grips implements Feature {
       // How its cells look, after their alignment: conditional formatting
       ...this.closingUnlessReplaced(slot("look")),
       { kind: "separator" },
+      ...custom("bottom"),
       ...this.section(slot("remove")),
       ...shape([this.deleteEntry(info, "column", column)]),
     ];

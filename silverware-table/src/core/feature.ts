@@ -498,8 +498,19 @@ export type LineMenuTarget = { readonly axis: "row" | "column"; readonly at: num
 /** The slots of a row's or a column's menu, by what their entries do (LineMenuSlots says each) */
 export type LineMenuSlot = "clipboard" | "edit" | "insert" | "columnType" | "view" | "look" | "remove";
 
-/** A module's entries in a slot of a row's or a column's menu */
-export type LineMenuGroup = { readonly slot: LineMenuSlot; readonly entries: readonly MenuEntry[] };
+/**
+ * A section of its own in a row's or a column's menu, by its name: the
+ * blocks of one name are one section, by `priority` (lower higher; equal: as
+ * they came), the sections as their names first came; `position` top (under
+ * the clipboard's and Clear) or bottom (before Remove metadata and Delete, the
+ * default)
+ */
+export type LineMenuCustom = { readonly name: string; readonly position?: "top" | "bottom"; readonly priority?: number };
+
+/** A module's entries in a slot of a row's or a column's menu, or in a section of its own (`custom`) */
+export type LineMenuGroup =
+  | { readonly slot: LineMenuSlot; readonly entries: readonly MenuEntry[] }
+  | { readonly slot: "custom"; readonly custom: LineMenuCustom; readonly entries: readonly MenuEntry[] };
 
 /** Entries put in a slot, by what they do; where each slot shows is the menu's */
 export type LineMenuSlots = {
@@ -517,6 +528,8 @@ export type LineMenuSlots = {
   readonly look: (entries: readonly MenuEntry[]) => LineMenuGroup;
   /** What takes something off the lines (Remove metadata) */
   readonly remove: (entries: readonly MenuEntry[]) => LineMenuGroup;
+  /** A section of its own (LineMenuCustom: by its name, where and in which order), what no slot above says; shown whatever the table */
+  readonly custom: (section: LineMenuCustom, entries: readonly MenuEntry[]) => LineMenuGroup;
 };
 
 type EntryOf<K extends MenuEntry["kind"]> = Omit<Extract<MenuEntry, { readonly kind: K }>, "kind">;

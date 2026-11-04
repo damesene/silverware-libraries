@@ -42,16 +42,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # What the groups share, made once: the groups, and Playwright's Chromium in the cache (put there here alone, the
+  # groups only reading it: they would race to put it there)
   groups:
     name: Groups of interaction tests
     runs-on: ubuntu-latest
     outputs:
       list: ${{ steps.list.outputs.list }}
+      chromium: ${{ steps.key.outputs.key }}
     steps:
       - uses: actions/checkout@v7
 
       - id: list
         run: echo "list=$(node scripts/ui-test-groups.mjs)" >> "$GITHUB_OUTPUT"
+
+      # The Chromium the version of Playwright in the lockfile pins (no npm ci needed to know it)
+      - id: key
+        run: echo "key=playwright-chromium-$RUNNER_OS-$(jq -r '.packages["node_modules/playwright"].version' package-lock.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Playwright's Chromium, kept
+        id: chromium
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.key.outputs.key }}
+          # Only whether it is there: the groups restore it
+          lookup-only: true
+
+      - name: Playwright's Chromium
+        if: steps.chromium.outputs.cache-hit != 'true'
+        run: npx --yes "playwright@$(jq -r '.packages["node_modules/playwright"].version' package-lock.json)" install chromium
 
   group:
     name: Tests (${{ inputs.target || 'silverbullet' }}) ${{ matrix.group.name }}
@@ -77,18 +97,14 @@ jobs:
 
       - run: npm ci
 
-      # Playwright's Chromium (the version Playwright pins) kept between runs by that version; the system's libraries
-      # it needs installed each run, as they are the runner's
-      - name: Playwright's version
-        id: playwright
-        run: echo "version=$(npx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
-
+      # Playwright's Chromium as the groups job put it in the cache; the system's libraries it needs installed each run,
+      # as they are the runner's. Not in the cache (it could not be put there): installed here, as before
       - name: Playwright's Chromium, kept
         id: chromium
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+          key: ${{ needs.groups.outputs.chromium }}
 
       - name: Playwright's Chromium
         if: steps.chromium.outputs.cache-hit != 'true'

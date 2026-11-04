@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cellText } from "../dom.ts";
 import { typeNamed } from "../columntypes/index.ts";
 import { clearCustomTypes } from "../columntypes/registry.ts";
-import { defineTypes } from "../index.ts";
+import { defineChoices, defineTypes } from "../index.ts";
+import { refreshChoices, resetChoicesForTests, setChoicesHost } from "../spacechoices.ts";
 import { bodyTexts, cell, clickOn, controller, editor, flashes, flush, key, press, setup, text, useTablePage } from "../testing/page.ts";
 
 describe("Column types", () => {
@@ -88,6 +89,63 @@ describe("Column types", () => {
     clickOn(cell(0, 1).querySelector(".swt-sort")!);
     // Values not in the list after it, a number among them too
     expect(bodyTexts()).toEqual(["B", "D", "A", "E", "C"]);
+  });
+
+  describe("a list of the space (silverware.table.defineChoices)", () => {
+    // As init sets it: lists read anew make the tables look again
+    beforeEach(() => setChoicesHost({ problem: () => {}, changed: () => controller.tablesChanged() }));
+    afterEach(() => resetChoicesForTests());
+    const SPACE_PAGE = ["| Task | Project #choice-projects |", "|---|---|", "| A | Beta |", "| B | Gamma |", ""].join("\n");
+    const openColumnMenu = () => {
+      cell(1, 1).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      document.querySelector(".swt-grip-column")!.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }));
+      window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0 }));
+    };
+
+    it("checks and sorts a column by the space's list, read anew as it changes", async () => {
+      let values = ["Alpha", "Beta"];
+      defineChoices("projects", () => values);
+      await refreshChoices();
+      await setup(SPACE_PAGE);
+      expect(cell(1, 1).classList.contains("swt-type-invalid")).toBe(false);
+      expect(cell(2, 1).title).toBe('"Gamma" is not one of the choices of projects');
+      // The index changed: the list read anew, the table looks again
+      values = ["Alpha", "Beta", "Gamma"];
+      await refreshChoices();
+      await flush();
+      expect(cell(2, 1).classList.contains("swt-type-invalid")).toBe(false);
+      clickOn(cell(1, 1));
+      expect(Array.from(document.querySelectorAll(".swt-choices .swt-choice")).map((c) => c.textContent)).toEqual(["Alpha", "Beta", "Gamma"]);
+    });
+
+    it("gives way to the table's own list of that name", async () => {
+      defineChoices("projects", () => ["Gamma"]);
+      await refreshChoices();
+      await setup(SPACE_PAGE.replace("| B | Gamma |\n", `| B | Gamma |\n| <meta core.table columntypes.choice.projects='["Beta"]'> |\n`));
+      expect(cell(1, 1).classList.contains("swt-type-invalid")).toBe(false);
+      expect(cell(2, 1).classList.contains("swt-type-invalid")).toBe(true);
+    });
+
+    it("is offered under Choice in the Type menu, and in the Choices dialog with its values", async () => {
+      defineChoices("projects", () => ["Alpha", "Beta"]);
+      await refreshChoices();
+      await setup("| Task | Project |\n|---|---|\n| A | Beta |\n");
+      openColumnMenu();
+      document.querySelector<HTMLElement>('.swt-menu .swt-segments[aria-label^="Type"] .swt-segment')!.click();
+      const row = document.querySelector<HTMLElement>('.swt-menu .swt-segments[aria-label="Choice: projects"]')!;
+      expect(row).not.toBeNull();
+      row.querySelector<HTMLElement>(".swt-segment")!.click();
+      await flush();
+      expect(text).toBe("| Task | Project #choice-projects |\n|---|---|\n| A | Beta |\n");
+      // The dialog opens on the space's list, its values shown, nothing to edit (the page as written, shown anew)
+      await setup(text);
+      openColumnMenu();
+      document.querySelector<HTMLElement>('.swt-menu [title="Edit the column\'s choices"]')!.click();
+      const dialog = document.querySelector<HTMLElement>(".swt-choices-dialog")!;
+      expect(dialog.querySelector<HTMLInputElement>('input[value="space"]')!.checked).toBe(true);
+      expect(dialog.querySelector(".swt-choices-space-values")!.textContent).toBe("Alpha, Beta");
+      expect(dialog.querySelector<HTMLElement>(".swt-choices-values")!.closest<HTMLElement>(".swt-choices-list")!.hidden).toBe(true);
+    });
   });
 
   it("sorts by the values, not by what the cells show", async () => {

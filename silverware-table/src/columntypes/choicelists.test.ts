@@ -4,9 +4,10 @@ import { choiceIndex, LIST_NAME_RE, listKey, listNameFor, listNames, readChoiceL
 import type { TypeTable } from "./type.ts";
 
 const choice = typeNamed("choice")!;
-const tableOf = (lists: Record<string, readonly string[]>, values: readonly string[] = []): TypeTable => ({
+const tableOf = (lists: Record<string, readonly string[]>, values: readonly string[] = [], space: Record<string, readonly string[]> = {}): TypeTable => ({
   stored: new Map(Object.entries(lists).map(([name, list]) => [listKey(name), writeChoiceList(list)])),
   values: () => values,
+  spaceList: (name) => space[name],
 });
 const STATUS = tableOf({ status: ["open", "in progress", "done"] }, ["done", "open", "Open", "later"]);
 const paramsOf = (tag: string) => typeOfTag(tag)!.params;
@@ -74,5 +75,15 @@ describe("#choice", () => {
   it("offers its list's values in order, without one the column's values each once, sorted", () => {
     expect(choice.choices!(paramsOf("choice-status"), STATUS).map((c) => c.value)).toEqual(["open", "in progress", "done"]);
     expect(choice.choices!(paramsOf("choice"), STATUS).map((c) => c.value)).toEqual(["done", "later", "open"]);
+  });
+});
+
+describe("the choice type and the space's lists", () => {
+  it("takes the space's list where the table keeps none of the name, the table's own first", () => {
+    const space = { status: ["open", "done"] };
+    expect(choice.check("later", paramsOf("choice-status"), tableOf({}, [], space))).toBe('"later" is not one of the choices of status');
+    expect(choice.check("done", paramsOf("choice-status"), tableOf({}, [], space))).toBeUndefined();
+    expect(choice.check("done", paramsOf("choice-status"), tableOf({ status: ["open"] }, [], space))).toBe('"done" is not one of the choices of status');
+    expect(choice.choices!(paramsOf("choice-status"), tableOf({}, ["x"], space)).map((c) => c.value)).toEqual(["open", "done"]);
   });
 });

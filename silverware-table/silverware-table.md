@@ -659,7 +659,7 @@ shows `$12.99`, `★★★★☆` and `☑`.
 | `#unit-kg` | A number with a unit: the unit after the dash. |
 | `#stars, #stars-10` | A rating as stars: a whole number from 0 to the most stars after the dash (default 5). |
 | `#check` | Yes or no as a check box: yes, true, x, ☑ or a number above 0 shows ☑; no, false, ☐, 0 or a number below it shows ☐. |
-| `#choice, #choice-name` | One of a list's values: the list named after the dash, kept in the table (picking Choice opens a dialog to set it up). A value not in the list is marked, and the column sorts in the list's order. Without a list the editor offers the values the column has. |
+| `#choice, #choice-name` | One of a list's values: the list named after the dash, kept in the table (picking Choice opens a dialog to set it up) or given by Space Lua for the whole space. A value not in the list is marked, and the column sorts in the list's order. Without a list the editor offers the values the column has. |
 | `#date, #date-long` | A date written as 2025-11-06 (with a time: 2025-11-06 14:30), shown as the locale writes it: short, medium (default) or long after the dash. |
 | `#time` | A time of day written as 14:30 or 14:30:15 (or as a fraction of a day, 0.5 is 12:00), shown as the locale writes times. |
 | `#trend` | A trend as an arrow: + or a number above 0 shows ↑, - or one below 0 shows ↓, = or 0 shows =. |
@@ -687,7 +687,23 @@ A `#choice` column takes one of a list of values, as a status column (open, in p
 * Every list of the table shows under *Choice* in the *Type* menu, where a column takes one (*Choice* itself opens the dialog, and is checked for `#choice` without a list), and where a list is deleted (🗑). Deleting a list columns take asks first; those columns are then left without a type, their cells as written. A list is not deleted by itself when no column takes it any more.
 * A list's name is lower case letters (a to z) and digits, words joined by dashes: `status`, `task-status`.
 * A column of a list shows the list in a box as its icon, `#choice` alone a plain list.
-* `#choice` alone, or a list the table does not have, checks nothing: the editor offers the values the column has.
+* `#choice` alone, or a list neither the table nor the space has, checks nothing: the editor offers the values the column has.
+
+#### Lists of the space
+
+A list can come from a script instead of the table: `silverware.table.defineChoices(name, fn)` in a `space-lua` block of yours gives the space a list by its name, its values what the function returns, such as a query's:
+
+```lua
+silverware.table.defineChoices("projects", function()
+  return query[[from p = index.tag "project" select p.name]]
+end)
+```
+
+* Any table's column `#choice-projects` then takes it, as it would a list of its own: values not in it are marked, the column sorts in its order, the editor offers them. A list the table keeps under the same name comes first.
+* The function runs when Space Lua loads, and again a moment after SilverBullet indexes a page, so the list follows the space (a new project shows in the editor's choices about a second after its page is saved). Nothing is written into the tables.
+* It returns a list of texts (numbers are taken as texts); each value counts once, empty ones are left out.
+* The space's lists show under *Choice* in the *Type* menu, to take for a column, and in the *Choices* dialog as *A list of the space*, with their values. They are changed in the script, not there.
+* A function that fails, or returns no list, is shown in a notification (once, until the problem changes); the list keeps the values it had. Until it has run once, the column checks nothing.
 
 ### Custom column types
 

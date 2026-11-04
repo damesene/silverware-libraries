@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Table API
 
-The Space Lua API of [Silverware Table](silverware-table.md): `silverware.table.defineFunctions`, `defineTypes`, `defineSeries`, `defineConditions` and `defineFormats` (your own functions, column types, AutoFill series, and conditions and formats of conditional formatting) `silverware.table.evaluate` and `evaluateText` (a formula calculated from Space Lua: its values for a script, its text for a page), with `silverware.table.evaluateAlias` and `evaluateTextAlias` giving them shorter names, `silverware.table.errors` and `errorsText` (the formula errors of a page or the space), and for other plugins `silverware.table.tables` (a text's tables as data) and `silverware.table.onWrite` (edits of the page written with the tables' writes). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [silverware-table-init](silverware-table-init.md) for what starts Silverware Table.
+The Space Lua API of [Silverware Table](silverware-table.md): `silverware.table.defineFunctions`, `defineTypes`, `defineSeries`, `defineConditions` and `defineFormats` (your own functions, column types, AutoFill series, and conditions and formats of conditional formatting), `silverware.table.defineChoices` (a choice list of the whole space, from a query), `silverware.table.evaluate` and `evaluateText` (a formula calculated from Space Lua: its values for a script, its text for a page), with `silverware.table.evaluateAlias` and `evaluateTextAlias` giving them shorter names, `silverware.table.errors` and `errorsText` (the formula errors of a page or the space), and for other plugins `silverware.table.tables` (a text's tables as data) and `silverware.table.onWrite` (edits of the page written with the tables' writes). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [silverware-table-init](silverware-table-init.md) for what starts Silverware Table.
 
 ```space-lua
 -- priority: 50
@@ -11,6 +11,7 @@ The Space Lua API of [Silverware Table](silverware-table.md): `silverware.table.
 -- unless they say otherwise): silverware.table.defineFunctions, silverware.table.defineTypes and
 -- silverware.table.defineSeries, see "Custom functions", "Custom column types" and "Custom series";
 -- silverware.table.defineMenuEntries, see "Custom menu entries";
+-- silverware.table.defineChoices, see "Lists of the space";
 -- silverware.table.defineConditions and silverware.table.defineFormats, see "Custom conditions and formats";
 -- silverware.table.evaluate, evaluateText, evaluateAlias, evaluateTextAlias, errors and errorsText, see
 -- "Formulas from Space Lua";
@@ -113,6 +114,15 @@ if js and js.window then
   --- @see Library/damesene/silverware-table#Custom menu entries
   function silverware.table.defineMenuEntries(definitions)
     shown(silverwareTableJs.defineMenuEntries(definitions), "defineMenuEntries")
+  end
+  --- A choice list of the whole space: a column #choice-<name> takes its values where its table keeps no
+  --- list of that name. The function gives them (a query's, usually); it runs now and again a moment after
+  --- SilverBullet indexes a page. A mistake is shown, the list keeping the values it had.
+  --- @param name string the list's name: lower case letters and digits, words joined by dashes, e.g. "projects"
+  --- @param fn function giving a list of the values, e.g. function() return query[[from p = index.tag "project" select p.name]] end
+  --- @see Library/damesene/silverware-table#Lists of the space
+  function silverware.table.defineChoices(name, fn)
+    shown(silverwareTableJs.defineChoices(name, fn), "defineChoices")
   end
   -- A formula calculated by the JS's function `calculate` (evaluated or evaluatedText) on the page it is on
   -- (a ${…}'s, else the page shown), its result as that function gives it.
@@ -284,6 +294,7 @@ else
   function silverware.table.defineConditions() end
   function silverware.table.defineFormats() end
   function silverware.table.defineMenuEntries() end
+  function silverware.table.defineChoices() end
   function silverware.table.evaluate() return nil, { code = "#N/A", detail = "formulas are off" } end
   function silverware.table.evaluateText() return "\\#N/A" end
   function silverware.table.evaluateAlias() end

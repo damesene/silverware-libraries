@@ -17,6 +17,7 @@ import { metaName } from "./meta.ts";
 import { columnNameIn } from "./names.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { customMenuEntries, customMenuEntriesAnew, defineCustomMenuEntries } from "./menus/custom.ts";
+import { choicesAnew, choicesIndexed, defineChoices as defineSpaceChoices, setChoicesHost } from "./spacechoices.ts";
 
 export const version = "0.1.0";
 
@@ -27,6 +28,8 @@ const GLOBAL_KEY = "__silverwareTable";
 export function pageIndexed(name: string): void {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
   void controller?.pageIndexed(name);
+  // The index the space's choice lists read may have changed
+  choicesIndexed();
 }
 
 /** Called by the init page on SilverBullet's `editor:pageLoaded` event */
@@ -345,8 +348,18 @@ export function defineMenuEntries(definitions: unknown): string | undefined {
   return notDefined("menu entries", problems);
 }
 
+/**
+ * `silverware.table.defineChoices(name, fn)`: a choice list of the space, its values what the Lua
+ * function gives (a query's), read now and again as SilverBullet indexes pages; a column naming it
+ * (`#choice-<name>`) takes it where its table keeps no list of that name. Why not, for a notification
+ */
+export function defineChoices(name: unknown, fn: unknown): string | undefined {
+  return defineSpaceChoices(name, fn);
+}
+
 /** Space Lua is loaded (again): the custom definitions are made anew, replacing those of before */
 export function resetDefinitions(): void {
+  choicesAnew();
   customMenuEntriesAnew();
   customFunctionsAnew();
   customTypesAnew();
@@ -373,6 +386,11 @@ export function init(bridge: Bridge): void {
     console.error(`Silverware Table: missing editor functions: ${missing.join(", ")}`);
     return;
   }
+  // A list that failed is said once until it changes; lists read anew make the tables look again
+  setChoicesHost({
+    problem: (message) => void bridge.flash(message, "error"),
+    changed: definitionsChanged,
+  });
   const global = globalThis as unknown as Record<string, Controller | undefined>;
   const existing = global[GLOBAL_KEY];
   if (existing) {

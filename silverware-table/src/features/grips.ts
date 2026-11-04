@@ -784,7 +784,7 @@ export class Grips implements Feature {
   /** What the modules make their entries with: values; a submenu shows in this menu's place */
   private readonly builder: LineMenuBuilder = (() => {
     const open = (title: string, entries: readonly MenuEntry[]) => this.replaceMenu(title, entries);
-    const slot = (name: LineMenuSlot) => (...entries: readonly MenuEntry[]): LineMenuGroup => ({ slot: name, entries });
+    const slot = (name: LineMenuSlot) => (entries: readonly MenuEntry[]): LineMenuGroup => ({ slot: name, entries });
     return {
       slot: { clipboard: slot("clipboard"), edit: slot("edit"), insert: slot("insert"), columnType: slot("columnType"), view: slot("view"), look: slot("look"), remove: slot("remove") },
       item: menuItem,

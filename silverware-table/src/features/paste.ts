@@ -197,7 +197,7 @@ export class Paste implements Feature {
     // A column's from its header: a column copied with it names it, anything else goes under it (pasteFromMenu)
     const at = axis === "row" ? { row: first, column: 0 } : { row: 0, column: first };
     return [
-      menu.slot.clipboard(
+      menu.slot.clipboard([
         this.clipboardBar(info, {
           copied: cells,
           cut: body.length ? body : undefined,
@@ -207,7 +207,7 @@ export class Paste implements Feature {
           asRows: axis === "row",
           fromHeader: axis === "column",
         }),
-      ),
+      ]),
     ];
   }
 

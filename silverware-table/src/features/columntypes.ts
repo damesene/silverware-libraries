@@ -172,7 +172,7 @@ export class ColumnTypes implements Feature {
     ];
     // As Filter: the type's name after Type, its icon opening the list of types, a × removing it
     return [
-      menu.slot.columnType(
+      menu.slot.columnType([
         menu.segmented({
           label: current ? `Type: ${typeLabel(current.type.name)}` : "Type",
           options: [
@@ -191,7 +191,7 @@ export class ColumnTypes implements Feature {
             },
           ],
         }),
-      ),
+      ]),
     ];
   }
 

@@ -410,7 +410,7 @@ export class Conditions implements Feature {
       },
     ];
     return [
-      menu.slot.look(
+      menu.slot.look([
         menu.submenu(
           {
             label: "Conditional formatting",
@@ -420,7 +420,7 @@ export class Conditions implements Feature {
           },
           entries,
         ),
-      ),
+      ]),
     ];
   }
 

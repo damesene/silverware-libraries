@@ -384,7 +384,7 @@ export class Formulas implements Feature {
           ? "Columns pinned to the right stay at the right"
           : undefined;
     return [
-      menu.slot.insert(
+      menu.slot.insert([
         menu.item({
           label: "Insert numbered column left",
           icon: ICONS.columnLeft,
@@ -392,7 +392,7 @@ export class Formulas implements Feature {
           disabled: blocked,
           run: () => void this.insertNumbered(info, column),
         }),
-      ),
+      ]),
     ];
   }
 

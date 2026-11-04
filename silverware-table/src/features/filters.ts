@@ -274,7 +274,7 @@ class FilterTable {
     if (axis !== "column") return [];
     const filtered = (this.filtersOf(info)[column] ?? "").trim() !== "";
     return [
-      menu.slot.view(
+      menu.slot.view([
         menu.segmented({
           label: "Filter",
           options: [
@@ -287,7 +287,7 @@ class FilterTable {
             },
           ],
         }),
-      ),
+      ]),
     ];
   }
 

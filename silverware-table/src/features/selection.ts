@@ -548,14 +548,14 @@ export class Selection implements Feature {
     const cells = rows.flatMap((row) => columns.map((column) => ({ row, column })));
     const name = `${lines.length > 1 ? `${lines.length} ` : ""}${axis}${lines.length > 1 ? "s" : ""}`;
     return [
-      menu.slot.edit(
+      menu.slot.edit([
         menu.item({
           label: `Clear ${name}`,
           icon: ICONS.clear,
           hint: axis === "row" ? "Empty the cells, formulas included, as Delete does" : "Empty the cells under the header (it keeps its name), as Delete does",
           run: () => void this.empty(info, cells),
         }),
-      ),
+      ]),
     ];
   }
 

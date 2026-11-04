@@ -153,14 +153,14 @@ class TableWidths {
     const width = grid ? grid.columnWidth(column) : this.widthsOf(info).get(column);
     if (width === undefined) return [];
     return [
-      menu.slot.view(
+      menu.slot.view([
         menu.item({
           label: "Auto width",
           icon: ICONS.columnWidth,
           hint: `The column is ${width}px wide: make it as wide as its text`,
           run: () => void this.set(this.table.current() ?? info, column, undefined),
         }),
-      ),
+      ]),
     ];
   }
 }

@@ -132,7 +132,7 @@ export class Metadata implements Feature {
     const columns = axis === "row" ? Array.from({ length: info.columns }, (_, column) => column) : lines;
     const part = { cells: rows.flatMap((row) => columns.map((column) => ({ row, column }))), columns: new Set(axis === "column" ? lines : []) };
     const entry = this.partEntry(info, part, lines.length === 1 ? `this ${axis}` : `these ${lines.length} ${axis}s`);
-    return entry ? [menu.slot.remove(entry)] : [];
+    return entry ? [menu.slot.remove([entry])] : [];
   }
 
   /** Remove metadata for a part of the table, where it has some */

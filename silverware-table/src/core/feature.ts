@@ -504,19 +504,19 @@ export type LineMenuGroup = { readonly slot: LineMenuSlot; readonly entries: rea
 /** Entries put in a slot, by what they do; where each slot shows is the menu's */
 export type LineMenuSlots = {
   /** Copying, cutting and pasting the lines (the clipboard's bar) */
-  readonly clipboard: (...entries: readonly MenuEntry[]) => LineMenuGroup;
+  readonly clipboard: (entries: readonly MenuEntry[]) => LineMenuGroup;
   /** What changes their cells (Clear); not shown where those are not changed by hand (a pivot's) */
-  readonly edit: (...entries: readonly MenuEntry[]) => LineMenuGroup;
+  readonly edit: (entries: readonly MenuEntry[]) => LineMenuGroup;
   /** What inserts lines beside them (a numbered column); not shown where the table's shape is fixed */
-  readonly insert: (...entries: readonly MenuEntry[]) => LineMenuGroup;
+  readonly insert: (entries: readonly MenuEntry[]) => LineMenuGroup;
   /** What a column is (its type); a column's menu only */
-  readonly columnType: (...entries: readonly MenuEntry[]) => LineMenuGroup;
+  readonly columnType: (entries: readonly MenuEntry[]) => LineMenuGroup;
   /** How a column shows (its filter, its width); a column's menu only */
-  readonly view: (...entries: readonly MenuEntry[]) => LineMenuGroup;
+  readonly view: (entries: readonly MenuEntry[]) => LineMenuGroup;
   /** How a column's cells look (conditional formatting); a column's menu only */
-  readonly look: (...entries: readonly MenuEntry[]) => LineMenuGroup;
+  readonly look: (entries: readonly MenuEntry[]) => LineMenuGroup;
   /** What takes something off the lines (Remove metadata) */
-  readonly remove: (...entries: readonly MenuEntry[]) => LineMenuGroup;
+  readonly remove: (entries: readonly MenuEntry[]) => LineMenuGroup;
 };
 
 type EntryOf<K extends MenuEntry["kind"]> = Omit<Extract<MenuEntry, { readonly kind: K }>, "kind">;
@@ -1046,7 +1046,7 @@ export interface Feature {
   tableLook?(table: Table): TableLook | undefined;
   /**
    * Entries for the menu of a row or a column (its grip's), each group in
-   * the slot of what its entries do (`menu.slot.look(…)`: LineMenuSlots);
+   * the slot of what its entries do (`menu.slot.look([…])`: LineMenuSlots);
    * where a slot shows is the menu's. `menu` makes the groups and entries.
    */
   lineMenu?(info: TableInfo, target: LineMenuTarget, menu: LineMenuBuilder): readonly LineMenuGroup[];

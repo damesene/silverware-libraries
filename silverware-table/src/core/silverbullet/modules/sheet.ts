@@ -1563,6 +1563,7 @@ export class Sheet implements AdapterFeature {
     if (step) this.go({ row: Math.max(0, at.row + step[0]), column: Math.max(0, at.column + step[1]) }, true);
     else if (after.key === "Escape") this.go(at, false);
     else if (after.key === "Tab") this.go({ row: at.row, column: Math.max(0, at.column + sign) }, true);
+    // (moveDownOnly only saves: the value is a table's last row now, the one it grew or made)
     else if ((await this.host.setting("enterKey")) === "moveDown") this.go({ row: Math.max(0, at.row + sign), column: at.column }, true);
     else this.go(at, false);
   }

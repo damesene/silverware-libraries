@@ -110,6 +110,37 @@ describe("Cell editor", () => {
     expect(text.split("\n").filter((line) => line.startsWith("|"))).toHaveLength(6);
   });
 
+  it("moves down on Enter with 'moveDownOnly', on the last row only saves and leaves the cell selected", async () => {
+    await setup(PAGE, { "silverware.table.editor.enterKey": "moveDownOnly" });
+    const editing = () => editor.querySelector<HTMLInputElement>(".swt-cell-editor");
+    const at = () => {
+      const td = editing()?.closest("td");
+      return td ? [(td.parentElement as HTMLTableRowElement).rowIndex, td.cellIndex] : null;
+    };
+    const waitFor = async (done: () => boolean) => {
+      for (let i = 0; i < 50 && !done(); i++) {
+        await flush();
+        await controller.scan();
+      }
+    };
+    clickOn(cell(1, 1));
+    editing()!.value = "4";
+    key(editing()!, "Enter");
+    await waitFor(() => at()?.[0] === 2);
+    expect(text).toContain("| Pear | 4 |");
+    expect(at()).toEqual([2, 1]);
+    const rows = text.split("\n").filter((line) => line.startsWith("|")).length;
+    clickOn(cell(3, 0));
+    await waitFor(() => at()?.[0] === 3);
+    editing()!.value = "Last";
+    key(editing()!, "Enter");
+    await waitFor(() => !editing() && text.includes("| Last |"));
+    await waitFor(() => !!cell(3, 0).classList.contains("swt-selected"));
+    expect(editing()).toBeNull();
+    expect(text.split("\n").filter((line) => line.startsWith("|"))).toHaveLength(rows);
+    expect(cell(3, 0).classList.contains("swt-selected")).toBe(true);
+  });
+
   it("moves down on Enter by default and with an unknown setting, only saves with save", async () => {
     const at = () => {
       const td = editor.querySelector(".swt-cell-editor")?.closest("td");

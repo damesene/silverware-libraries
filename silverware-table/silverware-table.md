@@ -1063,6 +1063,7 @@ Setting a part replaces what an earlier `config.set` of the same part set: set e
 * **Enter in a cell editor** (`enterKey`), default `moveDown`
   * `save`: Enter saves the cell.
   * `moveDown`: Enter saves and edits the cell below (on the last row: a row added under it, edited); Shift+Enter too, opening it with its text selected (with *Click selects the cell's text*: with the cursor at the end).
+  * `moveDownOnly`: as `moveDown`, but on the last row Enter only saves the cell and leaves it selected, no row added (on a sheet too).
 * **Click selects the cell's text** (`selectOnClick`), default `false`
   * `false`: a click, Enter, Tab and Ctrl+arrows open a cell with the cursor at the end of its text; Shift+Enter opens the cell below with its whole text selected.
   * `true`: they open it with its whole text selected; Shift+Enter with the cursor at the end.

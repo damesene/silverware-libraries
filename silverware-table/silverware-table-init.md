@@ -77,9 +77,9 @@ config.define("silverware.table", {
       properties = {
         enterKey = {
           type = "string",
-          enum = { "save", "moveDown" },
+          enum = { "save", "moveDown", "moveDownOnly" },
           default = "moveDown",
-          description = "What Enter does in a cell editor. save: save the value. moveDown: save it and edit the cell below (Shift+Enter: opened with its text selected, or the reverse with selectOnClick).",
+          description = "What Enter does in a cell editor. save: save the value. moveDown: save it and edit the cell below, on the last row a new one (Shift+Enter: opened with its text selected, or the reverse with selectOnClick). moveDownOnly: as moveDown, but on the last row only save it, the cell left selected.",
           ui = { category = "Silverware Table", label = "Enter in a cell editor", priority = 3 },
         },
         selectOnClick = {

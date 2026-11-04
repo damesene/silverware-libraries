@@ -515,18 +515,31 @@ export class CellEditing {
     }
   }
 
-  /** Enter: save; with the moveDown setting also edit the cell below (Shift: as on a Shift+click) */
+  /**
+   * Enter: save; with the moveDown setting also edit the cell below (Shift: as on a Shift+click), with moveDownOnly
+   * too but on the last row only save, the cell left selected
+   */
   private async enter(shift: boolean): Promise<void> {
     const active = this.editor;
     const info = active && this.host.infoOf(active.widget);
     if (!active || !info) return;
-    if ((await this.host.setting("enterKey")) !== "moveDown" || this.editor !== active) {
+    const enterKey = await this.host.setting("enterKey");
+    if (enterKey === "save" || this.editor !== active) {
       if (this.editor === active) await this.finish(true);
       return;
     }
     const shown = this.host.shownRows(info);
     const index = shown.indexOf(active.cell.parentElement as HTMLTableRowElement);
     const target = shown[index + 1];
+    if (!target && index > 0 && enterKey === "moveDownOnly") {
+      await this.finish(true);
+      // (Past the table, beyond or the caller's to write: no cell of the table to select)
+      if (!active.growth && !active.place && this.host.selectsCells()) {
+        const at = { row: active.row, column: active.column };
+        this.host.selectCells(info, at, at);
+      }
+      return;
+    }
     // Enter on the last row adds a row (above the rows pinned to the bottom), edited in the same column, as Tab on the
     // last cell does
     if (!target && index > 0) {

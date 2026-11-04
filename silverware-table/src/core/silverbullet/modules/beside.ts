@@ -28,6 +28,9 @@ export class BesideTables implements AdapterFeature {
     const ofLine = widgetOfLineBelow(target);
     if (ofLine) return ofLine;
     if (!target.matches(SCROLLER_SELECTOR) || target.closest(EDITOR_SELECTOR)) return undefined;
+    // Within its content box: its scrollbars are the scroller's too (a press there drags them)
+    const scroller = target.getBoundingClientRect();
+    if (x >= scroller.left + target.clientLeft + target.clientWidth || y >= scroller.top + target.clientTop + target.clientHeight) return undefined;
     for (const widget of target.querySelectorAll<HTMLElement>(WIDGET_SELECTOR)) {
       const box = widget.getBoundingClientRect();
       if (x >= box.right && y >= box.top && y < box.bottom) return widget;

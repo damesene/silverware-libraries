@@ -237,7 +237,9 @@ export function renderMenu(doc: Document, look: MenuLook, title: string, entries
     );
   const icon = (svg: string | undefined) => el(doc, "span", { class: `${p}-icon`, html: svg ?? "" });
 
-  for (const entry of entries) {
+  // A separator only between entries: none at the ends nor after another (where the sections between were left out)
+  const shown = entries.filter((entry, i) => entry.kind !== "separator" || (i > 0 && entries[i - 1]!.kind !== "separator" && entries.slice(i + 1).some((e) => e.kind !== "separator")));
+  for (const entry of shown) {
     if (entry.kind === "separator") {
       menu.append(el(doc, "div", { class: `${p}-menu-separator`, attrs: { role: "separator" } }));
     } else if (entry.kind === "item") {

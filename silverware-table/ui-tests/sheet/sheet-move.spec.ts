@@ -1,6 +1,6 @@
 // Moving a table on the sheet: its handle dragged or clicked, Move table…, the whole table selected and dragged by its edge
 import type { Page } from "@playwright/test";
-import { cell, center, drag, expect, hoverCell, markdown, notification, setPage, table, tableIcon, test } from "./helpers.ts";
+import { cell, center, drag, expect, hoverCell, markdown, notification, setPage, table, tableIcon, test } from "../helpers.ts";
 
 // a at A1 (its header and one row, two columns), b at D1
 const PAGE = "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1'> |\n\n| City |\n|---|\n| Brno |\n| <meta core.table core.name='b' sheet.name='Plan' sheet.at='D1'> |\n";

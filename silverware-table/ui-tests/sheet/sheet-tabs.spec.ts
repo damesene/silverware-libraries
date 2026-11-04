@@ -1,6 +1,6 @@
 // The sheets' tabs at the sheet view's bottom: going to another sheet, a new one, renaming and removing one
 import type { Page } from "@playwright/test";
-import { cell, expect, hoverCell, markdown, setPage, table, tableIcon, test } from "./helpers.ts";
+import { cell, expect, hoverCell, markdown, setPage, table, tableIcon, test } from "../helpers.ts";
 
 const PAGE =
   "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n| <meta core.table core.name='a' sheet.name='Plan' sheet.at='A1' sheet.width.A='120'> |\n\n" +

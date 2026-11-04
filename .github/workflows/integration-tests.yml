@@ -4,17 +4,19 @@
 # request (.github/dependabot.yml), which these tests then run against: green, it
 # merges by itself (dependabot.yml in this folder); red, the repository's owner is
 # assigned to it, which GitHub tells them.
-# Each plugin's tests (<plugin>/ui-tests/) in a job of its own, side by side on
-# runners of their own, each with the workers and SilverBullet servers it had:
-# the run takes as long as its largest plugin's tests, a new plugin's folder gets
-# its job by itself, and no runner is loaded more than one was (more workers on
-# one made the tests flaky). Tests (silverbullet), which main's rule requires,
-# passes once every plugin's does.
+# Each plugin's tests (<plugin>/ui-tests/) in a job of its own, and each area a
+# plugin keeps in a folder under it (silverware-table/ui-tests/sheet/: the sheet
+# view's) in one of its own (scripts/ui-test-groups.mjs), side by side on runners
+# of their own, each with the workers and SilverBullet servers a run had: the run
+# takes as long as its largest group, a new plugin or area gets its job by its
+# folder, and no runner is loaded more than one was (more workers on one made the
+# tests flaky). Tests (silverbullet), which main's rule requires, passes once
+# every group's does.
 # Run by hand (Actions > Integration tests > Run workflow), the target and the
 # image can be chosen (the playground, or another SilverBullet: ghcr.io/silverbulletmd/silverbullet:latest-slim).
-# Each plugin's job summary has the counts and the tests that failed; its HTML
+# Each group's job summary has the counts and the tests that failed; its HTML
 # report (each test's error, screenshot, trace and browser console) and
-# SilverBullet's log are artifacts of the run, by the plugin's name.
+# SilverBullet's log are artifacts of the run, by the group's name.
 name: Integration tests
 
 on:
@@ -40,28 +42,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  plugins:
-    name: Plugins with interaction tests
+  groups:
+    name: Groups of interaction tests
     runs-on: ubuntu-latest
     outputs:
       list: ${{ steps.list.outputs.list }}
     steps:
       - uses: actions/checkout@v7
 
-      # Every folder with a ui-tests folder (playwright.config.ts finds their tests so too)
       - id: list
-        run: echo "list=$(ls -d */ui-tests | cut -d/ -f1 | jq -R . | jq -sc .)" >> "$GITHUB_OUTPUT"
+        run: echo "list=$(node scripts/ui-test-groups.mjs)" >> "$GITHUB_OUTPUT"
 
-  plugin:
-    name: Tests (${{ inputs.target || 'silverbullet' }}) ${{ matrix.plugin }}
-    needs: plugins
+  group:
+    name: Tests (${{ inputs.target || 'silverbullet' }}) ${{ matrix.group.name }}
+    needs: groups
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
-      # Each plugin's outcome, whatever another's
+      # Each group's outcome, whatever another's
       fail-fast: false
       matrix:
-        plugin: ${{ fromJSON(needs.plugins.outputs.list) }}
+        group: ${{ fromJSON(needs.groups.outputs.list) }}
     env:
       SW_TARGET: ${{ inputs.target || 'silverbullet' }}
       SB_IMAGE: ${{ inputs.image }}
@@ -87,15 +88,17 @@ jobs:
           version=$(docker run --rm --entrypoint /silverbullet "$image" --version)
           echo "Testing against \`$image\`: $version" >> "$GITHUB_STEP_SUMMARY"
 
-      # (Playwright takes the folder as a filter of the test files' paths)
+      # (Playwright takes the filter as a regular expression of the test files' paths; given through the environment, as the shell would read its $)
       - name: Interaction tests
-        run: node scripts/ui-tests.mjs "$SW_TARGET" "${{ matrix.plugin }}/ui-tests/"
+        env:
+          FILTER: ${{ matrix.group.filter }}
+        run: node scripts/ui-tests.mjs "$SW_TARGET" "$FILTER"
 
       - name: HTML report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: report-${{ env.SW_TARGET }}-${{ matrix.plugin }}
+          name: report-${{ env.SW_TARGET }}-${{ matrix.group.id }}
           path: playwright-report/
           retention-days: 14
 
@@ -103,15 +106,15 @@ jobs:
         if: ${{ !cancelled() && env.SW_TARGET == 'silverbullet' }}
         uses: actions/upload-artifact@v7
         with:
-          name: silverbullet-log-${{ matrix.plugin }}
+          name: silverbullet-log-${{ matrix.group.id }}
           path: silverbullet-log/
           retention-days: 14
           if-no-files-found: ignore
 
-  # The check main's rule requires (its name as it was before the tests were split): every plugin's tests passed
+  # The check main's rule requires (its name as it was before the tests were split): every group's tests passed
   test:
     name: Tests (${{ inputs.target || 'silverbullet' }})
-    needs: plugin
+    needs: group
     if: ${{ always() }}
     runs-on: ubuntu-latest
     permissions:
@@ -120,11 +123,11 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - name: Every plugin's tests passed
+      - name: Every group's tests passed
         env:
-          RESULT: ${{ needs.plugin.result }}
+          RESULT: ${{ needs.group.result }}
         run: |
-          echo "The plugins' tests: $RESULT"
+          echo "The groups' tests: $RESULT"
           test "$RESULT" = "success"
 
       # A new SilverBullet that breaks the tests: its pull request stays open, the owner assigned (GitHub tells them), once
@@ -137,4 +140,4 @@ jobs:
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           gh pr edit "$PR" --add-assignee "$OWNER"
-          gh pr comment "$PR" --body "The interaction tests fail against this SilverBullet: $RUN (each plugin's report and SilverBullet's log are its artifacts)."
+          gh pr comment "$PR" --body "The interaction tests fail against this SilverBullet: $RUN (each group's report and SilverBullet's log are its artifacts)."

@@ -9,9 +9,7 @@
 // Turned off, no page is read, and formulas referring to one keep their
 // results (formula/page.ts: pages not read are `unread`).
 import type { Feature, ModelHost, TableTarget, TableInfo, WritePage } from "../core/feature.ts";
-import { type FormulaCells, type FormulasOffer, type PageLinksOffer, referredPages } from "../formulas/index.ts";
-import { formulaPages } from "../formulas/references.ts";
-import { tablesWritten } from "../formulas/page.ts";
+import { type FormulaCells, type FormulasOffer, formulaPages, type PageLinksOffer, referredPages, tablesWritten } from "../formulas/index.ts";
 import { type OtherPages, type PageTable, pageTablesOf, parseTable, type Table } from "../markdown.ts";
 
 // At most this many other pages are read for one page's formulas (pages that refer on and on)

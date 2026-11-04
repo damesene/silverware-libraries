@@ -16,7 +16,7 @@
 // setting, and it is said once (again once it was not shared meanwhile).
 import { columnIdOf } from "../columns.ts";
 import type { CellLook, CellRef, Feature, HeaderLook, NamingTarget, ModelHost, TableLooks, ToolbarButton, TableInfo } from "../core/feature.ts";
-import { functionNamed } from "../formulas/registry.ts";
+import { functionNamed } from "../formulas/index.ts";
 import { findTables, locateBySource, parseTable, type Table } from "../markdown.ts";
 import type { MenuNaming } from "../menu.ts";
 import { nameProblem, sameTableName, tableNameProblem } from "../namerules.ts";

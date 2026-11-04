@@ -355,9 +355,9 @@ export async function boxOf(target: Locator): Promise<{ x: number; y: number; wi
   return box!;
 }
 
+/** An element's centre, once laid out (`boxOf`: drawn anew meanwhile, as the toolbar's buttons are as it is placed, it has none for a moment) */
 export async function center(target: Locator): Promise<{ x: number; y: number }> {
-  const box = await target.boundingBox();
-  if (!box) throw new Error("not laid out");
+  const box = await boxOf(target);
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 

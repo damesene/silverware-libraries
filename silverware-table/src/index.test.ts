@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { completions, defineFormulaPlaces, evaluated, evaluatedText, formulaErrorsIn, formulaErrorsTextIn, luaCallPlaces, onWrite, resetDefinitions, tables } from "./index.ts";
+import { completions, defineFormulaPlaces, evaluated, evaluatedText, formulaErrorsIn, formulaErrorsTextIn, formulaPagesIn, luaCallPlaces, onWrite, resetDefinitions, tables } from "./index.ts";
 import { buttonLabel, cell, clickOn, controller, editor, edits, flush, key, menuButtons, nameInMenu, setup, text, toolbarName, useTablePage } from "./testing/page.ts";
 
 describe("silverware.table.evaluate: a formula calculated on the page shown", () => {
@@ -116,7 +116,20 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       expect((await formulaErrorsTextIn([{ page: "Clean", text: PAGE }])).errors).toBe("No formula errors");
     });
 
+    it("finds the pages whose rows in SilverBullet's index hold a formula, each once, as the formulas module tells a cell", async () => {
+      await setup(PAGE);
+      started();
+      const rows = {
+        1: { page: "Budget", ref: "Budget@40", item: "Pear", total: "\\#REF! <meta formulas.f='=nope!A1'>" },
+        2: { page: "Budget", ref: "Budget@60", item: "Fig", total: "2 <meta formulas.f='=1+1'>" },
+        3: { page: "Notes", ref: "Notes@9", note: "<meta core.n='x'> plain" },
+        4: { page: "Sums", ref: "Sums@9", sum: "3 <meta formulas.f='=1+2'>" },
+      };
+      expect(formulaPagesIn(rows)).toEqual(["Budget", "Sums"]);
+    });
+
     it("says the formulas are off, before Silverware Table starts or with the module off", async () => {
+      expect(formulaPagesIn([{ page: "Sums", sum: "3 <meta formulas.f='=1+2'>" }])).toEqual([]);
       expect(await formulaErrorsIn([])).toEqual({ errors: [], error: { code: "#N/A", detail: "formulas are off" }, pages: [] });
       expect((await formulaErrorsTextIn([])).errors).toBe("\\#N/A formulas are off");
     });

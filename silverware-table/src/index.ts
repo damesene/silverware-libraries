@@ -138,6 +138,26 @@ export type FormulaErrorRecord = {
 };
 
 /**
+ * The pages whose table rows hold a formula, each once in the rows' order: the
+ * rows as SilverBullet's index has them (`index.tag "table"`: `page` and each
+ * cell's raw text by its column's key), a cell told by the formulas module
+ * (the API page's Lua knows no attribute of it). None with the module off.
+ */
+export function formulaPagesIn(rows: unknown): string[] {
+  const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
+  const formulas = controller?.offered<FormulasOffer>("formulas");
+  if (!formulas) return [];
+  const pages = new Set<string>();
+  for (const row of listOf(rows)) {
+    if (!row || typeof row !== "object") continue;
+    const { page } = row as { page?: unknown };
+    if (typeof page !== "string" || pages.has(page)) continue;
+    if (Object.values(row).some((cell) => typeof cell === "string" && formulas.cells.formulaOf(cell) !== undefined)) pages.add(page);
+  }
+  return [...pages];
+}
+
+/**
  * `silverware.table.errors`: the errors formula cells show on these pages,
  * calculated now ({ page, text } each, as the API page's Lua read them), in
  * the pages' order and each page's cells' order: each page's and its row's

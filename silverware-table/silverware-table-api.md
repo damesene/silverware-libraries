@@ -163,7 +163,7 @@ if js and js.window then
     return calculated(silverwareTableJs.evaluatedText, formula, text, page).value
   end
   -- The errors of the formula cells of `page`, else of every page whose tables hold a formula (the index's
-  -- table rows keep a cell's raw text, its <meta formulas.f=…> too), by the JS's function `calculate` (errorsIn
+  -- table rows keep a cell's raw text, its hidden tags too), by the JS's function `calculate` (errorsIn
   -- or errorsTextIn) given each page's text: the page shown as the editor has it, the others read through
   -- SilverBullet, as are the other pages they read, so a ${…} showing them is shown anew as they change
   local function formulaErrors(calculate, page)
@@ -172,19 +172,11 @@ if js and js.window then
     if page then
       names[1] = page
     else
-      -- The page shown always: its formulas typed since it was indexed count too
-      local seen = { [shown] = true }
+      -- The page shown always (its formulas typed since it was indexed count too), then the pages whose
+      -- table rows in the index hold a formula, as the JS tells them (a row's cells are their raw text)
       names[1] = shown
-      for _, row in ipairs(query[[from index.tag "table"]]) do
-        if row.page and not seen[row.page] then
-          for _, value in pairs(row) do
-            if type(value) == "string" and string.find(value, "formulas.f=", 1, true) then
-              seen[row.page] = true
-              names[#names + 1] = row.page
-              break
-            end
-          end
-        end
+      for _, name in ipairs(silverwareTableJs.formulaPagesIn(query[[from index.tag "table"]])) do
+        if name ~= shown then names[#names + 1] = name end
       end
     end
     local pages = {}

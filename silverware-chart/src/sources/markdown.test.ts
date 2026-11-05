@@ -44,6 +44,10 @@ describe("markdown tables", () => {
     expect(columnKey("**Unit price** #euro")).toBe("unit_price");
   });
 
+  it("reads a body cell as it shows, markdown's escapes taken off", () => {
+    expect(tablesOf("| A |\n|---|\n| \\#REF! |\n| a\\*b\\\\c |\n")[0]?.rows).toEqual([["#REF!"], ["a*b\\c"]]);
+  });
+
   it("finds a table by its place: above, below, under a heading", () => {
     const block = blocksOf(TEXT)[0]!;
     expect(tableByPlace(TEXT, "above", block)?.columns[0]?.name).toBe("Month");

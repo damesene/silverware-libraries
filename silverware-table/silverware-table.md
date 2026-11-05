@@ -588,7 +588,7 @@ ${(function()
 end)()}
 ```
 
-* The page is named as SilverBullet names it (`"Budget"`, `editor.getCurrentPage()`); left out, every page whose tables hold a formula.
+* The page is named as SilverBullet names it (`"Budget"`, `editor.getCurrentPage()`); left out, every page whose tables hold a formula, and the page open.
 * It reads each page as saved (the page open as it is now), and the other pages their formulas read; a `${…}` showing them follows those pages as `evaluate` does.
 * With the formulas module off, `errors` gives `nil` and the error `#N/A`.
 

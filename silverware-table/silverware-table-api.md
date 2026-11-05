@@ -168,10 +168,13 @@ if js and js.window then
   -- SilverBullet, as are the other pages they read, so a ${…} showing them is shown anew as they change
   local function formulaErrors(calculate, page)
     local names = {}
+    local shown = editor.getCurrentPage()
     if page then
       names[1] = page
     else
-      local seen = {}
+      -- The page shown always: its formulas typed since it was indexed count too
+      local seen = { [shown] = true }
+      names[1] = shown
       for _, row in ipairs(query[[from index.tag "table"]]) do
         if row.page and not seen[row.page] then
           for _, value in pairs(row) do
@@ -184,7 +187,6 @@ if js and js.window then
         end
       end
     end
-    local shown = editor.getCurrentPage()
     local pages = {}
     for _, name in ipairs(names) do
       if name == shown then

@@ -76,7 +76,7 @@ import {
   withColumnKeys,
   writtenArea,
 } from "../formulas/index.ts";
-import { cellName, columnChoicesOf, FormulaError, type FormulaErrorAt, functionHelp, parseFormula, withEquals } from "../formulas/index.ts";
+import { cellName, columnChoicesOf, columnIdText, FormulaError, type FormulaErrorAt, functionHelp, parseFormula, withEquals } from "../formulas/index.ts";
 import { addAffected, affectedBy, isAffected, type NamedOtherPages, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
 import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
@@ -265,10 +265,12 @@ export class Formulas implements Feature {
       }
       return Array.from(formulaErrors(table, { cells: this.cells, tables: source, name }), ([key, error]): FormulaErrorAt => {
         const [row, column] = key.split(",").map(Number) as [number, number];
+        // As a reference names it: its key, `:2` where several share it
+        const id = columnIdOf(headers, column);
         return {
           ...(name ? { table: name } : {}),
           cell: cellName(row - 1, column),
-          column: columnIdOf(headers, column)?.name ?? "",
+          column: (id && columnIdText(id)) ?? "",
           at: starts[row + 1] ?? range.from,
           formula: this.cells.formulaOf(table.rows[row]?.cells[column] ?? "")?.formula ?? "",
           code: error.code,

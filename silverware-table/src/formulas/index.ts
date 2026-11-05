@@ -73,7 +73,7 @@ export type PageLinksOffer = {
   // Pages read for another module (a pivot's source), as `otherPages` then gives them; `fresh`: read again those read before
   readonly readPages: (pages: readonly string[], fresh: boolean) => Promise<void>;
 };
-export { type Area, areaText, callsCustomFunctions, formulaPages, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredTableNames, type TableRef, withColumnKeys } from "./references.ts";
+export { type Area, areaText, callsCustomFunctions, columnIdText, formulaPages, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredTableNames, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";
 export { type Calculation, evaluateFormula, formulaErrors, givesList, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows } from "./evaluate.ts";
 export { type Node as FormulaNode, parse as parseFormula } from "./parser.ts";

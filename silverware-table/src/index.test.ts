@@ -102,6 +102,9 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       expect(found.pages).toEqual(["Prices"]);
       // A list as Lua gives it: a table of 1, 2, …
       expect((await formulaErrorsIn({ 1: { page: "Budget", text: BUDGET } })).errors).toHaveLength(2);
+      // Its column as a reference names it: the second of two of one name
+      const twice = `| Unit price | Unit price |\n|---|---|\n| 1 | 0 <meta formulas.f='=1/0'> |\n`;
+      expect((await formulaErrorsIn([{ page: "Twice", text: twice }])).errors[0]).toMatchObject({ column: "unit_price:2", code: "#DIV/0!" });
     });
 
     it("gives records of markdown for a page: links, the code escaped so it is no hashtag; none, a line saying so", async () => {

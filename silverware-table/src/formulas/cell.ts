@@ -4,7 +4,7 @@
 // the functions that do (FormulaCells, made of its host), so the domain names
 // no attribute and reads no metadata.
 import type { Table } from "../markdown.ts";
-import { ERROR_CODES } from "./values.ts";
+import { ERROR_CODES, type ErrorCode } from "./values.ts";
 
 export type StoredFormula = {
   // The formula, starting with "="
@@ -53,9 +53,29 @@ export function isFormulaInput(text: string): boolean {
   return trimmed.startsWith("=") && trimmed.length > 1;
 }
 
+/**
+ * The error code a cell holds, as written now (`\#REF!`) or before (`#REF!`);
+ * undefined: none
+ */
+export function errorCodeIn(text: string): ErrorCode | undefined {
+  const code = text.trim().replace(/^\\(?=#)/, "");
+  return ERROR_CODES.find((c) => c === code);
+}
+
 /** Whether a cell shows a formula error such as #REF! */
 export function isErrorText(text: string): boolean {
-  return (ERROR_CODES as readonly string[]).includes(text.trim());
+  return errorCodeIn(text) !== undefined;
+}
+
+/**
+ * A result as a cell holds it: an error's code with its `#` escaped
+ * (`\#REF!`), which shows as written but is no hashtag: SilverBullet would
+ * take `#REF!` for the tag REF, highlighted short of its `!` and given to the
+ * table's row in its index (verified in 2.12.1, 2026-11-05)
+ */
+export function cellResult(text: string): string {
+  const code = errorCodeIn(text);
+  return code ? `\\${code}` : text;
 }
 
 export function hasFormulas(cells: FormulaCells, table: Table): boolean {

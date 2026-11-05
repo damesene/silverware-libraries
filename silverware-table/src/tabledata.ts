@@ -4,6 +4,7 @@
 // calls it reads them (the entry from the metadata, a module through its
 // host), so this reads no metadata.
 import { columnKey, columnName } from "./columns.ts";
+import { errorCodeIn } from "./formulas/index.ts";
 import { type Table, unescapeCell } from "./markdown.ts";
 import { withoutTags } from "./tags.ts";
 
@@ -29,6 +30,10 @@ export function tableData(table: Table, place: { readonly from: number; readonly
       const shown = columnName(cell);
       return { name: fixedName(i) ?? shown, key: columnKey(shown) };
     }),
-    rows: table.rows.slice(1).map((row) => row.cells.map((cell) => unescapeCell(withoutTags(cell)).trim())),
+    // (An error as it shows, `#REF!`: its `#` escaped in the markdown so it is no hashtag, cellResult)
+    rows: table.rows.slice(1).map((row) => row.cells.map((cell) => {
+      const text = unescapeCell(withoutTags(cell)).trim();
+      return errorCodeIn(text) ?? text;
+    })),
   };
 }

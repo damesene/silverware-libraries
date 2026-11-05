@@ -118,13 +118,13 @@ describe("custom functions", () => {
     expect(formulaHelp("=VAT(", 5)).toEqual({ syntax: "VAT(amount)", description: "With VAT.", argument: { from: 4, to: 10 } });
     // Arguments counted as for built-in functions
     const wrong = recalculate(parseTable(`| A |\n|---|\n| <meta formulas.f='=VAT()'> |\n`));
-    expect(wrong.rows[1]!.cells[0]).toBe(`#VALUE! <meta formulas.f='=VAT()'>`);
+    expect(wrong.rows[1]!.cells[0]).toBe(`\\#VALUE! <meta formulas.f='=VAT()'>`);
     // The built-in one's help gives way too
     expect(formulaHelp("=ABS(", 5)).toEqual({ syntax: "ABS(…)", description: "", argument: { from: 4, to: 5 } });
     clearCustomFunctions();
     expect(functionNamed("VAT")).toBeUndefined();
     expect(functionNamed("ABS")).toBe(BUILT_IN_FUNCTIONS.ABS);
-    expect(recalculate(table).rows[1]!.cells[1]).toBe(`#NAME? <meta formulas.f='=VAT(A1)'>`);
+    expect(recalculate(table).rows[1]!.cells[1]).toBe(`\\#NAME? <meta formulas.f='=VAT(A1)'>`);
   });
 
   it("keeps the functions of before until Space Lua defines its own again", () => {

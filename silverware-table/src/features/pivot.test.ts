@@ -40,6 +40,13 @@ describe("Pivot tables", () => {
     expect(pivotOf(text)).toBe(`${PIVOT("| East | 120 |\n| West | 80 |\n| Total | 200 |")}\n`);
   });
 
+  it("writes an error with its # escaped, so it is no hashtag", async () => {
+    await setup(`${ORDERS}\n\n${PIVOT("| East | 0 |").replace("pivot.values='SUM([revenue])'", "pivot.values='SUM([revenue]) / 0'")}\n`, { "silverware.table.editor.enterKey": "save" });
+    clickOn(cell(2, 1)); // West's revenue
+    await type("80");
+    expect(text).toMatch(/\| East +\| \\#DIV\/0! +\|/);
+  });
+
   it("is written as its source makes it with Refresh, the user's name of a header kept", async () => {
     await setup(`${ORDERS}\n\n${PIVOT("| East | 1 |\n| Total | 1 |")}\n`, { "silverware.table.editor.enterKey": "save", "silverware.table.metadata": true });
     const info = controller.shownTables()[1]!;

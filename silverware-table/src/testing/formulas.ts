@@ -24,7 +24,9 @@ export const formulaCell = (value: string, formula: string, name?: string) => wi
 export const hasFormulas = (table: Table) => domain.hasFormulas(CELLS, table);
 export const formulaCount = (table: Table) => domain.formulaCount(CELLS, table);
 export const recalculate = (table: Table, tables?: TableSource) => domain.recalculate(table, { cells: CELLS, tables, name: metaName(table) });
-export const formulaErrors = (table: Table, tables?: TableSource) => domain.formulaErrors(table, { cells: CELLS, tables, name: metaName(table) });
+// Each error as a cell's title says it: its code and why
+export const formulaErrors = (table: Table, tables?: TableSource) =>
+  new Map([...domain.formulaErrors(table, { cells: CELLS, tables, name: metaName(table) })].map(([at, error]) => [at, `${error.code} ${error.detail}`]));
 export const totalRows = (table: Table) => domain.totalRows(CELLS, table);
 export const calculatedFormula = (table: Table, column: number, except?: ReadonlySet<number>) => domain.calculatedFormula(CELLS, table, column, except);
 export const withCalculatedCells = (table: Table, row: number, added?: ReadonlySet<number>) => domain.withCalculatedCells(CELLS, table, row, added);

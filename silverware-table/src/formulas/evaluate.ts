@@ -578,9 +578,9 @@ export function scalarText(value: Scalar): string {
   return toText(value) as string;
 }
 
-/** Why formula cells show errors: "row,column" (rows of the markdown, header 0) → code and detail */
-export function formulaErrors(table: Table, { cells, tables, name }: Calculation): Map<string, string> {
-  const errors = new Map<string, string>();
+/** The errors formula cells show: "row,column" (rows of the markdown, header 0) → the error, its code and why */
+export function formulaErrors(table: Table, { cells, tables, name }: Calculation): Map<string, FormulaError> {
+  const errors = new Map<string, FormulaError>();
   if (!hasFormulas(cells, table)) return errors;
   const sheet = new Sheet(table, new Book(cells, tables), undefined, name);
   table.rows.forEach((row, r) => {
@@ -588,7 +588,7 @@ export function formulaErrors(table: Table, { cells, tables, name }: Calculation
     row.cells.forEach((cell, c) => {
       const stored = cells.formulaOf(cell);
       const result = stored && sheet.result(r - 1, c, stored.formula);
-      if (isError(result)) errors.set(`${r},${c}`, `${result.code} ${result.detail}`);
+      if (isError(result)) errors.set(`${r},${c}`, result);
     });
   });
   return errors;

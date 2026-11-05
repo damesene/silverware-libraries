@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { completions, defineFormulaPlaces, evaluated, evaluatedText, luaCallPlaces, onWrite, resetDefinitions, tables } from "./index.ts";
+import { completions, defineFormulaPlaces, evaluated, evaluatedText, formulaErrorsIn, formulaErrorsTextIn, luaCallPlaces, onWrite, resetDefinitions, tables } from "./index.ts";
 import { buttonLabel, cell, clickOn, controller, editor, edits, flush, key, menuButtons, nameInMenu, setup, text, toolbarName, useTablePage } from "./testing/page.ts";
 
 describe("silverware.table.evaluate: a formula calculated on the page shown", () => {
@@ -84,6 +84,39 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
     await setup(PAGE);
     started();
     expect((await evaluated("=fruit!B1", PAGE.replace("| 3 |", "| 30 |"))).value).toBe(30);
+  });
+
+  describe("silverware.table.errors: the errors formula cells show, on the pages given", () => {
+    const BUDGET = `# Budget\n\n| Item | Total |\n|---|---|\n| Pear | \\#REF! <meta formulas.f='=nope!A1'> |\n| Fig | 2 <meta formulas.f='=1+1'> |\n| <meta core.table core.name='costs'> |\n\n| A | B |\n|---|---|\n| 1 | 0 <meta formulas.f='=[[Prices]]prices!B9'> |\n`;
+    const PRICES = `| Name | Cost |\n|---|---|\n| Fig | 7 |\n| <meta core.table core.name='prices'> |\n`;
+
+    it("gives each with its page, its row's place, its table, cell, column, code, why and formula, in the pages' and cells' order", async () => {
+      await setup(PAGE, {}, { readPage: () => PRICES });
+      started();
+      const found = await formulaErrorsIn([{ page: "Budget", text: BUDGET }, { page: "Clean", text: PAGE }]);
+      expect(found.errors).toEqual([
+        { page: "Budget", ref: `Budget@${BUDGET.indexOf("| Pear")}`, table: "costs", cell: "B1", column: "total", code: "#REF!", detail: expect.stringContaining("nope"), formula: "=nope!A1" },
+        // Calculated now, not as written: of another page read, its row past its table's
+        { page: "Budget", ref: `Budget@${BUDGET.indexOf("| 1 |")}`, cell: "B1", column: "b", code: "#REF!", detail: expect.any(String), formula: "=[[Prices]]prices!B9" },
+      ]);
+      expect(found.pages).toEqual(["Prices"]);
+      // A list as Lua gives it: a table of 1, 2, …
+      expect((await formulaErrorsIn({ 1: { page: "Budget", text: BUDGET } })).errors).toHaveLength(2);
+    });
+
+    it("gives records of markdown for a page: links, the code escaped so it is no hashtag; none, a line saying so", async () => {
+      await setup(PAGE, {}, { readPage: () => PRICES });
+      started();
+      const [first] = (await formulaErrorsTextIn([{ page: "Budget", text: BUDGET }])).errors as Record<string, string>[];
+      expect(first).toEqual({ page: "[[Budget]]", table: "costs", cell: `[[Budget@${BUDGET.indexOf("| Pear")}|B1]]`, error: "\\#REF!", reason: expect.stringContaining("nope") });
+      expect(Object.keys(first!)).toEqual(["page", "table", "cell", "error", "reason"]);
+      expect((await formulaErrorsTextIn([{ page: "Clean", text: PAGE }])).errors).toBe("No formula errors");
+    });
+
+    it("says the formulas are off, before Silverware Table starts or with the module off", async () => {
+      expect(await formulaErrorsIn([])).toEqual({ errors: [], error: { code: "#N/A", detail: "formulas are off" }, pages: [] });
+      expect((await formulaErrorsTextIn([])).errors).toBe("\\#N/A formulas are off");
+    });
   });
 
   describe("completions of the name typed at the end of a formula", () => {

@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { cell, expect, header, markdown, openPage, reload, rendersAnew, setOtherPage, setPage, target, test } from "./helpers.ts";
+import { cell, cursorLine, expect, header, markdown, openPage, pickerOfCommand, reload, rendersAnew, setOtherPage, setPage, target, test } from "./helpers.ts";
 
 test.describe("Formulas", () => {
   test("a formula with a comparison and texts shows its result and is written as typed", async ({ page }) => {
@@ -147,5 +147,30 @@ test.describe("Formulas from Space Lua", () => {
     expect(text).toContain('uite("aliases![amount]")');
     expect(text).toContain('silverware.table.evaluateText("aliases![amount]")');
     expect(text).toContain('uiev("aliases!B1")');
+  });
+
+  test("errorsText shows a page's formula errors as a table, the error no hashtag; Find formula errors opens its row", async ({ page }) => {
+    const errors = [
+      "# Errors",
+      "",
+      "| Item | Total |",
+      "|---|---|",
+      "| Pear | \\#REF! <meta formulas.f='=nope!A1'> |",
+      "| <meta core.table core.name='errs'> |",
+      "",
+      "List: ${silverware.table.errorsText(editor.getCurrentPage())}",
+      "",
+    ].join("\n");
+    await setOtherPage(page, "UiTests/Errors", errors);
+    await openPage(page, "UiTests/Errors");
+    const list = line(page, "List:").locator("table");
+    await expect(list).toContainText("there is no table named nope");
+    await expect(list.locator(".sb-hashtag, .hashtag")).toHaveCount(0);
+    // The command: the space's errors, this page's among them; picked, its row with the cursor
+    const picker = await pickerOfCommand(page, "Silverware Table: Find formula errors");
+    await expect(picker).toContainText("UiTests/Errors · B1 #REF!");
+    await page.keyboard.type("Errors");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => cursorLine(page)).toContain("| Pear |");
   });
 });

@@ -1,7 +1,7 @@
 // Silverware Table entry point, loaded by the init page's Space Lua:
 //   js.importFromSpace("Library/damesene/silverware-table.js").init({ ... editor functions ... })
 import { customSeries, customSeriesAnew, defineCustomSeries } from "./autofill/index.ts";
-import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
+import { type Bridge, listOf, missingBridgeFunctions } from "./bridge.ts";
 import { Controller } from "./controller.ts";
 import { customTypes } from "./columntypes/custom.ts";
 import { customTypesAnew, defineCustomTypes } from "./columntypes/registry.ts";
@@ -123,6 +123,57 @@ export async function evaluatedText(formula: string, text?: string, page?: strin
   if (!result) return { value: cellResult(FORMULAS_OFF.code), pages: [] };
   const shown = (v: Scalar) => cellResult(scalarText(v));
   return { value: isRange(result.value) ? result.value.map(shown).join(", ") : shown(result.value as Scalar), pages: result.pages };
+}
+
+/** A formula cell showing an error, as `silverware.table.errors` gives it */
+export type FormulaErrorRecord = {
+  readonly page: string;
+  readonly ref: string;
+  readonly table?: string;
+  readonly cell: string;
+  readonly column: string;
+  readonly code: string;
+  readonly detail: string;
+  readonly formula: string;
+};
+
+/**
+ * `silverware.table.errors`: the errors formula cells show on these pages,
+ * calculated now ({ page, text } each, as the API page's Lua read them), in
+ * the pages' order and each page's cells' order: each page's and its row's
+ * place (`ref`, `Page@offset`), its table's name, its cell, its column's key,
+ * the error's code and why, its formula; the other pages read. With the
+ * formulas module off: `error`, and no records.
+ */
+export async function formulaErrorsIn(pages: unknown): Promise<{ readonly errors: readonly FormulaErrorRecord[]; readonly error?: EvaluatedError; readonly pages: readonly string[] }> {
+  const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
+  const formulas = controller?.offered<FormulasOffer>("formulas");
+  if (!formulas) return { errors: [], error: FORMULAS_OFF, pages: [] };
+  const errors: FormulaErrorRecord[] = [];
+  const read = new Set<string>();
+  for (const item of listOf(pages)) {
+    const { page, text } = (item ?? {}) as { page?: unknown; text?: unknown };
+    if (typeof page !== "string" || typeof text !== "string") continue;
+    const found = await formulas.errors(text, page);
+    for (const other of found.pages) read.add(other);
+    for (const { at, ...error } of found.errors) errors.push({ page, ref: `${page}@${at}`, ...error });
+  }
+  return { errors, pages: [...read] };
+}
+
+/**
+ * `silverware.table.errorsText`: the same errors as records of markdown, which
+ * a `${…}` shows as a table: the page and the cell as links (the cell's to its
+ * row), the error's code escaped so it is no hashtag, why. None: a line saying so.
+ */
+export async function formulaErrorsTextIn(pages: unknown): Promise<{ readonly errors: string | readonly Readonly<Record<string, string>>[]; readonly pages: readonly string[] }> {
+  const found = await formulaErrorsIn(pages);
+  if (found.error) return { errors: `${cellResult(found.error.code)} ${found.error.detail}`, pages: [] };
+  if (found.errors.length === 0) return { errors: "No formula errors", pages: found.pages };
+  return {
+    errors: found.errors.map((e) => ({ page: `[[${e.page}]]`, table: e.table ?? "", cell: `[[${e.ref}|${e.cell}]]`, error: cellResult(e.code), reason: e.detail })),
+    pages: found.pages,
+  };
 }
 
 /** A name a formula typed so far may go on with: the text it inserts, what it is, and for a function its syntax and description */

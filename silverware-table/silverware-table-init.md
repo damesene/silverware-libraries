@@ -523,6 +523,32 @@ if js and js.window then
       silverwareTableJs.removeAllMetadata()
     end,
   }
+  -- The space's formula errors in SilverBullet's picker, the one picked opened at its row: the public API only
+  command.define {
+    name = "Silverware Table: Find formula errors",
+    run = function()
+      local errors, failed = silverware.table.errors()
+      if not errors then
+        editor.flashNotification("Silverware Table: " .. failed.detail .. ".", "error")
+        return
+      end
+      if #errors == 0 then
+        editor.flashNotification("No formula errors.")
+        return
+      end
+      local options = {}
+      for _, e in ipairs(errors) do
+        options[#options + 1] = {
+          -- The page in the name: the picker's filter finds by the name
+          name = e.page .. " · " .. e.cell .. " " .. e.code,
+          description = (e.table and (e.table .. ": ") or "") .. e.detail,
+          ref = e.ref,
+        }
+      end
+      local picked = editor.filterBox("Formula errors", options, "The formula cells showing an error; pick one to open its row.")
+      if picked then editor.navigate(picked.ref) end
+    end,
+  }
   -- The modules' commands (of those turned on, known once they started: commandList waits for them), by their whole names, and their slash commands
   for _, module_command in ipairs(silverwareTableJs.commandList()) do
     local name = module_command.name

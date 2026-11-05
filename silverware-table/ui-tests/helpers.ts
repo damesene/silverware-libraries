@@ -334,6 +334,19 @@ export async function openPage(page: Page, name: string): Promise<void> {
   await expect(page).toHaveURL(new RegExp(`/${encodeURI(name)}$`));
 }
 
+/**
+ * Runs a command by its name and gives SilverBullet's picker it opens (`editor.filterBox`: a dialog of
+ * options, one picked by Enter); SilverBullet only, where the init page's Lua defines commands
+ */
+export async function pickerOfCommand(page: Page, name: string): Promise<Locator> {
+  if (target !== "silverbullet") throw new Error("pickerOfCommand: SilverBullet only");
+  // Not awaited: the command waits for the picker's answer
+  void page.evaluate((name) => (window as unknown as { client: { runCommandByName(name: string): Promise<void> } }).client.runCommandByName(name), name);
+  const picker = page.locator("dialog.sb-modal-box");
+  await expect(picker).toBeVisible();
+  return picker;
+}
+
 /** Checks that the editor's navigation was asked to open a page (the playground only says it would) */
 export async function expectNavigatedTo(page: Page, name: string): Promise<void> {
   if (target === "silverbullet") await expect(page).toHaveURL(new RegExp(`/${encodeURI(name)}$`));

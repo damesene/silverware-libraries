@@ -569,6 +569,31 @@ VAT: ${te("=fruit!vat")}
 
 **Before 2026-11**, `evaluate` gave text, several values as a list `["Pear","Fig"]`, and `evaluateAlias` made a name for it. In a page's text, write `evaluateText` where you had `evaluate`, and make the names you use there with `evaluateTextAlias` instead of `evaluateAlias`: with `evaluate`, several values show as a box with a line each, and an error as `nil`.
 
+#### Formula errors
+
+Every formula cell showing an error, on a page or in the whole space, calculated as it is now (a table not recalculated since shows its errors as they are, with why):
+
+```
+${silverware.table.errorsText()}
+${silverware.table.errorsText(editor.getCurrentPage())}
+```
+
+`errorsText` shows them as a table: the page, the table's name, the cell (a link to its row), the error and why; with none, *No formula errors*. For a script, `silverware.table.errors(page)` gives a list of records: `page`, `ref` (its row, as `Budget@1234`: `editor.navigate(ref)` opens it), `table` (`nil` where the table has no name), `cell` (`C3`), `column`, `code` (`#REF!`), `detail` (why) and `formula`:
+
+```
+${(function()
+  local count = {}
+  for _, e in ipairs(silverware.table.errors()) do count[e.code] = (count[e.code] or 0) + 1 end
+  return count["#REF!"] or 0
+end)()}
+```
+
+* The page is named as SilverBullet names it (`"Budget"`, `editor.getCurrentPage()`); left out, every page whose tables hold a formula.
+* It reads each page as saved (the page open as it is now), and the other pages their formulas read; a `${…}` showing them follows those pages as `evaluate` does.
+* With the formulas module off, `errors` gives `nil` and the error `#N/A`.
+
+The *Silverware Table: Find formula errors* command lists them in SilverBullet's picker (type to find a page or a cell), and opens the one you pick at its row.
+
 ### For other plugins
 
 These functions let another plugin (or a script of yours) work with tables without reading their markdown itself. [[Library/damesene/silverware-chart|Silverware Chart]] uses them for charts of named tables.

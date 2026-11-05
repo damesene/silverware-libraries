@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Table API
 
-The Space Lua API of [Silverware Table](silverware-table.md): `silverware.table.defineFunctions`, `defineTypes`, `defineSeries`, `defineConditions` and `defineFormats` (your own functions, column types, AutoFill series, and conditions and formats of conditional formatting) `silverware.table.evaluate` and `evaluateText` (a formula calculated from Space Lua: its values for a script, its text for a page), with `silverware.table.evaluateAlias` and `evaluateTextAlias` giving them shorter names, and for other plugins `silverware.table.tables` (a text's tables as data) and `silverware.table.onWrite` (edits of the page written with the tables' writes). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [silverware-table-init](silverware-table-init.md) for what starts Silverware Table.
+The Space Lua API of [Silverware Table](silverware-table.md): `silverware.table.defineFunctions`, `defineTypes`, `defineSeries`, `defineConditions` and `defineFormats` (your own functions, column types, AutoFill series, and conditions and formats of conditional formatting) `silverware.table.evaluate` and `evaluateText` (a formula calculated from Space Lua: its values for a script, its text for a page), with `silverware.table.evaluateAlias` and `evaluateTextAlias` giving them shorter names, `silverware.table.errors` and `errorsText` (the formula errors of a page or the space), and for other plugins `silverware.table.tables` (a text's tables as data) and `silverware.table.onWrite` (edits of the page written with the tables' writes). It is loaded before your scripts, so they can call it. It is installed with the library; see its page for how each is used, and [silverware-table-init](silverware-table-init.md) for what starts Silverware Table.
 
 ```space-lua
 -- priority: 50
@@ -12,7 +12,8 @@ The Space Lua API of [Silverware Table](silverware-table.md): `silverware.table.
 -- silverware.table.defineSeries, see "Custom functions", "Custom column types" and "Custom series";
 -- silverware.table.defineMenuEntries, see "Custom menu entries";
 -- silverware.table.defineConditions and silverware.table.defineFormats, see "Custom conditions and formats";
--- silverware.table.evaluate, evaluateText, evaluateAlias and evaluateTextAlias, see "Formulas from Space Lua";
+-- silverware.table.evaluate, evaluateText, evaluateAlias, evaluateTextAlias, errors and errorsText, see
+-- "Formulas from Space Lua";
 -- silverware.table.tables and silverware.table.onWrite, see "For other plugins"
 silverware = silverware or {}
 silverware.table = silverware.table or {}
@@ -161,6 +162,64 @@ if js and js.window then
   function silverware.table.evaluateText(formula, text, page)
     return calculated(silverwareTableJs.evaluatedText, formula, text, page).value
   end
+  -- The errors of the formula cells of `page`, else of every page whose tables hold a formula (the index's
+  -- table rows keep a cell's raw text, its <meta formulas.f=…> too), by the JS's function `calculate` (errorsIn
+  -- or errorsTextIn) given each page's text: the page shown as the editor has it, the others read through
+  -- SilverBullet, as are the other pages they read, so a ${…} showing them is shown anew as they change
+  local function formulaErrors(calculate, page)
+    local names = {}
+    if page then
+      names[1] = page
+    else
+      local seen = {}
+      for _, row in ipairs(query[[from index.tag "table"]]) do
+        if row.page and not seen[row.page] then
+          for _, value in pairs(row) do
+            if type(value) == "string" and string.find(value, "formulas.f=", 1, true) then
+              seen[row.page] = true
+              names[#names + 1] = row.page
+              break
+            end
+          end
+        end
+      end
+    end
+    local shown = editor.getCurrentPage()
+    local pages = {}
+    for _, name in ipairs(names) do
+      if name == shown then
+        pages[#pages + 1] = { page = name, text = editor.getText() }
+      else
+        -- A page the index still has but the space no longer does is left out, not the whole list
+        local ok, text = pcall(space.readPage, name)
+        if ok and text then pages[#pages + 1] = { page = name, text = text } end
+      end
+    end
+    local result = calculate(pages)
+    for _, other in ipairs(result.pages) do
+      space.pageExists(other)
+    end
+    return result
+  end
+  --- The errors formula cells show, calculated now: on one page, or on every page of the space with formulas.
+  --- For a page's text, errorsText.
+  --- @param page string? the page's name, e.g. "Budget" or editor.getCurrentPage() (left out: every page)
+  --- @return table? a list of { page, ref (its row, "Budget@1234"), table (nil: unnamed), cell ("C3"), column,
+  --- code ("#REF!"), detail, formula }; nil and { code, detail } with the formulas module off
+  --- @see Library/damesene/silverware-table#Formulas from Space Lua
+  function silverware.table.errors(page)
+    local result = formulaErrors(silverwareTableJs.formulaErrorsIn, page)
+    if result.error then return nil, result.error end
+    return result.errors
+  end
+  --- The errors formula cells show, for a page's text: ${silverware.table.errorsText()} shows them as a table,
+  --- each page and cell a link (the cell's to its row), the error as \#REF! (no hashtag), why.
+  --- @param page string? the page's name (left out: every page with formulas)
+  --- @return any the records the table shows, or the line "No formula errors"
+  --- @see Library/damesene/silverware-table#Formulas from Space Lua
+  function silverware.table.errorsText(page)
+    return formulaErrors(silverwareTableJs.formulaErrorsTextIn, page).errors
+  end
   --- The tables of a markdown text (a page's, as you have it): each with its name (where Silverware Table
   --- named it), its place in the text, its columns (their names and keys) and its body's cells as they show.
   --- @param text string the text, e.g. editor.getText()
@@ -235,6 +294,8 @@ else
   function silverware.table.evaluateText() return "\\#N/A" end
   function silverware.table.evaluateAlias() end
   function silverware.table.evaluateTextAlias() end
+  function silverware.table.errors() return nil, { code = "#N/A", detail = "formulas are off" } end
+  function silverware.table.errorsText() return "No formula errors" end
   function silverware.table.tables() return {} end
   function silverware.table.onWrite() end
 end

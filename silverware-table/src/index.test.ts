@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { completions, defineFormulaPlaces, evaluate, evaluated, luaCallPlaces, onWrite, resetDefinitions, tables } from "./index.ts";
+import { completions, defineFormulaPlaces, evaluated, evaluatedText, luaCallPlaces, onWrite, resetDefinitions, tables } from "./index.ts";
 import { buttonLabel, cell, clickOn, controller, editor, edits, flush, key, menuButtons, nameInMenu, setup, text, toolbarName, useTablePage } from "./testing/page.ts";
 
 describe("silverware.table.evaluate: a formula calculated on the page shown", () => {
@@ -13,47 +13,77 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
     `| Item | Qty | Price |\n|---|---|---|\n| Pear <meta core.n='pear'> | 3 | 1.5 |\n| Fig | 2 | 4 |\n| VAT | 21 <meta core.cn='vat'> | |\n| <meta core.table core.name='fruit'> |\n\n` +
     `| Note |\n|---|\n| unnamed |\n`;
 
-  it("gives one value as its text: a named cell, a cell, a row's cell, a calculation", async () => {
+  const valueOf = async (formula: string) => (await evaluated(formula)).value;
+  const textOf = async (formula: string) => (await evaluatedText(formula)).value;
+
+  it("gives one value as a value: a named cell, a cell, a row's cell, a calculation, a date, a time, a logical value, none", async () => {
     await setup(PAGE);
     started();
-    expect(await evaluate("=fruit!vat")).toBe("21");
-    expect(await evaluate("fruit!B2")).toBe("2");
-    expect(await evaluate("=fruit!pear[price]")).toBe("1.5");
-    expect(await evaluate("=SUM(fruit![qty]) * 2")).toBe("52");
-    expect(await evaluate('=fruit!A1 & "!"')).toBe("Pear!");
+    expect(await valueOf("=fruit!vat")).toBe(21);
+    expect(await valueOf("fruit!B2")).toBe(2);
+    expect(await valueOf("=fruit!pear[price]")).toBe(1.5);
+    expect(await valueOf("=SUM(fruit![qty]) * 2")).toBe(52);
+    expect(await valueOf('=fruit!A1 & "!"')).toBe("Pear!");
+    expect(await valueOf("=DATE(2026, 11, 5)")).toBe("2026-11-05");
+    expect(await valueOf("=TIME(14, 30, 0)")).toBe("14:30");
+    expect(await valueOf("=fruit!B1 > 2")).toBe(true);
+    // An empty cell: none, and no error
+    expect(await evaluated("=fruit!C3")).toEqual({ value: null, pages: [] });
   });
 
-  it("gives several values as a JSON list of their texts, a range of one cell as its value", async () => {
-    await setup(PAGE);
+  it("gives a range as a list, a range written as one however many cells: empty ones \"\", an error of one in its place", async () => {
+    await setup(`${PAGE}\n| X |\n|---|\n| 5 |\n| <meta core.table core.name='one'> |\n`);
     started();
-    expect(await evaluate("=fruit![item]")).toBe('["Pear","Fig","VAT"]');
-    expect(await evaluate("=fruit!B1:C2")).toBe('["3","1.5","2","4"]');
-    expect(await evaluate("=fruit!B1:B1")).toBe("3");
-    expect(await evaluate('=fruit![item] & "?"')).toBe('["Pear?","Fig?","VAT?"]');
+    expect(await valueOf("=fruit![item]")).toEqual(["Pear", "Fig", "VAT"]);
+    expect(await valueOf("=fruit!B1:C2")).toEqual([3, 1.5, 2, 4]);
+    expect(await valueOf("=fruit!B1:B1")).toEqual([3]);
+    expect(await valueOf("=one![x]")).toEqual([5]);
+    expect(await valueOf("=one!A1")).toBe(5);
+    expect(await valueOf("=fruit![price]")).toEqual([1.5, 4, ""]);
+    expect(await valueOf('=fruit![item] & "?"')).toEqual(["Pear?", "Fig?", "VAT?"]);
+    const [error, ...rest] = (await valueOf("=fruit![qty] / (fruit![qty] - 3)")) as unknown[];
+    expect(error).toMatchObject({ code: "#DIV/0!" });
+    expect(rest[0]).toBe(-2);
   });
 
-  it("gives an error by its code: no table of its own, a table not named, a slip", async () => {
+  it("gives an error of the formula as its code and why, the value none: no table of its own, a table not named, a slip", async () => {
     await setup(PAGE);
     started();
-    expect(await evaluate("=A1")).toBe("#REF!");
-    expect(await evaluate("=nope!A1")).toBe("#REF!");
-    expect(await evaluate("=1/0")).toBe("#DIV/0!");
-    expect(await evaluate("=SUM(")).toMatch(/^#/);
+    expect(await evaluated("=A1")).toMatchObject({ value: null, error: { code: "#REF!" } });
+    expect((await evaluated("=nope!A1")).error).toMatchObject({ code: "#REF!", detail: expect.stringContaining("nope") });
+    expect((await evaluated("=1/0")).error?.code).toBe("#DIV/0!");
+    expect((await evaluated("=SUM(")).error?.code).toMatch(/^#/);
+  });
+
+  it("gives text for a page, as a cell shows it: several joined, an error escaped so it is no hashtag", async () => {
+    await setup(`${PAGE}\n| P |\n|---|\n| \\#DIV/0! |\n| <meta core.table core.name='pivot'> |\n`);
+    started();
+    expect(await textOf("=fruit!pear[price]")).toBe("1.5");
+    expect(await textOf("=fruit![item]")).toBe("Pear, Fig, VAT");
+    expect(await textOf("=fruit![price]")).toBe("1.5, 4, ");
+    expect(await textOf("=fruit!C3")).toBe("");
+    expect(await textOf("=nope!A1")).toBe("\\#REF!");
+    expect(await textOf("=fruit![qty] / (fruit![qty] - 3)")).toMatch(/^\\#DIV\/0!, -2, /);
+    // A pivot's cell holding an error: the error's code, as formulas read it; a text value as it is
+    expect(await valueOf("=pivot!A1")).toBe("#DIV/0!");
+    expect(await textOf("=pivot!A1")).toBe("\\#DIV/0!");
+    expect(await textOf('="#" & "tag"')).toBe("#tag");
   });
 
   it("reads another page's tables it refers to, and says which pages it read", async () => {
     const OTHER = `| Name | Cost |\n|---|---|\n| Fig | 7 |\n| <meta core.table core.name='prices'> |\n`;
     await setup(PAGE, {}, { readPage: () => OTHER });
     started();
-    expect(await evaluate("=[[Prices]]prices!B1 + fruit!B1")).toBe("10");
-    expect(await evaluated("=[[Prices]]prices!B1")).toEqual({ value: "7", pages: ["Prices"] });
-    expect(await evaluated("=fruit!B1")).toEqual({ value: "3", pages: [] });
+    expect(await valueOf("=[[Prices]]prices!B1 + fruit!B1")).toBe(10);
+    expect(await evaluated("=[[Prices]]prices!B1")).toEqual({ value: 7, pages: ["Prices"] });
+    expect(await evaluatedText("=[[Prices]]prices!B1")).toEqual({ value: "7", pages: ["Prices"] });
+    expect(await evaluated("=fruit!B1")).toEqual({ value: 3, pages: [] });
   });
 
   it("calculates on the text it is given (the page as the init page's Lua reads it)", async () => {
     await setup(PAGE);
     started();
-    expect((await evaluated("=fruit!B1", PAGE.replace("| 3 |", "| 30 |"))).value).toBe("30");
+    expect((await evaluated("=fruit!B1", PAGE.replace("| 3 |", "| 30 |"))).value).toBe(30);
   });
 
   describe("completions of the name typed at the end of a formula", () => {
@@ -245,9 +275,11 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
   });
 
   it("is #N/A before Silverware Table starts, or with the formulas module off", async () => {
-    expect(await evaluate("=1+1")).toBe("#N/A");
+    const OFF = { value: null, error: { code: "#N/A", detail: "formulas are off" }, pages: [] };
+    expect(await evaluated("=1+1")).toEqual(OFF);
     await setup(PAGE, { "silverware.table.modules.formulas.enabled": false });
     started();
-    expect(await evaluate("=1+1")).toBe("#N/A");
+    expect(await evaluated("=1+1")).toEqual(OFF);
+    expect((await evaluatedText("=1+1")).value).toBe("\\#N/A");
   });
 });

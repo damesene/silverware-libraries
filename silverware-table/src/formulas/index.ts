@@ -58,7 +58,7 @@ export type PageLinksOffer = {
 };
 export { type Area, areaText, callsCustomFunctions, formulaPages, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredTableNames, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";
-export { type Calculation, evaluateFormula, formulaErrors, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows } from "./evaluate.ts";
+export { type Calculation, evaluateFormula, formulaErrors, givesList, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows } from "./evaluate.ts";
 export { type Node as FormulaNode, parse as parseFormula } from "./parser.ts";
 export { parseDate, toUnit, type Unit } from "./dates.ts";
 export { ERROR_CODES, FormulaError, parseClock, type Scalar, type Value } from "./values.ts";

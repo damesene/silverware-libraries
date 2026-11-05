@@ -7,9 +7,9 @@ import { customTypes } from "./columntypes/custom.ts";
 import { customTypesAnew, defineCustomTypes } from "./columntypes/registry.ts";
 import { checkedConditions, checkedFormats, customDefinitionsAnew, defineCustomConditions, defineCustomFormats } from "./conditions/index.ts";
 import { customFunctions } from "./formulas/custom.ts";
-import { choiceText, type FormulasOffer, functionNamed, scalarText } from "./formulas/index.ts";
+import { cellResult, choiceText, type FormulasOffer, functionNamed, givesList, scalarText, withEquals } from "./formulas/index.ts";
 import { defineFormulaPlaces as defineFormulaPlacesIn, type FormulaPlaces } from "./formulas/places.ts";
-import { isRange, single } from "./formulas/values.ts";
+import { isError, isRange, type Scalar, single, TimeValue, type Value } from "./formulas/values.ts";
 import { customFunctionsAnew, defineCustomFunctions } from "./formulas/registry.ts";
 import { addWriteListener, type WriteListener, writeListenersAnew } from "./core/writelisteners.ts";
 import { pageTablesOf } from "./markdown.ts";
@@ -59,22 +59,70 @@ export function removeAllMetadata(): void {
   void controller?.removeAllMetadata();
 }
 
+/** An error as `evaluated` gives it: its code (plain, `#REF!`) and why */
+export type EvaluatedError = { readonly code: string; readonly detail: string };
+/** One value as `evaluated` gives it: a number, a logical value, a text (a date, a time as written), none */
+export type EvaluatedScalar = number | boolean | string | null;
+
+/** What Silverware Table gives while it has not started or the formulas module is off */
+const FORMULAS_OFF: EvaluatedError = { code: "#N/A", detail: "formulas are off" };
+
 /**
- * A formula calculated on the page shown, in none of its tables, so what it
- * reads it names by a table's name (`=prices!vat`, `=SUM(prices![qty])`,
- * `=[[Other]]prices!B2`). One value as its text, as a cell shows it; several
- * (a range) as a JSON list of their texts, `["a","b"]`; an error by its code
- * (#N/A while Silverware Table has not started or the formulas module is off).
- * `text`: the text of the page to calculate on (else the editor's, as it is
- * now), `page` its name (else the page shown); `pages`: the other pages it
- * read, for a caller that follows their changes.
+ * A formula calculated on a page, in none of its tables, so what it reads it
+ * names by a table's name (`=prices!vat`, `=SUM(prices![qty])`,
+ * `=[[Other]]prices!B2`): its value, whether it is a list (a range written as
+ * one: a list however many values), and the other pages it read, for a caller
+ * that follows their changes. Undefined: Silverware Table has not started or
+ * the formulas module is off. `text`: the page's text (else the editor's),
+ * `page` its name (else the page shown).
  */
-export async function evaluated(formula: string, text?: string, page?: string): Promise<{ readonly value: string; readonly pages: readonly string[] }> {
+async function calculated(formula: string, text?: string, page?: string): Promise<{ readonly value: Value; readonly list: boolean; readonly pages: readonly string[] } | undefined> {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
   const formulas = controller?.offered<FormulasOffer>("formulas");
-  if (!controller || !formulas) return { value: "#N/A", pages: [] };
-  const { value, pages } = await formulas.evaluate(String(formula), text ?? (await controller.bridge.getText()), page === undefined ? undefined : String(page));
-  return { value: isRange(value) && value.length !== 1 ? JSON.stringify(value.map(scalarText)) : scalarText(single(value)), pages };
+  if (!controller || !formulas) return undefined;
+  const written = String(formula);
+  const { value, pages } = await formulas.evaluate(written, text ?? (await controller.bridge.getText()), page === undefined ? undefined : String(page));
+  const list = isRange(value) && (value.length !== 1 || givesList(withEquals(written).formula.trim()));
+  return { value: list ? value : single(value), list, pages };
+}
+
+/** A value as Lua takes it: a time as its text, an error its code and why */
+function luaValue(value: Scalar): EvaluatedScalar | EvaluatedError {
+  if (isError(value)) return { code: value.code, detail: value.detail };
+  if (value instanceof TimeValue) return scalarText(value);
+  return value;
+}
+
+/**
+ * `silverware.table.evaluate`: a formula's values, for Lua. One value as a
+ * number, a logical value, a text (a date, a time as written) or null where
+ * empty; a list (a range) as a list, empty cells "" in it, an error of one of
+ * its cells as `{ code, detail }` in its place. An error of the formula as
+ * `error` (and `value` null).
+ */
+export async function evaluated(
+  formula: string,
+  text?: string,
+  page?: string,
+): Promise<{ readonly value: EvaluatedScalar | readonly (EvaluatedScalar | EvaluatedError)[]; readonly error?: EvaluatedError; readonly pages: readonly string[] }> {
+  const result = await calculated(formula, text, page);
+  if (!result) return { value: null, error: FORMULAS_OFF, pages: [] };
+  const { value, pages } = result;
+  if (isRange(value)) return { value: value.map((v) => (v === null ? "" : luaValue(v))), pages };
+  const one = luaValue(value as Scalar);
+  return one !== null && typeof one === "object" ? { value: null, error: one, pages } : { value: one, pages };
+}
+
+/**
+ * `silverware.table.evaluateText`: a formula's result as text for a page, as
+ * a cell shows it: several values joined by ", "; an error as a cell holds
+ * it, `\#REF!`, so it shows as written and is no hashtag (`cellResult`).
+ */
+export async function evaluatedText(formula: string, text?: string, page?: string): Promise<{ readonly value: string; readonly pages: readonly string[] }> {
+  const result = await calculated(formula, text, page);
+  if (!result) return { value: cellResult(FORMULAS_OFF.code), pages: [] };
+  const shown = (v: Scalar) => cellResult(scalarText(v));
+  return { value: isRange(result.value) ? result.value.map(shown).join(", ") : shown(result.value as Scalar), pages: result.pages };
 }
 
 /** A name a formula typed so far may go on with: the text it inserts, what it is, and for a function its syntax and description */
@@ -147,11 +195,6 @@ export type TableOfText = TableData;
  */
 export function tables(text: string): TableOfText[] {
   return pageTablesOf(String(text)).map(({ range, table }) => tableData(table, range, metaName(table), (column) => columnNameIn(table, column)));
-}
-
-/** As `evaluated`, its value only */
-export async function evaluate(formula: string): Promise<string> {
-  return (await evaluated(formula)).value;
 }
 
 /**

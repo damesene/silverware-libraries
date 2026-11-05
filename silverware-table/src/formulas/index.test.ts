@@ -23,7 +23,9 @@ import {
   referenceSlot,
   withColumnKeys,
 } from "./index.ts";
-import { calculatedFormula, cellNamesOf, followTable, formulaCell, formulaErrors, formulaOf, qualifyCellNames, recalculate, referredTableNames, shiftReferences, withCalculatedCells } from "../testing/formulas.ts";
+import { CELLS, calculatedFormula, cellNamesOf, followTable, formulaCell, formulaErrors, formulaOf, qualifyCellNames, recalculate, referredTableNames, shiftReferences, withCalculatedCells } from "../testing/formulas.ts";
+import { formulaErrors as domainFormulaErrors } from "./evaluate.ts";
+import { FormulaError } from "./values.ts";
 import { parseMetaRow, parseTable, serializeTable, splitRow } from "../markdown.ts";
 import { metaName, withMetaName } from "../meta.ts";
 import { cellNameOf, namedRows, nameOf, rowNameIn, withCellName, withName, withoutName } from "../names.ts";
@@ -323,6 +325,10 @@ describe("evaluation", () => {
     const table = parseTable(FRUIT);
     const rows = table.rows.map((r, i) => (i === 4 ? { cells: [r.cells[0]!, r.cells[1]!, formulaCell("", "=Q1")] } : r));
     expect(formulaErrors({ ...table, rows })).toEqual(new Map([["4,2", "#REF! Q1 is outside the table"]]));
+    // The domain gives the error itself, its code and why apart (Space Lua's errors read them so)
+    const [error] = domainFormulaErrors({ ...table, rows }, { cells: CELLS }).values();
+    expect(error).toBeInstanceOf(FormulaError);
+    expect(error).toMatchObject({ code: "#REF!", detail: "Q1 is outside the table" });
   });
 
   it("skips a text cell passed to a number function as it does in a range", () => {

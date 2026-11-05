@@ -173,4 +173,24 @@ test.describe("Formulas from Space Lua", () => {
     await page.keyboard.press("Enter");
     await expect.poll(() => cursorLine(page)).toContain("| Pear |");
   });
+
+  test("errors gives a script the page's errors as records; errorsText says when a page has none", async ({ page }) => {
+    await setOtherPage(page, "UiTests/Clean", ["| Qty |", "|---|", "| 2 <meta formulas.f='=1+1'> |", ""].join("\n"));
+    const records = [
+      "# Records",
+      "",
+      "| Item | Total |",
+      "|---|---|",
+      "| Pear | \\#REF! <meta formulas.f='=nope!A1'> |",
+      "| <meta core.table core.name='recs'> |",
+      "",
+      'Found: ${(function() local e = silverware.table.errors(editor.getCurrentPage()) return #e .. " " .. e[1].cell .. " in " .. e[1].table end)()}',
+      "",
+      'Clean: ${silverware.table.errorsText("UiTests/Clean")}',
+      "",
+    ].join("\n");
+    await setPage(page, records);
+    await expect(line(page, "Found:")).toContainText("Found: 1 B1 in recs");
+    await expect(line(page, "Clean:")).toContainText("Clean: No formula errors");
+  });
 });

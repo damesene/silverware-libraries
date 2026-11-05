@@ -69,11 +69,24 @@ test.describe("Selecting cells", () => {
     await expect(page.locator(".swt-cell-editor")).toBeFocused();
     await page.keyboard.press("Control+a");
     await page.keyboard.type("Last");
+    // A key typed at once, before the table is rendered anew, goes into no page's text; once rendered the cell is
+    // selected, not edited, and typing edits it
+    const last = rows.last().locator("td").nth(1);
+    const editor = page.locator(".swt-cell-editor");
+    const js = async () => (await markdown(page)).split("j").length;
+    const before = await js();
     await page.keyboard.press("Enter");
-    await expect(page.locator(".swt-cell-editor")).toHaveCount(0);
+    await page.keyboard.press("j");
     await expect.poll(() => markdown(page)).toContain("Last");
+    // (Rendered before the key came, the cell was selected and the key edits it: dropped, the cell selected again)
+    await expect.poll(async () => (await editor.count()) > 0 || /swt-selected/.test((await last.getAttribute("class")) ?? "")).toBe(true);
+    if (await editor.count()) await page.keyboard.press("Escape");
     await expect(rows).toHaveCount(count);
-    await expect(rows.last().locator("td").nth(1)).toHaveClass(/swt-selected/);
+    await expect(last).toHaveClass(/swt-selected/);
+    expect(await js()).toBe(before);
+    await page.keyboard.press("k");
+    await expect(editor).toHaveValue("k");
+    await page.keyboard.press("Escape");
   });
 
   test("copied cells are outlined until Esc", async ({ page }) => {

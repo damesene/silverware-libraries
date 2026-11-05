@@ -459,7 +459,7 @@ export class CellEditing {
       // The other table was not re-rendered by this edit unless they share text
       const info = this.host.infoOf(next.widget);
       const cell = info && this.host.cellAt(info, next);
-      if (info && cell) this.open(next.widget, info, cell, next.select);
+      if (info && cell) this.goTo(next.widget, info, cell, next);
       return;
     }
     if (!next && refocus) this.host.focusEditor(closed.widget);
@@ -532,12 +532,11 @@ export class CellEditing {
     const index = shown.indexOf(active.cell.parentElement as HTMLTableRowElement);
     const target = shown[index + 1];
     if (!target && index > 0 && enterKey === "moveDownOnly") {
-      await this.finish(true);
-      // (Past the table, beyond or the caller's to write: no cell of the table to select)
-      if (!active.growth && !active.place && this.host.selectsCells()) {
-        const at = { row: active.row, column: active.column };
-        this.host.selectCells(info, at, at);
-      }
+      // The cell selected once its table is rendered anew, as moveDown edits the cell below then: the focus is not
+      // handed back to the page's text (a selection made at once was of the table before the write). (Past the
+      // table, beyond or the caller's to write: no cell of the table to select, the page's text gets the focus)
+      const selects = !active.growth && !active.place && this.host.selectsCells();
+      await this.finish(true, selects ? { widget: active.widget, row: active.row, column: active.column, selectCell: true } : undefined);
       return;
     }
     // Enter on the last row adds a row (above the rows pinned to the bottom), edited in the same column, as Tab on the
@@ -682,7 +681,16 @@ export class CellEditing {
     this.pending = undefined;
     if (Date.now() > pending.until || this.editor) return;
     const cell = this.host.cellAt(info, pending);
-    if (cell) this.open(widget, info, cell, pending.select);
+    if (cell) this.goTo(widget, info, cell, pending);
+  }
+
+  /** Where a write or a move goes: the cell edited, or only selected (`selectCell`) */
+  private goTo(widget: HTMLElement, info: WidgetInfo, cell: HTMLTableCellElement, focus: FocusTarget): void {
+    if (!focus.selectCell) this.open(widget, info, cell, focus.select);
+    else if (this.host.selectsCells()) {
+      const at = { row: focus.row, column: focus.column };
+      this.host.selectCells(info, at, at);
+    }
   }
 
   /** The view changed its size (an on-screen keyboard showed): the cell being edited is scrolled into it again */

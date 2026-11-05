@@ -152,8 +152,11 @@ export type TableLooks = {
 /** A cell of a table shown, as an event found it: its table, the cell rendered and where it is in the markdown */
 export type CellHit = { readonly widget: HTMLElement; readonly info: WidgetInfo; readonly cell: HTMLTableCellElement; readonly ref: CellRef };
 
-// A cell to edit once the table is rendered again; `select` selects its text
-export type FocusTarget = CellRef & { readonly select?: boolean };
+/**
+ * Where to go once a write is rendered: the cell edited (`select`: its text selected), or `selectCell` the cell
+ * selected where a feature selects cells, not edited (Enter's last row with moveDownOnly)
+ */
+export type FocusTarget = CellRef & { readonly select?: boolean; readonly selectCell?: boolean };
 
 export type WriteResult = "written" | "unchanged" | "failed";
 

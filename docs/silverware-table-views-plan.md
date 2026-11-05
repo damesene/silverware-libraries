@@ -61,7 +61,15 @@ First functions (one file each in formulas/builtin/, each with its syntax and de
 
 Builds on `silverware.table.defineChoices` (this branch's base, released with views). Its src/spacechoices.ts has what a source needs as well: the Lua functions by name, each called (a Promise) as it is defined and again REFRESH_MS after the last `page:index`, the definitions of before reading after Space Lua loads again until its first new one (`stale`), what each read last kept where it fails (`lastRead`), a problem said once until it changes (`said`). What differs is only what a function gives (values for a column's type; rows of objects for formulas) and whom it tells (the column types' space lists; the formulas' tables).
 
-So a source does not copy it (decided 2026-11-05, after looking at that branch): the step starts with a refactor of its own, that part of spacechoices.ts made a generic one (Lua functions by name, read and refreshed so) with `defineChoices` moved onto it, nothing changed for users, its tests passing; `defineSource` is then the second user of it, with its own conversion of what the function gives and its own receiver. Not done before: one user makes no generic part worth guessing at. `defineChoices` may change in that refactor where the two read better alike (unreleased: above); a list of values given simply is what a choice column needs, so it stays a call of its own. A choice column taking a source's column, so the same data are not defined twice, is for later, if wanted: a header's hashtag holds no `@` nor brackets, so it needs a form of its own, apart from a list's name.
+So a source does not copy it: **`defineChoices` becomes `defineSource`** (decided 2026-11-05; both unreleased, above). A list of the space is a source of one column, so there is one thing defined from Lua, one meaning of `@`, and no names shared between lists and sources that could clash. spacechoices.ts's way of reading (its Lua functions by name, refreshed, `stale`, `lastRead`, `said`) is the sources', what a function gives made rows instead of values. A source may give a plain list of values too (`select p.name`, as `defineChoices` takes today), read as one column named `value`:
+
+```lua
+silverware.table.defineSource("projects", function()
+  return query[[from p = index.tag "project" select p.name]]
+end)
+```
+
+A choice column uses it through its table's list, written as a formula (below): what a column checks against is always in its table, never found by a name alone.
 
 ```lua
 silverware.table.defineSource("tasks", { columns = { "name", "page", "due", "done" } }, function()
@@ -87,8 +95,9 @@ A table's choice list (`columntypes.choice.<name>`, today a JSON list of texts) 
 * What a hashtag cannot say (no `@` nor brackets in it) the list's value says: the header stays `#choice-<name>`.
 * `=@users[name]`, `=people![name]` (another table of the page), `=SORT(UNIQUE(tasks![status]))`, `=FILTER(…)`: whatever the formulas read, one way of referring for all of it.
 * The column types module asks the formulas module for it through an offer, as conditional formatting asks for a formula condition's values; with the formulas off, or a source not read yet, the column checks nothing, as a Lua list before its first reading.
-* The Choices dialog offers it as a third way beside the column's values and a list of its own (the formula field shared with the view's dialog).
-* `defineChoices` (a list of the space, no metadata in any table) and a source then overlap: a space's list could be a named source of one column. Both unreleased (above), so whether `defineChoices` stays, is made a source, or goes is decided in that step, by what reads better.
+* **A list from Space Lua is written into the table as a formula** (decided 2026-11-05): `columntypes.choice.projects='=@projects'`. A header `#choice-projects` alone no longer finds a list of the space by its name, as `defineChoices` does on its branch: the table says where its values come from, read in its markdown with no script known, and a table's list and the space's can no longer share a name. It needs the *Store table metadata* setting, as any list kept in a table and every new formula do.
+* The Choices dialog writes it: the space's sources offered by name (*Space list: projects*), the one picked written as `=@projects` (its column asked where it has several: `=@users[name]`), so no one types it. Beside them the column's values, a list of its own, and a formula of one's own (the formula field shared with the view's dialog).
+* The result must be a list, or a grid of one column; one of several columns checks nothing, the dialog saying which column to pick.
 
 ## Excel
 
@@ -101,8 +110,8 @@ Each a branch's worth, with its tests (unit tests of the evaluation, UI scenario
 1. **Grids in formulas**: the `Grid` value and its one boundary, `#SPILL!` in a cell, the references that give grids, `FILTER`, `SORT`, `SORTBY`, `UNIQUE`, `CHOOSECOLS`, `TAKE`, `DROP`. Visible to users only as the functions inside formulas that reduce a grid to one value (`=COUNTA(UNIQUE(tasks![assignee]))`).
 2. **The shared part of calculated tables** (`src/calculated/`), the pivot moved onto it, and the formula field moved to `src/formulafield.ts` for the conditional formatting dialog; nothing changed for users.
 3. **Views**: the formulas' domain calculating them in its order (a `Book`'s table made by a formula), the module, the dialog, Insert view, `/view`, the library page's section.
-4. **Sources from Space Lua**: first the generic part of src/spacechoices.ts taken out and `defineChoices` moved onto it (a refactor, a commit of its own); then `defineSource` on it, `@name` in formulas, the pivot's source.
-5. **A choice list made by a formula**: `columntypes.choice.<name>='=…'`, the third way in the Choices dialog; whether `defineChoices` stays beside sources, decided here.
+4. **Sources from Space Lua**: `defineChoices` made `defineSource` (spacechoices.ts's reading kept, rows instead of values, a plain list one column `value`), `@name` in formulas, the pivot's source.
+5. **A choice list made by a formula**: `columntypes.choice.<name>='=…'`, a list from Space Lua written so by the Choices dialog, the space's lists no longer found by a header's name alone.
 6. **More functions**: `VSTACK`, `HSTACK`, `SEQUENCE`, `GROUPBY`, `PIVOTBY`.
 
 ## Decided (2026-11-05, with the user)

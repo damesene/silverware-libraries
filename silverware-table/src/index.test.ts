@@ -95,9 +95,10 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       started();
       const found = await formulaErrorsIn([{ page: "Budget", text: BUDGET }, { page: "Clean", text: PAGE }]);
       expect(found.errors).toEqual([
-        { page: "Budget", ref: `Budget@${BUDGET.indexOf("| Pear")}`, table: "costs", cell: "B1", column: "total", code: "#REF!", detail: expect.stringContaining("nope"), formula: "=nope!A1" },
+        // Its place the cell's text in the markdown, where a link puts the cursor
+        { page: "Budget", ref: `Budget@${BUDGET.indexOf("\\#REF!")}`, table: "costs", cell: "B1", column: "total", code: "#REF!", detail: expect.stringContaining("nope"), formula: "=nope!A1" },
         // Calculated now, not as written: of another page read, its row past its table's
-        { page: "Budget", ref: `Budget@${BUDGET.indexOf("| 1 |")}`, cell: "B1", column: "b", code: "#REF!", detail: expect.any(String), formula: "=[[Prices]]prices!B9" },
+        { page: "Budget", ref: `Budget@${BUDGET.indexOf("0 <meta formulas.f='=[[Prices]]")}`, cell: "B1", column: "b", code: "#REF!", detail: expect.any(String), formula: "=[[Prices]]prices!B9" },
       ]);
       expect(found.pages).toEqual(["Prices"]);
       // A list as Lua gives it: a table of 1, 2, …
@@ -111,7 +112,7 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       await setup(PAGE, {}, { readPage: () => PRICES });
       started();
       const [first] = (await formulaErrorsTextIn([{ page: "Budget", text: BUDGET }])).errors as Record<string, string>[];
-      expect(first).toEqual({ page: "[[Budget]]", table: "costs", cell: `[[Budget@${BUDGET.indexOf("| Pear")}|B1]]`, error: "\\#REF!", reason: expect.stringContaining("nope") });
+      expect(first).toEqual({ page: "[[Budget]]", table: "costs", cell: `[[Budget@${BUDGET.indexOf("\\#REF!")}|B1]]`, error: "\\#REF!", reason: expect.stringContaining("nope") });
       expect(Object.keys(first!)).toEqual(["page", "table", "cell", "error", "reason"]);
       expect((await formulaErrorsTextIn([{ page: "Clean", text: PAGE }])).errors).toBe("No formula errors");
     });

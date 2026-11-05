@@ -578,7 +578,7 @@ ${silverware.table.errorsText()}
 ${silverware.table.errorsText(editor.getCurrentPage())}
 ```
 
-`errorsText` shows them as a table: the page, the table's name, the cell (a link to its row), the error and why; with none, *No formula errors*. For a script, `silverware.table.errors(page)` gives a list of records: `page`, `ref` (its row, as `Budget@1234`: `editor.navigate(ref)` opens it), `table` (`nil` where the table has no name), `cell` (`C3`), `column`, `code` (`#REF!`), `detail` (why) and `formula`:
+`errorsText` shows them as a table: the page, the table's name, the cell (a link that puts the cursor in it, the table shown as markdown), the error and why; with none, *No formula errors*. For a script, `silverware.table.errors(page)` gives a list of records: `page`, `ref` (the cell in the markdown, as `Budget@1234`: `editor.navigate(ref)` opens it), `table` (`nil` where the table has no name), `cell` (`C3`), `column`, `code` (`#REF!`), `detail` (why) and `formula`:
 
 ```
 ${(function()
@@ -592,7 +592,7 @@ end)()}
 * It reads each page as saved (the page open as it is now), and the other pages their formulas read; a `${…}` showing them follows those pages as `evaluate` does.
 * With the formulas module off, `errors` gives `nil` and the error `#N/A`.
 
-The *Silverware Table: Find formula errors* command lists them in SilverBullet's picker (type to find a page or a cell), and opens the one you pick at its row.
+The *Silverware Table: Find formula errors* command lists them in SilverBullet's picker (type to find a page or a cell), and opens the one you pick with the cursor in that cell.
 
 ### For other plugins
 

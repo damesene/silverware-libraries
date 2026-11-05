@@ -83,7 +83,7 @@ import { functionNamed } from "../formulas/registry.ts";
 import { FunctionDialog } from "./functiondialog.ts";
 import { el } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
-import { escapeCell, locateBySource, type OtherPages, type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
+import { cellSourceOffset, escapeCell, locateBySource, type OtherPages, type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
 import { sameTableName } from "../namerules.ts";
 import { insertColumn, setCell } from "../ops.ts";
 import { insertColumnAt } from "../pins.ts";
@@ -246,8 +246,8 @@ export class Formulas implements Feature {
   /**
    * The errors the formula cells of a page's tables show, calculated now on
    * the `text` of `page` (else the page shown), as `evaluate` calculates: each
-   * with its table's name, its cell, its column's key and where its row starts
-   * in the text; the other pages read, which the caller may watch
+   * with its table's name, its cell, its column's key and where the cell's
+   * text starts in the page's; the other pages read, which the caller may watch
    */
   private async errors(text: string, page = this.host.currentPage): Promise<{ readonly errors: readonly FormulaErrorAt[]; readonly pages: readonly string[] }> {
     const tables = pageTablesOf(text);
@@ -256,13 +256,7 @@ export class Formulas implements Feature {
     const errors = tables.flatMap(({ range, table }) => {
       const name = this.nameOf(table);
       const headers = table.rows[0]?.cells ?? [];
-      // Where each of the table's lines starts in the text (the delimiter row is line 1, so a row r > 0 is line r + 1)
-      const starts: number[] = [];
-      let at = range.from;
-      for (const line of text.slice(range.from, range.to).split("\n")) {
-        starts.push(at);
-        at += line.length + 1;
-      }
+      const markdown = text.slice(range.from, range.to);
       return Array.from(formulaErrors(table, { cells: this.cells, tables: source, name }), ([key, error]): FormulaErrorAt => {
         const [row, column] = key.split(",").map(Number) as [number, number];
         // As a reference names it: its key, `:2` where several share it
@@ -271,7 +265,7 @@ export class Formulas implements Feature {
           ...(name ? { table: name } : {}),
           cell: cellName(row - 1, column),
           column: (id && columnIdText(id)) ?? "",
-          at: starts[row + 1] ?? range.from,
+          at: range.from + cellSourceOffset(markdown, row, column),
           formula: this.cells.formulaOf(table.rows[row]?.cells[column] ?? "")?.formula ?? "",
           code: error.code,
           detail: error.detail,

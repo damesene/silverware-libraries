@@ -523,7 +523,7 @@ if js and js.window then
       silverwareTableJs.removeAllMetadata()
     end,
   }
-  -- The space's formula errors in SilverBullet's picker, the one picked opened at its row: the public API only
+  -- The space's formula errors in SilverBullet's picker, the one picked opened with the cursor in its cell: the public API only
   command.define {
     name = "Silverware Table: Find formula errors",
     run = function()
@@ -545,7 +545,7 @@ if js and js.window then
           ref = e.ref,
         }
       end
-      local picked = editor.filterBox("Formula errors", options, "The formula cells showing an error; pick one to open its row.")
+      local picked = editor.filterBox("Formula errors", options, "The formula cells showing an error; pick one to open it.")
       if picked then editor.navigate(picked.ref) end
     end,
   }

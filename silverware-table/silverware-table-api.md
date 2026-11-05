@@ -198,7 +198,7 @@ if js and js.window then
   --- The errors formula cells show, calculated now: on one page, or on every page of the space with formulas.
   --- For a page's text, errorsText.
   --- @param page string? the page's name, e.g. "Budget" or editor.getCurrentPage() (left out: every page)
-  --- @return table? a list of { page, ref (its row, "Budget@1234"), table (nil: unnamed), cell ("C3"), column,
+  --- @return table? a list of { page, ref (its cell in the markdown, "Budget@1234"), table (nil: unnamed), cell ("C3"), column,
   --- code ("#REF!"), detail, formula }; nil and { code, detail } with the formulas module off
   --- @see Library/damesene/silverware-table#Formulas from Space Lua
   function silverware.table.errors(page)
@@ -207,7 +207,7 @@ if js and js.window then
     return result.errors
   end
   --- The errors formula cells show, for a page's text: ${silverware.table.errorsText()} shows them as a table,
-  --- each page and cell a link (the cell's to its row), the error as \#REF! (no hashtag), why.
+  --- each page and cell a link (the cell's to its text in the markdown), the error as \#REF! (no hashtag), why.
   --- @param page string? the page's name (left out: every page with formulas)
   --- @return any the records the table shows, or the line "No formula errors"
   --- @see Library/damesene/silverware-table#Formulas from Space Lua

@@ -160,8 +160,8 @@ export function formulaPagesIn(rows: unknown): string[] {
 /**
  * `silverware.table.errors`: the errors formula cells show on these pages,
  * calculated now ({ page, text } each, as the API page's Lua read them), in
- * the pages' order and each page's cells' order: each page's and its row's
- * place (`ref`, `Page@offset`), its table's name, its cell, its column's key,
+ * the pages' order and each page's cells' order: each page's and its cell's
+ * place (`ref`, `Page@offset`: the cell's text in the markdown), its table's name, its cell, its column's key,
  * the error's code and why, its formula; the other pages read. With the
  * formulas module off: `error`, and no records.
  */
@@ -184,7 +184,7 @@ export async function formulaErrorsIn(pages: unknown): Promise<{ readonly errors
 /**
  * `silverware.table.errorsText`: the same errors as records of markdown, which
  * a `${…}` shows as a table: the page and the cell as links (the cell's to its
- * row), the error's code escaped so it is no hashtag, why. None: a line saying so.
+ * text in the markdown), the error's code escaped so it is no hashtag, why. None: a line saying so.
  */
 export async function formulaErrorsTextIn(pages: unknown): Promise<{ readonly errors: string | readonly Readonly<Record<string, string>>[]; readonly pages: readonly string[] }> {
   const found = await formulaErrorsIn(pages);

@@ -2,13 +2,16 @@
 
 Talked through with the user on 2026-11-05; decided the same day, to be built.
 
-**Status (2026-11-05): both steps built**, step 1 on `feat/evaluate-values` (960052d), step 2 on `feat/formula-errors` (102ba3d), each verified in the local SilverBullet 2.12.1. Where the code went otherwise than below:
+**Status (2026-11-05): done**, both steps (960052d, 102ba3d and the review's fixes after them), each verified in the local SilverBullet 2.12.1. Where the code went otherwise than below:
 
 * A range is a list where the formula writes one (`givesList` in formulas/evaluate.ts: `B1:B1`, a column, an operator over one), as a cell is a one-cell list too in the formulas' values; a name (`pear`, a row's or a cell's) is not told apart by the formula, so a named row of one cell gives its value.
 * `js.tolua` is not needed: SilverBullet makes the JS's arrays and objects Lua tables and null nil (verified).
 * `evaluateAliases` keeps the names only (what each calls is not needed: completion and following are the same for both).
 * Step 2's pages are read by the API page's Lua, not by `index.ts` through the bridge: a `${…}` follows what its Lua read, and the JS needs no reading of its own; a page the index has but the space no longer does is left out (`pcall`).
-* The command's options have the page in their name (`Budget · C3 #REF!`): SilverBullet's picker filters by the name only. Starts from `main`, which has `fix/errors-not-tags` (an error written into a cell as `\#REF!`: `cellResult` / `errorCodeIn` in formulas/cell.ts) and `fix/evaluate-other-page` (the page a `${…}` is on read as that page, `_CTX.currentPage`).
+* The command's options have the page in their name (`Budget · C3 #REF!`): SilverBullet's picker filters by the name only.
+* `ref` is the cell's place in the markdown, not its row's (`cellSourceOffset`): a link or the command puts the cursor in the cell (asked by the user after the review).
+* Which pages have formulas is told by the formulas module (`formulaPagesIn` in index.ts, the index's rows handed over by the Lua, a cell read by `cells.formulaOf`), not by the Lua looking for the attribute's name: the Lua knows no module's attribute (found in the review). The page shown is always among them, its formulas typed since it was indexed too.
+* Merged into `main` on 2026-11-05 (PR #9, both steps). Starts from `main`, which has `fix/errors-not-tags` (an error written into a cell as `\#REF!`: `cellResult` / `errorCodeIn` in formulas/cell.ts) and `fix/evaluate-other-page` (the page a `${…}` is on read as that page, `_CTX.currentPage`).
 
 ## How it is worked
 

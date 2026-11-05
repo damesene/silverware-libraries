@@ -123,6 +123,11 @@ describe("silverware.table.evaluate: a formula calculated on the page shown", ()
       expect(plain).not.toHaveProperty("name");
     });
 
+    it("gives a formula's error as it shows, its # unescaped", () => {
+      const [table] = tables("| A | B |\n|---|---|\n| \\#REF! <meta formulas.f='=x!A1'> | #tag |\n");
+      expect(table!.rows).toEqual([["#REF!", "#tag"]]);
+    });
+
     it("writes the listeners' edits in the same edit as the table, each told the text as the table was written", async () => {
       await setup(`${TABLE}\nChart: 12, 3\n`, { "silverware.table.metadata": true });
       const told: string[] = [];

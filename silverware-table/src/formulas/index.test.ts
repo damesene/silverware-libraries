@@ -28,6 +28,7 @@ import { parseMetaRow, parseTable, serializeTable, splitRow } from "../markdown.
 import { metaName, withMetaName } from "../meta.ts";
 import { cellNameOf, namedRows, nameOf, rowNameIn, withCellName, withName, withoutName } from "../names.ts";
 import { deleteColumn, deleteRow, insertRow, moveColumn, moveRow, reorderRows, setCell } from "../ops.ts";
+import { cellResult, errorCodeIn, isErrorText } from "./cell.ts";
 
 // A table whose cell `at` holds `formula`; returns what that cell shows after recalculating
 function evaluate(markdown: string, formula: string, at = { row: -1, column: -1 }): string {
@@ -40,7 +41,9 @@ function evaluate(markdown: string, formula: string, at = { row: -1, column: -1 
       i === row ? { cells: r.cells.map((c, j) => (j === column ? formulaCell("", formula) : c)) } : r,
     ),
   };
-  return formulaOf(recalculate(withFormula).rows[row]!.cells[column]!)!.value;
+  const value = formulaOf(recalculate(withFormula).rows[row]!.cells[column]!)!.value;
+  // (An error shows as its code: written with its # escaped, cellResult)
+  return errorCodeIn(value) ?? value;
 }
 
 const FRUIT = [
@@ -110,6 +113,35 @@ describe("formulas in cells", () => {
     expect(isFormulaInput(" =1")).toBe(true);
     expect(isFormulaInput("=")).toBe(false);
     expect(isFormulaInput("a=b")).toBe(false);
+  });
+});
+
+describe("an error in a cell", () => {
+  it("is written with its # escaped, so it is no hashtag; a text that is no error is left as it is", () => {
+    expect(cellResult("#REF!")).toBe("\\#REF!");
+    expect(cellResult("#DIV/0!")).toBe("\\#DIV/0!");
+    expect(cellResult("#tag")).toBe("#tag");
+    expect(cellResult("12")).toBe("12");
+  });
+
+  it("is read as written now and as written before", () => {
+    expect(errorCodeIn("\\#N/A")).toBe("#N/A");
+    expect(errorCodeIn(" #N/A ")).toBe("#N/A");
+    expect(errorCodeIn("\\#tag")).toBeUndefined();
+    expect(isErrorText("\\#VALUE!")).toBe(true);
+  });
+
+  it("written before as #REF!, is written anew escaped: the table out of date until then", () => {
+    const table = parseTable("| A |\n|---|\n| #REF! <meta formulas.f='=nothere!A1'> |");
+    const done = recalculate(table);
+    expect(done).not.toBe(table);
+    expect(formulaOf(done.rows[1]!.cells[0]!)!.value).toBe("\\#REF!");
+    expect(recalculate(done)).toBe(done);
+  });
+
+  it("in a plain cell (a pivot's), is read by formulas as it shows", () => {
+    const table = parseTable(`| A | B |\n|---|---|\n| \\#DIV/0! | <meta formulas.f='=A1&"x"'> |`);
+    expect(formulaOf(recalculate(table).rows[1]!.cells[1]!)!.value).toBe("#DIV/0!x");
   });
 });
 
@@ -802,7 +834,7 @@ describe("other tables", () => {
     expect(result("=mine!A1*2", tablesOf(), own)).toBe("10");
     const ping = `| A |\n|---|\n| 1 <meta formulas.f='=pong!A1'> |\n| <meta core.table core.name='ping'> |`;
     const pong = `| A |\n|---|\n| 1 <meta formulas.f='=ping!A1'> |\n| <meta core.table core.name='pong'> |`;
-    expect(formulaOf(recalculate(parseTable(ping), tablesOf(ping, pong)).rows[1]!.cells[0]!)!.value).toBe("#CYCLE!");
+    expect(formulaOf(recalculate(parseTable(ping), tablesOf(ping, pong)).rows[1]!.cells[0]!)!.value).toBe("\\#CYCLE!");
   });
 
   it("finds the references to other tables, for the controller to recalculate them", () => {
@@ -954,7 +986,7 @@ describe("named cells", () => {
 
   it("finds circles", () => {
     const loop = parseTable(`| A |\n|---|\n| 0 <meta formulas.f='=self+1'> <meta core.cn='self'> |`);
-    expect(formulaOf(recalculate(loop).rows[1]!.cells[0]!)!.value).toBe("#CYCLE!");
+    expect(formulaOf(recalculate(loop).rows[1]!.cells[0]!)!.value).toBe("\\#CYCLE!");
   });
 
   it("finds the named cells a formula refers to, not functions, cells or other tables' cell references", () => {

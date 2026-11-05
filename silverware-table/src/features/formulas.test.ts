@@ -651,7 +651,7 @@ describe("Formulas", () => {
       await controller.scan();
       clickOn(cell(2, 1));
       await type("=[[Prices]]fruit!B1");
-      expect(text).toContain(`| Kiwi | #REF! <meta formulas.f='=[[Prices]]fruit!B1'> |`);
+      expect(text).toContain(`| Kiwi | \\#REF! <meta formulas.f='=[[Prices]]fruit!B1'> |`);
       expect(cell(2, 1).title).toContain("the other page is not read");
       expect(read).toEqual([]);
     });
@@ -685,7 +685,7 @@ describe("Formulas", () => {
       withPages({ Prices: OTHER });
       clickOn(cell(1, 1));
       await type("=[[Nowhere]]fruit!B1");
-      expect(text).toContain("| Fig | #REF! <meta");
+      expect(text).toContain("| Fig | \\#REF! <meta");
       expect(cell(1, 1).title).toContain("there is no table named fruit on Nowhere");
     });
   });
@@ -1174,6 +1174,7 @@ describe("Formulas when a table they refer to is deleted", () => {
       "Delete the table prices (1 row) from the page? The formulas of the table costs that refer to it show #REF!. Ctrl+Z brings it back.",
     ]);
     // (At the page's start a line break stays, for the editor's cursor)
-    expect(text).toBe("\n| Double |\n|---|\n| #REF! <meta formulas.f='=prices!B1*2'> |\n| <meta core.table core.name='costs'> |\n");
+    // (An error written with its # escaped: no hashtag)
+    expect(text).toBe("\n| Double |\n|---|\n| \\#REF! <meta formulas.f='=prices!B1*2'> |\n| <meta core.table core.name='costs'> |\n");
   });
 });

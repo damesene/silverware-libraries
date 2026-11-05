@@ -169,6 +169,8 @@ describe("Excel's values", () => {
     expect(excelValue("40:00:30")).toEqual({ kind: "number", value: (40 * 3600 + 30) / 86400, format: "timeSeconds" });
     expect(excelValue("true")).toEqual({ kind: "boolean", value: true });
     expect(excelValue("#DIV/0!")).toEqual({ kind: "error", value: "#DIV/0!" });
+    // As a cell holds one now: its # escaped, no hashtag
+    expect(excelValue("\\#REF!")).toEqual({ kind: "error", value: "#REF!" });
     expect(excelValue("#CYCLE!")).toEqual({ kind: "error", value: "#VALUE!" });
     expect(excelValue("Pear")).toEqual({ kind: "text", value: "Pear" });
     expect(excelValue("  ")).toEqual({ kind: "empty" });

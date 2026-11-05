@@ -3,7 +3,7 @@
 // number format, a logical value, an error, or text. Dates and times become
 // Excel's serial numbers (days since 1899-12-30), shown in their format, so
 // they are dates in Excel whatever its language.
-import { ERROR_CODES, parseClock, parseDate } from "../formulas/index.ts";
+import { errorCodeIn, parseClock, parseDate } from "../formulas/index.ts";
 import { asNumber } from "../view.ts";
 
 // Number formats a value is shown with in Excel (their codes: xlsx.ts)
@@ -38,7 +38,8 @@ export function excelValue(text: string): ExcelValue {
   if (t === "") return { kind: "empty" };
   const upper = t.toUpperCase();
   if (upper === "TRUE" || upper === "FALSE") return { kind: "boolean", value: upper === "TRUE" };
-  if ((ERROR_CODES as readonly string[]).includes(t)) return { kind: "error", value: t === "#CYCLE!" || t === "#ERROR!" ? "#VALUE!" : t };
+  const code = errorCodeIn(t);
+  if (code) return { kind: "error", value: code === "#CYCLE!" || code === "#ERROR!" ? "#VALUE!" : code };
   const date = parseDate(t);
   if (date) {
     const serial = serialOf(date.ms);

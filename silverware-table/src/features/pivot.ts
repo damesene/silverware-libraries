@@ -12,7 +12,7 @@
 // what a pivot's column is). Formulas are calculated by the formulas
 // module's cells; without it, nothing is.
 import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, TableTarget, ToolbarButton, WriteEdit } from "../core/feature.ts";
-import { followOwnFormula, type FormulaCells, type FormulasOffer, type PageLinksOffer } from "../formulas/index.ts";
+import { cellResult, followOwnFormula, type FormulaCells, type FormulasOffer, type PageLinksOffer } from "../formulas/index.ts";
 import { listOf } from "../bridge.ts";
 import { columnName } from "../columns.ts";
 import { ICONS } from "../icons.ts";
@@ -100,7 +100,8 @@ export class Pivot implements Feature {
   private written(table: Table, pivot: Calculated, renames: Renames): Table {
     const header = pivot.columns.map((column) => escapeCell(renames[column.id] ?? column.header));
     const kept = Object.fromEntries(Object.entries(renames).filter(([id]) => pivot.columns.some((column) => column.id === id)));
-    const rows = [{ cells: header }, ...pivot.body.map((cells) => ({ cells: cells.map(escapeCell) }))];
+    // (An error written so that it is no hashtag, as a formula's result is)
+    const rows = [{ cells: header }, ...pivot.body.map((cells) => ({ cells: cells.map((cell) => escapeCell(cellResult(cell))) }))];
     const align = pivot.columns.map((column): Table["align"][number] => (column.numeric ? "right" : ""));
     // Its totals pinned (the row at the bottom, the columns at the right): they stay in view, out of a sort; other pins as they were
     const totals = { bottom: pivot.totalRow ? 1 : 0, right: pivot.totalColumns };

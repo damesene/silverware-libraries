@@ -4,12 +4,12 @@ import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
 import { setCell } from "../ops.ts";
 import { withoutTags } from "../tags.ts";
 import { asNumber } from "../view.ts";
-import { cellsByName, type FormulaCells, hasFormulas, rowsByName } from "./cell.ts";
+import { cellResult, cellsByName, errorCodeIn, type FormulaCells, hasFormulas, rowsByName } from "./cell.ts";
 import { dateArithmetic, parseDate } from "./dates.ts";
 import { type Node, parse, wholeColumnNames } from "./parser.ts";
 import { type Area, areaText, cellName, formulaPages, referencedColumn, type TableRef } from "./references.ts";
 import { functionNamed } from "./registry.ts";
-import { asTime, ERROR_CODES, FormulaError, isError, isRange, parseClock, type Scalar, single, timeArithmetic, TimeValue, toNumber, toText, type Value } from "./values.ts";
+import { asTime, FormulaError, isError, isRange, parseClock, type Scalar, single, timeArithmetic, TimeValue, toNumber, toText, type Value } from "./values.ts";
 
 const DECIMAL_COMMA_RE = /\d,\d/;
 
@@ -178,8 +178,8 @@ class Sheet {
     if (!stored) {
       const text = unescapeCell(withoutTags(cell)).trim();
       if (text === "") return null;
-      // A number, a time (14:30, 40:00), or text
-      return asNumber(text) ?? parseClock(text) ?? text;
+      // A number, a time (14:30, 40:00), or text (an error's code as it shows, `\#REF!` written: a pivot's cell)
+      return asNumber(text) ?? parseClock(text) ?? errorCodeIn(text) ?? text;
     }
     return this.result(row, column, stored.formula);
   }
@@ -197,7 +197,7 @@ class Sheet {
     if (this.book.keepsResult(formula)) {
       const shown = unescapeCell(this.book.cells.formulaOf(this.body[row]?.[column] ?? "")?.value ?? "").trim();
       // None yet, or an error code written: an error, saying why it is not calculated
-      const code = shown === "" ? "#REF!" : ERROR_CODES.find((c) => c === shown);
+      const code = shown === "" ? "#REF!" : errorCodeIn(shown);
       const kept: Scalar = code ? new FormulaError(code, "the other page is not read (are links to other pages turned off?)") : (asNumber(shown) ?? parseClock(shown) ?? shown);
       this.results.set(key, kept);
       return kept;
@@ -507,7 +507,8 @@ export function recalculate(table: Table, { cells, tables, name }: Calculation):
       if (!stored || (book.keepsResult(stored.formula) && stored.value.trim() !== "")) return;
       // Up to date when the result written is the one calculated: the cell's tag as
       // written stays (a table written before tags' values went into apostrophes too)
-      const text = sheet.text(r - 1, c, stored.formula);
+      // (An error written so that it is no hashtag: one written before as `#REF!` is out of date)
+      const text = cellResult(sheet.text(r - 1, c, stored.formula));
       if (escapeCell(text) === stored.value) return;
       result = setCell(result, r, c, cells.formulaCell(text, stored.formula, cell));
     });

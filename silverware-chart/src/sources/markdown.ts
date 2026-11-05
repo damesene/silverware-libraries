@@ -8,6 +8,15 @@ import { numberOf, plainNumberOf } from "./values.ts";
 export { numberOf, plainNumberOf };
 import type { Source, Unreadable } from "../core/model.ts";
 
+// A backslash before ASCII punctuation is markdown's escape: the character shows alone
+// (Silverware Table writes a formula's error `\#REF!`, so it is no hashtag)
+const ESCAPE_RE = /\\([!-/:-@[-`{-~])/g;
+
+/** A body cell's text as it shows: markdown's escapes taken off */
+function shownText(cell: string): string {
+  return cell.replace(ESCAPE_RE, "$1");
+}
+
 /** A table as the sources read it: where it is, its columns, its body's cells as they show */
 export type TextTable = {
   readonly from: number;
@@ -70,7 +79,7 @@ export function tablesOf(text: string): TextTable[] {
     while (end < lines.length && (lines[end] ?? "").includes("|") && (lines[end] ?? "").trim() !== "") end++;
     const rows = lines
       .slice(i + 2, end)
-      .map(cellsOf)
+      .map((row) => cellsOf(row).map(shownText))
       // A row that shows nothing (Silverware Table's metadata row, a hidden tag alone) is no data
       .filter((cells) => cells.some((cell) => cell !== ""));
     const last = end - 1;

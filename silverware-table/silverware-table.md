@@ -524,34 +524,75 @@ Then `=VAT([@price])` works in every table, and typing it shows its syntax and d
 
 ### Formulas from Space Lua
 
-`silverware.table.evaluate(formula)` calculates a formula on the page shown, outside any table, so a page's text or a script can use what its tables hold:
+Two functions calculate a formula on the page, outside any table, so a page's text or a script can use what its tables hold. `silverware.table.evaluateText(formula)` gives text for the page, as a cell would show it:
 
 ```
-VAT: ${silverware.table.evaluate("=fruit!vat")}
-Total: ${silverware.table.evaluate("=SUM(fruit![qty] * fruit![price])")}
+VAT: ${silverware.table.evaluateText("=fruit!vat")}
+Fruit: ${silverware.table.evaluateText("=fruit![item]")}
+```
+
+`silverware.table.evaluate(formula)` gives the values, for a script:
+
+```
+Expensive: ${(function()
+  local n = 0
+  for _, price in ipairs(silverware.table.evaluate("=fruit![price]")) do
+    if type(price) == "number" and price > 10 then n = n + 1 end
+  end
+  return n
+end)()}
 ```
 
 * It is not in a table, so it names what it reads by a table's name: `fruit!B2`, `fruit![qty]`, `fruit!vat`, `fruit!pear[price]`, `[[Prices]]fruit!B2` for a table on another page. `A1` or `[qty]` alone find no table: `#REF!`. The `=` is optional.
-* One value comes back as its text, as a cell would show it: `21`. Several (a range, a column, an operator over one) come back as a list of their texts: `["Pear","Fig"]`. An error comes back as its code: `#REF!`.
-* It reads the page as it is now, and calculates the formulas it reaches anew; your own functions work too. Nothing is written. A script that has a page's text may give it: `silverware.table.evaluate(formula, text, page)` calculates on that text, as the page `page`.
-* A `${…}` showing it follows the tables: SilverBullet shows it anew when the page is edited (a cell changed in a table too) or another page it reads changes.
+* `evaluateText`: one value as its text (`21`), several (a range, a column, an operator over one) joined by a comma: `Pear, Fig`. An error shows as its code, `#REF!`, written so that SilverBullet does not take it for a hashtag.
+* `evaluate`: one value as a number, `true` or `false`, or text (a date or a time as written: `2026-11-05`, `14:30`); an empty cell `nil`. A range (`fruit!B1:B3`, a column, an operator over one) is always a list, also of one value; an empty cell in it is `""`, and a cell with an error is `{ code = "#DIV/0!", detail = "…" }` in its place (a table, so `type(v) == "table"` tells it). An error of the whole formula gives `nil` and the error: `local value, err = silverware.table.evaluate("=nope!A1")`, then `err.code` is `#REF!` and `err.detail` says why.
+* It reads the page as it is now, and calculates the formulas it reaches anew; your own functions work too. Nothing is written. A script that has a page's text may give it: `silverware.table.evaluate(formula, text, page)` (and `evaluateText`) calculates on that text, as the page `page`.
+* A `${…}` showing it follows the tables: SilverBullet shows it anew when the page is edited (a cell changed in a table too) or another page it reads changes. (From SilverBullet's next release: 2.12.1 shows it anew when the page is opened again.)
 * While you type the formula, names complete as in a cell: the functions (with their syntax and what they do), the page's named tables, and after `table!` that table's named cells.
 * Its references follow the tables as a cell's do: rename a column or the table, insert, move or delete rows and columns with Silverware Table, and the formula in the page's text is written anew with them, in the same edit (one Ctrl+Z undoes both). That holds for a formula written whole in one string, in quotes or apostrophes, without escapes (`\"`): one put together in Lua (`"=SUM(" .. name .. ")"`) is left as it is. Edits made in the markdown are not followed, as for tables.
-* It needs the formulas module (else `#N/A`), and `[[Page]]` references the pageLinks module (else they are not read).
+* It needs the formulas module (else `evaluateText` shows `#N/A`, and `evaluate` gives `nil` and the error `#N/A`), and `[[Page]]` references the pageLinks module (else they are not read).
 
-A shorter name: `silverware.table.evaluateAlias("te")` in a `space-lua` block of yours makes a function `te` that does the same, completion included:
+A shorter name for each: in a `space-lua` block of yours, `silverware.table.evaluateTextAlias("te")` makes a function `te` that does what `evaluateText` does, `silverware.table.evaluateAlias("ev")` one `ev` doing what `evaluate` does, completion and following the tables included:
 
 ```lua
-silverware.table.evaluateAlias("te")
+silverware.table.evaluateTextAlias("te")
+silverware.table.evaluateAlias("ev")
 ```
 
 ```
 VAT: ${te("=fruit!vat")}
 ```
 
-* Call it once for each name you want; it takes effect when Space Lua loads (as your scripts do).
+* Call each once for each name you want; it takes effect when Space Lua loads (as your scripts do).
 * A name a Lua function cannot have, or one already taken by something else (`print`, a function of yours), is refused with a notification that says where it was called.
 * Remove the line and the name no longer completes; the function itself goes once the page is loaded again.
+
+**Before 2026-11**, `evaluate` gave text, several values as a list `["Pear","Fig"]`, and `evaluateAlias` made a name for it. In a page's text, write `evaluateText` where you had `evaluate`, and make the names you use there with `evaluateTextAlias` instead of `evaluateAlias`: with `evaluate`, several values show as a box with a line each, and an error as `nil`.
+
+#### Formula errors
+
+Every formula cell showing an error, on a page or in the whole space, calculated as it is now (a table not recalculated since shows its errors as they are, with why):
+
+```
+${silverware.table.errorsText()}
+${silverware.table.errorsText(editor.getCurrentPage())}
+```
+
+`errorsText` shows them as a table: the page, the table's name, the cell (a link that puts the cursor in it, the table shown as markdown), the error and why; with none, *No formula errors*. For a script, `silverware.table.errors(page)` gives a list of records: `page`, `ref` (the cell in the markdown, as `Budget@1234`: `editor.navigate(ref)` opens it), `table` (`nil` where the table has no name), `cell` (`C3`), `column`, `code` (`#REF!`), `detail` (why) and `formula`:
+
+```
+${(function()
+  local count = {}
+  for _, e in ipairs(silverware.table.errors()) do count[e.code] = (count[e.code] or 0) + 1 end
+  return count["#REF!"] or 0
+end)()}
+```
+
+* The page is named as SilverBullet names it (`"Budget"`, `editor.getCurrentPage()`); left out, every page whose tables hold a formula, and the page open.
+* It reads each page as saved (the page open as it is now), and the other pages their formulas read; a `${…}` showing them follows those pages as `evaluate` does.
+* With the formulas module off, `errors` gives `nil` and the error `#N/A`.
+
+The *Silverware Table: Find formula errors* command lists them in SilverBullet's picker (type to find a page or a cell), and opens the one you pick with the cursor in that cell.
 
 ### For other plugins
 

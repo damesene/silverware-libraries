@@ -530,6 +530,32 @@ export function evaluateFormula(formula: string, { cells, tables }: Calculation)
 }
 
 /**
+ * Whether a formula's result is a list however many values it holds: a range
+ * written as one (`B1:B1`, `[qty]`, `[@[a]:[b]]`) or an operator over one. A
+ * cell is a one-cell list too, and a column of one row as well: only the
+ * formula tells them apart. A name is a cell's or a row's: not told here.
+ */
+export function givesList(formula: string): boolean {
+  const tree = parse(formula);
+  return !isError(tree) && listNode(tree);
+}
+
+function listNode(node: Node): boolean {
+  switch (node.kind) {
+    case "area":
+      return node.range;
+    case "column":
+      return !node.thisRow || node.last !== undefined;
+    case "unary":
+      return listNode(node.arg);
+    case "binary":
+      return listNode(node.left) || listNode(node.right);
+    default:
+      return false;
+  }
+}
+
+/**
  * A formula of one row calculated for each body row of a table, as if in
  * none of its cells (`[@column]` that row's): a pivot's groups and its
  * condition, read row by row
@@ -552,9 +578,9 @@ export function scalarText(value: Scalar): string {
   return toText(value) as string;
 }
 
-/** Why formula cells show errors: "row,column" (rows of the markdown, header 0) → code and detail */
-export function formulaErrors(table: Table, { cells, tables, name }: Calculation): Map<string, string> {
-  const errors = new Map<string, string>();
+/** The errors formula cells show: "row,column" (rows of the markdown, header 0) → the error, its code and why */
+export function formulaErrors(table: Table, { cells, tables, name }: Calculation): Map<string, FormulaError> {
+  const errors = new Map<string, FormulaError>();
   if (!hasFormulas(cells, table)) return errors;
   const sheet = new Sheet(table, new Book(cells, tables), undefined, name);
   table.rows.forEach((row, r) => {
@@ -562,7 +588,7 @@ export function formulaErrors(table: Table, { cells, tables, name }: Calculation
     row.cells.forEach((cell, c) => {
       const stored = cells.formulaOf(cell);
       const result = stored && sheet.result(r - 1, c, stored.formula);
-      if (isError(result)) errors.set(`${r},${c}`, `${result.code} ${result.detail}`);
+      if (isError(result)) errors.set(`${r},${c}`, result);
     });
   });
   return errors;

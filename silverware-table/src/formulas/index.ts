@@ -36,6 +36,8 @@ export function withEquals(text: string): { readonly formula: string; readonly s
 export type FormulasOffer = {
   readonly cells: import("./cell.ts").FormulaCells;
   readonly evaluate: (formula: string, text: string, page?: string) => Promise<{ readonly value: import("./values.ts").Value; readonly pages: readonly string[] }>;
+  /** The errors the formula cells of a page's tables show, calculated now on its text (the Space Lua API's errors), and the other pages read */
+  readonly errors: (text: string, page?: string) => Promise<{ readonly errors: readonly FormulaErrorAt[]; readonly pages: readonly string[] }>;
   /**
    * What the name typed before `caret` in `formula` may be, on the page's `text`: its place in `formula` and the
    * choices; `table`, the table the formula is of (as a cell's formula is): its columns in [ ] and [@ ], its named
@@ -50,15 +52,30 @@ export type FormulasOffer = {
   readonly rowValues: (table: import("../markdown.ts").Table, formula: string) => readonly import("./values.ts").Scalar[];
 };
 
+/**
+ * A formula cell showing an error, as the formulas module's `errors` gives it: its table's name (none where
+ * unnamed), its cell as formulas address it (`C3`), its column's key, where its row starts in the page's
+ * text, its formula, and the error's code and why
+ */
+export type FormulaErrorAt = {
+  readonly table?: string;
+  readonly cell: string;
+  readonly column: string;
+  readonly at: number;
+  readonly formula: string;
+  readonly code: import("./values.ts").ErrorCode;
+  readonly detail: string;
+};
+
 /** What the pageLinks module offers: the other pages these formulas and tables refer to (and theirs, in turn) read anew; which they are */
 export type PageLinksOffer = {
   readonly readFor: (formulas: readonly string[], tables: readonly import("../markdown.ts").Table[]) => Promise<readonly string[]>;
   // Pages read for another module (a pivot's source), as `otherPages` then gives them; `fresh`: read again those read before
   readonly readPages: (pages: readonly string[], fresh: boolean) => Promise<void>;
 };
-export { type Area, areaText, callsCustomFunctions, formulaPages, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredTableNames, type TableRef, withColumnKeys } from "./references.ts";
+export { type Area, areaText, callsCustomFunctions, columnIdText, formulaPages, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredTableNames, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";
-export { type Calculation, evaluateFormula, formulaErrors, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows } from "./evaluate.ts";
+export { type Calculation, evaluateFormula, formulaErrors, givesList, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows } from "./evaluate.ts";
 export { type Node as FormulaNode, parse as parseFormula } from "./parser.ts";
 export { parseDate, toUnit, type Unit } from "./dates.ts";
 export { ERROR_CODES, FormulaError, parseClock, type Scalar, type Value } from "./values.ts";

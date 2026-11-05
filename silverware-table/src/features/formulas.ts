@@ -76,14 +76,14 @@ import {
   withColumnKeys,
   writtenArea,
 } from "../formulas/index.ts";
-import { columnChoicesOf, FormulaError, functionHelp, parseFormula, withEquals } from "../formulas/index.ts";
+import { cellName, columnChoicesOf, columnIdText, FormulaError, type FormulaErrorAt, functionHelp, parseFormula, withEquals } from "../formulas/index.ts";
 import { addAffected, affectedBy, isAffected, type NamedOtherPages, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
 import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
 import { FunctionDialog } from "./functiondialog.ts";
 import { el } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
-import { escapeCell, locateBySource, type OtherPages, type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
+import { cellSourceOffset, escapeCell, locateBySource, type OtherPages, type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
 import { sameTableName } from "../namerules.ts";
 import { insertColumn, setCell } from "../ops.ts";
 import { insertColumnAt } from "../pins.ts";
@@ -215,6 +215,7 @@ export class Formulas implements Feature {
     host.offer({
       cells: this.cells,
       evaluate: (formula, text, page) => this.evaluate(formula, text, page),
+      errors: (text, page) => this.errors(text, page),
       complete: (formula, caret, text, table) =>
         table
           ? formulaChoices(formula, caret, caret, this.namesOf(table, text), this.nameOf(table), columnChoicesOf(table.rows[0]?.cells ?? []), true)
@@ -240,6 +241,38 @@ export class Formulas implements Feature {
     const source = pageTables(this.cells, () => this.named(tables), page, undefined, this.namedOthers(this.host.otherPages()));
     const value = evaluateFormula(formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`, { cells: this.cells, tables: source });
     return { value, pages };
+  }
+
+  /**
+   * The errors the formula cells of a page's tables show, calculated now on
+   * the `text` of `page` (else the page shown), as `evaluate` calculates: each
+   * with its table's name, its cell, its column's key and where the cell's
+   * text starts in the page's; the other pages read, which the caller may watch
+   */
+  private async errors(text: string, page = this.host.currentPage): Promise<{ readonly errors: readonly FormulaErrorAt[]; readonly pages: readonly string[] }> {
+    const tables = pageTablesOf(text);
+    const pages = (await this.host.offered<PageLinksOffer>("pageLinks")?.readFor([], tables.map((t) => t.table))) ?? [];
+    const source = pageTables(this.cells, () => this.named(tables), page, undefined, this.namedOthers(this.host.otherPages()));
+    const errors = tables.flatMap(({ range, table }) => {
+      const name = this.nameOf(table);
+      const headers = table.rows[0]?.cells ?? [];
+      const markdown = text.slice(range.from, range.to);
+      return Array.from(formulaErrors(table, { cells: this.cells, tables: source, name }), ([key, error]): FormulaErrorAt => {
+        const [row, column] = key.split(",").map(Number) as [number, number];
+        // As a reference names it: its key, `:2` where several share it
+        const id = columnIdOf(headers, column);
+        return {
+          ...(name ? { table: name } : {}),
+          cell: cellName(row - 1, column),
+          column: (id && columnIdText(id)) ?? "",
+          at: range.from + cellSourceOffset(markdown, row, column),
+          formula: this.cells.formulaOf(table.rows[row]?.cells[column] ?? "")?.formula ?? "",
+          code: error.code,
+          detail: error.detail,
+        };
+      });
+    });
+    return { errors, pages };
   }
 
   /** A table's name, by which formulas refer to it */
@@ -702,7 +735,7 @@ export class Formulas implements Feature {
   private formulaLooks(model: Table, tables: TableSource, frame: AddressFrame | undefined): { row: number; column: number; marks: string[]; title: string }[] {
     const own = this.nameOf(model);
     // The reasons of errors evaluate the table again: only once a cell shows one
-    let errors: Map<string, string> | undefined;
+    let errors: Map<string, FormulaError> | undefined;
     const looks: { row: number; column: number; marks: string[]; title: string }[] = [];
     model.rows.forEach((r, row) => {
       if (row === 0) return;
@@ -712,7 +745,7 @@ export class Formulas implements Feature {
         const error = isErrorText(stored.value) ? (errors ??= formulaErrors(model, { cells: this.cells, tables, name: own })).get(`${row},${column}`) : undefined;
         // In a frame's addresses where one lays the table out (the sheet view), as its editor shows it
         const formula = (frame && framedOut(stored.formula, frame, own)) ?? stored.formula;
-        looks.push({ row, column, marks: error ? ["formula", "formula-error"] : ["formula"], title: error ? `${formula}\n${error}` : formula });
+        looks.push({ row, column, marks: error ? ["formula", "formula-error"] : ["formula"], title: error ? `${formula}\n${error.code} ${error.detail}` : formula });
       });
     });
     return looks;

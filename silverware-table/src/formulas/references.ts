@@ -80,7 +80,7 @@ export function columnRangeText(first: ColumnId | undefined, last: ColumnId | un
 }
 
 /** A column as a reference names it: its key, its occurrence where several share it */
-function columnIdText(id: ColumnId): string | undefined {
+export function columnIdText(id: ColumnId): string | undefined {
   const name = columnKey(id.name);
   return name ? `${name}${id.nth > 1 ? `:${id.nth}` : ""}` : undefined;
 }

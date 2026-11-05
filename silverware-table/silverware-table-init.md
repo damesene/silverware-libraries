@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Table init
 
-What starts [Silverware Table](silverware-table.md) in SilverBullet: its settings (shown in the Configuration Manager), the JavaScript loaded and handed SilverBullet's editor and config API, the events it follows, its commands, and completion in a formula given to `silverware.table.evaluate`. It is installed with the library; its Space Lua API is [silverware-table-api](silverware-table-api.md).
+What starts [Silverware Table](silverware-table.md) in SilverBullet: its settings (shown in the Configuration Manager), the JavaScript loaded and handed SilverBullet's editor and config API, the events it follows, its commands, and completion in a formula given to `silverware.table.evaluate` or `evaluateText`. It is installed with the library; its Space Lua API is [silverware-table-api](silverware-table-api.md).
 
 ```space-lua
 -- Settings, shown in the Configuration Manager (Configuration: Open)
@@ -523,6 +523,32 @@ if js and js.window then
       silverwareTableJs.removeAllMetadata()
     end,
   }
+  -- The space's formula errors in SilverBullet's picker, the one picked opened with the cursor in its cell: the public API only
+  command.define {
+    name = "Silverware Table: Find formula errors",
+    run = function()
+      local errors, failed = silverware.table.errors()
+      if not errors then
+        editor.flashNotification("Silverware Table: " .. failed.detail .. ".", "error")
+        return
+      end
+      if #errors == 0 then
+        editor.flashNotification("No formula errors.")
+        return
+      end
+      local options = {}
+      for _, e in ipairs(errors) do
+        options[#options + 1] = {
+          -- The page in the name: the picker's filter finds by the name
+          name = e.page .. " · " .. e.cell .. " " .. e.code,
+          description = (e.table and (e.table .. ": ") or "") .. e.detail,
+          ref = e.ref,
+        }
+      end
+      local picked = editor.filterBox("Formula errors", options, "The formula cells showing an error; pick one to open it.")
+      if picked then editor.navigate(picked.ref) end
+    end,
+  }
   -- The modules' commands (of those turned on, known once they started: commandList waits for them), by their whole names, and their slash commands
   for _, module_command in ipairs(silverwareTableJs.commandList()) do
     local name = module_command.name
@@ -542,30 +568,30 @@ if js and js.window then
       }
     end
   end
-  -- Formulas written in a page's text, in a call of silverware.table.evaluate or an alias of it: their places
+  -- Formulas written in a page's text, in a call of silverware.table.evaluate, evaluateText or an alias of either: their places
   -- found by the finder made for those names (the JS's Lua side, host/lua.ts), so their references follow the
   -- edits of tables made with Silverware Table, in the same edit. Made again when an alias is added (the API
-  -- page's evaluateAlias, which may run before or after this block)
+  -- page's evaluateAlias and evaluateTextAlias, which may run before or after this block)
   silverware_internal = silverware_internal or {}
   silverware_internal.table = silverware_internal.table or {}
   function silverware_internal.table.formulaCallsChanged()
-    local names = { "silverware.table.evaluate" }
+    local names = { "silverware.table.evaluate", "silverware.table.evaluateText" }
     for _, name in ipairs(silverware_internal.table.evaluateAliases or {}) do
       names[#names + 1] = name
     end
     silverwareTableJs.defineFormulaPlaces(silverwareTableJs.luaCallPlaces(table.unpack(names)))
   end
   silverware_internal.table.formulaCallsChanged()
-  -- Whether a call's function is silverware.table.evaluate, by its name or one evaluateAlias gave it
+  -- Whether a call's function is silverware.table.evaluate or evaluateText, by its name or an alias's
   local function evaluates(callee)
-    if callee == "silverware.table.evaluate" then return true end
+    if callee == "silverware.table.evaluate" or callee == "silverware.table.evaluateText" then return true end
     local internal = silverware_internal and silverware_internal.table or {}
     for _, name in ipairs(internal.evaluateAliases or {}) do
       if callee == name then return true end
     end
     return false
   end
-  -- Completion in a formula given to silverware.table.evaluate or an alias of it (the line before the caret
+  -- Completion in a formula given to silverware.table.evaluate, evaluateText or an alias (the line before the caret
   -- ends in one, in either quotes), as a cell's editor offers it: the whole formula given, the caret's place
   -- in it, so a name the caret is in the middle of is not completed again. The call's whole name before its
   -- "(", so an alias te is not found in paste(

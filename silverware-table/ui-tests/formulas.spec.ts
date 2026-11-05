@@ -1,4 +1,5 @@
-import { cell, expect, header, markdown, openPage, reload, rendersAnew, setOtherPage, target, test } from "./helpers.ts";
+import type { Page } from "@playwright/test";
+import { cell, cursorLine, expect, header, markdown, openPage, pickerOfCommand, reload, rendersAnew, setOtherPage, setPage, target, test } from "./helpers.ts";
 
 test.describe("Formulas", () => {
   test("a formula with a comparison and texts shows its result and is written as typed", async ({ page }) => {
@@ -94,11 +95,82 @@ test.describe("Formulas from Space Lua", () => {
   // Space Lua's ${…}: SilverBullet's
   test.skip(target !== "silverbullet", "SilverBullet only");
 
-  test("silverware.table.evaluate in a ${…} of a page opened from another page reads that page's tables", async ({ page }) => {
+  // A table of each test's own name: a page of a test before is deleted, and the index may still have its table
+  const ORDERS = (name: string) => ["| Customer | Qty |", "|---|--:|", "| Anna | 3 |", "| Petr | 2 |", `| <meta core.table core.name='${name}'> |`, ""];
+  const line = (page: Page, start: string) => page.locator(".cm-line", { hasText: start });
+
+  test("silverware.table.evaluateText in a ${…} of a page opened from another page reads that page's tables", async ({ page }) => {
     // As the page is opened, the editor still holds the page left: the formula must not be calculated on it
-    const orders = ["# Orders", "", "| Customer | Qty |", "|---|--:|", "| Anna | 3 |", "| Petr | 2 |", "| <meta core.table core.name='orders'> |", "", 'Customers: ${silverware.table.evaluate("orders![customer]")}', ""].join("\n");
+    const orders = ["# Orders", "", ...ORDERS("orders"), 'Customers: ${silverware.table.evaluateText("orders![customer]")}', ""].join("\n");
     await setOtherPage(page, "UiTests/Orders", orders);
     await openPage(page, "UiTests/Orders");
-    await expect(page.locator(".cm-line", { hasText: "Customers:" })).toContainText('["Anna","Petr"]');
+    await expect(line(page, "Customers:")).toContainText("Customers: Anna, Petr");
+  });
+
+  test("evaluate gives Lua the values, evaluateText the page an error that is no hashtag", async ({ page }) => {
+    const values = [
+      "# Values",
+      "",
+      ...ORDERS("values"),
+      'Sum: ${(function() local s = 0 for _, q in ipairs(silverware.table.evaluate("values![qty]")) do s = s + q end return s end)()}',
+      "",
+      'Missing: ${(function() local v, e = silverware.table.evaluate("nope!A1") return tostring(v) .. " " .. e.code end)()}',
+      "",
+      'Error: ${silverware.table.evaluateText("nope!A1")}',
+      "",
+    ].join("\n");
+    await setPage(page, values);
+    await expect(line(page, "Sum:")).toContainText("Sum: 5");
+    await expect(line(page, "Missing:")).toContainText("Missing: nil #REF!");
+    await expect(line(page, "Error:")).toContainText("Error: #REF!");
+    await expect(line(page, "Error:").locator(".sb-hashtag, .hashtag")).toHaveCount(0);
+  });
+
+  test("an alias of each gives what its function gives, the formulas in their calls followed as a column is renamed", async ({ page }) => {
+    const aliases = [
+      "# Aliases",
+      "",
+      ...ORDERS("aliases"),
+      'Both: ${(function() silverware.table.evaluateAlias("uiev") silverware.table.evaluateTextAlias("uite") return uite("aliases![qty]") .. " / " .. uiev("aliases!B1") + 1 end)()}',
+      "",
+      'Text: ${silverware.table.evaluateText("aliases![qty]")}',
+      "",
+    ].join("\n");
+    await setPage(page, aliases);
+    await expect(line(page, "Both:")).toContainText("Both: 3, 2 / 4");
+    // Qty renamed Amount: the formulas in every call of either function and their aliases follow
+    await header(page, 1).dblclick();
+    await page.keyboard.press("Control+a");
+    await page.keyboard.type("Amount");
+    await rendersAnew(page, () => page.keyboard.press("Enter"));
+    const text = await markdown(page);
+    expect(text).toContain('uite("aliases![amount]")');
+    expect(text).toContain('silverware.table.evaluateText("aliases![amount]")');
+    expect(text).toContain('uiev("aliases!B1")');
+  });
+
+  test("errorsText shows a page's formula errors as a table, the error no hashtag; Find formula errors opens its row", async ({ page }) => {
+    const errors = [
+      "# Errors",
+      "",
+      "| Item | Total |",
+      "|---|---|",
+      "| Pear | \\#REF! <meta formulas.f='=nope!A1'> |",
+      "| <meta core.table core.name='errs'> |",
+      "",
+      "List: ${silverware.table.errorsText(editor.getCurrentPage())}",
+      "",
+    ].join("\n");
+    await setOtherPage(page, "UiTests/Errors", errors);
+    await openPage(page, "UiTests/Errors");
+    const list = line(page, "List:").locator("table");
+    await expect(list).toContainText("there is no table named nope");
+    await expect(list.locator(".sb-hashtag, .hashtag")).toHaveCount(0);
+    // The command: the space's errors, this page's among them; picked, its row with the cursor
+    const picker = await pickerOfCommand(page, "Silverware Table: Find formula errors");
+    await expect(picker).toContainText("UiTests/Errors · B1 #REF!");
+    await page.keyboard.type("Errors");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => cursorLine(page)).toContain("| Pear |");
   });
 });

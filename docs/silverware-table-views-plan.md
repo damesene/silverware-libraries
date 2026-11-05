@@ -57,7 +57,9 @@ First functions (one file each in formulas/builtin/, each with its syntax and de
 
 ## Sources from Space Lua
 
-Depends on `silverware.table.defineChoices` (branch `feat/choices-from-lua`, not on main yet), whose way of calling Lua (a Promise, run as Space Lua loads and again after `page:index`, a failure said once, the values of before kept) a source reuses.
+Depends on `silverware.table.defineChoices` (branch `feat/choices-from-lua`, not on main yet). Its src/spacechoices.ts has what a source needs as well: the Lua functions by name, each called (a Promise) as it is defined and again REFRESH_MS after the last `page:index`, the definitions of before reading after Space Lua loads again until its first new one (`stale`), what each read last kept where it fails (`lastRead`), a problem said once until it changes (`said`). What differs is only what a function gives (values for a column's type; rows of objects for formulas) and whom it tells (the column types' space lists; the formulas' tables).
+
+So a source does not copy it (decided 2026-11-05, after looking at that branch): the step starts with a refactor of its own, that part of spacechoices.ts made a generic one (Lua functions by name, read and refreshed so) with `defineChoices` moved onto it, nothing changed for users, its tests passing; `defineSource` is then the second user of it, with its own conversion of what the function gives and its own receiver. Not done before: one user makes no generic part worth guessing at. `defineChoices` stays as it is (a list of values is what a choice column needs, simply given); a choice column taking a source's column (`#choice` of `@users[name]`), so the same data are not defined twice, is for later, if wanted.
 
 ```lua
 silverware.table.defineSource("tasks", { columns = { "name", "page", "due", "done" } }, function()
@@ -80,7 +82,7 @@ Each a branch's worth, with its tests (unit tests of the evaluation, UI scenario
 1. **Grids in formulas**: the `Grid` value and its one boundary, `#SPILL!` in a cell, the references that give grids, `FILTER`, `SORT`, `SORTBY`, `UNIQUE`, `CHOOSECOLS`, `TAKE`, `DROP`. Visible to users only as the functions inside formulas that reduce a grid to one value (`=COUNTA(UNIQUE(tasks![assignee]))`).
 2. **The shared part of calculated tables** (`src/calculated/`), the pivot moved onto it, and the formula field moved to `src/formulafield.ts` for the conditional formatting dialog; nothing changed for users.
 3. **Views**: the formulas' domain calculating them in its order (a `Book`'s table made by a formula), the module, the dialog, Insert view, `/view`, the library page's section.
-4. **Sources from Space Lua** (after `defineChoices` is on main): `defineSource`, `@name` in formulas, the pivot's source.
+4. **Sources from Space Lua** (after `defineChoices` is on main): first the generic part of src/spacechoices.ts taken out and `defineChoices` moved onto it (a refactor, a commit of its own); then `defineSource` on it, `@name` in formulas, the pivot's source.
 5. **More functions**: `VSTACK`, `HSTACK`, `SEQUENCE`, `GROUPBY`, `PIVOTBY`.
 
 ## Decided (2026-11-05, with the user)

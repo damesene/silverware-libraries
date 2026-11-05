@@ -396,3 +396,9 @@ step 4 by how much of today's features the sheet takes over.
 
 20. Step 1 first (one table, Excel-like).
 21. Desktop first; phones to follow, so nothing rules them out.
+
+## Not done yet
+
+Built in six phases on 2026-10-22 and 23 (the plan, deleted once done, is in the history: `docs/silverware-table-sheet-plan.md`). Left for later: large tables on the sheet, touch on a phone, the live renderer (`renderToDom`) and a renderer never evaluating `${…}` (a setting), tables of other pages on a sheet.
+
+Never clicked through in SilverBullet: a table growing by the next row or column, a table alone made a sheet, the names in the ⋯ menu and with Shift, a table moved to another sheet by its name, pinning rows and columns of a table on the sheet (only that pins scroll with the sheet).

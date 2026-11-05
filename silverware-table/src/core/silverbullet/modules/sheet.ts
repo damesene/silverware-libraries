@@ -1,5 +1,4 @@
-// The sheet module (docs/silverware-table-sheets.md; the plan:
-// docs/silverware-table-sheet-plan.md): a toolbar icon shows the table's sheet
+// The sheet module (docs/silverware-table-sheets.md): a toolbar icon shows the table's sheet
 // as a spreadsheet's sheet over the whole window. A table on a sheet (its
 // metadata row: `sheet`, `at`, sheet/page.ts) shows with the sheet's other
 // tables, each at its place on one grid; a table on no sheet shows alone, at

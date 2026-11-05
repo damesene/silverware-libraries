@@ -1,5 +1,5 @@
 // How a sheet's tables make room for one that grows: the one place the rule
-// is kept (docs/silverware-table-sheet-plan.md, phase 3). Everything that
+// is kept (agreed with the user on 2026-10-23). Everything that
 // starts below the grown table's bottom moves down, whatever its columns, and
 // everything that starts right of its right edge moves right, all by the same
 // amount, so the layout a user made (tables side by side, columns under each

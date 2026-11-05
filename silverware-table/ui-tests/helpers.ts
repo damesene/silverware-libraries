@@ -327,6 +327,13 @@ export async function answerConfirm(page: Page, yes: boolean, action: () => Prom
   return asked;
 }
 
+/** Opens another page of the space as following a link does, from the page open (SilverBullet only: the playground has one page) */
+export async function openPage(page: Page, name: string): Promise<void> {
+  if (target !== "silverbullet") throw new Error("openPage: SilverBullet only");
+  await page.evaluate((name) => (window as unknown as { client: { navigate(ref: { path: string }): Promise<void> } }).client.navigate({ path: `${name}.md` }), name);
+  await expect(page).toHaveURL(new RegExp(`/${encodeURI(name)}$`));
+}
+
 /** Checks that the editor's navigation was asked to open a page (the playground only says it would) */
 export async function expectNavigatedTo(page: Page, name: string): Promise<void> {
   if (target === "silverbullet") await expect(page).toHaveURL(new RegExp(`/${encodeURI(name)}$`));

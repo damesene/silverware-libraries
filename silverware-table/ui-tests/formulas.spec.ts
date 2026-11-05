@@ -1,4 +1,4 @@
-import { cell, expect, header, markdown, reload, rendersAnew, test } from "./helpers.ts";
+import { cell, expect, header, markdown, openPage, reload, rendersAnew, setOtherPage, target, test } from "./helpers.ts";
 
 test.describe("Formulas", () => {
   test("a formula with a comparison and texts shows its result and is written as typed", async ({ page }) => {
@@ -87,5 +87,18 @@ test.describe("Formulas", () => {
     // Not sorted: the first row is the one before
     await expect(cell(page, 1, 0)).toHaveText(before ?? "");
     await expect(header(page, 1).locator(".swt-sort.swt-active")).toHaveCount(0);
+  });
+});
+
+test.describe("Formulas from Space Lua", () => {
+  // Space Lua's ${…}: SilverBullet's
+  test.skip(target !== "silverbullet", "SilverBullet only");
+
+  test("silverware.table.evaluate in a ${…} of a page opened from another page reads that page's tables", async ({ page }) => {
+    // As the page is opened, the editor still holds the page left: the formula must not be calculated on it
+    const orders = ["# Orders", "", "| Customer | Qty |", "|---|--:|", "| Anna | 3 |", "| Petr | 2 |", "| <meta core.table core.name='orders'> |", "", 'Customers: ${silverware.table.evaluate("orders![customer]")}', ""].join("\n");
+    await setOtherPage(page, "UiTests/Orders", orders);
+    await openPage(page, "UiTests/Orders");
+    await expect(page.locator(".cm-line", { hasText: "Customers:" })).toContainText('["Anna","Petr"]');
   });
 });

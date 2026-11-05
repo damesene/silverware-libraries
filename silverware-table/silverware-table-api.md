@@ -125,8 +125,11 @@ if js and js.window then
     -- through SilverBullet, so a ${…} showing it is shown anew as they change. The editor's text only while
     -- it holds that page: a ${…} of a page being opened is evaluated before the editor has its text (the
     -- page's name already the new one), so the text must hold the formula itself, else the page is read
-    -- (as saved). A caller that has the text (Silverware Chart, as the page is edited) gives it
-    page = page or (_CTX and _CTX.currentPage and _CTX.currentPage.name)
+    -- (as saved). A caller that has the text (Silverware Chart, as the page is edited) gives it.
+    -- _CTX is the ${…}'s own: in this function, defined on this page, it has no page (verified in 2.12.1), so
+    -- the editor's page, already the one being opened, is the page (else a ${…} of a page opened from
+    -- another was calculated on that other page's text: #REF!)
+    page = page or (_CTX and _CTX.currentPage and _CTX.currentPage.name) or editor.getCurrentPage()
     if text == nil then
       text = editor.getText()
       if page and (page ~= editor.getCurrentPage() or not string.find(text, formula, 1, true)) then

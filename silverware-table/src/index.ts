@@ -70,20 +70,20 @@ const FORMULAS_OFF: EvaluatedError = { code: "#N/A", detail: "formulas are off" 
 /**
  * A formula calculated on a page, in none of its tables, so what it reads it
  * names by a table's name (`=prices!vat`, `=SUM(prices![qty])`,
- * `=[[Other]]prices!B2`): its value, whether it is a list (a range written as
- * one: a list however many values), and the other pages it read, for a caller
+ * `=[[Other]]prices!B2`): its value (a range written as one a list however
+ * many values, else one value), and the other pages it read, for a caller
  * that follows their changes. Undefined: Silverware Table has not started or
  * the formulas module is off. `text`: the page's text (else the editor's),
  * `page` its name (else the page shown).
  */
-async function calculated(formula: string, text?: string, page?: string): Promise<{ readonly value: Value; readonly list: boolean; readonly pages: readonly string[] } | undefined> {
+async function calculated(formula: string, text?: string, page?: string): Promise<{ readonly value: Value; readonly pages: readonly string[] } | undefined> {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
   const formulas = controller?.offered<FormulasOffer>("formulas");
   if (!controller || !formulas) return undefined;
   const written = String(formula);
   const { value, pages } = await formulas.evaluate(written, text ?? (await controller.bridge.getText()), page === undefined ? undefined : String(page));
   const list = isRange(value) && (value.length !== 1 || givesList(withEquals(written).formula.trim()));
-  return { value: list ? value : single(value), list, pages };
+  return { value: list ? value : single(value), pages };
 }
 
 /** A value as Lua takes it: a time as its text, an error its code and why */

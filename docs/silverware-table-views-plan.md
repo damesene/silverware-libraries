@@ -72,6 +72,23 @@ end)
 * A list of objects, each a row; `columns` the order (a Lua table keeps none). Values as text: numbers, text, dates as ISO text; booleans as `TRUE`/`FALSE` as formulas read them; `nil` empty; a list its values joined by a comma and a space (tags, people: read and filtered so); an object left out, the cell empty (it has no form a cell could show) (decided 2026-11-05).
 * In formulas a table of the space: `@tasks`, `@tasks[due]`, `@tasks[#Data]` (decided 2026-11-05: `@` is in no table's name, so it cannot clash, and it shows the table is no table of the page). Offered by a module to the formulas' `TableSource`; until the function has run once it is `unread`, so formulas and views keep what they show.
 * A pivot gets them too: `pivot.source='@tasks'`.
+* **Any formula** reads them, a source being one of the formulas' tables: a cell's (`=XLOOKUP([@id], @users[id], @users[email])`), a condition of conditional formatting, a view, a choice list's (below). As formulas reading another page do: the results written stay until written again (*Recalculate* highlighted where a source changed; viewing writes nothing), and until a source's function has run once it is `unread`, the results kept. In the Excel file a formula reading a source is its value, listed with why, as a custom function's without a template.
+
+### A choice list made by a formula
+
+A table's choice list (`columntypes.choice.<name>`, today a JSON list of texts) may be a formula, told by its leading `=` (a JSON list never starts so): its result, a list or a column of a grid, is the list, calculated as the column shows, never written.
+
+```markdown
+| Assignee #choice-assignee | Task |
+|---|---|
+| <meta core.table columntypes.choice.assignee='=FILTER(@users[name], @users[active])'> |
+```
+
+* What a hashtag cannot say (no `@` nor brackets in it) the list's value says: the header stays `#choice-<name>`.
+* `=@users[name]`, `=people![name]` (another table of the page), `=SORT(UNIQUE(tasks![status]))`, `=FILTER(…)`: whatever the formulas read, one way of referring for all of it.
+* The column types module asks the formulas module for it through an offer, as conditional formatting asks for a formula condition's values; with the formulas off, or a source not read yet, the column checks nothing, as a Lua list before its first reading.
+* The Choices dialog offers it as a third way beside the column's values and a list of its own (the formula field shared with the view's dialog).
+* `defineChoices` (a list of the space, no metadata in any table) and a source then overlap: a space's list could be a named source of one column. Both unreleased (above), so whether `defineChoices` stays, is made a source, or goes is decided in that step, by what reads better.
 
 ## Excel
 
@@ -85,7 +102,8 @@ Each a branch's worth, with its tests (unit tests of the evaluation, UI scenario
 2. **The shared part of calculated tables** (`src/calculated/`), the pivot moved onto it, and the formula field moved to `src/formulafield.ts` for the conditional formatting dialog; nothing changed for users.
 3. **Views**: the formulas' domain calculating them in its order (a `Book`'s table made by a formula), the module, the dialog, Insert view, `/view`, the library page's section.
 4. **Sources from Space Lua**: first the generic part of src/spacechoices.ts taken out and `defineChoices` moved onto it (a refactor, a commit of its own); then `defineSource` on it, `@name` in formulas, the pivot's source.
-5. **More functions**: `VSTACK`, `HSTACK`, `SEQUENCE`, `GROUPBY`, `PIVOTBY`.
+5. **A choice list made by a formula**: `columntypes.choice.<name>='=…'`, the third way in the Choices dialog; whether `defineChoices` stays beside sources, decided here.
+6. **More functions**: `VSTACK`, `HSTACK`, `SEQUENCE`, `GROUPBY`, `PIVOTBY`.
 
 ## Decided (2026-11-05, with the user)
 

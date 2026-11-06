@@ -21,6 +21,7 @@ import { type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } fr
 import { definitionAttributes, groupFormula, KEYS, type Key, looseDefinition, type PivotDefinition, readDefinition, sourceRef, sourceText, valueItem, valueParts } from "../pivot/definition.ts";
 import { type Fields, fieldsOf } from "../pivot/fields.ts";
 import { pivotOf } from "../pivot/pivot.ts";
+import { freeTableName } from "../namerules.ts";
 import { asNumber } from "../view.ts";
 import { openPivotDialog } from "./pivotdialog.ts";
 
@@ -368,10 +369,7 @@ export class Pivot implements Feature {
   private insert(info: TableInfo): void {
     const table = parseTable(info.source);
     const own = this.host.tableName(table)?.trim();
-    const taken = new Set(pageTablesOf(this.host.pageText).map((t) => this.host.tableName(t.table)?.toLowerCase()));
-    let n = 1;
-    while (taken.has(`table${n}`)) n++;
-    const name = own ?? `table${n}`;
+    const name = own ?? freeTableName("table", pageTablesOf(this.host.pageText).map((t) => this.host.tableName(t.table)));
     const fields = this.firstFields(name, table);
     const blocked = this.blocked({ ...table, meta: undefined });
     this.dialog(this.sources(own ? undefined : { name, table }), fields, "Insert", (definition) => {

@@ -11,18 +11,14 @@
 // keep their values.
 import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, ToolbarButton } from "../core/feature.ts";
 import { type Calculated, calculatedTable, readRenames, renamedIn, renamedViewIds, sameCells, storedRenames, viewCalculated } from "../calculated/index.ts";
-import type { FormulaHelpers } from "../formulafield.ts";
-import { choiceText, FormulaError, type FormulasOffer, type Grid, referredTableNames, tokenize, type ViewsOffer, withEquals } from "../formulas/index.ts";
+import { FormulaError, type FormulasOffer, type Grid, referredTableNames, tokenize, type ViewsOffer, withEquals } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import { locateBySource, pageTablesOf, parseTable, type Table } from "../markdown.ts";
-import { sameTableName, tableNameProblem } from "../namerules.ts";
+import { freeTableName, sameTableName, tableNameProblem } from "../namerules.ts";
 import { openViewDialog } from "./viewdialog.ts";
 
 // What the dialog says first while the formulas module, which calculates views, is off
 const FORMULAS_OFF = "A view is calculated by the formulas module, which is off: turn it on in Silverware Table's settings (the Silverware Table: Settings command), then reload.";
-
-// What a name offered while the formula is typed is (the list says so beside it)
-const CHOICE_KINDS: Readonly<Record<string, string>> = { function: "function", column: "column", cell: "named cell", row: "named row", table: "table" };
 
 export class Views implements Feature {
   // Whether a view shown is out of date (or why it cannot be calculated), as last checked
@@ -179,33 +175,7 @@ export class Views implements Feature {
 
   /** A name for a new table not taken on the page: view1, view2… (table1… for a source) */
   private freeName(prefix: string): string {
-    const taken = new Set(pageTablesOf(this.host.pageText).map((t) => this.host.tableName(t.table)?.toLowerCase()));
-    let n = 1;
-    while (taken.has(`${prefix}${n}`)) n++;
-    return `${prefix}${n}`;
-  }
-
-  /** What the formula's field offers as it is typed: the formulas module's help, the page's names (a view has no columns of its own) */
-  private helpers(): FormulaHelpers | undefined {
-    const formulas = this.formulas();
-    if (!formulas) return undefined;
-    return {
-      complete: (text, caret) => {
-        const { formula, shift } = withEquals(text);
-        const made = formulas.complete(formula, caret + shift, this.host.pageText);
-        if (!made) return undefined;
-        return {
-          from: made.from - shift,
-          to: made.to - shift,
-          choices: made.choices.map((choice) => ({ label: choiceText(choice).replace(/[([!]$/, ""), insert: choiceText(choice), kind: CHOICE_KINDS[choice.kind] ?? choice.kind })),
-        };
-      },
-      help: (text, caret) => {
-        const { formula, shift } = withEquals(text);
-        return formulas.help(formula, caret + shift);
-      },
-      problem: (text) => (text.trim() ? formulas.problem(withEquals(text).formula.trim()) : undefined),
-    };
+    return freeTableName(prefix, pageTablesOf(this.host.pageText).map((t) => this.host.tableName(t.table)));
   }
 
   /** Why no view can be inserted or saved (its metadata not stored, the formulas off), if so */
@@ -223,7 +193,7 @@ export class Views implements Feature {
       submitLabel,
       submit,
       ...(blocked ? { blocked } : {}),
-      ...(formulas ? { helpers: this.helpers()!, functions: formulas.functions } : { notice: FORMULAS_OFF }),
+      ...(formulas ? { helpers: formulas.fieldHelpers(), functions: formulas.functions } : { notice: FORMULAS_OFF }),
       preview: (f): Calculated | string => {
         const result = preview(f);
         return typeof result === "string" ? result : viewCalculated(result);

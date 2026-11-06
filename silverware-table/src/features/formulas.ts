@@ -85,11 +85,12 @@ import { cellName, columnChoicesOf, columnIdText, FormulaError, type FormulaErro
 import { addAffected, affectedBy, isAffected, type NamedOtherPages, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
 import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
+import type { FormulaHelpers } from "../formulafield.ts";
 import { FunctionDialog } from "./functiondialog.ts";
 import { ResultView } from "./resultview.ts";
 import { el } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
-import { cellSourceOffset, escapeCell, locateBySource, type OtherPages, type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
+import { cellSourceOffset, escapeCell, locateBySource, type OtherPages, type PageTable, pageTablesOf, parseTable, sameTable, type Table, unescapeCell } from "../markdown.ts";
 import { sameTableName } from "../namerules.ts";
 import { insertColumn, setCell } from "../ops.ts";
 import { insertColumnAt } from "../pins.ts";
@@ -127,6 +128,9 @@ function choiceHelp(choice: FormulaChoice): FormulaHelp {
       return { syntax: `[${choice.name}] · [@${choice.name}]`, description: "A column of this table: all of it, or (with @) its cell in the formula's row." };
   }
 }
+
+// What a name offered in a module's formula field is (its list says so beside it)
+const FIELD_KINDS: Readonly<Record<FormulaChoice["kind"], string>> = { function: "function", column: "column", cell: "named cell", row: "named row", table: "table" };
 
 // The ⤢ icon showing a cell's result (kept in step with the style page's .swt-result-button)
 const RESULT_BUTTON_SIZE = 20;
@@ -264,6 +268,7 @@ export class Formulas implements Feature {
       rowValues: (table, formula) => rowValues(table, withEquals(formula).formula.trim(), { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) }),
       view: (formula, table, replace) => this.viewOf(formula, table, replace),
       functions: (formula, caret, done) => this.pickFunction(formula, caret, done),
+      fieldHelpers: (table, outside) => this.fieldHelpers(table, outside),
     } satisfies FormulasOffer);
   }
 
@@ -334,6 +339,33 @@ export class Formulas implements Feature {
       const inserted = needsOperator(written, typed.from) ? `+${text}` : text;
       picked({ formula: written.slice(0, typed.from) + inserted + written.slice(typed.to), caret: typed.from + inserted.length });
     });
+  }
+
+  /** A formula field's helpers (see FormulasOffer.fieldHelpers): a formula written without its "=" read as one with it */
+  private fieldHelpers(table: (() => Table) | undefined, outside: FormulaHelp | undefined): FormulaHelpers {
+    const offer = this.host.offered<FormulasOffer>("formulas")!;
+    return {
+      complete: (text, caret) => {
+        const { formula, shift } = withEquals(text);
+        const made = offer.complete(formula, caret + shift, this.host.pageText, table?.());
+        if (!made) return undefined;
+        return {
+          from: made.from - shift,
+          to: made.to - shift,
+          // A column shown by its header's name, put in by its id
+          choices: made.choices.map((choice) => ({
+            label: choice.kind === "column" ? choice.name : choiceText(choice).replace(/[([!]$/, ""),
+            insert: choiceText(choice),
+            kind: FIELD_KINDS[choice.kind],
+          })),
+        };
+      },
+      help: (text, caret) => {
+        const { formula, shift } = withEquals(text);
+        return functionHelp(formula, caret + shift) ?? outside;
+      },
+      problem: (text) => (text.trim() ? offer.problem(withEquals(text).formula.trim()) : undefined),
+    };
   }
 
   /** The views module's offer, while it is on */
@@ -1557,18 +1589,6 @@ export class Formulas implements Feature {
       this.stopReferenceDrag = undefined;
     };
   }
-}
-
-/** Whether a table is written as it was: the same object, or the same cells, alignment and metadata (a view calculated anew to what it shows) */
-function sameTable(a: Table, b: Table): boolean {
-  if (a === b) return true;
-  return (
-    a.meta === b.meta &&
-    a.align.length === b.align.length &&
-    a.align.every((align, i) => align === b.align[i]) &&
-    a.rows.length === b.rows.length &&
-    a.rows.every((row, r) => row.cells.length === b.rows[r]!.cells.length && row.cells.every((cell, c) => cell === b.rows[r]!.cells[c]))
-  );
 }
 
 /** The columns an edit renamed: each one's name before → after (columnName, as a view names its columns), where they differ */

@@ -426,6 +426,18 @@ function tableLines(table: Table, maxWidth: number): string[] {
   return [header ? rowText(header) : "", delimiterText, ...body.map(rowText)];
 }
 
+/** Whether a table is written as it was: the same object, or the same cells, alignment and metadata */
+export function sameTable(a: Table, b: Table): boolean {
+  if (a === b) return true;
+  return (
+    a.meta === b.meta &&
+    a.align.length === b.align.length &&
+    a.align.every((align, i) => align === b.align[i]) &&
+    a.rows.length === b.rows.length &&
+    a.rows.every((row, r) => row.cells.length === b.rows[r]!.cells.length && row.cells.every((cell, c) => cell === b.rows[r]!.cells[c]))
+  );
+}
+
 /** Text typed into a cell editor, as markdown cell content */
 export function escapeCell(value: string): string {
   return value

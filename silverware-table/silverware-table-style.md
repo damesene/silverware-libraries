@@ -1548,8 +1548,9 @@ body.swt-resizing * {
   width: 14px;
   height: 14px;
 }
-/* The pivot dialog: its fields, a section a line, then the pivot they make */
-.swt-pivot-dialog {
+/* The pivot dialog (and the view dialog, which looks the same): its fields, a section a line, then the table they make */
+.swt-pivot-dialog,
+.swt-view-dialog {
   width: min(760px, calc(100vw - 24px));
 }
 .swt-pivot {
@@ -1562,21 +1563,25 @@ body.swt-resizing * {
   flex-direction: column;
   gap: 8px;
 }
-.swt-pivot-section {
+.swt-pivot-section,
+.swt-view-section {
   display: grid;
   grid-template-columns: 9em 1fr;
   gap: 4px 12px;
   align-items: start;
 }
-.swt-pivot-label {
+.swt-pivot-label,
+.swt-view-label {
   display: flex;
   flex-direction: column;
   padding-top: 5px;
 }
-.swt-pivot-name {
+.swt-pivot-name,
+.swt-view-name {
   font-weight: 600;
 }
-.swt-pivot-hint {
+.swt-pivot-hint,
+.swt-view-hint {
   font-size: 11px;
   opacity: 0.65;
 }
@@ -1655,43 +1660,53 @@ body.swt-resizing * {
   gap: 4px;
   margin-right: 12px;
 }
-.swt-pivot-preview-title {
+.swt-pivot-preview-title,
+.swt-view-preview-title {
   font-weight: 600;
   padding-top: 4px;
   border-top: 1px solid var(--swt-dialog-line);
 }
-.swt-pivot-scroll {
+.swt-pivot-scroll,
+.swt-view-scroll {
   overflow: auto;
   max-height: 260px;
 }
-.swt-pivot-table {
+.swt-pivot-table,
+.swt-view-table {
   border-collapse: collapse;
   font-size: 13px;
 }
 .swt-pivot-table th,
-.swt-pivot-table td {
+.swt-view-table th,
+.swt-pivot-table td,
+.swt-view-table td {
   padding: 3px 10px;
   border-bottom: 1px solid var(--swt-dialog-line);
   text-align: left;
   white-space: nowrap;
 }
-.swt-pivot-table th {
+.swt-pivot-table th,
+.swt-view-table th {
   position: sticky;
   top: 0;
   /* (Not SilverBullet's table header's colors: this is no table of the page) */
   color: var(--root-color);
   background: var(--swt-dialog-card);
 }
-.swt-pivot-table td.swt-pivot-number {
+.swt-pivot-table td.swt-pivot-number,
+.swt-view-table td.swt-view-number {
   text-align: right;
 }
 .swt-pivot-size,
-.swt-pivot-none {
+.swt-view-size,
+.swt-pivot-none,
+.swt-view-none {
   margin: 4px 0 0;
   font-size: 12px;
   opacity: 0.75;
 }
-.swt-pivot-warning {
+.swt-pivot-warning,
+.swt-view-warning {
   margin: 0 0 6px;
   padding: 6px 10px;
   font-size: 12px;
@@ -1706,48 +1721,30 @@ body.swt-resizing * {
   border-radius: 6px;
   background: color-mix(in srgb, var(--ui-accent-color, #4a7cf0) 12%, transparent);
 }
-.swt-pivot-foot {
+.swt-pivot-foot,
+.swt-view-foot {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.swt-pivot-note {
+.swt-pivot-note,
+.swt-view-note {
   flex: 1;
   font-size: 12px;
   opacity: 0.75;
 }
 @media (max-width: 600px) {
-  .swt-pivot-section {
+  .swt-pivot-section,
+  .swt-view-section {
     grid-template-columns: 1fr;
   }
 }
-/* The view dialog: its formula, its name, then the table they make */
-.swt-view-dialog {
-  width: min(760px, calc(100vw - 24px));
-}
+/* The view dialog (beside the pivot's, which it shares its look with): its formula with fx, its name */
 .swt-view,
 .swt-view-form {
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-.swt-view-section {
-  display: grid;
-  grid-template-columns: 9em 1fr;
-  gap: 4px 12px;
-  align-items: start;
-}
-.swt-view-label {
-  display: flex;
-  flex-direction: column;
-  padding-top: 5px;
-}
-.swt-view-name {
-  font-weight: 600;
-}
-.swt-view-hint {
-  font-size: 11px;
-  opacity: 0.65;
 }
 .swt-view-fields {
   min-width: 0;
@@ -1793,64 +1790,6 @@ body.swt-resizing * {
   align-self: center;
   font-size: 12px;
   color: var(--danger-color, #c62828);
-}
-.swt-view-preview-title {
-  font-weight: 600;
-  padding-top: 4px;
-  border-top: 1px solid var(--swt-dialog-line);
-}
-.swt-view-scroll {
-  overflow: auto;
-  max-height: 300px;
-}
-.swt-view-table {
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.swt-view-table th,
-.swt-view-table td {
-  padding: 3px 10px;
-  border-bottom: 1px solid var(--swt-dialog-line);
-  text-align: left;
-  white-space: nowrap;
-}
-.swt-view-table th {
-  position: sticky;
-  top: 0;
-  /* (Not SilverBullet's table header's colors: this is no table of the page) */
-  color: var(--root-color);
-  background: var(--swt-dialog-card);
-}
-.swt-view-table td.swt-view-number {
-  text-align: right;
-}
-.swt-view-size,
-.swt-view-none {
-  margin: 4px 0 0;
-  font-size: 12px;
-  opacity: 0.75;
-}
-.swt-view-warning {
-  margin: 0 0 6px;
-  padding: 6px 10px;
-  font-size: 12px;
-  border-radius: 6px;
-  background: color-mix(in srgb, #d9822b 18%, transparent);
-}
-.swt-view-foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.swt-view-note {
-  flex: 1;
-  font-size: 12px;
-  opacity: 0.75;
-}
-@media (max-width: 600px) {
-  .swt-view-section {
-    grid-template-columns: 1fr;
-  }
 }
 /* The Functions dialog: a search, the groups, the list beside the one picked */
 .swt-functions {

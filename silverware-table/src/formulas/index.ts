@@ -65,6 +65,13 @@ export type FormulasOffer = {
    * caret at `caret`: `picked` gets the formula with the function picked put in and the caret after it
    */
   readonly functions: (formula: string, caret: number, picked: (made: { readonly formula: string; readonly caret: number }) => void) => void;
+  /**
+   * What a formula's field in a module's dialog (formulafield.ts) offers as a formula is typed, its "=" left out or
+   * not: the functions and the page's names, and with `table` (as it is now: asked each time) its columns, named rows
+   * and cells, as a cell's formula has them; the function the caret is in, `outside` where it is in none; why it
+   * does not read
+   */
+  readonly fieldHelpers: (table?: () => import("../markdown.ts").Table, outside?: import("./help.ts").FormulaHelp) => import("../formulafield.ts").FormulaHelpers;
 };
 
 /**

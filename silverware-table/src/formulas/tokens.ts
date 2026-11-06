@@ -13,6 +13,8 @@ export type Token =
   | { readonly kind: "table"; readonly name: string; readonly page?: string; readonly from: number; readonly to: number }
   // "[[Page]]vat": the cell named vat on another page (a bare name is a "name" token)
   | { readonly kind: "named"; readonly name: string; readonly page: string; readonly from: number; readonly to: number }
+  // "@tasks": a source of the space (a table no page has), read whole, by a [column] or [#Data] after it
+  | { readonly kind: "source"; readonly name: string; readonly from: number; readonly to: number }
   // [#Data]: a table's body, every row and column (its own, or that of the table named before it), as Excel's tables write it
   | { readonly kind: "data"; readonly from: number; readonly to: number }
   // A reference to cells that were deleted, as written by shiftReferences
@@ -65,6 +67,15 @@ export function tokenize(formula: string): { tokens: Token[]; error?: FormulaErr
     if (fixedCell && fixedCell[0].includes("$")) {
       tokens.push({ kind: "name", text: fixedCell[0], from: i, to: i + fixedCell[0].length });
       i += fixedCell[0].length;
+      continue;
+    }
+    if (ch === "@") {
+      const source = /^@([A-Za-z_][A-Za-z0-9_]*)(!?)/.exec(formula.slice(i));
+      if (!source) return fail("@ is followed by a source's name, as in @tasks");
+      // A query's rows have no fixed order: a source has no cells to refer to
+      if (source[2]) return fail(`@${source[1]} is read whole, by a column or as [#Data] (@${source[1]}[due], @${source[1]}[#Data]): a source has no cells`);
+      tokens.push({ kind: "source", name: source[1]!, from: i, to: i + source[0].length });
+      i += source[0].length;
       continue;
     }
     const table = /^([A-Za-z_][A-Za-z0-9_]*)!/.exec(formula.slice(i));

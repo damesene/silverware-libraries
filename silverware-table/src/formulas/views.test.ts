@@ -20,7 +20,7 @@ const VIEW = (formula: string, name = "mine", body = "| x |\n|---|\n| old |") =>
 /** The page's tables as formulas see them, with views */
 function sourceOf(page: string, here = "Page", others?: Record<string, string>) {
   const named = (text: string) => pageTablesOf(text).map((t) => ({ ...t, name: metaName(t.table) }));
-  return pageTables(VIEW_CELLS, () => named(page), here, undefined, others && { tables: (p) => (p in others ? named(others[p]!) : undefined) });
+  return pageTables(VIEW_CELLS, () => named(page), here, undefined, others && { pages: { tables: (p) => (p in others ? named(others[p]!) : undefined) } });
 }
 
 /** The page's table named so */

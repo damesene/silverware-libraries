@@ -65,19 +65,24 @@ export const cellNamesOf = (table: Table) => domain.cellNamesOf(CELLS, table);
 export const referredPages = (table: Table) => domain.referredPages(CELLS, table);
 export const referredTableNames = (table: Table) => domain.referredTableNames(CELLS, table);
 export const callsCustomFunctions = (table: Table) => domain.callsCustomFunctions(CELLS, table);
-export const pageTables = (tables: () => readonly PageTable[], here: string, replace?: { readonly from: number; readonly table: Table }, others?: OtherPages) =>
-  page.pageTables(
-    CELLS,
-    () => named(tables()),
-    here,
-    replace && { ...replace, name: metaName(replace.table) },
-    others && {
-      tables: (name) => {
-        const list = others.tables(name);
-        return list ? named(list) : list;
+export const pageTables = (
+  tables: () => readonly PageTable[],
+  here: string,
+  replace?: { readonly from: number; readonly table: Table },
+  others?: OtherPages,
+  source?: (name: string) => Table | null | undefined,
+) =>
+  page.pageTables(CELLS, () => named(tables()), here, replace && { ...replace, name: metaName(replace.table) }, {
+    ...(others && {
+      pages: {
+        tables: (name: string) => {
+          const list = others.tables(name);
+          return list ? named(list) : list;
+        },
       },
-    },
-  );
+    }),
+    ...(source && { source }),
+  });
 export const pageNameChoices = (tables: readonly PageTable[]) => page.pageNameChoices(CELLS, named(tables));
 export const ownNameChoices = (table: Table) => page.ownNameChoices(CELLS, table);
 export const tablesWritten = (all: readonly PageTable[], source: string) => page.tablesWritten(CELLS, named(all), source);

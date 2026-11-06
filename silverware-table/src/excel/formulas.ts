@@ -94,6 +94,8 @@ export function excelFormula(formula: string, { table, name, cells, structured, 
         return { text: one && start === end ? start : `${start}:${end}`, range: node.range && !one };
       }
       case "column": {
+        // A source of the space is no table of the file (as another table is not)
+        if (node.table && "source" in node.table) throw new NotInExcel(`it reads the source ${node.table.source} of the space`);
         // The table's own name before it (mine![@a] in mine) is its own column
         if (node.table && (node.table.page !== undefined || node.table.name.toLowerCase() !== name?.trim().toLowerCase())) {
           throw new NotInExcel(`it refers to the table ${node.table.name}`);
@@ -128,6 +130,7 @@ export function excelFormula(formula: string, { table, name, cells, structured, 
         return first === last ? { text: excelCell(first, c), range: false } : { text: `${excelCell(first, c)}:${excelCell(last, c)}`, range: true };
       }
       case "data": {
+        if (node.table && "source" in node.table) throw new NotInExcel(`it reads the source ${node.table.source} of the space`);
         if (node.table && (node.table.page !== undefined || node.table.name.toLowerCase() !== name?.trim().toLowerCase())) {
           throw new NotInExcel(`it refers to the table ${node.table.name}`);
         }

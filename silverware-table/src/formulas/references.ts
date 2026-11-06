@@ -56,6 +56,14 @@ export function areaOf(start: CellAddress, end: CellAddress = start): { area: Ar
 /** The table a reference is to, when it is not the formula's own: by its name, on a page (none: this one) */
 export type TableRef = { readonly name: string; readonly page?: string };
 
+/** A source of the space a reference is to (@tasks): a table no page has, by its name */
+export type SourceRef = { readonly source: string };
+
+/** How a reference's table is written before what it refers to of it, in errors: prices!, @tasks; none for the formula's own */
+export function tablePrefix(table: TableRef | SourceRef | undefined): string {
+  return !table ? "" : "source" in table ? `@${table.source}` : `${table.name}!`;
+}
+
 /** A1 or A1:B3 for an area of body rows and columns, its fixed edges with $ */
 export function areaText(area: Area, fixed?: Fixed): string {
   const start = cellName(area.top, area.left, fixed && { column: fixed.left, row: fixed.top });
@@ -154,6 +162,8 @@ export function references(formula: string): Reference[] {
     const token = tokens[i]!;
     const previous = tokens[i - 1];
     const table = previous?.kind === "table" ? { table: tableRefOf(previous) } : {};
+    // A source's column (@tasks[due]) is no cell of the page's tables
+    if (token.kind === "column" && previous?.kind === "source") continue;
     if (token.kind === "column") {
       // pear[price]: the row named pear (of prices! before it, if written)
       const row = previous?.kind === "name" && isRowName(tokens, i - 1) ? previous.text : undefined;
@@ -236,6 +246,20 @@ export function referredPages(cells: FormulaCells, table: Table): Set<string> {
 export function formulaPages(formula: string): string[] {
   // A table's token ([[Page]]prices!, before a cell, a column, a name or [#Data]), or a name of the page alone ([[Page]]vat)
   return tokenize(formula).tokens.flatMap((token) => ((token.kind === "table" || token.kind === "named") && token.page !== undefined ? [token.page] : []));
+}
+
+/** The sources of the space a formula reads (@tasks), by their names as written */
+export function formulaSources(formula: string): string[] {
+  return tokenize(formula).tokens.flatMap((token) => (token.kind === "source" ? [token.name] : []));
+}
+
+/** The sources of the space (lowercase) a table's formulas read */
+export function referredSources(cells: FormulaCells, table: Table): Set<string> {
+  const names = new Set<string>();
+  forFormulas(cells, table, (formula) => {
+    for (const name of formulaSources(formula)) names.add(name.toLowerCase());
+  });
+  return names;
 }
 
 /**

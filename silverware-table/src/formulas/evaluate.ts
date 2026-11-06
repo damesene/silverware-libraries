@@ -8,7 +8,7 @@ import { asNumber } from "../view.ts";
 import { type CalculatedBy, cellResult, cellsByName, errorCodeIn, type FormulaCells, hasFormulas, rowsByName, withEquals } from "./cell.ts";
 import { dateArithmetic, parseDate } from "./dates.ts";
 import { type Node, parse, refersToOwnData, wholeColumnNames } from "./parser.ts";
-import { type Area, areaText, cellName, formulaPages, referencedColumn, type TableRef } from "./references.ts";
+import { type Area, areaText, cellName, formulaPages, formulaSources, referencedColumn, type SourceRef, tablePrefix, type TableRef } from "./references.ts";
 import { takesGrids } from "./function.ts";
 import { functionNamed } from "./registry.ts";
 import {
@@ -46,6 +46,11 @@ export type TableSource = ((name: string, page?: string) => Table | undefined) &
   readonly cellsNamed?: (name: string, page?: string) => readonly NamedCell[];
   /** Whether formulas may not read `page` (links to other pages are off): those referring to it keep their results */
   readonly unread?: (page: string) => boolean;
+  /**
+   * A source of the space by its name (@tasks, compared ignoring case): null where there is none so, undefined
+   * where it is not read yet; none (sources not offered): every source unread, formulas reading one keep their results
+   */
+  readonly source?: (name: string) => Table | null | undefined;
 };
 
 /** Where a named cell is: its table (and the table's name, if it has one), and its row (of the markdown, header 0) and column */
@@ -85,10 +90,13 @@ class Book {
     private readonly source: TableSource | undefined,
   ) {}
 
-  /** Whether a formula refers to a page formulas may not read: it keeps its stored result */
-  keepsResult(formula: string): boolean {
+  /** Why a formula keeps its stored result: it refers to a page formulas may not read, or reads a source not read; else undefined */
+  notRead(formula: string): string | undefined {
     const unread = this.source?.unread;
-    return !!unread && formulaPages(formula).some(unread);
+    if (unread && formulaPages(formula).some(unread)) return "the other page is not read (are links to other pages turned off?)";
+    const source = this.source?.source;
+    const name = formulaSources(formula).find((name) => !source || source(name) === undefined);
+    return name === undefined ? undefined : `the source ${name} is not read yet (are sources of the space turned off?)`;
   }
 
   /** The cells named so on `page` (undefined: the formulas' page), in every table: what a bare name not in its own table may have meant */
@@ -125,7 +133,7 @@ class Book {
    * is calculated (it reads itself, two read each other) is #CYCLE!.
    */
   calculated(table: Table, page: string | undefined, name: string | undefined, by: CalculatedBy, before?: Table): Table | FormulaError | undefined {
-    if (by.formulas.some((formula) => this.keepsResult(withEqualsOf(formula)))) return undefined;
+    if (by.formulas.some((formula) => this.notRead(withEqualsOf(formula)))) return undefined;
     return this.asCalculated(table, page, name, (own) =>
       by.calculate({ evaluate: (formula) => own.whole(withEqualsOf(formula)), table: (other, at) => own.tableNow({ name: other, ...(at === undefined ? {} : { page: at }) }) }, before),
     );
@@ -137,7 +145,7 @@ class Book {
    */
   viewResult(table: Table, page: string | undefined, name: string | undefined, formula: string): Grid | FormulaError | undefined {
     const written = withEqualsOf(formula);
-    if (this.keepsResult(written)) return undefined;
+    if (this.notRead(written)) return undefined;
     return this.asCalculated(table, page, name, (own) => viewGrid(own.whole(written)));
   }
 
@@ -153,8 +161,9 @@ class Book {
     }
   }
 
-  /** The sheet a reference from `from` is to: the other table, or `from` itself when it is named so */
-  sheet(ref: TableRef, from: Sheet): Sheet | FormulaError {
+  /** The sheet a reference from `from` is to: the other table, or `from` itself when it is named so; a source's */
+  sheet(ref: TableRef | SourceRef, from: Sheet): Sheet | FormulaError {
+    if ("source" in ref) return this.sourceSheet(ref.source);
     const page = ref.page ?? from.page;
     if (page === from.page && from.name !== undefined && from.name.toLowerCase() === ref.name.toLowerCase()) return from;
     const key = `${page ?? ""}\u0000${ref.name.toLowerCase()}`;
@@ -164,6 +173,20 @@ class Book {
       if (!table) return new FormulaError("#REF!", `there is no table named ${ref.name}${page === undefined ? " on this page" : ` on ${page}`}`);
       sheet = this.sheetOf(table, page, ref.name);
       if (!this.calculating.has(calculatedKey(table, page, ref.name))) this.sheets.set(key, sheet);
+    }
+    return sheet;
+  }
+
+  /** A source's sheet (@tasks): a table of the space, with no formulas of its own; why there is none */
+  private sourceSheet(name: string): Sheet | FormulaError {
+    const key = `@\u0000${name.toLowerCase()}`;
+    let sheet = this.sheets.get(key);
+    if (!sheet) {
+      const table = this.source?.source?.(name);
+      sheet = table
+        ? new Sheet(table, this, undefined, `@${name}`)
+        : new FormulaError("#REF!", table === null ? `there is no source named ${name} in the space` : `the source ${name} is not read yet (are sources of the space turned off?)`);
+      this.sheets.set(key, sheet);
     }
     return sheet;
   }
@@ -286,11 +309,12 @@ class Sheet {
     }
     // Refers to a page formulas may not read: the result stored, which
     // the formulas using the cell use too
-    if (this.book.keepsResult(formula)) {
+    const notRead = this.book.notRead(formula);
+    if (notRead) {
       const shown = unescapeCell(this.book.cells.formulaOf(this.body[row]?.[column] ?? "")?.value ?? "").trim();
       // None yet, or an error code written: an error, saying why it is not calculated
       const code = shown === "" ? "#REF!" : errorCodeIn(shown);
-      const kept: Scalar = code ? new FormulaError(code, "the other page is not read (are links to other pages turned off?)") : (asNumber(shown) ?? parseClock(shown) ?? shown);
+      const kept: Scalar = code ? new FormulaError(code, notRead) : (asNumber(shown) ?? parseClock(shown) ?? shown);
       this.results.set(key, kept);
       return kept;
     }
@@ -343,14 +367,14 @@ class Sheet {
   }
 
   /** Another table (by its name, on its page or this sheet's) as the formulas have it now, or why there is none: what a calculated table reads */
-  tableNow(ref: TableRef): Table | FormulaError {
+  tableNow(ref: TableRef | SourceRef): Table | FormulaError {
     const sheet = this.sheetOf(ref);
     return isError(sheet) ? sheet : sheet.withResults();
   }
 
   /** The result of a cell's formula as it is, a grid too: what a cell showing #SPILL! holds (Show result) */
   wholeResult(row: number, column: number, formula: string): Result {
-    if (this.book.keepsResult(formula)) return this.result(row, column, formula);
+    if (this.book.notRead(formula)) return this.result(row, column, formula);
     const tree = parse(formula);
     return isError(tree) ? tree : this.evaluate(tree, row, column);
   }
@@ -528,7 +552,7 @@ class Sheet {
   }
 
   /** The sheet a reference's table is: this one, or another the book has */
-  private sheetOf(table: TableRef | undefined): Sheet | FormulaError {
+  private sheetOf(table: TableRef | SourceRef | undefined): Sheet | FormulaError {
     const sheet = table ? this.book.sheet(table, this) : this;
     // A view's formula reading its own table: its cells are what is being calculated
     return sheet === this && this.ownError ? this.ownError : sheet;
@@ -542,12 +566,12 @@ class Sheet {
   private shaped(node: Node, row: number, column: number): Result {
     if (node.kind === "area" && node.range) {
       const sheet = this.sheetOf(node.table);
-      return isError(sheet) ? sheet : sheet.areaGrid(node.area, node.table ? `${node.table.name}!` : "");
+      return isError(sheet) ? sheet : sheet.areaGrid(node.area, tablePrefix(node.table));
     }
     if (node.kind === "column" && (!node.thisRow || node.last !== undefined)) {
       const sheet = this.sheetOf(node.table);
       if (isError(sheet)) return sheet;
-      const prefix = node.table ? `${node.table.name}!` : "";
+      const prefix = tablePrefix(node.table);
       return node.thisRow ? sheet.rowColumnsGrid(row, node.name, node.last!, prefix) : sheet.columnGrid(node.name, prefix);
     }
     return this.evaluate(node, row, column);
@@ -560,13 +584,13 @@ class Sheet {
       case "area": {
         const sheet = this.sheetOf(node.table);
         if (isError(sheet)) return sheet;
-        return sheet.areaValue(node.area, node.range, node.table ? `${node.table.name}!` : "");
+        return sheet.areaValue(node.area, node.range, tablePrefix(node.table));
       }
       case "column": {
         const sheet = this.sheetOf(node.table);
         if (isError(sheet)) return sheet;
-        if (node.thisRow) return sheet.rowColumnsValue(row, node.name, node.last, node.table ? `${node.table.name}!` : "");
-        return sheet.columnValue(node.name, node.table ? `${node.table.name}!` : "");
+        if (node.thisRow) return sheet.rowColumnsValue(row, node.name, node.last, tablePrefix(node.table));
+        return sheet.columnValue(node.name, tablePrefix(node.table));
       }
       case "named":
         return this.named(node);
@@ -577,7 +601,7 @@ class Sheet {
       case "rowCell": {
         const sheet = this.sheetOf(node.table);
         if (isError(sheet)) return sheet;
-        return sheet.rowCellValue(node.row, node.column, node.table ? `${node.table.name}!` : "");
+        return sheet.rowCellValue(node.row, node.column, tablePrefix(node.table));
       }
       case "call": {
         const f = functionNamed(node.name);
@@ -715,7 +739,7 @@ export function recalculate(table: Table, { cells, tables, name }: Calculation):
     row.cells.forEach((cell, c) => {
       const stored = cells.formulaOf(cell);
       // A result kept as it is written (a link to a page not read)
-      if (!stored || (book.keepsResult(stored.formula) && stored.value.trim() !== "")) return;
+      if (!stored || (book.notRead(stored.formula) && stored.value.trim() !== "")) return;
       // Up to date when the result written is the one calculated: the cell's tag as
       // written stays (a table written before tags' values went into apostrophes too)
       // (An error written so that it is no hashtag: one written before as `#REF!` is out of date)

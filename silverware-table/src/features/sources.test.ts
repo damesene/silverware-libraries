@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import type { ModelHost } from "../core/feature.ts";
+import { cell, clickOn, controller, editor, flush, key, setup, text, useTablePage } from "../testing/page.ts";
 import { memorySources, type SourceProvider, type SourcesOffer } from "../sources.ts";
 import { Sources, sourceTable } from "./sources.ts";
 
@@ -45,5 +47,45 @@ describe("the sources module", () => {
     module.stop();
     provider.set("people", undefined);
     expect(tablesChanged).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("sources in a page's formulas", () => {
+  useTablePage();
+
+  const TASKS = { columns: ["name", "done"], rows: [["Write", "TRUE"], ["Test", "FALSE"]] };
+  const recalc = () => {
+    cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+    return document.querySelector<HTMLElement>('.swt-bar button[aria-label="Recalculate"]')!;
+  };
+
+  it("writes a formula reading a source; a source changed highlights Recalculate, which writes it anew", async () => {
+    const sources = memorySources({ tasks: TASKS });
+    await setup("| Open |\n|---|\n| x |\n", { "silverware.table.metadata": true, "silverware.table.editor.enterKey": "save" }, {}, sources);
+    clickOn(cell(1, 0));
+    const field = editor.querySelector<HTMLInputElement>(".swt-cell-editor")!;
+    field.value = '=COUNTIFS(@tasks[done], "FALSE")';
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    key(field, "Enter");
+    await flush();
+    await controller.scan();
+    expect(text).toBe(`| Open |\n|---|\n| 1 <meta formulas.f='=COUNTIFS(@tasks[done], "FALSE")'> |\n`);
+    expect(recalc().classList.contains("swt-attention")).toBe(false);
+    sources.set("tasks", { ...TASKS, rows: [...TASKS.rows, ["Ship", "FALSE"]] });
+    expect(recalc().classList.contains("swt-attention")).toBe(true);
+    // Viewing writes nothing
+    expect(text).toContain("| 1 <meta");
+    recalc().click();
+    await flush();
+    expect(text).toContain("| 2 <meta");
+  });
+
+  it("keeps the results written with the module off", async () => {
+    const page = "| Open |\n|---|\n| 7 <meta formulas.f='=COUNTA(@tasks[name])'> |\n";
+    await setup(page, { "silverware.table.modules.sources.enabled": false }, {}, memorySources({ tasks: TASKS }));
+    expect(recalc().classList.contains("swt-attention")).toBe(false);
+    recalc().click();
+    await flush();
+    expect(text).toBe(page);
   });
 });

@@ -77,6 +77,8 @@ describe("Excel's formulas", () => {
     expect(write("=prices!B2")).toEqual({ reason: "it refers to the table prices" });
     expect(write("=[[Prices]]vat")).toEqual({ reason: "it refers to vat on another page" });
     expect(write("=prices!vat")).toEqual({ reason: "it refers to the table prices" });
+    expect(write("=COUNTA(@tasks[name])")).toEqual({ reason: "it reads the source tasks of the space" });
+    expect(write("=COUNTA(@tasks)")).toEqual({ reason: "it reads the source tasks of the space" });
     // The table's own name before its own cell: that cell
     expect(excelFormula("=shop!vat*2", { ...SHOP, meta: { "core.name": "shop" } }, 0, 3)).toEqual({ text: "C3*2", array: false });
     expect(write('=TEXT(A1, "dd.mm.yyyy")')).toEqual({ reason: "Excel reads TEXT's format codes in its own language" });

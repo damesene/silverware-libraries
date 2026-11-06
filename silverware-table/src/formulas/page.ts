@@ -15,21 +15,30 @@ export type NamedPageTable = PageTable & { readonly name: string | undefined };
 /** The other pages read, their tables with their names (null: no such page; undefined: not read) */
 export type NamedOtherPages = { readonly tables: (page: string) => readonly NamedPageTable[] | null | undefined };
 
+/**
+ * What formulas read outside the page: the other pages read (none: no page is
+ * read), and the sources of the space by their names (`@tasks`: null where
+ * there is none so, undefined where it is not read; none: no source is read)
+ */
+export type Elsewhere = { readonly pages?: NamedOtherPages; readonly source?: (name: string) => Table | null | undefined };
+
 /** A page's tables by their names, and its named cells by their names (lowercase), of every table (a name is unique in its table only) */
 type PageNames = { readonly tables: Map<string, Table>; readonly cells: Map<string, NamedCell[]> };
 
 /**
  * The tables of a page by their names, and its named cells, for formulas that
  * refer to them: `replace` stands in for one table (the one being written),
- * and `others` has those of other pages. `tables` is read on the first lookup.
+ * and `elsewhere` has those of other pages and the space's sources. `tables`
+ * is read on the first lookup.
  */
 export function pageTables(
   cells: FormulaCells,
   tables: () => readonly NamedPageTable[],
   here: string,
   replace?: { readonly from: number; readonly table: Table; readonly name: string | undefined },
-  others?: NamedOtherPages,
+  elsewhere?: Elsewhere,
 ): TableSource {
+  const others = elsewhere?.pages;
   const pages = new Map<string, PageNames>();
   const namesOf = (page: string | undefined): PageNames | undefined => {
     const isHere = page === undefined || page === here;
@@ -59,6 +68,7 @@ export function pageTables(
     cellsNamed: (name: string, page?: string) => namesOf(page)?.cells.get(name.toLowerCase()) ?? [],
     // Pages not read (none without the pageLinks module): formulas referring to them keep their results
     unread: (page: string) => page !== here && others?.tables(page) === undefined,
+    ...(elsewhere?.source ? { source: elsewhere.source } : {}),
   });
 }
 

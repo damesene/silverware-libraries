@@ -1,5 +1,5 @@
 // A formula's syntax tree, parsed once per formula text.
-import { type Area, areaOf, type Fixed, isRowName, parseCellName, type TableRef, tableRefOf } from "./references.ts";
+import { type Area, areaOf, type Fixed, isRowName, parseCellName, type SourceRef, type TableRef, tableRefOf } from "./references.ts";
 import { type Token, tokenize } from "./tokens.ts";
 import { FormulaError, type Scalar } from "./values.ts";
 
@@ -7,9 +7,9 @@ export type Node =
   | { readonly kind: "literal"; readonly value: Scalar }
   | { readonly kind: "area"; readonly area: Area; readonly range: boolean; readonly table?: TableRef; readonly fixed?: Fixed }
   // `last`: the formula's row from column `name` to `last` ([@[a]:[b]])
-  | { readonly kind: "column"; readonly name: string; readonly thisRow: boolean; readonly last?: string; readonly table?: TableRef }
-  // [#Data], prices![#Data]: a table's body as a grid, its total rows left out as [column] leaves them
-  | { readonly kind: "data"; readonly table?: TableRef }
+  | { readonly kind: "column"; readonly name: string; readonly thisRow: boolean; readonly last?: string; readonly table?: TableRef | SourceRef }
+  // [#Data], prices![#Data]: a table's body as a grid, its total rows left out as [column] leaves them; @tasks, @tasks[#Data]: a source's
+  | { readonly kind: "data"; readonly table?: TableRef | SourceRef }
   | { readonly kind: "call"; readonly name: string; readonly args: readonly Node[] }
   // A named cell (names.ts): vat in the formula's own table, prices!vat in another, [[Page]]prices!vat on another page;
   // [[Page]]vat as written before names were the table's (an error saying how to write it)
@@ -87,6 +87,21 @@ class Parser {
         return { kind: "data" };
       case "named":
         return { kind: "named", name: token.name, page: token.page };
+      case "source": {
+        // @tasks[due] a column, @tasks[#Data] or @tasks alone its body
+        const next = this.tokens[this.at];
+        const table = { source: token.name };
+        if (next?.kind === "data") {
+          this.at++;
+          return { kind: "data", table };
+        }
+        if (next?.kind === "column") {
+          this.at++;
+          if (next.thisRow) throw new FormulaError("#ERROR!", `@${token.name}[@${next.name}]: a source has no row of the formula's, its column is @${token.name}[${next.name}]`);
+          return { kind: "column", name: next.name, thisRow: false, table };
+        }
+        return { kind: "data", table };
+      }
       case "table": {
         // prices!B2, prices!A1:B3, prices![Price]
         const next = this.tokens[this.at];

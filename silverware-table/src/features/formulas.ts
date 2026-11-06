@@ -54,6 +54,7 @@ import {
   followTable,
   choiceText,
   formulaChoices,
+  sourceChoices,
   nameTyped,
   needsOperator,
   type FormulaChoice,
@@ -68,6 +69,7 @@ import {
   type Reference,
   referencedColumn,
   referredPages,
+  referredSources,
   referredTableNames,
   references,
   referenceSlot,
@@ -83,7 +85,7 @@ import {
   writtenArea,
 } from "../formulas/index.ts";
 import { cellName, columnChoicesOf, columnIdText, FormulaError, type FormulaErrorAt, functionHelp, type Grid, parseFormula, withEquals } from "../formulas/index.ts";
-import { addAffected, affectedBy, isAffected, type NamedOtherPages, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
+import { addAffected, affectedBy, type Elsewhere, isAffected, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
 import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
 import type { FormulaHelpers } from "../formulafield.ts";
@@ -91,7 +93,8 @@ import { FunctionDialog } from "./functiondialog.ts";
 import { ResultView } from "./resultview.ts";
 import { el } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
-import { cellSourceOffset, escapeCell, locateBySource, type OtherPages, type PageTable, pageTablesOf, parseTable, sameTable, type Table, unescapeCell } from "../markdown.ts";
+import type { SourcesOffer } from "../sources.ts";
+import { cellSourceOffset, escapeCell, locateBySource, type PageTable, pageTablesOf, parseTable, sameTable, type Table, unescapeCell } from "../markdown.ts";
 import { sameTableName } from "../namerules.ts";
 import { insertColumn, setCell } from "../ops.ts";
 import { insertColumnAt } from "../pins.ts";
@@ -108,6 +111,7 @@ const NAME_KINDS: Readonly<Record<Exclude<FormulaChoice["kind"], "function">, st
   row: "Named row of this table",
   table: "Named table",
   column: "Column of this table",
+  source: "Source of the space",
 };
 
 /** The help under the list for the choice picked: a function's syntax and description, a name's use */
@@ -126,7 +130,14 @@ function choiceHelp(choice: FormulaChoice): FormulaHelp {
     case "table":
       return { syntax: `${choice.name}!A1 · ${choice.name}![column]`, description: "A named table of the page: a cell, range or column of it." };
     case "column":
-      return { syntax: `[${choice.name}] · [@${choice.name}]`, description: "A column of this table: all of it, or (with @) its cell in the formula's row." };
+      return choice.table
+        ? { syntax: `${choice.table}[${choice.id ?? choice.name}]`, description: `A column of the source ${choice.table}: all its values.` }
+        : { syntax: `[${choice.name}] · [@${choice.name}]`, description: "A column of this table: all of it, or (with @) its cell in the formula's row." };
+    case "source":
+      return {
+        syntax: `@${choice.name} · @${choice.name}[column] · @${choice.name}[#Data]`,
+        description: "A source of the space, a table a Space Lua script gives: its rows, one column of them, or its rows as a table.",
+      };
   }
 }
 
@@ -134,7 +145,7 @@ function choiceHelp(choice: FormulaChoice): FormulaHelp {
 const CALCULATING = ["view", "pivot"] as const;
 
 // What a name offered in a module's formula field is (its list says so beside it)
-const FIELD_KINDS: Readonly<Record<FormulaChoice["kind"], string>> = { function: "function", column: "column", cell: "named cell", row: "named row", table: "table" };
+const FIELD_KINDS: Readonly<Record<FormulaChoice["kind"], string>> = { function: "function", column: "column", cell: "named cell", row: "named row", table: "table", source: "source" };
 
 // The ⤢ icon showing a cell's result (kept in step with the style page's .swt-result-button)
 const RESULT_BUTTON_SIZE = 20;
@@ -266,7 +277,7 @@ export class Formulas implements Feature {
       complete: (formula, caret, text, table) =>
         table
           ? formulaChoices(formula, caret, caret, this.namesOf(table, text), this.nameOf(table), columnChoicesOf(table.rows[0]?.cells ?? []), true)
-          : formulaChoices(formula, caret, caret, pageNameChoices(this.cells, this.named(pageTablesOf(text))), undefined, [], true),
+          : formulaChoices(formula, caret, caret, [...pageNameChoices(this.cells, this.named(pageTablesOf(text))), ...this.sourceNames()], undefined, [], true),
       help: (formula, caret) => functionHelp(formula, caret),
       problem: (formula) => {
         const tree = parseFormula(withEquals(formula).formula.trim());
@@ -289,7 +300,7 @@ export class Formulas implements Feature {
   private async evaluate(formula: string, text: string, page = this.host.currentPage): Promise<{ readonly value: Value; readonly pages: readonly string[] }> {
     const tables = pageTablesOf(text);
     const pages = (await this.host.offered<PageLinksOffer>("pageLinks")?.readFor([formula], tables.map((t) => t.table))) ?? [];
-    const source = pageTables(this.cells, () => this.named(tables), page, undefined, this.namedOthers(this.host.otherPages()));
+    const source = pageTables(this.cells, () => this.named(tables), page, undefined, this.elsewhere());
     const value = evaluateFormula(formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`, { cells: this.cells, tables: source });
     return { value, pages };
   }
@@ -303,7 +314,7 @@ export class Formulas implements Feature {
   private async errors(text: string, page = this.host.currentPage): Promise<{ readonly errors: readonly FormulaErrorAt[]; readonly pages: readonly string[] }> {
     const tables = pageTablesOf(text);
     const pages = (await this.host.offered<PageLinksOffer>("pageLinks")?.readFor([], tables.map((t) => t.table))) ?? [];
-    const source = pageTables(this.cells, () => this.named(tables), page, undefined, this.namedOthers(this.host.otherPages()));
+    const source = pageTables(this.cells, () => this.named(tables), page, undefined, this.elsewhere());
     const errors = tables.flatMap(({ range, table }) => {
       const name = this.nameOf(table);
       const headers = table.rows[0]?.cells ?? [];
@@ -329,7 +340,7 @@ export class Formulas implements Feature {
   /** A view's formula calculated on the page shown (the view module's dialog and its staleness): see FormulasOffer.view */
   private viewOf(formula: string, table: Table | undefined, replace: { readonly from: number; readonly table: Table } | undefined): Grid | FormulaError | undefined {
     const tables = replace
-      ? pageTables(this.cells, () => this.named(pageTablesOf(this.host.pageText)), this.host.currentPage, { ...replace, name: this.nameOf(replace.table) }, this.namedOthers(this.host.otherPages()))
+      ? pageTables(this.cells, () => this.named(pageTablesOf(this.host.pageText)), this.host.currentPage, { ...replace, name: this.nameOf(replace.table) }, this.elsewhere())
       : this.tableSource();
     // A view to be inserted: a table of its own it has none (A1, [x] alone read nothing)
     const own = table ?? { indent: "", align: [], rows: [{ cells: [] }], padded: false };
@@ -386,24 +397,30 @@ export class Formulas implements Feature {
     return tables.map((t) => ({ ...t, name: this.nameOf(t.table) }));
   }
 
-  /** The other pages read, their tables with their names */
-  private namedOthers(others: OtherPages | undefined): NamedOtherPages | undefined {
-    if (!others) return undefined;
+  /** What formulas read outside the page: the other pages read, their tables with their names; the space's sources, where offered */
+  private elsewhere(others = this.host.otherPages()): Elsewhere {
+    const sources = this.host.offered<SourcesOffer>("sources");
     return {
-      tables: (page) => {
-        const tables = others.tables(page);
-        return tables ? this.named(tables) : tables;
-      },
+      ...(others && {
+        pages: {
+          tables: (page: string) => {
+            const tables = others.tables(page);
+            return tables ? this.named(tables) : tables;
+          },
+        },
+      }),
+      ...(sources && { source: (name: string) => sources.table(name) }),
     };
   }
 
-  /** The page's tables (as last read) formulas can refer to by name, and those of the other pages read */
+  /** The page's tables (as last read) formulas can refer to by name, those of the other pages read, and the space's sources */
   private tableSource(): TableSource {
     const { pageText, currentPage } = this.host;
     const others = this.host.otherPages();
-    const key = `${others?.version ?? -1}\u0000${currentPage}\u0000${pageText}`;
+    const sources = this.host.offered<SourcesOffer>("sources")?.version() ?? -1;
+    const key = `${others?.version ?? -1}\u0000${sources}\u0000${currentPage}\u0000${pageText}`;
     if (this.source?.key !== key) {
-      this.source = { key, source: pageTables(this.cells, () => this.named(pageTablesOf(pageText)), currentPage, undefined, this.namedOthers(others)) };
+      this.source = { key, source: pageTables(this.cells, () => this.named(pageTablesOf(pageText)), currentPage, undefined, this.elsewhere(others)) };
     }
     return this.source.source;
   }
@@ -417,7 +434,7 @@ export class Formulas implements Feature {
    */
   writeStep(before: Table, after: Table, edit: WriteEdit): Table {
     const { page } = edit;
-    const tables = pageTables(this.cells, () => this.named(page.tables), this.host.currentPage, { from: page.from, table: after, name: this.nameOf(after) }, this.namedOthers(this.host.otherPages()));
+    const tables = pageTables(this.cells, () => this.named(page.tables), this.host.currentPage, { from: page.from, table: after, name: this.nameOf(after) }, this.elsewhere());
     const edited = formulasAfterEdit(before, after, { ...edit, tables, cells: this.cells, names: { before: this.nameOf(before), after: this.nameOf(after) } });
     // A calculated table written (its Refresh, its definition changed): calculated anew; one that cannot be stays as it was
     return this.calculatedWritten(edited, tables, before);
@@ -469,7 +486,7 @@ export class Formulas implements Feature {
     const followedAt = new Map(affectedTables.map((t) => [t.range.from, t.followed]));
     // Deleted (no `after`): the page without it, so what refers to it is #REF!
     const tables = page.tables.filter((t) => after || t.range.from !== page.from).map((t) => (followedAt.has(t.range.from) ? { ...t, table: followedAt.get(t.range.from)! } : t));
-    const now = pageTables(this.cells, () => this.named(tables), this.host.currentPage, after ? { from: page.from, table: after, name: this.nameOf(after) } : undefined, this.namedOthers(this.host.otherPages()));
+    const now = pageTables(this.cells, () => this.named(tables), this.host.currentPage, after ? { from: page.from, table: after, name: this.nameOf(after) } : undefined, this.elsewhere());
     const written: PageTable[] = [];
     for (const { range, table, followed } of affectedTables) {
       const recalculated = this.calculatedWritten(recalculate(followed, { cells: this.cells, tables: now, name: this.nameOf(followed) }), now);
@@ -1005,7 +1022,7 @@ export class Formulas implements Feature {
       if (info.key === except) continue;
       const model = parseTable(info.source);
       if (formulaCount(this.cells, model) === 0) continue;
-      const refersElsewhere = referredTableNames(this.cells, model).size > 0 || referredPages(this.cells, model).size > 0;
+      const refersElsewhere = referredTableNames(this.cells, model).size > 0 || referredPages(this.cells, model).size > 0 || referredSources(this.cells, model).size > 0;
       if (!refersElsewhere && !(withCustom && callsCustomFunctions(this.cells, model))) continue;
       this.stale.set(info, recalculate(model, { cells: this.cells, tables, name: this.nameOf(model) }) !== model);
       // An error's reason may have changed (another page read): the formula cells' looks
@@ -1256,7 +1273,13 @@ export class Formulas implements Feature {
     if (this.pageNames?.text !== text) this.pageNames = { text, choices: pageNameChoices(this.cells, this.named(pageTablesOf(text))) };
     const own = this.nameOf(table)?.toLowerCase();
     const others = this.pageNames.choices.filter((choice) => !(choice.table && choice.table.toLowerCase() === own));
-    return [...others, ...ownNameChoices(this.cells, table)];
+    return [...others, ...ownNameChoices(this.cells, table), ...this.sourceNames()];
+  }
+
+  /** The sources of the space offered while a name is typed (@tasks), with their columns for their [ ] */
+  private sourceNames(): FormulaChoice[] {
+    const sources = this.host.offered<SourcesOffer>("sources");
+    return sources ? sourceChoices(sources.names().map((name) => ({ name, headers: sources.table(name)?.rows[0]?.cells ?? [] }))) : [];
   }
 
   /**
@@ -1376,7 +1399,9 @@ export class Formulas implements Feature {
               choice.kind === "function"
                 ? (functionNamed(choice.name)?.description ?? "").split(/(?<=\.)\s/)[0]!
                 : choice.table
-                  ? `Named cell of ${choice.table}`
+                  ? choice.kind === "column"
+                    ? `Column of ${choice.table}`
+                    : `Named cell of ${choice.table}`
                   : NAME_KINDS[choice.kind],
           }),
         ),

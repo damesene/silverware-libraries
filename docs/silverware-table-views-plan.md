@@ -97,7 +97,7 @@ silverware.table.defineSource("tasks", { columns = { "name", "page", "due", "don
 end)
 ```
 
-* A list of objects, each a row; `columns` the order (a Lua table keeps none). Values as text: numbers, text, dates as ISO text; booleans as `TRUE`/`FALSE` as formulas read them; `nil` empty; a list its values joined by a comma and a space (tags, people: read and filtered so); an object left out, the cell empty (it has no form a cell could show) (decided 2026-11-05).
+* A list of objects, each a row; its columns in the order the function gives them: the first row's keys, then the keys new in later rows, as SilverBullet lays out a `${…}` of records (Space Lua keeps a table's keys in the order they were set, unlike C Lua: verified in 2.12.1, 2026-11-06, *Step 4: decided* 4); `columns` another order, or some of them. Values as text: numbers, text, dates as ISO text; booleans as `TRUE`/`FALSE` as formulas read them; `nil` empty; a list its values joined by a comma and a space (tags, people: read and filtered so); an object left out, the cell empty (it has no form a cell could show) (decided 2026-11-05).
 * In formulas a table of the space: `@tasks`, `@tasks[due]`, `@tasks[#Data]` (decided 2026-11-05: `@` is in no table's name, so it cannot clash, and it shows the table is no table of the page). Offered by a module to the formulas' `TableSource`; until the function has run once it is `unread`, so formulas and views keep what they show.
 * A pivot gets them too: `pivot.source='@tasks'`.
 * **Any formula** reads them, a source being one of the formulas' tables: a cell's (`=XLOOKUP([@id], @users[id], @users[email])`), a condition of conditional formatting, a view, a choice list's (below). As formulas reading another page do: the results written stay until written again (*Recalculate* highlighted where a source changed; viewing writes nothing), and until a source's function has run once it is `unread`, the results kept. In the Excel file a formula reading a source is its value, listed with why, as a custom function's without a template.
@@ -159,11 +159,11 @@ Each a branch's worth, with its tests (unit tests of the evaluation, UI scenario
 
 **Working notes for this machine**: write files with the editor tool, or with a Python script written by the editor tool, never through a shell heredoc or a `python -c` with backslashes: the shell mangles them (`\u0000` in a string became a NUL byte three times, `\r` vanished). Python's `open(..., "w")` writes CRLF on Windows unless `newline=""`; the repository is LF, so take `\r` off the files touched before a commit. A local SilverBullet for checks is in the memory (`local-silverbullet-podman`); a page there is changed through `client.editorView` in a Playwright script (import playwright by a `file:///` URL), never on disk.
 
-**Open questions** (to be decided with the user before step 4 starts; the answers go into *Step 4: decided*):
+**Open questions** (decided with the user on 2026-11-06: *Step 4: decided*, at the end of this plan):
 1. Choice lists of the space between steps 4 and 5: step 4 takes away `columntypes/spacelists.ts`, so `#choice-projects` stops finding a list of the space by its name until step 5 writes it as a formula (`=@projects`).
 2. What `@tasks` alone is (step 5's `=@projects` uses it bare), and which references a source has: `@tasks[due]`, `@tasks[#Data]`; cells (`@tasks!A1`), `[@due]`, named rows and cells?
 3. A source's name: the rules of a table's name (letters, digits, `_`), compared ignoring case?
-4. A source given objects without `columns`: the order of its columns (a Lua table keeps none).
+4. A source given objects without `columns`: the order of its columns.
 5. Where sources are offered: the names typed in a formula (cell editor, the view's and conditions' fields), the pivot dialog's Source list, the Functions dialog?
 6. The playground: its sources in memory beside its pages (decided), shown and edited how (a panel as the Benchmark's, or fixed sample sources)?
 
@@ -193,3 +193,14 @@ Each a branch's worth, with its tests (unit tests of the evaluation, UI scenario
 13. **Following its sources**: a view's formula, in its metadata row, is followed by the formulas module as another table's formulas are (`followTable` in `otherTablesWritten`: its source's columns renamed or moved, the source renamed) and written through the views module's offer, in the same edit.
 14. Two commits, 3a and 3b (*Steps*).
 15. The pivot's gap stays out of step 3; told to the user once views are done (*Steps*, 3).
+
+## Step 4: decided (2026-11-06, with the user)
+
+Binding for step 4, as *Step 3: decided* was for step 3; not to be opened again.
+
+1. **Choice lists of the space between steps 4 and 5**: the gap is accepted. Step 4 takes away the lists of the space found by a header's name (`#choice-projects` with `columntypes/spacelists.ts`), their code and their tests (ui-tests/spacechoices.spec.ts and the unit tests of spacechoices.ts: rewritten for sources, or gone), and the library page's *Lists of the space* section; step 5 brings them back as a formula (`columntypes.choice.projects='=@projects'`, written by the Choices dialog), right after it. No code kept for the commits in between: neither is released, and both go to main together.
+2. **References to a source**: `@tasks` alone is its whole body, as `@tasks[#Data]` (step 5's `=@projects`); `@tasks[due]` a column; `@tasks[#Data]` the body. Nothing else: no cells (`@tasks!A1`: a query's rows have no fixed order), no `[@due]` (a source is no table of the page, no formula is in its rows), no named rows or cells.
+3. **A source's name**: the rules of a table's name (`tableNameProblem` in namerules.ts: letters, digits and `_`, not starting with a digit, not reading as a cell or a value), compared ignoring case. `defineSource` refuses another, said in a notification as a definition's mistake is.
+4. **The order of a source's columns**: as the function gives them, the first row's keys then the keys new in later rows, as SilverBullet lays out a `${…}` of records. Verified in the local SilverBullet 2.12.1 (2026-11-06) by `${…}` of Lua tables: a constructor's keys (`{zeta, alpha, mid}`), keys set one after another, fourteen keys in no order, and a query's `select {zname = …, alpha = …, mid = …}` all came in the order written. `columns` stays, optional: another order, or some of the columns. (Space Lua is JavaScript: it keeps insertion order where C Lua keeps none; a SilverBullet release changing that would show in the sources' tests.)
+5. **Where sources are offered**: as a name is typed in a formula (the cell editor's list, the formula fields of the view's and the conditional formatting dialogs, through the formulas module's `formulaChoices` / `fieldHelpers`), and in the pivot dialog's Source list as a group of their own (the space's sources, beside the page's tables and *Another page…*). Not in the Functions dialog (functions only).
+6. **The playground**: fixed sample sources in its code (`tasks`, `projects`), given through the same `SourceProvider` as SilverBullet's, beside its pages; no panel to edit them.

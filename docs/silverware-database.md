@@ -6,7 +6,7 @@ A new plugin (`silverware-database/`, prefix `swd-`, settings and API under `sil
 
 ## Order: after Silverware Table's views (decided 2026-11-06)
 
-Silverware Table's views and choices from Space Lua (branches `feat/choices-from-lua` and `feat/views`, docs/silverware-table-views-plan.md there) are finished first, the database after. Why:
+Silverware Table's views and choices from Space Lua (both on the branch `feat/views`, docs/silverware-table-views-plan.md there) are finished first, the database after. Why:
 
 * **A database is a source for formulas.** The views plan makes `defineSource` and `@tasks`: rows from Space Lua that any formula, view or pivot reads. A database is exactly such rows; built after, it plugs into that shape (`@tasks[due]`, a pivot of a database) instead of designing sources twice.
 * **A select property is a choice list.** The views plan settles how a column's choices come from Space Lua (`=@projects`); the database's options follow that, not a model of their own reconciled later.

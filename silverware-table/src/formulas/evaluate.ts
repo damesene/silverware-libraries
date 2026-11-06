@@ -52,6 +52,16 @@ export type TableSource = ((name: string, page?: string) => Table | undefined) &
 export type NamedCell = { readonly table: Table; readonly tableName?: string; readonly row: number; readonly column: number };
 
 /**
+ * A view as the formulas reach it: by its page and name (whichever object of
+ * its table a caller holds: as written, as an edit follows it), else (one
+ * without a name, which only its own formula reaches) by its table
+ */
+function viewKey(table: Table, page: string | undefined, name: string | undefined): string | Table {
+  const named = name?.trim().toLowerCase();
+  return named ? `${page ?? ""}\u0000${named}` : table;
+}
+
+/**
  * The sheets of the tables formulas refer to, each made once: their results
  * are computed once too. A view (a table whose body is its formula's result)
  * is read as calculated now, as its module would write it: a table reading it
@@ -62,8 +72,8 @@ class Book {
   private readonly sheets = new Map<string, Sheet | FormulaError>();
   // The sheets by table, whether reached by the table's name or a named cell's
   private readonly tableSheets = new Map<Table, Sheet | FormulaError>();
-  // The views being calculated: one reached again depends on its own result
-  private readonly calculating = new Set<Table>();
+  // The views being calculated, by viewKey: one reached again depends on its own result
+  private readonly calculating = new Set<string | Table>();
   constructor(
     readonly cells: FormulaCells,
     private readonly source: TableSource | undefined,
@@ -89,11 +99,15 @@ class Book {
     if (!sheet) {
       const formula = this.cells.view?.formulaOf(table);
       const result = formula === undefined ? undefined : this.viewResult(table, page, name, formula);
+      // (Its own cycle said as it is: it is the view on the way to itself)
+      const cycling = this.calculating.has(viewKey(table, page, name));
       sheet = isError(result)
-        ? new FormulaError(result.code, `the view ${name} cannot be calculated: ${result.detail}`)
+        ? cycling
+          ? result
+          : new FormulaError(result.code, `the view ${name} cannot be calculated: ${result.detail}`)
         : new Sheet(result ? this.cells.view!.written(table, result) : table, this, page, name);
       // (A view on the way to itself is no sheet yet: its cycle is the calculation's, not kept)
-      if (!this.calculating.has(table)) this.tableSheets.set(table, sheet);
+      if (!this.calculating.has(viewKey(table, page, name))) this.tableSheets.set(table, sheet);
     }
     return sheet;
   }
@@ -108,8 +122,9 @@ class Book {
   viewResult(table: Table, page: string | undefined, name: string | undefined, formula: string): Grid | FormulaError | undefined {
     const written = formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`;
     if (this.keepsResult(written)) return undefined;
-    if (this.calculating.has(table)) return new FormulaError("#CYCLE!", `${name ? `the view ${name}` : "the view"} depends on its own result`);
-    this.calculating.add(table);
+    const key = viewKey(table, page, name);
+    if (this.calculating.has(key)) return new FormulaError("#CYCLE!", `${name ? `the view ${name}` : "the view"} depends on its own result`);
+    this.calculating.add(key);
     try {
       const own = new FormulaError("#CYCLE!", `${name ? `the view ${name}` : "a view"} cannot read itself: its cells are its formula's result`);
       const result = new Sheet(table, this, page, name, own).whole(written);
@@ -117,7 +132,7 @@ class Book {
       const grid = asGrid(result);
       return grid.width === 0 ? new FormulaError("#CALC!", "the result has no columns") : grid;
     } finally {
-      this.calculating.delete(table);
+      this.calculating.delete(key);
     }
   }
 
@@ -131,7 +146,7 @@ class Book {
       const table = this.source?.(ref.name, page);
       if (!table) return new FormulaError("#REF!", `there is no table named ${ref.name}${page === undefined ? " on this page" : ` on ${page}`}`);
       sheet = this.sheetOf(table, page, ref.name);
-      if (!this.calculating.has(table)) this.sheets.set(key, sheet);
+      if (!this.calculating.has(viewKey(table, page, ref.name))) this.sheets.set(key, sheet);
     }
     return sheet;
   }

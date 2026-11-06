@@ -1,5 +1,7 @@
 // A formula in a cell, and what the formulas read of a table besides its
-// values: the formulas of its cells and the names of its rows and cells. The
+// values: the formulas of its cells, the names of its rows and cells, and a
+// view's formula (the view module's: here, so whatever asks what a table's
+// formulas refer to or call, forFormulas, sees a view's with its cells'). The
 // domain reads none of it from the markdown itself: the formulas module gives
 // the functions that do (FormulaCells, made of its host), so the domain names
 // no attribute and reads no metadata.

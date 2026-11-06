@@ -72,6 +72,10 @@ describe("views in formulas", () => {
     const pair = `${VIEW("=SORT(b![#Data])", "a")}\n\n${VIEW("=SORT(a![#Data])", "b")}\n`;
     expect((resultOf(pair, "a") as FormulaError).code).toBe("#CYCLE!");
     expect((resultOf(pair, "b") as FormulaError).code).toBe("#CYCLE!");
+    // Told by its name, whichever object of its table is calculated (a copy, as a view's Out of date check holds)
+    const copy = parseTable(pageTablesOf(pair)[0]!.range.text);
+    const cycle = viewResult(copy, { cells: VIEW_CELLS, tables: sourceOf(pair), name: "a" }) as FormulaError;
+    expect(cycle.detail).toBe("the view b cannot be calculated: the view a depends on its own result");
   });
 
   it("is read by other formulas as calculated now, not as written: a table reading it follows its source", () => {

@@ -211,3 +211,28 @@ Binding for step 4, as *Step 3: decided* was for step 3; not to be opened again.
 4. **The order of a source's columns**: as the function gives them, the first row's keys then the keys new in later rows, as SilverBullet lays out a `${…}` of records. Verified in the local SilverBullet 2.12.1 (2026-11-06) by `${…}` of Lua tables: a constructor's keys (`{zeta, alpha, mid}`), keys set one after another, fourteen keys in no order, and a query's `select {zname = …, alpha = …, mid = …}` all came in the order written. `columns` stays, optional: another order, or some of the columns. (Space Lua is JavaScript: it keeps insertion order where C Lua keeps none; a SilverBullet release changing that would show in the sources' tests.)
 5. **Where sources are offered**: as a name is typed in a formula (the cell editor's list, the formula fields of the view's and the conditional formatting dialogs, through the formulas module's `formulaChoices` / `fieldHelpers`), and in the pivot dialog's Source list as a group of their own (the space's sources, beside the page's tables and *Another page…*). Not in the Functions dialog (functions only).
 6. **The playground**: fixed sample sources in its code (`tasks`, `projects`), given through the same `SourceProvider` as SilverBullet's, beside its pages; no panel to edit them.
+
+## Step 5: before it starts (written 2026-11-06, for a session starting afresh)
+
+**State**: branch `feat/views`, steps 1 to 4 done and committed (nothing pushed; released with the choices). `npm run verify` and `npm run test:ui` pass. Step 4 as built: *Step 4 done* in the status at the top, CLAUDE.md (Layout: src/sources.ts, src/host/sources.ts, features/sources.ts; *Sources of the space* under *Design decisions*). The Lua API as it is now: `silverware.table.defineSource({ name = "tasks", columns = { … }, data = fn })` (one table, its function `data`: `query = …` is a syntax error in Space Lua), written with parentheses in every example.
+
+**What step 4 left that step 5 builds on**:
+* A source is a table of the formulas' `TableSource` (`spaceSource`), so a list's formula `=@projects`, `=@users[name]`, `=FILTER(@users[name], @users[active])` calculates as any formula does; one reading a source not read yet keeps nothing to keep, so the column checks nothing then (`Book.notRead` gives why).
+* The column types module asks the formulas module through an offer, as the conditions module asks for a formula condition's values (`rowValues` in `FormulasOffer`); the choice type gets its list's values in the context its module passes (`TypeTable`), no module-level state (columntypes/spacelists.ts is gone).
+* A source changed: `tablesChanged` on every module; the column types module's `tablesChanged` today only hides the type hashtags anew: it must make the tables with a formula list look again (`looksChanged`).
+* Following renames: the formulas module follows a view's formula through the view module's `CalculatedOffer.follow`; a list's formula needs the column types module to offer its lists' formulas and write them back, the same way (in `otherTablesWritten` for other tables, the write step for the table's own).
+* The Choices dialog (features/choicesdialog.ts) has two ways today, *Column's values* and *Own list*; the formula field is src/formulafield.ts (its helpers the formulas' offer `fieldHelpers`, as the view's and the conditions' dialogs use them); the space's sources the sources module's offer (`SourcesOffer.names`, `columns`).
+* `ui-tests/spacechoices.spec.ts` was deleted in step 4: its scenario (a query's list, read anew once a page of the tag is indexed) comes back for a formula list of a source, SilverBullet only, through `defineSources` in ui-tests/helpers.ts.
+
+**Working notes for this machine**:
+* Shell heredocs mangle `\n` and backslashes (a `\u0000` became a NUL byte, `\n` in a test's string a line break): write scripts to a file with the editor tool and run them. Python writes LF only with `newline=""`.
+* A local SilverBullet: Docker inside WSL (`wsl -e docker …`, no Docker on Windows), image `ghcr.io/silverbulletmd/silverbullet:2.12.1-slim`, port 3010; see the memory `local-silverbullet-wsl`.
+* Node's locale here is cs-CZ: a `localeCompare` without a locale sorts CH after H (a test failed so: 11143a7).
+
+## Step 5: decided (2026-11-06, with the user)
+
+Binding for step 5, as *Step 4: decided* was for step 4; not to be opened again.
+
+1. **A list's formula follows its tables**: renames and moves of the page's tables and columns it reads (`people![name]` → `people![full_name]`, `people!` renamed), as a cell's or a view's formula follows them, in the same edit; a source (`@users`) is renamed by no edit, and another page's tables are followed nowhere. The column types module offers its lists' formulas and writes them back, as the view module offers its formula (`follow`): else a column renamed would leave the list checking nothing, unseen.
+2. **What a list is made of its result**: the values in the result's order (the user sorts with `SORT(…)`; the column sorts in the list's order, as an own list's), empty ones left out, duplicates left out whatever their case (the first kept), as values are matched; numbers and logical values as a cell shows them (`TRUE`, `FALSE`). A result that is an error: the column checks nothing, its header's title and the Choices dialog saying why.
+3. **In the Type menu**: a formula list is under *Choice* as an own list is (*Choice: projects*, taken for the column, deleted, asked first where columns take it), its hint showing the formula (`=@projects · Used by Project`), so lists are one kind that differ only in where their values come from.

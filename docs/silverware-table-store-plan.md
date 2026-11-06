@@ -3,9 +3,9 @@
 Status (2026-11-06, branch `refactor/table-store`): planned, nothing done.
 Starts once the views plan (docs/silverware-table-views-plan.md) is done
 through its step 5: its sources (`@tasks`) are the first tables kept nowhere
-in a page, and this plan takes them as its second store. The branch was made
-from `feat/views` before its step 4; it is rebased onto the finished views
-before the first step here.
+in a page, and this plan takes them as its second store. The branch is on
+`main`; once the views are merged into `main`, it is rebased onto it before
+the first step here.
 
 ## Why
 

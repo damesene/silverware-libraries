@@ -295,7 +295,8 @@ export function findFunctions(query: string, category?: FunctionCategory | "cust
       const text = `${f.name} ${f.description}`.toLowerCase();
       return words.every((word) => text.includes(word));
     })
-    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+    // Names are English: ordered so whatever the locale (in Czech CH comes after H)
+    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "en"));
 }
 
 /**

@@ -135,7 +135,10 @@ Each a branch's worth, with its tests (unit tests of the evaluation, UI scenario
 
 1. **Grids in formulas**: the `Grid` value and its one boundary, `#SPILL!` in a cell (a result of one cell its value), `#CALC!` and `FILTER`'s third argument, the references that give grids, `FILTER`, `SORT`, `SORTBY`, `UNIQUE`, `CHOOSECOLS`, `TAKE`, `DROP`, *Show result* and *Copy result* of a `#SPILL!` cell. Visible to users as the functions inside formulas that reduce a grid to one value (`=COUNTA(UNIQUE(tasks![assignee]))`, `=TEXTJOIN(", ", TRUE, FILTER(tasks![name], tasks![assignee]=[@name]))` in a calculated column), and a `#SPILL!` cell's result shown over the window.
 2. **The shared part of calculated tables** (`src/calculated/`), the pivot moved onto it, and the formula field moved to `src/formulafield.ts` for the conditional formatting dialog; nothing changed for users.
-3. **Views**: the formulas' domain calculating them in its order (a `Book`'s table made by a formula), the module, the dialog, Insert view, `/view`, the library page's section.
+3. **Views**, in two commits (decided 2026-11-06, *Step 3: decided* below):
+   * **3a**: a view in the formulas: its formula read through the views module's offer, a `Book`'s table made by a formula, the order a write recalculates in (`Affected`), its formula following its sources' renames and moves; unit tests, no UI.
+   * **3b**: the module, the dialog, *Insert view…*, the command, `/view`, *View settings…*, the library page's section, UI scenarios.
+   * **Once views are done**: tell the user about the pivot's gap (a table reading a pivot is recalculated only by its own next write, *A view is calculated by the formulas, in their order*), for them to decide whether to mend it (the pivot calculated by the formulas as a view is).
 4. **Sources from Space Lua**: `defineChoices` made `defineSource` (spacechoices.ts's reading moved to `host/sources.ts` behind `SourceProvider`, rows instead of values, a plain list one column `value`), the `sources` module offering them, `columntypes/spacelists.ts` gone, `@name` in formulas, the pivot's source.
 5. **A choice list made by a formula**: `columntypes.choice.<name>='=…'`, a list from Space Lua written so by the Choices dialog, the space's lists no longer found by a header's name alone.
 6. **More functions**: `VSTACK`, `HSTACK`, `SEQUENCE`, `GROUPBY`, `PIVOTBY`.
@@ -148,3 +151,21 @@ Each a branch's worth, with its tests (unit tests of the evaluation, UI scenario
 4. A view has no totals row of its own for now: a formula can `VSTACK` one, or another table's formula sum it; Excel's Total Row as a setting can come later.
 5. (2026-11-06) Sources keep SilverBullet apart: the Lua side in `host/sources.ts` behind a `SourceProvider` of plain data, a `sources` module that can be turned off offering them to the formulas and the column types, no module-level state in a domain.
 6. (2026-11-06) A result of one cell is its value; `FILTER` keeping nothing `#CALC!` unless its third argument; a `#SPILL!` cell's result shown read only over the window (*Show result*: a floating icon, the cell menu, Ctrl+Shift+Enter) and copied (*Copy result*), not on the sheet.
+
+## Step 3: decided (2026-11-06, with the user)
+
+1. **A result that is no grid**: one value is a table of one cell, a list one column. An error (`#CALC!` of a FILTER without its third argument, `#REF!`, `#CYCLE!`) writes nothing: the view stays as it was, its badge *Cannot be calculated* with the reason, as a pivot's. An empty result (`TAKE(…, 0)`) is the header alone, no body rows.
+2. **Headers**: a column's name in its source (the grid's `names`), else its letter (A, B, C), as *Show result* has them. A header may be renamed as any table's (only the body is read-only); the name is kept by the column's id through every recalculation; emptied or given its made name back, it follows the source again.
+3. **Columns' ids** (for the renamed headers): `name:<source column>`, a second column of the same source column `name:<column>:2`, a column of no origin `at:<place>`. A rename of a column the formula no longer gives goes (`storedRenames`).
+4. **Types are not taken from the source**: a header carries the column's name only (a grid's names are without hashtags). A type typed into a view's header (`#euro`) is a rename like any other: kept, changed or removed by renaming again, never overwritten by the source, and a source's type changed does not reach the view. Taking the source's type (a header not renamed following the source's, a renamed one the user's, as the pivot's *Sum of Revenue #euro*) would need a grid to carry its columns' types: later, if wanted.
+5. **Alignment**: a column right-aligned where all its values not empty are numbers.
+6. **A cycle** (a view reading itself, two views reading each other) is `#CYCLE!`: an error as in 1.
+7. **The formula it starts with**: from a table's ⋯ menu `=<name>![#Data]` (a table without a name named in the same edit, as *Insert pivot table…* does); from the command or `/view` the page's first named table's, else an empty field.
+8. **Its name**: offered free (`view1`, `view2`… not taken by any table of the page, as the pivot's `table1`), may be emptied (a view without a name shows, no formula reads it). A name another table of the page has is refused by the dialog, as naming refuses it.
+9. **A large result**: no limit; the dialog warns past 1,000 rows that each is written into the markdown; its preview shows the first rows (about 50) and the whole size.
+10. **The formulas module off**: views keep their values; *Insert view…* and the dialog say formulas are needed and insert nothing, as the pivot's.
+11. **Out of date**: calculated as a view is shown (nothing written), *Out of date* in its badge and *Refresh* in its toolbar; a source on another page checked again as SilverBullet indexes it, as the pivot's.
+12. **Who knows `view.formula`**: the attribute is the views module's; the module offers `viewFormula(table)` (and `withViewFormula(table, formula)`) and the formulas module uses it for its `Book`, `Affected` and following edits. With the views module off the formulas see no view: views keep their values, as any module's data does when it is off. (Set aside: an attribute of the formulas' own, `formulas.view`, which would make a view half another module's.)
+13. **Following its sources**: a view's formula, in its metadata row, is followed by the formulas module as another table's formulas are (`followTable` in `otherTablesWritten`: its source's columns renamed or moved, the source renamed) and written through the views module's offer, in the same edit.
+14. Two commits, 3a and 3b (*Steps*).
+15. The pivot's gap stays out of step 3; told to the user once views are done (*Steps*, 3).

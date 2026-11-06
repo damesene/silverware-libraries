@@ -386,6 +386,25 @@ The page's name in double brackets goes before the table's name: `[[Prices]]frui
 * The page is the name as SilverBullet writes it in links, without `#` or `|`.
 * With the `pageLinks` module off (see [[#Settings]]) Silverware Table reads no other page: formulas that refer to one keep the results they have, and a new one shows `#REF!`.
 
+### Sources of the space
+
+A script can give formulas a table of the space, built from a query: `silverware.table.defineSource(name, fn)` in a `space-lua` block of yours names it, and formulas read it as `@name`:
+
+```lua
+silverware.table.defineSource("tasks", { columns = { "name", "page", "due", "done" } }, function()
+  return query[[from t = index.tag "task" select { name = t.name, page = t.page, due = t.due, done = t.done }]]
+end)
+```
+
+* `@tasks[due]` is a column of it, `@tasks` (or `@tasks[#Data]`) all its rows: `=COUNTIFS(@tasks[done], "FALSE")`, `=XLOOKUP([@id], @users[id], @users[email])`, a view `=FILTER(@tasks[#Data], @tasks[done] = "FALSE")`, a pivot of it (`pivot.source='@tasks'`, or *Sources of the space* in the pivot dialog's *Source*). A source has no cells to refer to (`@tasks!A1`) and no row of the formula's (`@tasks[@due]`): a query's rows have no fixed order.
+* The function returns a list of records, each a row: its columns are the first record's keys, then the keys new in later ones, in the order the script sets them. `columns` (optional) gives another order, or some of them only; give it where the query may return nothing, so the columns are known then too. A list of plain values (`select p.name`) is one column, `value`.
+* Values are written as text: numbers and texts as they are, `true` and `false` as `TRUE` and `FALSE`, a list as its values joined by a comma (`money, review`), `nil` and an object as an empty cell.
+* Its name is a table's (letters, digits and `_`, not starting with a digit), compared ignoring case; `@` keeps it apart from the page's tables.
+* The function runs when Space Lua loads, and again a moment after SilverBullet indexes a page, so the source follows the space. Nothing is written by it: a table whose formulas read a source that changed has *Recalculate* highlighted, a view or pivot of it *Out of date*; click to write the new results. A function that fails, or returns no list, is shown in a notification (once, until the problem changes); the source keeps the rows it had.
+* While a source has not run yet (or with the `sources` module off), formulas reading it keep the results they have; a source no script defines is `#REF!`.
+* `@` typed in a formula offers the sources, and `@tasks[` their columns. In an Excel file a formula reading a source is written as its value.
+* `silverware.table.evaluate` reads sources too, but a `${…}` is not shown anew as a source changes (it follows the pages it read): it shows the source as it was when it was rendered.
+
 ### Operators and values
 
 * `+ - * / ^` (power), `%` after a number (`50%` is 0.5), `&` joins text, `= <> < > <= >=` compare (numbers as numbers, text ignoring case).
@@ -767,7 +786,7 @@ It is a plain markdown table, its numbers written in it (it shows anywhere, as a
 
 | Attribute | What it says |
 |---|---|
-| `pivot.source` | The table summarized: a table of the page by its name (see [[#Table names]]), or of another page as formulas refer to it: `[[Orders]]orders` |
+| `pivot.source` | The table summarized: a table of the page by its name (see [[#Table names]]), of another page as formulas refer to it: `[[Orders]]orders`, or a source of the space: `@tasks` (see [[#Sources of the space]]) |
 | `pivot.rows` | What groups the rows: a column (`region`), or a formula of one row (`TEXT([@date], "yyyy-mm")`, `YEAR([@date])`), several comma separated |
 | `pivot.columns` | What makes columns of the groups, the same way (optional): a cross table |
 | `pivot.values` | What each group shows: formulas over its rows, `SUM([revenue])`, `AVERAGE([qty])`, `COUNTA([date])`, `SUM([qty] * [price])`, comma separated; `SHARE(…)` around one shows it as a share of the grand total (`SHARE(SUM([revenue]))`), `SHARE(…, "row")` of its row's total, `SHARE(…, "column")` of its column's, its column typed `#percent-1`; SHARE is the pivot's, so it is the whole value or nothing (`SHARE(…) * 100` is `#NAME?`) |
@@ -779,6 +798,7 @@ It is a plain markdown table, its numbers written in it (it shows anywhere, as a
 * A pivot that cannot be calculated (its source gone) keeps its numbers; the formulas reading it show the error, as for a view.
 * Edited by hand (in its markdown) the source is ahead of the pivot: its **Refresh pivot** icon in the toolbar is highlighted, and its tab says *Out of date* (*Cannot be calculated* where it cannot be); click Refresh pivot and the pivot is calculated anew.
 * A source on another page is as a formula's table there (see [[#Other tables]]): its edits do not write the pivot; once SilverBullet has indexed that page, **Refresh pivot** is highlighted where the pivot is out of date. Renamed there, the source (or its columns) is not followed: the pivot says what it cannot find, and its settings fix it. It needs the `pageLinks` module.
+* A source of the space (`@tasks`) changed: **Refresh pivot** is highlighted; while it has not been read, the pivot keeps its numbers.
 * Its values are calculated, so its cells are not edited: the editor does not open on them (it says why, and the pivot's settings open instead, where what it shows is changed), and its menus offer nothing that changes them or adds, moves or deletes its rows and columns (nor *Unpin all*: its totals are pinned by it). Its grips open their menus but do not drag, and its cells selected have no edge to drag them by. The order of its groups and values is set in its dialog (↑ ↓ beside each). Rename a header as in any table: the pivot keeps your name (and a type's hashtag added to it) when it is calculated again.
 * It says what it is at a glance: *Pivot of orders* in a small tab at its top right corner (with the `tableLabels` module), `Pivot of [[Orders]]orders` for a source on another page, as its definition writes it.
 * Its totals are pinned: the Total row to the bottom, a cross table's Total column to the right, so they stay in view and out of a sort (with *Store table metadata*).
@@ -799,7 +819,7 @@ A view is a table made by one formula: its rows are the formula's result, as Exc
 * **What a formula gives**: rows and columns (`FILTER(tasks![#Data], …)`, `CHOOSECOLS(…)`), a list (`=SORT(UNIQUE(tasks![assignee]))`: one column), or one value (`=SUM(tasks![hours])`: one cell). See [[#Arrays]] for the functions. A result of no rows is the header alone.
 * **Its headers** are the names of the columns its values come from (`Assignee`), else letters (A, B, C). Rename a header as in any table: the view keeps your name (and a type's hashtag added to it) whenever it is calculated again; empty it, or give it its name back, and it follows its source again.
 * **It follows what it reads**: an edit of a table it reads, with Silverware Table, writes the view anew in the same edit (one Ctrl+Z takes back both), and so does a table whose formulas read the view, in the same edit too. The table it reads renamed, or its columns renamed or moved, the view's formula says so.
-* Changed otherwise (its source typed in the markdown, a table on another page it reads, `TODAY()` moved on), the view's tab says *Out of date* and its **Refresh view** icon in the toolbar is highlighted; click it and the view is calculated anew. A formula that cannot be calculated (its table gone: `#REF!`; `FILTER` keeping nothing without its third argument: `#CALC!`; a view reading itself or two reading each other: `#CYCLE!`) writes nothing: the view keeps what it shows, its tab says *Cannot be calculated* and its Refresh view icon why.
+* Changed otherwise (its source typed in the markdown, a table on another page it reads, a source of the space it reads, `TODAY()` moved on), the view's tab says *Out of date* and its **Refresh view** icon in the toolbar is highlighted; click it and the view is calculated anew. A formula that cannot be calculated (its table gone: `#REF!`; `FILTER` keeping nothing without its third argument: `#CALC!`; a view reading itself or two reading each other: `#CYCLE!`) writes nothing: the view keeps what it shows, its tab says *Cannot be calculated* and its Refresh view icon why.
 * **A named view is a table like any other** for formulas (`=SUM(annas![hours])`), pivots, charts and exports; its numbers are written in the markdown, so it shows anywhere.
 * Its values are its formula's, so its cells are not edited: a press on one says why and opens its settings, and its menus offer nothing that changes them or adds, moves or deletes its rows and columns. A large result is written whole (the dialog says so past 1,000 rows).
 * Its formula is in its metadata row (`view.formula`), its renamed headers too (`view.headers`); it needs *Store table metadata* and the `formulas` module (off: the dialog says so and inserts nothing; views keep their values). In an Excel file a view is its values.
@@ -1225,6 +1245,7 @@ Each module can be turned off with `enabled = false`, e.g. `config.set("silverwa
 | `formulas` | Formulas can be typed into cells, with their help and references; *Recalculate* in the toolbar; every edit recalculates the table and the tables referring to it, and references follow moved rows and columns. Off: nothing is recalculated, results stay as written, and references do not follow moves. A typed formula is saved as text; a formula cell edited, pasted over or emptied keeps its formula (hidden), which is used again once formulas are on. See [[#Formulas]]. |
 | `names` | Tables, columns, rows and cells can be named: the pencil in the title of a table's ⋯ menu, a column's, a row's or a cell's menu; named headers and cells show a mark. Off: none of these, and no marks; names already in tables are kept and formulas still use them, but a duplicated row copies them too. See [[#Table names]]. |
 | `pageLinks` | Formulas can refer to tables and named cells on other pages (`[[Prices]]fruit!B2`), which Silverware Table reads for them. Off: it reads no other page; formulas that refer to one keep the results they have (the formulas using them too), a new one shows `#REF!`. It needs the `formulas` module. See [[#Tables on other pages]]. |
+| `sources` | Formulas, views and pivots read the sources of the space a script gives (`silverware.table.defineSource`, read as `@tasks`). Off: no source is read; formulas, views and pivots reading one keep what they show. See [[#Sources of the space]]. |
 | `filters` | Rows can be filtered: the toolbar's filter icon shows a filter field under each header, *Filter* in a column menu opens that column's filter, *Filter: = value* in the cell menu filters by a cell's value; with *Store table metadata* the filters are stored in the table. Its setting `smart` (default `true`): fields understand `>10`, `/pattern/`, `=text`, `a\|b` and `!filter`; `false`: everything typed is text to find. Off: no filtering; filters stored in a table are kept but not used. See [[#Filtering]]. |
 | `columnTypes` | A header's type hashtag formats its column, the cell editor offers the type's values, and the column menu has *Type*. Off: cells show as written. See [[#Column types]]. |
 | `conditions` | Conditional formatting: rules that color cells by their values, from a column's menu and the table's ⋯ menu; a table with rules shows their icon in its toolbar. Off: cells look as they are; rules stored in tables are kept but not used. See [[#Conditional formatting]]. |

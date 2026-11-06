@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { insertRowWith } from "../core/structure.ts";
 import { setCell } from "../ops.ts";
+import { memorySources } from "../sources.ts";
 import { cell, cellMenuItem, clickOn, controller, cursorMoves, editor, flashes, flush, key, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 
 const ORDERS = [
@@ -707,6 +708,53 @@ describe("Pivot tables", () => {
       await run("Text.\n", 5);
       expect(dialog()!.querySelector('input[aria-label="Source page"]')).not.toBeNull();
       expect(dialog()!.querySelector<HTMLButtonElement>(".swt-dialog-primary")!.disabled).toBe(true);
+    });
+  });
+
+  describe("of a source of the space", () => {
+    const TASKS = { columns: ["owner", "hours"], rows: [["anna", "3"], ["petr", "1"], ["anna", "2"]] };
+    const SPACE = (body: string) =>
+      `| owner | Sum of hours |\n|---|--:|\n${body}\n| <meta core.table pivot.source='@tasks' pivot.rows='owner' pivot.values='SUM([hours])'> |`;
+    const refresh = () => {
+      cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      return document.querySelector<HTMLElement>('.swt-bar button[aria-label="Refresh pivot"]')!;
+    };
+
+    it("is calculated from it; out of date as it changes, Refresh writing it anew", async () => {
+      const sources = memorySources({ tasks: TASKS });
+      await setup(`${SPACE("| anna | 5 |\n| petr | 1 |\n| Total | 6 |")}\n`, {}, {}, sources);
+      expect(refresh().classList.contains("swt-attention")).toBe(false);
+      expect(controller.tableBadges(controller.shownTables()[0]!)[0]!.text).toBe("Pivot of @tasks");
+      sources.set("tasks", { ...TASKS, rows: [...TASKS.rows, ["petr", "4"]] });
+      expect(refresh().classList.contains("swt-attention")).toBe(true);
+      refresh().click();
+      await flush();
+      expect(text).toBe(`${SPACE("| anna | 5 |\n| petr | 5 |\n| Total | 10 |")}\n`);
+    });
+
+    it("keeps its numbers while the source is not read, or its module is off", async () => {
+      const page = `${SPACE("| anna | 5 |\n| Total | 5 |")}\n`;
+      await setup(page, { "silverware.table.modules.sources.enabled": false }, {}, memorySources({ tasks: TASKS }));
+      expect(refresh().classList.contains("swt-attention")).toBe(false);
+      refresh().click();
+      await flush();
+      expect(text).toBe(page);
+    });
+
+    it("says there is no such source", async () => {
+      await setup(`${SPACE("| anna | 5 |")}\n`, {}, {}, memorySources({}));
+      expect(refresh().title).toBe("This pivot cannot be calculated: no source named tasks in the space");
+    });
+
+    it("offers the space's sources in its dialog, its columns to pick", async () => {
+      await setup(`${SPACE("| anna | 5 |\n| petr | 1 |\n| Total | 6 |")}\n`, {}, {}, memorySources({ tasks: TASKS }));
+      cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      document.querySelector<HTMLElement>('.swt-bar button[aria-label="Pivot settings…"]')!.click();
+      const dialog = document.querySelector<HTMLElement>(".swt-pivot-dialog")!;
+      const source = dialog.querySelector<HTMLSelectElement>('select[aria-label="Source"]')!;
+      expect(source.value).toBe("@tasks");
+      expect(source.querySelector('optgroup[label="Sources of the space"]')!.textContent).toBe("@tasks");
+      expect(dialog.textContent).toContain("anna");
     });
   });
 });

@@ -69,6 +69,8 @@ export type CalculatedRead = {
   readonly evaluate: (formula: string) => Result;
   /** A table by its name (on `page`, else the calculated table's), its formulas' results as calculated now (a calculated one as calculated now) */
   readonly table: (name: string, page?: string) => Table | FormulaError;
+  /** A source of the space by its name (@tasks), or why there is none */
+  readonly source: (name: string) => Table | FormulaError;
 };
 
 /** A table's named rows by their names (lowercase), the first row of each name; rows of the markdown (header 0) */

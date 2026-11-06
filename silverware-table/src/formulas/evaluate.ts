@@ -135,7 +135,14 @@ class Book {
   calculated(table: Table, page: string | undefined, name: string | undefined, by: CalculatedBy, before?: Table): Table | FormulaError | undefined {
     if (by.formulas.some((formula) => this.notRead(withEqualsOf(formula)))) return undefined;
     return this.asCalculated(table, page, name, (own) =>
-      by.calculate({ evaluate: (formula) => own.whole(withEqualsOf(formula)), table: (other, at) => own.tableNow({ name: other, ...(at === undefined ? {} : { page: at }) }) }, before),
+      by.calculate(
+        {
+          evaluate: (formula) => own.whole(withEqualsOf(formula)),
+          table: (other, at) => own.tableNow({ name: other, ...(at === undefined ? {} : { page: at }) }),
+          source: (other) => own.tableNow({ source: other }),
+        },
+        before,
+      ),
     );
   }
 

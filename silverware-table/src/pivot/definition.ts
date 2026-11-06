@@ -53,16 +53,21 @@ export function splitList(text: string): string[] {
   return items.map((item) => item.trim()).filter((item) => item !== "");
 }
 
-/** The table a pivot summarizes: its name, and the page it is on where the source says one (`[[Orders]]orders`, as formulas refer to it) */
-export type SourceRef = { readonly name: string; readonly page?: string };
+/**
+ * The table a pivot summarizes: its name, and the page it is on where the source says one (`[[Orders]]orders`, as
+ * formulas refer to it); `space`: a source of the space (`@tasks`), no table of a page
+ */
+export type SourceRef = { readonly name: string; readonly page?: string; readonly space?: true };
 
 export function sourceRef(source: string): SourceRef {
-  const m = /^\[\[([^\]]*)\]\]([\s\S]*)$/.exec(source.trim());
-  return m ? { page: m[1]!.trim(), name: m[2]!.trim() } : { name: source.trim() };
+  const text = source.trim();
+  if (text.startsWith("@")) return { name: text.slice(1).trim(), space: true };
+  const m = /^\[\[([^\]]*)\]\]([\s\S]*)$/.exec(text);
+  return m ? { page: m[1]!.trim(), name: m[2]!.trim() } : { name: text };
 }
 
 export function sourceText(ref: SourceRef): string {
-  return ref.page !== undefined ? `[[${ref.page}]]${ref.name}` : ref.name;
+  return ref.space ? `@${ref.name}` : ref.page !== undefined ? `[[${ref.page}]]${ref.name}` : ref.name;
 }
 
 /** The definition of a table's attributes; undefined where it has no source (no pivot), else why it cannot be one */
@@ -70,7 +75,7 @@ export function readDefinition(attribute: (key: Key) => string | undefined): Piv
   const source = attribute("source")?.trim();
   if (!source) return undefined;
   const ref = sourceRef(source);
-  if (!ref.name || ref.page === "") return { problem: "its source names no table (pivot.source: orders, or [[Page]]orders on another page)" };
+  if (!ref.name || ref.page === "") return { problem: "its source names no table (pivot.source: orders, [[Page]]orders on another page, or @tasks of the space)" };
   const values = splitList(attribute("values") ?? "");
   const rows = splitList(attribute("rows") ?? "");
   if (!values.length) return { problem: "it says no values (pivot.values: SUM([revenue]))" };

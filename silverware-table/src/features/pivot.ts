@@ -25,6 +25,7 @@ import { type Fields, fieldsOf } from "../pivot/fields.ts";
 import { pivotOf } from "../pivot/pivot.ts";
 import { freeTableName } from "../namerules.ts";
 import { asNumber } from "../view.ts";
+import type { SourcesOffer } from "../sources.ts";
 import { openPivotDialog } from "./pivotdialog.ts";
 
 // How many pivots calculated are kept (pivotOf)
@@ -70,9 +71,10 @@ export class Pivot implements Feature {
     return page !== undefined && page !== this.host.currentPage ? page : undefined;
   }
 
-  /** The name of a source of this page, lowercased; none for one on another page */
+  /** The name of a source of this page, lowercased; none for one on another page, or a source of the space */
   private nameHere(definition: PivotDefinition): string | undefined {
-    return this.pageOf(definition) === undefined ? sourceRef(definition.source).name.toLowerCase() : undefined;
+    const ref = sourceRef(definition.source);
+    return this.pageOf(definition) === undefined && !ref.space ? ref.name.toLowerCase() : undefined;
   }
 
   /**
@@ -81,7 +83,15 @@ export class Pivot implements Feature {
    * until it has: the pivot then stays as written)
    */
   private find(definition: PivotDefinition, tables: readonly PageTable[], except: number): Found {
-    const { name } = sourceRef(definition.source);
+    const { name, space } = sourceRef(definition.source);
+    if (space) {
+      // A source of the space, as the sources module offers it (off: not read, the pivot kept as written)
+      const sources = this.host.offered<SourcesOffer>("sources");
+      if (!sources) return { notRead: `its source @${name} is a source of the space, which the sources module reads: it is off` };
+      const table = sources.table(name);
+      if (table === null) return { problem: `no source named ${name} in the space` };
+      return table ? { table } : { notRead: `the source @${name} is not read yet` };
+    }
     const page = this.pageOf(definition);
     if (page === undefined) {
       const table = this.sourceIn(tables, name, except);
@@ -112,6 +122,7 @@ export class Pivot implements Feature {
     if (!cells) return "it needs the formulas module, which is off";
     if ("problem" in found) return found.problem;
     if ("unread" in found) return this.unreadable() ?? `${found.unread} is not read yet`;
+    if ("notRead" in found) return found.notRead;
     return this.pivotOf(found.table, definition, cells);
   }
 
@@ -128,13 +139,14 @@ export class Pivot implements Feature {
     // What it reads: its source (on another page: unread until pageLinks has read it, the pivot kept as written meanwhile)
     const own = [...definition.rows, ...definition.columns].map(groupFormula);
     const values = definition.values.map((item) => valueParts(item).formula);
-    const formulas = [`=${sourceText(page === undefined ? { name: ref.name } : ref)}![#Data]`, ...[...own, ...values, ...(definition.where ? [definition.where] : [])].map((f) => `=${f}`)];
+    const read = ref.space ? `=${sourceText(ref)}[#Data]` : `=${sourceText(page === undefined ? { name: ref.name } : ref)}![#Data]`;
+    const formulas = [read, ...[...own, ...values, ...(definition.where ? [definition.where] : [])].map((f) => `=${f}`)];
     return {
       formulas,
       calculate: (read, before) => {
         const cells = this.cells();
         if (!cells) return new FormulaError("#VALUE!", "it needs the formulas module, which is off");
-        const source = read.table(ref.name, page);
+        const source = ref.space ? read.source(ref.name) : read.table(ref.name, page);
         if (source instanceof FormulaError) return source;
         const pivot = this.pivotOf(source, definition, cells);
         // A header renamed in this edit: its name kept for the column it is
@@ -142,6 +154,8 @@ export class Pivot implements Feature {
         return this.written(table, pivot, before ? renamedIn(before, table, pivot, renames) : renames);
       },
       follow: (before, after, following) => {
+        // A source of the space follows no table's edit
+        if (ref.space) return table;
         // The source's new name (as it names it: [[This page]] kept), its columns renamed or moved
         const newName = following.names?.after?.trim();
         const renamed = newName ? sourceText({ ...ref, name: newName }) : definition.source;
@@ -159,16 +173,23 @@ export class Pivot implements Feature {
    * calculated); not one calling a custom function (defined anew as Space Lua loads) or one of the time (TODAY())
    */
   private pivotOf(source: Table, definition: PivotDefinition, cells: FormulaCells): Calculated {
-    if (!keptOf(definition)) return pivotOf(source, definition, { cells, name: sourceRef(definition.source).name });
+    const name = this.ownName(definition);
+    if (!keptOf(definition)) return pivotOf(source, definition, { cells, name });
     const key = JSON.stringify([definition, source.rows.map((row) => row.cells)]);
     let pivot = this.made.get(key);
     if (pivot) {
       // (Last used, last out)
       this.made.delete(key);
-    } else pivot = pivotOf(source, definition, { cells, name: sourceRef(definition.source).name });
+    } else pivot = pivotOf(source, definition, { cells, name });
     this.made.set(key, pivot);
     if (this.made.size > MADE_KEPT) this.made.delete(this.made.keys().next().value!);
     return pivot;
+  }
+
+  /** The source's name, by which its formulas may name it (a source of the space has none a table could) */
+  private ownName(definition: PivotDefinition): string | undefined {
+    const ref = sourceRef(definition.source);
+    return ref.space ? undefined : ref.name;
   }
 
   /**
@@ -246,7 +267,14 @@ export class Pivot implements Feature {
     let checked = false;
     for (const info of this.host.shownTables()) {
       const definition = this.definitionOf(parseTable(info.source));
-      const page = definition && !("problem" in definition) ? this.pageOf(definition) : undefined;
+      if (!definition || "problem" in definition) continue;
+      // A source of the space read anew (or definitions changed): checked again (the last pivots are kept by their source's cells)
+      if (sourceRef(definition.source).space) {
+        this.check(info);
+        checked = true;
+        continue;
+      }
+      const page = this.pageOf(definition);
       if (page === undefined) continue;
       // (Not where its page is as it was checked from: another page read, or definitions changed)
       const tables = this.host.otherPages()?.tables(page);
@@ -289,6 +317,8 @@ export class Pivot implements Feature {
     // Why its source is not found, said as the dialog says it; else as the formulas calculate it now (a source that is a
     // view as calculated now, a cycle through one)
     if ("problem" in found) return void this.stale.set(info, `This pivot cannot be calculated: ${found.problem}`);
+    // A source of the space not read: kept as it is, as formulas reading one keep their results
+    if ("notRead" in found) return void this.stale.set(info, false);
     if ("unread" in found) return void this.stale.set(info, `This pivot cannot be calculated: ${this.unreadable() ?? `${found.unread} is not read yet`}`);
     const formulas = this.host.offered<FormulasOffer>("formulas");
     if (!formulas) return void this.stale.set(info, "This pivot cannot be calculated: it needs the formulas module, which is off");
@@ -341,6 +371,14 @@ export class Pivot implements Feature {
     return [...(also ? [also] : []), ...this.namedIn(pageTablesOf(this.host.pageText))].map(({ name, table }) => ({ name, table, columns: (table.rows[0]?.cells ?? []).map(columnName) }));
   }
 
+  /** The sources of the space a pivot can summarize (the sources module's), by their names and their columns' */
+  private spaceSources(): { name: string; columns: string[] }[] {
+    const offer = this.host.offered<SourcesOffer>("sources");
+    return [...(offer?.names() ?? [])]
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({ name, columns: (offer?.table(name)?.rows[0]?.cells ?? []).map(columnName) }));
+  }
+
   /** The tables of a page a pivot can summarize: named ones, not pivots */
   private namedIn(tables: readonly PageTable[]): { name: string; table: Table }[] {
     return tables.flatMap(({ table }) => {
@@ -376,6 +414,7 @@ export class Pivot implements Feature {
     const off = this.cells() ? undefined : FORMULAS_OFF;
     openPivotDialog(this.host, {
       sources,
+      spaceSources: this.spaceSources(),
       fields,
       submitLabel,
       submit,
@@ -501,8 +540,8 @@ export class Pivot implements Feature {
   }
 }
 
-/** A source as found: its table, why there is none, or the page it is on, not read yet */
-type Found = { readonly table: Table } | { readonly problem: string } | { readonly unread: string };
+/** A source as found: its table, why there is none, the page it is on, not read yet, or why a source of the space is not read */
+type Found = { readonly table: Table } | { readonly problem: string } | { readonly unread: string } | { readonly notRead: string };
 
 /** A column's id (its column's id in pivotOf: row:<group>, value:<value>, column:<key>|<value>, total:<value>) with its items as they are written now */
 function movedId(id: string, moved: ReadonlyMap<string, string>): string {

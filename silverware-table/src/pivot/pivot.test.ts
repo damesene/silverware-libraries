@@ -51,7 +51,10 @@ describe("a pivot's definition", () => {
     expect(sourceRef("[[Sales/2026]] orders")).toEqual({ page: "Sales/2026", name: "orders" });
     expect(sourceRef(" orders ")).toEqual({ name: "orders" });
     expect(sourceText({ page: "Sales/2026", name: "orders" })).toBe("[[Sales/2026]]orders");
-    expect(readDefinition((key) => ({ source: "[[Orders]]", rows: "region", values: "SUM([qty])" })[key as "source"])).toEqual({ problem: "its source names no table (pivot.source: orders, or [[Page]]orders on another page)" });
+    // A source of the space
+    expect(sourceRef(" @tasks")).toEqual({ name: "tasks", space: true });
+    expect(sourceText({ name: "tasks", space: true })).toBe("@tasks");
+    expect(readDefinition((key) => ({ source: "[[Orders]]", rows: "region", values: "SUM([qty])" })[key as "source"])).toEqual({ problem: "its source names no table (pivot.source: orders, [[Page]]orders on another page, or @tasks of the space)" });
     expect(readDefinition((key) => ({ source: "[[]]orders", rows: "region", values: "SUM([qty])" })[key as "source"])).toHaveProperty("problem");
   });
 

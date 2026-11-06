@@ -80,6 +80,22 @@ describe("sources in a page's formulas", () => {
     expect(text).toContain("| 2 <meta");
   });
 
+  it("a view of a source is out of date as it changes, Refresh view writing it anew", async () => {
+    const sources = memorySources({ tasks: TASKS });
+    const view = (body: string) => `| name | done |\n|---|---|\n${body}\n| <meta core.table view.formula='=FILTER(@tasks[#Data], @tasks[done] = "FALSE")'> |\n`;
+    await setup(view("| Test | FALSE |"), {}, {}, sources);
+    const refresh = () => {
+      cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      return document.querySelector<HTMLElement>('.swt-bar button[aria-label="Refresh view"]')!;
+    };
+    expect(refresh().classList.contains("swt-attention")).toBe(false);
+    sources.set("tasks", { ...TASKS, rows: [...TASKS.rows, ["Ship", "FALSE"]] });
+    expect(refresh().classList.contains("swt-attention")).toBe(true);
+    refresh().click();
+    await flush();
+    expect(text).toBe(view("| Test | FALSE |\n| Ship | FALSE |"));
+  });
+
   it("keeps the results written with the module off", async () => {
     const page = "| Open |\n|---|\n| 7 <meta formulas.f='=COUNTA(@tasks[name])'> |\n";
     await setup(page, { "silverware.table.modules.sources.enabled": false }, {}, memorySources({ tasks: TASKS }));

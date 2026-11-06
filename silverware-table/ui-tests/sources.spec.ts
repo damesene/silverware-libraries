@@ -2,7 +2,7 @@
 // read in formulas as @name. The playground has fixed sources (tasks, projects),
 // SilverBullet those a script of the test defines alike; a query's source read anew
 // as a page is indexed: SilverBullet only.
-import { cell, expect, markdown, reload, rendersAnew, setOtherPage, setPage, target, test } from "./helpers.ts";
+import { cell, expect, hoverCell, markdown, reload, rendersAnew, setOtherPage, setPage, tableIcon, target, test } from "./helpers.ts";
 
 // The playground's sources, as a script defines them in SilverBullet
 const SCRIPT = [
@@ -55,6 +55,24 @@ test.describe("Sources of the space", () => {
     });
     await expect(cell(page, 1, 0)).toHaveText("3");
     expect(await markdown(page)).toContain(`3 <meta formulas.f='=COUNTIFS(@tasks[done], "FALSE")'>`);
+  });
+
+  test("Insert pivot table… offers the space's sources as a group of their own, the pivot written of @tasks", async ({ page }) => {
+    await setPage(page, "# Pivots\n\n| Note |\n|---|\n| Tasks by page |\n");
+    await expect(cell(page, 1, 0)).toHaveText("Tasks by page");
+    await hoverCell(page, cell(page, 1, 0));
+    await (await tableIcon(page, "Insert pivot table…")).click();
+    const dialog = page.locator(".swt-pivot-dialog");
+    const source = dialog.locator('select[aria-label="Source"]');
+    await expect(source.locator('optgroup[label="Sources of the space"] option')).toHaveText(["@projects", "@tasks"]);
+    await source.selectOption("@tasks");
+    await dialog.locator('select[aria-label="Row 1 column"]').selectOption("page");
+    await dialog.locator('select[aria-label="Value 1 column"]').selectOption("name");
+    await dialog.locator('select[aria-label="Value 1 function"]').selectOption("COUNTA");
+    await expect(dialog.locator(".swt-pivot-table tr").nth(1)).toHaveText(/Projects\/Atlas\s*2/);
+    await dialog.locator(".swt-dialog-primary").click();
+    await expect.poll(() => markdown(page)).toContain("pivot.source='@tasks'");
+    await expect(cell(page, 1, 1, 1)).toHaveText("2");
   });
 
   test("a source from a query is read anew as a page is indexed: Recalculate highlighted, nothing written until it is pressed", async ({ page }) => {

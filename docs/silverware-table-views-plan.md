@@ -86,20 +86,20 @@ Builds on `silverware.table.defineChoices` (this branch's base, released with vi
 So a source does not copy it: **`defineChoices` becomes `defineSource`** (decided 2026-11-05; both unreleased, above). A list of the space is a source of one column, so there is one thing defined from Lua, one meaning of `@`, and no names shared between lists and sources that could clash. spacechoices.ts's way of reading (its Lua functions by name, refreshed, `stale`, `lastRead`, `said`) is the sources', what a function gives made rows instead of values. A source may give a plain list of values too (`select p.name`, as `defineChoices` takes today), read as one column named `value`:
 
 ```lua
-silverware.table.defineSource {
+silverware.table.defineSource({
   name = "projects",
   data = function() return query[[from p = index.tag "project" select p.name]] end,
-}
+})
 ```
 
 A choice column uses it through its table's list, written as a formula (below): what a column checks against is always in its table, never found by a name alone.
 
 ```lua
-silverware.table.defineSource {
+silverware.table.defineSource({
   name = "tasks",
   columns = { "name", "page", "due", "done" },
   data = function() return query[[from t = index.tag "task" select { name = t.name, page = t.page, due = t.due, done = t.done }]] end,
-}
+})
 ```
 
 (Written as one table, its function `data`, decided with the user on 2026-11-06 after step 4, in place of `defineSource(name, [options,] fn)`: options after a function read badly, and one table takes more keys as they come, as SilverBullet's `command.define` does. Not `query`: Space Lua reads `query = …` as its query syntax, a syntax error, seen in the local SilverBullet.)

@@ -388,18 +388,18 @@ The page's name in double brackets goes before the table's name: `[[Prices]]frui
 
 ### Sources of the space
 
-A script can give formulas a table of the space, built from a query: `silverware.table.defineSource { name, data, columns }` in a `space-lua` block of yours names it and the function that gives its rows, and formulas read it as `@name`:
+A script can give formulas a table of the space, built from a query: `silverware.table.defineSource({ name, data, columns })` in a `space-lua` block of yours names it and the function that gives its rows, and formulas read it as `@name`:
 
 ```lua
 local function tasks()
   return query[[from t = index.tag "task" select { name = t.name, page = t.page, due = t.due, done = t.done }]]
 end
 
-silverware.table.defineSource {
+silverware.table.defineSource({
   name = "tasks",
   columns = { "name", "page", "due", "done" },
   data = tasks,
-}
+})
 ```
 
 * `@tasks[due]` is a column of it, `@tasks` (or `@tasks[#Data]`) all its rows: `=COUNTIFS(@tasks[done], "FALSE")`, `=XLOOKUP([@id], @users[id], @users[email])`, a view `=FILTER(@tasks[#Data], @tasks[done] = "FALSE")`, a pivot of it (`pivot.source='@tasks'`, or *Sources of the space* in the pivot dialog's *Source*). A source has no cells to refer to (`@tasks!A1`) and no row of the formula's (`@tasks[@due]`): a query's rows have no fixed order.

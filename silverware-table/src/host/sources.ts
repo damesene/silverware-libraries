@@ -114,7 +114,7 @@ export class LuaSources implements SourceProvider {
   }
 
   /**
-   * `silverware.table.defineSource { name, data, columns }`: a source by its
+   * `silverware.table.defineSource({ name, data, columns })`: a source by its
    * name, its rows what the function `data` gives, `columns` (optional) its
    * columns; why not, else undefined (`query` would not do: Space Lua reads
    * `query = …` as its query syntax, a syntax error)

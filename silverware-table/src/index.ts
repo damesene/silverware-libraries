@@ -353,7 +353,7 @@ export function defineMenuEntries(definitions: unknown): string | undefined {
 }
 
 /**
- * `silverware.table.defineSource { name, data, columns }`: a source of the space, its rows what the Lua function `data`
+ * `silverware.table.defineSource({ name, data, columns })`: a source of the space, its rows what the Lua function `data`
  * gives (a query's), read now and again as SilverBullet indexes pages; formulas read it as `@name`. Why not,
  * for a notification
  */

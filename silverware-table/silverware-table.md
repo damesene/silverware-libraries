@@ -409,6 +409,7 @@ silverware.table.defineSource({
 * The function runs when Space Lua loads, and again a moment after SilverBullet indexes a page, so the source follows the space. Nothing is written by it: a table whose formulas read a source that changed has *Recalculate* highlighted, a view or pivot of it *Out of date*; click to write the new results. A function that fails, or returns no list, is shown in a notification (once, until the problem changes); the source keeps the rows it had.
 * While a source has not run yet (or with the `sources` module off), formulas reading it keep the results they have; a source no script defines is `#REF!`.
 * `@` typed in a formula offers the sources, and `@tasks[` their columns. In an Excel file a formula reading a source is written as its value.
+* A `#choice` column can take its values from a source: see [[#Choices]].
 * `silverware.table.evaluate` reads sources too, but a `${…}` is not shown anew as a source changes (it follows the pages it read): it shows the source as it was when it was rendered.
 
 ### Operators and values
@@ -726,7 +727,20 @@ A `#choice` column takes one of a list of values, as a status column (open, in p
 | <meta core.table columntypes.choice.status='["open","in progress","done"]'> |
 ```
 
-* Picking *Choice* in the *Type* menu opens the *Choices* dialog (so does the pencil in the column's *Type: Choice* row). Its row at the top picks where the values come from, what each does in a line under it: *Column's values* makes it `#choice`, which offers the values the column has and checks nothing; *Own list* sets up a list: its name, and its values one a line (dragged by the ⠿ left of each, or Alt+↑ ↓, to order them, Enter for a new one, *Take values from the column* to add those the column has). A new list starts with the column's values and is named after the column. Lists are kept in the table's metadata, so saving one needs the *Store table metadata* setting. Nothing changes until Save.
+* Picking *Choice* in the *Type* menu opens the *Choices* dialog (so does the pencil in the column's *Type: Choice* row). Its row at the top picks where the values come from, what each does in a line under it: *Column's values* makes it `#choice`, which offers the values the column has and checks nothing; *Own list* sets up a list: its name, and its values one a line (dragged by the ⠿ left of each, or Alt+↑ ↓, to order them, Enter for a new one, *Take values from the column* to add those the column has). A new list starts with the column's values and is named after the column; *Source* and *Formula* make it of a formula (below). Lists are kept in the table's metadata, so saving one needs the *Store table metadata* setting. Nothing changes until Save.
+* A list can be made by a formula instead of values typed: *Source* picks a source of the space ([[#Sources of the space]]; where it has several columns, which one), *Formula* takes a formula of your own (`=SORT(UNIQUE(tasks![status]))`, `=FILTER(@users[name], @users[active])`), and the dialog shows the values it gives as you pick or type. The table keeps the formula as the list (`columntypes.choice.projects='=@projects'`), so it says where its values come from, read in its markdown with no script known:
+
+  ```markdown
+  | Task | Project #choice-projects |
+  |------|--------------------------|
+  | A    | Atlas                    |
+  | <meta core.table columntypes.choice.projects='=@projects'> |
+  ```
+
+  * Its values are the formula's result as the column shows (nothing is written): a list, or a table of one column, in its order (sort it with `SORT(…)`), empty ones and repeats left out (whatever their case), numbers and `TRUE` / `FALSE` as cells show them. It follows what it reads: a source read anew, another table of the page edited.
+  * A result that is an error, or a table of several columns, checks nothing: the column's type icon says why in its tooltip, so does the dialog. So does a list whose formula reads a source not read yet, or with the `formulas` module off.
+  * Renaming a column or table of the page the formula reads, with Silverware Table, changes the formula with it, in the same edit.
+  * In the *Type* menu such a list is under *Choice* as any other, its formula in its tooltip (`=@projects · Used by Project`).
 * Renaming a value in the *Choices* dialog renames it in the cells of every column that takes the list; renaming the list renames it in their headers. A value removed from the list stays in its cells, marked.
 * The cell editor offers the list's values; a value not in the list is kept as typed and marked in red. Values match whatever their case.
 * Sorting by the column puts the values in the list's order (open, in progress, done), not the alphabet's.
@@ -1251,7 +1265,7 @@ Each module can be turned off with `enabled = false`, e.g. `config.set("silverwa
 | `formulas` | Formulas can be typed into cells, with their help and references; *Recalculate* in the toolbar; every edit recalculates the table and the tables referring to it, and references follow moved rows and columns. Off: nothing is recalculated, results stay as written, and references do not follow moves. A typed formula is saved as text; a formula cell edited, pasted over or emptied keeps its formula (hidden), which is used again once formulas are on. See [[#Formulas]]. |
 | `names` | Tables, columns, rows and cells can be named: the pencil in the title of a table's ⋯ menu, a column's, a row's or a cell's menu; named headers and cells show a mark. Off: none of these, and no marks; names already in tables are kept and formulas still use them, but a duplicated row copies them too. See [[#Table names]]. |
 | `pageLinks` | Formulas can refer to tables and named cells on other pages (`[[Prices]]fruit!B2`), which Silverware Table reads for them. Off: it reads no other page; formulas that refer to one keep the results they have (the formulas using them too), a new one shows `#REF!`. It needs the `formulas` module. See [[#Tables on other pages]]. |
-| `sources` | Formulas, views and pivots read the sources of the space a script gives (`silverware.table.defineSource`, read as `@tasks`). Off: no source is read; formulas, views and pivots reading one keep what they show. See [[#Sources of the space]]. |
+| `sources` | Formulas, views, pivots and choice lists read the sources of the space a script gives (`silverware.table.defineSource`, read as `@tasks`). Off: no source is read; formulas, views and pivots reading one keep what they show, a choice list of one checks nothing. See [[#Sources of the space]]. |
 | `filters` | Rows can be filtered: the toolbar's filter icon shows a filter field under each header, *Filter* in a column menu opens that column's filter, *Filter: = value* in the cell menu filters by a cell's value; with *Store table metadata* the filters are stored in the table. Its setting `smart` (default `true`): fields understand `>10`, `/pattern/`, `=text`, `a\|b` and `!filter`; `false`: everything typed is text to find. Off: no filtering; filters stored in a table are kept but not used. See [[#Filtering]]. |
 | `columnTypes` | A header's type hashtag formats its column, the cell editor offers the type's values, and the column menu has *Type*. Off: cells show as written. See [[#Column types]]. |
 | `conditions` | Conditional formatting: rules that color cells by their values, from a column's menu and the table's ⋯ menu; a table with rules shows their icon in its toolbar. Off: cells look as they are; rules stored in tables are kept but not used. See [[#Conditional formatting]]. |

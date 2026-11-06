@@ -46,8 +46,6 @@ import { openConditionsDialog, type RuleSample, type ScopeColumn } from "./condi
 // How a formula condition refers to cells, under its field out of a function: one line
 const CONDITION_REFERENCES = { syntax: "[@column] · [column] · table![column] · cell_name", description: "The row's cell of a column, a whole column, another table's column, a named cell." };
 
-// What each kind of choice is, beside it in a formula's list
-
 // The lines of a rule's preview (a whole table's rule column by column: one a column)
 const PREVIEW_LINES = 6;
 

@@ -281,6 +281,18 @@ config.define("silverware.table", {
             },
           },
         },
+        view = {
+          type = "object",
+          additionalProperties = false,
+          properties = {
+            enabled = {
+              type = "boolean",
+              default = true,
+              description = "Tables made by one formula (view.formula in their metadata row: FILTER, SORT, UNIQUE…), calculated anew with each edit of what they read.",
+              ui = { category = "Silverware Table: Modules", label = "Views", priority = 4.9 },
+            },
+          },
+        },
         conditions = {
           type = "object",
           additionalProperties = false,

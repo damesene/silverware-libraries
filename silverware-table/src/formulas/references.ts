@@ -234,10 +234,8 @@ export function referredPages(cells: FormulaCells, table: Table): Set<string> {
 
 /** The other pages a formula refers to */
 export function formulaPages(formula: string): string[] {
-  return [
-    ...references(formula).flatMap((ref) => (ref.table?.page ? [ref.table.page] : [])),
-    ...namedReferences(formula).flatMap((ref) => (ref.page ? [ref.page] : ref.table?.page ? [ref.table.page] : [])),
-  ];
+  // A table's token ([[Page]]prices!, before a cell, a column, a name or [#Data]), or a name of the page alone ([[Page]]vat)
+  return tokenize(formula).tokens.flatMap((token) => ((token.kind === "table" || token.kind === "named") && token.page !== undefined ? [token.page] : []));
 }
 
 /**

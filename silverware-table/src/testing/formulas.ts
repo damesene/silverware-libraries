@@ -8,7 +8,8 @@ import * as page from "../formulas/page.ts";
 import { type ExcelTable, excelFormula as excelFormulaOf } from "../excel/formulas.ts";
 import type { ExcelTemplates } from "../excel/functions.ts";
 import type { OtherPages, PageTable, Table } from "../markdown.ts";
-import { attributeName, metaName } from "../meta.ts";
+import { attributeName, metaName, metaPins, metaValue, withMetaPins } from "../meta.ts";
+import { calculatedTable, viewCalculated } from "../calculated/index.ts";
 import { cellNamesIn, rowNamesIn, withCellName } from "../names.ts";
 import { tagValue, withTagValue } from "../tagvalues.ts";
 
@@ -16,6 +17,15 @@ type IndexMap = domain.IndexMap;
 type TableSource = domain.TableSource;
 
 export const CELLS: domain.FormulaCells = formulaCellsOf({ get: (cell, key) => tagValue(cell, attributeName("formulas", key)), with: (cell, key, value) => withTagValue(cell, attributeName("formulas", key), value) }, { rowNames: rowNamesIn, cellNames: cellNamesIn });
+
+// The cells with views as the view module keeps them (view.formula in the metadata row), written with no header renamed
+export const VIEW_CELLS: domain.FormulaCells = {
+  ...CELLS,
+  view: {
+    formulaOf: (table) => metaValue(table, "view", "formula"),
+    written: (table, result) => calculatedTable(table, viewCalculated(result), {}, { pinsOf: metaPins, withPins: withMetaPins }),
+  },
+};
 
 const named = (tables: readonly PageTable[]) => tables.map((t) => ({ ...t, name: metaName(t.table) }));
 

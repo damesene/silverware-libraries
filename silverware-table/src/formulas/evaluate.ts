@@ -12,6 +12,7 @@ import { type Area, areaText, cellName, formulaPages, referencedColumn, type Tab
 import { takesGrids } from "./function.ts";
 import { functionNamed } from "./registry.ts";
 import {
+  asGrid,
   asTime,
   asValue,
   cellValue,
@@ -50,11 +51,19 @@ export type TableSource = ((name: string, page?: string) => Table | undefined) &
 /** Where a named cell is: its table (and the table's name, if it has one), and its row (of the markdown, header 0) and column */
 export type NamedCell = { readonly table: Table; readonly tableName?: string; readonly row: number; readonly column: number };
 
-/** The sheets of the tables formulas refer to, each made once: their results are computed once too */
+/**
+ * The sheets of the tables formulas refer to, each made once: their results
+ * are computed once too. A view (a table whose body is its formula's result)
+ * is read as calculated now, as its module would write it: a table reading it
+ * follows its sources in the same calculation; one that cannot be calculated
+ * is its error.
+ */
 class Book {
-  private readonly sheets = new Map<string, Sheet>();
+  private readonly sheets = new Map<string, Sheet | FormulaError>();
   // The sheets by table, whether reached by the table's name or a named cell's
-  private readonly tableSheets = new Map<Table, Sheet>();
+  private readonly tableSheets = new Map<Table, Sheet | FormulaError>();
+  // The views being calculated: one reached again depends on its own result
+  private readonly calculating = new Set<Table>();
   constructor(
     readonly cells: FormulaCells,
     private readonly source: TableSource | undefined,
@@ -74,14 +83,42 @@ class Book {
     return first ? [first] : [];
   }
 
-  /** The table's sheet, made on its first use (by its name or by a named cell's) */
-  private sheetOf(table: Table, page: string | undefined, name: string): Sheet {
+  /** The table's sheet, made on its first use (by its name or by a named cell's); a view's as calculated now, or its error */
+  private sheetOf(table: Table, page: string | undefined, name: string): Sheet | FormulaError {
     let sheet = this.tableSheets.get(table);
     if (!sheet) {
-      sheet = new Sheet(table, this, page, name);
-      this.tableSheets.set(table, sheet);
+      const formula = this.cells.view?.formulaOf(table);
+      const result = formula === undefined ? undefined : this.viewResult(table, page, name, formula);
+      sheet = isError(result)
+        ? new FormulaError(result.code, `the view ${name} cannot be calculated: ${result.detail}`)
+        : new Sheet(result ? this.cells.view!.written(table, result) : table, this, page, name);
+      // (A view on the way to itself is no sheet yet: its cycle is the calculation's, not kept)
+      if (!this.calculating.has(table)) this.tableSheets.set(table, sheet);
     }
     return sheet;
+  }
+
+  /**
+   * A view's formula calculated, its table `table` (on `page`, named `name`):
+   * its result as a grid (one value a cell, a list a column), or why it cannot
+   * be. Undefined where it reads a page formulas may not read: the view keeps
+   * what it shows. A view reached again while it is calculated (it reads
+   * itself, two views read each other) is #CYCLE!.
+   */
+  viewResult(table: Table, page: string | undefined, name: string | undefined, formula: string): Grid | FormulaError | undefined {
+    const written = formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`;
+    if (this.keepsResult(written)) return undefined;
+    if (this.calculating.has(table)) return new FormulaError("#CYCLE!", `${name ? `the view ${name}` : "the view"} depends on its own result`);
+    this.calculating.add(table);
+    try {
+      const own = new FormulaError("#CYCLE!", `${name ? `the view ${name}` : "a view"} cannot read itself: its cells are its formula's result`);
+      const result = new Sheet(table, this, page, name, own).whole(written);
+      if (isError(result)) return result;
+      const grid = asGrid(result);
+      return grid.width === 0 ? new FormulaError("#CALC!", "the result has no columns") : grid;
+    } finally {
+      this.calculating.delete(table);
+    }
   }
 
   /** The sheet a reference from `from` is to: the other table, or `from` itself when it is named so */
@@ -94,7 +131,7 @@ class Book {
       const table = this.source?.(ref.name, page);
       if (!table) return new FormulaError("#REF!", `there is no table named ${ref.name}${page === undefined ? " on this page" : ` on ${page}`}`);
       sheet = this.sheetOf(table, page, ref.name);
-      this.sheets.set(key, sheet);
+      if (!this.calculating.has(table)) this.sheets.set(key, sheet);
     }
     return sheet;
   }
@@ -145,6 +182,8 @@ class Sheet {
     private readonly book: Book,
     readonly page?: string,
     name?: string,
+    // A view being calculated: what its formula reads of its own table, its error (its cells are the result)
+    private readonly ownError?: FormulaError,
   ) {
     this.name = name?.trim() || undefined;
     this.headers = table.rows[0]?.cells ?? [];
@@ -247,6 +286,12 @@ class Sheet {
   standalone(formula: string): Value {
     const tree = parse(formula);
     return isError(tree) ? tree : asValue(this.evaluate(tree, 0, 0));
+  }
+
+  /** A formula's whole result in none of the table's cells, a grid as it is: a view's */
+  whole(formula: string): Result {
+    const tree = parse(formula);
+    return isError(tree) ? tree : this.evaluate(tree, 0, 0);
   }
 
   /** The result of a cell's formula as it is, a grid too: what a cell showing #SPILL! holds (Show result) */
@@ -368,8 +413,10 @@ class Sheet {
     }
     if (node.page === undefined || node.page === this.page) {
       const own = this.cellNamed(node.name);
+      const named = own ? undefined : this.rowNamed(node.name);
+      // A view's own cell or row, while it is calculated: its cells are the result
+      if (this.ownError && (own || named !== undefined)) return this.ownError;
       if (own) return this.value(own.row, own.column);
-      const named = this.rowNamed(node.name);
       if (named !== undefined) return this.rowValues(named);
     }
     return new FormulaError("#NAME?", this.namedElsewhere(node.name, node.page));
@@ -428,7 +475,9 @@ class Sheet {
 
   /** The sheet a reference's table is: this one, or another the book has */
   private sheetOf(table: TableRef | undefined): Sheet | FormulaError {
-    return table ? this.book.sheet(table, this) : this;
+    const sheet = table ? this.book.sheet(table, this) : this;
+    // A view's formula reading its own table: its cells are what is being calculated
+    return sheet === this && this.ownError ? this.ownError : sheet;
   }
 
   /**
@@ -696,6 +745,17 @@ export function cellWholeResult(table: Table, row: number, column: number, { cel
   const stored = row > 0 ? cells.formulaOf(table.rows[row]?.cells[column] ?? "") : undefined;
   if (!stored) return undefined;
   return new Sheet(table, new Book(cells, tables), undefined, name).wholeResult(row - 1, column, stored.formula);
+}
+
+/**
+ * A view's body as its formula makes it now (`cells.view`): a grid (one
+ * value a cell, a list a column), or why it cannot be calculated (an error:
+ * the view is written as it was). Undefined where the table is no view, or
+ * its formula reads a page formulas may not read (it keeps what it shows).
+ */
+export function viewResult(table: Table, { cells, tables, name }: Calculation): Grid | FormulaError | undefined {
+  const formula = cells.view?.formulaOf(table);
+  return formula === undefined ? undefined : new Book(cells, tables).viewResult(table, undefined, name, formula);
 }
 
 /** A value as a cell shows it: an error by its code */

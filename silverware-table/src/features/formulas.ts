@@ -10,7 +10,7 @@
 // formula/; this is the module around it.) Turned off, nothing is
 // recalculated: results stay as written.
 
-import { columnIdOf } from "../columns.ts";
+import { columnIdOf, columnName } from "../columns.ts";
 import { CELL_MENU_ORDER } from "../core/feature.ts";
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
 import type {
@@ -75,6 +75,8 @@ import {
   REF_ERROR,
   type TableSource,
   type Value,
+  viewResult,
+  type ViewsOffer,
   withAreasWritten,
   withColumnKeys,
   writtenArea,
@@ -235,10 +237,17 @@ export class Formulas implements Feature {
     // One of the core's floating elements: a press on it is on Silverware Table's controls, not the page
     const floating = host.floating("div", "swt-result-holder");
     floating.append(this.resultButton);
-    this.cells = formulaCellsOf(
-      { get: (cell, key) => host.getCellTag(cell, key), with: (cell, key, value) => host.withCellTag(cell, key, value) },
-      { rowNames: (table) => host.rowNames(table), cellNames: (table) => host.cellNames(table) },
-    );
+    this.cells = {
+      ...formulaCellsOf(
+        { get: (cell, key) => host.getCellTag(cell, key), with: (cell, key, value) => host.withCellTag(cell, key, value) },
+        { rowNames: (table) => host.rowNames(table), cellNames: (table) => host.cellNames(table) },
+      ),
+      // Views are the views module's (asked each time: it starts after this one); without it no table is one
+      view: {
+        formulaOf: (table) => this.views()?.viewFormula(table),
+        written: (table, result) => this.views()?.written(table, result) ?? table,
+      },
+    };
     host.offer({
       cells: this.cells,
       evaluate: (formula, text, page) => this.evaluate(formula, text, page),
@@ -302,6 +311,11 @@ export class Formulas implements Feature {
     return { errors, pages };
   }
 
+  /** The views module's offer, while it is on */
+  private views(): ViewsOffer | undefined {
+    return this.host.offered<ViewsOffer>("view");
+  }
+
   /** A table's name, by which formulas refer to it */
   private nameOf(table: Table): string | undefined {
     return this.host.tableName(table);
@@ -344,7 +358,16 @@ export class Formulas implements Feature {
   writeStep(before: Table, after: Table, edit: WriteEdit): Table {
     const { page } = edit;
     const tables = pageTables(this.cells, () => this.named(page.tables), this.host.currentPage, { from: page.from, table: after, name: this.nameOf(after) }, this.namedOthers(this.host.otherPages()));
-    return formulasAfterEdit(before, after, { ...edit, tables, cells: this.cells, names: { before: this.nameOf(before), after: this.nameOf(after) } });
+    const edited = formulasAfterEdit(before, after, { ...edit, tables, cells: this.cells, names: { before: this.nameOf(before), after: this.nameOf(after) } });
+    // A view written (its Refresh, its formula changed): its body calculated anew; one that cannot be stays as it was
+    return this.viewWritten(edited, tables, { before });
+  }
+
+  /** A view with its result as calculated now (`tables` the page's as written), else the table as it is */
+  private viewWritten(table: Table, tables: TableSource, options: { readonly before?: Table; readonly renamed?: ReadonlyMap<string, string> }): Table {
+    const views = this.views();
+    const result = views && viewResult(table, { cells: this.cells, tables, name: this.nameOf(table) });
+    return views && result && !(result instanceof FormulaError) ? views.written(table, result, options) : table;
   }
 
   /**
@@ -355,10 +378,9 @@ export class Formulas implements Feature {
    */
   otherTablesWritten(before: Table, after: Table | undefined, edit: WriteEdit): readonly PageTable[] {
     const { page } = edit;
-    // Deleted (no `after`): the page without it, so what refers to it is #REF!
-    const now = after
-      ? pageTables(this.cells, () => this.named(page.tables), this.host.currentPage, { from: page.from, table: after, name: this.nameOf(after) }, this.namedOthers(this.host.otherPages()))
-      : pageTables(this.cells, () => this.named(page.tables.filter((t) => t.range.from !== page.from)), this.host.currentPage, undefined, this.namedOthers(this.host.otherPages()));
+    const views = this.views();
+    // The edited table's columns renamed (old name → new): a view's header named after one stays the user's
+    const renamed = after ? renamedColumns(before, after, edit.columnMap) : new Map<string, string>();
     // Its name and the names of its cells, before and after the edit, and in turn those of the tables that refer to them
     const affected = after ? affectedBy(this.nameOf(before), this.nameOf(after)) : affectedBy(this.nameOf(before));
     const oldName = this.nameOf(before)?.toLowerCase();
@@ -366,21 +388,39 @@ export class Formulas implements Feature {
     // the markdown, is the one they use): else they stay as they are, only recalculated
     const firstOfName = oldName && page.tables.find((t) => this.nameOf(t.table)?.toLowerCase() === oldName)?.range.from === page.from;
     // What each other table refers to, read once for all the passes below
-    const others = page.tables.filter((other) => other.range.from !== page.from).map((other) => ({ ...other, referred: referredBy(this.cells, other.table) }));
-    const written: PageTable[] = [];
+    const rest = page.tables.filter((other) => other.range.from !== page.from).map((other) => ({ ...other, referred: referredBy(this.cells, other.table) }));
+    const following = { cells: this.cells, rowMap: edit.rowMap, columnMap: edit.columnMap, names: { before: this.nameOf(before), after: after && this.nameOf(after) } };
+    // First every table the edit affects, its references to the edited table following it (a view's formula too):
+    // what one reads of another is then as the edit leaves it, whichever is calculated first
+    const affectedTables: { range: PageTable["range"]; table: Table; followed: Table; follows: boolean }[] = [];
     for (let found = true; found; ) {
       found = false;
-      for (let i = others.length - 1; i >= 0; i--) {
-        const { range, table, referred } = others[i]!;
+      for (let i = rest.length - 1; i >= 0; i--) {
+        const { range, table, referred } = rest[i]!;
         if (!isAffected(referred, affected)) continue;
-        others.splice(i, 1);
+        rest.splice(i, 1);
         found = true;
         addAffected(affected, this.nameOf(table));
         // Its references to this table follow the edit: moved rows and columns, a new name
-        const followed = after && oldName && firstOfName && referred.tables.has(oldName) ? followTable(table, before, after, { cells: this.cells, rowMap: edit.rowMap, columnMap: edit.columnMap, names: { before: this.nameOf(before), after: this.nameOf(after) } }) : table;
-        const recalculated = recalculate(followed, { cells: this.cells, tables: now, name: this.nameOf(followed) });
-        if (recalculated !== table) written.push({ range, table: recalculated });
+        const follows = !!after && !!oldName && !!firstOfName && referred.tables.has(oldName);
+        let followed = follows ? followTable(table, before, after!, following) : table;
+        const view = follows ? views?.viewFormula(followed) : undefined;
+        if (view !== undefined) {
+          const formula = followFormula(view, before, after!, following);
+          if (formula !== view) followed = views!.withViewFormula(followed, formula);
+        }
+        affectedTables.push({ range, table, followed, follows });
       }
+    }
+    // Then each calculated over the page as followed (a view read by another calculated by the formulas as it is now)
+    const followedAt = new Map(affectedTables.map((t) => [t.range.from, t.followed]));
+    // Deleted (no `after`): the page without it, so what refers to it is #REF!
+    const tables = page.tables.filter((t) => after || t.range.from !== page.from).map((t) => (followedAt.has(t.range.from) ? { ...t, table: followedAt.get(t.range.from)! } : t));
+    const now = pageTables(this.cells, () => this.named(tables), this.host.currentPage, after ? { from: page.from, table: after, name: this.nameOf(after) } : undefined, this.namedOthers(this.host.otherPages()));
+    const written: PageTable[] = [];
+    for (const { range, table, followed, follows } of affectedTables) {
+      const recalculated = this.viewWritten(recalculate(followed, { cells: this.cells, tables: now, name: this.nameOf(followed) }), now, follows ? { renamed } : {});
+      if (!sameTable(recalculated, table)) written.push({ range, table: recalculated });
     }
     return written;
   }
@@ -1492,6 +1532,32 @@ export class Formulas implements Feature {
       this.stopReferenceDrag = undefined;
     };
   }
+}
+
+/** Whether a table is written as it was: the same object, or the same cells, alignment and metadata (a view calculated anew to what it shows) */
+function sameTable(a: Table, b: Table): boolean {
+  if (a === b) return true;
+  return (
+    a.meta === b.meta &&
+    a.align.length === b.align.length &&
+    a.align.every((align, i) => align === b.align[i]) &&
+    a.rows.length === b.rows.length &&
+    a.rows.every((row, r) => row.cells.length === b.rows[r]!.cells.length && row.cells.every((cell, c) => cell === b.rows[r]!.cells[c]))
+  );
+}
+
+/** The columns an edit renamed: each one's name before → after (columnName, as a view names its columns), where they differ */
+function renamedColumns(before: Table, after: Table, columnMap: ((column: number) => number | undefined) | undefined): Map<string, string> {
+  const renamed = new Map<string, string>();
+  const was = before.rows[0]?.cells ?? [];
+  const now = after.rows[0]?.cells ?? [];
+  was.forEach((cell, c) => {
+    const to = columnMap ? columnMap(c) : c;
+    const from = columnName(cell);
+    const name = to === undefined || now[to] === undefined ? undefined : columnName(now[to]!);
+    if (from && name && from !== name) renamed.set(from, name);
+  });
+  return renamed;
 }
 
 /** A cell's hidden tags read and written by an attribute's name (the core's: the module's host gives them) */

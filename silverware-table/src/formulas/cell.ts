@@ -31,6 +31,17 @@ export type FormulaCells = {
   readonly rowNames: (table: Table) => readonly RowName[];
   /** A table's named body cells, in their order (the first of a name counts) */
   readonly cellNames: (table: Table) => readonly CellNameAt[];
+  /**
+   * Views: tables whose body is one formula's result (the views module's).
+   * `formulaOf` a table's formula, undefined for a table that is no view;
+   * `written` the view with a result written as its module writes it (its
+   * headers, the names the user gave them kept), so formulas read a view
+   * calculated now as they would read it written. None: no table is a view.
+   */
+  readonly view?: {
+    readonly formulaOf: (table: Table) => string | undefined;
+    readonly written: (table: Table, result: import("./values.ts").Grid) => Table;
+  };
 };
 
 /** A table's named rows by their names (lowercase), the first row of each name; rows of the markdown (header 0) */
@@ -87,7 +98,10 @@ export function formulaCount(cells: FormulaCells, table: Table): number {
   return table.rows.reduce((n, row, r) => n + (r === 0 ? 0 : row.cells.filter((cell) => cells.formulaOf(cell)).length), 0);
 }
 
+/** Each formula of a table: its cells', and a view's own (what the table refers to and calls, as its cells' formulas do) */
 export function forFormulas(cells: FormulaCells, table: Table, each: (formula: string) => void): void {
+  const view = cells.view?.formulaOf(table);
+  if (view !== undefined) each(view);
   table.rows.forEach((row, r) => {
     if (r === 0) return;
     for (const cell of row.cells) {

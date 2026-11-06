@@ -154,7 +154,7 @@ Each a branch's worth, with its tests (unit tests of the evaluation, UI scenario
    * **Once views are done**: tell the user about the pivot's gap (a table reading a pivot is recalculated only by its own next write, *A view is calculated by the formulas, in their order*), for them to decide whether to mend it (the pivot calculated by the formulas as a view is).
 4. **Sources from Space Lua**: `defineChoices` made `defineSource` (spacechoices.ts's reading moved to `host/sources.ts` behind `SourceProvider`, rows instead of values, a plain list one column `value`), the `sources` module offering them, `columntypes/spacelists.ts` gone, `@name` in formulas, the pivot's source.
 5. **A choice list made by a formula**: `columntypes.choice.<name>='=…'`, a list from Space Lua written so by the Choices dialog, the space's lists no longer found by a header's name alone.
-6. **More functions**: `VSTACK`, `HSTACK`, `SEQUENCE`, `GROUPBY`, `PIVOTBY`.
+6. **More functions**: `VSTACK`, `HSTACK`, `SEQUENCE` first (*Step 6: before it starts*); `GROUPBY`, `PIVOTBY` later, on a branch of their own.
 
 ## Step 4: before it starts (written 2026-11-06, for a session starting afresh)
 
@@ -238,3 +238,30 @@ Binding for step 5, as *Step 4: decided* was for step 4; not to be opened again.
 1. **A list's formula follows its tables**: renames and moves of the page's tables and columns it reads (`people![name]` → `people![full_name]`, `people!` renamed), as a cell's or a view's formula follows them, in the same edit; a source (`@users`) is renamed by no edit, and another page's tables are followed nowhere. The column types module offers its lists' formulas and writes them back, as the view module offers its formula (`follow`): else a column renamed would leave the list checking nothing, unseen.
 2. **What a list is made of its result**: the values in the result's order (the user sorts with `SORT(…)`; the column sorts in the list's order, as an own list's), empty ones left out, duplicates left out whatever their case (the first kept), as values are matched; numbers and logical values as a cell shows them (`TRUE`, `FALSE`). A result that is an error: the column checks nothing, its header's title and the Choices dialog saying why.
 3. **In the Type menu**: a formula list is under *Choice* as an own list is (*Choice: projects*, taken for the column, deleted, asked first where columns take it), its hint showing the formula (`=@projects · Used by Project`), so lists are one kind that differ only in where their values come from.
+
+## Step 6: before it starts (written 2026-11-06, for a session starting afresh)
+
+**State**: branch `feat/views`, steps 1 to 5 done and committed (nothing pushed; released with the choices). `npm run verify` and `npm run test:ui` pass. Step 5 as built: *Step 5 done* in the status at the top, CLAUDE.md (Layout: features/choicesdialog.ts, columntypes/choicelists.ts, formulas/cell.ts `HeldFormulas`; *A choice list made by a formula* under *Design decisions*).
+
+**Scope, decided with the user on 2026-11-06**: `HSTACK`, `VSTACK` and `SEQUENCE` now; `GROUPBY` and `PIVOTBY` later, on a branch of their own. They take a function as an argument (`GROUPBY(…, …, COUNTA)`, Excel's `LAMBDA`), which the formulas have no value for (the parser and the evaluator would need one), and how they stand to the pivot module is to be decided: a round of decisions of their own. Once the three are done, `feat/views` goes to main with the choices.
+
+**Why these three first**: a view's body is one formula's result, so a column calculated beside a source's columns needs `HSTACK`. The user's case, a view of open tasks whose page is a link:
+
+```
+=HSTACK(CHOOSECOLS(FILTER(@tasks[#Data], @tasks[done] = "FALSE"), 1), "[[" & FILTER(@tasks[page], @tasks[done] = "FALSE") & "]]")
+```
+
+A view writes its cells as markdown (`calculatedTable` escapes `|` alone), so `[[Projects/Atlas]]` shows as a link in SilverBullet.
+
+**What each needs** (tests require the first three):
+* One file in formulas/builtin/, listed in builtin/index.ts, a `GridFunction` (`grids: true`) as `TAKE`, `CHOOSECOLS`, `SORTBY` are (what they share is in formulas/grids.ts); its `syntax`, `description`, `category` and `example` (read by the parser).
+* A row in the library page's Functions table.
+* Its Excel form decided in excel/functions.ts (`SAME_IN_EXCEL` or `EXCEL_FUNCTIONS`): the seven functions of step 1 are written as their values (Excel 365's only, *Status*), so these as well.
+* Excel 365's behaviour: `HSTACK` and `VSTACK` pad a shorter array with `#N/A`; `SEQUENCE(rows, [columns], [start], [step])`. The columns' names (`Grid.names`, what a view's headers are named after): `HSTACK` keeps each part's, `VSTACK` the first part's, `SEQUENCE` none (letters).
+* Tests: unit tests of the functions and of a view of them (formulas/views.test.ts); a UI scenario in ui-tests/views.spec.ts (a view of `HSTACK`, its headers by its parts' columns).
+
+**Open questions** (to ask the user, not to decide alone): anything Excel and this plan leave open, e.g. a part of `VSTACK` with other columns' names than the first's, `SEQUENCE` of 0 rows (Excel: `#CALC!`), `#N/A` padding shown in a view.
+
+**Checks by hand**: in the local SilverBullet (the memory `local-silverbullet-wsl`: one instance only, container `sw-step4`, port 3010; deploy with it stopped; pages changed only through its editor): the view above on SourcesTest (links clickable, headers by the source), a `VSTACK` of two tables, `SEQUENCE` in a cell (`#SPILL!`, Show result) and in a view.
+
+**Working notes for this machine**: shell heredocs mangle `\n` and backslashes, so write scripts to a file with the editor tool; Python writes LF only with `newline=""`; run vitest from `D:\` (not `d:\`); Node's locale is cs-CZ (a `localeCompare` without a locale sorts CH after H); Playwright imported by `file:///D:/git/silverbullet-libraries/node_modules/playwright/index.mjs`, SilverBullet at `http://127.0.0.1:3010/`; WSL sleeps when idle: keep `wsl -e sleep 86400` running in the background.

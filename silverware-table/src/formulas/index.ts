@@ -118,7 +118,7 @@ export type HeldFormulasOffer = {
   /** The formulas a table holds so, and how they are written back; undefined where it holds none */
   readonly held: (table: import("../markdown.ts").Table) => import("./cell.ts").HeldFormulas | undefined;
 };
-export { type Area, areaText, callsCustomFunctions, callsPureFunctionsOnly, columnIdText, formulaPages, formulaTableNames, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, formulaSources, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredSources, referredTableNames, sourceFormulaOf, sourceRefText, type SourceRef, type TableRef, withColumnKeys } from "./references.ts";
+export { type Area, areaText, callsCustomFunctions, callsPureFunctionsOnly, columnIdText, formulaPages, formulaTableNames, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, formulaSources, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredSources, referredTableNames, type SourceRef, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";
 export { type Calculation, cellWholeResult, evaluateFormula, formulaErrors, givesList, listResult, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows, calculatedNow, viewGrid, viewResult } from "./evaluate.ts";
 export { type Node as FormulaNode, parse as parseFormula } from "./parser.ts";

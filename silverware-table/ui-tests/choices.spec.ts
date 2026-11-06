@@ -156,39 +156,25 @@ test.describe("Choices", () => {
 
     const PROJECTS = ["| Task | Project |", "|---|---|", "| A | Atlas |", "| B | Delta |", ""].join("\n");
 
-    test("a source picked over the formula writes its formula: the column checks its values, the editor offers them", async ({ page }) => {
+    test("a source's formula typed (@ offering the sources): the column checks its values, the editor offers them", async ({ page }) => {
       await load(page, PROJECTS, 2);
       await pickChoice(page);
       await dialog(page).getByRole("radio", { name: /^Formula$/ }).check();
-      await dialog(page).getByRole("combobox", { name: "Source", exact: true }).selectOption("projects");
-      await expect(dialog(page).locator(".swt-choices-name")).toHaveValue("projects");
-      await expect(dialog(page).getByLabel("Source's column")).toBeHidden();
-      await expect(dialog(page).getByRole("textbox", { name: "Formula" })).toHaveValue("=@projects");
+      const field = dialog(page).getByRole("textbox", { name: "Formula" });
+      await field.click();
+      await page.keyboard.type("=@");
+      await expect(dialog(page).locator(".swt-formulafield-choice-name")).toHaveText(["@projects", "@tasks"]);
+      await page.keyboard.type("projects");
       await expect(dialog(page).locator(".swt-choices-readonly")).toHaveText(["Atlas", "Beacon", "Comet"]);
+      await expect(dialog(page).locator(".swt-choices-name")).toHaveValue("project");
       await rendersAnew(page, () => dialog(page).getByRole("button", { name: "Save" }).click());
       const text = await markdown(page);
-      expect(text).toMatch(/\| Task +\| Project #choice-projects +\|/);
-      expect(text).toContain("columntypes.choice.projects='=@projects'");
+      expect(text).toMatch(/\| Task +\| Project #choice-project +\|/);
+      expect(text).toContain("columntypes.choice.project='=@projects'");
       await expect(columnCells(page, 1).nth(1)).toHaveClass(/swt-type-invalid/);
       await expect(columnCells(page, 1).nth(0)).not.toHaveClass(/swt-type-invalid/);
       await cell(page, 2, 1).dblclick();
       await expect(page.locator(".swt-choices .swt-choice")).toHaveText(["Atlas", "Beacon", "Comet"]);
-    });
-
-    test("a source of several columns asks for its column; a list of a source opens on it again", async ({ page }) => {
-      await load(page, PROJECTS, 2);
-      await pickChoice(page);
-      await dialog(page).getByRole("radio", { name: /^Formula$/ }).check();
-      await dialog(page).getByRole("combobox", { name: "Source", exact: true }).selectOption("tasks");
-      await dialog(page).getByLabel("Source's column").selectOption({ label: "page" });
-      await expect(dialog(page).getByRole("textbox", { name: "Formula" })).toHaveValue("=@tasks[page]");
-      await expect(dialog(page).locator(".swt-choices-readonly")).toHaveText(["Projects/Atlas", "Projects/Beacon", "Projects/Comet"]);
-      await rendersAnew(page, () => dialog(page).getByRole("button", { name: "Save" }).click());
-      expect(await markdown(page)).toContain("columntypes.choice.tasks='=@tasks[page]'");
-      await openChoices(page);
-      await expect(dialog(page).getByRole("radio", { name: /^Formula$/ })).toBeChecked();
-      await expect(dialog(page).getByRole("combobox", { name: "Source", exact: true })).toHaveValue("tasks");
-      await expect(dialog(page).getByLabel("Source's column").locator("option:checked")).toHaveText("page");
     });
 
     test("Formula: a formula of one's own, its values shown as it is typed, why it gives none said", async ({ page }) => {
@@ -197,12 +183,8 @@ test.describe("Choices", () => {
       await dialog(page).getByRole("radio", { name: /^Formula$/ }).check();
       const field = dialog(page).getByRole("textbox", { name: "Formula" });
       await field.fill("=@tasks");
-      // A formula reading a source alone shows it over the field; any other, none
-      const source = dialog(page).getByRole("combobox", { name: "Source", exact: true });
-      await expect(source).toHaveValue("tasks");
       await expect(dialog(page).locator(".swt-choices-preview .swt-choices-empty")).toContainText("the result has 5 columns: pick one");
       await field.fill("=SORT(UNIQUE(@tasks[page]), 1, -1)");
-      await expect(source).toHaveValue("");
       await expect(dialog(page).locator(".swt-choices-readonly")).toHaveText(["Projects/Comet", "Projects/Beacon", "Projects/Atlas"]);
       // The name's field keeps its width as the name changes (the hashtag it makes is under it)
       const name = dialog(page).locator(".swt-choices-name");

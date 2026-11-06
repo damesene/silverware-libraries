@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sourceTable } from "../features/sources.ts";
 import { parseTable, type Table } from "../markdown.ts";
 import { CELLS, formulaCell, formulaErrors, pageTables, recalculate, shiftReferences } from "../testing/formulas.ts";
-import { evaluateFormula, formulaChoices, FormulaError, formulaSources, formulaTableNames, listResult, references, sourceChoices, sourceFormulaOf, sourceRefText, tokenize, withColumnKeys } from "./index.ts";
+import { evaluateFormula, formulaChoices, FormulaError, formulaSources, formulaTableNames, listResult, references, sourceChoices, tokenize, withColumnKeys } from "./index.ts";
 import { parse } from "./parser.ts";
 import { isError } from "./values.ts";
 
@@ -129,20 +129,7 @@ describe("a list's formula (a choice list made by one)", () => {
   });
 });
 
-describe("a source's own formula", () => {
-  it("is told by its tokens: the source alone, or one column of it as written", () => {
-    expect(sourceFormulaOf("=@projects")).toEqual({ source: "projects" });
-    expect(sourceFormulaOf(" =@users[Full Name] ")).toEqual({ source: "users", column: "Full Name" });
-    for (const other of ["=@users[#Data]", "=SORT(@projects)", "=@users[@name]", "=@users[name] & 1", "@projects", "=people![name]"]) {
-      expect(sourceFormulaOf(other)).toBeUndefined();
-    }
-  });
-
-  it("is written with the column's key", () => {
-    expect(sourceRefText("projects")).toBe("@projects");
-    expect(sourceRefText("users", { name: "Full Name", nth: 1 })).toBe("@users[full_name]");
-  });
-
+describe("the tables a formula reads", () => {
   it("names the page's tables a formula reads, not another page's", () => {
     expect(formulaTableNames("=SORT(People![name]) & [[Other]]x!A1 & tasks!#REF!")).toEqual(["people", "tasks"]);
   });

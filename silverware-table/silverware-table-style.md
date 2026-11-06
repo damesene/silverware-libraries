@@ -2014,7 +2014,6 @@ body.swt-resizing * {
   font-weight: 600;
 }
 .swt-choices-name,
-.swt-choices-source,
 .swt-choices-value {
   flex: 1;
   min-width: 0;

@@ -324,21 +324,16 @@ export class Formulas implements Feature {
   }
 
   /** The Functions dialog for a formula typed outside a cell: the function picked put in at the caret, as the cell editor's fx does */
-  private pickFunction(formula: string, caret: number, done: (picked?: { readonly formula: string; readonly caret: number }) => void): void {
+  private pickFunction(formula: string, caret: number, picked: (made: { readonly formula: string; readonly caret: number }) => void): void {
     // A formula typed without its "=" (a view's may be) read as one with it; none typed yet, "=" alone
     const { formula: written, shift } = formula.trim() ? withEquals(formula) : { formula: "=", shift: 1 };
     const at = Math.min(caret + shift, written.length);
-    let picked: { formula: string; caret: number } | undefined;
-    this.functions.open(
-      `${written.slice(0, at)}▌${written.slice(at)}`,
-      (name) => {
-        const text = `${name}(`;
-        const typed = nameTyped(written, at, at) ?? { from: at, to: at };
-        const inserted = needsOperator(written, typed.from) ? `+${text}` : text;
-        picked = { formula: written.slice(0, typed.from) + inserted + written.slice(typed.to), caret: typed.from + inserted.length };
-      },
-      () => done(picked),
-    );
+    this.functions.open(`${written.slice(0, at)}▌${written.slice(at)}`, (name) => {
+      const text = `${name}(`;
+      const typed = nameTyped(written, at, at) ?? { from: at, to: at };
+      const inserted = needsOperator(written, typed.from) ? `+${text}` : text;
+      picked({ formula: written.slice(0, typed.from) + inserted + written.slice(typed.to), caret: typed.from + inserted.length });
+    });
   }
 
   /** The views module's offer, while it is on */

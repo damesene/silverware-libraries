@@ -14,9 +14,9 @@ export type ViewDialogOptions = {
   readonly name: string;
   // What the formula's field offers as it is typed; none while the formulas module is off
   readonly helpers?: FormulaHelpers;
-  // The Functions dialog, for the formula with its caret: `done` gets the formula with the function picked put in
-  // (and its caret), or nothing where none was picked. The view's dialog is closed meanwhile (one dialog at a time)
-  readonly functions?: (formula: string, caret: number, done: (picked?: { readonly formula: string; readonly caret: number }) => void) => void;
+  // The Functions dialog (over this one), for the formula with its caret: `picked` gets the formula with the function
+  // picked put in, and its caret
+  readonly functions?: (formula: string, caret: number, picked: (made: { readonly formula: string; readonly caret: number }) => void) => void;
   // The table the formula makes, or why it makes none
   readonly preview: (formula: string) => Calculated | string;
   // Why a name cannot be the view's with the formula (another table's), if so
@@ -34,7 +34,7 @@ const PREVIEW_ROWS = 50;
 const PREVIEW_COLUMNS = 12;
 const LARGE_ROWS = 1000;
 
-export function openViewDialog(host: ModelHost, options: ViewDialogOptions, caret?: number): Dialog {
+export function openViewDialog(host: ModelHost, options: ViewDialogOptions): Dialog {
   const doc = host.doc;
   const e = <K extends keyof HTMLElementTagNameMap>(tag: K, props?: Parameters<typeof el>[2], ...children: ElementChild[]) => el(doc, tag, props, ...children);
   let formula = options.formula;
@@ -64,14 +64,14 @@ export function openViewDialog(host: ModelHost, options: ViewDialogOptions, care
         text: "fx",
         title: "Functions: find one by its name or what it does, and put it in at the caret",
         attrs: { "aria-label": "Functions" },
-        run: () => {
-          const at = input.selectionStart ?? formula.length;
-          // Its own state handed on: the dialog opened again as it was, the function picked put in
-          const again = (picked?: { readonly formula: string; readonly caret: number }) =>
-            openViewDialog(host, { ...options, formula: picked?.formula ?? formula, name }, picked?.caret ?? at);
-          dialog.close();
-          options.functions!(formula, at, again);
-        },
+        run: () =>
+          options.functions!(formula, input.selectionStart ?? formula.length, (made) => {
+            // Put in as typing would: the field's help and the preview follow
+            input.value = made.formula;
+            input.focus();
+            input.setSelectionRange(made.caret, made.caret);
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+          }),
       })
     : null;
 
@@ -160,9 +160,8 @@ export function openViewDialog(host: ModelHost, options: ViewDialogOptions, care
     dialog.close();
     options.submit(formula.trim(), name.trim());
   });
-  // The formula's field focused, its caret where it was (back from the Functions dialog) or at its end
+  // The formula's field focused, its caret at its end
   input.focus();
-  const at = caret ?? formula.length;
-  input.setSelectionRange(at, at);
+  input.setSelectionRange(formula.length, formula.length);
   return dialog;
 }

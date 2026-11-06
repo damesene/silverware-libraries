@@ -61,10 +61,10 @@ export type FormulasOffer = {
     replace?: { readonly from: number; readonly table: import("../markdown.ts").Table },
   ) => import("./values.ts").Grid | import("./values.ts").FormulaError | undefined;
   /**
-   * The Functions dialog for a formula typed outside a cell (a view's dialog), its caret at `caret`: `done` gets the
-   * formula with the function picked put in and the caret after it, or nothing where none was picked
+   * The Functions dialog for a formula typed outside a cell (a view's dialog: the Functions dialog opens over it), its
+   * caret at `caret`: `picked` gets the formula with the function picked put in and the caret after it
    */
-  readonly functions: (formula: string, caret: number, done: (picked?: { readonly formula: string; readonly caret: number }) => void) => void;
+  readonly functions: (formula: string, caret: number, picked: (made: { readonly formula: string; readonly caret: number }) => void) => void;
 };
 
 /**

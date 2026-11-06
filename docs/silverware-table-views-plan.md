@@ -82,6 +82,16 @@ end)
 * A pivot gets them too: `pivot.source='@tasks'`.
 * **Any formula** reads them, a source being one of the formulas' tables: a cell's (`=XLOOKUP([@id], @users[id], @users[email])`), a condition of conditional formatting, a view, a choice list's (below). As formulas reading another page do: the results written stay until written again (*Recalculate* highlighted where a source changed; viewing writes nothing), and until a source's function has run once it is `unread`, the results kept. In the Excel file a formula reading a source is its value, listed with why, as a custom function's without a template.
 
+### SilverBullet kept apart (decided 2026-11-06)
+
+A source is a direct dependency on SilverBullet (a Lua function, its Promise, Lua tables, `page:index`), and spacechoices.ts as it is on `feat/choices-from-lua` does not keep it apart: it lies in `src/` as no module (it cannot be turned off), keeps its state in the file (`sources`, `lastRead`, timers) and fills the column types' domain through module-level state set from outside (`setSpaceLists`, `setSpaceListNames` in columntypes/spacelists.ts), which the rules of *Modules and their data* forbid. So step 4 splits it in three:
+
+* **The host's side**, `src/host/sources.ts` (beside `host/lua.ts`, the host's sides apart from the rest): what is SilverBullet's alone. It keeps the functions `defineSource` was given, calls them and awaits them, makes their Lua tables plain data (`listOf`), reads them again REFRESH_MS after the last `page:index` and as Space Lua loads (`stale`, `lastRead`, `said`, as spacechoices.ts does now), and gives out plain data only, through an interface the rest knows: `SourceProvider { names(), read(name): { columns, rows } | undefined, changed(listener) }` (`undefined`: not read yet). Nothing else in `src/` calls a Lua function nor knows of `page:index` for sources.
+* **The `sources` module** (`features/sources.ts`, `silverware.table.modules.sources.enabled`, a module of the data kind in the settings): handed the provider by the core as a module is handed its host, it offers the sources (`offer`) to the formulas module, which makes them `@name` tables of its `TableSource`, and to the column types module, which takes a choice list's values from a formula through the formulas (step 5) and no longer from a list of the space by name. Turned off, every source is `unread`: formulas, views and pivots keep what they show, a choice list made of a source checks nothing.
+* **The domains know none of it**: the formulas' domain gets tables named `@…` in its `TableSource` (read or `unread`), as it gets another page's; `columntypes/spacelists.ts` and its module-level state go (the column types' domain gets a list's values in the context its module passes, as every domain does).
+
+So the playground and the unit tests give a provider in memory, with no Lua (a playground's sources beside its pages), and another host, or Silverware Database later, could give sources through the same interface without Lua in between.
+
 ### A choice list made by a formula
 
 A table's choice list (`columntypes.choice.<name>`, today a JSON list of texts) may be a formula, told by its leading `=` (a JSON list never starts so): its result, a list or a column of a grid, is the list, calculated as the column shows, never written.
@@ -110,7 +120,7 @@ Each a branch's worth, with its tests (unit tests of the evaluation, UI scenario
 1. **Grids in formulas**: the `Grid` value and its one boundary, `#SPILL!` in a cell, the references that give grids, `FILTER`, `SORT`, `SORTBY`, `UNIQUE`, `CHOOSECOLS`, `TAKE`, `DROP`. Visible to users only as the functions inside formulas that reduce a grid to one value (`=COUNTA(UNIQUE(tasks![assignee]))`).
 2. **The shared part of calculated tables** (`src/calculated/`), the pivot moved onto it, and the formula field moved to `src/formulafield.ts` for the conditional formatting dialog; nothing changed for users.
 3. **Views**: the formulas' domain calculating them in its order (a `Book`'s table made by a formula), the module, the dialog, Insert view, `/view`, the library page's section.
-4. **Sources from Space Lua**: `defineChoices` made `defineSource` (spacechoices.ts's reading kept, rows instead of values, a plain list one column `value`), `@name` in formulas, the pivot's source.
+4. **Sources from Space Lua**: `defineChoices` made `defineSource` (spacechoices.ts's reading moved to `host/sources.ts` behind `SourceProvider`, rows instead of values, a plain list one column `value`), the `sources` module offering them, `columntypes/spacelists.ts` gone, `@name` in formulas, the pivot's source.
 5. **A choice list made by a formula**: `columntypes.choice.<name>='=…'`, a list from Space Lua written so by the Choices dialog, the space's lists no longer found by a header's name alone.
 6. **More functions**: `VSTACK`, `HSTACK`, `SEQUENCE`, `GROUPBY`, `PIVOTBY`.
 
@@ -120,3 +130,4 @@ Each a branch's worth, with its tests (unit tests of the evaluation, UI scenario
 2. A Lua source in formulas: `@tasks`.
 3. Lua values: a list joined by a comma and a space, an object left out.
 4. A view has no totals row of its own for now: a formula can `VSTACK` one, or another table's formula sum it; Excel's Total Row as a setting can come later.
+5. (2026-11-06) Sources keep SilverBullet apart: the Lua side in `host/sources.ts` behind a `SourceProvider` of plain data, a `sources` module that can be turned off offering them to the formulas and the column types, no module-level state in a domain.

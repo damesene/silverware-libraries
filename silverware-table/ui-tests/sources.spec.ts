@@ -4,29 +4,11 @@
 // as a page is indexed: SilverBullet only.
 import { cell, defineSources, expect, hoverCell, markdown, reload, rendersAnew, setOtherPage, setPage, tableIcon, target, test } from "./helpers.ts";
 
-// The playground's sources (playground/playground.ts: kept in step with it), as a script defines them in SilverBullet
-const SCRIPT = [
-  "```space-lua",
-  "local function tasks()",
-  "  return {",
-  '    { name = "Write the plan", page = "Projects/Atlas", due = "2025-11-10", done = true, tags = { "planning" } },',
-  '    { name = "Review the budget", page = "Projects/Atlas", due = "2025-11-14", done = false, tags = { "money", "review" } },',
-  '    { name = "Call the printer", page = "Projects/Beacon", due = "2025-11-12", done = false },',
-  '    { name = "Order paper", page = "Projects/Beacon", due = "2025-11-20", done = false, tags = { "money" } },',
-  '    { name = "Send the invoice", page = "Projects/Comet", due = "2025-11-08", done = true, tags = { "money" } },',
-  "  }",
-  "end",
-  'silverware.table.defineSource({ name = "tasks", columns = { "name", "page", "due", "done", "tags" }, data = tasks })',
-  'silverware.table.defineSource({ name = "projects", data = function() return { "Atlas", "Beacon", "Comet" } end })',
-  "```",
-  "",
-].join("\n");
-
 const PAGE = "| Open | Note |\n|---|---|\n| | x |\n";
 
 test.describe("Sources of the space", () => {
   test.beforeEach(async ({ page }) => {
-    await defineSources(page, SCRIPT);
+    await defineSources(page);
   });
 
   test("@ offers the sources as a formula is typed, and their columns in their brackets; the formula reads them", async ({ page }) => {

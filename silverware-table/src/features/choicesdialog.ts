@@ -1,40 +1,57 @@
 // The column types module's Choices dialog, opened as a column's type is set
 // to Choice and by the pencil of its Type row: whether the column offers the
-// values it has (`#choice`, nothing checked) or takes a list of its own
-// (`#choice-<name>`), kept in the table's metadata row by its name. A value
-// renamed is renamed in the cells of every column taking the
-// list, the list renamed in their headers, all in one write; a value deleted
-// leaves its cells, marked as not of the list. In the core's dialog
-// (ModelHost.openDialog).
+// values it has (`#choice`, nothing checked) or takes a list
+// (`#choice-<name>`), kept in the table's metadata row by its name: values of
+// its own, a source of the space (written as its formula, `=@projects`), or a
+// formula of one's own (`=SORT(UNIQUE(tasks![status]))`), its values
+// calculated as the column shows. A value of a list of its own renamed is
+// renamed in the cells of every column taking the list, the list renamed in
+// their headers, all in one write; a value deleted leaves its cells, marked
+// as not of the list. In the core's dialog (ModelHost.openDialog).
 import { reorder } from "../../../shared/drag.ts";
 import { el } from "../../../shared/elements.ts";
+import { columnIdOf } from "../columns.ts";
 import {
   choiceListOf,
   columnTypeOf,
   distinctValues,
   isChoice,
   LIST_NAME_RE,
+  listFormula,
   listKey,
   listNameFor,
   listNames,
+  listOfValues,
   readChoiceList,
   withColumnType,
   writeChoiceList,
 } from "../columntypes/index.ts";
 import type { Dialog, ModelHost, TableInfo } from "../core/feature.ts";
+import { formulaField } from "../formulafield.ts";
+import { columnRefText, FormulaError, type FormulasOffer, withEquals } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import { escapeCell, parseTable, type Table, unescapeCell } from "../markdown.ts";
 import { setCell } from "../ops.ts";
+import type { SourcesOffer } from "../sources.ts";
 import { withoutTags } from "../tags.ts";
 
-/** Where a choice column's values come from: its own values, or a list the table keeps */
-type Way = "column" | "list";
+/** Where a choice column's values come from: its own values, a list of the table's own, a source of the space, a formula */
+type Way = "column" | "list" | "space" | "formula";
 
 /** A value's row in the dialog: the value it was (none: added here) and its field */
 type ValueRow = { readonly original: string | undefined; readonly field: HTMLInputElement; readonly element: HTMLElement };
 
+/** How many of the values a formula gives the dialog shows */
+const SHOWN = 200;
+
 /** A cell's text as a value: without its hidden tags, unescaped, trimmed */
 const textOf = (cell: string): string => unescapeCell(withoutTags(cell)).trim();
+
+/** What a source's own formula is: `=@projects`, a column of it `=@users[name]` */
+const SOURCE_FORMULA_RE = /^=@([\p{L}_][\p{L}\p{N}_]*)(?:\[([^\]]+)\])?$/u;
+
+// Why the ways that need formulas cannot be picked while the formulas module is off
+const FORMULAS_OFF = "it is calculated by the formulas module, which is off: turn it on in the settings";
 
 export class ChoicesDialog {
   private dialog: Dialog | undefined;
@@ -52,10 +69,17 @@ export class ChoicesDialog {
     const header = table.rows[0]?.cells[column] ?? "";
     const columnName = unescapeCell(withoutTags(withColumnType(header, undefined)));
     const stored = this.host.metaOf(table);
+    const formulas = this.host.offered<FormulasOffer>("formulas");
+    const sources = this.host.offered<SourcesOffer>("sources");
+    const sourceNames = sources?.names() ?? [];
     const was = choiceListOf(unescapeCell(header));
     // The list the column names, kept in the table (one that does not read is replaced: its values start from the column's)
     const kept = was !== undefined && stored.has(listKey(was));
-    const list = kept ? readChoiceList(stored.get(listKey(was!))) : undefined;
+    const keptFormula = kept ? listFormula(stored.get(listKey(was!))) : undefined;
+    const list = kept && keptFormula === undefined ? readChoiceList(stored.get(listKey(was!))) : undefined;
+    // A kept formula that is a source's own (=@projects, =@users[name]): the source picked
+    const fromSource = keptFormula === undefined ? undefined : SOURCE_FORMULA_RE.exec(keptFormula);
+    const keptSource = fromSource && sourceNames.find((name) => name.toLowerCase() === fromSource[1]!.toLowerCase());
     const taken = listNames(stored).filter((name) => name !== was || !kept);
     // The column's values, each once
     const present = (): string[] => distinctValues(table.rows.slice(1).map((row) => textOf(row.cells[column] ?? "")).filter((text) => text !== ""));
@@ -65,15 +89,19 @@ export class ChoicesDialog {
     const note = el(doc, "span", "swt-dialog-note");
     const nameField = el(doc, "input", { class: "swt-choices-name", attrs: { spellcheck: "false", "aria-label": "Name of the list" } });
     nameField.value = was ?? listNameFor(columnName, taken);
-    // A list of its own needs the metadata setting, but where the column's is kept already
+    // A name not typed nor kept follows the source picked (=@projects: projects)
+    let nameTyped = was !== undefined;
+    // A list needs the metadata setting, but where the column's is kept already
     const storable = kept || this.host.canStoreMeta(table, listKey(nameField.value));
     // A column of a list (or one becoming a choice column, where a list can be kept) starts on its list, `#choice` on the column's values
     const plainChoice = was === undefined && isChoice(columnTypeOf(unescapeCell(header)));
-    let way: Way = storable && !plainChoice ? "list" : "column";
-    let own = way === "list";
+    let way: Way = keptFormula !== undefined ? (keptSource ? "space" : "formula") : storable && !plainChoice ? "list" : "column";
     const tagHint = el(doc, "span", "swt-choices-tag");
     const showTag = () => (tagHint.textContent = `#choice-${nameField.value.trim().toLowerCase()}`);
-    nameField.addEventListener("input", showTag);
+    nameField.addEventListener("input", () => {
+      nameTyped = true;
+      showTag();
+    });
     showTag();
 
     const addRow = (value: string, original: string | undefined, after?: ValueRow): ValueRow => {
@@ -159,77 +187,148 @@ export class ChoicesDialog {
       },
     });
 
+    // A source of the space picked, and its column where it has several: written as the source's formula
+    const sourceField = el(doc, "select", { class: "swt-choices-source", attrs: { "aria-label": "Source" } });
+    for (const name of sourceNames) sourceField.append(el(doc, "option", { text: name, attrs: { value: name } }));
+    if (keptSource) sourceField.value = keptSource;
+    const columnField = el(doc, "select", { class: "swt-choices-source", attrs: { "aria-label": "Source's column" } });
+    const columnLabel = el(doc, "label", "swt-choices-label", el(doc, "span", "", "Column"), columnField);
+    // A source's columns as formulas name them ([name]), with their headers
+    const sourceColumns = (name: string) => {
+      const headers = sources?.table(name)?.rows[0]?.cells ?? [];
+      return headers.map((cell, c) => ({ label: unescapeCell(cell), ref: columnRefText(columnIdOf(headers, c), false) ?? "" }));
+    };
+    const showColumns = () => {
+      const columns = sourceColumns(sourceField.value);
+      columnField.replaceChildren(...columns.map((c) => el(doc, "option", { text: c.label, attrs: { value: c.ref } })));
+      const keptColumn = fromSource?.[2] && columns.find((c) => c.ref.toLowerCase() === `[${fromSource[2]!.toLowerCase()}]`);
+      if (keptColumn && sourceField.value === keptSource) columnField.value = keptColumn.ref;
+      // One column, or a source not read yet: the source alone
+      columnLabel.hidden = columns.length < 2;
+    };
+    const sourceFormula = () => {
+      const name = sourceField.value;
+      return sourceColumns(name).length > 1 ? `=@${name}${columnField.value}` : `=@${name}`;
+    };
+    const sourcePicked = () => {
+      showColumns();
+      if (!nameTyped) {
+        nameField.value = listNameFor(sourceField.value, taken);
+        showTag();
+      }
+      showPreview();
+    };
+    sourceField.addEventListener("change", sourcePicked);
+    columnField.addEventListener("change", () => showPreview());
+    showColumns();
+
+    // A formula of one's own
+    let formula = keptFormula !== undefined && !keptSource ? keptFormula : "";
+    const formulaPart = formulas
+      ? formulaField(doc, formulas.fieldHelpers(() => table), formula, (v) => {
+          formula = v;
+          showPreview();
+        }, { label: "Formula", focus: "formula", placeholder: "=SORT(UNIQUE(tasks![status]))" })
+      : el(doc, "span");
+
+    // The values a formula gives (a source's or one's own), or why it gives none
+    const previewValues = el(doc, "div", "swt-choices-preview-values");
+    const previewCount = el(doc, "span", "swt-choices-count");
+    const written = () => (way === "space" ? sourceFormula() : withEquals(formula.trim()).formula);
+    const showPreview = () => {
+      if (way !== "space" && way !== "formula") return;
+      const made = this.listOf(table, written(), formulas);
+      previewCount.textContent = typeof made === "string" ? "" : `· ${made.length}`;
+      const more = typeof made === "string" ? 0 : made.length - SHOWN;
+      previewValues.replaceChildren(
+        ...(typeof made === "string"
+          ? [el(doc, "span", "swt-choices-empty", made)]
+          : made.length
+            ? made.slice(0, SHOWN).map((value) => el(doc, "div", "swt-choices-row", el(doc, "span", "swt-choices-readonly", value)))
+            : [el(doc, "span", "swt-choices-empty", "No values")]),
+        ...(more > 0 ? [el(doc, "span", "swt-choices-empty", `… and ${more} more`)] : []),
+      );
+    };
+
     const save = () => {
-      if (!own) {
+      if (way === "column") {
         this.dialog?.close();
         void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => setCell(t, 0, column, withColumnType(t.rows[0]?.cells[column] ?? "", "choice")));
         return;
       }
       const name = nameField.value.trim().toLowerCase();
-      const problem = this.problem(table, name, taken, rows);
+      const value = way === "list" ? undefined : written();
+      const problem = this.nameProblem(table, name, taken) ?? (value === undefined ? this.valuesProblem(rows) : this.formulaProblem(value, formulas));
       if (problem) {
         note.textContent = problem;
         note.classList.add("swt-choices-problem");
         return;
       }
       const listed = rows.map((r) => r.field.value.trim()).filter((v) => v !== "");
-      // Values renamed: by what they were, their case ignored
-      const renamed = new Map(
-        rows.filter((r) => r.original !== undefined && r.field.value.trim() !== "" && r.field.value.trim() !== r.original).map((r) => [r.original!.toLowerCase(), r.field.value.trim()]),
-      );
+      // Values renamed (a list of its own's): by what they were, their case ignored
+      const renamed =
+        value === undefined
+          ? new Map(
+              rows.filter((r) => r.original !== undefined && r.field.value.trim() !== "" && r.field.value.trim() !== r.original).map((r) => [r.original!.toLowerCase(), r.field.value.trim()]),
+            )
+          : new Map<string, string>();
       this.dialog?.close();
-      void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.written(t, column, was, kept, name, listed, renamed));
+      void this.host.writeTable(this.host.tableFor(info.key) ?? info, (t) => this.written(t, column, was, kept, name, value ?? writeChoiceList(listed), renamed));
     };
     const saveButton = el(doc, "button", { class: "swt-dialog-primary", text: "Save", run: save });
     const cancel = el(doc, "button", { class: "swt-dialog-button", text: "Cancel", run: () => this.close() });
 
-    // The two ways, as radio buttons; the list's fields only for a list of its own
-    const listPart = el(
-      doc,
-      "div",
-      "swt-choices-list",
-      el(doc, "label", "swt-choices-label", el(doc, "span", "", "Name"), nameField, tagHint),
-      el(doc, "div", "swt-choices-label", "Values"),
-      values,
-      el(doc, "div", "swt-choices-actions", addButton, takeButton),
-    );
+    const namePart = el(doc, "label", "swt-choices-label", el(doc, "span", "", "Name"), nameField, tagHint);
+    const listPart = el(doc, "div", "swt-choices-list", el(doc, "div", "swt-choices-label", "Values"), values, el(doc, "div", "swt-choices-actions", addButton, takeButton));
+    const spacePart = el(doc, "div", "swt-choices-part swt-choices-from-space", el(doc, "label", "swt-choices-label", el(doc, "span", "", "Source"), sourceField), columnLabel);
+    const formulaWay = el(doc, "div", "swt-choices-part swt-choices-formula", el(doc, "div", "swt-choices-label", "Formula"), formulaPart);
+    const previewPart = el(doc, "div", "swt-choices-part swt-choices-preview", el(doc, "div", "swt-choices-label", "Values", previewCount), previewValues);
     // The ways as one row of segments (radio buttons, so the keys and a screen reader know them), what the one
     // picked does in a line under them
     const HINTS: Record<Way, string> = {
       column: "The editor offers the values the column has; nothing is checked. #choice",
       list: "Kept in this table: values not in it are marked, the column sorts in its order. A value renamed is renamed in the cells; one removed leaves its cells marked.",
+      space: "A source of the space (silverware.table.defineSource in Space Lua), kept in this table as its formula (=@projects) and read anew as the space changes: values not in it are marked.",
+      formula: "A formula's values, kept in this table and calculated as the column shows (a list, or one column): values not in it are marked, the column sorts in its order.",
     };
+    // Why a way cannot be picked, shown (not only as a tooltip: a touch screen has none)
+    const unstorable = storable ? undefined : "lists are kept in the table's metadata; turn on Store table metadata in the settings";
+    const DISABLED: Record<Way, string | undefined> = {
+      column: undefined,
+      list: unstorable,
+      space: unstorable ?? (!formulas ? FORMULAS_OFF : sourceNames.length ? undefined : "the space has no sources: a Space Lua script defines them with silverware.table.defineSource"),
+      formula: unstorable ?? (formulas ? undefined : FORMULAS_OFF),
+    };
+    const TITLES: Record<Way, string> = { column: "Column's values", list: "Own list", space: "Source", formula: "Formula" };
     const hint = el(doc, "p", "swt-choices-hint");
-    // Why Own list cannot be picked, shown (not only as a tooltip: a touch screen has none)
-    const unstorable = "Own list: lists are kept in the table's metadata; turn on Store table metadata in the settings.";
-    const reason = el(doc, "p", { class: "swt-choices-hint", text: unstorable });
-    reason.hidden = storable;
-    const wayOption = (value: Way, title: string, disabled?: string) => {
+    const reasons = (Object.keys(DISABLED) as Way[]).filter((w) => DISABLED[w]).map((w) => `${TITLES[w]}: ${DISABLED[w]}.`);
+    const reason = el(doc, "p", { class: "swt-choices-hint", text: reasons.join(" ") });
+    reason.hidden = !reasons.length;
+    const wayOption = (value: Way) => {
       const radio = el(doc, "input", { attrs: { type: "radio", name: "swt-choices-way", value } });
       radio.checked = way === value;
-      radio.disabled = disabled !== undefined;
+      radio.disabled = DISABLED[value] !== undefined;
       radio.addEventListener("change", () => {
         way = value;
-        own = value === "list";
+        if (way === "space" && !nameTyped) sourcePicked();
         show();
       });
-      return el(doc, "label", { class: "swt-choices-way", title: disabled ?? HINTS[value] }, radio, el(doc, "span", "", title));
+      return el(doc, "label", { class: "swt-choices-way", title: DISABLED[value] ?? HINTS[value] }, radio, el(doc, "span", "", TITLES[value]));
     };
-    const ways = el(
-      doc,
-      "div",
-      { class: "swt-choices-ways", attrs: { role: "radiogroup", "aria-label": "Values" } },
-      wayOption("column", "Column's values"),
-      wayOption("list", "Own list", storable ? undefined : unstorable),
-    );
+    const ways = el(doc, "div", { class: "swt-choices-ways", attrs: { role: "radiogroup", "aria-label": "Values" } }, ...(["column", "list", "space", "formula"] as const).map(wayOption));
     const show = () => {
+      namePart.hidden = way === "column";
       listPart.hidden = way !== "list";
+      spacePart.hidden = way !== "space";
+      formulaWay.hidden = way !== "formula";
+      previewPart.hidden = way !== "space" && way !== "formula";
       hint.textContent = HINTS[way];
       note.classList.remove("swt-choices-problem");
       note.textContent = "";
+      showPreview();
     };
     show();
-    const content = el(doc, "div", "swt-choices-form", ways, hint, reason, listPart);
+    const content = el(doc, "div", "swt-choices-form", ways, hint, reason, namePart, listPart, spacePart, formulaWay, previewPart);
     const footer = el(doc, "div", "swt-choices-foot", note, cancel, saveButton);
     this.dialog = this.host.openDialog({
       title: "Choices",
@@ -237,18 +336,42 @@ export class ChoicesDialog {
       className: "swt-choices-dialog",
       content,
       footer,
-      focus: way === "list" ? (rows[0]?.field ?? nameField) : ways.querySelector<HTMLInputElement>("input:checked") ?? undefined,
+      focus:
+        way === "list"
+          ? (rows[0]?.field ?? nameField)
+          : way === "space"
+            ? sourceField
+            : way === "formula"
+              ? (content.querySelector<HTMLInputElement>('[data-focus="formula"]') ?? undefined)
+              : (ways.querySelector<HTMLInputElement>("input:checked") ?? undefined),
       closed: () => {
         this.dialog = undefined;
       },
     });
   }
 
-  /** Why the list cannot be saved so, or undefined */
-  private problem(table: Table, name: string, taken: readonly string[], rows: readonly ValueRow[]): string | undefined {
+  /** The values a list's formula gives the table now (as the column will check them), or why it gives none */
+  private listOf(table: Table, formula: string, formulas: FormulasOffer | undefined): readonly string[] | string {
+    if (!formulas) return `No values: ${FORMULAS_OFF}`;
+    if (formula.trim() === "=") return "Type a formula";
+    const problem = formulas.problem(formula);
+    if (problem) return problem;
+    const result = formulas.list(table, formula);
+    if (result === undefined) return "Not read yet: it reads a page or a source not read yet";
+    if (result instanceof FormulaError) return `The column checks nothing: ${result.code} ${result.detail}`;
+    return listOfValues(result);
+  }
+
+  /** Why a list cannot be named so, or undefined */
+  private nameProblem(table: Table, name: string, taken: readonly string[]): string | undefined {
     if (!LIST_NAME_RE.test(name)) return "A list's name is lower case letters (a to z) and digits, words joined by dashes, starting with a letter.";
     if (taken.includes(name)) return `The table has a list named ${name} already.`;
     if (!this.host.canStoreMeta(table, listKey(name))) return "Lists are kept in the table's metadata: turn on Store table metadata in the settings to save one.";
+    return undefined;
+  }
+
+  /** Why a list of its own's values cannot be saved so, or undefined */
+  private valuesProblem(rows: readonly ValueRow[]): string | undefined {
     const seen = new Set<string>();
     for (const row of rows) {
       const value = row.field.value.trim().toLowerCase();
@@ -259,23 +382,23 @@ export class ChoicesDialog {
     return seen.size ? undefined : "The list has no values.";
   }
 
+  /** Why a list's formula cannot be saved so (none typed, one that does not read), or undefined: one giving no values now may later */
+  private formulaProblem(formula: string, formulas: FormulasOffer | undefined): string | undefined {
+    if (!formulas) return `The list's formula: ${FORMULAS_OFF}.`;
+    if (formula.trim() === "=" || formula.trim() === "=@") return "Type a formula, or pick a source.";
+    return formulas.problem(formula);
+  }
+
   /**
-   * The table with the list saved: under its name (the one it had gone), the
-   * headers of the columns that took it (and the column's own) naming it, the
-   * values renamed in their cells (but a cell a feature computes: a formula's)
+   * The table with the list saved (`value`: its values as stored, or its
+   * formula): under its name (the one it had gone), the headers of the columns
+   * that took it (and the column's own) naming it, the values renamed in their
+   * cells (but a cell a feature computes: a formula's)
    */
-  private written(
-    t: Table,
-    column: number,
-    was: string | undefined,
-    kept: boolean,
-    name: string,
-    listed: readonly string[],
-    renamed: ReadonlyMap<string, string>,
-  ): Table {
+  private written(t: Table, column: number, was: string | undefined, kept: boolean, name: string, value: string, renamed: ReadonlyMap<string, string>): Table {
     let table = t;
     if (was !== undefined && kept && was !== name) table = this.host.setMeta(table, listKey(was), undefined);
-    table = this.host.setMeta(table, listKey(name), writeChoiceList(listed));
+    table = this.host.setMeta(table, listKey(name), value);
     const columns = (table.rows[0]?.cells ?? []).flatMap((header, c) => (c === column || (was !== undefined && choiceListOf(unescapeCell(header)) === was) ? [c] : []));
     for (const c of columns) {
       table = setCell(table, 0, c, withColumnType(table.rows[0]?.cells[c] ?? "", `choice-${name}`));

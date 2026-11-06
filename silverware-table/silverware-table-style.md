@@ -1941,15 +1941,18 @@ body.swt-resizing * {
   flex-direction: column;
   gap: 8px;
 }
-.swt-choices-list {
+.swt-choices-list,
+.swt-choices-part {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.swt-choices-list[hidden] {
+.swt-choices-list[hidden],
+.swt-choices-part[hidden],
+.swt-choices-label[hidden] {
   display: none;
 }
-/* The ways (the column's values, a list of its own) as one row of segments, the one picked's hint under it */
+/* The ways (the column's values, a list of its own, a source of the space, a formula) as one row of segments, the one picked's hint under it */
 .swt-choices-ways {
   display: flex;
   border: 1px solid var(--swt-dialog-line);
@@ -2011,6 +2014,7 @@ body.swt-resizing * {
   font-weight: 600;
 }
 .swt-choices-name,
+.swt-choices-source,
 .swt-choices-value {
   flex: 1;
   min-width: 0;
@@ -2027,12 +2031,28 @@ body.swt-resizing * {
   font-family: var(--editor-font, monospace);
   opacity: 0.7;
 }
-.swt-choices-values {
+.swt-choices-values,
+.swt-choices-preview-values {
   display: flex;
   flex-direction: column;
   gap: 4px;
   max-height: 50vh;
   overflow-y: auto;
+}
+/* A value a formula gives (a source's, one's own): as a value's field, to read only */
+.swt-choices-readonly {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  opacity: 0.85;
+}
+.swt-choices-count,
+.swt-choices-empty {
+  font-weight: normal;
+  opacity: 0.7;
 }
 .swt-choices-row {
   display: flex;

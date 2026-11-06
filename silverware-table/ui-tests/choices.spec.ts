@@ -4,7 +4,7 @@
 // renamed there renamed in the cells;
 // the table's lists under Choice in the Type menu, deleted there (one columns take asked first, those columns then without a type)
 import type { Page } from "@playwright/test";
-import { answerConfirm, bodyRows, drag, columnCells, expect, header, markdown, menu, rendersAnew, setPage, settled, test } from "./helpers.ts";
+import { answerConfirm, bodyRows, cell, columnCells, defineSources, drag, expect, header, markdown, menu, rendersAnew, setOtherPage, setPage, settled, target, test } from "./helpers.ts";
 
 const LIST = `| <meta core.table columntypes.choice.status='["open","in progress","done"]'> |`;
 const PAGE = ["| Task | Status #choice-status |", "|---|---|", "| A | done |", "| B | open |", "| C | later |", LIST, ""].join("\n");
@@ -147,6 +147,89 @@ test.describe("Choices", () => {
     const text = await markdown(page);
     expect(text).toMatch(/\| Task +\| Status #choice +\|/);
     expect(text).toContain("columntypes.choice.status");
+  });
+
+  test.describe("a list from a source of the space or a formula", () => {
+    test.beforeEach(async ({ page }) => {
+      await defineSources(page);
+    });
+
+    const PROJECTS = ["| Task | Project |", "|---|---|", "| A | Atlas |", "| B | Delta |", ""].join("\n");
+
+    test("Source picks a source, written as its formula: the column checks its values, the editor offers them", async ({ page }) => {
+      await load(page, PROJECTS, 2);
+      await pickChoice(page);
+      await dialog(page).getByRole("radio", { name: /^Source$/ }).check();
+      await dialog(page).getByRole("combobox", { name: "Source", exact: true }).selectOption("projects");
+      await expect(dialog(page).locator(".swt-choices-name")).toHaveValue("projects");
+      await expect(dialog(page).getByLabel("Source's column")).toBeHidden();
+      await expect(dialog(page).locator(".swt-choices-readonly")).toHaveText(["Atlas", "Beacon", "Comet"]);
+      await rendersAnew(page, () => dialog(page).getByRole("button", { name: "Save" }).click());
+      const text = await markdown(page);
+      expect(text).toMatch(/\| Task +\| Project #choice-projects +\|/);
+      expect(text).toContain("columntypes.choice.projects='=@projects'");
+      await expect(columnCells(page, 1).nth(1)).toHaveClass(/swt-type-invalid/);
+      await expect(columnCells(page, 1).nth(0)).not.toHaveClass(/swt-type-invalid/);
+      await cell(page, 2, 1).dblclick();
+      await expect(page.locator(".swt-choices .swt-choice")).toHaveText(["Atlas", "Beacon", "Comet"]);
+    });
+
+    test("a source of several columns asks for its column; a list of a source opens on it again", async ({ page }) => {
+      await load(page, PROJECTS, 2);
+      await pickChoice(page);
+      await dialog(page).getByRole("radio", { name: /^Source$/ }).check();
+      await dialog(page).getByRole("combobox", { name: "Source", exact: true }).selectOption("tasks");
+      await dialog(page).getByLabel("Source's column").selectOption({ label: "page" });
+      await expect(dialog(page).locator(".swt-choices-readonly")).toHaveText(["Projects/Atlas", "Projects/Beacon", "Projects/Comet"]);
+      await rendersAnew(page, () => dialog(page).getByRole("button", { name: "Save" }).click());
+      expect(await markdown(page)).toContain("columntypes.choice.tasks='=@tasks[page]'");
+      await openChoices(page);
+      await expect(dialog(page).getByRole("radio", { name: /^Source$/ })).toBeChecked();
+      await expect(dialog(page).getByRole("combobox", { name: "Source", exact: true })).toHaveValue("tasks");
+      await expect(dialog(page).getByLabel("Source's column")).toHaveValue("[page]");
+    });
+
+    test("Formula: a formula of one's own, its values shown as it is typed, why it gives none said", async ({ page }) => {
+      await load(page, PROJECTS, 2);
+      await pickChoice(page);
+      await dialog(page).getByRole("radio", { name: /^Formula$/ }).check();
+      const field = dialog(page).getByRole("textbox", { name: "Formula" });
+      await field.fill("=@tasks");
+      await expect(dialog(page).locator(".swt-choices-preview .swt-choices-empty")).toContainText("the result has 5 columns: pick one");
+      await field.fill("=SORT(UNIQUE(@tasks[page]), 1, -1)");
+      await expect(dialog(page).locator(".swt-choices-readonly")).toHaveText(["Projects/Comet", "Projects/Beacon", "Projects/Atlas"]);
+      await dialog(page).locator(".swt-choices-name").fill("pages");
+      await rendersAnew(page, () => dialog(page).getByRole("button", { name: "Save" }).click());
+      const text = await markdown(page);
+      expect(text).toMatch(/\| Task +\| Project #choice-pages +\|/);
+      expect(text).toContain("columntypes.choice.pages='=SORT(UNIQUE(@tasks[page]), 1, -1)'");
+      await openChoices(page);
+      await expect(dialog(page).getByRole("radio", { name: /^Formula$/ })).toBeChecked();
+      await expect(dialog(page).getByRole("textbox", { name: "Formula" })).toHaveValue("=SORT(UNIQUE(@tasks[page]), 1, -1)");
+    });
+
+    test("a source from a query: its list read anew once a page of its tag is indexed", async ({ page }) => {
+      test.skip(target !== "silverbullet", "Space Lua and its index: SilverBullet only");
+      await setOtherPage(page, "UiTests/Alpha", "#uichoice\n");
+      await defineSources(
+        page,
+        [
+          "```space-lua",
+          'silverware.table.defineSource({ name = "uichoices", data = function() return query[[from p = index.tag "uichoice" select p.name]] end })',
+          "```",
+          "",
+        ].join("\n"),
+      );
+      await load(page, ["| Task | Project #choice-uichoices |", "|---|---|", "| A | UiTests/Alpha |", "| B | UiTests/Beta |", "| <meta core.table columntypes.choice.uichoices='=@uichoices'> |", ""].join("\n"), 2);
+      await expect(columnCells(page, 1).nth(0)).not.toHaveClass(/swt-type-invalid/);
+      await expect(columnCells(page, 1).nth(1)).toHaveClass(/swt-type-invalid/);
+      await setOtherPage(page, "UiTests/Beta", "#uichoice\n");
+      await expect(columnCells(page, 1).nth(1)).not.toHaveClass(/swt-type-invalid/, { timeout: 10_000 });
+      await cell(page, 1, 1).dblclick();
+      const choices = page.locator(".swt-choices .swt-choice");
+      await expect(choices).toHaveCount(2);
+      expect((await choices.allTextContents()).sort()).toEqual(["UiTests/Alpha", "UiTests/Beta"]);
+    });
   });
 
   test("Choice picked for a column of no type opens the dialog on a list of its own, saved as the column's", async ({ page }) => {

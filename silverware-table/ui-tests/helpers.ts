@@ -224,12 +224,30 @@ export async function setSettings(page: Page, values: Record<string, Setting>): 
   await reload(page);
 }
 
+// The playground's sources (playground/playground.ts: kept in step with it), as a script defines them in SilverBullet
+export const SAMPLE_SOURCES = [
+  "```space-lua",
+  "local function tasks()",
+  "  return {",
+  '    { name = "Write the plan", page = "Projects/Atlas", due = "2025-11-10", done = true, tags = { "planning" } },',
+  '    { name = "Review the budget", page = "Projects/Atlas", due = "2025-11-14", done = false, tags = { "money", "review" } },',
+  '    { name = "Call the printer", page = "Projects/Beacon", due = "2025-11-12", done = false },',
+  '    { name = "Order paper", page = "Projects/Beacon", due = "2025-11-20", done = false, tags = { "money" } },',
+  '    { name = "Send the invoice", page = "Projects/Comet", due = "2025-11-08", done = true, tags = { "money" } },',
+  "  }",
+  "end",
+  'silverware.table.defineSource({ name = "tasks", columns = { "name", "page", "due", "done", "tags" }, data = tasks })',
+  'silverware.table.defineSource({ name = "projects", data = function() return { "Atlas", "Beacon", "Comet" } end })',
+  "```",
+  "",
+].join("\n");
+
 /**
  * The sources of the space the tests read (silverware.table.defineSource): the
  * playground's are fixed in its code (tasks, projects), SilverBullet's defined
- * by `script` (a page's space-lua block giving the same), written and loaded
+ * by `script` (a page's space-lua block; by default the playground's, alike), written and loaded
  */
-export async function defineSources(page: Page, script: string): Promise<void> {
+export async function defineSources(page: Page, script = SAMPLE_SOURCES): Promise<void> {
   if (target !== "silverbullet") return;
   await setOtherPage(page, "UiTests/SourcesScript", script);
   await reload(page);

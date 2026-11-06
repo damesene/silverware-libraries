@@ -129,6 +129,9 @@ function sortKeys(rows: readonly HTMLTableRowElement[], values: readonly (readon
 
 export class Controller implements TableHost {
   private readonly infos = new WeakMap<HTMLElement, WidgetInfo>();
+  // The tables enhanced as the page was last scanned: one gone since (another page opened, a table out of CodeMirror's
+  // viewport) has the features' layout follow, as what they placed for it (a table's tab) would stay otherwise
+  private scanned = new Set<HTMLElement>();
   // The page's text as last read
   pageText = "";
   currentPage = "";
@@ -929,6 +932,9 @@ export class Controller implements TableHost {
       pending.push(this.enhance(widget, table));
     }
     await Promise.all(pending);
+    const shown = new Set(this.enhancedWidgets());
+    if ([...this.scanned].some((widget) => !shown.has(widget))) this.queueFeaturesLayout();
+    this.scanned = shown;
   }
 
   private enhance(widget: HTMLElement, table: HTMLTableElement): Promise<void> {

@@ -133,7 +133,7 @@ silverware-table/
       criteria.ts      conditions of the -IFS functions as spreadsheets write them (">10", "<>done", "app*", "", "<>"), wildcards (SEARCH, XLOOKUP's match_mode 2)
       function.ts      the shape of a function (FormulaFunction, its context)
       registry.ts      which functions exist: built-in and custom (`functionNamed`; a custom one replaces a built-in of its name)
-      grids.ts         what the functions taking grids share (`GridFunction` in function.ts, `grids: true`: FILTER, SORT, SORTBY, UNIQUE, CHOOSECOLS, TAKE, DROP): an argument's grid, lines picked, `sortOrder` (numbers, text, logical values, errors, empty cells last), `#CALC!` for nothing left
+      grids.ts         what the functions taking grids share (`GridFunction` in function.ts, `grids: true`: FILTER, SORT, SORTBY, UNIQUE, CHOOSECOLS, TAKE, DROP, HSTACK, VSTACK, SEQUENCE): an argument's grid, lines picked, `stacked` (HSTACK and VSTACK: shorter parts padded with `#N/A` as in Excel, the names each part's side by side, the first part's one under another, an argument that is an error the whole result), `sortOrder` (numbers, text, logical values, errors, empty cells last), `#CALC!` for nothing left
       custom.ts        custom functions (the user's, from Space Lua): definitions checked, a call's throw or wrong result made the formula's error, HELPERS
       builtin/         only functions a formula can call, one per file (sum.ts …), index.ts their list
       values.ts        value types and coercions for functions; `Grid` (rows of columns, each column's name where it came from a table's) and `Result` (a value, a list or a grid), `cellValue` (a cell's one value: several `#SPILL!`), `asValue` (a grid as the list functions taking none get)

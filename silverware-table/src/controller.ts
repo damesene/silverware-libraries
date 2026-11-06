@@ -1034,6 +1034,8 @@ export class Controller implements TableHost {
       // The cell showing the move cursor was rendered anew (Ctrl+arrows saved a cell)
       if (this.navigating) this.markNavigating();
       this.insert.tableEnhanced(widget, info);
+      // Known as enhanced at once: gone before the scan that enhanced it ends, it still has the features' layout follow
+      this.scanned.add(widget);
       this.queueStickyUpdate();
       void this.refreshSettings();
     } catch (e) {

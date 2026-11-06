@@ -147,6 +147,26 @@ Each a branch's worth, with its tests (unit tests of the evaluation, UI scenario
 5. **A choice list made by a formula**: `columntypes.choice.<name>='=…'`, a list from Space Lua written so by the Choices dialog, the space's lists no longer found by a header's name alone.
 6. **More functions**: `VSTACK`, `HSTACK`, `SEQUENCE`, `GROUPBY`, `PIVOTBY`.
 
+## Step 4: before it starts (written 2026-11-06, for a session starting afresh)
+
+**State**: branch `feat/views`, steps 1 to 3 done and committed (nothing pushed; released with the choices, *Released together with the choices* above). `npm run verify` passes; `npm run test:ui` passes but for a few tests that fail now and then under the machine's load, a different one each run, as on the branch's base (run a failing spec alone with `--retries=0` to tell). Everything below is in CLAUDE.md (Layout, *Views* under *Design decisions*) and in the code; this section is what a session starting step 4 needs besides.
+
+**What step 3 left that step 4 builds on**:
+* A source is read by the formulas as a table of their `TableSource` (formulas/page.ts `pageTables`, formulas/evaluate.ts `Book.sheet`): `@tasks` is a table there (read, or `unread` until its function has run once, as another page not read: `Book.keepsResult` keeps the results written). The sources module offers them to the formulas module, which adds them to the `TableSource` it builds (`tableSource()`, `writeStep`, `otherTablesWritten`, `viewOf`, `evaluate`, `errors` in features/formulas.ts).
+* Views and pivots are calculated tables (`CalculatedOffer`, `CalculatedBy` in formulas/cell.ts): a view of a source is `=FILTER(@tasks[#Data], …)`, nothing to add for it; a pivot of a source needs `pivot.source='@tasks'` read by pivot/definition.ts `sourceRef` and its `calculatedBy` (features/pivot.ts) giving the formulas `=@tasks[#Data]` as what it reads and reading it through `read.table` (which takes a name and a page: a source needs its own way in, `CalculatedRead`).
+* A source changed (read again): the formulas module's `tablesChanged` checks the tables shown again, the view and pivot modules theirs (their `tablesChanged`); nothing is written.
+* The formula field (formulafield.ts) and the cell editor's list complete names through the formulas module (`formulaChoices`, `fieldHelpers`): sources to be offered there.
+
+**Working notes for this machine**: write files with the editor tool, or with a Python script written by the editor tool, never through a shell heredoc or a `python -c` with backslashes: the shell mangles them (`\u0000` in a string became a NUL byte three times, `\r` vanished). Python's `open(..., "w")` writes CRLF on Windows unless `newline=""`; the repository is LF, so take `\r` off the files touched before a commit. A local SilverBullet for checks is in the memory (`local-silverbullet-podman`); a page there is changed through `client.editorView` in a Playwright script (import playwright by a `file:///` URL), never on disk.
+
+**Open questions** (to be decided with the user before step 4 starts; the answers go into *Step 4: decided*):
+1. Choice lists of the space between steps 4 and 5: step 4 takes away `columntypes/spacelists.ts`, so `#choice-projects` stops finding a list of the space by its name until step 5 writes it as a formula (`=@projects`).
+2. What `@tasks` alone is (step 5's `=@projects` uses it bare), and which references a source has: `@tasks[due]`, `@tasks[#Data]`; cells (`@tasks!A1`), `[@due]`, named rows and cells?
+3. A source's name: the rules of a table's name (letters, digits, `_`), compared ignoring case?
+4. A source given objects without `columns`: the order of its columns (a Lua table keeps none).
+5. Where sources are offered: the names typed in a formula (cell editor, the view's and conditions' fields), the pivot dialog's Source list, the Functions dialog?
+6. The playground: its sources in memory beside its pages (decided), shown and edited how (a panel as the Benchmark's, or fixed sample sources)?
+
 ## Decided (2026-11-05, with the user)
 
 1. A whole table as a grid: `tasks![#Data]`, as Excel's tables write it.

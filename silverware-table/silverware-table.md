@@ -398,6 +398,7 @@ The page's name in double brackets goes before the table's name: `[[Prices]]frui
 
 * **A cell holds one value**, so use them inside a function that makes one of the array: `=COUNTA(UNIQUE([assignee]))` (how many people), `=SUM(FILTER(orders![amount], orders![status] = "paid"))`, `=TEXTJOIN(", ", TRUE, SORT(UNIQUE([tag])))` (a sorted list in one cell), `=SUM(TAKE(SORT([score], 1, -1), 3))` (the three highest). In a calculated column, per row: `=TEXTJOIN(", ", TRUE, FILTER(tasks![name], tasks![assignee] = [@name], ""))` (the names of their tasks), `=SUM(FILTER(tasks![hours], tasks![assignee] = [@name], 0))`.
 * An array of one value is that value: `=TAKE(SORTBY(people![name], people![score], -1), 1)` is who scored most.
+* A table made of an array, kept up to date, is a view: see [[#Views]].
 * An array of several values left as a cell's result is `#SPILL!` (Excel would spill it into the cells around; here a cell keeps one value). Its values can still be seen: hover the cell (or select it) and click ⤢ at its corner, or pick *Show result* in its menu (Ctrl+Shift+Enter on the cell selected). The result shows over the window as a table, read only: the formula and its size above it, ⧉ copying it all (for Excel, or to paste as a new table), × or Esc closing it. At most 2,000 rows are drawn; the copy has every one. *Copy result* in the cell's menu copies it without showing it. Ctrl+C copies what the cell shows, `#SPILL!`.
 * `FILTER` keeping nothing is `#CALC!`; its third argument says what to give then: `=SUM(FILTER([amount], [paid], 0))` is 0, not an error. `COUNTA` counts an error as a value (as in Excel), so to count what a condition keeps use `COUNTIFS` (`=COUNTIFS(tasks![assignee], [@name])`), not `COUNTA(FILTER(…))`.
 * Operators work on a column or a row cell by cell, as on ranges (`FILTER([name], [qty] * [price] > 100)`); on an array of several rows and columns they are `#VALUE!` for now: pick a column first (`CHOOSECOLS`).
@@ -797,6 +798,26 @@ It is a plain markdown table, its numbers written in it (it shows anywhere, as a
 * It says what it is at a glance: *Pivot of orders* in a small tab at its top right corner (with the `tableLabels` module), `Pivot of [[Orders]]orders` for a source on another page, as its definition writes it.
 * Its totals are pinned: the Total row to the bottom, a cross table's Total column to the right, so they stay in view and out of a sort (with *Store table metadata*).
 * It needs the `formulas` module.
+
+## Views
+
+A view is a table made by one formula: its rows are the formula's result, as Excel 365 spills a `FILTER` or a `SORT`, kept in a table of its own. **Insert view…** in a table's ⋯ menu opens a dialog with the table's whole body to start from (`=tasks![#Data]`; a table without a name gets one in the same edit, as a view reads tables by their names): type the formula (names and functions are offered as you type, the function the caret is in is explained, **fx** finds one by what it does), name the view, and the table it makes shows under them as you type, with its size; *Insert* writes it under the table. The *Silverware Table: Insert view* command, or `/view` typed in the page, opens the same dialog starting from the page's first named table and writes the view where the cursor is. **View settings…** in a view's toolbar opens it to change the formula or the name.
+
+````markdown
+| Name | Assignee | Hours |
+|---|---|---:|
+| Write | anna | 3 |
+| Ship | anna | 2 |
+| <meta core.table core.name='annas' view.formula='=SORT(FILTER(tasks![#Data], tasks![assignee] = "anna"), 3, -1)'> |
+````
+
+* **What a formula gives**: rows and columns (`FILTER(tasks![#Data], …)`, `CHOOSECOLS(…)`), a list (`=SORT(UNIQUE(tasks![assignee]))`: one column), or one value (`=SUM(tasks![hours])`: one cell). See [[#Arrays]] for the functions. A result of no rows is the header alone.
+* **Its headers** are the names of the columns its values come from (`Assignee`), else letters (A, B, C). Rename a header as in any table: the view keeps your name (and a type's hashtag added to it) whenever it is calculated again; empty it, or give it its name back, and it follows its source again.
+* **It follows what it reads**: an edit of a table it reads, with Silverware Table, writes the view anew in the same edit (one Ctrl+Z takes back both), and so does a table whose formulas read the view, in the same edit too. The table it reads renamed, or its columns renamed or moved, the view's formula says so.
+* Changed otherwise (its source typed in the markdown, a table on another page it reads, `TODAY()` moved on), the view's tab says *Out of date* and its **Refresh view** icon in the toolbar is highlighted; click it and the view is calculated anew. A formula that cannot be calculated (its table gone: `#REF!`; `FILTER` keeping nothing without its third argument: `#CALC!`; a view reading itself or two reading each other: `#CYCLE!`) writes nothing: the view keeps what it shows, its tab says *Cannot be calculated* and its Refresh view icon why.
+* **A named view is a table like any other** for formulas (`=SUM(annas![hours])`), pivots, charts and exports; its numbers are written in the markdown, so it shows anywhere.
+* Its values are its formula's, so its cells are not edited: a press on one says why and opens its settings, and its menus offer nothing that changes them or adds, moves or deletes its rows and columns. A large result is written whole (the dialog says so past 1,000 rows).
+* Its formula is in its metadata row (`view.formula`), its renamed headers too (`view.headers`); it needs *Store table metadata* and the `formulas` module (off: the dialog says so and inserts nothing; views keep their values). In an Excel file a view is its values.
 
 ## Rows and columns
 
@@ -1228,6 +1249,7 @@ Each module can be turned off with `enabled = false`, e.g. `config.set("silverwa
 | `export` | *Copy as CSV* and *Copy as Markdown* in the table's ⋯ menu copy the whole table. |
 | `autofill` | The fill handle at the corner of the cells selected: drag it to fill the cells after them, double-click it to fill down. See [[#AutoFill]]. Needs `selection`. Off: no handle. |
 | `pivot` | Pivot tables: a table defined in its metadata row as a summary of another, calculated anew with each edit of it, *Refresh pivot* in its toolbar. Needs `formulas`. Off: pivots stay as written, their cells edited as any table's. See [[#Pivot tables]]. |
+| `view` | Views: a table made by one formula (`view.formula` in its metadata row), calculated anew with each edit of what it reads, *Insert view…*, *View settings…* and *Refresh view*. Needs `formulas`. Off: views stay as written, their cells edited as any table's. See [[#Views]]. |
 | `excel` | *Export to Excel…* in the table's ⋯ menu: copy for Excel, or download an .xlsx file with the formulas. Setting `functions`: templates for your custom functions in the file. See [[#Excel]]. |
 | `paste` | Copy, Cut and Paste in the cell menu; Ctrl+X cuts cells (they move where they are pasted); Ctrl+V pastes cells copied from a spreadsheet over the table, Ctrl+Shift+V as new rows. Off: a paste goes into the cell editor as text, no Cut or Paste in the cell menu (Copy and Ctrl+C stay, with the `selection` module). |
 | `handles` | The handles beside rows and above columns: drag them to move rows and columns, click them for the row and column menus. Off: rows and columns still move with Ctrl+Alt+arrows, and the **+** on a border still inserts them. |

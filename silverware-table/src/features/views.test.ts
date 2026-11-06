@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { setCell } from "../ops.ts";
-import { cell, clickOn, controller, editor, edits, flashes, flush, key, setup, text, useTablePage } from "../testing/page.ts";
+import { cell, clickOn, controller, cursorMoves, editor, edits, flashes, flush, key, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 
 const TASKS = [
   "| Name | Assignee | Hours |",
@@ -106,6 +106,141 @@ describe("Views", () => {
     const info = controller.shownTables()[1]!;
     expect(await controller.writeTable(info, (t) => setCell(t, 1, 0, "zed"))).toBe("failed");
     expect(text).toBe(page);
+  });
+
+  describe("its dialog", () => {
+    const dialog = () => document.querySelector<HTMLElement>(".swt-view-dialog");
+    const formulaField = () => dialog()!.querySelector<HTMLInputElement>('input[aria-label="Formula"]')!;
+    const nameField = () => dialog()!.querySelector<HTMLInputElement>('input[aria-label="Name"]')!;
+    const submit = () => dialog()!.querySelector<HTMLButtonElement>(".swt-dialog-primary")!;
+    const previewCells = () => Array.from(dialog()!.querySelectorAll(".swt-view-table tr"), (tr) => Array.from(tr.children, (c) => c.textContent));
+    const typeInto = (input: HTMLInputElement, value: string) => {
+      input.value = value;
+      input.setSelectionRange(value.length, value.length);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    const settle = async () => {
+      // (The preview once typing pauses)
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    };
+
+    it("makes a view of a table, its whole body to start with, its preview as the formula is typed, inserted under it", async () => {
+      await setup(`${TASKS}\n\nEnd.\n`, { "silverware.table.metadata": true });
+      tableMenuItem(/^Insert view…$/)!.click();
+      expect(formulaField().value).toBe("=tasks![#Data]");
+      expect(nameField().value).toBe("view1");
+      expect(previewCells()).toEqual([
+        ["Name", "Assignee", "Hours"],
+        ["Write", "anna", "3"],
+        ["Test", "petr", "1"],
+        ["Ship", "anna", "2"],
+      ]);
+      typeInto(formulaField(), '=SORT(FILTER(tasks![#Data], tasks![assignee] = "anna"))');
+      await settle();
+      expect(previewCells().slice(1)).toEqual([
+        ["Ship", "anna", "2"],
+        ["Write", "anna", "3"],
+      ]);
+      expect(dialog()!.querySelector(".swt-view-size")!.textContent).toBe("2 rows × 3 columns");
+      submit().click();
+      await flush();
+      await controller.scan();
+      expect(text).toBe(
+        `${TASKS}\n\n| Name | Assignee | Hours |\n|---|---|---:|\n| Ship | anna | 2 |\n| Write | anna | 3 |\n| <meta core.table view.formula='=SORT(FILTER(tasks![#Data], tasks![assignee] = "anna"))' core.name='view1'> |\n\nEnd.\n`,
+      );
+    });
+
+    it("names a table without a name in the same edit, and says why a formula or a name cannot be written", async () => {
+      await setup(`${TASKS.replace("| <meta core.table core.name='tasks'> |", "")}\nEnd.\n`, { "silverware.table.metadata": true });
+      tableMenuItem(/^Insert view…$/)!.click();
+      expect(formulaField().value).toBe("=table1![#Data]");
+      expect(previewCells().length).toBe(4);
+      // A formula that cannot be calculated: why, and nothing to insert
+      typeInto(formulaField(), "=FILTER(table1![name], table1![hours] > 9)");
+      await settle();
+      expect(dialog()!.querySelector(".swt-view-none")!.textContent).toContain("#CALC!");
+      expect(submit().disabled).toBe(true);
+      typeInto(formulaField(), "=SORT(table1![assignee])");
+      await settle();
+      // A name another table has: refused
+      typeInto(nameField(), "table1");
+      expect(submit().disabled).toBe(true);
+      expect(dialog()!.querySelector(".swt-view-problem")!.textContent).toContain("Another table");
+      // None: a view no formula reads
+      typeInto(nameField(), "");
+      expect(submit().disabled).toBe(false);
+      submit().click();
+      await flush();
+      await controller.scan();
+      expect(text).toContain("<meta core.table core.name='table1'>");
+      expect(text).toContain("| Assignee |\n|---|\n| anna |\n| anna |\n| petr |\n| <meta core.table view.formula='=SORT(table1![assignee])'> |");
+    });
+
+    it("is changed in View settings…, which a press on one of its cells opens", async () => {
+      await setup(`${TASKS}\n\n${VIEW("| anna |\n| petr |")}\n`, { "silverware.table.metadata": true });
+      clickOn(table(1).rows[1]!.cells[0]!);
+      expect(dialog()).not.toBeNull();
+      expect(formulaField().value).toBe("=SORT(UNIQUE(tasks![assignee]))");
+      expect(nameField().value).toBe("people");
+      typeInto(formulaField(), "=SORT(UNIQUE(tasks![assignee]), 1, -1)");
+      await settle();
+      expect(submit().textContent).toBe("Save");
+      submit().click();
+      await flush();
+      await controller.scan();
+      expect(text).toContain("| Assignee |\n|---|\n| petr |\n| anna |\n| <meta core.table core.name='people' view.formula='=SORT(UNIQUE(tasks![assignee]), 1, -1)'> |");
+    });
+
+    it("says first that formulas are needed, and inserts nothing, with the formulas module off", async () => {
+      await setup(`${TASKS}\n`, { "silverware.table.metadata": true, "silverware.table.modules.formulas.enabled": false });
+      tableMenuItem(/^Insert view…$/)!.click();
+      expect(dialog()!.querySelector(".swt-view-warning")!.textContent).toContain("formulas module");
+      expect(submit().disabled).toBe(true);
+    });
+
+    it("is a command, /view, starting from the page's first named table, inserted at the cursor", async () => {
+      const page = `Intro.\n\n${TASKS}\n\nAfter.\n`;
+      await setup(page, { "silverware.table.metadata": true }, { getCursor: () => page.length - 1 });
+      const command = (await controller.commands()).find((c) => c.name === "Silverware Table: Insert view");
+      expect(command).toMatchObject({ slash: "view" });
+      await command!.run();
+      expect(formulaField().value).toBe("=tasks![#Data]");
+      submit().click();
+      await flush();
+      await flush();
+      expect(text).toContain("After.\n\n| Name | Assignee | Hours |\n|---|---|---:|\n| Write | anna | 3 |");
+    });
+  });
+
+  it("says in its tab what it is, and that it is out of date where its source was changed by hand; Refresh view writes it", async () => {
+    await setup(`${TASKS}\n\n${VIEW("| anna |")}\n`, { "silverware.table.metadata": true });
+    const info = controller.shownTables()[1]!;
+    expect(controller.tableBadges(info).map((b) => b.text)).toEqual(["View", "Out of date"]);
+    table(1).rows[1]!.cells[0]!.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+    const refresh = document.querySelector<HTMLElement>('.swt-bar button[aria-label="Refresh view"]')!;
+    expect(refresh.classList.contains("swt-attention")).toBe(true);
+    refresh.click();
+    await flush();
+    await controller.scan();
+    expect(viewOf(text)).toBe("| Assignee |\n|---|\n| anna |\n| petr |\n| <meta core.table core.name='people' ");
+    expect(controller.tableBadges(controller.shownTables()[1]!).map((b) => b.text)).toEqual(["View"]);
+  });
+
+  it("shows out of date once its source is changed by hand, and cannot be calculated with the reason where its formula fails", async () => {
+    await setup(`${TASKS}\n\n${VIEW("| anna |\n| petr |")}\n`, { "silverware.table.metadata": true });
+    expect(controller.tableBadges(controller.shownTables()[1]!).map((b) => b.text)).toEqual(["View"]);
+    const edited = text.replace("| Test | petr | 1 |", "| Test | eva | 1 |");
+    setText(edited);
+    renderPage(edited, editor, cursorMoves);
+    await controller.scan();
+    expect(controller.tableBadges(controller.shownTables()[1]!).map((b) => b.text)).toEqual(["View", "Out of date"]);
+    const failing = text.replace("tasks![assignee]", "FILTER(tasks![name], tasks![hours] &gt; 9)");
+    setText(failing);
+    renderPage(failing, editor, cursorMoves);
+    await controller.scan();
+    expect(controller.tableBadges(controller.shownTables()[1]!).map((b) => b.text)).toEqual(["View", "Cannot be calculated"]);
+    table(1).rows[1]!.cells[0]!.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+    expect(document.querySelector('.swt-bar button[aria-label="Refresh view"]')!.getAttribute("title")).toContain("#CALC!");
   });
 
   it("is calculated by the formulas module through the view module: with the view module off, it keeps its values", async () => {

@@ -81,7 +81,7 @@ import {
   withColumnKeys,
   writtenArea,
 } from "../formulas/index.ts";
-import { cellName, columnChoicesOf, columnIdText, FormulaError, type FormulaErrorAt, functionHelp, parseFormula, withEquals } from "../formulas/index.ts";
+import { cellName, columnChoicesOf, columnIdText, FormulaError, type FormulaErrorAt, functionHelp, type Grid, parseFormula, withEquals } from "../formulas/index.ts";
 import { addAffected, affectedBy, isAffected, type NamedOtherPages, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
 import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
@@ -262,6 +262,8 @@ export class Formulas implements Feature {
         return tree instanceof FormulaError ? tree.detail : undefined;
       },
       rowValues: (table, formula) => rowValues(table, withEquals(formula).formula.trim(), { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) }),
+      view: (formula, table, replace) => this.viewOf(formula, table, replace),
+      functions: (formula, caret, done) => this.pickFunction(formula, caret, done),
     } satisfies FormulasOffer);
   }
 
@@ -309,6 +311,34 @@ export class Formulas implements Feature {
       });
     });
     return { errors, pages };
+  }
+
+  /** A view's formula calculated on the page shown (the view module's dialog and its staleness): see FormulasOffer.view */
+  private viewOf(formula: string, table: Table | undefined, replace: { readonly from: number; readonly table: Table } | undefined): Grid | FormulaError | undefined {
+    const tables = replace
+      ? pageTables(this.cells, () => this.named(pageTablesOf(this.host.pageText)), this.host.currentPage, { ...replace, name: this.nameOf(replace.table) }, this.namedOthers(this.host.otherPages()))
+      : this.tableSource();
+    // A view to be inserted: a table of its own it has none (A1, [x] alone read nothing)
+    const own = table ?? { indent: "", align: [], rows: [{ cells: [] }], padded: false };
+    return viewResult(own, { cells: this.cells, tables, name: table && this.nameOf(table) }, withEquals(formula).formula.trim());
+  }
+
+  /** The Functions dialog for a formula typed outside a cell: the function picked put in at the caret, as the cell editor's fx does */
+  private pickFunction(formula: string, caret: number, done: (picked?: { readonly formula: string; readonly caret: number }) => void): void {
+    // A formula typed without its "=" (a view's may be) read as one with it; none typed yet, "=" alone
+    const { formula: written, shift } = formula.trim() ? withEquals(formula) : { formula: "=", shift: 1 };
+    const at = Math.min(caret + shift, written.length);
+    let picked: { formula: string; caret: number } | undefined;
+    this.functions.open(
+      `${written.slice(0, at)}▌${written.slice(at)}`,
+      (name) => {
+        const text = `${name}(`;
+        const typed = nameTyped(written, at, at) ?? { from: at, to: at };
+        const inserted = needsOperator(written, typed.from) ? `+${text}` : text;
+        picked = { formula: written.slice(0, typed.from) + inserted + written.slice(typed.to), caret: typed.from + inserted.length };
+      },
+      () => done(picked),
+    );
   }
 
   /** The views module's offer, while it is on */

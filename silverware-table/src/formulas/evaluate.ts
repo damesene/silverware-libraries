@@ -752,9 +752,9 @@ export function cellWholeResult(table: Table, row: number, column: number, { cel
  * value a cell, a list a column), or why it cannot be calculated (an error:
  * the view is written as it was). Undefined where the table is no view, or
  * its formula reads a page formulas may not read (it keeps what it shows).
+ * `formula`: another than the table's (a view's dialog, its preview).
  */
-export function viewResult(table: Table, { cells, tables, name }: Calculation): Grid | FormulaError | undefined {
-  const formula = cells.view?.formulaOf(table);
+export function viewResult(table: Table, { cells, tables, name }: Calculation, formula = cells.view?.formulaOf(table)): Grid | FormulaError | undefined {
   return formula === undefined ? undefined : new Book(cells, tables).viewResult(table, undefined, name, formula);
 }
 

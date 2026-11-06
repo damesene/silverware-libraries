@@ -14,8 +14,11 @@ export class FunctionDialog {
 
   constructor(private readonly host: ModelHost) {}
 
-  /** Opens the dialog; `formula`: the formula being edited (the caret marked), `insert` gets the name picked */
-  open(formula: string, insert: (name: string) => void): void {
+  /**
+   * Opens the dialog; `formula`: the formula being edited (the caret marked), `insert` gets the name picked;
+   * `closed`: told once it closed, after `insert` where a name was picked
+   */
+  open(formula: string, insert: (name: string) => void, closed?: () => void): void {
     const { doc } = this.host;
     const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string) => {
       const e = doc.createElement(tag);
@@ -150,6 +153,8 @@ export class FunctionDialog {
       focus: search,
       closed: () => {
         this.dialog = undefined;
+        // (After insert: a choice closes the dialog first)
+        if (closed) queueMicrotask(closed);
       },
     });
   }

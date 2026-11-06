@@ -50,6 +50,21 @@ export type FormulasOffer = {
   readonly problem: (formula: string) => string | undefined;
   /** A formula of one row (`[@due] < TODAY()`) calculated for each body row of a table of the page shown (values[0]: row 1), as a cell of none */
   readonly rowValues: (table: import("../markdown.ts").Table, formula: string) => readonly import("./values.ts").Scalar[];
+  /**
+   * A view's formula calculated on the page shown, as a write would (its result a grid, or why there is none;
+   * undefined where it reads a page not read): `table` the view's own (none: a view to be inserted), `replace` a
+   * table of the page (where it starts) as it will be written with it (a source named in the same edit)
+   */
+  readonly view: (
+    formula: string,
+    table?: import("../markdown.ts").Table,
+    replace?: { readonly from: number; readonly table: import("../markdown.ts").Table },
+  ) => import("./values.ts").Grid | import("./values.ts").FormulaError | undefined;
+  /**
+   * The Functions dialog for a formula typed outside a cell (a view's dialog), its caret at `caret`: `done` gets the
+   * formula with the function picked put in and the caret after it, or nothing where none was picked
+   */
+  readonly functions: (formula: string, caret: number, done: (picked?: { readonly formula: string; readonly caret: number }) => void) => void;
 };
 
 /**

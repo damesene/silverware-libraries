@@ -136,3 +136,11 @@ export function forFormulas(cells: FormulaCells, table: Table, each: (formula: s
     }
   });
 }
+
+/**
+ * A formula as written where its "=" may be left out (a condition's, Space
+ * Lua's): the formula with it, and how far its places moved (1 where it was added)
+ */
+export function withEquals(text: string): { readonly formula: string; readonly shift: number } {
+  return text.trimStart().startsWith("=") ? { formula: text, shift: 0 } : { formula: `=${text}`, shift: 1 };
+}

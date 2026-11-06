@@ -257,6 +257,23 @@ export function callsCustomFunctions(cells: FormulaCells, table: Table): boolean
   return calls;
 }
 
+// Functions whose result is not of their arguments alone: of the time, of chance
+const VOLATILE = new Set(["TODAY", "NOW", "RAND", "RANDBETWEEN"]);
+
+/**
+ * Whether a formula's result is of what it reads alone: every function it calls built in (a custom one is defined
+ * anew as Space Lua loads) and none of the time or chance (TODAY()): what may be kept by what it read (a pivot)
+ */
+export function callsPureFunctionsOnly(formula: string): boolean {
+  const { tokens } = tokenize(formula);
+  return tokens.every((token, i) => {
+    const next = tokens[i + 1];
+    if (token.kind !== "name" || next?.kind !== "op" || next.text !== "(") return true;
+    const name = token.text.toUpperCase();
+    return !VOLATILE.has(name) && isBuiltInFunction(name) && !isCustomFunction(name);
+  });
+}
+
 /** The names (lowercase) of the tables on the page that a table's formulas refer to, so they change when those do */
 export function referredTableNames(cells: FormulaCells, table: Table): Set<string> {
   const names = new Set<string>();

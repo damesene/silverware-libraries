@@ -5,7 +5,7 @@ import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
 import { setCell } from "../ops.ts";
 import { withoutTags } from "../tags.ts";
 import { asNumber } from "../view.ts";
-import { type CalculatedBy, cellResult, cellsByName, errorCodeIn, type FormulaCells, hasFormulas, rowsByName } from "./cell.ts";
+import { type CalculatedBy, cellResult, cellsByName, errorCodeIn, type FormulaCells, hasFormulas, rowsByName, withEquals } from "./cell.ts";
 import { dateArithmetic, parseDate } from "./dates.ts";
 import { type Node, parse, refersToOwnData, wholeColumnNames } from "./parser.ts";
 import { type Area, areaText, cellName, formulaPages, referencedColumn, type TableRef } from "./references.ts";
@@ -62,7 +62,7 @@ function calculatedKey(table: Table, page: string | undefined, name: string | un
 }
 
 /** A formula as written where its "=" may be left out (a view's): with it */
-const withEquals = (formula: string) => (formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`);
+const withEqualsOf = (formula: string) => withEquals(formula.trim()).formula;
 
 /** What a table is called in an error: its name, else what it is */
 const called = (name: string | undefined) => (name ? `the table ${name}` : "the table");
@@ -125,9 +125,9 @@ class Book {
    * is calculated (it reads itself, two read each other) is #CYCLE!.
    */
   calculated(table: Table, page: string | undefined, name: string | undefined, by: CalculatedBy, before?: Table): Table | FormulaError | undefined {
-    if (by.formulas.some((formula) => this.keepsResult(withEquals(formula)))) return undefined;
+    if (by.formulas.some((formula) => this.keepsResult(withEqualsOf(formula)))) return undefined;
     return this.asCalculated(table, page, name, (own) =>
-      by.calculate({ evaluate: (formula) => own.whole(withEquals(formula)), table: (other, at) => own.tableNow({ name: other, ...(at === undefined ? {} : { page: at }) }) }, before),
+      by.calculate({ evaluate: (formula) => own.whole(withEqualsOf(formula)), table: (other, at) => own.tableNow({ name: other, ...(at === undefined ? {} : { page: at }) }) }, before),
     );
   }
 
@@ -136,7 +136,7 @@ class Book {
    * list a column), or why it cannot be; undefined where it reads a page formulas may not read
    */
   viewResult(table: Table, page: string | undefined, name: string | undefined, formula: string): Grid | FormulaError | undefined {
-    const written = withEquals(formula);
+    const written = withEqualsOf(formula);
     if (this.keepsResult(written)) return undefined;
     return this.asCalculated(table, page, name, (own) => viewGrid(own.whole(written)));
   }

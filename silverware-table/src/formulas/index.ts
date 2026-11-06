@@ -18,15 +18,7 @@
 // This is the formulas' API for the rest of Silverware Table; the parts are the
 // files beside it, the functions in builtin/ (only functions: what a formula
 // can call), custom functions in custom.ts, which exist in registry.ts.
-export { type CalculatedBy, type CalculatedRead, type CellNameAt, cellResult, cellsByName, errorCodeIn, type FormulaCells, formulaCount, forFormulas, hasFormulas, isErrorText, isFormulaInput, type RowName, rowsByName, type StoredFormula } from "./cell.ts";
-
-/**
- * A formula as written where its "=" may be left out (a condition's, Space
- * Lua's): the formula with it, and how far its places moved (1 where it was added)
- */
-export function withEquals(text: string): { readonly formula: string; readonly shift: number } {
-  return text.trimStart().startsWith("=") ? { formula: text, shift: 0 } : { formula: `=${text}`, shift: 1 };
-}
+export { type CalculatedBy, type CalculatedRead, type CellNameAt, cellResult, withEquals, cellsByName, errorCodeIn, type FormulaCells, formulaCount, forFormulas, hasFormulas, isErrorText, isFormulaInput, type RowName, rowsByName, type StoredFormula } from "./cell.ts";
 
 /**
  * What the formulas module offers other modules (ModelHost.offered("formulas")): its cells as the formulas read them;
@@ -111,7 +103,7 @@ export type CalculatedOffer = {
   /** How a table is calculated, undefined for one the module does not calculate */
   readonly calculated: (table: import("../markdown.ts").Table) => import("./cell.ts").CalculatedBy | undefined;
 };
-export { type Area, areaText, callsCustomFunctions, columnIdText, formulaPages, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredTableNames, type TableRef, withColumnKeys } from "./references.ts";
+export { type Area, areaText, callsCustomFunctions, callsPureFunctionsOnly, columnIdText, formulaPages, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredTableNames, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";
 export { type Calculation, cellWholeResult, evaluateFormula, formulaErrors, givesList, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows, calculatedNow, viewGrid, viewResult } from "./evaluate.ts";
 export { type Node as FormulaNode, parse as parseFormula } from "./parser.ts";

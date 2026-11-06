@@ -15,7 +15,7 @@
 // Without the formulas module nothing is calculated.
 import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, ToolbarButton } from "../core/feature.ts";
 import { type Calculated, calculatedTable, movedRenames, readRenames, renamedIn, type Renames, sameCells, storedRenames } from "../calculated/index.ts";
-import { type CalculatedBy, type CalculatedOffer, followOwnFormula, type Following, FormulaError, type FormulaCells, type FormulasOffer, functionNamed, isCustomFunction, type PageLinksOffer, tokenize } from "../formulas/index.ts";
+import { type CalculatedBy, type CalculatedOffer, followOwnFormula, type Following, callsPureFunctionsOnly, FormulaError, type FormulaCells, type FormulasOffer, type PageLinksOffer } from "../formulas/index.ts";
 import { listOf } from "../bridge.ts";
 import { columnName } from "../columns.ts";
 import { ICONS } from "../icons.ts";
@@ -29,9 +29,6 @@ import { openPivotDialog } from "./pivotdialog.ts";
 
 // How many pivots calculated are kept (pivotOf)
 const MADE_KEPT = 16;
-
-// Functions whose result is not of their arguments alone: a pivot calling one is not kept
-const VOLATILE = new Set(["TODAY", "NOW", "RAND", "RANDBETWEEN"]);
 
 // What a pivot's dialog says first while the formulas module, which calculates pivots, is off
 const FORMULAS_OFF = "A pivot is calculated by the formulas module, which is off: turn it on in Silverware Table's settings (the Silverware Table: Settings command), then reload.";
@@ -289,12 +286,16 @@ export class Pivot implements Feature {
       });
       return;
     }
-    const pivot = this.calculate(definition, found);
-    if (typeof pivot === "string") return void this.stale.set(info, `This pivot cannot be calculated: ${pivot}`);
-    // As the formulas calculate it now (a source that is a view as calculated now, a cycle through one)
-    const now = this.host.offered<FormulasOffer>("formulas")?.calculated(table) ?? this.written(table, pivot, this.renamesOf(table));
+    // Why its source is not found, said as the dialog says it; else as the formulas calculate it now (a source that is a
+    // view as calculated now, a cycle through one)
+    if ("problem" in found) return void this.stale.set(info, `This pivot cannot be calculated: ${found.problem}`);
+    if ("unread" in found) return void this.stale.set(info, `This pivot cannot be calculated: ${this.unreadable() ?? `${found.unread} is not read yet`}`);
+    const formulas = this.host.offered<FormulasOffer>("formulas");
+    if (!formulas) return void this.stale.set(info, "This pivot cannot be calculated: it needs the formulas module, which is off");
+    const now = formulas.calculated(table);
     if (now instanceof FormulaError) return void this.stale.set(info, `This pivot cannot be calculated: ${now.code} ${now.detail}`);
-    this.stale.set(info, !sameCells(now, table));
+    // (Not calculated: its source's page not read, as it keeps what it shows)
+    this.stale.set(info, !!now && !sameCells(now, table));
   }
 
   /** What a pivot is, at a glance: Pivot of its source as the definition writes it (another page's: Pivot of [[Orders]]orders), one with a problem too; out of date, said so */
@@ -509,16 +510,8 @@ function movedId(id: string, moved: ReadonlyMap<string, string>): string {
   return m ? m[1]! + (moved.get(m[2]!) ?? m[2]!) : id;
 }
 
-/** Whether a pivot's result is of its source alone: every function its definition calls built in, none of the time or chance */
+/** Whether a pivot's result is of its source alone, so it may be kept by it (formulas/references.ts) */
 function keptOf(definition: PivotDefinition): boolean {
   const formulas = [...definition.rows, ...definition.columns].map(groupFormula).concat(definition.values.map((item) => valueParts(item).formula), definition.where ? [definition.where] : []);
-  return formulas.every((formula) => {
-    const { tokens } = tokenize(`=${formula}`);
-    return tokens.every((token, i) => {
-      const next = tokens[i + 1];
-      if (token.kind !== "name" || next?.kind !== "op" || next.text !== "(") return true;
-      const name = token.text.toUpperCase();
-      return !VOLATILE.has(name) && !!functionNamed(name) && !isCustomFunction(name);
-    });
-  });
+  return formulas.every((formula) => callsPureFunctionsOnly(`=${formula}`));
 }

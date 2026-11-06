@@ -1941,17 +1941,15 @@ body.swt-resizing * {
   flex-direction: column;
   gap: 8px;
 }
-.swt-choices-list,
-.swt-choices-from-space {
+.swt-choices-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.swt-choices-list[hidden],
-.swt-choices-from-space[hidden] {
+.swt-choices-list[hidden] {
   display: none;
 }
-/* The ways (the column's values, a list of its own, the space's) as one row of segments, the one picked's hint under it */
+/* The ways (the column's values, a list of its own) as one row of segments, the one picked's hint under it */
 .swt-choices-ways {
   display: flex;
   border: 1px solid var(--swt-dialog-line);
@@ -2013,7 +2011,6 @@ body.swt-resizing * {
   font-weight: 600;
 }
 .swt-choices-name,
-.swt-choices-space,
 .swt-choices-value {
   flex: 1;
   min-width: 0;
@@ -2024,28 +2021,6 @@ body.swt-resizing * {
   background: var(--root-background-color);
   border: 1px solid var(--swt-dialog-line);
   border-radius: 6px;
-}
-.swt-choices-space-values {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 50vh;
-  overflow-y: auto;
-}
-/* A value of the space's list: as a value's field, to read only */
-.swt-choices-readonly {
-  flex: 1;
-  min-width: 0;
-  padding: 5px 8px;
-  overflow-wrap: anywhere;
-  border: 1px solid var(--swt-dialog-line);
-  border-radius: 6px;
-  opacity: 0.85;
-}
-.swt-choices-count,
-.swt-choices-empty {
-  font-weight: normal;
-  opacity: 0.7;
 }
 .swt-choices-tag {
   font-weight: normal;

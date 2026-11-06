@@ -19,8 +19,6 @@ import {
   type ColumnTypesOffer,
   listKey,
   listNames,
-  spaceList,
-  spaceListNames,
   choiceListOf,
   isChoice,
   typeTagPatterns,
@@ -86,8 +84,6 @@ export class ColumnTypes implements Feature {
   private readonly picker: Panel;
   private picking: Picking | undefined;
   private readonly choicesDialog: ChoicesDialog;
-  // The space's lists' names as tables last looked by them: a list gone repaints its columns too
-  private spaceNamesShown: readonly string[] = [];
 
   constructor(private readonly host: ModelHost) {
     this.choicesDialog = new ChoicesDialog(host);
@@ -128,7 +124,6 @@ export class ColumnTypes implements Feature {
       get stored() {
         return (stored ??= host.metaOf(table));
       },
-      spaceList,
       values: () =>
         (values ??= table.rows
           .slice(1)
@@ -137,26 +132,9 @@ export class ColumnTypes implements Feature {
     };
   }
 
-  /**
-   * Custom types were defined anew: their hashtags are hidden too (tables
-   * rendered from now on show them typed); the space's choice lists read anew:
-   * the tables shown with a column naming a list look again
-   */
+  /** Custom types were defined anew: their hashtags are hidden too (tables rendered from now on show them typed) */
   tablesChanged(): void {
     this.host.hideHeaderTags("types", typeTagPatterns());
-    // Only a column of a list its table does not keep can show another list now (one of the space's, or one gone)
-    const space = [...new Set([...spaceListNames(), ...this.spaceNamesShown])];
-    this.spaceNamesShown = spaceListNames();
-    if (!space.length) return;
-    for (const info of this.host.shownTables()) {
-      const table = parseTable(info.source);
-      const own = listNames(this.host.metaOf(table));
-      const header = table.rows[0]?.cells ?? [];
-      if (header.some((cell) => {
-        const name = choiceListOf(unescapeCell(cell));
-        return name !== undefined && !own.includes(name) && space.includes(name);
-      })) this.host.looksChanged(info);
-    }
   }
 
   // ---- the column menu ----------------------------------------------------------
@@ -232,27 +210,7 @@ export class ColumnTypes implements Feature {
     const write = (change: (t: Table) => Table) => void this.host.writeTable(this.host.tableFor(info.key) ?? info, change);
     // The list taken for the column: its header naming it
     const take = (name: string) => () => write((t) => setCell(t, 0, column, withColumnType(t.rows[0]?.cells[column] ?? "", `choice-${name}`)));
-    const own = listNames(this.host.metaOf(table));
-    // The space's lists (Space Lua's) the table keeps none of the name of: taken only, deleted in the script
-    const space = spaceListNames()
-      .filter((name) => !own.includes(name))
-      .map((name): MenuEntry => {
-        const used = users.get(name);
-        return {
-          kind: "segmented",
-          label: `Choice: ${name}`,
-          hint: `The space's list, from Space Lua${used ? `; used by ${used.join(", ")}` : ""}`,
-          options: [
-            {
-              icon: choice.iconFor?.({ name }) ?? iconOf(choice),
-              title: `Take the space's list ${name} for this column`,
-              active: taken === name,
-              run: take(name),
-            },
-          ],
-        };
-      });
-    return own.map((name): MenuEntry => {
+    return listNames(this.host.metaOf(table)).map((name): MenuEntry => {
       const used = users.get(name);
       return {
         kind: "segmented",
@@ -272,7 +230,7 @@ export class ColumnTypes implements Feature {
           },
         ],
       };
-    }).concat(space);
+    });
   }
 
   /**

@@ -17,7 +17,6 @@ import { metaName } from "./meta.ts";
 import { columnNameIn } from "./names.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { customMenuEntries, customMenuEntriesAnew, defineCustomMenuEntries } from "./menus/custom.ts";
-import { choicesAnew, choicesIndexed, defineChoices as defineSpaceChoices, setChoicesHost } from "./spacechoices.ts";
 import { LuaSources } from "./host/sources.ts";
 import type { SourceProvider } from "./sources.ts";
 
@@ -33,8 +32,7 @@ const spaceSources = new LuaSources();
 export function pageIndexed(name: string): void {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
   void controller?.pageIndexed(name);
-  // The index the space's choice lists and sources read may have changed
-  choicesIndexed();
+  // The index the space's sources read may have changed
   spaceSources.indexed();
 }
 
@@ -355,15 +353,6 @@ export function defineMenuEntries(definitions: unknown): string | undefined {
 }
 
 /**
- * `silverware.table.defineChoices(name, fn)`: a choice list of the space, its values what the Lua
- * function gives (a query's), read now and again as SilverBullet indexes pages; a column naming it
- * (`#choice-<name>`) takes it where its table keeps no list of that name. Why not, for a notification
- */
-export function defineChoices(name: unknown, fn: unknown): string | undefined {
-  return defineSpaceChoices(name, fn);
-}
-
-/**
  * `silverware.table.defineSource(name, [options,] fn)`: a source of the space, its rows what the Lua function
  * gives (a query's), read now and again as SilverBullet indexes pages; formulas read it as `@name`. Why not,
  * for a notification
@@ -374,7 +363,6 @@ export function defineSource(name: unknown, options: unknown, fn?: unknown): str
 
 /** Space Lua is loaded (again): the custom definitions are made anew, replacing those of before */
 export function resetDefinitions(): void {
-  choicesAnew();
   spaceSources.anew();
   customMenuEntriesAnew();
   customFunctionsAnew();
@@ -403,11 +391,6 @@ export function init(bridge: Bridge, sources: SourceProvider = spaceSources): vo
     console.error(`Silverware Table: missing editor functions: ${missing.join(", ")}`);
     return;
   }
-  // A list that failed is said once until it changes; lists read anew make the tables look again
-  setChoicesHost({
-    problem: (message) => void bridge.flash(message, "error"),
-    changed: definitionsChanged,
-  });
   // A source that failed is said once until it changes
   spaceSources.connect((message) => void bridge.flash(message, "error"));
   const global = globalThis as unknown as Record<string, Controller | undefined>;

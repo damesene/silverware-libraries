@@ -86,18 +86,23 @@ Builds on `silverware.table.defineChoices` (this branch's base, released with vi
 So a source does not copy it: **`defineChoices` becomes `defineSource`** (decided 2026-11-05; both unreleased, above). A list of the space is a source of one column, so there is one thing defined from Lua, one meaning of `@`, and no names shared between lists and sources that could clash. spacechoices.ts's way of reading (its Lua functions by name, refreshed, `stale`, `lastRead`, `said`) is the sources', what a function gives made rows instead of values. A source may give a plain list of values too (`select p.name`, as `defineChoices` takes today), read as one column named `value`:
 
 ```lua
-silverware.table.defineSource("projects", function()
-  return query[[from p = index.tag "project" select p.name]]
-end)
+silverware.table.defineSource {
+  name = "projects",
+  data = function() return query[[from p = index.tag "project" select p.name]] end,
+}
 ```
 
 A choice column uses it through its table's list, written as a formula (below): what a column checks against is always in its table, never found by a name alone.
 
 ```lua
-silverware.table.defineSource("tasks", { columns = { "name", "page", "due", "done" } }, function()
-  return query[[from t = index.tag "task" select { name = t.name, page = t.page, due = t.due, done = t.done }]]
-end)
+silverware.table.defineSource {
+  name = "tasks",
+  columns = { "name", "page", "due", "done" },
+  data = function() return query[[from t = index.tag "task" select { name = t.name, page = t.page, due = t.due, done = t.done }]] end,
+}
 ```
+
+(Written as one table, its function `data`, decided with the user on 2026-11-06 after step 4, in place of `defineSource(name, [options,] fn)`: options after a function read badly, and one table takes more keys as they come, as SilverBullet's `command.define` does. Not `query`: Space Lua reads `query = …` as its query syntax, a syntax error, seen in the local SilverBullet.)
 
 * A list of objects, each a row; its columns in the order the function gives them: the first row's keys, then the keys new in later rows, as SilverBullet lays out a `${…}` of records (Space Lua keeps a table's keys in the order they were set, unlike C Lua: verified in 2.12.1, 2026-11-06, *Step 4: decided* 4); `columns` another order, or some of them. Values as text: numbers, text, dates as ISO text; booleans as `TRUE`/`FALSE` as formulas read them; `nil` empty; a list its values joined by a comma and a space (tags, people: read and filtered so); an object left out, the cell empty (it has no form a cell could show) (decided 2026-11-05).
 * In formulas a table of the space: `@tasks`, `@tasks[due]`, `@tasks[#Data]` (decided 2026-11-05: `@` is in no table's name, so it cannot clash, and it shows the table is no table of the page). Offered by a module to the formulas' `TableSource`; until the function has run once it is `unread`, so formulas and views keep what they show.

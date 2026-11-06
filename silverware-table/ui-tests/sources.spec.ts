@@ -7,7 +7,7 @@ import { cell, defineSources, expect, hoverCell, markdown, reload, rendersAnew, 
 // The playground's sources (playground/playground.ts: kept in step with it), as a script defines them in SilverBullet
 const SCRIPT = [
   "```space-lua",
-  'silverware.table.defineSource("tasks", { columns = { "name", "page", "due", "done", "tags" } }, function()',
+  "local function tasks()",
   "  return {",
   '    { name = "Write the plan", page = "Projects/Atlas", due = "2025-11-10", done = true, tags = { "planning" } },',
   '    { name = "Review the budget", page = "Projects/Atlas", due = "2025-11-14", done = false, tags = { "money", "review" } },',
@@ -15,8 +15,9 @@ const SCRIPT = [
   '    { name = "Order paper", page = "Projects/Beacon", due = "2025-11-20", done = false, tags = { "money" } },',
   '    { name = "Send the invoice", page = "Projects/Comet", due = "2025-11-08", done = true, tags = { "money" } },',
   "  }",
-  "end)",
-  'silverware.table.defineSource("projects", function() return { "Atlas", "Beacon", "Comet" } end)',
+  "end",
+  'silverware.table.defineSource { name = "tasks", columns = { "name", "page", "due", "done", "tags" }, data = tasks }',
+  'silverware.table.defineSource { name = "projects", data = function() return { "Atlas", "Beacon", "Comet" } end }',
   "```",
   "",
 ].join("\n");
@@ -79,7 +80,15 @@ test.describe("Sources of the space", () => {
     await setOtherPage(
       page,
       "UiTests/QueryScript",
-      ["```space-lua", 'silverware.table.defineSource("uiprojects", function()', '  return query[[from p = index.tag "uiproject" select { name = p.name }]]', "end)", "```", ""].join("\n"),
+      [
+        "```space-lua",
+        "local function uiprojects()",
+        '  return query[[from p = index.tag "uiproject" select { name = p.name }]]',
+        "end",
+        'silverware.table.defineSource { name = "uiprojects", data = uiprojects }',
+        "```",
+        "",
+      ].join("\n"),
     );
     await reload(page);
     await setPage(page, "| Count |\n|---|\n| 1 <meta formulas.f='=COUNTA(@uiprojects[name])'> |\n");

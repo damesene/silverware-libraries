@@ -114,25 +114,30 @@ export class LuaSources implements SourceProvider {
   }
 
   /**
-   * `silverware.table.defineSource(name, [options,] fn)`: a source by its
-   * name, its rows what `fn` gives, `options.columns` its columns; why not,
-   * else undefined
+   * `silverware.table.defineSource { name, data, columns }`: a source by its
+   * name, its rows what the function `data` gives, `columns` (optional) its
+   * columns; why not, else undefined (`query` would not do: Space Lua reads
+   * `query = …` as its query syntax, a syntax error)
    */
-  define(name: unknown, options: unknown, fn?: unknown): string | undefined {
-    if (fn === undefined && typeof options === "function") return this.define(name, undefined, options);
+  define(definition: unknown): string | undefined {
+    const usage = 'give a table: { name = "tasks", data = function() … end, columns = { "name", "due" } } (columns optional)';
+    if (!definition || typeof definition !== "object" || Array.isArray(definition)) return `Silverware Table: source not defined: ${usage}.`;
+    const { name, data, columns: list, ...rest } = definition as Record<string, unknown>;
     const given = typeof name === "string" ? name.trim() : "";
     const problem = given ? tableNameProblem(given) : "it is empty";
-    if (problem) return `Silverware Table: source not defined: "${String(name)}" is no source's name: ${problem}.`;
-    if (typeof fn !== "function") return `Silverware Table: source ${given} not defined: give a function that returns its rows.`;
+    if (problem) return `Silverware Table: source not defined: "${String(name ?? "")}" is no source's name: ${problem}.`;
+    const unknown = Object.keys(rest);
+    if (unknown.length) return `Silverware Table: source ${given} not defined: it knows no ${unknown.join(", ")} (name, data, columns).`;
+    if (typeof data !== "function") return `Silverware Table: source ${given} not defined: its data is a function that returns its rows.`;
     let columns: string[] | undefined;
-    if (options !== undefined && options !== null) {
-      const list = typeof options === "object" ? (options as Record<string, unknown>).columns : undefined;
-      const items = list === undefined ? undefined : listOf(list);
-      if (items === undefined || !items.length || items.some((item) => typeof item !== "string" || !item.trim())) {
-        return `Silverware Table: source ${given} not defined: its options are { columns = { "name", "due" } }, the columns' names in their order.`;
+    if (list !== undefined && list !== null) {
+      const items = listOf(list);
+      if (!items.length || items.some((item) => typeof item !== "string" || !item.trim())) {
+        return `Silverware Table: source ${given} not defined: its columns are their names in their order, { "name", "due" }.`;
       }
       columns = (items as string[]).map((c) => c.trim());
     }
+    const fn = data;
     // The first definition of a new load of Space Lua: those of before go (their names unread meanwhile)
     if (this.stale) {
       this.previous = new Map([...this.definitions].map(([key, d]) => [key, d.name]));

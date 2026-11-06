@@ -116,14 +116,15 @@ if js and js.window then
     shown(silverwareTableJs.defineMenuEntries(definitions), "defineMenuEntries")
   end
   --- A source of the space: a table formulas, views and pivots read as @name (@tasks[due], @tasks[#Data]).
-  --- The function gives its rows (a query's, usually); it runs now and again a moment after SilverBullet
+  --- Its data function gives its rows (a query's, usually); it runs now and again a moment after SilverBullet
   --- indexes a page. A mistake is shown, the source keeping the rows it had.
-  --- @param name string the source's name, as a table's: letters, digits and _, e.g. "tasks"
-  --- @param options table|nil { columns = { "name", "due" } }: its columns in this order, or some of them
-  --- @param fn function giving a list of records (each a row) or of values (one column, value), e.g. function() return query[[from t = index.tag "task" select { name = t.name, due = t.due }]] end
+  --- @param definition table { name = "tasks", data = function() … end, columns = { "name", "due" } }:
+  --- name the source's, as a table's (letters, digits and _); data a function giving a list of records (each a row)
+  --- or of values (one column, value), e.g. function() return query[[from t = index.tag "task" select { name = t.name, due = t.due }]] end;
+  --- columns (optional) its columns in this order, or some of them
   --- @see Library/damesene/silverware-table#Sources of the space
-  function silverware.table.defineSource(name, options, fn)
-    shown(silverwareTableJs.defineSource(name, options, fn), "defineSource")
+  function silverware.table.defineSource(definition)
+    shown(silverwareTableJs.defineSource(definition), "defineSource")
   end
   -- A formula calculated by the JS's function `calculate` (evaluated or evaluatedText) on the page it is on
   -- (a ${…}'s, else the page shown), its result as that function gives it.

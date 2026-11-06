@@ -388,16 +388,22 @@ The page's name in double brackets goes before the table's name: `[[Prices]]frui
 
 ### Sources of the space
 
-A script can give formulas a table of the space, built from a query: `silverware.table.defineSource(name, fn)` in a `space-lua` block of yours names it, and formulas read it as `@name`:
+A script can give formulas a table of the space, built from a query: `silverware.table.defineSource { name, data, columns }` in a `space-lua` block of yours names it and the function that gives its rows, and formulas read it as `@name`:
 
 ```lua
-silverware.table.defineSource("tasks", { columns = { "name", "page", "due", "done" } }, function()
+local function tasks()
   return query[[from t = index.tag "task" select { name = t.name, page = t.page, due = t.due, done = t.done }]]
-end)
+end
+
+silverware.table.defineSource {
+  name = "tasks",
+  columns = { "name", "page", "due", "done" },
+  data = tasks,
+}
 ```
 
 * `@tasks[due]` is a column of it, `@tasks` (or `@tasks[#Data]`) all its rows: `=COUNTIFS(@tasks[done], "FALSE")`, `=XLOOKUP([@id], @users[id], @users[email])`, a view `=FILTER(@tasks[#Data], @tasks[done] = "FALSE")`, a pivot of it (`pivot.source='@tasks'`, or *Sources of the space* in the pivot dialog's *Source*). A source has no cells to refer to (`@tasks!A1`) and no row of the formula's (`@tasks[@due]`): a query's rows have no fixed order.
-* The function returns a list of records, each a row: its columns are the first record's keys, then the keys new in later ones, in the order the script sets them. `columns` (optional) gives another order, or some of them only; give it where the query may return nothing, so the columns are known then too. A list of plain values (`select p.name`) is one column, `value`.
+* `data` is a function returning a list of records, each a row: its columns are the first record's keys, then the keys new in later ones, in the order the script sets them. `columns` (optional) gives another order, or some of them only; give it where the query may return nothing, so the columns are known then too. A list of plain values (`select p.name`) is one column, `value`.
 * Values are written as text: numbers and texts as they are, `true` and `false` as `TRUE` and `FALSE`, a list as its values joined by a comma (`money, review`), `nil` and an object as an empty cell.
 * Its name is a table's (letters, digits and `_`, not starting with a digit), compared ignoring case; `@` keeps it apart from the page's tables.
 * The function runs when Space Lua loads, and again a moment after SilverBullet indexes a page, so the source follows the space. Nothing is written by it: a table whose formulas read a source that changed has *Recalculate* highlighted, a view or pivot of it *Out of date*; click to write the new results. A function that fails, or returns no list, is shown in a notification (once, until the problem changes); the source keeps the rows it had.

@@ -60,22 +60,25 @@ describe("LuaSources", () => {
   });
 
   it("refuses a name a table cannot have, no function, or options that are not columns", () => {
-    expect(sources.define("bad name", () => [])).toMatch(/is no source's name/);
-    expect(sources.define("A1", () => [])).toMatch(/is no source's name/);
-    expect(sources.define("ok", "nope")).toMatch(/give a function/);
-    expect(sources.define("ok", { columns: 3 }, () => [])).toMatch(/its options are/);
-    expect(sources.define("ok", () => [])).toBeUndefined();
-    expect(sources.define("other", { columns: { 1: "a" } }, () => [])).toBeUndefined();
+    expect(sources.define("tasks")).toMatch(/give a table/);
+    expect(sources.define({ name: "bad name", data: () => [] })).toMatch(/is no source's name/);
+    expect(sources.define({ name: "A1", data: () => [] })).toMatch(/is no source's name/);
+    expect(sources.define({ name: "ok", data: "nope" })).toMatch(/its data is a function/);
+    expect(sources.define({ name: "ok", data: () => [], columns: 3 })).toMatch(/its columns are/);
+    expect(sources.define({ name: "ok", data: () => [], run: () => [] })).toMatch(/knows no run/);
+    expect(sources.define({ name: "ok", data: () => [] })).toBeUndefined();
+    // A Lua table's list: keys 1, 2…
+    expect(sources.define({ name: "other", data: () => [], columns: { 1: "a" } })).toBeUndefined();
   });
 
   it("knows a source's name as it is defined, before its function has given rows; compared ignoring case", () => {
-    sources.define("Tasks", () => new Promise(() => {}));
+    sources.define({ name: "Tasks", data: () => new Promise(() => {}) });
     expect(sources.names()).toEqual(["Tasks"]);
     expect(sources.read("tasks")).toBeUndefined();
   });
 
   it("reads a source as it is defined, and tells of the change once", async () => {
-    sources.define("tasks", async () => [{ name: "a" }]);
+    sources.define({ name: "tasks", data: async () => [{ name: "a" }] });
     await vi.runAllTimersAsync();
     const read = sources.read("TASKS");
     expect(read).toEqual({ columns: ["name"], rows: [["a"]] });
@@ -87,14 +90,14 @@ describe("LuaSources", () => {
   });
 
   it("takes the columns given", async () => {
-    sources.define("tasks", { columns: ["due", "name"] }, () => [{ name: "a", due: "d" }]);
+    sources.define({ name: "tasks", columns: ["due", "name"], data: () => [{ name: "a", due: "d" }] });
     await vi.runAllTimersAsync();
     expect(sources.read("tasks")).toEqual({ columns: ["due", "name"], rows: [["d", "a"]] });
   });
 
   it("reads the sources again a while after the last page indexed", async () => {
     let values = ["a"];
-    sources.define("x", () => values);
+    sources.define({ name: "x", data: () => values });
     await vi.runAllTimersAsync();
     values = ["a", "b"];
     sources.indexed();
@@ -108,10 +111,10 @@ describe("LuaSources", () => {
 
   it("keeps a source's rows where its function fails, said once until the problem changes", async () => {
     let fail: unknown = undefined;
-    sources.define("x", () => {
+    sources.define({ name: "x", data: () => {
       if (fail) throw fail;
       return ["a"];
-    });
+    } });
     await vi.runAllTimersAsync();
     fail = new Error("no index");
     await sources.refresh();
@@ -126,18 +129,18 @@ describe("LuaSources", () => {
   });
 
   it("says a function that gives no list", async () => {
-    sources.define("x", () => "a, b");
+    sources.define({ name: "x", data: () => "a, b" });
     await vi.runAllTimersAsync();
     expect(sources.read("x")).toBeUndefined();
     expect(problems).toEqual(["Silverware Table: the source x gave no list (return a query's result, or a list of values)."]);
   });
 
   it("drops a source no script defines once Space Lua has loaded again", async () => {
-    sources.define("x", () => ["a"]);
-    sources.define("y", () => ["b"]);
+    sources.define({ name: "x", data: () => ["a"] });
+    sources.define({ name: "y", data: () => ["b"] });
     await vi.runAllTimersAsync();
     sources.anew();
-    sources.define("y", () => ["c"]);
+    sources.define({ name: "y", data: () => ["c"] });
     await vi.runAllTimersAsync();
     expect(sources.names()).toEqual(["y"]);
     expect(sources.read("x")).toBeUndefined();
@@ -145,7 +148,7 @@ describe("LuaSources", () => {
   });
 
   it("keeps reading the definitions of before until a script defines one, or for a while where none does", async () => {
-    sources.define("x", () => ["a"]);
+    sources.define({ name: "x", data: () => ["a"] });
     await vi.runAllTimersAsync();
     sources.anew();
     // A page indexed meanwhile: the source stays
@@ -160,7 +163,7 @@ describe("LuaSources", () => {
 
   it("keeps the columns read before where a query gives no rows", async () => {
     let rows: unknown[] = [{ name: "a", due: "d" }];
-    sources.define("overdue", () => rows);
+    sources.define({ name: "overdue", data: () => rows });
     await vi.runAllTimersAsync();
     rows = [];
     await sources.refresh();
@@ -168,20 +171,20 @@ describe("LuaSources", () => {
   });
 
   it("has the sources of before unread, not gone, while a new load of Space Lua defines them again", async () => {
-    sources.define("x", () => ["a"]);
-    sources.define("y", () => ["b"]);
+    sources.define({ name: "x", data: () => ["a"] });
+    sources.define({ name: "y", data: () => ["b"] });
     await vi.runAllTimersAsync();
     sources.anew();
-    sources.define("x", () => ["c"]);
+    sources.define({ name: "x", data: () => ["c"] });
     // y not defined again yet: known, not read
     expect(sources.names()).toEqual(["y", "x"]);
     expect(sources.read("y")).toBeUndefined();
-    sources.define("y", () => ["d"]);
+    sources.define({ name: "y", data: () => ["d"] });
     await vi.runAllTimersAsync();
     expect(sources.read("y")?.rows).toEqual([["d"]]);
     // One no script defines again goes once the load is over
     sources.anew();
-    sources.define("x", () => ["e"]);
+    sources.define({ name: "x", data: () => ["e"] });
     await vi.advanceTimersByTimeAsync(REFRESH_MS);
     await vi.runAllTimersAsync();
     expect(sources.names()).toEqual(["x"]);
@@ -190,9 +193,9 @@ describe("LuaSources", () => {
   it("says a problem found before init once it is connected", async () => {
     const early = new LuaSources();
     const said: string[] = [];
-    early.define("x", () => {
+    early.define({ name: "x", data: () => {
       throw new Error("early");
-    });
+    } });
     await vi.runAllTimersAsync();
     early.connect((m) => said.push(m));
     await vi.runAllTimersAsync();

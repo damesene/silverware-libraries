@@ -25,6 +25,7 @@ import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./features/metadata.ts";
 import { featureEntries } from "./modules.ts";
+import { memorySources, type SourceProvider } from "./sources.ts";
 import { moduleHost } from "./core/modulehost.ts";
 import {
   caretTextOffset,
@@ -237,6 +238,8 @@ export class Controller implements TableHost {
   constructor(
     readonly doc: Document,
     public bridge: Bridge,
+    // The sources of the space the host gives (the sources module offers them to formulas)
+    private readonly sources: SourceProvider = memorySources(),
   ) {
     this.adapter = new SilverBulletAdapter(doc, this.rows, {
       infoOf: (widget) => this.infos.get(widget),
@@ -374,7 +377,7 @@ export class Controller implements TableHost {
    * page is loaded again.
    */
   private async startFeatures(): Promise<void> {
-    const all = featureEntries(this.metadata);
+    const all = featureEntries(this.metadata, this.sources);
     const enabled = await Promise.all(all.map(({ name }) => (name ? this.featureEnabled(name) : true)));
     if (this.stopped) return;
     all.forEach(({ name }, i) => {

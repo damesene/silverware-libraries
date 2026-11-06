@@ -18,18 +18,24 @@ import { columnNameIn } from "./names.ts";
 import { type TableData, tableData } from "./tabledata.ts";
 import { customMenuEntries, customMenuEntriesAnew, defineCustomMenuEntries } from "./menus/custom.ts";
 import { choicesAnew, choicesIndexed, defineChoices as defineSpaceChoices, setChoicesHost } from "./spacechoices.ts";
+import { LuaSources } from "./host/sources.ts";
+import type { SourceProvider } from "./sources.ts";
 
 export const version = "0.1.0";
 
 // One controller per window, even if the module is loaded again (e.g. after an update)
 const GLOBAL_KEY = "__silverwareTable";
 
+// The sources Space Lua defines (silverware.table.defineSource), SilverBullet's provider of them
+const spaceSources = new LuaSources();
+
 /** Called by the init page on SilverBullet's `page:index` event */
 export function pageIndexed(name: string): void {
   const controller = (globalThis as unknown as Record<string, Controller | undefined>)[GLOBAL_KEY];
   void controller?.pageIndexed(name);
-  // The index the space's choice lists read may have changed
+  // The index the space's choice lists and sources read may have changed
   choicesIndexed();
+  spaceSources.indexed();
 }
 
 /** Called by the init page on SilverBullet's `editor:pageLoaded` event */
@@ -357,9 +363,19 @@ export function defineChoices(name: unknown, fn: unknown): string | undefined {
   return defineSpaceChoices(name, fn);
 }
 
+/**
+ * `silverware.table.defineSource(name, [options,] fn)`: a source of the space, its rows what the Lua function
+ * gives (a query's), read now and again as SilverBullet indexes pages; formulas read it as `@name`. Why not,
+ * for a notification
+ */
+export function defineSource(name: unknown, options: unknown, fn?: unknown): string | undefined {
+  return spaceSources.define(name, options, fn);
+}
+
 /** Space Lua is loaded (again): the custom definitions are made anew, replacing those of before */
 export function resetDefinitions(): void {
   choicesAnew();
+  spaceSources.anew();
   customMenuEntriesAnew();
   customFunctionsAnew();
   customTypesAnew();
@@ -380,7 +396,8 @@ function definitionsChanged(): void {
   });
 }
 
-export function init(bridge: Bridge): void {
+/** Silverware Table started on the bridge the host hands over; `sources` the space's (SilverBullet's: those Space Lua defines) */
+export function init(bridge: Bridge, sources: SourceProvider = spaceSources): void {
   const missing = missingBridgeFunctions(bridge);
   if (missing.length) {
     console.error(`Silverware Table: missing editor functions: ${missing.join(", ")}`);
@@ -391,13 +408,15 @@ export function init(bridge: Bridge): void {
     problem: (message) => void bridge.flash(message, "error"),
     changed: definitionsChanged,
   });
+  // A source that failed is said once until it changes
+  spaceSources.connect((message) => void bridge.flash(message, "error"));
   const global = globalThis as unknown as Record<string, Controller | undefined>;
   const existing = global[GLOBAL_KEY];
   if (existing) {
     existing.setBridge(bridge);
     return;
   }
-  const controller = new Controller(document, bridge);
+  const controller = new Controller(document, bridge, sources);
   global[GLOBAL_KEY] = controller;
   controller.start();
 }

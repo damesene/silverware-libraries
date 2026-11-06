@@ -1,6 +1,7 @@
 // A page without SilverBullet: markdown in a textarea, tables rendered the way
 // SilverBullet renders them, and Silverware Table on top through a mock Bridge.
 import type { Bridge } from "../silverware-table/src/bridge.ts";
+import { memorySources } from "../silverware-table/src/sources.ts";
 import { init, openSettings } from "../silverware-table/src/index.ts";
 import { findTables, parseTable } from "../silverware-table/src/markdown.ts";
 import { metaTagPattern } from "../silverware-table/src/tags.ts";
@@ -403,9 +404,24 @@ const bridge: Bridge = {
   navigate: (ref) => flash(`Playground: would open ${ref}`),
 };
 
+// The space's sources, fixed here as Space Lua would give them (silverware.table.defineSource): what @tasks and @projects read
+const sources = memorySources({
+  tasks: {
+    columns: ["name", "page", "due", "done", "tags"],
+    rows: [
+      ["Write the plan", "Projects/Atlas", "2025-11-10", "TRUE", "planning"],
+      ["Review the budget", "Projects/Atlas", "2025-11-14", "FALSE", "money, review"],
+      ["Call the printer", "Projects/Beacon", "2025-11-12", "FALSE", ""],
+      ["Order paper", "Projects/Beacon", "2025-11-20", "FALSE", "money"],
+      ["Send the invoice", "Projects/Comet", "2025-11-08", "TRUE", "money"],
+    ],
+  },
+  projects: { columns: ["value"], rows: [["Atlas"], ["Beacon"], ["Comet"]] },
+});
+
 source.value = text;
 render();
-init(bridge);
+init(bridge, sources);
 // The benchmark's log: what each phase and module took, measured from outside (Silverware Table has no measuring in it)
 setProfileSink(profileLog.add);
 void profileSilverwareTable();

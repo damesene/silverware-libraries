@@ -149,6 +149,18 @@ describe("as an Excel table", () => {
     // Its total row not its last one (no totals row): the column's cells as before
     expect(excelFormula("=SUM([jan])", table, 2, 1, {}, { ...structured, totalsRow: false })).toEqual({ text: "SUM(B2:B3)", array: false });
   });
+
+  it("writes [#Data] as the table's, without its total rows; the array functions as their values", () => {
+    const table = parseTable(["| Name | Jan | Feb | Total |", "|---|---|---|---|", "| a | 1 | 2 | |", "| b | 3 | 4 | |", "| Sum | 4 <meta formulas.f='=SUM([jan])'> | | |"].join("\n"));
+    const structured = { name: "T", columns: ["Name", "Jan", "Feb", "Total"], totalsRow: true };
+    expect(excelFormula("=COUNTA([#Data])", table, 2, 0, {}, structured)).toEqual({ text: "COUNTA(T[#Data])", array: false });
+    expect(excelFormula("=COUNTA([#Data])", table, 2, 0, {}, { ...structured, totalsRow: false })).toEqual({ text: "COUNTA(A2:D3)", array: false });
+    expect(excelFormula("=COUNTA(other![#Data])", table, 2, 0, {}, structured)).toEqual({ reason: "it refers to the table other" });
+    expect(excelFormula("=COUNTA(UNIQUE([jan]))", table, 2, 0, {}, structured)).toEqual({ reason: "UNIQUE is an array function of Excel 365 only" });
+    // Errors only Excel 365 knows are #VALUE! there
+    expect(excelValue("\\#SPILL!")).toEqual({ kind: "error", value: "#VALUE!" });
+    expect(excelValue("#CALC!")).toEqual({ kind: "error", value: "#VALUE!" });
+  });
 });
 
 describe("Excel's values", () => {

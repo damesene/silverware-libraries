@@ -1441,6 +1441,113 @@ body.swt-resizing * {
   font-size: 12px;
   opacity: 0.75;
 }
+/* Show result (the formulas module): a cell's result of several values (#SPILL!)
+   as a table, read only, in a dialog as large as the window; its size and Copy
+   in a bar above it, the header held as the rows scroll. The table is no table
+   of the page: SilverBullet's own rules for tables (the editor's) do not reach
+   it, so its look is said here, in SilverBullet's colors */
+.swt-dialog.swt-result-dialog {
+  width: calc(100vw - 24px);
+  height: calc(100vh - 24px);
+  height: calc(var(--sw-view-height, 100dvh) - 24px);
+  max-height: none;
+}
+.swt-result-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 8px;
+}
+.swt-result-size {
+  flex: 1;
+  font-size: 12px;
+  opacity: 0.75;
+}
+.swt-result-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swt-result-copy:hover,
+.swt-result-copy:focus-visible {
+  background: var(--swt-dialog-card);
+}
+.swt-result-copy svg {
+  width: 16px;
+  height: 16px;
+}
+.swt-result-dialog .swt-dialog-body {
+  padding: 0;
+}
+.swt-result-box {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border-top: 1px solid var(--swt-dialog-line);
+}
+.swt-result-table {
+  display: inline-block;
+  min-width: 100%;
+  font-family: var(--editor-font, inherit);
+  font-weight: normal;
+}
+.swt-result-table table {
+  border-spacing: 0;
+  min-width: 100%;
+}
+.swt-result-table td {
+  padding: 6px 10px;
+  white-space: nowrap;
+  max-width: 40em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.swt-result-table thead td {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-weight: bold;
+  color: var(--editor-table-head-color, inherit);
+  background: var(--editor-table-head-background-color, var(--swt-dialog-card));
+}
+.swt-result-table tbody tr:nth-child(even) td {
+  background: var(--editor-table-even-background-color, transparent);
+}
+/* The ⤢ icon at the corner of a cell showing #SPILL! (hovered or selected): Show result */
+.swt-floating.swt-result-holder {
+  z-index: 49;
+}
+.swt-result-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.85;
+}
+.swt-result-button:hover {
+  opacity: 1;
+  color: var(--ui-accent-color, inherit);
+}
+.swt-result-button svg {
+  width: 14px;
+  height: 14px;
+}
 /* The pivot dialog: its fields, a section a line, then the pivot they make */
 .swt-pivot-dialog {
   width: min(760px, calc(100vw - 24px));

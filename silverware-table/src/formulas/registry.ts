@@ -2,13 +2,13 @@
 // custom ones the user defines (custom.ts), which replace a built-in one of
 // their name.
 import { BUILT_IN_FUNCTIONS } from "./builtin/index.ts";
-import type { FormulaFunction } from "./function.ts";
+import type { AnyFunction, FormulaFunction } from "./function.ts";
 
 // The custom functions by name, as last defined
 let custom = new Map<string, FormulaFunction>();
 
 /** The function formulas call by this name (upper case): the custom one, else the built-in one */
-export function functionNamed(name: string): FormulaFunction | undefined {
+export function functionNamed(name: string): AnyFunction | undefined {
   return custom.get(name) ?? BUILT_IN_FUNCTIONS[name];
 }
 

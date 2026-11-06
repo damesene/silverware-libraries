@@ -5,7 +5,7 @@
 import { columnIdOf, columnName } from "../columns.ts";
 import { unescapeCell } from "../markdown.ts";
 import { CELL_RE } from "../namerules.ts";
-import type { FormulaFunction, FunctionCategory } from "./function.ts";
+import type { AnyFunction, FunctionCategory } from "./function.ts";
 import { functionNamed, functionNames } from "./registry.ts";
 import { cellName, columnRefText, references } from "./references.ts";
 import { tokenize } from "./tokens.ts";
@@ -281,10 +281,10 @@ export function argumentSpan(syntax: string, index: number): { from: number; to:
  * whose name starts with it first, then those with it in their name, then
  * the others, each in order of their names
  */
-export function findFunctions(query: string, category?: FunctionCategory | "custom"): FormulaFunction[] {
+export function findFunctions(query: string, category?: FunctionCategory | "custom"): AnyFunction[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   const name = words.join("");
-  const rank = (f: FormulaFunction) => {
+  const rank = (f: AnyFunction) => {
     const lower = f.name.toLowerCase();
     return lower.startsWith(name) ? 0 : lower.includes(name) ? 1 : 2;
   };

@@ -13,6 +13,8 @@ export type Token =
   | { readonly kind: "table"; readonly name: string; readonly page?: string; readonly from: number; readonly to: number }
   // "[[Page]]vat": the cell named vat on another page (a bare name is a "name" token)
   | { readonly kind: "named"; readonly name: string; readonly page: string; readonly from: number; readonly to: number }
+  // [#Data]: a table's body, every row and column (its own, or that of the table named before it), as Excel's tables write it
+  | { readonly kind: "data"; readonly from: number; readonly to: number }
   // A reference to cells that were deleted, as written by shiftReferences
   | { readonly kind: "ref-error"; readonly from: number; readonly to: number };
 
@@ -109,6 +111,11 @@ export function tokenize(formula: string): { tokens: Token[]; error?: FormulaErr
       const end = formula.indexOf("]", i);
       if (end < 0) return fail("a column name is missing its closing ]");
       const inner = formula.slice(i + 1, end);
+      if (/^\s*#data\s*$/i.test(inner)) {
+        tokens.push({ kind: "data", from: i, to: end + 1 });
+        i = end + 1;
+        continue;
+      }
       const thisRow = inner.startsWith("@");
       tokens.push({ kind: "column", name: (thisRow ? inner.slice(1) : inner).trim(), thisRow, from: i, to: end + 1 });
       i = end + 1;

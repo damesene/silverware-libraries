@@ -127,6 +127,21 @@ export function excelFormula(formula: string, { table, name, cells, structured, 
         if (last - first + 1 !== rows.length) throw new NotInExcel(`[${node.name}] has total rows between its rows`);
         return first === last ? { text: excelCell(first, c), range: false } : { text: `${excelCell(first, c)}:${excelCell(last, c)}`, range: true };
       }
+      case "data": {
+        if (node.table && (node.table.page !== undefined || node.table.name.toLowerCase() !== name?.trim().toLowerCase())) {
+          throw new NotInExcel(`it refers to the table ${node.table.name}`);
+        }
+        if (headers.length === 0) throw new NotInExcel("[#Data] of a table without columns");
+        // The body without its total rows, as [#Data] takes it: the table's where they are its totals row (or none)
+        totals ??= totalRows(cells, table);
+        if (structured && (totals.size === 0 || structured.totalsRow)) return { text: `${structured.name}[#Data]`, range: true };
+        const rows = Array.from({ length: bodyRows }, (_, r) => r).filter((r) => !totals!.has(r));
+        if (rows.length === 0) throw new NotInExcel("[#Data] has no rows");
+        const first = rows[0]!;
+        const last = rows[rows.length - 1]!;
+        if (last - first + 1 !== rows.length) throw new NotInExcel("[#Data] has total rows between its rows");
+        return { text: `${excelCell(first, 0)}:${excelCell(last, headers.length - 1)}`, range: true };
+      }
       case "named": {
         // The table's own name before its cell (prices!vat in prices) is that cell
         const ownName = name?.trim().toLowerCase();

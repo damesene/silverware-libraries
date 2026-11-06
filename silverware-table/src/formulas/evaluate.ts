@@ -1,15 +1,35 @@
 // Calculating formulas: a table's cells as a sheet, the other tables they
 // refer to as a book, results and the reasons of errors.
+import { columnName } from "../columns.ts";
 import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
 import { setCell } from "../ops.ts";
 import { withoutTags } from "../tags.ts";
 import { asNumber } from "../view.ts";
 import { cellResult, cellsByName, errorCodeIn, type FormulaCells, hasFormulas, rowsByName } from "./cell.ts";
 import { dateArithmetic, parseDate } from "./dates.ts";
-import { type Node, parse, wholeColumnNames } from "./parser.ts";
+import { type Node, parse, refersToOwnData, wholeColumnNames } from "./parser.ts";
 import { type Area, areaText, cellName, formulaPages, referencedColumn, type TableRef } from "./references.ts";
+import { takesGrids } from "./function.ts";
 import { functionNamed } from "./registry.ts";
-import { asTime, FormulaError, isError, isRange, parseClock, type Scalar, single, timeArithmetic, TimeValue, toNumber, toText, type Value } from "./values.ts";
+import {
+  asTime,
+  asValue,
+  cellValue,
+  FormulaError,
+  Grid,
+  isError,
+  isGrid,
+  isRange,
+  parseClock,
+  type Result,
+  type Scalar,
+  single,
+  timeArithmetic,
+  TimeValue,
+  toNumber,
+  toText,
+  type Value,
+} from "./values.ts";
 
 const DECIMAL_COMMA_RE = /\d,\d/;
 
@@ -82,7 +102,7 @@ class Book {
 
 /**
  * A table's total rows (body rows from 0): those with a cell that refers to
- * its own whole column, as =SUM([qty]) under Qty. A cell that refers to
+ * its own whole column, as =SUM([qty]) under Qty, or to its whole body ([#Data]). A cell that refers to
  * another column ([@qty] / SUM([qty]) in a Share column) does not make its row
  * one. [qty] leaves them out.
  */
@@ -94,7 +114,8 @@ export function totalRows(cells: FormulaCells, table: Table): ReadonlySet<number
       const stored = cells.formulaOf(cell);
       const tree = stored && parse(stored.formula);
       if (!tree || isError(tree)) return;
-      if (Array.from(wholeColumnNames(tree, new Set())).some((name) => referencedColumn(headers, name) === column)) totals.add(r);
+      // (Its whole body, [#Data], as of every column: the row is a total row, as Excel's totals row is out of it)
+      if (refersToOwnData(tree) || Array.from(wholeColumnNames(tree, new Set())).some((name) => referencedColumn(headers, name) === column)) totals.add(r);
     });
   });
   return totals;
@@ -206,7 +227,7 @@ class Sheet {
     let result: Scalar;
     try {
       const tree = parse(formula);
-      result = isError(tree) ? tree : single(this.evaluate(tree, row, column));
+      result = isError(tree) ? tree : cellValue(this.evaluate(tree, row, column));
       if ((typeof result === "number" && !Number.isFinite(result)) || (result instanceof TimeValue && !Number.isFinite(result.seconds))) {
         result = new FormulaError("#NUM!", "the result is not a finite number");
       }
@@ -219,13 +240,20 @@ class Sheet {
 
   /** A formula's value in no cell but with a body row as its own (`[@column]` that row's), one value; none of the cells' results kept by it */
   atRow(tree: Node, row: number): Scalar {
-    return single(this.evaluate(tree, row, -1));
+    return cellValue(this.evaluate(tree, row, -1));
   }
 
-  /** A formula's value in none of the table's cells (evaluateFormula): a range stays one, no cell's result being one value */
+  /** A formula's value in none of the table's cells (evaluateFormula): a range stays one (a grid its cells, row by row), no cell's result being one value */
   standalone(formula: string): Value {
     const tree = parse(formula);
-    return isError(tree) ? tree : this.evaluate(tree, 0, 0);
+    return isError(tree) ? tree : asValue(this.evaluate(tree, 0, 0));
+  }
+
+  /** The result of a cell's formula as it is, a grid too: what a cell showing #SPILL! holds (Show result) */
+  wholeResult(row: number, column: number, formula: string): Result {
+    if (this.book.keepsResult(formula)) return this.result(row, column, formula);
+    const tree = parse(formula);
+    return isError(tree) ? tree : this.evaluate(tree, row, column);
   }
 
   /** The text a formula cell shows for its result */
@@ -258,6 +286,49 @@ class Sheet {
       for (let c = left; c <= right; c++) values.push(this.value(r, c));
     }
     return range ? values : values[0]!;
+  }
+
+  /** A column's display name (its header without tags, hashtags and emphasis), as a grid names its columns */
+  private headerName(column: number): string | undefined {
+    const header = this.headers[column];
+    return header === undefined ? undefined : columnName(header) || undefined;
+  }
+
+  /** An area's values as a grid of its rows and columns, named by the table's headers */
+  areaGrid(area: Area, prefix = ""): Result {
+    const values = this.areaValue(area, true, prefix);
+    if (!isRange(values)) return values;
+    const names = Array.from({ length: area.right - area.left + 1 }, (_, c) => this.headerName(area.left + c));
+    return new Grid(area.bottom - area.top + 1, area.right - area.left + 1, values, names);
+  }
+
+  /** A column's values (see columnValue) as a grid of one column, named by its header */
+  columnGrid(name: string, prefix = ""): Result {
+    const values = this.columnValue(name, prefix);
+    if (!isRange(values)) return values;
+    return new Grid(values.length, 1, values, [this.headerName(referencedColumn(this.headers, name)!)]);
+  }
+
+  /** [@[a]:[b]]: the row's cells from column a to b as a grid of one row */
+  rowColumnsGrid(row: number, name: string, last: string, prefix: string): Result {
+    const values = this.rowColumnsValue(row, name, last, prefix);
+    if (!isRange(values)) return values;
+    const from = Math.min(referencedColumn(this.headers, name)!, referencedColumn(this.headers, last)!);
+    return new Grid(1, values.length, values, values.map((_, c) => this.headerName(from + c)));
+  }
+
+  /** [#Data]: the table's body as a grid, every column, its total rows left out as a column's are (see columnValue) */
+  dataGrid(): Grid {
+    const totals = this.totalRows();
+    const rows: Scalar[][] = [];
+    for (let r = 0; r < this.rows; r++) {
+      if (!totals.has(r)) rows.push(Array.from({ length: this.columns }, (_, c) => this.value(r, c)));
+    }
+    return Grid.ofRows(
+      rows,
+      Array.from({ length: this.columns }, (_, c) => this.headerName(c)),
+      this.columns,
+    );
   }
 
   /**
@@ -360,7 +431,26 @@ class Sheet {
     return table ? this.book.sheet(table, this) : this;
   }
 
-  private evaluate(node: Node, row: number, column: number): Value {
+  /**
+   * An argument of a function taking grids: a reference keeps its shape (A1:C5
+   * three columns, [@[a]:[b]] a row, a column named by its header), anything
+   * else as it evaluates
+   */
+  private shaped(node: Node, row: number, column: number): Result {
+    if (node.kind === "area" && node.range) {
+      const sheet = this.sheetOf(node.table);
+      return isError(sheet) ? sheet : sheet.areaGrid(node.area, node.table ? `${node.table.name}!` : "");
+    }
+    if (node.kind === "column" && (!node.thisRow || node.last !== undefined)) {
+      const sheet = this.sheetOf(node.table);
+      if (isError(sheet)) return sheet;
+      const prefix = node.table ? `${node.table.name}!` : "";
+      return node.thisRow ? sheet.rowColumnsGrid(row, node.name, node.last!, prefix) : sheet.columnGrid(node.name, prefix);
+    }
+    return this.evaluate(node, row, column);
+  }
+
+  private evaluate(node: Node, row: number, column: number): Result {
     switch (node.kind) {
       case "literal":
         return node.value;
@@ -377,6 +467,10 @@ class Sheet {
       }
       case "named":
         return this.named(node);
+      case "data": {
+        const sheet = this.sheetOf(node.table);
+        return isError(sheet) ? sheet : sheet.dataGrid();
+      }
       case "rowCell": {
         const sheet = this.sheetOf(node.table);
         if (isError(sheet)) return sheet;
@@ -388,21 +482,24 @@ class Sheet {
         if (node.args.length < f.minArgs || (f.maxArgs !== undefined && node.args.length > f.maxArgs)) {
           return new FormulaError("#VALUE!", `wrong number of arguments: ${f.syntax}`);
         }
-        // A reference is passed as a range, so number functions skip a text cell as in a range
+        // Where it is calculated, as A1 counts (row: the body's, from 1)
+        const context = { row: row + 1, column: column + 1 };
+        // A function taking grids gets them as they are, its references with their shape
+        if (takesGrids(f)) return f.call(node.args.map((arg) => this.shaped(arg, row, column)), context);
+        // Any other a grid's cells as a list; a reference as a range, so number functions skip a text cell as in a range
         return f.call(
           node.args.map((arg) => {
-            const value = this.evaluate(arg, row, column);
+            const value = asValue(this.evaluate(arg, row, column));
             const reference = arg.kind === "area" || (arg.kind === "column" && arg.thisRow);
             return reference && !isRange(value) && !isError(value) ? [value] : value;
           }),
-          // Where it is calculated, as A1 counts (row: the body's, from 1)
-          { row: row + 1, column: column + 1 },
+          context,
         );
       }
       case "unary":
-        return cellByCell([this.evaluate(node.arg, row, column)], ([arg]) => this.unary(node.op, arg!));
+        return cellByCell([operand(this.evaluate(node.arg, row, column))], ([arg]) => this.unary(node.op, arg!));
       case "binary": {
-        const operands = [this.evaluate(node.left, row, column), this.evaluate(node.right, row, column)];
+        const operands = [operand(this.evaluate(node.left, row, column)), operand(this.evaluate(node.right, row, column))];
         return cellByCell(operands, ([left, right]) => this.binary(node.op, left!, right!));
       }
     }
@@ -445,6 +542,17 @@ class Sheet {
         return a ** b;
     }
   }
+}
+
+/**
+ * What an operator works on: a grid of one column or one row as the list of
+ * its cells; one of several rows and columns not yet (an error saying so),
+ * as an operator on it would need to keep its shape
+ */
+function operand(value: Result): Value {
+  if (!isGrid(value)) return value;
+  if (value.width === 1 || value.height <= 1) return value.cells;
+  return new FormulaError("#VALUE!", `an operator on ${value.height} rows and ${value.width} columns: pick a column first (CHOOSECOLS), or compare a column`);
 }
 
 /**
@@ -546,6 +654,13 @@ function listNode(node: Node): boolean {
       return node.range;
     case "column":
       return !node.thisRow || node.last !== undefined;
+    case "data":
+      return true;
+    case "call": {
+      // A function taking grids gives one (FILTER, SORT…): a list here
+      const f = functionNamed(node.name);
+      return !!f && takesGrids(f);
+    }
     case "unary":
       return listNode(node.arg);
     case "binary":
@@ -570,6 +685,17 @@ export function rowValues(table: Table, formula: string, { cells, tables, name }
 export function tableValue(table: Table, formula: string, { cells, tables, name }: Calculation): Scalar {
   const tree = parse(formula);
   return isError(tree) ? tree : new Sheet(table, new Book(cells, tables), undefined, name).atRow(tree, 0);
+}
+
+/**
+ * The whole result of a body cell's formula (row of the markdown, header 0),
+ * a grid as it is: what a cell showing #SPILL! holds (Show result); a cell
+ * without a formula is undefined
+ */
+export function cellWholeResult(table: Table, row: number, column: number, { cells, tables, name }: Calculation): Result | undefined {
+  const stored = row > 0 ? cells.formulaOf(table.rows[row]?.cells[column] ?? "") : undefined;
+  if (!stored) return undefined;
+  return new Sheet(table, new Book(cells, tables), undefined, name).wholeResult(row - 1, column, stored.formula);
 }
 
 /** A value as a cell shows it: an error by its code */

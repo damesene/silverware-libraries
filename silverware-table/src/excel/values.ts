@@ -5,6 +5,7 @@
 // they are dates in Excel whatever its language.
 import { errorCodeIn, parseClock, parseDate } from "../formulas/index.ts";
 import { asNumber } from "../view.ts";
+import { EXCEL_ERRORS } from "./formulas.ts";
 
 // Number formats a value is shown with in Excel (their codes: xlsx.ts)
 export type NumberFormat = "date" | "dateTime" | "dateTimeSeconds" | "time" | "timeSeconds" | "percent" | "percent1" | "percent2";
@@ -39,7 +40,8 @@ export function excelValue(text: string): ExcelValue {
   const upper = t.toUpperCase();
   if (upper === "TRUE" || upper === "FALSE") return { kind: "boolean", value: upper === "TRUE" };
   const code = errorCodeIn(t);
-  if (code) return { kind: "error", value: code === "#CYCLE!" || code === "#ERROR!" ? "#VALUE!" : code };
+  // Ours Excel has not (#SPILL! and #CALC! Excel 365's only, an older one not reading them): #VALUE!
+  if (code) return { kind: "error", value: EXCEL_ERRORS.has(code) ? code : "#VALUE!" };
   const date = parseDate(t);
   if (date) {
     const serial = serialOf(date.ms);

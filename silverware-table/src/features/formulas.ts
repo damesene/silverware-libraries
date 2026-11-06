@@ -32,7 +32,10 @@ import type {
 import {
   type Area,
   areaText,
+  asGrid,
   autofixFormula,
+  cellWholeResult,
+  errorCodeIn,
   callsCustomFunctions,
   columnRangeText,
   columnRefText,
@@ -81,6 +84,7 @@ import { addAffected, affectedBy, isAffected, type NamedOtherPages, type NamedPa
 import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
 import { FunctionDialog } from "./functiondialog.ts";
+import { ResultView } from "./resultview.ts";
 import { el } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
 import { cellSourceOffset, escapeCell, locateBySource, type OtherPages, type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
@@ -121,6 +125,9 @@ function choiceHelp(choice: FormulaChoice): FormulaHelp {
       return { syntax: `[${choice.name}] · [@${choice.name}]`, description: "A column of this table: all of it, or (with @) its cell in the formula's row." };
   }
 }
+
+// The ⤢ icon showing a cell's result (kept in step with the style page's .swt-result-button)
+const RESULT_BUTTON_SIZE = 20;
 
 // Colors of the references of the formula being edited, in the order they are written
 const REFERENCE_COLORS = ["#3b6fd4", "#d0453a", "#8a55c9", "#2f9a4a", "#d9771c", "#1c9c9c"];
@@ -190,6 +197,11 @@ export class Formulas implements Feature {
   private typedAt: { readonly editor: CellEditor; readonly text: string; readonly at: number } | undefined;
   // Every function, to find one by what it does and insert it (fx, Shift+F3, Insert function…)
   private readonly functions: FunctionDialog;
+  // A cell's result of several values (#SPILL!) shown over the window, and the icon (⤢) showing it from a cell hovered or selected
+  private readonly results: ResultView;
+  private readonly resultButton: HTMLButtonElement;
+  private resultAt: { readonly key: TableKey; readonly row: number; readonly column: number } | undefined;
+  private hoveredAt: { readonly key: TableKey; readonly row: number; readonly column: number } | undefined;
   // Tables (by key, as of their markdown) whose formula cells show results from before a change made outside Silverware Table
   private readonly stale = new WeakMap<TableInfo, boolean>();
   // The tables whose cells can be pointed at (marked): the formula's own, and the others laid out with it in a frame
@@ -208,6 +220,21 @@ export class Formulas implements Feature {
   constructor(private readonly host: ModelHost) {
     this.formulaHint = host.panel("swt-formula-hint");
     this.functions = new FunctionDialog(host);
+    this.results = new ResultView(host);
+    this.resultButton = el(host.doc, "button", {
+      class: "swt-result-button",
+      title: "Show result: the values of this cell's formula (Ctrl+Shift+Enter)",
+      attrs: { "aria-label": "Show result", tabindex: -1 },
+      html: ICONS.expand,
+      run: () => {
+        const at = this.resultAt;
+        const info = at && this.host.tableFor(at.key);
+        if (info && at) this.showResult(info, at);
+      },
+    });
+    // One of the core's floating elements: a press on it is on Silverware Table's controls, not the page
+    const floating = host.floating("div", "swt-result-holder");
+    floating.append(this.resultButton);
     this.cells = formulaCellsOf(
       { get: (cell, key) => host.getCellTag(cell, key), with: (cell, key, value) => host.withCellTag(cell, key, value) },
       { rowNames: (table) => host.rowNames(table), cellNames: (table) => host.cellNames(table) },
@@ -447,6 +474,96 @@ export class Formulas implements Feature {
     this.stopPointing?.();
     this.hideFormulaUi();
     this.formulaHint.remove();
+    this.results.close();
+    this.resultButton.parentElement?.remove();
+  }
+
+  // ---- a result of several values (#SPILL!) --------------------------------------
+
+  /** Whether a body cell's formula shows #SPILL! (its result as written: viewing calculates nothing) */
+  private spills(info: TableInfo, ref: CellRef): boolean {
+    if (ref.row === 0) return false;
+    const stored = this.cells.formulaOf(parseTable(info.source).rows[ref.row]?.cells[ref.column] ?? "");
+    return !!stored && errorCodeIn(unescapeCell(stored.value).trim()) === "#SPILL!";
+  }
+
+  /** The whole result of a cell's formula, calculated now as a grid; an error said (its result is one) */
+  private resultOf(info: TableInfo, ref: CellRef): import("../formulas/index.ts").Grid | undefined {
+    const table = this.host.tableOf(info);
+    const result = cellWholeResult(table, ref.row, ref.column, { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) });
+    if (result === undefined) return undefined;
+    if (result instanceof FormulaError) {
+      void this.host.bridge.flash(`Silverware Table: ${result.code} ${result.detail}`, "error");
+      return undefined;
+    }
+    return asGrid(result);
+  }
+
+  /** Show result: the cell's result over the window */
+  private showResult(info: TableInfo, ref: CellRef): void {
+    const grid = this.resultOf(info, ref);
+    const formula = this.cells.formulaOf(parseTable(info.source).rows[ref.row]?.cells[ref.column] ?? "")?.formula ?? "";
+    if (grid) this.results.show(formula, grid);
+  }
+
+  /** Copy result: the cell's whole result copied, not shown */
+  private copyResult(info: TableInfo, ref: CellRef): void {
+    const grid = this.resultOf(info, ref);
+    if (grid) void this.results.copy(grid);
+  }
+
+  /** The cell a selection holds alone, in a table shown, where it shows #SPILL! */
+  private selectedSpill(): { info: TableInfo; ref: CellRef } | undefined {
+    for (const info of this.host.shownTables()) {
+      const selected = this.host.selectedCells(info);
+      if (selected.length === 1 && this.spills(info, selected[0]!)) return { info, ref: selected[0]! };
+    }
+    return undefined;
+  }
+
+  /** The ⤢ icon at the top right corner of the cell hovered (else of the one selected) showing #SPILL!, or none */
+  private placeResultButton(): void {
+    const hovered = this.hoveredAt && this.host.tableFor(this.hoveredAt.key);
+    const at =
+      !this.host.editing && hovered && this.hoveredAt && this.spills(hovered, this.hoveredAt)
+        ? { info: hovered, ref: { row: this.hoveredAt.row, column: this.hoveredAt.column } }
+        : this.host.editing
+          ? undefined
+          : this.selectedSpill();
+    const rect = at && this.host.rectOf(at.info, at.ref);
+    const holder = this.resultButton.parentElement!;
+    if (!at || !rect) {
+      this.resultAt = undefined;
+      holder.classList.remove("swt-visible");
+      return;
+    }
+    this.resultAt = { key: at.info.key, row: at.ref.row, column: at.ref.column };
+    // Inside the cell's corner, over its text: nothing is added to the cell, however narrow it is
+    this.host.place(holder, rect.right - RESULT_BUTTON_SIZE - 2, rect.top + 2);
+  }
+
+  hovered(info: TableInfo, ref: CellRef): void {
+    this.hoveredAt = { key: info.key, row: ref.row, column: ref.column };
+    this.placeResultButton();
+  }
+
+  hoverEnded(): void {
+    this.hoveredAt = undefined;
+    this.placeResultButton();
+  }
+
+  selectionChanged(): void {
+    this.placeResultButton();
+  }
+
+  /** Ctrl+Shift+Enter on a cell selected alone showing #SPILL!: its result shown */
+  keyDown(e: KeyboardEvent): boolean {
+    if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey) || !e.shiftKey || e.altKey || this.host.editing) return false;
+    const at = this.selectedSpill();
+    if (!at) return false;
+    e.preventDefault();
+    this.showResult(at.info, at.ref);
+    return true;
   }
 
   // ---- the cell editor ----------------------------------------------------------
@@ -481,6 +598,8 @@ export class Formulas implements Feature {
   // The formula's references are shown in the table, its function explained under the cell
   editorOpened(): void {
     this.updateFormulaUi();
+    // Not over the field: the icon showing a result goes while a cell is edited
+    this.placeResultButton();
   }
 
   editorInput(editor: CellEditor): void {
@@ -593,6 +712,7 @@ export class Formulas implements Feature {
     this.choosing = undefined;
     this.dismissed = undefined;
     this.hideFormulaUi();
+    this.placeResultButton();
   }
 
   // While a formula waits for a reference, a press in its table inserts one
@@ -605,9 +725,10 @@ export class Formulas implements Feature {
     return cell.row === 0 && this.pointReference(info, cell, e);
   }
 
-  // The outlines follow the table when it scrolls or moves
+  // The outlines follow the table when it scrolls or moves, and so does the icon showing a result
   layoutChanged(): void {
     if (this.host.editing && !this.stopReferenceDrag) this.updateFormulaUi();
+    if (this.resultAt || this.hoveredAt) this.placeResultButton();
   }
 
   // ---- formula cells in the table -------------------------------------------------
@@ -699,14 +820,29 @@ export class Formulas implements Feature {
     return this.cells.formulaCell("", filledFormula(stored.formula, to.row - from.row, to.column - from.column, size));
   }
 
-  /** Insert function… in a body cell's menu: the cell edited (its formula, or a new one) and the Functions dialog for it */
-  cellMenuEntries(info: TableInfo, cells: readonly CellRef[]): CellMenuGroup | undefined {
+  /**
+   * Insert function… in a body cell's menu: the cell edited (its formula, or a
+   * new one) and the Functions dialog for it; Show result and Copy result in
+   * the menu of a cell showing #SPILL!
+   */
+  cellMenuEntries(info: TableInfo, cells: readonly CellRef[]): CellMenuGroup[] | undefined {
     const [cell] = cells;
     if (cells.length !== 1 || !cell || cell.row === 0) return undefined;
     const raw = parseTable(info.source).rows[cell.row]?.cells[cell.column] ?? "";
     const hasFormula = this.cells.formulaOf(raw) !== undefined;
     const allowed = this.host.canStoreCellTag(raw, "f");
-    return {
+    const results: CellMenuGroup[] = this.spills(info, cell)
+      ? [
+          {
+            order: CELL_MENU_ORDER.viewing,
+            entries: [
+              { kind: "item", label: "Show result", icon: ICONS.expand, hint: "The values of the formula, over the window (Ctrl+Shift+Enter)", run: () => this.showResult(info, cell) },
+              { kind: "item", label: "Copy result", icon: ICONS.copy, hint: "The values of the formula, copied whole (for a spreadsheet, or to paste as a table)", run: () => this.copyResult(info, cell) },
+            ],
+          },
+        ]
+      : [];
+    const insert: CellMenuGroup = {
       // After clearing and moving: what is written into the cell
       order: CELL_MENU_ORDER.inserting,
       entries: [
@@ -729,6 +865,7 @@ export class Formulas implements Feature {
         },
       ],
     };
+    return [insert, ...results];
   }
 
   /** Formula cells marked, with their formulas and the reasons of their errors as their titles */

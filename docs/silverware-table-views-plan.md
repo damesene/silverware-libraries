@@ -1,6 +1,14 @@
 # Views: tables made by one formula (plan)
 
-Talked through with the user on 2026-11-05. Nothing of it is built yet; this is the plan to agree on before the first step.
+Talked through with the user on 2026-11-05.
+
+**Status** (2026-11-06): step 1 built (grids in formulas, the seven array functions, `#SPILL!` and `#CALC!`, Show result and Copy result). What it settled beyond this plan:
+
+* **Where the shape is kept**: references keep their shape only as arguments of a function taking grids (`GridFunction`, `grids: true`: `shaped` in evaluate.ts): `A1:C5` a grid of three columns, `[qty]` a grid of one column named by its header, `[@[a]:[b]]` one row. Everywhere else they evaluate as before (a list), so no existing formula changed. A grid reaching a function that takes none is its cells, row by row (`asValue`); an operator takes a grid of one row or column as a list (`operand`), one of several rows and columns is `#VALUE!` saying to pick a column.
+* **A cell's result** (`cellValue` in values.ts): a list of several values left as a cell's result is `#SPILL!` too, where it was `#VALUE!` (`=[qty] * 2`, `=pear*2`); one of none an empty cell.
+* **Excel**: the seven functions are written as their values (Excel 365's only; how a file without spill metadata has them calculated is not verified), `[#Data]` as `Table1[#Data]`, `#SPILL!` and `#CALC!` as `#VALUE!` (an Excel before 365 does not know them).
+* **Not done in step 1**: `tasks![[a]:[c]]` (a table's columns from a to b as a grid; `CHOOSECOLS(tasks![#Data], …)` does it meanwhile): its tokens need edits.ts, references and the Excel writer to follow both ends, as `[@[a]:[b]]` does. `silverware.table.evaluate` gives a grid's cells as one list, row by row, and a formula calling a function that takes grids a list even of one value (`TAKE(…, 1)`), as `givesList` tells it by the formula (a grid as rows, a `${…}` showing a table, is open).
+* **Show result**: the core's dialog as large as the window, the core's preview table (`previewTable`) in it, in SilverBullet's colors (not the table's theme).
 
 **Released together with the choices** (decided the same day): the choice lists from Space Lua (`silverware.table.defineChoices`) are not released on their own: their commits are on this branch (`feat/views`, its first ones, the branch `feat/choices-from-lua` merged into it and deleted on 2026-11-06), and both go to main as one, once views are done. Until then neither is anyone's to rely on, so their API and what they write (the `#choice-…` header, `columntypes.choice.…`, `defineChoices`' arguments) may change in any refactor here, with no care for what was written before.
 

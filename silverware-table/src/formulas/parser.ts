@@ -8,6 +8,8 @@ export type Node =
   | { readonly kind: "area"; readonly area: Area; readonly range: boolean; readonly table?: TableRef; readonly fixed?: Fixed }
   // `last`: the formula's row from column `name` to `last` ([@[a]:[b]])
   | { readonly kind: "column"; readonly name: string; readonly thisRow: boolean; readonly last?: string; readonly table?: TableRef }
+  // [#Data], prices![#Data]: a table's body as a grid, its total rows left out as [column] leaves them
+  | { readonly kind: "data"; readonly table?: TableRef }
   | { readonly kind: "call"; readonly name: string; readonly args: readonly Node[] }
   // A named cell (names.ts): vat in the formula's own table, prices!vat in another, [[Page]]prices!vat on another page;
   // [[Page]]vat as written before names were the table's (an error saying how to write it)
@@ -81,6 +83,8 @@ class Parser {
         return { kind: "column", name: token.name, thisRow: token.thisRow, ...(token.last !== undefined ? { last: token.last } : {}) };
       case "ref-error":
         return { kind: "literal", value: new FormulaError("#REF!", "a reference to deleted cells") };
+      case "data":
+        return { kind: "data" };
       case "named":
         return { kind: "named", name: token.name, page: token.page };
       case "table": {
@@ -91,6 +95,10 @@ class Parser {
         if (next?.kind === "ref-error") {
           this.at++;
           return { kind: "literal", value: new FormulaError("#REF!", `a reference to deleted cells of ${token.name}`) };
+        }
+        if (next?.kind === "data") {
+          this.at++;
+          return { kind: "data", table: tableRefOf(token) };
         }
         if (next?.kind === "column") {
           this.at++;
@@ -112,7 +120,7 @@ class Parser {
           this.at++;
           return { kind: "named", name: next.text, table: tableRefOf(token) };
         }
-        throw new FormulaError("#ERROR!", `${prefix} is followed by a cell, a range, a [column] or a named cell, as in ${prefix}A1`);
+        throw new FormulaError("#ERROR!", `${prefix} is followed by a cell, a range, a [column], [#Data] or a named cell, as in ${prefix}A1`);
       }
       case "op":
         if (token.text === "(") {
@@ -190,6 +198,22 @@ export function parse(formula: string): Node | FormulaError {
   if (parsed.size > 500) parsed.clear();
   parsed.set(formula, result);
   return result;
+}
+
+/** Whether a formula refers to its own table's whole body ([#Data], no table's name before it): its row is a total row */
+export function refersToOwnData(node: Node): boolean {
+  switch (node.kind) {
+    case "data":
+      return !node.table;
+    case "call":
+      return node.args.some(refersToOwnData);
+    case "unary":
+      return refersToOwnData(node.arg);
+    case "binary":
+      return refersToOwnData(node.left) || refersToOwnData(node.right);
+    default:
+      return false;
+  }
 }
 
 export function wholeColumnNames(node: Node, names: Set<string>): Set<string> {

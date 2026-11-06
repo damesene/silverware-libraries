@@ -5,7 +5,7 @@
 // click); the dialog is the core's (ModelHost.openDialog), so the cell editor
 // stays open behind it.
 import type { Dialog, ModelHost } from "../core/feature.ts";
-import { findFunctions, FUNCTION_CATEGORIES, type FormulaFunction, type FunctionCategory } from "../formulas/index.ts";
+import { type AnyFunction, findFunctions, FUNCTION_CATEGORIES, type FunctionCategory } from "../formulas/index.ts";
 
 type Group = FunctionCategory | "custom" | undefined;
 
@@ -24,7 +24,7 @@ export class FunctionDialog {
       return e;
     };
     let group: Group;
-    let found: FormulaFunction[] = [];
+    let found: AnyFunction[] = [];
     let picked = 0;
 
     const search = el("input", "swt-functions-search");

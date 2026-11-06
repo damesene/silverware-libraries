@@ -172,8 +172,8 @@ describe("evaluation", () => {
     // A one-cell reference is its value; ranges must be the same size
     expect(evaluate(FRUIT, '=TEXTJOIN("+", TRUE, [qty] * B1)')).toBe("9+30+6+0");
     expect(evaluate(FRUIT, "=SUM(B1:B3 * C1:C2)")).toBe("#VALUE!");
-    // A cell shows one value: a range left as the result is #VALUE!
-    expect(evaluate(FRUIT, "=[qty] * 2")).toBe("#VALUE!");
+    // A cell shows one value: a range left as the result is #SPILL! (of one value, that value)
+    expect(evaluate(FRUIT, "=[qty] * 2")).toBe("#SPILL!");
     expect(evaluate(FRUIT, "=B1 * 2")).toBe("6");
   });
 
@@ -711,7 +711,7 @@ describe("findFunctions", () => {
 
   it("finds them in a group", () => {
     expect(names("", "logic")).toEqual(["AND", "IF", "IFERROR", "ISNUMBER", "NOT", "OR"]);
-    expect(names("", "lookup")).toEqual(["ROW", "XLOOKUP"]);
+    expect(names("", "lookup")).toEqual(["CHOOSECOLS", "DROP", "FILTER", "ROW", "SORT", "SORTBY", "TAKE", "UNIQUE", "XLOOKUP"]);
     expect(names("", "custom")).toEqual([]);
   });
 });
@@ -817,7 +817,7 @@ describe("other tables", () => {
     expect(errors('=XLOOKUP("fig", prices![qty], prices![price], 0)')).toBe('#REF! there is no column named "qty" in prices');
     expect(errors("=[[Other page]]prices!A1")).toBe("#REF! there is no table named prices on Other page");
     expect(errors("=prices![@cost]")).toBe('#REF! there is no column named "cost" in prices');
-    expect(errors("=prices!SUM(A1)")).toContain("is followed by a cell, a range, a [column] or a named cell");
+    expect(errors("=prices!SUM(A1)")).toContain("is followed by a cell, a range, a [column], [#Data] or a named cell");
     expect(errors("=prices!")).toBeDefined();
   });
 
@@ -1059,7 +1059,7 @@ describe("named rows", () => {
     // In its own row: the formula is in the range
     expect(formulaErrors(at(1, "=SUM(pear)")).get("1,3")).toContain("#CYCLE!");
     // Where one value is asked for: as for a whole column
-    expect(formulaErrors(at(2, "=pear*2")).get("2,3")).toContain("#VALUE!");
+    expect(formulaErrors(at(2, "=pear*2")).get("2,3")).toContain("#SPILL!");
     // From another table
     expect(result("=SUM(prices!pear)")).toBe("12");
     // A cell's name goes before a row's

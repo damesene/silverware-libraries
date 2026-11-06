@@ -1740,11 +1740,35 @@ body.swt-resizing * {
   }
 }
 /* The view dialog (beside the pivot's, which it shares its look with): its formula with fx, its name */
+/* Of one height, as the settings dialog: a preview growing or shrinking as the formula is typed does not move it;
+   the preview fills what the fields leave */
+.swt-view-dialog {
+  height: min(720px, calc(100vh - 32px));
+  height: min(720px, calc(var(--sw-view-height, 100dvh) - 32px));
+}
 .swt-view,
 .swt-view-form {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+.swt-view {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.swt-view-form {
+  flex: none;
+}
+.swt-view-preview {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.swt-view-preview > .swt-view-scroll {
+  flex: 0 1 auto;
+  max-height: none;
+  min-height: 0;
 }
 .swt-view-fields {
   min-width: 0;

@@ -54,6 +54,14 @@ test.describe("Views", () => {
     const field = dialog.locator('input[aria-label="Formula"]');
     await expect(field).toHaveValue("=tasks![#Data]");
     await expect(dialog.locator(".swt-view-size")).toHaveText("3 rows × 3 columns");
+    // Of one height: a preview of fewer rows, or none (an error), moves nothing
+    const box = await dialog.boundingBox();
+    await field.fill("=SUM(tasks![hours])");
+    await expect(dialog.locator(".swt-view-size")).toHaveText("1 row × 1 column");
+    expect(await dialog.boundingBox()).toEqual(box);
+    await field.fill("=nothing![#Data]");
+    await expect(dialog.locator(".swt-view-none")).toBeVisible();
+    expect(await dialog.boundingBox()).toEqual(box);
     // fx: the Functions dialog, the function picked put in where the caret was
     await field.fill("=");
     await dialog.locator('button[aria-label="Functions"]').click();

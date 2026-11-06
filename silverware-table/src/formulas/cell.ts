@@ -43,6 +43,18 @@ export type FormulaCells = {
 };
 
 /**
+ * Cells read as data only (a source of the space's): no formula, no name, a
+ * hidden tag in a value left out as in any plain cell
+ */
+export const PLAIN_CELLS: FormulaCells = {
+  formulaOf: () => undefined,
+  formulaCell: (value) => value,
+  withoutFormula: (cell) => cell,
+  rowNames: () => [],
+  cellNames: () => [],
+};
+
+/**
  * A table calculated from others, as its module calculates it: the formulas
  * calculate it in their order (a table reading it follows its sources in the
  * same calculation), read it as its module would write it, and write it with

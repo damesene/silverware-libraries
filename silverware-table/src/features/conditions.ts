@@ -117,10 +117,14 @@ export class Conditions implements Feature {
     });
   }
 
-  /** Custom conditions or formats defined anew: tables with rules look as they say now */
+  /**
+   * Custom conditions or formats defined anew, or what a formula condition reads changed (another page, a source of
+   * the space read anew): tables with rules look as they say now
+   */
   tablesChanged(): void {
-    // (A column type defined anew may read a value otherwise)
+    // (A column type defined anew may read a value otherwise; a formula condition another table)
     this.readers = new WeakMap();
+    this.evaluated = new WeakMap();
     for (const info of this.host.shownTables()) if (this.rulesIn(parseTable(info.source)).length) this.host.looksChanged(info);
   }
 

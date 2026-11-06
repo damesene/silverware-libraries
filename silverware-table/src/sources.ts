@@ -29,12 +29,17 @@ export type SourceProvider = {
  * data are the same; `version` counts their changes
  */
 export type SourcesOffer = {
-  /** The sources' names, as defined */
+  /** The sources' names, as defined, in the alphabet's order */
   readonly names: () => readonly string[];
+  /** A source's columns' names as it gives them; undefined where it is not read (or there is none) */
+  readonly columns: (name: string) => readonly string[] | undefined;
   /** A source as a table: its columns the header; null where none is defined so, undefined where it is not read yet */
   readonly table: (name: string) => Table | null | undefined;
   readonly version: () => number;
 };
+
+/** No sources: the provider of a host that gives none */
+export const NO_SOURCES: SourceProvider = { names: () => [], read: () => undefined, changed: () => () => {} };
 
 /** A provider of sources kept in memory (the playground's, the tests'): `set` gives one (or takes it away: undefined) */
 export function memorySources(given: Readonly<Record<string, SourceData>> = {}): SourceProvider & { set(name: string, data: SourceData | undefined): void } {

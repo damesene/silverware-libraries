@@ -15,7 +15,7 @@
 // Without the formulas module nothing is calculated.
 import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, ToolbarButton } from "../core/feature.ts";
 import { type Calculated, calculatedTable, movedRenames, readRenames, renamedIn, type Renames, sameCells, storedRenames } from "../calculated/index.ts";
-import { type CalculatedBy, type CalculatedOffer, followOwnFormula, type Following, callsPureFunctionsOnly, FormulaError, type FormulaCells, type FormulasOffer, type PageLinksOffer } from "../formulas/index.ts";
+import { type CalculatedBy, type CalculatedOffer, followOwnFormula, type Following, callsPureFunctionsOnly, FormulaError, type FormulaCells, type FormulasOffer, type PageLinksOffer, PLAIN_CELLS } from "../formulas/index.ts";
 import { listOf } from "../bridge.ts";
 import { columnName } from "../columns.ts";
 import { ICONS } from "../icons.ts";
@@ -123,7 +123,7 @@ export class Pivot implements Feature {
     if ("problem" in found) return found.problem;
     if ("unread" in found) return this.unreadable() ?? `${found.unread} is not read yet`;
     if ("notRead" in found) return found.notRead;
-    return this.pivotOf(found.table, definition, cells);
+    return this.pivotOf(found.table, definition, sourceRef(definition.source).space ? PLAIN_CELLS : cells);
   }
 
   /**
@@ -148,7 +148,8 @@ export class Pivot implements Feature {
         if (!cells) return new FormulaError("#VALUE!", "it needs the formulas module, which is off");
         const source = ref.space ? read.source(ref.name) : read.table(ref.name, page);
         if (source instanceof FormulaError) return source;
-        const pivot = this.pivotOf(source, definition, cells);
+        // (A source of the space is data: no formula or name in its cells)
+        const pivot = this.pivotOf(source, definition, ref.space ? PLAIN_CELLS : cells);
         // A header renamed in this edit: its name kept for the column it is
         const renames = this.renamesOf(table);
         return this.written(table, pivot, before ? renamedIn(before, table, pivot, renames) : renames);
@@ -372,11 +373,9 @@ export class Pivot implements Feature {
   }
 
   /** The sources of the space a pivot can summarize (the sources module's), by their names and their columns' */
-  private spaceSources(): { name: string; columns: string[] }[] {
+  private spaceSources(): { name: string; columns: readonly string[] }[] {
     const offer = this.host.offered<SourcesOffer>("sources");
-    return [...(offer?.names() ?? [])]
-      .sort((a, b) => a.localeCompare(b))
-      .map((name) => ({ name, columns: (offer?.table(name)?.rows[0]?.cells ?? []).map(columnName) }));
+    return (offer?.names() ?? []).map((name) => ({ name, columns: offer?.columns(name) ?? [] }));
   }
 
   /** The tables of a page a pivot can summarize: named ones, not pivots */
@@ -479,7 +478,14 @@ export class Pivot implements Feature {
     const empty: Table = { indent: "", align: [], rows: [{ cells: [""] }], padded: false };
     const sources = this.sources();
     const first = sources[0];
-    const fields: Fields = first ? this.firstFields(first.name, first.table) : { source: "", rows: [], columns: [], values: [{ fn: "COUNTA", column: "", show: "" }], conditions: [], any: false, sort: [], totals: "both" };
+    // No named table on the page: the first source of the space, its table as the sources module offers it
+    const space = first ? undefined : this.spaceSources()[0];
+    const spaceTable = space && this.host.offered<SourcesOffer>("sources")?.table(space.name);
+    const fields: Fields = first
+      ? this.firstFields(first.name, first.table)
+      : space && spaceTable
+        ? this.firstFields(sourceText({ name: space.name, space: true }), spaceTable)
+        : { source: "", rows: [], columns: [], values: [{ fn: "COUNTA", column: "", show: "" }], conditions: [], any: false, sort: [], totals: "both" };
     this.dialog(sources, fields, "Insert", (definition) => {
       const pivot = this.calculate(definition, this.sourceFor(definition, this.sources()));
       if (typeof pivot === "string") return void this.host.bridge.flash(`Silverware Table: ${pivot}`, "error");
@@ -540,7 +546,11 @@ export class Pivot implements Feature {
   }
 }
 
-/** A source as found: its table, why there is none, the page it is on, not read yet, or why a source of the space is not read */
+/**
+ * A source as found: its table, why there is none, the page it is on, not read yet (pageLinks reads it as the pivot shows,
+ * then it is checked again), or why a source of the space is not read (nothing to have read: the pivot kept as it is, as
+ * formulas reading one keep their results)
+ */
 type Found = { readonly table: Table } | { readonly problem: string } | { readonly unread: string } | { readonly notRead: string };
 
 /** A column's id (its column's id in pivotOf: row:<group>, value:<value>, column:<key>|<value>, total:<value>) with its items as they are written now */

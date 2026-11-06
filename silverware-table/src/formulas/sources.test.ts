@@ -55,6 +55,14 @@ describe("sources in formulas", () => {
     expect(formulaErrors(empty, tables()).get("1,0")).toMatch(/the source people is not read yet/);
   });
 
+  it("reads a source's values as data: a hidden tag in one is no formula nor name, an error message names the source whole", () => {
+    const rows = sourceTable({ columns: ["total"], rows: [["42 <meta formulas.f='=SUM([qty])' core.n='pear'>"]] });
+    const source = (name: string) => (name === "rows" ? rows : null);
+    expect(value("=SUM(@rows[total])", source)).toBe(42);
+    const missing = value("=SUM(@tasks[nope])");
+    expect(isError(missing) && missing.detail).toBe('there is no column named "nope" in @tasks');
+  });
+
   it("reads a source by @ and a name only: no cells, no row of the formula's", () => {
     expect(tokenize("=@tasks!A1").error?.detail).toMatch(/a source has no cells/);
     expect(tokenize("=@ + 1").error?.detail).toMatch(/followed by a source's name/);
@@ -76,19 +84,19 @@ describe("sources in formulas", () => {
 
 describe("sources offered while a formula is typed", () => {
   const names = sourceChoices([
-    { name: "tasks", headers: ["name", "Due date"] },
-    { name: "people", headers: ["value"] },
+    { name: "tasks", columns: ["name", "Due date"] },
+    { name: "people", columns: ["value"] },
   ]);
 
   it("offers the sources after @, and among the names", () => {
     expect(formulaChoices("=@", 2, 2, names)?.choices.map((c) => c.name)).toEqual(["people", "tasks"]);
-    expect(formulaChoices("=COUNTA(@ta", 11, 11, names)).toEqual({ from: 8, to: 11, choices: [{ kind: "source", name: "tasks" }] });
-    expect(formulaChoices("=ta", 3, 3, names)?.choices[0]).toEqual({ kind: "source", name: "tasks" });
+    expect(formulaChoices("=COUNTA(@ta", 11, 11, names)).toMatchObject({ from: 8, to: 11, choices: [{ kind: "source", name: "tasks" }] });
+    expect(formulaChoices("=ta", 3, 3, names)?.choices[0]).toMatchObject({ kind: "source", name: "tasks" });
   });
 
   it("offers a source's columns in its brackets, not the table's", () => {
     const found = formulaChoices("=@tasks[du", 10, 10, names, undefined, [{ name: "Duty", id: "duty" }]);
-    expect(found?.choices).toEqual([{ kind: "column", name: "Due date", id: "due_date", table: "@tasks" }]);
+    expect(found?.choices).toEqual([{ kind: "column", name: "Due date", id: "due_date", source: "tasks" }]);
     expect(formulaChoices("=@tasks[@", 9, 9, names)).toBeUndefined();
   });
 });

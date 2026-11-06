@@ -2,9 +2,9 @@
 // read in formulas as @name. The playground has fixed sources (tasks, projects),
 // SilverBullet those a script of the test defines alike; a query's source read anew
 // as a page is indexed: SilverBullet only.
-import { cell, expect, hoverCell, markdown, reload, rendersAnew, setOtherPage, setPage, tableIcon, target, test } from "./helpers.ts";
+import { cell, defineSources, expect, hoverCell, markdown, reload, rendersAnew, setOtherPage, setPage, tableIcon, target, test } from "./helpers.ts";
 
-// The playground's sources, as a script defines them in SilverBullet
+// The playground's sources (playground/playground.ts: kept in step with it), as a script defines them in SilverBullet
 const SCRIPT = [
   "```space-lua",
   'silverware.table.defineSource("tasks", { columns = { "name", "page", "due", "done", "tags" } }, function()',
@@ -25,9 +25,7 @@ const PAGE = "| Open | Note |\n|---|---|\n| | x |\n";
 
 test.describe("Sources of the space", () => {
   test.beforeEach(async ({ page }) => {
-    if (target !== "silverbullet") return;
-    await setOtherPage(page, "UiTests/SourcesScript", SCRIPT);
-    await reload(page);
+    await defineSources(page, SCRIPT);
   });
 
   test("@ offers the sources as a formula is typed, and their columns in their brackets; the formula reads them", async ({ page }) => {

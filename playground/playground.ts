@@ -405,6 +405,7 @@ const bridge: Bridge = {
 };
 
 // The space's sources, fixed here as Space Lua would give them (silverware.table.defineSource): what @tasks and @projects read
+// (silverware-table/ui-tests/sources.spec.ts defines the same in SilverBullet: kept in step with it)
 const sources = memorySources({
   tasks: {
     columns: ["name", "page", "due", "done", "tags"],

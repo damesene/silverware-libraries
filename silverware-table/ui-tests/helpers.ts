@@ -225,6 +225,17 @@ export async function setSettings(page: Page, values: Record<string, Setting>): 
 }
 
 /**
+ * The sources of the space the tests read (silverware.table.defineSource): the
+ * playground's are fixed in its code (tasks, projects), SilverBullet's defined
+ * by `script` (a page's space-lua block giving the same), written and loaded
+ */
+export async function defineSources(page: Page, script: string): Promise<void> {
+  if (target !== "silverbullet") return;
+  await setOtherPage(page, "UiTests/SourcesScript", script);
+  await reload(page);
+}
+
+/**
  * Writes another page of the space (what formulas and pivots read of other
  * pages): in the playground into its store of pages, in SilverBullet into
  * the space, indexed, gone after the test

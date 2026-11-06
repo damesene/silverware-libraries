@@ -56,6 +56,8 @@ export function sourceData(given: unknown, columns?: readonly string[]): SourceD
     return { columns: keys, rows: records.map((record) => keys.map((key) => cellText(record[key]))) };
   }
   if (items.some((item) => typeof item === "object")) return { problem: "gave a list of lists (select { … } for every row, or one field)" };
+  // (Nothing given: no columns known, but those asked for)
+  if (!items.length) return { columns: columns ?? [], rows: [] };
   return { columns: columns ?? ["value"], rows: items.map((item) => [cellText(item)]) };
 }
 
@@ -81,6 +83,9 @@ export class LuaSources implements SourceProvider {
   // Space Lua loaded again and no script has defined a source since: the definitions of before still read
   // (else a reading meanwhile dropped every source and the formulas reading them showed errors for a moment)
   private stale = false;
+  // Once a script of the new load defines one: the names of before not defined again yet, unread (not gone) until
+  // they are or REFRESH_MS has passed since the load, so a table reading one keeps its results meanwhile
+  private previous = new Map<string, string>();
   private staleTimer: ReturnType<typeof setTimeout> | undefined;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private reading: Promise<void> | undefined;
@@ -95,7 +100,8 @@ export class LuaSources implements SourceProvider {
   }
 
   names(): readonly string[] {
-    return [...this.definitions.values()].map((d) => d.name);
+    const names = new Map([...this.previous, ...[...this.definitions].map(([key, d]): [string, string] => [key, d.name])]);
+    return [...names.values()];
   }
 
   read(name: string): SourceData | undefined {
@@ -127,8 +133,13 @@ export class LuaSources implements SourceProvider {
       }
       columns = (items as string[]).map((c) => c.trim());
     }
-    // The first definition of a new load of Space Lua: those of before go
-    if (this.stale) this.endStale();
+    // The first definition of a new load of Space Lua: those of before go (their names unread meanwhile)
+    if (this.stale) {
+      this.previous = new Map([...this.definitions].map(([key, d]) => [key, d.name]));
+      this.stale = false;
+      this.definitions.clear();
+    }
+    this.previous.delete(given.toLowerCase());
     this.definitions.set(given.toLowerCase(), { name: given, fn: fn as () => unknown, ...(columns ? { columns } : {}) });
     this.tell();
     this.schedule(0);
@@ -144,9 +155,11 @@ export class LuaSources implements SourceProvider {
     this.stale = true;
     if (this.staleTimer !== undefined) clearTimeout(this.staleTimer);
     this.staleTimer = setTimeout(() => {
-      if (!this.stale) return;
-      this.endStale();
-      this.lastRead.clear();
+      this.staleTimer = undefined;
+      // No script defined one: those of before go; else the names of before not defined again
+      if (this.stale) this.endStale();
+      this.previous.clear();
+      for (const key of [...this.lastRead.keys()]) if (!this.definitions.has(key)) this.lastRead.delete(key);
       this.tell();
     }, REFRESH_MS);
   }
@@ -178,6 +191,7 @@ export class LuaSources implements SourceProvider {
     this.reading = undefined;
     this.again = false;
     this.endStale();
+    this.previous.clear();
     this.lastRead.clear();
     this.said.clear();
     this.listeners.clear();
@@ -219,12 +233,14 @@ export class LuaSources implements SourceProvider {
     const results = await Promise.all(defined.map(([, definition]) => this.readOne(definition)));
     let changed = false;
     defined.forEach(([key], i) => {
-      const result = results[i]!;
+      let result = results[i]!;
       // Defined anew meanwhile (another load of Space Lua): its own reading follows
       if (this.definitions.get(key) !== defined[i]![1]) return;
       if (!("problem" in result)) {
         this.said.delete(key);
         const was = this.lastRead.get(key);
+        // Nothing given now: the columns read before kept (a query that may give no rows: its columns still known)
+        if (!result.rows.length && !defined[i]![1].columns && was) result = { columns: was.columns, rows: [] };
         if (!was || !sameData(was, result)) {
           this.lastRead.set(key, result);
           changed = true;

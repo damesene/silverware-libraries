@@ -244,13 +244,24 @@ export function referredPages(cells: FormulaCells, table: Table): Set<string> {
 
 /** The other pages a formula refers to */
 export function formulaPages(formula: string): string[] {
-  // A table's token ([[Page]]prices!, before a cell, a column, a name or [#Data]), or a name of the page alone ([[Page]]vat)
-  return tokenize(formula).tokens.flatMap((token) => ((token.kind === "table" || token.kind === "named") && token.page !== undefined ? [token.page] : []));
+  return formulaOutside(formula).pages;
 }
 
 /** The sources of the space a formula reads (@tasks), by their names as written */
 export function formulaSources(formula: string): string[] {
-  return tokenize(formula).tokens.flatMap((token) => (token.kind === "source" ? [token.name] : []));
+  return formulaOutside(formula).sources;
+}
+
+/** What a formula reads outside its page, in one pass over its tokens: other pages, and sources of the space by their names */
+export function formulaOutside(formula: string): { readonly pages: string[]; readonly sources: string[] } {
+  const pages: string[] = [];
+  const sources: string[] = [];
+  for (const token of tokenize(formula).tokens) {
+    // A table's token ([[Page]]prices!, before a cell, a column, a name or [#Data]), or a name of the page alone ([[Page]]vat)
+    if ((token.kind === "table" || token.kind === "named") && token.page !== undefined) pages.push(token.page);
+    else if (token.kind === "source") sources.push(token.name);
+  }
+  return { pages, sources };
 }
 
 /** The sources of the space (lowercase) a table's formulas read */

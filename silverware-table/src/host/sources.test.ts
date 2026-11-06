@@ -29,7 +29,9 @@ describe("sourceData", () => {
 
   it("takes a list of values as one column, value", () => {
     expect(sourceData(["Atlas", 2, null, true])).toEqual({ columns: ["value"], rows: [["Atlas"], ["2"], ["TRUE"]] });
-    expect(sourceData({})).toEqual({ columns: ["value"], rows: [] });
+    // Nothing: no columns known but those asked for
+    expect(sourceData({})).toEqual({ columns: [], rows: [] });
+    expect(sourceData([], ["name"])).toEqual({ columns: ["name"], rows: [] });
   });
 
   it("is no source for anything else", () => {
@@ -154,6 +156,35 @@ describe("LuaSources", () => {
     await vi.runAllTimersAsync();
     expect(sources.names()).toEqual([]);
     expect(changes).toBeGreaterThan(told);
+  });
+
+  it("keeps the columns read before where a query gives no rows", async () => {
+    let rows: unknown[] = [{ name: "a", due: "d" }];
+    sources.define("overdue", () => rows);
+    await vi.runAllTimersAsync();
+    rows = [];
+    await sources.refresh();
+    expect(sources.read("overdue")).toEqual({ columns: ["name", "due"], rows: [] });
+  });
+
+  it("has the sources of before unread, not gone, while a new load of Space Lua defines them again", async () => {
+    sources.define("x", () => ["a"]);
+    sources.define("y", () => ["b"]);
+    await vi.runAllTimersAsync();
+    sources.anew();
+    sources.define("x", () => ["c"]);
+    // y not defined again yet: known, not read
+    expect(sources.names()).toEqual(["y", "x"]);
+    expect(sources.read("y")).toBeUndefined();
+    sources.define("y", () => ["d"]);
+    await vi.runAllTimersAsync();
+    expect(sources.read("y")?.rows).toEqual([["d"]]);
+    // One no script defines again goes once the load is over
+    sources.anew();
+    sources.define("x", () => ["e"]);
+    await vi.advanceTimersByTimeAsync(REFRESH_MS);
+    await vi.runAllTimersAsync();
+    expect(sources.names()).toEqual(["x"]);
   });
 
   it("says a problem found before init once it is connected", async () => {

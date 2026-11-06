@@ -20,7 +20,7 @@ export type NamedOtherPages = { readonly tables: (page: string) => readonly Name
  * read), and the sources of the space by their names (`@tasks`: null where
  * there is none so, undefined where it is not read; none: no source is read)
  */
-export type Elsewhere = { readonly pages?: NamedOtherPages; readonly source?: (name: string) => Table | null | undefined };
+export type Elsewhere = { readonly pages?: NamedOtherPages; readonly spaceSource?: (name: string) => Table | null | undefined };
 
 /** A page's tables by their names, and its named cells by their names (lowercase), of every table (a name is unique in its table only) */
 type PageNames = { readonly tables: Map<string, Table>; readonly cells: Map<string, NamedCell[]> };
@@ -68,7 +68,7 @@ export function pageTables(
     cellsNamed: (name: string, page?: string) => namesOf(page)?.cells.get(name.toLowerCase()) ?? [],
     // Pages not read (none without the pageLinks module): formulas referring to them keep their results
     unread: (page: string) => page !== here && others?.tables(page) === undefined,
-    ...(elsewhere?.source ? { source: elsewhere.source } : {}),
+    ...(elsewhere?.spaceSource ? { spaceSource: elsewhere.spaceSource } : {}),
   });
 }
 

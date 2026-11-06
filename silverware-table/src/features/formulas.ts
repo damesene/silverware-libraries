@@ -130,8 +130,8 @@ function choiceHelp(choice: FormulaChoice): FormulaHelp {
     case "table":
       return { syntax: `${choice.name}!A1 · ${choice.name}![column]`, description: "A named table of the page: a cell, range or column of it." };
     case "column":
-      return choice.table
-        ? { syntax: `${choice.table}[${choice.id ?? choice.name}]`, description: `A column of the source ${choice.table}: all its values.` }
+      return choice.source
+        ? { syntax: `@${choice.source}[${choice.id ?? choice.name}]`, description: `A column of the source ${choice.source}: all its values.` }
         : { syntax: `[${choice.name}] · [@${choice.name}]`, description: "A column of this table: all of it, or (with @) its cell in the formula's row." };
     case "source":
       return {
@@ -409,7 +409,7 @@ export class Formulas implements Feature {
           },
         },
       }),
-      ...(sources && { source: (name: string) => sources.table(name) }),
+      ...(sources && { spaceSource: (name: string) => sources.table(name) }),
     };
   }
 
@@ -1279,7 +1279,7 @@ export class Formulas implements Feature {
   /** The sources of the space offered while a name is typed (@tasks), with their columns for their [ ] */
   private sourceNames(): FormulaChoice[] {
     const sources = this.host.offered<SourcesOffer>("sources");
-    return sources ? sourceChoices(sources.names().map((name) => ({ name, headers: sources.table(name)?.rows[0]?.cells ?? [] }))) : [];
+    return sources ? sourceChoices(sources.names().map((name) => ({ name, columns: sources.columns(name) ?? [] }))) : [];
   }
 
   /**
@@ -1398,11 +1398,11 @@ export class Formulas implements Feature {
             text:
               choice.kind === "function"
                 ? (functionNamed(choice.name)?.description ?? "").split(/(?<=\.)\s/)[0]!
-                : choice.table
-                  ? choice.kind === "column"
-                    ? `Column of ${choice.table}`
-                    : `Named cell of ${choice.table}`
-                  : NAME_KINDS[choice.kind],
+                : choice.source
+                  ? `Column of @${choice.source}`
+                  : choice.table
+                    ? `Named cell of ${choice.table}`
+                    : NAME_KINDS[choice.kind],
           }),
         ),
       ),

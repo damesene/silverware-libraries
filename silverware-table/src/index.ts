@@ -391,8 +391,8 @@ export function init(bridge: Bridge, sources: SourceProvider = spaceSources): vo
     console.error(`Silverware Table: missing editor functions: ${missing.join(", ")}`);
     return;
   }
-  // A source that failed is said once until it changes
-  spaceSources.connect((message) => void bridge.flash(message, "error"));
+  // A source that failed is said once until it changes (SilverBullet's sources: another host gives its own)
+  if (sources === spaceSources) spaceSources.connect((message) => void bridge.flash(message, "error"));
   const global = globalThis as unknown as Record<string, Controller | undefined>;
   const existing = global[GLOBAL_KEY];
   if (existing) {

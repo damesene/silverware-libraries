@@ -73,6 +73,14 @@ describe("isolation", () => {
     expect(matches(users, /from "[./]*formulas\/(?!index\.ts")/)).toEqual([]);
   });
 
+  it("SilverBullet's side of the sources of the space is the entry's only: no other file imports host/, no domain the sources", () => {
+    const all = import.meta.glob(["./**/*.ts", "!./**/*.test.ts", "!./index.ts", "!./host/**"], { query: "?raw", import: "default", eager: true });
+    expect(Object.keys(all)).toContain("./features/sources.ts");
+    expect(matches(all, /from "[./]*host\//)).toEqual([]);
+    // (The domains get tables, never the provider nor the offer)
+    expect(matches({ ...domains, ...pivot }, /from "[./]*(sources|features\/sources)\.ts"/)).toEqual([]);
+  });
+
   it("the core and the adapter name no module", () => {
     // Remove metadata is the controller's own (a page command too), made by it for the list of modules
     expect(matches(core, /from "[./]*features\/(?!metadata\.ts")/)).toEqual([]);

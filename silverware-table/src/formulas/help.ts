@@ -3,7 +3,7 @@
 // pointed reference goes; and the functions found by what they are or do
 // (the Functions dialog).
 import { columnIdOf, columnName } from "../columns.ts";
-import { unescapeCell } from "../markdown.ts";
+import { escapeCell, unescapeCell } from "../markdown.ts";
 import { CELL_RE } from "../namerules.ts";
 import type { AnyFunction, FunctionCategory } from "./function.ts";
 import { functionNamed, functionNames } from "./registry.ts";
@@ -69,15 +69,19 @@ export function needsOperator(formula: string, at: number): boolean {
  * What a name typed in a formula may be: a function, or a name the page has
  * (a named cell of the table edited, or of another table: `table`, written
  * table!name; a named row of the table edited; a named table), or a source of
- * the space (@tasks; its columns with `table` @tasks, offered in its [ ])
+ * the space (@tasks, with its columns, offered in its [ ])
  */
 export type FormulaChoice = {
   readonly kind: "function" | "cell" | "row" | "table" | "column" | "source";
   // What the list shows (a column: its header's name)
   readonly name: string;
+  // A named cell of another table: that table's name
   readonly table?: string;
   // A column: how a reference writes it (its key, its occurrence where several share it: unit_price, qty:2)
   readonly id?: string;
+  // A source's column: the source's name (@tasks[due]); a source: its columns
+  readonly source?: string;
+  readonly columns?: readonly ColumnChoice[];
 };
 
 /** A column of the table a formula is of: its header's name, what a reference writes for it */
@@ -94,12 +98,9 @@ export function columnChoicesOf(headers: readonly string[]): ColumnChoice[] {
   });
 }
 
-/** The sources of the space as choices (`headers`: each one's header cells): each by its name, and its columns for its [ ] */
-export function sourceChoices(sources: readonly { readonly name: string; readonly headers: readonly string[] }[]): FormulaChoice[] {
-  return sources.flatMap(({ name, headers }): FormulaChoice[] => [
-    { kind: "source", name },
-    ...columnChoicesOf(headers).map((c): FormulaChoice => ({ kind: "column", name: c.name, id: c.id, table: `@${name}` })),
-  ]);
+/** The sources of the space as choices: each by its name, with its columns (by their names as the source gives them) for its [ ] */
+export function sourceChoices(sources: readonly { readonly name: string; readonly columns: readonly string[] }[]): FormulaChoice[] {
+  return sources.map(({ name, columns }): FormulaChoice => ({ kind: "source", name, columns: columnChoicesOf(columns.map(escapeCell)) }));
 }
 
 /** The choices a name typed right before the caret may be, and where the name is (from..to) */
@@ -131,11 +132,12 @@ export function formulaChoices(
     const prefix = text.slice(column.from, start).toLowerCase();
     // By the name shown or the id written (unit_ finds Unit price too)
     const starting = (c: { readonly name: string; readonly id?: string }) => c.name.toLowerCase().startsWith(prefix) || !!c.id?.toLowerCase().startsWith(prefix);
-    // A source's column (@tasks[du): its columns, as the names have them; it has no row of the formula's ([@)
+    // A source's column (@tasks[du): its columns, as the source's choice has them; it has no row of the formula's ([@)
     const source = /@([A-Za-z_][A-Za-z0-9_]*)$/.exec(text.slice(0, open))?.[1]?.toLowerCase();
     if (source !== undefined) {
       if (text[open + 1] === "@") return undefined;
-      const choices = names.filter((c) => c.kind === "column" && c.table?.toLowerCase() === `@${source}` && starting(c));
+      const of = names.find((c) => c.kind === "source" && c.name.toLowerCase() === source);
+      const choices = (of?.columns ?? []).filter(starting).map((c): FormulaChoice => ({ kind: "column", name: c.name, id: c.id, source: of!.name }));
       return choices.length ? { ...column, choices } : undefined;
     }
     // Another table's column (prices![qu): its columns are not these, nothing offered; this table's own name's, they are
@@ -156,13 +158,11 @@ export function formulaChoices(
   if (/\]\][A-Za-z_][A-Za-z0-9_]*!$/.test(before)) return undefined;
   const table = sourceTyped ? undefined : /([A-Za-z_][A-Za-z0-9_]*)!$/.exec(before)?.[1]?.toLowerCase();
   const ownCells = table !== undefined && table === own?.toLowerCase();
-  // (A source's columns are offered in its [ ] only)
-  const named = names.filter((choice) => choice.kind !== "column");
   const candidates = sourceTyped
-    ? named.filter((choice) => choice.kind === "source")
+    ? names.filter((choice) => choice.kind === "source")
     : table === undefined
-      ? [...named, ...functionNames().map((name): FormulaChoice => ({ kind: "function", name }))]
-      : named
+      ? [...names, ...functionNames().map((name): FormulaChoice => ({ kind: "function", name }))]
+      : names
           .filter((choice) => choice.kind === "cell" && (ownCells ? !choice.table : choice.table?.toLowerCase() === table))
           .map((choice): FormulaChoice => ({ kind: "cell", name: choice.name }));
   const all = candidates.filter((choice) => choice.name.toLowerCase().startsWith(prefix));

@@ -30,7 +30,9 @@ export class Sources implements Feature {
     private readonly provider: SourceProvider,
   ) {
     host.offer({
-      names: () => provider.names(),
+      // (Names are of letters, digits and _: "en" orders them so in every locale)
+      names: () => [...provider.names()].sort((a, b) => a.localeCompare(b, "en")),
+      columns: (name) => provider.read(name)?.columns,
       table: (name) => this.table(name),
       version: () => this.version,
     } satisfies SourcesOffer);

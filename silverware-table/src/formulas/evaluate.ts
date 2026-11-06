@@ -5,10 +5,10 @@ import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
 import { setCell } from "../ops.ts";
 import { withoutTags } from "../tags.ts";
 import { asNumber } from "../view.ts";
-import { type CalculatedBy, cellResult, cellsByName, errorCodeIn, type FormulaCells, hasFormulas, rowsByName, withEquals } from "./cell.ts";
+import { type CalculatedBy, cellResult, cellsByName, errorCodeIn, type FormulaCells, hasFormulas, PLAIN_CELLS, rowsByName, withEquals } from "./cell.ts";
 import { dateArithmetic, parseDate } from "./dates.ts";
 import { type Node, parse, refersToOwnData, wholeColumnNames } from "./parser.ts";
-import { type Area, areaText, cellName, formulaPages, formulaSources, referencedColumn, type SourceRef, tablePrefix, type TableRef } from "./references.ts";
+import { type Area, areaText, cellName, formulaOutside, referencedColumn, type SourceRef, tablePrefix, type TableRef } from "./references.ts";
 import { takesGrids } from "./function.ts";
 import { functionNamed } from "./registry.ts";
 import {
@@ -50,7 +50,7 @@ export type TableSource = ((name: string, page?: string) => Table | undefined) &
    * A source of the space by its name (@tasks, compared ignoring case): null where there is none so, undefined
    * where it is not read yet; none (sources not offered): every source unread, formulas reading one keep their results
    */
-  readonly source?: (name: string) => Table | null | undefined;
+  readonly spaceSource?: (name: string) => Table | null | undefined;
 };
 
 /** Where a named cell is: its table (and the table's name, if it has one), and its row (of the markdown, header 0) and column */
@@ -68,6 +68,12 @@ function calculatedKey(table: Table, page: string | undefined, name: string | un
 
 /** A formula as written where its "=" may be left out (a view's): with it */
 const withEqualsOf = (formula: string) => withEquals(formula.trim()).formula;
+
+/** " in prices" for a reference's prefix (tablePrefix: prices!, @tasks), nothing for the formula's own table */
+const inTable = (prefix: string) => (prefix ? ` in ${prefix.replace(/!$/, "")}` : "");
+
+/** Why a formula reading a source of the space is not calculated */
+const sourceNotRead = (name: string) => `the source ${name} is not read yet (are sources of the space turned off?)`;
 
 /** What a table is called in an error: its name, else what it is */
 const called = (name: string | undefined) => (name ? `the table ${name}` : "the table");
@@ -92,11 +98,16 @@ class Book {
 
   /** Why a formula keeps its stored result: it refers to a page formulas may not read, or reads a source not read; else undefined */
   notRead(formula: string): string | undefined {
+    const { pages, sources } = formulaOutside(formula);
     const unread = this.source?.unread;
-    if (unread && formulaPages(formula).some(unread)) return "the other page is not read (are links to other pages turned off?)";
-    const source = this.source?.source;
-    const name = formulaSources(formula).find((name) => !source || source(name) === undefined);
-    return name === undefined ? undefined : `the source ${name} is not read yet (are sources of the space turned off?)`;
+    if (unread && pages.some(unread)) return "the other page is not read (are links to other pages turned off?)";
+    const name = sources.find((name) => this.spaceSource(name) === undefined);
+    return name === undefined ? undefined : sourceNotRead(name);
+  }
+
+  /** A source of the space as a table; null: there is none so; undefined: not read (or no sources offered) */
+  private spaceSource(name: string): Table | null | undefined {
+    return this.source?.spaceSource?.(name);
   }
 
   /** The cells named so on `page` (undefined: the formulas' page), in every table: what a bare name not in its own table may have meant */
@@ -189,10 +200,8 @@ class Book {
     const key = `@\u0000${name.toLowerCase()}`;
     let sheet = this.sheets.get(key);
     if (!sheet) {
-      const table = this.source?.source?.(name);
-      sheet = table
-        ? new Sheet(table, this, undefined, `@${name}`)
-        : new FormulaError("#REF!", table === null ? `there is no source named ${name} in the space` : `the source ${name} is not read yet (are sources of the space turned off?)`);
+      const table = this.spaceSource(name);
+      sheet = table ? new Sheet(table, this, undefined, `@${name}`, undefined, PLAIN_CELLS) : new FormulaError("#REF!", table === null ? `there is no source named ${name} in the space` : sourceNotRead(name));
       this.sheets.set(key, sheet);
     }
     return sheet;
@@ -246,6 +255,8 @@ class Sheet {
     name?: string,
     // A view being calculated: what its formula reads of its own table, its error (its cells are the result)
     private readonly ownError?: FormulaError,
+    // How its cells are read: as the book's, or as data only (a source of the space's: PLAIN_CELLS)
+    private readonly cells: FormulaCells = book.cells,
   ) {
     this.name = name?.trim() || undefined;
     this.headers = table.rows[0]?.cells ?? [];
@@ -254,7 +265,7 @@ class Sheet {
     let point = 0;
     for (const cells of this.body) {
       for (const cell of cells) {
-        if (book.cells.formulaOf(cell)) continue;
+        if (this.cells.formulaOf(cell)) continue;
         const text = unescapeCell(cell).trim();
         if (asNumber(text) === undefined) continue;
         if (DECIMAL_COMMA_RE.test(text)) comma++;
@@ -270,7 +281,7 @@ class Sheet {
    * table's name as written, for the errors)
    */
   rowColumnsValue(row: number, name: string, last: string | undefined, prefix: string): Value {
-    const at = prefix ? ` in ${prefix.slice(0, -1)}` : "";
+    const at = inTable(prefix);
     if (row >= this.rows) return new FormulaError("#REF!", `${prefix}[@…]: the row ${row + 1} is outside the table`);
     const index = referencedColumn(this.headers, name);
     if (index === undefined) return new FormulaError("#REF!", `there is no column named "${name}"${at}`);
@@ -296,7 +307,7 @@ class Sheet {
     if (cell === undefined || column >= this.columns) {
       return new FormulaError("#REF!", `${cellName(row, column)} is outside the table`);
     }
-    const stored = this.book.cells.formulaOf(cell);
+    const stored = this.cells.formulaOf(cell);
     if (!stored) {
       const text = unescapeCell(withoutTags(cell)).trim();
       if (text === "") return null;
@@ -318,7 +329,7 @@ class Sheet {
     // the formulas using the cell use too
     const notRead = this.book.notRead(formula);
     if (notRead) {
-      const shown = unescapeCell(this.book.cells.formulaOf(this.body[row]?.[column] ?? "")?.value ?? "").trim();
+      const shown = unescapeCell(this.cells.formulaOf(this.body[row]?.[column] ?? "")?.value ?? "").trim();
       // None yet, or an error code written: an error, saying why it is not calculated
       const code = shown === "" ? "#REF!" : errorCodeIn(shown);
       const kept: Scalar = code ? new FormulaError(code, notRead) : (asNumber(shown) ?? parseClock(shown) ?? shown);
@@ -359,7 +370,7 @@ class Sheet {
 
   /** The table as the formulas have it now: its formula cells showing their results as calculated in this book */
   withResults(): Table {
-    if (!hasFormulas(this.book.cells, this.table)) return this.table;
+    if (!hasFormulas(this.cells, this.table)) return this.table;
     // (In one pass: a source of thousands of rows is read so for each table reading a pivot of it)
     const { cells } = this.book;
     const rows = this.table.rows.map((row, r) => {
@@ -396,11 +407,11 @@ class Sheet {
 
   /** The cell of the row named `row` in the column `column` */
   rowCellValue(row: string, column: string, prefix = ""): Value {
-    this.rowNames ??= rowsByName(this.book.cells, this.table);
+    this.rowNames ??= rowsByName(this.cells, this.table);
     const r = this.rowNames.get(row.toLowerCase());
-    if (r === undefined) return new FormulaError("#REF!", `there is no row named ${row}${prefix ? ` in ${prefix.slice(0, -1)}` : ""}`);
+    if (r === undefined) return new FormulaError("#REF!", `there is no row named ${row}${inTable(prefix)}`);
     const c = referencedColumn(this.headers, column);
-    if (c === undefined) return new FormulaError("#REF!", `there is no column named "${column}"${prefix ? ` in ${prefix.slice(0, -1)}` : ""}`);
+    if (c === undefined) return new FormulaError("#REF!", `there is no column named "${column}"${inTable(prefix)}`);
     // rowsByName counts the header as row 0, the body starts at 0 here
     return this.value(r - 1, c);
   }
@@ -467,7 +478,7 @@ class Sheet {
    */
   columnValue(name: string, prefix = ""): Value {
     const index = referencedColumn(this.headers, name);
-    if (index === undefined) return new FormulaError("#REF!", `there is no column named "${name}"${prefix ? ` in ${prefix.slice(0, -1)}` : ""}`);
+    if (index === undefined) return new FormulaError("#REF!", `there is no column named "${name}"${inTable(prefix)}`);
     const totals = this.totalRows();
     const values: Scalar[] = [];
     for (let r = 0; r < this.rows; r++) {
@@ -478,7 +489,7 @@ class Sheet {
 
   /** The total rows (see totalRows), once */
   private totalRows(): ReadonlySet<number> {
-    this.totals ??= totalRows(this.book.cells, this.table);
+    this.totals ??= totalRows(this.cells, this.table);
     return this.totals;
   }
 
@@ -524,7 +535,7 @@ class Sheet {
 
   /** The body row (from 0) of this table named so (ignoring case), if any */
   private rowNamed(name: string): number | undefined {
-    this.rowNames ??= rowsByName(this.book.cells, this.table);
+    this.rowNames ??= rowsByName(this.cells, this.table);
     const found = this.rowNames.get(name.toLowerCase());
     // rowsByName counts the header as row 0, the body starts at 0 here
     return found === undefined ? undefined : found - 1;
@@ -552,7 +563,7 @@ class Sheet {
 
   /** The body cell of this table named so (ignoring case), if any */
   private cellNamed(name: string): { row: number; column: number } | undefined {
-    this.cellNames ??= cellsByName(this.book.cells, this.table);
+    this.cellNames ??= cellsByName(this.cells, this.table);
     const found = this.cellNames.get(name.toLowerCase());
     // cellsByName counts the header as row 0, the body starts at 0 here
     return found && { row: found.row - 1, column: found.column };

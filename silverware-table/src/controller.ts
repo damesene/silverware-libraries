@@ -25,7 +25,7 @@ import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./features/metadata.ts";
 import { featureEntries } from "./modules.ts";
-import { memorySources, type SourceProvider } from "./sources.ts";
+import { NO_SOURCES, type SourceProvider } from "./sources.ts";
 import { moduleHost } from "./core/modulehost.ts";
 import {
   caretTextOffset,
@@ -239,7 +239,7 @@ export class Controller implements TableHost {
     readonly doc: Document,
     public bridge: Bridge,
     // The sources of the space the host gives (the sources module offers them to formulas)
-    private readonly sources: SourceProvider = memorySources(),
+    private readonly sources: SourceProvider = NO_SOURCES,
   ) {
     this.adapter = new SilverBulletAdapter(doc, this.rows, {
       infoOf: (widget) => this.infos.get(widget),

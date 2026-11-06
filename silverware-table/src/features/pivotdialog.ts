@@ -291,7 +291,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
     const tables = options.sources.map((s) => s.name);
     // The source written where none of the lists has it (a table gone, renamed), first
     const listed = [...tables, ...space];
-    const written = otherPage === undefined && withWritten(listed, fields.source) !== listed ? [fields.source] : [];
+    const written = otherPage === undefined && fields.source && !listed.some((n) => n.toLowerCase() === fields.source.toLowerCase()) ? [fields.source] : [];
     const picked = e("select", { attrs: { "aria-label": "Source", "data-focus": "Source" } });
     const group = (label: string, values: readonly string[]) => {
       if (!values.length) return;

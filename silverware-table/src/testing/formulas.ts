@@ -70,7 +70,7 @@ export const pageTables = (
   here: string,
   replace?: { readonly from: number; readonly table: Table },
   others?: OtherPages,
-  source?: (name: string) => Table | null | undefined,
+  spaceSource?: (name: string) => Table | null | undefined,
 ) =>
   page.pageTables(CELLS, () => named(tables()), here, replace && { ...replace, name: metaName(replace.table) }, {
     ...(others && {
@@ -81,7 +81,7 @@ export const pageTables = (
         },
       },
     }),
-    ...(source && { source }),
+    ...(spaceSource && { spaceSource }),
   });
 export const pageNameChoices = (tables: readonly PageTable[]) => page.pageNameChoices(CELLS, named(tables));
 export const ownNameChoices = (table: Table) => page.ownNameChoices(CELLS, table);

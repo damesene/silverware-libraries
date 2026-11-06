@@ -297,8 +297,7 @@ export class ChoicesDialog {
     const HINTS: Record<Way, string> = {
       column: "The editor offers the values the column has; nothing is checked. #choice",
       list: "Kept in this table: values not in it are marked, the column sorts in its order. A value renamed is renamed in the cells; one removed leaves its cells marked.",
-      formula:
-        "A formula's values (a list, or one column), kept in this table and calculated as the column shows: a source of the space picked (silverware.table.defineSource in Space Lua: =@projects, read anew as the space changes) or a formula of your own. Values not in it are marked, the column sorts in its order.",
+      formula: "A source's values, or a formula's (a list, or one column): values not in them are marked, the column sorts in their order.",
     };
     // Why a way cannot be picked, shown (not only as a tooltip: a touch screen has none)
     const unstorable = storable ? undefined : "lists are kept in the table's metadata; turn on Store table metadata in the settings";

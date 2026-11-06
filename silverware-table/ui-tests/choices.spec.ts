@@ -208,6 +208,17 @@ test.describe("Choices", () => {
       await expect(dialog(page).getByRole("textbox", { name: "Formula" })).toHaveValue("=SORT(UNIQUE(@tasks[page]), 1, -1)");
     });
 
+    test("a list made by a formula is under Choice in the Type menu, its formula in its hint, taken for another column there", async ({ page }) => {
+      await load(page, ["| Task | Next | Project #choice-projects |", "|---|---|---|", "| A | Delta | Atlas |", "| <meta core.table columntypes.choice.projects='=@projects'> |", ""].join("\n"), 1);
+      await header(page, 1).click({ button: "right" });
+      await menu(page).getByTitle("Choose how the column's cells show").click();
+      const row = menu(page).locator(".swt-menu-segmented", { hasText: "Choice: projects" });
+      await expect(row.locator(".swt-label")).toHaveAttribute("title", "=@projects · Used by Project");
+      await rendersAnew(page, () => row.getByTitle("Take the list projects for this column").click());
+      expect(await markdown(page)).toMatch(/\| Next #choice-projects +\|/);
+      await expect(columnCells(page, 1).nth(0)).toHaveClass(/swt-type-invalid/);
+    });
+
     test("a source from a query: its list read anew once a page of its tag is indexed", async ({ page }) => {
       test.skip(target !== "silverbullet", "Space Lua and its index: SilverBullet only");
       await setOtherPage(page, "UiTests/Alpha", "#uichoice\n");

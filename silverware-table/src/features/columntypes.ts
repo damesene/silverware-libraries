@@ -277,9 +277,10 @@ export class ColumnTypes implements Feature {
   }
 
   /**
-   * The lists of choices the table keeps, under the Choice type in the Type
-   * menu: each taken for the column, or deleted where no column takes it (a
-   * list no column takes stays until deleted so)
+   * The lists of choices the table keeps (values or a formula, its hint showing
+   * it), under the Choice type in the Type menu: each taken for the column, or
+   * deleted where no column takes it (a list no column takes stays until
+   * deleted so)
    */
   private listEntries(info: TableInfo, table: Table, column: number, choice: ColumnType): MenuEntry[] {
     const users = new Map<string, string[]>();
@@ -291,12 +292,16 @@ export class ColumnTypes implements Feature {
     const write = (change: (t: Table) => Table) => void this.host.writeTable(this.host.tableFor(info.key) ?? info, change);
     // The list taken for the column: its header naming it
     const take = (name: string) => () => write((t) => setCell(t, 0, column, withColumnType(t.rows[0]?.cells[column] ?? "", `choice-${name}`)));
-    return listNames(this.host.metaOf(table)).map((name): MenuEntry => {
+    const stored = this.host.metaOf(table);
+    return listNames(stored).map((name): MenuEntry => {
       const used = users.get(name);
+      // A list made by a formula: its formula first, as where its values come from
+      const formula = listFormula(stored.get(listKey(name)));
+      const usedBy = used ? `Used by ${used.join(", ")}` : "Used by no column";
       return {
         kind: "segmented",
         label: `Choice: ${name}`,
-        hint: used ? `Used by ${used.join(", ")}` : "Used by no column",
+        hint: formula === undefined ? usedBy : `${formula} · ${usedBy}`,
         options: [
           {
             icon: choice.iconFor?.({ name }) ?? iconOf(choice),

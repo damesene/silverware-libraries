@@ -1,8 +1,10 @@
 // The lists of the choice column type (builtin/choice.ts): a table keeps each
 // in its metadata row by its name, a JSON list of texts
-// (`columntypes.choice.status='["open","in progress","done"]'`), a column
-// names the one it takes in its hashtag (`#choice-status`). Pure: the column
-// types module reads and writes them through its host.
+// (`columntypes.choice.status='["open","in progress","done"]'`) or a formula
+// making it (`columntypes.choice.projects='=@projects'`: its leading "=", which
+// no JSON list starts with), a column names the one it takes in its hashtag
+// (`#choice-status`). Pure: the column types module reads and writes them
+// through its host, and has a formula calculated by the formulas module.
 
 /** What a list's name may be: lower case ASCII letters and digits, words joined by single dashes, starting with a letter */
 export const LIST_NAME_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -33,6 +35,29 @@ export function readChoiceList(text: string | undefined): readonly string[] | un
   }
   if (read.size > 200) read.clear();
   read.set(text, list);
+  return list;
+}
+
+/** The formula a list is made by, as stored (with its "="); undefined where it is kept as a list of texts */
+export function listFormula(text: string | undefined): string | undefined {
+  const trimmed = text?.trim();
+  return trimmed?.startsWith("=") ? trimmed : undefined;
+}
+
+/**
+ * A list made of a formula's values (as cells show them, in its result's
+ * order): empty ones left out, each value once whatever its case (the first
+ * kept), as values are matched
+ */
+export function listOfValues(values: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const list: string[] = [];
+  for (const raw of values) {
+    const value = raw.trim();
+    if (value === "" || seen.has(value.toLowerCase())) continue;
+    seen.add(value.toLowerCase());
+    list.push(value);
+  }
   return list;
 }
 

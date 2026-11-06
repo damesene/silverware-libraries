@@ -705,7 +705,7 @@ shows `$12.99`, `★★★★☆` and `☑`.
 | `#unit-kg` | A number with a unit: the unit after the dash. |
 | `#stars, #stars-10` | A rating as stars: a whole number from 0 to the most stars after the dash (default 5). |
 | `#check` | Yes or no as a check box: yes, true, x, ☑ or a number above 0 shows ☑; no, false, ☐, 0 or a number below it shows ☐. |
-| `#choice, #choice-name` | One of a list's values: the list named after the dash, kept in the table (picking Choice opens a dialog to set it up). A value not in the list is marked, and the column sorts in the list's order. Without a list the editor offers the values the column has. |
+| `#choice, #choice-name` | One of a list's values: the list named after the dash, kept in the table as values or as a formula making them (=@projects; picking Choice opens a dialog to set it up). A value not in the list is marked, and the column sorts in the list's order. Without a list the editor offers the values the column has. |
 | `#date, #date-long` | A date written as 2025-11-06 (with a time: 2025-11-06 14:30), shown as the locale writes it: short, medium (default) or long after the dash. |
 | `#time` | A time of day written as 14:30 or 14:30:15 (or as a fraction of a day, 0.5 is 12:00), shown as the locale writes times. |
 | `#trend` | A trend as an arrow: + or a number above 0 shows ↑, - or one below 0 shows ↓, = or 0 shows =. |

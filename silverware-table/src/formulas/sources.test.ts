@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sourceTable } from "../features/sources.ts";
 import { parseTable, type Table } from "../markdown.ts";
 import { CELLS, formulaCell, formulaErrors, pageTables, recalculate, shiftReferences } from "../testing/formulas.ts";
-import { evaluateFormula, formulaChoices, formulaSources, references, sourceChoices, tokenize, withColumnKeys } from "./index.ts";
+import { evaluateFormula, formulaChoices, FormulaError, formulaSources, listResult, references, sourceChoices, tokenize, withColumnKeys } from "./index.ts";
 import { parse } from "./parser.ts";
 import { isError } from "./values.ts";
 
@@ -98,5 +98,25 @@ describe("sources offered while a formula is typed", () => {
     const found = formulaChoices("=@tasks[du", 10, 10, names, undefined, [{ name: "Duty", id: "duty" }]);
     expect(found?.choices).toEqual([{ kind: "column", name: "Due date", id: "due_date", source: "tasks" }]);
     expect(formulaChoices("=@tasks[@", 9, 9, names)).toBeUndefined();
+  });
+});
+
+describe("a list's formula (a choice list made by one)", () => {
+  const own = parseTable(["| Status | Done |", "|---|---|", "| open | 1 |", "| done | TRUE |", "| open | 2.5 |"].join("\n"));
+  const list = (formula: string) => listResult(own, { cells: CELLS, tables: tables() }, formula);
+
+  it("gives a source's values, its own table's columns, numbers and logical values as cells show them", () => {
+    expect(list("=@tasks[name]")).toEqual(["Write", "Test", "Ship"]);
+    expect(list("=SORT(UNIQUE([status]))")).toEqual(["done", "open"]);
+    expect(list("=[done]")).toEqual(["1", "TRUE", "2.5"]);
+    expect(list('="one"')).toEqual(["one"]);
+  });
+
+  it("is why where its result has several columns or is an error; undefined where it reads a source not read", () => {
+    const wide = list("=@tasks") as FormulaError;
+    expect(wide.code).toBe("#VALUE!");
+    expect(wide.detail).toMatch(/3 columns: pick one/);
+    expect((list("=@nope[x]") as FormulaError).code).toBe("#REF!");
+    expect(list("=@people[name]")).toBeUndefined();
   });
 });

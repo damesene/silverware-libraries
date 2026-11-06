@@ -853,6 +853,25 @@ export function viewResult(table: Table, { cells, tables, name }: Calculation, f
   return new Book(cells, tables).viewResult(table, undefined, name, formula);
 }
 
+/**
+ * A formula calculated in none of a table's cells but with the table as its
+ * own (`[status]` its column, its own name its own: a choice list's formula,
+ * which no cell holds, so reading its table is no cycle): its values as cells
+ * show them, in the result's order (one value one, a list or a grid of one
+ * column its values), or why there are none (a grid of several columns too).
+ * Undefined where it reads a page or a source not read: no values to give yet.
+ */
+export function listResult(table: Table, { cells, tables, name }: Calculation, formula: string): readonly string[] | FormulaError | undefined {
+  const written = withEqualsOf(formula);
+  const book = new Book(cells, tables);
+  if (book.notRead(written)) return undefined;
+  const result = new Sheet(table, book, undefined, name).whole(written);
+  if (isError(result)) return result;
+  const grid = asGrid(result);
+  if (grid.width > 1) return new FormulaError("#VALUE!", `the result has ${grid.width} columns: pick one (@users[name], CHOOSECOLS(…, 1))`);
+  return grid.cells.map(scalarText);
+}
+
 /** A view's result as its table's body: a grid (one value a cell, a list a column), an error as it is, none of no columns #CALC! */
 export function viewGrid(result: Result): Grid | FormulaError {
   if (isError(result)) return result;

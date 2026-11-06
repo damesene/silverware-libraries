@@ -1,7 +1,10 @@
 // Column types in the table: a column whose header has a type's hashtag
 // (`| Price #currency |`) shows its cells as that type (columntypes/), hides that
 // hashtag, and marks the cells that are not values of the type. The markdown
-// keeps the values as written: sorting, filters and copying use them.
+// keeps the values as written: sorting, filters and copying use them. A
+// choice list made by a formula (`columntypes.choice.projects='=@projects'`)
+// is calculated by the formulas module (its offer `list`) as the column shows,
+// never written.
 import { type CellEditor, type CellLook, type CellRef, type Feature, HEADER_ICON_ORDER, type HeaderLook, type Panel, type ModelHost, type TableLooks, type TableInfo } from "../core/feature.ts";
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
@@ -17,15 +20,23 @@ import {
   typeOfTag,
   allTypes,
   type ColumnTypesOffer,
+  listFormula,
   listKey,
   listNames,
+  listOfValues,
+  readChoiceList,
   choiceListOf,
   isChoice,
   typeTagPatterns,
   type TypeTable,
   withColumnType,
 } from "../columntypes/index.ts";
+import { FormulaError, type FormulasOffer, tokenize } from "../formulas/index.ts";
+import { sameTableName } from "../namerules.ts";
 import { ChoicesDialog } from "./choicesdialog.ts";
+
+/** A table's choice list as read: its values, or why it gives none (a formula's error, a formula not calculated) */
+type ListRead = { readonly values?: readonly string[]; readonly problem?: string };
 
 /** A type's icon, or a tag for a type without one */
 function iconOf(type: ColumnType): string {
@@ -84,6 +95,9 @@ export class ColumnTypes implements Feature {
   private readonly picker: Panel;
   private picking: Picking | undefined;
   private readonly choicesDialog: ChoicesDialog;
+  // The lists read, by table and name, as of the page's text (a formula's reads the page's other tables); emptied
+  // as what formulas read outside the page changes (tablesChanged)
+  private lists: { readonly text: string; readonly byTable: WeakMap<Table, Map<string, ListRead>> } | undefined;
 
   constructor(private readonly host: ModelHost) {
     this.choicesDialog = new ChoicesDialog(host);
@@ -121,9 +135,7 @@ export class ColumnTypes implements Feature {
     const host = this.host;
     // Read only by a type that asks (a choice's list): most types never do
     return {
-      get stored() {
-        return (stored ??= host.metaOf(table));
-      },
+      list: (name) => this.listOf(table, name, (stored ??= host.metaOf(table))).values,
       values: () =>
         (values ??= table.rows
           .slice(1)
@@ -132,9 +144,58 @@ export class ColumnTypes implements Feature {
     };
   }
 
-  /** Custom types were defined anew: their hashtags are hidden too (tables rendered from now on show them typed) */
+  /**
+   * A choice list of the table, read once per table and page text: kept as a list of texts, or made by a formula
+   * (its leading "="), calculated by the formulas module on the page shown; undefined values where it gives none, with why
+   */
+  private listOf(table: Table, name: string, stored = this.host.metaOf(table)): ListRead {
+    const text = this.host.pageText;
+    if (this.lists?.text !== text) this.lists = { text, byTable: new WeakMap() };
+    let read = this.lists.byTable.get(table);
+    if (!read) this.lists.byTable.set(table, (read = new Map()));
+    let list = read.get(name);
+    if (!list) read.set(name, (list = this.readList(table, stored.get(listKey(name)))));
+    return list;
+  }
+
+  private readList(table: Table, stored: string | undefined): ListRead {
+    const formula = listFormula(stored);
+    if (formula === undefined) return { values: readChoiceList(stored) };
+    const formulas = this.host.offered<FormulasOffer>("formulas");
+    if (!formulas) return { problem: `its formula (${formula}) is calculated by the formulas module, which is off` };
+    const result = formulas.list(table, formula);
+    if (result === undefined) return { problem: `its formula (${formula}) reads a page or a source not read yet` };
+    if (result instanceof FormulaError) return { problem: `its formula (${formula}) gives ${result.code} ${result.detail}` };
+    return { values: listOfValues(result) };
+  }
+
+  /** The formulas of a table's choice lists (none where it has no list made by one) */
+  private listFormulas(table: Table): string[] {
+    const stored = this.host.metaOf(table);
+    return listNames(stored).flatMap((name) => listFormula(stored.get(listKey(name))) ?? []);
+  }
+
+  /**
+   * Custom types were defined anew: their hashtags are hidden too (tables rendered from now on show them typed);
+   * what formulas read outside the page changed (a source read anew, another page): lists made by formulas read again
+   */
   tablesChanged(): void {
     this.host.hideHeaderTags("types", typeTagPatterns());
+    this.lists = undefined;
+    for (const info of this.host.shownTables()) if (this.listFormulas(parseTable(info.source)).length) this.host.looksChanged(info);
+  }
+
+  /** A table shown anew (edited): the tables whose lists' formulas read it look as their lists are now */
+  enhanced(info: TableInfo): void {
+    const name = this.host.tableName(parseTable(info.source))?.trim();
+    if (!name) return;
+    for (const other of this.host.shownTables()) {
+      if (other.key === info.key) continue;
+      const reads = this.listFormulas(parseTable(other.source)).some((formula) =>
+        tokenize(formula).tokens.some((token) => token.kind === "table" && token.page === undefined && sameTableName(token.name, name)),
+      );
+      if (reads) this.host.looksChanged(other);
+    }
   }
 
   // ---- the column menu ----------------------------------------------------------
@@ -396,10 +457,14 @@ export class ColumnTypes implements Feature {
       const typed = columnTypeOf(unescapeCell(name));
       if (!typed) return;
       const typeTable = this.typeTable(table, column);
+      // A choice list that gives no values (its formula's error): the column checks nothing, its icon says why
+      const list = isChoice(typed) && typed.params.name !== undefined ? this.listOf(table, String(typed.params.name).toLowerCase()) : undefined;
+      const why = list?.problem ? `
+The list ${String(typed.params.name).toLowerCase()} checks nothing: ${list.problem}` : "";
       headers.push({
         column,
         hidesTag: (tag) => !!typeOfTag(tag),
-        icons: [{ svg: columnIcon(typed), title: `${typeLabel(typed.type.name)} (#${typed.tag}): ${typed.type.description}`, className: "swt-type-icon", order: HEADER_ICON_ORDER.kind }],
+        icons: [{ svg: columnIcon(typed), title: `${typeLabel(typed.type.name)} (#${typed.tag}): ${typed.type.description}${why}`, className: "swt-type-icon", order: HEADER_ICON_ORDER.kind }],
       });
       table.rows.forEach((r, row) => {
         const raw = r.cells[column];

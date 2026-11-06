@@ -42,6 +42,7 @@ import {
   cycleFixed,
   evaluateFormula,
   rowValues,
+  listResult,
   filledFormula,
   type FormulaCells,
   formulaCount,
@@ -284,6 +285,7 @@ export class Formulas implements Feature {
         return tree instanceof FormulaError ? tree.detail : undefined;
       },
       rowValues: (table, formula) => rowValues(table, withEquals(formula).formula.trim(), { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) }),
+      list: (table, formula) => listResult(table, { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) }, formula),
       view: (formula, table, replace) => this.viewOf(formula, table, replace),
       functions: (formula, caret, done) => this.pickFunction(formula, caret, done),
       fieldHelpers: (table, outside) => this.fieldHelpers(table, outside),

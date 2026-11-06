@@ -4,6 +4,7 @@ import { cellText } from "../dom.ts";
 import { typeNamed } from "../columntypes/index.ts";
 import { clearCustomTypes } from "../columntypes/registry.ts";
 import { defineTypes } from "../index.ts";
+import { memorySources } from "../sources.ts";
 import { bodyTexts, cell, clickOn, controller, editor, flashes, flush, key, press, setup, text, useTablePage } from "../testing/page.ts";
 
 describe("Column types", () => {
@@ -88,6 +89,97 @@ describe("Column types", () => {
     clickOn(cell(0, 1).querySelector(".swt-sort")!);
     // Values not in the list after it, a number among them too
     expect(bodyTexts()).toEqual(["B", "D", "A", "E", "C"]);
+  });
+
+  describe("a choice list made by a formula", () => {
+    const projects = () =>
+      memorySources({ projects: { columns: ["value"], rows: [["Beacon"], ["Atlas"], [""], ["atlas"], ["Comet"]] }, users: { columns: ["name", "active"], rows: [["anna", "TRUE"], ["petr", "FALSE"]] } });
+    const options = () => Array.from(document.querySelectorAll<HTMLElement>(".swt-choices .swt-choice")).map((o) => o.textContent);
+    const typeIcon = (column: number) => cell(0, column).querySelector<HTMLElement>(".swt-type-icon")!;
+    const invalid = (row: number, column: number) => cell(row, column).classList.contains("swt-type-invalid");
+
+    it("checks a column against a source's values, offers them in their order, each once, and sorts by it", async () => {
+      await setup(
+        ["| Task | Project #choice-projects |", "|---|---|", "| A | Comet |", "| B | Delta |", "| C | atlas |", `| <meta core.table columntypes.choice.projects='=@projects'> |`, ""].join("\n"),
+        { "silverware.table.editor.enterKey": "save" },
+        {},
+        projects(),
+      );
+      expect([invalid(1, 1), invalid(2, 1), invalid(3, 1)]).toEqual([false, true, false]);
+      expect(cell(2, 1).title).toBe('"Delta" is not one of the choices of projects');
+      clickOn(cell(0, 1).querySelector(".swt-sort")!);
+      expect(bodyTexts()).toEqual(["C", "A", "B"]);
+      clickOn(cell(1, 1));
+      expect(options()).toEqual(["Beacon", "Atlas", "Comet"]);
+    });
+
+    it("is read anew as a source changes, a table of the page it reads is edited, a formula picks a source's column", async () => {
+      const sources = projects();
+      await setup(
+        [
+          "| Task | Project #choice-projects | Owner #choice-people |",
+          "|---|---|---|",
+          "| A | Delta | anna |",
+          `| <meta core.table columntypes.choice.projects='=@projects' columntypes.choice.people='=FILTER(@users[name], @users[active])'> |`,
+          "",
+        ].join("\n"),
+        {},
+        {},
+        sources,
+      );
+      expect([invalid(1, 1), invalid(1, 2)]).toEqual([true, false]);
+      sources.set("projects", { columns: ["value"], rows: [["Delta"]] });
+      sources.set("users", { columns: ["name", "active"], rows: [["anna", "FALSE"], ["petr", "TRUE"]] });
+      await flush();
+      expect([invalid(1, 1), invalid(1, 2)]).toEqual([false, true]);
+    });
+
+    it("reads another table of the page, and is read anew as that table is", async () => {
+      await setup(
+        [
+          "| Task | Owner #choice-people |",
+          "|---|---|",
+          "| A | petr |",
+          `| <meta core.table columntypes.choice.people='=SORT(people![name])'> |`,
+          "",
+          "| Name |",
+          "|---|",
+          "| anna |",
+          "| <meta core.table core.name='people'> |",
+          "",
+        ].join("\n"),
+      );
+      expect(invalid(1, 1)).toBe(true);
+      const people = () => editor.querySelectorAll("table")[1]!;
+      clickOn(people().rows[1]!.cells[0]!);
+      const field = editor.querySelector<HTMLInputElement>(".swt-cell-editor")!;
+      field.value = "petr";
+      key(field, "Enter");
+      await flush();
+      await controller.scan();
+      expect(invalid(1, 1)).toBe(false);
+    });
+
+    it("checks nothing where its formula gives no list, its header saying why; nor with the formulas module off", async () => {
+      const page = [
+        "| Task | Owner #choice-people | Project #choice-projects |",
+        "|---|---|---|",
+        "| A | x | y |",
+        `| <meta core.table columntypes.choice.people='=@users' columntypes.choice.projects='=nope![x]'> |`,
+        "",
+      ].join("\n");
+      await setup(page, {}, {}, projects());
+      expect([invalid(1, 1), invalid(1, 2)]).toEqual([false, false]);
+      expect(typeIcon(1).title).toContain("The list people checks nothing: its formula (=@users) gives #VALUE! the result has 2 columns");
+      expect(typeIcon(2).title).toContain("The list projects checks nothing: its formula (=nope![x]) gives #REF!");
+      // The column's values offered, as a column without a list
+      clickOn(cell(1, 1));
+      expect(options()).toEqual(["x"]);
+
+      await setup(page, { "silverware.table.modules.formulas.enabled": false }, {}, projects());
+      expect(invalid(1, 2)).toBe(false);
+      expect(typeIcon(2).title).toContain("calculated by the formulas module, which is off");
+    });
   });
 
   it("sorts by the values, not by what the cells show", async () => {

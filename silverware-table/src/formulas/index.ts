@@ -43,6 +43,11 @@ export type FormulasOffer = {
   /** A formula of one row (`[@due] < TODAY()`) calculated for each body row of a table of the page shown (values[0]: row 1), as a cell of none */
   readonly rowValues: (table: import("../markdown.ts").Table, formula: string) => readonly import("./values.ts").Scalar[];
   /**
+   * A formula of `table`'s calculated in none of its cells, on the page shown (a choice list's): its values as cells
+   * show them, in the result's order, or why there are none; undefined where it reads a page or source not read
+   */
+  readonly list: (table: import("../markdown.ts").Table, formula: string) => readonly string[] | import("./values.ts").FormulaError | undefined;
+  /**
    * A view's formula calculated on the page shown, as a write would (its result a grid, or why there is none;
    * undefined where it reads a page not read): `table` the view's own (none: a view to be inserted), `replace` a
    * table of the page (where it starts) as it will be written with it (a source named in the same edit)
@@ -105,7 +110,7 @@ export type CalculatedOffer = {
 };
 export { type Area, areaText, callsCustomFunctions, callsPureFunctionsOnly, columnIdText, formulaPages, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, formulaSources, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredSources, referredTableNames, type SourceRef, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";
-export { type Calculation, cellWholeResult, evaluateFormula, formulaErrors, givesList, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows, calculatedNow, viewGrid, viewResult } from "./evaluate.ts";
+export { type Calculation, cellWholeResult, evaluateFormula, formulaErrors, givesList, listResult, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows, calculatedNow, viewGrid, viewResult } from "./evaluate.ts";
 export { type Node as FormulaNode, parse as parseFormula } from "./parser.ts";
 export { parseDate, toUnit, type Unit } from "./dates.ts";
 export { asGrid, ERROR_CODES, FormulaError, Grid, parseClock, type Result, type Scalar, type Value } from "./values.ts";

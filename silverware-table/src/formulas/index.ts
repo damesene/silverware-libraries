@@ -18,7 +18,7 @@
 // This is the formulas' API for the rest of Silverware Table; the parts are the
 // files beside it, the functions in builtin/ (only functions: what a formula
 // can call), custom functions in custom.ts, which exist in registry.ts.
-export { type CellNameAt, cellResult, cellsByName, errorCodeIn, type FormulaCells, formulaCount, forFormulas, hasFormulas, isErrorText, isFormulaInput, type RowName, rowsByName, type StoredFormula } from "./cell.ts";
+export { type CalculatedBy, type CalculatedRead, type CellNameAt, cellResult, cellsByName, errorCodeIn, type FormulaCells, formulaCount, forFormulas, hasFormulas, isErrorText, isFormulaInput, type RowName, rowsByName, type StoredFormula } from "./cell.ts";
 
 /**
  * A formula as written where its "=" may be left out (a condition's, Space
@@ -71,6 +71,12 @@ export type FormulasOffer = {
    * and cells, as a cell's formula has them; the function the caret is in, `outside` where it is in none; why it
    * does not read
    */
+  /**
+   * A table calculated from others (a view, a pivot) as the formulas calculate it now on the page shown, written as
+   * its module writes it (what its Out of date compares with), or why it cannot be; undefined where it is none or
+   * reads a page not read
+   */
+  readonly calculated: (table: import("../markdown.ts").Table) => import("../markdown.ts").Table | import("./values.ts").FormulaError | undefined;
   readonly fieldHelpers: (table?: () => import("../markdown.ts").Table, outside?: import("./help.ts").FormulaHelp) => import("../formulafield.ts").FormulaHelpers;
 };
 
@@ -97,29 +103,17 @@ export type PageLinksOffer = {
 };
 
 /**
- * What the views module offers (a view: a table whose body is one formula's result, `view.formula` its
- * attribute): the formulas calculate views, follow their formulas through their sources' edits and write
- * them with the other tables, through it
+ * What a module calculating tables from others offers (the view module: a view, a table made by a formula; the pivot
+ * module: a pivot): how each of its tables is calculated. The formulas calculate them in their order, read them as
+ * calculated now and write them with the other tables an edit changes, through it
  */
-export type ViewsOffer = {
-  /** A table's view formula (with its "="), undefined for a table that is no view */
-  readonly viewFormula: (table: import("../markdown.ts").Table) => string | undefined;
-  /** The view with its formula written anew (its sources' edits followed) */
-  readonly withViewFormula: (table: import("../markdown.ts").Table, formula: string) => import("../markdown.ts").Table;
-  /**
-   * The view with a result written over its body, its headers the names the user gave them kept: `before`,
-   * the view before an edit of it (a header renamed in it named so from now on); `renamed`, its sources'
-   * columns renamed in the same edit (old name → new), so a header named after one stays the user's
-   */
-  readonly written: (
-    table: import("../markdown.ts").Table,
-    result: import("./values.ts").Grid,
-    options?: { readonly before?: import("../markdown.ts").Table; readonly renamed?: ReadonlyMap<string, string> },
-  ) => import("../markdown.ts").Table;
+export type CalculatedOffer = {
+  /** How a table is calculated, undefined for one the module does not calculate */
+  readonly calculated: (table: import("../markdown.ts").Table) => import("./cell.ts").CalculatedBy | undefined;
 };
 export { type Area, areaText, callsCustomFunctions, columnIdText, formulaPages, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredTableNames, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";
-export { type Calculation, cellWholeResult, evaluateFormula, formulaErrors, givesList, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows, viewResult } from "./evaluate.ts";
+export { type Calculation, cellWholeResult, evaluateFormula, formulaErrors, givesList, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows, calculatedNow, viewGrid, viewResult } from "./evaluate.ts";
 export { type Node as FormulaNode, parse as parseFormula } from "./parser.ts";
 export { parseDate, toUnit, type Unit } from "./dates.ts";
 export { asGrid, ERROR_CODES, FormulaError, Grid, parseClock, type Result, type Scalar, type Value } from "./values.ts";

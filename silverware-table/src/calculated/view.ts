@@ -2,7 +2,9 @@
 // column it came from (else its letter, as Show result names them), with an id
 // by which a header the user renamed is kept through every recalculation;
 // cells as texts, a column right-aligned where its values are all numbers.
+import { columnName } from "../columns.ts";
 import { columnLetters, type Grid, scalarText } from "../formulas/index.ts";
+import type { Table } from "../markdown.ts";
 import type { Calculated, Renames } from "./table.ts";
 
 /**
@@ -39,4 +41,18 @@ export function renamedViewIds(renames: Renames, renamed: ReadonlyMap<string, st
       return [to ? `name:${to}${m[2] ?? ""}` : id, name];
     }),
   );
+}
+
+/** The columns an edit of a table renamed: each one's name before → after (as a view names its columns), where they differ */
+export function renamedColumns(before: Table, after: Table, columnMap: ((column: number) => number | undefined) | undefined): Map<string, string> {
+  const renamed = new Map<string, string>();
+  const was = before.rows[0]?.cells ?? [];
+  const now = after.rows[0]?.cells ?? [];
+  was.forEach((cell, c) => {
+    const to = columnMap ? columnMap(c) : c;
+    const from = columnName(cell);
+    const name = to === undefined || now[to] === undefined ? undefined : columnName(now[to]!);
+    if (from && name && from !== name) renamed.set(from, name);
+  });
+  return renamed;
 }

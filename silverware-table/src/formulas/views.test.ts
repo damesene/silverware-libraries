@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { metaName } from "../meta.ts";
+import { metaName, metaValue } from "../meta.ts";
 import { pageTablesOf, parseTable, type Table } from "../markdown.ts";
 import { VIEW_CELLS } from "../testing/formulas.ts";
 import { evaluateFormula, FormulaError, Grid, recalculate, referredPages, referredTableNames, viewResult } from "./index.ts";
@@ -26,7 +26,13 @@ function sourceOf(page: string, here = "Page", others?: Record<string, string>) 
 /** The page's table named so */
 const tableNamed = (page: string, name: string): Table => pageTablesOf(page).find((t) => metaName(t.table) === name)!.table;
 
-const resultOf = (page: string, name: string) => viewResult(tableNamed(page, name), { cells: VIEW_CELLS, tables: sourceOf(page), name });
+/** A view's formula as written in its metadata row */
+const formulaOf = (table: Table) => metaValue(table, "view", "formula") ?? "";
+
+const resultOf = (page: string, name: string) => {
+  const table = tableNamed(page, name);
+  return metaValue(table, "view", "formula") === undefined ? undefined : viewResult(table, { cells: VIEW_CELLS, tables: sourceOf(page), name }, formulaOf(table));
+};
 
 describe("views in formulas", () => {
   it("calculates a view's formula as a grid, its columns named after their sources", () => {
@@ -74,8 +80,8 @@ describe("views in formulas", () => {
     expect((resultOf(pair, "b") as FormulaError).code).toBe("#CYCLE!");
     // Told by its name, whichever object of its table is calculated (a copy, as a view's Out of date check holds)
     const copy = parseTable(pageTablesOf(pair)[0]!.range.text);
-    const cycle = viewResult(copy, { cells: VIEW_CELLS, tables: sourceOf(pair), name: "a" }) as FormulaError;
-    expect(cycle.detail).toBe("the view b cannot be calculated: the view a depends on its own result");
+    const cycle = viewResult(copy, { cells: VIEW_CELLS, tables: sourceOf(pair), name: "a" }, formulaOf(copy)) as FormulaError;
+    expect(cycle.detail).toBe("the table b cannot be calculated: the table a depends on its own result");
   });
 
   it("is read by other formulas as calculated now, not as written: a table reading it follows its source", () => {
@@ -88,7 +94,7 @@ describe("views in formulas", () => {
     const broken = `${VIEW("=SORT(gone![#Data])")}\n`;
     const read = evaluateFormula("=SUM(mine![x])", { cells: VIEW_CELLS, tables: sourceOf(broken) }) as FormulaError;
     expect(read.code).toBe("#REF!");
-    expect(read.detail).toContain("the view mine cannot be calculated");
+    expect(read.detail).toContain("the table mine cannot be calculated");
   });
 
   it("is calculated by a cell reading a view that reads another view", () => {
@@ -102,9 +108,9 @@ describe("views in formulas", () => {
 
   it("keeps what it shows where its formula reads a page formulas may not read", () => {
     const page = `${VIEW("=SORT([[Other]]tasks![#Data])")}\n`;
-    expect(viewResult(tableNamed(page, "mine"), { cells: VIEW_CELLS, tables: sourceOf(page), name: "mine" })).toBeUndefined();
+    expect(viewResult(tableNamed(page, "mine"), { cells: VIEW_CELLS, tables: sourceOf(page), name: "mine" }, formulaOf(tableNamed(page, "mine")))).toBeUndefined();
     // Read: calculated
-    const read = viewResult(tableNamed(page, "mine"), { cells: VIEW_CELLS, tables: sourceOf(page, "Page", { Other: TASKS }), name: "mine" }) as Grid;
+    const read = viewResult(tableNamed(page, "mine"), { cells: VIEW_CELLS, tables: sourceOf(page, "Page", { Other: TASKS }), name: "mine" }, formulaOf(tableNamed(page, "mine"))) as Grid;
     expect(read.height).toBe(3);
   });
 

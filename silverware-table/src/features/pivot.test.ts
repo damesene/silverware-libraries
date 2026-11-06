@@ -40,6 +40,64 @@ describe("Pivot tables", () => {
     expect(pivotOf(text)).toBe(`${PIVOT("| East | 120 |\n| West | 80 |\n| Total | 200 |")}\n`);
   });
 
+  describe("calculated by the formulas, in their order", () => {
+    const SUMS = PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |").replace("<meta core.table", "<meta core.table core.name='sums'");
+    const READER = (value: string) => `| West |\n|---|\n| ${value} <meta formulas.f='=XLOOKUP("West", sums![region], sums![sum_of_revenue])'> |`;
+
+    it("writes a table reading a pivot, and a view of it, in the same edit as its source", async () => {
+      const view = "| Region |\n|---|\n| East |\n| West |\n| Total |\n| <meta core.table view.formula='=CHOOSECOLS(sums![#Data], 1)'> |";
+      await setup(`${ORDERS}\n\n${SUMS}\n\n${READER("50")}\n\n${view}\n`, { "silverware.table.editor.enterKey": "save" });
+      clickOn(cell(1, 0)); // East's region
+      await type("North");
+      expect(text).toContain("| North | 100 |");
+      expect(text).toContain(READER("50"));
+      clickOn(cell(2, 1)); // West's revenue
+      await type("80");
+      expect(text).toContain("| West | 80 |\n| Total | 200 |");
+      expect(text).toContain(READER("80"));
+      expect(text).toContain("| Region |\n|---|\n| East |\n| North |\n| West |\n| Total |");
+    });
+
+    it("is calculated from a view of its source, in the same edit", async () => {
+      const big = "| Region | Revenue |\n|---|--:|\n| East | 100 |\n| West | 50 |\n| <meta core.table core.name='big' view.formula='=FILTER(orders![#Data], orders![revenue] &gt; 30)'> |";
+      const pivot = PIVOT("| East | 100 |\n| West | 50 |\n| Total | 150 |").replace("pivot.source='orders'", "pivot.source='big'");
+      await setup(`${ORDERS}\n\n${big}\n\n${pivot}\n`, { "silverware.table.editor.enterKey": "save" });
+      clickOn(cell(3, 1)); // the second East's revenue: 20, now in the view
+      await type("40");
+      expect(text).toContain("| East | 140 |\n| West | 50 |\n| Total | 190 |");
+    });
+
+    it("names its source anew as it is renamed, in the same edit", async () => {
+      await setup(`${ORDERS}\n\n${SUMS}\n\n${READER("50")}\n`, { "silverware.table.metadata": true });
+      await controller.writeTable(controller.shownTables()[0]!, (t) => controller.withTableName(t, "sales"));
+      await controller.scan();
+      expect(text).toContain("pivot.source='sales'");
+      expect(text).toContain("| East | 120 |\n| West | 50 |\n| Total | 170 |");
+      expect(text).toContain(READER("50"));
+    });
+
+    it("is #CYCLE! where it reads a view of itself: neither is written", async () => {
+      const loop = "| Region |\n|---|\n| x |\n| <meta core.table core.name='loop' view.formula='=CHOOSECOLS(sums![#Data], 1)'> |";
+      const pivot = SUMS.replace("pivot.source='orders'", "pivot.source='loop'");
+      await setup(`${pivot}\n\n${loop}\n`, { "silverware.table.metadata": true });
+      const page = text;
+      await controller.writeTable(controller.shownTables()[0]!, (t) => t);
+      await controller.scan();
+      expect(text).toBe(page);
+      const info = controller.shownTables()[0]!;
+      expect(controller.tableBadges(info).map((b) => b.text)).toContain("Cannot be calculated");
+    });
+
+    it("keeps its numbers where it cannot be calculated; a table reading it gets the error", async () => {
+      const gone = SUMS.replace("pivot.source='orders'", "pivot.source='gone'");
+      await setup(`${gone}\n\n${READER("50")}\n`, { "silverware.table.metadata": true });
+      await controller.writeTable(controller.shownTables()[1]!, (t) => t);
+      await controller.scan();
+      expect(text).toContain("| East | 120 |\n| West | 50 |\n| Total | 170 |");
+      expect(text).toContain(`| \\#REF! <meta formulas.f='=XLOOKUP("West", sums![region], sums![sum_of_revenue])'> |`);
+    });
+  });
+
   it("writes an error with its # escaped, so it is no hashtag", async () => {
     await setup(`${ORDERS}\n\n${PIVOT("| East | 0 |").replace("pivot.values='SUM([revenue])'", "pivot.values='SUM([revenue]) / 0'")}\n`, { "silverware.table.editor.enterKey": "save" });
     clickOn(cell(2, 1)); // West's revenue

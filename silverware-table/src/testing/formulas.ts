@@ -21,9 +21,17 @@ export const CELLS: domain.FormulaCells = formulaCellsOf({ get: (cell, key) => t
 // The cells with views as the view module keeps them (view.formula in the metadata row), written with no header renamed
 export const VIEW_CELLS: domain.FormulaCells = {
   ...CELLS,
-  view: {
-    formulaOf: (table) => metaValue(table, "view", "formula"),
-    written: (table, result) => calculatedTable(table, viewCalculated(result), {}, { pinsOf: metaPins, withPins: withMetaPins }),
+  calculated: (table) => {
+    const formula = metaValue(table, "view", "formula");
+    if (!formula) return undefined;
+    return {
+      formulas: [formula],
+      calculate: (read) => {
+        const result = domain.viewGrid(read.evaluate(formula));
+        return result instanceof domain.FormulaError ? result : calculatedTable(table, viewCalculated(result), {}, { pinsOf: metaPins, withPins: withMetaPins });
+      },
+      follow: () => table,
+    };
   },
 };
 

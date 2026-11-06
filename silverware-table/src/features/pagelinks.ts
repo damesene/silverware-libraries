@@ -20,6 +20,8 @@ export class PageLinks implements Feature {
   private readonly pages = new Map<string, readonly PageTable[] | null>();
   // Counts the pages read, so what formulas computed from them is computed anew
   private version = 0;
+  // The pages being read: asked again meanwhile (a table shown and a pivot of it at once), the same reading
+  private readonly reading = new Map<string, Promise<void>>();
 
   constructor(private readonly host: ModelHost) {
     host.offer({ readFor: (formulas, tables) => this.readFor(formulas, tables), readPages: (pages, fresh) => this.load([], fresh, pages).then(() => undefined) } satisfies PageLinksOffer);
@@ -109,8 +111,17 @@ export class PageLinks implements Feature {
     return read;
   }
 
+  /** Reads another page's tables (one reading at a time for a page: asked meanwhile, that one) */
+  private read(page: string): Promise<void> {
+    const reading = this.reading.get(page);
+    if (reading) return reading;
+    const read = this.readNow(page).finally(() => this.reading.delete(page));
+    this.reading.set(page, read);
+    return read;
+  }
+
   /** Reads another page's tables; the earlier ones stay until it is read, so formulas never see it missing meanwhile */
-  private async read(page: string): Promise<void> {
+  private async readNow(page: string): Promise<void> {
     let tables: readonly PageTable[] | null;
     try {
       tables = pageTablesOf(await this.host.bridge.readPage!(page));

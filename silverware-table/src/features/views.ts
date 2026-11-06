@@ -1,17 +1,18 @@
 // The view module: a view is a table whose body is one formula's result
 // (`view.formula` in its metadata row), written into the page as any table.
 // The formulas calculate it, in their order (a table reading a view follows it
-// in the same edit), through what this module offers: a view's formula, the
-// formula written anew as its sources' edits follow, and the result written
-// over its body, the headers the user renamed kept (`view.headers`, by what
-// each column stands for: src/calculated/). This module holds the rest: the
+// in the same edit), through what this module offers (CalculatedOffer): what
+// it reads (its formula), its result written over its body, the headers the
+// user renamed kept (`view.headers`, by what each column stands for:
+// src/calculated/), and its formula following its sources' edits. This module
+// holds the rest: the
 // dialog (Insert view…, the command and /view, View settings…), its cells
 // read-only and its shape fixed, what it is and whether it is out of date in
 // its tab, Refresh view in its toolbar. Turned off, no table is a view: views
 // keep their values.
 import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, ToolbarButton } from "../core/feature.ts";
-import { type Calculated, calculatedTable, readRenames, renamedIn, renamedViewIds, sameCells, storedRenames, viewCalculated } from "../calculated/index.ts";
-import { FormulaError, type FormulasOffer, type Grid, referredTableNames, tokenize, type ViewsOffer, withEquals } from "../formulas/index.ts";
+import { type Calculated, calculatedTable, readRenames, renamedColumns, renamedIn, renamedViewIds, sameCells, storedRenames, viewCalculated } from "../calculated/index.ts";
+import { type CalculatedBy, type CalculatedOffer, followFormula, FormulaError, type FormulasOffer, type Grid, referredTableNames, tokenize, viewGrid, withEquals } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import { locateBySource, pageTablesOf, parseTable, type Table } from "../markdown.ts";
 import { freeTableName, sameTableName, tableNameProblem } from "../namerules.ts";
@@ -25,11 +26,28 @@ export class Views implements Feature {
   private readonly stale = new WeakMap<TableInfo, string | boolean>();
 
   constructor(private readonly host: ModelHost) {
-    host.offer({
-      viewFormula: (table) => this.formulaOf(table),
-      withViewFormula: (table, formula) => host.setMeta(table, "formula", formula),
-      written: (table, result, options) => this.written(table, result, options),
-    } satisfies ViewsOffer);
+    host.offer({ calculated: (table) => this.calculatedBy(table) } satisfies CalculatedOffer);
+  }
+
+  /** How a view is calculated, for the formulas: its formula's result over its body; its formula following its sources */
+  private calculatedBy(table: Table): CalculatedBy | undefined {
+    const formula = this.formulaOf(table);
+    if (formula === undefined) return undefined;
+    return {
+      formulas: [formula],
+      calculate: (read, before) => {
+        const result = viewGrid(read.evaluate(formula));
+        return result instanceof FormulaError ? result : this.written(table, result, before);
+      },
+      follow: (before, after, following) => {
+        const followed = followFormula(formula, before, after, following);
+        const named = followed === formula ? table : this.host.setMeta(table, "formula", followed);
+        // A header the user named after a source column renamed: kept by the column's new id
+        const renames = readRenames(this.host.getMeta(named, "headers"));
+        const moved = renamedViewIds(renames, renamedColumns(before, after, following.columnMap));
+        return moved === renames ? named : this.host.setMeta(named, "headers", Object.keys(moved).length ? JSON.stringify(moved) : undefined);
+      },
+    };
   }
 
   private formulas(): FormulasOffer | undefined {
@@ -44,11 +62,11 @@ export class Views implements Feature {
   }
 
   /** The view with its result written over its body (src/calculated/), its renamed headers kept by their columns' ids */
-  private written(table: Table, result: Grid, options: { readonly before?: Table; readonly renamed?: ReadonlyMap<string, string> } = {}): Table {
+  private written(table: Table, result: Grid, before?: Table): Table {
     const calculated = viewCalculated(result);
-    let renames = renamedViewIds(readRenames(this.host.getMeta(table, "headers")), options.renamed ?? new Map());
+    let renames = readRenames(this.host.getMeta(table, "headers"));
     // A header renamed in this edit: the user's name for its column from now on
-    if (options.before) renames = renamedIn(options.before, table, calculated, renames);
+    if (before) renames = renamedIn(before, table, calculated, renames);
     const made = calculatedTable(table, calculated, renames, { pinsOf: this.host.pinsOf, withPins: this.host.withPins });
     return this.host.setMeta(made, "headers", storedRenames(renames, calculated));
   }
@@ -100,11 +118,11 @@ export class Views implements Feature {
     const table = parseTable(info.source);
     const formula = this.formulaOf(table);
     if (formula === undefined) return void this.stale.delete(info);
-    const result = this.formulas()?.view(formula, table);
+    const now = this.formulas()?.calculated(table);
     // Not calculated (the formulas off, a page not read yet): as written
-    if (result === undefined) return void this.stale.set(info, false);
-    if (result instanceof FormulaError) return void this.stale.set(info, `This view cannot be calculated: ${result.code} ${result.detail}`);
-    this.stale.set(info, !sameCells(this.written(table, result), table));
+    if (now === undefined) return void this.stale.set(info, false);
+    if (now instanceof FormulaError) return void this.stale.set(info, `This view cannot be calculated: ${now.code} ${now.detail}`);
+    this.stale.set(info, !sameCells(now, table));
   }
 
   /** What a view is, at a glance; out of date, or not calculated at all, said so */

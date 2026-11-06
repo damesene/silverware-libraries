@@ -5,7 +5,7 @@ import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
 import { setCell } from "../ops.ts";
 import { withoutTags } from "../tags.ts";
 import { asNumber } from "../view.ts";
-import { cellResult, cellsByName, errorCodeIn, type FormulaCells, hasFormulas, rowsByName } from "./cell.ts";
+import { type CalculatedBy, cellResult, cellsByName, errorCodeIn, type FormulaCells, hasFormulas, rowsByName } from "./cell.ts";
 import { dateArithmetic, parseDate } from "./dates.ts";
 import { type Node, parse, refersToOwnData, wholeColumnNames } from "./parser.ts";
 import { type Area, areaText, cellName, formulaPages, referencedColumn, type TableRef } from "./references.ts";
@@ -52,27 +52,33 @@ export type TableSource = ((name: string, page?: string) => Table | undefined) &
 export type NamedCell = { readonly table: Table; readonly tableName?: string; readonly row: number; readonly column: number };
 
 /**
- * A view as the formulas reach it: by its page and name (whichever object of
- * its table a caller holds: as written, as an edit follows it), else (one
- * without a name, which only its own formula reaches) by its table
+ * A calculated table as the formulas reach it: by its page and name (whichever
+ * object of its table a caller holds: as written, as an edit follows it), else
+ * (one without a name, which only its own formula reaches) by its table
  */
-function viewKey(table: Table, page: string | undefined, name: string | undefined): string | Table {
+function calculatedKey(table: Table, page: string | undefined, name: string | undefined): string | Table {
   const named = name?.trim().toLowerCase();
   return named ? `${page ?? ""}\u0000${named}` : table;
 }
 
+/** A formula as written where its "=" may be left out (a view's): with it */
+const withEquals = (formula: string) => (formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`);
+
+/** What a table is called in an error: its name, else what it is */
+const called = (name: string | undefined) => (name ? `the table ${name}` : "the table");
+
 /**
  * The sheets of the tables formulas refer to, each made once: their results
- * are computed once too. A view (a table whose body is its formula's result)
- * is read as calculated now, as its module would write it: a table reading it
- * follows its sources in the same calculation; one that cannot be calculated
- * is its error.
+ * are computed once too. A table calculated from others (a view, a pivot:
+ * `cells.calculated`) is read as calculated now, as its module would write it:
+ * a table reading it follows its sources in the same calculation; one that
+ * cannot be calculated is its error.
  */
 class Book {
   private readonly sheets = new Map<string, Sheet | FormulaError>();
   // The sheets by table, whether reached by the table's name or a named cell's
   private readonly tableSheets = new Map<Table, Sheet | FormulaError>();
-  // The views being calculated, by viewKey: one reached again depends on its own result
+  // The calculated tables being calculated, by calculatedKey: one reached again depends on its own result
   private readonly calculating = new Set<string | Table>();
   constructor(
     readonly cells: FormulaCells,
@@ -93,44 +99,55 @@ class Book {
     return first ? [first] : [];
   }
 
-  /** The table's sheet, made on its first use (by its name or by a named cell's); a view's as calculated now, or its error */
+  /** The table's sheet, made on its first use (by its name or by a named cell's); a calculated one's as calculated now, or its error */
   private sheetOf(table: Table, page: string | undefined, name: string): Sheet | FormulaError {
     let sheet = this.tableSheets.get(table);
     if (!sheet) {
-      const formula = this.cells.view?.formulaOf(table);
-      const result = formula === undefined ? undefined : this.viewResult(table, page, name, formula);
-      // (Its own cycle said as it is: it is the view on the way to itself)
-      const cycling = this.calculating.has(viewKey(table, page, name));
-      sheet = isError(result)
+      const by = this.cells.calculated?.(table);
+      const made = by && this.calculated(table, page, name, by);
+      // (Its own cycle said as it is: it is the table on the way to itself)
+      const cycling = this.calculating.has(calculatedKey(table, page, name));
+      sheet = isError(made)
         ? cycling
-          ? result
-          : new FormulaError(result.code, `the view ${name} cannot be calculated: ${result.detail}`)
-        : new Sheet(result ? this.cells.view!.written(table, result) : table, this, page, name);
-      // (A view on the way to itself is no sheet yet: its cycle is the calculation's, not kept)
-      if (!this.calculating.has(viewKey(table, page, name))) this.tableSheets.set(table, sheet);
+          ? made
+          : new FormulaError(made.code, `${called(name)} cannot be calculated: ${made.detail}`)
+        : new Sheet(made ?? table, this, page, name);
+      // (A table on the way to itself is no sheet yet: its cycle is the calculation's, not kept)
+      if (!cycling) this.tableSheets.set(table, sheet);
     }
     return sheet;
   }
 
   /**
-   * A view's formula calculated, its table `table` (on `page`, named `name`):
-   * its result as a grid (one value a cell, a list a column), or why it cannot
-   * be. Undefined where it reads a page formulas may not read: the view keeps
-   * what it shows. A view reached again while it is calculated (it reads
-   * itself, two views read each other) is #CYCLE!.
+   * A calculated table (on `page`, named `name`) as calculated now, written as
+   * its module writes it, or why it cannot be. Undefined where it reads a page
+   * formulas may not read: it keeps what it shows. One reached again while it
+   * is calculated (it reads itself, two read each other) is #CYCLE!.
+   */
+  calculated(table: Table, page: string | undefined, name: string | undefined, by: CalculatedBy, before?: Table): Table | FormulaError | undefined {
+    if (by.formulas.some((formula) => this.keepsResult(withEquals(formula)))) return undefined;
+    return this.asCalculated(table, page, name, (own) =>
+      by.calculate({ evaluate: (formula) => own.whole(withEquals(formula)), table: (other, at) => own.tableNow({ name: other, ...(at === undefined ? {} : { page: at }) }) }, before),
+    );
+  }
+
+  /**
+   * A formula calculated as a view of `table` (its own cells #CYCLE!): its result as a grid (one value a cell, a
+   * list a column), or why it cannot be; undefined where it reads a page formulas may not read
    */
   viewResult(table: Table, page: string | undefined, name: string | undefined, formula: string): Grid | FormulaError | undefined {
-    const written = formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`;
+    const written = withEquals(formula);
     if (this.keepsResult(written)) return undefined;
-    const key = viewKey(table, page, name);
-    if (this.calculating.has(key)) return new FormulaError("#CYCLE!", `${name ? `the view ${name}` : "the view"} depends on its own result`);
+    return this.asCalculated(table, page, name, (own) => viewGrid(own.whole(written)));
+  }
+
+  /** `calculate` with the table as being calculated: its own sheet reading its own cells as #CYCLE!, the table reached again #CYCLE! */
+  private asCalculated<T>(table: Table, page: string | undefined, name: string | undefined, calculate: (own: Sheet) => T): T | FormulaError {
+    const key = calculatedKey(table, page, name);
+    if (this.calculating.has(key)) return new FormulaError("#CYCLE!", `${called(name)} depends on its own result`);
     this.calculating.add(key);
     try {
-      const own = new FormulaError("#CYCLE!", `${name ? `the view ${name}` : "a view"} cannot read itself: its cells are its formula's result`);
-      const result = new Sheet(table, this, page, name, own).whole(written);
-      if (isError(result)) return result;
-      const grid = asGrid(result);
-      return grid.width === 0 ? new FormulaError("#CALC!", "the result has no columns") : grid;
+      return calculate(new Sheet(table, this, page, name, new FormulaError("#CYCLE!", `${called(name)} cannot read itself: its cells are what is calculated`)));
     } finally {
       this.calculating.delete(key);
     }
@@ -146,7 +163,7 @@ class Book {
       const table = this.source?.(ref.name, page);
       if (!table) return new FormulaError("#REF!", `there is no table named ${ref.name}${page === undefined ? " on this page" : ` on ${page}`}`);
       sheet = this.sheetOf(table, page, ref.name);
-      if (!this.calculating.has(viewKey(table, page, ref.name))) this.sheets.set(key, sheet);
+      if (!this.calculating.has(calculatedKey(table, page, ref.name))) this.sheets.set(key, sheet);
     }
     return sheet;
   }
@@ -307,6 +324,28 @@ class Sheet {
   whole(formula: string): Result {
     const tree = parse(formula);
     return isError(tree) ? tree : this.evaluate(tree, 0, 0);
+  }
+
+  /** The table as the formulas have it now: its formula cells showing their results as calculated in this book */
+  withResults(): Table {
+    if (!hasFormulas(this.book.cells, this.table)) return this.table;
+    // (In one pass: a source of thousands of rows is read so for each table reading a pivot of it)
+    const { cells } = this.book;
+    const rows = this.table.rows.map((row, r) => {
+      if (r === 0) return row;
+      const written = row.cells.map((cell, c) => {
+        const stored = cells.formulaOf(cell);
+        return stored ? cells.formulaCell(cellResult(this.text(r - 1, c, stored.formula)), stored.formula, cell) : cell;
+      });
+      return written.every((cell, c) => cell === row.cells[c]) ? row : { ...row, cells: written };
+    });
+    return { ...this.table, rows };
+  }
+
+  /** Another table (by its name, on its page or this sheet's) as the formulas have it now, or why there is none: what a calculated table reads */
+  tableNow(ref: TableRef): Table | FormulaError {
+    const sheet = this.sheetOf(ref);
+    return isError(sheet) ? sheet : sheet.withResults();
   }
 
   /** The result of a cell's formula as it is, a grid too: what a cell showing #SPILL! holds (Show result) */
@@ -763,14 +802,32 @@ export function cellWholeResult(table: Table, row: number, column: number, { cel
 }
 
 /**
- * A view's body as its formula makes it now (`cells.view`): a grid (one
- * value a cell, a list a column), or why it cannot be calculated (an error:
- * the view is written as it was). Undefined where the table is no view, or
- * its formula reads a page formulas may not read (it keeps what it shows).
- * `formula`: another than the table's (a view's dialog, its preview).
+ * A formula calculated as a view of `table` (a view's dialog, its preview, its
+ * Out of date): a grid (one value a cell, a list a column), or why it cannot
+ * be (its own cells read: #CYCLE!). Undefined where it reads a page formulas
+ * may not read.
  */
-export function viewResult(table: Table, { cells, tables, name }: Calculation, formula = cells.view?.formulaOf(table)): Grid | FormulaError | undefined {
-  return formula === undefined ? undefined : new Book(cells, tables).viewResult(table, undefined, name, formula);
+export function viewResult(table: Table, { cells, tables, name }: Calculation, formula: string): Grid | FormulaError | undefined {
+  return new Book(cells, tables).viewResult(table, undefined, name, formula);
+}
+
+/** A view's result as its table's body: a grid (one value a cell, a list a column), an error as it is, none of no columns #CALC! */
+export function viewGrid(result: Result): Grid | FormulaError {
+  if (isError(result)) return result;
+  const grid = asGrid(result);
+  return grid.width === 0 ? new FormulaError("#CALC!", "the result has no columns") : grid;
+}
+
+/**
+ * A table calculated from others (`cells.calculated`: a view, a pivot) as
+ * calculated now and written as its module writes it, or why it cannot be (an
+ * error: written as it was); `before` the table before an edit of it.
+ * Undefined where it is no calculated table, or reads a page formulas may not
+ * read (it keeps what it shows).
+ */
+export function calculatedNow(table: Table, { cells, tables, name }: Calculation, before?: Table): Table | FormulaError | undefined {
+  const by = cells.calculated?.(table);
+  return by && new Book(cells, tables).calculated(table, undefined, name, by, before);
 }
 
 /** A value as a cell shows it: an error by its code */

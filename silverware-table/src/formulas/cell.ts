@@ -1,12 +1,14 @@
 // A formula in a cell, and what the formulas read of a table besides its
-// values: the formulas of its cells, the names of its rows and cells, and a
-// view's formula (the view module's: here, so whatever asks what a table's
-// formulas refer to or call, forFormulas, sees a view's with its cells'). The
+// values: the formulas of its cells, the names of its rows and cells, and how
+// a table calculated from others is calculated (a view's formula, a pivot's
+// definition: their modules', here so that whatever asks what a table's
+// formulas refer to or call, forFormulas, sees theirs with its cells'). The
 // domain reads none of it from the markdown itself: the formulas module gives
 // the functions that do (FormulaCells, made of its host), so the domain names
 // no attribute and reads no metadata.
 import type { Table } from "../markdown.ts";
-import { ERROR_CODES, type ErrorCode } from "./values.ts";
+import type { Following } from "./edits.ts";
+import { ERROR_CODES, type ErrorCode, type FormulaError, type Result } from "./values.ts";
 
 export type StoredFormula = {
   // The formula, starting with "="
@@ -34,16 +36,39 @@ export type FormulaCells = {
   /** A table's named body cells, in their order (the first of a name counts) */
   readonly cellNames: (table: Table) => readonly CellNameAt[];
   /**
-   * Views: tables whose body is one formula's result (the views module's).
-   * `formulaOf` a table's formula, undefined for a table that is no view;
-   * `written` the view with a result written as its module writes it (its
-   * headers, the names the user gave them kept), so formulas read a view
-   * calculated now as they would read it written. None: no table is a view.
+   * How a table calculated from others (a view, a pivot) is calculated, as its
+   * module gives it; undefined for any other table (none: no table is one)
    */
-  readonly view?: {
-    readonly formulaOf: (table: Table) => string | undefined;
-    readonly written: (table: Table, result: import("./values.ts").Grid) => Table;
-  };
+  readonly calculated?: (table: Table) => CalculatedBy | undefined;
+};
+
+/**
+ * A table calculated from others, as its module calculates it: the formulas
+ * calculate it in their order (a table reading it follows its sources in the
+ * same calculation), read it as its module would write it, and write it with
+ * the other tables an edit changes
+ */
+export type CalculatedBy = {
+  /**
+   * What it refers to and calls, as formulas (with their "="): a view's formula; a pivot's source as a reference to
+   * it (`=orders![#Data]`) and its definition's formulas. A page among them not read: the table keeps what it shows
+   */
+  readonly formulas: readonly string[];
+  /**
+   * The table written as calculated now, or why it cannot be (nothing is written then): `read` what it reads as the
+   * formulas have it now; `before` the table before an edit of it (a header renamed in it named so from now on)
+   */
+  readonly calculate: (read: CalculatedRead, before?: Table) => Table | FormulaError;
+  /** The table with its definition following an edit of a table it reads (`before` → `after`: renamed, its columns renamed or moved) */
+  readonly follow: (before: Table, after: Table, following: Following) => Table;
+};
+
+/** What a calculated table reads, as the formulas have it now */
+export type CalculatedRead = {
+  /** A formula's whole result in none of the table's cells: what it reads of the table itself is #CYCLE! (its cells are what is calculated) */
+  readonly evaluate: (formula: string) => Result;
+  /** A table by its name (on `page`, else the calculated table's), its formulas' results as calculated now (a calculated one as calculated now) */
+  readonly table: (name: string, page?: string) => Table | FormulaError;
 };
 
 /** A table's named rows by their names (lowercase), the first row of each name; rows of the markdown (header 0) */
@@ -100,10 +125,9 @@ export function formulaCount(cells: FormulaCells, table: Table): number {
   return table.rows.reduce((n, row, r) => n + (r === 0 ? 0 : row.cells.filter((cell) => cells.formulaOf(cell)).length), 0);
 }
 
-/** Each formula of a table: its cells', and a view's own (what the table refers to and calls, as its cells' formulas do) */
+/** Each formula of a table: its cells', and a calculated table's (what the table refers to and calls, as its cells' formulas do) */
 export function forFormulas(cells: FormulaCells, table: Table, each: (formula: string) => void): void {
-  const view = cells.view?.formulaOf(table);
-  if (view !== undefined) each(view);
+  for (const formula of cells.calculated?.(table)?.formulas ?? []) each(formula);
   table.rows.forEach((row, r) => {
     if (r === 0) return;
     for (const cell of row.cells) {

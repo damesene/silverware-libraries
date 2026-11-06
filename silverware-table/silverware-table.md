@@ -420,7 +420,7 @@ silverware.table.defineSource({
 
 ### Arrays
 
-`FILTER`, `SORT`, `SORTBY`, `UNIQUE`, `CHOOSECOLS`, `TAKE`, `DROP`, `HSTACK` and `VSTACK` work on arrays, as Excel 365's do: a range of several rows and columns (`A1:C9`), a column (`[qty]`, `prices![price]`), a whole table (`prices![#Data]`), or the result of another of them. They keep the rows and columns of what they get, so `SORT(prices![#Data], 2, -1)` sorts whole rows by the second column. `SEQUENCE` makes one of numbers.
+`FILTER`, `SORT`, `SORTBY`, `UNIQUE`, `CHOOSECOLS`, `TAKE`, `DROP`, `HSTACK` and `VSTACK` work on arrays, as Excel 365's do: a range of several rows and columns (`A1:C9`), a column (`[qty]`, `prices![price]`), a whole table (`prices![#Data]`), or the result of another of them. They keep the rows and columns of what they get, so `SORT(prices![#Data], 2, -1)` sorts whole rows by the second column. `SEQUENCE` makes one of numbers (at most 1,048,576 of them).
 
 * **A cell holds one value**, so use them inside a function that makes one of the array: `=COUNTA(UNIQUE([assignee]))` (how many people), `=SUM(FILTER(orders![amount], orders![status] = "paid"))`, `=TEXTJOIN(", ", TRUE, SORT(UNIQUE([tag])))` (a sorted list in one cell), `=SUM(TAKE(SORT([score], 1, -1), 3))` (the three highest). In a calculated column, per row: `=TEXTJOIN(", ", TRUE, FILTER(tasks![name], tasks![assignee] = [@name], ""))` (the names of their tasks), `=SUM(FILTER(tasks![hours], tasks![assignee] = [@name], 0))`.
 * An array of one value is that value: `=TAKE(SORTBY(people![name], people![score], -1), 1)` is who scored most.

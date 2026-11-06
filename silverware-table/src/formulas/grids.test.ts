@@ -232,6 +232,10 @@ describe("SEQUENCE", () => {
     expect((call("SEQUENCE", -1) as FormulaError).detail).toBe("rows is a count, not -1");
     expect((call("SEQUENCE", 1_048_577) as FormulaError).detail).toBe("rows is at most 1,048,576, as in Excel");
     expect((call("SEQUENCE", 1, 16_385) as FormulaError).code).toBe("#VALUE!");
+    // Rows and columns a sheet has, but more values than a page holds: refused before any is made
+    expect((call("SEQUENCE", 1_048_576, 16_384) as FormulaError).detail).toBe("SEQUENCE makes at most 1,048,576 values, not 17,179,869,184");
+    expect((call("SEQUENCE", 1_048_576, 2) as FormulaError).code).toBe("#VALUE!");
+    expect((call("SEQUENCE", 1024, 1024) as Grid).height).toBe(1024);
     expect((call("SEQUENCE", 2, 1, "x") as FormulaError).code).toBe("#VALUE!");
   });
 

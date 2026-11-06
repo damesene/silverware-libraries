@@ -16,8 +16,9 @@ export function given(value: Result | undefined): value is Result {
 
 /** A number from an argument (one value), or its error */
 export function numberOf(value: Result, what: string): number | FormulaError {
-  if (asGrid(value).cells.length !== 1) return new FormulaError("#VALUE!", `${what} is one number`);
-  return toNumber(asGrid(value).cells[0]!);
+  const cells = asGrid(value).cells;
+  if (cells.length !== 1) return new FormulaError("#VALUE!", `${what} is one number`);
+  return toNumber(cells[0]!);
 }
 
 /** A whole number from an argument (one value), or its error */
@@ -135,7 +136,7 @@ export function stacked(parts: readonly Result[], sideBySide: boolean, name: str
   }
   // Across the way they are stacked: rows side by side, columns one under another
   const across = Math.max(...grids.map((g) => (sideBySide ? g.height : g.width)));
-  const pad = new FormulaError("#N/A", `${name} pads a shorter array with #N/A`);
+  const pad = new FormulaError("#N/A", `${name}: this array is ${sideBySide ? "shorter" : "narrower"} than the others`);
   if (sideBySide) {
     const rows = Array.from({ length: across }, (_, r) =>
       grids.flatMap((g) => (r < g.height ? g.row(r) : Array<Scalar>(g.width).fill(pad))),

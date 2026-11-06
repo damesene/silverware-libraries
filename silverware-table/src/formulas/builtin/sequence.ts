@@ -5,8 +5,10 @@ import type { GridFunction } from "../function.ts";
 // Excel's sheet: as many rows and columns as an array may have there
 const MAX_ROWS = 1_048_576;
 const MAX_COLUMNS = 16_384;
+// All its cells: the rows and columns a sheet has would be 17 billion values, more than a page can hold (decided 2026-11-06)
+const MAX_CELLS = 1_048_576;
 
-/** A count of lines (left out: 1), or its error: none #CALC! as in Excel, fewer #VALUE!, more than a sheet has #VALUE! */
+/** A count of lines (left out: 1), or its error: none #CALC! as in Excel, negative #VALUE!, more than a sheet has #VALUE! */
 function countOf(value: Result | undefined, what: string, max: number): number | FormulaError {
   if (!given(value)) return 1;
   const n = wholeOf(value, what);
@@ -32,6 +34,9 @@ export default {
     if (isError(height)) return height;
     const width = countOf(columns, "columns", MAX_COLUMNS);
     if (isError(width)) return width;
+    if (height * width > MAX_CELLS) {
+      return new FormulaError("#VALUE!", `SEQUENCE makes at most ${MAX_CELLS.toLocaleString("en-US")} values, not ${(height * width).toLocaleString("en-US")}`);
+    }
     const first = given(start) ? numberOf(start, "start") : 1;
     if (isError(first)) return first;
     const by = given(step) ? numberOf(step, "step") : 1;

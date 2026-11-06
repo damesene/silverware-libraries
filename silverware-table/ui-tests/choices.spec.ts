@@ -156,13 +156,14 @@ test.describe("Choices", () => {
 
     const PROJECTS = ["| Task | Project |", "|---|---|", "| A | Atlas |", "| B | Delta |", ""].join("\n");
 
-    test("Source picks a source, written as its formula: the column checks its values, the editor offers them", async ({ page }) => {
+    test("a source picked over the formula writes its formula: the column checks its values, the editor offers them", async ({ page }) => {
       await load(page, PROJECTS, 2);
       await pickChoice(page);
-      await dialog(page).getByRole("radio", { name: /^Source$/ }).check();
+      await dialog(page).getByRole("radio", { name: /^Formula$/ }).check();
       await dialog(page).getByRole("combobox", { name: "Source", exact: true }).selectOption("projects");
       await expect(dialog(page).locator(".swt-choices-name")).toHaveValue("projects");
       await expect(dialog(page).getByLabel("Source's column")).toBeHidden();
+      await expect(dialog(page).getByRole("textbox", { name: "Formula" })).toHaveValue("=@projects");
       await expect(dialog(page).locator(".swt-choices-readonly")).toHaveText(["Atlas", "Beacon", "Comet"]);
       await rendersAnew(page, () => dialog(page).getByRole("button", { name: "Save" }).click());
       const text = await markdown(page);
@@ -177,14 +178,15 @@ test.describe("Choices", () => {
     test("a source of several columns asks for its column; a list of a source opens on it again", async ({ page }) => {
       await load(page, PROJECTS, 2);
       await pickChoice(page);
-      await dialog(page).getByRole("radio", { name: /^Source$/ }).check();
+      await dialog(page).getByRole("radio", { name: /^Formula$/ }).check();
       await dialog(page).getByRole("combobox", { name: "Source", exact: true }).selectOption("tasks");
       await dialog(page).getByLabel("Source's column").selectOption({ label: "page" });
+      await expect(dialog(page).getByRole("textbox", { name: "Formula" })).toHaveValue("=@tasks[page]");
       await expect(dialog(page).locator(".swt-choices-readonly")).toHaveText(["Projects/Atlas", "Projects/Beacon", "Projects/Comet"]);
       await rendersAnew(page, () => dialog(page).getByRole("button", { name: "Save" }).click());
       expect(await markdown(page)).toContain("columntypes.choice.tasks='=@tasks[page]'");
       await openChoices(page);
-      await expect(dialog(page).getByRole("radio", { name: /^Source$/ })).toBeChecked();
+      await expect(dialog(page).getByRole("radio", { name: /^Formula$/ })).toBeChecked();
       await expect(dialog(page).getByRole("combobox", { name: "Source", exact: true })).toHaveValue("tasks");
       await expect(dialog(page).getByLabel("Source's column").locator("option:checked")).toHaveText("page");
     });
@@ -195,10 +197,19 @@ test.describe("Choices", () => {
       await dialog(page).getByRole("radio", { name: /^Formula$/ }).check();
       const field = dialog(page).getByRole("textbox", { name: "Formula" });
       await field.fill("=@tasks");
+      // A formula reading a source alone shows it over the field; any other, none
+      const source = dialog(page).getByRole("combobox", { name: "Source", exact: true });
+      await expect(source).toHaveValue("tasks");
       await expect(dialog(page).locator(".swt-choices-preview .swt-choices-empty")).toContainText("the result has 5 columns: pick one");
       await field.fill("=SORT(UNIQUE(@tasks[page]), 1, -1)");
+      await expect(source).toHaveValue("");
       await expect(dialog(page).locator(".swt-choices-readonly")).toHaveText(["Projects/Comet", "Projects/Beacon", "Projects/Atlas"]);
-      await dialog(page).locator(".swt-choices-name").fill("pages");
+      // The name's field keeps its width as the name changes (the hashtag it makes is under it)
+      const name = dialog(page).locator(".swt-choices-name");
+      const width = (await name.boundingBox())!.width;
+      await name.fill("pages-of-every-project-in-the-space");
+      expect((await name.boundingBox())!.width).toBe(width);
+      await name.fill("pages");
       await rendersAnew(page, () => dialog(page).getByRole("button", { name: "Save" }).click());
       const text = await markdown(page);
       expect(text).toMatch(/\| Task +\| Project #choice-pages +\|/);

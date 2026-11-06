@@ -1952,7 +1952,7 @@ body.swt-resizing * {
 .swt-choices-label[hidden] {
   display: none;
 }
-/* The ways (the column's values, a list of its own, a source of the space, a formula) as one row of segments, the one picked's hint under it */
+/* The ways (the column's values, a list of its own, a formula) as one row of segments, the one picked's hint under it */
 .swt-choices-ways {
   display: flex;
   border: 1px solid var(--swt-dialog-line);
@@ -2030,6 +2030,20 @@ body.swt-resizing * {
   font-weight: normal;
   font-family: var(--editor-font, monospace);
   opacity: 0.7;
+}
+/* The name's row: its field as wide as the room, the hashtag it makes under it, so typing the name moves nothing */
+.swt-choices-label.swt-choices-name-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 8px;
+}
+.swt-choices-name-row .swt-choices-tag {
+  grid-column: 2;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.swt-choices-label.swt-choices-name-row[hidden] {
+  display: none;
 }
 .swt-choices-values,
 .swt-choices-preview-values {

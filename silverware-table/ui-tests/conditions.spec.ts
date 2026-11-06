@@ -44,13 +44,13 @@ test.describe("Conditional formatting", () => {
     await hoverCell(page, scores(page).nth(0));
     await page.locator('.swt-bar button[aria-label="Conditional formatting"]').click();
     await dialog(page).locator(".swt-cf-summary").first().click();
-    const field = dialog(page).locator(".swt-cf-formula");
+    const field = dialog(page).locator(".swt-formulafield-text");
     await field.click();
     await field.evaluate((input: HTMLInputElement) => input.setSelectionRange(2, 7));
     await page.keyboard.press("Backspace");
     await expect(field).toHaveValue("[@] > 50");
     await page.keyboard.type("S");
-    await expect(page.locator(".swt-cf-choice .swt-cf-choice-name")).toHaveText(["Score"]);
+    await expect(page.locator(".swt-formulafield-choice .swt-formulafield-choice-name")).toHaveText(["Score"]);
     await page.keyboard.press("Enter");
     await expect(field).toHaveValue("[@score] > 50");
   });

@@ -4442,33 +4442,40 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   gap: 8px;
   min-width: 0;
 }
-/* A formula's field: the choices for the name typed in a list under it, the syntax of the function the caret is in */
+/* A formula's field (src/formulafield.ts, any module's dialog): the choices for the name typed in a list under it, the syntax of the function the caret is in */
 /* A formula's name by its field, not by the middle of its help under it */
-.swt-cf-param:has(> .swt-cf-formula-box) {
+.swt-cf-param:has(> .swt-formulafield) {
   align-items: flex-start;
 }
-.swt-cf-param:has(> .swt-cf-formula-box) > .swt-cf-param-name {
+.swt-cf-param:has(> .swt-formulafield) > .swt-cf-param-name {
   padding-top: 6px;
 }
-.swt-cf-formula-box {
+.swt-formulafield {
   display: inline-flex;
   flex-direction: column;
   gap: 4px;
   max-width: 100%;
 }
 /* The field and its list, the list right under the field */
-.swt-cf-formula-input {
+.swt-formulafield-input {
   position: relative;
   display: inline-flex;
   max-width: 100%;
 }
-.swt-cf input.swt-cf-formula {
+.swt-formulafield-input input.swt-formulafield-text {
   width: 28em;
   max-width: 100%;
+  padding: 4px 6px;
+  font: inherit;
   font-family: var(--editor-font, monospace);
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  min-width: 0;
 }
 /* Over the dialog (fixed: its body scrolls and would cut it), placed under the field by the script */
-.swt-cf-choices {
+.swt-formulafield-choices {
   position: fixed;
   z-index: 2;
   min-width: 16em;
@@ -4481,10 +4488,10 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   border-radius: 6px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
 }
-.swt-cf-choices[hidden] {
+.swt-formulafield-choices[hidden] {
   display: none;
 }
-.swt-cf-choice {
+.swt-formulafield-choice {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -4492,31 +4499,43 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   border-radius: 4px;
   cursor: pointer;
 }
-.swt-cf-choice:hover,
-.swt-cf-choice-active {
+.swt-formulafield-choice:hover,
+.swt-formulafield-choice-active {
   background: color-mix(in srgb, var(--ui-accent-color) 18%, transparent);
 }
-.swt-cf-choice-name {
+.swt-formulafield-choice-name {
   font-family: var(--editor-font, monospace);
 }
-.swt-cf-choice-kind {
+.swt-formulafield-choice-kind {
   font-size: 11px;
   opacity: 0.6;
 }
-.swt-cf-formula-help {
+.swt-formulafield-problem {
+  font-size: 12px;
+  color: var(--danger-color, #c62828);
+}
+.swt-formulafield-problem:empty {
+  display: none;
+}
+.swt-formulafield-help {
   display: flex;
   flex-direction: column;
   gap: 2px;
   max-width: 34em;
 }
-.swt-cf-formula-help:empty {
+.swt-formulafield-help:empty {
   display: none;
 }
-.swt-cf-formula-syntax {
+.swt-formulafield-syntax {
   font-size: 12px;
 }
-.swt-cf-formula-syntax b {
+.swt-formulafield-syntax b {
   color: var(--ui-accent-color);
+}
+.swt-formulafield-description {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.7;
 }
 /* A rule's preview: its cells across their values, a line for each range (a column), each cell in its look */
 .swt-cf-preview {

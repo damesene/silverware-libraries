@@ -40,7 +40,8 @@ import { ICONS } from "../icons.ts";
 import { parseTable, type Table, unescapeCell } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
 import { withoutTags } from "../tags.ts";
-import { type FormulaHelpers, openConditionsDialog, type RuleSample, type ScopeColumn } from "./conditionsdialog.ts";
+import type { FormulaHelpers } from "../formulafield.ts";
+import { openConditionsDialog, type RuleSample, type ScopeColumn } from "./conditionsdialog.ts";
 
 // How a formula condition refers to cells, under its field out of a function: one line
 const CONDITION_REFERENCES = { syntax: "[@column] · [column] · table![column] · cell_name", description: "The row's cell of a column, a whole column, another table's column, a named cell." };

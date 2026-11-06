@@ -8,9 +8,9 @@ import { describe, expect, it } from "vitest";
 const features = import.meta.glob(["./features/*.ts", "!./features/*.test.ts"], { query: "?raw", import: "default", eager: true });
 const core = import.meta.glob(["./controller.ts", "./core/**/*.ts", "!./core/**/*.test.ts"], { query: "?raw", import: "default", eager: true });
 // The domains the modules hand data to: their own pure code
-const domains = import.meta.glob(["./formulas/**/*.ts", "./sheet/**/*.ts", "./excel/**/*.ts", "./export/**/*.ts", "!./**/*.test.ts"], { query: "?raw", import: "default", eager: true });
-// The pivot module's domain
-const pivot = import.meta.glob(["./pivot/**/*.ts", "!./**/*.test.ts"], { query: "?raw", import: "default", eager: true });
+const domains = import.meta.glob(["./formulas/**/*.ts", "./calculated/**/*.ts", "./sheet/**/*.ts", "./excel/**/*.ts", "./export/**/*.ts", "!./**/*.test.ts"], { query: "?raw", import: "default", eager: true });
+// The pivot module's domain, and what it shares with views (calculated tables)
+const pivot = import.meta.glob(["./pivot/**/*.ts", "./calculated/**/*.ts", "!./**/*.test.ts"], { query: "?raw", import: "default", eager: true });
 
 /** The lines of each file that match, as `file:line: text` */
 function matches(files: Record<string, string>, pattern: RegExp): string[] {
@@ -59,6 +59,11 @@ describe("isolation", () => {
     expect(matches(modules, /from "[./]*(meta|metanames|names|tagvalues)\.ts"/)).toEqual([]);
     expect(matches(modules, /\bmetaAttribute\b/)).toEqual([]);
     expect(matches(domains, /from "[./]*(meta|metanames|names|tagvalues)\.ts"|\bmetaAttribute\b|[\w)\]?]\.meta\b/)).toEqual([]);
+  });
+
+  it("the domains of calculated tables import no module", () => {
+    expect(Object.keys(pivot)).toContain("./calculated/table.ts");
+    expect(matches(pivot, /from "[./]*(features|core)\//)).toEqual([]);
   });
 
   it("the modules and the pivot's domain use the formulas through their API (formulas/index.ts), not their files", () => {

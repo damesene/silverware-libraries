@@ -30,7 +30,7 @@ import {
   valueFormula,
   valueText,
 } from "../pivot/fields.ts";
-import type { Pivot } from "../pivot/pivot.ts";
+import type { Calculated } from "../calculated/index.ts";
 
 /** A table a pivot can summarize, by its name, its columns' names */
 type Source = { readonly name: string; readonly columns: readonly string[] };
@@ -44,7 +44,7 @@ export type PivotDialogOptions = {
   readonly pages?: () => Promise<readonly string[]>;
   readonly fields: Fields;
   // The pivot the definition makes, or why it makes none
-  readonly preview: (definition: PivotDefinition) => Pivot | string;
+  readonly preview: (definition: PivotDefinition) => Calculated | string;
   readonly submit: (definition: PivotDefinition) => void;
   readonly submitLabel: string;
   // Why it cannot be submitted at all (the metadata setting off)

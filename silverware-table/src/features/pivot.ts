@@ -8,26 +8,24 @@
 // that page is indexed. Shown out of date (its source edited by hand, or on
 // another page), its Refresh says so. Its headers' names
 // are the user's: one renamed is kept (pivot.headers, by what each column
-// stands for, as the core follows a column's attributes by place, not by
-// what a pivot's column is). Formulas are calculated by the formulas
-// module's cells; without it, nothing is.
+// stands for). How a calculated table is written, its renamed headers kept
+// and its staleness told is src/calculated/'s, shared with views. Formulas
+// are calculated by the formulas module's cells; without it, nothing is.
 import type { Feature, ModelHost, PageCommand, TableBadge, TableInfo, TableTarget, ToolbarButton, WriteEdit } from "../core/feature.ts";
-import { cellResult, followOwnFormula, type FormulaCells, type FormulasOffer, type PageLinksOffer } from "../formulas/index.ts";
+import { type Calculated, calculatedTable, movedRenames, readRenames, renamedIn, type Renames, sameCells, storedRenames } from "../calculated/index.ts";
+import { followOwnFormula, type FormulaCells, type FormulasOffer, type PageLinksOffer } from "../formulas/index.ts";
 import { listOf } from "../bridge.ts";
 import { columnName } from "../columns.ts";
 import { ICONS } from "../icons.ts";
-import { escapeCell, type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
+import { type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
 import { definitionAttributes, groupFormula, KEYS, type Key, looseDefinition, type PivotDefinition, readDefinition, sourceRef, sourceText, valueItem, valueParts } from "../pivot/definition.ts";
 import { type Fields, fieldsOf } from "../pivot/fields.ts";
-import { type Pivot as Calculated, pivotOf } from "../pivot/pivot.ts";
+import { pivotOf } from "../pivot/pivot.ts";
 import { asNumber } from "../view.ts";
 import { openPivotDialog } from "./pivotdialog.ts";
 
 // What a pivot's dialog says first while the formulas module, which calculates pivots, is off
 const FORMULAS_OFF = "A pivot is calculated by the formulas module, which is off: turn it on in Silverware Table's settings (the Silverware Table: Settings command), then reload.";
-
-/** The headers the user named, by what each column stands for (PivotColumn.id) */
-type Renames = Readonly<Record<string, string>>;
 
 export class Pivot implements Feature {
   // Whether a pivot shown is out of date (or why it cannot be calculated), as last read
@@ -46,12 +44,7 @@ export class Pivot implements Feature {
   }
 
   private renamesOf(table: Table): Renames {
-    try {
-      const read = JSON.parse(this.host.getMeta(table, "headers") ?? "{}") as unknown;
-      return read && typeof read === "object" ? (read as Renames) : {};
-    } catch {
-      return {};
-    }
+    return readRenames(this.host.getMeta(table, "headers"));
   }
 
   /** The source the definition names among the page's tables: the first of that name, not the pivot itself */
@@ -96,20 +89,10 @@ export class Pivot implements Feature {
     return undefined;
   }
 
-  /** The pivot table written as calculated: its headers (the user's names kept), its cells, numbers right-aligned; its metadata as it was */
+  /** The pivot table written as calculated (src/calculated/: its headers, the user's names kept, its totals pinned); its metadata as it was */
   private written(table: Table, pivot: Calculated, renames: Renames): Table {
-    const header = pivot.columns.map((column) => escapeCell(renames[column.id] ?? column.header));
-    const kept = Object.fromEntries(Object.entries(renames).filter(([id]) => pivot.columns.some((column) => column.id === id)));
-    // (An error written so that it is no hashtag, as a formula's result is)
-    const rows = [{ cells: header }, ...pivot.body.map((cells) => ({ cells: cells.map((cell) => escapeCell(cellResult(cell))) }))];
-    const align = pivot.columns.map((column): Table["align"][number] => (column.numeric ? "right" : ""));
-    // Its totals pinned (the row at the bottom, the columns at the right): they stay in view, out of a sort; other pins as they were
-    const totals = { bottom: pivot.totalRow ? 1 : 0, right: pivot.totalColumns };
-    // (Its delimiter row as written where its columns are aligned as before)
-    const same = align.length === table.align.length && align.every((a, i) => a === table.align[i]);
-    const made: Table = same ? { ...table, rows } : { ...table, rows, align, delimiterSource: undefined, alignSource: undefined };
-    const pinned = this.host.withPins(made, { ...this.host.pinsOf(made), ...totals });
-    return this.host.setMeta(pinned, "headers", Object.keys(kept).length ? JSON.stringify(kept) : undefined);
+    const made = calculatedTable(table, pivot, renames, { pinsOf: this.host.pinsOf, withPins: this.host.withPins });
+    return this.host.setMeta(made, "headers", storedRenames(renames, pivot));
   }
 
   /** The pivot calculated from a source, or why it cannot be */
@@ -134,20 +117,8 @@ export class Pivot implements Feature {
     if (!definition || "problem" in definition) return after;
     const pivot = this.calculate(definition, this.find(definition, edit.page.tables, edit.page.from));
     if (typeof pivot === "string") return after;
-    const renames: Record<string, string> = { ...this.renamesOf(after) };
-    // A header renamed in this edit: its name kept for the column it is (the pivot as shown is as calculated now)
-    const was = before.rows[0]?.cells ?? [];
-    const now = after.rows[0]?.cells ?? [];
-    if (now.length === pivot.columns.length) {
-      now.forEach((cell, i) => {
-        if (cell === was[i]) return;
-        const column = pivot.columns[i]!;
-        const name = unescapeCell(cell).trim();
-        if (!name || name === column.header) delete renames[column.id];
-        else renames[column.id] = name;
-      });
-    }
-    return this.written(after, pivot, renames);
+    // A header renamed in this edit: its name kept for the column it is
+    return this.written(after, pivot, renamedIn(before, after, pivot, this.renamesOf(after)));
   }
 
   /** The page's pivots of the table written, calculated anew in the same edit (a renamed source's new name written in them) */
@@ -173,9 +144,8 @@ export class Pivot implements Feature {
       const pivot = this.calculate(followed, { table: after });
       if (typeof pivot === "string") continue;
       // The headers the user named, by what their columns stand for now
-      const renames = Object.fromEntries(Object.entries(this.renamesOf(table)).map(([id, name]) => [movedId(id, moved), name]));
-      const written = this.written(named, pivot, renames);
-      if (JSON.stringify(written.rows.map((r) => r.cells)) !== JSON.stringify(table.rows.map((r) => r.cells)) || written.meta !== table.meta) out.push({ range, table: written });
+      const written = this.written(named, pivot, movedRenames(this.renamesOf(table), (id) => movedId(id, moved)));
+      if (!sameCells(written, table) || written.meta !== table.meta) out.push({ range, table: written });
     }
     return out;
   }
@@ -298,7 +268,7 @@ export class Pivot implements Feature {
     const pivot = this.calculate(definition, found);
     if (typeof pivot === "string") return void this.stale.set(info, `This pivot cannot be calculated: ${pivot}`);
     const now = this.written(table, pivot, this.renamesOf(table));
-    this.stale.set(info, JSON.stringify(now.rows.map((r) => r.cells)) !== JSON.stringify(table.rows.map((r) => r.cells)));
+    this.stale.set(info, !sameCells(now, table));
   }
 
   /** What a pivot is, at a glance: Pivot of its source as the definition writes it (another page's: Pivot of [[Orders]]orders), one with a problem too; out of date, said so */
@@ -510,7 +480,7 @@ export class Pivot implements Feature {
 /** A source as found: its table, why there is none, or the page it is on, not read yet */
 type Found = { readonly table: Table } | { readonly problem: string } | { readonly unread: string };
 
-/** A column's id (PivotColumn.id: row:<group>, value:<value>, column:<key>|<value>, total:<value>) with its items as they are written now */
+/** A column's id (its column's id in pivotOf: row:<group>, value:<value>, column:<key>|<value>, total:<value>) with its items as they are written now */
 function movedId(id: string, moved: ReadonlyMap<string, string>): string {
   const m = /^(row:|value:|total:|column:[^|]*\|)(.*)$/.exec(id);
   return m ? m[1]! + (moved.get(m[2]!) ?? m[2]!) : id;

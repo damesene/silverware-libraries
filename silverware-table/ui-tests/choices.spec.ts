@@ -186,7 +186,7 @@ test.describe("Choices", () => {
       await openChoices(page);
       await expect(dialog(page).getByRole("radio", { name: /^Source$/ })).toBeChecked();
       await expect(dialog(page).getByRole("combobox", { name: "Source", exact: true })).toHaveValue("tasks");
-      await expect(dialog(page).getByLabel("Source's column")).toHaveValue("[page]");
+      await expect(dialog(page).getByLabel("Source's column").locator("option:checked")).toHaveText("page");
     });
 
     test("Formula: a formula of one's own, its values shown as it is typed, why it gives none said", async ({ page }) => {

@@ -61,6 +61,9 @@ export function listOfValues(values: readonly string[]): string[] {
   return list;
 }
 
+/** A list as read: its values, or why it gives none (its formula's error, a formula not calculated) */
+export type ListRead = { readonly values?: readonly string[]; readonly problem?: string };
+
 /** A list's values as stored */
 export function writeChoiceList(values: readonly string[]): string {
   return JSON.stringify(values);

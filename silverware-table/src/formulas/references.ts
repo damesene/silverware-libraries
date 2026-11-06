@@ -313,10 +313,33 @@ export function callsPureFunctionsOnly(formula: string): boolean {
 export function referredTableNames(cells: FormulaCells, table: Table): Set<string> {
   const names = new Set<string>();
   forFormulas(cells, table, (formula) => {
-    // Table tokens, not references: prices!#REF! is to prices too
-    for (const token of tokenize(formula).tokens) {
-      if (token.kind === "table" && token.page === undefined) names.add(token.name.toLowerCase());
-    }
+    for (const name of formulaTableNames(formula)) names.add(name);
   });
   return names;
+}
+
+/** The names (lowercase) of the tables on the formula's page it refers to: table tokens, not references (prices!#REF! is to prices too) */
+export function formulaTableNames(formula: string): string[] {
+  return tokenize(formula).tokens.flatMap((token) => (token.kind === "table" && token.page === undefined ? [token.name.toLowerCase()] : []));
+}
+
+/**
+ * What a formula that is a source's alone reads: `=@projects` its whole body,
+ * `=@users[name]` one of its columns as written; undefined for any other
+ * formula (`=@users[#Data]`, `=SORT(@projects)`)
+ */
+export function sourceFormulaOf(formula: string): { readonly source: string; readonly column?: string } | undefined {
+  const written = formula.trim();
+  if (!written.startsWith("=")) return undefined;
+  const { tokens, error } = tokenize(written);
+  if (error || tokens[0]?.kind !== "source") return undefined;
+  const source = tokens[0].name;
+  if (tokens.length === 1) return { source };
+  const column = tokens[1];
+  return tokens.length === 2 && column?.kind === "column" && !column.thisRow && column.last === undefined ? { source, column: column.name } : undefined;
+}
+
+/** A source of the space as a formula reads it: `@projects`, a column of it `@users[name]` (by its key) */
+export function sourceRefText(source: string, column?: ColumnId): string {
+  return `@${source}${(column && columnRefText(column, false)) ?? ""}`;
 }

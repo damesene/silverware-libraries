@@ -21,14 +21,14 @@ import {
   listKey,
   listNameFor,
   listNames,
-  listOfValues,
+  type ListRead,
   readChoiceList,
   withColumnType,
   writeChoiceList,
 } from "../columntypes/index.ts";
 import type { Dialog, ModelHost, TableInfo } from "../core/feature.ts";
 import { formulaField } from "../formulafield.ts";
-import { columnRefText, FormulaError, type FormulasOffer, withEquals } from "../formulas/index.ts";
+import { type FormulasOffer, referencedColumn, sourceFormulaOf, sourceRefText, withEquals } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import { escapeCell, parseTable, type Table, unescapeCell } from "../markdown.ts";
 import { setCell } from "../ops.ts";
@@ -47,16 +47,17 @@ const SHOWN = 200;
 /** A cell's text as a value: without its hidden tags, unescaped, trimmed */
 const textOf = (cell: string): string => unescapeCell(withoutTags(cell)).trim();
 
-/** What a source's own formula is: `=@projects`, a column of it `=@users[name]` */
-const SOURCE_FORMULA_RE = /^=@([\p{L}_][\p{L}\p{N}_]*)(?:\[([^\]]+)\])?$/u;
-
 // Why the ways that need formulas cannot be picked while the formulas module is off
 const FORMULAS_OFF = "it is calculated by the formulas module, which is off: turn it on in the settings";
 
 export class ChoicesDialog {
   private dialog: Dialog | undefined;
 
-  constructor(private readonly host: ModelHost) {}
+  constructor(
+    private readonly host: ModelHost,
+    // A list's formula read for a table as the column checks it (the column types module's)
+    private readonly read: (table: Table, formula: string) => ListRead,
+  ) {}
 
   close(): void {
     this.dialog?.close();
@@ -78,8 +79,8 @@ export class ChoicesDialog {
     const keptFormula = kept ? listFormula(stored.get(listKey(was!))) : undefined;
     const list = kept && keptFormula === undefined ? readChoiceList(stored.get(listKey(was!))) : undefined;
     // A kept formula that is a source's own (=@projects, =@users[name]): the source picked
-    const fromSource = keptFormula === undefined ? undefined : SOURCE_FORMULA_RE.exec(keptFormula);
-    const keptSource = fromSource && sourceNames.find((name) => name.toLowerCase() === fromSource[1]!.toLowerCase());
+    const fromSource = keptFormula === undefined ? undefined : sourceFormulaOf(keptFormula);
+    const keptSource = fromSource && sourceNames.find((name) => name.toLowerCase() === fromSource.source.toLowerCase());
     const taken = listNames(stored).filter((name) => name !== was || !kept);
     // The column's values, each once
     const present = (): string[] => distinctValues(table.rows.slice(1).map((row) => textOf(row.cells[column] ?? "")).filter((text) => text !== ""));
@@ -193,22 +194,22 @@ export class ChoicesDialog {
     if (keptSource) sourceField.value = keptSource;
     const columnField = el(doc, "select", { class: "swt-choices-source", attrs: { "aria-label": "Source's column" } });
     const columnLabel = el(doc, "label", "swt-choices-label", el(doc, "span", "", "Column"), columnField);
-    // A source's columns as formulas name them ([name]), with their headers
-    const sourceColumns = (name: string) => {
-      const headers = sources?.table(name)?.rows[0]?.cells ?? [];
-      return headers.map((cell, c) => ({ label: unescapeCell(cell), ref: columnRefText(columnIdOf(headers, c), false) ?? "" }));
-    };
+    // A source's columns as it gives them (none where it is not read yet), each an option by its place
+    const sourceColumns = (name: string) => sources?.columns(name) ?? [];
     const showColumns = () => {
       const columns = sourceColumns(sourceField.value);
-      columnField.replaceChildren(...columns.map((c) => el(doc, "option", { text: c.label, attrs: { value: c.ref } })));
-      const keptColumn = fromSource?.[2] && columns.find((c) => c.ref.toLowerCase() === `[${fromSource[2]!.toLowerCase()}]`);
-      if (keptColumn && sourceField.value === keptSource) columnField.value = keptColumn.ref;
+      columnField.replaceChildren(...columns.map((column, c) => el(doc, "option", { text: column, attrs: { value: String(c) } })));
+      // The column the kept formula reads, found as formulas find it (by its key)
+      const keptColumn = fromSource?.column === undefined ? undefined : referencedColumn(columns, fromSource.column);
+      if (keptColumn !== undefined && sourceField.value === keptSource) columnField.value = String(keptColumn);
       // One column, or a source not read yet: the source alone
       columnLabel.hidden = columns.length < 2;
     };
     const sourceFormula = () => {
-      const name = sourceField.value;
-      return sourceColumns(name).length > 1 ? `=@${name}${columnField.value}` : `=@${name}`;
+      const columns = sourceColumns(sourceField.value);
+      // A kept source not read yet: its formula as kept (its column unknown here, not to be lost)
+      if (!columns.length && keptFormula !== undefined && sourceField.value === keptSource) return keptFormula;
+      return `=${sourceRefText(sourceField.value, columns.length > 1 ? columnIdOf(columns, Number(columnField.value)) : undefined)}`;
     };
     const sourcePicked = () => {
       showColumns();
@@ -237,7 +238,7 @@ export class ChoicesDialog {
     const written = () => (way === "space" ? sourceFormula() : withEquals(formula.trim()).formula);
     const showPreview = () => {
       if (way !== "space" && way !== "formula") return;
-      const made = this.listOf(table, written(), formulas);
+      const made = this.preview(table, written(), formulas);
       previewCount.textContent = typeof made === "string" ? "" : `· ${made.length}`;
       const more = typeof made === "string" ? 0 : made.length - SHOWN;
       previewValues.replaceChildren(
@@ -296,10 +297,20 @@ export class ChoicesDialog {
     const DISABLED: Record<Way, string | undefined> = {
       column: undefined,
       list: unstorable,
-      space: unstorable ?? (!formulas ? FORMULAS_OFF : sourceNames.length ? undefined : "the space has no sources: a Space Lua script defines them with silverware.table.defineSource"),
+      space:
+        unstorable ??
+        (!formulas
+          ? FORMULAS_OFF
+          : !sources
+            ? "the sources module is off: turn it on in the settings"
+            : sourceNames.length
+              ? undefined
+              : "the space has no sources: a Space Lua script defines them with silverware.table.defineSource"),
       formula: unstorable ?? (formulas ? undefined : FORMULAS_OFF),
     };
     const TITLES: Record<Way, string> = { column: "Column's values", list: "Own list", space: "Source", formula: "Formula" };
+    // A list kept as a way that cannot be picked now (the formulas module off): the column's values, until Save
+    if (DISABLED[way]) way = "column";
     const hint = el(doc, "p", "swt-choices-hint");
     const reasons = (Object.keys(DISABLED) as Way[]).filter((w) => DISABLED[w]).map((w) => `${TITLES[w]}: ${DISABLED[w]}.`);
     const reason = el(doc, "p", { class: "swt-choices-hint", text: reasons.join(" ") });
@@ -351,15 +362,11 @@ export class ChoicesDialog {
   }
 
   /** The values a list's formula gives the table now (as the column will check them), or why it gives none */
-  private listOf(table: Table, formula: string, formulas: FormulasOffer | undefined): readonly string[] | string {
+  private preview(table: Table, formula: string, formulas: FormulasOffer | undefined): readonly string[] | string {
     if (!formulas) return `No values: ${FORMULAS_OFF}`;
-    if (formula.trim() === "=") return "Type a formula";
-    const problem = formulas.problem(formula);
-    if (problem) return problem;
-    const result = formulas.list(table, formula);
-    if (result === undefined) return "Not read yet: it reads a page or a source not read yet";
-    if (result instanceof FormulaError) return `The column checks nothing: ${result.code} ${result.detail}`;
-    return listOfValues(result);
+    if (formula.trim() === "=" || formula.trim() === "=@") return "Type a formula, or pick a source";
+    const read = this.read(table, formula);
+    return read.values ?? `The column checks nothing: its formula ${read.problem ?? "gives no values"}`;
   }
 
   /** Why a list cannot be named so, or undefined */

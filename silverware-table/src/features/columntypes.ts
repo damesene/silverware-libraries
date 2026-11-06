@@ -24,6 +24,7 @@ import {
   listKey,
   listNames,
   listOfValues,
+  type ListRead,
   readChoiceList,
   choiceListOf,
   isChoice,
@@ -31,12 +32,9 @@ import {
   type TypeTable,
   withColumnType,
 } from "../columntypes/index.ts";
-import { FormulaError, type FormulasOffer, type HeldFormulas, type HeldFormulasOffer, tokenize } from "../formulas/index.ts";
+import { FormulaError, formulaSources, formulaTableNames, type FormulasOffer, type HeldFormulas, type HeldFormulasOffer } from "../formulas/index.ts";
 import { sameTableName } from "../namerules.ts";
 import { ChoicesDialog } from "./choicesdialog.ts";
-
-/** A table's choice list as read: its values, or why it gives none (a formula's error, a formula not calculated) */
-type ListRead = { readonly values?: readonly string[]; readonly problem?: string };
 
 /** A type's icon, or a tag for a type without one */
 function iconOf(type: ColumnType): string {
@@ -100,7 +98,7 @@ export class ColumnTypes implements Feature {
   private lists: { readonly text: string; readonly byTable: WeakMap<Table, Map<string, ListRead>> } | undefined;
 
   constructor(private readonly host: ModelHost) {
-    this.choicesDialog = new ChoicesDialog(host);
+    this.choicesDialog = new ChoicesDialog(host, (table, formula) => this.formulaList(table, formula));
     // The type hashtags of headers hidden from the start (a table shows before its looks apply)
     host.hideHeaderTags("types", typeTagPatterns());
     this.picker = host.panel("swt-choices");
@@ -161,11 +159,22 @@ export class ColumnTypes implements Feature {
   private readList(table: Table, stored: string | undefined): ListRead {
     const formula = listFormula(stored);
     if (formula === undefined) return { values: readChoiceList(stored) };
+    const read = this.formulaList(table, formula);
+    return read.problem ? { problem: `its formula (${formula}) ${read.problem}` } : read;
+  }
+
+  /** The values a list's formula gives a table now (the formulas module's), as the column checks them; or why none (also the Choices dialog's) */
+  private formulaList(table: Table, formula: string): ListRead {
     const formulas = this.host.offered<FormulasOffer>("formulas");
-    if (!formulas) return { problem: `its formula (${formula}) is calculated by the formulas module, which is off` };
+    if (!formulas) return { problem: "is calculated by the formulas module, which is off" };
+    const problem = formulas.problem(formula);
+    if (problem) return { problem: `does not read: ${problem}` };
     const result = formulas.list(table, formula);
-    if (result === undefined) return { problem: `its formula (${formula}) reads a page or a source not read yet` };
-    if (result instanceof FormulaError) return { problem: `its formula (${formula}) gives ${result.code} ${result.detail}` };
+    if (result === undefined) {
+      const off = !this.host.offered("sources") && formulaSources(formula).length;
+      return { problem: off ? "reads a source of the space, and the sources module is off" : "reads a page or a source not read yet" };
+    }
+    if (result instanceof FormulaError) return { problem: `gives ${result.code} ${result.detail}` };
     return { values: listOfValues(result) };
   }
 
@@ -211,9 +220,7 @@ export class ColumnTypes implements Feature {
     if (!name) return;
     for (const other of this.host.shownTables()) {
       if (other.key === info.key) continue;
-      const reads = this.listFormulas(parseTable(other.source)).some((formula) =>
-        tokenize(formula).tokens.some((token) => token.kind === "table" && token.page === undefined && sameTableName(token.name, name)),
-      );
+      const reads = this.listFormulas(parseTable(other.source)).some((formula) => formulaTableNames(formula).some((read) => sameTableName(read, name)));
       if (reads) this.host.looksChanged(other);
     }
   }

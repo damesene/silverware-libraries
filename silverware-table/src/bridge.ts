@@ -178,7 +178,7 @@ export const MODULE_DESCRIPTIONS: Readonly<Record<FeatureName, string>> = {
   formulas: "Formulas in cells (=SUM(B1:B3)), recalculated on every edit",
   names: "Name tables, columns, rows and cells, to refer to them in formulas",
   pageLinks: "Formulas can refer to tables and named cells on other pages",
-  sources: "Formulas, views and pivots can read tables a Space Lua script gives (silverware.table.defineSource: @tasks)",
+  sources: "Formulas, views, pivots and choice lists can read tables a Space Lua script gives (silverware.table.defineSource: @tasks)",
   filters: "Show only the rows whose cells match what you type under a header",
   columnTypes: "A header's hashtag formats its column (#currency, #stars…)",
   conditions: "Cells look different where their values meet a condition (colors, bars, icons): rules for a column or the whole table, from a column's menu or the table's ⋯ menu",

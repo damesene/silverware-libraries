@@ -28,6 +28,7 @@ import {
   timeArithmetic,
   TimeValue,
   toNumber,
+  formatNumber,
   toText,
   type Value,
 } from "./values.ts";
@@ -94,6 +95,9 @@ class Book {
   constructor(
     readonly cells: FormulaCells,
     private readonly source: TableSource | undefined,
+    // Plain cells read as written where a number would lose what they show (`2024 Roadmap`, `007`, `2,5`): a list's
+    // values (a choice list's), which are matched with cells as written
+    readonly asWritten = false,
   ) {}
 
   /** Why a formula keeps its stored result: it refers to a page formulas may not read, or reads a source not read; else undefined */
@@ -312,7 +316,9 @@ class Sheet {
       const text = unescapeCell(withoutTags(cell)).trim();
       if (text === "") return null;
       // A number, a time (14:30, 40:00), or text (an error's code as it shows, `\#REF!` written: a pivot's cell)
-      return asNumber(text) ?? parseClock(text) ?? errorCodeIn(text) ?? text;
+      const number = asNumber(text);
+      if (number !== undefined && !(this.book.asWritten && formatNumber(number) !== text)) return number;
+      return parseClock(text) ?? errorCodeIn(text) ?? text;
     }
     return this.result(row, column, stored.formula);
   }
@@ -858,18 +864,27 @@ export function viewResult(table: Table, { cells, tables, name }: Calculation, f
  * own (`[status]` its column, its own name its own: a choice list's formula,
  * which no cell holds, so reading its table is no cycle): its values as cells
  * show them, in the result's order (one value one, a list or a grid of one
- * column its values), or why there are none (a grid of several columns too).
- * Undefined where it reads a page or a source not read: no values to give yet.
+ * column its values): a plain cell's text as written, a number calculated as
+ * the table writes numbers (its decimal comma); an error among them left out
+ * (it is no value to pick). Or why there are none (a grid of several columns
+ * too). Undefined where it reads a page or a source not read: no values to
+ * give yet.
  */
 export function listResult(table: Table, { cells, tables, name }: Calculation, formula: string): readonly string[] | FormulaError | undefined {
   const written = withEqualsOf(formula);
-  const book = new Book(cells, tables);
+  const book = new Book(cells, tables, true);
   if (book.notRead(written)) return undefined;
-  const result = new Sheet(table, book, undefined, name).whole(written);
+  const own = new Sheet(table, book, undefined, name);
+  const result = own.whole(written);
   if (isError(result)) return result;
   const grid = asGrid(result);
   if (grid.width > 1) return new FormulaError("#VALUE!", `the result has ${grid.width} columns: pick one (@users[name], CHOOSECOLS(…, 1))`);
-  return grid.cells.map(scalarText);
+  return grid.cells.flatMap((value) => {
+    // (An error, calculated or written in a cell as one: `\#REF!`)
+    if (isError(value) || (typeof value === "string" && errorCodeIn(value))) return [];
+    const text = scalarText(value);
+    return [typeof value === "number" && own.decimalComma ? text.replace(".", ",") : text];
+  });
 }
 
 /** A view's result as its table's body: a grid (one value a cell, a list a column), an error as it is, none of no columns #CALC! */

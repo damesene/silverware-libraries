@@ -277,11 +277,11 @@ export class Formulas implements Feature {
       },
       // Formulas a table holds besides its cells': the column types module's lists (asked each time: it starts after this one)
       held: (table) => {
-        for (const name of HOLDING) {
-          const held = this.host.offered<HeldFormulasOffer>(name)?.held(table);
-          if (held) return held;
-        }
-        return undefined;
+        const holders = HOLDING.flatMap((name) => this.host.offered<HeldFormulasOffer>(name) ?? []);
+        const found = holders.flatMap((holder) => holder.held(table) ?? []);
+        if (found.length < 2) return found[0];
+        // Several modules' formulas: all of them, each module's followed over the table the one before left
+        return { formulas: found.flatMap((held) => held.formulas), follow: (follow) => holders.reduce((t, holder) => holder.held(t)?.follow(follow) ?? t, table) };
       },
     };
     host.offer({

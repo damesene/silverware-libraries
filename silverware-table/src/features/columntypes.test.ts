@@ -160,6 +160,48 @@ describe("Column types", () => {
       expect(invalid(1, 1)).toBe(false);
     });
 
+    /** Renames a header of the `index`th table of the page in its editor */
+    const renameHeader = async (index: number, column: number, name: string) => {
+      clickOn(editor.querySelectorAll("table")[index]!.rows[0]!.cells[column]!);
+      const field = editor.querySelector<HTMLInputElement>(".swt-cell-editor")!;
+      field.value = name;
+      key(field, "Enter");
+      await flush();
+      await controller.scan();
+    };
+
+    it("follows the tables of the page it reads: a column renamed, in the same write", async () => {
+      await setup(
+        [
+          "| Task | Owner #choice-people |",
+          "|---|---|",
+          "| A | anna |",
+          `| <meta core.table columntypes.choice.people='=SORT(people![name])'> |`,
+          "",
+          "| Name |",
+          "|---|",
+          "| anna |",
+          "| <meta core.table core.name='people'> |",
+          "",
+        ].join("\n"),
+        { "silverware.table.editor.enterKey": "save" },
+      );
+      await renameHeader(1, 0, "Full name");
+      expect(text).toContain("| Full name |");
+      expect(text).toContain("columntypes.choice.people='=SORT(people![full_name])'");
+      expect(invalid(1, 1)).toBe(false);
+    });
+
+    it("follows its own table's columns renamed", async () => {
+      await setup(
+        ["| Status | Next #choice-states |", "|---|---|", "| open | done |", `| <meta core.table columntypes.choice.states='=UNIQUE([status])'> |`, ""].join("\n"),
+        { "silverware.table.editor.enterKey": "save" },
+      );
+      expect(invalid(1, 1)).toBe(true);
+      await renameHeader(0, 0, "State");
+      expect(text).toContain("columntypes.choice.states='=UNIQUE([state])'");
+    });
+
     it("checks nothing where its formula gives no list, its header saying why; nor with the formulas module off", async () => {
       const page = [
         "| Task | Owner #choice-people | Project #choice-projects |",

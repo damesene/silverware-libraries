@@ -31,7 +31,7 @@ import {
   type TypeTable,
   withColumnType,
 } from "../columntypes/index.ts";
-import { FormulaError, type FormulasOffer, tokenize } from "../formulas/index.ts";
+import { FormulaError, type FormulasOffer, type HeldFormulas, type HeldFormulasOffer, tokenize } from "../formulas/index.ts";
 import { sameTableName } from "../namerules.ts";
 import { ChoicesDialog } from "./choicesdialog.ts";
 
@@ -105,7 +105,7 @@ export class ColumnTypes implements Feature {
     host.hideHeaderTags("types", typeTagPatterns());
     this.picker = host.panel("swt-choices");
     this.picker.element.setAttribute("role", "listbox");
-    host.offer({ valueOf: (header, text) => this.valueOf(header, text) } satisfies ColumnTypesOffer);
+    host.offer({ valueOf: (header, text) => this.valueOf(header, text), held: (table) => this.held(table) } satisfies ColumnTypesOffer & HeldFormulasOffer);
   }
 
   /** A cell's value as its column's type compares it, as its looks give it (`value`): the text where it is none of the type's */
@@ -169,10 +169,30 @@ export class ColumnTypes implements Feature {
     return { values: listOfValues(result) };
   }
 
-  /** The formulas of a table's choice lists (none where it has no list made by one) */
-  private listFormulas(table: Table): string[] {
+  /**
+   * A table's lists made by formulas, for the formulas module: what the table reads, followed through the edits of
+   * the tables they read (a column renamed, a table renamed) and written back in the same write
+   */
+  private held(table: Table): HeldFormulas | undefined {
     const stored = this.host.metaOf(table);
-    return listNames(stored).flatMap((name) => listFormula(stored.get(listKey(name))) ?? []);
+    const lists = listNames(stored).flatMap((name) => {
+      const formula = listFormula(stored.get(listKey(name)));
+      return formula === undefined ? [] : [{ name, formula }];
+    });
+    if (!lists.length) return undefined;
+    return {
+      formulas: lists.map((list) => list.formula),
+      follow: (follow) =>
+        lists.reduce((t, { name, formula }) => {
+          const followed = follow(formula);
+          return followed === formula ? t : this.host.setMeta(t, listKey(name), followed);
+        }, table),
+    };
+  }
+
+  /** The formulas of a table's choice lists (none where it has no list made by one) */
+  private listFormulas(table: Table): readonly string[] {
+    return this.held(table)?.formulas ?? [];
   }
 
   /**

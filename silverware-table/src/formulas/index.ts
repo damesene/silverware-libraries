@@ -18,7 +18,7 @@
 // This is the formulas' API for the rest of Silverware Table; the parts are the
 // files beside it, the functions in builtin/ (only functions: what a formula
 // can call), custom functions in custom.ts, which exist in registry.ts.
-export { type CalculatedBy, type CalculatedRead, type CellNameAt, cellResult, PLAIN_CELLS, withEquals, cellsByName, errorCodeIn, type FormulaCells, formulaCount, forFormulas, hasFormulas, isErrorText, isFormulaInput, type RowName, rowsByName, type StoredFormula } from "./cell.ts";
+export { type CalculatedBy, type CalculatedRead, type HeldFormulas, type CellNameAt, cellResult, PLAIN_CELLS, withEquals, cellsByName, errorCodeIn, type FormulaCells, formulaCount, forFormulas, hasFormulas, isErrorText, isFormulaInput, type RowName, rowsByName, type StoredFormula } from "./cell.ts";
 
 /**
  * What the formulas module offers other modules (ModelHost.offered("formulas")): its cells as the formulas read them;
@@ -107,6 +107,16 @@ export type PageLinksOffer = {
 export type CalculatedOffer = {
   /** How a table is calculated, undefined for one the module does not calculate */
   readonly calculated: (table: import("../markdown.ts").Table) => import("./cell.ts").CalculatedBy | undefined;
+};
+
+/**
+ * What a module keeping formulas in a table's metadata row that calculate none of its cells offers (the column types
+ * module: a choice list made by a formula): the formulas see them as the table's (what it reads) and have their
+ * references follow the edits of what they read, in the same write
+ */
+export type HeldFormulasOffer = {
+  /** The formulas a table holds so, and how they are written back; undefined where it holds none */
+  readonly held: (table: import("../markdown.ts").Table) => import("./cell.ts").HeldFormulas | undefined;
 };
 export { type Area, areaText, callsCustomFunctions, callsPureFunctionsOnly, columnIdText, formulaPages, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, formulaSources, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredSources, referredTableNames, type SourceRef, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";

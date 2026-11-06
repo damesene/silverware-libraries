@@ -40,6 +40,25 @@ export type FormulaCells = {
    * module gives it; undefined for any other table (none: no table is one)
    */
   readonly calculated?: (table: Table) => CalculatedBy | undefined;
+  /**
+   * The formulas a module keeps in a table's metadata row that calculate none
+   * of its cells (a choice list's), as its module gives them; undefined where
+   * the table has none
+   */
+  readonly held?: (table: Table) => HeldFormulas | undefined;
+};
+
+/**
+ * Formulas a table holds besides its cells' and calculating none of them (a
+ * choice list's: its values calculated as its column shows, never written):
+ * what the table reads, so that their references follow the edits of what
+ * they read as a cell's do
+ */
+export type HeldFormulas = {
+  /** The formulas, with their "=" */
+  readonly formulas: readonly string[];
+  /** The table with each of them as `follow` makes it (an edit of what it reads followed), written back where changed */
+  readonly follow: (follow: (formula: string) => string) => Table;
 };
 
 /**
@@ -139,9 +158,10 @@ export function formulaCount(cells: FormulaCells, table: Table): number {
   return table.rows.reduce((n, row, r) => n + (r === 0 ? 0 : row.cells.filter((cell) => cells.formulaOf(cell)).length), 0);
 }
 
-/** Each formula of a table: its cells', and a calculated table's (what the table refers to and calls, as its cells' formulas do) */
+/** Each formula of a table: its cells', a calculated table's and those it holds (what the table refers to and calls, as its cells' formulas do) */
 export function forFormulas(cells: FormulaCells, table: Table, each: (formula: string) => void): void {
   for (const formula of cells.calculated?.(table)?.formulas ?? []) each(formula);
+  for (const formula of cells.held?.(table)?.formulas ?? []) each(formula);
   table.rows.forEach((row, r) => {
     if (r === 0) return;
     for (const cell of row.cells) {

@@ -52,6 +52,7 @@ import {
   type FormulasOffer,
   formulasAfterEdit,
   followFormula,
+  followOwnFormula,
   followTable,
   choiceText,
   formulaChoices,
@@ -81,6 +82,7 @@ import {
   viewResult,
   calculatedNow,
   type CalculatedOffer,
+  type HeldFormulasOffer,
   withAreasWritten,
   withColumnKeys,
   writtenArea,
@@ -144,6 +146,9 @@ function choiceHelp(choice: FormulaChoice): FormulaHelp {
 
 // The modules whose tables are calculated from others (CalculatedOffer), asked in this order
 const CALCULATING = ["view", "pivot"] as const;
+
+// The modules keeping formulas in a table's metadata row that calculate none of its cells (HeldFormulasOffer)
+const HOLDING = ["columnTypes"] as const;
 
 // What a name offered in a module's formula field is (its list says so beside it)
 const FIELD_KINDS: Readonly<Record<FormulaChoice["kind"], string>> = { function: "function", column: "column", cell: "named cell", row: "named row", table: "table", source: "source" };
@@ -267,6 +272,14 @@ export class Formulas implements Feature {
         for (const name of CALCULATING) {
           const by = this.host.offered<CalculatedOffer>(name)?.calculated(table);
           if (by) return by;
+        }
+        return undefined;
+      },
+      // Formulas a table holds besides its cells': the column types module's lists (asked each time: it starts after this one)
+      held: (table) => {
+        for (const name of HOLDING) {
+          const held = this.host.offered<HeldFormulasOffer>(name)?.held(table);
+          if (held) return held;
         }
         return undefined;
       },
@@ -437,7 +450,11 @@ export class Formulas implements Feature {
   writeStep(before: Table, after: Table, edit: WriteEdit): Table {
     const { page } = edit;
     const tables = pageTables(this.cells, () => this.named(page.tables), this.host.currentPage, { from: page.from, table: after, name: this.nameOf(after) }, this.elsewhere());
-    const edited = formulasAfterEdit(before, after, { ...edit, tables, cells: this.cells, names: { before: this.nameOf(before), after: this.nameOf(after) } });
+    const names = { before: this.nameOf(before), after: this.nameOf(after) };
+    let edited = formulasAfterEdit(before, after, { ...edit, tables, cells: this.cells, names });
+    // Formulas it holds besides its cells' (a choice list's) follow its own edit, as its cells' do
+    const held = this.cells.held?.(edited);
+    if (held) edited = held.follow((formula) => followOwnFormula(formula, before, after, { cells: this.cells, rowMap: edit.rowMap, columnMap: edit.columnMap, names }));
     // A calculated table written (its Refresh, its definition changed): calculated anew; one that cannot be stays as it was
     return this.calculatedWritten(edited, tables, before);
   }
@@ -481,6 +498,8 @@ export class Formulas implements Feature {
         let followed = follows ? followTable(table, before, after!, following) : table;
         const by = follows ? this.cells.calculated?.(followed) : undefined;
         if (by) followed = by.follow(before, after!, following);
+        const held = follows ? this.cells.held?.(followed) : undefined;
+        if (held) followed = held.follow((formula) => followFormula(formula, before, after!, following));
         affectedTables.push({ range, table, followed });
       }
     }

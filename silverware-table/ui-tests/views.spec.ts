@@ -1,4 +1,4 @@
-import { cell, expect, hoverCell, markdown, notification, rendersAnew, setPage, table, tableIcon, test } from "./helpers.ts";
+import { cell, expect, header, hoverCell, markdown, notification, rendersAnew, setPage, table, tableIcon, test } from "./helpers.ts";
 
 const TASKS = `| Name | Assignee | Hours |
 |---|---|--:|
@@ -77,5 +77,22 @@ test.describe("Views", () => {
     await expect(page.locator(".swt-view-dialog")).toHaveCount(0);
     await expect.poll(() => markdown(page)).toContain(`view.formula='=FILTER(tasks![#Data], tasks![assignee] = "anna")' core.name='annas'`);
     await expect(cell(page, 2, 0, 1)).toHaveText("Ship");
+  });
+
+  test("a view of HSTACK: its headers by its parts' columns, a column calculated beside them shown as markdown", async ({ page }) => {
+    await expect(cell(page, 1, 0)).toHaveText("Write");
+    await hoverCell(page, cell(page, 1, 0));
+    await (await tableIcon(page, "Insert view…")).click();
+    const dialog = page.locator(".swt-view-dialog");
+    await dialog.locator('input[aria-label="Formula"]').fill('=HSTACK(tasks![name], tasks![hours], "[[" & tasks![assignee] & "]]")');
+    await expect(dialog.locator(".swt-view-size")).toHaveText("3 rows × 3 columns");
+    await expect(dialog.locator(".swt-view-table thead th")).toHaveText(["Name", "Hours", "C"]);
+    await dialog.locator(".swt-dialog-primary").click();
+    await expect(dialog).toHaveCount(0);
+    await expect.poll(() => markdown(page)).toMatch(/\| Write \| +3 \| \[\[anna\]\] \|/);
+    const view = table(page, 1);
+    for (const [column, name] of ["Name", "Hours", "C"].entries()) await expect(header(page, column, 1).locator(".swt-head-name")).toHaveText(name);
+    // The page as a link, as SilverBullet renders [[…]]
+    await expect(view.locator('tr[data-swt-row="1"] > td').nth(2).locator("a")).toHaveText("anna");
   });
 });

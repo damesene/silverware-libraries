@@ -170,6 +170,78 @@ describe("CHOOSECOLS, TAKE and DROP", () => {
   });
 });
 
+describe("HSTACK and VSTACK", () => {
+  const TEAMS = new Grid(2, 2, ["dev", 3, "ops", 1], ["Team", "Size"]);
+
+  it("HSTACK puts arrays side by side, each keeping its columns' names, a shorter one padded with #N/A", () => {
+    const result = call("HSTACK", PEOPLE, TEAMS, "x") as Grid;
+    expect(result.names).toEqual(["Name", "Team", "Score", "Team", "Size", undefined]);
+    expect(result.row(0)).toEqual(["Anna", "dev", 30, "dev", 3, "x"]);
+    const last = result.row(3);
+    expect(last.slice(0, 3)).toEqual(["Eva", "dev", null]);
+    expect(last.slice(3).map((v) => (v as FormulaError).code)).toEqual(["#N/A", "#N/A", "#N/A"]);
+  });
+
+  it("VSTACK puts arrays one under another, named as the first, a narrower one padded with #N/A", () => {
+    const result = call("VSTACK", TEAMS, PEOPLE, ["a", "b"]) as Grid;
+    expect(result.names).toEqual(["Team", "Size"]);
+    expect(result.width).toBe(3);
+    expect(result.height).toBe(8);
+    expect(result.row(0).slice(0, 2)).toEqual(["dev", 3]);
+    expect((result.row(0)[2] as FormulaError).code).toBe("#N/A");
+    expect(result.row(2)).toEqual(["Anna", "dev", 30]);
+    expect(result.column(0).slice(6)).toEqual(["a", "b"]);
+  });
+
+  it("an array that is no grid is a column, a value one cell; an argument that is an error is the result", () => {
+    expect(rowsOf(call("VSTACK", 1, [2, 3]))).toEqual([[1], [2], [3]]);
+    expect(rowsOf(call("HSTACK", 1, 2))).toEqual([[1, 2]]);
+    const error = new FormulaError("#CALC!", "nothing kept");
+    expect(call("HSTACK", PEOPLE, error)).toBe(error);
+  });
+
+  it("an empty array adds no rows (VSTACK) and is padded (HSTACK)", () => {
+    const none = new Grid(0, 2, [], ["Name", "Due"]);
+    expect(rowsOf(call("VSTACK", none, TEAMS))).toEqual([["dev", 3], ["ops", 1]]);
+    expect((call("VSTACK", none, TEAMS) as Grid).names).toEqual(["Name", "Due"]);
+    expect((call("HSTACK", TEAMS, none) as Grid).row(1).slice(2).map((v) => (v as FormulaError).code)).toEqual(["#N/A", "#N/A"]);
+  });
+
+  it("in formulas: a column calculated beside a table's", () => {
+    expect(shown(OWN, '=TEXTJOIN(";", TRUE, TAKE(HSTACK(tasks![name], "[[" & tasks![assignee] & "]]"), 1))', tasks)).toBe("Login;[[anna]]");
+    expect(shown(OWN, "=COUNTA(VSTACK(tasks![name], tasks![assignee]))", tasks)).toBe("8");
+    expect(shown(OWN, "=HSTACK(tasks![name], FILTER(tasks![name], tasks![hours] > 99))", tasks)).toBe("#CALC!");
+  });
+});
+
+describe("SEQUENCE", () => {
+  it("counts along each row first, from start by step", () => {
+    expect(rowsOf(call("SEQUENCE", 3))).toEqual([[1], [2], [3]]);
+    expect(rowsOf(call("SEQUENCE", 2, 3))).toEqual([
+      [1, 2, 3],
+      [4, 5, 6],
+    ]);
+    expect(rowsOf(call("SEQUENCE", 1, 3, 0, 10))).toEqual([[0, 10, 20]]);
+    expect(rowsOf(call("SEQUENCE", 2, null, 5, -1))).toEqual([[5], [4]]);
+    expect((call("SEQUENCE", 2) as Grid).names).toEqual([]);
+  });
+
+  it("is #CALC! of none, #VALUE! of fewer or more than Excel's sheet has", () => {
+    expect((call("SEQUENCE", 0) as FormulaError).code).toBe("#CALC!");
+    expect((call("SEQUENCE", 2, 0) as FormulaError).code).toBe("#CALC!");
+    expect((call("SEQUENCE", -1) as FormulaError).detail).toBe("rows is a count, not -1");
+    expect((call("SEQUENCE", 1_048_577) as FormulaError).detail).toBe("rows is at most 1,048,576, as in Excel");
+    expect((call("SEQUENCE", 1, 16_385) as FormulaError).code).toBe("#VALUE!");
+    expect((call("SEQUENCE", 2, 1, "x") as FormulaError).code).toBe("#VALUE!");
+  });
+
+  it("in formulas: reduced to one value, else #SPILL!", () => {
+    expect(shown(OWN, "=SUM(SEQUENCE(10))", tasks)).toBe("55");
+    expect(shown(OWN, "=SEQUENCE(1, 1, 0.1)", tasks)).toBe("0.1");
+    expect(shown(OWN, "=SEQUENCE(3)", tasks)).toBe("#SPILL!");
+  });
+});
+
 describe("arrays in formulas", () => {
   it("reduce to one value in a cell", () => {
     expect(shown(OWN, "=COUNTA(UNIQUE(tasks![assignee]))", tasks)).toBe("3");

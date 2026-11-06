@@ -79,7 +79,7 @@ export const EXCEL_FUNCTIONS: Readonly<Record<string, ExcelCall>> = {
   // Excel 365's dynamic array functions (an older Excel shows #NAME?); how a file without spill metadata has them
   // calculated is not verified: their cells are written as their values
   ...Object.fromEntries(
-    ["FILTER", "SORT", "SORTBY", "UNIQUE", "CHOOSECOLS", "TAKE", "DROP"].map((name) => [
+    ["FILTER", "SORT", "SORTBY", "UNIQUE", "CHOOSECOLS", "TAKE", "DROP", "HSTACK", "VSTACK", "SEQUENCE"].map((name) => [
       name,
       () => ({ reason: `${name} is an array function of Excel 365 only` }),
     ]),

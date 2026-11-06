@@ -14,10 +14,15 @@ export function given(value: Result | undefined): value is Result {
   return value !== undefined && value !== null;
 }
 
+/** A number from an argument (one value), or its error */
+export function numberOf(value: Result, what: string): number | FormulaError {
+  if (asGrid(value).cells.length !== 1) return new FormulaError("#VALUE!", `${what} is one number`);
+  return toNumber(asGrid(value).cells[0]!);
+}
+
 /** A whole number from an argument (one value), or its error */
 export function wholeOf(value: Result, what: string): number | FormulaError {
-  if (asGrid(value).cells.length !== 1) return new FormulaError("#VALUE!", `${what} is one number`);
-  const n = toNumber(asGrid(value).cells[0]!);
+  const n = numberOf(value, what);
   return isError(n) ? n : Math.trunc(n);
 }
 
@@ -113,6 +118,33 @@ export function orderOf(value: Result | undefined, what = "sort_order"): boolean
 /** Nothing left of an array: #CALC!, saying why (a cell cannot show an empty result, as in Excel) */
 export function emptyResult(why: string): FormulaError {
   return new FormulaError("#CALC!", why);
+}
+
+/**
+ * The arguments' grids side by side (`sideBySide`: HSTACK) or one under
+ * another (VSTACK), the shorter ones padded with #N/A as in Excel; or the
+ * first argument that is an error, the whole result's. Columns are named by
+ * each part's (HSTACK), or by the first part's (VSTACK)
+ */
+export function stacked(parts: readonly Result[], sideBySide: boolean, name: string): Grid | FormulaError {
+  const grids: Grid[] = [];
+  for (const part of parts) {
+    const grid = gridOf(part);
+    if (isError(grid)) return grid;
+    grids.push(grid);
+  }
+  // Across the way they are stacked: rows side by side, columns one under another
+  const across = Math.max(...grids.map((g) => (sideBySide ? g.height : g.width)));
+  const pad = new FormulaError("#N/A", `${name} pads a shorter array with #N/A`);
+  if (sideBySide) {
+    const rows = Array.from({ length: across }, (_, r) =>
+      grids.flatMap((g) => (r < g.height ? g.row(r) : Array<Scalar>(g.width).fill(pad))),
+    );
+    const names = grids.flatMap((g) => Array.from({ length: g.width }, (_, c) => g.names[c]));
+    return Grid.ofRows(rows, names, names.length);
+  }
+  const rows = grids.flatMap((g) => g.rows().map((row) => [...row, ...Array<Scalar>(across - g.width).fill(pad)]));
+  return Grid.ofRows(rows, grids[0]!.names, across);
 }
 
 /** The grid's rows and columns at these places (TAKE, DROP), or #CALC! where none are left */

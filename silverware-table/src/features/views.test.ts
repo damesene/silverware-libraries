@@ -45,6 +45,19 @@ describe("Views", () => {
     expect(table(1).rows.length).toBe(5);
   });
 
+  it("writes a view of stacked arrays: HSTACK's columns named by their parts, a link as markdown, VSTACK's padding as \\#N/A", async () => {
+    const stack = (name: string, formula: string) => `| x |\n|---|\n| old |\n| <meta core.table core.name='${name}' view.formula='${formula}'> |`;
+    const links = stack("links", "=HSTACK(tasks![name], &quot;[[&quot; &amp; tasks![assignee] &amp; &quot;]]&quot;)");
+    const both = stack("both", "=VSTACK(tasks![#Data], SEQUENCE(1, 2))");
+    await setup(`${TASKS}\n\n${links}\n\n${both}\n`, { "silverware.table.editor.enterKey": "save" });
+    clickOn(cell(2, 1));
+    await type("eva");
+    expect(edits).toBe(1);
+    expect(text).toContain("| Name | B |\n|---|---|\n| Write | [[anna]] |\n| Test | [[eva]] |\n| Ship | [[anna]] |\n| <meta core.table core.name='links' ");
+    // (Hours not right-aligned: #N/A is no number)
+    expect(text).toContain("| Name | Assignee | Hours |\n|---|---|---|\n| Write | anna | 3 |\n| Test | eva | 1 |\n| Ship | anna | 2 |\n| 1 | 2 | \\#N/A |\n| <meta core.table core.name='both' ");
+  });
+
   it("follows its source's renamed column and table in its formula, a header named after the column with it", async () => {
     await setup(`${TASKS}\n\n${VIEW("| anna |\n| petr |")}\n`, { "silverware.table.editor.enterKey": "save", "silverware.table.metadata": true });
     clickOn(cell(0, 1));

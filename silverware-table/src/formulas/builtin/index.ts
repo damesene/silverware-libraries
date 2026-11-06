@@ -75,6 +75,9 @@ import unique from "./unique.ts";
 import choosecols from "./choosecols.ts";
 import take from "./take.ts";
 import drop from "./drop.ts";
+import hstack from "./hstack.ts";
+import vstack from "./vstack.ts";
+import sequence from "./sequence.ts";
 import type { AnyFunction } from "../function.ts";
 
 const ALL: readonly AnyFunction[] = [
@@ -149,6 +152,9 @@ const ALL: readonly AnyFunction[] = [
   choosecols,
   take,
   drop,
+  hstack,
+  vstack,
+  sequence,
 ];
 
 /** The built-in functions by name */

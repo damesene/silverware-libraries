@@ -711,7 +711,7 @@ describe("findFunctions", () => {
 
   it("finds them in a group", () => {
     expect(names("", "logic")).toEqual(["AND", "IF", "IFERROR", "ISNUMBER", "NOT", "OR"]);
-    expect(names("", "lookup")).toEqual(["CHOOSECOLS", "DROP", "FILTER", "ROW", "SORT", "SORTBY", "TAKE", "UNIQUE", "XLOOKUP"]);
+    expect(names("", "lookup")).toEqual(["CHOOSECOLS", "DROP", "FILTER", "HSTACK", "ROW", "SORT", "SORTBY", "TAKE", "UNIQUE", "VSTACK", "XLOOKUP"]);
     expect(names("", "custom")).toEqual([]);
   });
 });

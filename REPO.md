@@ -5,7 +5,7 @@ Silverware: plugins for SilverBullet by `damesene`.
 
 ```#meta/library/remote
 name: Silverware Table
-description: Sort, filter and edit markdown tables in place, with formulas, column types, and moving, adding or deleting rows and columns. Tables stay plain markdown.
+description: "Sort, filter and edit markdown tables in place, with formulas, column types, conditional formatting, views and pivot tables that stay up to date, tables of your space from Space Lua queries, and moving, adding or deleting rows and columns. Tables stay plain markdown."
 author: damesene
 website: https://github.com/damesene/silverware-libraries/tree/main/silverware-table
 uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-table/silverware-table.md

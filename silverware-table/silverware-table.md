@@ -25,6 +25,10 @@ Makes the markdown tables in your pages interactive: edit cells in place, sort, 
 * **Paste from a spreadsheet**: copy cells in Excel or Google Sheets, click a cell, Ctrl+V; Ctrl+Shift+V adds them as new rows. See [[#Pasting from a spreadsheet]].
 * **Column types**: `| Price #currency |` shows `12.99` as `€12.99`, `#stars` a rating as stars, `#check` yes / no as ☑ / ☐, `#choice` one of a list of values (a status: open, in progress, done). See [[#Column types]] and [[#Choices]].
 * **Formulas**: type `=SUM(B1:B3)` or `=SUM([qty])` into a cell; the result is written into the markdown. See [[#Formulas]].
+* **Arrays in formulas**: `FILTER`, `SORT`, `UNIQUE`, `HSTACK`, `SEQUENCE` and more, as in Excel 365: `=COUNTA(UNIQUE([assignee]))`. See [[#Arrays]].
+* **Views**: a table made by one formula (`=FILTER(tasks![#Data], tasks![done] = FALSE)`), written anew as what it reads changes; *Insert view…* in a table's ⋯ menu, or `/view`. See [[#Views]].
+* **Pivot tables**: a table's rows grouped and summed, kept up to date; *Insert pivot table…* in its ⋯ menu, or `/pivot`. See [[#Pivot tables]].
+* **Tables from Space Lua**: a query of your space as a table formulas, views and pivots read as `@tasks`, given by `silverware.table.defineSource`; a `#choice` column can take its list from one too. See [[#Sources of the space]].
 * **The table's names**: the title of a table's ⋯ menu is its name (the pencil after it names it); under *Full screen* and *Sheet view*, the row *Sheet* says the sheet it is on (*Sheet: Budget*), its pencil to type another sheet's name, its × to take the table off it. Hold Shift and the toolbar shows both names too, left of its icons (above them where both do not fit); the *Names in the toolbar* setting shows them always, or never.
 * **Sheet view** (in a table's ⋯ menu) shows the table like a spreadsheet over the whole window, with empty rows and columns around it; type into one to grow the table. See [[#Sheet view]].
 * **Pin rows and columns** to the edges, where they stay in view (needs *Store table metadata*). See [[#Pinning]].

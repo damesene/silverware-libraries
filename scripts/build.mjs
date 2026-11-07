@@ -4,7 +4,7 @@ import * as esbuild from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
 import { emojiModuleText } from "./emoji.mjs";
 
-const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart"];
+const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart", "silverware-database"];
 // Files bundled beside a library's, loaded by it when needed: Chart.js beside the chart's (src/chartjs.ts)
 const beside = [{ entry: "silverware-chart/src/chartjs.ts", outfile: "silverware-chart/silverware-chart-chartjs.js" }];
 const watch = process.argv.includes("--watch");

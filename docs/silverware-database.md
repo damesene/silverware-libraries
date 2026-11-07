@@ -272,16 +272,71 @@ Each a branch's worth, with its tests (unit tests of the domain and the core, Pl
 
 3a to 3e are in: the model and the types, the store's interface with the memory store and its contract, the core's writes with Undo and the order by hand, views and places with a filter and sort per view, and the playground (`npm run playground`, /database.html): the core over the memory store, two sample databases, two debug views written against the view API alone (a table to edit, sort, filter, order, add, remove and undo; the raw data), *Edit outside* changing an item as a page edited by hand. Checked in Chromium the same day: every action shown, no error in the console. Next: step 4, the pages store and the SilverBullet binding.
 
+### Step 4b: the pages store (2026-11-07)
+
+Done: `store/pages/` (store.ts the store, format.ts the forms by version, testing.ts a space of pages in memory with an index as SilverBullet's), passing the same contract as the memory store; what a transaction comes to moved to `store/transaction.ts`, which both stores plan by (so they refuse alike); the page writer's skips carry a `cause` (`changed`, `missing`, `refused`). Decided on the way:
+
+* **Read from the index, written through the writer.** The index parses any YAML, so the store reads what a user typed by hand too; it writes only through the page writer, page by page where each is still as read.
+* **What the store wrote it holds until the index has it** (or tells of the page anew), so a write shows at once.
+* **A revision is of the content read** (an item's name, values and rank; a record's whole; two 32-bit hashes of its text), not of a time: the index catching up with a write changes none, so a change made from what was shown is not refused as stale. An item's body is not in its revision (the index has none): a body is written only where it is still as `body()` read it (`setBody`'s `was`), read from the page as the transaction is planned.
+* **An item's key holds by its page's name for the session**, kept when it goes, so Undo brings a page back under its key; a page renamed outside is another item (probe 5). **A root page's making** is the store's for the session, so a part planned for a database removed and made again is never written into the new one.
+* **Bodies are read apart** (`DatabaseStore.body(id, item)`, added to the interface): the index has none, and reading every page for a list would cost a read per item.
+* **A value the model cannot hold** (a map) is given as its JSON text, shown as kept, never written unless the user changes it (each value is written by its own key).
+* **Names compare whatever their case**, as a disk may ignore it. **Two items' names swapped in one transaction** are refused (both, never one): two pages cannot be renamed into each other's names without a third; the contract allows that or a swap written whole.
+* **Each part is planned as a page of its own**, and applied with pages removed first, so a name freed by a removal or a rename may be taken by another part; a name still taken as it is planned is refused (the writer: exists already).
+* **A body is checked twice**: by the transaction against `was`, and by the page writer against the body as the store read it (`p.body(text, was)`), so a hand's edit between the two reads is never written over.
+* **Formats**: a registry of readers by version (`FORMATS`, the latest last); the tests add an older one and migrate from it, as the next version will.
+* The contract changed where a store of pages differs and nothing is lost: a value of a property gone from the schema is checked once the property is back (a page's other keys are its own, shown nowhere); an item renamed outside may be `missing` to an undo (another item) as well as `changed`.
+### Step 4c: the SilverBullet binding (2026-11-07)
+
+Done: the plugin's folder and pages (`silverware-database.md` the library page, `-init.md` its settings, the bridge, the code widget, the command and the index's events, `-api.md` `silverware.database.defineViews` and `defineTypes`, `-style.md`), `src/index.ts` the entry, `src/host/silverbullet/` (platform.ts the platform made of the bridge, block.ts the block as a place's state); the page writer's part `codeBlocks` (`p.codeBlocks.replace(language, body, text, occurrence)`: a block written anew where it is still as read, the one of those alike by its order), so a place's state is written as anything else is; the build and deploy scripts list the plugin. Not in REPO.md yet: with the built-in views (step 5), when it is of use.
+
+Verified in the local SilverBullet (2.12.1, a test page, two views defined from a JS module by `defineViews`):
+
+* A block draws its database: the switcher of the views on, the view its state names; a view picked is written into the block (`view: count`), the place drawn anew from it.
+* An item added through a view: its page written as the format has it (`tags: [db]`, `_database.rank`), shown at once.
+* **SilverBullet tells of a page indexed a moment before a query gives it** (`page:index` of the new page, then the query without it for a moment): the store had let its copy of the page go on the event, so the item showed, went, and came back later. Now it holds what it wrote until a query gives the page as written, or HOLD_TOLD_MS (10 s) after the event (so a page changed by hand right after shows as the index has it); a page the store wrote and the index tells deleted goes at once, one it removed and the index tells indexed (made again) shows at once. The memory space tells early too where asked (`toldEarly`), and a test has it.
+* The index's objects: `tags` a list, `_database` a nested map as written (the root's properties with their options), so the store reads them as they are.
+* *Silverware Database: New database* asks the name (SilverBullet's prompt), writes the root page beside the page open (`DbTest/db-ideas`, a Status property to start with) and the block at the cursor, drawn at once.
+* Not ours: SilverBullet's own requests answered 404 (`CONFIG.md` of a space without one, a page about to be made).
+
+### Step 4 done (2026-11-07)
+
+4d and 4e are in:
+
+* **The settings dialog** (`core/settings.ts`, the command *Silverware Database: Settings*): a tab *Views*, each view registered with its switch and, under it while it is on, the settings it declares (switch, number, text, choice), built-in and the user's views alike; nothing written until Save (nor while a number does not read), then into a block of CONFIG of its own (`-- managed-by: silverware-database`, as the toolbar keeps its favourites): the Configuration Manager writes its block anew from the settings its schema shows, which views' open-ended settings are not, so in its block they went with its next save (its source, plugs/configuration-manager, 2026-11-07) and the places drawn anew (a view reads its settings as it is drawn: no reload). The other plugins' settings look (its CSS copied with the prefix `swd-`).
+* **Interaction tests against SilverBullet** (`silverware-database/ui-tests/`, a CI job of their own by the folder; SilverBullet only, as the chart's: code widgets are SilverBullet's): a block drawn, a view picked written into its block, an item added shown at once and still once the index has it, *New database*, a block in a list item not written, two blocks alike, the settings turning a view off. Each test's views are defined from a JS module by Space Lua, the page loaded again once (SilverBullet indexes a space before its Space Lua runs). Run locally against the 2.12.1 binary (`SB_BIN`, `SW_SB_FIRST_PORT=3020`), three times each, all passing.
+* What the tests found: **an empty Lua table comes to JS as an empty object**, not an empty list (a space with no database: the query of `db-root` gave `{}`, and *New database* failed); the platform makes lists of what Lua hands over (`listOf` in platform.ts).
+
+Next: step 5, the built-in views (table, list, kanban).
+### Left open after step 4c's review (2026-11-07)
+
+* **Two blocks of a page written the same** (a database shown twice alike): a place's state is written into the one shown, told by the blocks' order, only where every block alike is in the page (CodeMirror keeps blocks out of view out of it); else nothing is written and the user is told to scroll or tell them apart. A block could carry a line of its own (`place: …`) made as it is first written: with the built-in views, if it comes up.
+* **A block indented** (in a list item) is not written: SilverBullet hands the widget its lines as they are (indented), and a line written without the indent would end the item and leave the fence open (the second review saw it swallow the rest of the page). The page writer refuses an indented block (`codeBlocks`, said why); a block in a quote is no block it finds. A view's state there stays as shown, unwritten: writing with the block's indent comes with the built-in views, if it is wanted.
+* **SilverBullet's widget cache** reuses a block's element by its text: after Ctrl+Z an element whose state moved on may be put back for the text before, showing that state until it is drawn anew. A write from it is checked against the page (the block alike counted, `of`), so it is refused rather than written elsewhere; to be watched in step 4e's tests.
+* **Each block is rendered twice** by SilverBullet (one element never attached, as the chart's): each starts a place, the one never attached let go a minute after. Starting a place only once its element is in the page would halve the work: with the built-in views, measured.
+* **HOLD_TOLD_MS (10 s) is a guess**: SilverBullet tells `page:index` as the index plug takes a page up (`plugs/index/queue.ts`), before a query has it; how long that takes on a large space is to be measured with step 4e.
+* **No Undo command yet**: Undo is a view's (`host.undo`); a command *Silverware Database: Undo* comes with the built-in views.
+### Left open after step 4b's review (2026-11-07)
+
+* **Two root pages of one id** (a root copied by hand): the store reads the first the index gives, the copy's items hidden; writes stay safe (a part planned for one root is refused for another). The block should say so in the attention look, as the plan has it (*Two root pages of one id*): step 4c, with the binding.
+* **The index's events in another order** than the writes (an event for an earlier write after a later one): the store lets its own copy of a page go on any event of it; the memory space indexes the text as it is now, so it cannot show this. Checked in step 4c against SilverBullet.
+* **`tags` as one text** in SilverBullet's index objects (the memory space gives a list): checked in step 4c.
+* **A chain of renames in one transaction** (A to B, B to C) may be written in part, by the order the writer meets them: nothing lost, but not whole or nothing. Rare (the core renames one item at a time); with step 7's changes over many items if it comes up.
+* **A value changed by hand and not indexed yet** is not seen by a transaction's check (the index's revision lags the text): the store's write of the same key wins. Each value is written by its own key and the page's text is checked between plan and apply (the writer), so only a hand's edit of that very key in that moment is lost: inherent to reading from the index, written here so it is known.
+### Left open after step 4a (2026-11-07)
+
+* **A page removed while it is open in the editor**: the writer removes it through the space, the editor still holding its text; whether SilverBullet saves it back is to be checked in step 4c, with the binding (else the store closes it first, or refuses).
+* **A body starting with `---` on a page without frontmatter** would read as its frontmatter: the pages store always writes an item's frontmatter (`tags: db`), so none of its pages is one; a plugin writing such a body itself must give the page a frontmatter.
+* **A top-level key in quotes** (`"status": x`) is still read by the plain-key codec as missing, so a set would add a second key (as before step 4a); the nested route refuses it. Checked for every key when the frontmatter codec gets its higher API (*Left open after step 2b*).
 ### Left open after step 3d (2026-11-07)
 
 * **Menus gathered from the modules** (`host.itemMenu(item)`, `host.propertyMenu(key)`, slots by what entries do) and `open` through the peek module's offer: with the first modules (step 6), when there is an entry to gather; `open` goes to the item's document meanwhile.
-* **The settings dialog's tab *Views*** (each view's switch and settings, declared by `ViewSetting`): with the binding (step 4), which defines them for SilverBullet's `config.define`.
-* **Custom views** (`silverware.database.defineViews`, `ViewRegistry.define` ready): with the binding's API page (step 4).
 * **What a view keeps across a drawing anew** (its scroll, the item edited), handed to the new rendering by place and view; and why `update` was called (the view's own write, another's): with the built-in views (step 5), kanban first.
 
 ### Left open after step 3a and 3b's review (2026-11-07)
 
-* **The page writer makes and removes no page** (shared/pages/changes.ts: properties, tags, a rename, text): the pages store needs a page made (an item, a database's root page) and one removed, and `PageHistory` their undo. Step 4, before the pages store writes `createItem`, `removeItem`, `createDatabase`.
+* ~~**The page writer makes and removes no page**~~ Done in step 4a: `pageChanges().create(name, make)` (a name taken: left alone), `p.remove()` (only as read; its text kept in the report, so Undo makes it again where its name is still free), `p.body(text)`; a page made is taken out by Undo only as it was made.
 * **A value the model cannot hold** (a YAML map in a property's key): the pages store keeps it as read, untouched, and gives the core a value shown as not readable. Step 4.
 * **Keys hold for a store's session**: an item renamed outside the core may come back under another key (model/database.ts, `ItemKey`); the contract does not ask more. Relations (step 9) name items by what the store keeps of them, never by a key.
 
@@ -293,7 +348,7 @@ What the review of step 2b found and was put off, each with the step it belongs 
 * **"Only the writer writes a page's text" is checked in Silverware Tags alone** (its isolation test, by the names imported): the database's `isolation.test.ts` checks it from step 3 (no import of `shared/pages/tags/edit.ts`' edits nor `shared/pages/frontmatter.ts` outside the pages store), and Silverware Table's store plan in its step 4b.
 * **Silverware Tags has no Playwright tests**: the window, the review's preview and Undo were checked by hand in the playground (2026-11-07). A `silverware-tags/ui-tests/` of its own (rename reviewed and applied, Undo, a page left alone), a CI job by its folder; a task of its own, before step 5.
 * **The frontmatter codec's API is low** (`readKey`/`writeKey`, the entry read handed back): only the writer calls it, so it stays; a higher one (`readValues(text)`, `applyChanges(text, changes)`) where a second caller needs it.
-* **A plan's summary in the model's terms** (`status: Doing → Done`) and **nested properties** (`_database.rank`): step 4.
+* **A plan's summary in the model's terms** (`status: Doing → Done`): step 4b, with the pages store. **Nested properties**: done in step 4a (`p.properties.set(["_database", "rank"], "a0")`, a path of keys; `shared/pages/yamltree.ts`).
 
 ## Decided (2026-11-06, with the user)
 
@@ -340,4 +395,7 @@ What the review of step 2b found and was put off, each with the step it belongs 
 
 27. **No data goes but by a change that says so, and every such change can be undone.** A store writes a document only where it is as read (else left, `changed`), a plan once (applied again, nothing written), and refuses a transaction's part whole where one of its changes is refused. What a plan checks (two items never of one name, a database removed only with nothing of it left, the database and the making of it a part is for, the record's revision it was made from) is checked again as it is applied, against the store as it is then: anything may have been written between the two. A value goes only by its own `setValue` to undefined: a schema without a property keeps its values in the items (shown again once the property is back; the pages store keeps them in the frontmatter), and what the model cannot hold is kept as read. An undo takes away only what is still as it wrote it (an item made and changed since stays, and its database with it) and gives a name back only where no item took it since. Removing an item or a database (step 4) is never more than the writer can undo: the page removed is held by its plan's undo, and the core asks before a removal of many items, saying how many. Each rule has its case in the contract tests, which every store passes.
 
+## Decided (2026-11-07, with the user: nested data without a YAML library)
+
+28. **A plugin's own nested data (`_database`) is read and written by a few forms of our own** (`shared/pages/yamltree.ts`), not a YAML library (some 40 kB for what we write ourselves): maps by indent, maps and lists in brackets on one line, block lists of values, YAML's scalars (a date stays text, as SilverBullet's index has it). Written so: a key's map by indent, a map of scalars below it on one line (`status: { type: select, options: [Todo, Done] }`), lists in brackets. A form not among these (an anchor, a block scalar, a list item holding a block), typed by hand, is said why and its key left as written, never rewritten from a guess: the database is read (the index parses any YAML) but not written there. A key down a path is written by rewriting its top key whole (its other keys kept, its comments not); the user's own properties at the top level keep the form the page has (frontmatter.ts).
 **Open**: what other plugins write with a write (Silverware Table's `onWrite(fn(text))`, the chart's data written with a table's edit) is text today, and the table's store plan keeps it so ("names kept"). Joined to the writer, a plugin would give changes in its model and the writer would write them in the same edit; to decide with the store plan.

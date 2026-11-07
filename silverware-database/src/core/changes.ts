@@ -12,8 +12,8 @@ export type DatabaseChange =
   | { readonly kind: "renameItem"; readonly item: ItemKey; readonly name: string }
   // Its place in the order by hand
   | { readonly kind: "setRank"; readonly item: ItemKey; readonly rank: string }
-  // Its body (where the store keeps one: `capabilities.itemBody`)
-  | { readonly kind: "setBody"; readonly item: ItemKey; readonly body: string }
+  // Its body (where the store keeps one: `capabilities.itemBody`), written only where it is still `was` (as `body()` read it; undefined: it had none)
+  | { readonly kind: "setBody"; readonly item: ItemKey; readonly body: string; readonly was: string | undefined }
   // A new item; `ref` names it in this transaction (what its key is once made, in the report)
   | { readonly kind: "createItem"; readonly ref: string; readonly name: string; readonly values: Readonly<Record<string, Value>>; readonly rank?: string; readonly body?: string }
   | { readonly kind: "removeItem"; readonly item: ItemKey }

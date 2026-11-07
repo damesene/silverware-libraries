@@ -97,7 +97,7 @@ export function readKey(text: string, frontmatter: Frontmatter, key: string): Ke
       }
       if (items.length === 0) indent = item[1]!;
       const raw = (item[2] ?? "").trim();
-      const read = scalarOf(raw);
+      const read = readScalar(raw);
       if (!read) return { unreadable: `its frontmatter's ${key} hold ${raw || "an empty item"}` };
       items.push({ ...read, raw });
       last = i;
@@ -115,13 +115,13 @@ export function readKey(text: string, frontmatter: Frontmatter, key: string): Ke
     const items: FrontmatterItem[] = [];
     for (const part of inner ? splitFlow(inner) : []) {
       const raw = part.trim();
-      const read = scalarOf(raw);
+      const read = readScalar(raw);
       if (!read) return { unreadable: `its frontmatter's ${key} hold ${raw}` };
       items.push({ ...read, raw });
     }
     return { entry: { key, from: line.from, to: line.to, kind: "list", form: "flow", items, indent: "" } };
   }
-  const read = scalarOf(withoutComment);
+  const read = readScalar(withoutComment);
   if (!read) return { unreadable: `its frontmatter's ${key} are written as ${withoutComment}` };
   return { entry: { key, from: line.from, to: line.to, kind: "scalar", ...read, raw: withoutComment } };
 }
@@ -176,7 +176,7 @@ function splitFlow(inner: string): string[] {
 }
 
 /** A scalar as written: its text (quotes and a comment off) and its value; undefined: not a scalar read here */
-function scalarOf(raw: string): { text: string; value: YamlScalar } | undefined {
+export function readScalar(raw: string): { text: string; value: YamlScalar } | undefined {
   const value = stripComment(raw);
   if (!value) return { text: "", value: null };
   if (value.startsWith('"')) {

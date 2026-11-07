@@ -76,8 +76,10 @@ export interface DatabaseStore {
   databases(): Promise<readonly DatabaseSummary[]>;
   /** A database with its revision, undefined where the store has none of that id */
   database(id: string): Promise<Revised<Database> | undefined>;
-  /** A database's items with their revision (one that changes whenever any of them does) */
+  /** A database's items with their revision (one that changes whenever any of them does); their bodies where the store reads them with them (else: `body`) */
   items(id: string): Promise<Revised<readonly Item[]>>;
+  /** An item's body as kept (none: it has none, or the store keeps none), read apart: a store of pages reads its page for it */
+  body(id: string, item: ItemKey): Promise<string | undefined>;
   /**
    * What a transaction would do, part by part; nothing written. A part is
    * left where it cannot be made (with why), where an item's revision is not

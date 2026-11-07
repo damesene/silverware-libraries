@@ -139,7 +139,7 @@ describe("meta pages protected", () => {
     // A page the index had as no meta page, made one since: the guard reads its text
     const plan = await makePlan(writerOf(space), await readCatalog(space), renameOperation("auto", "automobile", false), undefined, (page) => (page.tagUses().some((use) => use.name === "meta/library") ? "a meta page" : undefined));
     expect(plan.pages.map((c) => c.page)).toEqual(["Car"]);
-    expect(plan.skipped).toEqual([{ page: "Lib", reason: "a meta page" }]);
+    expect(plan.skipped).toEqual([{ page: "Lib", cause: "refused", reason: "a meta page" }]);
   });
 });
 

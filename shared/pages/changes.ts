@@ -7,15 +7,22 @@
 //   const changes = pageChanges()
 //     .page("Projects/Fix login", (p) => p.properties.set("status", "Done").tags.rename("bug", "defect"))
 //     .page("Projects/Write docs", (p) => p.tags.add("docs"))
+//     .create("Projects/Plan", (p) => p.properties.set(["_database", "rank"], "a2").body("Notes"))
+//     .page("Projects/Old", (p) => p.remove())
 //     .build();
 import { type PageChange, type PageSections, PARTS } from "./parts.ts";
 import type { EditResult } from "./tags/edit.ts";
 
 // The changes' types are their parts', given here to whoever builds them
-export type { PageChange, PageSections, PropertyValue, TagsFrom, TagsRemoval } from "./parts.ts";
+export type { PageChange, PageSections, PropertyPath, PropertyValue, TagsFrom, TagsRemoval } from "./parts.ts";
 
-/** A page's changes: its content's in the order made, and its new name (made first) */
-export type PageEntry = { readonly page: string; readonly renameTo?: string; readonly changes: readonly PageChange[] };
+/**
+ * A page's changes: its content's in the order made, and its new name (made
+ * first); `create`: the page is made (none of that name may be there), its
+ * content made by its changes from nothing; `remove`: the page is taken out
+ * of the space (no other change of it)
+ */
+export type PageEntry = { readonly page: string; readonly renameTo?: string; readonly create?: true; readonly remove?: true; readonly changes: readonly PageChange[] };
 
 /** The changes of a batch, a page once */
 export type Changes = readonly PageEntry[];
@@ -26,12 +33,23 @@ export interface PageBuilder extends PageSections {
   rename(to: string): PageBuilder;
   /** The text edited by a function of it: only for a user's script, which the model cannot hold */
   editText(edit: (text: string) => EditResult | Promise<EditResult>): PageBuilder;
+  /** Its body (all after its frontmatter) made this text; `was`: only where it is still that (as the plugin read it) */
+  body(text: string, was?: string): PageBuilder;
+  /** The page taken out of the space (Undo makes it again where its name is still free) */
+  remove(): PageBuilder;
 }
 
 /** A batch of changes made page by page; `build()` gives them as frozen data, the builder no longer used */
 export class ChangesBuilder {
-  private readonly pages = new Map<string, { renameTo?: string; changes: PageChange[] }>();
+  private readonly pages = new Map<string, { renameTo?: string; create?: true; remove?: true; changes: PageChange[] }>();
   private built = false;
+
+  /** A page made, its content made by `make` from nothing (a page of that name there already: left alone) */
+  create(name: string, make?: (page: PageBuilder) => unknown): this {
+    if (this.pages.has(name)) throw new Error(`the page "${name}" is named in this batch already`);
+    this.pages.set(name, { create: true, changes: [] });
+    return this.page(name, make ?? (() => {}));
+  }
 
   /** A page's changes made by `make` (a page named again: its changes after those made before) */
   page(name: string, make: (page: PageBuilder) => unknown): this {
@@ -52,6 +70,11 @@ export class ChangesBuilder {
         return builder;
       },
       editText: (edit) => add({ kind: "editText", edit }),
+      body: (text, was) => add({ kind: "setBody", text, ...(was === undefined ? {} : { was }) }),
+      remove: () => {
+        target.remove = true;
+        return builder;
+      },
     };
     make(builder);
     return this;
@@ -61,8 +84,8 @@ export class ChangesBuilder {
   build(): Changes {
     this.built = true;
     return Object.freeze(
-      [...this.pages].map(([page, { renameTo, changes }]) =>
-        Object.freeze({ page, ...(renameTo === undefined ? {} : { renameTo }), changes: Object.freeze(changes.map(frozen)) }),
+      [...this.pages].map(([page, { renameTo, create, remove, changes }]) =>
+        Object.freeze({ page, ...(renameTo === undefined ? {} : { renameTo }), ...(create ? { create } : {}), ...(remove ? { remove } : {}), changes: Object.freeze(changes.map(frozen)) }),
       ),
     );
   }

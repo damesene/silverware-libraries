@@ -30,6 +30,7 @@ function memory(pages: Record<string, string>, open?: string) {
     },
     write: (name, text) => void map.set(name, text),
     list: () => [...map.keys()],
+    remove: (name) => void map.delete(name),
     rename: (from, to) => {
       if (map.has(to)) return { problem: `${to} exists` };
       map.set(to, map.get(from)!);
@@ -130,12 +131,173 @@ describe("the page writer", () => {
     expect(map.get("A")).toBe("ABC");
     expect(report.skipped.map((skip) => skip.reason)).toEqual(["its edit failed (broken): left alone"]);
   });
-});
+  it("makes a page, refusing a name taken, and Undo takes it out again only as it was made", async () => {
+    const { map, writer } = memory({ Taken: "mine" });
+    const report = await writer.write(
+      pageChanges()
+        .create("Projects/db-tasks/Fix login", (p) => p.properties.set("status", "Todo").properties.set(["_database", "rank"], "a0").body("Steps"))
+        .create("Taken", (p) => p.body("over it"))
+        .build(),
+    );
+    expect(report.written.map((page) => [page.page, page.created])).toEqual([["Projects/db-tasks/Fix login", true]]);
+    expect(report.skipped.map((skip) => [skip.page, skip.reason])).toEqual([["Taken", "exists already: left alone"]]);
+    expect(map.get("Projects/db-tasks/Fix login")).toBe("---\nstatus: Todo\n_database:\n  rank: a0\n---\nSteps");
+    expect(map.get("Taken")).toBe("mine");
+    // Changed since it was made: Undo leaves it
+    map.set("Projects/db-tasks/Fix login", map.get("Projects/db-tasks/Fix login") + " more");
+    expect((await writer.apply(await writer.planUndo(report))).written).toEqual([]);
+    expect(map.has("Projects/db-tasks/Fix login")).toBe(true);
+    map.set("Projects/db-tasks/Fix login", "---\nstatus: Todo\n_database:\n  rank: a0\n---\nSteps");
+    await writer.apply(await writer.planUndo(report));
+    expect(map.has("Projects/db-tasks/Fix login")).toBe(false);
+  });
+
+  it("removes a page only as read, keeping its text for Undo, which makes it again where its name is free", async () => {
+    const { map, writer } = memory({ Old: "---\nstatus: Done\n---\nnotes", Other: "x" });
+    const plan = await writer.plan(pageChanges().page("Old", (p) => p.remove()).page("Other", (p) => p.remove()).build());
+    map.set("Other", "changed");
+    const report = await writer.apply(plan);
+    expect(report.written.map((page) => [page.page, page.removed])).toEqual([["Old", true]]);
+    expect(report.skipped.map((skip) => skip.page)).toEqual(["Other"]);
+    expect(map.has("Old")).toBe(false);
+    const undo = await writer.planUndo(report);
+    map.set("Old", "someone else's");
+    expect((await writer.apply(undo)).skipped.map((skip) => skip.reason)).toEqual(["its name was taken since it was removed: left as it is"]);
+    map.delete("Old");
+    await writer.apply(await writer.planUndo(report));
+    expect(map.get("Old")).toBe("---\nstatus: Done\n---\nnotes");
+    expect((await writer.plan(pageChanges().page("Other", (p) => p.remove().properties.set("x", 1)).build())).skipped).toHaveLength(1);
+  });
+
+  it("writes a key down a path of maps, keeping the rest of the map and of the page as written", async () => {
+    const page = "---\ntitle: Mine # kept\n_database:\n  id: tasks\n  properties:\n    status: { type: select, options: [Todo, Done] }\nstatus: Todo\n---\nbody";
+    const { map, writer } = memory({ Root: page, Odd: "---\n_database: &x\n  id: 1\n---\n", Flat: "---\n_database: 3\n---\n" });
+    await writer.write(pageChanges().page("Root", (p) => p.properties.set(["_database", "properties", "due"], { type: "date", label: "Due" }).properties.set(["_database", "name"], "Tasks")).build());
+    expect(map.get("Root")).toBe(
+      "---\ntitle: Mine # kept\n_database:\n  id: tasks\n  properties:\n    status: { type: select, options: [Todo, Done] }\n    due: { type: date, label: Due }\n  name: Tasks\nstatus: Todo\n---\nbody",
+    );
+    await writer.write(pageChanges().page("Root", (p) => p.properties.remove(["_database", "properties", "status"])).build());
+    expect(map.get("Root")).toContain("  properties:\n    due: { type: date, label: Due }\n  name: Tasks\nstatus: Todo\n");
+    const refused = await writer.plan(pageChanges().page("Odd", (p) => p.properties.set(["_database", "rank"], "a0")).page("Flat", (p) => p.properties.set(["_database", "rank"], "a0")).build());
+    expect(refused.skipped.map((skip) => skip.reason)).toEqual([
+      expect.stringMatching(/^its frontmatter's _database is written in a form not read here/),
+      `its frontmatter's _database.rank: "_database" holds no map: left alone`,
+    ]);
+  });
+
+  it("sets a page's body, its frontmatter kept", async () => {
+    const { map, writer } = memory({ A: "---\nstatus: x\n---\nold body", B: "no frontmatter" });
+    await writer.write(pageChanges().page("A", (p) => p.body("new body")).page("B", (p) => p.body("replaced")).build());
+    expect([map.get("A"), map.get("B")]).toEqual(["---\nstatus: x\n---\nnew body", "replaced"]);
+  });
+  it("leaves a key's lines whole: a list at the key's own indent, a quoted twin, comments where nothing changes", async () => {
+    const { map, writer } = memory({
+      List: "---\n_database:\n- a\n- b\nother: 1\n---\nbody",
+      Twin: '---\n"_database":\n  rank: a\n---\n',
+      Comments: "---\n_database: # mine\n  # note\n  rank: a # r\n---\n",
+    });
+    const report = await writer.write(
+      pageChanges()
+        .page("List", (p) => p.properties.set(["_database", "rank"], "x"))
+        .page("Twin", (p) => p.properties.set(["_database", "rank"], "x"))
+        .page("Comments", (p) => p.properties.remove(["_database", "missing"]))
+        .build(),
+    );
+    expect(report.written).toEqual([]);
+    expect(report.skipped.map((skip) => skip.page)).toEqual(["List", "Twin"]);
+    expect([map.get("List"), map.get("Twin"), map.get("Comments")]).toEqual(["---\n_database:\n- a\n- b\nother: 1\n---\nbody", '---\n"_database":\n  rank: a\n---\n', "---\n_database: # mine\n  # note\n  rank: a # r\n---\n"]);
+  });
+
+  it("never replaces a key typed by hand in a form not read with a plain value, and keeps a page's line breaks", async () => {
+    const { map, writer } = memory({ Mine: "---\nstatus:\n  nested: 1\n---\n", Crlf: "---\r\ntitle: x\r\n---\r\nbody" });
+    const report = await writer.write(pageChanges().page("Mine", (p) => p.properties.set("status", "Done")).page("Crlf", (p) => p.properties.set(["_database", "rank"], "a0")).build());
+    expect(report.skipped.map((skip) => skip.page)).toEqual(["Mine"]);
+    expect(map.get("Mine")).toBe("---\nstatus:\n  nested: 1\n---\n");
+    expect(map.get("Crlf")).toBe("---\r\ntitle: x\r\n_database:\r\n  rank: a0\r\n---\r\nbody");
+  });
+
+  it("puts a body after a closing fence with no line break after it, the frontmatter kept", async () => {
+    const { map, writer } = memory({ A: "---\na: 1\n---" });
+    await writer.write(pageChanges().page("A", (p) => p.body("hello")).build());
+    expect(map.get("A")).toBe("---\na: 1\n---\nhello");
+  });
+
+  it("writes a key named as an object's own property as any key", async () => {
+    const { map, writer } = memory({ A: "" });
+    await writer.write(pageChanges().page("A", (p) => p.properties.set(["_database", "__proto__"], "x").properties.set(["_database", "constructor"], 1)).build());
+    expect(map.get("A")).toBe("---\n_database:\n  __proto__: x\n  constructor: 1\n---\n");
+  });
+
+  it("makes no page of a name another has in another case", async () => {
+    const { map, writer } = memory({ "Projects/Plan": "mine" });
+    const report = await writer.write(pageChanges().create("projects/plan", (p) => p.body("x")).build());
+    expect(report.written).toEqual([]);
+    expect([...map.keys()]).toEqual(["Projects/Plan"]);
+  });  it("takes a map off by its key, and leaves a key under none as it is", async () => {
+    const { map, writer } = memory({ A: "---\n_database:\n  rank: a1\ntitle: x\n---\nbody", B: "---\n_database: { rank: a1 }\n---\n", C: "---\n_database: ~ # keep\n---\n" });
+    const report = await writer.write(
+      pageChanges()
+        .page("A", (p) => p.properties.remove("_database"))
+        .page("B", (p) => p.properties.remove("_database"))
+        .page("C", (p) => p.properties.remove(["_database", "rank"]))
+        .build(),
+    );
+    expect(report.written.map((page) => page.page)).toEqual(["A", "B"]);
+    expect([map.get("A"), map.get("B"), map.get("C")]).toEqual(["---\ntitle: x\n---\nbody", "", "---\n_database: ~ # keep\n---\n"]);
+  });
+
+  it("refuses a value that is none of a page's, a key written twice or in quotes that do not read, and a page open in the editor to remove", async () => {
+    const { writer } = memory({ A: "", Twice: "---\n_database:\n  rank: a1\n_database:\n  rank: b2\n---\n", Odd: '---\n"a\\x": 1\n---\n', Open: "x" }, "Open");
+    const plan = await writer.plan(
+      pageChanges()
+        .page("A", (p) => p.properties.set(["_database"], { a: undefined, b: 1 } as never).properties.set("d", new Date(0) as never))
+        .page("Twice", (p) => p.properties.set(["_database", "rank"], "c"))
+        .page("Odd", (p) => p.properties.set(["_database", "rank"], "c"))
+        .page("Open", (p) => p.remove())
+        .build(),
+    );
+    expect(plan.pages).toEqual([]);
+    expect(plan.skipped.map((skip) => skip.reason)).toEqual([
+      "a: undefined is no value of a page",
+      "its frontmatter has _database twice: left alone",
+      "its frontmatter's _database is written in quotes: left alone",
+      "open in the editor: open another page first",
+    ]);
+  });
+
+  it("writes a page of CRLF line breaks with CRLF, its fences too", async () => {
+    const { map, writer } = memory({ A: "line1\r\nline2", B: "---\r\na: 1\r\n---" });
+    await writer.write(pageChanges().page("A", (p) => p.properties.set(["_database", "rank"], "a")).page("B", (p) => p.body("x")).build());
+    expect(map.get("A")).toBe("---\r\n_database:\r\n  rank: a\r\n---\r\nline1\r\nline2");
+    expect(map.get("B")).toBe("---\r\na: 1\r\n---\r\nx");
+  });  it("writes a code block of a language and text anew, the one of its kind asked, and leaves a page whose block changed", async () => {
+    const page = "# Tasks\n```silverware-database\nid: tasks\n```\ntext\n```silverware-database\nid: tasks\n```\n```silverware-database\n```\n";
+    const { map, writer } = memory({ A: page, Crlf: "```silverware-database\r\nid: x\r\n```\r\n", End: "x\n```silverware-database" });
+    const report = await writer.write(
+      pageChanges()
+        .page("A", (p) => p.codeBlocks.replace("silverware-database", "id: tasks", "id: tasks\nview: kanban", { occurrence: 1, of: 2 }).codeBlocks.replace("silverware-database", "", "id: new"))
+        .page("Crlf", (p) => p.codeBlocks.replace("silverware-database", "id: x", "id: x\nview: list"))
+        .build(),
+    );
+    expect(report.skipped).toEqual([]);
+    expect(map.get("A")).toBe("# Tasks\n```silverware-database\nid: tasks\n```\ntext\n```silverware-database\nid: tasks\nview: kanban\n```\n```silverware-database\nid: new\n```\n");
+    expect(map.get("Crlf")).toBe("```silverware-database\r\nid: x\r\nview: list\r\n```\r\n");
+    const end = await writer.write(pageChanges().page("End", (p) => p.codeBlocks.replace("silverware-database", "", "id: b")).build());
+    expect([end.skipped, map.get("End")]).toEqual([[], "x\n```silverware-database\nid: b\n"]);
+    const gone = await writer.plan(pageChanges().page("A", (p) => p.codeBlocks.replace("silverware-database", "id: other", "x")).build());
+    expect(gone.skipped.map((one) => one.reason)).toEqual(["its silverware-database block changed since it was read: left alone"]);
+    // Counted as two alike where the page has one now (the other written since), and a block in a list item: left alone
+    const more = await writer.plan(pageChanges().page("A", (p) => p.codeBlocks.replace("silverware-database", "id: tasks", "x", { occurrence: 0, of: 2 })).build());
+    expect(more.skipped).toHaveLength(1);
+    map.set("List", "- item\n  ```silverware-database\n  id: tasks\n  ```\n- next\n");
+    const listed = await writer.plan(pageChanges().page("List", (p) => p.codeBlocks.replace("silverware-database", "  id: tasks", "  id: tasks\nview: b")).build());
+    expect(listed.skipped.map((one) => one.reason)).toEqual(["its silverware-database block is indented (in a list item): it is written by hand only"]);
+  });});
 
 describe("the builder", () => {
   it("has every section the parts make, each a part of its own", () => {
     const sections = PARTS.flatMap((one) => (one.section ? [one.section.name] : []));
-    expect(sections).toEqual(["properties", "tags"]);
+    expect(sections).toEqual(["properties", "tags", "codeBlocks"]);
     pageChanges().page("A", (p) => {
       for (const name of sections) expect(Object.values(p[name]).every((method) => typeof method === "function"), name).toBe(true);
     });

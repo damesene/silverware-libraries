@@ -6,15 +6,20 @@
 // else. Built in only for now (decided 2026-11-07); another plugin's part
 // would be registered the same way, its types added to `PageChange` and
 // `PageSections` (TypeScript's interface merging for the latter).
+import { codeBlocksOf, sameBody } from "./blocks.ts";
 import type { PageBuilder } from "./changes.ts";
-import { type FrontmatterValue, readFrontmatter, readKey, validateFrontmatterKey, writeKey, type YamlScalar } from "./frontmatter.ts";
+import { type FrontmatterValue, readFrontmatter, readKey, readScalar, validateFrontmatterKey, writeKey } from "./frontmatter.ts";
 import { addPageTags, applyEdits, type EditResult, removeTags, type RemoveHow, renameTags } from "./tags/edit.ts";
 import type { FrontmatterForm } from "./tags/frontmatter.ts";
 import { isWithin, matches, renamedTag } from "./tags/names.ts";
 import type { TagContext } from "./tags/scan.ts";
+import { emptyMap, isYamlMap, readYamlMap, validateYamlValue, writeYamlEntry, type YamlMap, type YamlValue } from "./yamltree.ts";
 
-/** A property's value: a scalar, or a list of them */
-export type PropertyValue = YamlScalar | readonly YamlScalar[];
+/** A property's value: a scalar, a list, or a map (a plugin's own data, `_database`), nested as deep as needed */
+export type PropertyValue = YamlValue;
+
+/** Where a property is: its key, or the keys down to it in maps (`["_database", "rank"]`) */
+export type PropertyPath = string | readonly string[];
 
 /** Where tags are taken off a page: its own tags (SilverBullet's page tags), the hashtags in its body, or both */
 export type TagsFrom = "pageTags" | "body" | "both";
@@ -29,19 +34,25 @@ export type TagsRemoval = {
 
 /** One change of a page's content, of a kind a part below writes */
 export type PageChange =
-  | { readonly kind: "setProperty"; readonly key: string; readonly value: PropertyValue }
-  | { readonly kind: "removeProperty"; readonly key: string }
+  | { readonly kind: "setProperty"; readonly path: readonly string[]; readonly value: PropertyValue }
+  | { readonly kind: "removeProperty"; readonly path: readonly string[] }
   | { readonly kind: "renameTags"; readonly tags: readonly string[]; readonly into: string; readonly subtags: boolean }
   | { readonly kind: "removeTags"; readonly tags: readonly string[]; readonly subtags: boolean; readonly from: TagsFrom; readonly keepWord: boolean }
   | { readonly kind: "addTags"; readonly tags: readonly string[] }
   // A user's script editing the text itself (Silverware Tags' custom operations): the one way past the model
-  | { readonly kind: "editText"; readonly edit: (text: string) => EditResult | Promise<EditResult> };
+  | { readonly kind: "editText"; readonly edit: (text: string) => EditResult | Promise<EditResult> }
+  // The body, all after the frontmatter (a database item's); `was`: written only where it is still that
+  | { readonly kind: "setBody"; readonly text: string; readonly was?: string }
+  // A fenced code block of a language and body (the `occurrence`-th of those alike, counted from 0) written anew
+  | { readonly kind: "replaceCodeBlock"; readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number; readonly text: string };
 
 /** The builder's sections, one per part of a page's content (their parts below make them); every method gives the page's builder back */
 export interface PageSections {
   readonly properties: {
-    set(key: string, value: PropertyValue): PageBuilder;
-    remove(key: string): PageBuilder;
+    /** A property's value, at its key or down a path of keys in maps (the maps on the way made where missing) */
+    set(path: PropertyPath, value: PropertyValue): PageBuilder;
+    /** A property taken off (a map left empty by it stays) */
+    remove(path: PropertyPath): PageBuilder;
   };
   readonly tags: {
     /** A tag renamed everywhere on the page (the page's own tags and its body); into a name it has, the two merge */
@@ -52,6 +63,16 @@ export interface PageSections {
     remove(tags: string | readonly string[], options?: TagsRemoval): PageBuilder;
     /** Tags given to the page as its own, those it has left out */
     add(tags: string | readonly string[]): PageBuilder;
+  };
+  readonly codeBlocks: {
+    /**
+     * A fenced code block's text written anew: the block of `language` whose
+     * text is `body` (as the plugin read it), the `occurrence`-th of those alike
+     * (two blocks showing the same, counted from 0 in the page's order); none
+     * so: the page left alone (the block changed since it was read); `of`: how
+     * many alike the plugin counted (another made since: left alone too)
+     */
+    replace(language: string, body: string, text: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
   };
 }
 
@@ -80,16 +101,129 @@ function part<K extends Kind, N extends keyof PageSections>(definition: {
 }
 
 const list = (tags: string | readonly string[]) => (typeof tags === "string" ? [tags] : [...tags]);
+const pathOf = (path: PropertyPath): readonly string[] => (typeof path === "string" ? [path] : [...path]);
 
-/** A property's change: the key written in the page's frontmatter in the form it has */
-function propertyEdit(text: string, key: string, value: FrontmatterValue | undefined): EditResult {
-  const problem = validateFrontmatterKey(key) ?? (key === "tags" ? "tags are no property: change them as tags" : undefined);
+/** The line break a page's text uses (a page of none: "\n") */
+const lineBreakOf = (text: string) => (text.includes("\r\n") ? "\r\n" : "\n");
+
+/**
+ * A property's change: a key of scalars or a list written in the page's
+ * frontmatter in the form it has; a map, or a key down a path, in the forms
+ * yamltree.ts reads and writes (a key written otherwise left alone, said why)
+ */
+function propertyEdit(text: string, path: readonly string[], value: PropertyValue | undefined): EditResult {
+  const [key] = path;
+  const problem =
+    key === undefined || path.some((one) => !one)
+      ? "a property's path is empty"
+      : (validateFrontmatterKey(key) ?? (key === "tags" ? "tags are no property: change them as tags" : undefined) ?? (value === undefined ? undefined : validateYamlValue(value)));
   if (problem) return { text, changes: 0, problem };
   const frontmatter = readFrontmatter(text);
-  const { entry, unreadable } = readKey(text, frontmatter, key);
-  if (unreadable) return { text, changes: 0, problem: `${unreadable}: left alone` };
-  const edit = writeKey(text, frontmatter, key, entry, value);
-  return edit ? { text: applyEdits(text, [edit]), changes: 1 } : { text, changes: 0 };
+  // A key of its own set to a scalar or a list, or taken off: in the page's own form, or left alone where that is not read
+  // (a map typed by hand there is never replaced by a value meant for a plain key)
+  if (path.length === 1 && !isYamlMap(value) && !(Array.isArray(value) && value.some((item) => typeof item === "object" && item !== null))) {
+    const { entry, unreadable } = readKey(text, frontmatter, key!);
+    // (A key taken off whole may be a map: the nested route reads it, or says why it cannot)
+    if (unreadable && value === undefined) return nestedEdit(text, frontmatter, path, value);
+    if (unreadable) return { text, changes: 0, problem: `${unreadable}: left alone` };
+    const edit = writeKey(text, frontmatter, key!, entry, value as FrontmatterValue | undefined);
+    return edit ? { text: applyEdits(text, [edit]), changes: 1 } : { text, changes: 0 };
+  }
+  return nestedEdit(text, frontmatter, path, value);
+}
+
+/** A top-level key's lines: from its line to the last line indented under it; `twice`: the key has a second block */
+function keyBlock(text: string, yaml: { readonly from: number; readonly to: number }, key: string): { readonly from: number; readonly to: number; readonly twice?: true } | undefined {
+  const head = new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[ \\t]*:`);
+  let from: number | undefined;
+  let to = 0;
+  for (let at = yaml.from; at < yaml.to; ) {
+    const nl = text.indexOf("\n", at);
+    const end = nl < 0 || nl >= yaml.to ? yaml.to : nl + 1;
+    const line = text.slice(at, end).replace(/\r?\n$/, "");
+    if (from === undefined) {
+      if (head.test(line)) [from, to] = [at, end];
+    } else if ((/^\s/.test(line) && line.trim()) || /^-(\s|$)/.test(line)) to = end;
+    else if (line.trim() && !/^#/.test(line)) {
+      // The rest of the frontmatter searched for the key again: one block edited and another left would read otherwise
+      if (yamlLines(text, end, yaml.to).some((rest) => head.test(rest))) return { from, to, twice: true };
+      if (head.test(line)) return { from, to, twice: true };
+      break;
+    }
+    at = end;
+  }
+  return from === undefined ? undefined : { from, to };
+}
+
+function yamlLines(text: string, from: number, to: number): string[] {
+  return text.slice(from, to).split(/\r?\n/);
+}
+
+/** Whether a top-level key of the frontmatter is the key written another way (in quotes) */
+function twinKey(text: string, yaml: { readonly from: number; readonly to: number }, key: string): boolean {
+  return text
+    .slice(yaml.from, yaml.to)
+    .split(/\r?\n/)
+    .some((line) => {
+      const quotedKey = /^("(?:[^"\\]|\\.)*"|'(?:[^']|'')*')\s*:/.exec(line);
+      if (!quotedKey) return false;
+      // A key in quotes that does not read: taken for the key (refused rather than written beside it)
+      return (readScalar(quotedKey[1]!)?.text ?? key) === key;
+    });
+}
+
+/** A map with `value` set down `path` (undefined: taken off), the maps on the way made; or why not (a value on the way that is no map) */
+function setIn(map: YamlMap, path: readonly string[], value: PropertyValue | undefined): YamlMap | string {
+  const [key, ...rest] = path;
+  const copy = Object.assign(emptyMap(), map);
+  if (!rest.length) {
+    if (value === undefined) delete copy[key!];
+    else copy[key!] = value;
+    return copy;
+  }
+  const inner = Object.hasOwn(copy, key!) ? copy[key!] : undefined;
+  if (inner !== undefined && inner !== null && !isYamlMap(inner)) return `"${key}" holds no map`;
+  if ((inner === undefined || inner === null) && value === undefined) return copy;
+  const set = setIn(isYamlMap(inner) ? inner : emptyMap(), rest, value);
+  if (typeof set === "string") return set;
+  copy[key!] = set;
+  return copy;
+}
+
+function nestedEdit(text: string, frontmatter: ReturnType<typeof readFrontmatter>, path: readonly string[], value: PropertyValue | undefined): EditResult {
+  const [key] = path as [string, ...string[]];
+  const { range, yaml } = frontmatter;
+  // The key written another way (in quotes) too: a second block of it would make the frontmatter read otherwise
+  if (yaml && twinKey(text, yaml, key)) return { text, changes: 0, problem: `its frontmatter's ${key} is written in quotes: left alone` };
+  const block = yaml && keyBlock(text, yaml, key);
+  if (block?.twice) return { text, changes: 0, problem: `its frontmatter has ${key} twice: left alone` };
+  let now: YamlMap = emptyMap();
+  if (block) {
+    const read = readYamlMap(text.slice(block.from, block.to));
+    if ("problem" in read) return { text, changes: 0, problem: `its frontmatter's ${key} is written in a form not read here (${read.problem}): left alone` };
+    now = read.value as YamlMap;
+  }
+  const set = setIn(now, path, value);
+  if (typeof set === "string") return { text, changes: 0, problem: `its frontmatter's ${path.join(".")}: ${set}: left alone` };
+  // Nothing changed: the block left as written, its comments with it
+  if (JSON.stringify(set) === JSON.stringify(now)) return { text, changes: 0 };
+  const after = Object.hasOwn(set, key) ? set[key] : undefined;
+  let entry: string;
+  try {
+    entry = after === undefined ? "" : writeYamlEntry(key, after);
+  } catch (error) {
+    return { text, changes: 0, problem: `its frontmatter's ${path.join(".")}: ${error instanceof Error ? error.message : String(error)}` };
+  }
+  // In the line breaks the page has, the fences too
+  const nl = lineBreakOf(text);
+  entry = entry.replace(/\n/g, nl);
+  let edit: { from: number; to: number; insert: string } | undefined;
+  if (!range || !yaml) edit = entry ? { from: 0, to: 0, insert: `---${nl}${entry}---${nl}` } : undefined;
+  else if (!block) edit = entry ? { from: yaml.to, to: yaml.to, insert: (yaml.to > yaml.from && text[yaml.to - 1] !== "\n" ? nl : "") + entry } : undefined;
+  else if (!entry && !(text.slice(yaml.from, block.from) + text.slice(block.to, yaml.to)).trim()) edit = { from: range.from, to: range.to, insert: "" };
+  else edit = { from: block.from, to: block.to, insert: entry };
+  if (!edit || text.slice(edit.from, edit.to) === edit.insert) return { text, changes: 0 };
+  return { text: applyEdits(text, [edit]), changes: 1 };
 }
 
 /**
@@ -122,11 +256,11 @@ export const PARTS: readonly Part[] = [
     section: {
       name: "properties",
       make: (add) => ({
-        set: (key, value) => add({ kind: "setProperty", key, value: Array.isArray(value) ? [...value] : value }),
-        remove: (key) => add({ kind: "removeProperty", key }),
+        set: (path, value) => add({ kind: "setProperty", path: pathOf(path), value: structuredClone(value) }),
+        remove: (path) => add({ kind: "removeProperty", path: pathOf(path) }),
       }),
     },
-    write: (text, change) => propertyEdit(text, change.key, change.kind === "setProperty" ? change.value : undefined),
+    write: (text, change) => propertyEdit(text, change.path, change.kind === "setProperty" ? change.value : undefined),
   }),
   part({
     kinds: ["renameTags", "removeTags", "addTags"],
@@ -149,6 +283,40 @@ export const PARTS: readonly Part[] = [
   }),
   // A user's script editing the text itself: the page builder's own `editText`, no section
   part({ kinds: ["editText"], write: (text, change) => change.edit(text) }),
+  part({
+    kinds: ["replaceCodeBlock"],
+    section: { name: "codeBlocks", make: (add) => ({ replace: (language, body, text, where = {}) => add({ kind: "replaceCodeBlock", language, body, text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }) }) },
+    write: (text, change) => {
+      const alike = codeBlocksOf(text).filter((block) => block.language === change.language && sameBody(block.body) === sameBody(change.body));
+      const block = alike[change.occurrence];
+      if (!block || (change.of !== undefined && alike.length !== change.of)) return { text, changes: 0, problem: `its ${change.language} block changed since it was read: left alone` };
+      // A block indented (in a list item) has its lines indented: a line written without it would end the item and leave the fence open
+      if (block.indent) return { text, changes: 0, problem: `its ${change.language} block is indented (in a list item): it is written by hand only` };
+      const nl = lineBreakOf(text);
+      const body = sameBody(change.text).replace(/\n/g, nl);
+      // A block's text ends before the line break of its closing fence (its CR kept); an empty block has none, so a text
+      // written into one brings its own
+      const region = text.slice(block.bodyFrom, block.bodyTo);
+      // (An opening fence at the text's very end has no line break of its own: one goes before the text)
+      const atEnd = block.bodyFrom === text.length && !text.endsWith("\n");
+      const insert = block.bodyTo > block.bodyFrom ? body + (region.endsWith("\r") ? "\r" : "") : body ? (atEnd ? nl : "") + body + nl : "";
+      if (region === insert) return { text, changes: 0 };
+      return { text: text.slice(0, block.bodyFrom) + insert + text.slice(block.bodyTo), changes: 1 };
+    },
+  }),
+  // The body: the page builder's own `body`, no section
+  part({
+    kinds: ["setBody"],
+    write: (text, change) => {
+      const start = readFrontmatter(text).bodyStart;
+      if (text.slice(start) === change.text) return { text, changes: 0 };
+      // (The body as the plugin read it: one changed since, by hand, is never written over)
+      if (change.was !== undefined && text.slice(start) !== change.was) return { text, changes: 0, problem: "its body changed since it was read: left alone" };
+      // A closing fence at the text's very end gets its line break, else the body would run on from it and end the frontmatter
+      const head = text.slice(0, start);
+      return { text: head + (start > 0 && !head.endsWith("\n") ? lineBreakOf(text) : "") + change.text, changes: 1 };
+    },
+  }),
 ];
 
 const partOf = new Map(PARTS.flatMap((one) => one.kinds.map((kind) => [kind, one] as const)));

@@ -23,7 +23,8 @@ export interface ItemChanges {
   rename(name: string): ItemChanges;
   /** Its place in the order by hand (domain/rank.ts) */
   rank(rank: string): ItemChanges;
-  body(body: string): ItemChanges;
+  /** Its body made `body`, written only where it is still `was` (as the store's `body()` read it; none: it had none) */
+  body(body: string, was?: string): ItemChanges;
   /** The item removed: nothing more is asked of it */
   remove(): ItemChanges;
 }
@@ -100,7 +101,7 @@ export class DatabaseChangesBuilder {
       unset: (name) => add({ kind: "setValue", item: key, key: name, value: undefined }),
       rename: (name) => add({ kind: "renameItem", item: key, name }),
       rank: (rank) => add({ kind: "setRank", item: key, rank }),
-      body: (body) => add({ kind: "setBody", item: key, body }),
+      body: (body, was) => add({ kind: "setBody", item: key, body, was }),
       remove: () => add({ kind: "removeItem", item: key }),
     }));
     return this;

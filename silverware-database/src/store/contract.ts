@@ -146,14 +146,16 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
       expect((await itemOf(store, docs))!.values).toEqual({ status: "Done", deadline: "2026-11-10" });
     });
 
-    it("loses no value by a schema without its property: only a value taken off by its own change goes", async () => {
+    it("loses no value by a schema without its property: the property back, its values show again", async () => {
       const { store } = make(SEED);
       const docs = await keyOf(store, "Write docs");
       const report = await store.apply(await store.plan(changes("tasks", { kind: "setSchema", properties: TASKS.properties.filter((property) => property.key !== "due") })));
       expect(report.skipped).toEqual([]);
-      expect((await itemOf(store, docs))!.values).toEqual({ status: "Done", due: "2026-11-10" });
+      // (Shown meanwhile or not, as the store keeps it: a page's keys the schema lacks are the page's own)
+      expect((await itemOf(store, docs))!.values.status).toBe("Done");
       await store.apply(await store.planUndo(report));
       expect((await store.database("tasks"))!.value).toEqual(TASKS);
+      expect((await itemOf(store, docs))!.values).toEqual({ status: "Done", due: "2026-11-10" });
     });
 
     it("refuses a schema of a key twice or one no store keeps, and a database without a name", async () => {
@@ -210,13 +212,20 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
       expect(new Set(names).size).toBe(names.length);
     });
 
-    it("swaps two items' names in one transaction, and undoes it", async () => {
+    it("swaps two items' names in one transaction whole or not at all, and undoes it", async () => {
       const { store } = make(SEED);
       const [fix, docs] = [await keyOf(store, "Fix login"), await keyOf(store, "Write docs")];
       const swap = [{ kind: "renameItem", item: fix, name: "Write docs" }, { kind: "renameItem", item: docs, name: "Fix login" }] as const;
       const report = await store.apply(await store.plan(changes("tasks", ...swap)));
+      const names = [(await itemOf(store, fix))!.name, (await itemOf(store, docs))!.name];
+      // (A store of pages cannot rename two pages into each other's names: it refuses both, never one)
+      if (report.written.length === 0) {
+        expect(causes(report)).toEqual(["refused", "refused"]);
+        expect(names).toEqual(["Fix login", "Write docs"]);
+        return;
+      }
       expect(report.skipped).toEqual([]);
-      expect([(await itemOf(store, fix))!.name, (await itemOf(store, docs))!.name]).toEqual(["Write docs", "Fix login"]);
+      expect(names).toEqual(["Write docs", "Fix login"]);
       expect((await store.apply(await store.planUndo(report))).skipped).toEqual([]);
       expect((await itemOf(store, fix))!.name).toBe("Fix login");
     });
@@ -256,14 +265,14 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
     it("gives everything of an item back by an undo: a value taken off, and an item removed whole", async () => {
       const { store } = make(SEED);
       const docs = await keyOf(store, "Write docs");
-      await store.apply(await store.plan(changes("tasks", { kind: "setBody", item: docs, body: "Notes" })));
+      await store.apply(await store.plan(changes("tasks", { kind: "setBody", item: docs, body: "Notes", was: await store.body("tasks", docs) })));
       const whole = await itemOf(store, docs);
       const off = await store.apply(await store.plan(changes("tasks", { kind: "setValue", item: docs, key: "due", value: undefined })));
       await store.apply(await store.planUndo(off));
       const removed = await store.apply(await store.plan(changes("tasks", { kind: "removeItem", item: docs })));
       await store.apply(await store.planUndo(removed));
       const back = (await itemOf(store, docs))!;
-      expect([back.name, back.values, back.rank, back.body]).toEqual([whole!.name, whole!.values, whole!.rank, whole!.body]);
+      expect([back.name, back.values, back.rank, await store.body("tasks", docs)]).toEqual([whole!.name, whole!.values, whole!.rank, "Notes"]);
     });
 
     it("migrates once, and undoes a migration", async () => {
@@ -336,11 +345,11 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
       const schema = [...TASKS.properties, { key: "estimate", label: "Estimate", type: "number", params: {}, readonly: false }];
       const report = await store.apply(
         await store.plan(
-          changes("tasks", { kind: "setRank", item: fix, rank: "a3" }, { kind: "setBody", item: fix, body: "Steps" }, { kind: "setSchema", properties: schema }, { kind: "renameDatabase", name: "My tasks" }),
+          changes("tasks", { kind: "setRank", item: fix, rank: "a3" }, { kind: "setBody", item: fix, body: "Steps", was: await store.body("tasks", fix) }, { kind: "setSchema", properties: schema }, { kind: "renameDatabase", name: "My tasks" }),
         ),
       );
       expect(report.skipped).toEqual([]);
-      expect([(await itemOf(store, fix))!.rank, (await itemOf(store, fix))!.body]).toEqual(["a3", "Steps"]);
+      expect([(await itemOf(store, fix))!.rank, await store.body("tasks", fix)]).toEqual(["a3", "Steps"]);
       expect((await store.database("tasks"))!.value).toEqual({ ...TASKS, name: "My tasks", properties: schema });
       expect((await store.database("tasks"))!.revision).not.toBe(record);
       await store.apply(await store.planUndo(report));
@@ -382,7 +391,9 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
       const again = await store.apply(await store.plan(changes("more", { kind: "createDatabase", name: "More" }, { kind: "createItem", ref: "x", name: "X", values: {} })));
       await changeOutside("more", again.created.get("x")!, { name: "Y" });
       const undo = await store.planUndo(again);
-      expect(causes(undo).sort()).toEqual(["changed", "changed"]);
+      // (An item renamed outside is changed to a store keeping its key, gone to one that reads it as another item: missing)
+      expect(undo.planned).toEqual([]);
+      for (const cause of causes(undo)) expect(["changed", "missing"]).toContain(cause);
       await store.apply(undo);
       expect((await store.items("more")).value.map((item) => item.name)).toEqual(["Y"]);
     });

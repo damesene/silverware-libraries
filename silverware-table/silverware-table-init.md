@@ -148,6 +148,18 @@ config.define("silverware.table", {
             },
           },
         },
+        sources = {
+          type = "object",
+          additionalProperties = false,
+          properties = {
+            enabled = {
+              type = "boolean",
+              default = true,
+              description = "Sources of the space: tables a Space Lua script gives (silverware.table.defineSource), which formulas, views and pivots read as @name (@tasks[due]). Off: no source is read; formulas, views and pivots reading one keep what they show.",
+              ui = { category = "Silverware Table: Modules", label = "Sources of the space", priority = 10.5 },
+            },
+          },
+        },
         filters = {
           type = "object",
           additionalProperties = false,
@@ -278,6 +290,18 @@ config.define("silverware.table", {
               default = true,
               description = "Tables that summarize another (pivot.source in their metadata row), calculated anew with each of its edits.",
               ui = { category = "Silverware Table: Modules", label = "Pivot tables", priority = 4.95 },
+            },
+          },
+        },
+        view = {
+          type = "object",
+          additionalProperties = false,
+          properties = {
+            enabled = {
+              type = "boolean",
+              default = true,
+              description = "Tables made by one formula (view.formula in their metadata row: FILTER, SORT, UNIQUE…), calculated anew with each edit of what they read.",
+              ui = { category = "Silverware Table: Modules", label = "Views", priority = 4.9 },
             },
           },
         },

@@ -1,6 +1,6 @@
 // A named table's tab with its name at its top right corner (the tableLabels module), in the page and on the sheet
 import type { Locator, Page } from "@playwright/test";
-import { cell, expect, hoverCell, setPage, table, tableIcon, test } from "./helpers.ts";
+import { cell, expect, hoverCell, openPage, setOtherPage, setPage, table, tableIcon, target, test } from "./helpers.ts";
 
 const filler = (lines: number) => Array.from({ length: lines }, (_, i) => `Line ${i + 1}.`).join("\n\n");
 // Text above the tables for the page to scroll, not so much that SilverBullet's editor leaves them out of
@@ -28,6 +28,17 @@ async function open(page: Page): Promise<void> {
 }
 
 test.describe("Table labels", () => {
+  test("another page opened, one without tables: the tabs of the page left go", async ({ page }) => {
+    await open(page);
+    await expect(label(page, "fruit")).toBeVisible();
+    const other = "# Other\n\nNo tables here.\n";
+    if (target === "silverbullet") {
+      await setOtherPage(page, "UiTests/NoTables", other);
+      await openPage(page, "UiTests/NoTables");
+    } else await setPage(page, other);
+    await expect(labels(page)).toHaveCount(0);
+  });
+
   test("a long table scrolled: the tab goes along with its header held at the view's top, above it", async ({ page }) => {
     const rows = Array.from({ length: 30 }, (_, i) => `| R${i} | ${i} |`).join("\n");
     await setPage(page, `# T\n\nText.\n\n| Name | Qty |\n|---|---|\n${rows}\n| <meta core.table core.name='long'> |\n\nMore.\n`);

@@ -18,15 +18,7 @@
 // This is the formulas' API for the rest of Silverware Table; the parts are the
 // files beside it, the functions in builtin/ (only functions: what a formula
 // can call), custom functions in custom.ts, which exist in registry.ts.
-export { type CellNameAt, cellResult, cellsByName, errorCodeIn, type FormulaCells, formulaCount, forFormulas, hasFormulas, isErrorText, isFormulaInput, type RowName, rowsByName, type StoredFormula } from "./cell.ts";
-
-/**
- * A formula as written where its "=" may be left out (a condition's, Space
- * Lua's): the formula with it, and how far its places moved (1 where it was added)
- */
-export function withEquals(text: string): { readonly formula: string; readonly shift: number } {
-  return text.trimStart().startsWith("=") ? { formula: text, shift: 0 } : { formula: `=${text}`, shift: 1 };
-}
+export { type CalculatedBy, type CalculatedRead, type HeldFormulas, type CellNameAt, cellResult, PLAIN_CELLS, withEquals, cellsByName, errorCodeIn, type FormulaCells, formulaCount, forFormulas, hasFormulas, isErrorText, isFormulaInput, type RowName, rowsByName, type StoredFormula } from "./cell.ts";
 
 /**
  * What the formulas module offers other modules (ModelHost.offered("formulas")): its cells as the formulas read them;
@@ -50,6 +42,39 @@ export type FormulasOffer = {
   readonly problem: (formula: string) => string | undefined;
   /** A formula of one row (`[@due] < TODAY()`) calculated for each body row of a table of the page shown (values[0]: row 1), as a cell of none */
   readonly rowValues: (table: import("../markdown.ts").Table, formula: string) => readonly import("./values.ts").Scalar[];
+  /**
+   * A formula of `table`'s calculated in none of its cells, on the page shown (a choice list's): its values as cells
+   * show them, in the result's order, or why there are none; undefined where it reads a page or source not read
+   */
+  readonly list: (table: import("../markdown.ts").Table, formula: string) => readonly string[] | import("./values.ts").FormulaError | undefined;
+  /**
+   * A view's formula calculated on the page shown, as a write would (its result a grid, or why there is none;
+   * undefined where it reads a page not read): `table` the view's own (none: a view to be inserted), `replace` a
+   * table of the page (where it starts) as it will be written with it (a source named in the same edit)
+   */
+  readonly view: (
+    formula: string,
+    table?: import("../markdown.ts").Table,
+    replace?: { readonly from: number; readonly table: import("../markdown.ts").Table },
+  ) => import("./values.ts").Grid | import("./values.ts").FormulaError | undefined;
+  /**
+   * The Functions dialog for a formula typed outside a cell (a view's dialog: the Functions dialog opens over it), its
+   * caret at `caret`: `picked` gets the formula with the function picked put in and the caret after it
+   */
+  readonly functions: (formula: string, caret: number, picked: (made: { readonly formula: string; readonly caret: number }) => void) => void;
+  /**
+   * What a formula's field in a module's dialog (formulafield.ts) offers as a formula is typed, its "=" left out or
+   * not: the functions and the page's names, and with `table` (as it is now: asked each time) its columns, named rows
+   * and cells, as a cell's formula has them; the function the caret is in, `outside` where it is in none; why it
+   * does not read
+   */
+  /**
+   * A table calculated from others (a view, a pivot) as the formulas calculate it now on the page shown, written as
+   * its module writes it (what its Out of date compares with), or why it cannot be; undefined where it is none or
+   * reads a page not read
+   */
+  readonly calculated: (table: import("../markdown.ts").Table) => import("../markdown.ts").Table | import("./values.ts").FormulaError | undefined;
+  readonly fieldHelpers: (table?: () => import("../markdown.ts").Table, outside?: import("./help.ts").FormulaHelp) => import("../formulafield.ts").FormulaHelpers;
 };
 
 /**
@@ -73,17 +98,37 @@ export type PageLinksOffer = {
   // Pages read for another module (a pivot's source), as `otherPages` then gives them; `fresh`: read again those read before
   readonly readPages: (pages: readonly string[], fresh: boolean) => Promise<void>;
 };
-export { type Area, areaText, callsCustomFunctions, columnIdText, formulaPages, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredTableNames, type TableRef, withColumnKeys } from "./references.ts";
+
+/**
+ * What a module calculating tables from others offers (the view module: a view, a table made by a formula; the pivot
+ * module: a pivot): how each of its tables is calculated. The formulas calculate them in their order, read them as
+ * calculated now and write them with the other tables an edit changes, through it
+ */
+export type CalculatedOffer = {
+  /** How a table is calculated, undefined for one the module does not calculate */
+  readonly calculated: (table: import("../markdown.ts").Table) => import("./cell.ts").CalculatedBy | undefined;
+};
+
+/**
+ * What a module keeping formulas in a table's metadata row that calculate none of its cells offers (the column types
+ * module: a choice list made by a formula): the formulas see them as the table's (what it reads) and have their
+ * references follow the edits of what they read, in the same write
+ */
+export type HeldFormulasOffer = {
+  /** The formulas a table holds so, and how they are written back; undefined where it holds none */
+  readonly held: (table: import("../markdown.ts").Table) => import("./cell.ts").HeldFormulas | undefined;
+};
+export { type Area, areaText, callsCustomFunctions, callsPureFunctionsOnly, columnIdText, formulaPages, formulaTableNames, type Fixed, cellName, cellNamesOf, columnLetters, columnRangeText, columnRefText, formulaSources, type NamedReference, namedReferences, type Reference, referencedColumn, referencedColumnId, references, referredPages, referredSources, referredTableNames, type SourceRef, type TableRef, withColumnKeys } from "./references.ts";
 export { autofixFormula, type FormulaFix, qualifyCellNames } from "./autofix.ts";
-export { type Calculation, evaluateFormula, formulaErrors, givesList, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows } from "./evaluate.ts";
+export { type Calculation, cellWholeResult, evaluateFormula, formulaErrors, givesList, listResult, type NamedCell, recalculate, rowValues, scalarText, tableValue, type TableSource, totalRows, calculatedNow, viewGrid, viewResult } from "./evaluate.ts";
 export { type Node as FormulaNode, parse as parseFormula } from "./parser.ts";
 export { parseDate, toUnit, type Unit } from "./dates.ts";
-export { ERROR_CODES, FormulaError, parseClock, type Scalar, type Value } from "./values.ts";
+export { asGrid, ERROR_CODES, FormulaError, Grid, parseClock, type Result, type Scalar, type Value } from "./values.ts";
 export { withAreasWritten, type WrittenArea, writtenArea } from "./frame.ts";
 export { REF_ERROR, type Token, tokenize } from "./tokens.ts";
 export { tablesWritten } from "./page.ts";
 export { calculatedFormula, filledFormula, followFormula, followOwnFormula, followTable, type Following, formulasAfterEdit, shiftReferences, withCalculatedCells, withoutFormulas } from "./edits.ts";
-export { argumentSpan, type ColumnChoice, columnChoicesOf, type FormulaChoice, type FormulaChoices, choiceText, cycleFixed, findFunctions, type FormulaHelp, formulaChoices, formulaHelp, functionHelp, nameTyped, needsOperator, type PointedSpan, REFERENCE_HELP, referenceSlot } from "./help.ts";
-export { FUNCTION_CATEGORIES, type FormulaFunction, type FunctionCategory } from "./function.ts";
+export { argumentSpan, type ColumnChoice, columnChoicesOf, type FormulaChoice, type FormulaChoices, choiceText, cycleFixed, findFunctions, type FormulaHelp, formulaChoices, formulaHelp, functionHelp, nameTyped, needsOperator, type PointedSpan, REFERENCE_HELP, referenceSlot, sourceChoices } from "./help.ts";
+export { FUNCTION_CATEGORIES, type AnyFunction, type FormulaFunction, type FunctionCategory } from "./function.ts";
 export { functionNamed, isCustomFunction } from "./registry.ts";
 export type { IndexMap } from "../ops.ts";

@@ -25,6 +25,7 @@ import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { SettingsDialog } from "./settings.ts";
 import { Metadata } from "./features/metadata.ts";
 import { featureEntries } from "./modules.ts";
+import { NO_SOURCES, type SourceProvider } from "./sources.ts";
 import { moduleHost } from "./core/modulehost.ts";
 import {
   caretTextOffset,
@@ -128,6 +129,9 @@ function sortKeys(rows: readonly HTMLTableRowElement[], values: readonly (readon
 
 export class Controller implements TableHost {
   private readonly infos = new WeakMap<HTMLElement, WidgetInfo>();
+  // The tables enhanced as the page was last scanned: one gone since (another page opened, a table out of CodeMirror's
+  // viewport) has the features' layout follow, as what they placed for it (a table's tab) would stay otherwise
+  private scanned = new Set<HTMLElement>();
   // The page's text as last read
   pageText = "";
   currentPage = "";
@@ -237,6 +241,8 @@ export class Controller implements TableHost {
   constructor(
     readonly doc: Document,
     public bridge: Bridge,
+    // The sources of the space the host gives (the sources module offers them to formulas)
+    private readonly sources: SourceProvider = NO_SOURCES,
   ) {
     this.adapter = new SilverBulletAdapter(doc, this.rows, {
       infoOf: (widget) => this.infos.get(widget),
@@ -374,7 +380,7 @@ export class Controller implements TableHost {
    * page is loaded again.
    */
   private async startFeatures(): Promise<void> {
-    const all = featureEntries(this.metadata);
+    const all = featureEntries(this.metadata, this.sources);
     const enabled = await Promise.all(all.map(({ name }) => (name ? this.featureEnabled(name) : true)));
     if (this.stopped) return;
     all.forEach(({ name }, i) => {
@@ -926,6 +932,9 @@ export class Controller implements TableHost {
       pending.push(this.enhance(widget, table));
     }
     await Promise.all(pending);
+    const shown = new Set(this.enhancedWidgets());
+    if ([...this.scanned].some((widget) => !shown.has(widget))) this.queueFeaturesLayout();
+    this.scanned = shown;
   }
 
   private enhance(widget: HTMLElement, table: HTMLTableElement): Promise<void> {
@@ -1025,6 +1034,8 @@ export class Controller implements TableHost {
       // The cell showing the move cursor was rendered anew (Ctrl+arrows saved a cell)
       if (this.navigating) this.markNavigating();
       this.insert.tableEnhanced(widget, info);
+      // Known as enhanced at once: gone before the scan that enhanced it ends, it still has the features' layout follow
+      this.scanned.add(widget);
       this.queueStickyUpdate();
       void this.refreshSettings();
     } catch (e) {

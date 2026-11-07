@@ -30,7 +30,7 @@ import {
   valueFormula,
   valueText,
 } from "../pivot/fields.ts";
-import type { Pivot } from "../pivot/pivot.ts";
+import type { Calculated } from "../calculated/index.ts";
 
 /** A table a pivot can summarize, by its name, its columns' names */
 type Source = { readonly name: string; readonly columns: readonly string[] };
@@ -38,13 +38,15 @@ type Source = { readonly name: string; readonly columns: readonly string[] };
 export type PivotDialogOptions = {
   // The page's tables a pivot can summarize
   readonly sources: readonly Source[];
+  // The sources of the space (by their names, without @), a group of their own
+  readonly spaceSources?: readonly Source[];
   // Another page's, read, or why there are none; without it no other page is offered
   readonly readPage?: (page: string) => Promise<readonly Source[] | string>;
   // The space's other pages, offered as one is typed
   readonly pages?: () => Promise<readonly string[]>;
   readonly fields: Fields;
   // The pivot the definition makes, or why it makes none
-  readonly preview: (definition: PivotDefinition) => Pivot | string;
+  readonly preview: (definition: PivotDefinition) => Calculated | string;
   readonly submit: (definition: PivotDefinition) => void;
   readonly submitLabel: string;
   // Why it cannot be submitted at all (the metadata setting off)
@@ -69,7 +71,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
   let fields: Fields = options.fields;
   // The page of a source on another page, as picked ("" while none is typed yet); undefined: a source of this page
   // (No source and none of this page to pick: one of another page's)
-  let otherPage = options.readPage ? (sourceRef(fields.source).page ?? (!fields.source && !options.sources.length ? "" : undefined)) : undefined;
+  let otherPage = options.readPage ? (sourceRef(fields.source).page ?? (!fields.source && !options.sources.length && !options.spaceSources?.length ? "" : undefined)) : undefined;
   // Other pages' sources as read (or why there are none), those being read
   const read = new Map<string, readonly Source[] | string>();
   const reading = new Set<string>();
@@ -88,7 +90,7 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
   const named = (list: readonly Source[] | string | undefined, name: string) => (typeof list === "object" ? list.find((s) => s.name.toLowerCase() === name.toLowerCase()) : undefined);
   const columnsOf = () => {
     const ref = sourceRef(fields.source);
-    return named(ref.page === undefined ? options.sources : read.get(ref.page), ref.name)?.columns ?? [];
+    return named(ref.space ? options.spaceSources : ref.page === undefined ? options.sources : read.get(ref.page), ref.name)?.columns ?? [];
   };
   // A list's names, the one written first where none of them is (a table gone, renamed), as a column is offered
   const withWritten = (names: readonly string[], written: string) => (!written || names.some((n) => n.toLowerCase() === written.toLowerCase()) ? names : [written, ...names]);
@@ -282,20 +284,32 @@ export function openPivotDialog(host: ModelHost, options: PivotDialogOptions): D
     showPreview();
   }
 
-  // The table summarized: one of the page's, or of another page (its page typed, then one of its tables), said what that does not do
+  // The table summarized: one of the page's, a source of the space (@tasks), or of another page (its page typed, then one of
+  // its tables), said what that does not do
   function sourceSection(): HTMLElement {
-    const names = otherPage === undefined ? withWritten(options.sources.map((s) => s.name), fields.source) : options.sources.map((s) => s.name);
-    const picked = select(
-      [...names, ...(options.readPage ? [ANOTHER] : [])],
-      (n) => (n === ANOTHER ? "Another page…" : n),
-      otherPage === undefined ? fields.source : ANOTHER,
-      (value) => {
-        otherPage = value === ANOTHER ? "" : undefined;
-        set({ source: value === ANOTHER ? "" : value });
-        if (value === ANOTHER) form.querySelector<HTMLElement>('[data-focus="source page"]')?.focus();
-      },
-      "Source",
-    );
+    const space = (options.spaceSources ?? []).map((s) => sourceText({ name: s.name, space: true }));
+    const tables = options.sources.map((s) => s.name);
+    // The source written where none of the lists has it (a table gone, renamed), first
+    const listed = [...tables, ...space];
+    const written = otherPage === undefined && fields.source && !listed.some((n) => n.toLowerCase() === fields.source.toLowerCase()) ? [fields.source] : [];
+    const picked = e("select", { attrs: { "aria-label": "Source", "data-focus": "Source" } });
+    const group = (label: string, values: readonly string[]) => {
+      if (!values.length) return;
+      const g = e("optgroup", { attrs: { label } });
+      for (const v of values) g.append(new Option(v, v));
+      picked.append(g);
+    };
+    for (const v of written) picked.append(new Option(v, v));
+    group("Tables of this page", tables);
+    group("Sources of the space", space);
+    if (options.readPage) picked.append(new Option("Another page…", ANOTHER));
+    picked.value = otherPage === undefined ? fields.source : ANOTHER;
+    picked.addEventListener("change", () => {
+      const value = picked.value;
+      otherPage = value === ANOTHER ? "" : undefined;
+      set({ source: value === ANOTHER ? "" : value });
+      if (value === ANOTHER) form.querySelector<HTMLElement>('[data-focus="source page"]')?.focus();
+    });
     if (otherPage === undefined) return section("Source", "The table summarized", picked);
     const page = otherPage;
     if (!pagesRead && options.pages) {

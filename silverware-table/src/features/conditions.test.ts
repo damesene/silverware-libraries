@@ -222,7 +222,7 @@ describe("Conditional formatting", () => {
     at(2, 1).dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 }));
     item("Conditional formatting…")!.click();
     dialog()!.querySelector<HTMLElement>(".swt-cf-summary")!.click();
-    const field = dialog()!.querySelector<HTMLInputElement>("input.swt-cf-formula")!;
+    const field = dialog()!.querySelector<HTMLInputElement>("input.swt-formulafield-text")!;
     // As a key types: its input, then its keyup (which must leave the list open)
     const type = (text: string) => {
       field.focus();
@@ -231,7 +231,7 @@ describe("Conditional formatting", () => {
       field.dispatchEvent(new Event("input", { bubbles: true }));
       field.dispatchEvent(new KeyboardEvent("keyup", { key: text[text.length - 1] ?? "", bubbles: true }));
     };
-    const offered = () => Array.from(dialog()!.querySelectorAll(".swt-cf-choice .swt-cf-choice-name")).map((c) => c.textContent);
+    const offered = () => Array.from(dialog()!.querySelectorAll(".swt-formulafield-choice .swt-formulafield-choice-name")).map((c) => c.textContent);
     type("[@S");
     expect(offered()).toEqual(["Score"]);
     // The caret moved by an arrow: the list closes; typing opens it again
@@ -251,10 +251,10 @@ describe("Conditional formatting", () => {
     expect(offered()).toEqual([]);
     expect(dialog()).not.toBeNull();
     type("[@Score] > ROUND(");
-    expect(dialog()!.querySelector(".swt-cf-formula-syntax b")!.textContent).toBe("number");
-    expect(dialog()!.querySelector(".swt-cf-formula-box .swt-cf-problem")!.textContent).not.toBe("");
+    expect(dialog()!.querySelector(".swt-formulafield-syntax b")!.textContent).toBe("number");
+    expect(dialog()!.querySelector(".swt-formulafield .swt-formulafield-problem")!.textContent).not.toBe("");
     type("[@Score] > 50");
-    expect(dialog()!.querySelector(".swt-cf-formula-box .swt-cf-problem")!.textContent).toBe("");
+    expect(dialog()!.querySelector(".swt-formulafield .swt-formulafield-problem")!.textContent).toBe("");
     peek();
     await flush();
     expect([1, 2, 3].map((r) => formatted(r))).toEqual([false, true, true]);
@@ -271,12 +271,12 @@ describe("Conditional formatting", () => {
     setText(text.replace("| Name | Score |", "| Name | Points |"));
     renderPage(text, editor, cursorMoves);
     await controller.scan();
-    const field = dialog()!.querySelector<HTMLInputElement>("input.swt-cf-formula")!;
+    const field = dialog()!.querySelector<HTMLInputElement>("input.swt-formulafield-text")!;
     field.focus();
     field.value = "[@p";
     field.setSelectionRange(3, 3);
     field.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(Array.from(dialog()!.querySelectorAll(".swt-cf-choice .swt-cf-choice-name")).map((c) => c.textContent)).toEqual(["Points"]);
+    expect(Array.from(dialog()!.querySelectorAll(".swt-formulafield-choice .swt-formulafield-choice-name")).map((c) => c.textContent)).toEqual(["Points"]);
   });
 
   it("clears a column's rules from its menu", async () => {

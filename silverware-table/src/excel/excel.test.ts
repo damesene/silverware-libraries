@@ -77,6 +77,8 @@ describe("Excel's formulas", () => {
     expect(write("=prices!B2")).toEqual({ reason: "it refers to the table prices" });
     expect(write("=[[Prices]]vat")).toEqual({ reason: "it refers to vat on another page" });
     expect(write("=prices!vat")).toEqual({ reason: "it refers to the table prices" });
+    expect(write("=COUNTA(@tasks[name])")).toEqual({ reason: "it reads the source tasks of the space" });
+    expect(write("=COUNTA(@tasks)")).toEqual({ reason: "it reads the source tasks of the space" });
     // The table's own name before its own cell: that cell
     expect(excelFormula("=shop!vat*2", { ...SHOP, meta: { "core.name": "shop" } }, 0, 3)).toEqual({ text: "C3*2", array: false });
     expect(write('=TEXT(A1, "dd.mm.yyyy")')).toEqual({ reason: "Excel reads TEXT's format codes in its own language" });
@@ -148,6 +150,18 @@ describe("as an Excel table", () => {
     expect(excelFormula("=[@jan]*2", table, 2, 3, {}, structured)).toEqual({ text: "B4*2", array: false });
     // Its total row not its last one (no totals row): the column's cells as before
     expect(excelFormula("=SUM([jan])", table, 2, 1, {}, { ...structured, totalsRow: false })).toEqual({ text: "SUM(B2:B3)", array: false });
+  });
+
+  it("writes [#Data] as the table's, without its total rows; the array functions as their values", () => {
+    const table = parseTable(["| Name | Jan | Feb | Total |", "|---|---|---|---|", "| a | 1 | 2 | |", "| b | 3 | 4 | |", "| Sum | 4 <meta formulas.f='=SUM([jan])'> | | |"].join("\n"));
+    const structured = { name: "T", columns: ["Name", "Jan", "Feb", "Total"], totalsRow: true };
+    expect(excelFormula("=COUNTA([#Data])", table, 2, 0, {}, structured)).toEqual({ text: "COUNTA(T[#Data])", array: false });
+    expect(excelFormula("=COUNTA([#Data])", table, 2, 0, {}, { ...structured, totalsRow: false })).toEqual({ text: "COUNTA(A2:D3)", array: false });
+    expect(excelFormula("=COUNTA(other![#Data])", table, 2, 0, {}, structured)).toEqual({ reason: "it refers to the table other" });
+    expect(excelFormula("=COUNTA(UNIQUE([jan]))", table, 2, 0, {}, structured)).toEqual({ reason: "UNIQUE is an array function of Excel 365 only" });
+    // Errors only Excel 365 knows are #VALUE! there
+    expect(excelValue("\\#SPILL!")).toEqual({ kind: "error", value: "#VALUE!" });
+    expect(excelValue("#CALC!")).toEqual({ kind: "error", value: "#VALUE!" });
   });
 });
 

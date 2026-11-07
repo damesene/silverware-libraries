@@ -20,6 +20,45 @@ test.describe("Formulas", () => {
     await expect(cell(page, 1, 3)).toHaveText("few");
   });
 
+  test("a result of several values is #SPILL!, shown over the window by ⤢ or Ctrl+Shift+Enter, nothing written", async ({ page }) => {
+    await setPage(page, "| Tag | List |\n|---|---|\n| b | |\n| a | |\n| b | |\n");
+    // The page's table rendered (not the sample's before it)
+    await expect(cell(page, 2, 0)).toHaveText("a");
+    await cell(page, 1, 1).dblclick();
+    await expect(page.locator(".swt-cell-editor")).toBeFocused();
+    await page.keyboard.type("=SORT(UNIQUE([tag]))");
+    await rendersAnew(page, () => page.keyboard.press("Enter"));
+    await page.keyboard.press("Escape");
+    // (The playground shows the error's escape as written, SilverBullet does not)
+    await expect(cell(page, 1, 1)).toHaveText(/#SPILL!/);
+    expect(await markdown(page)).toContain("\\#SPILL! <meta formulas.f='=SORT(UNIQUE([tag]))'>");
+    const written = await markdown(page);
+    // The icon at the corner of the cell hovered, none on another
+    const button = page.locator(".swt-result-button");
+    await cell(page, 2, 0).hover();
+    await expect(button).toBeHidden();
+    await cell(page, 1, 1).hover();
+    await expect(button).toBeVisible();
+    await button.click();
+    const dialog = page.locator(".swt-result-dialog");
+    await expect(dialog.locator("tr")).toHaveText(["Tag", "a", "b"]);
+    await expect(dialog.locator(".swt-result-size")).toHaveText("2 × 1");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    // The cell selected alone: Ctrl+Shift+Enter shows it too
+    await cell(page, 1, 1).click();
+    await page.keyboard.press("Control+Shift+Enter");
+    await expect(dialog.locator("tr")).toHaveCount(3);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    // Not over the cell's editor: gone while the cell is edited
+    await cell(page, 1, 1).dblclick();
+    await expect(page.locator(".swt-cell-editor")).toBeFocused();
+    await expect(button).toBeHidden();
+    await page.keyboard.press("Escape");
+    expect(await markdown(page)).toBe(written);
+  });
+
   test("the table's columns offered after [@ by their names, put in by their keys; none once the caret is moved into a reference", async ({ page }) => {
     const field = page.locator(".swt-cell-editor");
     const choices = page.locator(".swt-formula-choice code");

@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { insertRowWith } from "../core/structure.ts";
 import { setCell } from "../ops.ts";
+import { memorySources } from "../sources.ts";
 import { cell, cellMenuItem, clickOn, controller, cursorMoves, editor, flashes, flush, key, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
 
 const ORDERS = [
@@ -38,6 +39,64 @@ describe("Pivot tables", () => {
     clickOn(cell(2, 1)); // West's revenue
     await type("80");
     expect(pivotOf(text)).toBe(`${PIVOT("| East | 120 |\n| West | 80 |\n| Total | 200 |")}\n`);
+  });
+
+  describe("calculated by the formulas, in their order", () => {
+    const SUMS = PIVOT("| East | 120 |\n| West | 50 |\n| Total | 170 |").replace("<meta core.table", "<meta core.table core.name='sums'");
+    const READER = (value: string) => `| West |\n|---|\n| ${value} <meta formulas.f='=XLOOKUP("West", sums![region], sums![sum_of_revenue])'> |`;
+
+    it("writes a table reading a pivot, and a view of it, in the same edit as its source", async () => {
+      const view = "| Region |\n|---|\n| East |\n| West |\n| Total |\n| <meta core.table view.formula='=CHOOSECOLS(sums![#Data], 1)'> |";
+      await setup(`${ORDERS}\n\n${SUMS}\n\n${READER("50")}\n\n${view}\n`, { "silverware.table.editor.enterKey": "save" });
+      clickOn(cell(1, 0)); // East's region
+      await type("North");
+      expect(text).toContain("| North | 100 |");
+      expect(text).toContain(READER("50"));
+      clickOn(cell(2, 1)); // West's revenue
+      await type("80");
+      expect(text).toContain("| West | 80 |\n| Total | 200 |");
+      expect(text).toContain(READER("80"));
+      expect(text).toContain("| Region |\n|---|\n| East |\n| North |\n| West |\n| Total |");
+    });
+
+    it("is calculated from a view of its source, in the same edit", async () => {
+      const big = "| Region | Revenue |\n|---|--:|\n| East | 100 |\n| West | 50 |\n| <meta core.table core.name='big' view.formula='=FILTER(orders![#Data], orders![revenue] &gt; 30)'> |";
+      const pivot = PIVOT("| East | 100 |\n| West | 50 |\n| Total | 150 |").replace("pivot.source='orders'", "pivot.source='big'");
+      await setup(`${ORDERS}\n\n${big}\n\n${pivot}\n`, { "silverware.table.editor.enterKey": "save" });
+      clickOn(cell(3, 1)); // the second East's revenue: 20, now in the view
+      await type("40");
+      expect(text).toContain("| East | 140 |\n| West | 50 |\n| Total | 190 |");
+    });
+
+    it("names its source anew as it is renamed, in the same edit", async () => {
+      await setup(`${ORDERS}\n\n${SUMS}\n\n${READER("50")}\n`, { "silverware.table.metadata": true });
+      await controller.writeTable(controller.shownTables()[0]!, (t) => controller.withTableName(t, "sales"));
+      await controller.scan();
+      expect(text).toContain("pivot.source='sales'");
+      expect(text).toContain("| East | 120 |\n| West | 50 |\n| Total | 170 |");
+      expect(text).toContain(READER("50"));
+    });
+
+    it("is #CYCLE! where it reads a view of itself: neither is written", async () => {
+      const loop = "| Region |\n|---|\n| x |\n| <meta core.table core.name='loop' view.formula='=CHOOSECOLS(sums![#Data], 1)'> |";
+      const pivot = SUMS.replace("pivot.source='orders'", "pivot.source='loop'");
+      await setup(`${pivot}\n\n${loop}\n`, { "silverware.table.metadata": true });
+      const page = text;
+      await controller.writeTable(controller.shownTables()[0]!, (t) => t);
+      await controller.scan();
+      expect(text).toBe(page);
+      const info = controller.shownTables()[0]!;
+      expect(controller.tableBadges(info).map((b) => b.text)).toContain("Cannot be calculated");
+    });
+
+    it("keeps its numbers where it cannot be calculated; a table reading it gets the error", async () => {
+      const gone = SUMS.replace("pivot.source='orders'", "pivot.source='gone'");
+      await setup(`${gone}\n\n${READER("50")}\n`, { "silverware.table.metadata": true });
+      await controller.writeTable(controller.shownTables()[1]!, (t) => t);
+      await controller.scan();
+      expect(text).toContain("| East | 120 |\n| West | 50 |\n| Total | 170 |");
+      expect(text).toContain(`| \\#REF! <meta formulas.f='=XLOOKUP("West", sums![region], sums![sum_of_revenue])'> |`);
+    });
   });
 
   it("writes an error with its # escaped, so it is no hashtag", async () => {
@@ -649,6 +708,53 @@ describe("Pivot tables", () => {
       await run("Text.\n", 5);
       expect(dialog()!.querySelector('input[aria-label="Source page"]')).not.toBeNull();
       expect(dialog()!.querySelector<HTMLButtonElement>(".swt-dialog-primary")!.disabled).toBe(true);
+    });
+  });
+
+  describe("of a source of the space", () => {
+    const TASKS = { columns: ["owner", "hours"], rows: [["anna", "3"], ["petr", "1"], ["anna", "2"]] };
+    const SPACE = (body: string) =>
+      `| owner | Sum of hours |\n|---|--:|\n${body}\n| <meta core.table pivot.source='@tasks' pivot.rows='owner' pivot.values='SUM([hours])'> |`;
+    const refresh = () => {
+      cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      return document.querySelector<HTMLElement>('.swt-bar button[aria-label="Refresh pivot"]')!;
+    };
+
+    it("is calculated from it; out of date as it changes, Refresh writing it anew", async () => {
+      const sources = memorySources({ tasks: TASKS });
+      await setup(`${SPACE("| anna | 5 |\n| petr | 1 |\n| Total | 6 |")}\n`, {}, {}, sources);
+      expect(refresh().classList.contains("swt-attention")).toBe(false);
+      expect(controller.tableBadges(controller.shownTables()[0]!)[0]!.text).toBe("Pivot of @tasks");
+      sources.set("tasks", { ...TASKS, rows: [...TASKS.rows, ["petr", "4"]] });
+      expect(refresh().classList.contains("swt-attention")).toBe(true);
+      refresh().click();
+      await flush();
+      expect(text).toBe(`${SPACE("| anna | 5 |\n| petr | 5 |\n| Total | 10 |")}\n`);
+    });
+
+    it("keeps its numbers while the source is not read, or its module is off", async () => {
+      const page = `${SPACE("| anna | 5 |\n| Total | 5 |")}\n`;
+      await setup(page, { "silverware.table.modules.sources.enabled": false }, {}, memorySources({ tasks: TASKS }));
+      expect(refresh().classList.contains("swt-attention")).toBe(false);
+      refresh().click();
+      await flush();
+      expect(text).toBe(page);
+    });
+
+    it("says there is no such source", async () => {
+      await setup(`${SPACE("| anna | 5 |")}\n`, {}, {}, memorySources({}));
+      expect(refresh().title).toBe("This pivot cannot be calculated: no source named tasks in the space");
+    });
+
+    it("offers the space's sources in its dialog, its columns to pick", async () => {
+      await setup(`${SPACE("| anna | 5 |\n| petr | 1 |\n| Total | 6 |")}\n`, {}, {}, memorySources({ tasks: TASKS }));
+      cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      document.querySelector<HTMLElement>('.swt-bar button[aria-label="Pivot settings…"]')!.click();
+      const dialog = document.querySelector<HTMLElement>(".swt-pivot-dialog")!;
+      const source = dialog.querySelector<HTMLSelectElement>('select[aria-label="Source"]')!;
+      expect(source.value).toBe("@tasks");
+      expect(source.querySelector('optgroup[label="Sources of the space"]')!.textContent).toBe("@tasks");
+      expect(dialog.textContent).toContain("anna");
     });
   });
 });

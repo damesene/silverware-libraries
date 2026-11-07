@@ -12,7 +12,10 @@
 // brings it back: the page under it is the user's meanwhile (presses, keys,
 // scrolling), the dialog kept as it was; `peeked(on)` tells the caller, which
 // shows its changes in the page then (the conditions dialog: its rules in the
-// table); `${base}-peeking` on the backdrop meanwhile (`isPeeking`).
+// table); `${base}-peeking` on the backdrop meanwhile (`isPeeking`). With
+// `above`, a dialog opens over the one open (the Functions dialog over a
+// view's), which stays under it: Esc, × or a press beside it close the top
+// one alone, the focus going back into the one under it.
 
 export type DialogLook = {
   // The classes' base
@@ -48,6 +51,8 @@ export type DialogOptions = {
   readonly peeked?: (on: boolean) => void;
   // Held from the top of the window, not centered: what grows in it grows downwards (`${base}-backdrop-top`)
   readonly anchor?: "top";
+  // Opened over the dialog open now, which stays under it (and closes with it); else that one is closed first
+  readonly above?: boolean;
 };
 
 export type Dialog = {
@@ -100,15 +105,21 @@ function followView(backdrop: HTMLElement): () => void {
 }
 
 export class Dialogs {
-  private shown: Shown | undefined;
+  // The dialogs open, the one on top last
+  private readonly stack: Shown[] = [];
 
   constructor(
     private readonly doc: Document,
     private readonly look: DialogLook,
   ) {}
 
+  // The dialog on top: the one keys and presses are for
+  private get shown(): Shown | undefined {
+    return this.stack[this.stack.length - 1];
+  }
+
   get isOpen(): boolean {
-    return !!this.shown?.backdrop.isConnected;
+    return this.stack.some((shown) => shown.backdrop.isConnected);
   }
 
   /** Whether the open dialog is put aside (peek): the page under it is the user's meanwhile */
@@ -116,13 +127,13 @@ export class Dialogs {
     return !!this.shown?.peeking;
   }
 
-  /** Whether a node is the open dialog's */
+  /** Whether a node is an open dialog's */
   contains(node: Node): boolean {
-    return !!this.shown?.backdrop.contains(node);
+    return this.stack.some((shown) => shown.backdrop.contains(node));
   }
 
   open(options: DialogOptions): Dialog {
-    this.close();
+    if (!options.above) this.close();
     const { doc } = this;
     const { base } = this.look;
     const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string) => {
@@ -189,40 +200,47 @@ export class Dialogs {
     backdrop.addEventListener("keydown", (e) => this.onKeyDown(e, dialog));
     // A press beside the dialog closes it; one in it stays in it (while the page is looked at, presses reach the page)
     backdrop.addEventListener("mousedown", (e) => {
-      if (e.target === backdrop && !shown.peeking) {
+      if (e.target === backdrop && !shown.peeking && this.shown === shown) {
         e.preventDefault();
         void this.dismiss();
       }
     });
     const shown: Shown = { backdrop, returnFocus: doc.activeElement, options, unfollow: followView(backdrop), peeking: false, setPeek };
-    this.shown = shown;
+    this.stack.push(shown);
     doc.body.append(backdrop);
     (options.focus ?? dialog).focus({ preventScroll: true });
     return {
       element: dialog,
       dismiss: () => (this.shown === shown ? this.dismiss() : Promise.resolve()),
-      close: () => {
-        if (this.shown === shown) this.close();
-      },
+      close: () => this.closeFrom(shown),
     };
   }
 
-  /** Closes the open dialog once its `dismiss` agrees */
+  /** Closes the dialog on top once its `dismiss` agrees */
   async dismiss(): Promise<void> {
     const shown = this.shown;
     if (!shown) return;
     if (shown.options.dismiss && !(await shown.options.dismiss())) return;
-    if (this.shown === shown) this.close();
+    if (this.shown === shown) this.closeFrom(shown);
   }
 
+  /** Closes every dialog open */
   close(): void {
-    const shown = this.shown;
-    if (!shown) return;
-    this.shown = undefined;
-    shown.unfollow();
-    shown.backdrop.remove();
-    if (shown.returnFocus instanceof HTMLElement && shown.returnFocus.isConnected) shown.returnFocus.focus({ preventScroll: true });
-    shown.options.closed?.();
+    const bottom = this.stack[0];
+    if (bottom) this.closeFrom(bottom);
+  }
+
+  /** Closes a dialog, and those over it first */
+  private closeFrom(from: Shown): void {
+    const at = this.stack.indexOf(from);
+    if (at < 0) return;
+    while (this.stack.length > at) {
+      const shown = this.stack.pop()!;
+      shown.unfollow();
+      shown.backdrop.remove();
+      if (shown.returnFocus instanceof HTMLElement && shown.returnFocus.isConnected) shown.returnFocus.focus({ preventScroll: true });
+      shown.options.closed?.();
+    }
   }
 
   // Esc closes; Tab stays in the dialog; no key goes on to the page

@@ -3,9 +3,9 @@
 // pointed reference goes; and the functions found by what they are or do
 // (the Functions dialog).
 import { columnIdOf, columnName } from "../columns.ts";
-import { unescapeCell } from "../markdown.ts";
+import { escapeCell, unescapeCell } from "../markdown.ts";
 import { CELL_RE } from "../namerules.ts";
-import type { FormulaFunction, FunctionCategory } from "./function.ts";
+import type { AnyFunction, FunctionCategory } from "./function.ts";
 import { functionNamed, functionNames } from "./registry.ts";
 import { cellName, columnRefText, references } from "./references.ts";
 import { tokenize } from "./tokens.ts";
@@ -18,9 +18,9 @@ export type FormulaHelp = {
 };
 
 export const REFERENCE_HELP: FormulaHelp = {
-  syntax: "A1 · A1:B3 · $A$1 · [Column] · [@Column] · table!A1 · table![Column] · cell_name · table!cell_name",
+  syntax: "A1 · A1:B3 · $A$1 · [Column] · [@Column] · table!A1 · table![Column] · cell_name · table!cell_name · @source[Column]",
   description:
-    "A cell (A1 is the first row under the header), a range, a cell with its column or row kept where it is when the formula is filled into other cells (F4 cycles them), a whole column by its name, that column in this row, a cell, range or column of another table on the page by its name, or a named cell of this table (of another: its table's name, !, then the cell's). Click or drag in the table to insert one, click a header for its column.",
+    "A cell (A1 is the first row under the header), a range, a cell with its column or row kept where it is when the formula is filled into other cells (F4 cycles them), a whole column by its name, that column in this row, a cell, range or column of another table on the page by its name, a named cell of this table (of another: its table's name, !, then the cell's), or a column of a source of the space (a table a Space Lua script gives). Click or drag in the table to insert one, click a header for its column.",
 };
 
 // After these a reference can follow: clicking the table inserts one there
@@ -68,15 +68,20 @@ export function needsOperator(formula: string, at: number): boolean {
 /**
  * What a name typed in a formula may be: a function, or a name the page has
  * (a named cell of the table edited, or of another table: `table`, written
- * table!name; a named row of the table edited; a named table)
+ * table!name; a named row of the table edited; a named table), or a source of
+ * the space (@tasks, with its columns, offered in its [ ])
  */
 export type FormulaChoice = {
-  readonly kind: "function" | "cell" | "row" | "table" | "column";
+  readonly kind: "function" | "cell" | "row" | "table" | "column" | "source";
   // What the list shows (a column: its header's name)
   readonly name: string;
+  // A named cell of another table: that table's name
   readonly table?: string;
   // A column: how a reference writes it (its key, its occurrence where several share it: unit_price, qty:2)
   readonly id?: string;
+  // A source's column: the source's name (@tasks[due]); a source: its columns
+  readonly source?: string;
+  readonly columns?: readonly ColumnChoice[];
 };
 
 /** A column of the table a formula is of: its header's name, what a reference writes for it */
@@ -91,6 +96,11 @@ export function columnChoicesOf(headers: readonly string[]): ColumnChoice[] {
     const nth = id && /:(\d+)$/.exec(id)?.[1];
     return id && name ? [{ name: nth ? `${name} (${nth})` : name, id }] : [];
   });
+}
+
+/** The sources of the space as choices: each by its name, with its columns (by their names as the source gives them) for its [ ] */
+export function sourceChoices(sources: readonly { readonly name: string; readonly columns: readonly string[] }[]): FormulaChoice[] {
+  return sources.map(({ name, columns }): FormulaChoice => ({ kind: "source", name, columns: columnChoicesOf(columns.map(escapeCell)) }));
 }
 
 /** The choices a name typed right before the caret may be, and where the name is (from..to) */
@@ -118,28 +128,39 @@ export function formulaChoices(
 ): FormulaChoices | undefined {
   const column = columnTyped(text, start, end, typing);
   if (column) {
-    // Another table's column (prices![qu): its columns are not these, nothing offered; this table's own name's, they are
     const open = text.lastIndexOf("[", column.from);
-    const table = /([A-Za-z_][A-Za-z0-9_]*)!$/.exec(text.slice(0, open))?.[1];
-    if (table !== undefined && table.toLowerCase() !== own?.toLowerCase()) return undefined;
     const prefix = text.slice(column.from, start).toLowerCase();
     // By the name shown or the id written (unit_ finds Unit price too)
-    const choices = columns
-      .filter((c) => c.name.toLowerCase().startsWith(prefix) || c.id.toLowerCase().startsWith(prefix))
-      .map((c): FormulaChoice => ({ kind: "column", name: c.name, id: c.id }));
+    const starting = (c: { readonly name: string; readonly id?: string }) => c.name.toLowerCase().startsWith(prefix) || !!c.id?.toLowerCase().startsWith(prefix);
+    // A source's column (@tasks[du): its columns, as the source's choice has them; it has no row of the formula's ([@)
+    const source = /@([A-Za-z_][A-Za-z0-9_]*)$/.exec(text.slice(0, open))?.[1]?.toLowerCase();
+    if (source !== undefined) {
+      if (text[open + 1] === "@") return undefined;
+      const of = names.find((c) => c.kind === "source" && c.name.toLowerCase() === source);
+      const choices = (of?.columns ?? []).filter(starting).map((c): FormulaChoice => ({ kind: "column", name: c.name, id: c.id, source: of!.name }));
+      return choices.length ? { ...column, choices } : undefined;
+    }
+    // Another table's column (prices![qu): its columns are not these, nothing offered; this table's own name's, they are
+    const table = /([A-Za-z_][A-Za-z0-9_]*)!$/.exec(text.slice(0, open))?.[1];
+    if (table !== undefined && table.toLowerCase() !== own?.toLowerCase()) return undefined;
+    const choices = columns.filter(starting).map((c): FormulaChoice => ({ kind: "column", name: c.name, id: c.id }));
     return choices.length ? { ...column, choices } : undefined;
   }
   const typed = nameTyped(text, start, end);
   if (!typed) return undefined;
-  const prefix = text.slice(typed.from, typed.to).toLowerCase();
+  const written = text.slice(typed.from, typed.to).toLowerCase();
+  // "@" typed (@ta): the sources alone, by their names after it
+  const sourceTyped = written.startsWith("@");
+  const prefix = sourceTyped ? written.slice(1) : written;
   // Right after a table's name and ! (prices!va): that table's cells, by their names alone; another
   // page's table ([[Page]]prices!va): nothing, its names are not known while typing
   const before = text.slice(0, typed.from);
   if (/\]\][A-Za-z_][A-Za-z0-9_]*!$/.test(before)) return undefined;
-  const table = /([A-Za-z_][A-Za-z0-9_]*)!$/.exec(before)?.[1]?.toLowerCase();
+  const table = sourceTyped ? undefined : /([A-Za-z_][A-Za-z0-9_]*)!$/.exec(before)?.[1]?.toLowerCase();
   const ownCells = table !== undefined && table === own?.toLowerCase();
-  const candidates =
-    table === undefined
+  const candidates = sourceTyped
+    ? names.filter((choice) => choice.kind === "source")
+    : table === undefined
       ? [...names, ...functionNames().map((name): FormulaChoice => ({ kind: "function", name }))]
       : names
           .filter((choice) => choice.kind === "cell" && (ownCells ? !choice.table : choice.table?.toLowerCase() === table))
@@ -164,6 +185,8 @@ export function choiceText(choice: FormulaChoice): string {
       return choice.table ? `${choice.table}!${choice.name}` : choice.name;
     case "column":
       return `${choice.id ?? choice.name}]`;
+    case "source":
+      return `@${choice.name}`;
   }
 }
 
@@ -201,12 +224,13 @@ export function columnTyped(text: string, start: number, end: number, typing = f
 export function nameTyped(text: string, start: number, end: number): { from: number; to: number } | undefined {
   if (start !== end || !text.trimStart().startsWith("=")) return undefined;
   const before = text.slice(0, start);
-  // A name as functions and the page's names are written (a name may start with "_": names.ts)
-  const typing = /([A-Za-z_][A-Za-z0-9_.]*)$/.exec(before)?.[1];
+  // A name as functions and the page's names are written (a name may start with "_": names.ts); a source's after "@" (@ alone too)
+  const typing = /(@[A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_.]*)$/.exec(before)?.[1];
   if (!typing || CELL_RE.test(typing) || text[start] === "(" || /[A-Za-z0-9_.$]/.test(text[start] ?? "")) return undefined;
   // $A, A$: a cell being typed
   if (before[start - typing.length - 1] === "$") return undefined;
-  if (tokenize(before).error) return undefined;
+  // (Up to the name: "@" alone is no token yet)
+  if (tokenize(before.slice(0, start - typing.length)).error) return undefined;
   return { from: start - typing.length, to: start };
 }
 
@@ -281,10 +305,10 @@ export function argumentSpan(syntax: string, index: number): { from: number; to:
  * whose name starts with it first, then those with it in their name, then
  * the others, each in order of their names
  */
-export function findFunctions(query: string, category?: FunctionCategory | "custom"): FormulaFunction[] {
+export function findFunctions(query: string, category?: FunctionCategory | "custom"): AnyFunction[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   const name = words.join("");
-  const rank = (f: FormulaFunction) => {
+  const rank = (f: AnyFunction) => {
     const lower = f.name.toLowerCase();
     return lower.startsWith(name) ? 0 : lower.includes(name) ? 1 : 2;
   };
@@ -295,7 +319,8 @@ export function findFunctions(query: string, category?: FunctionCategory | "cust
       const text = `${f.name} ${f.description}`.toLowerCase();
       return words.every((word) => text.includes(word));
     })
-    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+    // Names are English: ordered so whatever the locale (in Czech CH comes after H)
+    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "en"));
 }
 
 /**

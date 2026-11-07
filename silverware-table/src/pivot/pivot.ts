@@ -5,23 +5,12 @@
 // gives the source and how formulas read it, this gives the table's cells.
 // The rows are read as they show (a formula cell by its result), so a group's
 // own formulas are not calculated again in it.
+import type { Calculated, CalculatedColumn } from "../calculated/index.ts";
 import { columnKey, columnName } from "../columns.ts";
 import { type Calculation, isErrorText, rowValues, type Scalar, scalarText, tableValue } from "../formulas/index.ts";
 import type { Table } from "../markdown.ts";
 import { compareValues } from "../view.ts";
 import { groupFormula, type PivotDefinition, valueParts } from "./definition.ts";
-
-/** A column of the pivot: what it stands for (kept through a refresh, its header named by the user), its header as made, its alignment */
-export type PivotColumn = { readonly id: string; readonly header: string; readonly numeric: boolean };
-
-export type Pivot = {
-  readonly columns: readonly PivotColumn[];
-  // The body's cells as written (texts), the totals' row last where it has one
-  readonly body: readonly (readonly string[])[];
-  // Whether its last row is the totals', and how many of its last columns are totals
-  readonly totalRow: boolean;
-  readonly totalColumns: number;
-};
 
 const TOTAL = "Total";
 // The type of a column of shares: a fraction shown as a percentage
@@ -62,8 +51,8 @@ function asShown(source: Table, calculation: Calculation): Table {
   return { ...source, rows: source.rows.map((row, r) => (r === 0 ? row : { ...row, cells: row.cells.map((cell) => calculation.cells.withoutFormula(cell)) })) };
 }
 
-/** The pivot of a source table by its definition */
-export function pivotOf(source: Table, definition: PivotDefinition, calculation: Calculation): Pivot {
+/** The pivot of a source table by its definition: a calculated table, its columns' ids row:<group>, value:<value>, column:<key>|<value>, total:<value> */
+export function pivotOf(source: Table, definition: PivotDefinition, calculation: Calculation): Calculated {
   const table = asShown(source, calculation);
   const headers = table.rows[0]?.cells ?? [];
   const count = table.rows.length - 1;
@@ -123,7 +112,7 @@ export function pivotOf(source: Table, definition: PivotDefinition, calculation:
   };
 
   // The columns: the groups', then each column key's values (or the values alone), then the rows' totals
-  const out: PivotColumn[] = definition.rows.map((item) => ({ id: `row:${item}`, header: headerOf(item, headers, false), numeric: false }));
+  const out: CalculatedColumn[] = definition.rows.map((item) => ({ id: `row:${item}`, header: headerOf(item, headers, false), numeric: false }));
   const cellsOf = (rows: readonly number[]): string[] => {
     if (!across) return definition.values.map((value) => valueOf(value, rows, rows));
     const byColumn = columnList.flatMap((column) => {

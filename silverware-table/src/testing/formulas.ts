@@ -8,7 +8,8 @@ import * as page from "../formulas/page.ts";
 import { type ExcelTable, excelFormula as excelFormulaOf } from "../excel/formulas.ts";
 import type { ExcelTemplates } from "../excel/functions.ts";
 import type { OtherPages, PageTable, Table } from "../markdown.ts";
-import { attributeName, metaName } from "../meta.ts";
+import { attributeName, metaName, metaPins, metaValue, withMetaPins } from "../meta.ts";
+import { calculatedTable, viewCalculated } from "../calculated/index.ts";
 import { cellNamesIn, rowNamesIn, withCellName } from "../names.ts";
 import { tagValue, withTagValue } from "../tagvalues.ts";
 
@@ -16,6 +17,23 @@ type IndexMap = domain.IndexMap;
 type TableSource = domain.TableSource;
 
 export const CELLS: domain.FormulaCells = formulaCellsOf({ get: (cell, key) => tagValue(cell, attributeName("formulas", key)), with: (cell, key, value) => withTagValue(cell, attributeName("formulas", key), value) }, { rowNames: rowNamesIn, cellNames: cellNamesIn });
+
+// The cells with views as the view module keeps them (view.formula in the metadata row), written with no header renamed
+export const VIEW_CELLS: domain.FormulaCells = {
+  ...CELLS,
+  calculated: (table) => {
+    const formula = metaValue(table, "view", "formula");
+    if (!formula) return undefined;
+    return {
+      formulas: [formula],
+      calculate: (read) => {
+        const result = domain.viewGrid(read.evaluate(formula));
+        return result instanceof domain.FormulaError ? result : calculatedTable(table, viewCalculated(result), {}, { pinsOf: metaPins, withPins: withMetaPins });
+      },
+      follow: () => table,
+    };
+  },
+};
 
 const named = (tables: readonly PageTable[]) => tables.map((t) => ({ ...t, name: metaName(t.table) }));
 
@@ -47,19 +65,24 @@ export const cellNamesOf = (table: Table) => domain.cellNamesOf(CELLS, table);
 export const referredPages = (table: Table) => domain.referredPages(CELLS, table);
 export const referredTableNames = (table: Table) => domain.referredTableNames(CELLS, table);
 export const callsCustomFunctions = (table: Table) => domain.callsCustomFunctions(CELLS, table);
-export const pageTables = (tables: () => readonly PageTable[], here: string, replace?: { readonly from: number; readonly table: Table }, others?: OtherPages) =>
-  page.pageTables(
-    CELLS,
-    () => named(tables()),
-    here,
-    replace && { ...replace, name: metaName(replace.table) },
-    others && {
-      tables: (name) => {
-        const list = others.tables(name);
-        return list ? named(list) : list;
+export const pageTables = (
+  tables: () => readonly PageTable[],
+  here: string,
+  replace?: { readonly from: number; readonly table: Table },
+  others?: OtherPages,
+  spaceSource?: (name: string) => Table | null | undefined,
+) =>
+  page.pageTables(CELLS, () => named(tables()), here, replace && { ...replace, name: metaName(replace.table) }, {
+    ...(others && {
+      pages: {
+        tables: (name: string) => {
+          const list = others.tables(name);
+          return list ? named(list) : list;
+        },
       },
-    },
-  );
+    }),
+    ...(spaceSource && { spaceSource }),
+  });
 export const pageNameChoices = (tables: readonly PageTable[]) => page.pageNameChoices(CELLS, named(tables));
 export const ownNameChoices = (table: Table) => page.ownNameChoices(CELLS, table);
 export const tablesWritten = (all: readonly PageTable[], source: string) => page.tablesWritten(CELLS, named(all), source);

@@ -35,18 +35,16 @@ import {
   type StoredRule,
   styleLook,
 } from "../conditions/index.ts";
-import { choiceText, FormulaError, type FormulasOffer, isErrorText, type Scalar, scalarText, withEquals } from "../formulas/index.ts";
+import { FormulaError, type FormulasOffer, isErrorText, type Scalar, scalarText } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import { parseTable, type Table, unescapeCell } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
 import { withoutTags } from "../tags.ts";
-import { type FormulaHelpers, openConditionsDialog, type RuleSample, type ScopeColumn } from "./conditionsdialog.ts";
+import type { FormulaHelpers } from "../formulafield.ts";
+import { openConditionsDialog, type RuleSample, type ScopeColumn } from "./conditionsdialog.ts";
 
 // How a formula condition refers to cells, under its field out of a function: one line
 const CONDITION_REFERENCES = { syntax: "[@column] · [column] · table![column] · cell_name", description: "The row's cell of a column, a whole column, another table's column, a named cell." };
-
-// What each kind of choice is, beside it in a formula's list
-const CHOICE_KINDS: Readonly<Record<string, string>> = { function: "function", column: "column", cell: "named cell", row: "named row", table: "table" };
 
 // The lines of a rule's preview (a whole table's rule column by column: one a column)
 const PREVIEW_LINES = 6;
@@ -119,10 +117,14 @@ export class Conditions implements Feature {
     });
   }
 
-  /** Custom conditions or formats defined anew: tables with rules look as they say now */
+  /**
+   * Custom conditions or formats defined anew, or what a formula condition reads changed (another page, a source of
+   * the space read anew): tables with rules look as they say now
+   */
   tablesChanged(): void {
-    // (A column type defined anew may read a value otherwise)
+    // (A column type defined anew may read a value otherwise; a formula condition another table)
     this.readers = new WeakMap();
+    this.evaluated = new WeakMap();
     for (const info of this.host.shownTables()) if (this.rulesIn(parseTable(info.source)).length) this.host.looksChanged(info);
   }
 
@@ -331,25 +333,8 @@ export class Conditions implements Feature {
     if (!formulas) return undefined;
     // The table as it is now (the dialog put aside, its columns may have been renamed meanwhile)
     const table = () => this.host.tableOf(this.host.tableFor(shownInfo.key) ?? shownInfo);
-    return {
-      complete: (text, caret) => {
-        const { formula, shift } = withEquals(text);
-        const made = formulas.complete(formula, caret + shift, this.host.pageText, table());
-        if (!made) return undefined;
-        return {
-          from: made.from - shift,
-          to: made.to - shift,
-          // A column shown by its header's name, put in by its id
-          choices: made.choices.map((choice) => ({ label: choice.kind === "column" ? choice.name : choiceText(choice).replace(/[([!]$/, ""), insert: choiceText(choice), kind: CHOICE_KINDS[choice.kind] ?? choice.kind })),
-        };
-      },
-      // Out of a function, how a condition refers to cells, in a line (the cell editor's longer help is of pointing in the table)
-      help: (text, caret) => {
-        const { formula, shift } = withEquals(text);
-        return formulas.help(formula, caret + shift) ?? CONDITION_REFERENCES;
-      },
-      problem: (text) => formulas.problem(text),
-    };
+    // Out of a function, how a condition refers to cells, in a line (the cell editor's longer help is of pointing in the table)
+    return formulas.fieldHelpers(table, CONDITION_REFERENCES);
   }
 
   private async save(info: TableInfo, rules: readonly StoredRule[]): Promise<void> {

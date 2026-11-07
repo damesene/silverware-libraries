@@ -9,6 +9,7 @@ import { ColumnTypes } from "./features/columntypes.ts";
 import { Conditions } from "./features/conditions.ts";
 import { Excel } from "./features/excel.ts";
 import { Pivot } from "./features/pivot.ts";
+import { Views } from "./features/views.ts";
 import { Export } from "./features/export.ts";
 import { Expressions } from "./core/silverbullet/modules/expressions.ts";
 import { Filters } from "./features/filters.ts";
@@ -28,6 +29,8 @@ import { CellPopup } from "./core/silverbullet/modules/popup.ts";
 import { Selection } from "./features/selection.ts";
 import { Sheet } from "./core/silverbullet/modules/sheet.ts";
 import { Sheets } from "./features/sheets.ts";
+import { Sources } from "./features/sources.ts";
+import type { SourceProvider } from "./sources.ts";
 import { Sticky } from "./core/silverbullet/modules/sticky.ts";
 import { TableLabels } from "./core/silverbullet/modules/labels.ts";
 import { Themes } from "./features/themes.ts";
@@ -39,8 +42,11 @@ import { Widths } from "./features/widths.ts";
  */
 export type FeatureEntry = { readonly name: FeatureName | undefined; readonly create: (host: TableHost) => AdapterFeature };
 
-/** The features in the order they get events; `metadata` is the controller's own (Remove metadata, also a page command) */
-export function featureEntries(metadata: Feature): readonly FeatureEntry[] {
+/**
+ * The features in the order they get events; `metadata` is the controller's own (Remove metadata, also a page
+ * command), `sources` what the host gives the sources module
+ */
+export function featureEntries(metadata: Feature, sources: SourceProvider): readonly FeatureEntry[] {
   const optional = (name: FeatureName, create: (host: TableHost) => AdapterFeature): FeatureEntry => ({ name, create });
   const always = (create: (host: TableHost) => AdapterFeature): FeatureEntry => ({ name: undefined, create });
   return [
@@ -58,8 +64,11 @@ export function featureEntries(metadata: Feature): readonly FeatureEntry[] {
     // Recalculate first in the toolbar
     optional("formulas", (host) => new Formulas(host)),
     optional("pageLinks", (host) => new PageLinks(host)),
+    optional("sources", (host) => new Sources(host, sources)),
     // After formulas: a pivot is calculated from its source as formulas left it
     optional("pivot", (host) => new Pivot(host)),
+    // Views are calculated by the formulas, through what it offers
+    optional("view", (host) => new Views(host)),
     // Before types: Filter right after the sorting in the column menu
     optional("filters", (host) => new Filters(host)),
     // After formulas: a formula's result is shown in its column's type

@@ -5,7 +5,7 @@
 // click); the dialog is the core's (ModelHost.openDialog), so the cell editor
 // stays open behind it.
 import type { Dialog, ModelHost } from "../core/feature.ts";
-import { findFunctions, FUNCTION_CATEGORIES, type FormulaFunction, type FunctionCategory } from "../formulas/index.ts";
+import { type AnyFunction, findFunctions, FUNCTION_CATEGORIES, type FunctionCategory } from "../formulas/index.ts";
 
 type Group = FunctionCategory | "custom" | undefined;
 
@@ -14,7 +14,10 @@ export class FunctionDialog {
 
   constructor(private readonly host: ModelHost) {}
 
-  /** Opens the dialog; `formula`: the formula being edited (the caret marked), `insert` gets the name picked */
+  /**
+   * Opens the dialog, over a dialog open (a view's, whose formula it is for); `formula`: the formula being
+   * edited (the caret marked), `insert` gets the name picked
+   */
   open(formula: string, insert: (name: string) => void): void {
     const { doc } = this.host;
     const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string) => {
@@ -24,7 +27,7 @@ export class FunctionDialog {
       return e;
     };
     let group: Group;
-    let found: FormulaFunction[] = [];
+    let found: AnyFunction[] = [];
     let picked = 0;
 
     const search = el("input", "swt-functions-search");
@@ -148,6 +151,7 @@ export class FunctionDialog {
       content,
       footer,
       focus: search,
+      above: true,
       closed: () => {
         this.dialog = undefined;
       },

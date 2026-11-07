@@ -3,10 +3,10 @@ import libraryPage from "../../../silverware-table.md?raw";
 import { BUILT_IN_FUNCTIONS as FUNCTIONS } from "./index.ts";
 import { FUNCTION_CATEGORIES } from "../function.ts";
 import { parse } from "../parser.ts";
-import { FormulaError, isError, parseClock, TimeValue, toText, type Value } from "../values.ts";
+import { asValue, FormulaError, isError, parseClock, TimeValue, toText, type Value } from "../values.ts";
 
-// Called in the first cell (A1); ROW() tests set the place itself
-const call = (name: string, ...args: Value[]) => FUNCTIONS[name]!.call(args, { row: 1, column: 1 });
+// Called in the first cell (A1); ROW() tests set the place itself (a grid a function taking grids gives, as its cells)
+const call = (name: string, ...args: Value[]) => asValue(FUNCTIONS[name]!.call(args, { row: 1, column: 1 }));
 const toTime = (text: string) => parseClock(text)!;
 
 describe("FUNCTIONS", () => {
@@ -16,7 +16,7 @@ describe("FUNCTIONS", () => {
     expect(f.description).not.toBe("");
     // The Functions table in silverware-table.md: | `SYNTAX` | Description |, an error code in it as code
     // (`#VALUE!`: else SilverBullet indexes it as a tag); the description itself is plain text (the Functions dialog's)
-    expect(libraryPage).toContain(`| \`${f.syntax}\` | ${f.description.replace(/#(?:VALUE!|DIV\/0!|N\/A|REF!|NAME\?|NUM!|CYCLE!)/g, "`$&`")} |`);
+    expect(libraryPage).toContain(`| \`${f.syntax}\` | ${f.description.replace(/#(?:VALUE!|DIV\/0!|N\/A|REF!|NAME\?|NUM!|CYCLE!|SPILL!|CALC!)/g, "`$&`")} |`);
     // In a group of the Functions dialog, with an example of it that formulas read
     expect(Object.keys(FUNCTION_CATEGORIES)).toContain(f.category);
     expect(f.example!.startsWith("=") && f.example!.includes(`${name}(`)).toBe(true);

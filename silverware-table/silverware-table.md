@@ -25,6 +25,10 @@ Makes the markdown tables in your pages interactive: edit cells in place, sort, 
 * **Paste from a spreadsheet**: copy cells in Excel or Google Sheets, click a cell, Ctrl+V; Ctrl+Shift+V adds them as new rows. See [[#Pasting from a spreadsheet]].
 * **Column types**: `| Price #currency |` shows `12.99` as `€12.99`, `#stars` a rating as stars, `#check` yes / no as ☑ / ☐, `#choice` one of a list of values (a status: open, in progress, done). See [[#Column types]] and [[#Choices]].
 * **Formulas**: type `=SUM(B1:B3)` or `=SUM([qty])` into a cell; the result is written into the markdown. See [[#Formulas]].
+* **Arrays in formulas**: `FILTER`, `SORT`, `UNIQUE`, `HSTACK`, `SEQUENCE` and more, as in Excel 365: `=COUNTA(UNIQUE([assignee]))`. See [[#Arrays]].
+* **Views**: a table made by one formula (`=FILTER(tasks![#Data], tasks![done] = FALSE)`), written anew as what it reads changes; *Insert view…* in a table's ⋯ menu, or `/view`. See [[#Views]].
+* **Pivot tables**: a table's rows grouped and summed, kept up to date; *Insert pivot table…* in its ⋯ menu, or `/pivot`. See [[#Pivot tables]].
+* **Tables from Space Lua**: a query of your space as a table formulas, views and pivots read as `@tasks`, given by `silverware.table.defineSource`; a `#choice` column can take its list from one too. See [[#Sources of the space]].
 * **The table's names**: the title of a table's ⋯ menu is its name (the pencil after it names it); under *Full screen* and *Sheet view*, the row *Sheet* says the sheet it is on (*Sheet: Budget*), its pencil to type another sheet's name, its × to take the table off it. Hold Shift and the toolbar shows both names too, left of its icons (above them where both do not fit); the *Names in the toolbar* setting shows them always, or never.
 * **Sheet view** (in a table's ⋯ menu) shows the table like a spreadsheet over the whole window, with empty rows and columns around it; type into one to grow the table. See [[#Sheet view]].
 * **Pin rows and columns** to the edges, where they stay in view (needs *Store table metadata*). See [[#Pinning]].
@@ -100,7 +104,7 @@ Makes the markdown tables in your pages interactive: edit cells in place, sort, 
 Formulas in the file:
 
 * References become Excel's: `[qty]` the table's column (`Table1[Qty]`, Excel's totals row not among its rows; with a total row elsewhere in the table, the column's rows as cells, such as `B2:B9`), `[@qty]` the cell in the formula's row (`[@Qty]`), `[@[jan]:[mar]]` the row's columns (`Table1[@[Jan]:[Mar]]`), `A1` (the first row under the header) Excel's `A2`, a named cell or row its cells. Functions are written as Excel has them: `CEILING` as `CEILING.MATH`, `ROW()` counting from the first row under the header, `DATEADD` with `+` or `EDATE`, `DATEDIF`'s units with Excel's.
-* A formula Excel cannot have is written as its value: one that refers to another table or page, a whole column with total rows between its rows, `TEXT` (Excel reads its format codes in its own language), `DATEADD` or `DATEDIF` whose unit comes from a cell, a custom function without an Excel form. The dialog lists them under *Download .xlsx* before the file is made, each with its cell (as Excel names it) and why, or says that every formula will be an Excel formula.
+* A formula Excel cannot have is written as its value: one that refers to another table or page, a whole column with total rows between its rows, `TEXT` (Excel reads its format codes in its own language), `DATEADD` or `DATEDIF` whose unit comes from a cell, the array functions (`FILTER`, `SORT`, `SORTBY`, `UNIQUE`, `CHOOSECOLS`, `TAKE`, `DROP`, `HSTACK`, `VSTACK`, `SEQUENCE`: Excel 365's only), a custom function without an Excel form. `[#Data]` is the table's `Table1[#Data]`; `#SPILL!` and `#CALC!`, which only Excel 365 knows, are written `#VALUE!`. The dialog lists them under *Download .xlsx* before the file is made, each with its cell (as Excel names it) and why, or says that every formula will be an Excel formula.
 * In Excel, dates, times, percentages and amounts are numbers: a formula that takes them as text (`[@due] & " due"`, `LEN`, `CONCAT`) gives Excel's number there (`45967 due`), where Silverware Table gives the text as written.
 * Excel calculates the formulas again when it opens the file. Formulas with operators on whole ranges (`SUM([qty] * [price])`) are written as array formulas, so older versions of Excel calculate them too; `XLOOKUP`, `TEXTJOIN`, `MAXIFS` and the like need Excel 2019, 2021 or 365.
 * Your custom functions are written as Excel formulas by templates in the setting `silverware.table.modules.excel.functions`: `{1}`, `{2}`… are the function's arguments (as Excel writes them), `false` writes the function's cells as their values. Write the template as Excel's English formulas are, with commas:
@@ -312,6 +316,7 @@ With the *Store table metadata* setting on (see [[#Settings]]), type a formula i
 | `[@qty]` | The Qty cell in the formula's own row, e.g. `=[@price]*[@qty]` |
 | `[@[jan]:[mar]]` | The formula's own row from the column Jan to Mar, e.g. `=SUM([@[jan]:[mar]])`, as Excel's tables write it; the formula's own column outside it, else `#CYCLE!` |
 | `prices![@price]`, `prices![@[jan]:[mar]]` | The same of a table by its name: of its own, its row; of another table, that table's row of the same number (the formula in the third row reads prices' third row; a row prices does not have is `#REF!`) |
+| `[#Data]`, `prices![#Data]` | The table's whole body, every row and column, as Excel's tables write it, without its total rows (as `[qty]`; a row with a formula using its own table's `[#Data]` is one too): for the array functions, e.g. `=TEXTJOIN(", ", TRUE, CHOOSECOLS(FILTER(prices![#Data], prices![price] > 10, ""), 1))` (see [[#Arrays]]) |
 
 * Edits made with Silverware Table keep references on their cells, as in a spreadsheet: inserting, deleting, moving and sorting rows (*Sort the rows in the markdown*), and inserting, deleting and moving columns. A row inserted inside a range widens it, a deleted one narrows it, and a reference to deleted cells becomes `#REF!`. Renaming a column renames its `[Name]` references.
 * Edits made in the markdown do not change references. `[qty]` and `[@qty]` are not affected by added or moved rows at all, so they are the safest choice for totals.
@@ -347,7 +352,7 @@ A cell can have a name, by which formulas use it: in its own table by the name a
 A row can have a name, by which formulas use its cells: `pear[price]` is the Price cell of the row named pear, `prices!pear[price]` of the table named prices, `[[Shop]]prices!pear[price]` on another page. The name stays with the row wherever it is moved or sorted (also in the markdown), and does not depend on what the row's cells say. Open the row's menu (the ⠿ grip left of the row), click the pencil after its title (*Row 3*, or the row's name), type the name and press Enter; an empty name removes it.
 
 * It is stored in the row's first cell as a hidden `<meta core.n='pear'>`: `| Pear <meta core.n='pear'> | 12 |`, as a column's name is in its header. A named row has a mark in the top left corner of its first cell; hover it for the name. A first cell that is also a named cell holds both in one tag: `<meta core.n='pear' core.cn='first'>`.
-* The name alone is the row's cells as a range, as `[price]` is a column's: `=SUM(pear)`, `=MAX(prices!pear)`. It is every cell of the row: a formula in that row is in its own range, `#CYCLE!` (put a row's total in another row, or another table). Where one value is asked for (`=pear*2`), it is `#VALUE!`. A cell named as the row (see [[#Named cells]]) goes first. In an Excel file it is the row's cells (`SUM(A2:D2)`).
+* The name alone is the row's cells as a range, as `[price]` is a column's: `=SUM(pear)`, `=MAX(prices!pear)`. It is every cell of the row: a formula in that row is in its own range, `#CYCLE!` (put a row's total in another row, or another table). Left as a cell's result (`=pear*2`), it is `#SPILL!` (several values). A cell named as the row (see [[#Named cells]]) goes first. In an Excel file it is the row's cells (`SUM(A2:D2)`).
 * A row's name is its table's: two rows of a table cannot have the same one. The column after it is written as any column reference (`[price]`, a column's name, `[price:2]`) and follows the column when it is renamed or moved.
 * `XLOOKUP("Pear", prices![name], prices![price])` does the same by a key column's value; a row's name works without one, and is not changed by editing the row's cells.
 * Deleting the column that holds rows' or cells' names removes the names with it: Silverware Table says which and asks first, as the formulas that use them then show `#REF!` or `#NAME?`.
@@ -385,11 +390,49 @@ The page's name in double brackets goes before the table's name: `[[Prices]]frui
 * The page is the name as SilverBullet writes it in links, without `#` or `|`.
 * With the `pageLinks` module off (see [[#Settings]]) Silverware Table reads no other page: formulas that refer to one keep the results they have, and a new one shows `#REF!`.
 
+### Sources of the space
+
+A script can give formulas a table of the space, built from a query: `silverware.table.defineSource({ name, data, columns })` in a `space-lua` block of yours names it and the function that gives its rows, and formulas read it as `@name`:
+
+```lua
+local function tasks()
+  return query[[from t = index.tag "task" select { name = t.name, page = t.page, due = t.due, done = t.done }]]
+end
+
+silverware.table.defineSource({
+  name = "tasks",
+  columns = { "name", "page", "due", "done" },
+  data = tasks,
+})
+```
+
+* `@tasks[due]` is a column of it, `@tasks` (or `@tasks[#Data]`) all its rows: `=COUNTIFS(@tasks[done], "FALSE")`, `=XLOOKUP([@id], @users[id], @users[email])`, a view `=FILTER(@tasks[#Data], @tasks[done] = "FALSE")`, a pivot of it (`pivot.source='@tasks'`, or *Sources of the space* in the pivot dialog's *Source*). A source has no cells to refer to (`@tasks!A1`) and no row of the formula's (`@tasks[@due]`): a query's rows have no fixed order.
+* `data` is a function returning a list of records, each a row: its columns are the first record's keys, then the keys new in later ones, in the order the script sets them. `columns` (optional) gives another order, or some of them only; give it where the query may return nothing, so the columns are known then too. A list of plain values (`select p.name`) is one column, `value`.
+* Values are written as text: numbers and texts as they are, `true` and `false` as `TRUE` and `FALSE`, a list as its values joined by a comma (`money, review`), `nil` and an object as an empty cell.
+* Its name is a table's (letters, digits and `_`, not starting with a digit), compared ignoring case; `@` keeps it apart from the page's tables.
+* The function runs when Space Lua loads, and again a moment after SilverBullet indexes a page, so the source follows the space. Nothing is written by it: a table whose formulas read a source that changed has *Recalculate* highlighted, a view or pivot of it *Out of date*; click to write the new results. A function that fails, or returns no list, is shown in a notification (once, until the problem changes); the source keeps the rows it had.
+* While a source has not run yet (or with the `sources` module off), formulas reading it keep the results they have; a source no script defines is `#REF!`.
+* `@` typed in a formula offers the sources, and `@tasks[` their columns. In an Excel file a formula reading a source is written as its value.
+* A `#choice` column can take its values from a source: see [[#Choices]].
+* `silverware.table.evaluate` reads sources too, but a `${…}` is not shown anew as a source changes (it follows the pages it read): it shows the source as it was when it was rendered.
+
 ### Operators and values
 
 * `+ - * / ^` (power), `%` after a number (`50%` is 0.5), `&` joins text, `= <> < > <= >=` compare (numbers as numbers, text ignoring case).
 * Numbers with a decimal point (`1.5`), text in double quotes (`"a ""quoted"" word"`), `TRUE`, `FALSE`.
 * Function arguments are separated by `,` or `;`. Function names may be in any case.
+
+### Arrays
+
+`FILTER`, `SORT`, `SORTBY`, `UNIQUE`, `CHOOSECOLS`, `TAKE`, `DROP`, `HSTACK` and `VSTACK` work on arrays, as Excel 365's do: a range of several rows and columns (`A1:C9`), a column (`[qty]`, `prices![price]`), a whole table (`prices![#Data]`), or the result of another of them. They keep the rows and columns of what they get, so `SORT(prices![#Data], 2, -1)` sorts whole rows by the second column. `SEQUENCE` makes one of numbers (at most 1,048,576 of them).
+
+* **A cell holds one value**, so use them inside a function that makes one of the array: `=COUNTA(UNIQUE([assignee]))` (how many people), `=SUM(FILTER(orders![amount], orders![status] = "paid"))`, `=TEXTJOIN(", ", TRUE, SORT(UNIQUE([tag])))` (a sorted list in one cell), `=SUM(TAKE(SORT([score], 1, -1), 3))` (the three highest). In a calculated column, per row: `=TEXTJOIN(", ", TRUE, FILTER(tasks![name], tasks![assignee] = [@name], ""))` (the names of their tasks), `=SUM(FILTER(tasks![hours], tasks![assignee] = [@name], 0))`.
+* An array of one value is that value: `=TAKE(SORTBY(people![name], people![score], -1), 1)` is who scored most.
+* A table made of an array, kept up to date, is a view: see [[#Views]].
+* An array of several values left as a cell's result is `#SPILL!` (Excel would spill it into the cells around; here a cell keeps one value). Its values can still be seen: hover the cell (or select it) and click ⤢ at its corner, or pick *Show result* in its menu (Ctrl+Shift+Enter on the cell selected). The result shows over the window as a table, read only: the formula and its size above it, ⧉ copying it all (for Excel, or to paste as a new table), × or Esc closing it. At most 2,000 rows are drawn; the copy has every one. *Copy result* in the cell's menu copies it without showing it. Ctrl+C copies what the cell shows, `#SPILL!`.
+* `FILTER` keeping nothing is `#CALC!`; its third argument says what to give then: `=SUM(FILTER([amount], [paid], 0))` is 0, not an error. `COUNTA` counts an error as a value (as in Excel), so to count what a condition keeps use `COUNTIFS` (`=COUNTIFS(tasks![assignee], [@name])`), not `COUNTA(FILTER(…))`.
+* `HSTACK` puts arrays side by side, `VSTACK` one under another; one shorter (or narrower) than the others is padded with `#N/A`, as in Excel, and an argument that is an error (a `FILTER` keeping nothing) makes the whole result that error. In a view, `HSTACK` adds a calculated column beside a table's: `=HSTACK(CHOOSECOLS(FILTER(tasks![#Data], tasks![done] = FALSE), 1), "[[" & FILTER(tasks![page], tasks![done] = FALSE) & "]]")` (each open task and a link to its page).
+* Operators work on a column or a row cell by cell, as on ranges (`FILTER([name], [qty] * [price] > 100)`); on an array of several rows and columns they are `#VALUE!` for now: pick a column first (`CHOOSECOLS`).
 
 ### Dates
 
@@ -455,6 +498,16 @@ The *Functions* dialog shows them all: **Functions…** (fx) under a formula bei
 | `TRIM(text)` | The text without spaces at its start and end, and with one space where there were several. |
 | `ROW()` | The row of the cell the formula is in, counted in the table as written: 1 is the first row under the header. =ROW() in every row of a column numbers the rows. |
 | `XLOOKUP(value, lookup_range, result_range, [if_not_found], [match_mode], [search_mode])` | Finds the value in one range or column and gives the value in the same place of another, e.g. XLOOKUP("Pear", prices![Name], prices![Price]); text is found ignoring case. Not found: if_not_found, else `#N/A`. match_mode: 0 the same value (the default), -1 or else the next smaller, 1 or else the next larger, 2 with wildcards (* any text, ? one character). search_mode: 1 from the first (the default), -1 from the last. |
+| `FILTER(array, include, [if_empty])` | The rows of the array (a range, a column, a whole table) for which include is TRUE, e.g. FILTER(tasks![name], tasks![done] = FALSE); include as long as the array's rows, or a row as wide as its columns to keep columns. Nothing kept: if_empty, else `#CALC!`. |
+| `SORT(array, [sort_index], [sort_order], [by_col])` | The array's rows sorted by one of its columns, sort_index (1, the first, by default): sort_order 1 ascending (the default) or -1 descending; numbers, then text ignoring case, then logical values, empty cells last. by_col TRUE sorts its columns by a row. |
+| `SORTBY(array, by_array1, [sort_order1], …)` | The array's rows sorted by other columns of as many rows, the first by_array first, each with its sort_order: 1 ascending (the default) or -1 descending, e.g. SORTBY(people![name], people![score], -1). Rows as wide as the array's columns sort its columns. |
+| `UNIQUE(array, [by_col], [exactly_once])` | The array's rows, each once, in their order (text compared ignoring case), e.g. UNIQUE(tasks![assignee]). by_col TRUE compares its columns; exactly_once TRUE keeps only those that occur once. |
+| `CHOOSECOLS(array, col_num1, [col_num2], …)` | The columns of the array at these places, in this order: 1 the first, -1 the last, e.g. CHOOSECOLS(A1:D9, 1, 3). |
+| `TAKE(array, rows, [columns])` | The first rows of the array (the last where rows is negative), and with columns its first (or last) columns, e.g. TAKE(SORT([score], 1, -1), 3) the three highest; rows left empty takes all of them. |
+| `DROP(array, rows, [columns])` | The array without its first rows (its last where rows is negative), and with columns without its first (or last) columns, e.g. DROP(SORT([score], 1, -1), 1) all but the highest; rows left empty drops none. |
+| `HSTACK(array1, [array2], …)` | The arrays side by side, each keeping its columns' names; a shorter one padded with `#N/A`, e.g. HSTACK(tasks![name], tasks![due]) or a column calculated beside a table's. |
+| `VSTACK(array1, [array2], …)` | The arrays one under another, their columns named as the first one's; a narrower one padded with `#N/A`, e.g. VSTACK(people![#Data], staff![#Data]) or a total row under a table's rows. |
+| `SEQUENCE(rows, [columns], [start], [step])` | Numbers in rows and columns, along each row first: from start (1) by step (1), e.g. SEQUENCE(5) 1 to 5 in a column, SEQUENCE(1, 3, 0, 10) 0, 10, 20 in a row. |
 | `TEXT(value, format)` | A number, a date or a time as text in a format: TEXT(A1, "#,##0.00"), TEXT(A1, "0%"), TEXT(A1, "dd.mm.yyyy hh:mm"), TEXT(A1, "[h]:mm") for all the hours of a length of time. Number codes: 0 (a digit), # (a digit where it counts), , (thousands), . (decimals), %, and ; between formats of positive;negative;zero numbers ("0.00;(0.00)"); date codes: yyyy, yy, m, mm, d, dd, h, hh, m, mm (minutes), s, ss, [h], [m], [s]; text in quotes as it is. |
 | `TODAY()` | Today's date, e.g. 2025-11-06. The result is written when the table is calculated: the next day, Recalculate updates it. |
 | `NOW()` | The date and time now, e.g. 2025-11-06 14:30:15. The result is written when the table is calculated: Recalculate updates it. |
@@ -627,6 +680,8 @@ end)
 | `#NUM!` | A result that is not a finite number, or a number a function cannot take (`LARGE` with k past the count, `WEEKDAY` with an unknown type) |
 | `#N/A` | `XLOOKUP` did not find the value, or `RANK` the number |
 | `#CYCLE!` | The formula depends on its own result |
+| `#SPILL!` | The result is several values and a cell holds one (see [[#Arrays]]: *Show result* shows them) |
+| `#CALC!` | An array function left nothing (`FILTER` keeping no row without its if_empty, `TAKE` of no rows, `SEQUENCE` of none) |
 | `#ERROR!` | The formula cannot be read (e.g. a missing `)`) |
 
 An error is written into the markdown with its `#` escaped (`\#REF!`), so SilverBullet does not take it for a hashtag (it would tag the row `REF`); it shows as `#REF!`. A table written before shows *Out of date* once, and Recalculate writes its errors so.
@@ -659,7 +714,7 @@ shows `$12.99`, `★★★★☆` and `☑`.
 | `#unit-kg` | A number with a unit: the unit after the dash. |
 | `#stars, #stars-10` | A rating as stars: a whole number from 0 to the most stars after the dash (default 5). |
 | `#check` | Yes or no as a check box: yes, true, x, ☑ or a number above 0 shows ☑; no, false, ☐, 0 or a number below it shows ☐. |
-| `#choice, #choice-name` | One of a list's values: the list named after the dash, kept in the table (picking Choice opens a dialog to set it up). A value not in the list is marked, and the column sorts in the list's order. Without a list the editor offers the values the column has. |
+| `#choice, #choice-name` | One of a list's values: the list named after the dash, kept in the table as values or as a formula making them (=@projects; picking Choice opens a dialog to set it up). A value not in the list is marked, and the column sorts in the list's order. Without a list the editor offers the values the column has. |
 | `#date, #date-long` | A date written as 2025-11-06 (with a time: 2025-11-06 14:30), shown as the locale writes it: short, medium (default) or long after the dash. |
 | `#time` | A time of day written as 14:30 or 14:30:15 (or as a fraction of a day, 0.5 is 12:00), shown as the locale writes times. |
 | `#trend` | A trend as an arrow: + or a number above 0 shows ↑, - or one below 0 shows ↓, = or 0 shows =. |
@@ -680,7 +735,20 @@ A `#choice` column takes one of a list of values, as a status column (open, in p
 | <meta core.table columntypes.choice.status='["open","in progress","done"]'> |
 ```
 
-* Picking *Choice* in the *Type* menu opens the *Choices* dialog (so does the pencil in the column's *Type: Choice* row): *The column's values* makes it `#choice`, which offers the values the column has and checks nothing; *A list of its own* sets up a list: its name, and its values one a line (dragged by the ⠿ left of each, or Alt+↑ ↓, to order them, Enter for a new one, *Take values from the column* to add those the column has). A new list starts with the column's values and is named after the column. Lists are kept in the table's metadata, so saving one needs the *Store table metadata* setting. Nothing changes until Save.
+* Picking *Choice* in the *Type* menu opens the *Choices* dialog (so does the pencil in the column's *Type: Choice* row). Its row at the top picks where the values come from, what each does in a line under it: *Column's values* makes it `#choice`, which offers the values the column has and checks nothing; *Own list* sets up a list: its name, and its values one a line (dragged by the ⠿ left of each, or Alt+↑ ↓, to order them, Enter for a new one, *Take values from the column* to add those the column has). A new list starts with the column's values and is named after the column; *Formula* makes it of a formula (below). Lists are kept in the table's metadata, so saving one needs the *Store table metadata* setting. Nothing changes until Save.
+* A list can be made by a formula instead of values typed: *Formula* takes one, a source of the space ([[#Sources of the space]]) as `=@projects` (one of its columns: `=@users[name]`; `@` typed offers the sources) or any other (`=SORT(UNIQUE(tasks![status]))`, `=FILTER(@users[name], @users[active])`). The dialog shows the values it gives as you type. The table keeps the formula as the list (`columntypes.choice.projects='=@projects'`), so it says where its values come from, read in its markdown with no script known:
+
+  ```markdown
+  | Task | Project #choice-projects |
+  |------|--------------------------|
+  | A    | Atlas                    |
+  | <meta core.table columntypes.choice.projects='=@projects'> |
+  ```
+
+  * Its values are the formula's result as the column shows (nothing is written): a list, or a table of one column, in its order (sort it with `SORT(…)`), empty ones and repeats left out (whatever their case), numbers and `TRUE` / `FALSE` as cells show them. It follows what it reads: a source read anew, another table of the page edited.
+  * A result that is an error, or a table of several columns, checks nothing: the column's type icon says why in its tooltip, so does the dialog. So does a list whose formula reads a source not read yet, or with the `formulas` module off.
+  * Renaming a column or table of the page the formula reads, with Silverware Table, changes the formula with it, in the same edit.
+  * In the *Type* menu such a list is under *Choice* as any other, its formula in its tooltip (`=@projects · Used by Project`).
 * Renaming a value in the *Choices* dialog renames it in the cells of every column that takes the list; renaming the list renames it in their headers. A value removed from the list stays in its cells, marked.
 * The cell editor offers the list's values; a value not in the list is kept as typed and marked in red. Values match whatever their case.
 * Sorting by the column puts the values in the list's order (open, in progress, done), not the alphabet's.
@@ -746,7 +814,7 @@ It is a plain markdown table, its numbers written in it (it shows anywhere, as a
 
 | Attribute | What it says |
 |---|---|
-| `pivot.source` | The table summarized: a table of the page by its name (see [[#Table names]]), or of another page as formulas refer to it: `[[Orders]]orders` |
+| `pivot.source` | The table summarized: a table of the page by its name (see [[#Table names]]), of another page as formulas refer to it: `[[Orders]]orders`, or a source of the space: `@tasks` (see [[#Sources of the space]]) |
 | `pivot.rows` | What groups the rows: a column (`region`), or a formula of one row (`TEXT([@date], "yyyy-mm")`, `YEAR([@date])`), several comma separated |
 | `pivot.columns` | What makes columns of the groups, the same way (optional): a cross table |
 | `pivot.values` | What each group shows: formulas over its rows, `SUM([revenue])`, `AVERAGE([qty])`, `COUNTA([date])`, `SUM([qty] * [price])`, comma separated; `SHARE(…)` around one shows it as a share of the grand total (`SHARE(SUM([revenue]))`), `SHARE(…, "row")` of its row's total, `SHARE(…, "column")` of its column's, its column typed `#percent-1`; SHARE is the pivot's, so it is the whole value or nothing (`SHARE(…) * 100` is `#NAME?`) |
@@ -754,13 +822,35 @@ It is a plain markdown table, its numbers written in it (it shows anywhere, as a
 | `pivot.sort` | The rows' order: groups or values as the definition writes them, each with `desc` where it goes down (`SUM([revenue]) desc, region`); by default the groups, as numbers, dates or texts sort |
 | `pivot.totals` | `both` (the default): the Total row and, with columns, the Total column; `row`: the Total row alone; `column`: the Total column alone; `none` |
 
-* An edit of its source with Silverware Table writes the pivot anew in the same edit: one Ctrl+Z takes back both. Its source renamed, the pivot names it so.
+* An edit of its source with Silverware Table writes the pivot anew in the same edit: one Ctrl+Z takes back both. Its source renamed, the pivot names it so. A table whose formulas read the pivot, and a view of it, are written anew in the same edit too; a pivot's source may be a view.
+* A pivot that cannot be calculated (its source gone) keeps its numbers; the formulas reading it show the error, as for a view.
 * Edited by hand (in its markdown) the source is ahead of the pivot: its **Refresh pivot** icon in the toolbar is highlighted, and its tab says *Out of date* (*Cannot be calculated* where it cannot be); click Refresh pivot and the pivot is calculated anew.
 * A source on another page is as a formula's table there (see [[#Other tables]]): its edits do not write the pivot; once SilverBullet has indexed that page, **Refresh pivot** is highlighted where the pivot is out of date. Renamed there, the source (or its columns) is not followed: the pivot says what it cannot find, and its settings fix it. It needs the `pageLinks` module.
+* A source of the space (`@tasks`) changed: **Refresh pivot** is highlighted; while it has not been read, the pivot keeps its numbers.
 * Its values are calculated, so its cells are not edited: the editor does not open on them (it says why, and the pivot's settings open instead, where what it shows is changed), and its menus offer nothing that changes them or adds, moves or deletes its rows and columns (nor *Unpin all*: its totals are pinned by it). Its grips open their menus but do not drag, and its cells selected have no edge to drag them by. The order of its groups and values is set in its dialog (↑ ↓ beside each). Rename a header as in any table: the pivot keeps your name (and a type's hashtag added to it) when it is calculated again.
 * It says what it is at a glance: *Pivot of orders* in a small tab at its top right corner (with the `tableLabels` module), `Pivot of [[Orders]]orders` for a source on another page, as its definition writes it.
 * Its totals are pinned: the Total row to the bottom, a cross table's Total column to the right, so they stay in view and out of a sort (with *Store table metadata*).
 * It needs the `formulas` module.
+
+## Views
+
+A view is a table made by one formula: its rows are the formula's result, as Excel 365 spills a `FILTER` or a `SORT`, kept in a table of its own. **Insert view…** in a table's ⋯ menu opens a dialog with the table's whole body to start from (`=tasks![#Data]`; a table without a name gets one in the same edit, as a view reads tables by their names): type the formula (names and functions are offered as you type, the function the caret is in is explained, **fx** finds one by what it does), name the view, and the table it makes shows under them as you type, with its size; *Insert* writes it under the table. The *Silverware Table: Insert view* command, or `/view` typed in the page, opens the same dialog starting from the page's first named table and writes the view where the cursor is. **View settings…** in a view's toolbar opens it to change the formula or the name.
+
+````markdown
+| Name | Assignee | Hours |
+|---|---|---:|
+| Write | anna | 3 |
+| Ship | anna | 2 |
+| <meta core.table core.name='annas' view.formula='=SORT(FILTER(tasks![#Data], tasks![assignee] = "anna"), 3, -1)'> |
+````
+
+* **What a formula gives**: rows and columns (`FILTER(tasks![#Data], …)`, `CHOOSECOLS(…)`), a list (`=SORT(UNIQUE(tasks![assignee]))`: one column), or one value (`=SUM(tasks![hours])`: one cell). See [[#Arrays]] for the functions. A result of no rows is the header alone.
+* **Its headers** are the names of the columns its values come from (`Assignee`), else letters (A, B, C). Rename a header as in any table: the view keeps your name (and a type's hashtag added to it) whenever it is calculated again; empty it, or give it its name back, and it follows its source again.
+* **It follows what it reads**: an edit of a table it reads, with Silverware Table, writes the view anew in the same edit (one Ctrl+Z takes back both), and so does a table whose formulas read the view, in the same edit too. The table it reads renamed, or its columns renamed or moved, the view's formula says so.
+* Changed otherwise (its source typed in the markdown, a table on another page it reads, a source of the space it reads, `TODAY()` moved on), the view's tab says *Out of date* and its **Refresh view** icon in the toolbar is highlighted; click it and the view is calculated anew. A formula that cannot be calculated (its table gone: `#REF!`; `FILTER` keeping nothing without its third argument: `#CALC!`; a view reading itself or two reading each other: `#CYCLE!`) writes nothing: the view keeps what it shows, its tab says *Cannot be calculated* and its Refresh view icon why.
+* **A named view is a table like any other** for formulas (`=SUM(annas![hours])`), pivots, charts and exports; its numbers are written in the markdown, so it shows anywhere.
+* Its values are its formula's, so its cells are not edited: a press on one says why and opens its settings, and its menus offer nothing that changes them or adds, moves or deletes its rows and columns. A large result is written whole (the dialog says so past 1,000 rows).
+* Its formula is in its metadata row (`view.formula`), its renamed headers too (`view.headers`); it needs *Store table metadata* and the `formulas` module (off: the dialog says so and inserts nothing; views keep their values). In an Excel file a view is its values.
 
 ## Rows and columns
 
@@ -1183,6 +1273,7 @@ Each module can be turned off with `enabled = false`, e.g. `config.set("silverwa
 | `formulas` | Formulas can be typed into cells, with their help and references; *Recalculate* in the toolbar; every edit recalculates the table and the tables referring to it, and references follow moved rows and columns. Off: nothing is recalculated, results stay as written, and references do not follow moves. A typed formula is saved as text; a formula cell edited, pasted over or emptied keeps its formula (hidden), which is used again once formulas are on. See [[#Formulas]]. |
 | `names` | Tables, columns, rows and cells can be named: the pencil in the title of a table's ⋯ menu, a column's, a row's or a cell's menu; named headers and cells show a mark. Off: none of these, and no marks; names already in tables are kept and formulas still use them, but a duplicated row copies them too. See [[#Table names]]. |
 | `pageLinks` | Formulas can refer to tables and named cells on other pages (`[[Prices]]fruit!B2`), which Silverware Table reads for them. Off: it reads no other page; formulas that refer to one keep the results they have (the formulas using them too), a new one shows `#REF!`. It needs the `formulas` module. See [[#Tables on other pages]]. |
+| `sources` | Formulas, views, pivots and choice lists read the sources of the space a script gives (`silverware.table.defineSource`, read as `@tasks`). Off: no source is read; formulas, views and pivots reading one keep what they show, a choice list of one checks nothing. See [[#Sources of the space]]. |
 | `filters` | Rows can be filtered: the toolbar's filter icon shows a filter field under each header, *Filter* in a column menu opens that column's filter, *Filter: = value* in the cell menu filters by a cell's value; with *Store table metadata* the filters are stored in the table. Its setting `smart` (default `true`): fields understand `>10`, `/pattern/`, `=text`, `a\|b` and `!filter`; `false`: everything typed is text to find. Off: no filtering; filters stored in a table are kept but not used. See [[#Filtering]]. |
 | `columnTypes` | A header's type hashtag formats its column, the cell editor offers the type's values, and the column menu has *Type*. Off: cells show as written. See [[#Column types]]. |
 | `conditions` | Conditional formatting: rules that color cells by their values, from a column's menu and the table's ⋯ menu; a table with rules shows their icon in its toolbar. Off: cells look as they are; rules stored in tables are kept but not used. See [[#Conditional formatting]]. |
@@ -1192,6 +1283,7 @@ Each module can be turned off with `enabled = false`, e.g. `config.set("silverwa
 | `export` | *Copy as CSV* and *Copy as Markdown* in the table's ⋯ menu copy the whole table. |
 | `autofill` | The fill handle at the corner of the cells selected: drag it to fill the cells after them, double-click it to fill down. See [[#AutoFill]]. Needs `selection`. Off: no handle. |
 | `pivot` | Pivot tables: a table defined in its metadata row as a summary of another, calculated anew with each edit of it, *Refresh pivot* in its toolbar. Needs `formulas`. Off: pivots stay as written, their cells edited as any table's. See [[#Pivot tables]]. |
+| `view` | Views: a table made by one formula (`view.formula` in its metadata row), calculated anew with each edit of what it reads, *Insert view…*, *View settings…* and *Refresh view*. Needs `formulas`. Off: views stay as written, their cells edited as any table's. See [[#Views]]. |
 | `excel` | *Export to Excel…* in the table's ⋯ menu: copy for Excel, or download an .xlsx file with the formulas. Setting `functions`: templates for your custom functions in the file. See [[#Excel]]. |
 | `paste` | Copy, Cut and Paste in the cell menu; Ctrl+X cuts cells (they move where they are pasted); Ctrl+V pastes cells copied from a spreadsheet over the table, Ctrl+Shift+V as new rows. Off: a paste goes into the cell editor as text, no Cut or Paste in the cell menu (Copy and Ctrl+C stay, with the `selection` module). |
 | `handles` | The handles beside rows and above columns: drag them to move rows and columns, click them for the row and column menus. Off: rows and columns still move with Ctrl+Alt+arrows, and the **+** on a border still inserts them. |

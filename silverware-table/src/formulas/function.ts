@@ -1,4 +1,4 @@
-import type { Scalar, Value } from "./values.ts";
+import type { Result, Scalar, Value } from "./values.ts";
 
 /**
  * A function formulas can call: a built-in one (builtin/, where a test
@@ -31,6 +31,26 @@ export type FormulaFunction = {
    */
   readonly call: (args: readonly Value[], context: FunctionContext) => Scalar;
 };
+
+/**
+ * A built-in function that takes grids and may give one (FILTER, SORT…): its
+ * arguments as they are, a reference to several rows and columns (A1:C5,
+ * prices![#Data]) a Grid, a column (prices![due]) a list, which `asGrid`
+ * takes as a grid of one column. Any other function (a custom one too) gets a
+ * grid's cells as a list. A grid it gives is a cell's result only where it is
+ * one value (`cellValue`), else #SPILL!.
+ */
+export type GridFunction = Omit<FormulaFunction, "call"> & {
+  readonly grids: true;
+  readonly call: (args: readonly Result[], context: FunctionContext) => Result;
+};
+
+/** Any function formulas can call */
+export type AnyFunction = FormulaFunction | GridFunction;
+
+export function takesGrids(f: AnyFunction): f is GridFunction {
+  return "grids" in f && f.grids === true;
+}
 
 /** Where a formula is calculated */
 export type FunctionContext = {

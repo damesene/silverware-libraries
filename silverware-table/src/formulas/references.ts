@@ -56,6 +56,14 @@ export function areaOf(start: CellAddress, end: CellAddress = start): { area: Ar
 /** The table a reference is to, when it is not the formula's own: by its name, on a page (none: this one) */
 export type TableRef = { readonly name: string; readonly page?: string };
 
+/** A source of the space a reference is to (@tasks): a table no page has, by its name */
+export type SourceRef = { readonly source: string };
+
+/** How a reference's table is written before what it refers to of it, in errors: prices!, @tasks; none for the formula's own */
+export function tablePrefix(table: TableRef | SourceRef | undefined): string {
+  return !table ? "" : "source" in table ? `@${table.source}` : `${table.name}!`;
+}
+
 /** A1 or A1:B3 for an area of body rows and columns, its fixed edges with $ */
 export function areaText(area: Area, fixed?: Fixed): string {
   const start = cellName(area.top, area.left, fixed && { column: fixed.left, row: fixed.top });
@@ -154,6 +162,8 @@ export function references(formula: string): Reference[] {
     const token = tokens[i]!;
     const previous = tokens[i - 1];
     const table = previous?.kind === "table" ? { table: tableRefOf(previous) } : {};
+    // A source's column (@tasks[due]) is no cell of the page's tables
+    if (token.kind === "column" && previous?.kind === "source") continue;
     if (token.kind === "column") {
       // pear[price]: the row named pear (of prices! before it, if written)
       const row = previous?.kind === "name" && isRowName(tokens, i - 1) ? previous.text : undefined;
@@ -234,10 +244,33 @@ export function referredPages(cells: FormulaCells, table: Table): Set<string> {
 
 /** The other pages a formula refers to */
 export function formulaPages(formula: string): string[] {
-  return [
-    ...references(formula).flatMap((ref) => (ref.table?.page ? [ref.table.page] : [])),
-    ...namedReferences(formula).flatMap((ref) => (ref.page ? [ref.page] : ref.table?.page ? [ref.table.page] : [])),
-  ];
+  return formulaOutside(formula).pages;
+}
+
+/** The sources of the space a formula reads (@tasks), by their names as written */
+export function formulaSources(formula: string): string[] {
+  return formulaOutside(formula).sources;
+}
+
+/** What a formula reads outside its page, in one pass over its tokens: other pages, and sources of the space by their names */
+export function formulaOutside(formula: string): { readonly pages: string[]; readonly sources: string[] } {
+  const pages: string[] = [];
+  const sources: string[] = [];
+  for (const token of tokenize(formula).tokens) {
+    // A table's token ([[Page]]prices!, before a cell, a column, a name or [#Data]), or a name of the page alone ([[Page]]vat)
+    if ((token.kind === "table" || token.kind === "named") && token.page !== undefined) pages.push(token.page);
+    else if (token.kind === "source") sources.push(token.name);
+  }
+  return { pages, sources };
+}
+
+/** The sources of the space (lowercase) a table's formulas read */
+export function referredSources(cells: FormulaCells, table: Table): Set<string> {
+  const names = new Set<string>();
+  forFormulas(cells, table, (formula) => {
+    for (const name of formulaSources(formula)) names.add(name.toLowerCase());
+  });
+  return names;
 }
 
 /**
@@ -259,14 +292,33 @@ export function callsCustomFunctions(cells: FormulaCells, table: Table): boolean
   return calls;
 }
 
+// Functions whose result is not of their arguments alone: of the time, of chance
+const VOLATILE = new Set(["TODAY", "NOW", "RAND", "RANDBETWEEN"]);
+
+/**
+ * Whether a formula's result is of what it reads alone: every function it calls built in (a custom one is defined
+ * anew as Space Lua loads) and none of the time or chance (TODAY()): what may be kept by what it read (a pivot)
+ */
+export function callsPureFunctionsOnly(formula: string): boolean {
+  const { tokens } = tokenize(formula);
+  return tokens.every((token, i) => {
+    const next = tokens[i + 1];
+    if (token.kind !== "name" || next?.kind !== "op" || next.text !== "(") return true;
+    const name = token.text.toUpperCase();
+    return !VOLATILE.has(name) && isBuiltInFunction(name) && !isCustomFunction(name);
+  });
+}
+
 /** The names (lowercase) of the tables on the page that a table's formulas refer to, so they change when those do */
 export function referredTableNames(cells: FormulaCells, table: Table): Set<string> {
   const names = new Set<string>();
   forFormulas(cells, table, (formula) => {
-    // Table tokens, not references: prices!#REF! is to prices too
-    for (const token of tokenize(formula).tokens) {
-      if (token.kind === "table" && token.page === undefined) names.add(token.name.toLowerCase());
-    }
+    for (const name of formulaTableNames(formula)) names.add(name);
   });
   return names;
+}
+
+/** The names (lowercase) of the tables on the formula's page it refers to: table tokens, not references (prices!#REF! is to prices too) */
+export function formulaTableNames(formula: string): string[] {
+  return tokenize(formula).tokens.flatMap((token) => (token.kind === "table" && token.page === undefined ? [token.name.toLowerCase()] : []));
 }

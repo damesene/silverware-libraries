@@ -32,13 +32,17 @@ import type {
 import {
   type Area,
   areaText,
+  asGrid,
   autofixFormula,
+  cellWholeResult,
+  errorCodeIn,
   callsCustomFunctions,
   columnRangeText,
   columnRefText,
   cycleFixed,
   evaluateFormula,
   rowValues,
+  listResult,
   filledFormula,
   type FormulaCells,
   formulaCount,
@@ -48,9 +52,11 @@ import {
   type FormulasOffer,
   formulasAfterEdit,
   followFormula,
+  followOwnFormula,
   followTable,
   choiceText,
   formulaChoices,
+  sourceChoices,
   nameTyped,
   needsOperator,
   type FormulaChoice,
@@ -65,6 +71,7 @@ import {
   type Reference,
   referencedColumn,
   referredPages,
+  referredSources,
   referredTableNames,
   references,
   referenceSlot,
@@ -72,18 +79,25 @@ import {
   REF_ERROR,
   type TableSource,
   type Value,
+  viewResult,
+  calculatedNow,
+  type CalculatedOffer,
+  type HeldFormulasOffer,
   withAreasWritten,
   withColumnKeys,
   writtenArea,
 } from "../formulas/index.ts";
-import { cellName, columnChoicesOf, columnIdText, FormulaError, type FormulaErrorAt, functionHelp, parseFormula, withEquals } from "../formulas/index.ts";
-import { addAffected, affectedBy, isAffected, type NamedOtherPages, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
+import { cellName, columnChoicesOf, columnIdText, FormulaError, type FormulaErrorAt, functionHelp, type Grid, parseFormula, withEquals } from "../formulas/index.ts";
+import { addAffected, affectedBy, type Elsewhere, isAffected, type NamedPageTable, ownNameChoices, pageNameChoices, pageTables, referredBy } from "../formulas/page.ts";
 import { formulaPlacesIn } from "../formulas/places.ts";
 import { functionNamed } from "../formulas/registry.ts";
+import type { FormulaHelpers } from "../formulafield.ts";
 import { FunctionDialog } from "./functiondialog.ts";
+import { ResultView } from "./resultview.ts";
 import { el } from "../../../shared/elements.ts";
 import { ICONS } from "../icons.ts";
-import { cellSourceOffset, escapeCell, locateBySource, type OtherPages, type PageTable, pageTablesOf, parseTable, type Table, unescapeCell } from "../markdown.ts";
+import type { SourcesOffer } from "../sources.ts";
+import { cellSourceOffset, escapeCell, locateBySource, type PageTable, pageTablesOf, parseTable, sameTable, type Table, unescapeCell } from "../markdown.ts";
 import { sameTableName } from "../namerules.ts";
 import { insertColumn, setCell } from "../ops.ts";
 import { insertColumnAt } from "../pins.ts";
@@ -100,6 +114,7 @@ const NAME_KINDS: Readonly<Record<Exclude<FormulaChoice["kind"], "function">, st
   row: "Named row of this table",
   table: "Named table",
   column: "Column of this table",
+  source: "Source of the space",
 };
 
 /** The help under the list for the choice picked: a function's syntax and description, a name's use */
@@ -118,9 +133,28 @@ function choiceHelp(choice: FormulaChoice): FormulaHelp {
     case "table":
       return { syntax: `${choice.name}!A1 · ${choice.name}![column]`, description: "A named table of the page: a cell, range or column of it." };
     case "column":
-      return { syntax: `[${choice.name}] · [@${choice.name}]`, description: "A column of this table: all of it, or (with @) its cell in the formula's row." };
+      return choice.source
+        ? { syntax: `@${choice.source}[${choice.id ?? choice.name}]`, description: `A column of the source ${choice.source}: all its values.` }
+        : { syntax: `[${choice.name}] · [@${choice.name}]`, description: "A column of this table: all of it, or (with @) its cell in the formula's row." };
+    case "source":
+      return {
+        syntax: `@${choice.name} · @${choice.name}[column] · @${choice.name}[#Data]`,
+        description: "A source of the space, a table a Space Lua script gives: its rows, one column of them, or its rows as a table.",
+      };
   }
 }
+
+// The modules whose tables are calculated from others (CalculatedOffer), asked in this order
+const CALCULATING = ["view", "pivot"] as const;
+
+// The modules keeping formulas in a table's metadata row that calculate none of its cells (HeldFormulasOffer)
+const HOLDING = ["columnTypes"] as const;
+
+// What a name offered in a module's formula field is (its list says so beside it)
+const FIELD_KINDS: Readonly<Record<FormulaChoice["kind"], string>> = { function: "function", column: "column", cell: "named cell", row: "named row", table: "table", source: "source" };
+
+// The ⤢ icon showing a cell's result (kept in step with the style page's .swt-result-button)
+const RESULT_BUTTON_SIZE = 20;
 
 // Colors of the references of the formula being edited, in the order they are written
 const REFERENCE_COLORS = ["#3b6fd4", "#d0453a", "#8a55c9", "#2f9a4a", "#d9771c", "#1c9c9c"];
@@ -190,6 +224,11 @@ export class Formulas implements Feature {
   private typedAt: { readonly editor: CellEditor; readonly text: string; readonly at: number } | undefined;
   // Every function, to find one by what it does and insert it (fx, Shift+F3, Insert function…)
   private readonly functions: FunctionDialog;
+  // A cell's result of several values (#SPILL!) shown over the window, and the icon (⤢) showing it from a cell hovered or selected
+  private readonly results: ResultView;
+  private readonly resultButton: HTMLButtonElement;
+  private resultAt: { readonly key: TableKey; readonly row: number; readonly column: number } | undefined;
+  private hoveredAt: { readonly key: TableKey; readonly row: number; readonly column: number } | undefined;
   // Tables (by key, as of their markdown) whose formula cells show results from before a change made outside Silverware Table
   private readonly stale = new WeakMap<TableInfo, boolean>();
   // The tables whose cells can be pointed at (marked): the formula's own, and the others laid out with it in a frame
@@ -208,10 +247,43 @@ export class Formulas implements Feature {
   constructor(private readonly host: ModelHost) {
     this.formulaHint = host.panel("swt-formula-hint");
     this.functions = new FunctionDialog(host);
-    this.cells = formulaCellsOf(
-      { get: (cell, key) => host.getCellTag(cell, key), with: (cell, key, value) => host.withCellTag(cell, key, value) },
-      { rowNames: (table) => host.rowNames(table), cellNames: (table) => host.cellNames(table) },
-    );
+    this.results = new ResultView(host);
+    this.resultButton = el(host.doc, "button", {
+      class: "swt-result-button",
+      title: "Show result: the values of this cell's formula (Ctrl+Shift+Enter)",
+      attrs: { "aria-label": "Show result", tabindex: -1 },
+      html: ICONS.expand,
+      run: () => {
+        const at = this.resultAt;
+        const info = at && this.host.tableFor(at.key);
+        if (info && at) this.showResult(info, at);
+      },
+    });
+    // One of the core's floating elements: a press on it is on Silverware Table's controls, not the page
+    const floating = host.floating("div", "swt-result-holder");
+    floating.append(this.resultButton);
+    this.cells = {
+      ...formulaCellsOf(
+        { get: (cell, key) => host.getCellTag(cell, key), with: (cell, key, value) => host.withCellTag(cell, key, value) },
+        { rowNames: (table) => host.rowNames(table), cellNames: (table) => host.cellNames(table) },
+      ),
+      // Tables calculated from others: the view and pivot modules' (asked each time: they start after this one)
+      calculated: (table) => {
+        for (const name of CALCULATING) {
+          const by = this.host.offered<CalculatedOffer>(name)?.calculated(table);
+          if (by) return by;
+        }
+        return undefined;
+      },
+      // Formulas a table holds besides its cells': the column types module's lists (asked each time: it starts after this one)
+      held: (table) => {
+        const holders = HOLDING.flatMap((name) => this.host.offered<HeldFormulasOffer>(name) ?? []);
+        const found = holders.flatMap((holder) => holder.held(table) ?? []);
+        if (found.length < 2) return found[0];
+        // Several modules' formulas: all of them, each module's followed over the table the one before left
+        return { formulas: found.flatMap((held) => held.formulas), follow: (follow) => holders.reduce((t, holder) => holder.held(t)?.follow(follow) ?? t, table) };
+      },
+    };
     host.offer({
       cells: this.cells,
       evaluate: (formula, text, page) => this.evaluate(formula, text, page),
@@ -219,13 +291,18 @@ export class Formulas implements Feature {
       complete: (formula, caret, text, table) =>
         table
           ? formulaChoices(formula, caret, caret, this.namesOf(table, text), this.nameOf(table), columnChoicesOf(table.rows[0]?.cells ?? []), true)
-          : formulaChoices(formula, caret, caret, pageNameChoices(this.cells, this.named(pageTablesOf(text))), undefined, [], true),
+          : formulaChoices(formula, caret, caret, [...pageNameChoices(this.cells, this.named(pageTablesOf(text))), ...this.sourceNames()], undefined, [], true),
       help: (formula, caret) => functionHelp(formula, caret),
       problem: (formula) => {
         const tree = parseFormula(withEquals(formula).formula.trim());
         return tree instanceof FormulaError ? tree.detail : undefined;
       },
       rowValues: (table, formula) => rowValues(table, withEquals(formula).formula.trim(), { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) }),
+      list: (table, formula) => listResult(table, { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) }, formula),
+      view: (formula, table, replace) => this.viewOf(formula, table, replace),
+      functions: (formula, caret, done) => this.pickFunction(formula, caret, done),
+      fieldHelpers: (table, outside) => this.fieldHelpers(table, outside),
+      calculated: (table) => calculatedNow(table, { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) }),
     } satisfies FormulasOffer);
   }
 
@@ -238,7 +315,7 @@ export class Formulas implements Feature {
   private async evaluate(formula: string, text: string, page = this.host.currentPage): Promise<{ readonly value: Value; readonly pages: readonly string[] }> {
     const tables = pageTablesOf(text);
     const pages = (await this.host.offered<PageLinksOffer>("pageLinks")?.readFor([formula], tables.map((t) => t.table))) ?? [];
-    const source = pageTables(this.cells, () => this.named(tables), page, undefined, this.namedOthers(this.host.otherPages()));
+    const source = pageTables(this.cells, () => this.named(tables), page, undefined, this.elsewhere());
     const value = evaluateFormula(formula.trim().startsWith("=") ? formula.trim() : `=${formula.trim()}`, { cells: this.cells, tables: source });
     return { value, pages };
   }
@@ -252,7 +329,7 @@ export class Formulas implements Feature {
   private async errors(text: string, page = this.host.currentPage): Promise<{ readonly errors: readonly FormulaErrorAt[]; readonly pages: readonly string[] }> {
     const tables = pageTablesOf(text);
     const pages = (await this.host.offered<PageLinksOffer>("pageLinks")?.readFor([], tables.map((t) => t.table))) ?? [];
-    const source = pageTables(this.cells, () => this.named(tables), page, undefined, this.namedOthers(this.host.otherPages()));
+    const source = pageTables(this.cells, () => this.named(tables), page, undefined, this.elsewhere());
     const errors = tables.flatMap(({ range, table }) => {
       const name = this.nameOf(table);
       const headers = table.rows[0]?.cells ?? [];
@@ -275,6 +352,56 @@ export class Formulas implements Feature {
     return { errors, pages };
   }
 
+  /** A view's formula calculated on the page shown (the view module's dialog and its staleness): see FormulasOffer.view */
+  private viewOf(formula: string, table: Table | undefined, replace: { readonly from: number; readonly table: Table } | undefined): Grid | FormulaError | undefined {
+    const tables = replace
+      ? pageTables(this.cells, () => this.named(pageTablesOf(this.host.pageText)), this.host.currentPage, { ...replace, name: this.nameOf(replace.table) }, this.elsewhere())
+      : this.tableSource();
+    // A view to be inserted: a table of its own it has none (A1, [x] alone read nothing)
+    const own = table ?? { indent: "", align: [], rows: [{ cells: [] }], padded: false };
+    return viewResult(own, { cells: this.cells, tables, name: table && this.nameOf(table) }, withEquals(formula).formula.trim());
+  }
+
+  /** The Functions dialog for a formula typed outside a cell: the function picked put in at the caret, as the cell editor's fx does */
+  private pickFunction(formula: string, caret: number, picked: (made: { readonly formula: string; readonly caret: number }) => void): void {
+    // A formula typed without its "=" (a view's may be) read as one with it; none typed yet, "=" alone
+    const { formula: written, shift } = formula.trim() ? withEquals(formula) : { formula: "=", shift: 1 };
+    const at = Math.min(caret + shift, written.length);
+    this.functions.open(`${written.slice(0, at)}▌${written.slice(at)}`, (name) => {
+      const text = `${name}(`;
+      const typed = nameTyped(written, at, at) ?? { from: at, to: at };
+      const inserted = needsOperator(written, typed.from) ? `+${text}` : text;
+      picked({ formula: written.slice(0, typed.from) + inserted + written.slice(typed.to), caret: typed.from + inserted.length });
+    });
+  }
+
+  /** A formula field's helpers (see FormulasOffer.fieldHelpers): a formula written without its "=" read as one with it */
+  private fieldHelpers(table: (() => Table) | undefined, outside: FormulaHelp | undefined): FormulaHelpers {
+    const offer = this.host.offered<FormulasOffer>("formulas")!;
+    return {
+      complete: (text, caret) => {
+        const { formula, shift } = withEquals(text);
+        const made = offer.complete(formula, caret + shift, this.host.pageText, table?.());
+        if (!made) return undefined;
+        return {
+          from: made.from - shift,
+          to: made.to - shift,
+          // A column shown by its header's name, put in by its id
+          choices: made.choices.map((choice) => ({
+            label: choice.kind === "column" ? choice.name : choiceText(choice).replace(/[([!]$/, ""),
+            insert: choiceText(choice),
+            kind: FIELD_KINDS[choice.kind],
+          })),
+        };
+      },
+      help: (text, caret) => {
+        const { formula, shift } = withEquals(text);
+        return functionHelp(formula, caret + shift) ?? outside;
+      },
+      problem: (text) => (text.trim() ? offer.problem(withEquals(text).formula.trim()) : undefined),
+    };
+  }
+
   /** A table's name, by which formulas refer to it */
   private nameOf(table: Table): string | undefined {
     return this.host.tableName(table);
@@ -285,24 +412,30 @@ export class Formulas implements Feature {
     return tables.map((t) => ({ ...t, name: this.nameOf(t.table) }));
   }
 
-  /** The other pages read, their tables with their names */
-  private namedOthers(others: OtherPages | undefined): NamedOtherPages | undefined {
-    if (!others) return undefined;
+  /** What formulas read outside the page: the other pages read, their tables with their names; the space's sources, where offered */
+  private elsewhere(others = this.host.otherPages()): Elsewhere {
+    const sources = this.host.offered<SourcesOffer>("sources");
     return {
-      tables: (page) => {
-        const tables = others.tables(page);
-        return tables ? this.named(tables) : tables;
-      },
+      ...(others && {
+        pages: {
+          tables: (page: string) => {
+            const tables = others.tables(page);
+            return tables ? this.named(tables) : tables;
+          },
+        },
+      }),
+      ...(sources && { spaceSource: (name: string) => sources.table(name) }),
     };
   }
 
-  /** The page's tables (as last read) formulas can refer to by name, and those of the other pages read */
+  /** The page's tables (as last read) formulas can refer to by name, those of the other pages read, and the space's sources */
   private tableSource(): TableSource {
     const { pageText, currentPage } = this.host;
     const others = this.host.otherPages();
-    const key = `${others?.version ?? -1}\u0000${currentPage}\u0000${pageText}`;
+    const sources = this.host.offered<SourcesOffer>("sources")?.version() ?? -1;
+    const key = `${others?.version ?? -1}\u0000${sources}\u0000${currentPage}\u0000${pageText}`;
     if (this.source?.key !== key) {
-      this.source = { key, source: pageTables(this.cells, () => this.named(pageTablesOf(pageText)), currentPage, undefined, this.namedOthers(others)) };
+      this.source = { key, source: pageTables(this.cells, () => this.named(pageTablesOf(pageText)), currentPage, undefined, this.elsewhere(others)) };
     }
     return this.source.source;
   }
@@ -316,8 +449,20 @@ export class Formulas implements Feature {
    */
   writeStep(before: Table, after: Table, edit: WriteEdit): Table {
     const { page } = edit;
-    const tables = pageTables(this.cells, () => this.named(page.tables), this.host.currentPage, { from: page.from, table: after, name: this.nameOf(after) }, this.namedOthers(this.host.otherPages()));
-    return formulasAfterEdit(before, after, { ...edit, tables, cells: this.cells, names: { before: this.nameOf(before), after: this.nameOf(after) } });
+    const tables = pageTables(this.cells, () => this.named(page.tables), this.host.currentPage, { from: page.from, table: after, name: this.nameOf(after) }, this.elsewhere());
+    const names = { before: this.nameOf(before), after: this.nameOf(after) };
+    let edited = formulasAfterEdit(before, after, { ...edit, tables, cells: this.cells, names });
+    // Formulas it holds besides its cells' (a choice list's) follow its own edit, as its cells' do
+    const held = this.cells.held?.(edited);
+    if (held) edited = held.follow((formula) => followOwnFormula(formula, before, after, { cells: this.cells, rowMap: edit.rowMap, columnMap: edit.columnMap, names }));
+    // A calculated table written (its Refresh, its definition changed): calculated anew; one that cannot be stays as it was
+    return this.calculatedWritten(edited, tables, before);
+  }
+
+  /** A calculated table (a view, a pivot) as calculated now (`tables` the page's), else the table as it is */
+  private calculatedWritten(table: Table, tables: TableSource, before?: Table): Table {
+    const made = calculatedNow(table, { cells: this.cells, tables, name: this.nameOf(table) }, before);
+    return made && !(made instanceof FormulaError) ? made : table;
   }
 
   /**
@@ -328,10 +473,6 @@ export class Formulas implements Feature {
    */
   otherTablesWritten(before: Table, after: Table | undefined, edit: WriteEdit): readonly PageTable[] {
     const { page } = edit;
-    // Deleted (no `after`): the page without it, so what refers to it is #REF!
-    const now = after
-      ? pageTables(this.cells, () => this.named(page.tables), this.host.currentPage, { from: page.from, table: after, name: this.nameOf(after) }, this.namedOthers(this.host.otherPages()))
-      : pageTables(this.cells, () => this.named(page.tables.filter((t) => t.range.from !== page.from)), this.host.currentPage, undefined, this.namedOthers(this.host.otherPages()));
     // Its name and the names of its cells, before and after the edit, and in turn those of the tables that refer to them
     const affected = after ? affectedBy(this.nameOf(before), this.nameOf(after)) : affectedBy(this.nameOf(before));
     const oldName = this.nameOf(before)?.toLowerCase();
@@ -339,21 +480,38 @@ export class Formulas implements Feature {
     // the markdown, is the one they use): else they stay as they are, only recalculated
     const firstOfName = oldName && page.tables.find((t) => this.nameOf(t.table)?.toLowerCase() === oldName)?.range.from === page.from;
     // What each other table refers to, read once for all the passes below
-    const others = page.tables.filter((other) => other.range.from !== page.from).map((other) => ({ ...other, referred: referredBy(this.cells, other.table) }));
-    const written: PageTable[] = [];
+    const rest = page.tables.filter((other) => other.range.from !== page.from).map((other) => ({ ...other, referred: referredBy(this.cells, other.table) }));
+    const following = { cells: this.cells, rowMap: edit.rowMap, columnMap: edit.columnMap, names: { before: this.nameOf(before), after: after && this.nameOf(after) } };
+    // First every table the edit affects, its references to the edited table following it (a calculated table's definition too):
+    // what one reads of another is then as the edit leaves it, whichever is calculated first
+    const affectedTables: { range: PageTable["range"]; table: Table; followed: Table }[] = [];
     for (let found = true; found; ) {
       found = false;
-      for (let i = others.length - 1; i >= 0; i--) {
-        const { range, table, referred } = others[i]!;
+      for (let i = rest.length - 1; i >= 0; i--) {
+        const { range, table, referred } = rest[i]!;
         if (!isAffected(referred, affected)) continue;
-        others.splice(i, 1);
+        rest.splice(i, 1);
         found = true;
         addAffected(affected, this.nameOf(table));
         // Its references to this table follow the edit: moved rows and columns, a new name
-        const followed = after && oldName && firstOfName && referred.tables.has(oldName) ? followTable(table, before, after, { cells: this.cells, rowMap: edit.rowMap, columnMap: edit.columnMap, names: { before: this.nameOf(before), after: this.nameOf(after) } }) : table;
-        const recalculated = recalculate(followed, { cells: this.cells, tables: now, name: this.nameOf(followed) });
-        if (recalculated !== table) written.push({ range, table: recalculated });
+        const follows = !!after && !!oldName && !!firstOfName && referred.tables.has(oldName);
+        let followed = follows ? followTable(table, before, after!, following) : table;
+        const by = follows ? this.cells.calculated?.(followed) : undefined;
+        if (by) followed = by.follow(before, after!, following);
+        const held = follows ? this.cells.held?.(followed) : undefined;
+        if (held) followed = held.follow((formula) => followFormula(formula, before, after!, following));
+        affectedTables.push({ range, table, followed });
       }
+    }
+    // Then each calculated over the page as followed (a calculated table read by another calculated as it is now)
+    const followedAt = new Map(affectedTables.map((t) => [t.range.from, t.followed]));
+    // Deleted (no `after`): the page without it, so what refers to it is #REF!
+    const tables = page.tables.filter((t) => after || t.range.from !== page.from).map((t) => (followedAt.has(t.range.from) ? { ...t, table: followedAt.get(t.range.from)! } : t));
+    const now = pageTables(this.cells, () => this.named(tables), this.host.currentPage, after ? { from: page.from, table: after, name: this.nameOf(after) } : undefined, this.elsewhere());
+    const written: PageTable[] = [];
+    for (const { range, table, followed } of affectedTables) {
+      const recalculated = this.calculatedWritten(recalculate(followed, { cells: this.cells, tables: now, name: this.nameOf(followed) }), now);
+      if (!sameTable(recalculated, table)) written.push({ range, table: recalculated });
     }
     return written;
   }
@@ -447,6 +605,96 @@ export class Formulas implements Feature {
     this.stopPointing?.();
     this.hideFormulaUi();
     this.formulaHint.remove();
+    this.results.close();
+    this.resultButton.parentElement?.remove();
+  }
+
+  // ---- a result of several values (#SPILL!) --------------------------------------
+
+  /** Whether a body cell's formula shows #SPILL! (its result as written: viewing calculates nothing) */
+  private spills(info: TableInfo, ref: CellRef): boolean {
+    if (ref.row === 0) return false;
+    const stored = this.cells.formulaOf(parseTable(info.source).rows[ref.row]?.cells[ref.column] ?? "");
+    return !!stored && errorCodeIn(unescapeCell(stored.value).trim()) === "#SPILL!";
+  }
+
+  /** The whole result of a cell's formula, calculated now as a grid; an error said (its result is one) */
+  private resultOf(info: TableInfo, ref: CellRef): import("../formulas/index.ts").Grid | undefined {
+    const table = this.host.tableOf(info);
+    const result = cellWholeResult(table, ref.row, ref.column, { cells: this.cells, tables: this.tableSource(), name: this.nameOf(table) });
+    if (result === undefined) return undefined;
+    if (result instanceof FormulaError) {
+      void this.host.bridge.flash(`Silverware Table: ${result.code} ${result.detail}`, "error");
+      return undefined;
+    }
+    return asGrid(result);
+  }
+
+  /** Show result: the cell's result over the window */
+  private showResult(info: TableInfo, ref: CellRef): void {
+    const grid = this.resultOf(info, ref);
+    const formula = this.cells.formulaOf(parseTable(info.source).rows[ref.row]?.cells[ref.column] ?? "")?.formula ?? "";
+    if (grid) this.results.show(formula, grid);
+  }
+
+  /** Copy result: the cell's whole result copied, not shown */
+  private copyResult(info: TableInfo, ref: CellRef): void {
+    const grid = this.resultOf(info, ref);
+    if (grid) void this.results.copy(grid);
+  }
+
+  /** The cell a selection holds alone, in a table shown, where it shows #SPILL! */
+  private selectedSpill(): { info: TableInfo; ref: CellRef } | undefined {
+    for (const info of this.host.shownTables()) {
+      const selected = this.host.selectedCells(info);
+      if (selected.length === 1 && this.spills(info, selected[0]!)) return { info, ref: selected[0]! };
+    }
+    return undefined;
+  }
+
+  /** The ⤢ icon at the top right corner of the cell hovered (else of the one selected) showing #SPILL!, or none */
+  private placeResultButton(): void {
+    const hovered = this.hoveredAt && this.host.tableFor(this.hoveredAt.key);
+    const at =
+      !this.host.editing && hovered && this.hoveredAt && this.spills(hovered, this.hoveredAt)
+        ? { info: hovered, ref: { row: this.hoveredAt.row, column: this.hoveredAt.column } }
+        : this.host.editing
+          ? undefined
+          : this.selectedSpill();
+    const rect = at && this.host.rectOf(at.info, at.ref);
+    const holder = this.resultButton.parentElement!;
+    if (!at || !rect) {
+      this.resultAt = undefined;
+      holder.classList.remove("swt-visible");
+      return;
+    }
+    this.resultAt = { key: at.info.key, row: at.ref.row, column: at.ref.column };
+    // Inside the cell's corner, over its text: nothing is added to the cell, however narrow it is
+    this.host.place(holder, rect.right - RESULT_BUTTON_SIZE - 2, rect.top + 2);
+  }
+
+  hovered(info: TableInfo, ref: CellRef): void {
+    this.hoveredAt = { key: info.key, row: ref.row, column: ref.column };
+    this.placeResultButton();
+  }
+
+  hoverEnded(): void {
+    this.hoveredAt = undefined;
+    this.placeResultButton();
+  }
+
+  selectionChanged(): void {
+    this.placeResultButton();
+  }
+
+  /** Ctrl+Shift+Enter on a cell selected alone showing #SPILL!: its result shown */
+  keyDown(e: KeyboardEvent): boolean {
+    if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey) || !e.shiftKey || e.altKey || this.host.editing) return false;
+    const at = this.selectedSpill();
+    if (!at) return false;
+    e.preventDefault();
+    this.showResult(at.info, at.ref);
+    return true;
   }
 
   // ---- the cell editor ----------------------------------------------------------
@@ -481,6 +729,8 @@ export class Formulas implements Feature {
   // The formula's references are shown in the table, its function explained under the cell
   editorOpened(): void {
     this.updateFormulaUi();
+    // Not over the field: the icon showing a result goes while a cell is edited
+    this.placeResultButton();
   }
 
   editorInput(editor: CellEditor): void {
@@ -593,6 +843,7 @@ export class Formulas implements Feature {
     this.choosing = undefined;
     this.dismissed = undefined;
     this.hideFormulaUi();
+    this.placeResultButton();
   }
 
   // While a formula waits for a reference, a press in its table inserts one
@@ -605,9 +856,10 @@ export class Formulas implements Feature {
     return cell.row === 0 && this.pointReference(info, cell, e);
   }
 
-  // The outlines follow the table when it scrolls or moves
+  // The outlines follow the table when it scrolls or moves, and so does the icon showing a result
   layoutChanged(): void {
     if (this.host.editing && !this.stopReferenceDrag) this.updateFormulaUi();
+    if (this.resultAt || this.hoveredAt) this.placeResultButton();
   }
 
   // ---- formula cells in the table -------------------------------------------------
@@ -699,14 +951,29 @@ export class Formulas implements Feature {
     return this.cells.formulaCell("", filledFormula(stored.formula, to.row - from.row, to.column - from.column, size));
   }
 
-  /** Insert function… in a body cell's menu: the cell edited (its formula, or a new one) and the Functions dialog for it */
-  cellMenuEntries(info: TableInfo, cells: readonly CellRef[]): CellMenuGroup | undefined {
+  /**
+   * Insert function… in a body cell's menu: the cell edited (its formula, or a
+   * new one) and the Functions dialog for it; Show result and Copy result in
+   * the menu of a cell showing #SPILL!
+   */
+  cellMenuEntries(info: TableInfo, cells: readonly CellRef[]): CellMenuGroup[] | undefined {
     const [cell] = cells;
     if (cells.length !== 1 || !cell || cell.row === 0) return undefined;
     const raw = parseTable(info.source).rows[cell.row]?.cells[cell.column] ?? "";
     const hasFormula = this.cells.formulaOf(raw) !== undefined;
     const allowed = this.host.canStoreCellTag(raw, "f");
-    return {
+    const results: CellMenuGroup[] = this.spills(info, cell)
+      ? [
+          {
+            order: CELL_MENU_ORDER.viewing,
+            entries: [
+              { kind: "item", label: "Show result", icon: ICONS.expand, hint: "The values of the formula, over the window (Ctrl+Shift+Enter)", run: () => this.showResult(info, cell) },
+              { kind: "item", label: "Copy result", icon: ICONS.copy, hint: "The values of the formula, copied whole (for a spreadsheet, or to paste as a table)", run: () => this.copyResult(info, cell) },
+            ],
+          },
+        ]
+      : [];
+    const insert: CellMenuGroup = {
       // After clearing and moving: what is written into the cell
       order: CELL_MENU_ORDER.inserting,
       entries: [
@@ -729,6 +996,7 @@ export class Formulas implements Feature {
         },
       ],
     };
+    return [insert, ...results];
   }
 
   /** Formula cells marked, with their formulas and the reasons of their errors as their titles */
@@ -775,7 +1043,7 @@ export class Formulas implements Feature {
       if (info.key === except) continue;
       const model = parseTable(info.source);
       if (formulaCount(this.cells, model) === 0) continue;
-      const refersElsewhere = referredTableNames(this.cells, model).size > 0 || referredPages(this.cells, model).size > 0;
+      const refersElsewhere = referredTableNames(this.cells, model).size > 0 || referredPages(this.cells, model).size > 0 || referredSources(this.cells, model).size > 0;
       if (!refersElsewhere && !(withCustom && callsCustomFunctions(this.cells, model))) continue;
       this.stale.set(info, recalculate(model, { cells: this.cells, tables, name: this.nameOf(model) }) !== model);
       // An error's reason may have changed (another page read): the formula cells' looks
@@ -1026,7 +1294,13 @@ export class Formulas implements Feature {
     if (this.pageNames?.text !== text) this.pageNames = { text, choices: pageNameChoices(this.cells, this.named(pageTablesOf(text))) };
     const own = this.nameOf(table)?.toLowerCase();
     const others = this.pageNames.choices.filter((choice) => !(choice.table && choice.table.toLowerCase() === own));
-    return [...others, ...ownNameChoices(this.cells, table)];
+    return [...others, ...ownNameChoices(this.cells, table), ...this.sourceNames()];
+  }
+
+  /** The sources of the space offered while a name is typed (@tasks), with their columns for their [ ] */
+  private sourceNames(): FormulaChoice[] {
+    const sources = this.host.offered<SourcesOffer>("sources");
+    return sources ? sourceChoices(sources.names().map((name) => ({ name, columns: sources.columns(name) ?? [] }))) : [];
   }
 
   /**
@@ -1145,9 +1419,11 @@ export class Formulas implements Feature {
             text:
               choice.kind === "function"
                 ? (functionNamed(choice.name)?.description ?? "").split(/(?<=\.)\s/)[0]!
-                : choice.table
-                  ? `Named cell of ${choice.table}`
-                  : NAME_KINDS[choice.kind],
+                : choice.source
+                  ? `Column of @${choice.source}`
+                  : choice.table
+                    ? `Named cell of ${choice.table}`
+                    : NAME_KINDS[choice.kind],
           }),
         ),
       ),

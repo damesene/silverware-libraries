@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { typeNamed, typeOfTag } from "./index.ts";
-import { choiceIndex, LIST_NAME_RE, listKey, listNameFor, listNames, readChoiceList, writeChoiceList } from "./choicelists.ts";
+import { choiceIndex, LIST_NAME_RE, listFormula, listNameFor, listNames, listOfValues, readChoiceList, writeChoiceList } from "./choicelists.ts";
 import type { TypeTable } from "./type.ts";
 
 const choice = typeNamed("choice")!;
 const tableOf = (lists: Record<string, readonly string[]>, values: readonly string[] = []): TypeTable => ({
-  stored: new Map(Object.entries(lists).map(([name, list]) => [listKey(name), writeChoiceList(list)])),
+  list: (name) => lists[name],
   values: () => values,
 });
 const STATUS = tableOf({ status: ["open", "in progress", "done"] }, ["done", "open", "Open", "later"]);
@@ -17,6 +17,17 @@ describe("choice lists", () => {
     expect(readChoiceList("[1, 2]")).toBeUndefined();
     expect(readChoiceList("open|done")).toBeUndefined();
     expect(readChoiceList(undefined)).toBeUndefined();
+  });
+
+  it("may be made by a formula, told by its leading =, which no JSON list starts with", () => {
+    expect(listFormula(" =@projects ")).toBe("=@projects");
+    expect(listFormula(writeChoiceList(["=a"]))).toBeUndefined();
+    expect(listFormula(undefined)).toBeUndefined();
+    expect(readChoiceList("=@projects")).toBeUndefined();
+  });
+
+  it("take a formula's values in its order, empty ones and repeats (whatever their case) left out, the first kept", () => {
+    expect(listOfValues(["Beacon", "", "atlas", " Atlas ", "BEACON", "TRUE", "2"])).toEqual(["Beacon", "atlas", "TRUE", "2"]);
   });
 
   it("are named strictly: lower case ASCII, words joined by single dashes, starting with a letter", () => {

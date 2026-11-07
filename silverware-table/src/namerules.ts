@@ -21,6 +21,14 @@ export function tableNameProblem(name: string): string | undefined {
   return nameProblem(name, "table");
 }
 
+/** A name for a new table none of `taken` is (compared ignoring case): `prefix` and the first number free, table1, view2 */
+export function freeTableName(prefix: string, taken: Iterable<string | undefined>): string {
+  const names = new Set(Array.from(taken, (name) => name?.toLowerCase()));
+  let n = 1;
+  while (names.has(`${prefix}${n}`.toLowerCase())) n++;
+  return `${prefix}${n}`;
+}
+
 /** Whether two table names are the same: names are compared ignoring case */
 export function sameTableName(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();

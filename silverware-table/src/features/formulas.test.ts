@@ -347,6 +347,49 @@ describe("Formulas", () => {
     });
   });
 
+  describe("a result of several values (#SPILL!)", () => {
+    const SPILL = "| Tag | List |\n|---|---|\n| b | \\#SPILL! <meta formulas.f='=SORT(UNIQUE([tag]))'> |\n| a | |\n| b | |\n";
+    afterEach(() => document.querySelector<HTMLElement>(".swt-result-dialog")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+
+    it("shows it over the window, read only, from the cell's menu", async () => {
+      await setup(SPILL);
+      // (The test page renders markdown escapes as written)
+      expect(cell(1, 1).textContent).toContain("#SPILL!");
+      cellMenuItem(cell(1, 1), /^Show result/)!.click();
+      const dialog = document.querySelector<HTMLElement>(".swt-result-dialog")!;
+      expect(dialog.querySelector(".swt-dialog-subtitle")!.getAttribute("title")).toBe("=SORT(UNIQUE([tag]))");
+      expect(dialog.querySelector(".swt-result-size")!.textContent).toBe("2 × 1");
+      const rows = Array.from(dialog.querySelectorAll("tr"), (tr) => Array.from(tr.cells, (td) => td.textContent));
+      // Its column named as the one it came from
+      expect(rows).toEqual([["Tag"], ["a"], ["b"]]);
+      // Nothing written, and no table of the page: the core leaves it alone
+      expect(edits).toBe(0);
+      expect(controller.shownTables()).toHaveLength(1);
+    });
+
+    it("is offered on such a cell only, and copied whole without showing it", async () => {
+      let copied = "";
+      Object.defineProperty(window.navigator, "clipboard", { value: { writeText: async (t: string) => void (copied = t) }, configurable: true });
+      await setup(SPILL);
+      expect(cellMenuItem(cell(2, 0), /^Show result/)).toBeUndefined();
+      cellMenuItem(cell(1, 1), /^Copy result/)!.click();
+      await flush();
+      expect(copied).toBe("Tag\na\nb");
+      expect(document.querySelector(".swt-result-dialog")).toBeNull();
+    });
+
+    it("shows it from the ⤢ icon on the cell hovered", async () => {
+      await setup(SPILL);
+      const button = document.querySelector<HTMLElement>(".swt-result-button")!;
+      cell(2, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      expect(button.parentElement!.classList.contains("swt-visible")).toBe(false);
+      cell(1, 1).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      expect(button.parentElement!.classList.contains("swt-visible")).toBe(true);
+      button.click();
+      expect(document.querySelector(".swt-result-dialog")).not.toBeNull();
+    });
+  });
+
   it("fixes a missing ) when the formula is saved, and says so", async () => {
     await setup(TOTAL);
     clickOn(cell(3, 1));

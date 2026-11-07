@@ -76,6 +76,14 @@ export const EXCEL_FUNCTIONS: Readonly<Record<string, ExcelCall>> = {
   TEXT: () => ({ reason: "Excel reads TEXT's format codes in its own language" }),
   // Excel 365's since 2024 (an older Excel shows #NAME?), and its patterns are PCRE2's, not JavaScript's
   REGEXTEST: () => ({ reason: "REGEXTEST is in Excel 365 only, its patterns read otherwise" }),
+  // Excel 365's dynamic array functions (an older Excel shows #NAME?); how a file without spill metadata has them
+  // calculated is not verified: their cells are written as their values
+  ...Object.fromEntries(
+    ["FILTER", "SORT", "SORTBY", "UNIQUE", "CHOOSECOLS", "TAKE", "DROP", "HSTACK", "VSTACK", "SEQUENCE"].map((name) => [
+      name,
+      () => ({ reason: `${name} is an array function of Excel 365 only` }),
+    ]),
+  ),
   DATEADD: ([date, amount, unit]) => {
     const d = `(${date!.text})`;
     const n = `(${amount!.text})`;

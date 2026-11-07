@@ -19,8 +19,9 @@ Then install a plugin with `Library: Install`.
 ## Plugins
 
 - **Silverware Table** ([`silverware-table/`](silverware-table/silverware-table.md)): sort, filter and edit markdown tables
-  in place, formulas, column types (a choice of a list of values too), conditional formatting, and moving, adding or
-  deleting rows and columns. Tables stay plain markdown.
+  in place, formulas (Excel 365's array functions too), column types (a choice of a list of values too), conditional
+  formatting, views and pivot tables that stay up to date, tables of your space from Space Lua queries, and moving,
+  adding or deleting rows and columns. Tables stay plain markdown.
 - **Silverware Toolbar** ([`silverware-toolbar/`](silverware-toolbar/silverware-toolbar.md)): a toolbar by the text you
   select (docked over the keyboard on a phone) to format it, turn lines into lists, headings, quotes or code blocks, and
   run any action or command, with gesture buttons, text snippets and an emoji picker.

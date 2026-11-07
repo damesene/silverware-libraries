@@ -2,9 +2,10 @@
 import { formatLuaNumber } from "../format.ts";
 import { asNumber } from "../view.ts";
 
-export type ErrorCode = "#VALUE!" | "#DIV/0!" | "#REF!" | "#NAME?" | "#NUM!" | "#N/A" | "#CYCLE!" | "#ERROR!";
+// #SPILL!: a cell's result of several values (a cell holds one); #CALC!: a result of no values (FILTER keeping nothing)
+export type ErrorCode = "#VALUE!" | "#DIV/0!" | "#REF!" | "#NAME?" | "#NUM!" | "#N/A" | "#CYCLE!" | "#ERROR!" | "#SPILL!" | "#CALC!";
 
-export const ERROR_CODES: readonly ErrorCode[] = ["#VALUE!", "#DIV/0!", "#REF!", "#NAME?", "#NUM!", "#N/A", "#CYCLE!", "#ERROR!"];
+export const ERROR_CODES: readonly ErrorCode[] = ["#VALUE!", "#DIV/0!", "#REF!", "#NAME?", "#NUM!", "#N/A", "#CYCLE!", "#ERROR!", "#SPILL!", "#CALC!"];
 
 /** A formula's error: the cell shows the code, the cell's tooltip the detail */
 export class FormulaError {
@@ -61,6 +62,78 @@ export function asTime(value: Scalar): TimeValue | undefined {
 
 // A range (A1:B3, [Qty]) is passed to functions as the list of its cells' values
 export type Value = Scalar | readonly Scalar[];
+
+/**
+ * Values with a shape: rows of columns, as a range of several rows and
+ * columns (A1:C5), a table's body (prices![#Data]) and the array functions
+ * (FILTER, SORT…) give them. `names`: each column's name where it came from a
+ * table's column (a view's headers, Show result's), else undefined. Only the
+ * functions that say they take grids (`GridFunction`) get one as it is; any
+ * other gets its cells as a list, row by row.
+ */
+export class Grid {
+  constructor(
+    readonly height: number,
+    readonly width: number,
+    // Row by row: the cell of row r and column c is cells[r * width + c]
+    readonly cells: readonly Scalar[],
+    readonly names: readonly (string | undefined)[] = [],
+  ) {}
+
+  /** A grid of these rows, each of the same length */
+  static ofRows(rows: readonly (readonly Scalar[])[], names: readonly (string | undefined)[] = [], width = rows[0]?.length ?? 0): Grid {
+    return new Grid(rows.length, width, rows.flat(), names);
+  }
+
+  at(row: number, column: number): Scalar {
+    return this.cells[row * this.width + column] ?? null;
+  }
+
+  row(row: number): Scalar[] {
+    return this.cells.slice(row * this.width, (row + 1) * this.width);
+  }
+
+  column(column: number): Scalar[] {
+    return Array.from({ length: this.height }, (_, r) => this.at(r, column));
+  }
+
+  rows(): Scalar[][] {
+    return Array.from({ length: this.height }, (_, r) => this.row(r));
+  }
+}
+
+// What a formula's parts evaluate to: a value, a list, or a grid
+export type Result = Value | Grid;
+
+export function isGrid(value: unknown): value is Grid {
+  return value instanceof Grid;
+}
+
+/** A result as a grid: a value one cell, a list one column, a grid as it is */
+export function asGrid(value: Result): Grid {
+  if (isGrid(value)) return value;
+  if (isRange(value)) return new Grid(value.length, 1, value);
+  return new Grid(1, 1, [value]);
+}
+
+/** A result as functions that take no grids get it: a grid's cells as a list, row by row */
+export function asValue(value: Result): Value {
+  return isGrid(value) ? value.cells : value;
+}
+
+/**
+ * A cell's result: one value. A list or a grid of one value is that value,
+ * of none an empty cell; of several #SPILL!, as a cell holds one (a view is
+ * a table made of such a result)
+ */
+export function cellValue(value: Result): Scalar {
+  const cells = isGrid(value) ? value.cells : isRange(value) ? value : undefined;
+  if (!cells) return value as Scalar;
+  if (cells.length === 0) return null;
+  if (cells.length === 1) return cells[0]!;
+  const size = isGrid(value) ? `${value.height} × ${value.width}` : `${cells.length}`;
+  return new FormulaError("#SPILL!", `the result is ${size} values and a cell holds one: reduce it to one (SUM, COUNTA, TEXTJOIN, TAKE…), or see it with Show result`);
+}
 
 export function isError(value: unknown): value is FormulaError {
   return value instanceof FormulaError;

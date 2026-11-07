@@ -37,13 +37,13 @@ export type ParamsOf<S extends ParamSpecs> = {
 };
 
 /**
- * What a type reads of the table its column is in: the column types' data
- * there, which its metadata row keeps (`columntypes.<type>.<key>`: a choice's
- * lists, `choice.<name>`), and the column's values
+ * What a type reads of the table its column is in: the choice lists its
+ * metadata row keeps (`columntypes.choice.<name>`), and the column's values
  */
 export type TypeTable = {
-  // The column types' data in the table, by key (`<type>.<key>`)
-  readonly stored: ReadonlyMap<string, string>;
+  // The values of the table's choice list of that name (lower case): kept as a list, or made by a formula as it
+  // calculates now; undefined where the table has no such list, or its formula gives none (an error, not calculated)
+  list(name: string): readonly string[] | undefined;
   // The column's body values as written (a formula's result), empty ones left out, in the rows' order
   values(): readonly string[];
 };

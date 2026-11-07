@@ -1,7 +1,7 @@
 // The built-in functions formulas can call, one per file in this folder: only
 // functions, what they share is in the folder above (arguments.ts, values.ts).
 //
-// To add one: copy a file such as sum.ts, change its name, syntax, description
+// To add one: copy a file such as sum.ts (a function taking grids, as filter.ts, says `grids: true`), change its name, syntax, description
 // and call, import it here and add it to the list. Then add its syntax and
 // description to the Functions table in silverware-table.md (a test checks that).
 import sum from "./sum.ts";
@@ -68,9 +68,19 @@ import networkdays from "./networkdays.ts";
 import workday from "./workday.ts";
 import isoweeknum from "./isoweeknum.ts";
 import eomonth from "./eomonth.ts";
-import type { FormulaFunction } from "../function.ts";
+import filter from "./filter.ts";
+import sort from "./sort.ts";
+import sortby from "./sortby.ts";
+import unique from "./unique.ts";
+import choosecols from "./choosecols.ts";
+import take from "./take.ts";
+import drop from "./drop.ts";
+import hstack from "./hstack.ts";
+import vstack from "./vstack.ts";
+import sequence from "./sequence.ts";
+import type { AnyFunction } from "../function.ts";
 
-const ALL: readonly FormulaFunction[] = [
+const ALL: readonly AnyFunction[] = [
   sum,
   average,
   min,
@@ -135,7 +145,17 @@ const ALL: readonly FormulaFunction[] = [
   workday,
   isoweeknum,
   eomonth,
+  filter,
+  sort,
+  sortby,
+  unique,
+  choosecols,
+  take,
+  drop,
+  hstack,
+  vstack,
+  sequence,
 ];
 
 /** The built-in functions by name */
-export const BUILT_IN_FUNCTIONS: Readonly<Record<string, FormulaFunction>> = Object.fromEntries(ALL.map((f) => [f.name, f]));
+export const BUILT_IN_FUNCTIONS: Readonly<Record<string, AnyFunction>> = Object.fromEntries(ALL.map((f) => [f.name, f]));

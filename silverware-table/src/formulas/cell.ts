@@ -1,10 +1,14 @@
 // A formula in a cell, and what the formulas read of a table besides its
-// values: the formulas of its cells and the names of its rows and cells. The
+// values: the formulas of its cells, the names of its rows and cells, and how
+// a table calculated from others is calculated (a view's formula, a pivot's
+// definition: their modules', here so that whatever asks what a table's
+// formulas refer to or call, forFormulas, sees theirs with its cells'). The
 // domain reads none of it from the markdown itself: the formulas module gives
 // the functions that do (FormulaCells, made of its host), so the domain names
 // no attribute and reads no metadata.
 import type { Table } from "../markdown.ts";
-import { ERROR_CODES, type ErrorCode } from "./values.ts";
+import type { Following } from "./edits.ts";
+import { ERROR_CODES, type ErrorCode, type FormulaError, type Result } from "./values.ts";
 
 export type StoredFormula = {
   // The formula, starting with "="
@@ -31,6 +35,73 @@ export type FormulaCells = {
   readonly rowNames: (table: Table) => readonly RowName[];
   /** A table's named body cells, in their order (the first of a name counts) */
   readonly cellNames: (table: Table) => readonly CellNameAt[];
+  /**
+   * How a table calculated from others (a view, a pivot) is calculated, as its
+   * module gives it; undefined for any other table (none: no table is one)
+   */
+  readonly calculated?: (table: Table) => CalculatedBy | undefined;
+  /**
+   * The formulas a module keeps in a table's metadata row that calculate none
+   * of its cells (a choice list's), as its module gives them; undefined where
+   * the table has none
+   */
+  readonly held?: (table: Table) => HeldFormulas | undefined;
+};
+
+/**
+ * Formulas a table holds besides its cells' and calculating none of them (a
+ * choice list's: its values calculated as its column shows, never written):
+ * what the table reads, so that their references follow the edits of what
+ * they read as a cell's do
+ */
+export type HeldFormulas = {
+  /** The formulas, with their "=" */
+  readonly formulas: readonly string[];
+  /** The table with each of them as `follow` makes it (an edit of what it reads followed), written back where changed */
+  readonly follow: (follow: (formula: string) => string) => Table;
+};
+
+/**
+ * Cells read as data only (a source of the space's): no formula, no name, a
+ * hidden tag in a value left out as in any plain cell
+ */
+export const PLAIN_CELLS: FormulaCells = {
+  formulaOf: () => undefined,
+  formulaCell: (value) => value,
+  withoutFormula: (cell) => cell,
+  rowNames: () => [],
+  cellNames: () => [],
+};
+
+/**
+ * A table calculated from others, as its module calculates it: the formulas
+ * calculate it in their order (a table reading it follows its sources in the
+ * same calculation), read it as its module would write it, and write it with
+ * the other tables an edit changes
+ */
+export type CalculatedBy = {
+  /**
+   * What it refers to and calls, as formulas (with their "="): a view's formula; a pivot's source as a reference to
+   * it (`=orders![#Data]`) and its definition's formulas. A page among them not read: the table keeps what it shows
+   */
+  readonly formulas: readonly string[];
+  /**
+   * The table written as calculated now, or why it cannot be (nothing is written then): `read` what it reads as the
+   * formulas have it now; `before` the table before an edit of it (a header renamed in it named so from now on)
+   */
+  readonly calculate: (read: CalculatedRead, before?: Table) => Table | FormulaError;
+  /** The table with its definition following an edit of a table it reads (`before` → `after`: renamed, its columns renamed or moved) */
+  readonly follow: (before: Table, after: Table, following: Following) => Table;
+};
+
+/** What a calculated table reads, as the formulas have it now */
+export type CalculatedRead = {
+  /** A formula's whole result in none of the table's cells: what it reads of the table itself is #CYCLE! (its cells are what is calculated) */
+  readonly evaluate: (formula: string) => Result;
+  /** A table by its name (on `page`, else the calculated table's), its formulas' results as calculated now (a calculated one as calculated now) */
+  readonly table: (name: string, page?: string) => Table | FormulaError;
+  /** A source of the space by its name (@tasks), or why there is none */
+  readonly source: (name: string) => Table | FormulaError;
 };
 
 /** A table's named rows by their names (lowercase), the first row of each name; rows of the markdown (header 0) */
@@ -87,7 +158,10 @@ export function formulaCount(cells: FormulaCells, table: Table): number {
   return table.rows.reduce((n, row, r) => n + (r === 0 ? 0 : row.cells.filter((cell) => cells.formulaOf(cell)).length), 0);
 }
 
+/** Each formula of a table: its cells', a calculated table's and those it holds (what the table refers to and calls, as its cells' formulas do) */
 export function forFormulas(cells: FormulaCells, table: Table, each: (formula: string) => void): void {
+  for (const formula of cells.calculated?.(table)?.formulas ?? []) each(formula);
+  for (const formula of cells.held?.(table)?.formulas ?? []) each(formula);
   table.rows.forEach((row, r) => {
     if (r === 0) return;
     for (const cell of row.cells) {
@@ -95,4 +169,12 @@ export function forFormulas(cells: FormulaCells, table: Table, each: (formula: s
       if (stored) each(stored.formula);
     }
   });
+}
+
+/**
+ * A formula as written where its "=" may be left out (a condition's, Space
+ * Lua's): the formula with it, and how far its places moved (1 where it was added)
+ */
+export function withEquals(text: string): { readonly formula: string; readonly shift: number } {
+  return text.trimStart().startsWith("=") ? { formula: text, shift: 0 } : { formula: `=${text}`, shift: 1 };
 }

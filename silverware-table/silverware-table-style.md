@@ -1441,8 +1441,116 @@ body.swt-resizing * {
   font-size: 12px;
   opacity: 0.75;
 }
-/* The pivot dialog: its fields, a section a line, then the pivot they make */
-.swt-pivot-dialog {
+/* Show result (the formulas module): a cell's result of several values (#SPILL!)
+   as a table, read only, in a dialog as large as the window; its size and Copy
+   in a bar above it, the header held as the rows scroll. The table is no table
+   of the page: SilverBullet's own rules for tables (the editor's) do not reach
+   it, so its look is said here, in SilverBullet's colors */
+.swt-dialog.swt-result-dialog {
+  width: calc(100vw - 24px);
+  height: calc(100vh - 24px);
+  height: calc(var(--sw-view-height, 100dvh) - 24px);
+  max-height: none;
+}
+.swt-result-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 8px;
+}
+.swt-result-size {
+  flex: 1;
+  font-size: 12px;
+  opacity: 0.75;
+}
+.swt-result-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swt-result-copy:hover,
+.swt-result-copy:focus-visible {
+  background: var(--swt-dialog-card);
+}
+.swt-result-copy svg {
+  width: 16px;
+  height: 16px;
+}
+.swt-result-dialog .swt-dialog-body {
+  padding: 0;
+}
+.swt-result-box {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border-top: 1px solid var(--swt-dialog-line);
+}
+.swt-result-table {
+  display: inline-block;
+  min-width: 100%;
+  font-family: var(--editor-font, inherit);
+  font-weight: normal;
+}
+.swt-result-table table {
+  border-spacing: 0;
+  min-width: 100%;
+}
+.swt-result-table td {
+  padding: 6px 10px;
+  white-space: nowrap;
+  max-width: 40em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.swt-result-table thead td {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-weight: bold;
+  color: var(--editor-table-head-color, inherit);
+  background: var(--editor-table-head-background-color, var(--swt-dialog-card));
+}
+.swt-result-table tbody tr:nth-child(even) td {
+  background: var(--editor-table-even-background-color, transparent);
+}
+/* The ⤢ icon at the corner of a cell showing #SPILL! (hovered or selected): Show result */
+.swt-floating.swt-result-holder {
+  z-index: 49;
+}
+.swt-result-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.85;
+}
+.swt-result-button:hover {
+  opacity: 1;
+  color: var(--ui-accent-color, inherit);
+}
+.swt-result-button svg {
+  width: 14px;
+  height: 14px;
+}
+/* The pivot dialog (and the view dialog, which looks the same): its fields, a section a line, then the table they make */
+.swt-pivot-dialog,
+.swt-view-dialog {
   width: min(760px, calc(100vw - 24px));
 }
 .swt-pivot {
@@ -1455,21 +1563,25 @@ body.swt-resizing * {
   flex-direction: column;
   gap: 8px;
 }
-.swt-pivot-section {
+.swt-pivot-section,
+.swt-view-section {
   display: grid;
   grid-template-columns: 9em 1fr;
   gap: 4px 12px;
   align-items: start;
 }
-.swt-pivot-label {
+.swt-pivot-label,
+.swt-view-label {
   display: flex;
   flex-direction: column;
   padding-top: 5px;
 }
-.swt-pivot-name {
+.swt-pivot-name,
+.swt-view-name {
   font-weight: 600;
 }
-.swt-pivot-hint {
+.swt-pivot-hint,
+.swt-view-hint {
   font-size: 11px;
   opacity: 0.65;
 }
@@ -1548,43 +1660,53 @@ body.swt-resizing * {
   gap: 4px;
   margin-right: 12px;
 }
-.swt-pivot-preview-title {
+.swt-pivot-preview-title,
+.swt-view-preview-title {
   font-weight: 600;
   padding-top: 4px;
   border-top: 1px solid var(--swt-dialog-line);
 }
-.swt-pivot-scroll {
+.swt-pivot-scroll,
+.swt-view-scroll {
   overflow: auto;
   max-height: 260px;
 }
-.swt-pivot-table {
+.swt-pivot-table,
+.swt-view-table {
   border-collapse: collapse;
   font-size: 13px;
 }
 .swt-pivot-table th,
-.swt-pivot-table td {
+.swt-view-table th,
+.swt-pivot-table td,
+.swt-view-table td {
   padding: 3px 10px;
   border-bottom: 1px solid var(--swt-dialog-line);
   text-align: left;
   white-space: nowrap;
 }
-.swt-pivot-table th {
+.swt-pivot-table th,
+.swt-view-table th {
   position: sticky;
   top: 0;
   /* (Not SilverBullet's table header's colors: this is no table of the page) */
   color: var(--root-color);
   background: var(--swt-dialog-card);
 }
-.swt-pivot-table td.swt-pivot-number {
+.swt-pivot-table td.swt-pivot-number,
+.swt-view-table td.swt-view-number {
   text-align: right;
 }
 .swt-pivot-size,
-.swt-pivot-none {
+.swt-view-size,
+.swt-pivot-none,
+.swt-view-none {
   margin: 4px 0 0;
   font-size: 12px;
   opacity: 0.75;
 }
-.swt-pivot-warning {
+.swt-pivot-warning,
+.swt-view-warning {
   margin: 0 0 6px;
   padding: 6px 10px;
   font-size: 12px;
@@ -1599,20 +1721,99 @@ body.swt-resizing * {
   border-radius: 6px;
   background: color-mix(in srgb, var(--ui-accent-color, #4a7cf0) 12%, transparent);
 }
-.swt-pivot-foot {
+.swt-pivot-foot,
+.swt-view-foot {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.swt-pivot-note {
+.swt-pivot-note,
+.swt-view-note {
   flex: 1;
   font-size: 12px;
   opacity: 0.75;
 }
 @media (max-width: 600px) {
-  .swt-pivot-section {
+  .swt-pivot-section,
+  .swt-view-section {
     grid-template-columns: 1fr;
   }
+}
+/* The view dialog (beside the pivot's, which it shares its look with): its formula with fx, its name */
+/* Of one height, as the settings dialog: a preview growing or shrinking as the formula is typed does not move it;
+   the preview fills what the fields leave */
+.swt-view-dialog {
+  height: min(720px, calc(100vh - 32px));
+  height: min(720px, calc(var(--sw-view-height, 100dvh) - 32px));
+}
+.swt-view,
+.swt-view-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.swt-view {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.swt-view-form {
+  flex: none;
+}
+.swt-view-preview {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.swt-view-preview > .swt-view-scroll {
+  flex: 0 1 auto;
+  max-height: none;
+  min-height: 0;
+}
+.swt-view-fields {
+  min-width: 0;
+}
+.swt-view-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 100%;
+}
+.swt-view-row > .swt-formulafield {
+  flex: 1;
+  min-width: 0;
+}
+.swt-view input[type="text"] {
+  padding: 4px 6px;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  min-width: 0;
+}
+.swt-view-row > input[type="text"] {
+  width: 16em;
+  max-width: 100%;
+}
+.swt-view-fx {
+  padding: 4px 8px;
+  font: inherit;
+  font-style: italic;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swt-view-fx:hover {
+  background: var(--swt-dialog-card);
+}
+.swt-view-problem {
+  align-self: center;
+  font-size: 12px;
+  color: var(--danger-color, #c62828);
 }
 /* The Functions dialog: a search, the groups, the list beside the one picked */
 .swt-functions {
@@ -1740,44 +1941,69 @@ body.swt-resizing * {
   flex-direction: column;
   gap: 8px;
 }
-.swt-choices-list {
+.swt-choices-list,
+.swt-choices-part {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.swt-choices-list[hidden] {
+.swt-choices-list[hidden],
+.swt-choices-part[hidden],
+.swt-choices-label[hidden] {
   display: none;
 }
-/* The two ways: the column's values or a list of its own */
+/* The ways (the column's values, a list of its own, a formula) as one row of segments, the one picked's hint under it */
 .swt-choices-ways {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.swt-choices-way {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 6px 8px;
   border: 1px solid var(--swt-dialog-line);
   border-radius: 6px;
+  overflow: hidden;
+}
+.swt-choices-way {
+  /* Each as wide as its label, the room left shared: no label wraps, a narrow screen cuts it with … */
+  flex: 1 1 auto;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  white-space: nowrap;
   cursor: pointer;
 }
+.swt-choices-way > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.swt-choices-way + .swt-choices-way {
+  border-left: 1px solid var(--swt-dialog-line);
+}
 .swt-choices-way:has(input:checked) {
-  border-color: var(--ui-accent-color);
+  /* As the primary button: SilverBullet's --ui-accent-text-color is the accent itself */
+  color: #fff;
+  background: var(--ui-accent-color);
+  font-weight: 600;
+}
+.swt-choices-way:has(input:focus-visible) {
+  outline: 2px solid var(--ui-accent-color);
+  outline-offset: -4px;
 }
 .swt-choices-way:has(input:disabled) {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: default;
 }
+/* The radio itself unseen over the whole segment (a press on it picks it), kept for the keys and a screen reader */
 .swt-choices-way input {
-  margin-top: 3px;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
 }
-.swt-choices-way > span {
-  display: flex;
-  flex-direction: column;
-}
-.swt-choices-way-text {
+.swt-choices-hint {
+  margin: 0;
   font-size: 12px;
   opacity: 0.75;
 }
@@ -1804,12 +2030,42 @@ body.swt-resizing * {
   font-family: var(--editor-font, monospace);
   opacity: 0.7;
 }
-.swt-choices-values {
+/* The name's row: its field as wide as the room, the hashtag it makes under it, so typing the name moves nothing */
+.swt-choices-label.swt-choices-name-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 8px;
+}
+.swt-choices-name-row .swt-choices-tag {
+  grid-column: 2;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.swt-choices-label.swt-choices-name-row[hidden] {
+  display: none;
+}
+.swt-choices-values,
+.swt-choices-preview-values {
   display: flex;
   flex-direction: column;
   gap: 4px;
   max-height: 50vh;
   overflow-y: auto;
+}
+/* A value a formula gives (a source's, one's own): as a value's field, to read only */
+.swt-choices-readonly {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  opacity: 0.85;
+}
+.swt-choices-count,
+.swt-choices-empty {
+  font-weight: normal;
+  opacity: 0.7;
 }
 .swt-choices-row {
   display: flex;
@@ -4288,33 +4544,40 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   gap: 8px;
   min-width: 0;
 }
-/* A formula's field: the choices for the name typed in a list under it, the syntax of the function the caret is in */
+/* A formula's field (src/formulafield.ts, any module's dialog): the choices for the name typed in a list under it, the syntax of the function the caret is in */
 /* A formula's name by its field, not by the middle of its help under it */
-.swt-cf-param:has(> .swt-cf-formula-box) {
+.swt-cf-param:has(> .swt-formulafield) {
   align-items: flex-start;
 }
-.swt-cf-param:has(> .swt-cf-formula-box) > .swt-cf-param-name {
+.swt-cf-param:has(> .swt-formulafield) > .swt-cf-param-name {
   padding-top: 6px;
 }
-.swt-cf-formula-box {
+.swt-formulafield {
   display: inline-flex;
   flex-direction: column;
   gap: 4px;
   max-width: 100%;
 }
 /* The field and its list, the list right under the field */
-.swt-cf-formula-input {
+.swt-formulafield-input {
   position: relative;
   display: inline-flex;
   max-width: 100%;
 }
-.swt-cf input.swt-cf-formula {
+.swt-formulafield-input input.swt-formulafield-text {
   width: 28em;
   max-width: 100%;
+  padding: 4px 6px;
+  font: inherit;
   font-family: var(--editor-font, monospace);
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swt-dialog-line);
+  border-radius: 6px;
+  min-width: 0;
 }
 /* Over the dialog (fixed: its body scrolls and would cut it), placed under the field by the script */
-.swt-cf-choices {
+.swt-formulafield-choices {
   position: fixed;
   z-index: 2;
   min-width: 16em;
@@ -4327,10 +4590,10 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   border-radius: 6px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
 }
-.swt-cf-choices[hidden] {
+.swt-formulafield-choices[hidden] {
   display: none;
 }
-.swt-cf-choice {
+.swt-formulafield-choice {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -4338,31 +4601,43 @@ html[data-theme="dark"] :is(td, .swt-cf-sample).swt-cf {
   border-radius: 4px;
   cursor: pointer;
 }
-.swt-cf-choice:hover,
-.swt-cf-choice-active {
+.swt-formulafield-choice:hover,
+.swt-formulafield-choice-active {
   background: color-mix(in srgb, var(--ui-accent-color) 18%, transparent);
 }
-.swt-cf-choice-name {
+.swt-formulafield-choice-name {
   font-family: var(--editor-font, monospace);
 }
-.swt-cf-choice-kind {
+.swt-formulafield-choice-kind {
   font-size: 11px;
   opacity: 0.6;
 }
-.swt-cf-formula-help {
+.swt-formulafield-problem {
+  font-size: 12px;
+  color: var(--danger-color, #c62828);
+}
+.swt-formulafield-problem:empty {
+  display: none;
+}
+.swt-formulafield-help {
   display: flex;
   flex-direction: column;
   gap: 2px;
   max-width: 34em;
 }
-.swt-cf-formula-help:empty {
+.swt-formulafield-help:empty {
   display: none;
 }
-.swt-cf-formula-syntax {
+.swt-formulafield-syntax {
   font-size: 12px;
 }
-.swt-cf-formula-syntax b {
+.swt-formulafield-syntax b {
   color: var(--ui-accent-color);
+}
+.swt-formulafield-description {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.7;
 }
 /* A rule's preview: its cells across their values, a line for each range (a column), each cell in its look */
 .swt-cf-preview {

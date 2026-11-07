@@ -2,6 +2,7 @@
 // renders them, a bridge over the page's text, and helpers to click and type.
 // Test files call useTablePage() inside their describe; the page's state is
 // exported as live bindings, so `text` is always the page's current text.
+import type { SourceProvider } from "../sources.ts";
 import { afterEach, beforeEach, vi } from "vitest";
 import type { Bridge } from "../bridge.ts";
 import { Controller } from "../controller.ts";
@@ -91,7 +92,7 @@ export function renderPage(page: string, into: HTMLElement, moves: number[]): vo
 // Most tests check the markdown byte for byte as written, so formatting is off
 // unless a test turns it on; so is storing metadata (on by default): what a
 // test stores it says so, and a view (a sort, a width) writes nothing
-export async function setup(page: string, settings: Record<string, unknown> = {}, bridgeExtras: Partial<Bridge> = {}): Promise<void> {
+export async function setup(page: string, settings: Record<string, unknown> = {}, bridgeExtras: Partial<Bridge> = {}, sources?: SourceProvider): Promise<void> {
   const config: Record<string, unknown> = { "silverware.table.autoFormat": false, "silverware.table.metadata": false, ...settings };
   // A test setting up twice, or without useTablePage: the controller before goes (else it watched the next pages too)
   controller?.stop();
@@ -117,7 +118,7 @@ export async function setup(page: string, settings: Record<string, unknown> = {}
     getConfig: (path, defaultValue) => (path in config ? config[path] : defaultValue),
     ...bridgeExtras,
   };
-  controller = new Controller(document, bridge);
+  controller = new Controller(document, bridge, sources);
   controller.start();
   await controller.scan();
   // The settings are read asynchronously: tests start once they are

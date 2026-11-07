@@ -19,6 +19,30 @@ describe("The shared dialog", () => {
     expect(document.activeElement).toBe(dialog.element);
   });
 
+  it("opens over another with `above`, Esc closing the top one alone, the focus back in the one under it; else closes it first", async () => {
+    const shown = dialogs();
+    const field = document.createElement("input");
+    const under = shown.open({ title: "Under", content: field, focus: field });
+    let closed = 0;
+    const over = shown.open({ title: "Over", content: content(), above: true, closed: () => closed++ });
+    expect(document.querySelectorAll(".x-dialog")).toHaveLength(2);
+    expect(shown.contains(field)).toBe(true);
+    key(over.element, "Escape");
+    await Promise.resolve();
+    expect(closed).toBe(1);
+    expect(document.querySelectorAll(".x-dialog")).toHaveLength(1);
+    expect(document.activeElement).toBe(field);
+    expect(shown.isOpen).toBe(true);
+    // The one under closed: the one over it with it
+    shown.open({ title: "Over again", content: content(), above: true });
+    under.close();
+    expect(document.querySelectorAll(".x-dialog")).toHaveLength(0);
+    // Without `above`: the one open closed first
+    shown.open({ title: "A", content: content() });
+    shown.open({ title: "B", content: content() });
+    expect(Array.from(document.querySelectorAll(".x-dialog"), (d) => d.getAttribute("aria-label"))).toEqual(["B"]);
+  });
+
   it("closes on Esc, ×, a press beside it, once dismiss agrees; the focus back where it was; no key reaches the page", async () => {
     const before = document.body.appendChild(document.createElement("button"));
     before.focus();

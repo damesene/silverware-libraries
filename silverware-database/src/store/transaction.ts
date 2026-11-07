@@ -25,7 +25,7 @@ export type StoreState =
 
 /** What one store refuses beside the model's rules, and how it tells names apart */
 export type StoreRules = {
-  readonly latestFormat: number;
+  readonly latestVersion: number;
   validatePropertyKey(key: string): string | undefined;
   validateItemName(name: string): string | undefined;
   /** What two names are compared by (a page's name: whatever its case, as a disk may ignore it) */
@@ -58,9 +58,9 @@ export type TransactionDraft = {
 
 const CHANGED_READ = "changed since it was read: left alone";
 
-/** Why a database's format is not written (older: migrate it first; newer: read only) */
-export function formatReason(version: number, latest: number): string {
-  return version < latest ? `kept in an older format (version ${version}): migrate it first` : `kept in a newer format (version ${version}) than this store writes: read only`;
+/** Why a database of another version is not written (older: migrate it first; newer: read only) */
+export function versionReason(version: number, latest: number): string {
+  return version < latest ? `kept in an older version (${version}): migrate it first` : `kept in a newer version (${version}) than this store writes: read only`;
 }
 
 /** A transaction's changes checked against what the store has: each part's draft, or why it is left */
@@ -96,7 +96,7 @@ function validateTransaction(state: StoreState, changes: Changes, rules: StoreRu
   if (new Set(refs).size !== refs.length) return { cause: "refused", reason: "an item made twice under one ref" };
   if (creates === 0 && state) return { cause: "refused", reason: `a database "${changes.database}" exists already` };
   if (creates < 0 && !state) return { cause: "missing", reason: `no database "${changes.database}"` };
-  if (state && state.record.version !== rules.latestFormat) return { cause: "format", reason: formatReason(state.record.version, rules.latestFormat) };
+  if (state && state.record.version !== rules.latestVersion) return { cause: "version", reason: versionReason(state.record.version, rules.latestVersion) };
   if (state && changes.expects?.database !== undefined && changes.expects.database !== state.recordRevision) return { cause: "changed", reason: `its database ${CHANGED_READ}` };
   return undefined;
 }
@@ -106,7 +106,7 @@ function draftRecord(state: StoreState, changes: Changes, rules: StoreRules): { 
   const list = changes.changes.filter((change) => change.kind === "createDatabase" || change.kind === "renameDatabase" || change.kind === "setSchema");
   let record = state?.record;
   for (const change of list) {
-    if (change.kind === "createDatabase") record = { database: { id: changes.database, name: change.name, properties: [] }, version: rules.latestFormat };
+    if (change.kind === "createDatabase") record = { database: { id: changes.database, name: change.name, properties: [] }, version: rules.latestVersion };
     else if (change.kind === "renameDatabase") record = { ...record!, database: { ...record!.database, name: change.name } };
     else record = { ...record!, database: { ...record!.database, properties: change.properties } };
   }

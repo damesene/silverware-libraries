@@ -9,13 +9,13 @@ import type { IndexedObject } from "../../../../shared/platform.ts";
 import type { Property, Value } from "../../model/database.ts";
 import type { ItemState, RecordState } from "../transaction.ts";
 
-/** A root page as a format reads it: its record, or why it cannot be read (the database then not shown) */
+/** A root page as a version reads it: its record, or why it cannot be read (the database then not shown) */
 export type RootRead = { readonly record: RecordState } | { readonly problem: string };
 
-/** An item's page as a format reads it (its key given by the store) */
+/** An item's page as a version reads it (its key given by the store) */
 export type ItemRead = Omit<ItemState, "key">;
 
-export type PagesFormat = {
+export type PagesVersion = {
   readonly version: number;
   /** The root page's record, from its index object */
   readRoot(object: IndexedObject, version: number): RootRead;
@@ -41,9 +41,13 @@ export function systemOf(object: IndexedObject): Readonly<Record<string, unknown
   return isObject(system) ? system : {};
 }
 
-/** The version a root page is kept in (none written: 1, what exists before versions) */
+/**
+ * The version a root page is kept in, its `_database.version` (none written:
+ * 1, what exists before versions; `format`, its name until 2026-11-07, holds
+ * only 1, so it reads the same)
+ */
 export function versionOf(object: IndexedObject): number {
-  const version = systemOf(object).format;
+  const version = systemOf(object).version;
   return typeof version === "number" && Number.isInteger(version) ? version : 1;
 }
 
@@ -62,10 +66,10 @@ export function modelValue(value: unknown): Value | undefined {
 }
 
 // A property's settings in the root page beside its params: what the model has as fields
-const PROPERTY_FIELDS = new Set(["type", "label", "readonly"]);
+const PROPERTY_FIELDS = new Set(["type", "label", "readonly", "hidden", "required"]);
 
 /** Version 1: the schema under `_database.properties` by key, each property's params beside its type and label */
-export const FORMAT_1: PagesFormat = {
+export const VERSION_1: PagesVersion = {
   version: 1,
   readRoot(object, version) {
     const system = systemOf(object);
@@ -76,7 +80,7 @@ export const FORMAT_1: PagesFormat = {
     for (const [key, raw] of Object.entries(schema)) {
       if (!isObject(raw)) return { problem: `its property ${key} is no map` };
       const params = Object.fromEntries(Object.entries(raw).filter(([field]) => !PROPERTY_FIELDS.has(field)));
-      properties.push({ key, label: typeof raw.label === "string" ? raw.label : key, type: typeof raw.type === "string" ? raw.type : "text", params, readonly: raw.readonly === true });
+      properties.push({ key, label: typeof raw.label === "string" ? raw.label : key, type: typeof raw.type === "string" ? raw.type : "text", params, readonly: raw.readonly === true, ...(raw.hidden === true ? { hidden: true } : {}), ...(raw.required === true ? { required: true } : {}) });
     }
     const name = typeof system.name === "string" && system.name ? system.name : system.id;
     return { record: { database: { id: system.id, name, properties }, version } };
@@ -93,11 +97,13 @@ export const FORMAT_1: PagesFormat = {
   writeRoot(page, before, after) {
     if (!before) page.tags.add(ROOT_TAG).properties.set([SYSTEM_KEY, "id"], after.database.id);
     if (before?.database.name !== after.database.name) page.properties.set([SYSTEM_KEY, "name"], after.database.name);
-    if (before?.version !== after.version) page.properties.set([SYSTEM_KEY, "format"], after.version);
+    // Its version written with each write of the root page, and `format`, the name it had, taken off (none there: nothing)
+    page.properties.set([SYSTEM_KEY, "version"], after.version);
+    page.properties.remove([SYSTEM_KEY, "format"]);
     const schema = (record: RecordState | undefined) => (record ? JSON.stringify(record.database.properties) : undefined);
     if (schema(before) !== schema(after)) {
       const map = Object.fromEntries(
-        after.database.properties.map((one) => [one.key, { type: one.type, label: one.label, ...(one.readonly ? { readonly: true } : {}), ...(one.params as Record<string, never>) }]),
+        after.database.properties.map((one) => [one.key, { type: one.type, label: one.label, ...(one.readonly ? { readonly: true } : {}), ...(one.hidden ? { hidden: true } : {}), ...(one.required ? { required: true } : {}), ...(one.params as Record<string, never>) }]),
       );
       page.properties.set([SYSTEM_KEY, "properties"], map);
     }
@@ -115,5 +121,5 @@ export const FORMAT_1: PagesFormat = {
   },
 };
 
-/** The formats the store knows, the latest last */
-export const FORMATS: readonly PagesFormat[] = [FORMAT_1];
+/** The versions the store knows, the latest last */
+export const VERSIONS: readonly PagesVersion[] = [VERSION_1];

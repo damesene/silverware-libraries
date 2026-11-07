@@ -5,20 +5,20 @@ import { writeYamlEntry } from "../../../../shared/pages/yamltree.ts";
 import type { Changes } from "../../core/changes.ts";
 import type { Database, ItemKey } from "../../model/database.ts";
 import { type ContractSeed, storeContract } from "../contract.ts";
-import { FORMAT_1, type PagesFormat } from "./format.ts";
+import { VERSION_1, type PagesVersion } from "./versions.ts";
 import { PagesStore } from "./store.ts";
 import { memoryPages } from "./testing.ts";
 
 // An older form, read as version 1 is: what a migration brings to the latest
-const FORMAT_0: PagesFormat = { ...FORMAT_1, version: 0 };
+const VERSION_0: PagesVersion = { ...VERSION_1, version: 0 };
 
 /** A database's pages as the store writes them, its root at `db-<id>` */
 function seedPages(seeds: readonly ContractSeed[]): Record<string, string> {
   const pages: Record<string, string> = {};
-  for (const { database, items, format } of seeds) {
-    const version = format === "older" ? 0 : format === "newer" ? 2 : 1;
+  for (const { database, items, version: kept } of seeds) {
+    const version = kept === "older" ? 0 : kept === "newer" ? 2 : 1;
     const properties = Object.fromEntries(database.properties.map((one) => [one.key, { type: one.type, label: one.label, ...(one.readonly ? { readonly: true } : {}), ...(one.params as Record<string, never>) }]));
-    pages[`db-${database.id}`] = `---\ntags: [db-root]\n${writeYamlEntry("_database", { id: database.id, name: database.name, format: version, properties })}---\n`;
+    pages[`db-${database.id}`] = `---\ntags: [db-root]\n${writeYamlEntry("_database", { id: database.id, name: database.name, version, properties })}---\n`;
     for (const item of items ?? []) {
       const values = Object.entries(item.values).map(([key, value]) => writeYamlEntry(key, value as never)).join("");
       const rank = item.rank === undefined ? "" : writeYamlEntry("_database", { rank: item.rank });
@@ -30,7 +30,7 @@ function seedPages(seeds: readonly ContractSeed[]): Record<string, string> {
 
 function harness(seeds: readonly ContractSeed[], options: { readonly lagging?: boolean; readonly toldEarly?: boolean } = {}) {
   const memory = memoryPages(seedPages(seeds), options);
-  const store = new PagesStore(memory.platform, { formats: [FORMAT_0, FORMAT_1] });
+  const store = new PagesStore(memory.platform, { versions: [VERSION_0, VERSION_1] });
   // Another hand on the pages: a writer of its own, as a page edited by hand
   const hand = pageWriter(memory.platform);
   const changeOutside = async (database: string, item: ItemKey, change: { values?: Record<string, unknown>; name?: string; removed?: true }) => {
@@ -63,10 +63,21 @@ describe("the pages store", () => {
     );
     expect(made.skipped).toEqual([]);
     expect(memory.pages.get("db-tasks")).toBe(
-      "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  format: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    due: { type: date, label: Due, readonly: true }\n---\n",
+      "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    due: { type: date, label: Due, readonly: true }\n---\n",
     );
     expect(memory.pages.get("db-tasks/Fix login")).toBe('---\ntags: [db]\nstatus: Todo\ndue: "2026-11-10"\n_database:\n  rank: a0\n---\nSteps');
     expect(store.documentOf(made.created.get("a")!)).toBe("db-tasks/Fix login");
+  });
+
+  it("reads a root page's version under format, its name before, as the same, and writes it as version", async () => {
+    const { memory, store } = harness(SEED);
+    const old = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  format: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n---\n";
+    memory.writeOutside("db-tasks", old);
+    expect(await store.version("tasks")).toEqual({ version: 1, latest: 1 });
+    const report = await store.apply(await store.plan(changes("tasks", { kind: "renameDatabase", name: "Jobs" })));
+    expect(report.skipped).toEqual([]);
+    // (The old name taken off, the version under its name after the others, as a key added is)
+    expect(memory.pages.get("db-tasks")).toBe(old.replace("name: Tasks", "name: Jobs").replace("  format: 1\n", "").replace("---\n---", "---\n").replace("[Todo, Done] }\n", "[Todo, Done] }\n  version: 1\n"));
   });
 
   it("renames an item's page, its key kept, and refuses a name another page has in another case", async () => {
@@ -127,6 +138,19 @@ describe("the pages store", () => {
     expect(memory.pages.get("db-tasks/Fix login")).toBe('---\ntags: [db]\nstatus: { nested: 1 }\ndue: "2026-12-01"\n_database:\n  rank: a0\n---\n');
   });
 
+  it("tells its progress page by page as it writes them, one after another", async () => {
+    const seed: ContractSeed[] = [{ database: TASKS, items: ["A", "B", "C"].map((name, at) => ({ name, values: { status: "Todo" }, rank: `a${at}` })) }];
+    const { memory, store } = harness(seed);
+    const items = (await store.items("tasks")).value;
+    const plan = await store.plan(changes("tasks", { kind: "renameDatabase", name: "Jobs" }, ...items.map((item) => ({ kind: "setValue" as const, item: item.key, key: "status", value: "Done" }))));
+    const told: [number, number, number][] = [];
+    // (With each told: how many items' pages hold Done by then)
+    const done = () => [...memory.pages.values()].filter((text) => text.includes("status: Done")).length;
+    await store.apply(plan, (at, of) => void told.push([at, of, done()]));
+    // (The database's own page first, then the items', the last told again once all is done)
+    expect(told).toEqual([[1, 4, 0], [2, 4, 1], [3, 4, 2], [4, 4, 3], [4, 4, 3]]);
+  });
+
   it("never writes a body over one changed by hand since it was read", async () => {
     const { memory, store } = harness([{ database: TASKS, items: [{ name: "A", values: {}, rank: "a0", body: "Body A" }] }]);
     const [item] = (await store.items("tasks")).value;
@@ -176,7 +200,7 @@ describe("the pages store", () => {
   });
 
   it("migrates the databases of a page before any is read", async () => {
-    const { store } = harness([{ ...SEED[0]!, format: "older" }]);
+    const { store } = harness([{ ...SEED[0]!, version: "older" }]);
     expect(await store.planMigration({ document: "db-tasks" })).toHaveLength(1);
   });
 

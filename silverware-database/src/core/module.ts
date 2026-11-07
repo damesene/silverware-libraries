@@ -55,8 +55,17 @@ export type ModuleHost = {
   openDocument(item: Item): Promise<void>;
   /** The editor's area on screen, where a panel beside the document goes (undefined: the window) */
   editorArea(): DOMRect | undefined;
+  /** How the page's text looks (CSS properties: its font, size, line height, color), for what a module shows beside it; none: the style page's */
+  editorLook?(): Readonly<Record<string, string>> | undefined;
   /** One of the module's settings (declared in its `settings`), its default where not set */
   setting(key: string): unknown;
+  /**
+   * One of the module's settings saved where the user keeps them (SilverBullet's
+   * CONFIG: for every database), `undefined` back to its default; false where
+   * settings cannot be saved here (said to no one: the value then holds for this
+   * session alone)
+   */
+  saveSetting(key: string, value: unknown): Promise<boolean>;
   /** What this module offers the others (one offer a module, by its name) */
   offer(api: unknown): void;
   /** What another module offers, undefined where it is off or offers none, or starts after this one (the modules start in their order: ask as it is needed, not as it starts) */
@@ -106,8 +115,8 @@ export class Modules {
 
   constructor(
     readonly all: readonly ModuleDefinition[],
-    private readonly host: Omit<ModuleHost, "setting" | "offer" | "offered">,
-    private readonly settings: Pick<Settings, "get">,
+    private readonly host: Omit<ModuleHost, "setting" | "saveSetting" | "offer" | "offered">,
+    private readonly settings: Pick<Settings, "get" | "save">,
   ) {}
 
   /** The modules on started, those of before stopped first */
@@ -123,6 +132,13 @@ export class Modules {
       const host: ModuleHost = {
         ...this.host,
         setting: (key) => values.get(key),
+        saveSetting: async (key, value) => {
+          const declared = definition.settings?.find((one) => one.key === key);
+          values.set(key, value === undefined ? declared?.default : value);
+          if (!this.settings.save) return false;
+          await this.settings.save({ [moduleSettingPath(definition.name, key)]: value });
+          return true;
+        },
         offer: (api) => void this.offers.set(definition.name, api),
         offered: <T>(module: string) => this.offers.get(module) as T | undefined,
       };

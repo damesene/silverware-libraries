@@ -1,7 +1,7 @@
 // A `silverware-database` block's text: a place's state (docs/silverware-database.md,
-// *The pages store*, the block), one key a line: `id: tasks`, `view: kanban`,
-// `kanban.groupBy: status`; a value a YAML scalar, or JSON where it is a list
-// or a map (`kanban.filter: {"status": "!=Done"}`), so the block stays
+// *The pages store*, the block), one key a line: `id: tasks`, `view: board`,
+// `board.groupBy: status`; a value a YAML scalar, or JSON where it is a list
+// or a map (`board.filter: {"status": "!=Done"}`), so the block stays
 // readable and a diff of it small. A line it does not read (typed by hand) is
 // kept as written, as are the lines of keys a write leaves alone.
 import { readScalar, yamlString } from "../../../../shared/pages/frontmatter.ts";

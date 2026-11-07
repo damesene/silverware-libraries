@@ -3,7 +3,7 @@
 // block through `render`, tells the index's changes (`indexChanged`) and runs
 // the commands; the API page defines the user's own views and types
 // (`defineViews`, `defineTypes`), before `init`, as Space Lua loads.
-import { codeBlocksOf, sameBody } from "../../shared/pages/blocks.ts";
+import { type CodeBlock, codeBlocksOf, sameBody } from "../../shared/pages/blocks.ts";
 import { pageChanges } from "../../shared/pages/changes.ts";
 import { pageWriter, type PageWriter } from "../../shared/pages/writer.ts";
 import type { Platform } from "../../shared/platform.ts";
@@ -18,7 +18,7 @@ import { VIEW_HELPERS } from "./views/helpers.ts";
 import { TypeRegistry } from "./domain/types/registry.ts";
 import type { PropertyType } from "./domain/types/type.ts";
 import { BLOCK_LANGUAGE, BlockState, readBlock } from "./host/silverbullet/block.ts";
-import { type Bridge, editorArea, silverBulletPlatform } from "./host/silverbullet/platform.ts";
+import { type Bridge, editorArea, editorLook, silverBulletPlatform } from "./host/silverbullet/platform.ts";
 import { PagesStore } from "./store/pages/store.ts";
 import { BUILT_IN_MODULES } from "./modules/builtin.ts";
 import { BUILT_IN_VIEWS } from "./views/builtin/index.ts";
@@ -130,6 +130,7 @@ export function init(bridge: Bridge): void {
         }
       },
       editorArea: () => editorArea(document),
+      editorLook: () => editorLook(document),
       onChanged: (listener) => store.onChanged((change) => listener(change.database)),
       onDocumentOpened: (listener) => platform.editor.onOpened?.(listener) ?? (() => {}),
       refreshPlaces: (database) => {
@@ -254,7 +255,7 @@ function start(element: HTMLElement, shown: Shown): void {
     return;
   }
   const state = new BlockState(shown.current, (body, text) => writeBlock(element, shown, body, text));
-  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, settings: platform.settings, ui: platform.ui, editor: platform.editor, moduleTools: (place) => app!.modules.placeTools(place), openItem: (item, database) => app!.modules.openItem(item, database) });
+  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, settings: platform.settings, ui: platform.ui, editor: platform.editor, moduleTools: (place) => app!.modules.placeTools(place), openItem: (item, database) => app!.modules.openItem(item, database), editSource: () => void editSource(element, shown) });
   void shown.place.render();
 }
 
@@ -265,20 +266,9 @@ function start(element: HTMLElement, shown: Shown): void {
  */
 async function writeBlock(element: HTMLElement, shown: Shown, body: string, text: string): Promise<boolean> {
   const { writer, platform } = app!;
-  const alike = [...app!.shown].filter(([one, other]) => other.page === shown.page && sameBody(other.current) === sameBody(body) && one.isConnected).map(([one]) => one);
-  alike.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
-  const occurrence = alike.indexOf(element);
-  if (!app!.shown.has(element)) {
-    platform.ui.notify("Silverware Database: this block was drawn before Silverware Database started again: reload the page", { type: "error" });
-    return false;
-  }
-  // Which of the blocks alike this is, by their order: told only where every one of the page is shown (CodeMirror keeps
-  // blocks out of view out of the page), else nothing guessed
-  const inText = codeBlocksOf(String(await platform.editor.text())).filter((block) => block.language === BLOCK_LANGUAGE && sameBody(block.body) === sameBody(body)).length;
-  if (occurrence < 0 || alike.length !== inText) {
-    platform.ui.notify("Silverware Database: this block is written the same as another of the page, which is out of view: scroll so both show, or tell them apart (a line of your own in one)", { type: "error" });
-    return false;
-  }
+  const found = await blockOf(element, shown, body);
+  if (!found) return false;
+  const { occurrence, of: inText } = found;
   // (The place drawn as the write starts: drawn anew meanwhile, from the text its element was rendered for, it is no longer the one that wrote)
   const place = shown.place;
   const report = await writer.write(pageChanges().page(shown.page, (p) => p.codeBlocks.replace(BLOCK_LANGUAGE, body, text, { occurrence, of: inText })).build());
@@ -293,6 +283,36 @@ async function writeBlock(element: HTMLElement, shown: Shown, body: string, text
     }
   }
   return report.written.length > 0;
+}
+
+/**
+ * Which of the page's blocks an element is, those written alike told apart by
+ * their order: found only where every one of them is shown (CodeMirror keeps
+ * blocks out of view out of the page), else nothing guessed and said why
+ */
+async function blockOf(element: HTMLElement, shown: Shown, body: string): Promise<{ readonly occurrence: number; readonly of: number; readonly block: CodeBlock } | undefined> {
+  const { platform } = app!;
+  if (!app!.shown.has(element)) {
+    platform.ui.notify("Silverware Database: this block was drawn before Silverware Database started again: reload the page", { type: "error" });
+    return undefined;
+  }
+  const alike = [...app!.shown].filter(([one, other]) => other.page === shown.page && sameBody(other.current) === sameBody(body) && one.isConnected).map(([one]) => one);
+  alike.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+  const occurrence = alike.indexOf(element);
+  const inText = codeBlocksOf(String(await platform.editor.text())).filter((block) => block.language === BLOCK_LANGUAGE && sameBody(block.body) === sameBody(body));
+  if (occurrence < 0 || alike.length !== inText.length) {
+    platform.ui.notify("Silverware Database: this block is written the same as another of the page, which is out of view: scroll so both show, or tell them apart (a line of your own in one)", { type: "error" });
+    return undefined;
+  }
+  return { occurrence, of: inText.length, block: inText[occurrence]! };
+}
+
+/** The block's markdown shown to edit: the cursor put at the start of its text (SilverBullet shows a block with the cursor in it as text) */
+async function editSource(element: HTMLElement, shown: Shown): Promise<void> {
+  const found = await blockOf(element, shown, shown.current);
+  if (!found) return;
+  if (!bridgeCalls?.moveCursor) return app!.platform.ui.notify("Silverware Database: this SilverBullet cannot put the cursor into the block", { type: "error" });
+  await bridgeCalls.moveCursor(found.block.bodyFrom);
 }
 
 /**
@@ -340,6 +360,22 @@ function blockLine(line: Element): boolean {
   return !!before?.querySelector(".swd-widget");
 }
 
+/**
+ * The editor's line at a height, for a press in the editor on none of its
+ * lines: left or right of them (the content's padding, the scroller's room
+ * beside it), which CodeMirror puts on the line beside it
+ */
+function lineAt(target: Element, y: number): Element | undefined {
+  const content = target.closest(".cm-editor")?.querySelector(".cm-content");
+  if (!content) return undefined;
+  for (const line of content.children) {
+    if (!line.classList.contains("cm-line")) continue;
+    const box = line.getBoundingClientRect();
+    if (y >= box.top && y < box.bottom) return line;
+  }
+  return undefined;
+}
+
 function pressBeside(event: MouseEvent): void {
   if (event.type !== "mousedown") {
     // (Only the mouseup and click of a press taken: a selection dragged onto the line ends as CodeMirror sees it)
@@ -352,8 +388,17 @@ function pressBeside(event: MouseEvent): void {
   }
   pressTaken = 0;
   if (event.altKey || event.shiftKey || event.button !== 0 || !(event.target instanceof Element)) return;
-  const line = event.target.closest(".cm-line");
-  if (!line || event.target.closest(".swd-widget") || !blockLine(line)) return;
+  const widget = event.target.closest(".swd-widget");
+  if (widget) {
+    // A press on what takes no focus in it (a view's margin, a table's header) moves the focus, where a field or a menu of
+    // it had it, to the nearest element that takes it: the editor's content, the caret put at the press, in the block, which
+    // shows its markdown. Focusable itself (out of the tab order), the widget takes it: set as the press comes, before the
+    // browser moves the focus (SilverBullet makes the widget's element; its class is the init page's)
+    if (!widget.hasAttribute("tabindex")) widget.setAttribute("tabindex", "-1");
+    return;
+  }
+  const line = event.target.closest(".cm-line") ?? lineAt(event.target, event.clientY);
+  if (!line || !blockLine(line)) return;
   pressTaken = Date.now();
   event.preventDefault();
   event.stopPropagation();
@@ -396,7 +441,7 @@ async function newDatabase(): Promise<void> {
 }
 
 // The bridge's own calls that are no part of the platform (a prompt, text typed at the cursor), kept as `init` runs
-let bridgeCalls: Pick<Bridge, "prompt" | "insertAtCursor"> | undefined;
+let bridgeCalls: Pick<Bridge, "prompt" | "insertAtCursor" | "moveCursor"> | undefined;
 const bridgePrompt = (message: string) => bridgeCalls?.prompt(message) ?? Promise.resolve(undefined);
 const insertAtCursor = (text: string) => bridgeCalls?.insertAtCursor(text) ?? Promise.resolve();
 

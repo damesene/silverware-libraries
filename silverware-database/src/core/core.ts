@@ -14,12 +14,13 @@
 import type { UserInterface } from "../../../shared/platform.ts";
 import { inRankOrder, isRank, placeAt } from "../domain/rank.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
+import { optionsOf } from "../domain/types/options.ts";
 import { keptText } from "../domain/types/type.ts";
 import { type Database, type Item, type ItemKey, isEmpty, isValue, NAME_KEY, type Params, type Property, type Revised, validatePropertyKey, type Value } from "../model/database.ts";
 import { databaseChanges, type DatabaseChangesBuilder } from "./builder.ts";
 import type { Changes } from "./changes.ts";
 import { TransactionHistory } from "./history.ts";
-import type { DatabaseStore, Skipped, Target, TransactionPlan, TransactionReport } from "./store.ts";
+import type { DatabaseStore, Skipped, Target, TransactionPlan, TransactionReport, WriteProgress } from "./store.ts";
 
 /** What the core asks of the user: told what was refused or left, asked before anything is removed */
 export type CoreInterface = Pick<UserInterface, "notify"> & Required<Pick<UserInterface, "ask">>;
@@ -54,9 +55,16 @@ export type Proposal = {
   readonly label: string;
   readonly plan: TransactionPlan;
   readonly unreadable?: readonly ItemKey[];
+  /** Where each item is a document of its own (a page): how many documents it writes, one after another, and whether that is many (it takes a while, not to be stopped) */
+  readonly documents?: { readonly count: number; readonly many: boolean };
+  /** Options renamed (`retypeProperty`'s `renames`): each with how many items' values it renames */
+  readonly renamed?: readonly OptionRenamed[];
   // Written whole or not at all, proposed against the items at this revision: a key changed in part would leave items' values under the old key, out of every view
   readonly whole?: { readonly items: string };
 };
+
+/** An option renamed, and how many items hold it */
+export type OptionRenamed = { readonly from: string; readonly to: string; readonly items: number };
 
 /** An item as one is added: its name (none: a free *Untitled*), values, body */
 export type ItemDraft = { readonly name?: string; readonly values?: Readonly<Record<string, Value>>; readonly body?: string };
@@ -67,19 +75,40 @@ export type NewProperty = { readonly label: string; readonly type: string; reado
 /**
  * Where an item goes in the order by hand: right after `after`, else right
  * before `before` (items of the same database, as a view shows them, filtered
- * or not), else after the ranked items (those without a rank, made outside the
- * core, stay after them: adding one never writes them all); with values set
- * there (a kanban column's; undefined: taken off, the column of none)
+ * or not), else at the end (those without a rank, made outside the core, ranked
+ * where they are first, so it is the last as shown; many of them: after the
+ * ranked ones, writing none of them); with values set
+ * there (a board column's; undefined: taken off, the column of none)
  */
 export type Place = { readonly after?: Item; readonly before?: Item; readonly values?: Readonly<Record<string, Value | undefined>> };
 
 const UNTITLED = "Untitled";
+
+/** From how many documents (pages) a write says it takes a while, not to be stopped: a change shown first, an undo asked first */
+const MANY_DOCUMENTS = 200;
+
+/** How many documents a plan writes (each part one, where each item is a document), and whether that is many */
+function manyDocuments(plan: TransactionPlan): { readonly count: number; readonly many: boolean } {
+  return { count: plan.planned.length, many: plan.planned.length >= MANY_DOCUMENTS };
+}
+
+// How many items without a rank an item added at the end ranks in the same write, at most (more: it goes after the ranked ones)
+const RANKED_AT_ONCE = 20;
+
+/** Params alike whatever the order of their keys (a map's order is no change) */
+function sameParams(a: unknown, b: unknown): boolean {
+  const canonical = (value: unknown): unknown =>
+    Array.isArray(value) ? value.map(canonical) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical((value as Record<string, unknown>)[key])])) : value;
+  return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+}
 
 /** What is refused where a write is given something that is no value (a view's mistake: an object, NaN, a list of numbers) */
 const notValue = (label: string) => `${label}: not a value (a text, a number, true or false, a list of texts): not written`;
 
 export class DatabaseCore {
   readonly history: TransactionHistory;
+  // A proposal or an undo being written (`apply`, `undo`): one at a time, as either may write thousands of pages
+  private writing = false;
 
   constructor(
     private readonly store: DatabaseStore,
@@ -98,6 +127,7 @@ export class DatabaseCore {
     const property = writable(read.value, key);
     if (typeof property === "string") return this.refuse(property);
     if (value !== undefined && !isValue(value)) return this.refuse(notValue(property.label));
+    if (property.required && (value === undefined || isEmpty(value)) && !isEmpty(item.values[key])) return this.refuse(`${property.label} is required: not emptied`);
     const changes = databaseChanges(database).item(item, (i) => (value === undefined ? i.unset(key) : i.set(key, value)));
     return this.write(changes.build(), `Set ${property.label} of ${item.name}`);
   }
@@ -167,17 +197,20 @@ export class DatabaseCore {
       const property = writable(read.database.value, key);
       if (typeof property === "string") return this.refuse(property);
       if (value !== undefined && !isValue(value)) return this.refuse(notValue(property.label));
+      // (A card moved to the column of none: a required value is not taken off by it)
+      if (property.required && (value === undefined || isEmpty(value)) && !isEmpty(item.values[key])) return this.refuse(`${property.label} is required: not emptied`);
     }
-    const placing = placed(read.items.value, item, place);
+    // No neighbour named (a card dropped in an empty column, on a board sorted): its values alone, its place by hand kept
+    const placing = place.after || place.before ? placed(read.items.value, item, place) : undefined;
     if (typeof placing === "string") return this.refuse(placing);
     const changes = databaseChanges(database).item(item, (i) => {
-      i.rank(placing.rank);
+      if (placing) i.rank(placing.rank);
       for (const [key, value] of Object.entries(place.values ?? {})) {
         if (value === undefined) i.unset(key);
         else i.set(key, value);
       }
     });
-    rankOthers(changes, read.items.value, placing.others);
+    if (placing) rankOthers(changes, read.items.value, placing.others);
     return this.write(changes.build(), `Move ${item.name}`, { item: item.key });
   }
 
@@ -240,6 +273,70 @@ export class DatabaseCore {
     return this.writeSchema(read, read.value.properties.map((one) => (one.key === key ? { ...one, readonly } : one)), `${readonly ? "Lock" : "Unlock"} property ${property.label}`);
   }
 
+  /** A property required (every item is to have a value: one without shows as missing, none is taken off) or optional: the schema alone */
+  async setPropertyRequired(database: string, key: string, required: boolean): Promise<Result> {
+    const read = await this.store.database(database);
+    if (!read) return this.refuse(`No database "${database}"`);
+    const property = read.value.properties.find((one) => one.key === key);
+    if (!property) return this.refuse(`No property "${key}"`);
+    if ((property.required ?? false) === required) return unchanged("It is so already");
+    return this.writeSchema(
+      read,
+      read.value.properties.map((one) => {
+        if (one.key !== key) return one;
+        const { required: _was, ...rest } = one;
+        return required ? { ...rest, required: true } : rest;
+      }),
+      `Make property ${property.label} ${required ? "required" : "optional"}`,
+    );
+  }
+
+  /** A property hidden in the views (its values kept, filtered and sorted by, shown in the peek) or shown: the schema alone */
+  async setPropertyHidden(database: string, key: string, hidden: boolean): Promise<Result> {
+    const read = await this.store.database(database);
+    if (!read) return this.refuse(`No database "${database}"`);
+    const property = read.value.properties.find((one) => one.key === key);
+    if (!property) return this.refuse(`No property "${key}"`);
+    if ((property.hidden ?? false) === hidden) return unchanged("It is so already");
+    return this.writeSchema(
+      read,
+      read.value.properties.map((one) => {
+        if (one.key !== key) return one;
+        const { hidden: _was, ...rest } = one;
+        return hidden ? { ...rest, hidden: true } : rest;
+      }),
+      `${hidden ? "Hide" : "Show"} property ${property.label}`,
+    );
+  }
+
+  /**
+   * A property's params changed from `was` (the params the caller read and
+   * changed) where no item's value reads otherwise for it (a select's colors):
+   * the schema alone, written at once. Refused where the params are no longer
+   * `was` (changed meanwhile: an option added elsewhere would be lost), and
+   * where a value would read otherwise (an option an item has taken away): that
+   * is a change of type (`retypeProperty`), shown first.
+   */
+  async setPropertyParams(database: string, key: string, params: Params, was: Params): Promise<Result> {
+    const read = await this.read(database);
+    if ("problem" in read) return read;
+    const property = read.database.value.properties.find((one) => one.key === key);
+    if (!property) return this.refuse(`No property "${key}"`);
+    if (!sameParams(property.params, was)) return this.refuse(`${property.label}: its settings changed meanwhile: not written, shown as they are now`);
+    if (sameParams(params, property.params)) return unchanged("The settings are the same");
+    const type = this.types.named(property.type);
+    if (!type) return this.refuse(`${property.label}: its type "${property.type}" is not defined now`);
+    const problem = type.validateParams?.(params);
+    if (problem) return this.refuse(`${property.label}: ${problem}`);
+    const reads = (value: Value, at: Params) => type.validate(value, at) === undefined;
+    const changed = read.items.value.find((item) => {
+      const value = item.values[key];
+      return value !== undefined && !isEmpty(value) && reads(value, property.params) !== reads(value, params);
+    });
+    if (changed) return this.refuse(`${property.label}: "${changed.name}"'s value would read otherwise: change its options through its type`);
+    return this.writeSchema(read.database, read.database.value.properties.map((one) => (one.key === key ? { ...one, params } : one)), `Change the settings of ${property.label}`);
+  }
+
   /** A property moved to `index` among the properties (its order as views show them): the schema alone */
   async moveProperty(database: string, key: string, index: number): Promise<Result> {
     const read = await this.store.database(database);
@@ -276,8 +373,15 @@ export class DatabaseCore {
    * the new type takes them, else none): a proposal. A value that does not
    * read as the new type is read from its text where it can be (text "3" as
    * a number), else kept as it is and listed as `unreadable`.
+   *
+   * `renames` (an option's old name to its new one, the type the same): the
+   * items' values renamed with the options, as Notion does, all at once (two
+   * options swapping names swap the values too; a list keeps its order), and
+   * written whole or not at all. An option taken away is no rename: its values
+   * stay, shown invalid. A rename that would put two options into one (or an
+   * option and a value items hold) is refused.
    */
-  async retypeProperty(database: string, key: string, type: string, params?: Params): Promise<Proposal | Refused> {
+  async retypeProperty(database: string, key: string, type: string, params?: Params, renames?: Readonly<Record<string, string>>): Promise<Proposal | Refused> {
     const read = await this.read(database);
     if ("problem" in read) return read;
     const property = read.database.value.properties.find((one) => one.key === key);
@@ -287,17 +391,46 @@ export class DatabaseCore {
     const kept = params ?? (newType.validateParams?.(property.params) === undefined ? property.params : {});
     const problem = newType.validateParams?.(kept);
     if (problem) return this.refuse(`${property.label}: ${problem}`);
-    if (type === property.type && JSON.stringify(kept) === JSON.stringify(property.params)) return unchanged("The type is the same");
+    const checked = renames && Object.keys(renames).length ? validateRenames(property, type, kept, renames, read.items.value) : undefined;
+    if (typeof checked === "string") return this.refuse(`${property.label}: ${checked}`);
+    // (Only names alike: no rename)
+    const renaming = checked?.size ? checked : undefined;
+    // (Options swapped and moved back to their places: the params alike, the values still to swap)
+    if (type === property.type && !renaming && JSON.stringify(kept) === JSON.stringify(property.params)) return unchanged("The type is the same");
     const changes = databaseChanges(database).expectDatabase(read.database.revision).schema(read.database.value.properties.map((one) => (one.key === key ? { ...one, type, params: kept } : one)));
     const unreadable: ItemKey[] = [];
+    const counts = new Map<string, number>();
     for (const item of read.items.value) {
       const value = item.values[key];
-      if (value === undefined || isEmpty(value) || newType.validate(value, kept) === undefined) continue;
+      if (value === undefined || isEmpty(value)) continue;
+      if (renaming) {
+        const renamed = renamedValue(value, renaming);
+        if (renamed) {
+          changes.item(item, (i) => i.set(key, renamed.value));
+          for (const from of renamed.from) counts.set(from, (counts.get(from) ?? 0) + 1);
+          // (Renamed, a part of it still none of the options: one taken away, kept as it was)
+          if (newType.validate(renamed.value, kept) !== undefined) unreadable.push(item.key);
+          continue;
+        }
+      }
+      if (newType.validate(value, kept) === undefined) continue;
+      // (Options renamed: a value that is none of them as it is, text typed by hand, is kept: read again by the new names, it
+      // could take an option renamed for the one it meant, a swap's)
+      if (renaming) {
+        unreadable.push(item.key);
+        continue;
+      }
       const parsed = newType.parse(keptText(value), kept);
       if ("value" in parsed && newType.validate(parsed.value, kept) === undefined) changes.item(item, (i) => i.set(key, parsed.value));
       else unreadable.push(item.key);
     }
-    return { ...(await this.propose(changes.build(), `Change the type of ${property.label} to ${newType.label}`)), unreadable };
+    const label = renaming ? `Change the options of ${property.label}` : `Change the type of ${property.label} to ${newType.label}`;
+    const proposal: Proposal = { ...(await this.propose(changes.build(), label)), unreadable };
+    if (!renaming) return proposal;
+    const renamed = [...renaming].map(([from, to]) => ({ from, to, items: counts.get(from) ?? 0 }));
+    // (Written whole against the items as read, whether or not one holds a renamed option now: an item given an old name
+    // meanwhile would take the meaning of another, a swap's; checked against them too, a value held that is no option)
+    return { ...proposal, renamed, whole: { items: read.items.revision } };
   }
 
   /** A property removed from the schema (its values stay in the items unless `values`, then taken off them too): a proposal */
@@ -313,26 +446,57 @@ export class DatabaseCore {
 
   // Proposals and Undo
 
-  /** A proposal the user agreed to, written where each part is still as planned (one to be written whole: all of it, else none), kept for Undo */
-  async apply(proposal: Proposal): Promise<Result> {
+  /**
+   * A proposal the user agreed to, written where each part is still as planned
+   * (one to be written whole: all of it, else none), kept for Undo; `progress`
+   * told as its parts are written (many items: as many documents of a store of pages)
+   */
+  async apply(proposal: Proposal, progress?: WriteProgress): Promise<Result> {
+    if (this.writing) return this.refuse(`${proposal.label}: another change is being written: apply it once that is done`);
+    this.writing = true;
+    try {
+      return await this.applyNow(proposal, progress);
+    } finally {
+      this.writing = false;
+    }
+  }
+
+  private async applyNow(proposal: Proposal, progress?: WriteProgress): Promise<Result> {
     if (proposal.whole && (await this.store.items(proposal.plan.database)).revision !== proposal.whole.items) {
       const problem = `${proposal.label}: its items changed since it was proposed: nothing was written, propose it again`;
       this.ui.notify(problem, { type: "error" });
       return { problem, cause: "left" };
     }
-    return this.settle(proposal.label, await this.store.apply(proposal.plan), proposal.whole ? () => true : undefined);
+    return this.settle(proposal.label, await this.store.apply(proposal.plan, progress), proposal.whole ? () => true : undefined);
   }
 
   /**
    * The last transaction (of one database where named) put back where it is
    * still as written; undefined where nothing is to undo. One that cannot be
-   * put back at all is said so and goes off the history.
+   * put back at all is said so and goes off the history. One of many pages
+   * is asked first (MANY_DOCUMENTS); `progress` told as it is written.
    */
-  async undo(database?: string): Promise<Result | undefined> {
-    const last = this.history.last(database);
-    if (!last) return undefined;
-    const report = await this.history.undo(last.report);
-    return report && this.outcome(`Undo: ${last.label}`, report);
+  async undo(database?: string, progress?: WriteProgress): Promise<Result | undefined> {
+    // One at a time: an undo planned while another is written would be of the same transaction, half written by the
+    // first; one planned while a change is applied, of the one before it (the change not recorded yet)
+    if (this.writing) return this.refuse("A change is being written: undo once it is done");
+    this.writing = true;
+    try {
+      const last = this.history.last(database);
+      let plan = last && (await this.history.planUndo(last.report));
+      if (!last || !plan) return undefined;
+      // Many pages, one after another (an option renamed in thousands of items): said, and asked first
+      if (this.store.capabilities.itemDocument && manyDocuments(plan).many) {
+        if (!(await this.ui.ask(`Undo "${last.label}"? It writes ${plan.planned.length.toLocaleString("en-US")} pages, one after another: it takes a while; keep this page open until it is done.`))) return { problem: "Not undone", cause: "declined" };
+        // (Asked, the pages may have changed meanwhile, another client's, a change recorded since: the last one planned anew)
+        if (this.history.last(database) !== last) return this.refuse(`Undo: "${last.label}" is no longer the last change: not undone, undo again`);
+        plan = await this.history.planUndo(last.report);
+        if (!plan) return undefined;
+      }
+      return this.outcome(`Undo: ${last.label}`, await this.history.applyUndo(plan, progress));
+    } finally {
+      this.writing = false;
+    }
   }
 
   /** Changes written at once; `needed`: a part without which none of it stands (the item moved, the item made) */
@@ -357,7 +521,8 @@ export class DatabaseCore {
   }
 
   private async propose(changes: Changes, label: string): Promise<Proposal> {
-    return { label, plan: await this.store.plan(changes) };
+    const plan = await this.store.plan(changes);
+    return { label, plan, ...(this.store.capabilities.itemDocument ? { documents: manyDocuments(plan) } : {}) };
   }
 
   private writeSchema(read: Revised<Database>, properties: readonly Property[], label: string): Promise<Result> {
@@ -439,9 +604,11 @@ function validateKeptValues(key: string, items: readonly Item[]): string | undef
 function placed(items: readonly Item[], item: Item | undefined, place: Place): ReturnType<typeof placeAt> | string {
   const ordered = inRankOrder(items.filter((one) => one.key !== item?.key));
   const at = (neighbour: Item) => ordered.findIndex((one) => one.key === neighbour.key);
-  // The end of the ranked items: those without a rank stay after, unwritten
-  let index = ordered.findIndex((one) => !isRank(one.rank));
-  if (index < 0) index = ordered.length;
+  // By default the very end, after those without a rank too (made outside the core: they get ranks in their order, as `placeAt` gives
+  // them, so the new item is the last as shown), where they are few; many (a database imported): after the ranked ones, as
+  // one item added never writes a whole database
+  const unranked = ordered.findIndex((one) => !isRank(one.rank));
+  let index = unranked < 0 || ordered.length - unranked <= RANKED_AT_ONCE ? ordered.length : unranked;
   if (place.after) index = at(place.after) + 1;
   else if (place.before) index = at(place.before);
   if (index < 0 || (place.after && index === 0)) return "The item it was placed beside is gone";
@@ -473,4 +640,53 @@ function keyFrom(label: string): string {
 function freeName(name: string, taken: ReadonlySet<string>, separator = " "): string {
   if (!taken.has(name)) return name;
   for (let n = 2; ; n++) if (!taken.has(`${name}${separator}${n}`)) return `${name}${separator}${n}`;
+}
+
+/**
+ * The renames of a property's options checked, as a map, or why they cannot be:
+ * the type the same, each from one of its options as they are, each to one of
+ * the options as they are to be, no two to one name, none onto an option kept
+ * as it is (two options put into one, their values no longer told apart)
+ */
+function validateRenames(property: Property, type: string, params: Params, renames: Readonly<Record<string, string>>, items: readonly Item[]): ReadonlyMap<string, string> | string {
+  const before = optionsOf(property.params);
+  const after = optionsOf(params);
+  const map = new Map<string, string>();
+  for (const [from, to] of Object.entries(renames)) {
+    if (typeof to !== "string") return `"${from}" is renamed to no text`;
+    if (from === to) continue;
+    if (!before.includes(from)) return `"${from}" is none of its options: not renamed`;
+    if (!after.includes(to)) return `"${to}" is none of its new options: "${from}" not renamed to it`;
+    map.set(from, to);
+  }
+  if (map.size && type !== property.type) return "options cannot be renamed with a change of type";
+  const targets = [...map.values()];
+  const twice = targets.find((one, at) => targets.indexOf(one) !== at);
+  if (twice !== undefined) return `two options renamed to "${twice}": give each a name of its own`;
+  const onto = [...map].find(([, to]) => before.includes(to) && !map.has(to));
+  if (onto) return `"${onto[1]}" is one of its options as they are (kept, or taken away with its values kept in the items): renaming "${onto[0]}" to it would put the two into one`;
+  // Nor onto a value items hold that is none of the options (typed by hand): the two would no longer be told apart
+  const held = new Set(items.flatMap((item) => {
+    const value = item.values[property.key];
+    return typeof value === "string" ? [value] : Array.isArray(value) ? value : [];
+  }));
+  const stray = [...map].find(([, to]) => held.has(to) && !before.includes(to));
+  if (stray) return `items hold "${stray[1]}", none of its options: renaming "${stray[0]}" to it would put the two into one`;
+  return map;
+}
+
+/**
+ * A value with its options renamed, all at once (a swap swaps), a list in its
+ * order; undefined where it holds none renamed (the renames checked: one to
+ * one, none onto a value held, so no list comes to hold one option twice)
+ */
+function renamedValue(value: Value, renames: ReadonlyMap<string, string>): { readonly value: Value; readonly from: readonly string[] } | undefined {
+  if (typeof value === "string") {
+    const to = renames.get(value);
+    return to === undefined ? undefined : { value: to, from: [value] };
+  }
+  if (!Array.isArray(value)) return undefined;
+  const from = value.filter((one) => renames.has(one));
+  if (!from.length) return undefined;
+  return { value: value.map((one) => renames.get(one) ?? one), from: [...new Set(from)] };
 }

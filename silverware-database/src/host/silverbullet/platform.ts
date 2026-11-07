@@ -11,6 +11,8 @@ export type Bridge = {
   getText(): Promise<string>;
   replaceRange(from: number, to: number, text: string): Promise<void>;
   insertAtCursor(text: string): Promise<void>;
+  // The cursor put at an offset of the page open (Edit source: a block with the cursor in it shows its markdown)
+  moveCursor?(at: number): Promise<void>;
   navigate(ref: string): Promise<void>;
   readPage(name: string): Promise<string>;
   writePage(name: string, text: string): Promise<void>;
@@ -111,4 +113,17 @@ export function silverBulletPlatform(bridge: Bridge): { readonly platform: Platf
 /** SilverBullet's editor's area on screen (`#sb-editor`: not its sidebars), where a panel beside the page goes */
 export function editorArea(doc: Document): DOMRect | undefined {
   return doc.querySelector("#sb-editor")?.getBoundingClientRect();
+}
+
+/**
+ * How the page's text looks in SilverBullet's editor (its content, `.cm-content`: the theme's font, size, line height,
+ * color), for a panel beside the page that is no part of it (it hangs in the document's body, where none of the editor's
+ * rules reach: the browser's Times showed): as CSS properties, none where the editor is not there
+ */
+export function editorLook(doc: Document): Readonly<Record<string, string>> | undefined {
+  const content = doc.querySelector(".cm-content");
+  const view = doc.defaultView;
+  if (!content || !view) return undefined;
+  const style = view.getComputedStyle(content);
+  return { "font-family": style.fontFamily, "font-size": style.fontSize, "line-height": style.lineHeight, color: style.color };
 }

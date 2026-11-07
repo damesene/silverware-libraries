@@ -9,11 +9,11 @@ import type { Database, Item, ItemKey, Value } from "../model/database.ts";
 import type { Changes, DatabaseChange } from "../core/changes.ts";
 import type { DatabaseStore, TransactionPlan } from "../core/store.ts";
 
-/** A database a store starts with: its record, its items (their keys the store's), kept in an older or a newer format than the store writes */
+/** A database a store starts with: its record, its items (their keys the store's), kept in an older or a newer version than the store writes */
 export type ContractSeed = {
   readonly database: Database;
   readonly items?: readonly Omit<Item, "key" | "revision">[];
-  readonly format?: "older" | "newer";
+  readonly version?: "older" | "newer";
 };
 
 /** What a test changes of an item outside the core (a page edited by hand): values set, a new name, the item gone */
@@ -230,6 +230,50 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
       expect((await itemOf(store, fix))!.name).toBe("Fix login");
     });
 
+    it("renames options in the schema and the items' values in one transaction, swapped and in a list's order, undone whole", async () => {
+      const { store } = make(SEED);
+      const [fix, docs] = [await keyOf(store, "Fix login"), await keyOf(store, "Write docs")];
+      const labels = { key: "labels", label: "Labels", type: "multi-select", params: { options: ["c", "a", "b"] }, readonly: false };
+      await store.apply(await store.plan(changes("tasks", { kind: "setSchema", properties: [...TASKS.properties, labels] }, { kind: "setValue", item: fix, key: "labels", value: ["c", "a", "b"] })));
+      const items = (await store.items("tasks")).value;
+      const revisions = Object.fromEntries(items.map((item) => [item.key, item.revision]));
+      // Todo and Done swap names, "a" becomes "alpha": the values with them
+      const schema = [{ ...TASKS.properties[0]!, params: { options: ["Done", "Todo"] } }, TASKS.properties[1]!, { ...labels, params: { options: ["c", "alpha", "b"] } }];
+      const report = await store.apply(
+        await store.plan({
+          ...changes("tasks", { kind: "setSchema", properties: schema }, { kind: "setValue", item: fix, key: "status", value: "Done" }, { kind: "setValue", item: fix, key: "labels", value: ["c", "alpha", "b"] }, { kind: "setValue", item: docs, key: "status", value: "Todo" }),
+          expects: { items: revisions, database: (await store.database("tasks"))!.revision },
+        }),
+      );
+      expect(report.skipped).toEqual([]);
+      expect((await itemOf(store, fix))!.values).toEqual({ status: "Done", labels: ["c", "alpha", "b"] });
+      expect((await itemOf(store, docs))!.values).toEqual({ status: "Todo", due: "2026-11-10" });
+      expect((await store.database("tasks"))!.value.properties).toEqual(schema);
+      expect((await store.apply(await store.planUndo(report))).skipped).toEqual([]);
+      expect((await itemOf(store, fix))!.values).toEqual({ status: "Todo", labels: ["c", "a", "b"] });
+      expect((await itemOf(store, docs))!.values.status).toBe("Done");
+      expect((await store.database("tasks"))!.value.properties[2]).toEqual(labels);
+    });
+
+    it("tells how far a plan's writing is, part by part, the last with all of them, left parts counted", async () => {
+      const { store, changeOutside } = make(SEED);
+      const [fix, docs] = [await keyOf(store, "Fix login"), await keyOf(store, "Write docs")];
+      const plan = await store.plan(changes("tasks", { kind: "renameDatabase", name: "Jobs" }, { kind: "setValue", item: fix, key: "status", value: "Done" }, { kind: "setValue", item: docs, key: "status", value: "Todo" }));
+      await changeOutside("tasks", docs, { values: { due: "2026-12-01" } });
+      const told: [number, number][] = [];
+      const report = await store.apply(plan, (done, of) => void told.push([done, of]));
+      expect(report.skipped).toHaveLength(1);
+      expect(told.at(-1)).toEqual([3, 3]);
+      expect(told.every(([done, of], at) => of === 3 && done <= of && (at === 0 || done >= told[at - 1]![0]))).toBe(true);
+      // A listener that throws stops nothing: every part written, reported
+      const again = await store.plan(changes("tasks", { kind: "setValue", item: fix, key: "due", value: "2026-12-24" }));
+      const throwing = await store.apply(again, () => {
+        throw new Error("a listener's mistake");
+      });
+      expect(throwing.written).toHaveLength(1);
+      expect((await itemOf(store, fix))!.values.due).toBe("2026-12-24");
+    });
+
     it("refuses one ref made twice in a transaction", async () => {
       const { store } = make(SEED);
       const plan = await store.plan(changes("tasks", { kind: "createItem", ref: "x", name: "C", values: {} }, { kind: "createItem", ref: "x", name: "D", values: {} }));
@@ -276,13 +320,13 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
     });
 
     it("migrates once, and undoes a migration", async () => {
-      const { store } = make([{ ...SEED[0]!, format: "older" }]);
-      const before = await store.format("tasks");
+      const { store } = make([{ ...SEED[0]!, version: "older" }]);
+      const before = await store.version("tasks");
       const [migration] = await store.planMigration({ database: "tasks" });
       const report = await store.apply(migration!);
       expect(causes(await store.apply(migration!))).toEqual(["changed"]);
       await store.apply(await store.planUndo(report));
-      expect(await store.format("tasks")).toEqual(before);
+      expect(await store.version("tasks")).toEqual(before);
       expect((await store.items("tasks")).value).toHaveLength(2);
     });
 
@@ -403,26 +447,26 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
       expect(causes(await store.plan(changes("tasks", { kind: "renameDatabase", name: "x" }, { kind: "createDatabase", name: "y" })))).toEqual(["refused"]);
     });
 
-    it("writes nothing to a database kept in an older format, until it is migrated", async () => {
-      const { store } = make([{ ...SEED[0]!, format: "older" }]);
-      const format = await store.format("tasks");
-      expect(format.version).toBeLessThan(format.latest);
+    it("writes nothing to a database kept in an older version, until it is migrated", async () => {
+      const { store } = make([{ ...SEED[0]!, version: "older" }]);
+      const status = await store.version("tasks");
+      expect(status.version).toBeLessThan(status.latest);
       const fix = await keyOf(store, "Fix login");
-      expect(causes(await store.plan(changes("tasks", { kind: "setValue", item: fix, key: "status", value: "Done" })))).toEqual(["format"]);
+      expect(causes(await store.plan(changes("tasks", { kind: "setValue", item: fix, key: "status", value: "Done" })))).toEqual(["version"]);
       const migrations = await store.planMigration({ space: true });
       expect(migrations).toHaveLength(1);
       for (const plan of migrations) await store.apply(plan);
-      expect(await store.format("tasks")).toEqual({ version: format.latest, latest: format.latest });
+      expect(await store.version("tasks")).toEqual({ version: status.latest, latest: status.latest });
       expect(await store.planMigration({ database: "tasks" })).toEqual([]);
       expect((await store.plan(changes("tasks", { kind: "setValue", item: fix, key: "status", value: "Done" }))).planned).toHaveLength(1);
     });
 
-    it("reads a database kept in a newer format, never writing nor migrating it", async () => {
-      const { store } = make([{ ...SEED[0]!, format: "newer" }]);
-      const format = await store.format("tasks");
-      expect(format.version).toBeGreaterThan(format.latest);
+    it("reads a database kept in a newer version, never writing nor migrating it", async () => {
+      const { store } = make([{ ...SEED[0]!, version: "newer" }]);
+      const status = await store.version("tasks");
+      expect(status.version).toBeGreaterThan(status.latest);
       expect((await store.items("tasks")).value).toHaveLength(2);
-      expect(causes(await store.plan(changes("tasks", { kind: "renameDatabase", name: "x" })))).toEqual(["format"]);
+      expect(causes(await store.plan(changes("tasks", { kind: "renameDatabase", name: "x" })))).toEqual(["version"]);
       expect(await store.planMigration({ space: true })).toEqual([]);
     });
   });

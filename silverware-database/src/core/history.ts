@@ -6,7 +6,7 @@
 // one forever, and nothing is lost, the store having left it all. An undo is
 // no change to undo itself. An undo puts back only what is still as the
 // transaction left it: the store's `planUndo`, whatever the store.
-import type { DatabaseStore, TransactionPlan, TransactionReport } from "./store.ts";
+import type { DatabaseStore, TransactionPlan, TransactionReport, WriteProgress } from "./store.ts";
 
 // At most this many kept per database (a busy one pushes out none of a quiet one's)
 const KEPT = 50;
@@ -52,8 +52,12 @@ export class TransactionHistory {
   /** `report` (the last by default) put back at once, recorded so; undefined where nothing is to undo */
   async undo(report?: TransactionReport): Promise<TransactionReport | undefined> {
     const plan = await this.planUndo(report);
-    if (!plan) return undefined;
-    const undone = await this.store.apply(plan);
+    return plan && this.applyUndo(plan);
+  }
+
+  /** An undo planned (`planUndo`) written, recorded so; `progress` told as it is written */
+  async applyUndo(plan: TransactionPlan, progress?: WriteProgress): Promise<TransactionReport> {
+    const undone = await this.store.apply(plan, progress);
     this.record(undone, "");
     return undone;
   }

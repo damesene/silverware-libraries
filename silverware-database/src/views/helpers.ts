@@ -1,6 +1,6 @@
 // What a view's definitions are given where they are a function (`export default (HELPERS) => [ … ]`
 // in the module given to `silverware.database.defineViews`): the built-in views' own editors, so a view of the
-// user's edits a value as the table, the list and the kanban do, nothing written the user did not
+// user's edits a value as the table, the list and the board do, nothing written the user did not
 // change (views/editors.ts).
 import { editValue, NAME, shownValue, toggle } from "./editors.ts";
 

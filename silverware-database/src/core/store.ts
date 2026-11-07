@@ -15,7 +15,21 @@ export type StoreCapabilities = {
   readonly renameFollowsLinks: boolean;
   // An item has a body of its own (content in the markdown language)
   readonly itemBody: boolean;
+  // An item is a document of its own (a page): a change of many items writes as many documents, one after another
+  readonly itemDocument: boolean;
 };
+
+/** Told as a transaction is written: how many of its parts are done (written or left) of how many */
+export type WriteProgress = (done: number, of: number) => void;
+
+/** Progress told, a listener that throws taken as none: never stopping a write halfway (the pages written before it, then out of every report and Undo) */
+export function told(progress: WriteProgress | undefined, done: number, of: number): void {
+  try {
+    progress?.(done, of);
+  } catch {
+    // (Its own mistake: the write goes on)
+  }
+}
 
 /** What a part of a transaction is about: an item, one it makes (by its `ref`), or the database's own record */
 export type Target = { readonly item: ItemKey } | { readonly ref: string } | { readonly database: string };
@@ -35,10 +49,10 @@ export type Planned = {
  * Why a part is left alone, as a code to act on (the words are the store's):
  * `changed` since it was read (or, an undo, since it was written), `refused`
  * by the store (a name taken, a key it cannot keep), `missing` (no such item
- * or database), `format` (kept in another format than the store writes:
+ * or database), `version` (kept in another version than the store writes:
  * older, migrate it first; newer, read only)
  */
-export type SkipCause = "changed" | "refused" | "missing" | "format";
+export type SkipCause = "changed" | "refused" | "missing" | "version";
 
 /** A part left alone, why in words and as a code */
 export type Skipped = { readonly target: Target; readonly cause: SkipCause; readonly reason: string };
@@ -62,7 +76,7 @@ export type TransactionReport = {
 };
 
 /** The version of the form a database is kept in, and the latest the store writes (docs/silverware-database.md, *Decided* 26) */
-export type FormatStatus = { readonly version: number; readonly latest: number };
+export type VersionStatus = { readonly version: number; readonly latest: number };
 
 /**
  * What a migration brings to the latest version: a database, the databases
@@ -84,15 +98,15 @@ export interface DatabaseStore {
    * What a transaction would do, part by part; nothing written. A part is
    * left where it cannot be made (with why), where an item's revision is not
    * the one `expects` names, and all of it where the database is kept in
-   * another format than the store writes (*Decided* 26)
+   * another version than the store writes (*Decided* 26)
    */
   plan(changes: Changes): Promise<TransactionPlan>;
-  /** A plan written part by part, each where still as read, the rest left and reported */
-  apply(plan: TransactionPlan): Promise<TransactionReport>;
+  /** A plan written part by part, each where still as read, the rest left and reported; `progress` told as parts are done, last with all of them */
+  apply(plan: TransactionPlan, progress?: WriteProgress): Promise<TransactionReport>;
   /** What `report` wrote put back, where each part is still as it left it */
   planUndo(report: TransactionReport): Promise<TransactionPlan>;
   /** The version a database is kept in and the latest the store writes */
-  format(id: string): Promise<FormatStatus>;
+  version(id: string): Promise<VersionStatus>;
   /** The plans bringing what `scope` holds to the latest version, one per database (none: nothing to migrate) */
   planMigration(scope: MigrationScope): Promise<readonly TransactionPlan[]>;
   /** Told as a database or its items change outside the core's transactions (edited by hand, synced); the function given back stops it */
@@ -106,7 +120,7 @@ export interface DatabaseStore {
 }
 
 /**
- * What a view keeps where a database is shown (`kanban.groupBy`): one place's
+ * What a view keeps where a database is shown (`board.groupBy`): one place's
  * values by key. In SilverBullet its block's text; in memory a map. Views know
  * no block: the core gives each view its own keys of it.
  */

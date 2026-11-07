@@ -52,7 +52,8 @@ afterEach(() => document.body.replaceChildren());
 describe("the table", () => {
   it("shows a row per item and a column per property, a value that does not read marked with why", async () => {
     const { all, q } = await setup("table");
-    expect(all("th").map((th) => th.textContent)).toEqual(["Name", "Status", "Estimate", "Done", ""]);
+    // (The grips' column first, the actions' last: no name)
+    expect(all("th").map((th) => th.textContent)).toEqual(["", "Name", "Status", "Estimate", "Done", ""]);
     expect(all("tbody tr").map((tr) => tr.querySelector('[data-key="name"] .swd-table-name')!.textContent)).toEqual(["Fix login", "Write docs", "Plan"]);
     const lot = q('tbody tr:nth-child(2) [data-key="estimate"]');
     expect([lot.classList.contains("swd-invalid"), lot.title]).toEqual([true, "no number"]);
@@ -116,105 +117,169 @@ describe("the table, from the keys and while edited", () => {
     const { q, all } = await setup("table");
     all<HTMLButtonElement>(".swd-table-sort")[1]!.click();
     await settle();
-    expect(q<HTMLSelectElement>(".swd-sort").value).toBe("status");
-    expect(q<HTMLButtonElement>(".swd-sort-direction").disabled).toBe(false);
+    const sort = q<HTMLButtonElement>(".swd-sort-button");
+    expect([sort.textContent, sort.classList.contains("swd-tool-on")]).toEqual(["Status", true]);
+    // The header's arrow held to its name's last word: never on a line of its own
+    expect(q('th[aria-sort] .swd-table-sort-end').textContent).toBe("Status ↑");
   });
 });
 
 describe("the list", () => {
-  it("shows each item's values, or those its Properties pick", async () => {
-    const { q, all } = await setup("list");
+  it("shows each item's values, those of a property hidden in the views left out, and has no Properties of its own", async () => {
+    const { all } = await setup("list");
     expect(all(".swd-list-item")[0]!.textContent).toBe("Fix loginTodo3");
-    q<HTMLButtonElement>(".swd-list-properties").click();
-    const estimate = q<HTMLInputElement>('.swd-list-chooser input[value="estimate"]');
-    estimate.checked = false;
-    q<HTMLButtonElement>(".swd-list-properties").click();
-    await settle();
-    expect(all(".swd-list-item")[0]!.textContent).toBe("Fix loginTodo");
+    expect(all(".swd-list-properties")).toEqual([]);
+    const hidden = await setup("list", {}, { ...TASKS, properties: TASKS.properties.map((one) => (one.key === "estimate" ? { ...one, hidden: true } : one)) });
+    expect(hidden.all(".swd-list-item")[0]!.textContent).toBe("Fix loginTodo");
   });
 });
 
-describe("the kanban", () => {
+describe("the board", () => {
   it("has a column per option, one for a value none of them is, and one for none", async () => {
-    const { all } = await setup("kanban");
-    expect(all(".swd-kanban-column").map((column) => column.getAttribute("aria-label"))).toEqual(["Todo", "Done", "Later (none of its options)", "No Status"]);
-    expect(all('.swd-kanban-column[data-value="Todo"] .swd-kanban-name').map((one) => one.textContent)).toEqual(["Fix login"]);
+    const { all } = await setup("board");
+    // (No column of none: every item has a value)
+    expect(all(".swd-board-column").map((column) => column.getAttribute("aria-label"))).toEqual(["Todo", "Done", "Later (none of its options)"]);
+    expect(all('.swd-board-column[data-value="Todo"] .swd-board-name').map((one) => one.textContent)).toEqual(["Fix login"]);
   });
 
-  it("moves a card to another column by Move to, its value set and its place there", async () => {
-    const { all, named, items } = await setup("kanban");
-    const mover = all<HTMLSelectElement>('.swd-kanban-column[data-value="Todo"] .swd-kanban-move')[0]!;
-    mover.value = "1";
-    mover.dispatchEvent(new Event("change"));
+  it("shows the column of none first, and only where an item has no value", async () => {
+    const { all, store, named } = await setup("board");
+    store.changeOutside("tasks", (await named("Plan")).key, { values: { status: null } });
+    await settle();
+    expect(all(".swd-board-column").map((column) => column.getAttribute("aria-label"))).toEqual(["No Status", "Todo", "Done"]);
+  });
+
+  it("moves a card to another column by dragging it, its value set and its place there", async () => {
+    const { all, named, items } = await setup("board");
+    const drag = (card: Element, onto: Element) => {
+      card.dispatchEvent(new Event("dragstart"));
+      onto.dispatchEvent(new MouseEvent("dragover", { bubbles: true, cancelable: true, clientY: 1000 }));
+      onto.dispatchEvent(new Event("drop", { bubbles: true, cancelable: true }));
+    };
+    drag(all('.swd-board-column[data-value="Todo"] .swd-board-card')[0]!, all('.swd-board-column[data-value="Done"]')[0]!);
     await settle();
     expect((await named("Fix login")).values.status).toBe("Done");
     expect(inRankOrder((await items()).filter((one) => one.values.status === "Done")).map((one) => one.name)).toEqual(["Write docs", "Fix login"]);
-    const none = all<HTMLSelectElement>('.swd-kanban-column[data-value="Done"] .swd-kanban-move')[0]!;
-    none.value = String(none.options.length - 2);
-    none.dispatchEvent(new Event("change"));
-    await settle();
-    expect((await named("Write docs")).values.status).toBeUndefined();
   });
 
   it("moves nothing for a card dropped on itself", async () => {
-    const { all, items } = await setup("kanban");
+    const { all, items } = await setup("board");
     const before = (await items()).map((one) => one.rank);
-    const card = all('.swd-kanban-column[data-value="Todo"] .swd-kanban-card')[0]!;
+    const card = all('.swd-board-column[data-value="Todo"] .swd-board-card')[0]!;
     card.dispatchEvent(new Event("dragstart"));
     const drop = new Event("drop", { bubbles: true, cancelable: true });
-    card.querySelector(".swd-kanban-name")!.dispatchEvent(drop);
+    card.querySelector(".swd-board-name")!.dispatchEvent(drop);
     await settle();
     expect((await items()).map((one) => one.rank)).toEqual(before);
   });
 
   it("moves a card within its own column by its place alone, its value never rewritten; at its column's end already, nothing", async () => {
     const odd: Database = { ...TASKS, id: "odd" };
-    const { all, store, items, named } = await setup("kanban", {}, odd);
+    const { all, store, items, named } = await setup("board", {}, odd);
     // Two cards of a value of another kind (a list) in one column, and one alone in its column
     for (const name of ["Fix login", "Write docs"]) store.changeOutside("odd", (await named(name)).key, { values: { status: ["x", "y"] } });
     await settle();
-    const drag = (card: Element, onto: Element) => {
+    // Over `onto` at a height (jsdom lays nothing out: every card's middle at 0; above it, before the first card; below, at the end), then dropped
+    const drag = (card: Element, onto: Element, y: number) => {
       card.dispatchEvent(new Event("dragstart"));
+      onto.dispatchEvent(new MouseEvent("dragover", { bubbles: true, cancelable: true, clientY: y }));
       onto.dispatchEvent(new Event("drop", { bubbles: true, cancelable: true }));
     };
-    const column = all(".swd-kanban-column").find((one) => one.getAttribute("aria-label")?.startsWith("x"))!;
-    const [first, second] = [...column.querySelectorAll(".swd-kanban-card")];
-    drag(second!, first!.querySelector(".swd-kanban-name")!);
+    const column = all(".swd-board-column").find((one) => one.getAttribute("aria-label")?.startsWith("x"))!;
+    const [first, second] = [...column.querySelectorAll(".swd-board-card")];
+    drag(second!, first!.querySelector(".swd-board-name")!, -1);
+    // (The line shown while over it, gone with the drop)
+    expect(column.querySelector(".swd-board-drop-line")).toBeNull();
     await settle();
     expect((await named("Write docs")).values.status).toEqual(["x", "y"]);
     expect(inRankOrder((await items()).filter((one) => Array.isArray(one.values.status))).map((one) => one.name)).toEqual(["Write docs", "Fix login"]);
     const ranks = (await items()).map((one) => one.rank);
-    const alone = all(".swd-kanban-column").find((one) => one.getAttribute("aria-label")?.startsWith("Later"))!;
-    drag(alone.querySelector(".swd-kanban-card")!, alone.querySelector(".swd-kanban-title")!);
+    const alone = all(".swd-board-column").find((one) => one.getAttribute("aria-label")?.startsWith("Later"))!;
+    drag(alone.querySelector(".swd-board-card")!, alone.querySelector(".swd-board-title")!, 1000);
     await settle();
     expect((await items()).map((one) => one.rank)).toEqual(ranks);
   });
 
-  it("takes Move to's mouse pick after the keys went through it and were left", async () => {
-    const { all, named } = await setup("kanban");
-    const mover = all<HTMLSelectElement>('.swd-kanban-column[data-value="Todo"] .swd-kanban-move')[0]!;
-    key(mover, "ArrowDown");
-    mover.value = "2";
-    mover.dispatchEvent(new Event("change"));
-    mover.dispatchEvent(new Event("blur"));
-    expect(mover.value).toBe("");
-    mover.value = "1";
-    mover.dispatchEvent(new Event("change"));
+  it("groups by the property its meta names, picked by Group by in ⋯, and says so where no property can group", async () => {
+    const both: Database = { ...TASKS, properties: [...TASKS.properties, { key: "area", label: "Area", type: "select", params: { options: ["Web"] }, readonly: false }] };
+    const { q, viewState, all } = await setup("board", {}, both);
+    q<HTMLButtonElement>(".swd-more").click();
+    // The selects alone, the one grouped by checked, no None: a board always groups
+    expect(all<HTMLButtonElement>(".swd-group-option").map((one) => [one.textContent, one.getAttribute("aria-pressed")])).toEqual([
+      ["Status", "true"],
+      ["Area", "false"],
+    ]);
+    q<HTMLButtonElement>('.swd-group-option[data-key="area"]').click();
     await settle();
-    expect((await named("Fix login")).values.status).toBe("Done");
+    expect(viewState.get("board.groupBy")).toBe("area");
+    expect(all(".swd-board-column").map((column) => column.getAttribute("aria-label"))).toEqual(["No Area", "Web"]);
+    const none = await setup("board", {}, { ...TASKS, properties: TASKS.properties.filter((one) => one.type !== "select") });
+    expect(none.q(".swd-place-note").textContent).toContain("has none");
+    // A table is grouped by the place: any property, or None
+    const table = await setup("table");
+    table.q<HTMLButtonElement>(".swd-more").click();
+    expect(table.all(".swd-group-option").map((one) => one.textContent)[0]).toBe("None");
+  });
+});
+
+describe("a row's place by hand", () => {
+  it("moves a table's row and a list's line by Alt+↑ ↓ on its grip, its rank alone written; rests while the view is sorted", async () => {
+    for (const view of ["table", "list"] as const) {
+      const { all, items } = await setup(view);
+      const names = async () => inRankOrder(await items()).map((one) => one.name);
+      const grips = () => all<HTMLButtonElement>(".swd-row-grip");
+      grips()[0]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", altKey: true, bubbles: true }));
+      await settle();
+      expect(await names()).toEqual(["Write docs", "Fix login", "Plan"]);
+      grips()[2]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", altKey: true, bubbles: true }));
+      await settle();
+      expect(await names()).toEqual(["Write docs", "Plan", "Fix login"]);
+      // At the top already: nothing written
+      const ranks = (await items()).map((one) => one.rank);
+      grips()[0]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", altKey: true, bubbles: true }));
+      await settle();
+      expect((await items()).map((one) => one.rank)).toEqual(ranks);
+    }
+    const sorted = await setup("table", { "table.sort": [{ key: "name", direction: "asc" }] });
+    expect(sorted.all<HTMLButtonElement>(".swd-row-grip").every((one) => one.disabled)).toBe(true);
+  });
+});
+
+describe("a property required", () => {
+  it("marks an item without a value missing, its cell saying so", async () => {
+    const required: Database = { ...TASKS, properties: TASKS.properties.map((one) => (one.key === "estimate" ? { ...one, required: true } : one)) };
+    const { q } = await setup("table", {}, required);
+    const plan = q('tbody tr:nth-child(3) [data-key="estimate"]');
+    expect([plan.classList.contains("swd-missing"), plan.classList.contains("swd-invalid"), plan.title]).toEqual([true, true, "Estimate is required"]);
+    expect(q('tbody tr:first-child [data-key="estimate"]').classList.contains("swd-missing")).toBe(false);
+    // A list's line and a card say it too
+    const list = await setup("list", {}, required);
+    expect(list.all('.swd-list-value[data-key="estimate"] .swd-pill-missing')).toHaveLength(1);
+    const board = await setup("board", {}, required);
+    expect(board.all('.swd-board-value[data-key="estimate"] .swd-pill-missing')).toHaveLength(1);
   });
 
-  it("groups by the property its meta names, picked by Group by, and says so where no property can group", async () => {
-    const both: Database = { ...TASKS, properties: [...TASKS.properties, { key: "area", label: "Area", type: "select", params: { options: ["Web"] }, readonly: false }] };
-    const { q, viewState, all } = await setup("kanban", {}, both);
-    const picker = q<HTMLSelectElement>(".swd-kanban-by");
-    picker.value = "area";
-    picker.dispatchEvent(new Event("change"));
+  it("never takes a checkbox for missing: unticked is its value", async () => {
+    const required: Database = { ...TASKS, properties: TASKS.properties.map((one) => (one.key === "done" ? { ...one, required: true } : one)) };
+    const { all } = await setup("table", {}, required);
+    expect(all('[data-key="done"].swd-missing')).toHaveLength(0);
+  });
+});
+
+describe("a property hidden in the views", () => {
+  it("is no column, card line or list value, and is still filtered and sorted by", async () => {
+    const hidden: Database = { ...TASKS, properties: TASKS.properties.map((one) => (one.key === "estimate" ? { ...one, hidden: true } : one)) };
+    const { all, q, viewState } = await setup("table", {}, hidden);
+    expect(all("th").map((th) => th.textContent)).not.toContain("Estimate");
+    expect(q('.swd-filter input[data-key="estimate"]')).not.toBeNull();
+    q<HTMLButtonElement>(".swd-sort-button").click();
+    q<HTMLButtonElement>('.swd-sort-option[data-key="estimate"]').click();
     await settle();
-    expect(viewState.get("kanban.groupBy")).toBe("area");
-    expect(all(".swd-kanban-column").map((column) => column.getAttribute("aria-label"))).toEqual(["No Area", "Web"]);
-    const none = await setup("kanban", {}, { ...TASKS, properties: TASKS.properties.filter((one) => one.type !== "select") });
-    expect(none.q(".swd-place-note").textContent).toContain("has none");
+    expect(viewState.get("table.sort")).toEqual([{ key: "estimate", direction: "asc" }]);
+    const list = await setup("list", {}, hidden);
+    expect(list.all('.swd-list-value[data-key="estimate"]')).toHaveLength(0);
+    const board = await setup("board", {}, hidden);
+    expect(board.all('.swd-board-value[data-key="estimate"]')).toHaveLength(0);
   });
 });
 
@@ -228,12 +293,22 @@ describe("the place's tools", () => {
     await settle();
     expect(viewState.get("table.filter")).toEqual({ status: "Todo" });
     expect(all("tbody tr")).toHaveLength(1);
-    expect(q(".swd-filter-button").textContent).toBe("Filter (1)");
-    const sort = q<HTMLSelectElement>(".swd-sort");
-    sort.value = "name";
-    sort.dispatchEvent(new Event("change"));
+    expect(q(".swd-filter-button").getAttribute("aria-label")).toBe("Filter (1)");
+    expect(q(".swd-place-count").textContent).toBe("1 of 3");
+    // The sort's menu: a property, then the other way
+    q<HTMLButtonElement>(".swd-sort-button").click();
+    q<HTMLButtonElement>('.swd-sort-option[data-key="name"]').click();
     await settle();
     expect(viewState.get("table.sort")).toEqual([{ key: "name", direction: "asc" }]);
+    expect(q<HTMLElement>(".swd-popover").hidden).toBe(true);
+    q<HTMLButtonElement>(".swd-sort-button").click();
+    q<HTMLButtonElement>(".swd-sort-desc").click();
+    await settle();
+    expect(viewState.get("table.sort")).toEqual([{ key: "name", direction: "desc" }]);
+    q<HTMLButtonElement>(".swd-sort-button").click();
+    q<HTMLButtonElement>('.swd-sort-option[data-key=""]').click();
+    await settle();
+    expect(viewState.get("table.sort")).toBeUndefined();
     q('tbody tr:first-child [data-key="estimate"]').click();
     const input = q<HTMLInputElement>('tbody tr:first-child [data-key="estimate"] input');
     input.value = "9";

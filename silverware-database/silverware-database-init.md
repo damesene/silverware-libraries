@@ -31,6 +31,7 @@ if js and js.window then
     getText = editor.getText,
     replaceRange = editor.replaceRange,
     insertAtCursor = editor.insertAtCursor,
+    moveCursor = editor.moveCursor,
     navigate = editor.navigate,
     readPage = space.readPage,
     writePage = space.writePage,

@@ -4,7 +4,7 @@ import type { ViewDefinition } from "./core/view.ts";
 import { type Bridge, defineViews, init, render, resetDefinitions } from "./index.ts";
 import { memoryPages } from "./store/pages/testing.ts";
 
-const ROOT = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  format: 1\n  properties: {}\n---\n";
+const ROOT = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties: {}\n---\n";
 const TWICE = "```silverware-database\nid: tasks\n```\n\nmiddle\n\n```silverware-database\nid: tasks\n```\n";
 
 /** SilverBullet's API over a space of pages in memory, `open` the page in its editor */

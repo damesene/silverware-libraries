@@ -41,6 +41,58 @@ const applied = async (core: DatabaseCore, proposal: Proposal | { problem: strin
 };
 
 describe("the core", () => {
+  it("makes a property required: a value of it never emptied, said; an item still added without one", async () => {
+    const { core, store, told, named } = setup();
+    expect(await core.setPropertyRequired("tasks", "status", true)).not.toHaveProperty("problem");
+    expect((await store.database("tasks"))!.value.properties[0]!.required).toBe(true);
+    expect(await core.update("tasks", await named("Fix login"), "status", undefined)).toHaveProperty("problem");
+    expect(await core.update("tasks", await named("Fix login"), "status", "")).toHaveProperty("problem");
+    expect(told.at(-1)).toContain("Status is required");
+    expect((await named("Fix login")).values.status).toBe("Todo");
+    // Nor by a move to the column of none
+    expect(await core.move("tasks", await named("Fix login"), { values: { status: undefined } })).toHaveProperty("problem");
+    expect((await named("Fix login")).values.status).toBe("Todo");
+    expect(await core.update("tasks", await named("Fix login"), "status", "Done")).not.toHaveProperty("problem");
+    expect(await core.create("tasks", { name: "No status yet" })).not.toHaveProperty("problem");
+    await core.setPropertyRequired("tasks", "status", false);
+    expect((await store.database("tasks"))!.value.properties[0]!.required).toBeUndefined();
+  });
+
+  it("hides a property and shows it again, the schema alone, its values kept, undone as any change", async () => {
+    const { core, store, named } = setup();
+    const status = async () => (await store.database("tasks"))!.value.properties[0]!;
+    expect(await core.setPropertyHidden("tasks", "status", true)).not.toHaveProperty("problem");
+    expect((await status()).hidden).toBe(true);
+    expect((await named("Fix login")).values.status).toBe("Todo");
+    expect(await core.setPropertyHidden("tasks", "status", true)).toMatchObject({ cause: "unchanged" });
+    await core.setPropertyHidden("tasks", "status", false);
+    expect((await status()).hidden).toBeUndefined();
+    await core.undo("tasks");
+    expect((await status()).hidden).toBe(true);
+  });
+
+  it("sets a property's params at once where no value reads otherwise, refused where one would", async () => {
+    const { core, store, told, named } = setup();
+    const status = async () => (await store.database("tasks"))!.value.properties[0]!.params;
+    const was = await status();
+    expect(await core.setPropertyParams("tasks", "status", { options: ["Todo", "Done"], colors: { Done: "green" } }, was)).not.toHaveProperty("problem");
+    const now = await status();
+    expect(now).toEqual({ options: ["Todo", "Done"], colors: { Done: "green" } });
+    // The same in another order of its keys: nothing written, nothing to undo
+    expect(await core.setPropertyParams("tasks", "status", { colors: { Done: "green" }, options: ["Todo", "Done"] }, now)).toMatchObject({ cause: "unchanged" });
+    // Changed meanwhile (an option added elsewhere): what was read is no longer so, refused, the option kept
+    expect(await core.setPropertyParams("tasks", "status", { ...was, colors: { Todo: "red" } }, was)).toHaveProperty("problem");
+    expect(await status()).toEqual(now);
+    // An option taken away: "Done" would read otherwise
+    expect(await core.setPropertyParams("tasks", "status", { options: ["Todo"] }, now)).toHaveProperty("problem");
+    expect(await core.setPropertyParams("tasks", "status", { options: ["Todo", "Done"], colors: { Done: "teal" } }, now)).toHaveProperty("problem");
+    expect(told.at(-1)).toContain('"teal" is no color');
+    expect((await named("Write docs")).values.status).toBe("Done");
+    // Undone as any change
+    await core.undo("tasks");
+    expect(await status()).toEqual({ options: ["Todo", "Done"] });
+  });
+
   it("writes only values: an object, NaN or a list of numbers a view gives is refused, said, nothing written", async () => {
     const { core, told, named } = setup();
     const item = await named("Fix login");
@@ -206,19 +258,29 @@ describe("the core", () => {
     expect((await store.database("tasks"))!.value.properties[0]!.params).toEqual({ options: ["Todo", "Done"] });
   });
 
-  it("places an item after one without a rank, ranking those above it in the order shown, and adds one after the ranked alone", async () => {
+  it("places an item after one without a rank, ranking those above it in the order shown, and adds one at the very end", async () => {
     const { core, items, named } = setup(true, [{ name: "Loose", values: {}, rank: undefined }, { name: "Odd", values: {}, rank: undefined }]);
     const loose = await named("Loose");
     const placed = await core.create("tasks", { name: "After loose" }, { after: loose });
     expect("problem" in placed ? [] : placed.report.written).toHaveLength(2);
-    // Added at the end of the ranked items: the item without a rank stays after it, not written
+    // Added at the very end, the last as shown: the item without a rank above it ranked where it is, in the same write
     const last = await core.create("tasks", { name: "Last" });
-    expect("problem" in last ? [] : last.report.written).toHaveLength(1);
-    expect(inRankOrder(await items()).map((one) => one.name)).toEqual(["Fix login", "Write docs", "Loose", "After loose", "Last", "Odd"]);
+    expect("problem" in last ? [] : last.report.written).toHaveLength(2);
+    expect(inRankOrder(await items()).map((one) => one.name)).toEqual(["Fix login", "Write docs", "Loose", "After loose", "Odd", "Last"]);
     await core.move("tasks", await named("Last"), { before: await named("Fix login") });
     expect(inRankOrder(await items()).map((one) => one.name)[0]).toBe("Last");
     expect(await core.move("tasks", await named("Last"), { after: { ...loose, key: "gone" as typeof loose.key } })).toMatchObject({ cause: "invalid" });
   });
+  it("writes no more than a few items without a rank for one added, and none for a card moved without a neighbour", async () => {
+    const many = Array.from({ length: 30 }, (_, at) => ({ name: `Imported ${at}`, values: {}, rank: undefined }));
+    const { core, named } = setup(true, many);
+    const added = await core.create("tasks", { name: "New" });
+    expect("problem" in added ? [] : added.report.written).toHaveLength(1);
+    const moved = await core.move("tasks", await named("Fix login"), { values: { status: "Done" } });
+    expect("problem" in moved ? [] : moved.report.written).toHaveLength(1);
+    expect((await named("Fix login")).values.status).toBe("Done");
+  });
+
   it("goes on undoing past a transaction that cannot be undone, and undoes one database's alone", async () => {
     const { store, core, named } = setup();
     await core.update("tasks", await named("Fix login"), "status", "Done");
@@ -269,5 +331,239 @@ describe("the core", () => {
     expect(await core.move("tasks", await named("Fix login"), { after: await named("Fix login") })).toMatchObject({ cause: "unchanged" });
     expect(await core.retypeProperty("tasks", "status", "select")).toMatchObject({ cause: "unchanged" });
     expect(told).toHaveLength(1);
+  });
+});
+
+describe("renaming options", () => {
+  const BOARD: Database = {
+    id: "board",
+    name: "Board",
+    properties: [
+      { key: "status", label: "Status", type: "select", params: { options: ["Todo", "Doing", "Done"], colors: { Todo: "red" } }, readonly: false },
+      { key: "tags", label: "Tags", type: "multi-select", params: { options: ["a", "b", "c"] }, readonly: false },
+    ],
+  };
+  function board() {
+    const store = new MemoryStore([
+      {
+        database: BOARD,
+        items: [
+          { name: "One", values: { status: "Todo", tags: ["c", "a", "b"] }, rank: "a0" },
+          { name: "Two", values: { status: "Done", tags: ["b"] }, rank: "a1" },
+          { name: "Three", values: { status: "Todo" }, rank: "a2" },
+          { name: "Four", values: { status: "Stray", tags: ["a", "x"] }, rank: "a3" },
+        ],
+      },
+    ]);
+    const told: string[] = [];
+    const asked: string[] = [];
+    const core = new DatabaseCore(store, new TypeRegistry(), { notify: (message) => void told.push(message), ask: (message) => (asked.push(message), true) });
+    const named = async (name: string) => (await store.items("board")).value.find((one) => one.name === name)!;
+    const params = async (key: string) => (await store.database("board"))!.value.properties.find((one) => one.key === key)!.params;
+    return { store, core, told, asked, named, params };
+  }
+
+  it("renames a select's values with its option in one proposal, said by option, undone in one step", async () => {
+    const { core, named, params } = board();
+    const proposal = await core.retypeProperty("board", "status", "select", { options: ["To do", "Doing", "Done"], colors: { "To do": "red" } }, { Todo: "To do" });
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    expect(proposal.renamed).toEqual([{ from: "Todo", to: "To do", items: 2 }]);
+    expect(proposal.whole).toBeDefined();
+    // (Nothing written before Apply)
+    expect((await named("One")).values.status).toBe("Todo");
+    await core.apply(proposal);
+    expect([(await named("One")).values.status, (await named("Two")).values.status, (await named("Three")).values.status]).toEqual(["To do", "Done", "To do"]);
+    // A value none of the options was none before and stays so
+    expect((await named("Four")).values.status).toBe("Stray");
+    expect((await params("status")).options).toEqual(["To do", "Doing", "Done"]);
+    await core.undo("board");
+    expect([(await named("One")).values.status, (await named("Three")).values.status]).toEqual(["Todo", "Todo"]);
+    expect(await params("status")).toEqual(BOARD.properties[0]!.params);
+    expect(await core.undo("board")).toBeUndefined();
+  });
+
+  it("renames one value of a multi-select's list, its order kept", async () => {
+    const { core, named } = board();
+    await applied(core, await core.retypeProperty("board", "tags", "multi-select", { options: ["alpha", "b", "c"] }, { a: "alpha" }));
+    expect((await named("One")).values.tags).toEqual(["c", "alpha", "b"]);
+    expect((await named("Two")).values.tags).toEqual(["b"]);
+    expect((await named("Four")).values.tags).toEqual(["alpha", "x"]);
+  });
+
+  it("swaps two options' names and their values at once, losing none", async () => {
+    const { core, named } = board();
+    const proposal = await core.retypeProperty("board", "status", "select", { options: ["Done", "Doing", "Todo"] }, { Todo: "Done", Done: "Todo" });
+    expect("renamed" in proposal && proposal.renamed).toEqual([
+      { from: "Todo", to: "Done", items: 2 },
+      { from: "Done", to: "Todo", items: 1 },
+    ]);
+    await applied(core, proposal);
+    expect([(await named("One")).values.status, (await named("Two")).values.status, (await named("Three")).values.status]).toEqual(["Done", "Todo", "Done"]);
+    await applied(core, await core.retypeProperty("board", "tags", "multi-select", { options: ["b", "a", "c"] }, { a: "b", b: "a" }));
+    expect((await named("One")).values.tags).toEqual(["c", "b", "a"]);
+    expect((await named("Two")).values.tags).toEqual(["a"]);
+  });
+
+  it("leaves an option taken away in the items, shown invalid, never emptied", async () => {
+    const { core, named } = board();
+    const proposal = await core.retypeProperty("board", "tags", "multi-select", { options: ["alpha", "c"] }, { a: "alpha" });
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    // (One: renamed, its "b" none of the options now; Two: "b" alone, kept; Four: renamed, its "x" none before either)
+    expect(proposal.unreadable).toEqual([(await named("One")).key, (await named("Two")).key, (await named("Four")).key]);
+    await core.apply(proposal);
+    expect((await named("One")).values.tags).toEqual(["c", "alpha", "b"]);
+    expect((await named("Two")).values.tags).toEqual(["b"]);
+  });
+
+  it("refuses renames that would put two options into one, or name what is no option", async () => {
+    const { core, told, named } = board();
+    // Onto an option kept as it is
+    expect(await core.retypeProperty("board", "status", "select", { options: ["Doing", "Done"] }, { Todo: "Done" })).toMatchObject({ cause: "invalid" });
+    // Two onto one
+    expect(await core.retypeProperty("board", "status", "select", { options: ["New", "Done"] }, { Todo: "New", Doing: "New" })).toMatchObject({ cause: "invalid" });
+    // From what is no option, to what is none of the new ones, with a change of type
+    expect(await core.retypeProperty("board", "status", "select", { options: ["Todo", "Doing", "Done", "S"] }, { Stray: "S" })).toMatchObject({ cause: "invalid" });
+    expect(await core.retypeProperty("board", "status", "select", { options: ["Todo", "Doing", "Done"] }, { Todo: "Later" })).toMatchObject({ cause: "invalid" });
+    expect(await core.retypeProperty("board", "status", "multi-select", { options: ["To do", "Doing", "Done"] }, { Todo: "To do" })).toMatchObject({ cause: "invalid" });
+    expect(told).toHaveLength(5);
+    expect((await named("One")).values.status).toBe("Todo");
+  });
+
+  it("refuses a rename onto a value items hold that is none of the options, a select's or a list's", async () => {
+    const { core, named } = board();
+    // ("x" and "Stray" are no options: "a" renamed "x", Four would hold "x" twice; "Todo" renamed "Stray", told from it no more)
+    expect(await core.retypeProperty("board", "tags", "multi-select", { options: ["x", "b", "c"] }, { a: "x" })).toMatchObject({ cause: "invalid" });
+    expect(await core.retypeProperty("board", "status", "select", { options: ["Stray", "Doing", "Done"] }, { Todo: "Stray" })).toMatchObject({ cause: "invalid" });
+    expect((await named("Four")).values.tags).toEqual(["a", "x"]);
+    expect((await named("One")).values.status).toBe("Todo");
+  });
+
+  it("keeps a value typed by hand that is none of the options as it is: read by the new names it would take a swapped one", async () => {
+    const { core, store, named } = board();
+    store.changeOutside("board", (await named("Two")).key, { values: { tags: "a, c", status: " Todo" } });
+    const proposal = await core.retypeProperty("board", "tags", "multi-select", { options: ["b", "a", "c"] }, { a: "b", b: "a" });
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    expect(proposal.unreadable).toContain((await named("Two")).key);
+    await core.apply(proposal);
+    expect((await named("Two")).values.tags).toBe("a, c");
+    await applied(core, await core.retypeProperty("board", "status", "select", { options: ["Done", "Doing", "Todo"] }, { Todo: "Done", Done: "Todo" }));
+    expect((await named("Two")).values.status).toBe(" Todo");
+    expect((await named("One")).values.status).toBe("Done");
+  });
+
+  it("writes nothing of a swap no item held where one was given an old name between the proposal and Apply", async () => {
+    const { core, store, named, params } = board();
+    store.changeOutside("board", (await named("One")).key, { values: { status: "Stray" } });
+    store.changeOutside("board", (await named("Three")).key, { values: { status: "Stray" } });
+    const proposal = await core.retypeProperty("board", "status", "select", { options: ["Doing", "Todo", "Done"] }, { Todo: "Doing", Doing: "Todo" });
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    expect(proposal.renamed).toEqual([
+      { from: "Todo", to: "Doing", items: 0 },
+      { from: "Doing", to: "Todo", items: 0 },
+    ]);
+    store.changeOutside("board", (await named("One")).key, { values: { status: "Todo" } });
+    expect(await core.apply(proposal)).toMatchObject({ cause: "left" });
+    expect((await params("status")).options).toEqual(["Todo", "Doing", "Done"]);
+    expect((await named("One")).values.status).toBe("Todo");
+  });
+
+  it("takes renames of names alike as none: a change of type as before", async () => {
+    const { core, named } = board();
+    const proposal = await core.retypeProperty("board", "status", "text", undefined, { Todo: "Todo" });
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    expect(proposal.renamed).toBeUndefined();
+    expect(proposal.label).toBe("Change the type of Status to Text");
+    await core.apply(proposal);
+    expect((await named("One")).values.status).toBe("Todo");
+  });
+
+  it("swaps the values of two options swapped and moved back to their places, the params alike", async () => {
+    const { core, named } = board();
+    const proposal = await core.retypeProperty("board", "tags", "multi-select", { options: ["a", "b", "c"] }, { a: "b", b: "a" });
+    expect(proposal).not.toHaveProperty("problem");
+    await applied(core, proposal);
+    expect((await named("One")).values.tags).toEqual(["c", "b", "a"]);
+  });
+
+  it("asks before an undo of many pages, tells how far it is, and undoes one at a time", async () => {
+    const many = Array.from({ length: 200 }, (_, at) => ({ name: `Item ${at}`, values: { status: "Todo" }, rank: `b${at}` }));
+    const store = new MemoryStore([{ database: TASKS, items: many }]);
+    // (As a store of pages: each item a document of its own)
+    Object.defineProperty(store, "capabilities", { value: { ...store.capabilities, itemDocument: true } });
+    let answer = false;
+    let meanwhile = async () => {};
+    const asked: string[] = [];
+    const core = new DatabaseCore(store, new TypeRegistry(), { notify: () => {}, ask: async (message) => (asked.push(message), await meanwhile(), answer) });
+    const status = async () => (await store.items("tasks")).value.filter((one) => one.values.status === "To do").length;
+    const proposal = await core.retypeProperty("tasks", "status", "select", { options: ["To do", "Done"] }, { Todo: "To do" });
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    expect(proposal.documents).toEqual({ count: 201, many: true });
+    await core.apply(proposal);
+    expect(await status()).toBe(200);
+    // Declined: nothing undone, still to undo
+    expect(await core.undo("tasks")).toMatchObject({ cause: "declined" });
+    expect(asked.at(-1)).toContain("It writes 201 pages");
+    expect(await status()).toBe(200);
+    // A change recorded while the user is asked: the one asked about is no longer the last, nothing undone
+    answer = true;
+    meanwhile = async () => void (await core.update("tasks", (await store.items("tasks")).value[0]!, "estimate", "9"));
+    expect(await core.undo("tasks")).toMatchObject({ cause: "invalid" });
+    expect(await status()).toBe(200);
+    meanwhile = async () => {};
+    // (The change made meanwhile undone: a page, nothing asked)
+    await core.undo("tasks");
+    const told: number[][] = [];
+    const [first, second] = await Promise.all([core.undo("tasks", (done, of) => void told.push([done, of])), core.undo("tasks")]);
+    expect(first).not.toHaveProperty("problem");
+    expect(second).toMatchObject({ cause: "invalid" });
+    // (The item changed meanwhile since the rename is left as it is: the rest undone)
+    expect(told.at(-1)).toEqual([200, 200]);
+    expect(await status()).toBe(1);
+  });
+
+  it("undoes nothing while a change is applied, nor applies one while an undo is written, and undoes no change but the last one asked about", async () => {
+    const { core, store, named } = board();
+    await core.update("board", await named("Two"), "status", "Doing");
+    const proposal = await core.retypeProperty("board", "status", "select", { options: ["To do", "Doing", "Done"] }, { Todo: "To do" });
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    // The store's write held: an Undo meanwhile would undo the change before (Two's), alongside
+    let letGo = () => {};
+    const held = new Promise<void>((resolve) => (letGo = resolve));
+    const apply = store.apply.bind(store);
+    store.apply = async (plan, progress) => (await held, apply(plan, progress));
+    const applying = core.apply(proposal);
+    expect(await core.undo("board")).toMatchObject({ cause: "invalid" });
+    letGo();
+    expect(await applying).not.toHaveProperty("problem");
+    expect((await named("Two")).values.status).toBe("Doing");
+    expect((await named("One")).values.status).toBe("To do");
+  });
+
+  it("asks nothing before an undo of a few pages, nor where items are no pages", async () => {
+    const { core, named, asked } = board();
+    await applied(core, await core.retypeProperty("board", "status", "select", { options: ["To do", "Doing", "Done"] }, { Todo: "To do" }));
+    await core.undo("board");
+    expect((await named("One")).values.status).toBe("Todo");
+    expect(asked).toEqual([]);
+  });
+
+  it("tells how far Apply's writing is", async () => {
+    const { core } = board();
+    const proposal = await core.retypeProperty("board", "status", "select", { options: ["To do", "Doing", "Done"] }, { Todo: "To do" });
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    const told: number[][] = [];
+    await core.apply(proposal, (done, of) => void told.push([done, of]));
+    expect(told.at(-1)).toEqual([3, 3]);
+  });
+
+  it("writes nothing where an item changed between the proposal and Apply", async () => {
+    const { core, store, named, params } = board();
+    const proposal = await core.retypeProperty("board", "status", "select", { options: ["To do", "Doing", "Done"] }, { Todo: "To do" });
+    // An item renamed by hand meanwhile to the old name, and another one changed
+    store.changeOutside("board", (await named("Two")).key, { values: { status: "Todo" } });
+    expect(await applied(core, proposal)).toMatchObject({ cause: "left" });
+    expect((await params("status")).options).toEqual(["Todo", "Doing", "Done"]);
+    expect([(await named("One")).values.status, (await named("Two")).values.status]).toEqual(["Todo", "Todo"]);
+    expect(await core.undo("board")).toBeUndefined();
   });
 });

@@ -19,13 +19,22 @@ import type { ModuleHost } from "../../core/module.ts";
 import { textOf, typeOf } from "../../domain/listing.ts";
 import type { Database, Item, Property, Value } from "../../model/database.ts";
 import { type EditorHost, editValue, toggle } from "../../views/editors.ts";
+import { reorder } from "../../../../shared/drag.ts";
+import { typeIcon, VIEW_ICONS } from "../../views/icons.ts";
+import type { PropertiesOffer } from "../properties/index.ts";
+import { missing, valueNodes } from "../../views/values.ts";
 
-const CLOSE = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>';
-// The panel's width at most, and its share of the editor's area at most
-const WIDTH = 460;
-const SHARE = 0.5;
+// The panel's width where none is set (the module's setting `width`), the narrowest it may be set to, and its share of the
+// editor's area at most (the page beside it still seen)
+const WIDTH = 600;
+const MIN_WIDTH = 320;
+const SHARE = 0.8;
+// An editor's area narrower than this (a phone, a narrow window): the panel takes all of it, as a page of its own
+const NARROW = 720;
 // What a press there is not beside the panel: a dialog over the page (a question asked), a notification
-const NOT_BESIDE = 'dialog, [role="dialog"], [role="alertdialog"], .sb-modal-box, .sb-notifications, .sb-notification';
+const NOT_BESIDE = 'dialog, [role="dialog"], [role="alertdialog"], .sb-modal-box, .sb-notifications, .sb-notification, .swd-settings-backdrop';
+// A grip: six dots, what a property's row is dragged by
+const GRIP = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><circle cx="6" cy="4" r="1.1"/><circle cx="10" cy="4" r="1.1"/><circle cx="6" cy="8" r="1.1"/><circle cx="10" cy="8" r="1.1"/><circle cx="6" cy="12" r="1.1"/><circle cx="10" cy="12" r="1.1"/></svg>';
 
 const isRefused = (result: Result): result is Extract<Result, { problem: string }> => "problem" in result;
 
@@ -46,6 +55,11 @@ type Shown = {
   readonly opener: Element | null;
 };
 
+/** A button whose press takes no focus (a field being edited stays so until what it opens takes the focus): its click not lost to a redraw */
+function keepFocus(button: HTMLElement): void {
+  button.addEventListener("mousedown", (event) => event.preventDefault());
+}
+
 export class PeekPanel {
   private shown: Shown | undefined;
   private element: HTMLElement | undefined;
@@ -58,6 +72,10 @@ export class PeekPanel {
   private bodyWrites = 0;
   // When the user was last told a body kept stops the panel going (a press beside, then the press's own open: told once)
   private toldKept = 0;
+  // The width its edge was dragged to in this session (undefined: the module's setting)
+  private dragged: number | undefined;
+  // Its left edge, kept as the panel is drawn anew
+  private handle: HTMLElement | undefined;
 
   constructor(private readonly host: ModuleHost) {}
 
@@ -75,7 +93,8 @@ export class PeekPanel {
     if (!this.element) this.open();
     this.draw();
     void this.readBody();
-    this.element?.querySelector<HTMLElement>(".swd-peek-name")?.focus({ preventScroll: true });
+    // (The panel, not its name: on a phone a field focused brings the keyboard up)
+    this.element?.focus({ preventScroll: true });
   }
 
   /** Closed, once the field being edited is written; not where a body typed could not be written (said beside it): false then */
@@ -190,6 +209,10 @@ export class PeekPanel {
     const place = () => this.place();
     view?.addEventListener("resize", place);
     this.stops.push(() => view?.removeEventListener("resize", place));
+    // The page's text's look (the panel hangs in the document's body, where none of the editor's rules reach)
+    for (const [name, value] of Object.entries(this.host.editorLook?.() ?? {})) element.style.setProperty(name, value);
+    this.handle = this.resizer();
+    element.append(this.handle);
     doc.body.append(element);
     this.element = element;
     this.place();
@@ -201,10 +224,61 @@ export class PeekPanel {
     const view = this.host.document.defaultView;
     if (!element || !view) return;
     const area = this.host.editorArea() ?? new DOMRect(0, 0, view.innerWidth, view.innerHeight);
+    const whole = area.width < NARROW;
+    element.classList.toggle("swd-peek-whole", whole);
     element.style.top = `${Math.max(0, area.top)}px`;
     element.style.right = `${Math.max(0, view.innerWidth - area.right)}px`;
     element.style.height = `${Math.max(0, Math.min(area.bottom, view.innerHeight) - Math.max(0, area.top))}px`;
-    element.style.width = `${Math.round(Math.min(WIDTH, area.width * SHARE, view.innerWidth))}px`;
+    element.style.width = `${Math.round(whole ? Math.min(area.width, view.innerWidth) : Math.min(this.width(), area.width * SHARE, view.innerWidth))}px`;
+  }
+
+  /** The width set (the module's setting, its left edge dragged), within what a panel may be */
+  private width(): number {
+    const set = Number(this.dragged ?? this.host.setting("width"));
+    return Number.isFinite(set) && set > 0 ? Math.max(MIN_WIDTH, Math.round(set)) : WIDTH;
+  }
+
+  /**
+   * Its left edge: dragged, the panel as wide as the pointer leaves it, saved
+   * as the module's setting (for every database) as it is let go; a double
+   * click its default again; ← → from the keys, 40px a press
+   */
+  private resizer(): HTMLElement {
+    const doc = this.host.document;
+    const handle = el(doc, "div", { class: "swd-peek-resize", title: "Drag to set the panel's width (a double click: its default)", attrs: { role: "separator", "aria-orientation": "vertical", "aria-label": "The panel's width", tabindex: "0" } });
+    // (The setting's value set first, as it is saved: the panel then placed by it)
+    const save = (width: number | undefined) => {
+      void this.host.saveSetting("width", width);
+      this.dragged = undefined;
+      this.place();
+    };
+    handle.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || !this.element) return;
+      event.preventDefault();
+      const start = { x: event.clientX, width: this.element.getBoundingClientRect().width };
+      handle.setPointerCapture?.(event.pointerId);
+      const move = (moved: PointerEvent) => {
+        this.dragged = Math.max(MIN_WIDTH, Math.round(start.width + start.x - moved.clientX));
+        this.place();
+      };
+      const up = () => {
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        handle.removeEventListener("pointercancel", up);
+        // (As wide as it shows: a width past what the area allows is not kept)
+        if (this.element) save(Math.round(this.element.getBoundingClientRect().width));
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+      handle.addEventListener("pointercancel", up);
+    });
+    handle.addEventListener("dblclick", () => save(undefined));
+    handle.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      save(Math.max(MIN_WIDTH, this.width() + (event.key === "ArrowLeft" ? 40 : -40)));
+    });
+    return handle;
   }
 
   /** Whether something of the panel is being edited (a value's editor open, the body, the name changed): nothing drawn anew under it */
@@ -247,27 +321,59 @@ export class PeekPanel {
     const editor = this.editorHost(shown);
     // What had the focus (the name, a value) has it again in the panel drawn anew
     const active = doc.activeElement;
-    const focused = active && element.contains(active) ? (active.matches(".swd-peek-name") ? ".swd-peek-name" : active.matches(".swd-peek-value") ? `.swd-peek-value[data-key="${CSS.escape((active as HTMLElement).dataset.key ?? "")}"]` : undefined) : undefined;
+    const rowOf = (one: Element) => `.swd-peek-row[data-property="${CSS.escape((one.closest(".swd-peek-row") as HTMLElement | null)?.dataset.property ?? "")}"]`;
+    const focused =
+      active && element.contains(active)
+        ? active.matches(".swd-peek-name")
+          ? ".swd-peek-name"
+          : active.matches(".swd-peek-value")
+            ? `.swd-peek-value[data-key="${CSS.escape((active as HTMLElement).dataset.key ?? "")}"]`
+            : active.matches(".swd-peek-grip, .swd-peek-label")
+              ? `${rowOf(active)} .${active.matches(".swd-peek-grip") ? "swd-peek-grip" : "swd-peek-label"}`
+              : undefined
+        : undefined;
     const name = el(doc, "input", { class: "swd-peek-name", attrs: { id: "swd-peek-name", "aria-label": "Name", value: item.name } });
     name.addEventListener("change", () => void this.rename(shown, name, editor));
     name.addEventListener("keydown", (event) => {
       if (event.key === "Enter") name.blur();
     });
     const open = el(doc, "button", {
-      class: "swd-tool swd-peek-open",
-      text: "Open",
+      class: "swd-peek-button swd-peek-open",
+      html: VIEW_ICONS.open,
       title: "Open its page",
+      attrs: { "aria-label": "Open its page" },
       run: async () => {
         // (Its page in the editor, the panel closed first: the body is not edited in two places)
         if (await this.close()) await this.host.openDocument(shown.item);
       },
     });
-    const close = el(doc, "button", { class: "swd-peek-close", html: CLOSE, attrs: { "aria-label": "Close (Esc)", title: "Close (Esc)" }, run: () => void this.close() });
-    const head = el(doc, "div", "swd-peek-head", name, open, close);
-    const rows = shown.schema.properties.map((property) => this.row(shown, property, editor));
-    const parts: HTMLElement[] = [head, el(doc, "div", "swd-peek-properties", ...rows)];
+    // Closed by × beside the page, by ← where it is the whole page (a phone): the style page shows the one that fits
+    const close = el(
+      doc,
+      "button",
+      { class: "swd-peek-button swd-peek-close", attrs: { "aria-label": "Close (Esc)", title: "Close (Esc)" }, run: () => void this.close() },
+      el(doc, "span", { class: "swd-peek-close-x", html: VIEW_ICONS.close }),
+      el(doc, "span", { class: "swd-peek-close-back", html: VIEW_ICONS.back }),
+    );
+    const head = el(doc, "div", "swd-peek-head", close, el(doc, "span", "swd-peek-gap"), open);
+    // The properties: those shown in the views, then those hidden there under their own heading (an item's every value is
+    // shown and edited in its peek); each list dragged to its order by its grips
+    const group = (hidden: boolean) => {
+      const list = el(doc, "div", `swd-peek-properties${hidden ? " swd-peek-hidden" : ""}`);
+      list.append(...shown.schema.properties.filter((property) => !!property.hidden === hidden).map((property) => this.row(shown, property, editor, list)));
+      return list;
+    };
+    const properties = this.host.offered<PropertiesOffer>("properties");
+    const parts: HTMLElement[] = [head, name, group(false)];
+    if (shown.schema.properties.some((property) => property.hidden)) parts.push(el(doc, "div", { class: "swd-peek-hidden-title", text: "Hidden in views" }), group(true));
+    // A property added, in Properties (the peek's own way to the schema: the properties module's where it is on)
+    if (properties) {
+      const add = el(doc, "button", { class: "swd-peek-add-property", text: "+ Add a property", run: () => void properties.open(shown.database, { add: true }).then(() => this.refocus(".swd-peek-add-property")) });
+      keepFocus(add);
+      parts.push(add);
+    }
     if (this.host.itemBodies) {
-      const body = el(doc, "textarea", { class: "swd-peek-body", attrs: { "aria-label": `Content of ${item.name}`, placeholder: "Reading…", readonly: "", "data-reading": "" } });
+      const body = el(doc, "textarea", { class: "swd-peek-body", attrs: { "aria-label": `Content of ${item.name}`, placeholder: "Reading…", readonly: "", "data-reading": "", rows: "8" } });
       body.addEventListener("blur", () => {
         this.bodyWrites++;
         this.writing = this.writing.then(async () => {
@@ -296,19 +402,21 @@ export class PeekPanel {
         delete body.dataset.reading;
       }
     }
-    element.replaceChildren(...parts);
+    element.replaceChildren(...(this.handle ? [this.handle] : []), ...parts);
     this.note(shown);
     if (focused) element.querySelector<HTMLElement>(focused)?.focus({ preventScroll: true });
   }
 
   /** A property's row: its label, its value as it shows, edited in place as the views edit it */
-  private row(shown: Shown, property: Property, editor: EditorHost): HTMLElement {
+  private row(shown: Shown, property: Property, editor: EditorHost, list: HTMLElement): HTMLElement {
     const doc = this.host.document;
     const value = el(doc, "div", { class: "swd-peek-value", attrs: { "data-key": property.key, "aria-label": property.label } });
     const show = () => {
       const now = shown.item;
-      const text = editor.type(property).name === "checkbox" ? (now.values[property.key] === true ? "✓" : "☐") : editor.text(now, property.key);
-      value.replaceChildren(text || el(doc, "span", { class: "swd-peek-empty", text: "Empty" }));
+      if (editor.type(property).name === "checkbox") return void value.replaceChildren(el(doc, "span", { class: `swd-peek-check${now.values[property.key] === true ? " swd-on" : ""}`, html: now.values[property.key] === true ? typeIcon("checkbox") : "", attrs: { "aria-label": now.values[property.key] === true ? "Yes" : "No" } }));
+      const shownNodes = valueNodes(editor, now, property);
+      const lacking = missing(editor, now, property);
+      value.replaceChildren(...(shownNodes.length ? shownNodes : [el(doc, "span", { class: `swd-peek-empty${lacking ? " swd-peek-missing" : ""}`, text: lacking ? "Required" : "Empty" })]));
     };
     show();
     if (!property.readonly) {
@@ -326,7 +434,63 @@ export class PeekPanel {
         edit();
       });
     } else value.classList.add("swd-peek-readonly");
-    return el(doc, "div", "swd-peek-row", el(doc, "span", { class: "swd-peek-label", text: property.label }), value);
+    // Its name: opens it in Properties (its name, type, options, required, hidden, removed) where that module is on
+    const properties = this.host.offered<PropertiesOffer>("properties");
+    const labelParts = [el(doc, "span", { class: "swd-peek-type", html: typeIcon(editor.type(property).name) }), el(doc, "span", { text: property.label }), ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", attrs: { "aria-hidden": "true" } })] : [])];
+    const label = properties
+      ? el(
+          doc,
+          "button",
+          {
+            class: "swd-peek-label",
+            title: `Edit ${property.label} (name, type, options…)`,
+            attrs: { "aria-label": `Edit the property ${property.label}` },
+            run: () => void properties.open(shown.database, { property: property.key }).then(() => this.refocus(`.swd-peek-row[data-property="${CSS.escape(property.key)}"] .swd-peek-label`)),
+          },
+          ...labelParts,
+        )
+      : el(doc, "span", "swd-peek-label", ...labelParts);
+    if (label instanceof HTMLButtonElement) keepFocus(label);
+    const grip = el(doc, "button", { class: "swd-peek-grip", html: GRIP, title: "Drag to move (Alt+↑ ↓)", attrs: { "aria-label": `Move ${property.label} (Alt+Up, Alt+Down)` } });
+    const row = el(doc, "div", { class: "swd-peek-row", attrs: { "data-property": property.key } }, grip, label, value);
+    // Its place: among its list's (the shown ones, or the hidden ones), written as the schema's order at once
+    const keysOf = () => [...list.querySelectorAll<HTMLElement>(":scope > .swd-peek-row")].map((one) => one.dataset.property);
+    // (`keys`: the list's order before the move: a drag moves the row in the list as it goes)
+    const moveTo = (index: number, keys = keysOf()) => {
+      const target = keys[Math.max(0, Math.min(keys.length - 1, index))];
+      const to = shown.schema.properties.findIndex((one) => one.key === target);
+      const from = shown.schema.properties.findIndex((one) => one.key === property.key);
+      if (to < 0 || to === from) return void this.draw();
+      void this.host.core
+        .moveProperty(shown.database, property.key, to)
+        .then(() => {
+          this.host.refreshPlaces();
+          return this.follow();
+        })
+        .catch((error: unknown) => this.host.ui.notify(`Silverware Database: ${error instanceof Error ? error.message : String(error)}`, { type: "error" }));
+    };
+    grip.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      // (No focus moved yet: a field being edited is written, and the panel drawn anew, only once the row is let go)
+      event.preventDefault();
+      const before = keysOf();
+      reorder(event, {
+        element: row,
+        base: "swd-props",
+        layer: this.element,
+        flow: "block",
+        containers: () => [list],
+        items: (container) => [...container.querySelectorAll<HTMLElement>(":scope > .swd-peek-row")],
+        done: (to) => (to ? moveTo(to.index, before) : this.draw()),
+      });
+    });
+    grip.addEventListener("keydown", (event) => {
+      if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+      event.preventDefault();
+      const keys = keysOf();
+      moveTo(keys.indexOf(property.key) + (event.key === "ArrowUp" ? -1 : 1), keys);
+    });
+    return row;
   }
 
   private async rename(shown: Shown, field: HTMLInputElement, editor: EditorHost): Promise<void> {
@@ -346,6 +510,12 @@ export class PeekPanel {
     if (isRefused(result) && this.shown === shown && field.isConnected) field.value = shown.latest.name;
   }
 
+  /** The focus back on something of the panel (what opened the dialog), drawn anew meanwhile; the panel where it is gone */
+  private refocus(selector: string): void {
+    if (!this.element) return;
+    (this.element.querySelector<HTMLElement>(selector) ?? this.element).focus({ preventScroll: true });
+  }
+
   /** The body read as it is now, into its field (unless something was typed there: a kept text, or the field taken meanwhile) */
   private async readBody(): Promise<void> {
     const shown = this.shown;
@@ -358,7 +528,7 @@ export class PeekPanel {
     field.value = was ?? "";
     field.readOnly = false;
     delete field.dataset.reading;
-    field.placeholder = "No content";
+    field.placeholder = "Add content…";
   }
 
   /** The body written as its field is left, where it differs from what was read and is still so in the store; else kept in the field, said so */

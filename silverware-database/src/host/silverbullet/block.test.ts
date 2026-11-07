@@ -3,13 +3,13 @@ import { BlockState, readBlock, writeBlock } from "./block.ts";
 
 describe("a database's block", () => {
   it("reads one key a line, scalars as YAML has them, lists and maps as JSON", () => {
-    const values = readBlock('id: tasks\nview: kanban\nkanban.filter: {"status": "!=Done"}\ntable.widths: [240, 120]\ncount: 3\n# a note\nodd line');
-    expect(Object.fromEntries(values)).toEqual({ id: "tasks", view: "kanban", "kanban.filter": { status: "!=Done" }, "table.widths": [240, 120], count: 3 });
+    const values = readBlock('id: tasks\nview: board\nboard.filter: {"status": "!=Done"}\ntable.widths: [240, 120]\ncount: 3\n# a note\nodd line');
+    expect(Object.fromEntries(values)).toEqual({ id: "tasks", view: "board", "board.filter": { status: "!=Done" }, "table.widths": [240, 120], count: 3 });
   });
 
   it("writes the keys asked, keeping every other line as written, new keys at the end, a key taken off whole", () => {
-    const body = "id: tasks\n# mine\nview: table\nodd line\nkanban.groupBy: status";
-    expect(writeBlock(body, { view: "kanban", "kanban.groupBy": undefined, "kanban.filter": { status: "!=Done" } })).toBe('id: tasks\n# mine\nview: kanban\nodd line\nkanban.filter: {"status":"!=Done"}');
+    const body = "id: tasks\n# mine\nview: table\nodd line\nboard.groupBy: status";
+    expect(writeBlock(body, { view: "board", "board.groupBy": undefined, "board.filter": { status: "!=Done" } })).toBe('id: tasks\n# mine\nview: board\nodd line\nboard.filter: {"status":"!=Done"}');
     expect(writeBlock("", { id: "tasks", view: "yes" })).toBe('id: tasks\nview: "yes"');
   });
 
@@ -20,12 +20,12 @@ describe("a database's block", () => {
     await state.set({ view: "list" });
     expect([state.get("view"), state.keys()]).toEqual(["list", ["id", "view"]]);
     accept = false;
-    await state.set({ view: "kanban" });
+    await state.set({ view: "board" });
     expect(state.get("view")).toBe("list");
     await state.set({ view: "list" });
     expect(writes).toEqual([
       ["id: tasks", "id: tasks\nview: list"],
-      ["id: tasks\nview: list", "id: tasks\nview: kanban"],
+      ["id: tasks\nview: list", "id: tasks\nview: board"],
     ]);
   });
 });

@@ -8,9 +8,12 @@ import { el, pressed } from "../../../shared/elements.ts";
 import type { Editor, Settings, UserInterface } from "../../../shared/platform.ts";
 import { type Filter, listItems, type SortKey, textOf, typeOf, validateCondition } from "../domain/listing.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
-import type { Database, Item } from "../model/database.ts";
+import type { Database, Item, Property } from "../model/database.ts";
 import type { DatabaseCore } from "./core.ts";
+import { drawGrouped } from "./groups.ts";
+import { ICONS } from "./icons.ts";
 import type { PlaceContext } from "./module.ts";
+import { popover } from "./popover.ts";
 import type { DatabaseStore, ViewStateStore } from "./store.ts";
 import type { ViewDefinition, ViewHost, ViewInstance } from "./view.ts";
 import type { ViewRegistry } from "./views.ts";
@@ -31,6 +34,8 @@ export type PlaceOptions = {
   readonly editor?: Pick<Editor, "open">;
   /** What the modules on add to the place's tools (core/module.ts), asked as the place is drawn */
   readonly moduleTools?: (place: PlaceContext) => readonly Node[];
+  /** The block's own text shown to edit (Edit source in ⋯, last), where the place is a block of a document */
+  readonly editSource?: () => void;
   /** An item opened by a module's own way (the peek, core/module.ts): whether one took it; else it opens where the store says */
   readonly openItem?: (item: Item, database: string) => boolean;
 };
@@ -42,7 +47,26 @@ export const viewSettingPath = (view: string, key: string) => `silverware.databa
 type Data = { readonly database: Database; readonly items: readonly Item[] };
 
 // A view drawn: its own host, made for it (its name and settings fixed in it), the data it was last given, what it gave back, whether it has gone
-type Drawn = { readonly view: ViewDefinition; data: Data; instance: ViewInstance | void; ended: boolean; syncTools?: () => void };
+type Drawn = { readonly view: ViewDefinition; data: Data; instance: ViewInstance | void; ended: boolean; syncTools?: () => void; stopTools?: () => void; host?: ViewHost; grouped?: string };
+
+/** The property a view is drawn once per group by (Group by picked, of a type it is grouped by, else the first where it always is; none where the view draws its own groups) */
+function groupingOf(view: ViewDefinition, host: ViewHost): Property | undefined {
+  const groupBy = view.groupBy;
+  if (groupBy === false || groupBy?.draws) return undefined;
+  const eligible = host.database.properties.filter((one) => !groupBy?.types || groupBy.types.includes(host.type(one).name));
+  return eligible.find((one) => one.key === host.listing.group) ?? (groupBy?.required ? eligible[0] : undefined);
+}
+
+/** What decides how a view is drawn grouped: the property and its type (changed, the view drawn anew) */
+const groupingKey = (view: ViewDefinition, host: ViewHost) => {
+  const property = groupingOf(view, host);
+  return property ? `${property.key}\u0000${property.type}` : "";
+};
+
+// Where each database's view is scrolled, kept as it scrolls: each box the user scrolled (the place's body, any box the
+// view draws: a wide table's, a board's) by its place among the elements under the body, a path of child indexes. A view
+// drawn anew (a change), or a new place of the same block (the editor drew it anew after a write), has them put back.
+const scrolled = new Map<string, Map<string, readonly [number, number]>>();
 
 export class DatabasePlace {
   private drawn: Drawn | undefined;
@@ -52,6 +76,11 @@ export class DatabasePlace {
   private pending: Promise<void> | undefined;
   private readonly stopListening: () => void;
   private gone = false;
+  // An undo from this place being written, how far (`of` 0: not told yet), and its Undo shown so as the tools are drawn
+  private undoing: { readonly done: number; readonly of: number } | undefined;
+  private undoShown: (() => void) | undefined;
+  // The view's scroll being put back: its boxes' scroll events then are not the user's
+  private puttingBack = false;
 
   /** The id of the database the place shows */
   get database(): string {
@@ -80,9 +109,12 @@ export class DatabasePlace {
       if (this.gone || drawn !== this.drawn) return;
       if (!data) return this.draw();
       drawn.data = data;
+      // (Grouped otherwise now: by another property, its type changed, or none: drawn anew)
+      if (drawn.host && groupingKey(drawn.view, drawn.host) !== drawn.grouped) return this.draw();
       try {
         drawn.syncTools?.();
         drawn.instance.update();
+        this.putScroll();
       } catch (error) {
         this.note(`The view "${drawn.view.label}" failed: ${message(error)}`);
       }
@@ -115,25 +147,94 @@ export class DatabasePlace {
     if (!data) return this.note(`No database "${this.options.database}"`);
     const named = state.get(VIEW_KEY);
     const view = typeof named === "string" ? on.find((one) => one.name === named) : on[0];
-    const bar = this.switcher(doc, on, view?.name);
+    // The database's name and how many items show, the views' tabs and the tools in one bar under it
+    const count = el(doc, "span", { class: "swd-place-count", text: String(data.items.length) });
+    element.append(el(doc, "div", "swd-place-head", el(doc, "span", { class: "swd-place-name", text: data.database.name }), count));
+    const bar = el(doc, "nav", { class: "swd-place-bar", attrs: { "aria-label": `${data.database.name}: views and tools` } }, this.switcher(doc, on, view?.name));
     element.append(bar);
     this.body = el(doc, "div", "swd-place-body");
     element.append(this.body);
+    // (A scroll does not bubble: caught on its way down)
+    this.body.addEventListener("scroll", (event) => this.keepScroll(event.target), { capture: true, passive: true });
     if (!view) return this.note(typeof named === "string" ? `No view "${named}" is on here: pick one above` : "No view is on: turn one on in the settings");
     const settings = await this.settingsOf(view);
     if (this.gone) return;
     const drawn: Drawn = { view, data, instance: undefined, ended: false };
     this.drawn = drawn;
     const host = this.host(drawn, settings);
-    const tools = this.tools(doc, host);
+    drawn.host = host;
+    const tools = this.tools(doc, host, count, view);
     drawn.syncTools = tools.sync;
+    drawn.stopTools = tools.stop;
     bar.append(tools.bar);
     this.body.before(tools.panel);
     try {
-      drawn.instance = view.render(host, this.body);
+      const grouping = groupingOf(view, host);
+      drawn.grouped = groupingKey(view, host);
+      drawn.instance = grouping ? drawGrouped(view, host, this.body, grouping) : view.render(host, this.body);
     } catch (error) {
       this.note(`The view "${view.label}" failed: ${message(error)}`);
     }
+    this.putScroll();
+  }
+
+  /** The key a view's scroll is kept by */
+  private scrollKey(): string | undefined {
+    return this.drawn ? `${this.options.database}\u0000${this.drawn.view.name}` : undefined;
+  }
+
+  /** A box's path under the body: its child indexes, from the body down ("" the body itself) */
+  private pathOf(box: Element): string | undefined {
+    const at: number[] = [];
+    for (let one: Element | null = box; one && one !== this.body; one = one.parentElement) {
+      if (!one.parentElement) return undefined;
+      at.unshift([...one.parentElement.children].indexOf(one));
+    }
+    return at.join(".");
+  }
+
+  private boxAt(path: string): HTMLElement | undefined {
+    let one: Element | undefined = this.body;
+    for (const index of path ? path.split(".").map(Number) : []) one = one?.children[index];
+    return one instanceof HTMLElement ? one : undefined;
+  }
+
+  /** Where a box the user scrolled is, kept for the view (a box out of the page is left as kept; not while the view is put back: what it reports then is where it could go, laid out or not) */
+  private keepScroll(box: EventTarget | null): void {
+    const key = this.scrollKey();
+    if (this.puttingBack || !key || !this.body?.isConnected || !(box instanceof HTMLElement) || !this.body.contains(box)) return;
+    const path = this.pathOf(box);
+    if (path === undefined) return;
+    const kept = scrolled.get(key) ?? new Map<string, readonly [number, number]>();
+    kept.set(path, [box.scrollLeft, box.scrollTop]);
+    scrolled.set(key, kept);
+  }
+
+  /** The view's boxes scrolled where they were kept, now and once laid out (a block the editor puts in the page after it is drawn) */
+  private putScroll(): void {
+    const key = this.scrollKey();
+    const kept = key ? scrolled.get(key) : undefined;
+    if (!kept) return;
+    // (Its own copy: a box scrolled by `put` before it is laid out reports where it could go, kept meanwhile)
+    const wanted = [...kept];
+    const put = () => {
+      if (key !== this.scrollKey()) return;
+      for (const [path, [left, top]] of wanted) {
+        const box = this.boxAt(path);
+        if (!box) continue;
+        if (box.scrollLeft !== left) box.scrollLeft = left;
+        if (box.scrollTop !== top) box.scrollTop = top;
+      }
+    };
+    const view = this.options.element.ownerDocument.defaultView;
+    this.puttingBack = true;
+    put();
+    view?.requestAnimationFrame(() => {
+      put();
+      // (The scroll events of what was put back come before the next frame: the user's after it)
+      view.requestAnimationFrame(() => (this.puttingBack = false));
+    });
+    if (!view) this.puttingBack = false;
   }
 
   private async read(): Promise<Data | undefined> {
@@ -155,11 +256,12 @@ export class DatabasePlace {
     return values;
   }
 
+  /** The views' tabs: each its icon and label, the one shown marked; one row, scrolled sideways where it does not fit */
   private switcher(doc: Document, views: readonly ViewDefinition[], current: string | undefined): HTMLElement {
     return el(
       doc,
-      "nav",
-      { class: "swd-place-bar", attrs: { "aria-label": "Views" } },
+      "div",
+      { class: "swd-tabs", attrs: { role: "group", "aria-label": "Views" } },
       ...views.map((view) =>
         el(
           doc,
@@ -173,19 +275,48 @@ export class DatabasePlace {
   }
 
   /**
-   * What every view has beside the switcher: the view's filter (a condition a
-   * property, in a panel under the bar: Silverware Table's filter syntax), its
-   * sort (a property and its direction; none: the order by hand), Undo of the
-   * database's last change. Kept in the view's own state (`<view>.filter`,
-   * `<view>.sort`), as the host's listing keeps them.
+   * What every view has beside the tabs, as icons: the view's filter (a
+   * condition a property, in a panel under the bar: Silverware Table's filter
+   * syntax; how many shown on it), its sort (a menu: a property and its
+   * direction, or the order by hand; the property shown on it), Undo of the
+   * database's last change, and ⋯ with what the modules add (Properties).
+   * Kept in the view's own state (`<view>.filter`, `<view>.sort`), as the
+   * host's listing keeps them.
    */
-  private tools(doc: Document, host: ViewHost): { readonly bar: HTMLElement; readonly panel: HTMLElement; readonly sync: () => void } {
+  /** The database's last change undone from this place, how far it is shown on its Undo (one at a time) */
+  private async undo(host: ViewHost): Promise<void> {
+    if (this.undoing) return;
+    this.undoing = { done: 0, of: 0 };
+    this.undoShown?.();
+    const drawn = this.drawn;
+    try {
+      await host.undo((done, of) => {
+        this.undoing = { done, of };
+        this.undoShown?.();
+      });
+      // (Drawn anew meanwhile: the view the undo was asked from ended, so it showed nothing of it; the one drawn since shows it)
+      if (this.drawn !== drawn && !this.gone) await this.refresh();
+    } finally {
+      this.undoing = undefined;
+      this.undoShown?.();
+    }
+  }
+
+  private tools(doc: Document, host: ViewHost, count: HTMLElement, view: ViewDefinition): { readonly bar: HTMLElement; readonly panel: HTMLElement; readonly sync: () => void; readonly stop: () => void } {
     const { listing, database } = host;
     const columns = [{ key: "name", label: "Name" }, ...database.properties.map((one) => ({ key: one.key, label: one.label }))];
-    const count = () => Object.keys(listing.filter).length;
+    const labelOf = (key: string) => columns.find((one) => one.key === key)?.label ?? key;
+    const filters = () => Object.keys(listing.filter).length;
+
     const filterButton = el(doc, "button", { class: "swd-tool swd-filter-button", attrs: { "aria-expanded": "false" } });
-    const label = () => (filterButton.textContent = count() ? `Filter (${count()})` : "Filter");
-    label();
+    const filterLabel = () => {
+      const n = filters();
+      filterButton.replaceChildren(el(doc, "span", { class: "swd-tool-icon", html: ICONS.filter }), ...(n ? [el(doc, "span", { class: "swd-tool-badge", text: String(n) })] : []));
+      filterButton.title = n ? `Filter: ${Object.keys(listing.filter).map(labelOf).join(", ")}` : "Filter";
+      filterButton.setAttribute("aria-label", n ? `Filter (${n})` : "Filter");
+      filterButton.classList.toggle("swd-tool-on", n > 0);
+    };
+    filterLabel();
     const panel = el(
       doc,
       "div",
@@ -198,7 +329,7 @@ export class DatabasePlace {
           input.classList.toggle("swd-invalid", !!problem);
           input.title = problem ?? "";
           if (problem || input.value === (listing.filter[column.key] ?? "")) return;
-          void listing.setFilter(column.key, input.value).then(label);
+          void listing.setFilter(column.key, input.value).then(filterLabel);
         };
         input.addEventListener("change", apply);
         input.addEventListener("keydown", (event) => {
@@ -210,26 +341,88 @@ export class DatabasePlace {
     filterButton.addEventListener("click", () => {
       panel.hidden = !panel.hidden;
       filterButton.setAttribute("aria-expanded", String(!panel.hidden));
+      if (!panel.hidden) panel.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
     });
-    const sorted = listing.sort[0];
-    const sortBy = el(doc, "select", { class: "swd-tool swd-sort", attrs: { "aria-label": "Sort by" } }, new Option("Order by hand", ""), ...columns.map((column) => new Option(column.label, column.key, false, column.key === sorted?.key)));
-    const direction = el(doc, "button", { class: "swd-tool swd-sort-direction", title: "Ascending or descending", text: sorted?.direction === "desc" ? "↓" : "↑" });
-    direction.disabled = !sorted;
-    const setSort = (dir: "asc" | "desc") => {
-      direction.disabled = !sortBy.value;
-      direction.textContent = dir === "desc" ? "↓" : "↑";
-      void listing.setSort(sortBy.value ? [{ key: sortBy.value, direction: dir }] : []);
-    };
-    sortBy.addEventListener("change", () => setSort("asc"));
-    direction.addEventListener("click", () => setSort(listing.sort[0]?.direction === "asc" ? "desc" : "asc"));
-    const undo = el(doc, "button", { class: "swd-tool swd-undo", title: "Undo this database's last change", text: "Undo", run: () => void host.undo() });
-    // The controls as the view's state has them now (a header's sort, a filter set by the view itself)
-    const sync = () => {
+
+    // The sort: a menu of the order by hand and the properties, each way
+    const sortButton = el(doc, "button", { class: "swd-tool swd-sort-button" });
+    const sortLabel = () => {
       const now = listing.sort[0];
-      sortBy.value = now?.key ?? "";
-      direction.disabled = !now;
-      direction.textContent = now?.direction === "desc" ? "↓" : "↑";
-      label();
+      sortButton.replaceChildren(el(doc, "span", { class: "swd-tool-icon", html: now ? (now.direction === "desc" ? ICONS.down : ICONS.up) : ICONS.sort }), ...(now ? [el(doc, "span", { class: "swd-tool-text", text: labelOf(now.key) })] : []));
+      sortButton.title = now ? `Sorted by ${labelOf(now.key)}, ${now.direction === "desc" ? "descending" : "ascending"}` : "Sort (now in the order by hand)";
+      sortButton.setAttribute("aria-label", sortButton.title);
+      sortButton.classList.toggle("swd-tool-on", !!now);
+    };
+    sortLabel();
+    const sort = popover(doc, sortButton, "Sort", (menu, close) => {
+      const now = listing.sort[0];
+      const choose = (key: string, direction: "asc" | "desc") => {
+        close();
+        void listing.setSort(key ? [{ key, direction }] : []).then(sortLabel);
+      };
+      const on = (key: string) => (now?.key ?? "") === key;
+      const option = (key: string, label: string) =>
+        el(
+          doc,
+          "button",
+          { class: "swd-menu-item swd-sort-option", attrs: { "aria-pressed": pressed(on(key)), "data-key": key }, run: () => choose(key, key && now?.key === key ? now.direction : "asc") },
+          el(doc, "span", { class: "swd-menu-check", html: on(key) ? ICONS.check : "" }),
+          label,
+        );
+      const way = (direction: "asc" | "desc", label: string) =>
+        el(doc, "button", { class: `swd-menu-way swd-sort-${direction}`, text: label, attrs: { "aria-pressed": pressed(now?.direction === direction), ...(now ? {} : { disabled: "" }) }, run: () => now && choose(now.key, direction) });
+      menu.replaceChildren(option("", "Order by hand"), el(doc, "div", { class: "swd-menu-line", attrs: { "aria-hidden": "true" } }), ...columns.map((column) => option(column.key, column.label)), el(doc, "div", "swd-menu-ways", way("asc", "Ascending"), way("desc", "Descending")));
+    });
+
+    // Undo, and how far it is while it writes (many pages: one after another), kept by the place as it is drawn anew meanwhile
+    const undoText = el(doc, "span", { class: "swd-tool-text swd-undo-progress" });
+    const undo = el(doc, "button", { class: "swd-tool swd-undo", title: "Undo this database's last change", attrs: { "aria-label": "Undo this database's last change" }, run: () => void this.undo(host) }, el(doc, "span", { class: "swd-tool-icon", html: ICONS.undo }), undoText);
+    this.undoShown = () => {
+      const at = this.undoing;
+      undo.setAttribute("aria-busy", String(!!at));
+      undoText.hidden = !at?.of;
+      undoText.textContent = at?.of ? `${at.done.toLocaleString("en-US")} / ${at.of.toLocaleString("en-US")}` : "";
+      undo.title = at ? "Undoing: keep this page open until it is done" : "Undo this database's last change";
+    };
+    this.undoShown();
+
+    // ⋯: Group by where the view groups (the properties of the types it groups by, the one it does checked), then what the
+    // modules add (Properties) and Edit source, as items of a menu
+    const { editSource } = this.options;
+    const own = [
+      ...(this.options.moduleTools?.({ document: doc, database }) ?? []),
+      ...(editSource ? [el(doc, "button", { class: "swd-tool swd-edit-source", text: "Edit source", title: "Show the block's text, to edit it as markdown", run: editSource })] : []),
+    ];
+    const groupBy = view.groupBy === false ? undefined : (view.groupBy ?? {});
+    const grouping = (): HTMLElement[] => {
+      if (!groupBy) return [];
+      const eligible = database.properties.filter((property) => !groupBy.types || groupBy.types.includes(host.type(property).name));
+      const kept = eligible.find((property) => property.key === listing.group);
+      const current = kept?.key ?? (groupBy.required ? eligible[0]?.key : undefined);
+      const option = (key: string | undefined, label: string) =>
+        el(
+          doc,
+          "button",
+          { class: "swd-menu-item swd-group-option", attrs: { "aria-pressed": pressed(current === key), "data-key": key ?? "" }, run: () => void listing.setGroup(key) },
+          el(doc, "span", { class: "swd-menu-check", html: current === key ? ICONS.check : "" }),
+          label,
+        );
+      return [
+        el(doc, "div", { class: "swd-menu-heading", text: "Group by" }),
+        ...(groupBy.required ? [] : [option(undefined, "None")]),
+        ...eligible.map((property) => option(property.key, property.label)),
+        ...(eligible.length ? [] : [el(doc, "p", { class: "swd-menu-note", text: "No property of a type this view groups by" })]),
+        ...(own.length ? [el(doc, "div", { class: "swd-menu-line", attrs: { "aria-hidden": "true" } })] : []),
+      ];
+    };
+    // (A choice closes it, the popover's own; what it opens, a dialog, is the module's)
+    const more = own.length || groupBy ? popover(doc, el(doc, "button", { class: "swd-tool swd-more", title: "More", attrs: { "aria-label": "More" } }, el(doc, "span", { class: "swd-tool-icon", html: ICONS.more })), "More", (menu) => menu.replaceChildren(...grouping(), ...own)) : undefined;
+
+    // The controls as the view's state has them now (a header's sort, a filter set by the view itself), and how many items show
+    const sync = () => {
+      sortLabel();
+      filterLabel();
+      count.textContent = host.items.length === host.total ? String(host.total) : `${host.items.length} of ${host.total}`;
       for (const input of panel.querySelectorAll<HTMLInputElement>("input[data-key]")) {
         if (doc.activeElement === input) continue;
         input.value = listing.filter[input.dataset.key!] ?? "";
@@ -238,8 +431,13 @@ export class DatabasePlace {
         input.title = "";
       }
     };
-    const own = this.options.moduleTools?.({ document: doc, database }) ?? [];
-    return { bar: el(doc, "span", "swd-tools", filterButton, sortBy, direction, undo, ...own), panel, sync };
+    sync();
+    // The place drawn anew: what is open closed, its listeners with it
+    const stop = () => {
+      sort.close();
+      more?.close();
+    };
+    return { bar: el(doc, "span", "swd-tools", filterButton, sort.box, undo, ...(more ? [more.box] : [])), panel, sync, stop };
   }
 
   /** Another view picked: written into the place's state, drawn */
@@ -263,6 +461,10 @@ export class DatabasePlace {
     const data = () => drawn.data;
     const prefixed = (key: string) => `${drawn.view.name}.${key}`;
     const listing = () => ({ filter: filterOf(state.get(prefixed("filter"))), sort: sortOf(state.get(prefixed("sort"))) });
+    const group = () => {
+      const kept = state.get(prefixed("groupBy"));
+      return typeof kept === "string" && kept ? kept : undefined;
+    };
     // The items as listed, made once per data read and listing
     let listed: { data: Data; key: string; items: readonly Item[] } | undefined;
     const items = () => {
@@ -312,6 +514,14 @@ export class DatabasePlace {
           await setMeta({ sort: sort.length ? sort : undefined });
           await shownAgain();
         },
+        get group() {
+          return group();
+        },
+        async setGroup(key) {
+          if (key === group()) return;
+          await setMeta({ groupBy: key });
+          await shownAgain();
+        },
         validateCondition,
       },
       type: (property) => typeOf(types, property),
@@ -321,7 +531,7 @@ export class DatabasePlace {
       rename: (item, name) => refreshed(core.rename(id, item, name)),
       remove: (items) => refreshed(core.remove(id, items)),
       move: (item, where) => refreshed(core.move(id, item, where)),
-      undo: () => refreshed(core.undo(id)),
+      undo: (progress) => refreshed(core.undo(id, progress)),
       open: async (item) => {
         if (this.options.openItem?.(item, id)) return;
         const document = store.documentOf(item.key);
@@ -345,6 +555,7 @@ export class DatabasePlace {
     this.drawn = undefined;
     if (!drawn) return;
     drawn.ended = true;
+    drawn.stopTools?.();
     // What it drew stays until the place is drawn anew, taking no presses meanwhile: its writes would go on, unseen
     this.body?.setAttribute("inert", "");
     try {

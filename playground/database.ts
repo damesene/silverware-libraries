@@ -11,11 +11,34 @@ import { ViewRegistry } from "../silverware-database/src/core/views.ts";
 import { TypeRegistry } from "../silverware-database/src/domain/types/registry.ts";
 import { MemoryStore } from "../silverware-database/src/store/memory.ts";
 import { MemoryViewState } from "../silverware-database/src/store/viewstate.ts";
+
 import stylePage from "../silverware-database/silverware-database-style.md";
 import { flash, setUpTheme } from "./common.ts";
 import { SAMPLE_DATABASES } from "./database-sample.ts";
 import { BUILT_IN_VIEWS } from "../silverware-database/src/views/builtin/index.ts";
 import { DEBUG_VIEWS } from "./database-views.ts";
+
+/** A place's state kept in the browser (as SilverBullet keeps it in the block's text): the view picked, its filter and sort, after a reload */
+class StoredViewState extends MemoryViewState {
+  constructor(private readonly storageKey: string) {
+    let kept: Record<string, unknown> = {};
+    try {
+      kept = JSON.parse(localStorage.getItem(storageKey) ?? "{}") as Record<string, unknown>;
+    } catch {
+      // (Not kept, or not readable: the defaults)
+    }
+    super(kept);
+  }
+
+  override async set(values: Readonly<Record<string, unknown>>): Promise<void> {
+    await super.set(values);
+    try {
+      localStorage.setItem(this.storageKey, JSON.stringify(Object.fromEntries(this.keys().map((key) => [key, this.get(key)]))));
+    } catch {
+      // (The browser keeps nothing: kept for this visit only)
+    }
+  }
+}
 
 setUpTheme();
 
@@ -65,14 +88,13 @@ function start(): void {
   const main = document.getElementById("places")!;
   main.replaceChildren();
   places = SAMPLE_DATABASES.map(({ database }) => {
+    // (The place shows the database's name itself)
     const section = document.createElement("section");
-    const heading = document.createElement("h2");
-    heading.textContent = database.name;
     const element = document.createElement("div");
     element.className = "swd-place";
-    section.append(heading, element);
+    section.append(element);
     main.append(section);
-    const place = new DatabasePlace({ element, database: database.id, state: new MemoryViewState(), store, core, types, views, settings, ui, editor: { open: (ref) => flash(`Open ${ref}`) }, moduleTools: (where) => modules.placeTools(where), openItem: (item, database) => modules.openItem(item, database) });
+    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store, core, types, views, settings, ui, editor: { open: (ref) => flash(`Open ${ref}`) }, moduleTools: (where) => modules.placeTools(where), openItem: (item, database) => modules.openItem(item, database) });
     return place;
   });
   void modules.start().then(() => places.forEach((place) => void place.render()));

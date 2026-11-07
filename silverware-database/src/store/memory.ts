@@ -1,7 +1,7 @@
 // A store of databases in memory: the core's, the views' and the modules'
 // tests and the playground run over it, as over any store (it passes the same
 // contract as the pages store, contract.ts). A "document" here is an item, or
-// a database's own record (its name, schema and format), each with its
+// a database's own record (its name, schema and version), each with its
 // revision: a transaction writes each where it is still as read, as pages
 // are written. Changes made outside the core (`changeOutside`) are what a page
 // edited by hand is to the pages store.
@@ -12,12 +12,13 @@
 // anything may have been written between the two. What a transaction comes
 // to is transaction.ts', the same for every store.
 import type { Changes } from "../core/changes.ts";
-import type { DatabaseStore, FormatStatus, MigrationScope, Planned, SkipCause, Skipped, StoreCapabilities, Target, TransactionPlan, TransactionReport } from "../core/store.ts";
+import type { DatabaseStore, VersionStatus, MigrationScope, Planned, SkipCause, Skipped, StoreCapabilities, Target, TransactionPlan, TransactionReport, WriteProgress } from "../core/store.ts";
+import { told } from "../core/store.ts";
 import type { Database, DatabaseSummary, Item, ItemKey, Revised, Value } from "../model/database.ts";
 import { draftTransaction, type ItemState, type RecordState, type StoreRules, type StoreState, takenNames, withoutClashes } from "./transaction.ts";
 
 /** The version of the form this store writes (a store in memory has one; a database seeded older or newer stands for one kept so) */
-export const MEMORY_FORMAT = 1;
+export const MEMORY_VERSION = 1;
 
 /** A database to start with: its record, its items (keys and revisions made by the store), the version it is kept in */
 export type MemorySeed = {
@@ -68,7 +69,7 @@ const ANOTHER_DATABASE = "its database was removed and made again since: left al
 const asNumber = (revision: string | undefined) => (revision === undefined ? undefined : Number(revision));
 
 export class MemoryStore implements DatabaseStore {
-  readonly capabilities: StoreCapabilities = { renameFollowsLinks: false, itemBody: true };
+  readonly capabilities: StoreCapabilities = { renameFollowsLinks: false, itemBody: true, itemDocument: false };
   private readonly kept = new Map<string, KeptDatabase>();
   private readonly listeners = new Set<(change: { readonly database: string }) => void>();
   private readonly steps = new WeakMap<Planned, Step>();
@@ -76,7 +77,7 @@ export class MemoryStore implements DatabaseStore {
   // Parts applied once: a plan applied again writes none of them anew (an item made twice)
   private readonly applied = new WeakSet<Planned>();
   private readonly rules: StoreRules = {
-    latestFormat: MEMORY_FORMAT,
+    latestVersion: MEMORY_VERSION,
     validatePropertyKey: () => this.validatePropertyKey(),
     validateItemName: (name) => this.validateItemName(name),
     nameKey: (name) => name,
@@ -87,7 +88,7 @@ export class MemoryStore implements DatabaseStore {
 
   constructor(seeds: readonly MemorySeed[] = []) {
     for (const seed of seeds) {
-      const kept = this.newDatabase({ database: seed.database, version: seed.version ?? MEMORY_FORMAT });
+      const kept = this.newDatabase({ database: seed.database, version: seed.version ?? MEMORY_VERSION });
       for (const item of seed.items ?? []) {
         const key = this.newKey();
         kept.items.set(key, { ...item, key });
@@ -140,7 +141,14 @@ export class MemoryStore implements DatabaseStore {
     return { database: id, planned, skipped: draft.skipped };
   }
 
-  async apply(plan: TransactionPlan): Promise<TransactionReport> {
+  async apply(plan: TransactionPlan, progress?: WriteProgress): Promise<TransactionReport> {
+    // (Written at once, in memory: told once, done)
+    const report = this.applyNow(plan);
+    told(progress, plan.planned.length, plan.planned.length);
+    return report;
+  }
+
+  private applyNow(plan: TransactionPlan): TransactionReport {
     const written: Planned[] = [];
     const skipped: Skipped[] = [...plan.skipped];
     const created = new Map<string, ItemKey>();
@@ -283,8 +291,8 @@ export class MemoryStore implements DatabaseStore {
     return { database: report.database, planned, skipped, undoes: report };
   }
 
-  async format(id: string): Promise<FormatStatus> {
-    return { version: this.kept.get(id)?.record.version ?? MEMORY_FORMAT, latest: MEMORY_FORMAT };
+  async version(id: string): Promise<VersionStatus> {
+    return { version: this.kept.get(id)?.record.version ?? MEMORY_VERSION, latest: MEMORY_VERSION };
   }
 
   async planMigration(scope: MigrationScope): Promise<readonly TransactionPlan[]> {
@@ -292,9 +300,9 @@ export class MemoryStore implements DatabaseStore {
     const ids = "database" in scope ? [scope.database] : "space" in scope ? [...this.kept.keys()] : [];
     return ids.flatMap((id) => {
       const kept = this.kept.get(id);
-      if (!kept || kept.record.version >= MEMORY_FORMAT) return [];
+      if (!kept || kept.record.version >= MEMORY_VERSION) return [];
       const planned: Planned[] = [];
-      this.add(planned, { database: id }, 1, { kind: "record", database: id, expects: kept.recordRevision, after: { ...kept.record, version: MEMORY_FORMAT } });
+      this.add(planned, { database: id }, 1, { kind: "record", database: id, expects: kept.recordRevision, after: { ...kept.record, version: MEMORY_VERSION } });
       return [{ database: id, planned, skipped: [] }];
     });
   }

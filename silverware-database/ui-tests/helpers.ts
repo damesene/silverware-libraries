@@ -66,9 +66,9 @@ const TYPES = `export default (HELPERS) => [
 ];
 `;
 
-/** A database's root page, of the format the store writes */
+/** A database's root page, of the version the store writes */
 export const root = (id: string, name: string) =>
-  `---\ntags: [db-root]\n_database:\n  id: ${id}\n  name: ${name}\n  format: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n---\n`;
+  `---\ntags: [db-root]\n_database:\n  id: ${id}\n  name: ${name}\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n---\n`;
 
 /** An item's page */
 export const item = (status: string, rank: string) => `---\ntags: [db]\nstatus: ${status}\n_database:\n  rank: ${rank}\n---\n`;

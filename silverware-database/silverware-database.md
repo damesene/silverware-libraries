@@ -1,7 +1,7 @@
 ---
 name: Library/damesene/silverware-database
 tags: meta/library
-description: "Silverware Database: databases of pages, in the spirit of Notion's: one item a page, its properties the page's frontmatter, shown in your pages as a table, a list or a kanban. In development."
+description: "Silverware Database: databases of pages, in the spirit of Notion's: one item a page, its properties the page's frontmatter, shown in your pages as a table, a list or a board. In development."
 files:
 - silverware-database.js
 - silverware-database-init.md
@@ -12,7 +12,7 @@ files:
 
 Databases of pages, as Notion has them: each item is a page of its own, its properties are the page's frontmatter, and a database is shown wherever you write its block, by a view you pick.
 
-**In development.** What is here: databases kept in your pages, made, changed and undone safely, shown as a table, a list or a kanban (or by views you write yourself).
+**In development.** What is here: databases kept in your pages, made, changed and undone safely, shown as a table, a list or a board (or by views you write yourself).
 
 ## A database in your space
 
@@ -42,24 +42,43 @@ id: tasks
 Above it, a button for each view; the one you pick is written into the block (`view: …`), and so is what a view keeps there (its filter, its sort, prefixed by its name). Beside them:
 
 * **Filter**: a condition for each property, written as in Silverware Table's filter row (`Done`, `!=Done`, `>3`, `/regex/`); every condition has to hold.
-* **Sort**: a property and its direction; *Order by hand* is the order you give items yourself (a kanban's cards dragged).
-* **Undo**: puts this database's last change back, where it is still as it was written (also the command **Silverware Database: Undo**).
+* **Sort**: a property and its direction; *Order by hand* is the order you give items yourself (a board's cards dragged).
+* **Undo**: puts this database's last change back, where it is still as it was written (also the command **Silverware Database: Undo**). One that writes 200 pages or more (an option renamed in many items) asks first, and the button shows how far it is while it writes; it waits for no other: while a change is written, Undo says so and does nothing.
+* **⋯**: **Group by**: any view in groups by a property, as Notion has it: a table or a list is drawn once per group, each under its title and how many items it has (a click folds it; folded groups are kept in the block), an item added in a group gets its value. A select's groups are its options in their order (empty ones too, so you can add there), then values that are none of them; a multi-select's item is in the group of each of its values; a checkbox's are *Checked* and *Unchecked*; any other property's (text, a number, a date) a group per value, in the order sorting gives them; items without a value in a group of their own, first. On a board the groups are its columns (a select's). Then **Properties** (below) and **Edit source**, which shows the block's own text to edit it as markdown (the cursor put into it; move the cursor out of the block and the database shows again). A click anywhere else in the block, or beside it on its lines, keeps the database shown.
 
 ## The views
 
 * **Table**: a row per item, a column per property. Click a value to change it, or reach it with Tab and press Enter or F2: Enter or a click elsewhere saves, Esc puts it aside; a value you leave as it was is not written. A value typed that does not read (`1,000` as a number) is not written, and you are told. A checkbox turns at once; ↗ opens the item's page; ✕ removes the item (asked first); a header sorts by its column. A value that does not read as its property's type shows in red, its reason on hover, and is kept as it is until you change it.
-* **List**: an item a line, its name (a click shows it in the peek) and its values; **Properties** picks which.
-* **Kanban**: a column for each option of a select property (the first one, or the one picked in **Group by**), one for items without a value, and one for any value that is none of the options, so no item is out of sight. Drag a card to another column or within one; on a phone, or from the keyboard, **Move to…** on the card does the same. **+ New** adds an item in its column.
+* **Table** and **List**: a row's grip (shown as you hover it) drags it to its place by hand, Alt+↑ ↓ from the keys; while a sort is on, the grip rests.
+* **List**: an item a line, its name (a click shows it in the peek) and its values, a property hidden in the views (**Properties**, its eye) left out.
+* **Board**: a column for each option of a select property (the first one, or the one picked under **Group by** in ⋯), first one for items without a value where there are any, and one for any value that is none of the options, so no item is out of sight. Drag a card to another column or within one (near the board's edge it scrolls); its column changes too by its value, in the table or the item's peek. **+ New** adds an item in its column.
+
+Long text wraps, as in Notion: a table's cell is at most 24em wide (a date and a number stay on one line), a board's columns are all one width (16em), a list's line wraps. A `space-style` block sets other widths:
+
+```css
+.swd-place {
+  --swd-cell-max-width: 30em;
+  --swd-column-width: 20em;
+}
+```
 
 ## Properties
 
-**Properties** beside the views opens the database's properties: change a property's label, its key (how pages and queries name it), its type, a select's options (one a line), whether it is read only (no view offers to change it), its place in the order, or remove it; add one with its label and type. A change that touches items (a key, a type, options, a property removed) first shows how many items it changes and which values it keeps as they are (a value that does not read as the new type is never emptied), and is written only when you apply it. Removing a property asks whether its values go too: if not, they stay in the pages and show again if the property comes back.
+**Properties** (under ⋯ beside the views) opens the database's properties: change a property's name, its type, a select's options, its place in the order, or remove it; add one with its name and type. Under **Advanced**: its key (how pages and queries name it) and **Locked in views** (no view offers to change it, for values a script or another tool keeps; the page itself can still be edited by hand). A change that touches items (a key, a type, options, a property removed) first shows how many items it changes, how many pages it writes (each item is a page) and which values it keeps as they are (a value that does not read as the new type is never emptied), and is written only when you apply it. Removing a property asks whether its values go too: if not, they stay in the pages and show again if the property comes back.
+
+A select's and a multi-select's options are edited as a list and saved together (**Save options**). An option renamed renames the items' values too, in the same change (in a multi-select's list only that value, the order kept), and two options can swap names: the review says how many items each rename changes (*3 items: Todo → To do*), and Undo puts all of it back in one step. Each item is a page of its own, so the review also says how many pages the change writes (the database's own page with them); from 200 on it says that this takes a while, and **Apply** shows how far it is. Keep the page open until it is done: stopped halfway, the items not written yet keep their old values, shown as none of the options. If any item changed between the review and **Apply**, nothing is written and you save the options again. An option taken away leaves its values in the items, shown as none of the options, and so does a value typed by hand that is none of them. Two options are never put into one: a rename onto a name another option has (kept or taken away), or onto a value items hold that is none of the options, is refused.
+
+A property is optional; **Required** in its details makes it required (not a checkbox: unticked is its value), marked * in the list: an item without a value shows it missing (*Required* in red in the table and the peek, a dashed pill in a list's line and on a card, the board's column of none in red), and a value of it is never emptied (said so). An item can still be added without one, to be filled in later.
+
+A property can be hidden (the eye beside it in **Properties**): no view shows it, while its values stay in the pages as they are, the bar's filter and sort still offer it, a board can still group by it, and an item's peek shows it under *Hidden in views*.
+
+A select's and a multi-select's values show as colored pills. Each option has the color of its place among the options, unless you give it one: under **Colors**, press an option and pick its color (**Auto** takes it back). **Custom…** picks a color of your own. Colors are kept with the property in the database's root page (`colors: { Done: green, Blocked: "#c0392b" }`: gray, blue, green, yellow, orange, red, purple or pink, or your own as `#rrggbb`; every color is mixed with your theme's; a color of your own too light or too dark to read is shown lighter or darker, its hue kept), and a change of them is written at once and undone by Undo. An option renamed in **Options** keeps its color. A value that is none of the options shows with a dashed red edge.
 
 The table is a basic one: with [[Library/damesene/silverware-table|Silverware Table]], a table of its own over a database (formulas, column types, widths) is to come.
 
 ## Peek
 
-A click on an item's name (or its ↗) shows the item in a panel at the right of the page: its name, its values (a click on one edits it, as in the views), its content as text, and **Open** for its page. Each is written as you leave its field. If the content was changed elsewhere since the panel showed it, what you typed is not written over it: it stays in the field with a note, and **Load the content as it is now** replaces it only once you agree. Esc, a click beside the panel or opening another page closes it (not while it holds content that could not be written). With the module turned off (Settings, Modules), a click opens the item's page.
+A click on an item's name (or its ↗) shows the item in a panel at the right of the page (on a phone or a narrow window, over the whole page): its name, its values (a click on one edits it, as in the views), its content as text, and **Open** for its page. A press on a property's name there opens it in **Properties** (its name, type, options, required, hidden, removed), **+ Add a property** adds one, and a property's grip (shown as you hover its row) drags it to its place (Alt+↑ ↓ from the keys). Each is written as you leave its field. If the content was changed elsewhere since the panel showed it, what you typed is not written over it: it stays in the field with a note, and **Load the content as it is now** replaces it only once you agree. Esc, a click beside the panel or opening another page closes it (not while it holds content that could not be written). The panel is 600px wide (at most four fifths of the editor's area); drag its left edge to set another width, or set **Width** under Peek in Settings: it is kept in CONFIG, for every database (a double click on the edge, or ← → when it has the focus: its default again, or 40px wider or narrower). With the module turned off (Settings, Modules), a click opens the item's page.
 
 ## Nothing lost by mistake
 
@@ -113,6 +132,7 @@ A view has:
 |---|---|
 | `name` | How a block (`view: names`) and the settings name it: lower case letters, digits and `-` |
 | `label`, `icon` | How the switcher shows it (the icon a character) |
+| `groupBy` | Optional: how the view is grouped (**Group by** in ⋯). By default the place draws it once per group, the view knowing nothing of it (its `host.items` and `host.total` are the group's, an item it adds gets the group's value). `false`: never grouped. `{ types, required, draws }`: the types of property it groups by (`["select"]`; left out, every type), `required: true` where it always is (the first such property where none is picked, no *None*), `draws: true` where the view draws its groups itself, reading the property picked as `host.listing.group` (the board) |
 | `settings` | Optional: its settings, each `{ key, label, hint, control, choices, default }` (`control`: `switch`, `number`, `text` or `choice`), shown in **Settings** under the view and read with `host.setting(key)` |
 | `render(host, element)` | Draws the view into `element`. It may give back `{ update, destroy }`: `update()` is called when the data change (without it the view is drawn anew), `destroy()` when it goes |
 
@@ -120,10 +140,10 @@ A view has:
 
 * `document` (draw with it rather than the global one), `database` (its name and `properties`: each `{ key, label, type, params, readonly }`), `items` (filtered and sorted as the place shows them: each `{ key, name, values }`, a value read as `item.values[property.key]`; `key` tells items apart, nothing to read in it) and `total` (every item's count);
 * `text(item, key)` a value as it shows (`"name"` the item's name), `type(property)` its type;
-* the writes: `update(item, key, value)` (`undefined` takes the value off), `create({ name, values, body }, place)`, `rename(item, name)`, `remove(items)` (asked first), `move(item, { after, before, values })` and `undo()`. Each is checked (a value is a text, a number, `true`/`false`, `null` or a list of texts), written only where the item is still as the view read it, and undoable. One not done gives back `{ problem, cause }`: `invalid` (refused, said to the user) or `left` (the item changed since, said), `declined` (the user said no) or `unchanged` (nothing to do);
+* the writes: `update(item, key, value)` (`undefined` takes the value off), `create({ name, values, body }, place)`, `rename(item, name)`, `remove(items)` (asked first), `move(item, { after, before, values })` and `undo(progress)` (`progress(done, of)` told as it writes, optional). Each is checked (a value is a text, a number, `true`/`false`, `null` or a list of texts), written only where the item is still as the view read it, and undoable. One not done gives back `{ problem, cause }`: `invalid` (refused, said to the user) or `left` (the item changed since, said), `declined` (the user said no) or `unchanged` (nothing to do);
 * `open(item)`: the item in the peek (or its page);
-* `listing`: the place's filter and sort (`filter`, `sort`, `setFilter(key, condition)`, `setSort([{ key, direction }])`, `validateCondition(condition)`);
-* `getMeta(key)` and `setMeta({ key: value })`: what the view keeps in its block (`kanban.groupBy`), `setting(key)` its settings, `refresh()`, `notify(message)`.
+* `listing`: the place's filter, sort and grouping (`filter`, `sort`, `group`: the key picked under Group by, or none; `setFilter(key, condition)`, `setSort([{ key, direction }])`, `setGroup(key)`, `validateCondition(condition)`);
+* `getMeta(key)` and `setMeta({ key: value })`: what the view keeps in its block, under its name (`mine.size`; `filter`, `sort`, `groupBy` and `folded` are the place's own, not to be used for anything else), `setting(key)` its settings, `refresh()`, `notify(message)`.
 
 Write only from what the user does (a click, a key), never while `render` or `update` draws: a write draws the view again, which would write again.
 

@@ -16,16 +16,17 @@ import { readFrontmatter } from "../../../../shared/pages/frontmatter.ts";
 import { type ApplyReport, type PagePlan, type PageWriter, pageWriter } from "../../../../shared/pages/writer.ts";
 import type { IndexedObject, Platform } from "../../../../shared/platform.ts";
 import type { Changes } from "../../core/changes.ts";
-import type { DatabaseStore, FormatStatus, MigrationScope, Planned, SkipCause, Skipped, StoreCapabilities, Target, TransactionPlan, TransactionReport } from "../../core/store.ts";
+import type { DatabaseStore, VersionStatus, MigrationScope, Planned, SkipCause, Skipped, StoreCapabilities, Target, TransactionPlan, TransactionReport, WriteProgress } from "../../core/store.ts";
+import { told } from "../../core/store.ts";
 import type { Database, DatabaseSummary, Item, ItemKey, Revised } from "../../model/database.ts";
 import { draftTransaction, type ItemState, type RecordState, type StoreRules, type StoreState, takenNames, withoutClashes } from "../transaction.ts";
-import { FORMATS, ITEM_TAG, type PagesFormat, ROOT_TAG, systemOf, versionOf } from "./format.ts";
+import { VERSIONS, ITEM_TAG, type PagesVersion, ROOT_TAG, systemOf, versionOf } from "./versions.ts";
 
 export type PagesStoreOptions = {
   /** The root page a database made by the store gets (by default `db-<id>` at the space's top; the binding: beside the page showing it) */
   readonly rootPage?: (id: string) => string;
-  /** The formats known, the latest last (by default those of format.ts; a test adds an older one) */
-  readonly formats?: readonly PagesFormat[];
+  /** The versions known, the latest last (by default those of versions.ts; a test adds an older one) */
+  readonly versions?: readonly PagesVersion[];
 };
 
 /** Keys SilverBullet's page objects have, beside a page's frontmatter (probe 1): no property's key */
@@ -104,8 +105,8 @@ const hasTag = (object: IndexedObject, tag: string) => Array.isArray(object.tags
 export class PagesStore implements DatabaseStore {
   readonly capabilities: StoreCapabilities;
   private readonly writer: PageWriter;
-  private readonly formats: readonly PagesFormat[];
-  private readonly latest: PagesFormat;
+  private readonly versions: readonly PagesVersion[];
+  private readonly latest: PagesVersion;
   private readonly rules: StoreRules;
   // Each page's key for the session, kept when its item goes (Undo brings it back under it)
   private readonly keys = new Map<string, ItemKey>();
@@ -127,11 +128,11 @@ export class PagesStore implements DatabaseStore {
     private readonly options: PagesStoreOptions = {},
   ) {
     this.writer = pageWriter(platform);
-    this.formats = options.formats ?? FORMATS;
-    this.latest = this.formats[this.formats.length - 1]!;
-    this.capabilities = { renameFollowsLinks: !!platform.space.rename, itemBody: true };
+    this.versions = options.versions ?? VERSIONS;
+    this.latest = this.versions[this.versions.length - 1]!;
+    this.capabilities = { renameFollowsLinks: !!platform.space.rename, itemBody: true, itemDocument: true };
     this.rules = {
-      latestFormat: this.latest.version,
+      latestVersion: this.latest.version,
       validatePropertyKey: (key) => this.validatePropertyKey(key),
       validateItemName: (name) => this.validateItemName(name),
       // A page's name whatever its case: a disk that ignores case has one page of the two
@@ -158,7 +159,7 @@ export class PagesStore implements DatabaseStore {
     const seen = new Set<string>();
     const out: DatabaseSummary[] = [];
     for (const object of await this.objects(ROOT_TAG)) {
-      const read = this.formatOf(versionOf(object)).readRoot(object, versionOf(object));
+      const read = this.versionNamed(versionOf(object)).readRoot(object, versionOf(object));
       if ("problem" in read || seen.has(read.record.database.id)) continue;
       seen.add(read.record.database.id);
       this.roots.set(read.record.database.id, String(object.name));
@@ -258,7 +259,16 @@ export class PagesStore implements DatabaseStore {
     return { database: id, planned, skipped };
   }
 
-  async apply(plan: TransactionPlan): Promise<TransactionReport> {
+  async apply(plan: TransactionPlan, progress?: WriteProgress): Promise<TransactionReport> {
+    const report = await this.applyParts(plan, (done, of) => told(progress, done, of));
+    told(progress, plan.planned.length, plan.planned.length);
+    return report;
+  }
+
+  private async applyParts(plan: TransactionPlan, progress?: WriteProgress): Promise<TransactionReport> {
+    // Told after each page written or left (those left before any is written counted with the first)
+    let done = 0;
+    const tick = () => progress?.(Math.min(++done + plan.planned.length - toWrite, plan.planned.length), plan.planned.length);
     const written: Planned[] = [];
     const skipped: Skipped[] = [...plan.skipped];
     const created = new Map<string, ItemKey>();
@@ -273,7 +283,13 @@ export class PagesStore implements DatabaseStore {
       else (part.kind === "record" ? records : items).push({ one, part });
     }
     let recordLeft = false;
-    const writeRecord = async ({ one, part }: { one: Planned; part: Part }) => {
+    // (The parts that come to a page's write; the others, left at once, are counted as done from the start)
+    const toWrite = records.length + items.length;
+    const writeRecord = async (each: { one: Planned; part: Part }) => {
+      await writeRecordPage(each);
+      tick();
+    };
+    const writeRecordPage = async ({ one, part }: { one: Planned; part: Part }) => {
       const read = await this.read(plan.database);
       if (part.made !== undefined && read?.made !== part.made) {
         recordLeft = true;
@@ -308,24 +324,28 @@ export class PagesStore implements DatabaseStore {
     // Pages removed first: a name another part takes may be one of theirs
     const ordered = withoutClashes(now, parts, this.rules, ({ one: left }, reason) => skip(left, "refused", reason)).sort((a, b) => Number(a.own.after !== undefined) - Number(b.own.after !== undefined));
     for (const { one, own } of ordered) {
-      const before = own.key === undefined ? undefined : read!.items.get(own.key)?.item;
-      // A page made gets its key before it is written: whoever reads meanwhile (a listener told by the index) sees the key it keeps
-      if (own.key === undefined && own.after) {
-        this.keys.delete(own.page);
-        this.keyOf(own.page);
+      try {
+        const before = own.key === undefined ? undefined : read!.items.get(own.key)?.item;
+        // A page made gets its key before it is written: whoever reads meanwhile (a listener told by the index) sees the key it keeps
+        if (own.key === undefined && own.after) {
+          this.keys.delete(own.page);
+          this.keyOf(own.page);
+        }
+        const result = await this.applyPage(own, before);
+        if ("cause" in result) {
+          skip(one, result.cause, result.reason);
+          continue;
+        }
+        // Its name written alone (the rename changed its text, so the rest was left): said, and kept for Undo
+        if (result.renamedAlone) skip(one, "changed", "renamed, but the rename changed its text, so its other changes were left");
+        const after = own.after as ItemState | undefined;
+        const page = after ? `${read!.folder}/${after.name}` : own.page;
+        const key = this.keyAfter(own, page, after);
+        if (own.ref !== undefined) created.set(own.ref, key);
+        this.keep(written, one, { part: own, report: result.report, before, made: read!.made, key });
+      } finally {
+        tick();
       }
-      const result = await this.applyPage(own, before);
-      if ("cause" in result) {
-        skip(one, result.cause, result.reason);
-        continue;
-      }
-      // Its name written alone (the rename changed its text, so the rest was left): said, and kept for Undo
-      if (result.renamedAlone) skip(one, "changed", "renamed, but the rename changed its text, so its other changes were left");
-      const after = own.after as ItemState | undefined;
-      const page = after ? `${read!.folder}/${after.name}` : own.page;
-      const key = this.keyAfter(own, page, after);
-      if (own.ref !== undefined) created.set(own.ref, key);
-      this.keep(written, one, { part: own, report: result.report, before, made: read!.made, key });
     }
     for (const one of records.filter(({ part }) => part.after === undefined)) await writeRecord(one);
     return { database: plan.database, written, skipped, created, ...(plan.undoes ? { undoes: plan.undoes } : {}) };
@@ -386,7 +406,7 @@ export class PagesStore implements DatabaseStore {
     return { database: report.database, planned, skipped, undoes: report };
   }
 
-  async format(id: string): Promise<FormatStatus> {
+  async version(id: string): Promise<VersionStatus> {
     const read = await this.read(id);
     return { version: read?.version ?? this.latest.version, latest: this.latest.version };
   }
@@ -475,8 +495,8 @@ export class PagesStore implements DatabaseStore {
   private objectOf(part: Part, page: string): IndexedObject {
     if (part.kind === "record") {
       const record = part.after as RecordState;
-      const properties = Object.fromEntries(record.database.properties.map((one) => [one.key, { type: one.type, label: one.label, ...(one.readonly ? { readonly: true } : {}), ...one.params }]));
-      return { name: page, tags: [ROOT_TAG], _database: { id: record.database.id, name: record.database.name, format: record.version, properties } };
+      const properties = Object.fromEntries(record.database.properties.map((one) => [one.key, { type: one.type, label: one.label, ...(one.readonly ? { readonly: true } : {}), ...(one.hidden ? { hidden: true } : {}), ...(one.required ? { required: true } : {}), ...one.params }]));
+      return { name: page, tags: [ROOT_TAG], _database: { id: record.database.id, name: record.database.name, version: record.version, properties } };
     }
     const item = part.after as ItemState;
     return { name: page, tags: [ITEM_TAG], ...item.values, ...(item.rank === undefined ? {} : { _database: { rank: item.rank } }) };
@@ -486,8 +506,8 @@ export class PagesStore implements DatabaseStore {
   private async read(id: string): Promise<Read | undefined> {
     for (const object of await this.objects(ROOT_TAG)) {
       const version = versionOf(object);
-      const format = this.formatOf(version);
-      const read = format.readRoot(object, version);
+      const reader = this.versionNamed(version);
+      const read = reader.readRoot(object, version);
       if ("problem" in read || read.record.database.id !== id) continue;
       const root = String(object.name);
       this.roots.set(id, root);
@@ -496,7 +516,7 @@ export class PagesStore implements DatabaseStore {
         const page = String(one.name);
         if (!page.startsWith(`${root}/`) || page.slice(root.length + 1).includes("/")) continue;
         const key = this.keyOf(page);
-        const item: ItemState = { key, ...format.readItem(one, page.slice(root.length + 1), read.record) };
+        const item: ItemState = { key, ...reader.readItem(one, page.slice(root.length + 1), read.record) };
         items.set(key, { page, item, revision: revisionOf({ name: item.name, values: item.values, rank: item.rank }) });
       }
       return { root, folder: root, made: this.makingOf(root), version, record: read.record, recordRevision: revisionOf(read.record), items };
@@ -537,8 +557,8 @@ export class PagesStore implements DatabaseStore {
     return out;
   }
 
-  private formatOf(version: number): PagesFormat {
-    return this.formats.find((one) => one.version === version) ?? this.latest;
+  private versionNamed(version: number): PagesVersion {
+    return this.versions.find((one) => one.version === version) ?? this.latest;
   }
 
   /** What the store has as transaction.ts reads it, the bodies read for it given */

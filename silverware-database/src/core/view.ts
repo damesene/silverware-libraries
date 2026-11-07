@@ -7,6 +7,7 @@ import type { Filter, SortKey } from "../domain/listing.ts";
 import type { PropertyType } from "../domain/types/type.ts";
 import type { Database, Item, Property, Value } from "../model/database.ts";
 import type { ItemDraft, Place, Result } from "./core.ts";
+import type { WriteProgress } from "./store.ts";
 
 export type { Filter, SortKey } from "../domain/listing.ts";
 export type { ItemDraft, Place, Refused, Result, Written } from "./core.ts";
@@ -31,7 +32,12 @@ export type ViewInstance = {
   destroy?(): void;
 };
 
-/** A view: drawn into a place's element from what its host gives */
+/**
+ * A view: drawn into a place's element from what its host gives. Where its
+ * boxes are scrolled (a wide table's, a board's) the place keeps as the view
+ * is drawn anew, by each box's place among the elements it draws: a view
+ * draws the same shape again, nothing to declare.
+ */
 export type ViewDefinition = {
   /** Its name, as a place's state and its settings name it: lower case, no spaces */
   readonly name: string;
@@ -39,13 +45,27 @@ export type ViewDefinition = {
   /** Its icon in the switcher: the plugin's own markup (an SVG) or a character, never text of a page */
   readonly icon: string;
   readonly settings?: readonly ViewSetting[];
+  /**
+   * How the view is grouped by a property (Group by in ⋯, which offers the
+   * properties of `types`, every type where none are named, and None unless
+   * `required`). By default the place draws the view once per group, each a
+   * section of its own, the view knowing nothing of it; `draws: true` where the
+   * view draws its groups itself (a board: its columns), reading the property
+   * picked as `listing.group` (`required`: the first such where none is); false
+   * where the view is never grouped
+   */
+  readonly groupBy?: false | { readonly types?: readonly string[]; readonly required?: boolean; readonly draws?: boolean };
   render(host: ViewHost, element: HTMLElement): ViewInstance | void;
 };
 
-/** The view's filter and sort, kept in its own meta (`<view>.filter`, `<view>.sort`); setting one draws the view anew */
+/** The view's filter, sort and grouping, kept in its own meta (`<view>.filter`, `<view>.sort`, `<view>.groupBy`); setting one draws the view anew */
 export type ViewListing = {
   readonly filter: Filter;
   readonly sort: readonly SortKey[];
+  /** The key of the property picked to group by (Group by in ⋯), as kept: undefined where none */
+  readonly group: string | undefined;
+  /** The property to group by (undefined: none) */
+  setGroup(key: string | undefined): Promise<void>;
   /** A property's condition (empty or undefined: none) */
   setFilter(key: string, condition: string | undefined): Promise<void>;
   setSort(sort: readonly SortKey[]): Promise<void>;
@@ -73,7 +93,7 @@ export type ViewHost = {
   remove(items: readonly Item[]): Promise<Result>;
   move(item: Item, place: Place): Promise<Result>;
   /** The database's last change put back where still as written (undefined: nothing to undo) */
-  undo(): Promise<Result | undefined>;
+  undo(progress?: WriteProgress): Promise<Result | undefined>;
   /** The item opened: in a module's own way where one takes it (the peek), else where the store says it can be (its page); a failure is said to the user */
   open(item: Item): Promise<void>;
   /** The view's own data in its place, by its key (the core prefixes it with the view's name); undefined where none */

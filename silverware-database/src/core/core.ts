@@ -15,7 +15,7 @@ import type { UserInterface } from "../../../shared/platform.ts";
 import { inRankOrder, isRank, placeAt } from "../domain/rank.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
 import { keptText } from "../domain/types/type.ts";
-import { type Database, type Item, type ItemKey, isEmpty, NAME_KEY, type Params, type Property, type Revised, validatePropertyKey, type Value } from "../model/database.ts";
+import { type Database, type Item, type ItemKey, isEmpty, isValue, NAME_KEY, type Params, type Property, type Revised, validatePropertyKey, type Value } from "../model/database.ts";
 import { databaseChanges, type DatabaseChangesBuilder } from "./builder.ts";
 import type { Changes } from "./changes.ts";
 import { TransactionHistory } from "./history.ts";
@@ -69,11 +69,14 @@ export type NewProperty = { readonly label: string; readonly type: string; reado
  * before `before` (items of the same database, as a view shows them, filtered
  * or not), else after the ranked items (those without a rank, made outside the
  * core, stay after them: adding one never writes them all); with values set
- * there (a kanban column's)
+ * there (a kanban column's; undefined: taken off, the column of none)
  */
-export type Place = { readonly after?: Item; readonly before?: Item; readonly values?: Readonly<Record<string, Value>> };
+export type Place = { readonly after?: Item; readonly before?: Item; readonly values?: Readonly<Record<string, Value | undefined>> };
 
 const UNTITLED = "Untitled";
+
+/** What is refused where a write is given something that is no value (a view's mistake: an object, NaN, a list of numbers) */
+const notValue = (label: string) => `${label}: not a value (a text, a number, true or false, a list of texts): not written`;
 
 export class DatabaseCore {
   readonly history: TransactionHistory;
@@ -94,6 +97,7 @@ export class DatabaseCore {
     if (!read) return this.refuse(`No database "${database}"`);
     const property = writable(read.value, key);
     if (typeof property === "string") return this.refuse(property);
+    if (value !== undefined && !isValue(value)) return this.refuse(notValue(property.label));
     const changes = databaseChanges(database).item(item, (i) => (value === undefined ? i.unset(key) : i.set(key, value)));
     return this.write(changes.build(), `Set ${property.label} of ${item.name}`);
   }
@@ -102,10 +106,12 @@ export class DatabaseCore {
   async create(database: string, draft: ItemDraft = {}, place: Place = {}): Promise<(Written & { readonly key: ItemKey | undefined }) | Refused> {
     const read = await this.read(database);
     if ("problem" in read) return read;
-    const values = { ...draft.values, ...place.values };
-    for (const key of Object.keys(values)) {
+    // (A value the place takes off is none of the item's: made without it)
+    const values = Object.fromEntries(Object.entries({ ...draft.values, ...place.values }).filter((entry): entry is [string, Value] => entry[1] !== undefined));
+    for (const [key, value] of Object.entries(values)) {
       const property = writable(read.database.value, key);
       if (typeof property === "string") return this.refuse(property);
+      if (!isValue(value)) return this.refuse(notValue(property.label));
     }
     const names = new Set(read.items.value.map((one) => one.name));
     const name = draft.name?.trim() || freeName(UNTITLED, names);
@@ -130,6 +136,13 @@ export class DatabaseCore {
     return this.write(databaseChanges(database).item(item, (i) => i.rename(trimmed)).build(), `Rename ${item.name} to ${trimmed}`);
   }
 
+  /** An item's body (its content in the markdown language), written only where it is still `was` as read (`store.body`): a body changed since is left, never written over */
+  async setBody(database: string, item: Item, body: string, was: string | undefined): Promise<Result> {
+    if (!this.store.capabilities.itemBody) return this.refuse("This database keeps no body of an item");
+    if (body === (was ?? "")) return unchanged("The body is the same");
+    return this.write(databaseChanges(database).item(item, (i) => i.body(body, was)).build(), `Edit the body of ${item.name}`);
+  }
+
   /** Items removed, the user asked first (an item changed since it was read is left) */
   async remove(database: string, items: readonly Item[]): Promise<Result> {
     if (!items.length) return unchanged("Nothing to remove");
@@ -150,15 +163,19 @@ export class DatabaseCore {
     if (place.after?.key === item.key || place.before?.key === item.key) return unchanged("An item stays beside itself");
     const read = await this.read(database);
     if ("problem" in read) return read;
-    for (const key of Object.keys(place.values ?? {})) {
+    for (const [key, value] of Object.entries(place.values ?? {})) {
       const property = writable(read.database.value, key);
       if (typeof property === "string") return this.refuse(property);
+      if (value !== undefined && !isValue(value)) return this.refuse(notValue(property.label));
     }
     const placing = placed(read.items.value, item, place);
     if (typeof placing === "string") return this.refuse(placing);
     const changes = databaseChanges(database).item(item, (i) => {
       i.rank(placing.rank);
-      for (const [key, value] of Object.entries(place.values ?? {})) i.set(key, value);
+      for (const [key, value] of Object.entries(place.values ?? {})) {
+        if (value === undefined) i.unset(key);
+        else i.set(key, value);
+      }
     });
     rankOthers(changes, read.items.value, placing.others);
     return this.write(changes.build(), `Move ${item.name}`, { item: item.key });
@@ -211,6 +228,30 @@ export class DatabaseCore {
     if (!trimmed) return this.refuse("A property needs a label");
     if (trimmed === property.label) return unchanged("The label is the same");
     return this.writeSchema(read, read.value.properties.map((one) => (one.key === key ? { ...one, label: trimmed } : one)), `Rename property ${property.label} to ${trimmed}`);
+  }
+
+  /** A property read only (no view offers to change it, the core refuses to) or not: the schema alone */
+  async setPropertyReadonly(database: string, key: string, readonly: boolean): Promise<Result> {
+    const read = await this.store.database(database);
+    if (!read) return this.refuse(`No database "${database}"`);
+    const property = read.value.properties.find((one) => one.key === key);
+    if (!property) return this.refuse(`No property "${key}"`);
+    if (property.readonly === readonly) return unchanged("It is so already");
+    return this.writeSchema(read, read.value.properties.map((one) => (one.key === key ? { ...one, readonly } : one)), `${readonly ? "Lock" : "Unlock"} property ${property.label}`);
+  }
+
+  /** A property moved to `index` among the properties (its order as views show them): the schema alone */
+  async moveProperty(database: string, key: string, index: number): Promise<Result> {
+    const read = await this.store.database(database);
+    if (!read) return this.refuse(`No database "${database}"`);
+    const properties = [...read.value.properties];
+    const at = properties.findIndex((one) => one.key === key);
+    if (at < 0) return this.refuse(`No property "${key}"`);
+    const to = Math.max(0, Math.min(properties.length - 1, index));
+    if (to === at) return unchanged("It is there already");
+    const [moved] = properties.splice(at, 1);
+    properties.splice(to, 0, moved!);
+    return this.writeSchema(read, properties, `Move property ${moved!.label}`);
   }
 
   /** A property's key changed, every item's value moved to it: a proposal; refused where items still keep values under the new key */

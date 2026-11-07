@@ -45,9 +45,10 @@ function listOf<T>(value: unknown): T[] {
 // plugs/configuration-manager, 2026-11-07)
 export const OWN_MARKER = "-- managed-by: silverware-database";
 
-/** The platform over SilverBullet's API, and the index's events to feed it (`indexChanged`, from the init page's listeners) */
-export function silverBulletPlatform(bridge: Bridge): { readonly platform: Platform; readonly indexChanged: (change: IndexChange) => void } {
+/** The platform over SilverBullet's API, and the events to feed it (`indexChanged`, `pageOpened`: from the init page's listeners) */
+export function silverBulletPlatform(bridge: Bridge): { readonly platform: Platform; readonly indexChanged: (change: IndexChange) => void; readonly pageOpened: () => Promise<void> } {
   const listeners = new Set<(change: IndexChange) => void>();
+  const openedListeners = new Set<(name: string) => void>();
   const names = async () => listOf<string>(await bridge.listPages());
   // A rename checked by what the space has after it: SilverBullet answers the same whether it renamed or not
   const renamed = async (from: string, to: string, run: () => Promise<unknown>) => {
@@ -61,6 +62,10 @@ export function silverBulletPlatform(bridge: Bridge): { readonly platform: Platf
       text: () => bridge.getText(),
       replace: (from, to, insert) => bridge.replaceRange(from, to, insert),
       open: (ref) => bridge.navigate(ref),
+      onOpened: (listener) => {
+        openedListeners.add(listener);
+        return () => void openedListeners.delete(listener);
+      },
     },
     space: {
       read: (name) => bridge.readPage(name),
@@ -92,5 +97,18 @@ export function silverBulletPlatform(bridge: Bridge): { readonly platform: Platf
         : {}),
     },
   };
-  return { platform, indexChanged: (change) => listeners.forEach((listener) => listener(change)) };
+  return {
+    platform,
+    indexChanged: (change) => listeners.forEach((listener) => listener(change)),
+    pageOpened: async () => {
+      // (Its name not read: told without it, as what listens needs to know only that another page is open)
+      const name = await Promise.resolve(bridge.getCurrentPage()).then(String, () => "");
+      openedListeners.forEach((listener) => listener(name));
+    },
+  };
+}
+
+/** SilverBullet's editor's area on screen (`#sb-editor`: not its sidebars), where a panel beside the page goes */
+export function editorArea(doc: Document): DOMRect | undefined {
+  return doc.querySelector("#sb-editor")?.getBoundingClientRect();
 }

@@ -85,6 +85,16 @@ export function validatePropertyKey(key: string): string | undefined {
   return undefined;
 }
 
+/** Whether something is a value as the model keeps one (a text, a finite number, a logical value, null, a list of texts): what a type's answer is checked by */
+export function isValue(value: unknown): value is Value {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (!Array.isArray(value)) return false;
+  // (Every place, holes too: `every` skips a hole)
+  for (let at = 0; at < value.length; at++) if (typeof value[at] !== "string") return false;
+  return true;
+}
+
 /** Whether a value is empty: none, an empty text, an empty list */
 export function isEmpty(value: Value | undefined): boolean {
   return value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);

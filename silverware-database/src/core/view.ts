@@ -74,7 +74,7 @@ export type ViewHost = {
   move(item: Item, place: Place): Promise<Result>;
   /** The database's last change put back where still as written (undefined: nothing to undo) */
   undo(): Promise<Result | undefined>;
-  /** The item opened where the store says it can be (its page), else nothing; a failure is said to the user */
+  /** The item opened: in a module's own way where one takes it (the peek), else where the store says it can be (its page); a failure is said to the user */
   open(item: Item): Promise<void>;
   /** The view's own data in its place, by its key (the core prefixes it with the view's name); undefined where none */
   getMeta(key: string): unknown;
@@ -82,4 +82,8 @@ export type ViewHost = {
   setMeta(values: Readonly<Record<string, unknown>>): Promise<void>;
   /** One of the view's settings (declared in its `settings`), its default where not set */
   setting(key: string): unknown;
+  /** The view told anew (`update`) with the data as they are, after a change of its own meta (`setMeta` draws nothing) */
+  refresh(): Promise<void>;
+  /** A message to the user (a value typed that was not written, and why) */
+  notify(message: string): void;
 };

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
+import type { ModuleDefinition } from "./module.ts";
 import { SettingsDialog } from "./settings.ts";
 import type { ViewDefinition } from "./view.ts";
 import { ViewRegistry } from "./views.ts";
@@ -9,6 +10,8 @@ const VIEWS: ViewDefinition[] = [
   { name: "list", label: "List", icon: "L", render: () => {} },
 ];
 
+const MODULES: ModuleDefinition[] = [{ name: "peek", label: "Peek", description: "An item beside the page", settings: [{ key: "width", label: "Width", control: "number", default: 400 }], start: () => {} }];
+
 function setup(configured: Record<string, unknown> = {}, canSave = true) {
   const saves: Record<string, unknown>[] = [];
   let saved = 0;
@@ -16,7 +19,7 @@ function setup(configured: Record<string, unknown> = {}, canSave = true) {
     get: (path: string, fallback: unknown) => (path in configured ? configured[path] : fallback),
     ...(canSave ? { save: async (values: Readonly<Record<string, unknown>>) => void saves.push({ ...values }) } : {}),
   };
-  const dialog = new SettingsDialog(document, { views: new ViewRegistry(VIEWS), settings, ui: { notify: () => {}, ask: () => true }, saved: () => void saved++ });
+  const dialog = new SettingsDialog(document, { views: new ViewRegistry(VIEWS), modules: MODULES, settings, ui: { notify: () => {}, ask: () => true }, saved: () => void saved++ });
   const q = <T extends Element>(selector: string) => document.querySelector<T>(selector)!;
   return { dialog, saves, saved: () => saved, q };
 }
@@ -50,6 +53,23 @@ describe("the settings dialog", () => {
     expect(saves).toEqual([{ "silverware.database.views.board.columns": 4, "silverware.database.views.list.enabled": false }]);
     expect(saved()).toBe(1);
     expect(dialog.isOpen).toBe(false);
+  });
+
+  it("shows each module with its switch and its settings on the Modules tab, saved under silverware.database.modules", async () => {
+    const { dialog, saves, saved, q } = setup({ "silverware.database.modules.peek.width": 500 });
+    await dialog.open();
+    const peek = q<HTMLInputElement>('[data-swd-module="peek"]');
+    expect(peek.checked).toBe(true);
+    const width = q<HTMLInputElement>('[data-swd-setting="silverware.database.modules.peek.width"]');
+    expect(width.value).toBe("500");
+    width.value = "320";
+    width.dispatchEvent(new Event("input"));
+    peek.checked = false;
+    peek.dispatchEvent(new Event("change"));
+    q<HTMLButtonElement>(".swd-settings-save").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(saves).toEqual([{ "silverware.database.modules.peek.width": 320, "silverware.database.modules.peek.enabled": false }]);
+    expect(saved()).toBe(1);
   });
 
   it("says where the settings cannot be saved", async () => {

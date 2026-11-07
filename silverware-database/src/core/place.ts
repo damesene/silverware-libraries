@@ -10,6 +10,7 @@ import { type Filter, listItems, type SortKey, textOf, typeOf, validateCondition
 import type { TypeRegistry } from "../domain/types/registry.ts";
 import type { Database, Item } from "../model/database.ts";
 import type { DatabaseCore } from "./core.ts";
+import type { PlaceContext } from "./module.ts";
 import type { DatabaseStore, ViewStateStore } from "./store.ts";
 import type { ViewDefinition, ViewHost, ViewInstance } from "./view.ts";
 import type { ViewRegistry } from "./views.ts";
@@ -28,6 +29,10 @@ export type PlaceOptions = {
   readonly settings: Pick<Settings, "get">;
   readonly ui: Pick<UserInterface, "notify">;
   readonly editor?: Pick<Editor, "open">;
+  /** What the modules on add to the place's tools (core/module.ts), asked as the place is drawn */
+  readonly moduleTools?: (place: PlaceContext) => readonly Node[];
+  /** An item opened by a module's own way (the peek, core/module.ts): whether one took it; else it opens where the store says */
+  readonly openItem?: (item: Item, database: string) => boolean;
 };
 
 /** The settings' path of a view's setting */
@@ -37,7 +42,7 @@ export const viewSettingPath = (view: string, key: string) => `silverware.databa
 type Data = { readonly database: Database; readonly items: readonly Item[] };
 
 // A view drawn: its own host, made for it (its name and settings fixed in it), the data it was last given, what it gave back, whether it has gone
-type Drawn = { readonly view: ViewDefinition; data: Data; instance: ViewInstance | void; ended: boolean };
+type Drawn = { readonly view: ViewDefinition; data: Data; instance: ViewInstance | void; ended: boolean; syncTools?: () => void };
 
 export class DatabasePlace {
   private drawn: Drawn | undefined;
@@ -47,6 +52,11 @@ export class DatabasePlace {
   private pending: Promise<void> | undefined;
   private readonly stopListening: () => void;
   private gone = false;
+
+  /** The id of the database the place shows */
+  get database(): string {
+    return this.options.database;
+  }
 
   constructor(private readonly options: PlaceOptions) {
     this.stopListening = options.store.onChanged((change) => {
@@ -71,6 +81,7 @@ export class DatabasePlace {
       if (!data) return this.draw();
       drawn.data = data;
       try {
+        drawn.syncTools?.();
         drawn.instance.update();
       } catch (error) {
         this.note(`The view "${drawn.view.label}" failed: ${message(error)}`);
@@ -104,7 +115,8 @@ export class DatabasePlace {
     if (!data) return this.note(`No database "${this.options.database}"`);
     const named = state.get(VIEW_KEY);
     const view = typeof named === "string" ? on.find((one) => one.name === named) : on[0];
-    element.append(this.switcher(doc, on, view?.name));
+    const bar = this.switcher(doc, on, view?.name);
+    element.append(bar);
     this.body = el(doc, "div", "swd-place-body");
     element.append(this.body);
     if (!view) return this.note(typeof named === "string" ? `No view "${named}" is on here: pick one above` : "No view is on: turn one on in the settings");
@@ -112,8 +124,13 @@ export class DatabasePlace {
     if (this.gone) return;
     const drawn: Drawn = { view, data, instance: undefined, ended: false };
     this.drawn = drawn;
+    const host = this.host(drawn, settings);
+    const tools = this.tools(doc, host);
+    drawn.syncTools = tools.sync;
+    bar.append(tools.bar);
+    this.body.before(tools.panel);
     try {
-      drawn.instance = view.render(this.host(drawn, settings), this.body);
+      drawn.instance = view.render(host, this.body);
     } catch (error) {
       this.note(`The view "${view.label}" failed: ${message(error)}`);
     }
@@ -153,6 +170,76 @@ export class DatabasePlace {
         ),
       ),
     );
+  }
+
+  /**
+   * What every view has beside the switcher: the view's filter (a condition a
+   * property, in a panel under the bar: Silverware Table's filter syntax), its
+   * sort (a property and its direction; none: the order by hand), Undo of the
+   * database's last change. Kept in the view's own state (`<view>.filter`,
+   * `<view>.sort`), as the host's listing keeps them.
+   */
+  private tools(doc: Document, host: ViewHost): { readonly bar: HTMLElement; readonly panel: HTMLElement; readonly sync: () => void } {
+    const { listing, database } = host;
+    const columns = [{ key: "name", label: "Name" }, ...database.properties.map((one) => ({ key: one.key, label: one.label }))];
+    const count = () => Object.keys(listing.filter).length;
+    const filterButton = el(doc, "button", { class: "swd-tool swd-filter-button", attrs: { "aria-expanded": "false" } });
+    const label = () => (filterButton.textContent = count() ? `Filter (${count()})` : "Filter");
+    label();
+    const panel = el(
+      doc,
+      "div",
+      { class: "swd-filter", attrs: { hidden: "" } },
+      ...columns.map((column) => {
+        const input = el(doc, "input", { attrs: { type: "text", placeholder: "any", "data-key": column.key, "aria-label": `Filter ${column.label}` } });
+        input.value = listing.filter[column.key] ?? "";
+        const apply = () => {
+          const problem = listing.validateCondition(input.value);
+          input.classList.toggle("swd-invalid", !!problem);
+          input.title = problem ?? "";
+          if (problem || input.value === (listing.filter[column.key] ?? "")) return;
+          void listing.setFilter(column.key, input.value).then(label);
+        };
+        input.addEventListener("change", apply);
+        input.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") apply();
+        });
+        return el(doc, "label", "swd-filter-row", el(doc, "span", { text: column.label }), input);
+      }),
+    );
+    filterButton.addEventListener("click", () => {
+      panel.hidden = !panel.hidden;
+      filterButton.setAttribute("aria-expanded", String(!panel.hidden));
+    });
+    const sorted = listing.sort[0];
+    const sortBy = el(doc, "select", { class: "swd-tool swd-sort", attrs: { "aria-label": "Sort by" } }, new Option("Order by hand", ""), ...columns.map((column) => new Option(column.label, column.key, false, column.key === sorted?.key)));
+    const direction = el(doc, "button", { class: "swd-tool swd-sort-direction", title: "Ascending or descending", text: sorted?.direction === "desc" ? "↓" : "↑" });
+    direction.disabled = !sorted;
+    const setSort = (dir: "asc" | "desc") => {
+      direction.disabled = !sortBy.value;
+      direction.textContent = dir === "desc" ? "↓" : "↑";
+      void listing.setSort(sortBy.value ? [{ key: sortBy.value, direction: dir }] : []);
+    };
+    sortBy.addEventListener("change", () => setSort("asc"));
+    direction.addEventListener("click", () => setSort(listing.sort[0]?.direction === "asc" ? "desc" : "asc"));
+    const undo = el(doc, "button", { class: "swd-tool swd-undo", title: "Undo this database's last change", text: "Undo", run: () => void host.undo() });
+    // The controls as the view's state has them now (a header's sort, a filter set by the view itself)
+    const sync = () => {
+      const now = listing.sort[0];
+      sortBy.value = now?.key ?? "";
+      direction.disabled = !now;
+      direction.textContent = now?.direction === "desc" ? "↓" : "↑";
+      label();
+      for (const input of panel.querySelectorAll<HTMLInputElement>("input[data-key]")) {
+        if (doc.activeElement === input) continue;
+        input.value = listing.filter[input.dataset.key!] ?? "";
+        // (What it shows now is the condition kept, which reads: a mark of one typed before goes)
+        input.classList.remove("swd-invalid");
+        input.title = "";
+      }
+    };
+    const own = this.options.moduleTools?.({ document: doc, database }) ?? [];
+    return { bar: el(doc, "span", "swd-tools", filterButton, sortBy, direction, undo, ...own), panel, sync };
   }
 
   /** Another view picked: written into the place's state, drawn */
@@ -236,6 +323,7 @@ export class DatabasePlace {
       move: (item, where) => refreshed(core.move(id, item, where)),
       undo: () => refreshed(core.undo(id)),
       open: async (item) => {
+        if (this.options.openItem?.(item, id)) return;
         const document = store.documentOf(item.key);
         if (!document || !editor?.open) return;
         try {
@@ -247,6 +335,8 @@ export class DatabasePlace {
       getMeta: (key) => state.get(prefixed(key)),
       setMeta,
       setting: (key) => settings.get(key),
+      refresh: shownAgain,
+      notify: (text) => ui.notify(text, { type: "error" }),
     };
   }
 

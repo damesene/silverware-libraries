@@ -1,0 +1,34 @@
+// The peek module: an item a view opens (its name, its ↗) shown in a panel
+// beside the document instead of its page (docs/silverware-database.md,
+// *peek*); its page still one press away (*Open*). Off: items open their page.
+import type { ModuleDefinition } from "../../core/module.ts";
+import { PeekPanel } from "./panel.ts";
+
+export const PEEK_MODULE: ModuleDefinition = {
+  name: "peek",
+  label: "Peek",
+  description: "An item opened from a view shows in a panel beside the page: its name, its properties and its content edited there, its page one press away (Open). Off: an item opens its page.",
+  start(host) {
+    const panel = new PeekPanel(host);
+    const stops = [
+      host.onChanged(() => void panel.follow()),
+      // Another page opened: the panel closed (what is typed written first; a body kept stays, as for any press beside)
+      host.onDocumentOpened(() => void panel.close()),
+    ];
+    return {
+      // A place drawn anew (a schema changed, its properties' dialog): the panel follows (a store may tell only of changes made elsewhere)
+      placeTools: () => {
+        void panel.follow();
+        return [];
+      },
+      openItem: (item, database) => {
+        void panel.show(item, database);
+        return true;
+      },
+      stop: () => {
+        for (const stop of stops) stop();
+        panel.stop();
+      },
+    };
+  },
+};

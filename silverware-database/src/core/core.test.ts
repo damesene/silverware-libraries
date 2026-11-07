@@ -41,6 +41,16 @@ const applied = async (core: DatabaseCore, proposal: Proposal | { problem: strin
 };
 
 describe("the core", () => {
+  it("writes only values: an object, NaN or a list of numbers a view gives is refused, said, nothing written", async () => {
+    const { core, told, named } = setup();
+    const item = await named("Fix login");
+    for (const wrong of [{}, Number.NaN, [1, 2], new Date()]) expect(await core.update("tasks", item, "estimate", wrong as never)).toHaveProperty("problem");
+    expect(await core.create("tasks", { name: "New", values: { estimate: Number.POSITIVE_INFINITY as never } })).toHaveProperty("problem");
+    expect(await core.move("tasks", item, { values: { status: {} as never } })).toHaveProperty("problem");
+    expect((await named("Fix login")).values.estimate).toBe("3");
+    expect(told.every((one) => one.includes("not a value"))).toBe(true);
+  });
+
   it("sets a value, refusing the name, a property it lacks and one read only, said to the user", async () => {
     const { core, told, named } = setup();
     expect(await core.update("tasks", await named("Fix login"), "status", "Done")).not.toHaveProperty("problem");

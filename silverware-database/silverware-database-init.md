@@ -94,6 +94,13 @@ if js and js.window then
       if e.data and e.data.name then silverwareDatabaseJs.pageIndexed(e.data.name, false) end
     end,
   }
+  -- Another page opened in the editor: what shows beside the page (the peek) is closed
+  event.listen {
+    name = "editor:pageLoaded",
+    run = function()
+      silverwareDatabaseJs.pageLoaded()
+    end,
+  }
   event.listen {
     name = "page:deleted",
     run = function(e)

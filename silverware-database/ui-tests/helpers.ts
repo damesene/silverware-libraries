@@ -18,8 +18,8 @@ export const onSilverBullet = process.env.SW_TARGET === "silverbullet";
 const server = () => silverbulletServer(test.info().parallelIndex, process.env.SW_SB_SPACE ?? "");
 const FOLDER = "UiDatabase";
 
-/** The views the tests define: the items' names with a button adding one, and how many items there are */
-const VIEWS = `export default [
+/** The views the tests define (a function given HELPERS, as a definition may be): the items' names with a button adding one, and how many items there are */
+const VIEWS = `export default (HELPERS) => [
   {
     name: "names",
     label: "Names",
@@ -39,8 +39,29 @@ const VIEWS = `export default [
     label: "Count",
     icon: "#",
     render(host, element) {
-      element.replaceChildren(Object.assign(document.createElement("p"), { textContent: host.items.length + " of " + host.total, className: "test-count" }));
+      element.replaceChildren(Object.assign(document.createElement("p"), { textContent: host.items.length + " of " + host.total, className: "test-count", title: "helpers: " + typeof HELPERS.editValue }));
     },
+  },
+];
+`;
+
+/** The types the tests define (given HELPERS): stars for a number from 1 to 5, and one whose text always fails */
+const TYPES = `export default (HELPERS) => [
+  {
+    name: "stars",
+    label: "Stars",
+    validate: (value) => (HELPERS.isEmpty(value) || (Number.isInteger(value) && value >= 1 && value <= 5) ? undefined : "1 to 5"),
+    text: (value) => (Number.isInteger(value) && value >= 1 && value <= 5 ? "★".repeat(value) : HELPERS.keptText(value)),
+    parse: (text) => (text.trim() === "" ? { value: null } : /^[1-5]$/.test(text.trim()) ? { value: Number(text.trim()) } : { problem: "1 to 5" }),
+  },
+  {
+    name: "broken",
+    label: "Broken",
+    validate: () => undefined,
+    text: () => {
+      throw new Error("no text");
+    },
+    parse: (text) => ({ value: text }),
   },
 ];
 `;
@@ -95,7 +116,8 @@ export const test = base.extend<{ space: Space }>({
         const views = join(server().space, folder, "views.js");
         await mkdir(dirname(views), { recursive: true });
         await writeFile(views, VIEWS);
-        const lua = `\`\`\`space-lua\nsilverware.database.defineViews(js.importFromSpace("${folder}/views.js"))\n\`\`\`\n`;
+        await writeFile(join(server().space, folder, "types.js"), TYPES);
+        const lua = `\`\`\`space-lua\nsilverware.database.defineViews(js.importFromSpace("${folder}/views.js"))\nsilverware.database.defineTypes(js.importFromSpace("${folder}/types.js"))\n\`\`\`\n`;
         await writeFile(path("Views"), `# Views\n\n${lua}`);
         for (const [name, text] of Object.entries(pages)) {
           await mkdir(dirname(path(name)), { recursive: true });

@@ -3,7 +3,7 @@
 // case), "app*" (* any text, ? one character, ~ before either for itself),
 // "" (an empty cell), "<>" (a cell that is not empty), or a value to equal.
 import { parseDate } from "./dates.ts";
-import { asNumber } from "../view.ts";
+import { asNumber } from "../../../shared/filter.ts";
 import {
   asTime,
   DAY_SECONDS,

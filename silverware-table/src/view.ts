@@ -1,5 +1,6 @@
 // View state of a table: sorting changes what is shown, never the markdown
 // (filters are the filters module's: features/filters.ts).
+import { asNumber } from "../../shared/filter.ts";
 
 export type SortDirection = "asc" | "desc";
 
@@ -65,15 +66,6 @@ export function remapColumns(
   // Pins are counts at the edges: whoever changes the columns sets them
   const result = withoutSort(view);
   return view.sort && column !== undefined ? { ...result, sort: { column, direction: view.sort.direction } } : result;
-}
-
-// A number with an optional currency symbol in front and a unit after it:
-// "12,99 €", "$5", "15 %", "3 kg", "1 000"
-const NUMBER_RE = /^\p{Sc}?\s*([-+]?(?:\d{1,3}(?:[ \u00a0]\d{3})+|\d+)(?:[.,]\d+)?)\s*[\p{L}\p{Sc}%°]*$/u;
-
-export function asNumber(s: string): number | undefined {
-  const m = NUMBER_RE.exec(s.trim());
-  return m ? Number(m[1]!.replace(/[ \u00a0]/g, "").replace(",", ".")) : undefined;
 }
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });

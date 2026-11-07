@@ -1,6 +1,6 @@
 // Values formulas compute with, and the conversions formula functions use.
 import { formatLuaNumber } from "../format.ts";
-import { asNumber } from "../view.ts";
+import { asNumber } from "../../../shared/filter.ts";
 
 // #SPILL!: a cell's result of several values (a cell holds one); #CALC!: a result of no values (FILTER keeping nothing)
 export type ErrorCode = "#VALUE!" | "#DIV/0!" | "#REF!" | "#NAME?" | "#NUM!" | "#N/A" | "#CYCLE!" | "#ERROR!" | "#SPILL!" | "#CALC!";

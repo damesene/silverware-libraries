@@ -9,8 +9,7 @@ import { pagesWith, subtagsOf } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule, WorkspaceHost } from "../core/module.ts";
 import type { RenameOffer } from "../core/offers.ts";
 import { counted, type Operation } from "../core/operation.ts";
-import { renameTags } from "../../../shared/pages/tags/edit.ts";
-import { cleanName, hashtagOf, isWithin, validateName, renamedTag } from "../../../shared/pages/tags/names.ts";
+import { cleanName, hashtagOf, isWithin, validateName } from "../../../shared/pages/tags/names.ts";
 import { suggestions, tagField } from "../ui/chips.ts";
 import { el } from "../../../shared/elements.ts";
 import { note } from "../ui/form.ts";
@@ -20,9 +19,8 @@ export function renameOperation(from: string, to: string, children: boolean, sub
   return {
     label: `Rename ${what}`,
     pages: (catalog) => pagesWith(catalog, from, children),
-    // Into a subtag of its own (#a to #a/x): the tags under the target stay as they are, so the two merge as the
-    // field said, else #a/x would move on to #a/x/x
-    edit: (text) => renameTags(text, (name) => (to !== from && isWithin(to, from) && isWithin(name, to) ? undefined : renamedTag(name, from, to, children))),
+    // (Into a subtag of its own, #a to #a/x, the tags under the target stay as they are: the writer's rename)
+    change: (p) => p.tags.rename(from, to, { subtags: children }),
     done: (pages, changes) => `Renamed ${what}: ${counted(changes, "tag")} on ${counted(pages, "page")}`,
     ...(subtags ? { options: [{ label: `Its subtags too (${subtags})`, on: children, toggled: () => renameOperation(from, to, !children, subtags) }] } : {}),
     shows: to,
@@ -37,20 +35,10 @@ export function renameOperation(from: string, to: string, children: boolean, sub
  */
 export function mergeOperation(tags: readonly string[], into: string, children: boolean, subtags = 0): Operation {
   const what = `${tags.map(hashtagOf).join(" ")} into ${hashtagOf(into)}${children ? " with their subtags" : ""}`;
-  const renamed = (name: string) => {
-    for (const from of tags) {
-      if (from === into) continue;
-      // Into a subtag of its own (as a rename): the tags under the target stay
-      if (isWithin(into, from) && isWithin(name, into)) return undefined;
-      const to = renamedTag(name, from, into, children);
-      if (to !== undefined) return to;
-    }
-    return undefined;
-  };
   return {
     label: `Merge ${what}`,
     pages: (catalog) => [...new Set(tags.flatMap((tag) => pagesWith(catalog, tag, children)))].sort((a, b) => a.localeCompare(b)),
-    edit: (text) => renameTags(text, renamed),
+    change: (p) => p.tags.merge(tags, into, { subtags: children }),
     done: (pages, changes) => `Merged ${what}: ${counted(changes, "tag")} on ${counted(pages, "page")}`,
     ...(subtags ? { options: [{ label: `Their subtags too (${subtags})`, on: children, toggled: () => mergeOperation(tags, into, !children, subtags) }] } : {}),
     shows: into,

@@ -2,12 +2,11 @@ import { describe, expect, it } from "vitest";
 import { pagesOperation } from "../modules/pages.ts";
 import { removeOperation } from "../modules/remove.ts";
 import { renameOperation, validateRename } from "../modules/rename.ts";
-import { memorySpace } from "../space/memory.ts";
-import { minimalEdit } from "../space/space.ts";
+import { memorySpace, writerOf } from "../space/memory.ts";
 import { indexCaughtUp, metaPages, pagesWith, readCatalog, subtagsOf } from "./catalog.ts";
-import { diffLines } from "../../../shared/pages/diff.ts";
-import { History } from "./history.ts";
-import { type Applied, applyPlan, makePlan, undoOperation } from "./plan.ts";
+import type { PageBuilder } from "../../../shared/pages/changes.ts";
+import { undoneBy } from "./operation.ts";
+import { applyPlan, makePlan, undoOperation } from "./plan.ts";
 
 const pages = () =>
   memorySpace({
@@ -38,34 +37,34 @@ describe("meta", () => {
 describe("plans", () => {
   it("plans a rename, applies it and undoes it", async () => {
     const space = pages();
-    const plan = await makePlan(space, await readCatalog(space), renameOperation("project", "work", true));
-    expect(plan.changes.map((c) => c.page)).toEqual(["A", "A/Plan", "B"]);
+    const plan = await makePlan(writerOf(space), await readCatalog(space), renameOperation("project", "work", true));
+    expect(plan.pages.map((c) => c.page)).toEqual(["A", "A/Plan", "B"]);
     // Nothing written until applied
     expect(space.pages.get("A")).toContain("project/alpha");
-    const applied = await applyPlan(space, plan);
+    const applied = await applyPlan(writerOf(space), plan);
     expect(applied.written).toHaveLength(3);
     expect(space.pages.get("A")).toBe("---\ntags: [work/alpha]\n---\n- [ ] do #todo");
     expect(space.pages.get("B")).toBe("#work/beta\n\nnote #idea");
     // Undo: an operation as any other, its review the pages going back
-    const undo = await makePlan(space, await readCatalog(space), undoOperation(applied));
-    expect(undo.changes.map((c) => c.page)).toEqual(["A", "A/Plan", "B"]);
-    expect(undo.operation.undoes).toBe(applied);
-    await applyPlan(space, undo);
+    const undo = await makePlan(writerOf(space), await readCatalog(space), undoOperation({ report: applied.report, label: applied.operation.label }));
+    expect(undo.pages.map((c) => c.page)).toEqual(["A", "A/Plan", "B"]);
+    expect(undoneBy(undo.operation)!.report).toBe(applied.report);
+    await applyPlan(writerOf(space), undo);
     expect(space.pages.get("A")).toBe("---\ntags: [project/alpha]\n---\n- [ ] do #todo");
   });
   it("leaves a page changed since it was read, and one changed since it was written", async () => {
     const space = pages();
-    const plan = await makePlan(space, await readCatalog(space), renameOperation("plan", "plans", false));
+    const plan = await makePlan(writerOf(space), await readCatalog(space), renameOperation("plan", "plans", false));
     space.pages.set("A/Plan", "#plan edited");
-    const applied = await applyPlan(space, plan);
+    const applied = await applyPlan(writerOf(space), plan);
     expect(applied.written).toHaveLength(0);
     expect(applied.skipped[0]!.reason).toMatch(/changed since/);
 
-    const again = await applyPlan(space, await makePlan(space, await readCatalog(space), renameOperation("plan", "plans", false)));
+    const again = await applyPlan(writerOf(space), await makePlan(writerOf(space), await readCatalog(space), renameOperation("plan", "plans", false)));
     space.pages.set("A/Plan", "#plans edited later");
-    const undo = await makePlan(space, await readCatalog(space), undoOperation(again));
+    const undo = await makePlan(writerOf(space), await readCatalog(space), undoOperation({ report: again.report, label: again.operation.label }));
     expect(undo.skipped.map((s) => s.reason)).toEqual(["changed since it was written: left as it is"]);
-    await applyPlan(space, undo);
+    await applyPlan(writerOf(space), undo);
     expect(space.pages.get("A/Plan")).toBe("#plans edited later");
   });
   it("reads hundreds of pages a few at a time, in their order", async () => {
@@ -73,51 +72,46 @@ describe("plans", () => {
     const space = memorySpace(pages);
     let reading = 0;
     let most = 0;
-    const read = space.read;
-    space.read = async (page) => {
+    // (The page writer reads them, through the space it is given)
+    const store = space.platform.space;
+    const read = store.read.bind(store);
+    store.read = async (page) => {
       most = Math.max(most, ++reading);
       await new Promise((resolve) => setTimeout(resolve, 0));
       reading--;
       return read(page);
     };
     const seen: number[] = [];
-    const plan = await makePlan(space, await readCatalog(space), renameOperation("many", "lots", false), (done) => seen.push(done));
-    expect(plan.changes.map((c) => c.page)).toEqual(Object.keys(pages));
+    const plan = await makePlan(writerOf(space), await readCatalog(space), renameOperation("many", "lots", false), (done) => seen.push(done));
+    expect(plan.pages.map((c) => c.page)).toEqual(Object.keys(pages));
     expect(most).toBeLessThanOrEqual(6);
     expect(seen.at(-1)).toBe(300);
-  });
-  it("keeps the changes applied, the last first, one undone taken off", () => {
-    const history = new History();
-    const op = renameOperation("a", "b", false);
-    history.push({ operation: op, written: [], skipped: [] });
-    expect(history.last).toBeUndefined();
-    const first: Applied = { operation: op, written: [{ page: "x", before: "", after: "", changes: 1 }], skipped: [] };
-    const second: Applied = { ...first };
-    history.push(first);
-    history.push(second);
-    expect(history.last).toBe(second);
-    history.remove(second);
-    expect(history.last).toBe(first);
   });
 });
 
 describe("operations", () => {
+  it("changes a page listed twice once", async () => {
+    const space = memorySpace({ A: "text" });
+    const twice = { label: "Twice", pages: () => ["A", "A"], change: (p: PageBuilder) => p.editText((text) => ({ text: `${text}!`, changes: 1 })), done: () => "done" };
+    await applyPlan(writerOf(space), await makePlan(writerOf(space), await readCatalog(space), twice));
+    expect(space.pages.get("A")).toBe("text!");
+  });
   it("deletes a tag with its subtags", async () => {
     const space = pages();
-    await applyPlan(space, await makePlan(space, await readCatalog(space), removeOperation("project", true, 0, { from: "all", keepWord: false })));
+    await applyPlan(writerOf(space), await makePlan(writerOf(space), await readCatalog(space), removeOperation("project", true, 0, { from: "both", keepWord: false })));
     expect(space.pages.get("A")).toBe("- [ ] do #todo");
     expect(space.pages.get("A/Plan")).toBe("#plan\n\ntext");
     expect(space.pages.get("B")).toBe("note #idea");
   });
   it("tags pages: added into the frontmatter, removed from it and the tag lines", async () => {
     const space = pages();
-    await applyPlan(space, await makePlan(space, await readCatalog(space), pagesOperation(["A", "C"], ["review"], ["project/alpha"])));
+    await applyPlan(writerOf(space), await makePlan(writerOf(space), await readCatalog(space), pagesOperation(["A", "C"], ["review"], ["project/alpha"])));
     expect(space.pages.get("A")).toBe("---\ntags: [review]\n---\n- [ ] do #todo");
     expect(space.pages.get("C")).toBe("---\ntags: [review]\n---\nNothing here");
   });
   it("changes one page's tags", async () => {
     const space = pages();
-    await applyPlan(space, await makePlan(space, await readCatalog(space), pagesOperation(["A/Plan"], ["draft"], ["project/alpha"])));
+    await applyPlan(writerOf(space), await makePlan(writerOf(space), await readCatalog(space), pagesOperation(["A/Plan"], ["draft"], ["project/alpha"])));
     expect(space.pages.get("A/Plan")).toBe("---\ntags: [draft]\n---\n#plan\n\ntext");
   });
   it("offers the subtags in the review, the operation made anew", () => {
@@ -136,19 +130,6 @@ describe("operations", () => {
   });
 });
 
-describe("edits and diffs", () => {
-  it("makes one edit of the part changed", () => {
-    expect(minimalEdit("abcdef", "abXYef")).toEqual({ from: 2, to: 4, insert: "XY" });
-    expect(minimalEdit("same", "same")).toBeUndefined();
-  });
-  it("shows the lines changed in runs", () => {
-    expect(diffLines("a\nb\nc\nd", "a\nB\nc\nd\ne")).toEqual([
-      { line: 2, removed: ["b"], added: ["B"] },
-      { line: 5, removed: [], added: ["e"] },
-    ]);
-  });
-});
-
 describe("meta pages protected", () => {
   it("leaves meta pages out of the catalog, and a plan's guard leaves one alone as read", async () => {
     const space = memorySpace({ Lib: "---\ntags: meta/library\n---\nWrites #auto.", Car: "#auto" });
@@ -156,8 +137,8 @@ describe("meta pages protected", () => {
     expect([...catalog.tags.keys()]).toEqual(["auto"]);
     expect(catalog.pages).toEqual(["Car"]);
     // A page the index had as no meta page, made one since: the guard reads its text
-    const plan = await makePlan(space, await readCatalog(space), renameOperation("auto", "automobile", false), undefined, (text) => (text.includes("meta/library") ? "a meta page" : undefined));
-    expect(plan.changes.map((c) => c.page)).toEqual(["Car"]);
+    const plan = await makePlan(writerOf(space), await readCatalog(space), renameOperation("auto", "automobile", false), undefined, (page) => (page.tagUses().some((use) => use.name === "meta/library") ? "a meta page" : undefined));
+    expect(plan.pages.map((c) => c.page)).toEqual(["Car"]);
     expect(plan.skipped).toEqual([{ page: "Lib", reason: "a meta page" }]);
   });
 });
@@ -170,7 +151,7 @@ describe("the index caught up", () => {
     // An index two reads behind the writes
     s.tagRecords = async () => (++calls < 3 ? [{ name: "old", page: "A", parent: "page" }] : records());
     s.pages.set("A", "#new");
-    await indexCaughtUp(s, [{ page: "A", before: "#old", after: "#new" }]);
+    await indexCaughtUp(s, [{ page: "A", tagChanges: () => ({ gone: ["old"], added: ["new"] }) }]);
     expect(calls).toBe(3);
   });
 });

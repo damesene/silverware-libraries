@@ -13,7 +13,7 @@
 import type { Catalog } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule } from "../core/module.ts";
 import { type PanelOffer, type PanelRow, RENAME_OFFER, type RenameOffer } from "../core/offers.ts";
-import { addPageTags, pageTags, removePageTags } from "../../../shared/pages/tags/edit.ts";
+import { pageTags } from "../../../shared/pages/tags/edit.ts";
 import { hashtagOf, isMetaTag, isWithin } from "../../../shared/pages/tags/names.ts";
 
 /**
@@ -71,7 +71,7 @@ export function panelModule(host: ModuleHost, settings: PanelSettings): TagsModu
     await host.apply({
       label: `Tags of ${page}: ${verb} ${hashtagOf(tag)}`,
       pages: () => [page],
-      edit: (text) => (verb === "add" ? addPageTags(text, [tag], host.newTagsForm) : removePageTags(text, [tag])),
+      change: (p) => (verb === "add" ? p.tags.add(tag) : p.tags.remove(tag, { from: "pageTags" })),
       done: () => `${page}: ${verb === "add" ? "added" : "removed"} ${hashtagOf(tag)}`,
     });
   };

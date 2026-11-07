@@ -1,6 +1,6 @@
 // The frontmatter's tags, read and written in the page's own form, the rest of
 // the frontmatter as written (its comments, its other keys): a key's forms are
-// shared/frontmatter.ts', what is the tags' own here. SilverBullet reads
+// shared/pages/frontmatter.ts', what is the tags' own here. SilverBullet reads
 // `tags` as a list or a string (`a, b`, `a b`, `#a #b`), a leading # dropped
 // (plugs/index/frontmatter.ts). Forms kept: a block list (its indent and
 // items as written), a list in brackets on one line, a string of names; a

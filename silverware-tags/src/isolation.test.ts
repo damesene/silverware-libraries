@@ -1,8 +1,9 @@
 // The parts kept apart, by what they import (a guard against a slip, as the
-// table's isolation test is): the domain imports nothing outside it but the
-// pure parts the plugins share (shared/frontmatter.ts, no UI); the core
+// table's isolation test is): the domain imports nothing outside it; the core
 // and the dialogs no module; the modules nothing of how SilverBullet is
-// reached (the bridge, space/silverbullet.ts); only index.ts makes that Space.
+// reached (the bridge, space/silverbullet.ts); only index.ts makes that Space;
+// no part writes a page's text itself: the page writer (shared/pages/) does,
+// given changes (custom.ts alone hands a user's script the text's edits).
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -26,19 +27,23 @@ function imports(file: string): string[] {
   });
 }
 
-// What the plugins share that is pure (no DOM): the domain may use it
-const PURE_SHARED = /(^|\/)shared\/(frontmatter|filter|compare)\.ts$/;
-
 const of = (folder: string) => files(join(SRC, folder)).map((file) => [relative(SRC, file).replace(/\\/g, "/"), imports(file)] as const);
 
 describe("isolation", () => {
   it("keeps the domain to itself", () => {
-    for (const [file, list] of of("tags")) expect(list.filter((path) => !path.startsWith("tags/") && !PURE_SHARED.test(path)), file).toEqual([]);
+    for (const [file, list] of of("tags")) expect(list.filter((path) => !path.startsWith("tags/")), file).toEqual([]);
   });
   it("keeps the core and the dialogs off the modules and SilverBullet", () => {
     for (const [file, list] of [...of("core"), ...of("ui")]) expect(list.filter((path) => path.startsWith("modules") || path === "bridge.ts" || path === "space/silverbullet.ts"), file).toEqual([]);
   });
   it("keeps the modules off each other and SilverBullet", () => {
     for (const [file, list] of of("modules")) expect(list.filter((path) => path.startsWith("modules/") || path === "bridge.ts" || path.startsWith("space/")), file).toEqual([]);
+  });
+  it("leaves writing a page's text to the page writer", () => {
+    const writing = /\b(renameTags|removeTags|addPageTags|removePageTags|writeTags|writeKey|applyEdits|minimalEdit)\b/;
+    for (const [file] of [...of("core"), ...of("ui"), ...of("modules"), ...of("space"), ...of("tags")]) {
+      const imported = [...readFileSync(join(SRC, file), "utf8").matchAll(/^import\s*(?:type\s*)?\{([^}]*)\}/gm)].map(([, names]) => names!).join(",");
+      expect(writing.test(imported), file).toBe(false);
+    }
   });
 });

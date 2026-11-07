@@ -184,13 +184,15 @@ export function customOperation(definition: OperationDefinition, context: TagsCo
       if (!Array.isArray(pages) || !pages.every((page) => typeof page === "string")) throw new Error(`${name}'s pages did not give a list of page names`);
       return pages;
     },
-    edit: async (text, page) => {
-      try {
-        return editResultOf(await definition.edit(text, page, context), text);
-      } catch (e) {
-        throw new Error(`${name}: ${message(e)}`);
-      }
-    },
+    // A user's script edits the text itself: the one change past the page writer's model
+    change: (p, page) =>
+      p.editText(async (text) => {
+        try {
+          return editResultOf(await definition.edit(text, page, context), text);
+        } catch (e) {
+          throw new Error(`${name}: ${message(e)}`);
+        }
+      }),
     done: (pages, changes) => `${label}: ${counted(changes, "change")} on ${counted(pages, "page")}`,
   };
 }

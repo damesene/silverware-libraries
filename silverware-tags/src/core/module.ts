@@ -6,7 +6,6 @@
 import type { Notifier, Space } from "../space/space.ts";
 import type { Catalog } from "./catalog.ts";
 import type { PanelRow } from "./offers.ts";
-import type { FrontmatterForm } from "../../../shared/pages/tags/frontmatter.ts";
 import type { Operation } from "./operation.ts";
 
 export type Command = {
@@ -116,8 +115,6 @@ export type ModuleHost = {
   readonly notifier: Notifier;
   /** The tags of the space, read anew (SilverBullet's meta pages left out where the setting protects them) */
   catalog(): Promise<Catalog>;
-  /** How a page's tags are written where it has none yet (the setting): what a module adds tags with */
-  readonly newTagsForm: FrontmatterForm;
   /**
    * The window opened (or brought to) a view: "tags" (a tag picked: `state`
    * its name, or `{ tag, focus: "name" }` with its name's field focused) or a

@@ -14,9 +14,8 @@
 import { metaPages } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule, WorkspaceHost } from "../core/module.ts";
 import { counted, type Operation } from "../core/operation.ts";
-import { each } from "../core/plan.ts";
-import { addPageTags, removePageTags, tagUses } from "../../../shared/pages/tags/edit.ts";
-import type { FrontmatterForm } from "../../../shared/pages/tags/frontmatter.ts";
+import { inBatches } from "../../../shared/pages/batch.ts";
+import { tagUses } from "../../../shared/pages/tags/edit.ts";
 import { hashtagOf, isMetaTag } from "../../../shared/pages/tags/names.ts";
 import { isEmptyQuery, pageMatches, parsePageQuery } from "../tags/query.ts";
 import { chipsField, suggestions, tagSearchField } from "../ui/chips.ts";
@@ -40,19 +39,14 @@ type State = {
 
 const listed = (names: readonly string[]) => names.map(hashtagOf).join(" ");
 
-export function pagesOperation(pages: readonly string[], add: readonly string[], remove: readonly string[], form: FrontmatterForm = "flow"): Operation {
+export function pagesOperation(pages: readonly string[], add: readonly string[], remove: readonly string[]): Operation {
   const parts = [...(add.length ? [`add ${listed(add)}`] : []), ...(remove.length ? [`remove ${listed(remove)}`] : [])].join(", ");
   const which = pages.length === 1 ? pages[0]! : counted(pages.length, "page");
   return {
     label: `Tags of ${which}: ${parts}`,
     pages: () => pages,
-    edit: (text) => {
-      const added = addPageTags(text, add, form);
-      if (added.problem) return added;
-      const removed = removePageTags(added.text, remove);
-      if (removed.problem) return removed;
-      return { text: removed.text, changes: added.changes + removed.changes };
-    },
+    // (Added first: a page whose tags cannot be read is left alone whichever is asked)
+    change: (p) => p.tags.add(add).tags.remove(remove, { from: "pageTags" }),
     done: (pages, changes) => `Tags of ${pages === 1 ? which : counted(pages, "page")}: ${parts} (${counted(changes, "change")})`,
   };
 }
@@ -125,7 +119,7 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
       const toAdd = add.values();
       if (!state.checked.length || (!toAdd.length && !state.remove.length)) return;
       keep({ add: toAdd });
-      host.review(pagesOperation(state.checked, toAdd, state.remove, module.newTagsForm));
+      host.review(pagesOperation(state.checked, toAdd, state.remove));
     },
   });
   const right = el(
@@ -153,7 +147,7 @@ function pagesView(module: ModuleHost, host: WorkspaceHost, given: unknown): HTM
     if (!missing.length) return;
     void (async () => {
       // (A few at a time, as a plan reads them)
-      await each(missing, async (page) => {
+      await inBatches(missing, async (page) => {
         try {
           const uses = tagUses(await module.space.read(page));
           const own = [...new Set(uses.filter((use) => use.context === "page").map((use) => use.name))];

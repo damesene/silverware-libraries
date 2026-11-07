@@ -2,15 +2,15 @@
 // parts, operations planned, reviewed there, applied and kept for Undo, its
 // own commands (the window, Undo) and the modules' commands. Knows no module
 // by name.
-import type { Notifier, Space } from "../space/space.ts";
+import type { Notifier, Space, WritingPlatform } from "../space/space.ts";
 import { TAGS_VIEW, Workspace } from "../ui/workspace.ts";
 import type { FrontmatterForm } from "../../../shared/pages/tags/frontmatter.ts";
 import { isMetaTag } from "../../../shared/pages/tags/names.ts";
-import { tagUses } from "../../../shared/pages/tags/edit.ts";
 import { indexCaughtUp, readCatalog } from "./catalog.ts";
-import { History } from "./history.ts";
+import { PageHistory } from "../../../shared/pages/history.ts";
+import { pageWriter, type PageWriter } from "../../../shared/pages/writer.ts";
 import type { Command, ModuleHost, TagsModule } from "./module.ts";
-import { counted } from "./operation.ts";
+import { counted, undoneBy } from "./operation.ts";
 import { type Applied, applyPlan, type Guard, makePlan, type Skipped, undoOperation } from "./plan.ts";
 
 // Pages left alone a notification names (the rest counted)
@@ -38,25 +38,33 @@ export type ControllerOptions = {
 export class Controller {
   // What every module's host has; each module gets its own of it (`hostFor`)
   private readonly host: Omit<ModuleHost, "offer">;
-  private readonly history = new History();
+  private readonly history: PageHistory;
   private modules: readonly TagsModule[] = [];
   private readonly workspace: Workspace;
   // What leaves a meta page alone where they are protected
-  private guard: Guard | undefined;
+  private readonly guard: Guard | undefined;
+  // The page writer every change goes through
+  private readonly writer: PageWriter;
   // What the modules offer each other, by the name of the module offering it (made as they are created)
   private readonly offers = new Map<string, unknown>();
 
   constructor(
     doc: Document,
     space: Space,
+    platform: WritingPlatform,
     private readonly notifier: Notifier,
     private readonly options: ControllerOptions = {},
   ) {
     const catalog = () => readCatalog(space, { hideMeta: this.options.protectMeta });
     // A meta page as read now is never changed (the index may not have caught up with it); its tags as the
     // index has the page's (the catalog hides by them): the frontmatter's, tag lines', a paragraph's hashtags
-    const meta = (text: string) => tagUses(text).some((use) => (use.context === "page" || use.context === "paragraph") && isMetaTag(use.name));
-    const guard: Guard | undefined = (this.guard = this.options.protectMeta ? (text) => (meta(text) ? "a meta page: left alone (Hide and protect meta pages)" : undefined) : undefined);
+    const meta: Guard = (page) => (page.tagUses().some((use) => (use.context === "page" || use.context === "paragraph") && isMetaTag(use.name)) ? "a meta page: left alone (Hide and protect meta pages)" : undefined);
+    this.guard = this.options.protectMeta ? meta : undefined;
+    // The one page writer of Silverware Tags (the setting: how a page's tags are written where it has none yet)
+    this.writer = pageWriter(platform, { newTagsForm: this.options.newTagsForm ?? "flow" });
+    this.history = new PageHistory(this.writer);
+    // Once written, the index waited for (SilverBullet's indexes each page a moment later)
+    const settled = () => space.settled();
     this.workspace = new Workspace(doc, {
       catalog,
       metaApart: !this.options.protectMeta,
@@ -67,9 +75,9 @@ export class Controller {
       tagsActions: () => this.modules.flatMap((module) => module.tagsActions?.() ?? []),
       navigate: (page) => space.navigate(page),
       // An undo not guarded: it puts back text the guard let through, where the page is as written (a change that made a page a meta page is undone too)
-      plan: async (operation, progress) => makePlan(space, await catalog(), operation, progress, operation.undoes ? undefined : guard),
+      plan: async (operation, progress) => makePlan(this.writer, await catalog(), operation, progress, undoneBy(operation) ? undefined : this.guard),
       apply: async (plan, progress, waiting) => {
-        const applied = await applyPlan(space, plan, progress);
+        const applied = await applyPlan(this.writer, plan, progress, settled);
         this.said(applied);
         // The window then reads the tags anew: as the change left them, not as the index had them before it
         waiting?.();
@@ -77,23 +85,22 @@ export class Controller {
         await indexCaughtUp(space, applied.written).catch((e: unknown) => console.error("Silverware Tags: waiting for the index failed", e));
         return applied;
       },
-      undo: () => (this.history.last ? { label: this.history.last.operation.label, run: () => this.undo() } : undefined),
+      undo: () => (this.history.last ? { label: this.history.last.label, run: () => this.undo() } : undefined),
     });
     this.host = {
       doc,
       space,
       notifier,
       catalog,
-      newTagsForm: this.options.newTagsForm ?? "flow",
       open: (view, state) => this.workspace.show(view, state),
       review: (operation, tag) => this.workspace.showReview(operation, tag),
       apply: async (operation) => {
-        const plan = await makePlan(space, await catalog(), operation, undefined, this.guard);
-        if (!plan.changes.length) {
+        const plan = await makePlan(this.writer, await catalog(), operation, undefined, this.guard);
+        if (!plan.pages.length) {
           this.notifier.flash(plan.skipped.length ? `${operation.label}: ${leftAlone(plan.skipped)}` : `${operation.label}: nothing to change`, plan.skipped.length ? "error" : "info");
           return;
         }
-        this.said(await applyPlan(space, plan));
+        this.said(await applyPlan(this.writer, plan, undefined, settled));
       },
       offered: <T>(name: string) => this.offers.get(name) as T | undefined,
       panelActions: () =>
@@ -156,11 +163,9 @@ export class Controller {
 
   /** What was applied said, with Undo, and kept for it; an undo takes the change it undid off instead */
   private said(applied: Applied): void {
-    const undid = applied.operation.undoes;
-    // (An undo that wrote nothing, every page left alone or failing, keeps the change to undo)
-    if (undid) {
-      if (applied.written.length) this.history.remove(undid);
-    } else this.history.push(applied);
+    const undid = undoneBy(applied.operation);
+    // (An undo takes what it undid off the history where it wrote anything; a change that wrote nothing is not kept)
+    this.history.record(applied.report, applied.operation.label);
     const changes = applied.written.reduce((sum, change) => sum + change.changes, 0);
     const skipped = applied.skipped.length ? ` (${leftAlone(applied.skipped)})` : "";
     // Its own Undo: this change, not whichever was applied last when it is clicked
@@ -170,7 +175,7 @@ export class Controller {
 
   /** The last change applied (or `applied`, while it is still to undo), reviewed to be undone in the window (as any change: what goes back, page by page) */
   async undo(applied?: Applied): Promise<void> {
-    const target = applied ? (this.history.has(applied) ? applied : undefined) : this.history.last;
+    const target = applied ? (this.history.has(applied.report) ? { report: applied.report, label: applied.operation.label } : undefined) : this.history.last;
     if (!target) {
       this.notifier.flash(applied ? `Silverware Tags: ${applied.operation.label} is undone already, or no longer kept` : "Silverware Tags: nothing to undo");
       return;

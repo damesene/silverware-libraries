@@ -106,9 +106,11 @@ export function readKey(text: string, frontmatter: Frontmatter, key: string): Ke
     if (items.length === 0) return { entry: { key, from: line.from, to: line.to, kind: "scalar", text: "", value: null, raw: "" } };
     return { entry: { key, from: line.from, to: lines[last]!.to, kind: "list", form: "block", items, indent } };
   }
+  // (A list in brackets left open and a block scalar said as such first, as Silverware Tags has always said them)
+  if (withoutComment.startsWith("[") && !withoutComment.endsWith("]")) return { unreadable: `its frontmatter's ${key} are a list over several lines` };
+  if (/^[&*!|>{]/.test(withoutComment)) return { unreadable: `its frontmatter's ${key} are written as ${withoutComment}` };
   if (goesOn(lines, at)) return { unreadable: `its frontmatter's ${key} are written over several lines` };
   if (withoutComment.startsWith("[")) {
-    if (!withoutComment.endsWith("]")) return { unreadable: `its frontmatter's ${key} are a list over several lines` };
     const inner = withoutComment.slice(1, -1).trim();
     const items: FrontmatterItem[] = [];
     for (const part of inner ? splitFlow(inner) : []) {
@@ -119,7 +121,7 @@ export function readKey(text: string, frontmatter: Frontmatter, key: string): Ke
     }
     return { entry: { key, from: line.from, to: line.to, kind: "list", form: "flow", items, indent: "" } };
   }
-  const read = /^[&*!|>{]/.test(withoutComment) ? undefined : scalarOf(withoutComment);
+  const read = scalarOf(withoutComment);
   if (!read) return { unreadable: `its frontmatter's ${key} are written as ${withoutComment}` };
   return { entry: { key, from: line.from, to: line.to, kind: "scalar", ...read, raw: withoutComment } };
 }

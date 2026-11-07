@@ -271,7 +271,7 @@ export class Workspace {
     }
     // (Gone back, or another review asked for, meanwhile)
     if (this.reviewing !== reviewing) return;
-    const changes = plan.changes.reduce((sum, change) => sum + change.changes, 0);
+    const changes = plan.pages.reduce((sum, change) => sum + change.changes, 0);
     const options = (operation.options ?? []).map((option) => {
       const element =
         "toggled" in option
@@ -285,22 +285,22 @@ export class Workspace {
         "div",
         "swg-review",
         el(doc, "h3", { class: "swg-review-title", text: operation.label }),
-        el(doc, "p", { class: "swg-note", text: plan.changes.length ? `${counted(changes, "tag")} on ${counted(plan.changes.length, "page")} change. Nothing is written until you apply it.` : "Nothing to change." }),
+        el(doc, "p", { class: "swg-note", text: plan.pages.length ? `${counted(changes, "tag")} on ${counted(plan.pages.length, "page")} change. Nothing is written until you apply it.` : "Nothing to change." }),
         options.length ? el(doc, "div", "swg-review-options", ...options.map((o) => o.element)) : null,
         reviewList(doc, plan),
       ),
     );
-    const label = `Apply to ${counted(plan.changes.length, "page")}`;
+    const label = `Apply to ${counted(plan.pages.length, "page")}`;
     const apply = el(doc, "button", {
       class: "swg-button swg-primary swg-apply",
       text: label,
       run: () => void this.apply(plan, reviewing, apply, back),
     });
-    apply.disabled = !plan.changes.length;
+    apply.disabled = !plan.pages.length;
     this.foot.replaceChildren(buttons(doc, back, el(doc, "span", "swg-spacer"), apply));
     // A choice made from the keyboard keeps its place: its control focused again, else Apply (Back where nothing changes)
     const again = options.find((o) => o.label === chose)?.element.querySelector<HTMLElement>("select, input:checked, input");
-    (again ?? (plan.changes.length ? apply : back)).focus({ preventScroll: true });
+    (again ?? (plan.pages.length ? apply : back)).focus({ preventScroll: true });
   }
 
   private async apply(plan: Plan, reviewing: { readonly operation: Operation; applying: boolean }, button: HTMLButtonElement, back: HTMLButtonElement): Promise<void> {

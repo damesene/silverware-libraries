@@ -51,3 +51,14 @@ export function diffLines(before: string, after: string): DiffRun[] {
   flush();
   return runs;
 }
+
+/** The one edit making `before` into `after`: what lies between their common start and end */
+export function minimalEdit(before: string, after: string): { from: number; to: number; insert: string } | undefined {
+  if (before === after) return undefined;
+  let start = 0;
+  const max = Math.min(before.length, after.length);
+  while (start < max && before[start] === after[start]) start++;
+  let end = 0;
+  while (end < max - start && before[before.length - 1 - end] === after[after.length - 1 - end]) end++;
+  return { from: start, to: before.length - end, insert: after.slice(start, after.length - end) };
+}

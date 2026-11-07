@@ -36,7 +36,7 @@ import {
   type Style,
   styleLook,
 } from "../conditions/index.ts";
-import { parseFilter } from "../filter.ts";
+import { parseFilter } from "../../../shared/filter.ts";
 import { formulaField, type FormulaHelpers } from "../formulafield.ts";
 
 /** A column a rule may apply to: its place and its name */

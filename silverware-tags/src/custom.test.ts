@@ -7,7 +7,7 @@ import type { Operation } from "./core/operation.ts";
 import { applyPlan, makePlan } from "./core/plan.ts";
 import { customActions, customOperationsAnew, defineCustomOperations, HELPERS, operationsOf, resetCustomOperations } from "./custom.ts";
 import { defineOperations } from "./index.ts";
-import { memorySpace } from "./space/memory.ts";
+import { memorySpace, writerOf } from "./space/memory.ts";
 
 afterEach(() => resetCustomOperations());
 
@@ -18,8 +18,8 @@ async function runOn(id: string, tag: string, s = space()) {
   const catalog = await readCatalog(s);
   const action = customActions().find((a) => a.id === id)!;
   const operation = (await action.run(tag, { catalog } as unknown as WorkspaceHost)) as Operation;
-  const plan = await makePlan(s, catalog, operation);
-  await applyPlan(s, plan);
+  const plan = await makePlan(writerOf(s), catalog, operation);
+  await applyPlan(writerOf(s), plan);
   return { s, plan, operation, offered: action.when?.(tag, catalog) ?? true };
 }
 
@@ -34,13 +34,13 @@ describe("custom operations", () => {
     defineCustomOperations(operationsOf((helpers: typeof HELPERS) => [{ name: "lower", label: "Lower case", edit: async (text: string, _page: string, context: { tag: string }) => helpers.renameTags(text, (name) => (name === context.tag ? name.toLowerCase() : undefined)) }]).operations);
     const { s, plan, operation } = await runOn("custom.lower", "Todo");
     expect(operation.label).toBe("Lower case #Todo");
-    expect(plan.changes.map((c) => c.page)).toEqual(["A", "B"]);
+    expect(plan.pages.map((c) => c.page)).toEqual(["A", "B"]);
     expect(s.pages.get("A")).toBe("#todo\n\n- [ ] do #todo");
   });
   it("leaves a page its edit fails on, said in the review", async () => {
     defineCustomOperations(operationsOf([{ name: "fails", label: "Fails", edit: (_t: string, page: string) => { if (page === "A") throw new Error("no"); return "changed"; } }]).operations);
     const { plan } = await runOn("custom.fails", "Todo");
-    expect(plan.changes.map((c) => c.page)).toEqual(["B"]);
+    expect(plan.pages.map((c) => c.page)).toEqual(["B"]);
     expect(plan.skipped[0]!.reason).toMatch(/fails: no/);
   });
   it("replaces the definitions of before once Space Lua loads again", () => {
@@ -58,7 +58,7 @@ describe("custom operations", () => {
     expect(lower.offered).toBe(true);
     expect(lower.s.pages.get("B")).toBe("- [ ] task #todo");
     const promoted = await runOn("custom.promote", "Todo");
-    expect(promoted.plan.changes.map((c) => c.page)).toEqual(["B"]);
+    expect(promoted.plan.pages.map((c) => c.page)).toEqual(["B"]);
     expect(promoted.s.pages.get("B")).toBe("---\ntags: [Todo]\n---\n- [ ] task #Todo");
   });
 });

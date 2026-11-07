@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Bridge } from "../bridge.ts";
 import { MODULE_NAMES, missingBridgeFunctions, readSettings } from "../bridge.ts";
-import { silverBulletSpace } from "./silverbullet.ts";
+import { pageChanges } from "../../../shared/pages/changes.ts";
+import { pageWriter } from "../../../shared/pages/writer.ts";
+import { silverBulletPlatform, silverBulletSpace } from "./silverbullet.ts";
 
 function bridge(pages: Record<string, string>, current: string) {
   let editor = pages[current] ?? "";
@@ -33,15 +35,18 @@ describe("SilverBullet's space", () => {
     expect(await space.pageNames()).toEqual(["A", "B"]);
     expect(await space.tagRecords()).toEqual([{ name: "x", page: "A", parent: "task" }]);
   });
-  it("writes the page open through the editor, in one edit, the others as files", async () => {
-    const { b, calls, editor } = bridge({ A: "one #a two", B: "#b" }, "A");
-    const space = silverBulletSpace(b);
-    expect(await space.write("A", "one #c two", "one #a two")).toBe("written");
-    expect(await space.write("B", "#d", "#b")).toBe("written");
+  it("gives the page writer the page open through the editor, written in one edit, the others as files", async () => {
+    const pages = { A: "one #a two", B: "#b" };
+    const { b, calls, editor } = bridge(pages, "A");
+    const writer = pageWriter(silverBulletPlatform(b));
+    const report = await writer.write(pageChanges().page("A", (p) => p.tags.rename("a", "c")).page("B", (p) => p.tags.rename("b", "d")).build());
+    expect(report.written.map((page) => page.page)).toEqual(["A", "B"]);
     expect(calls).toEqual(["replace 5-6 c", "write B"]);
     expect(editor()).toBe("one #c two");
     // Changed since it was read: nothing written
-    expect(await space.write("B", "#e", "#b")).toBe("changed");
+    const plan = await writer.plan(pageChanges().page("B", (p) => p.tags.rename("d", "e")).build());
+    pages.B = "#d changed";
+    expect((await writer.apply(plan)).skipped.map((skip) => skip.reason)).toEqual(["changed since it was read: left alone"]);
   });
   it("needs the functions it works with, reads the modules turned off", async () => {
     expect(missingBridgeFunctions({})).toContain("listPages");

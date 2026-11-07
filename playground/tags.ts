@@ -208,7 +208,7 @@ const store: SettingsStore = {
   confirm: async (question) => confirm(question),
   flash: (message, type) => flash(message, type),
 };
-const controller = await start(space, { flash: (message, type, actions) => flash(message, type, { actions }) }, await readSettings({ getConfig }), store);
+const controller = await start(space, space.platform, { flash: (message, type, actions) => flash(message, type, { actions }) }, await readSettings({ getConfig }), store);
 // The commands as SilverBullet would list them, as buttons (the prefix left out)
 document.getElementById("commands")!.replaceChildren(
   ...controller.commands().map(({ name }) => {

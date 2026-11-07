@@ -2,16 +2,29 @@
 // would have it (a tag once per page and context; a hashtag in a paragraph is
 // the page's; a table row's and a heading's are theirs, as the init page's
 // Lua reads them): the unit tests and the playground work with it.
-import { tagUses } from "../tags/edit.ts";
-import type { TagContext } from "../tags/scan.ts";
-import { breather, type Space, type TagRecord } from "./space.ts";
+import { breather } from "../../../shared/pages/batch.ts";
+import { tagUses } from "../../../shared/pages/tags/edit.ts";
+import type { TagContext } from "../../../shared/pages/tags/scan.ts";
+import { pageWriter, type PageWriter } from "../../../shared/pages/writer.ts";
+import type { Space, TagRecord, WritingPlatform } from "./space.ts";
 
 const PARENT: Readonly<Record<TagContext, string>> = { page: "page", paragraph: "page", item: "item", task: "task", table: "table", heading: "header" };
 
 export type MemorySpace = Space & {
   readonly pages: Map<string, string>;
   current: string | undefined;
+  // Its editor and space for the page writer (handed to the controller apart, as SilverBullet's are)
+  readonly platform: WritingPlatform;
 };
+
+const writers = new WeakMap<MemorySpace, PageWriter>();
+
+/** The one page writer of a space in memory, as a test asks for it (the controller makes its own) */
+export function writerOf(space: MemorySpace): PageWriter {
+  let writer = writers.get(space);
+  if (!writer) writers.set(space, (writer = pageWriter(space.platform)));
+  return writer;
+}
 
 export function memorySpace(pages: Readonly<Record<string, string>>, options: { readonly current?: string; readonly changed?: (page: string, text: string) => void; readonly navigated?: (page: string) => void } = {}): MemorySpace {
   const map = new Map(Object.entries(pages));
@@ -41,11 +54,33 @@ export function memorySpace(pages: Readonly<Record<string, string>>, options: { 
       if (text === undefined) throw new Error(`no page ${page}`);
       return text;
     },
-    write: async (page, text, before) => {
-      if ((map.get(page) ?? "") !== before) return "changed";
-      map.set(page, text);
-      options.changed?.(page, text);
-      return "written";
+    platform: {
+      editor: {
+        documentName: async () => {
+          if (space.current === undefined) throw new Error("no page is open");
+          return space.current;
+        },
+        text: async () => map.get(space.current ?? "") ?? "",
+        replace: async (from, to, insert) => {
+          const page = space.current ?? "";
+          const text = map.get(page) ?? "";
+          const after = text.slice(0, from) + insert + text.slice(to);
+          map.set(page, after);
+          options.changed?.(page, after);
+        },
+      },
+      space: {
+        read: async (page) => {
+          const text = map.get(page);
+          if (text === undefined) throw new Error(`no page ${page}`);
+          return text;
+        },
+        write: async (page, text) => {
+          map.set(page, text);
+          options.changed?.(page, text);
+        },
+        list: async () => [...map.keys()].sort(),
+      },
     },
     currentPage: async () => space.current,
     navigate: async (page) => {

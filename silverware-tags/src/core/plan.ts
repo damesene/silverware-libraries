@@ -1,127 +1,71 @@
-// An operation over its pages: planned (each page read and edited, nothing
-// written: what the preview shows), applied (each page written where it is
-// still as it was read, the others skipped and said), undone (each page
-// written back where it is still as applied). A tag may be on hundreds of
-// pages: they are read and written a few at a time (each a call into
-// SilverBullet), in their order, the progress reported after each.
-import { breather, type Space } from "../space/space.ts";
+// An operation over its pages, through the page writer
+// (shared/pages/writer.ts): planned (each page read and changed in memory,
+// nothing written: what the review shows), applied (each page written where
+// it is still as it was read, the others left and said), undone (each page
+// written back where it is still as applied). What is written and how is the
+// writer's; this is what Silverware Tags keeps around it: its operation, its
+// guard of meta pages, its wait for the index.
+import { pageChanges } from "../../../shared/pages/changes.ts";
+import type { RecordedChange } from "../../../shared/pages/history.ts";
+import type { ApplyReport, PagePlan, PageRead, PageWriter, PlannedPage, Progress, Skipped } from "../../../shared/pages/writer.ts";
 import type { Catalog } from "./catalog.ts";
 import { counted, type Operation } from "./operation.ts";
 
-export type PageChange = { readonly page: string; readonly before: string; readonly after: string; readonly changes: number };
-export type Skipped = { readonly page: string; readonly reason: string };
+export type { PlannedPage, Progress, Skipped } from "../../../shared/pages/writer.ts";
 
 export type Plan = {
   readonly operation: Operation;
-  readonly changes: readonly PageChange[];
+  // The pages it changes (each its preview), as the review lists them
+  readonly pages: readonly PlannedPage[];
   readonly skipped: readonly Skipped[];
+  // The writer's plan, which `applyPlan` hands back to it
+  readonly planned: PagePlan;
 };
 
 export type Applied = {
   readonly operation: Operation;
-  readonly written: readonly PageChange[];
+  readonly written: readonly PlannedPage[];
   readonly skipped: readonly Skipped[];
+  // The writer's report, which the history keeps for Undo
+  readonly report: ApplyReport;
 };
 
-export type Progress = (done: number, of: number) => void;
+/** Why a page is left alone whatever an operation would do (a meta page, protected), as read; none: undefined */
+export type Guard = (page: PageRead) => string | undefined;
 
-// Pages read or written at once
-const AT_ONCE = 6;
 const reasonOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-/** `work` for each item, `AT_ONCE` at a time; the results in the items' order, `progress` after each */
-export async function each<T, R>(items: readonly T[], work: (item: T) => Promise<R>, progress?: Progress): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  let done = 0;
-  const breathe = breather();
-  const worker = async () => {
-    while (next < items.length) {
-      const at = next++;
-      results[at] = await work(items[at]!);
-      progress?.(++done, items.length);
-      await breathe();
+/** An operation planned by the writer (the controller's one): its pages read and changed in memory, nothing written */
+export async function makePlan(writer: PageWriter, catalog: Catalog, operation: Operation, progress?: Progress, guard?: Guard): Promise<Plan> {
+  let planned: PagePlan;
+  if ("undoes" in operation) planned = await writer.planUndo(operation.undoes.report, { progress });
+  else {
+    let pages: readonly string[];
+    try {
+      pages = await operation.pages(catalog);
+    } catch (e) {
+      throw new Error(`${operation.label}: its pages could not be told (${reasonOf(e)})`);
     }
-  };
-  await Promise.all(Array.from({ length: Math.min(AT_ONCE, items.length) }, worker));
-  return results;
-}
-
-type Outcome<T> = { readonly ok: T } | { readonly skipped: Skipped } | undefined;
-
-/** Why a page is left alone whatever an operation would do (a meta page, protected), as read; none: undefined */
-export type Guard = (text: string, page: string) => string | undefined;
-
-export async function makePlan(space: Space, catalog: Catalog, operation: Operation, progress?: Progress, guard?: Guard): Promise<Plan> {
-  let pages: readonly string[];
-  try {
-    pages = await operation.pages(catalog);
-  } catch (e) {
-    throw new Error(`${operation.label}: its pages could not be told (${reasonOf(e)})`);
+    const changes = pageChanges();
+    // (A page listed twice is changed once, as before: a custom operation's list may repeat one)
+    for (const page of new Set(pages)) changes.page(page, (p) => operation.change(p, page));
+    planned = await writer.plan(changes.build(), { progress, leaveAlone: guard });
   }
-  const outcomes = await each(
-    pages,
-    async (page): Promise<Outcome<PageChange>> => {
-      let before: string;
-      try {
-        before = await space.read(page);
-      } catch (e) {
-        return { skipped: { page, reason: `could not be read (${reasonOf(e)})` } };
-      }
-      // (Told by its text as it is now: the index may not have caught up with it)
-      const guarded = guard?.(before, page);
-      if (guarded) return { skipped: { page, reason: guarded } };
-      let result: Awaited<ReturnType<Operation["edit"]>>;
-      try {
-        result = await operation.edit(before, page);
-      } catch (e) {
-        return { skipped: { page, reason: `its edit failed (${reasonOf(e)}): left alone` } };
-      }
-      if (result.problem) return { skipped: { page, reason: result.problem } };
-      return result.changes && result.text !== before ? { ok: { page, before, after: result.text, changes: result.changes } } : undefined;
-    },
-    progress,
-  );
-  return { operation, changes: oks(outcomes), skipped: skips(outcomes) };
+  return { operation, pages: planned.pages, skipped: planned.skipped, planned };
 }
 
-const oks = <T>(outcomes: readonly Outcome<T>[]): T[] => outcomes.flatMap((o) => (o && "ok" in o ? [o.ok] : []));
-const skips = <T>(outcomes: readonly Outcome<T>[]): Skipped[] => outcomes.flatMap((o) => (o && "skipped" in o ? [o.skipped] : []));
-
-/** The plan written, its pages a few at a time */
-export async function applyPlan(space: Space, plan: Plan, progress?: Progress): Promise<Applied> {
-  const outcomes = await each(
-    plan.changes,
-    async (change): Promise<Outcome<PageChange>> => {
-      try {
-        return (await space.write(change.page, change.after, change.before)) === "written" ? { ok: change } : { skipped: { page: change.page, reason: "changed since it was read: left alone" } };
-      } catch (e) {
-        return { skipped: { page: change.page, reason: `could not be written (${reasonOf(e)})` } };
-      }
-    },
-    progress,
-  );
-  await space.settled();
-  return { operation: plan.operation, written: oks(outcomes), skipped: [...plan.skipped, ...skips(outcomes)] };
+/** The plan written by the writer, its pages a few at a time; `settled` waited for after (the space's index) */
+export async function applyPlan(writer: PageWriter, plan: Plan, progress?: Progress, settled?: () => Promise<void>): Promise<Applied> {
+  const report = await writer.apply(plan.planned, { progress });
+  await settled?.();
+  return { operation: plan.operation, written: report.written, skipped: report.skipped, report };
 }
 
-/**
- * What was applied written back, as an operation reviewed as any other: each
- * page as it was before, where it is still as it was written (a page changed
- * since is left as it is, said in the review)
- */
-export function undoOperation(applied: Applied): Operation {
-  const byPage = new Map(applied.written.map((change) => [change.page, change]));
-  const label = `Undo: ${applied.operation.label}`;
+/** What was applied written back, as an operation reviewed as any other (a page changed since is left as it is, said in the review) */
+export function undoOperation(recorded: RecordedChange): Operation {
   return {
-    label,
-    pages: () => applied.written.map((change) => change.page),
-    edit: (text, page) => {
-      const change = byPage.get(page)!;
-      if (text !== change.after) return { text, changes: 0, problem: "changed since it was written: left as it is" };
-      return { text: change.before, changes: change.changes };
-    },
-    done: (pages) => `Undone: ${applied.operation.label} (${counted(pages, "page")})`,
-    undoes: applied,
+    label: `Undo: ${recorded.label}`,
+    done: (pages) => `Undone: ${recorded.label} (${counted(pages, "page")})`,
+    undoes: recorded,
   };
 }

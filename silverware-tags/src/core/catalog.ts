@@ -2,8 +2,7 @@
 // it, by context. Read anew whenever a dialog opens or a change is applied
 // (the index is the space's, it changes without telling).
 import type { Space, TagRecord } from "../space/space.ts";
-import { tagUses } from "../tags/edit.ts";
-import { isMetaTag, matches } from "../tags/names.ts";
+import { isMetaTag, matches } from "../../../shared/pages/tags/names.ts";
 
 export type TagInfo = {
   readonly name: string;
@@ -54,14 +53,10 @@ const INDEX_POLL_MS = 300;
  * (a tag the index reads otherwise than the scanner does would wait for
  * nothing: only the tags the change made a difference to are looked at)
  */
-export async function indexCaughtUp(space: Space, written: readonly { readonly page: string; readonly before: string; readonly after: string }[]): Promise<void> {
-  const names = (text: string) => new Set(tagUses(text).map((use) => use.name));
-  const expected = written.flatMap(({ page, before, after }) => {
-    const was = names(before);
-    const now = names(after);
-    const gone = [...was].filter((name) => !now.has(name));
-    const added = [...now].filter((name) => !was.has(name));
-    return gone.length || added.length ? [{ page, gone, added }] : [];
+export async function indexCaughtUp(space: Space, written: readonly { readonly page: string; readonly renamedTo?: string; tagChanges(): { readonly gone: readonly string[]; readonly added: readonly string[] } }[]): Promise<void> {
+  const expected = written.flatMap((one) => {
+    const { gone, added } = one.tagChanges();
+    return gone.length || added.length ? [{ page: one.renamedTo ?? one.page, gone, added }] : [];
   });
   if (!expected.length) return;
   const until = performance.now() + INDEX_WAIT_MS;

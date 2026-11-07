@@ -1,7 +1,9 @@
 // The parts kept apart, by what they import (a guard against a slip, as the
 // table's isolation test is): the domain imports nothing outside it; the core
 // and the dialogs no module; the modules nothing of how SilverBullet is
-// reached (the bridge, space/silverbullet.ts); only index.ts makes that Space.
+// reached (the bridge, space/silverbullet.ts); only index.ts makes that Space;
+// no part writes a page's text itself: the page writer (shared/pages/) does,
+// given changes (custom.ts alone hands a user's script the text's edits).
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -36,5 +38,12 @@ describe("isolation", () => {
   });
   it("keeps the modules off each other and SilverBullet", () => {
     for (const [file, list] of of("modules")) expect(list.filter((path) => path.startsWith("modules/") || path === "bridge.ts" || path.startsWith("space/")), file).toEqual([]);
+  });
+  it("leaves writing a page's text to the page writer", () => {
+    const writing = /\b(renameTags|removeTags|addPageTags|removePageTags|writeTags|writeKey|applyEdits|minimalEdit)\b/;
+    for (const [file] of [...of("core"), ...of("ui"), ...of("modules"), ...of("space"), ...of("tags")]) {
+      const imported = [...readFileSync(join(SRC, file), "utf8").matchAll(/^import\s*(?:type\s*)?\{([^}]*)\}/gm)].map(([, names]) => names!).join(",");
+      expect(writing.test(imported), file).toBe(false);
+    }
   });
 });

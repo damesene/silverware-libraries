@@ -24,7 +24,7 @@ import { definitionAttributes, groupFormula, KEYS, type Key, looseDefinition, ty
 import { type Fields, fieldsOf } from "../pivot/fields.ts";
 import { pivotOf } from "../pivot/pivot.ts";
 import { freeTableName } from "../namerules.ts";
-import { asNumber } from "../view.ts";
+import { asNumber } from "../../../shared/filter.ts";
 import type { SourcesOffer } from "../sources.ts";
 import { openPivotDialog } from "./pivotdialog.ts";
 

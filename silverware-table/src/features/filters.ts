@@ -32,11 +32,10 @@ import {
   tablePartsOf,
 } from "../core/feature.ts";
 import { el } from "../../../shared/elements.ts";
-import { type FilterOptions, normalizeForFilter, parseFilter } from "../filter.ts";
+import { asNumber, type FilterOptions, normalizeForFilter, parseFilter } from "../../../shared/filter.ts";
 import { ICONS } from "../icons.ts";
 import { parseTable } from "../markdown.ts";
 import type { MenuEntry } from "../menu.ts";
-import { asNumber } from "../view.ts";
 import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget, TableKey } from "../core/feature.ts";
 
 // A column with at most this many different values offers them to tick

@@ -10,7 +10,8 @@ import { type ColumnId, columnIdOf, findColumn } from "./columns.ts";
 import type { Row, Table } from "./markdown.ts";
 import { attributeName, COLUMN_MARK, CORE, type Owner } from "./metanames.ts";
 import { validateTableName } from "./namerules.ts";
-import { NO_PINS, type Pins, type SortDirection } from "./view.ts";
+import type { SortDirection } from "../../shared/compare.ts";
+import { NO_PINS, type Pins } from "./view.ts";
 
 export { attributeName, CORE, type Owner } from "./metanames.ts";
 

@@ -249,6 +249,14 @@ from outside told, `writable` respected. A store that passes it is a store.
 
 Modules get none of them: what they need is a host function in model terms.
 
+**The interfaces are shared with Silverware Database** (decided 2026-11-07,
+docs/silverware-database.md on `feat/database`, *Layers*): the database is
+built before this plan, in its shapes, and puts `DocumentPort`, `SpacePort`,
+`UiPort` and `ConfigPort` into `shared/ports.ts` (interfaces only, bundled into
+each plugin). This plan takes them from there and adds what only the table
+needs (`RenderPort`) in `host/ports.ts`; a change of a shared port is made for
+both plugins.
+
 ### The SilverBullet binding (`host/silverbullet/`)
 
 Everything that is SilverBullet's and not markdown's, in one place:
@@ -274,7 +282,8 @@ Each step is commits that leave `npm run verify` and the UI tests (both
 targets) passing; an old host function stays until no module uses it. Each
 step tightens `isolation.test.ts` so that what it moved cannot come back.
 
-1. **Ports.** `Bridge` split into the ports; `host.notify`, `host.ask`,
+1. **Ports.** `Bridge` split into the ports (those of `shared/ports.ts`, see
+   *Ports*); `host.notify`, `host.ask`,
    `host.navigate` for modules; no module reads `host.bridge` (removed from
    `ModelHost`). Test: no `bridge` in `features/`.
 2. **Tables through the host.** The store interface and the markdown store

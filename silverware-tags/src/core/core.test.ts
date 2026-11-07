@@ -5,7 +5,7 @@ import { renameOperation, validateRename } from "../modules/rename.ts";
 import { memorySpace } from "../space/memory.ts";
 import { minimalEdit } from "../space/space.ts";
 import { indexCaughtUp, metaPages, pagesWith, readCatalog, subtagsOf } from "./catalog.ts";
-import { diffLines } from "./diff.ts";
+import { diffLines } from "../../../shared/pages/diff.ts";
 import { History } from "./history.ts";
 import { type Applied, applyPlan, makePlan, undoOperation } from "./plan.ts";
 

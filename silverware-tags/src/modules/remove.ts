@@ -8,9 +8,9 @@
 import { pagesWith, subtagsOf } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule } from "../core/module.ts";
 import { counted, type Operation, type OperationOption } from "../core/operation.ts";
-import { removeTags, type RemoveHow } from "../tags/edit.ts";
-import type { TagContext } from "../tags/scan.ts";
-import { hashtagOf, matches } from "../tags/names.ts";
+import { removeTags, type RemoveHow } from "../../../shared/pages/tags/edit.ts";
+import type { TagContext } from "../../../shared/pages/tags/scan.ts";
+import { hashtagOf, matches } from "../../../shared/pages/tags/names.ts";
 
 /** Where a tag is taken off: the text and the page's own tags, the text only, the page's own tags only */
 export type RemoveFrom = "all" | "text" | "page";

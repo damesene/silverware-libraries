@@ -6,7 +6,7 @@
 import type { Notifier, Space } from "../space/space.ts";
 import type { Catalog } from "./catalog.ts";
 import type { PanelRow } from "./offers.ts";
-import type { FrontmatterForm } from "../tags/frontmatter.ts";
+import type { FrontmatterForm } from "../../../shared/pages/tags/frontmatter.ts";
 import type { Operation } from "./operation.ts";
 
 export type Command = {

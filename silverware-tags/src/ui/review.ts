@@ -1,7 +1,7 @@
 // A plan as the window's review shows it: each page that changes with its
 // lines before and after (folded under its name, the first few open, the
 // others' lines made as they are opened), the pages left alone and why.
-import { diffLines } from "../core/diff.ts";
+import { diffLines } from "../../../shared/pages/diff.ts";
 import { counted } from "../core/operation.ts";
 import type { Plan } from "../core/plan.ts";
 import { el } from "../../../shared/elements.ts";

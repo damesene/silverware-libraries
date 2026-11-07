@@ -2,8 +2,8 @@
 // it, by context. Read anew whenever a dialog opens or a change is applied
 // (the index is the space's, it changes without telling).
 import type { Space, TagRecord } from "../space/space.ts";
-import { tagUses } from "../tags/edit.ts";
-import { isMetaTag, matches } from "../tags/names.ts";
+import { tagUses } from "../../../shared/pages/tags/edit.ts";
+import { isMetaTag, matches } from "../../../shared/pages/tags/names.ts";
 
 export type TagInfo = {
   readonly name: string;

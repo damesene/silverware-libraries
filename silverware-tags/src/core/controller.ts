@@ -4,9 +4,9 @@
 // by name.
 import type { Notifier, Space } from "../space/space.ts";
 import { TAGS_VIEW, Workspace } from "../ui/workspace.ts";
-import type { FrontmatterForm } from "../tags/frontmatter.ts";
-import { isMetaTag } from "../tags/names.ts";
-import { tagUses } from "../tags/edit.ts";
+import type { FrontmatterForm } from "../../../shared/pages/tags/frontmatter.ts";
+import { isMetaTag } from "../../../shared/pages/tags/names.ts";
+import { tagUses } from "../../../shared/pages/tags/edit.ts";
 import { indexCaughtUp, readCatalog } from "./catalog.ts";
 import { History } from "./history.ts";
 import type { Command, ModuleHost, TagsModule } from "./module.ts";

@@ -1,7 +1,7 @@
 // An operation: what a module wants done to pages, as the core runs it (plan,
 // review, apply, undo; core/plan.ts). The core knows no operation: a module
 // says which pages it may change and how it edits a page's text.
-import type { EditResult } from "../tags/edit.ts";
+import type { EditResult } from "../../../shared/pages/tags/edit.ts";
 import type { Catalog } from "./catalog.ts";
 
 export type Operation = {

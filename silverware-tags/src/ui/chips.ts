@@ -6,7 +6,7 @@
 // the dialog stays).
 import { el } from "../../../shared/elements.ts";
 import { ICONS } from "./icons.ts";
-import { cleanName, hashtagOf, validateName } from "../tags/names.ts";
+import { cleanName, hashtagOf, validateName } from "../../../shared/pages/tags/names.ts";
 import { tagAtCaret } from "../tags/query.ts";
 
 // At most this many offered

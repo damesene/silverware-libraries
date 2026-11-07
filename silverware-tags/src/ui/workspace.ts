@@ -11,7 +11,7 @@ import { type Catalog, pageCounts, pagesWith, subtagsOf, type TagInfo } from "..
 import type { TagAction, TagParts, TagsAction, View, WorkspaceHost } from "../core/module.ts";
 import { counted, type Operation } from "../core/operation.ts";
 import type { Applied, Plan, Progress } from "../core/plan.ts";
-import { hashtagOf, isMetaTag, validateName } from "../tags/names.ts";
+import { hashtagOf, isMetaTag, validateName } from "../../../shared/pages/tags/names.ts";
 import { filterTree, type TagNode, tagTree } from "../tags/tree.ts";
 import { buttons, openDialog } from "./dialog.ts";
 import { el } from "../../../shared/elements.ts";

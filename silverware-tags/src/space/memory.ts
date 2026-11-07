@@ -2,8 +2,8 @@
 // would have it (a tag once per page and context; a hashtag in a paragraph is
 // the page's; a table row's and a heading's are theirs, as the init page's
 // Lua reads them): the unit tests and the playground work with it.
-import { tagUses } from "../tags/edit.ts";
-import type { TagContext } from "../tags/scan.ts";
+import { tagUses } from "../../../shared/pages/tags/edit.ts";
+import type { TagContext } from "../../../shared/pages/tags/scan.ts";
 import { breather, type Space, type TagRecord } from "./space.ts";
 
 const PARENT: Readonly<Record<TagContext, string>> = { page: "page", paragraph: "page", item: "item", task: "task", table: "table", heading: "header" };

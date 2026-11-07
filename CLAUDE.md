@@ -16,7 +16,7 @@ npm run test:ui      # Playwright: interactions in its Chromium against the play
 npm run test:ui:open # the same in Playwright's window: tests picked and run one by one, each step's page to look at
 npm run test:ui:sb   # the same tests against a real SilverBullet (Docker, the version scripts/silverbullet/Dockerfile names; SB_IMAGE another), the committed .js deployed; options after -- (--ui, -g)
 npm run check        # tsc
-npm run playground   # http://localhost:8000/: Silverware Table without SilverBullet, on mock data; /toolbar.html: Silverware Toolbar on a CodeMirror editor
+npm run playground   # http://localhost:8000/: Silverware Table without SilverBullet, on mock data; /toolbar.html: Silverware Toolbar on a CodeMirror editor; /database.html: Silverware Database's core over the memory store, with debug views (playground/database-views.ts, written against the view API as a user's view is)
 npm run deploy -- <space folder>   # copy the library into a local space
 ```
 

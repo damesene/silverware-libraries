@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Silverware Database playground</title>
+    <link rel="stylesheet" href="common.css" />
+    <link rel="stylesheet" href="database-playground.css" />
+  </head>
+  <body>
+    <header>
+      <strong>Silverware Database<span class="long"> playground</span></strong>
+      <nav class="playgrounds" aria-label="Playgrounds">
+        <a href="./">Table</a>
+        <a href="toolbar.html">Toolbar</a>
+        <a href="tags.html">Tags</a>
+        <a href="database.html" aria-current="page">Database</a>
+      </nav>
+      <span class="hint">The core over a store in memory, its views the playground's own until the built-in ones come</span>
+      <span class="spacer"></span>
+      <button id="outside" type="button" title="Change a task's estimate outside the core, as a page edited by hand"><span class="icon">✎</span><span class="label">Edit outside</span></button>
+      <button id="reset" type="button" title="Reset sample"><span class="icon">↺</span><span class="label">Reset sample</span></button>
+      <button id="theme" type="button" title="Dark / light"><span class="icon">◐</span><span class="label">Dark / light</span></button>
+    </header>
+    <main id="places"></main>
+    <div id="flash" aria-live="polite"></div>
+    <script type="module" src="database.js"></script>
+  </body>
+</html>

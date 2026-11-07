@@ -1,0 +1,99 @@
+/* The database playground (common.css: what every playground shares). The
+   place's switcher and notes are styled here until the library's style page
+   comes with the binding (step 4); the debug views' look is the playground's. */
+#places {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 8px 16px 48px;
+}
+#places h2 {
+  margin: 24px 0 8px;
+  font-size: 1.1rem;
+}
+.swd-place-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.swd-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--button-border-color);
+  border-radius: 6px;
+  color: inherit;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.swd-switch[aria-pressed="true"] {
+  border-color: var(--ui-accent-color);
+  color: var(--ui-accent-color);
+}
+.swd-place-body {
+  overflow-x: auto;
+}
+.swd-place-body[inert] {
+  opacity: 0.6;
+}
+.swd-place-note {
+  color: var(--danger-color);
+}
+.dbg-table {
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.dbg-table th,
+.dbg-table td {
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+.dbg-table thead tr:first-child th {
+  background: var(--editor-table-head-background-color);
+  cursor: pointer;
+}
+.dbg-table input {
+  width: 9rem;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+}
+.dbg-filters input {
+  font-weight: normal;
+}
+.dbg-table input:invalid,
+.dbg-table input.dbg-invalid {
+  outline: 1px solid var(--danger-color);
+  color: var(--danger-color);
+}
+.dbg-actions {
+  width: 1px;
+}
+.dbg-actions button {
+  padding: 0 4px;
+  border: 0;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+}
+.dbg-actions button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.dbg-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dbg-raw {
+  max-height: 400px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+}

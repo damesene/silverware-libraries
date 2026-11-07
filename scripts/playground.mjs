@@ -12,7 +12,7 @@ const port = Number(process.env.PORT ?? 8000);
 const host = process.env.HOST ?? "127.0.0.1";
 
 const ctx = await esbuild.context({
-  entryPoints: ["playground/playground.ts", "playground/toolbar.ts", "playground/tags.ts"],
+  entryPoints: ["playground/playground.ts", "playground/toolbar.ts", "playground/tags.ts", "playground/database.ts"],
   outdir: "playground",
   bundle: true,
   format: "esm",

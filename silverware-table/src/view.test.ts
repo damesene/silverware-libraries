@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareValues, cycleSort, DEFAULT_VIEW, remapColumns, visibleRows } from "./view.ts";
+import { cycleSort, DEFAULT_VIEW, remapColumns, visibleRows } from "./view.ts";
 
 const values = [
   ["Banana", "10"],
@@ -25,12 +25,6 @@ describe("sorting", () => {
 
   it("sorts numbers numerically", () => {
     expect(visibleRows(values, cycleSort(DEFAULT_VIEW, 1))).toEqual([1, 0, 2, 3]);
-    expect(compareValues("-2,5", "1")).toBeLessThan(0);
-    expect(compareValues("1 000", "999")).toBeGreaterThan(0);
-    expect(compareValues("15 %", "9 %")).toBeGreaterThan(0);
-    expect(compareValues("105 €", "12,99 €")).toBeGreaterThan(0);
-    expect(compareValues("$5", "$40")).toBeLessThan(0);
-    expect(compareValues("3 kg", "20kg")).toBeLessThan(0);
   });
 
   it("keeps the source order without sorting", () => {

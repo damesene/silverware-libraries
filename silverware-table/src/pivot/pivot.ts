@@ -9,7 +9,7 @@ import type { Calculated, CalculatedColumn } from "../calculated/index.ts";
 import { columnKey, columnName } from "../columns.ts";
 import { type Calculation, isErrorText, rowValues, type Scalar, scalarText, tableValue } from "../formulas/index.ts";
 import type { Table } from "../markdown.ts";
-import { compareValues } from "../view.ts";
+import { compareValues } from "../../../shared/compare.ts";
 import { groupFormula, type PivotDefinition, valueParts } from "./definition.ts";
 
 const TOTAL = "Total";

@@ -1,8 +1,6 @@
 // View state of a table: sorting changes what is shown, never the markdown
 // (filters are the filters module's: features/filters.ts).
-import { asNumber } from "../../shared/filter.ts";
-
-export type SortDirection = "asc" | "desc";
+import { compareForSort, type SortDirection } from "../../shared/compare.ts";
 
 // Pinned rows and columns are moved to the edges of the table in the markdown
 // and kept there: the first `top` and last `bottom` body rows, the first `left`
@@ -68,15 +66,6 @@ export function remapColumns(
   return view.sort && column !== undefined ? { ...result, sort: { column, direction: view.sort.direction } } : result;
 }
 
-const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
-
-export function compareValues(a: string, b: string): number {
-  const na = asNumber(a);
-  const nb = asNumber(b);
-  if (na !== undefined && nb !== undefined) return na - nb;
-  return collator.compare(a.trim(), b.trim());
-}
-
 /**
  * The body rows to show between the pinned ones, in display order, as indexes
  * into `values` (one array of cell texts per body row, values[0] being row 1),
@@ -97,13 +86,5 @@ export function visibleRows(
     .filter((i) => i >= top && i < values.length - bottom && !hidden.has(i));
   const sort = view.sort;
   if (!sort) return indexes;
-  const sign = sort.direction === "asc" ? 1 : -1;
-  return indexes.sort((a, b) => {
-    const va = sortKey(a, sort.column);
-    const vb = sortKey(b, sort.column);
-    const ea = va.trim() === "";
-    const eb = vb.trim() === "";
-    if (ea !== eb) return ea ? 1 : -1;
-    return sign * compareValues(va, vb) || a - b;
-  });
+  return indexes.sort((a, b) => compareForSort(sortKey(a, sort.column), sortKey(b, sort.column), sort.direction) || a - b);
 }

@@ -22,7 +22,7 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const isThenable = (v: unknown): v is PromiseLike<unknown> => isObject(v) && typeof v.then === "function";
 
 /** Why an entry is none a menu can show; undefined: it is one (the builder's are) */
-function entryProblem(entry: unknown): string | undefined {
+function validateEntry(entry: unknown): string | undefined {
   if (!isObject(entry) || typeof entry.kind !== "string" || !KINDS.has(entry.kind)) return "an entry is none (made with the menu's item, submenu, segmented, actions or separator)";
   if (entry.kind === "item" && (typeof entry.label !== "string" || typeof entry.run !== "function")) return "an item has no label or no run";
   if ((entry.kind === "segmented" || entry.kind === "actions" || entry.kind === "tiles") && !Array.isArray(entry.options)) return `a ${entry.kind} row has no options`;
@@ -30,7 +30,7 @@ function entryProblem(entry: unknown): string | undefined {
 }
 
 /** Why what a lineMenu gave is no list of groups of entries; undefined: it is one */
-function groupsProblem(groups: unknown): string | undefined {
+function validateGroups(groups: unknown): string | undefined {
   if (!Array.isArray(groups)) return "its lineMenu gave no list (of the menu's slot groups: menu.slot.view([…]), menu.slot.custom({…}, […]))";
   for (const group of groups) {
     if (!isObject(group) || !Array.isArray(group.entries)) return "a group is none (made with menu.slot)";
@@ -41,7 +41,7 @@ function groupsProblem(groups: unknown): string | undefined {
       if (priority !== undefined && !(typeof priority === "number" && Number.isFinite(priority))) return `a custom section's priority is no number: ${String(priority)}`;
     } else if (typeof group.slot !== "string" || !SLOTS.has(group.slot)) return `a group's slot is no slot: ${String(group.slot)}`;
     for (const entry of group.entries) {
-      const problem = entryProblem(entry);
+      const problem = validateEntry(entry);
       if (problem) return problem;
     }
   }
@@ -81,7 +81,7 @@ export class CustomMenus implements Feature {
               this.failed(definition, message(e), true);
               return [];
             }
-            const problem = Array.isArray(made) ? made.map(entryProblem).find((p) => p) : "a submenu gave no list of entries";
+            const problem = Array.isArray(made) ? made.map(validateEntry).find((p) => p) : "a submenu gave no list of entries";
             if (problem) {
               this.failed(definition, problem, true);
               return [];
@@ -101,7 +101,7 @@ export class CustomMenus implements Feature {
         this.failed(definition, "its lineMenu gave a promise: it runs as the menu opens, which does not wait (async is for an entry's run)");
         return [];
       }
-      const problem = groupsProblem(groups);
+      const problem = validateGroups(groups);
       if (problem) {
         this.failed(definition, problem);
         return [];

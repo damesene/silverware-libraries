@@ -6,7 +6,7 @@
 // the dialog stays).
 import { el } from "../../../shared/elements.ts";
 import { ICONS } from "./icons.ts";
-import { cleanName, hashtagOf, nameProblem } from "../tags/names.ts";
+import { cleanName, hashtagOf, validateName } from "../tags/names.ts";
 import { tagAtCaret } from "../tags/query.ts";
 
 // At most this many offered
@@ -159,9 +159,9 @@ export function chipsField(doc: Document, options: { readonly values?: readonly 
   const add = (typed: string): boolean => {
     const name = cleanName(typed);
     if (!name) return true;
-    if (nameProblem(name)) {
+    if (validateName(name)) {
       input.setAttribute("aria-invalid", "true");
-      input.title = nameProblem(name)!;
+      input.title = validateName(name)!;
       return false;
     }
     input.removeAttribute("aria-invalid");

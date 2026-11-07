@@ -6,7 +6,7 @@
 // row), `sort` the rows' order, `totals` the totals shown. Pure: the module
 // reads and writes the attributes, this reads and writes their values.
 import { type Token, tokenize } from "../formulas/index.ts";
-import { tableNameProblem } from "../namerules.ts";
+import { validateTableName } from "../namerules.ts";
 
 // The totals shown: the Total row and (a cross table's) the Total column, the row alone, the column alone, none.
 // The row and the column by what they are, not as Excel's "grand totals for rows", which is the Total column
@@ -77,7 +77,7 @@ export function readDefinition(attribute: (key: Key) => string | undefined): Piv
   if (!source) return undefined;
   const ref = sourceRef(source);
   if (!ref.name || ref.page === "") return { problem: "its source names no table (pivot.source: orders, [[Page]]orders on another page, or @tasks of the space)" };
-  if (ref.space && tableNameProblem(ref.name)) return { problem: `@${ref.name} is no source's name (letters, digits and _, as a table's)` };
+  if (ref.space && validateTableName(ref.name)) return { problem: `@${ref.name} is no source's name (letters, digits and _, as a table's)` };
   const values = splitList(attribute("values") ?? "");
   const rows = splitList(attribute("rows") ?? "");
   if (!values.length) return { problem: "it says no values (pivot.values: SUM([revenue]))" };

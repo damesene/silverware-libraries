@@ -167,7 +167,7 @@ export class ColumnTypes implements Feature {
   private formulaList(table: Table, formula: string): ListRead {
     const formulas = this.host.offered<FormulasOffer>("formulas");
     if (!formulas) return { problem: "is calculated by the formulas module, which is off" };
-    const problem = formulas.problem(formula);
+    const problem = formulas.validate(formula);
     if (problem) return { problem: `does not read: ${problem}` };
     const result = formulas.list(table, formula);
     if (result === undefined) {

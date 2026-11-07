@@ -19,7 +19,7 @@ import type { CellLook, CellRef, Feature, HeaderLook, NamingTarget, ModelHost, T
 import { functionNamed } from "../formulas/index.ts";
 import { findTables, locateBySource, parseTable, type Table } from "../markdown.ts";
 import type { MenuNaming } from "../menu.ts";
-import { nameProblem, sameTableName, tableNameProblem } from "../namerules.ts";
+import { validateName, sameTableName, validateTableName } from "../namerules.ts";
 
 /** Names, as a sentence lists them: "pear, fig and 3 more" */
 function listed(names: readonly string[]): string {
@@ -183,7 +183,7 @@ export class Names implements Feature {
     // Against the name as stored, so an empty answer also clears a name that is not valid
     if (name === (this.host.writtenTableName(shown)?.trim() ?? "")) return this.unchanged();
     const info = this.host.tableFor(shownInfo.key) ?? shownInfo;
-    const problem = name === "" ? undefined : tableNameProblem(name);
+    const problem = name === "" ? undefined : validateTableName(name);
     if (problem) return problem;
     if (name !== "") {
       const text = await this.host.bridge.getText();
@@ -206,7 +206,7 @@ export class Names implements Feature {
     const table = parseTable(shownInfo.source);
     const current = this.host.rowName(table, row) ?? "";
     if (name === current) return this.unchanged();
-    let problem = name === "" ? undefined : nameProblem(name, "row");
+    let problem = name === "" ? undefined : validateName(name, "row");
     // The name is the table's: no other row of it may have it
     const other = name ? this.host.rowNames(table).find((named) => named.name.toLowerCase() === name.toLowerCase())?.row : undefined;
     if (!problem && other !== undefined && other !== row) problem = `another row of this table is named ${name}`;
@@ -227,7 +227,7 @@ export class Names implements Feature {
     const table = this.host.tableOf(shownInfo);
     const current = this.host.cellName(table, row, column) ?? "";
     if (name === current) return this.unchanged();
-    let problem = name === "" ? undefined : nameProblem(name, "cell");
+    let problem = name === "" ? undefined : validateName(name, "cell");
     if (!problem && name && functionNamed(name.toUpperCase())) problem = `${name} is a function's name`;
     if (!problem && name) {
       const taken = this.host.cellNames(table).some((named) => named.name.toLowerCase() === name.toLowerCase() && !(named.row === row && named.column === column));
@@ -246,7 +246,7 @@ export class Names implements Feature {
     const headers = table.rows[0]?.cells ?? [];
     const current = this.host.columnName(table, column) ?? "";
     if (name === current) return this.unchanged();
-    const problem = name === "" ? undefined : nameProblem(name, "column");
+    const problem = name === "" ? undefined : validateName(name, "column");
     // Another column already answers to it: [name] would be ambiguous
     const taken =
       name !== "" &&

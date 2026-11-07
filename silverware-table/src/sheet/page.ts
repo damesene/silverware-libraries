@@ -56,7 +56,7 @@ export function sameSheet(a: string, b: string): boolean {
 }
 
 /** Why a text cannot be a sheet's name; undefined when it can */
-export function sheetNameProblem(name: string): string | undefined {
+export function validateSheetName(name: string): string | undefined {
   if (name.trim() === "") return "a sheet needs a name";
   if (name.length > 60) return "a sheet's name is at most 60 characters";
   return undefined;

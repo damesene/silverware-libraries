@@ -36,10 +36,10 @@ import { columnLetters, isFormulaInput } from "../../../formulas/index.ts";
 import { ICONS } from "../../../icons.ts";
 import { escapeCell, findTables, parseTable, type Table, type TableRange } from "../../../markdown.ts";
 import { sameTableName } from "../../../namerules.ts";
-import { AT_KEY, formatAt, freeName, freeSheetName, SHEET_KEY, WIDTH_PREFIX, sameSheet, type SheetCell, canPlace, sheetDataTable, sheetNameProblem, sheetOfTable, sheetsOf, sheetTables, sheetWidths } from "../../../sheet/page.ts";
+import { AT_KEY, formatAt, freeName, freeSheetName, SHEET_KEY, WIDTH_PREFIX, sameSheet, type SheetCell, canPlace, sheetDataTable, validateSheetName, sheetOfTable, sheetsOf, sheetTables, sheetWidths } from "../../../sheet/page.ts";
 import { nameEmptyHeaders } from "../../../ops.ts";
 import { parseClipboardCells } from "../../../paste.ts";
-import { placeProblem, roomFor } from "../../../sheet/layout.ts";
+import { validatePlace, roomFor } from "../../../sheet/layout.ts";
 import { watchPress } from "../../press.ts";
 import { growTo } from "../../structure.ts";
 import { type MenuEntry, namingThatCloses } from "../../../menu.ts";
@@ -587,7 +587,7 @@ export class Sheet implements AdapterFeature {
     const board = this.board;
     const name = typed.trim();
     if (!board || name === sheet) return undefined;
-    const problem = sheetNameProblem(name);
+    const problem = validateSheetName(name);
     if (problem) return problem;
     const text = await this.host.bridge.getText();
     const shown = !!board.sheet && sameSheet(board.sheet, sheet);
@@ -964,7 +964,7 @@ export class Sheet implements AdapterFeature {
       movable: !!board.sheet,
       origin: mine.at,
       cellAt: (point) => this.cellNear(point.x, point.y),
-      placeProblem: (at) => this.placeProblemOf(info.key, at),
+      validatePlace: (at) => this.validatePlaceFor(info.key, at),
       previewPlace: (at) => this.previewPlace(info.key, at),
       moveTo: (at) => this.moveTable(info.key, at),
       // (Once the board follows the page: a table deleted is still on it until then)
@@ -980,7 +980,7 @@ export class Sheet implements AdapterFeature {
   // ---- moving a table ----------------------------------------------------------------------
 
   /** Why a table of the board cannot lie with its top left at `at` (sheet/layout.ts) */
-  private placeProblemOf(key: TableKey, at: SheetCell): string | undefined {
+  private validatePlaceFor(key: TableKey, at: SheetCell): string | undefined {
     const board = this.board;
     const placed = board?.tables.get(key);
     if (!board || !placed) return undefined;
@@ -992,7 +992,7 @@ export class Sheet implements AdapterFeature {
       const name = this.host.tableName(model);
       return { id: p.range.from, at: p.at, rows: model.rows.length, columns: model.align.length, ...(name ? { name } : {}) };
     });
-    const problem = placeProblem(laidOut, placed.range.from, at);
+    const problem = validatePlace(laidOut, placed.range.from, at);
     return problem && `${problem} is there`;
   }
 
@@ -1004,7 +1004,7 @@ export class Sheet implements AdapterFeature {
       return;
     }
     const model = parseTable(placed.range.text);
-    this.outline(at, model.rows.length, model.align.length, this.placeProblemOf(key, at));
+    this.outline(at, model.rows.length, model.align.length, this.validatePlaceFor(key, at));
   }
 
   /** The outline of `rows` and `columns` from `at` (its address by it, marked where it cannot go: `problem`) */
@@ -1037,7 +1037,7 @@ export class Sheet implements AdapterFeature {
     const info = this.infoOfKey(key);
     if (!placed || !info) return "failed";
     if (placed.at.row === at.row && placed.at.column === at.column) return "unchanged";
-    const problem = this.placeProblemOf(key, at);
+    const problem = this.validatePlaceFor(key, at);
     if (problem) {
       void this.host.bridge.flash(`Silverware Table: the table cannot go to ${formatAt(at)}: ${problem}`, "info");
       return "failed";
@@ -1101,7 +1101,7 @@ export class Sheet implements AdapterFeature {
     if (!open) return;
     const previous = open.element;
     const entries = this.addable().map((table): MenuEntry => {
-      const problem = this.addProblem(table, at);
+      const problem = this.validateAdd(table, at);
       return {
         kind: "item",
         label: table.label,
@@ -1185,7 +1185,7 @@ export class Sheet implements AdapterFeature {
   }
 
   /** What a table put at `at` would cover (a table of the sheet's), or nothing */
-  private addProblem(table: { rows: number; columns: number }, at: SheetCell): string | undefined {
+  private validateAdd(table: { rows: number; columns: number }, at: SheetCell): string | undefined {
     const board = this.board;
     if (!board) return undefined;
     const laidOut = [...board.tables.values()].map((p) => {
@@ -1193,7 +1193,7 @@ export class Sheet implements AdapterFeature {
       const name = this.host.tableName(model);
       return { id: p.range.from, at: p.at, rows: model.rows.length, columns: model.align.length, ...(name ? { name } : {}) };
     });
-    return placeProblem([...laidOut, { id: -1, at, rows: table.rows, columns: table.columns }], -1, at);
+    return validatePlace([...laidOut, { id: -1, at, rows: table.rows, columns: table.columns }], -1, at);
   }
 
   /**
@@ -1211,7 +1211,7 @@ export class Sheet implements AdapterFeature {
     const range = ranges[keys.indexOf(key)];
     if (!range) return;
     const model = parseTable(range.text);
-    const problem = this.addProblem({ rows: model.rows.length, columns: model.align.length }, at);
+    const problem = this.validateAdd({ rows: model.rows.length, columns: model.align.length }, at);
     if (problem) {
       void this.host.bridge.flash(`Silverware Table: the table cannot go to ${formatAt(at)}: it would cover ${problem}`, "info");
       return;

@@ -74,7 +74,7 @@ export type AddressFrame = {
   /** The frame's cell at a point of the window (the grid past the tables too), the point kept on the grid (left of it: its first column; above it: its first row) */
   cellAt(point: { readonly x: number; readonly y: number }): CellRef | undefined;
   /** Why the table cannot lie with its header's first cell at `at` (another table there); undefined: it can */
-  placeProblem(at: CellRef): string | undefined;
+  validatePlace(at: CellRef): string | undefined;
   /** The table shown where it would lie with its header's first cell at `at` (an outline with its address, marked where it cannot go); undefined: not */
   previewPlace(at: CellRef | undefined): void;
   /** The table put with its header's first cell at `at`, in one edit; where it cannot go, nothing written and said why */

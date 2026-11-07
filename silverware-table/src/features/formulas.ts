@@ -293,7 +293,7 @@ export class Formulas implements Feature {
           ? formulaChoices(formula, caret, caret, this.namesOf(table, text), this.nameOf(table), columnChoicesOf(table.rows[0]?.cells ?? []), true)
           : formulaChoices(formula, caret, caret, [...pageNameChoices(this.cells, this.named(pageTablesOf(text))), ...this.sourceNames()], undefined, [], true),
       help: (formula, caret) => functionHelp(formula, caret),
-      problem: (formula) => {
+      validate: (formula) => {
         const tree = parseFormula(withEquals(formula).formula.trim());
         return tree instanceof FormulaError ? tree.detail : undefined;
       },
@@ -398,7 +398,7 @@ export class Formulas implements Feature {
         const { formula, shift } = withEquals(text);
         return functionHelp(formula, caret + shift) ?? outside;
       },
-      problem: (text) => (text.trim() ? offer.problem(withEquals(text).formula.trim()) : undefined),
+      validate: (text) => (text.trim() ? offer.validate(withEquals(text).formula.trim()) : undefined),
     };
   }
 

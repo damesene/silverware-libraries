@@ -13,7 +13,7 @@ const KEYS: ReadonlySet<string> = new Set([...FLAGS, ...COLORS, "bar", "icon"]);
 const UNSAFE_RE = /[;{}<>]/;
 
 /** Why a value is no color; undefined: it is one */
-export function colorProblem(value: unknown): string | undefined {
+export function validateColor(value: unknown): string | undefined {
   const one = (v: unknown) => (typeof v !== "string" || v.trim() === "" ? "is no color text" : UNSAFE_RE.test(v) ? `"${v}" is no color` : undefined);
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
     const { light, dark } = value as Record<string, unknown>;
@@ -34,14 +34,14 @@ export function checkStyle(value: unknown): Style | string {
   for (const flag of FLAGS) if (style[flag] !== undefined && typeof style[flag] !== "boolean") return `a style's ${flag} is true or false`;
   for (const key of COLORS) {
     if (style[key] === undefined) continue;
-    const problem = colorProblem(style[key]);
+    const problem = validateColor(style[key]);
     if (problem) return `a style's ${key} ${problem}`;
   }
   if (style.icon !== undefined && (typeof style.icon !== "string" || [...style.icon].length > 4)) return "a style's icon is a short text (at most 4 characters)";
   if (style.bar !== undefined) {
     const bar = style.bar as Record<string, unknown> | null;
     if (typeof bar !== "object" || bar === null || typeof bar.share !== "number" || !Number.isFinite(bar.share)) return "a style's bar is { share, color } with share from 0 to 1";
-    if (bar.color !== undefined && colorProblem(bar.color)) return `a style's bar color ${colorProblem(bar.color)}`;
+    if (bar.color !== undefined && validateColor(bar.color)) return `a style's bar color ${validateColor(bar.color)}`;
   }
   return style as Style;
 }

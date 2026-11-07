@@ -16,7 +16,7 @@ export type FormulaHelpers = {
   // The function the caret is in: its syntax, the argument at the caret
   readonly help: (formula: string, caret: number) => { readonly syntax: string; readonly description: string; readonly argument?: { readonly from: number; readonly to: number } } | undefined;
   // Why it does not read; undefined: it does
-  readonly problem: (formula: string) => string | undefined;
+  readonly validate: (formula: string) => string | undefined;
 };
 
 /** Where the field is and what it says while empty */
@@ -109,7 +109,7 @@ export function formulaField(doc: Document, helpers: FormulaHelpers, value: stri
     active = 0;
     showList();
     showHelp();
-    problem.textContent = input.value.trim() === "" ? "" : (helpers.problem(input.value) ?? "");
+    problem.textContent = input.value.trim() === "" ? "" : (helpers.validate(input.value) ?? "");
     if (typing) changed(input.value);
   };
   input.addEventListener("input", () => update(true));
@@ -141,7 +141,7 @@ export function formulaField(doc: Document, helpers: FormulaHelpers, value: stri
     ev.stopPropagation();
   });
   list.hidden = true;
-  problem.textContent = value.trim() === "" ? "" : (helpers.problem(value) ?? "");
+  problem.textContent = value.trim() === "" ? "" : (helpers.validate(value) ?? "");
   // The help from the start, as for the caret at the formula's end: a press into the field changes it, not the dialog's height from nothing
   showHelp(value.length);
   // The list under the field itself, not under the help after it

@@ -10,7 +10,7 @@ import type { ModuleHost, TagsModule, WorkspaceHost } from "../core/module.ts";
 import type { RenameOffer } from "../core/offers.ts";
 import { counted, type Operation } from "../core/operation.ts";
 import { renameTags } from "../tags/edit.ts";
-import { cleanName, hashtagOf, isWithin, nameProblem, renamedTag } from "../tags/names.ts";
+import { cleanName, hashtagOf, isWithin, validateName, renamedTag } from "../tags/names.ts";
 import { suggestions, tagField } from "../ui/chips.ts";
 import { el } from "../../../shared/elements.ts";
 import { note } from "../ui/form.ts";
@@ -58,15 +58,15 @@ export function mergeOperation(tags: readonly string[], into: string, children: 
 }
 
 /** What is wrong with merging `tags` into `into` (nothing: undefined) */
-export function mergeProblem(into: string, tags: readonly string[]): string | undefined {
+export function validateMerge(into: string, tags: readonly string[]): string | undefined {
   if (tags.some((tag) => tag !== into && isWithin(into, tag))) return "the tag they become cannot be under one of them";
   return undefined;
 }
 
 /** What is wrong with renaming `from` to `to` (nothing: undefined) */
-export function renameProblem(from: string, to: string): string | undefined {
+export function validateRename(from: string, to: string): string | undefined {
   if (!from) return "Which tag?";
-  const problem = nameProblem(to);
+  const problem = validateName(to);
   if (problem) return `The new name: ${problem}`;
   if (from === to) return "That is its name already";
   return undefined;
@@ -87,14 +87,14 @@ function nameField(tag: string, host: WorkspaceHost): HTMLElement {
     const changed = name !== tag;
     actions.hidden = !changed;
     if (!changed) return;
-    const problem = renameProblem(tag, name);
+    const problem = validateRename(tag, name);
     rename.disabled = !!problem;
     if (problem) said.say(problem, true);
     else said.say(catalog.tags.has(name) ? `${hashtagOf(name)} exists: the two become one.` : `Renames it on ${counted(catalog.tags.get(tag)?.pages.size ?? 0, "page")}; you see every change first.`);
   };
   const submit = () => {
     const name = field.value();
-    if (renameProblem(tag, name)) return;
+    if (validateRename(tag, name)) return;
     const subtags = subtagsOf(catalog, tag).length;
     host.review(renameOperation(tag, name, subtags > 0, subtags));
   };
@@ -120,7 +120,7 @@ export function renameModule(host: ModuleHost): TagsModule {
       const subtags = subtagsOf(await host.catalog(), from).length;
       await host.review(renameOperation(from, to, subtags > 0, subtags), from);
     },
-    problem: renameProblem,
+    validate: validateRename,
     merge: (tags, into, catalog) => {
       const subtags = new Set(tags.flatMap((tag) => subtagsOf(catalog, tag))).size;
       return mergeOperation(tags, into, subtags > 0, subtags);
@@ -135,7 +135,7 @@ export function renameModule(host: ModuleHost): TagsModule {
       {
         id: "rename.merge",
         label: "Merge into…",
-        ask: { label: "Into the tag", problem: mergeProblem },
+        ask: { label: "Into the tag", validate: validateMerge },
         run: (tags, host, into) => {
           const subtags = new Set(tags.flatMap((tag) => subtagsOf(host.catalog, tag))).size;
           return mergeOperation(tags, into!, subtags > 0, subtags);

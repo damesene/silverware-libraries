@@ -5,7 +5,7 @@
 // What a definition's function gives is checked as it is called (evaluate.ts).
 import type { ConditionDefinition, FormatDefinition } from "./api.ts";
 import { HELPERS } from "./helpers.ts";
-import { specsProblem } from "./params.ts";
+import { validateSpecs } from "./params.ts";
 import { checkStyle } from "./style.ts";
 
 const NAME_RE = /^[a-z][a-z0-9_]*$/i;
@@ -24,7 +24,7 @@ function made(definition: unknown): unknown {
 }
 
 /** Why a definition is none (as a condition, or as a format); undefined: it is one */
-function definitionProblem(d: unknown, kind: "condition" | "format"): string | undefined {
+function validateDefinition(d: unknown, kind: "condition" | "format"): string | undefined {
   if (d instanceof Error) return `failed: ${d.message}`;
   if (!isObject(d)) return `is no ${kind} (an object, or a function of the helpers giving one)`;
   if (typeof d.name !== "string" || !NAME_RE.test(d.name)) return "has no name (letters, digits and _, starting with a letter)";
@@ -32,7 +32,7 @@ function definitionProblem(d: unknown, kind: "condition" | "format"): string | u
   if (typeof d.label !== "string" || !d.label.trim()) return `${name}: has no label`;
   if (d.description !== undefined && typeof d.description !== "string") return `${name}: its description is no text`;
   if (d.category !== undefined && typeof d.category !== "string") return `${name}: its category is no text`;
-  const params = specsProblem(d.params);
+  const params = validateSpecs(d.params);
   if (params) return `${name}: ${params}`;
   if (d.excel !== undefined && typeof d.excel !== "function") return `${name}: its excel is no function (params, at)`;
   if (kind === "condition") return typeof d.test === "function" ? undefined : `${name}: has no test(cell, context)`;
@@ -61,7 +61,7 @@ export function checkedDefinitions<T>(definitions: unknown, kind: "condition" | 
   const problems: string[] = [];
   list.forEach((item: unknown, i) => {
     const definition = made(item);
-    const problem = definitionProblem(definition, kind);
+    const problem = validateDefinition(definition, kind);
     if (problem) problems.push(`${kind} ${i + 1} ${problem}`);
     else out.push(definition as T);
   });

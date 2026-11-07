@@ -11,7 +11,7 @@ export type RenameOffer = {
   /** Reviewed in the window (its subtags too, as the review offers) */
   review(from: string, to: string): Promise<void>;
   /** What is wrong with it (nothing: undefined) */
-  problem(from: string, to: string): string | undefined;
+  validate(from: string, to: string): string | undefined;
   /** Several tags merged into one, as an operation to review where the asker is (their subtags under it) */
   merge(tags: readonly string[], into: string, catalog: Catalog): Operation;
 };

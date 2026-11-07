@@ -75,7 +75,7 @@ export function roomFor(tables: readonly LaidOut[], growth: Growth): Room {
  * table it would overlap (a table is never put over another, nor pushes one
  * aside); undefined: it can
  */
-export function placeProblem(tables: readonly LaidOut[], id: number, at: SheetCell): string | undefined {
+export function validatePlace(tables: readonly LaidOut[], id: number, at: SheetCell): string | undefined {
   const moved = tables.find((t) => t.id === id);
   if (!moved) return undefined;
   const there = box(at, moved.rows, moved.columns);

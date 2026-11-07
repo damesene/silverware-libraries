@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { pagesOperation } from "../modules/pages.ts";
 import { removeOperation } from "../modules/remove.ts";
-import { renameOperation, renameProblem } from "../modules/rename.ts";
+import { renameOperation, validateRename } from "../modules/rename.ts";
 import { memorySpace } from "../space/memory.ts";
 import { minimalEdit } from "../space/space.ts";
 import { indexCaughtUp, metaPages, pagesWith, readCatalog, subtagsOf } from "./catalog.ts";
@@ -130,9 +130,9 @@ describe("operations", () => {
     expect(removeOperation("project", false, 0).options?.map((o) => o.label)).toEqual(["Remove from", "In the text"]);
   });
   it("says what is wrong with a rename", () => {
-    expect(renameProblem("a", "a")).toBeDefined();
-    expect(renameProblem("a", "")).toBeDefined();
-    expect(renameProblem("a", "b")).toBeUndefined();
+    expect(validateRename("a", "a")).toBeDefined();
+    expect(validateRename("a", "")).toBeDefined();
+    expect(validateRename("a", "b")).toBeUndefined();
   });
 });
 

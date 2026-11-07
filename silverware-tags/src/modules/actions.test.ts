@@ -4,7 +4,7 @@ import type { ModuleHost, TagAction, WorkspaceHost } from "../core/module.ts";
 import { memorySpace } from "../space/memory.ts";
 import { pagesModule } from "./pages.ts";
 import { removeManyOperation, removeModule } from "./remove.ts";
-import { mergeOperation, mergeProblem, renameOperation } from "./rename.ts";
+import { mergeOperation, validateMerge, renameOperation } from "./rename.ts";
 import { applyPlan, makePlan } from "../core/plan.ts";
 
 const space = memorySpace({ A: "#todo\n\n- [ ] do #todo/later", B: "- item #todo" });
@@ -56,8 +56,8 @@ describe("several tags at once", () => {
     expect(s.pages.get("P")).toBe("#todo #todo #todo");
     expect(s.pages.get("Q")).toBe("- [ ] x #todo/later");
     expect(s.pages.get("R")).toBe("#todo/now");
-    expect(mergeProblem("a/x", ["a", "b"])).toBeDefined();
-    expect(mergeProblem("a", ["a", "b"])).toBeUndefined();
+    expect(validateMerge("a/x", ["a", "b"])).toBeDefined();
+    expect(validateMerge("a", ["a", "b"])).toBeUndefined();
   });
   it("merges a tag picked under the target into it", async () => {
     const s = memorySpace({ P: "#a #a/b", Q: "#a/b/c" });

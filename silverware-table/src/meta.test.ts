@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { findTables, locateByShape, parseMetaRow, parseTable, serializeTable } from "./markdown.ts";
 import { columnValues, followColumnMeta, metaName, metaSort, withColumnValues, withMeta, withMetaName, withMetaSort } from "./meta.ts";
-import { sameTableName, tableNameProblem } from "./namerules.ts";
+import { sameTableName, validateTableName } from "./namerules.ts";
 import { columnAfterMove, deleteColumn, insertRow, moveColumn, setCell } from "./ops.ts";
 
 const md = (t: ReturnType<typeof parseTable>) => serializeTable(t);
@@ -138,17 +138,17 @@ describe("attributes of columns", () => {
 
 describe("table names", () => {
   it("takes names that formulas can write before !", () => {
-    expect(tableNameProblem("prices")).toBeUndefined();
-    expect(tableNameProblem("price_list2")).toBeUndefined();
-    expect(tableNameProblem("_x")).toBeUndefined();
-    expect(tableNameProblem("2prices")).toBeDefined();
-    expect(tableNameProblem("price list")).toBeDefined();
-    expect(tableNameProblem("ceník")).toBeDefined();
+    expect(validateTableName("prices")).toBeUndefined();
+    expect(validateTableName("price_list2")).toBeUndefined();
+    expect(validateTableName("_x")).toBeUndefined();
+    expect(validateTableName("2prices")).toBeDefined();
+    expect(validateTableName("price list")).toBeDefined();
+    expect(validateTableName("ceník")).toBeDefined();
     // Read as a cell or a value
-    expect(tableNameProblem("A1")).toBeDefined();
-    expect(tableNameProblem("ab12")).toBeDefined();
-    expect(tableNameProblem("TRUE")).toBeDefined();
-    expect(tableNameProblem("ABCD1")).toBeUndefined();
+    expect(validateTableName("A1")).toBeDefined();
+    expect(validateTableName("ab12")).toBeDefined();
+    expect(validateTableName("TRUE")).toBeDefined();
+    expect(validateTableName("ABCD1")).toBeUndefined();
   });
 
   it("reads and writes a table's name in its metadata row, compared ignoring case", () => {

@@ -39,7 +39,7 @@ export type FormulasOffer = {
   /** The function the caret is in, its syntax with the argument at the caret; undefined out of any */
   readonly help: (formula: string, caret: number) => import("./help.ts").FormulaHelp | undefined;
   /** Why a formula does not read (a ")" missing); undefined: it does */
-  readonly problem: (formula: string) => string | undefined;
+  readonly validate: (formula: string) => string | undefined;
   /** A formula of one row (`[@due] < TODAY()`) calculated for each body row of a table of the page shown (values[0]: row 1), as a cell of none */
   readonly rowValues: (table: import("../markdown.ts").Table, formula: string) => readonly import("./values.ts").Scalar[];
   /**

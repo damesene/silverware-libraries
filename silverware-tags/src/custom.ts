@@ -13,7 +13,7 @@ import type { TagAction } from "./core/module.ts";
 import { counted, type Operation } from "./core/operation.ts";
 import { addPageTags, applyEdits, type EditResult, frontmatterTags, pageTags, removePageTags, removeTags, renameTags, tagUses } from "./tags/edit.ts";
 import { type FrontmatterForm, readFrontmatter } from "./tags/frontmatter.ts";
-import { hashtagOf, isMetaTag, isWithin, matches, nameProblem, parentOf, renamedTag } from "./tags/names.ts";
+import { hashtagOf, isMetaTag, isWithin, matches, validateName, parentOf, renamedTag } from "./tags/names.ts";
 import { scanHashtags } from "./tags/scan.ts";
 
 /** What a custom operation's functions get to tell the space by: plain lists (a JS module's, Space Lua's alike) */
@@ -59,7 +59,9 @@ export const HELPERS = {
   isMetaTag,
   isWithin,
   matches,
-  nameProblem,
+  validateName,
+  // Its name before 2026-11-07, kept for the scripts that call it
+  nameProblem: validateName,
   parentOf,
   renamedTag,
 };
@@ -97,7 +99,7 @@ function definitionsOf(value: unknown, problems: string[]): unknown[] {
 }
 
 /** What is wrong with a definition (nothing: undefined) */
-function definitionProblem(d: Partial<OperationDefinition>): string | undefined {
+function validateDefinition(d: Partial<OperationDefinition>): string | undefined {
   if (typeof d.name !== "string" || !NAME_RE.test(d.name)) return `its name ${JSON.stringify(d.name)} is not letters, digits and _ starting with a letter`;
   if (typeof d.label !== "string" || !d.label) return "it has no label";
   if (typeof d.edit !== "function") return "its edit is not a function";
@@ -115,7 +117,7 @@ export function operationsOf(definitions: unknown): { operations: OperationDefin
       problems.push(`operation ${i + 1}: not an object`);
       return;
     }
-    const problem = definitionProblem(definition as Partial<OperationDefinition>);
+    const problem = validateDefinition(definition as Partial<OperationDefinition>);
     if (problem) problems.push(`operation ${typeof definition.name === "string" ? definition.name : i + 1}: ${problem}`);
     else operations.push(definition as OperationDefinition);
   });

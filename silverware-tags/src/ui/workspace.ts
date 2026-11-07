@@ -11,7 +11,7 @@ import { type Catalog, pageCounts, pagesWith, subtagsOf, type TagInfo } from "..
 import type { TagAction, TagParts, TagsAction, View, WorkspaceHost } from "../core/module.ts";
 import { counted, type Operation } from "../core/operation.ts";
 import type { Applied, Plan, Progress } from "../core/plan.ts";
-import { hashtagOf, isMetaTag, nameProblem } from "../tags/names.ts";
+import { hashtagOf, isMetaTag, validateName } from "../tags/names.ts";
 import { filterTree, type TagNode, tagTree } from "../tags/tree.ts";
 import { buttons, openDialog } from "./dialog.ts";
 import { el } from "../../../shared/elements.ts";
@@ -587,7 +587,7 @@ export class Workspace {
       const said = note(doc);
       const submit = () => {
         const name = field.value();
-        const problem = nameProblem(name) ?? action.ask?.problem?.(name, tags);
+        const problem = validateName(name) ?? action.ask?.validate?.(name, tags);
         if (problem) {
           said.say(problem, true);
           return;

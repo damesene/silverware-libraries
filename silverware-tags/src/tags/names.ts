@@ -33,7 +33,7 @@ export function hashtagBefore(name: string, after: string): string {
 }
 
 /** What is wrong with a name for a tag (nothing: undefined) */
-export function nameProblem(name: string): string | undefined {
+export function validateName(name: string): string | undefined {
   if (!name.trim()) return "a tag needs a name";
   if (name !== name.trim()) return "a tag's name cannot start or end with a space";
   if (/[\n>]/.test(name)) return "a tag's name cannot hold a line break or >";

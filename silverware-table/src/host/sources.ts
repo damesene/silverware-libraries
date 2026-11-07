@@ -7,7 +7,7 @@
 // table of records or of values, is made plain data here (`sourceData`), and
 // the rest reads it through `SourceProvider` (src/sources.ts).
 import { listOf } from "../bridge.ts";
-import { tableNameProblem } from "../namerules.ts";
+import { validateTableName } from "../namerules.ts";
 import type { SourceData, SourceProvider } from "../sources.ts";
 
 /** How long after the last page indexed the sources are read again; after Space Lua loaded, how long its definitions of before stay */
@@ -124,7 +124,7 @@ export class LuaSources implements SourceProvider {
     if (!definition || typeof definition !== "object" || Array.isArray(definition)) return `Silverware Table: source not defined: ${usage}.`;
     const { name, data, columns: list, ...rest } = definition as Record<string, unknown>;
     const given = typeof name === "string" ? name.trim() : "";
-    const problem = given ? tableNameProblem(given) : "it is empty";
+    const problem = given ? validateTableName(given) : "it is empty";
     if (problem) return `Silverware Table: source not defined: "${String(name ?? "")}" is no source's name: ${problem}.`;
     const unknown = Object.keys(rest);
     if (unknown.length) return `Silverware Table: source ${given} not defined: it knows no ${unknown.join(", ")} (name, data, columns).`;

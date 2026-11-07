@@ -15,7 +15,7 @@ import { type Calculated, calculatedTable, readRenames, renamedColumns, renamedI
 import { type CalculatedBy, type CalculatedOffer, followFormula, FormulaError, type FormulasOffer, type Grid, referredTableNames, tokenize, viewGrid, withEquals } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";
 import { locateBySource, pageTablesOf, parseTable, type Table } from "../markdown.ts";
-import { freeTableName, sameTableName, tableNameProblem } from "../namerules.ts";
+import { freeTableName, sameTableName, validateTableName } from "../namerules.ts";
 import { openViewDialog } from "./viewdialog.ts";
 
 // What the dialog says first while the formulas module, which calculates views, is off
@@ -173,7 +173,7 @@ export class Views implements Feature {
   private result(formula: string, table?: Table, replace?: { readonly from: number; readonly table: Table }): Grid | string {
     const formulas = this.formulas();
     if (!formulas) return "It needs the formulas module, which is off";
-    const problem = formulas.problem(withEquals(formula).formula.trim());
+    const problem = formulas.validate(withEquals(formula).formula.trim());
     if (problem) return problem;
     const result = formulas.view(formula, table, replace);
     if (result === undefined) return "It reads another page, which is not read yet";
@@ -181,8 +181,8 @@ export class Views implements Feature {
   }
 
   /** Why a name cannot be a view's: no table's name, or another table's of the page (`own`: the view itself) */
-  private nameProblem(name: string, own?: Table): string | undefined {
-    const problem = tableNameProblem(name);
+  private validateName(name: string, own?: Table): string | undefined {
+    const problem = validateTableName(name);
     if (problem) return problem;
     const taken = pageTablesOf(this.host.pageText).some(({ table }) => {
       const other = this.host.tableName(table);
@@ -217,9 +217,9 @@ export class Views implements Feature {
         return typeof result === "string" ? result : viewCalculated(result);
       },
       // (`naming`: the name a table gets in the same edit with the formula, taken as well)
-      nameProblem: (n, f) => {
+      validateName: (n, f) => {
         const named = naming?.(f);
-        return named && sameTableName(n, named) ? `Another table of the page is named ${n}` : this.nameProblem(n, own);
+        return named && sameTableName(n, named) ? `Another table of the page is named ${n}` : this.validateName(n, own);
       },
     });
   }

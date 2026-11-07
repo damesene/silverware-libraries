@@ -20,7 +20,7 @@ export type ViewDialogOptions = {
   // The table the formula makes, or why it makes none
   readonly preview: (formula: string) => Calculated | string;
   // Why a name cannot be the view's with the formula (another table's), if so
-  readonly nameProblem: (name: string, formula: string) => string | undefined;
+  readonly validateName: (name: string, formula: string) => string | undefined;
   readonly submit: (formula: string, name: string) => void;
   readonly submitLabel: string;
   // Why it cannot be submitted at all (the metadata setting off, the formulas module off)
@@ -94,7 +94,7 @@ export function openViewDialog(host: ModelHost, options: ViewDialogOptions): Dia
 
   // The submit button: disabled with why, where the view cannot be written
   function check(): void {
-    const problem = name.trim() ? options.nameProblem(name.trim(), formula) : undefined;
+    const problem = name.trim() ? options.validateName(name.trim(), formula) : undefined;
     nameNote.textContent = problem ?? "";
     const why = options.blocked ?? (typeof result() === "string" ? (result() as string) : problem);
     submit.disabled = !!why;

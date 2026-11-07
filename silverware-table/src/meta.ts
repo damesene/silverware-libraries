@@ -9,7 +9,7 @@
 import { type ColumnId, columnIdOf, findColumn } from "./columns.ts";
 import type { Row, Table } from "./markdown.ts";
 import { attributeName, COLUMN_MARK, CORE, type Owner } from "./metanames.ts";
-import { tableNameProblem } from "./namerules.ts";
+import { validateTableName } from "./namerules.ts";
 import { NO_PINS, type Pins, type SortDirection } from "./view.ts";
 
 export { attributeName, CORE, type Owner } from "./metanames.ts";
@@ -194,7 +194,7 @@ export function hasMetaPins(table: Table): boolean {
 /** The table's name, if it has a valid one */
 export function metaName(table: Table): string | undefined {
   const name = metaValue(table, CORE, "name")?.trim();
-  return name && !tableNameProblem(name) ? name : undefined;
+  return name && !validateTableName(name) ? name : undefined;
 }
 
 /** The table's name as written, valid or not */

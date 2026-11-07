@@ -2,13 +2,13 @@
 // values read by them (leniently: a value that does not fit is the default),
 // so a definition gets its params as their specs say.
 import type { ParamSpec, ParamSpecs, Params } from "./api.ts";
-import { checkStyle, colorProblem } from "./style.ts";
+import { checkStyle, validateColor } from "./style.ts";
 
 const KINDS: ReadonlySet<string> = new Set(["number", "choice", "text", "pattern", "formula", "color", "boolean", "style", "list"]);
 const KEY_RE = /^[a-z][a-z0-9_]*$/i;
 
 /** Why specs are not ones; undefined: they are */
-export function specsProblem(specs: unknown, depth = 0): string | undefined {
+export function validateSpecs(specs: unknown, depth = 0): string | undefined {
   if (specs === undefined) return undefined;
   if (typeof specs !== "object" || specs === null || Array.isArray(specs)) return "params is an object of parameters by name";
   for (const [key, spec] of Object.entries(specs as Record<string, unknown>)) {
@@ -22,7 +22,7 @@ export function specsProblem(specs: unknown, depth = 0): string | undefined {
     if (s.kind === "choice" && (!Array.isArray(s.values) || !s.values.length || s.values.some((v) => typeof v !== "string"))) return `the parameter ${key}'s values are a list of texts`;
     if (s.kind === "list") {
       if (depth > 0) return `the parameter ${key}: a list within a list`;
-      const inner = specsProblem(s.of, depth + 1);
+      const inner = validateSpecs(s.of, depth + 1);
       if (inner || s.of === undefined) return `the parameter ${key}'s rows: ${inner ?? "of is missing"}`;
     }
   }
@@ -45,7 +45,7 @@ function valueOf(spec: ParamSpec, stored: unknown): unknown {
     case "formula":
       return typeof stored === "string" ? stored : typeof stored === "number" ? String(stored) : undefined;
     case "color":
-      return stored !== undefined && colorProblem(stored) === undefined ? stored : undefined;
+      return stored !== undefined && validateColor(stored) === undefined ? stored : undefined;
     case "boolean":
       return typeof stored === "boolean" ? stored : undefined;
     case "style": {

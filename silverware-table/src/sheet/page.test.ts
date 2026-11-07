@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAt, parseAt, placeBelow, sameSheet, sheetNameProblem, sheetsOf, sheetTables, sheetWidths } from "./page.ts";
+import { formatAt, parseAt, placeBelow, sameSheet, validateSheetName, sheetsOf, sheetTables, sheetWidths } from "./page.ts";
 import { SHEET_META } from "../testing/meta.ts";
 
 const PAGE = [
@@ -67,8 +67,8 @@ describe("Sheets of a page", () => {
   });
 
   it("refuses an empty or too long sheet name", () => {
-    expect(sheetNameProblem(" ")).toBe("a sheet needs a name");
-    expect(sheetNameProblem("x".repeat(61))).toMatch(/at most 60/);
-    expect(sheetNameProblem("Budget 2025")).toBeUndefined();
+    expect(validateSheetName(" ")).toBe("a sheet needs a name");
+    expect(validateSheetName("x".repeat(61))).toMatch(/at most 60/);
+    expect(validateSheetName("Budget 2025")).toBeUndefined();
   });
 });

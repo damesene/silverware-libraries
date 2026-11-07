@@ -79,7 +79,7 @@ export type TagsAction = {
   // A key running it while the tags are picked (KeyboardEvent.key)
   readonly key?: string;
   // A tag's name asked for first: the field's label, and what is wrong with a name typed (nothing: undefined)
-  readonly ask?: { readonly label: string; readonly problem?: (name: string, tags: readonly string[]) => string | undefined };
+  readonly ask?: { readonly label: string; readonly validate?: (name: string, tags: readonly string[]) => string | undefined };
   readonly run: (tags: readonly string[], host: WorkspaceHost, name?: string) => Operation | void | Promise<Operation | void>;
 };
 

@@ -32,7 +32,7 @@ const NAME_RE = /^[a-z][a-z0-9_-]*$/i;
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 
 /** Why a definition is none; undefined: it is one */
-function definitionProblem(d: unknown): string | undefined {
+function validateDefinition(d: unknown): string | undefined {
   if (!isObject(d)) return "is no definition (an object with a name and a lineMenu)";
   if (typeof d.name !== "string" || !NAME_RE.test(d.name)) return "has no name (letters, digits, - and _, starting with a letter)";
   if (typeof d.lineMenu !== "function") return `${d.name}: has no lineMenu(context, menu)`;
@@ -47,7 +47,7 @@ export function customMenuEntries(definitions: unknown): { readonly list: MenuEn
   const out: MenuEntriesDefinition[] = [];
   const problems: string[] = [];
   for (const d of list) {
-    const problem = definitionProblem(d);
+    const problem = validateDefinition(d);
     if (problem) problems.push(problem);
     else out.push(d as MenuEntriesDefinition);
   }

@@ -212,7 +212,7 @@ export class ChoicesDialog {
       }
       const name = nameField.value.trim().toLowerCase();
       const value = way === "list" ? undefined : written();
-      const problem = this.nameProblem(table, name, taken) ?? (value === undefined ? this.valuesProblem(rows) : this.formulaProblem(value, formulas));
+      const problem = this.validateName(table, name, taken) ?? (value === undefined ? this.validateValues(rows) : this.validateFormula(value, formulas));
       if (problem) {
         note.textContent = problem;
         note.classList.add("swt-choices-problem");
@@ -300,7 +300,7 @@ export class ChoicesDialog {
   }
 
   /** Why a list cannot be named so, or undefined */
-  private nameProblem(table: Table, name: string, taken: readonly string[]): string | undefined {
+  private validateName(table: Table, name: string, taken: readonly string[]): string | undefined {
     if (!LIST_NAME_RE.test(name)) return "A list's name is lower case letters (a to z) and digits, words joined by dashes, starting with a letter.";
     if (taken.includes(name)) return `The table has a list named ${name} already.`;
     if (!this.host.canStoreMeta(table, listKey(name))) return "Lists are kept in the table's metadata: turn on Store table metadata in the settings to save one.";
@@ -308,7 +308,7 @@ export class ChoicesDialog {
   }
 
   /** Why a list of its own's values cannot be saved so, or undefined */
-  private valuesProblem(rows: readonly ValueRow[]): string | undefined {
+  private validateValues(rows: readonly ValueRow[]): string | undefined {
     const seen = new Set<string>();
     for (const row of rows) {
       const value = row.field.value.trim().toLowerCase();
@@ -320,10 +320,10 @@ export class ChoicesDialog {
   }
 
   /** Why a list's formula cannot be saved so (none typed, one that does not read), or undefined: one giving no values now may later */
-  private formulaProblem(formula: string, formulas: FormulasOffer | undefined): string | undefined {
+  private validateFormula(formula: string, formulas: FormulasOffer | undefined): string | undefined {
     if (!formulas) return `The list's formula: ${FORMULAS_OFF}.`;
     if (formula.trim() === "=" || formula.trim() === "=@") return "Type a formula.";
-    return formulas.problem(formula);
+    return formulas.validate(formula);
   }
 
   /**

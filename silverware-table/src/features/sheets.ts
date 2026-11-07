@@ -30,7 +30,7 @@ import {
   sheetOfTable,
   sameSheet,
   sheetData,
-  sheetNameProblem,
+  validateSheetName,
   sheetsOf,
   sheetTables,
   sheetTablesOf,
@@ -110,7 +110,7 @@ export class Sheets implements Feature {
       this.host.focusPage();
       return undefined;
     }
-    const problem = sheetNameProblem(name);
+    const problem = validateSheetName(name);
     if (problem) return problem;
     // (Taken off it above: that removes, which the setting off allows)
     if (!canPlace(this.host, parseTable(info.source))) return "a table's sheet, place and name are kept in its metadata: turn on Store table metadata in the settings";

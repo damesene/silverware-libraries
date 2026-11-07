@@ -108,7 +108,7 @@ export function panelModule(host: ModuleHost, settings: PanelSettings): TagsModu
         return;
       }
       // (Under itself, its subtags with it, the level dropped on would move under its own new name)
-      const problem = to !== tag && isWithin(to, tag) ? "a tag cannot move under itself" : rename.problem(tag, to);
+      const problem = to !== tag && isWithin(to, tag) ? "a tag cannot move under itself" : rename.validate(tag, to);
       if (problem) {
         host.notifier.flash(`Silverware Tags: ${hashtagOf(tag)} to ${hashtagOf(to)}: ${problem}`, "error");
         return;

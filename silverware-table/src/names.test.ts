@@ -5,7 +5,7 @@ import {
 } from "./formulas/index.ts";
 import { formulaCell, formulaOf, recalculate } from "./testing/formulas.ts";
 import { parseMetaRow, parseTable } from "./markdown.ts";
-import { nameProblem } from "./namerules.ts";
+import { validateName } from "./namerules.ts";
 import { nameOf, withCellName, withName, withoutName } from "./names.ts";
 
 describe("names in cells", () => {
@@ -25,9 +25,9 @@ describe("names in cells", () => {
   });
 
   it("takes names formulas can write", () => {
-    expect(nameProblem("price", "column")).toBeUndefined();
-    expect(nameProblem("unit price", "column")).toContain("is not a column name");
-    expect(nameProblem("B2", "column")).toContain("would read as a cell");
+    expect(validateName("price", "column")).toBeUndefined();
+    expect(validateName("unit price", "column")).toContain("is not a column name");
+    expect(validateName("B2", "column")).toContain("would read as a cell");
   });
 
   it("is not a metadata row when a last row holds only a named empty cell", () => {

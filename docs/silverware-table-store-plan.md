@@ -43,9 +43,10 @@ row's name is).
 Modules and domains work on a table **in memory**: its columns, rows and
 cells, each with its content and its attributes, by the table's key. Where it
 came from and how it is written back is a **store**'s; what the platform
-offers (a document's text, other documents, settings, notifications) is a
-**port**'s. Moving tables to a new place is a new store, and running outside
-SilverBullet is new ports and a new adapter, with no module changed.
+offers (a document's text, other documents, settings, notifications) is the
+**platform**'s, how a document is written the **page writer**'s. Moving tables
+to a new place is a new store, and running outside SilverBullet is a new
+platform and a new adapter, with no module changed.
 
 Not a goal: changing what users have. Pages keep their tables as they are
 now, byte for byte where nothing changed; settings and the Lua API keep their
@@ -60,8 +61,9 @@ What the design below follows, and what decides a case it does not name:
    back. Nothing of one store's form (escapes, tags, hashtags, lines,
    offsets) is in the model or the modules' API.
 2. **Dependencies go one way**: model ← domains ← modules ← core ← stores ←
-   host bindings, each importing only what is left of it (and ports, the
-   stores and the bindings). `isolation.test.ts` checks it by folder.
+   host bindings, each importing only what is left of it (and the
+   platform, the stores and the bindings). `isolation.test.ts` checks it by
+   folder.
 3. **What can be derived is not kept.** An attribute follows its column
    because it is on the column, not because a step moves it; a column's
    attributes survive its header renamed because the name is not where they
@@ -83,9 +85,10 @@ features/     modules: ModelHost and TableModel only
    ▲
 core          controller, write pipeline, view, editor; TableStore (the interface)
    ▲
-store/        markdown/ (codec, register), memory.ts, sources; over ports
+store/        markdown/ (codec, register), memory.ts, sources; over the
+              platform and the page writer
    ▲
-host/         ports.ts (the interfaces); silverbullet/ (the ports, the adapter,
+host/         renderer.ts (the interface); silverbullet/ (the platform, the adapter,
               the Lua API, places in Lua calls, history markers); playground/
 ```
 
@@ -194,7 +197,7 @@ What the core asks; modules never see it (they get tables through the host):
 - `transaction(document, changes)`: tables changed, inserted or deleted and
   places written, **as one step** (one undo step where the platform has
   undo), whether the document is open or not (lazy saving writes into a page
-  left: the store reads and writes it through the `SpacePort` then). What a
+  left: the store reads and writes it through the platform's `space` then). What a
   write needs today of `also`, `otherTablesWritten`, `otherTextWritten`,
   `insertTable`, `deleteTable`, and lazy saving's `writePage`.
 - `places(document)`: content kept outside tables that formulas are in, each
@@ -223,8 +226,9 @@ it under the path it has now.
 
 - **Markdown in a page** (`store/markdown/`): the codec (markdown.ts, meta.ts,
   tags.ts, tagvalues.ts, names.ts' storage, columns.ts' keys, a type as a
-  header's hashtag, a row's name in a cell, escapes), the register, over a
-  `DocumentPort` for the open page and the `SpacePort` for others. Nothing of
+  header's hashtag, a row's name in a cell, escapes), the register, through the
+  page writer (its part `tables`), over the platform's `editor` for the open
+  page and its `space` for others. Nothing of
   SilverBullet in it: it is markdown in a text.
 - **Memory** (`store/memory.ts`): tables in memory, for tests and the
   playground's benchmark.
@@ -236,38 +240,57 @@ against itself: tables read in order with stable keys, a transaction of
 several tables and places as one step, insert and delete, revisions, changes
 from outside told, `writable` respected. A store that passes it is a store.
 
-### Ports (`host/ports.ts`)
+### The platform (`shared/platform.ts`) and the page writer (`shared/pages/`)
 
-`Bridge` split by what it is for, each optional where it is now:
+Shared with Silverware Database (decided 2026-11-07, *Decided (2026-11-07)*
+below; docs/silverware-database.md on `feat/database`, *Layers*, *Shared with
+Silverware Table and Silverware Tags*, its *Decided* 18 to 25): the database
+is built first, in these shapes, and puts them into `shared/`; this plan takes
+them from there, so that tables and pages are written one way. A change of
+either is made for both plugins.
 
-- `DocumentPort`: the open document's text, an edit applied, cursor and
-  selection, undo/redo.
-- `SpacePort`: read, write and list documents, navigate.
-- `UiPort`: notify, ask.
-- `ConfigPort`: settings read and saved, reload.
-- `RenderPort`: markdown to HTML, `${…}` evaluated (the adapter's).
+`Bridge` split by what it is for. What the bridge has optional stays optional:
+a member the platform marks so (the editor's undo, a rename), or a part of the
+platform the table takes as optional where it can do without it (a bridge
+without `readPage` gives no `space`):
+
+- `Platform = { editor, space, index, ui, settings }` (interfaces only, plain
+  names in place of ports): `Editor` (the open document's text, an edit
+  applied, cursor and selection, undo/redo, a document opened, told as it is
+  edited or another is opened), `Space` (documents read, written, listed,
+  renamed), `Index` (the index's objects and its changes, reading only),
+  `UserInterface` (notify, ask, pick, reload), `Settings` (read, saved).
+
+- `Renderer` (`host/renderer.ts`, the table's own): markdown to HTML, `${…}`
+  evaluated (the adapter's).
 
 Modules get none of them: what they need is a host function in model terms.
 
-**The interfaces are shared with Silverware Database** (decided 2026-11-07,
-docs/silverware-database.md on `feat/database`, *Layers*): the database is
-built before this plan, in its shapes, and puts `DocumentPort`, `SpacePort`,
-`UiPort` and `ConfigPort` into `shared/ports.ts` (interfaces only, bundled into
-each plugin). This plan takes them from there and adds what only the table
-needs (`RenderPort`) in `host/ports.ts`; a change of a shared port is made for
-both plugins.
+**One writer per document.** The database writes pages through the page
+writer: changes made by a builder in the model's terms (a section per part of
+a page's content, `properties` and `tags`; a page's `rename`), `plan` (pages
+read, new texts in memory, a preview, nothing written) and `apply` (page by
+page where still as read, reported), `PageHistory` for undo; the writer alone
+writes documents (`Editor.replace`, `Space.write`). The markdown store's codec
+of tables (the metadata row, hidden tags, escapes, *Stores*) stays the
+store's, the one place that reads that form back (Principle 1), and is
+registered with the writer as its part `tables` (step 4b): a transaction of
+this plan becomes a batch of the writer's changes, so a table's edit and a
+page's properties or tags are written in one edit of one document. The
+writer's parts are built in only until a plugin needs its own; the registry
+they go through is the one the table's part is registered with.
 
 ### The SilverBullet binding (`host/silverbullet/`)
 
 Everything that is SilverBullet's and not markdown's, in one place:
 
-- the ports, made of what the init page hands over;
+- the platform, made of what the init page hands over;
 - the adapter (`core/silverbullet/` now) and its pairing with the markdown
   store: which key a rendered table is (`data-pos`, shape, source; moved out
   of the controller), the type hashtags hidden in headers (the codec tells
   which part of a header it wrote);
 - the history markers (the cursor put outside a table around each write, for
-  SilverBullet's undo): the binding's `DocumentPort` places them, as it knows
+  SilverBullet's undo): the binding's `Editor` places them, as it knows
   the edit's range;
 - the places in Lua calls (host/lua.ts, formulas/places.ts' finding);
 - the Lua API: `silverware.table.tables(text)`, `onWrite(fn(text))`,
@@ -282,8 +305,8 @@ Each step is commits that leave `npm run verify` and the UI tests (both
 targets) passing; an old host function stays until no module uses it. Each
 step tightens `isolation.test.ts` so that what it moved cannot come back.
 
-1. **Ports.** `Bridge` split into the ports (those of `shared/ports.ts`, see
-   *Ports*); `host.notify`, `host.ask`,
+1. **The platform.** `Bridge` split into the platform (`shared/platform.ts`,
+   see *The platform and the page writer*); `host.notify`, `host.ask`,
    `host.navigate` for modules; no module reads `host.bridge` (removed from
    `ModelHost`). Test: no `bridge` in `features/`.
 2. **Tables through the host.** The store interface and the markdown store
@@ -307,6 +330,12 @@ step tightens `isolation.test.ts` so that what it moved cannot come back.
 4. **Outside tables.** Places through the store, `reveal`, `InsertPlace`;
    `TextPosition`, `TextWritten`, `WritePage` gone from the interfaces, the
    offsets left only in the markdown store.
+4b. **Through the page writer.** The markdown store writes through the page
+    writer (`shared/pages/`, built by then for Silverware Database): its codec
+    registered as the writer's part `tables`, a transaction a batch of the
+    writer's changes, its undo the writer's report where the document is not
+    the open one. Test: nothing in `store/markdown/` calls `Editor.replace` or
+    `Space.write`.
 5. **The other stores.** The memory store and the views plan's sources on the
    store interface, both passing the contract tests; a few module tests over
    the memory store as the proof that modules need no text (the rest keep the
@@ -365,6 +394,15 @@ steps 4 to 7 a few days each.
   its name with parameters as written.
 - **Silverware Chart onto the codec: a follow-up** (*After this plan*).
 
+## Decided (2026-11-07, with the user)
+
+- **The platform and the page writer, shared with Silverware Database**: the
+  ports are the platform (`shared/platform.ts`, plain names), and every
+  document is written by the page writer (`shared/pages/`), the table's codec
+  its part `tables`, staying the markdown store's (*The platform and the page
+  writer*, step 4b). What other plugins write with a write stays open
+  (*Open*).
+
 ## After this plan
 
 - **Silverware Chart reads tables through the codec.** It reads markdown
@@ -376,3 +414,12 @@ steps 4 to 7 a few days each.
   Table: one reader of markdown tables instead of two. Its `numberOf` and
   `plainNumberOf` stay the chart's (what it draws), only the reading of
   tables moves.
+
+## Open (2026-11-07)
+
+- **What other plugins write with a write.** `onWrite(fn(text))` keeps its
+  name in *The SilverBullet binding*, and with it its form: a listener gets
+  the text and gives text edits, so the chart knows how its data are written
+  in a page. Joined to the page writer, a plugin would give changes in its
+  model (a part of its own, once the writer's registry is opened) and the
+  writer would write them in the same edit. To decide with step 6.

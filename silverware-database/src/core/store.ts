@@ -6,7 +6,7 @@
 // (store/pages/, step 4), another in memory (store/memory.ts: the tests, the
 // playground); every store passes the same contract (store/contract.ts).
 // Modules and views never see a store: they ask the core.
-import type { Database, DatabaseSummary, Item, ItemKey, Revised } from "../model/database.ts";
+import type { Database, DatabaseSummary, Item, ItemKey, Revised, Value } from "../model/database.ts";
 import type { Changes } from "./changes.ts";
 
 /** What a store can and another cannot: the core offers by these, never assumes */
@@ -117,7 +117,17 @@ export interface DatabaseStore {
   validateItemName(name: string): string | undefined;
   /** Where an item can be opened (a page's name), undefined where nowhere */
   documentOf(item: ItemKey): string | undefined;
+  /**
+   * The values items keep under keys the schema has none of (a property
+   * removed with its values kept, a key typed by hand or another tool's), by
+   * key: how many items, their values; none of the store's own keys. A value
+   * of them is taken off by a `setValue` to undefined, as any
+   */
+  looseValues(id: string): Promise<readonly LooseKey[]>;
 }
+
+/** A key items keep that the schema has none of: the items keeping it, each its value */
+export type LooseKey = { readonly key: string; readonly values: readonly { readonly item: ItemKey; readonly value: Value }[] };
 
 /**
  * What a view keeps where a database is shown (`board.groupBy`): one place's

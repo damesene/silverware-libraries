@@ -7,6 +7,7 @@ import { DatabaseCore } from "../silverware-database/src/core/core.ts";
 import { Modules } from "../silverware-database/src/core/module.ts";
 import { BUILT_IN_MODULES } from "../silverware-database/src/modules/builtin.ts";
 import { DatabasePlace } from "../silverware-database/src/core/place.ts";
+import { documentsHost, type DocumentsSource } from "../silverware-database/src/core/documents.ts";
 import { ViewRegistry } from "../silverware-database/src/core/views.ts";
 import { TypeRegistry } from "../silverware-database/src/domain/types/registry.ts";
 import { MemoryStore } from "../silverware-database/src/store/memory.ts";
@@ -55,13 +56,17 @@ const ui = {
 const settings = { get: (_path: string, fallback: unknown) => fallback };
 
 let store: MemoryStore;
+// The pages a reference may name: the playground has no space of its own
+const PAGES: DocumentsSource = { list: () => ["Projects/Alpha", "Projects/Beta", "People/Ada", "People/Linus", "Notes/Weekly"], open: (name) => flash(`Open ${name}`), folderSeparator: "/" };
+
 let places: DatabasePlace[] = [];
 
 function start(): void {
   for (const place of places) place.destroy();
   store = new MemoryStore(SAMPLE_DATABASES);
   const types = new TypeRegistry();
-  const core = new DatabaseCore(store, types, ui);
+  // (The playground's items stand for pages, as SilverBullet's)
+  const core = new DatabaseCore(store, types, ui, { one: "page", many: "pages" });
   // The built-in views, and the playground's own after them (the raw data a view gets)
   const views = new ViewRegistry([...BUILT_IN_VIEWS, ...DEBUG_VIEWS.filter((view) => view.name === "raw")]);
   const modules = new Modules(
@@ -76,6 +81,7 @@ function start(): void {
       itemBodies: store.capabilities.itemBody,
       body: (id, item) => store.body(id, item.key),
       openDocument: async (item) => flash(`Open ${store.documentOf(item.key) ?? item.name}`),
+      ...documentsHost(PAGES, core.noun, ui),
       // (The playground's page has no editor apart: the window)
       editorArea: () => undefined,
       onChanged: (listener) => store.onChanged((change) => listener(change.database)),
@@ -94,7 +100,7 @@ function start(): void {
     element.className = "swd-place";
     section.append(element);
     main.append(section);
-    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store, core, types, views, settings, ui, editor: { open: (ref) => flash(`Open ${ref}`) }, moduleMenu: (where, menu) => modules.placeMenu(where, menu), placeDrawn: (where) => modules.placeDrawn(where), openItem: (item, database) => modules.openItem(item, database) });
+    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store, core, types, views, settings, ui, editor: { open: (ref) => flash(`Open ${ref}`) }, documents: PAGES, moduleMenu: (where, menu) => modules.placeMenu(where, menu), placeDrawn: (where) => modules.placeDrawn(where), openItem: (item, database) => modules.openItem(item, database) });
     return place;
   });
   void modules.start().then(() => places.forEach((place) => void place.render()));

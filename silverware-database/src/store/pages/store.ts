@@ -16,12 +16,12 @@ import { readFrontmatter } from "../../../../shared/pages/frontmatter.ts";
 import { type ApplyReport, type PagePlan, type PageWriter, pageWriter } from "../../../../shared/pages/writer.ts";
 import type { Index, IndexedObject, Platform, Space, TaskCount } from "../../../../shared/platform.ts";
 import type { Changes } from "../../core/changes.ts";
-import type { DatabaseStore, VersionStatus, MigrationScope, Planned, SkipCause, Skipped, StoreCapabilities, Target, TransactionPlan, TransactionReport, WriteProgress } from "../../core/store.ts";
+import type { DatabaseStore, LooseKey, VersionStatus, MigrationScope, Planned, SkipCause, Skipped, StoreCapabilities, Target, TransactionPlan, TransactionReport, WriteProgress } from "../../core/store.ts";
 import { told } from "../../core/store.ts";
 import type { Database, DatabaseSummary, Item, ItemKey, Revised } from "../../model/database.ts";
-import { draftTransaction, type ItemState, type RecordState, type StoreRules, type StoreState, takenNames, withoutClashes } from "../transaction.ts";
+import { draftTransaction, type ItemState, looseKeys, type RecordState, type StoreRules, type StoreState, takenNames, withoutClashes } from "../transaction.ts";
 import { hasSystem, localStamp, type SystemFacts, withSystemValues } from "../../domain/system.ts";
-import { VERSIONS, ITEM_TAG, type PagesVersion, ROOT_TAG, schemaEntry, systemOf, versionOf } from "./versions.ts";
+import { modelValue, VERSIONS, ITEM_TAG, type PagesVersion, ROOT_TAG, schemaEntry, systemOf, versionOf } from "./versions.ts";
 
 export type PagesStoreOptions = {
   /** The root page a database made by the store gets (by default `db-<id>` at the space's top; the binding: beside the page showing it) */
@@ -62,13 +62,24 @@ type Part = {
   readonly after: ItemState | RecordState | undefined;
   readonly withRecord: boolean;
   readonly recordRead?: string;
+  // The keys the write takes off its page (a value taken off, a key outside the schema): the index has caught up only without them
+  readonly gone?: readonly string[];
 };
+
+/** The keys of an item's page a write takes off: those it had (its values, its keys outside the schema) and has no more */
+function goneKeys(before: ItemState | undefined, after: ItemState | undefined): readonly string[] {
+  if (!before || !after) return [];
+  const kept = new Set([...Object.keys(after.values), ...Object.keys(after.loose ?? {})]);
+  return [...Object.keys(before.values), ...Object.keys(before.loose ?? {})].filter((key) => !kept.has(key));
+}
 
 // A page the store wrote, as the index will have it (none: removed), the tags it had (a removed page's: let go only by a
 // query of one of them), what the store knows of it meanwhile (an item's page: made when it was, written now, its tags);
 // whether the write is done, whether the index has told of the page since, and started on it since the write was done
 type Held = {
   readonly object: IndexedObject | undefined;
+  // The keys the write took off the page: the index has caught up only without them
+  readonly gone?: readonly string[];
   readonly tags: readonly string[];
   readonly facts?: SystemFacts;
   written?: boolean;
@@ -197,7 +208,8 @@ export class PagesStore implements DatabaseStore {
     const read = await this.read(id);
     if (!read) return { value: [], revision: "0" };
     const pages = new Map([...read.items.values()].map(({ item, page }) => [item.key, page]));
-    const plain = [...read.items.values()].map(({ item, revision }) => ({ ...item, revision }));
+    // (What it keeps apart is none of an item's: `looseValues` gives it)
+    const plain = [...read.items.values()].map(({ item: { loose: _loose, ...item }, revision }) => ({ ...item, revision }));
     // The pages' tasks counted, only where the database shows their progress (every task of the space read)
     const tasks = hasSystem(read.record.database, "taskProgress") ? await this.tasksOf(id, new Set(pages.values())) : undefined;
     // The system properties' values from the pages' facts (an item's revision its own: they are not what a write checks)
@@ -208,6 +220,11 @@ export class PagesStore implements DatabaseStore {
     });
     const system = read.record.database.properties.filter((one) => one.system !== undefined);
     return { value: items, revision: revisionOf(items.map((one) => (system.length ? [one.revision, system.map((property) => one.values[property.key] ?? null)] : one.revision))) };
+  }
+
+  async looseValues(id: string): Promise<readonly LooseKey[]> {
+    const read = await this.read(id);
+    return looseKeys([...(read?.items.values() ?? [])].map(({ item }) => ({ key: item.key, values: item.loose ?? {} })));
   }
 
   async body(id: string, item: ItemKey): Promise<string | undefined> {
@@ -287,6 +304,7 @@ export class PagesStore implements DatabaseStore {
           ...(item.ref === undefined ? {} : { ref: item.ref }),
           ...(item.key === undefined ? {} : { key: item.key }),
           after: item.after,
+          gone: goneKeys(item.before ?? was?.item, item.after),
           withRecord: !!draft.record,
           ...(draft.recordRead === undefined ? {} : { recordRead: draft.recordRead }),
         },
@@ -432,7 +450,7 @@ export class PagesStore implements DatabaseStore {
         continue;
       }
       const page = pagePlan.pages[0]!.page;
-      planned.push(this.part({ target: { item: was.key! }, changes: one.changes }, { database: report.database, made: read?.made, kind: "item", page, pagePlan, key: was.key!, after, withRecord: remade }));
+      planned.push(this.part({ target: { item: was.key! }, changes: one.changes }, { database: report.database, made: read?.made, kind: "item", page, pagePlan, key: was.key!, after, gone: goneKeys(was.part.after as ItemState | undefined, after), withRecord: remade }));
     }
     if (record?.was) {
       const { one, was } = record;
@@ -502,7 +520,7 @@ export class PagesStore implements DatabaseStore {
     // The holds this write makes (another write of the page at once makes its own: each marks and puts back its own alone)
     const mine = new Map<string, Held>();
     if (planned.renamedTo !== undefined) mine.set(planned.page, { object: undefined, tags });
-    mine.set(to, part.after === undefined ? { object: undefined, tags } : { object: this.objectOf(part, to, planned.page), tags, facts: this.heldFactsOf(part, to, planned.page) });
+    mine.set(to, part.after === undefined ? { object: undefined, tags } : { object: this.objectOf(part, to, planned.page), tags, facts: this.heldFactsOf(part, to, planned.page), ...(part.gone?.length ? { gone: part.gone } : {}) });
     for (const [one, hold] of mine) this.wrote.set(one, hold);
     const report = await this.writer.apply(part.pagePlan);
     // (The write done: what the index starts on from now has it)
@@ -560,7 +578,7 @@ export class PagesStore implements DatabaseStore {
       return { name: page, tags: [ROOT_TAG], _database: { id: record.database.id, name: record.database.name, version: record.version, properties } };
     }
     const item = part.after as ItemState;
-    return { name: page, tags: [ITEM_TAG, ...(this.facts.get(from)?.tags ?? [])], ...item.values, ...(item.rank === undefined ? {} : { _database: { rank: item.rank } }) };
+    return { name: page, tags: [ITEM_TAG, ...(this.facts.get(from)?.tags ?? [])], ...item.loose, ...item.values, ...(item.rank === undefined ? {} : { _database: { rank: item.rank } }) };
   }
 
   /** A database as read now: the index's objects, the pages the store wrote as it wrote them */
@@ -579,8 +597,14 @@ export class PagesStore implements DatabaseStore {
         const page = String(one.name);
         if (!page.startsWith(`${root}/`) || page.slice(root.length + 1).includes("/")) continue;
         const key = this.keyOf(page);
-        const item: ItemState = { key, ...reader.readItem(one, page.slice(root.length + 1), read.record) };
-        items.set(key, { page, item, revision: revisionOf({ name: item.name, values: item.values, rank: item.rank }) });
+        const { loose, ...own } = reader.readItem(one, page.slice(root.length + 1), read.record);
+        // (Its other keys but those the index gives every page)
+        const reserved = this.platform.index.reservedKeys;
+        const kept = loose && Object.fromEntries(Object.entries(loose).filter(([name]) => !reserved?.has(name)));
+        const item: ItemState = { key, ...own, ...(kept && Object.keys(kept).length ? { loose: kept } : {}) };
+        // (Its revision of what the store reads of it, those other keys too: one changed by hand since they were shown, the
+        // page is not written as they were)
+        items.set(key, { page, item, revision: revisionOf({ name: item.name, values: item.values, rank: item.rank, ...(item.loose ? { loose: item.loose } : {}) }) });
         // (A page it wrote, the index not having it yet: what it knows of it; else the index's)
         const writing = this.wrote.get(page);
         const held = writing?.object === one ? writing.facts : undefined;
@@ -603,7 +627,7 @@ export class PagesStore implements DatabaseStore {
       seen.add(page);
       const held = this.wrote.get(page);
       // The index caught up (it has the page as the store wrote it): the index's again
-      if (!held || (held.object && caughtUp(object, held.object))) {
+      if (!held || (held.object && caughtUp(object, held.object, held.gone))) {
         this.wrote.delete(page);
         out.push(object);
       } else if (held.object && hasTag(held.object, tag)) out.push(held.object);
@@ -661,8 +685,10 @@ export class PagesStore implements DatabaseStore {
   }
 }
 
-/** Whether the index has a page as the store wrote it: its own data and its values (its tags may be more) */
-function caughtUp(indexed: IndexedObject, mine: IndexedObject): boolean {
+/** Whether the index has a page as the store wrote it: its own data and its values (its tags may be more), none of the keys it took off */
+function caughtUp(indexed: IndexedObject, mine: IndexedObject, gone: readonly string[] = []): boolean {
   if (stable(systemOf(indexed)) !== stable(systemOf(mine))) return false;
-  return Object.entries(mine).every(([key, value]) => key === "name" || key === "tags" || key === "_database" || stable(indexed[key]) === stable(value));
+  if (gone.some((key) => key in indexed)) return false;
+  // (The index's values in the model's form, as the store holds them: a list of numbers as texts, a map as its JSON)
+  return Object.entries(mine).every(([key, value]) => key === "name" || key === "tags" || key === "_database" || stable(modelValue(indexed[key])) === stable(value));
 }

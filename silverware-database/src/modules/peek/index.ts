@@ -7,7 +7,7 @@ import { PeekPanel } from "./panel.ts";
 export const PEEK_MODULE: ModuleDefinition = {
   name: "peek",
   label: "Peek",
-  description: "An item opened from a view shows in a panel beside the page: its name, its properties and its content edited there, its page one press away (Open). Off: an item opens its page.",
+  description: "An item opened from a view shows in a panel beside the editor: its name, its properties and its content edited there, the item itself one press away (Open). Off: an item opens where it is kept.",
   settings: [{ key: "width", label: "Width", hint: "The panel's width in pixels, for every database (its left edge dragged sets it too; at most most of the editor's area)", control: "number", default: 600 }],
   start(host) {
     const panel = new PeekPanel(host);

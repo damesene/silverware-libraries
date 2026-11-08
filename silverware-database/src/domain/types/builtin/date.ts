@@ -1,28 +1,28 @@
 // Date: a day, as ISO text (`2026-11-10`), as formulas write dates and as
-// SilverBullet's index keeps one unquoted (probe 1). A date and time is no
-// date of this type (the index does not keep one as written).
+// SilverBullet's index keeps one unquoted (probe 1). A value with a time too
+// (a date and time's, the property's type changed) reads as its day and keeps
+// its time: shown, sorted, grouped and filtered by its day, its time kept as
+// another day is picked (domain/types/moment.ts).
 import { isEmpty } from "../../../model/database.ts";
+import { readMoment, writeMoment } from "../moment.ts";
 import { keptText, type PropertyType } from "../type.ts";
 
-const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
-
-/** Whether a text is a day of the calendar written as ISO (no 2026-02-30) */
-function isDay(text: string): boolean {
-  const m = DATE_RE.exec(text);
-  if (!m) return false;
-  const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-}
+const moment = (value: unknown) => (typeof value === "string" ? readMoment(value) : undefined);
 
 export const date: PropertyType = {
   name: "date",
   label: "Date",
-  validate: (value) => (isEmpty(value) || (typeof value === "string" && isDay(value)) ? undefined : "no date (YYYY-MM-DD)"),
-  text: keptText,
-  parse: (typed) => {
+  editor: "date",
+  validate: (value) => (isEmpty(value) || moment(value) ? undefined : "no date (YYYY-MM-DD)"),
+  text: (value) => moment(value)?.day ?? keptText(value),
+  // (Grouped by its day: a value with a time in the group of its day)
+  groupValue: (value) => moment(value)?.day ?? value,
+  parse: (typed, _params, was) => {
     const trimmed = typed.trim();
     if (trimmed === "") return { value: null };
-    return isDay(trimmed) ? { value: trimmed } : { problem: `"${trimmed}" is no date (YYYY-MM-DD)` };
+    const read = readMoment(trimmed);
+    if (!read) return { problem: `"${trimmed}" is no date (YYYY-MM-DD)` };
+    // (A day alone: the time the value had kept with it)
+    return { value: writeMoment(read.time === undefined ? { day: read.day, time: moment(was)?.time } : read) };
   },
 };

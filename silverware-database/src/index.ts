@@ -9,6 +9,7 @@ import { pageWriter, type PageWriter } from "../../shared/pages/writer.ts";
 import type { Platform } from "../../shared/platform.ts";
 import { DatabaseCore } from "./core/core.ts";
 import { Modules } from "./core/module.ts";
+import { documentsHost, platformDocuments } from "./core/documents.ts";
 import { DatabasePlace } from "./core/place.ts";
 import { SettingsDialog } from "./core/settings.ts";
 import type { ViewDefinition } from "./core/view.ts";
@@ -115,7 +116,7 @@ export function init(bridge: Bridge): void {
   const own: Partial<App> & { home: string } = { home: "" };
   const store = new PagesStore(platform, { rootPage: (id) => (own.home ? `${own.home}/db-${id}` : `db-${id}`) });
   const ui = { notify: platform.ui.notify, ask: async (message: string) => (await platform.ui.ask?.(message)) ?? false };
-  const core = new DatabaseCore(store, types, ui);
+  const core = new DatabaseCore(store, types, ui, platform.space.noun);
   const modules = new Modules(
     BUILT_IN_MODULES,
     {
@@ -136,6 +137,7 @@ export function init(bridge: Bridge): void {
           platform.ui.notify(`"${item.name}" could not be opened: ${error instanceof Error ? error.message : String(error)}`, { type: "error" });
         }
       },
+      ...documentsHost(platformDocuments(platform), core.noun, platform.ui),
       editorArea: () => editorArea(document),
       editorLook: () => editorLook(document),
       onChanged: (listener) => store.onChanged((change) => listener(change.database)),
@@ -275,7 +277,7 @@ function start(element: HTMLElement, shown: Shown): void {
     handovers.delete(key);
     return handover.until > Date.now() && handover.from !== shown.place ? handover.from.handOver() : undefined;
   };
-  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, settings: platform.settings, ui: platform.ui, editor: platform.editor, moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database) => app!.modules.openItem(item, database), editSource: () => void editSource(element, shown), takeOver });
+  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, settings: platform.settings, ui: platform.ui, editor: platform.editor, documents: platformDocuments(app!.platform), moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database) => app!.modules.openItem(item, database), editSource: () => void editSource(element, shown), takeOver });
   void shown.place.render();
 }
 

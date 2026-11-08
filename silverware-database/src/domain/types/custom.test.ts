@@ -11,8 +11,32 @@ describe("custom types", () => {
     expect(validateType({ ...fine, label: " " })).toContain("has no label");
     expect(validateType({ ...fine, parse: undefined } as unknown as PropertyType)).toContain("has no parse");
     expect(validateType({ ...fine, sortKey: "x" } as unknown as PropertyType)).toContain("sortKey is no function");
-    // (A built-in type's name: the views and editors draw that one by its name)
+    // (A built-in type's name: a property names its type by it, so it would stand for two)
     expect(validateType({ ...fine, name: "select" })).toContain("a built-in type's name");
+  });
+
+  it("keep the editor and the look they say, one of those known, so the views edit and draw them so", () => {
+    const chosen: PropertyType = { ...fine, editor: "select", look: "options" };
+    expect(validateType(chosen)).toBeUndefined();
+    expect(validateType({ ...fine, editor: "wheel" } as unknown as PropertyType)).toContain("its editor is one of");
+    expect(validateType({ ...fine, look: "sparkles" } as unknown as PropertyType)).toContain("its look is one of");
+    const guarded = guardedType(chosen, () => {});
+    expect([guarded.editor, guarded.look]).toEqual(["select", "options"]);
+    // (A checkbox's kinds too: a type of the user's turned by a press and drawn as a box)
+    expect(validateType({ ...fine, editor: "toggle", look: "check" })).toBeUndefined();
+    // (Its groups' value: a function, what it gives a value, else a group per value, told)
+    expect(validateType({ ...fine, groupValue: "day" } as unknown as PropertyType)).toContain("groupValue is no function");
+    const told: string[] = [];
+    const grouping = guardedType({ ...fine, groupValue: () => ({ odd: true }) as unknown as string }, (message) => void told.push(message));
+    expect(grouping.groupValue!("x", {})).toBe("x");
+    expect(told).toHaveLength(1);
+    // (Values that are lists kept said so: grouped, an item in the group of each)
+    expect(guardedType({ ...fine, lists: true }, () => {}).lists).toBe(true);
+    // (Never a value's group the group of none)
+    expect(guardedType({ ...fine, groupValue: () => "" }, () => {}).groupValue!("x", {})).toBe("x");
+    // (Never one without the other: a box edited as text, or a value turned by a press shown as text with nothing to turn it)
+    expect(validateType({ ...fine, editor: "toggle" })).toContain("go together");
+    expect(validateType({ ...fine, editor: "select", look: "check" })).toContain("go together");
   });
 
   it("tell a failure once per method, whatever its message, saying what was done", () => {

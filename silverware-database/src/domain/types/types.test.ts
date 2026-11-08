@@ -17,9 +17,40 @@ describe("property keys", () => {
 });
 
 describe("the built-in types", () => {
-  it("are the first seven, in their order, then date and time, offered for no property of the user's", () => {
-    expect(types.all().map((one) => one.name)).toEqual(["text", "number", "checkbox", "date", "select", "multi-select", "url", "datetime", "progress"]);
-    expect(types.all().filter((one) => one.offered === false).map((one) => one.name)).toEqual(["datetime", "progress"]);
+  it("are in their order, a day, a time and both side by side; progress, a system property's own, offered for no property of the user's", () => {
+    expect(types.all().map((one) => one.name)).toEqual(["text", "number", "checkbox", "date", "time", "datetime", "select", "multi-select", "url", "reference", "progress"]);
+    expect(types.all().filter((one) => one.offered === false).map((one) => one.name)).toEqual(["progress"]);
+  });
+
+  it("read a time of day, kept with two digits each, and a date and time of a real day", () => {
+    const time = type("time");
+    expect(time.parse("9:05", {})).toEqual({ value: "09:05" });
+    expect(time.parse("23:59:30", {})).toEqual({ value: "23:59:30" });
+    expect(time.parse("24:00", {})).toHaveProperty("problem");
+    expect(time.validate("9:05", {})).toBe("no time (HH:MM)");
+    const moment = type("datetime");
+    expect(moment.parse("2026-11-08T14:30", {})).toEqual({ value: "2026-11-08T14:30" });
+    expect(moment.parse("2026-02-30 10:00", {})).toHaveProperty("problem");
+    expect([type("date").editor, time.editor, moment.editor, type("url").editor]).toEqual(["date", "time", "datetime-local", "link"]);
+    expect([type("select").look, type("multi-select").look, type("progress").look, type("url").look]).toEqual(["options", "options", "share", "link"]);
+    // (A checkbox by its kinds too: turned by a press, drawn as a box; the views know no type by name)
+    expect([type("checkbox").editor, type("checkbox").look]).toEqual(["toggle", "check"]);
+  });
+
+  it("read a link as an address alone or with its text, as a markdown link; its text what is filtered", () => {
+    const link = type("url");
+    expect(link.parse("www.example.com", {})).toEqual({ value: "https://www.example.com" });
+    expect(link.parse("google.com", {})).toEqual({ value: "https://google.com" });
+    expect(link.parse("[Maps](google.com/maps)", {})).toEqual({ value: "[Maps](https://google.com/maps)" });
+    expect(link.parse("me@x.dev", {})).toEqual({ value: "mailto:me@x.dev" });
+    // (Written without its scheme by hand: read so)
+    expect(link.validate("google.com", {})).toBeUndefined();
+    expect(link.parse("no address", {})).toHaveProperty("problem");
+    expect(link.parse("[Docs](https://silverbullet.md/x)", {})).toEqual({ value: "[Docs](https://silverbullet.md/x)" });
+    expect(link.parse("[Docs](javascript:alert(1))", {})).toHaveProperty("problem");
+    expect(link.validate("[Docs](https://silverbullet.md)", {})).toBeUndefined();
+    expect(link.text("[Docs](https://silverbullet.md)", {})).toBe("Docs");
+    expect(link.text("https://silverbullet.md", {})).toBe("https://silverbullet.md");
   });
 
   it("show a share done as a percent, sort it as its number, read one typed as a share or a percent", () => {
@@ -39,9 +70,32 @@ describe("the built-in types", () => {
     const moment = type("datetime");
     expect(moment.text("2026-11-08T14:30:05.123", {})).toBe("2026-11-08 14:30");
     expect(moment.validate("2026-11-08T14:30:05.123", {})).toBeUndefined();
-    expect(moment.validate("2026-11-08", {})).toBe("no date and time (YYYY-MM-DD HH:MM)");
+    expect(moment.validate("2026-11-08 14:30", {})).toBeUndefined();
+    expect(moment.validate("2026-11-08T25:00", {})).toBe("no date and time (YYYY-MM-DD HH:MM)");
     expect(moment.parse("2026-11-08 14:30", {})).toEqual({ value: "2026-11-08T14:30" });
     expect(moment.sortKey!("2026-11-08T09:05", {}) < moment.sortKey!("2026-11-08T14:30:05.123", {})).toBe(true);
+  });
+
+  it("a date and a date and time read each other's values, so a change of type between them loses nothing", () => {
+    const [day, moment] = [type("date"), type("datetime")];
+    // A date and time's value as a date: its day shown, its time kept
+    expect(day.validate("2026-11-08T14:30", {})).toBeUndefined();
+    expect(day.text("2026-11-08T14:30", {})).toBe("2026-11-08");
+    // Another day picked: the time it had kept; a day and time typed whole: as typed
+    expect(day.parse("2026-11-12", {}, "2026-11-08T14:30")).toEqual({ value: "2026-11-12T14:30" });
+    expect(day.parse("2026-11-12", {}, "2026-11-08")).toEqual({ value: "2026-11-12" });
+    expect(day.parse("2026-11-12 09:00", {}, "2026-11-08T14:30")).toEqual({ value: "2026-11-12T09:00" });
+    // A date's value as a date and time: its day, no midnight made up for it
+    expect(moment.validate("2026-11-08", {})).toBeUndefined();
+    expect(moment.text("2026-11-08", {})).toBe("2026-11-08");
+    expect(moment.parse("2026-11-08", {})).toEqual({ value: "2026-11-08" });
+    // A time takes a date and time's time, its day left (a change of type to a time)
+    expect(type("time").parse("2026-11-08T14:30", {})).toEqual({ value: "14:30" });
+    expect(type("time").parse("2026-11-08", {})).toHaveProperty("problem");
+    // (A page's Created, to the millisecond: sorted so, its day changed keeping it; a time takes it to the second)
+    expect(moment.sortKey!("2026-11-08T14:30:05.123", {}) < moment.sortKey!("2026-11-08T14:30:05.9", {})).toBe(true);
+    expect(day.parse("2026-11-12", {}, "2026-11-08T14:30:05.123")).toEqual({ value: "2026-11-12T14:30:05.123" });
+    expect(type("time").parse("2026-11-08T14:30:05.123", {})).toEqual({ value: "14:30:05" });
   });
 
   it("read typed text as their values, or say why not", () => {
@@ -108,7 +162,7 @@ describe("the registry", () => {
     const mine: PropertyType = { name: "date", label: "My date", validate: () => undefined, text: String, parse: (text) => ({ value: text }) };
     const stars: PropertyType = { name: "stars", label: "Stars", validate: () => undefined, text: String, parse: (text) => ({ value: text }) };
     registry.define([stars, mine]);
-    expect(registry.all().map((one) => one.label)).toEqual(["Text", "Number", "Checkbox", "My date", "Select", "Multi-select", "URL", "Date & time", "Progress", "Stars"]);
+    expect(registry.all().map((one) => one.label)).toEqual(["Text", "Number", "Checkbox", "My date", "Time", "Date & time", "Select", "Multi-select", "URL", "Reference", "Progress", "Stars"]);
     registry.define([]);
     expect(registry.named("date")!.label).toBe("Date");
     expect(registry.named("stars")).toBeUndefined();

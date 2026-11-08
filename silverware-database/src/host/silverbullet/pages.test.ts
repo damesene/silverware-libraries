@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PAGE_KEYS, pageDates, tasksOfPages, validatePageName } from "./pages.ts";
+import { PAGE_KEYS, pageDates, referablePages, tasksOfPages, validatePageName } from "./pages.ts";
 
 describe("what SilverBullet says of a page, in the platform's terms", () => {
   it("names the keys every page object has, and a page's dates", () => {
@@ -20,5 +20,12 @@ describe("what SilverBullet says of a page, in the platform's terms", () => {
   it("refuses the names SilverBullet's isValidName does", () => {
     for (const name of ["x|y", "#tag", "[[x]]", ".hidden", "^up", "Fix v1.2", "a@b"]) expect(validatePageName(name), name).toBeDefined();
     expect(validatePageName("Fix login (2)")).toBeUndefined();
+  });
+});
+
+describe("the pages a reference may name", () => {
+  it("are the index's pages by name, meta ones (a tag meta or under it) left out", () => {
+    const pages = [{ name: "Zeta" }, { name: "CONFIG", tags: ["meta"] }, { name: "Library/x", tags: ["meta/library"] }, { name: "Alpha", tags: ["project", "metal"] }, { tags: ["x"] }];
+    expect(referablePages(pages)).toEqual(["Alpha", "Zeta"]);
   });
 });

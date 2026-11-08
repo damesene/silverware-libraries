@@ -6,6 +6,9 @@
 // so they follow its light and dark looks.
 import { el } from "../../../shared/elements.ts";
 import { wholePercent } from "../domain/types/builtin/progress.ts";
+import { fullAddress, isOpenable, prettyUrl, readLink } from "../domain/types/link.ts";
+import { pathOf } from "../domain/folders.ts";
+import { linkedDocument, type Reference, readReferences } from "../domain/types/reference.ts";
 import type { ViewHost } from "../core/view.ts";
 import { optionColor } from "../domain/types/options.ts";
 import { isEmpty, type Item, type Property, type Value } from "../model/database.ts";
@@ -19,7 +22,8 @@ export function problemOf(host: Pick<ViewHost, "type">, item: Item, property: Pr
 
 /** Whether an item lacks the value of a property required (a checkbox never does: unticked is its value) */
 export function missing(host: Pick<ViewHost, "type">, item: Item, property: Property): boolean {
-  return !!property.required && host.type(property).name !== "checkbox" && isEmpty(item.values[property.key]);
+  // (A value turned by a press is never missing: unticked is its value)
+  return !!property.required && host.type(property).editor !== "toggle" && isEmpty(item.values[property.key]);
 }
 
 /** A required value missing, as a line of values shows it: a pill of no color saying so */
@@ -139,18 +143,65 @@ function chosen(value: Value | undefined): string[] {
 }
 
 /**
- * A value drawn: pills for a select's and a multi-select's values, else its
- * type's text; nothing where it is empty. A checkbox is the view's own (a box
- * to tick, or its property's name on a card).
+ * A value drawn as its type's look says (`PropertyType.look`): its options as
+ * pills, a share as a bar beside its percent, a link to open, links to the
+ * documents it names; else its type's text; nothing where it is empty. A
+ * checkbox is the view's own (a box to tick, or its property's name on a card).
  */
-export function valueNodes(host: Pick<ViewHost, "document" | "type" | "text">, item: Item, property: Property): Node[] {
+export function valueNodes(host: Pick<ViewHost, "document" | "type" | "text" | "openByName" | "folderSeparator">, item: Item, property: Property): Node[] {
   const doc = host.document;
-  const kind = host.type(property).name;
-  if (kind === "select" || kind === "multi-select") return chosen(item.values[property.key]).map((one) => optionPill(doc, property, one));
-  const text = host.text(item, property.key);
-  // A share done: a bar filled to it beside its percent
+  const type = host.type(property);
   const value = item.values[property.key];
-  if (kind === "progress" && typeof value === "number" && value >= 0 && value <= 1)
+  if (type.look === "options") return chosen(value).map((one) => optionPill(doc, property, one));
+  // (Links only of a value that reads as the type: one that does not is shown as kept, marked by the view)
+  const references = type.look === "documents" && type.validate(value ?? null, property.params) === undefined ? readReferences(value) : undefined;
+  if (references) return references.map((one) => referenceNode(doc, one, host.folderSeparator, host.openByName));
+  const text = host.text(item, property.key);
+  if (type.look === "share" && typeof value === "number" && value >= 0 && value <= 1)
     return [el(doc, "span", { class: "swd-progress", attrs: { "aria-hidden": "true" } }, el(doc, "span", { class: "swd-progress-done", attrs: { style: `width: ${wholePercent(value)}%` } })), doc.createTextNode(text)];
+  // (A link only of a value that reads as the type: one that does not is shown as kept, marked by the view)
+  const link = type.look === "link" && typeof value === "string" && type.validate(value, property.params) === undefined ? readLink(value) : undefined;
+  // (Its address as a browser opens it: one written without its scheme by hand, https)
+  if (link && isOpenable(fullAddress(link.url))) return [linkNode(doc, { ...link, url: fullAddress(link.url) })];
   return text ? [doc.createTextNode(text)] : [];
+}
+
+/**
+ * A link to open in a tab of its own: its text, else its address as read
+ * (the host, the rest quieter: `github.com` `/silverbullet/issues`), its
+ * address its title. A press on it opens it alone: not the value's editor
+ * (pressed beside it, the value is edited)
+ */
+function linkNode(doc: Document, link: { readonly url: string; readonly text?: string }): HTMLElement {
+  const pretty = prettyUrl(link.url);
+  const shown = link.text !== undefined ? [doc.createTextNode(link.text)] : [doc.createTextNode(pretty.host), ...(pretty.rest ? [el(doc, "span", { class: "swd-link-rest", text: pretty.rest })] : [])];
+  const anchor = el(doc, "a", { class: "swd-link", attrs: { href: link.url, target: "_blank", rel: "noopener noreferrer", title: link.url } }, ...shown);
+  anchor.addEventListener("click", (event) => event.stopPropagation());
+  return anchor;
+}
+
+/**
+ * A reference: the document it names as a link (its text where it has one),
+ * opened in the editor by a press or Enter, which edits nothing (pressed
+ * beside it, the value is edited); a link of the page's look, not the
+ * browser's: a document is opened by the host, never by an address
+ */
+function referenceNode(doc: Document, reference: Reference, separator: string | undefined, open: (name: string) => Promise<void>): HTMLElement {
+  // (Its text where it has one; else its name, the folder of its document before it quieter, as a URL's path)
+  const folder = reference.text === undefined ? pathOf(linkedDocument(reference.target), separator).folder : undefined;
+  const shown =
+    folder === undefined
+      ? [doc.createTextNode(reference.text ?? reference.target)]
+      : [el(doc, "span", { class: "swd-reference-folder", text: `${folder}${separator}` }), doc.createTextNode(reference.target.slice(folder.length + separator!.length))];
+  const anchor = el(doc, "a", { class: "swd-reference", attrs: { title: reference.target, role: "link", tabindex: "0" } }, ...shown);
+  const opened = (event: Event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void open(reference.target);
+  };
+  anchor.addEventListener("click", opened);
+  anchor.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") opened(event);
+  });
+  return anchor;
 }

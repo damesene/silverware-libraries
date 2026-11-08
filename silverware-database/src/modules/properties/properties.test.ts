@@ -28,10 +28,11 @@ async function setup(answer = false, configured: Record<string, unknown> = {}, a
   if (itemDocuments) Object.defineProperty(store, "capabilities", { value: { ...store.capabilities, itemDocument: true } });
   const types = new TypeRegistry();
   const told: string[] = [];
-  const ui = { notify: (message: string) => void told.push(message), ask: () => answer };
+  let asked = 0;
+  const ui = { notify: (message: string) => void told.push(message), ask: () => (asked++, answer) };
   const core = new DatabaseCore(store, types, ui);
   let refreshed = 0;
-  const modules = new Modules(all, { document, core, types, ui, database: (id) => store.database(id), items: async (id) => (await store.items(id)).value, itemBodies: true, body: (id, item) => store.body(id, item.key), openDocument: async () => {}, editorArea: () => undefined, onChanged: (listener) => store.onChanged((one) => listener(one.database)), onDocumentOpened: () => () => {}, refreshPlaces: () => void refreshed++ }, { get: (path, fallback) => (path in configured ? configured[path] : fallback) });
+  const modules = new Modules(all, { document, core, types, ui, database: (id) => store.database(id), items: async (id) => (await store.items(id)).value, itemBodies: true, body: (id, item) => store.body(id, item.key), openDocument: async () => {}, documents: async () => [], validateDocumentName: () => undefined, openByName: async () => {}, noun: { one: "page", many: "pages" }, editorArea: () => undefined, onChanged: (listener) => store.onChanged((one) => listener(one.database)), onDocumentOpened: () => () => {}, refreshPlaces: () => void refreshed++ }, { get: (path, fallback) => (path in configured ? configured[path] : fallback) });
   await modules.start();
   const schema = async () => (await store.database("tasks"))!.value.properties;
   const named = async (name: string) => (await store.items("tasks")).value.find((one) => one.name === name)!;
@@ -40,7 +41,7 @@ async function setup(answer = false, configured: Record<string, unknown> = {}, a
     await settle();
   };
   const q = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
-  return { store, core, modules, schema, named, open, q, told, refreshed: () => refreshed };
+  return { store, core, modules, schema, named, open, q, told, refreshed: () => refreshed, asked: () => asked };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
@@ -119,8 +120,9 @@ describe("the properties' dialog", () => {
     const { open, q, schema, named } = await setup();
     await open();
     const types = () => [...q<HTMLSelectElement>(".swd-property-new-type").options];
-    // (Date and time is a system property's own: not offered for one of the user's)
-    expect(types().some((one) => one.value === "datetime")).toBe(false);
+    // (Progress is a system property's own: not offered for one of the user's; date and time is)
+    expect(types().some((one) => one.value === "progress")).toBe(false);
+    expect(types().some((one) => one.value === "datetime")).toBe(true);
     expect(types().filter((one) => one.value.startsWith("system:")).map((one) => one.text)).toEqual(["Created", "Modified", "Order", "Page", "Tags", "Task progress"]);
     change(q<HTMLSelectElement>(".swd-property-new-type"), "system:order");
     expect(q<HTMLInputElement>(".swd-property-new-label").value).toBe("Order");
@@ -144,6 +146,53 @@ describe("the properties' dialog", () => {
     q<HTMLButtonElement>(".swd-property-apply").click();
     await settle();
     expect((await schema()).some((one) => one.key === "order")).toBe(false);
+  });
+
+  it("shows the values outside the database on a screen of their own, read only as it is asked for: added with a type picked, or taken off the pages", async () => {
+    const { open, q, schema, store, named } = await setup();
+    // A key the items keep that no property is
+    store.changeOutside("tasks", (await named("Fix login")).key, { values: { points: 5 } });
+    store.changeOutside("tasks", (await named("Write docs")).key, { values: { points: 8, legacy: "x" } });
+    const looseValues = store.looseValues.bind(store);
+    let read = 0;
+    store.looseValues = (id) => (read++, looseValues(id));
+    await open();
+    expect(read).toBe(0);
+    q<HTMLButtonElement>(".swd-property-loose-open").click();
+    await settle();
+    expect(read).toBe(1);
+    const rows = () => [...document.querySelectorAll<HTMLElement>(".swd-loose-row")].map((row) => [row.dataset.key, row.querySelector(".swd-loose-count")!.textContent, row.querySelector<HTMLSelectElement>(".swd-loose-type")!.value]);
+    expect(rows()).toEqual([
+      ["points", "2 items", "number"],
+      ["legacy", "1 item", "text"],
+    ]);
+    // Added as a text, its values back in the items
+    const type = q<HTMLSelectElement>('.swd-loose-row[data-key="points"] .swd-loose-type');
+    type.value = "text";
+    type.dispatchEvent(new Event("change"));
+    q<HTMLButtonElement>('.swd-loose-row[data-key="points"] .swd-loose-add').click();
+    await settle();
+    expect((await schema()).at(-1)).toMatchObject({ key: "points", label: "Points", type: "text" });
+    expect(rows().map(([key]) => key)).toEqual(["legacy"]);
+    // Taken off the pages: shown first, applied, gone from the screen and the items
+    q<HTMLButtonElement>('.swd-loose-row[data-key="legacy"] .swd-loose-remove').click();
+    await settle();
+    expect(q(".swd-property-review").textContent).toContain('Take "legacy" off the items: one item changes');
+    q<HTMLButtonElement>(".swd-property-apply").click();
+    await settle();
+    expect((await named("Write docs")).values.legacy).toBeUndefined();
+    expect(q(".swd-loose-none").textContent).toBe("Every key the items keep is a property of the database.");
+    // Back to the properties
+    q<HTMLButtonElement>(".swd-loose-back").click();
+    expect(document.querySelector(".swd-property-new-label")).not.toBeNull();
+    // Closed on that screen: opened again on the properties
+    q<HTMLButtonElement>(".swd-property-loose-open").click();
+    await settle();
+    document.querySelector<HTMLElement>(".swd-settings-close")!.click();
+    await settle();
+    await open();
+    expect(document.querySelector(".swd-loose")).toBeNull();
+    expect(document.querySelector(".swd-property-new-label")).not.toBeNull();
   });
 
   it("makes a property required from its details, marked * in the list", async () => {
@@ -293,7 +342,7 @@ describe("the properties' dialog", () => {
     for (let at = 0; at < 200; at++) await core.create("tasks", { name: `Item ${at}`, values: { status: "Todo" } });
     q<HTMLButtonElement>(".swd-property-options-save").click();
     await settle();
-    expect(q(".swd-property-review").textContent).toContain("Writes 202 pages: it takes a while; keep this page open until it is done");
+    expect(q(".swd-property-review").textContent).toContain("Writes 202 pages: it takes a while; keep this window open until it is done");
   });
 
   it("stays open while a change is written, said why, and closes once it is", async () => {
@@ -312,7 +361,7 @@ describe("the properties' dialog", () => {
     await settle();
     q<HTMLElement>(".swd-settings-close").click();
     await settle();
-    expect(told.at(-1)).toContain("Wait until the change is written");
+    expect(told.at(-1)).toContain("Wait until the change is shown or written");
     expect(document.querySelector(".swd-property-review")).not.toBeNull();
     letGo();
     await settle();
@@ -487,12 +536,16 @@ describe("the properties' dialog", () => {
     expect((await schema())[0]!.params).toEqual({ options: ["Todo", "Doing"], colors: { Todo: "red" } });
   });
 
-  it("removes a property keeping its values, unless asked to take them too", async () => {
+  it("removes a property, asking nothing: the review shown at once, its values kept unless its switch takes them off too", async () => {
     const kept = await setup(false);
     await kept.open();
     expand("estimate");
     kept.q<HTMLButtonElement>('[data-property="estimate"] .swd-property-remove').click();
     await settle();
+    // The review with its switch, off: nothing taken off the items
+    const choice = () => kept.q<HTMLInputElement>('.swd-property-choice input[role="switch"]');
+    expect(choice().checked).toBe(false);
+    expect(kept.q(".swd-property-review").textContent).toContain("no item's value changes");
     kept.q<HTMLButtonElement>(".swd-property-apply").click();
     await settle();
     expect((await kept.schema()).map((one) => one.key)).toEqual(["status"]);
@@ -503,8 +556,19 @@ describe("the properties' dialog", () => {
     expand("estimate");
     gone.q<HTMLButtonElement>('[data-property="estimate"] .swd-property-remove').click();
     await settle();
+    // Switched on: held still while the change is proposed again, then what it writes said, the focus on the switch (not on
+    // Apply, which a second key would press)
+    const on = gone.q<HTMLInputElement>('.swd-property-choice input[role="switch"]');
+    on.checked = true;
+    on.dispatchEvent(new Event("change"));
+    expect(on.disabled).toBe(true);
+    await settle();
+    const switched = gone.q<HTMLInputElement>('.swd-property-choice input[role="switch"]');
+    expect([switched.checked, switched.disabled, document.activeElement === switched]).toEqual([true, false, true]);
+    expect(gone.q(".swd-property-review").textContent).toContain("Remove Estimate and its values: 2 items change");
     gone.q<HTMLButtonElement>(".swd-property-apply").click();
     await settle();
     expect((await gone.named("Fix login")).values.estimate).toBeUndefined();
+    expect([kept.asked(), gone.asked()]).toEqual([0, 0]);
   });
 });

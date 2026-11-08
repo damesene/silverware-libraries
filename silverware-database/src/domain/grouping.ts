@@ -7,12 +7,14 @@
 // kept that is none of them. A multi-select's item is in the group of each of
 // its values. A checkbox: Checked, then Unchecked (an item without the
 // property reads unticked). Any other type (text, a number, a date, a URL, a
-// type of the user's): a group per value, in the order sorting gives them.
+// type of the user's): a group per value, or per the value the type groups
+// it by (`groupValue`: a date's day, whatever its time), in the order sorting
+// gives them.
 // Items without a value: a group of their own, first, only where there are any.
 import { compareForSort } from "../../../shared/compare.ts";
-import { isEmpty, type Item, type Property, type Value } from "../model/database.ts";
+import { isEmpty, type Item, type Params, type Property, type Value } from "../model/database.ts";
 import { optionsOf } from "./types/options.ts";
-import type { PropertyType } from "./types/type.ts";
+import { keptText, type PropertyType } from "./types/type.ts";
 
 /** A group: its key (kept to remember it folded), its title, the value an item added in it gets (none: the group of none), its items */
 export type ItemGroup = {
@@ -36,7 +38,8 @@ export function groupItems(items: readonly Item[], property: Property, type: Pro
     if (item) group.items.push(item);
   };
   const keyOf = (value: Value) => `value:${JSON.stringify(value)}`;
-  if (type.name === "checkbox") {
+  // (A value turned by a press, true or not: Checked and Unchecked, an item without it unticked)
+  if (type.editor === "toggle") {
     add(keyOf(true), () => ({ label: "Checked", value: true, known: true, sort: "" }), undefined);
     add(keyOf(false), () => ({ label: "Unchecked", value: false, known: true, sort: "" }), undefined);
     for (const item of items) {
@@ -46,10 +49,13 @@ export function groupItems(items: readonly Item[], property: Property, type: Pro
     return [...groups].map(([key, group]) => ({ key, label: group.label, value: group.value, known: group.known, items: group.items }));
   }
   const options = optionsOf(property.params);
-  const list = type.name === "multi-select";
+  // (Its values lists where the type picks several: a multi-select's, references, a type of the user's so)
+  const list = type.lists === true;
   // An item added in a group gets its value as the type keeps it: a multi-select's a list of it
   const valueOf = (one: string): Value => (list ? [one] : one);
   for (const option of options) add(keyOf(option), () => ({ label: option, value: valueOf(option), known: true, sort: "" }), undefined);
+  // (Values of one group where the type says so: a date's day, whatever its time; else a group per value)
+  const grouped = (part: Value): Value => (type.groupValue && type.validate(part, property.params) === undefined ? type.groupValue(part, property.params) : part);
   for (const item of items) {
     const value = item.values[property.key];
     if (value === undefined || isEmpty(value)) {
@@ -57,7 +63,8 @@ export function groupItems(items: readonly Item[], property: Property, type: Pro
       continue;
     }
     // A list (a multi-select's): the item in each of its values' groups, once
-    const parts: readonly Value[] = Array.isArray(value) ? [...new Set(value)] : [value];
+    // (Each part by its group's value: a reference by the document it names, whatever text its link shows)
+    const parts: readonly Value[] = [...new Map((Array.isArray(value) ? value : [value]).map((one) => grouped(one)).map((one) => [JSON.stringify(one), one])).values()];
     for (const part of parts) {
       const text = typeof part === "string" ? part : type.text(part, property.params);
       const known = !options.length || options.includes(text);
@@ -99,22 +106,33 @@ const same = (a: Value | undefined, b: Value | undefined) => JSON.stringify(a) =
 
 /**
  * An item's value once it is moved from one group to another (a board's card
- * dragged to another column). A value alone (or none): the other group's. A
+ * dragged to another column). A value alone (or none): the other group's (a
+ * type grouping values that differ given: read over the item's own, so a date
+ * keeps its time). A
  * list (a multi-select's, or a list kept under any property): the value of the
  * group it left replaced in its place by the other's (every copy of it gone,
  * so it is out of that group), its other values kept as they are, nothing of
  * them lost; the other's value there already, not twice; to the group of none,
  * that value alone taken off; none left: no value (undefined: taken off)
  */
-export function movedValue(value: Value | undefined, from: ItemGroup | undefined, to: ItemGroup): Value | undefined {
-  if (!Array.isArray(value)) return to.value;
+export function movedValue(value: Value | undefined, from: ItemGroup | undefined, to: ItemGroup, type?: PropertyType, params: Params = {}): Value | undefined {
+  if (!Array.isArray(value)) {
+    // (A group of values that differ, the type's: its value read over the item's own, a date keeping its time)
+    if (!type?.groupValue || value === undefined || to.value === undefined || isEmpty(value)) return to.value;
+    const read = type.parse(keptText(to.value), params, value);
+    // (Only where it lands in that group: else the group's value as it is)
+    return "value" in read && type.validate(read.value, params) === undefined && same(type.groupValue(read.value, params), to.value) ? read.value : to.value;
+  }
   const leaving = partOf(from);
   const coming = partOf(to);
-  const has = (one: Value | undefined) => one !== undefined && value.some((each) => same(each, one) || each === String(one));
+  // (A part by its group's value where the type groups values that differ: `[[B|bee]]` is in the group of `[[B]]`)
+  const key = (one: Value): Value => (type?.groupValue ? type.groupValue(one, params) : one);
+  const isOf = (each: string, group: Value) => same(key(each), key(group)) || each === String(group);
+  const has = (one: Value | undefined) => one !== undefined && value.some((each) => isOf(each, one));
   const kept: string[] = [];
   let placed = has(coming);
   for (const each of value) {
-    if (leaving === undefined || (!same(each, leaving) && each !== String(leaving))) kept.push(each);
+    if (leaving === undefined || !isOf(each, leaving)) kept.push(each);
     else if (!placed && coming !== undefined) {
       kept.push(String(coming));
       placed = true;

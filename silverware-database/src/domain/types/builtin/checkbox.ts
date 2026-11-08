@@ -10,6 +10,8 @@ const CLEAR = new Set(["false", "no", "0"]);
 export const checkbox: PropertyType = {
   name: "checkbox",
   label: "Checkbox",
+  editor: "toggle",
+  look: "check",
   validate: (value) => (isEmpty(value) || typeof value === "boolean" ? undefined : "neither ticked nor not"),
   text: (value) => (typeof value === "boolean" ? String(value) : isEmpty(value) ? "false" : keptText(value)),
   parse: (typed) => {

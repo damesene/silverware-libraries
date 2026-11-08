@@ -43,6 +43,43 @@ describe("grouping a view's items", () => {
     expect(groups([item("a", { p: "2026-12-01" }), item("b", { p: "2026-11-20" }), item("c", {})], property("date")).map(([label]) => label)).toEqual(["No P", "2026-11-20", "2026-12-01"]);
   });
 
+  it("groups a date by its day whatever its time, a card moved to another day keeping its time", () => {
+    const date = property("date");
+    const days = groupItems([item("a", { p: "2026-11-08T14:30" }), item("b", { p: "2026-11-08" }), item("c", { p: "2026-11-09T09:00" })], date, types.named("date")!);
+    expect(days.map((group) => [group.label, group.value, group.items.map((each) => each.name)])).toEqual([
+      ["2026-11-08", "2026-11-08", ["a", "b"]],
+      ["2026-11-09", "2026-11-09", ["c"]],
+    ]);
+    expect(movedValue("2026-11-08T14:30", days[0], days[1]!, types.named("date")!)).toBe("2026-11-09T14:30");
+    expect(movedValue("2026-11-08", days[0], days[1]!, types.named("date")!)).toBe("2026-11-09");
+    // A date and time to the minute, as shown: a card moved there takes that minute; a value that is no date its own group
+    const moments = groupItems([item("a", { p: "2026-11-08T14:30:05.123" }), item("b", { p: "2026-11-08T14:30" }), item("c", { p: "2026-11-08T15:00:09" })], property("datetime"), types.named("datetime")!);
+    expect(moments.map((group) => [group.label, group.value, group.items.map((each) => each.name)])).toEqual([
+      ["2026-11-08 14:30", "2026-11-08T14:30", ["a", "b"]],
+      ["2026-11-08 15:00", "2026-11-08T15:00", ["c"]],
+    ]);
+    expect(movedValue("2026-11-08T14:30:05.123", moments[0], moments[1]!, types.named("datetime")!)).toBe("2026-11-08T15:00");
+    expect(groups([item("a", { p: "soon" }), item("b", { p: "2026-11-08T14:30" })], date).map(([, value]) => value)).toEqual(["2026-11-08", "soon"]);
+    // References: an item in the group of each page it names, the group's value a list of its link
+    const pages = groups([item("a", { p: ["[[Alpha]]", "[[Beta]]"] }), item("b", { p: ["[[Beta]]"] })], property("reference"));
+    expect(pages).toEqual([
+      ["Alpha", ["[[Alpha]]"], ["a"]],
+      ["Beta", ["[[Beta]]"], ["a", "b"]],
+    ]);
+    // A link with a text of its own in the group of the page it names; moved, it leaves that group and lands in the other once
+    const reference = types.named("reference")!;
+    const byPage = groupItems([item("a", { p: ["[[Beta|bee]]"] }), item("b", { p: ["[[Beta]]", "[[Alpha]]"] })], property("reference"), reference);
+    expect(byPage.map((group) => [group.label, group.items.map((each) => each.name)])).toEqual([
+      ["Alpha", ["b"]],
+      ["Beta", ["a", "b"]],
+    ]);
+    expect(movedValue(["[[Beta|bee]]"], byPage[1], byPage[0]!, reference)).toEqual(["[[Alpha]]"]);
+    expect(movedValue(["[[Gamma]]", "[[Alpha|ay]]"], undefined, byPage[0]!, reference)).toEqual(["[[Gamma]]", "[[Alpha|ay]]"]);
+    // (A link's text shown, which reads as no link: its group by its value, as kept)
+    const links = groups([item("a", { p: "[Docs](https://a.dev)" }), item("b", { p: "[Docs](https://b.dev)" })], property("url"));
+    expect(links.map(([, value]) => value)).toEqual(["[Docs](https://a.dev)", "[Docs](https://b.dev)"]);
+  });
+
   it("arranges groups in the order given them by hand, new ones after, those hidden and empty ones left out of what shows", () => {
     const status = property("select", { options: ["Todo", "Doing", "Done"] });
     const made = groupItems([item("a", { p: "Done" }), item("b", { p: "Todo" })], status, types.named("select")!);

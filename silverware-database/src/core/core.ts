@@ -11,7 +11,9 @@
 // a value that does not read as a property's new type is kept as read, a key
 // that items still hold values under (a property removed) is not taken over,
 // and every transaction is undone by `undo`.
+import { guessedType, optionsOfValues } from "../domain/loose.ts";
 import { systemKind } from "../domain/system.ts";
+import { DOCUMENT, type Noun } from "../domain/noun.ts";
 import type { UserInterface } from "../../../shared/platform.ts";
 import { inRankOrder, isRank, placeAt } from "../domain/rank.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
@@ -21,7 +23,7 @@ import { type Database, type Item, type ItemKey, isEmpty, isValue, NAME_KEY, typ
 import { databaseChanges, type DatabaseChangesBuilder } from "./builder.ts";
 import type { Changes } from "./changes.ts";
 import { TransactionHistory } from "./history.ts";
-import type { DatabaseStore, Skipped, Target, TransactionPlan, TransactionReport, WriteProgress } from "./store.ts";
+import type { DatabaseStore, LooseKey, Skipped, Target, TransactionPlan, TransactionReport, WriteProgress } from "./store.ts";
 
 /** What the core asks of the user: told what was refused or left, asked before anything is removed */
 export type CoreInterface = Pick<UserInterface, "notify"> & Required<Pick<UserInterface, "ask">>;
@@ -63,6 +65,10 @@ export type Proposal = {
   // Written whole or not at all, proposed against the items at this revision: a key changed in part would leave items' values under the old key, out of every view
   readonly whole?: { readonly items: string };
 };
+
+/** A key items keep that the schema has none of, as the core shows it: how many items, a few of their values, the type they look like */
+// `options`: its values as a select's options would be (a select or multi-select added of it takes them)
+export type LooseProperty = { readonly key: string; readonly items: number; readonly samples: readonly string[]; readonly type: string; readonly options: readonly string[] };
 
 /** An option renamed, and how many items hold it */
 export type OptionRenamed = { readonly from: string; readonly to: string; readonly items: number };
@@ -130,6 +136,8 @@ export class DatabaseCore {
     private readonly store: DatabaseStore,
     private readonly types: TypeRegistry,
     private readonly ui: CoreInterface,
+    /** What the place the items are kept in calls its documents, for what is said to the user */
+    readonly noun: Noun = DOCUMENT,
   ) {
     this.history = new TransactionHistory(store);
   }
@@ -262,7 +270,8 @@ export class DatabaseCore {
   async addProperty(database: string, property: NewProperty): Promise<Result> {
     const read = await this.read(database);
     if ("problem" in read) return read;
-    const made = this.newProperty(property, read.database.value.properties, read.items.value);
+    // (The keys the store keeps apart taken too: a property named so takes no values typed by hand, unless asked by its key)
+    const made = this.newProperty(property, read.database.value.properties, read.items.value, (await this.store.looseValues(database)).map((one) => one.key));
     if (typeof made === "string") return this.refuse(made);
     return this.writeSchema(read.database, [...read.database.value.properties, made], `Add property ${made.label}`);
   }
@@ -378,7 +387,7 @@ export class DatabaseCore {
     if (!property) return this.refuse(`No property "${key}"`);
     if (property.system !== undefined) return this.refuse(systemProperty(property));
     if (newKey === key) return unchanged("The key is the same");
-    const problem = this.validateKey(newKey, read.database.value.properties) ?? validateKeptValues(newKey, read.items.value);
+    const problem = this.validateKey(newKey, read.database.value.properties) ?? validateKeptValues(newKey, read.items.value, await this.store.looseValues(database));
     if (problem) return this.refuse(problem);
     const changes = databaseChanges(database).expectDatabase(read.database.revision).schema(read.database.value.properties.map((one) => (one.key === key ? { ...one, key: newKey } : one)));
     for (const item of read.items.value) {
@@ -441,7 +450,7 @@ export class DatabaseCore {
         unreadable.push(item.key);
         continue;
       }
-      const parsed = newType.parse(keptText(value), kept);
+      const parsed = newType.parse(keptText(value), kept, value);
       if ("value" in parsed && newType.validate(parsed.value, kept) === undefined) changes.item(item, (i) => i.set(key, parsed.value));
       else unreadable.push(item.key);
     }
@@ -452,6 +461,36 @@ export class DatabaseCore {
     // (Written whole against the items as read, whether or not one holds a renamed option now: an item given an old name
     // meanwhile would take the meaning of another, a swap's; checked against them too, a value held that is no option)
     return { ...proposal, renamed, whole: { items: itemsRevision(read.items.value) } };
+  }
+
+  /**
+   * The keys items keep that the schema has none of (read as asked: every
+   * item's page looked through), each with how many items keep it, a few of
+   * their values as text, the type they look like (a property added with that
+   * key takes their values back: `addProperty` with `key`)
+   */
+  async looseProperties(database: string): Promise<readonly LooseProperty[] | Refused> {
+    const read = await this.store.database(database);
+    if (!read) return this.refuse(`No database "${database}"`);
+    return (await this.store.looseValues(database)).map(({ key, values }) => ({
+      key,
+      items: values.length,
+      samples: [...new Set(values.map(({ value }) => keptText(value)).filter(Boolean))].slice(0, 3),
+      type: guessedType(values.map(({ value }) => value)),
+      options: optionsOfValues(values.map(({ value }) => value)),
+    }));
+  }
+
+  /** A key the schema has none of taken off every item keeping it: a proposal, written whole or not at all */
+  async removeLooseProperty(database: string, key: string): Promise<Proposal | Refused> {
+    const read = await this.read(database);
+    if ("problem" in read) return read;
+    if (read.database.value.properties.some((one) => one.key === key)) return this.refuse(`"${key}" is a property of the database: remove it as one`);
+    const keeping = new Set((await this.store.looseValues(database)).find((one) => one.key === key)?.values.map(({ item }) => item) ?? []);
+    if (!keeping.size) return unchanged(`No item keeps "${key}"`);
+    const changes = databaseChanges(database).expectDatabase(read.database.revision);
+    for (const item of read.items.value) if (keeping.has(item.key)) changes.item(item, (i) => i.unset(key));
+    return { ...(await this.propose(changes.build(), `Take "${key}" off the items`)), whole: { items: itemsRevision(read.items.value) } };
   }
 
   /** A property removed from the schema (its values stay in the items unless `values`, then taken off them too): a proposal */
@@ -510,7 +549,7 @@ export class DatabaseCore {
       if (!last || !plan) return undefined;
       // Many pages, one after another (an option renamed in thousands of items): said, and asked first
       if (this.store.capabilities.itemDocument && manyDocuments(plan).many) {
-        if (!(await this.ui.ask(`Undo "${last.label}"? It writes ${plan.planned.length.toLocaleString("en-US")} pages, one after another: it takes a while; keep this page open until it is done.`))) return { problem: "Not undone", cause: "declined" };
+        if (!(await this.ui.ask(`Undo "${last.label}"? It writes ${plan.planned.length.toLocaleString("en-US")} ${this.noun.many}, one after another: it takes a while; keep this window open until it is done.`))) return { problem: "Not undone", cause: "declined" };
         // (Asked, the pages may have changed meanwhile, another client's, a change recorded since: the last one planned anew)
         if (this.history.last(database) !== last) return this.refuse(`Undo: "${last.label}" is no longer the last change: not undone, undo again`);
         plan = await this.history.planUndo(last.report);
@@ -559,11 +598,11 @@ export class DatabaseCore {
   }
 
   /** A property as added to `properties`, or why it cannot be; a key made from its label is one no item keeps a value under */
-  private newProperty(property: NewProperty, properties: readonly Property[], items: readonly Item[]): Property | string {
-    const taken = new Set([...properties.map((one) => one.key), ...items.flatMap((item) => Object.keys(item.values))]);
+  private newProperty(property: NewProperty, properties: readonly Property[], items: readonly Item[], loose: readonly string[] = []): Property | string {
+    const taken = new Set([...properties.map((one) => one.key), ...items.flatMap((item) => Object.keys(item.values)), ...loose]);
     // A system property: its type and key its kind's, read only, its label the kind's where none is given; one of a kind
     if (property.system !== undefined) {
-      const kind = systemKind(property.system);
+      const kind = systemKind(property.system, this.noun);
       if (!kind) return `No system property "${property.system}"`;
       const there = properties.find((one) => one.system === kind.kind);
       if (there) return `${kind.label} is there already: ${there.label}`;
@@ -629,10 +668,12 @@ function writable(database: Database, key: string): Property | string {
 }
 
 /** Why a key cannot take a property's values: items keep values under it (a property removed, its values kept), which would be written over */
-function validateKeptValues(key: string, items: readonly Item[]): string | undefined {
-  const holding = items.filter((item) => item.values[key] !== undefined);
-  if (!holding.length) return undefined;
-  return `${holding.length === 1 ? "An item keeps" : `${holding.length} items keep`} values under "${key}" (a property removed): add it back, or remove those values first`;
+function validateKeptValues(key: string, items: readonly Item[], loose: readonly LooseKey[] = []): string | undefined {
+  // (Values under it: among the items' values, or kept apart by the store, a key typed by hand)
+  const holding = new Set([...items.filter((item) => item.values[key] !== undefined).map((item) => item.key), ...(loose.find((one) => one.key === key)?.values.map(({ item }) => item) ?? [])]);
+  if (!holding.size) return undefined;
+  const count = holding.size;
+  return `${count === 1 ? "An item keeps" : `${count} items keep`} values under "${key}" (a property removed, or typed by hand): add it back, or remove those values first`;
 }
 
 /** The ranks of an item at `place` among `items` (the item itself left out, where it is one of them), or why the place is not there */

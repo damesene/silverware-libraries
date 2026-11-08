@@ -3,6 +3,7 @@
 // (docs/silverware-database.md, *The core*). Views import only types from
 // here: no view leans on the core's insides, and a custom view outside the
 // bundle uses the same.
+import type { DocumentsHost } from "./documents.ts";
 import type { GroupArrangement, ItemGroup } from "../domain/grouping.ts";
 import type { Filter, SortKey } from "../domain/listing.ts";
 import type { PropertyType } from "../domain/types/type.ts";
@@ -88,7 +89,7 @@ export type ViewListing = {
 };
 
 /** What a view gets: its database's data as it asks for it, the core's writes for that database, its own meta and settings */
-export type ViewHost = {
+export type ViewHost = DocumentsHost & {
   readonly document: Document;
   readonly database: Database;
   /** The items as the view shows them: filtered and sorted by its listing, else in the order by hand */

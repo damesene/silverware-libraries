@@ -52,6 +52,17 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
     const keyOf = async (store: DatabaseStore, itemName: string) => (await store.items("tasks")).value.find((item) => item.name === itemName)!.key;
     const itemOf = async (store: DatabaseStore, key: ItemKey) => (await store.items("tasks")).value.find((item) => item.key === key);
 
+    it("gives the values items keep under keys the schema has none of, and takes one off as any value", async () => {
+      const { store } = make([{ database: TASKS, items: [{ name: "Fix login", values: { status: "Todo", legacy: "kept" }, rank: "a0" }, { name: "Write docs", values: { status: "Done" }, rank: "a1" }] }]);
+      const fix = await keyOf(store, "Fix login");
+      expect(await store.looseValues("tasks")).toEqual([{ key: "legacy", values: [{ item: fix, value: "kept" }] }]);
+      const read = (await itemOf(store, fix))!;
+      const report = await store.apply(await store.plan({ database: "tasks", changes: [{ kind: "setValue", item: fix, key: "legacy", value: undefined }], expects: { items: { [fix]: read.revision } } }));
+      expect(report.written).toHaveLength(1);
+      expect(await store.looseValues("tasks")).toEqual([]);
+      expect(await store.looseValues("none")).toEqual([]);
+    });
+
     it("reads databases and their items, the keys the same at every read", async () => {
       const { store } = make(SEED);
       expect(await store.databases()).toEqual([{ id: "tasks", name: "Tasks" }]);

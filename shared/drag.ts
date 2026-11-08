@@ -68,14 +68,15 @@ export function reorder(e: PointerEvent, options: Reorder): void {
     if (!scrolling) scroll();
   };
 
-  // A container that scrolls (a long list in a box) scrolls while the pointer is near its top or bottom
+  // A container that scrolls, or a box around it that does (a long list in a box), scrolls while the pointer is near its top or bottom
   let last = start;
   let scrolling = 0;
   const scroll = () => {
     scrolling = 0;
     if (!ghost) return;
-    const container = containerAt(options.containers(), last.x, last.y);
-    if (!container || container.scrollHeight <= container.clientHeight) return;
+    const found = containerAt(options.containers(), last.x, last.y);
+    const container = found && scrollerOf(found);
+    if (!container) return;
     const r = container.getBoundingClientRect();
     const by = last.y < r.top + SCROLL_EDGE ? -1 : last.y > r.bottom - SCROLL_EDGE ? 1 : 0;
     if (!by) return;
@@ -163,11 +164,30 @@ function nextItem(element: HTMLElement, others: readonly HTMLElement[]): HTMLEle
 }
 
 /** The container the point is in, else the one nearest it up or down */
+/** The box that scrolls a container up and down: the container itself, else the nearest around it that does; none where none does */
+function scrollerOf(container: HTMLElement): HTMLElement | undefined {
+  for (let one: HTMLElement | null = container; one; one = one.parentElement) {
+    if (one.scrollHeight <= one.clientHeight) continue;
+    const overflow = one.ownerDocument.defaultView?.getComputedStyle(one).overflowY;
+    if (overflow === "auto" || overflow === "scroll") return one;
+  }
+  return undefined;
+}
+
+/** A container's part in view: its box cut to the box that scrolls it (a list longer than its box: the part the box shows) */
+function shownRect(container: HTMLElement): { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number } {
+  const r = container.getBoundingClientRect();
+  const scroller = scrollerOf(container);
+  if (!scroller || scroller === container) return r;
+  const s = scroller.getBoundingClientRect();
+  return { left: Math.max(r.left, s.left), right: Math.min(r.right, s.right), top: Math.max(r.top, s.top), bottom: Math.min(r.bottom, s.bottom) };
+}
+
 function containerAt(containers: readonly HTMLElement[], x: number, y: number): HTMLElement | undefined {
   let nearest: HTMLElement | undefined;
   let distance = Infinity;
   for (const container of containers) {
-    const r = container.getBoundingClientRect();
+    const r = shownRect(container);
     if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return container;
     const d = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
     if (d < distance) {

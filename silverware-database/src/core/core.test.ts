@@ -81,6 +81,46 @@ describe("the core", () => {
     expect(proposal.label).toBe("Remove property Rank");
   });
 
+  it("removes a property and its values whole or not at all: the database changed since the proposal, no item's value taken off", async () => {
+    const { core, store, named } = setup();
+    const proposal = await core.removeProperty("tasks", "estimate", { values: true });
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    expect(await core.renameDatabase("tasks", "Jobs")).not.toHaveProperty("problem");
+    await core.apply(proposal);
+    expect((await store.database("tasks"))!.value.properties.map((one) => one.key)).toContain("estimate");
+    expect((await named("Fix login")).values.estimate).toBe("3");
+  });
+
+  it("lists the keys items keep outside the schema with a guessed type, adds one back by its key, takes one off the items whole", async () => {
+    const { core, store, named } = setup(true, [
+      { name: "Old one", values: { status: "Done", due: "2026-11-01", legacy: "x" }, rank: "a2" },
+      { name: "Older", values: { due: "2026-12-01" }, rank: "a3" },
+    ]);
+    const listed = await core.looseProperties("tasks");
+    if (!Array.isArray(listed)) throw new Error("refused");
+    expect(listed.map(({ key, items, samples, type }) => [key, items, samples, type])).toEqual([
+      ["due", 2, ["2026-11-01", "2026-12-01"], "date"],
+      ["legacy", 1, ["x"], "text"],
+    ]);
+    // Added by its key: its values shown again
+    expect(await core.addProperty("tasks", { label: "Due", type: "date", key: "due" })).not.toHaveProperty("problem");
+    expect((await named("Older")).values.due).toBe("2026-12-01");
+    // A property of the database: not as a loose key
+    expect(await core.removeLooseProperty("tasks", "due")).toHaveProperty("problem");
+    // Taken off the items keeping it, whole: an item changed since the proposal, nothing written
+    const proposal = await core.removeLooseProperty("tasks", "legacy");
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    expect(proposal.whole).toBeDefined();
+    expect(await core.update("tasks", await named("Fix login"), "status", "Done")).not.toHaveProperty("problem");
+    await core.apply(proposal);
+    expect((await named("Old one")).values.legacy).toBe("x");
+    const again = await core.removeLooseProperty("tasks", "legacy");
+    if ("problem" in again) throw new Error(again.problem);
+    await core.apply(again);
+    expect((await named("Old one")).values.legacy).toBeUndefined();
+    expect((await store.looseValues("tasks")).map((one) => one.key)).toEqual([]);
+  });
+
   it("refuses a property's setting named as one of its own fields (a setting `system` would make it a system property)", async () => {
     const { core, store } = setup();
     expect(await core.addProperty("tasks", { label: "Unit", type: "text", params: { system: "metric" } })).toHaveProperty("problem");
@@ -262,6 +302,22 @@ describe("the core", () => {
     await applied(core, proposal);
     expect((await named("Fix login")).values.estimate).toBe(3);
     expect((await named("Write docs")).values.estimate).toBe("a lot");
+  });
+
+  it("changes a date to a date and time and back writing nothing, a time kept; to a time only the time", async () => {
+    const { core, named } = setup(true, [
+      { name: "Meet", values: { estimate: "2026-11-08T14:30" }, rank: "a2" },
+      { name: "Due", values: { estimate: "2026-11-10" }, rank: "a3" },
+    ]);
+    await applied(core, await core.retypeProperty("tasks", "estimate", "date"));
+    const asDate = await core.retypeProperty("tasks", "estimate", "datetime");
+    // (Every value read by both: the schema alone written, no item)
+    expect("plan" in asDate && asDate.plan.planned).toHaveLength(1);
+    await applied(core, asDate);
+    await applied(core, await core.retypeProperty("tasks", "estimate", "date"));
+    expect([(await named("Meet")).values.estimate, (await named("Due")).values.estimate]).toEqual(["2026-11-08T14:30", "2026-11-10"]);
+    await applied(core, await core.retypeProperty("tasks", "estimate", "time"));
+    expect([(await named("Meet")).values.estimate, (await named("Due")).values.estimate]).toEqual(["14:30", "2026-11-10"]);
   });
 
   it("removes a property keeping its values, unless asked to take them too", async () => {
@@ -541,7 +597,8 @@ describe("renaming options", () => {
     let answer = false;
     let meanwhile = async () => {};
     const asked: string[] = [];
-    const core = new DatabaseCore(store, new TypeRegistry(), { notify: () => {}, ask: async (message) => (asked.push(message), await meanwhile(), answer) });
+    // (The items' pages: what the core says of them, in the platform's word)
+    const core = new DatabaseCore(store, new TypeRegistry(), { notify: () => {}, ask: async (message) => (asked.push(message), await meanwhile(), answer) }, { one: "page", many: "pages" });
     const status = async () => (await store.items("tasks")).value.filter((one) => one.values.status === "To do").length;
     const proposal = await core.retypeProperty("tasks", "status", "select", { options: ["To do", "Done"] }, { Todo: "To do" });
     if ("problem" in proposal) throw new Error(proposal.problem);
@@ -550,7 +607,7 @@ describe("renaming options", () => {
     expect(await status()).toBe(200);
     // Declined: nothing undone, still to undo
     expect(await core.undo("tasks")).toMatchObject({ cause: "declined" });
-    expect(asked.at(-1)).toContain("It writes 201 pages");
+    expect(asked.at(-1)).toContain("It writes 201 pages, one after another: it takes a while; keep this window open");
     expect(await status()).toBe(200);
     // A change recorded while the user is asked: the one asked about is no longer the last, nothing undone
     answer = true;

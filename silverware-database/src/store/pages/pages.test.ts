@@ -135,6 +135,15 @@ describe("the pages store", () => {
     expect(store.validateItemName("Fix login (2)")).toBeUndefined();
   });
 
+  it("writes references as a list of wiki links in quotes, read back as written", async () => {
+    const { memory, store } = harness(SEED);
+    const [item] = (await store.items("tasks")).value;
+    // (Whatever the property's type: the store writes values, the type says what they are)
+    await store.apply(await store.plan(changes("tasks", { kind: "setValue", item: item!.key, key: "status", value: ["[[Projects/Alpha]]", "[[People/Ada|Ada]]"] })));
+    expect(memory.pages.get("db-tasks/Fix login")).toContain('status: ["[[Projects/Alpha]]", "[[People/Ada|Ada]]"]');
+    expect((await store.items("tasks")).value[0]!.values.status).toEqual(["[[Projects/Alpha]]", "[[People/Ada|Ada]]"]);
+  });
+
   it("leaves a value the model cannot hold as it is, writing only what changes", async () => {
     const { memory, store } = harness(SEED);
     memory.writeOutside("db-tasks/Fix login", "---\ntags: [db]\nstatus: { nested: 1 }\ndue: 2026-11-10\n_database:\n  rank: a0\n---\n");
@@ -279,6 +288,79 @@ describe("the pages store", () => {
     expect(await status()).toBe("Done");
     memory.catchUp();
     expect(await status()).toBe("Done");
+  });
+
+  it("keeps the keys a page has outside the schema apart, gives them as asked, takes one off its page, leaves the index's own and `_` keys", async () => {
+    const { memory, store } = harness(SEED);
+    const fix = (await store.items("tasks")).value[0]!;
+    await memory.platform.space.write("db-tasks/Fix login", memory.pages.get("db-tasks/Fix login")!.replace("status: Todo", ["status: Todo", "note: keep me", "_tool: x"].join(String.fromCharCode(10))));
+    // (Not an item's value: the views see none of it)
+    expect((await store.items("tasks")).value[0]!.values).toEqual({ status: "Todo" });
+    expect(await store.looseValues("tasks")).toEqual([{ key: "note", values: [{ item: fix.key, value: "keep me" }] }]);
+    const read = (await store.items("tasks")).value[0]!;
+    await store.apply(await store.plan({ ...changes("tasks", { kind: "setValue", item: read.key, key: "note", value: undefined }), expects: { items: { [read.key]: read.revision } } }));
+    expect(memory.pages.get("db-tasks/Fix login")).not.toContain("note:");
+    expect(memory.pages.get("db-tasks/Fix login")).toContain("_tool: x");
+    expect(await store.looseValues("tasks")).toEqual([]);
+  });
+
+  it("shows a key or a value taken off as gone while the index still has the page as it was", async () => {
+    const { memory, store } = harness([{ database: TASKS, items: [{ name: "Fix login", values: { status: "Todo", due: "2026-11-10" }, rank: "a0" }] }], { lagging: true });
+    await memory.platform.space.write("db-tasks/Fix login", memory.pages.get("db-tasks/Fix login")!.replace("status: Todo", ["status: Todo", "note: old"].join(String.fromCharCode(10))));
+    memory.catchUp();
+    const read = (await store.items("tasks")).value[0]!;
+    await store.apply(await store.plan(changes("tasks", { kind: "setValue", item: read.key, key: "note", value: undefined }, { kind: "setValue", item: read.key, key: "due", value: undefined })));
+    // (The index not caught up: the page as the store wrote it)
+    expect(await store.looseValues("tasks")).toEqual([]);
+    expect((await store.items("tasks")).value[0]!.values.due).toBeUndefined();
+    memory.catchUp();
+    expect(await store.looseValues("tasks")).toEqual([]);
+  });
+
+  it("keeps a key typed in a page outside the schema from a property's key changed onto it, or a property named so", async () => {
+    const withOld: Database = { ...TASKS, properties: [...TASKS.properties, { key: "old", label: "Old", type: "text", params: {}, readonly: false }] };
+    const { memory, store } = harness([{ database: withOld, items: [{ name: "Fix login", values: { status: "Todo", old: "was" }, rank: "a0" }] }]);
+    await memory.platform.space.write("db-tasks/Fix login", memory.pages.get("db-tasks/Fix login")!.replace("status: Todo", ["status: Todo", "note: typed by hand"].join(String.fromCharCode(10))));
+    const core = new DatabaseCore(store, new TypeRegistry(), { notify: () => {}, ask: () => true });
+    expect(await core.rekeyProperty("tasks", "old", "note")).toHaveProperty("problem");
+    expect(memory.pages.get("db-tasks/Fix login")).toContain("note: typed by hand");
+    // A property named Note: a key of its own, the hand's left alone
+    expect(await core.addProperty("tasks", { label: "Note", type: "text" })).not.toHaveProperty("problem");
+    expect((await store.database("tasks"))!.value.properties.at(-1)!.key).toBe("note_2");
+    // Added by its key (the screen's Add): takes it, its value shown
+    expect(await core.addProperty("tasks", { label: "Note", type: "text", key: "note" })).not.toHaveProperty("problem");
+    expect((await store.items("tasks")).value[0]!.values.note).toBe("typed by hand");
+  });
+
+  it("lets a page it wrote go once the index has it, its keys outside the schema a map and a list of numbers", async () => {
+    const { memory, store } = harness(SEED);
+    await memory.platform.space.write("db-tasks/Fix login", memory.pages.get("db-tasks/Fix login")!.replace("status: Todo", ["status: Todo", "meta: { a: 1 }", "nums: [1, 2]"].join(String.fromCharCode(10))));
+    const read = (await store.items("tasks")).value[0]!;
+    await store.apply(await store.plan(changes("tasks", { kind: "setValue", item: read.key, key: "status", value: "Done" })));
+    // Changed by hand right after: shown once the index has it (the store's hold let go as caught up)
+    await memory.platform.space.write("db-tasks/Fix login", memory.pages.get("db-tasks/Fix login")!.replace("status: Done", "status: Todo"));
+    expect((await store.items("tasks")).value[0]!.values.status).toBe("Todo");
+  });
+
+  it("refuses to take a key off a page changed by hand since it was read, the key's value too", async () => {
+    const { memory, store } = harness(SEED);
+    await memory.platform.space.write("db-tasks/Fix login", memory.pages.get("db-tasks/Fix login")!.replace("status: Todo", ["status: Todo", "note: first"].join(String.fromCharCode(10))));
+    const read = (await store.items("tasks")).value[0]!;
+    await memory.platform.space.write("db-tasks/Fix login", memory.pages.get("db-tasks/Fix login")!.replace("note: first", "note: second"));
+    const report = await store.apply(await store.plan({ ...changes("tasks", { kind: "setValue", item: read.key, key: "note", value: undefined }), expects: { items: { [read.key]: read.revision } } }));
+    expect(report.written).toHaveLength(0);
+    expect(memory.pages.get("db-tasks/Fix login")).toContain("note: second");
+  });
+
+  it("removes a property and its values whole or not at all: the database changed since the proposal, no item's page written", async () => {
+    const { memory, store } = harness([{ database: { ...TASKS, properties: [...TASKS.properties, { key: "note", label: "Note", type: "text", params: {}, readonly: false }] }, items: [{ name: "Fix login", values: { status: "Todo", note: "keep me" }, rank: "a0" }] }]);
+    const core = new DatabaseCore(store, new TypeRegistry(), { notify: () => {}, ask: () => true });
+    const proposal = await core.removeProperty("tasks", "note", { values: true });
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    expect(await core.renameDatabase("tasks", "Jobs")).not.toHaveProperty("problem");
+    await core.apply(proposal);
+    expect(memory.pages.get("db-tasks")).toContain("note:");
+    expect(memory.pages.get("db-tasks/Fix login")).toContain("note: keep me");
   });
 
   it("shows what it wrote where the index tells of the page before a query has it, as SilverBullet's does", async () => {

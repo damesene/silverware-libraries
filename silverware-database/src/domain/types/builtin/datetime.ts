@@ -1,26 +1,40 @@
-// Date and time: a moment as local ISO text (`2026-11-08T14:30:05.123`), as
-// SilverBullet's index keeps a page's dates; shown to the minute
-// (`2026-11-08 14:30`), sorted as kept. The system properties' (Created,
-// Modified) only: not offered for a property of the user's, as a date and time
-// written in a page is not kept as written by the index (probe 1).
+// Date and time: a moment as local ISO text (`2026-11-08T14:30`, seconds
+// where given), as a browser's date and time field gives it and as
+// SilverBullet's index keeps a page's dates (Created, Modified); shown to the
+// minute (`2026-11-08 14:30`), sorted as kept. A day alone (a date's, the
+// property's type changed) reads too and shows as its day, no time made up
+// for it (domain/types/moment.ts). Written into a page as text in quotes (the
+// page writer quotes what would read as another kind), so the index keeps it
+// as written; one typed unquoted by hand may be read otherwise, and is shown
+// as kept, invalid.
 import { isEmpty } from "../../../model/database.ts";
+import { readMoment, writeMoment } from "../moment.ts";
 import { keptText, type PropertyType } from "../type.ts";
 
-const MOMENT_RE = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?$/;
+const moment = (value: unknown) => (typeof value === "string" ? readMoment(value) : undefined);
 
 export const datetime: PropertyType = {
   name: "datetime",
   label: "Date & time",
-  offered: false,
-  validate: (value) => (isEmpty(value) || (typeof value === "string" && MOMENT_RE.test(value)) ? undefined : "no date and time (YYYY-MM-DD HH:MM)"),
+  editor: "datetime-local",
+  validate: (value) => (isEmpty(value) || moment(value) ? undefined : "no date and time (YYYY-MM-DD HH:MM)"),
   text: (value) => {
-    const m = typeof value === "string" ? MOMENT_RE.exec(value) : null;
-    return m ? `${m[1]} ${m[2]}` : keptText(value);
+    const read = moment(value);
+    return read ? `${read.day}${read.time === undefined ? "" : ` ${read.time.slice(0, 5)}`}` : keptText(value);
   },
-  sortKey: (value) => (typeof value === "string" ? value.replace(" ", "T") : keptText(value)),
+  // (Grouped to the minute, as shown: a page's Created to the millisecond in the group of its minute)
+  groupValue: (value) => {
+    const read = moment(value);
+    return read ? writeMoment(read.time === undefined ? read : { day: read.day, time: read.time.slice(0, 5) }) : value;
+  },
+  sortKey: (value) => {
+    const read = moment(value);
+    return read ? writeMoment(read) : keptText(value);
+  },
   parse: (typed) => {
     const trimmed = typed.trim();
     if (trimmed === "") return { value: null };
-    return MOMENT_RE.test(trimmed) ? { value: trimmed.replace(" ", "T") } : { problem: `"${trimmed}" is no date and time (YYYY-MM-DD HH:MM)` };
+    const read = readMoment(trimmed);
+    return read ? { value: writeMoment(read) } : { problem: `"${trimmed}" is no date and time (YYYY-MM-DD HH:MM)` };
   },
 };

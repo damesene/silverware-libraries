@@ -10,6 +10,9 @@ const texts = (value: unknown): readonly string[] => (Array.isArray(value) ? val
 export const multiSelect: PropertyType = {
   name: "multi-select",
   label: "Multi-select",
+  editor: "multi-select",
+  look: "options",
+  lists: true,
   validateParams: (params) => validateOptions(params, { commas: false }),
   validate: (value, params) => {
     if (isEmpty(value)) return undefined;

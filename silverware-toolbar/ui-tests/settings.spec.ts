@@ -380,6 +380,12 @@ test.describe("The settings dialog", () => {
   });
 
   test("a module turned off: Save and reload, its actions gone; closing with changes asks first", async ({ page }) => {
+    // (On, its action found by the word)
+    await select(page, "some text");
+    await barButton(page, "actions.more").click();
+    await popup(page).locator(".swb-search-field").fill("clear");
+    await expect(popup(page).locator('.swb-option[data-swb-action="actions.clear"]')).toHaveCount(1);
+    await page.keyboard.press("Escape");
     await openSettings(page);
     await tab(page, "modules").click();
     await dialog(page).locator('[data-swb-module="clear"]').uncheck({ force: true });
@@ -393,6 +399,7 @@ test.describe("The settings dialog", () => {
     await select(page, "some text");
     await barButton(page, "actions.more").click();
     await popup(page).locator(".swb-search-field").fill("clear");
-    await expect(popup(page).locator(".swb-option")).toHaveCount(0);
+    // The module's action gone (a command of SilverBullet's may still be found by the word: Credentials: Clear)
+    await expect(popup(page).locator('.swb-option[data-swb-action="actions.clear"]')).toHaveCount(0);
   });
 });

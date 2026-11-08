@@ -6,10 +6,12 @@
 // read.
 import { type Database, type Item, type ItemKey, NAME_KEY, type Property, validatePropertyKey, type Value } from "../model/database.ts";
 import type { Changes, DatabaseChange } from "../core/changes.ts";
-import type { SkipCause, Skipped, Target } from "../core/store.ts";
+import type { LooseKey, SkipCause, Skipped, Target } from "../core/store.ts";
 
 /** An item as a store keeps it, its revision apart */
-export type ItemState = Omit<Item, "revision">;
+// `loose`: values it keeps under keys the schema has none of, where the store reads them apart from its values (a page's other
+// frontmatter keys): none of the model's, taken off by a `setValue` to undefined
+export type ItemState = Omit<Item, "revision"> & { readonly loose?: Readonly<Record<string, Value>> };
 
 /** A database's own record: its name, schema and the version of the form it is kept in */
 export type RecordState = { readonly database: Database; readonly version: number };
@@ -184,6 +186,19 @@ function draftItem(group: ItemGroup, state: StoreState, keys: ReadonlySet<string
   return { target, key, ...(created ? { ref: created.ref } : {}), count, before, after: item, named, expects: kept?.revision };
 }
 
+/** Items' values under keys the schema has none of, by key (as the items come, the keys as first met) */
+export function looseKeys(items: readonly { readonly key: ItemKey; readonly values: Readonly<Record<string, Value>> }[]): LooseKey[] {
+  const keys = new Map<string, { item: ItemKey; value: Value }[]>();
+  for (const item of items) {
+    for (const [key, value] of Object.entries(item.values)) {
+      const list = keys.get(key) ?? [];
+      list.push({ item: item.key, value });
+      keys.set(key, list);
+    }
+  }
+  return [...keys].map(([key, values]) => ({ key, values }));
+}
+
 /** Two values the same (lists by their items) */
 function same(a: Value | undefined, b: Value | undefined): boolean {
   if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((one, i) => one === b[i]);
@@ -194,6 +209,11 @@ function same(a: Value | undefined, b: Value | undefined): boolean {
 function changedItem(item: ItemState, change: DatabaseChange): ItemState | undefined {
   switch (change.kind) {
     case "setValue": {
+      // (A key the schema has none of, taken off: from what the store keeps apart)
+      if (change.value === undefined && !(change.key in item.values) && item.loose && change.key in item.loose) {
+        const { [change.key]: _gone, ...loose } = item.loose;
+        return { ...item, loose };
+      }
       if (same(item.values[change.key], change.value)) return item;
       const values = { ...item.values };
       if (change.value === undefined) delete values[change.key];

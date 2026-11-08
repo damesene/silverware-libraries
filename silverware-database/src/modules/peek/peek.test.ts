@@ -48,6 +48,10 @@ async function setup(answer = true, withProperties = false, configured: Record<s
       itemBodies: true,
       body: (id, item) => store.body(id, item.key),
       openDocument: async (item) => void opened.push(item.name),
+      documents: async () => ["Projects/Alpha", "Projects/Beta"],
+      openByName: async (name) => void opened.push(name),
+      validateDocumentName: () => undefined,
+      noun: { one: "page", many: "pages" },
       editorArea: () => undefined,
       onChanged: (listener) => store.onChanged((one) => listener(one.database)),
       onDocumentOpened: (listener) => {
@@ -127,6 +131,26 @@ describe("the peek", () => {
     await settle();
     expect(document.querySelector(".swd-peek")).toBeNull();
     expect(opened).toEqual(["Fix login"]);
+  });
+
+  it("shows a pencil after a link, which edits it as the link itself opens its address; none where there is no link", async () => {
+    const { q, peek, core, named, store, place } = await setup();
+    await core.addProperty("tasks", { label: "Web", type: "url" });
+    const key = (await store.database("tasks"))!.value.properties.find((one) => one.label === "Web")!.key;
+    await core.update("tasks", await named("Fix login"), key, "example.com/docs");
+    // (The view drawn anew with it, as the place is once the store says so)
+    await place.render();
+    await peek("Fix login");
+    const value = q(`.swd-peek-value[data-key="${key}"]`);
+    expect(value.querySelector("a.swd-link")?.getAttribute("href")).toBe("https://example.com/docs");
+    // (Not a control of its own: the value is the button the keys edit)
+    expect(value.querySelector(".swd-peek-edit")?.getAttribute("aria-hidden")).toBe("true");
+    q(`.swd-peek-value[data-key="${key}"] .swd-peek-edit`).click();
+    expect(value.querySelector(".swd-editor-link")).not.toBeNull();
+    // (No link, no pencil: an empty value, a value of another type)
+    await peek("Write docs");
+    expect(q(`.swd-peek-value[data-key="${key}"]`).querySelector(".swd-peek-edit")).toBeNull();
+    expect(document.querySelector('.swd-peek-value[data-key="estimate"] .swd-peek-edit')).toBeNull();
   });
 
   it("writes a value, the name and the body as their fields are left, the panel following", async () => {

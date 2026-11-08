@@ -88,7 +88,7 @@ function cell(host: ViewHost, item: Item, column: Column, editing: Editing): HTM
   // A required value missing: its cell says so (the style page's word in it)
   if (property && missing(host, item, property)) td.classList.add("swd-missing");
   if (property?.readonly) td.classList.add("swd-readonly");
-  else if (property && host.type(property).name === "checkbox") return td;
+  else if (property && host.type(property).editor === "toggle") return td;
   else {
     const edit = () => {
       if (editing.cell === td) return;
@@ -138,7 +138,7 @@ function content(host: ViewHost, item: Item, column: Column): Node[] {
     return [el(doc, "span", "swd-table-name", head, el(doc, "span", "swd-table-name-end", last, open))];
   }
   const { property } = column;
-  if (property && host.type(property).name === "checkbox") {
+  if (property && host.type(property).look === "check") {
     const box = el(doc, "input", { attrs: { type: "checkbox", "aria-label": `${property.label} of ${item.name}` } });
     box.checked = item.values[property.key] === true;
     box.disabled = property.readonly;

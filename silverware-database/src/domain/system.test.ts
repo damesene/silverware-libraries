@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Database, Item, ItemKey, Value } from "../model/database.ts";
-import { localStamp, SYSTEM_PROPERTIES, systemKind, tasksIn, withSystemValues } from "./system.ts";
+import { DOCUMENT } from "./noun.ts";
+import { localStamp, systemKind, systemProperties, tasksIn, withSystemValues } from "./system.ts";
 
 const item = (name: string, rank: string | undefined, values: Record<string, Value> = {}): Item => ({ key: name as ItemKey, revision: "1", name, values, rank });
 const property = (key: string, system: string, type: string) => ({ key, label: key, type, params: {}, readonly: true, system });
@@ -19,7 +20,7 @@ const DATABASE: Database = {
 
 describe("system properties", () => {
   it("are five kinds, each its type and key, found by name", () => {
-    expect(SYSTEM_PROPERTIES.map((one) => [one.kind, one.type, one.key])).toEqual([
+    expect(systemProperties(DOCUMENT).map((one) => [one.kind, one.type, one.key])).toEqual([
       ["createdAt", "datetime", "created_at"],
       ["modifiedAt", "datetime", "modified_at"],
       ["order", "number", "order"],
@@ -27,8 +28,11 @@ describe("system properties", () => {
       ["tags", "multi-select", "page_tags"],
       ["taskProgress", "progress", "task_progress"],
     ]);
-    expect(systemKind("order")?.label).toBe("Order");
-    expect(systemKind("nothing")).toBeUndefined();
+    expect(systemKind("order", DOCUMENT)?.label).toBe("Order");
+    // (Said in the word of the place the items are kept in: a document, a page)
+    expect([systemKind("page", DOCUMENT)?.label, systemKind("page", DOCUMENT)?.hint]).toEqual(["Document", "The item's document"]);
+    expect([systemKind("page", { one: "page", many: "pages" })?.label, systemKind("createdAt", { one: "page", many: "pages" })?.hint]).toEqual(["Page", "When the item's page was made"]);
+    expect(systemKind("nothing", DOCUMENT)).toBeUndefined();
   });
 
   it("give each item its values from what the store knows of it, the order counted over every item in the order by hand", () => {

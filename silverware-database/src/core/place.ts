@@ -11,6 +11,7 @@ import type { TypeRegistry } from "../domain/types/registry.ts";
 import type { GroupArrangement } from "../domain/grouping.ts";
 import type { Database, Item, Property } from "../model/database.ts";
 import { type DatabaseCore, isRefused } from "./core.ts";
+import { documentsHost, type DocumentsSource } from "./documents.ts";
 import { arrangedGroups, focusGroupList, type GroupFocus, groupedBy, groupEntry } from "./groupmenu.ts";
 import { drawGrouped } from "./groups.ts";
 import { ICONS } from "./icons.ts";
@@ -35,6 +36,8 @@ export type PlaceOptions = {
   readonly settings: Pick<Settings, "get">;
   readonly ui: Pick<UserInterface, "notify">;
   readonly editor?: Pick<Editor, "open">;
+  /** The documents references name (core/documents.ts); none: no document offered nor opened */
+  readonly documents?: DocumentsSource;
   /** What the modules on put in the place's menu (core/module.ts), asked as it opens */
   readonly moduleMenu?: (place: PlaceContext, menu: PlaceMenuBuilder) => readonly PlaceMenuGroup[];
   /** Told as the place is drawn (anew: a change made elsewhere, an Undo), so what a module shows for it follows */
@@ -503,7 +506,7 @@ export class DatabasePlace {
       undo.setAttribute("aria-busy", String(!!at));
       undoText.hidden = !at?.of;
       undoText.textContent = at?.of ? `${at.done.toLocaleString("en-US")} / ${at.of.toLocaleString("en-US")}` : "";
-      undo.title = at ? "Undoing: keep this page open until it is done" : "Undo this database's last change";
+      undo.title = at ? "Undoing: keep this window open until it is done" : "Undo this database's last change";
     };
     this.undoShown();
 
@@ -732,6 +735,7 @@ export class DatabasePlace {
           ui.notify(`"${item.name}" could not be opened: ${message(error)}`, { type: "error" });
         }
       },
+      ...documentsHost(this.options.documents, core.noun, ui),
       getMeta: (key) => state.get(prefixed(key)),
       setMeta,
       setting: (key) => settings.get(key),

@@ -13,10 +13,10 @@
 // to is transaction.ts', the same for every store.
 import { hasSystem, localStamp, tasksIn, withSystemValues } from "../domain/system.ts";
 import type { Changes } from "../core/changes.ts";
-import type { DatabaseStore, VersionStatus, MigrationScope, Planned, SkipCause, Skipped, StoreCapabilities, Target, TransactionPlan, TransactionReport, WriteProgress } from "../core/store.ts";
+import type { DatabaseStore, LooseKey, VersionStatus, MigrationScope, Planned, SkipCause, Skipped, StoreCapabilities, Target, TransactionPlan, TransactionReport, WriteProgress } from "../core/store.ts";
 import { told } from "../core/store.ts";
 import type { Database, DatabaseSummary, Item, ItemKey, Revised, Value } from "../model/database.ts";
-import { draftTransaction, type ItemState, type RecordState, type StoreRules, type StoreState, takenNames, withoutClashes } from "./transaction.ts";
+import { draftTransaction, type ItemState, looseKeys, type RecordState, type StoreRules, type StoreState, takenNames, withoutClashes } from "./transaction.ts";
 
 /** The version of the form this store writes (a store in memory has one; a database seeded older or newer stands for one kept so) */
 export const MEMORY_VERSION = 1;
@@ -120,6 +120,14 @@ export class MemoryStore implements DatabaseStore {
     const tasks = hasSystem(kept.record.database, "taskProgress");
     const items = withSystemValues(plain, kept.record.database, (item) => ({ ...this.stamps.get(item.key), ...(tasks ? { tasks: tasksIn(item.body ?? "") } : {}) }));
     return { value: items, revision: String(latest) };
+  }
+
+  async looseValues(id: string): Promise<readonly LooseKey[]> {
+    const kept = this.kept.get(id);
+    if (!kept) return [];
+    // (Its items keep any key among their values: those the schema has none of)
+    const schema = new Set(kept.record.database.properties.map((one) => one.key));
+    return looseKeys([...kept.items.values()].map((item) => ({ key: item.key, values: Object.fromEntries(Object.entries(item.values).filter(([key]) => !schema.has(key))) })));
   }
 
   async body(id: string, item: ItemKey): Promise<string | undefined> {

@@ -1584,9 +1584,6 @@ tr:focus-within .swd-open {
   color: inherit;
   background: var(--swd-hover);
 }
-.swd-prop-eye[aria-pressed="false"] {
-  color: var(--swd-accent);
-}
 .swd-prop-eye svg {
   width: 16px;
   height: 16px;
@@ -1646,6 +1643,126 @@ tr:focus-within .swd-open {
   gap: 10px;
   padding: 12px 14px 14px 28px;
 }
+/* A link (URL): opened in a tab of its own; its address without what says nothing, its path a little quieter */
+.swd-link {
+  color: var(--link-color, var(--swd-accent));
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.swd-link:hover {
+  text-decoration: underline;
+}
+.swd-link-rest {
+  opacity: 0.7;
+}
+/* A reference: a link to a page of the space, opened by a press, side by side with the others */
+.swd-reference {
+  margin-right: 6px;
+  color: var(--link-color, var(--swd-accent));
+  text-decoration: none;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.swd-reference:hover {
+  text-decoration: underline;
+}
+.swd-reference-folder {
+  opacity: 0.7;
+}
+/* References' editor: a search over the pages, the pages picked then those found, a box each; the list scrolls */
+.swd-editor-documents {
+  min-width: 16em;
+  max-width: min(28em, 90vw);
+}
+.swd-editor-search {
+  box-sizing: border-box;
+  width: 100%;
+  margin-bottom: 4px;
+}
+.swd-editor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 16em;
+  overflow-y: auto;
+}
+/* A document's row: its box and name (the label), its folder icon after them, its folder under its name */
+.swd-editor-documents .swd-editor-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  column-gap: 6px;
+  align-items: start;
+  padding: 2px 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.swd-editor-pick {
+  display: contents;
+}
+.swd-editor-pick > input {
+  margin-top: 0.25em;
+}
+.swd-editor-document-folder {
+  grid-column: 2;
+  justify-self: start;
+  color: var(--swd-quiet);
+  font-size: 0.8em;
+}
+.swd-editor-document-into {
+  grid-column: 3;
+  grid-row: 1;
+}
+/* A document's folder and its icon: each puts its path in the search (a new document made there), quiet until hovered */
+button.swd-editor-document-folder,
+.swd-editor-document-into {
+  padding: 0 2px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.swd-editor-document-folder {
+  font-size: 0.8em;
+  color: var(--swd-quiet);
+}
+.swd-editor-document-into {
+  display: inline-flex;
+  color: var(--swd-quiet);
+  opacity: 0.5;
+}
+.swd-editor-document-into svg {
+  width: 14px;
+  height: 14px;
+}
+.swd-editor-choice:hover .swd-editor-document-into {
+  opacity: 1;
+}
+button.swd-editor-document-folder:hover,
+.swd-editor-document-into:hover {
+  color: var(--swd-accent);
+  background: var(--swd-hover);
+}
+.swd-editor-note {
+  padding: 2px 4px;
+  color: var(--swd-quiet);
+  font-size: 0.9em;
+}
+.swd-editor-new {
+  color: var(--swd-quiet);
+  font-style: italic;
+}
+/* A link's editor: its address and its text, one under the other */
+.swd-editor-link {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.swd-editor-link input {
+  width: 100%;
+  box-sizing: border-box;
+}
 /* A share done (Task progress): a short bar filled to it, before its percent */
 .swd-progress {
   display: inline-block;
@@ -1686,6 +1803,20 @@ tr:focus-within .swd-open {
 }
 .swd-prop-field-name .swd-settings-hint {
   font-size: 0.85em;
+}
+/* A review's choice (Remove: its values too): its label and hint across the width, its switch at the right, on a phone too */
+.swd-prop-field.swd-property-choice {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  padding: 0 4px;
+}
+.swd-property-choice .swd-prop-field-name {
+  gap: 2px;
+  color: inherit;
+  font-size: 1em;
+}
+.swd-property-choice .swd-prop-field-name .swd-settings-hint {
+  color: var(--swd-quiet);
 }
 .swd-prop-options {
   align-items: start;
@@ -1886,6 +2017,99 @@ tr:focus-within .swd-open {
   flex-wrap: wrap;
   gap: 6px;
 }
+.swd-property-adder-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* Values outside the database: the way to them (a quiet link), and their screen, each key a row */
+.swd-property-loose-open {
+  align-self: flex-start;
+  padding: 2px 0;
+  border: 0;
+  color: var(--swd-quiet);
+  background: none;
+  font: inherit;
+  font-size: 0.9em;
+  text-decoration: underline dotted;
+  cursor: pointer;
+}
+.swd-property-loose-open:hover {
+  color: inherit;
+}
+.swd-loose {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.swd-loose-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.swd-loose-back {
+  display: inline-flex;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+}
+.swd-loose-back:hover {
+  background: var(--swd-hover);
+}
+.swd-loose-back svg {
+  width: 16px;
+  height: 16px;
+}
+.swd-loose-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.swd-loose-row {
+  display: grid;
+  grid-template-columns: minmax(8em, 1fr) minmax(0, 1.4fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--swd-line);
+}
+.swd-loose-key {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.swd-loose-key code {
+  overflow-wrap: anywhere;
+}
+.swd-loose-count,
+.swd-loose-samples,
+.swd-loose-reading,
+.swd-loose-none {
+  color: var(--swd-quiet);
+  font-size: 0.9em;
+}
+.swd-loose-samples {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swd-loose-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.swd-loose-remove {
+  color: var(--danger-color, #c62828);
+}
+@media (max-width: 600px) {
+  .swd-loose-row {
+    grid-template-columns: 1fr;
+  }
+}
 .swd-properties .swd-property-new-label {
   flex: 1 1 12em;
   border-style: dashed;
@@ -1899,6 +2123,12 @@ tr:focus-within .swd-open {
   background: none;
   font: inherit;
   cursor: pointer;
+}
+/* A change shown before it is written: a choice of what it is (Remove: its values too), then its summary */
+.swd-property-review-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .swd-property-review {
   padding: 4px 12px;
@@ -1956,6 +2186,19 @@ tr:focus-within .swd-open {
   padding: 8px 16px max(16px, env(safe-area-inset-bottom));
   border-left: 0;
   box-shadow: none;
+}
+/* Its controls and the item's name: held at its top as the panel scrolls (its top padding above them) */
+.swd-peek-top {
+  position: sticky;
+  top: -10px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: -10px;
+  padding-top: 10px;
+  padding-bottom: 4px;
+  background: var(--root-background-color);
 }
 .swd-peek-head {
   display: flex;
@@ -2016,6 +2259,19 @@ tr:focus-within .swd-open {
 .swd-peek-name:hover,
 .swd-peek-name:focus {
   background: var(--swd-hover);
+}
+/* The properties' box: past this height it scrolls on its own, the content under it always in view (the room left of its
+   rows, where their grips show, kept inside it: a box that scrolls clips what is outside it) */
+.swd-peek-props-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: none;
+  max-height: var(--swd-peek-properties-max-height, 45vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-left: -18px;
+  padding-left: 18px;
 }
 .swd-peek-properties {
   display: flex;
@@ -2117,6 +2373,7 @@ button.swd-peek-label:hover {
 }
 .swd-peek-value {
   position: relative;
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2130,6 +2387,44 @@ button.swd-peek-label:hover {
 }
 .swd-peek-value[role="button"]:hover {
   background: var(--swd-hover);
+}
+/* The pencil after a link: edits it, the link taking its own press; quiet until the value is hovered. The link
+   narrowed to keep it on its line, however long */
+.swd-peek-value > .swd-link {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.swd-peek-edit {
+  display: inline-flex;
+  flex: none;
+  margin-left: auto;
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--swd-quiet);
+  opacity: 0.6;
+}
+.swd-peek-edit svg {
+  width: 14px;
+  height: 14px;
+}
+.swd-peek-value:hover .swd-peek-edit {
+  opacity: 1;
+}
+.swd-peek-edit:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: var(--swd-accent);
+}
+/* An editor of choices in the peek (a select's boxes, references, a link's fields): in its row, not over it (a panel over
+   the properties' box was cut by its edge), as narrow as the row is (a phone's), framed as a field rather than lifted */
+.swd-peek-value > .swd-editor-choices {
+  position: static;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  margin: 2px 0;
+  box-shadow: none;
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.3));
+  border-radius: 6px;
 }
 .swd-peek-value > .swd-editor:not(.swd-editor-choices) {
   width: 100%;

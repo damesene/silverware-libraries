@@ -21,6 +21,7 @@ export const progress: PropertyType = {
   name: "progress",
   label: "Progress",
   offered: false,
+  look: "share",
   validate: (value) => (isEmpty(value) || isShare(value) ? undefined : "no share (0 to 1)"),
   text: (value) => (isShare(value) ? `${wholePercent(value)}%` : keptText(value)),
   // (Fixed places, so the texts sort as the numbers: 0.0500 before 0.5000 before 1.0000)

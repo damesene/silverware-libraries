@@ -310,6 +310,11 @@ export class PeekPanel {
       update: (item: Item, key: string, value: Value | undefined) => written(core.update(shown.database, item, key, value)),
       rename: (item: Item, name: string) => written(core.rename(shown.database, item, name)),
       notify: (text) => ui.notify(text, { type: "error" }),
+      documents: () => this.host.documents(),
+      validateDocumentName: (name) => this.host.validateDocumentName(name),
+      noun: this.host.noun,
+      ...(this.host.folderSeparator ? { folderSeparator: this.host.folderSeparator } : {}),
+      openByName: (name) => this.host.openByName(name),
     };
   }
 
@@ -341,8 +346,8 @@ export class PeekPanel {
     const open = el(doc, "button", {
       class: "swd-peek-button swd-peek-open",
       html: VIEW_ICONS.open,
-      title: "Open its page",
-      attrs: { "aria-label": "Open its page" },
+      title: `Open its ${this.host.noun.one}`,
+      attrs: { "aria-label": `Open its ${this.host.noun.one}` },
       run: async () => {
         // (Its page in the editor, the panel closed first: the body is not edited in two places)
         if (await this.close()) await this.host.openDocument(shown.item);
@@ -365,14 +370,19 @@ export class PeekPanel {
       return list;
     };
     const properties = this.host.offered<PropertiesOffer>("properties");
-    const parts: HTMLElement[] = [head, name, group(false)];
-    if (shown.schema.properties.some((property) => property.hidden)) parts.push(el(doc, "div", { class: "swd-peek-hidden-title", text: "Hidden in views" }), group(true));
+    // The properties in a box of their own, scrolled past a height (the style page's), so the content under them stays in
+    // view however many a database has
+    const box = el(doc, "div", "swd-peek-props-box", group(false));
+    if (shown.schema.properties.some((property) => property.hidden)) box.append(el(doc, "div", { class: "swd-peek-hidden-title", text: "Hidden in views" }), group(true));
     // A property added, in Properties (the peek's own way to the schema: the properties module's where it is on)
     if (properties) {
       const add = el(doc, "button", { class: "swd-peek-add-property", text: "+ Add a property", run: () => void properties.open(shown.database, { add: true }).then(() => this.refocus(".swd-peek-add-property")) });
       keepFocus(add);
-      parts.push(add);
+      box.append(add);
     }
+    // Its controls and its name held at its top however it scrolls (a low window: the properties and the content not fitting)
+    const top = el(doc, "div", "swd-peek-top", head, name);
+    const parts: HTMLElement[] = [top, box];
     if (this.host.itemBodies) {
       const body = el(doc, "textarea", { class: "swd-peek-body", attrs: { "aria-label": `Content of ${item.name}`, placeholder: "Reading…", readonly: "", "data-reading": "", rows: "8" } });
       body.addEventListener("blur", () => {
@@ -403,9 +413,18 @@ export class PeekPanel {
         delete body.dataset.reading;
       }
     }
+    // (Drawn anew for the same item, a value edited: the box scrolled where it was; another item from its top)
+    const scrolled = element.dataset.item === item.key ? (element.querySelector<HTMLElement>(".swd-peek-props-box")?.scrollTop ?? 0) : 0;
+    element.dataset.item = item.key;
     element.replaceChildren(...(this.handle ? [this.handle] : []), ...parts);
+    box.scrollTop = scrolled;
+    // (What the browser scrolls into view with the keys not put under the top held there)
+    element.style.scrollPaddingTop = `${top.offsetHeight + 8}px`;
     this.note(shown);
-    if (focused) element.querySelector<HTMLElement>(focused)?.focus({ preventScroll: true });
+    // The focus where it was; brought into view only where it is out of it (a row moved by Alt+arrows past the box's edge)
+    const again = focused ? element.querySelector<HTMLElement>(focused) : null;
+    again?.focus({ preventScroll: true });
+    again?.scrollIntoView?.({ block: "nearest" });
   }
 
   /** A property's row: its label, its value as it shows, edited in place as the views edit it */
@@ -414,10 +433,13 @@ export class PeekPanel {
     const value = el(doc, "div", { class: "swd-peek-value", attrs: { "data-key": property.key, "aria-label": property.label } });
     const show = () => {
       const now = shown.item;
-      if (editor.type(property).name === "checkbox") return void value.replaceChildren(el(doc, "span", { class: `swd-peek-check${now.values[property.key] === true ? " swd-on" : ""}`, html: now.values[property.key] === true ? typeIcon("checkbox") : "", attrs: { "aria-label": now.values[property.key] === true ? "Yes" : "No" } }));
+      if (editor.type(property).look === "check") return void value.replaceChildren(el(doc, "span", { class: `swd-peek-check${now.values[property.key] === true ? " swd-on" : ""}`, html: now.values[property.key] === true ? typeIcon("checkbox") : "", attrs: { "aria-label": now.values[property.key] === true ? "Yes" : "No" } }));
       const shownNodes = valueNodes(editor, now, property);
       const lacking = missing(editor, now, property);
-      value.replaceChildren(...(shownNodes.length ? shownNodes : [el(doc, "span", { class: `swd-peek-empty${lacking ? " swd-peek-missing" : ""}`, text: lacking ? "Required" : "Empty" })]));
+      // A value drawn as a link takes its press, so a pencil after it edits it whatever room is left beside it: only a
+      // pointer's way, the value itself being the button the keys edit (Enter, F2), its press reaching it
+      const pencil = !property.readonly && shownNodes.some((node) => node instanceof Element && node.matches("a")) ? [el(doc, "span", { class: "swd-peek-edit", html: VIEW_ICONS.edit, title: `Edit ${property.label}`, attrs: { "aria-hidden": "true" } })] : [];
+      value.replaceChildren(...(shownNodes.length ? shownNodes : [el(doc, "span", { class: `swd-peek-empty${lacking ? " swd-peek-missing" : ""}`, text: lacking ? "Required" : "Empty" })]), ...pencil);
     };
     show();
     if (!property.readonly) {
@@ -425,7 +447,7 @@ export class PeekPanel {
       value.setAttribute("role", "button");
       const edit = () => {
         if (value.querySelector(".swd-editor")) return;
-        if (editor.type(property).name === "checkbox") return void toggle(editor, shown.item, property.key);
+        if (editor.type(property).editor === "toggle") return void toggle(editor, shown.item, property.key);
         editValue(editor, value, shown.item, property.key, show);
       };
       value.addEventListener("click", edit);

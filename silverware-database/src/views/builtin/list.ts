@@ -24,7 +24,7 @@ function line(host: ViewHost, item: Item, list: () => HTMLElement): HTMLElement 
     ...shown.map((property) => {
       const problem = problemOf(host, item, property);
       // (A checkbox its property's name where ticked; any other value as the views draw it: a select's as pills)
-      const shown = missing(host, item, property) ? [missingPill(doc, property)] : host.type(property).name === "checkbox" ? [shownValue(host, item, property)!] : valueNodes(host, item, property);
+      const shown = missing(host, item, property) ? [missingPill(doc, property)] : host.type(property).look === "check" ? [shownValue(host, item, property)!] : valueNodes(host, item, property);
       return el(doc, "span", { class: `swd-list-value${problem ? " swd-invalid" : ""}`, title: problem ?? property.label, attrs: { "data-key": property.key } }, ...shown);
     }),
   );

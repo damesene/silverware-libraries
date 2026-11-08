@@ -108,9 +108,8 @@ function endDrag(drag: Drag): void {
 function title(host: ViewHost, by: Property, column: ItemGroup): HTMLElement {
   const doc = host.document;
   if (column.value === undefined) return el(doc, "span", { class: `swd-board-none${by.required ? " swd-board-missing" : ""}`, text: column.label, ...(by.required ? { title: `${by.label} is required: these items have none yet` } : {}) });
-  const kind = host.type(by).name;
   const one = Array.isArray(column.value) ? column.value[0] : column.value;
-  if ((kind === "select" || kind === "multi-select") && typeof one === "string") return optionPill(doc, by, one);
+  if (host.type(by).look === "options" && typeof one === "string") return optionPill(doc, by, one);
   return el(doc, "span", { class: `swd-board-label${column.known ? "" : " swd-invalid"}`, text: column.label });
 }
 
@@ -177,7 +176,7 @@ function columnElement(host: ViewHost, by: Property, column: ItemGroup, drag: Dr
     if (!same && column.items.some((one) => one.key === item.key)) return;
     // A property not changed by hand: the card keeps its column
     if (!same && by.readonly) return void host.notify(`${by.label} is not changed by hand: the card stays in its column`);
-    const values = { [by.key]: movedValue(item.values[by.key], from, column) };
+    const values = { [by.key]: movedValue(item.values[by.key], from, column, host.type(by), by.params) };
     const rest = column.items.filter((one) => one.key !== item.key);
     // Sorted (no order by hand shown): its column alone; in its own column nothing moves
     if (sorted) return same ? undefined : void host.move(item, { values });
@@ -208,7 +207,7 @@ function card(host: ViewHost, by: Property, item: Item, column: ItemGroup, drag:
       if (missing(host, item, property)) return [el(doc, "span", { class: "swd-board-value", attrs: { "data-key": property.key } }, missingPill(doc, property))];
       if (shownValue(host, item, property) === undefined) return [];
       // (A checkbox its property's name where ticked; any other value as the views draw it: a select's as pills)
-      const shown = host.type(property).name === "checkbox" ? [shownValue(host, item, property)!] : valueNodes(host, item, property);
+      const shown = host.type(property).look === "check" ? [shownValue(host, item, property)!] : valueNodes(host, item, property);
       return [el(doc, "span", { class: "swd-board-value", title: property.label, attrs: { "data-key": property.key } }, ...shown)];
     }),
   );

@@ -337,6 +337,155 @@ test("the Properties dialog adds a property and changes a type, the change of it
   await expect.poll(() => space.saved("Page/db-tasks")).toContain("status: { type: text");
 });
 
+test("a time, a date and time and a link: edited in their own fields, written and read back through the index; a link opened by a press", async ({ page, space }) => {
+  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    at: { type: time, label: At }\n    when: { type: datetime, label: When }\n    web: { type: url, label: Web }\n---\n";
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS, "Page/db-tasks": rootPage }, "Page");
+  const row = page.locator(".swd-table tbody tr", { hasText: "Fix login" });
+  const cell = (key: string) => row.locator(`td[data-key="${key}"]`);
+  // A time
+  await cell("at").click();
+  await expect(cell("at").locator("input")).toHaveAttribute("type", "time");
+  await cell("at").locator("input").fill("14:30");
+  await cell("at").locator("input").press("Enter");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toMatch(/at: "?14:30"?/);
+  await expect(cell("at")).toHaveText("14:30");
+  await expect(cell("at")).not.toHaveClass(/swd-invalid/);
+  // A date and time
+  await cell("when").click();
+  await expect(cell("when").locator("input")).toHaveAttribute("type", "datetime-local");
+  await cell("when").locator("input").fill("2026-11-08T14:30");
+  await cell("when").locator("input").press("Enter");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toMatch(/when: "?2026-11-08T14:30"?/);
+  await expect(cell("when")).toHaveText("2026-11-08 14:30");
+  await expect(cell("when")).not.toHaveClass(/swd-invalid/);
+  // A link: its address, then a text of its own
+  await cell("web").click();
+  // (Typed without its scheme: kept as a web address)
+  await cell("web").locator(".swd-link-address").fill("example.com/docs/");
+  await cell("web").locator(".swd-link-address").press("Enter");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toMatch(/web: "?https:\/\/example\.com\/docs\/"?/);
+  await expect(cell("web").locator("a.swd-link")).toHaveText("example.com/docs");
+  await expect(cell("web").locator(".swd-link-rest")).toHaveText("/docs");
+  // Pressed: opened in a tab of its own, the block's markdown not shown, no editor opened
+  const opened = page.waitForEvent("popup");
+  await cell("web").locator("a.swd-link").click();
+  expect((await opened).url()).toBe("https://example.com/docs/");
+  await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);
+  await expect(cell("web").locator(".swd-editor-link")).toHaveCount(0);
+  // Its text, pressed beside the link
+  const box = (await cell("web").boundingBox())!;
+  await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2);
+  await cell("web").locator(".swd-link-text").fill("Docs");
+  await cell("web").locator(".swd-link-text").press("Enter");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("[Docs](https://example.com/docs/)");
+  await expect(cell("web").locator("a.swd-link")).toHaveText("Docs");
+  // A select in the peek: its list open at once
+  await row.locator(".swd-table-name").hover();
+  await row.locator(".swd-open").click();
+  await page.locator('.swd-peek .swd-peek-value[data-key="status"]').click();
+  const select = page.locator('.swd-peek .swd-peek-value[data-key="status"] select');
+  await expect(select).toBeFocused();
+  expect(await select.evaluate((one) => one.matches(":open"))).toBe(true);
+  // The link in the peek: its pencil edits it, on the link's line
+  const web = page.locator('.swd-peek .swd-peek-value[data-key="web"]');
+  await expect(web.locator("a.swd-link")).toHaveText("Docs");
+  const [link, pencil] = [(await web.locator("a.swd-link").boundingBox())!, (await web.locator(".swd-peek-edit").boundingBox())!];
+  expect(Math.abs(link.y + link.height / 2 - (pencil.y + pencil.height / 2))).toBeLessThan(6);
+  await web.locator(".swd-peek-edit").click();
+  await expect(web.locator(".swd-link-text")).toHaveValue("Docs");
+  await expect(web.locator(".swd-link-address")).toHaveValue("https://example.com/docs/");
+});
+
+test("a reference: pages picked, kept as wiki links, opened by a press, renamed with their page by SilverBullet", async ({ page, space }) => {
+  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    refs: { type: reference, label: Refs }\n---\n";
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS, "Page/db-tasks": rootPage, "Refs target one": "# One\n", "Refs target two": "# Two\n" }, "Page");
+  const target = `${space.folder}/Refs target one`;
+  const cell = page.locator(".swd-table tbody tr", { hasText: "Fix login" }).locator('td[data-key="refs"]');
+  await cell.click();
+  // Found by words of its name, ticked by Enter, saved by Enter again
+  const search = cell.locator(".swd-editor-search");
+  // A page's folder pressed: its path in the search, its page not ticked, the editor still open
+  await search.fill(`${space.folder} target two`);
+  await cell.locator(".swd-editor-choice").first().locator("button.swd-editor-document-folder").click();
+  await expect(search).toHaveValue(`${space.folder}/`);
+  await expect(search).toBeFocused();
+  await expect(cell.locator("input[type=checkbox]:checked")).toHaveCount(0);
+  await expect(cell.locator(`.swd-editor-choice[title="${space.folder}/Refs target one"]`)).toBeVisible();
+  await search.fill(`${space.folder} target one`);
+  // (Each document its name, its folder under it)
+  await expect(cell.locator(".swd-editor-choice").first()).toHaveAttribute("title", target);
+  await expect(cell.locator(".swd-editor-choice").first().locator(".swd-editor-document-folder")).toHaveText(space.folder);
+  await search.press("Enter");
+  await search.press("Enter");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain(`refs: ["[[${target}]]"]`);
+  await expect(cell.locator("a.swd-reference")).toHaveText(target);
+  // In the peek its editor is in the value's row, its search in view (a panel over the properties' box was cut by its edge)
+  await page.locator(".swd-table tbody tr", { hasText: "Fix login" }).locator(".swd-table-name").hover();
+  await page.locator(".swd-table tbody tr", { hasText: "Fix login" }).locator(".swd-open").click();
+  const peekRefs = page.locator('.swd-peek .swd-peek-value[data-key="refs"]');
+  await peekRefs.click({ position: { x: 4, y: 4 } });
+  await expect(peekRefs.locator(".swd-editor-documents")).toHaveCSS("position", "static");
+  await expect(peekRefs.locator(".swd-editor-search")).toBeInViewport({ ratio: 1 });
+  await peekRefs.locator(".swd-editor-search").press("Escape");
+  await page.locator(".swd-peek-close").click();
+  // Its page renamed in SilverBullet: the link in the item's page renamed with it
+  type Client = { clientSystem: { localSyscall(name: string, args: unknown[]): Promise<unknown> } };
+  await waitForIndex(page, "link", target);
+  await page.evaluate(
+    ([from, to]) => (window as unknown as { client: Client }).client.clientSystem.localSyscall("system.invokeFunction", ["index.renamePageCommand", { oldPage: from, page: to }]),
+    [target, `${space.folder}/Refs target renamed`],
+  );
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain(`refs: ["[[${space.folder}/Refs target renamed]]"]`);
+  // Pressed: its page opened
+  await expect(cell.locator("a.swd-reference")).toHaveText(`${space.folder}/Refs target renamed`);
+  await cell.locator("a.swd-reference").click();
+  await expect(page).toHaveURL(/Refs%20target%20renamed$|Refs target renamed$/);
+});
+
+test("a property removed in Properties: no question, the change shown with a switch taking its values off the items too", async ({ page, space }) => {
+  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    note: { type: text, label: Note }\n---\n";
+  const itemPage = "---\ntags: [db]\nstatus: Todo\nnote: keep me\n_database:\n  rank: a0\n---\n";
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", "Page/db-tasks": rootPage, "Page/db-tasks/Fix login": itemPage }, "Page");
+  await page.locator(".swd-more").click();
+  await choose(page, "Properties");
+  await page.locator('[data-property="note"] .swd-prop-head').click();
+  await page.locator('[data-property="note"] .swd-property-remove').click();
+  // No dialog of the browser's or SilverBullet's asked: the review at once, its switch off
+  const review = page.locator(".swd-property-review");
+  await expect(review).toContainText("Remove Note: no item's value changes");
+  const values = page.locator('.swd-property-choice input[role="switch"]');
+  await expect(values).not.toBeChecked();
+  await page.locator(".swd-property-choice .swd-settings-switch").click();
+  await expect(review).toContainText("Remove Note and its values: one item changes");
+  await page.locator(".swd-property-apply").click();
+  await expect.poll(() => space.saved("Page/db-tasks")).not.toContain("note:");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).not.toContain("note:");
+});
+
+test("values outside the database, on their screen in Properties: one added back as a property, another taken off the pages", async ({ page, space }) => {
+  const itemPage = "---\ntags: [db]\nstatus: Todo\npoints: 5\nlegacy: old text\n_tool: kept\n_database:\n  rank: a0\n---\n";
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS, "Page/db-tasks/Fix login": itemPage }, "Page");
+  await page.locator(".swd-more").click();
+  await choose(page, "Properties");
+  await page.locator(".swd-property-loose-open").click();
+  const rows = page.locator(".swd-loose-row");
+  await expect(rows).toHaveCount(2);
+  await expect(page.locator('.swd-loose-row[data-key="points"] .swd-loose-type')).toHaveValue("number");
+  // Added: a property of that key, its value in the table
+  await page.locator('.swd-loose-row[data-key="points"] .swd-loose-add').click();
+  await expect.poll(() => space.saved("Page/db-tasks")).toContain("points: { type: number, label: Points }");
+  await expect(rows).toHaveCount(1);
+  // Taken off the pages, shown first
+  await page.locator('.swd-loose-row[data-key="legacy"] .swd-loose-remove').click();
+  await expect(page.locator(".swd-property-review")).toContainText('Take "legacy" off the items: one item changes');
+  await page.locator(".swd-property-apply").click();
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).not.toContain("legacy:");
+  expect(await space.saved("Page/db-tasks/Fix login")).toContain("_tool: kept");
+  await expect(page.locator(".swd-loose-none")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator('.swd-table td[data-key="points"]').first()).toHaveText("5");
+});
+
 test("system properties added in Properties show the pages' dates, the order by hand, the page, its tags and its tasks done, written into no item's page", async ({ page, space }) => {
   // (Write docs with tasks in its page: two of three done)
   const tasks = ["- [x] outline", "- [x] draft", "- [ ] review", ""].join(String.fromCharCode(10));
@@ -440,6 +589,72 @@ test("the peek stays as its content typed is written by a press beside its field
   await peek.locator('.swd-peek-row[data-property="status"] .swd-peek-value').click();
   await expect(peek.locator('.swd-peek-row[data-property="status"] :is(select, input)')).toHaveCount(1);
   await expect(page.locator(".swd-list-name")).toHaveCount(2);
+});
+
+test("the peek's properties scroll in their own box past a height, the content under them in view, the box kept where it was as a value is edited", async ({ page, space }) => {
+  // A database of 30 text properties
+  const keys = Array.from({ length: 30 }, (_, at) => `p${at}`);
+  const schema = keys.map((key) => `    ${key}: { type: text, label: Property ${key} }`).join("\n");
+  const rootPage = `---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n${schema}\n---\n`;
+  const itemPage = `---\ntags: [db]\n${keys.map((key) => `${key}: value ${key}`).join("\n")}\n_database:\n  rank: a0\n---\nThe content\n`;
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", "Page/db-tasks": rootPage, "Page/db-tasks/Fix login": itemPage }, "Page");
+  await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
+  const peek = page.locator(".swd-peek");
+  const box = peek.locator(".swd-peek-props-box");
+  await expect(peek.locator(".swd-peek-body")).toHaveValue("The content\n");
+  // The content in the window, the properties' box scrolling (more in it than it shows)
+  await expect(peek.locator(".swd-peek-body")).toBeInViewport();
+  expect(await box.evaluate((one) => one.scrollHeight > one.clientHeight + 50)).toBe(true);
+  // The last property scrolled to and edited: the box where it was once the peek is drawn anew
+  const last = peek.locator('.swd-peek-value[data-key="p29"]');
+  await last.scrollIntoViewIfNeeded();
+  const scrolled = await box.evaluate((one) => one.scrollTop);
+  expect(scrolled).toBeGreaterThan(0);
+  await last.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" edited");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("p29: value p29 edited");
+  await expect(last).toContainText("value p29 edited");
+  expect(Math.abs((await box.evaluate((one) => one.scrollTop)) - scrolled)).toBeLessThan(40);
+  await expect(peek.locator(".swd-peek-body")).toBeInViewport();
+  // Back at the box's top: a row moved down by Alt+↓ past its edge stays in view, the box following it
+  await box.evaluate((one) => (one.scrollTop = 0));
+  const shownInBox = async (key: string) => {
+    const [row, edges] = await Promise.all([peek.locator(`.swd-peek-row[data-property="${key}"]`).boundingBox(), box.boundingBox()]);
+    return !!row && !!edges && row.y >= edges.y - 1 && row.y + row.height <= edges.y + edges.height + 1;
+  };
+  const lowest = await box.evaluate((one) => {
+    const edge = one.getBoundingClientRect().bottom;
+    const rows = [...one.querySelectorAll<HTMLElement>(".swd-peek-row")].filter((row) => row.getBoundingClientRect().bottom <= edge);
+    return rows.at(-1)!.dataset.property!;
+  });
+  await peek.locator(`.swd-peek-row[data-property="${lowest}"]`).hover();
+  await peek.locator(`.swd-peek-row[data-property="${lowest}"] .swd-peek-grip`).focus();
+  for (let n = 0; n < 3; n++) {
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect.poll(() => shownInBox(lowest)).toBe(true);
+  }
+  // A row dragged by its grip to the box's bottom edge: the box scrolls on (the rows past it reachable)
+  await box.evaluate((one) => (one.scrollTop = 0));
+  const first = peek.locator('.swd-peek-row[data-property="p0"]');
+  await first.hover();
+  const grip = (await first.locator(".swd-peek-grip").boundingBox())!;
+  const edges = (await box.boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2, edges.y + edges.height - 6, { steps: 8 });
+  await expect.poll(() => box.evaluate((one) => one.scrollTop)).toBeGreaterThan(40);
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  // A low window (the properties and the content no longer fit): the peek scrolled to its end, its controls and the item's
+  // name still at its top
+  await page.setViewportSize({ width: 1200, height: 300 });
+  // (Once the panel has followed the window)
+  await expect.poll(() => peek.evaluate((one) => ((one.scrollTop = one.scrollHeight), one.scrollTop))).toBeGreaterThan(0);
+  for (const part of [".swd-peek-close", ".swd-peek-open", ".swd-peek-name"]) await expect(peek.locator(part)).toBeInViewport({ ratio: 1 });
+  await peek.locator(".swd-peek-close").click();
+  await expect(peek).toHaveCount(0);
 });
 
 test("a type of the user's shows and reads its values, one that fails shows them as kept, a view's definition given HELPERS", async ({ page, space }) => {

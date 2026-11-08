@@ -120,8 +120,17 @@ export const VERSION_1: PagesVersion = {
       const value = modelValue(object[key]);
       if (value !== undefined) values[key] = value;
     }
+    // Its other keys, kept apart (none of the database's own: its data, the page's name and tags, a key starting `_`, another
+    // tool's data by its own rule; the index's own keys the store leaves out)
+    const schema = new Set(record.database.properties.map((one) => one.key));
+    const loose: Record<string, Value> = {};
+    for (const [key, raw] of Object.entries(object)) {
+      if (schema.has(key) || key.startsWith("_") || key.startsWith("$") || key === "name" || key === "tags") continue;
+      const value = modelValue(raw);
+      if (value !== undefined) loose[key] = value;
+    }
     const rank = systemOf(object).rank;
-    return { name, values, rank: typeof rank === "string" ? rank : undefined };
+    return { name, values, rank: typeof rank === "string" ? rank : undefined, ...(Object.keys(loose).length ? { loose } : {}) };
   },
   writeRoot(page, before, after) {
     if (!before) page.tags.add(ROOT_TAG).properties.set([SYSTEM_KEY, "id"], after.database.id);
@@ -139,6 +148,8 @@ export const VERSION_1: PagesVersion = {
     if (!before) page.tags.add(ITEM_TAG);
     for (const [key, value] of Object.entries(after.values)) if (JSON.stringify(before?.values[key]) !== JSON.stringify(value)) page.properties.set(key, value);
     for (const key of Object.keys(before?.values ?? {})) if (!(key in after.values)) page.properties.remove(key);
+    // (A key the schema has none of, taken off)
+    for (const key of Object.keys(before?.loose ?? {})) if (!(key in (after.loose ?? {}))) page.properties.remove(key);
     if (after.rank !== before?.rank) {
       if (after.rank === undefined) page.properties.remove([SYSTEM_KEY, "rank"]);
       else page.properties.set([SYSTEM_KEY, "rank"], after.rank);

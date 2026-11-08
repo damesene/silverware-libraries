@@ -7,6 +7,8 @@ import { keptText, type PropertyType } from "../type.ts";
 export const select: PropertyType = {
   name: "select",
   label: "Select",
+  editor: "select",
+  look: "options",
   validateParams: (params) => validateOptions(params),
   validate: (value, params) => {
     if (isEmpty(value)) return undefined;

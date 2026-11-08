@@ -10,11 +10,16 @@
 // that does not read is said so and not written. An empty value takes the key
 // off the item.
 import { el } from "../../../shared/elements.ts";
+import { readLink, writeLink } from "../domain/types/link.ts";
+import { folderSearch, foundBy, pathOf } from "../domain/folders.ts";
+import { linkedDocument, type Reference, readReferences, validateReferenceTarget, writeReference } from "../domain/types/reference.ts";
+import { readMoment } from "../domain/types/moment.ts";
 import type { Item, Property, Value } from "../model/database.ts";
 import type { ViewHost } from "../core/view.ts";
+import { VIEW_ICONS } from "./icons.ts";
 
 /** What an editor needs of its host: a view's, or a module's made of the same parts (the peek's) */
-export type EditorHost = Pick<ViewHost, "document" | "database" | "type" | "text" | "update" | "rename" | "notify">;
+export type EditorHost = Pick<ViewHost, "document" | "database" | "type" | "text" | "update" | "rename" | "notify" | "documents" | "validateDocumentName" | "openByName" | "noun" | "folderSeparator">;
 
 /** The built-in property every item has: its name */
 export const NAME = "name";
@@ -28,8 +33,21 @@ function optionsOf(property: Property): readonly string[] {
 /** What a value given by an editor is written as: an empty one taken off (the property empty) */
 const written = (value: Value): Value | undefined => (value === null || value === "" || (Array.isArray(value) && !value.length) ? undefined : value);
 
-// A date as the browser's date field holds it
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// The browser's field of each kind of editor a type says (`PropertyType.editor`) its values are edited in
+const FIELD_OF: Readonly<Record<string, string>> = { date: "date", time: "time", "datetime-local": "datetime-local" };
+
+/**
+ * A value as the browser's field of a date or a date and time takes it: a
+ * date's its day (a time it keeps not shown), a date and time's its day and
+ * time (a day alone at midnight, which is written only if the field is
+ * changed); else as kept
+ */
+function fieldValue(field: string, kept: string): string {
+  const moment = readMoment(kept);
+  if (!moment) return kept;
+  if (field === "date") return moment.day;
+  return field === "datetime-local" ? `${moment.day}T${moment.time ?? "00:00"}` : kept;
+}
 
 /**
  * A list to pick from (a select) that acts as the mouse picks, not as arrow
@@ -104,7 +122,7 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
   const kept = now === undefined || now === null ? "" : Array.isArray(now) ? now.join(", ") : String(now);
   const type = property ? host.type(property) : undefined;
 
-  if (type?.name === "select" && property) {
+  if (type?.editor === "select" && property) {
     const select = el(doc, "select", "swd-editor");
     const options = optionsOf(property);
     select.append(new Option("", ""), ...options.map((option) => new Option(option, option)));
@@ -118,10 +136,17 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
     cell.replaceChildren(select);
     editing.set(cell, select);
     select.focus();
+    // Its list open at once (a press, a key on the value: the browser lets a page open it within one); where it cannot, the
+    // field focused, its list a press or Alt+↓ away
+    try {
+      (select as HTMLSelectElement & { showPicker?: () => void }).showPicker?.();
+    } catch {
+      // (Not within a user's press or key, or not supported for a list: left closed)
+    }
     return;
   }
 
-  if (type?.name === "multi-select" && property) {
+  if (type?.editor === "multi-select" && property) {
     // A box per option, the values kept that are none of them too: saved as the panel is left (Enter, a press elsewhere)
     const was = Array.isArray(now) ? now.map(String) : now === undefined || now === null || now === "" ? [] : [String(now)];
     const options = [...optionsOf(property), ...was.filter((one) => !optionsOf(property).includes(one))];
@@ -151,27 +176,65 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
     escape(panel);
     cell.replaceChildren(panel);
     editing.set(cell, panel);
-    (boxes[0] ?? panel).focus();
+    (boxes[0] ?? panel).focus({ preventScroll: true });
+    // (Whole in view: in a box that scrolls, the peek's properties, it may open past its edge)
+    panel.scrollIntoView?.({ block: "nearest" });
     return;
   }
 
-  // A field of text, read by the type as typed; a date in the browser's date field where it holds the date kept
+  // References: picked from the space's documents; a value the type does not take, or in another form than a list of links
+  // (a type of the user's), edited as text below, kept as it is
+  const references = type?.editor === "documents" && property && (kept === "" || type.validate(now ?? null, property.params) === undefined) ? (kept === "" ? [] : readReferences(now)) : undefined;
+  if (references && property && type) {
+    return documentsEditor(cell, property.label, host, references, host.documents(), escape, (picked) => {
+      // (The same documents in the same order: nothing written; a reference kept keeps how it was written, its text too)
+      const targets = references.map((one) => one.target);
+      if (picked.length === targets.length && picked.every((one, at) => one === targets[at])) return end();
+      // (Read by the type, as any editor's text: the links picked, each kept one as written, the new ones links)
+      const asKept = new Map(references.map((one) => [one.target, one.written]));
+      const parsed = type.parse(picked.map((one) => asKept.get(one) ?? writeReference(one)).join(", "), property.params, now);
+      if ("problem" in parsed) {
+        host.notify(`${property.label} of ${item.name}: ${parsed.problem}: not written`);
+        return end();
+      }
+      void save(written(parsed.value));
+    });
+  }
+
+  if (type?.editor === "link" && property) {
+    // (Read by the type as typed: an address it takes, `www.` an https one; one it does not, said so, nothing written)
+    return linkEditor(cell, kept, escape, end, (typed, leaving) => {
+      if (typed === "") return void save(undefined);
+      const parsed = type.parse(typed, property.params, now);
+      if ("problem" in parsed) {
+        // (Left: not written, said so; Enter: kept open on what was typed, why said there)
+        if (!leaving) return parsed.problem;
+        host.notify(`${property.label} of ${item.name}: ${parsed.problem}: not written`);
+        return void end();
+      }
+      void save(written(parsed.value));
+      return undefined;
+    });
+  }
+
+  // A field of text, read by the type as typed; the browser's own field of a date, a time, both, where the type says its
+  // values are edited in one and the value kept reads as the type (else a field of text, the value kept as it is)
   const input = el(doc, "input", "swd-editor");
-  // (A date as the field holds it: of its form and a real day, `2026-02-30` none; else a field of text, the date kept as it is)
-  const realDate = kept === "" || (ISO_DATE_RE.test(kept) && !!property && !!type && type.validate(kept, property.params) === undefined);
-  input.type = type?.name === "date" && realDate ? "date" : type?.name === "url" ? "url" : "text";
-  input.value = key === NAME || !property || typeof now !== "number" ? kept : host.text(item, key);
+  const field = type?.editor ? FIELD_OF[type.editor] : undefined;
+  const reads = kept === "" || (!!property && !!type && type.validate(kept, property.params) === undefined);
+  input.type = field && reads ? field : "text";
+  input.value = input.type === "text" ? (key === NAME || !property || typeof now !== "number" ? kept : host.text(item, key)) : fieldValue(input.type, kept);
   const shown = input.value;
   const commit = (leaving: boolean) => {
-    // A date the field cannot read (one left half typed, a day no month has): the browser says empty, which is no clearing
+    // A date or a time the field cannot read (one left half typed, a day no month has): the browser says empty, which is no clearing
     if (input.validity?.badInput) {
-      host.notify(`${property?.label ?? "The value"} of ${item.name}: not a date: not written`);
+      host.notify(`${property?.label ?? "The value"} of ${item.name}: not read as ${type?.label.toLowerCase() ?? "its type"}: not written`);
       return end();
     }
     // Nothing typed: nothing written (a value of another kind kept as it is)
     if (input.value === shown) return end();
     if (key === NAME || !type || !property) return void save(input.value);
-    const parsed = type.parse(input.value, property.params);
+    const parsed = type.parse(input.value, property.params, now);
     if ("problem" in parsed) {
       if (leaving) {
         // (The field left: not written, said so, rather than kept open under the user's next press)
@@ -201,6 +264,58 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
 }
 
 /**
+ * A link's editor: its address and its text (none: the address shown) in two
+ * fields, written together as the link the type keeps (domain/types/link.ts)
+ * once Enter is pressed or the editor is left; Esc puts it aside. What the
+ * type makes of it is its `parse`'s, as for any field.
+ */
+function linkEditor(cell: HTMLElement, kept: string, escape: (field: HTMLElement) => void, end: () => void, take: (typed: string, leaving: boolean) => string | undefined): void {
+  const doc = cell.ownerDocument;
+  const link = kept ? readLink(kept) : undefined;
+  const address = el(doc, "input", { class: "swd-editor swd-link-address", attrs: { type: "text", placeholder: "https://…", "aria-label": "Address" } });
+  const text = el(doc, "input", { class: "swd-editor swd-link-text", attrs: { type: "text", placeholder: "Text shown (the address where none)", "aria-label": "Text shown" } });
+  address.value = link?.url ?? kept;
+  text.value = link?.text ?? "";
+  const panel = el(doc, "div", { class: "swd-editor swd-editor-choices swd-editor-link", attrs: { role: "group", "aria-label": "Link" } }, address, text);
+  const [urlWas, textWas] = [address.value, text.value];
+  let done = false;
+  const commit = (leaving: boolean) => {
+    if (done) return;
+    // Neither field changed: nothing written (a link kept as it was, its form as written)
+    if (address.value === urlWas && text.value === textWas) {
+      done = true;
+      return end();
+    }
+    // (No address: the link taken off, whatever its text)
+    const problem = take(address.value.trim() ? writeLink(address.value, text.value) : "", leaving);
+    if (problem === undefined) return void (done = true);
+    address.setCustomValidity(problem);
+    address.reportValidity();
+    address.title = problem;
+  };
+  for (const field of [address, text]) {
+    field.addEventListener("input", () => address.setCustomValidity(""));
+    field.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      commit(false);
+    });
+    escape(field);
+  }
+  // (Esc: what is typed put aside, the editor closed)
+  panel.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") done = true;
+  }, true);
+  panel.addEventListener("focusout", (event) => {
+    if (!panel.contains(event.relatedTarget as Node | null)) commit(true);
+  });
+  cell.replaceChildren(panel);
+  editing.set(cell, panel);
+  address.focus();
+  address.select();
+}
+
+/**
  * A value as a line of a card or a list shows it, beside others with no column
  * to say whose: a checkbox ticked its property's name (unticked: nothing),
  * any other value as its type shows it; none: nothing to show
@@ -208,11 +323,149 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
 export function shownValue(host: ViewHost, item: Item, property: Property): string | undefined {
   const value = item.values[property.key];
   if (value === undefined || value === null || value === "") return undefined;
-  if (host.type(property).name === "checkbox") return value === true ? `✓ ${property.label}` : undefined;
+  if (host.type(property).look === "check") return value === true ? `✓ ${property.label}` : undefined;
   return host.text(item, property.key);
 }
 
 /** A checkbox's value turned (a click on it): written at once, as Notion's; unticked is false (a checkbox has no empty value) */
 export function toggle(host: Pick<EditorHost, "update">, item: Item, key: string): Promise<unknown> {
   return host.update(item, key, item.values[key] !== true);
+}
+
+// The documents a search shows at most: more are found by typing more of a name
+const SHOWN_DOCUMENTS = 50;
+
+/**
+ * References' editor: the documents picked, in their order, then the space's
+ * documents a search finds (its words each in a document's name, ignoring
+ * case; what it has up to a folder separator the folder they are in), a box
+ * each; a name typed that no document has offered too, where a document can
+ * have it (a link to a document to make), else why not. Enter in the search
+ * ticks the first found and empties it, Enter without one saves, as leaving
+ * the editor does; Esc puts it aside. Until the documents are listed nothing
+ * typed is offered as new, nor ticked by Enter. Each document its name, its
+ * folder under it; where documents are in folders, its folder icon searches
+ * in it and its folder pressed beside it (a new one made there).
+ */
+function documentsEditor(
+  cell: HTMLElement,
+  label: string,
+  host: Pick<EditorHost, "noun" | "folderSeparator" | "validateDocumentName">,
+  references: readonly Reference[],
+  documents: Promise<readonly string[]>,
+  escape: (field: HTMLElement) => void,
+  take: (picked: readonly string[]) => void,
+): void {
+  const doc = cell.ownerDocument;
+  const { noun, folderSeparator: separator } = host;
+  const picked = references.map((one) => one.target);
+  let known: readonly string[] | undefined;
+  let failed: string | undefined;
+  const search = el(doc, "input", { class: "swd-editor-search", attrs: { type: "text", placeholder: `Find a ${noun.one}…`, "aria-label": `Find a ${noun.one} for ${label}` } });
+  const list = el(doc, "div", { class: "swd-editor-list", attrs: { role: "group", "aria-label": label } });
+  const note = el(doc, "div", { class: "swd-editor-note", attrs: { role: "status" } });
+  const panel = el(doc, "div", { class: "swd-editor swd-editor-choices swd-editor-documents", attrs: { tabindex: "-1" } }, search, list, note);
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    take(picked);
+  };
+  // What a search offers: the documents it finds, then the name typed where it is new and a document can have it; else why not
+  const offered = (): { readonly found: readonly string[]; readonly fresh?: string; readonly problem?: string } => {
+    if (!known) return { found: [] };
+    const read = folderSearch(search.value, separator);
+    const found = known.filter((name) => !picked.includes(name) && foundBy(name, read)).slice(0, SHOWN_DOCUMENTS);
+    const typed = search.value.trim();
+    // (A folder typed, `Projects/`, is no name yet: its documents found, a name still to type after it)
+    if (!typed || (separator && typed.endsWith(separator)) || known.includes(typed) || picked.includes(typed)) return { found };
+    const problem = validateReferenceTarget(typed) ?? host.validateDocumentName(typed);
+    return problem ? { found, problem } : { found, fresh: typed };
+  };
+  // A button putting a folder in the search in place of what was typed (`Projects/`): the documents in it found, a name typed
+  // after it a new one there. Pressed, it takes no focus (the search keeps it: the editor is not left); a pointer's way, the
+  // keys type the path
+  const searchIn = (folder: string, props: { readonly class: string; readonly html?: string; readonly text?: string }) =>
+    el(doc, "button", {
+      ...props,
+      attrs: { title: `Find in ${folder}${separator} (a new ${noun.one} there: type its name after it)`, "aria-label": `Find in ${folder}${separator}`, tabindex: "-1" },
+      on: { mousedown: (event) => event.preventDefault() },
+      run: () => {
+        search.value = `${folder}${separator}`;
+        search.focus({ preventScroll: true });
+        search.setSelectionRange(search.value.length, search.value.length);
+        draw();
+      },
+    });
+  // A document's row: its box and its name (the label ticking it), its folder icon after it, its folder under it
+  const row = (name: string, ticked: boolean, isNew = false) => {
+    const input = el(doc, "input", { attrs: { type: "checkbox", value: name, "aria-label": isNew ? `New: ${name}` : name } });
+    input.checked = ticked;
+    input.addEventListener("change", () => {
+      if (input.checked && !picked.includes(name)) picked.push(name);
+      if (!input.checked && picked.includes(name)) picked.splice(picked.indexOf(name), 1);
+    });
+    // (A link to a heading of a document, `People/Ada#Bio`: the folder its document's, the heading shown with its name)
+    const document = linkedDocument(name);
+    const { folder } = pathOf(document, separator);
+    const leaf = folder === undefined ? name : name.slice(folder.length + separator!.length);
+    return el(
+      doc,
+      "div",
+      { class: `swd-editor-choice${isNew ? " swd-editor-new" : ""}`, attrs: { title: name } },
+      el(doc, "label", "swd-editor-pick", input, el(doc, "span", { class: "swd-editor-document-name", text: `${isNew ? "New: " : ""}${leaf}` })),
+      ...(isNew || !separator ? [] : [searchIn(document, { class: "swd-editor-document-into", html: VIEW_ICONS.folder })]),
+      ...(folder === undefined ? [] : [isNew ? el(doc, "span", { class: "swd-editor-document-folder", text: folder }) : searchIn(folder, { class: "swd-editor-document-folder", text: folder })]),
+    );
+  };
+  const draw = () => {
+    // (The box that had the focus has it again, drawn anew; one gone leaves it to the search)
+    const focused = doc.activeElement instanceof HTMLInputElement && list.contains(doc.activeElement) ? doc.activeElement.value : undefined;
+    const { found, fresh, problem } = offered();
+    list.replaceChildren(...picked.map((name) => row(name, true)), ...found.map((name) => row(name, false)), ...(fresh ? [row(fresh, false, true)] : []));
+    note.textContent = failed ?? (!known ? `Listing the ${noun.many}…` : (problem ?? ""));
+    note.hidden = note.textContent === "";
+    if (focused === undefined) return;
+    const again = [...list.querySelectorAll<HTMLInputElement>("input")].find((one) => one.value === focused);
+    (again ?? search).focus({ preventScroll: true });
+  };
+  search.addEventListener("input", draw);
+  search.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    if (!search.value.trim()) return finish();
+    const { found, fresh } = offered();
+    const first = found[0] ?? fresh;
+    if (!first) return;
+    picked.push(first);
+    search.value = "";
+    draw();
+  });
+  panel.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && event.target !== search) {
+      event.preventDefault();
+      finish();
+    }
+  });
+  panel.addEventListener("focusout", (event) => {
+    if (!panel.contains(event.relatedTarget as Node | null)) finish();
+  });
+  escape(panel);
+  draw();
+  cell.replaceChildren(panel);
+  editing.set(cell, panel);
+  search.focus({ preventScroll: true });
+  panel.scrollIntoView?.({ block: "nearest" });
+  // (The space's documents as they come: what was typed meanwhile searched among them; not listed, said, the names typed still taken)
+  void documents.then(
+    (names) => {
+      known = names;
+      if (!done) draw();
+    },
+    (error: unknown) => {
+      known = [];
+      failed = `The ${noun.many} could not be listed: ${error instanceof Error ? error.message : String(error)}`;
+      if (!done) draw();
+    },
+  );
 }

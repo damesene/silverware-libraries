@@ -8,12 +8,13 @@
 // first: how many items it changes and which values it keeps as they are,
 // applied only as the user says so. Every change goes through the core:
 // checked, said where refused, kept for Undo.
-import { SYSTEM_PROPERTIES, systemKind } from "../../domain/system.ts";
+import { systemKind, systemProperties } from "../../domain/system.ts";
 import { switchControl } from "../../../../shared/controls.ts";
 import { Dialogs } from "../../../../shared/dialog.ts";
 import { reorder } from "../../../../shared/drag.ts";
 import { el } from "../../../../shared/elements.ts";
-import type { Proposal, Refused, Result } from "../../core/core.ts";
+import type { LooseProperty, Proposal, Refused, Result } from "../../core/core.ts";
+import { labelOfKey } from "../../domain/loose.ts";
 import type { ModuleHost } from "../../core/module.ts";
 import { colorsOf, OPTION_COLORS, type OptionColor } from "../../domain/types/options.ts";
 import type { PropertyType } from "../../domain/types/type.ts";
@@ -35,6 +36,7 @@ const isRefused = (result: Result | Proposal | Refused): result is Refused => "p
 
 // A grip: six dots, what a row is dragged by
 const GRIP = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><circle cx="6" cy="4" r="1.1"/><circle cx="10" cy="4" r="1.1"/><circle cx="6" cy="8" r="1.1"/><circle cx="10" cy="8" r="1.1"/><circle cx="6" cy="12" r="1.1"/><circle cx="10" cy="12" r="1.1"/></svg>';
+const BACK = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m10 4-4 4 4 4"/></svg>';
 const CHEVRON = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 4 4-4 4"/></svg>';
 const SHOWN = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8s2.25-4.5 6-4.5S14 8 14 8s-2.25 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="1.75"/></svg>';
 const HIDDEN = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8s2.25-4.5 6-4.5S14 8 14 8s-2.25 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="1.75"/><path d="M3 13 13 3"/></svg>';
@@ -86,12 +88,18 @@ function optionsOf(property: Property): readonly string[] {
   return Array.isArray(options) ? options.filter((one): one is string => typeof one === "string") : [];
 }
 
+/** A choice the review of a change offers (Remove: its values too or not), the change proposed again as it is switched */
+type ReviewChoice = { readonly label: string; readonly hint: string; readonly on: boolean; readonly change: (on: boolean) => void; readonly switched?: boolean };
+
 export class PropertiesDialog {
   private readonly dialogs: Dialogs;
   private body: HTMLElement | undefined;
   private database: Database | undefined;
   // A change of items proposed, shown over the properties until applied or put aside
-  private proposal: { readonly proposal: Proposal; readonly what: string; readonly draft?: string } | undefined;
+  private proposal: { readonly proposal: Proposal; readonly what: string; readonly draft?: string; readonly choice?: ReviewChoice } | undefined;
+  // The keys the items keep that the schema has none of, shown on their own screen as asked (read then: every item looked
+  // through), the type picked for each; undefined: the properties shown
+  private loose: { list: readonly LooseProperty[] | undefined; readonly types: Map<string, string> } | undefined;
   // What is typed and not saved yet, kept as the dialog is drawn anew (another change made meanwhile):
   // a select's options by its property's key, the new property's label and type
   private readonly drafts = new Map<string, OptionDraft[]>();
@@ -132,19 +140,21 @@ export class PropertiesDialog {
     if (!read || this.dialogs.isOpen) return this.whenClosed;
     this.whenClosed = new Promise((resolve) => (this.closedNow = resolve));
     this.database = read.value;
+    // (Opened anew: on the properties, not on the screen of the keys outside the schema it was closed on)
+    this.loose = undefined;
     this.drafts.clear();
     this.adding = { label: "", type: "" };
     this.opened = at?.property;
     this.body = el(this.host.document, "div", "swd-properties");
     this.dialogs.open({
       title: `${read.value.name}: properties`,
-      subtitle: "Each item's values are kept in its page",
+      subtitle: `Each item's values are kept in its ${this.host.noun.one}`,
       content: this.body,
       // (Options edited and not saved, a property's name typed and not added: lost only once the user agrees)
       // (Not while a change is written: it would go on unseen, the page to be kept open meanwhile)
       dismiss: async () => {
         if (this.busy) {
-          this.host.ui.notify("Wait until the change is written: closed now, it would go on unseen", { type: "info" });
+          this.host.ui.notify("Wait until the change is shown or written: closed now, it would go on unseen", { type: "info" });
           return false;
         }
         return (!this.drafts.size && !this.adding.label.trim()) || !!(await this.host.ui.ask?.("Close the properties? The options edited and the property typed and not saved are lost.", { destructive: true }));
@@ -181,7 +191,25 @@ export class PropertiesDialog {
     const read = await this.host.database(this.id);
     if (read) this.database = read.value;
     this.changed();
+    // (On the screen of the keys outside the schema: those read anew, one added or taken off gone from them)
+    if (this.loose) await this.readLoose();
     this.draw();
+  }
+
+  /** The keys outside the schema shown, read now */
+  private async showLoose(): Promise<void> {
+    this.loose = { list: undefined, types: new Map() };
+    this.draw();
+    await this.readLoose();
+    this.draw();
+    this.body?.querySelector<HTMLElement>(".swd-loose-back")?.focus();
+  }
+
+  private async readLoose(): Promise<void> {
+    const loose = this.loose;
+    if (!loose) return;
+    const read = await this.host.core.looseProperties(this.id);
+    if (this.loose === loose) loose.list = Array.isArray(read) ? read : [];
   }
 
   private async run(write: () => Promise<Result | Proposal | Refused>, what: string, draft?: string): Promise<boolean> {
@@ -190,9 +218,11 @@ export class PropertiesDialog {
     try {
       const result = await write();
       if (isRefused(result)) {
-        // (Refused, said to the user: the database as it is now, so what is shown is what a next change starts from)
+        // (Refused, said to the user: the database as it is now, so what is shown is what a next change starts from; on the
+        // screen of the keys outside the schema, those too: one gone meanwhile)
         const read = await this.host.database(this.id);
         if (read) this.database = read.value;
+        if (this.loose) await this.readLoose();
         this.draw();
         return false;
       }
@@ -213,9 +243,17 @@ export class PropertiesDialog {
     const { document: doc } = this.host;
     const database = this.database;
     if (!this.body || !database) return;
+    if (this.loose && !this.proposal) {
+      const focused = this.body.contains(doc.activeElement) ? (doc.activeElement as HTMLElement).closest<HTMLElement>("[data-key]")?.dataset.key : undefined;
+      this.body.replaceChildren(this.looseScreen());
+      // (The focus kept in the screen: on its row where it is still there, else on its way back)
+      if (!this.body.contains(doc.activeElement)) ((focused ? this.body.querySelector<HTMLElement>(`.swd-loose-row[data-key="${CSS.escape(focused)}"] .swd-loose-add`) : null) ?? this.body.querySelector<HTMLElement>(".swd-loose-back"))?.focus();
+      return;
+    }
     if (this.proposal) {
-      this.body.replaceChildren(this.review(this.proposal.proposal, this.proposal.what));
-      this.body.querySelector<HTMLElement>(".swd-property-apply")?.focus();
+      this.body.replaceChildren(this.review(this.proposal.proposal, this.proposal.what, this.proposal.choice));
+      // (Drawn after its switch was flipped: the focus on the switch, so a key meant for it applies nothing)
+      this.body.querySelector<HTMLElement>(this.proposal.choice?.switched ? ".swd-property-choice input" : ".swd-property-apply")?.focus();
       return;
     }
     // (The focus kept on what had it: a row's head or grip, a field, by its class and property)
@@ -250,7 +288,7 @@ export class PropertiesDialog {
       el(doc, "span", { class: "swd-prop-icon", html: typeIcon(type?.name ?? "text") }),
       el(doc, "span", { class: "swd-prop-name", text: property.label }, ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", title: "Required", attrs: { "aria-hidden": "true" } })] : [])),
       ...(property.readonly ? [el(doc, "span", { class: "swd-prop-lock", html: LOCK, title: property.system ? "Given by the system" : "Locked in views" })] : []),
-      el(doc, "span", { class: "swd-prop-type", text: systemKind(property.system)?.label ? `System: ${systemKind(property.system)!.label}` : (type?.label ?? property.type) }),
+      el(doc, "span", { class: "swd-prop-type", text: systemKind(property.system, this.host.noun)?.label ? `System: ${systemKind(property.system, this.host.noun)!.label}` : (type?.label ?? property.type) }),
     );
     head.addEventListener("click", () => {
       this.opened = open ? undefined : property.key;
@@ -305,7 +343,7 @@ export class PropertiesDialog {
     const field = (name: string, control: HTMLElement, hint?: string) => el(doc, "label", "swd-prop-field", el(doc, "span", "swd-prop-field-name", name, ...(hint ? [el(doc, "span", { class: `${BASE}-hint`, text: hint })] : [])), control);
     // A system property: its name (and shown or hidden, its place, from the list); what it is, its key; no type, setting or value to change
     if (property.system !== undefined) {
-      const kind = systemKind(property.system);
+      const kind = systemKind(property.system, this.host.noun);
       return el(
         doc,
         "div",
@@ -328,15 +366,16 @@ export class PropertiesDialog {
     key.addEventListener("change", () => {
       if (key.value.trim() && key.value.trim() !== property.key) void this.run(() => core.rekeyProperty(this.id, property.key, key.value.trim()), `Change the key of ${property.label} to ${key.value.trim()}`);
     });
-    const named = types.named(property.type)?.name;
     return el(
       doc,
       "div",
       "swd-prop-detail",
       field("Name", label),
       field("Type", type),
-      ...(named === "select" || named === "multi-select" ? [this.options(property)] : []),
-      ...(named === "checkbox"
+      // (Options where its values are picked from them: a select's, a multi-select's, a type of the user's so)
+      ...(types.named(property.type)?.look === "options" ? [this.options(property)] : []),
+      // (A value turned by a press has no empty one to require)
+      ...(types.named(property.type)?.editor === "toggle"
         ? []
         : [
             el(
@@ -352,11 +391,11 @@ export class PropertiesDialog {
         el(
           doc,
           "label",
-          { class: "swd-prop-field swd-property-locked", title: "Locked: no view offers to change it (its page can still be edited by hand, a script can still write it)" },
+          { class: "swd-prop-field swd-property-locked", title: `Locked: no view offers to change it (its ${this.host.noun.one} can still be edited by hand, a script can still write it)` },
           el(doc, "span", "swd-prop-field-name", "Locked in views", el(doc, "span", { class: `${BASE}-hint`, text: "For values a script or another tool keeps" })),
           locked,
         ),
-        field("Key", key, "How pages and queries name it"),
+        field("Key", key, `How ${this.host.noun.many} and queries name it`),
       ]),
       el(doc, "div", "swd-prop-actions", remove),
     );
@@ -527,13 +566,28 @@ export class PropertiesDialog {
     button.setAttribute("aria-expanded", "true");
   }
 
-  /** A property removed: its values kept in the items (shown again if it comes back), or taken off them too, as the user picks */
-  private async removing(property: Property): Promise<void> {
-    const { core, ui } = this.host;
-    // (A system property's values are none of the items': nothing to ask)
-    if (property.system !== undefined) return void (await this.run(() => core.removeProperty(this.id, property.key, { values: false }), `Remove ${property.label}`));
-    const values = (await ui.ask?.(`Take ${property.label}'s values off the items too? (No: removed from the database, its values kept in the pages. Either way the change is shown before it is written.)`, { destructive: true })) ?? false;
-    await this.run(() => core.removeProperty(this.id, property.key, { values }), `Remove ${property.label}${values ? " and its values" : ""}`);
+  /**
+   * A property removed, the change shown first: its values kept in the items
+   * (shown again if it comes back) or, the review's switch turned on, taken
+   * off them too (the change proposed again so, what it writes shown)
+   */
+  private async removing(property: Property, values = false, switched = false): Promise<void> {
+    const { core } = this.host;
+    const done = await this.run(() => core.removeProperty(this.id, property.key, { values }), `Remove ${property.label}${values ? " and its values" : ""}`);
+    // (A system property's values are none of the items': nothing to choose)
+    if (!done || !this.proposal || property.system !== undefined) return;
+    this.proposal = {
+      ...this.proposal,
+      choice: {
+        label: "Also take its values off the items",
+        hint: `Off: its values stay in the ${this.host.noun.many} (shown again if it comes back). On: taken off the items holding one; Undo puts them back.`,
+        on: values,
+        switched,
+        // (Its label as it is now: renamed meanwhile, the key the same)
+        change: (on) => void this.removing(this.database?.properties.find((one) => one.key === property.key) ?? property, on, true),
+      },
+    };
+    this.draw();
   }
 
   /** A property added: its label and type (kept as typed while the dialog is drawn anew) */
@@ -547,7 +601,7 @@ export class PropertiesDialog {
       doc,
       "optgroup",
       { attrs: { label: "System (read only)" } },
-      ...SYSTEM_PROPERTIES.map((one) => {
+      ...systemProperties(this.host.noun).map((one) => {
         const option = new Option(one.label, `${SYSTEM_PREFIX}${one.kind}`, false, `${SYSTEM_PREFIX}${one.kind}` === this.adding.type);
         option.disabled = there.has(one.kind);
         option.title = there.has(one.kind) ? `${one.label} is there already` : one.hint;
@@ -558,14 +612,14 @@ export class PropertiesDialog {
     // A system property picked: its own name offered, which may be changed
     type.addEventListener("change", () => {
       this.adding.type = type.value;
-      const kind = type.value.startsWith(SYSTEM_PREFIX) ? systemKind(type.value.slice(SYSTEM_PREFIX.length)) : undefined;
+      const kind = type.value.startsWith(SYSTEM_PREFIX) ? systemKind(type.value.slice(SYSTEM_PREFIX.length), this.host.noun) : undefined;
       if (kind && !label.value.trim()) label.value = this.adding.label = kind.label;
     });
     const add = el(doc, "button", {
       class: "swd-property-add",
       text: "Add",
       run: async () => {
-        const kind = type.value.startsWith(SYSTEM_PREFIX) ? systemKind(type.value.slice(SYSTEM_PREFIX.length)) : undefined;
+        const kind = type.value.startsWith(SYSTEM_PREFIX) ? systemKind(type.value.slice(SYSTEM_PREFIX.length), this.host.noun) : undefined;
         if (!label.value.trim() && !kind) return label.focus();
         this.adding = { label: label.value, type: type.value };
         const wanted = kind ? { label: label.value, type: kind.type, system: kind.kind } : { label: label.value, type: type.value };
@@ -578,11 +632,64 @@ export class PropertiesDialog {
     label.addEventListener("keydown", (event) => {
       if (event.key === "Enter") add.click();
     });
-    return el(doc, "div", "swd-property-adder", label, type, add);
+    // The keys the items keep that the schema has none of: on a screen of their own, read only as it is asked for
+    const loose = el(doc, "button", { class: "swd-property-loose-open", text: "Values outside the database…", title: `Keys the items keep that no property is (a property removed with its values kept, a key typed in a ${this.host.noun.one}): add them again, or take them off`, run: () => void this.showLoose() });
+    return el(doc, "div", "swd-property-adder-box", el(doc, "div", "swd-property-adder", label, type, add), loose);
+  }
+
+  /**
+   * The keys the items keep that the schema has none of: each with how many
+   * items keep it and a few of their values, a type (the one they look like
+   * first), Add (a property of that key, its values back in the views) and
+   * Remove from pages (shown first, as any change of items)
+   */
+  private looseScreen(): HTMLElement {
+    const { document: doc, core, types } = this.host;
+    const loose = this.loose!;
+    const back = el(doc, "button", {
+      class: "swd-loose-back",
+      html: BACK,
+      title: "Back to the properties",
+      attrs: { "aria-label": "Back to the properties" },
+      run: () => {
+        this.loose = undefined;
+        this.draw();
+      },
+    });
+    const head = el(doc, "div", "swd-loose-head", back, el(doc, "span", { class: "swd-loose-title", text: "Values outside the database" }));
+    const hint = el(doc, "p", { class: `${BASE}-hint`, text: `Keys the items keep in their ${this.host.noun.many} that no property of the database is: a property removed with its values kept, a key typed in a ${this.host.noun.one} or another tool's.` });
+    if (!loose.list) return el(doc, "div", "swd-loose", head, hint, el(doc, "p", { class: "swd-loose-reading", text: "Reading the items…" }));
+    if (!loose.list.length) return el(doc, "div", "swd-loose", head, hint, el(doc, "p", { class: "swd-loose-none", text: "Every key the items keep is a property of the database." }));
+    const rows = loose.list.map((one) => {
+      const type = el(doc, "select", { class: "swd-loose-type", attrs: { "aria-label": `Type of ${one.key}` } }, ...offered(types.all()).map((t) => new Option(t.label, t.name, false, t.name === (loose.types.get(one.key) ?? one.type))));
+      type.addEventListener("change", () => void loose.types.set(one.key, type.value));
+      const add = el(doc, "button", {
+        class: "swd-loose-add",
+        text: "Add",
+        title: `Add ${one.key} as a property: its values shown again`,
+        // (A select or a multi-select taking its values as its options: none refused as it is added)
+        run: () => void this.run(() => core.addProperty(this.id, { label: labelOfKey(one.key), type: type.value, key: one.key, ...(types.named(type.value)?.look === "options" ? { params: { options: [...one.options] } } : {}) }), ""),
+      });
+      const remove = el(doc, "button", {
+        class: "swd-loose-remove",
+        text: `Remove from ${this.host.noun.many}`,
+        title: `Take ${one.key} off the items keeping it (shown first)`,
+        run: () => void this.run(() => core.removeLooseProperty(this.id, one.key), `Take "${one.key}" off the items`),
+      });
+      return el(
+        doc,
+        "div",
+        { class: "swd-loose-row", attrs: { role: "listitem", "data-key": one.key } },
+        el(doc, "span", "swd-loose-key", el(doc, "code", { text: one.key }), el(doc, "span", { class: "swd-loose-count", text: one.items === 1 ? "1 item" : `${one.items} items` })),
+        el(doc, "span", { class: "swd-loose-samples", text: one.samples.join(", "), title: one.samples.join(", ") }),
+        el(doc, "span", "swd-loose-actions", type, add, remove),
+      );
+    });
+    return el(doc, "div", "swd-loose", head, hint, el(doc, "div", { class: "swd-loose-list", attrs: { role: "list", "aria-label": "Values outside the database" } }, ...rows));
   }
 
   /** A change of items shown before it is applied: how many items, the values kept as they are */
-  private review(proposal: Proposal, what: string): HTMLElement {
+  private review(proposal: Proposal, what: string, choice?: ReviewChoice): HTMLElement {
     const { document: doc, core } = this.host;
     const items = proposal.plan.planned.filter((one) => "item" in one.target).length;
     const left = proposal.plan.skipped.length;
@@ -601,8 +708,10 @@ export class PropertiesDialog {
           : `${kept === 1 ? "One value does" : `${kept} values do`} not read as the new type: kept as ${kept === 1 ? "it is" : "they are"}, shown invalid.`
         : "",
       left ? `${left === 1 ? "One part" : `${left} parts`} cannot be changed and will be left: ${[...new Set(proposal.plan.skipped.map((one) => one.reason))].join("; ")}.` : "",
-      pages ? `Writes ${pages === 1 ? "1 page" : `${number(pages)} pages`}${proposal.documents?.many ? ": it takes a while; keep this page open until it is done (stopped halfway, the items not written yet keep their old values)" : ""}.` : "",
+      pages ? `Writes ${pages === 1 ? `1 ${this.host.noun.one}` : `${number(pages)} ${this.host.noun.many}`}${proposal.documents?.many ? ": it takes a while; keep this window open until it is done (stopped halfway, the items not written yet keep their old values)" : ""}.` : "",
     ].filter(Boolean);
+    // What is held still while the change is written (the choice's switch)
+    const holding: HTMLInputElement[] = [];
     // How far the write is, told as it goes (a store of pages writes them one after another)
     const progress = el(doc, "p", { class: "swd-property-progress", attrs: { hidden: "" } });
     const apply = el(doc, "button", {
@@ -612,11 +721,12 @@ export class PropertiesDialog {
         if (this.busy) return;
         this.busy = true;
         apply.disabled = cancel.disabled = true;
+        for (const one of holding) one.disabled = true;
         const draft = this.proposal?.draft;
         try {
           const result = await core.apply(proposal, (done, of) => {
             progress.hidden = false;
-            progress.textContent = `Written ${number(done)} of ${number(of)}${pages ? " pages" : ""}…`;
+            progress.textContent = `Written ${number(done)} of ${number(of)}${pages ? ` ${this.host.noun.many}` : ""}…`;
           });
           if (draft && !("problem" in result)) this.drafts.delete(draft);
         } finally {
@@ -635,6 +745,24 @@ export class PropertiesDialog {
         this.draw();
       },
     });
-    return el(doc, "div", { class: `${BASE}-card swd-property-review`, attrs: { role: "status", "aria-live": "polite" } }, ...lines.map((line) => el(doc, "p", { text: line })), progress, el(doc, "div", `${BASE}-row`, cancel, apply));
+    // A choice of what the change is (the values taken off too, or not): switched, the change proposed again, the switch held
+    // still meanwhile (and while the change is written), so what it shows is what Apply writes
+    const chosen = choice
+      ? switchControl(doc, BASE, choice.on, (on) => {
+          if (this.busy) return void (switchBox!.checked = !on);
+          switchBox!.disabled = true;
+          choice.change(on);
+        })
+      : undefined;
+    const switchBox = chosen?.querySelector("input");
+    if (switchBox) {
+      switchBox.disabled = this.busy;
+      holding.push(switchBox);
+    }
+    // (Named by its label, the hint said as its description; outside the summary told as it changes)
+    const hint = choice && el(doc, "span", { class: `${BASE}-hint`, text: choice.hint, attrs: { id: "swd-property-choice-hint" } });
+    if (switchBox && hint) switchBox.setAttribute("aria-describedby", hint.id);
+    const choiceRow = choice && chosen && hint ? [el(doc, "label", "swd-prop-field swd-property-choice", el(doc, "span", "swd-prop-field-name", choice.label, hint), chosen)] : [];
+    return el(doc, "div", "swd-property-review-box", ...choiceRow, el(doc, "div", { class: `${BASE}-card swd-property-review`, attrs: { role: "status", "aria-live": "polite" } }, ...lines.map((line) => el(doc, "p", { text: line })), progress, el(doc, "div", `${BASE}-row`, cancel, apply)));
   }
 }

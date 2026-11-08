@@ -4,7 +4,7 @@
 // platform (shared/platform.ts).
 import { saveConfigPage, withConfigSettings } from "../../../../shared/configpage.ts";
 import type { IndexChange, IndexedObject, Platform } from "../../../../shared/platform.ts";
-import { PAGE_KEYS, pageDates, tasksOfPages, validatePageName } from "./pages.ts";
+import { PAGE_KEYS, pageDates, referablePages, tasksOfPages, validatePageName } from "./pages.ts";
 import { settledIndex } from "./settledindex.ts";
 
 /** What the init page hands over, each SilverBullet's own function or a few lines of Lua around it */
@@ -90,6 +90,8 @@ export function silverBulletPlatform(bridge: Bridge): {
       list: names,
       remove: (name) => bridge.deletePage(name),
       validateName: validatePageName,
+      noun: { one: "page", many: "pages" },
+      folderSeparator: "/",
       rename: (from, to) => renamed(from, to, () => bridge.renamePage(from, to)),
       renamePrefix: async (from, to) => {
         await bridge.renamePrefix(from, to);
@@ -101,6 +103,7 @@ export function silverBulletPlatform(bridge: Bridge): {
       reservedKeys: PAGE_KEYS,
       documentDates: pageDates,
       tasks: async (pages) => tasksOfPages(await index.objects("task"), pages),
+      referableDocuments: async () => referablePages(await index.objects("page")),
       onChanged: (listener) => {
         listeners.add(listener);
         return () => void listeners.delete(listener);

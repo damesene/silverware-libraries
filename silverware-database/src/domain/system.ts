@@ -5,6 +5,7 @@
 // A property says which it is (`system`, its kind); it is read only always,
 // its values never kept in an item (a store reads none of its key from a page
 // and writes none), made here from what the store knows of each item.
+import { capitalized, type Noun } from "./noun.ts";
 import { inRankOrder } from "./rank.ts";
 import type { Database, Item, Value } from "../model/database.ts";
 
@@ -21,22 +22,25 @@ export type SystemFacts = {
 /** A kind of system property: its name (a property's `system`), its label and key when added, the type its values are */
 export type SystemProperty = { readonly kind: string; readonly label: string; readonly key: string; readonly type: string; readonly hint: string };
 
-/** The system properties, in the order offered */
-export const SYSTEM_PROPERTIES: readonly SystemProperty[] = [
-  { kind: "createdAt", label: "Created", key: "created_at", type: "datetime", hint: "When the item's page was made" },
-  { kind: "modifiedAt", label: "Modified", key: "modified_at", type: "datetime", hint: "When the item's page was last written (moving it in the order too)" },
-  { kind: "order", label: "Order", key: "order", type: "number", hint: "Its place in the order by hand: 1, 2, 3…" },
-  { kind: "page", label: "Page", key: "page", type: "text", hint: "The item's page" },
-  { kind: "tags", label: "Tags", key: "page_tags", type: "multi-select", hint: "The tags of the item's page, but the database's own" },
-  { kind: "taskProgress", label: "Task progress", key: "task_progress", type: "progress", hint: "How much of the tasks in the item's page is done (none where it has no task)" },
-];
+/** The system properties, in the order offered, said in the word of the place the items are kept in (`noun`: an item's page) */
+export function systemProperties(noun: Noun): readonly SystemProperty[] {
+  const its = `the item's ${noun.one}`;
+  return [
+    { kind: "createdAt", label: "Created", key: "created_at", type: "datetime", hint: `When ${its} was made` },
+    { kind: "modifiedAt", label: "Modified", key: "modified_at", type: "datetime", hint: `When ${its} was last written (moving it in the order too)` },
+    { kind: "order", label: "Order", key: "order", type: "number", hint: "Its place in the order by hand: 1, 2, 3…" },
+    { kind: "page", label: capitalized(noun.one), key: "page", type: "text", hint: capitalized(its) },
+    { kind: "tags", label: "Tags", key: "page_tags", type: "multi-select", hint: `The tags of ${its}, but the database's own` },
+    { kind: "taskProgress", label: "Task progress", key: "task_progress", type: "progress", hint: `How much of the tasks in ${its} is done (none where it has no task)` },
+  ];
+}
 
 /** Whether a database has a system property of a kind (a store asks what it needs to read: its pages' tasks) */
 export const hasSystem = (database: Database, kind: string) => database.properties.some((one) => one.system === kind);
 
 /** A system property's kind by its name; undefined where there is none of that name */
-export function systemKind(name: string | undefined): SystemProperty | undefined {
-  return name === undefined ? undefined : SYSTEM_PROPERTIES.find((one) => one.kind === name);
+export function systemKind(name: string | undefined, noun: Noun): SystemProperty | undefined {
+  return name === undefined ? undefined : systemProperties(noun).find((one) => one.kind === name);
 }
 
 /** The tasks of a markdown text (`- [ ] …`, `- [x] …`, as SilverBullet's index counts them, x or X done): where a store has a page's text, not the index's tasks */

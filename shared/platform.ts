@@ -77,6 +77,10 @@ export interface Space {
   renamePrefix?(from: string, to: string): Awaitable<Renamed>;
   /** Why a name cannot be a document's (characters the platform does not take in one), undefined where it can */
   validateName?(name: string): string | undefined;
+  /** What is between a document's folders and its name (SilverBullet: `/`); none: documents are in no folders */
+  readonly folderSeparator?: string;
+  /** What the space calls its documents, one and several, for what is said to the user (SilverBullet: page, pages); none: document */
+  readonly noun?: { readonly one: string; readonly many: string };
 }
 
 /** A rename asked of the space: `problem` why nothing was renamed (a name taken, one the space cannot hold) */
@@ -94,6 +98,8 @@ export interface Index {
   documentDates?(object: IndexedObject): DocumentDates;
   /** The tasks in the documents given, counted per document (one without tasks left out); none where the index keeps no tasks */
   tasks?(documents: ReadonlySet<string>): Awaitable<ReadonlyMap<string, TaskCount>>;
+  /** The documents a value may refer to by their names, those the platform keeps for itself left out (SilverBullet's meta pages); none where it does not tell them apart */
+  referableDocuments?(): Awaitable<readonly string[]>;
 }
 
 /** An object of the index: its fields as indexed, among them `name` (its document's name, for a document's own object) and `tags` (a list of texts) */

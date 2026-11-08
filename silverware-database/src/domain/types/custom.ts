@@ -9,8 +9,8 @@ import { isEmpty, isValue, type Params, type Value } from "../../model/database.
 import { BUILT_IN_TYPES } from "./builtin/index.ts";
 import { keptText, type Parsed, type PropertyType } from "./type.ts";
 
-// The built-in types' names: the views and editors draw and edit those by name (a select's list, a checkbox), so a type
-// of one's name would be drawn as the built-in one and its own methods half used: refused, its own name asked for
+// The built-in types' names: a property names its type by it, so a type of one's name would stand for two: refused, its own
+// name asked for. How a type is edited and shown it says itself (`editor`, `look`), a type of the user's as a built-in one
 const BUILT_IN_NAMES = new Set(BUILT_IN_TYPES.map((type) => type.name));
 
 /** What a type's definition is given where it is a function: what the built-in types use */
@@ -32,15 +32,24 @@ export function validateType(type: PropertyType): string | undefined {
   if (BUILT_IN_NAMES.has(type.name)) return `"${type.name}" is a built-in type's name: give yours a name of its own`;
   if (typeof type.label !== "string" || !type.label.trim()) return `the type "${type.name}" has no label`;
   for (const method of ["validate", "text", "parse"] as const) if (typeof type[method] !== "function") return `the type "${type.name}" has no ${method}`;
-  for (const method of ["validateParams", "sortKey"] as const) if (type[method] !== undefined && typeof type[method] !== "function") return `the type "${type.name}": ${method} is no function`;
+  for (const method of ["validateParams", "sortKey", "groupValue"] as const) if (type[method] !== undefined && typeof type[method] !== "function") return `the type "${type.name}": ${method} is no function`;
+  if (type.editor !== undefined && !EDITORS.includes(type.editor)) return `the type "${type.name}": its editor is one of ${EDITORS.join(", ")}`;
+  if (type.look !== undefined && !LOOKS.includes(type.look)) return `the type "${type.name}": its look is one of ${LOOKS.join(", ")}`;
+  // (A value turned by a press is a box, and a box is turned by a press: one without the other would be drawn one way and edited another)
+  if ((type.editor === "toggle") !== (type.look === "check")) return `the type "${type.name}": the editor "toggle" and the look "check" go together`;
   return undefined;
 }
+
+// The kinds of editor and of look a type may say (domain/types/type.ts)
+const EDITORS: readonly string[] = ["select", "multi-select", "date", "time", "datetime-local", "link", "toggle", "documents"];
+const LOOKS: readonly string[] = ["options", "share", "link", "check", "documents"];
 
 // What is done where a method failed, as the user is told
 const DONE: Readonly<Record<string, string>> = {
   validate: "its values shown as kept, invalid",
   text: "its values shown as kept",
   sortKey: "its values sorted by their text",
+  groupValue: "a group per value",
   parse: "the text typed not written",
   validateParams: "its properties' settings taken as not its own",
 };
@@ -77,11 +86,17 @@ export function guardedType(type: PropertyType, told: (problem: string) => void)
   return {
     name: type.name,
     label: type.label,
+    ...(type.editor ? { editor: type.editor } : {}),
+    ...(type.look ? { look: type.look } : {}),
+    ...(type.offered === false ? { offered: false } : {}),
+    ...(type.lists === true ? { lists: true } : {}),
     ...(type.validateParams ? { validateParams: (params: Params) => call("validateParams", () => type.validateParams!(params), problemOrNone, (problem) => problem) } : {}),
     validate: (value: Value, params: Params) => call("validate", () => type.validate(value, params), problemOrNone, (problem) => problem),
     text: (value: Value, params: Params) => call("text", () => type.text(value, params), text, () => keptText(value)),
     ...(type.sortKey ? { sortKey: (value: Value, params: Params) => call("sortKey", () => type.sortKey!(value, params), text, () => keptText(value)) } : {}),
-    parse: (typed: string, params: Params) => call("parse", () => type.parse(typed, params), parsed, (problem): Parsed => ({ problem })),
+    // (A value's group never the group of none: an empty answer for a value is a wrong one)
+    ...(type.groupValue ? { groupValue: (value: Value, params: Params) => call("groupValue", () => type.groupValue!(value, params), (answer): answer is Value => isValue(answer) && (isEmpty(value) || !isEmpty(answer)), () => value) } : {}),
+    parse: (typed: string, params: Params, was?: Value) => call("parse", () => type.parse(typed, params, was), parsed, (problem): Parsed => ({ problem })),
   };
 }
 

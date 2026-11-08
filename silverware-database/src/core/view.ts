@@ -62,8 +62,14 @@ export type ViewDefinition = {
   readonly groupBy?: false | { readonly types?: readonly string[]; readonly required?: boolean; readonly draws?: boolean; readonly prefer?: readonly string[] };
   /** False where the view draws no item's color (`host.look.item`): no Color by in its ⋯ */
   readonly colors?: false;
-  /** False where the view shows no property beside the name (`host.look.shownProperties`): no Visible properties in its ⋯ */
-  readonly properties?: false;
+  /**
+   * False where the view shows no property beside the name
+   * (`host.look.shownProperties`): no Visible properties in its ⋯.
+   * `hiddenByDefault`: every property hidden until the user shows it (the
+   * view keeps those shown, `<view>.shownProperties`, so a property added
+   * stays hidden there: a calendar's, a timeline's small room)
+   */
+  readonly properties?: false | { readonly hiddenByDefault?: boolean };
   /** Its own meta's keys whose value is a property's key (the calendar's `dateBy`): followed as the property's key changes */
   readonly propertyMeta?: readonly string[];
   /**

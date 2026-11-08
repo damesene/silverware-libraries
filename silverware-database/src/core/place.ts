@@ -818,17 +818,24 @@ export class DatabasePlace {
       return colored.by;
     };
     // The properties the view hides (Properties in ⋯), as kept: keys only
-    const hiddenKeys = (): readonly string[] => keys(state.get(prefixed("hiddenProperties")));
-    // (Found once per data read and keys kept: read for every item drawn)
-    let shownFor: { data: Data; hidden: readonly string[]; shown: readonly Property[] } | undefined;
-    const shownProperties = (): readonly Property[] => {
-      const hidden = hiddenKeys();
-      if (shownFor?.data !== data() || JSON.stringify(shownFor.hidden) !== JSON.stringify(hidden)) {
+    // (A view hiding its properties by default keeps those it shows: a property added stays hidden there)
+    const byDefault = typeof drawn.view.properties === "object" && drawn.view.properties.hiddenByDefault === true;
+    const keptKey = prefixed(byDefault ? "shownProperties" : "hiddenProperties");
+    // What the view shows and hides, worked out once per data read and value kept (read for every item drawn)
+    let visible: { data: Data; kept: unknown; hidden: readonly string[]; shown: readonly Property[] } | undefined;
+    const visibility = () => {
+      const kept = state.get(keptKey);
+      if (visible?.data !== data() || visible.kept !== kept) {
+        const { properties } = data().database;
+        const listed = new Set(keys(kept));
+        const hidden = byDefault ? properties.filter((one) => !listed.has(one.key)).map((one) => one.key) : [...listed];
         const off = new Set(hidden);
-        shownFor = { data: data(), hidden, shown: data().database.properties.filter((one) => !off.has(one.key)) };
+        visible = { data: data(), kept, hidden, shown: properties.filter((one) => !off.has(one.key)) };
       }
-      return shownFor.shown;
+      return visible;
     };
+    const hiddenKeys = (): readonly string[] => visibility().hidden;
+    const shownProperties = (): readonly Property[] => visibility().shown;
     return {
       document: this.options.element.ownerDocument,
       get database() {
@@ -898,7 +905,12 @@ export class DatabasePlace {
           // (Of keys only, each once, in the order given)
           const next = [...new Set(keys.filter((one) => typeof one === "string"))];
           if (JSON.stringify(next) === JSON.stringify(hiddenKeys())) return;
-          await setMeta({ hiddenProperties: next.length ? next : undefined });
+          if (byDefault) {
+            // (Those shown as the schema has them now: a key kept of a property gone from it is let go)
+            const off = new Set(next);
+            const shown = data().database.properties.filter((one) => !off.has(one.key)).map((one) => one.key);
+            await setMeta({ shownProperties: shown.length ? shown : undefined });
+          } else await setMeta({ hiddenProperties: next.length ? next : undefined });
           await shownAgain();
         },
         get colorBy() {

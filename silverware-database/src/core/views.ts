@@ -22,6 +22,10 @@ export function validateView(view: ViewDefinition): string | undefined {
   const names = (value: unknown) => value === undefined || (Array.isArray(value) && value.every((one) => typeof one === "string"));
   if (groupBy !== undefined && groupBy !== false && (typeof groupBy !== "object" || groupBy === null || !names(groupBy.types) || !names(groupBy.prefer) || !flag(groupBy.required) || !flag(groupBy.draws)))
     return `the view "${view.name}": its groupBy is false or { types: [type names], prefer: [type names], required, draws: true or false }`;
+  const properties = view.properties as false | { hiddenByDefault?: unknown } | undefined;
+  if (properties !== undefined && properties !== false && (typeof properties !== "object" || properties === null || !flag(properties.hiddenByDefault)))
+    return `the view "${view.name}": its properties is false or { hiddenByDefault: true or false }`;
+  if (view.colors !== undefined && view.colors !== false) return `the view "${view.name}": its colors is false or left out`;
   const keys = new Set<string>();
   for (const setting of view.settings ?? []) {
     if (typeof setting?.key !== "string" || !SETTING_KEY_RE.test(setting.key)) return `the view "${view.name}": "${String(setting?.key)}" is no setting's key: letters, digits, _ and -`;

@@ -163,6 +163,24 @@ describe("the calendar", () => {
   });
 });
 
+describe("the calendar's properties", () => {
+  it("shows none by default, a property added staying hidden; those shown under Visible properties a line each under the name", async () => {
+    const hidden = await setup([{ name: "Trip", due: "2026-11-03", until: "2026-11-05" }]);
+    expect(hidden.all(".swd-cal-value")).toHaveLength(0);
+    // (Kept as those shown: Until shown, Made, never shown, hidden still)
+    const { all, element } = await setup([{ name: "Trip", due: "2026-11-03", until: "2026-11-05" }], { "calendar.shownProperties": ["until"] });
+    expect(all(".swd-cal-value").map((one) => one.dataset.key)).toEqual(["until"]);
+    element.querySelector<HTMLButtonElement>(".swd-more")!.click();
+    const eye = (key: string) => document.querySelector<HTMLButtonElement>(`.swd-shown-row[data-property="${key}"] .swd-shown-eye`)!;
+    [...document.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].find((one) => one.textContent?.startsWith("Visible properties"))!.click();
+    expect(eye("until").getAttribute("aria-pressed")).toBe("true");
+    expect(eye("made").getAttribute("aria-pressed")).toBe("false");
+    eye("until").click();
+    await settle();
+    expect(all(".swd-cal-value")).toHaveLength(0);
+  });
+});
+
 describe("the calendar's spans", () => {
   const ranged = { "calendar.endBy": "until" };
 

@@ -34,7 +34,7 @@ async function setup(items: readonly { name: string; start?: Value; end?: Value;
   const place = new DatabasePlace({ element, database: database.id, state: new MemoryViewState({ [VIEW_KEY]: "timeline", ...state }), store, core, types, views: new ViewRegistry(BUILT_IN_VIEWS), settings: { get: (_path, fallback) => fallback }, ui: { notify: (message) => void told.push(message) }, openItem: (item) => (opened.push(item.name), true) });
   await place.render();
   const all = <T extends Element = HTMLElement>(selector: string) => [...element.querySelectorAll<T>(selector)];
-  const bar = (name: string) => all(".swd-tl-bar").find((one) => one.textContent?.endsWith(name))!;
+  const bar = (name: string) => all(".swd-tl-bar").find((one) => one.querySelector(".swd-tl-bar-text")?.textContent?.endsWith(name))!;
   const track = (name: string) => all(".swd-tl-row").find((one) => one.querySelector(".swd-tl-name-text")!.textContent === name)!.querySelector<HTMLElement>(".swd-tl-track")!;
   const stored = async () => Object.fromEntries((await store.items(database.id)).value.map((one) => [one.name, [one.values.start, one.values.end]]));
   // A drag of the pointer from x to x (jsdom lays nothing out: what counts is how far it went)
@@ -65,6 +65,17 @@ afterEach(() => {
   vi.useRealTimers();
   localStorage.clear();
   document.body.replaceChildren();
+});
+
+describe("the timeline's properties", () => {
+  it("shows none by default; those shown under Visible properties after the bar, part of it", async () => {
+    const hidden = await setup([{ name: "Sketch", start: "2026-11-10", end: "2026-11-12", phase: "Design" }]);
+    expect(hidden.all(".swd-tl-values")).toHaveLength(0);
+    const { all } = await setup([{ name: "Sketch", start: "2026-11-10", end: "2026-11-12", phase: "Design" }], { "timeline.endBy": "end", "timeline.shownProperties": ["phase"] });
+    const values = all(".swd-tl-bar .swd-tl-values");
+    expect(values).toHaveLength(1);
+    expect(values[0]!.textContent).toBe("Design");
+  });
 });
 
 describe("the timeline", () => {

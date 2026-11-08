@@ -21,6 +21,7 @@ import { addDays, type Day, daysBetween, inMonth, type Month, monthOfDay, monthW
 import type { Item } from "../../model/database.ts";
 import { svg } from "../icons.ts";
 import { type ItemSpan, SPAN_META, type SpanChange, spanMenu, viewSpans } from "../spans.ts";
+import { fieldNodes } from "../values.ts";
 
 const ICON = svg('<rect x="2.5" y="3.5" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3M5 9h1.5M7.5 9H9M10 9h1.5M5 11.5h1.5M7.5 11.5H9"/>');
 const BACK = svg('<path d="m10 4-4 4 4 4"/>');
@@ -117,6 +118,12 @@ function draw(host: ViewHost, element: HTMLElement, drag: Drag): void {
       },
       // (A space between its time and its name, not a margin: else the two are one word to the lines, broken inside)
       el(doc, "span", "swd-cal-text", host.look.icon(item), ...(time ? [el(doc, "span", { class: "swd-cal-time", text: time }), " "] : []), el(doc, "span", { class: "swd-cal-name", text: item.name })),
+      // The properties it shows (Visible properties in ⋯, none by default), a line each under the name, those with a value
+      ...host.look.shownProperties.flatMap((property) => {
+        const nodes = fieldNodes(host, item, property);
+        // (Read, not used: the item opens itself, a button; a link in it no control inside that button, `inert`)
+        return nodes.length ? [el(doc, "span", { class: "swd-cal-value", title: property.label, attrs: { "data-key": property.key, inert: "" } }, ...nodes)] : [];
+      }),
     );
     host.look.item(item, box);
     box.addEventListener("keydown", (event) => {
@@ -389,8 +396,8 @@ export const CALENDAR_VIEW: ViewDefinition = {
   groupBy: false,
   // (Its Start and End by a property's key: followed as the key changes)
   propertyMeta: SPAN_META,
-  // (No property beside an item's name: no Visible properties in its ⋯)
-  properties: false,
+  // (Its properties under the name, a line each: none until shown, the room small)
+  properties: { hiddenByDefault: true },
   menu: (host, menu) => spanMenu(host, menu, ICON),
   render(host, element) {
     const drag: Drag = {};

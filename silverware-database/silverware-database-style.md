@@ -1591,6 +1591,15 @@ tr:focus-within .swd-open {
   color: var(--swd-quiet);
   font-size: 0.9em;
 }
+/* The properties a calendar shows (Visible properties in ⋯): a line each under the item's name, quiet, cut where long */
+.swd-cal-value {
+  display: block;
+  overflow: hidden;
+  color: var(--swd-quiet);
+  font-size: 0.9em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .swd-cal-text {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -2143,6 +2152,32 @@ tr:focus-within .swd-open {
 .swd-tl-bar-text {
   overflow: visible;
   pointer-events: none;
+}
+/* The properties a timeline shows (Visible properties in ⋯): after its bar on its row, part of the bar so they go with it as
+   it is dragged; quiet, on one line, taking no press. As wide as the axis leaves after the bar (set inline), cut past it:
+   else they would widen the box past its days; none while the bar is dragged (a bar dragged past the axis widens it, so it
+   scrolls on, its values not) */
+.swd-tl-dragging .swd-tl-values {
+  display: none;
+}
+.swd-tl-values {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 8px);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--swd-quiet);
+  font-size: 0.85em;
+  overflow: hidden;
+  white-space: nowrap;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.swd-tl-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 /* Its ends: dragged to change its start or its end (shown as it is hovered; on a touch screen always) */
 .swd-tl-handle {

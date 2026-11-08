@@ -443,7 +443,7 @@ describe("a property hidden in the views", () => {
     expect(hidden.all(".swd-board-title").map((one) => one.textContent)).toEqual(columns);
   });
 
-  it("is hidden and shown again by its eye under Visible properties in ⋯, the menu staying open; Hide all and Show all; none for a calendar", async () => {
+  it("is hidden and shown again by its eye under Visible properties in ⋯, the menu staying open; Hide all and Show all", async () => {
     const { all, q, viewState } = await setup("table");
     q<HTMLButtonElement>(".swd-more").click();
     choose(document, "Visible properties");
@@ -460,9 +460,6 @@ describe("a property hidden in the views", () => {
     q<HTMLButtonElement>(".swd-shown-all").click();
     await settle();
     expect(viewState.get("table.hiddenProperties")).toBeUndefined();
-    const calendar = await setup("calendar");
-    calendar.q<HTMLButtonElement>(".swd-more").click();
-    expect([...document.querySelectorAll(".swd-menu .swd-label")].map((one) => one.textContent)).not.toContain("Visible properties");
   });
 });
 

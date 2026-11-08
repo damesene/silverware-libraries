@@ -19,6 +19,11 @@ import { foldedOf, groupHead, setFolded } from "../groups.ts";
 import { edgeScroll } from "../edgescroll.ts";
 import { svg } from "../icons.ts";
 import { type ItemSpan, SPAN_META, type SpanChange, spanMenu, viewSpans } from "../spans.ts";
+import { fieldNodes } from "../values.ts";
+
+// The room between a bar and its values (the style page's `left: calc(100% + 8px)`), and the least room they are shown in
+const VALUES_GAP = 8;
+const VALUES_MIN = 24;
 
 const CHEVRON_LEFT = svg('<path d="m10 4-4 4 4 4"/>');
 const CHEVRON_RIGHT = svg('<path d="m6 4 4 4-4 4"/>');
@@ -227,6 +232,20 @@ function draw(host: ViewHost, element: HTMLElement, live: Live): void {
       },
       el(doc, "span", "swd-tl-bar-text", host.look.icon(item), `${span.time ? `${span.time.slice(0, 5)} ` : ""}${item.name}`),
     );
+    // The properties it shows (Visible properties in ⋯, none by default) after it on its row: a part of the bar laid past
+    // its end by the style page, so it goes with the bar as it is dragged; the bar's presses its own
+    const values = host.look.shownProperties.flatMap((property) => {
+      const nodes = fieldNodes(host, item, property);
+      return nodes.length ? [el(doc, "span", { class: "swd-tl-value", title: property.label, attrs: { "data-key": property.key } }, ...nodes)] : [];
+    });
+    // (As wide as the axis leaves after the bar, so they widen no box past its days; none where there is no room. Read, not
+    // used: the bar opens the item; a link among them out of Tab's reach as of the pointer's, `inert`)
+    const room = trackWidth - (left + width) - VALUES_GAP;
+    if (values.length && room >= VALUES_MIN) {
+      const after = el(doc, "span", { class: "swd-tl-values", attrs: { "aria-hidden": "true", inert: "" } }, ...values);
+      after.style.maxWidth = `${room}px`;
+      box.append(after);
+    }
     host.look.item(item, box);
     box.style.left = `${left}px`;
     box.style.width = `${width}px`;
@@ -513,8 +532,8 @@ export const TIMELINE_VIEW: ViewDefinition = {
   groupBy: { draws: true },
   // (Its Start and End by a property's key: followed as the key changes)
   propertyMeta: SPAN_META,
-  // (No property beside an item's name: no Visible properties in its ⋯)
-  properties: false,
+  // (Its properties after its bar, on its row: none until shown, the bars' room small)
+  properties: { hiddenByDefault: true },
   menu: (host, menu) => spanMenu(host, menu, ICON),
   render(host, element) {
     const live: Live = { dragging: false, pending: false };

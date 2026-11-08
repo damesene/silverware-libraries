@@ -34,8 +34,8 @@ export interface PropertyType {
    * where none (or where a value kept does not read as it)
    */
   readonly editor?: "select" | "multi-select" | "date" | "time" | "datetime-local" | "link" | "toggle" | "documents";
-  /** How a value shows where not as its text alone: its options as pills, a share as a bar, a link to open, a box ticked or not, links to the documents it names */
-  readonly look?: "options" | "share" | "link" | "check" | "documents";
+  /** How a value shows where not as its text alone: its options as pills, a share as a bar, a link to open, a box ticked or not, links to the documents it names, labels (texts as quiet pills, no options) */
+  readonly look?: "options" | "share" | "link" | "check" | "documents" | "labels";
   /** Why a property's params are not this type's (a select's options no list of texts), undefined where they are */
   validateParams?(params: Params): string | undefined;
   /** Why a value does not read as this type (shown invalid, kept as read), undefined where it does; an empty value always does (`isEmpty`) */

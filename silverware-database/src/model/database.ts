@@ -41,6 +41,10 @@ export type Property = {
   readonly hidden?: boolean;
   // Every item is to have a value: one without shows as missing; the core takes none off (optional where not said)
   readonly required?: boolean;
+  // Its name shown with its value where a value stands alone (a card's line, a list's row: `Status: Todo`), not under a header naming it
+  readonly showName?: boolean;
+  /** Its own icon (an emoji) where the views name it, in place of its type's; kept as written, shown where it is one */
+  readonly icon?: string;
   // A system property's kind (domain/system.ts: createdAt, modifiedAt, order, page, tags): its values given by the store, never kept in an item; read only
   readonly system?: string;
 };
@@ -63,17 +67,27 @@ export type DatabaseSummary = { readonly id: string; readonly name: string };
  * ranked ones, by name), its body where the store keeps one (content in the
  * markdown language), its revision (changes whenever the item does: a change
  * made from it can ask to be written only where it still is so), when it was
- * last changed where the store knows (ISO text)
+ * last changed where the store knows (ISO text), how it looks besides its
+ * values (`look`: none, as any other)
  */
 export type Item = {
   readonly key: ItemKey;
   readonly name: string;
   readonly values: Readonly<Record<string, Value>>;
   readonly rank: string | undefined;
+  readonly look?: ItemLook;
   readonly body?: string;
   readonly revision: string;
   readonly modified?: string;
 };
+
+/**
+ * How an item looks besides its values, whatever view shows it: an icon (one
+ * character: an emoji) and a color (the palette's by name, or `#rrggbb`:
+ * domain/colors.ts); either may be none. Not a property: no filter, sort or
+ * group reads it
+ */
+export type ItemLook = { readonly icon?: string; readonly color?: string };
 
 /** What a store gives with how it was when read: a revision that changes whenever it does (what tells a view to draw anew) */
 export type Revised<T> = { readonly value: T; readonly revision: string };

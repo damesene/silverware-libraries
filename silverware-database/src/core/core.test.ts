@@ -146,6 +146,16 @@ describe("the core", () => {
     expect((await store.database("tasks"))!.value.properties[0]!.required).toBeUndefined();
   });
 
+  it("shows a property's name with its values and leaves it out again, the schema alone", async () => {
+    const { core, store } = setup();
+    const status = async () => (await store.database("tasks"))!.value.properties[0]!;
+    expect(await core.setPropertyShowName("tasks", "status", true)).not.toHaveProperty("problem");
+    expect((await status()).showName).toBe(true);
+    expect(await core.setPropertyShowName("tasks", "status", true)).toMatchObject({ cause: "unchanged" });
+    await core.setPropertyShowName("tasks", "status", false);
+    expect((await status()).showName).toBeUndefined();
+  });
+
   it("hides a property and shows it again, the schema alone, its values kept, undone as any change", async () => {
     const { core, store, named } = setup();
     const status = async () => (await store.database("tasks"))!.value.properties[0]!;
@@ -234,6 +244,33 @@ describe("the core", () => {
     expect(await named("Fix the login")).toBeDefined();
     expect(await core.rename("tasks", await named("Fix the login"), "Write docs")).toHaveProperty("problem");
     expect(await core.rename("tasks", await named("Fix the login"), " ")).toHaveProperty("problem");
+  });
+
+  it("sets an item's look, refusing what is no icon or color, one step of Undo", async () => {
+    const { core, named, told } = setup();
+    expect(await core.setLook("tasks", await named("Fix login"), { icon: "two words" })).toHaveProperty("problem");
+    expect(await core.setLook("tasks", await named("Fix login"), { color: "navy" })).toHaveProperty("problem");
+    expect((await named("Fix login")).look).toBeUndefined();
+    expect(await core.setLook("tasks", await named("Fix login"), { icon: "🚀", color: "green" })).not.toHaveProperty("problem");
+    expect((await named("Fix login")).look).toEqual({ icon: "🚀", color: "green" });
+    expect(await core.setLook("tasks", await named("Fix login"), { icon: "🚀" })).not.toHaveProperty("problem");
+    expect((await named("Fix login")).look).toEqual({ icon: "🚀" });
+    await core.undo("tasks");
+    expect((await named("Fix login")).look).toEqual({ icon: "🚀", color: "green" });
+    expect(told).toEqual(["An icon is one character (an emoji)", '"navy" is no color']);
+  });
+
+  it("gives a property an icon of its own, refusing what is no icon, taken off again, one step of Undo each", async () => {
+    const { core, store, told } = setup();
+    const icon = async () => (await store.database("tasks"))!.value.properties.find((one) => one.key === "status")!.icon;
+    expect(await core.setPropertyIcon("tasks", "status", "two words")).toHaveProperty("problem");
+    expect(await core.setPropertyIcon("tasks", "status", "🚦")).not.toHaveProperty("problem");
+    expect(await icon()).toBe("🚦");
+    expect(await core.setPropertyIcon("tasks", "status", undefined)).not.toHaveProperty("problem");
+    expect(await icon()).toBeUndefined();
+    await core.undo("tasks");
+    expect(await icon()).toBe("🚦");
+    expect(told).toEqual(["An icon is one character (an emoji)"]);
   });
 
   it("removes items only once the user says yes, and Undo brings them back", async () => {

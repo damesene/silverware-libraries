@@ -578,7 +578,8 @@ export class PagesStore implements DatabaseStore {
       return { name: page, tags: [ROOT_TAG], _database: { id: record.database.id, name: record.database.name, version: record.version, properties } };
     }
     const item = part.after as ItemState;
-    return { name: page, tags: [ITEM_TAG, ...(this.facts.get(from)?.tags ?? [])], ...item.loose, ...item.values, ...(item.rank === undefined ? {} : { _database: { rank: item.rank } }) };
+    const system = { ...(item.rank === undefined ? {} : { rank: item.rank }), ...item.lookKept, ...item.look };
+    return { name: page, tags: [ITEM_TAG, ...(this.facts.get(from)?.tags ?? [])], ...item.loose, ...item.values, ...(Object.keys(system).length ? { _database: system } : {}) };
   }
 
   /** A database as read now: the index's objects, the pages the store wrote as it wrote them */
@@ -604,7 +605,7 @@ export class PagesStore implements DatabaseStore {
         const item: ItemState = { key, ...own, ...(kept && Object.keys(kept).length ? { loose: kept } : {}) };
         // (Its revision of what the store reads of it, those other keys too: one changed by hand since they were shown, the
         // page is not written as they were)
-        items.set(key, { page, item, revision: revisionOf({ name: item.name, values: item.values, rank: item.rank, ...(item.loose ? { loose: item.loose } : {}) }) });
+        items.set(key, { page, item, revision: revisionOf({ name: item.name, values: item.values, rank: item.rank, ...(item.look ? { look: item.look } : {}), ...(item.lookKept ? { lookKept: item.lookKept } : {}), ...(item.loose ? { loose: item.loose } : {}) }) });
         // (A page it wrote, the index not having it yet: what it knows of it; else the index's)
         const writing = this.wrote.get(page);
         const held = writing?.object === one ? writing.facts : undefined;

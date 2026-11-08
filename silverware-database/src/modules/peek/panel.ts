@@ -17,11 +17,12 @@ import { el } from "../../../../shared/elements.ts";
 import type { Result } from "../../core/core.ts";
 import type { ModuleHost } from "../../core/module.ts";
 import { textOf, typeOf } from "../../domain/listing.ts";
-import type { Database, Item, Property, Value } from "../../model/database.ts";
+import type { Database, Item, ItemLook, Property, Value } from "../../model/database.ts";
 import { type EditorHost, editValue, toggle } from "../../views/editors.ts";
 import { reorder } from "../../../../shared/drag.ts";
-import { typeIcon, VIEW_ICONS } from "../../views/icons.ts";
+import { propertyIcon, typeIcon, VIEW_ICONS } from "../../views/icons.ts";
 import type { PropertiesOffer } from "../properties/index.ts";
+import { type LookControls, lookControls } from "./look.ts";
 import { missing, valueNodes } from "../../views/values.ts";
 
 // The panel's width where none is set (the module's setting `width`), the narrowest it may be set to, and its share of the
@@ -53,7 +54,17 @@ type Shown = {
   kept?: { readonly text: string; readonly why: string };
   // Where the focus was as the panel opened: given back as it closes
   readonly opener: Element | null;
+  // The body's field and its note: made once for the item shown and left in place as the rest is drawn anew, so a value written
+  // shows at once while the body is typed in (drawn anew under it, the field lost its focus and what was typed)
+  field?: { readonly body: HTMLTextAreaElement; readonly note: HTMLElement };
 };
+
+/** A content's field waiting for the content read (`readBody` fills only such a field): read only, marked */
+function toRead(body: HTMLTextAreaElement): void {
+  body.readOnly = true;
+  body.dataset.reading = "";
+  body.placeholder = "Reading…";
+}
 
 /** A button whose press takes no focus (a field being edited stays so until what it opens takes the focus): its click not lost to a redraw */
 function keepFocus(button: HTMLElement): void {
@@ -76,6 +87,8 @@ export class PeekPanel {
   private dragged: number | undefined;
   // Its left edge, kept as the panel is drawn anew
   private handle: HTMLElement | undefined;
+  // The item's icon and color over its name, as last drawn (a picker of theirs closed as the panel is drawn anew)
+  private look: LookControls | undefined;
 
   constructor(private readonly host: ModuleHost) {}
 
@@ -111,7 +124,8 @@ export class PeekPanel {
     const field = this.element?.querySelector<HTMLTextAreaElement>(".swd-peek-body");
     // (A body typed and not left yet: not every browser blurs a field as it goes)
     const typed = shown && field && field.dataset.reading === undefined && shown.body && field.value !== (shown.body.was ?? "") ? field.value : undefined;
-    const kept = shown?.kept ?? (typed === undefined ? undefined : { text: typed, why: "the module stopped before it was written" });
+    const inField = field && field.dataset.reading === undefined ? field.value : undefined;
+    const kept = shown?.kept ? { ...shown.kept, text: inField ?? shown.kept.text } : typed === undefined ? undefined : { text: typed, why: "the module stopped before it was written" };
     if (shown && kept) this.host.ui.notify(`Silverware Database: the content typed for "${shown.item.name}" was not written (${kept.why}). It was:\n${kept.text}`, { type: "error" });
     this.remove();
   }
@@ -132,8 +146,9 @@ export class PeekPanel {
     shown.latest = now;
     // (Its values compared too: a system property's change with no change of the item's own, its order as another moves past it)
     if (now.revision === shown.item.revision && JSON.stringify(now.values) === JSON.stringify(shown.item.values) && JSON.stringify(read.value) === JSON.stringify(shown.schema)) return;
-    // Something edited: drawn once it is not, the item kept as drawn meanwhile (a value written from it is checked against it)
-    if (this.editing()) {
+    // A value or the name edited: drawn once it is not, the item kept as drawn meanwhile (a value written from it is checked
+    // against it); the body typed in is no reason, as it is not drawn anew
+    if (this.drawingPutOff()) {
       shown.stale = true;
       return;
     }
@@ -161,6 +176,8 @@ export class PeekPanel {
   private remove(): void {
     if (!this.element) return;
     for (const stop of this.stops.splice(0)) stop();
+    this.look?.close();
+    this.look = undefined;
     const opener = this.shown?.opener;
     this.element.remove();
     this.element = undefined;
@@ -186,11 +203,11 @@ export class PeekPanel {
     element.addEventListener("focusout", () =>
       setTimeout(() => {
         const shown = this.shown;
-        if (shown?.stale && !this.editing()) {
+        if (shown?.stale && !this.drawingPutOff()) {
           shown.stale = false;
           // (After the body's write, if one was just queued: what it wrote is read with the rest)
           void this.writing.then(() => this.follow()).then(() => {
-            if (this.shown === shown && !this.editing()) {
+            if (this.shown === shown && !this.drawingPutOff()) {
               this.draw();
               void this.readBody();
             }
@@ -282,7 +299,13 @@ export class PeekPanel {
     return handle;
   }
 
-  /** Whether something of the panel is being edited (a value's editor open, the body, the name changed): nothing drawn anew under it */
+  /** Whether what is drawn anew is being edited (a value's editor open, the name changed): the panel's drawing put off until it is not */
+  private drawingPutOff(): boolean {
+    const active = this.host.document.activeElement;
+    return this.editing() && !(active instanceof HTMLElement && active.matches(".swd-peek-body"));
+  }
+
+  /** Whether something of the panel is being edited (a value's editor open, the body, the name changed) */
   private editing(): boolean {
     const active = this.host.document.activeElement;
     if (!this.element || !active || !this.element.contains(active)) return false;
@@ -338,6 +361,9 @@ export class PeekPanel {
               ? `${rowOf(active)} .${active.matches(".swd-peek-grip") ? "swd-peek-grip" : "swd-peek-label"}`
               : undefined
         : undefined;
+    // Its icon and color over its name (a picker open of the item as drawn before closed)
+    this.look?.close();
+    this.look = lookControls(this.host, element, item, (look, refocus) => void this.writeLook(shown, look, refocus));
     const name = el(doc, "input", { class: "swd-peek-name", attrs: { id: "swd-peek-name", "aria-label": "Name", value: item.name } });
     name.addEventListener("change", () => void this.rename(shown, name, editor));
     name.addEventListener("keydown", (event) => {
@@ -381,10 +407,12 @@ export class PeekPanel {
       box.append(add);
     }
     // Its controls and its name held at its top however it scrolls (a low window: the properties and the content not fitting)
-    const top = el(doc, "div", "swd-peek-top", head, name);
+    const top = el(doc, "div", "swd-peek-top", head, this.look.row, name);
     const parts: HTMLElement[] = [top, box];
-    if (this.host.itemBodies) {
+    const made = this.host.itemBodies && !shown.field;
+    if (this.host.itemBodies && !shown.field) {
       const body = el(doc, "textarea", { class: "swd-peek-body", attrs: { "aria-label": `Content of ${item.name}`, placeholder: "Reading…", readonly: "", "data-reading": "", rows: "8" } });
+      shown.field = { body, note: el(doc, "div", "swd-peek-note") };
       body.addEventListener("blur", () => {
         this.bodyWrites++;
         this.writing = this.writing.then(async () => {
@@ -394,29 +422,46 @@ export class PeekPanel {
             // (Whatever failed: said, the chain of writes going on; a body typed and not written kept as one refused, never dropped)
             const why = error instanceof Error ? error.message : String(error);
             this.host.ui.notify(`Silverware Database: ${why}`, { type: "error" });
-            if (shown.body && body.value !== (shown.body.was ?? "") && !shown.kept && (await this.host.body(shown.database, shown.latest).catch(() => undefined)) !== body.value) {
+            if (shown.body && body.value !== (shown.body.was ?? "") && shown.kept?.text !== body.value && (await this.host.body(shown.database, shown.latest).catch(() => undefined)) !== body.value) {
               shown.kept = { text: body.value, why };
-              if (this.shown === shown) this.draw();
+              if (this.shown === shown && !this.drawingPutOff()) this.draw();
+              else shown.stale = true;
             }
           } finally {
             this.bodyWrites--;
-            // (A field drawn anew while bodies were written, its reading put off: read now, once none is written)
-            if (!this.bodyWrites) void this.readBody();
+            // (The content as written read again, once no write is going on: what was put off meanwhile, or changed since)
+            if (!this.bodyWrites && this.shown === shown) {
+              this.readAgain(shown);
+              void this.readBody();
+            }
           }
         });
       });
-      parts.push(el(doc, "div", "swd-peek-note"), body);
-      if (shown.kept) {
-        // (Not read anew over what was typed: the text kept, its note again)
-        body.value = shown.kept.text;
-        body.readOnly = false;
-        delete body.dataset.reading;
+    }
+    const field = shown.field;
+    if (field) {
+      field.body.setAttribute("aria-label", `Content of ${item.name}`);
+      if (made && shown.kept) {
+        // (Not read anew over what was typed: the text kept, its note again; a field kept from before has it, typed on since)
+        field.body.value = shown.kept.text;
+        field.body.readOnly = false;
+        delete field.body.dataset.reading;
       }
+      // (Drawn anew, the item changed: its content read again where nothing is typed in it, as a field made anew would be;
+      // read here, as not every drawing is followed by a reading)
+      else if (!made && this.readAgain(shown)) void this.readBody();
     }
     // (Drawn anew for the same item, a value edited: the box scrolled where it was; another item from its top)
     const scrolled = element.dataset.item === item.key ? (element.querySelector<HTMLElement>(".swd-peek-props-box")?.scrollTop ?? 0) : 0;
     element.dataset.item = item.key;
-    element.replaceChildren(...(this.handle ? [this.handle] : []), ...parts);
+    // The body's field left where it is (drawn anew under the user's typing, it lost the focus and the caret): the rest put
+    // in place of what it was; the item's first drawing whole
+    const before = element.querySelector(".swd-peek-top");
+    const was = element.querySelector(".swd-peek-props-box");
+    if (!made && field && field.body.isConnected && before && was) {
+      before.replaceWith(top);
+      was.replaceWith(box);
+    } else element.replaceChildren(...(this.handle ? [this.handle] : []), ...parts, ...(field ? [field.note, field.body] : []));
     box.scrollTop = scrolled;
     // (What the browser scrolls into view with the keys not put under the top held there)
     element.style.scrollPaddingTop = `${top.offsetHeight + 8}px`;
@@ -459,7 +504,7 @@ export class PeekPanel {
     } else value.classList.add("swd-peek-readonly");
     // Its name: opens it in Properties (its name, type, options, required, hidden, removed) where that module is on
     const properties = this.host.offered<PropertiesOffer>("properties");
-    const labelParts = [el(doc, "span", { class: "swd-peek-type", html: typeIcon(editor.type(property).name) }), el(doc, "span", { text: property.label }), ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", attrs: { "aria-hidden": "true" } })] : [])];
+    const labelParts = [propertyIcon(doc, property, editor.type(property).name, "swd-peek-type"), el(doc, "span", { text: property.label }), ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", attrs: { "aria-hidden": "true" } })] : [])];
     const label = properties
       ? el(
           doc,
@@ -533,10 +578,39 @@ export class PeekPanel {
     if (isRefused(result) && this.shown === shown && field.isConnected) field.value = shown.latest.name;
   }
 
+  /** The item's look written (its icon, its color), against the item as drawn; the panel drawn anew, the button focused again */
+  private async writeLook(shown: Shown, look: ItemLook, refocus: string): Promise<void> {
+    try {
+      // Against the item as read now (a value changed elsewhere is no reason to refuse it); refused where its look changed
+      // elsewhere since it was shown
+      if (JSON.stringify(shown.latest.look ?? {}) !== JSON.stringify(shown.item.look ?? {})) {
+        this.host.ui.notify(`The look of "${shown.item.name}" was changed elsewhere meanwhile: not changed`, { type: "error" });
+      } else await this.host.core.setLook(shown.database, shown.latest, look);
+      this.host.refreshPlaces(shown.database);
+      await this.follow();
+      if (this.shown === shown) this.refocus(refocus);
+    } catch (error) {
+      this.host.ui.notify(`Silverware Database: ${error instanceof Error ? error.message : String(error)}`, { type: "error" });
+    }
+  }
+
   /** The focus back on something of the panel (what opened the dialog), drawn anew meanwhile; the panel where it is gone */
   private refocus(selector: string): void {
     if (!this.element) return;
     (this.element.querySelector<HTMLElement>(selector) ?? this.element).focus({ preventScroll: true });
+  }
+
+  /**
+   * The content's field put back to be read (`readBody`) where nothing is typed
+   * in it: not focused, no text kept, its text the content as last read. A
+   * field made anew starts so; one kept across drawings is put back so as the
+   * item changes or its write is done
+   */
+  private readAgain(shown: Shown): boolean {
+    const body = shown.field?.body;
+    if (!body || shown.kept || body.dataset.reading !== undefined || this.host.document.activeElement === body || body.value !== (shown.body?.was ?? "")) return false;
+    toRead(body);
+    return true;
   }
 
   /** The body read as it is now, into its field (unless something was typed there: a kept text, or the field taken meanwhile) */
@@ -611,11 +685,20 @@ export class PeekPanel {
           this.asking = false;
         }
         if (!agreed || this.shown !== shown) return;
+        // (A write of the text going on, the field left before: done first, so nothing of the text given up comes after)
+        await this.writing;
+        if (this.shown !== shown) return;
         shown.kept = undefined;
+        if (shown.field) {
+          shown.field.body.value = "";
+          toRead(shown.field.body);
+        }
         this.draw();
         await this.readBody();
       },
     });
+    // (Pressed, the field keeps the focus: leaving it would write the text the user is asked to give up)
+    keepFocus(reload);
     note.replaceChildren(el(doc, "p", { attrs: { role: "alert" }, text: `Not written: ${kept.why}. Your text is still here: copy it, or load the content as it is now.` }), reload);
   }
 }

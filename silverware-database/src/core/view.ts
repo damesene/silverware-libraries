@@ -60,12 +60,21 @@ export type ViewDefinition = {
    * false where the view is never grouped
    */
   readonly groupBy?: false | { readonly types?: readonly string[]; readonly required?: boolean; readonly draws?: boolean; readonly prefer?: readonly string[] };
+  /** False where the view draws no item's color (`host.itemLook`): no Color by in its ⋯ */
+  readonly colors?: false;
+  /** Its own meta's keys whose value is a property's key (the calendar's `dateBy`): followed as the property's key changes */
+  readonly propertyMeta?: readonly string[];
   /**
    * The view's own entries in its place's menu (⋯), asked as it opens: given
    * the menu's builder (core/placemenu.ts), groups in its slots (`view`: how
    * the view shows its items) or in sections of their own
    */
   menu?(host: ViewHost, menu: PlaceMenuBuilder): readonly PlaceMenuGroup[];
+  /**
+   * Draws the view into `element`. Where its boxes were scrolled is kept by
+   * the place and put back as it is drawn anew; a box marked
+   * `data-own-scroll` is left to the view, which keeps its scroll its own way
+   */
   render(host: ViewHost, element: HTMLElement): ViewInstance | void;
 };
 
@@ -81,6 +90,10 @@ export type ViewListing = {
   readonly groupArrangement: GroupArrangement;
   /** Part of the arrangement changed, the rest kept */
   setGroupArrangement(change: Partial<GroupArrangement>): Promise<void>;
+  /** The key of the property the view colors its items by (Color by in ⋯: a property of options, each its color), as kept: undefined where none */
+  readonly colorBy: string | undefined;
+  /** The property to color the items by (undefined: none: each its own color alone); the place drawn anew */
+  setColorBy(key: string | undefined): Promise<void>;
   /** A property's condition (empty or undefined: none) */
   setFilter(key: string, condition: string | undefined): Promise<void>;
   setSort(sort: readonly SortKey[]): Promise<void>;
@@ -128,4 +141,8 @@ export type ViewHost = DocumentsHost & {
   refresh(): Promise<void>;
   /** A message to the user (a value typed that was not written, and why) */
   notify(message: string): void;
+  /** An item's icon drawn, its size the CSS of where it goes (1em: as the text around it); none where it has none (core/look.ts) */
+  itemIcon(item: Item): HTMLElement | undefined;
+  /** An item's color put on the element drawing it (a card, a row, a bar: its CSS says how it shows), taken off where it has none */
+  itemLook(item: Item, element: HTMLElement): void;
 };

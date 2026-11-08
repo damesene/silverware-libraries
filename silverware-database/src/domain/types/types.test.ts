@@ -17,9 +17,12 @@ describe("property keys", () => {
 });
 
 describe("the built-in types", () => {
-  it("are in their order, a day, a time and both side by side; progress, a system property's own, offered for no property of the user's", () => {
-    expect(types.all().map((one) => one.name)).toEqual(["text", "number", "checkbox", "date", "time", "datetime", "select", "multi-select", "url", "reference", "progress"]);
-    expect(types.all().filter((one) => one.offered === false).map((one) => one.name)).toEqual(["progress"]);
+  it("are in their order, a day, a time and both side by side; tags and progress, the system properties' own, offered for no property of the user's", () => {
+    expect(types.all().map((one) => one.name)).toEqual(["text", "number", "checkbox", "date", "time", "datetime", "select", "multi-select", "url", "reference", "tags", "progress"]);
+    expect(types.all().filter((one) => one.offered === false).map((one) => one.name)).toEqual(["tags", "progress"]);
+    // (Tags: labels, no options to check them against; a list of texts)
+    const tags = type("tags");
+    expect([tags.look, tags.lists, tags.validate(["work", "urgent"], {}), tags.validate("work", {}), tags.text(["work", "urgent"], {})]).toEqual(["labels", true, undefined, "no list of tags", "work, urgent"]);
   });
 
   it("read a time of day, kept with two digits each, and a date and time of a real day", () => {
@@ -89,6 +92,7 @@ describe("the built-in types", () => {
     expect(moment.validate("2026-11-08", {})).toBeUndefined();
     expect(moment.text("2026-11-08", {})).toBe("2026-11-08");
     expect(moment.parse("2026-11-08", {})).toEqual({ value: "2026-11-08" });
+    expect(moment.parse("2026-11-09", {}, "2026-11-08T14:30")).toEqual({ value: "2026-11-09T14:30" });
     // A time takes a date and time's time, its day left (a change of type to a time)
     expect(type("time").parse("2026-11-08T14:30", {})).toEqual({ value: "14:30" });
     expect(type("time").parse("2026-11-08", {})).toHaveProperty("problem");
@@ -162,7 +166,7 @@ describe("the registry", () => {
     const mine: PropertyType = { name: "date", label: "My date", validate: () => undefined, text: String, parse: (text) => ({ value: text }) };
     const stars: PropertyType = { name: "stars", label: "Stars", validate: () => undefined, text: String, parse: (text) => ({ value: text }) };
     registry.define([stars, mine]);
-    expect(registry.all().map((one) => one.label)).toEqual(["Text", "Number", "Checkbox", "My date", "Time", "Date & time", "Select", "Multi-select", "URL", "Reference", "Progress", "Stars"]);
+    expect(registry.all().map((one) => one.label)).toEqual(["Text", "Number", "Checkbox", "My date", "Time", "Date & time", "Select", "Multi-select", "URL", "Reference", "Tags", "Progress", "Stars"]);
     registry.define([]);
     expect(registry.named("date")!.label).toBe("Date");
     expect(registry.named("stars")).toBeUndefined();

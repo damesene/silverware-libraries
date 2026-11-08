@@ -12,6 +12,7 @@ import type { Settings, UserInterface } from "../../../shared/platform.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
 import type { Database, Item, Revised } from "../model/database.ts";
 import type { DatabaseCore } from "./core.ts";
+import { itemIcon, itemLook } from "./look.ts";
 import type { PlaceMenuBuilder, PlaceMenuGroup } from "./placemenu.ts";
 import type { ViewSetting } from "./view.ts";
 
@@ -22,12 +23,28 @@ export type ModuleSetting = ViewSetting;
 export type PlaceContext = {
   readonly document: Document;
   readonly database: Database;
+  /** Whether the place is shown over the whole window (the place lays itself so: its box, Esc ending it) */
+  readonly overWindow: boolean;
+  /** The place shown over the whole window, or back in its document */
+  setOverWindow(on: boolean): void;
+};
+
+/** An icon a module adds among a place's tools (after Undo, before ⋯): its icon (the plugin's own markup), what it does, pressed or not */
+export type PlaceTool = {
+  /** Which it is, among the place's tools (`data-tool`) */
+  readonly key: string;
+  readonly icon: string;
+  readonly label: string;
+  readonly pressed?: boolean;
+  run(): void;
 };
 
 /** What a started module adds; each part optional */
 export type ModuleInstance = {
   /** Its entries in a place's menu (⋯), asked as it opens: given the menu's builder, groups in its slots (`data`: Properties) or sections of their own */
   placeMenu?(place: PlaceContext, menu: PlaceMenuBuilder): readonly PlaceMenuGroup[];
+  /** Its icons among a place's tools, asked as the place is drawn (pressed, the place drawn anew) */
+  placeTools?(place: PlaceContext): readonly PlaceTool[];
   /** Told as a place is drawn (anew: a change made elsewhere, an Undo), so what it shows for a database follows (a dialog open, the peek) */
   placeDrawn?(place: PlaceContext): void;
   /**
@@ -80,6 +97,10 @@ export type ModuleHost = DocumentsHost & {
   onDocumentOpened(listener: (name: string) => void): () => void;
   /** Places drawn anew: every one whole (a schema changed: every view of it shows it), or those of `database` with its data read anew (an item written) */
   refreshPlaces(database?: string): void;
+  /** An item's icon drawn, its size the CSS of where it goes (1em: as the text around it); none where it has none (core/look.ts) */
+  itemIcon(item: Item): HTMLElement | undefined;
+  /** An item's color put on the element drawing it (a card, a row, a bar: its CSS says how it shows), taken off where it has none */
+  itemLook(item: Item, element: HTMLElement): void;
 };
 
 export type ModuleDefinition = {
@@ -119,7 +140,7 @@ export class Modules {
 
   constructor(
     readonly all: readonly ModuleDefinition[],
-    private readonly host: Omit<ModuleHost, "setting" | "saveSetting" | "offer" | "offered">,
+    private readonly host: Omit<ModuleHost, "setting" | "saveSetting" | "offer" | "offered" | "itemIcon" | "itemLook">,
     private readonly settings: Pick<Settings, "get" | "save">,
   ) {}
 
@@ -145,6 +166,8 @@ export class Modules {
         },
         offer: (api) => void this.offers.set(definition.name, api),
         offered: <T>(module: string) => this.offers.get(module) as T | undefined,
+        itemIcon: (item) => itemIcon(this.host.document, item),
+        itemLook,
       };
       try {
         this.started.push({ definition, instance: definition.start(host) ?? {} });
@@ -182,6 +205,11 @@ export class Modules {
   /** The modules' entries in a place's menu, in their order */
   placeMenu(place: PlaceContext, menu: PlaceMenuBuilder): PlaceMenuGroup[] {
     return this.started.flatMap(({ instance }) => [...(instance.placeMenu?.(place, menu) ?? [])]);
+  }
+
+  /** The modules' icons among a place's tools, in their order */
+  placeTools(place: PlaceContext): PlaceTool[] {
+    return this.started.flatMap(({ instance }) => [...(instance.placeTools?.(place) ?? [])]);
   }
 
   /** The modules told a place was drawn */

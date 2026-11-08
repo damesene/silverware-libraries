@@ -31,10 +31,12 @@ export const datetime: PropertyType = {
     const read = moment(value);
     return read ? writeMoment(read) : keptText(value);
   },
-  parse: (typed) => {
+  parse: (typed, _params, was) => {
     const trimmed = typed.trim();
     if (trimmed === "") return { value: null };
     const read = readMoment(trimmed);
-    return read ? { value: writeMoment(read) } : { problem: `"${trimmed}" is no date and time (YYYY-MM-DD HH:MM)` };
+    if (!read) return { problem: `"${trimmed}" is no date and time (YYYY-MM-DD HH:MM)` };
+    // (A day alone: the time the value had kept with it, as a date keeps it; a day put on a calendar's other day)
+    return { value: writeMoment(read.time === undefined ? { day: read.day, time: moment(was)?.time } : read) };
   },
 };

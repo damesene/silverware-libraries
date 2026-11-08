@@ -135,12 +135,69 @@ describe("the table, from the keys and while edited", () => {
 });
 
 describe("the list", () => {
+  it("shows a property's name with its values where the property says so, on a list's row and a card's line, never in a table's cell nor where empty", async () => {
+    const named = { ...TASKS, properties: TASKS.properties.map((one) => (one.key === "estimate" ? { ...one, showName: true } : one)) };
+    const list = await setup("list", {}, named);
+    expect(list.all(".swd-list-item").map((one) => one.textContent)).toEqual(["Fix loginTodoEstimate: 3", "Write docsDoneEstimate: a lot", "PlanLater"]);
+    expect(list.q(".swd-field-name").textContent).toBe("Estimate: ");
+    document.body.replaceChildren();
+    const board = await setup("board", {}, named);
+    expect(board.all(".swd-board-card").map((one) => one.textContent)).toContain("Fix loginEstimate: 3");
+    document.body.replaceChildren();
+    const table = await setup("table", {}, named);
+    expect(table.all(".swd-field-name")).toEqual([]);
+  });
+
   it("shows each item's values, those of a property hidden in the views left out, and has no Properties of its own", async () => {
     const { all } = await setup("list");
     expect(all(".swd-list-item")[0]!.textContent).toBe("Fix loginTodo3");
     expect(all(".swd-list-properties")).toEqual([]);
     const hidden = await setup("list", {}, { ...TASKS, properties: TASKS.properties.map((one) => (one.key === "estimate" ? { ...one, hidden: true } : one)) });
     expect(hidden.all(".swd-list-item")[0]!.textContent).toBe("Fix loginTodo");
+  });
+});
+
+describe("the table grouped", () => {
+  it("is one table, a part per group, each its head, its own header row, its rows and + New adding in it", async () => {
+    const { all, q, named, viewState } = await setup("table", { "table.groupBy": "status" });
+    expect(all("table")).toHaveLength(1);
+    const parts = all(".swd-table-group");
+    expect(parts.map((part) => part.querySelector(".swd-group-label")!.textContent)).toEqual(["Todo", "Done", "Later (none of its options)"]);
+    expect(parts.map((part) => part.querySelectorAll(".swd-table-headrow").length)).toEqual([1, 1, 1]);
+    expect(parts.map((part) => [...part.querySelectorAll("tr[data-item]")].map((row) => row.querySelector(".swd-table-name")!.textContent))).toEqual([["Fix login"], ["Write docs"], ["Plan"]]);
+    // (Its group's head over the whole width: the grips' column, the name's, each property's, the actions')
+    expect(parts[0]!.querySelector(".swd-table-group-head > th")!.getAttribute("colspan")).toBe("6");
+    parts[1]!.querySelector<HTMLButtonElement>(".swd-table-add")!.click();
+    await settle();
+    expect((await named("Untitled")).values.status).toBe("Done");
+    // Folded: its rows kept in the table, unseen; kept in the view's meta
+    q<HTMLButtonElement>('.swd-table-group[data-group] .swd-group-head').click();
+    await settle();
+    expect(viewState.get("table.folded")).toEqual([all(".swd-table-group")[0]!.dataset.group]);
+    expect([all(".swd-table-group")[0]!.classList.contains("swd-folded"), all(".swd-table-group")[0]!.querySelectorAll("tr[data-item]").length]).toEqual([true, 1]);
+  });
+});
+
+describe("the table grouped, its edges", () => {
+  it("keeps + New under the table where no group shows, every one hidden", async () => {
+    const { all, q, items } = await setup("table", { "table.groupBy": "status", "table.groupHidden": ['value:"Todo"', 'value:"Done"', 'value:"Later"'] });
+    expect(all(".swd-table-group")).toEqual([]);
+    q<HTMLButtonElement>(".swd-table-foot .swd-table-add").click();
+    await settle();
+    expect((await items()).map((one) => one.name)).toContain("Untitled");
+  });
+
+  it("puts the focus back on a row moved by Alt+arrows in its own group, an item in several groups having a row in each", async () => {
+    const tagged: Database = { ...TASKS, properties: [...TASKS.properties, { key: "tags", label: "Tags", type: "multi-select", params: { options: ["a", "b"] }, readonly: false }] };
+    const { all, store } = await setup("table", { "table.groupBy": "tags" }, tagged);
+    const keys = (await store.items("tasks")).value.map((one) => one.key);
+    for (const key of keys.slice(0, 2)) store.changeOutside("tasks", key, { values: { tags: ["a", "b"] } });
+    await settle();
+    const group = () => all(".swd-table-group").find((part) => part.querySelector(".swd-group-label")!.textContent === "b")!;
+    const grip = group().querySelector<HTMLElement>("tr[data-item] .swd-row-grip")!;
+    grip.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", altKey: true, bubbles: true, cancelable: true }));
+    await settle();
+    expect(group().contains(document.activeElement)).toBe(true);
   });
 });
 

@@ -50,7 +50,7 @@ export function pill(doc: Document, text: string, color: number | `#${string}` |
   if (typeof color === "number") made.dataset.color = String(color % PILL_COLORS);
   else if (color) {
     made.dataset.color = "own";
-    made.style.setProperty("--swd-pill", ownPill(color));
+    made.style.setProperty("--swd-pill", readableColor(color));
   }
   return made;
 }
@@ -67,8 +67,8 @@ const CONTRAST = 4.6;
 // Own colors made readable, by their text: a table draws a pill of the same color on every row
 const readableOf = new Map<string, string>();
 
-/** An own color's `--swd-pill` (`r, g, b`), made readable once */
-function ownPill(color: string): string {
+/** An own color (`#rrggbb`) as the palette's are drawn (`r, g, b`, a pill's `--swd-pill`, an item's `--swd-item`), made readable once */
+export function readableColor(color: string): string {
   let made = readableOf.get(color);
   if (made === undefined) {
     made = readable([1, 3, 5].map((at) => parseInt(color.slice(at, at + 2), 16)) as [number, number, number]).join(", ");
@@ -145,7 +145,7 @@ function chosen(value: Value | undefined): string[] {
 /**
  * A value drawn as its type's look says (`PropertyType.look`): its options as
  * pills, a share as a bar beside its percent, a link to open, links to the
- * documents it names; else its type's text; nothing where it is empty. A
+ * documents it names, labels as quiet pills; else its type's text; nothing where it is empty. A
  * checkbox is the view's own (a box to tick, or its property's name on a card).
  */
 export function valueNodes(host: Pick<ViewHost, "document" | "type" | "text" | "openByName" | "folderSeparator">, item: Item, property: Property): Node[] {
@@ -153,6 +153,8 @@ export function valueNodes(host: Pick<ViewHost, "document" | "type" | "text" | "
   const type = host.type(property);
   const value = item.values[property.key];
   if (type.look === "options") return chosen(value).map((one) => optionPill(doc, property, one));
+  // (Labels: each a quiet pill, none of them an option; a value that is no list shown as kept, marked by the view)
+  if (type.look === "labels" && Array.isArray(value)) return value.map((one) => pill(doc, String(one), 0));
   // (Links only of a value that reads as the type: one that does not is shown as kept, marked by the view)
   const references = type.look === "documents" && type.validate(value ?? null, property.params) === undefined ? readReferences(value) : undefined;
   if (references) return references.map((one) => referenceNode(doc, one, host.folderSeparator, host.openByName));
@@ -164,6 +166,23 @@ export function valueNodes(host: Pick<ViewHost, "document" | "type" | "text" | "
   // (Its address as a browser opens it: one written without its scheme by hand, https)
   if (link && isOpenable(fullAddress(link.url))) return [linkNode(doc, { ...link, url: fullAddress(link.url) })];
   return text ? [doc.createTextNode(text)] : [];
+}
+
+/**
+ * A value drawn where it stands alone (a card's line, a list's row: no header
+ * names it), the one place of what that shows: a required one without a value
+ * said missing (its pill names it); a box ticked its property's name (`✓ Done`,
+ * unticked nothing); any other as `valueNodes` draws it, its property's name
+ * before it where the property says so (`showName`: `Status: Todo`); nothing
+ * where it has no value (no name alone). A view drawing values under a header
+ * naming them (a table's column) draws them with `valueNodes`
+ */
+export function fieldNodes(host: Pick<ViewHost, "document" | "type" | "text" | "openByName" | "folderSeparator">, item: Item, property: Property): Node[] {
+  const doc = host.document;
+  if (missing(host, item, property)) return [missingPill(doc, property)];
+  if (host.type(property).look === "check") return item.values[property.key] === true ? [doc.createTextNode(`✓ ${property.label}`)] : [];
+  const nodes = valueNodes(host, item, property);
+  return property.showName && nodes.length ? [el(doc, "span", { class: "swd-field-name", text: `${property.label}: ` }), ...nodes] : nodes;
 }
 
 /**

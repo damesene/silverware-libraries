@@ -8,6 +8,7 @@ import type { PageBuilder } from "../../../../shared/pages/changes.ts";
 import type { YamlMap } from "../../../../shared/pages/yamltree.ts";
 import type { IndexedObject } from "../../../../shared/platform.ts";
 import type { Property, Value } from "../../model/database.ts";
+import { readLook } from "../../domain/look.ts";
 import type { ItemState, RecordState } from "../transaction.ts";
 
 /** A root page as a version reads it: its record, or why it cannot be read (the database then not shown) */
@@ -67,18 +68,21 @@ export function modelValue(value: unknown): Value | undefined {
 }
 
 // A property's settings in the root page beside its params: what the model has as fields
-const PROPERTY_FIELDS = new Set(["type", "label", "readonly", "hidden", "required", "system"]);
+const PROPERTY_FIELDS = new Set(["type", "label", "readonly", "hidden", "required", "showName", "icon", "system"]);
 
 /** A property as the root page keeps it under its key: its type, label, flags, a system property's kind, its params beside them */
 export function schemaEntry(property: Property): YamlMap {
   // (A param named as a field of its own, which the core refuses, left out: it would take the field's place as read)
-  const params = Object.fromEntries(Object.entries(property.params as YamlMap).filter(([name]) => !PROPERTY_FIELDS.has(name)));
+  // (`icon` kept as a param where the property has no icon of its own: a value there that is no text, written as it was read)
+  const params = Object.fromEntries(Object.entries(property.params as YamlMap).filter(([name]) => (name === "icon" ? property.icon === undefined : !PROPERTY_FIELDS.has(name))));
   return {
     type: property.type,
     label: property.label,
     ...(property.readonly ? { readonly: true } : {}),
     ...(property.hidden ? { hidden: true } : {}),
     ...(property.required ? { required: true } : {}),
+    ...(property.showName ? { showName: true } : {}),
+    ...(property.icon !== undefined ? { icon: property.icon } : {}),
     ...(property.system ? { system: property.system } : {}),
     ...params,
   };
@@ -95,7 +99,9 @@ export const VERSION_1: PagesVersion = {
     if (!isObject(schema)) return { problem: "its _database.properties are no map" };
     for (const [key, raw] of Object.entries(schema)) {
       if (!isObject(raw)) return { problem: `its property ${key} is no map` };
-      const params = Object.fromEntries(Object.entries(raw).filter(([field]) => !PROPERTY_FIELDS.has(field)));
+      // (`icon` the property's own only where it is a text: anything else written there kept as a param, as it was, not lost)
+      const ownIcon = typeof raw.icon === "string" && raw.icon !== "";
+      const params = Object.fromEntries(Object.entries(raw).filter(([field]) => (field === "icon" ? !ownIcon : !PROPERTY_FIELDS.has(field))));
       // (A system property is read only, whatever is written)
       const system = typeof raw.system === "string" && raw.system ? raw.system : undefined;
       properties.push({
@@ -106,6 +112,9 @@ export const VERSION_1: PagesVersion = {
         readonly: raw.readonly === true || system !== undefined,
         ...(raw.hidden === true ? { hidden: true } : {}),
         ...(raw.required === true ? { required: true } : {}),
+        ...(raw.showName === true ? { showName: true } : {}),
+        // (Its icon kept as written, one that is none too: the schema is written whole, so dropped here it would be lost)
+        ...(ownIcon ? { icon: raw.icon as string } : {}),
         ...(system ? { system } : {}),
       });
     }
@@ -129,8 +138,16 @@ export const VERSION_1: PagesVersion = {
       const value = modelValue(raw);
       if (value !== undefined) loose[key] = value;
     }
-    const rank = systemOf(object).rank;
-    return { name, values, rank: typeof rank === "string" ? rank : undefined, ...(Object.keys(loose).length ? { loose } : {}) };
+    const system = systemOf(object);
+    const rank = system.rank;
+    // How it looks: a part that reads as none (typed by hand) kept as written, apart, so no write loses it
+    const look = readLook(system);
+    const lookKept: Record<string, Value> = {};
+    for (const part of ["icon", "color"] as const) {
+      const value = system[part] === undefined || look?.[part] !== undefined ? undefined : modelValue(system[part]);
+      if (value !== undefined) lookKept[part] = value;
+    }
+    return { name, values, rank: typeof rank === "string" ? rank : undefined, ...(look ? { look } : {}), ...(Object.keys(lookKept).length ? { lookKept } : {}), ...(Object.keys(loose).length ? { loose } : {}) };
   },
   writeRoot(page, before, after) {
     if (!before) page.tags.add(ROOT_TAG).properties.set([SYSTEM_KEY, "id"], after.database.id);
@@ -153,6 +170,14 @@ export const VERSION_1: PagesVersion = {
     if (after.rank !== before?.rank) {
       if (after.rank === undefined) page.properties.remove([SYSTEM_KEY, "rank"]);
       else page.properties.set([SYSTEM_KEY, "rank"], after.rank);
+    }
+    // Its look, each part written only where it changed (what was there and is none: taken off)
+    for (const part of ["icon", "color"] as const) {
+      const was = before?.look?.[part] ?? before?.lookKept?.[part];
+      const now = after.look?.[part] ?? after.lookKept?.[part];
+      if (JSON.stringify(now) === JSON.stringify(was)) continue;
+      if (now === undefined) page.properties.remove([SYSTEM_KEY, part]);
+      else page.properties.set([SYSTEM_KEY, part], now);
     }
     // (The body as read with it: the writer leaves a page whose body changed since)
     if (after.body !== undefined && after.body !== before?.body) page.body(after.body, before?.body);

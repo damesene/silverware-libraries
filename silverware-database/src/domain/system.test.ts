@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Database, Item, ItemKey, Value } from "../model/database.ts";
+import { typeOf } from "./listing.ts";
 import { DOCUMENT } from "./noun.ts";
+import { TypeRegistry } from "./types/registry.ts";
 import { localStamp, systemKind, systemProperties, tasksIn, withSystemValues } from "./system.ts";
 
 const item = (name: string, rank: string | undefined, values: Record<string, Value> = {}): Item => ({ key: name as ItemKey, revision: "1", name, values, rank });
@@ -25,7 +27,7 @@ describe("system properties", () => {
       ["modifiedAt", "datetime", "modified_at"],
       ["order", "number", "order"],
       ["page", "text", "page"],
-      ["tags", "multi-select", "page_tags"],
+      ["tags", "tags", "page_tags"],
       ["taskProgress", "progress", "task_progress"],
     ]);
     expect(systemKind("order", DOCUMENT)?.label).toBe("Order");
@@ -33,6 +35,8 @@ describe("system properties", () => {
     expect([systemKind("page", DOCUMENT)?.label, systemKind("page", DOCUMENT)?.hint]).toEqual(["Document", "The item's document"]);
     expect([systemKind("page", { one: "page", many: "pages" })?.label, systemKind("createdAt", { one: "page", many: "pages" })?.hint]).toEqual(["Page", "When the item's page was made"]);
     expect(systemKind("nothing", DOCUMENT)).toBeUndefined();
+    // (A system property's type its kind's, whatever its schema keeps: Tags added as a multi-select before)
+    expect(typeOf(new TypeRegistry(), { key: "page_tags", label: "Tags", type: "multi-select", params: {}, readonly: true, system: "tags" }).name).toBe("tags");
   });
 
   it("give each item its values from what the store knows of it, the order counted over every item in the order by hand", () => {

@@ -13,8 +13,8 @@ import { el } from "../../../../shared/elements.ts";
 import type { ItemGroup, ViewDefinition, ViewHost } from "../../core/view.ts";
 import { movedValue } from "../../domain/grouping.ts";
 import type { Item, Property } from "../../model/database.ts";
-import { shownValue } from "../editors.ts";
-import { missing, missingPill, optionPill, valueNodes } from "../values.ts";
+import { edgeScroll } from "../edgescroll.ts";
+import { fieldNodes, optionPill } from "../values.ts";
 
 // What a card dragged carries: its own type, so dropped on the page's text it inserts nothing there
 const DRAG_TYPE = "application/x-silverware-database-item";
@@ -35,52 +35,30 @@ function draw(host: ViewHost, element: HTMLElement, drag: Drag): void {
   const sorted = host.listing.sort.length > 0;
   const by = grouping.property;
   const board = el(doc, "div", "swd-board", ...grouping.groups.map((column) => columnElement(host, by, column, drag, sorted)));
-  edgeScroll(board, drag);
+  boardEdgeScroll(board, drag);
   element.replaceChildren(board);
 }
 
-// How near the board's left or right edge a card dragged scrolls it (px; a sixth of a narrow board at most), and how fast at
-// the edge itself (px a second, whatever the screen's frame rate)
-const EDGE = 72;
-const EDGE_SPEED = 1300;
 // A drag's last word older than this (a browser tells a drag's place again at least every 350 ms or so, moved or not;
 // the drag ended without telling): the scroll stops
 const EDGE_QUIET_MS = 500;
 
 /**
- * A card dragged near the board's left or right edge scrolls the board that way, the faster the nearer the edge, as
- * long as it is held there; away from the edges, out of the board, or the drag over, it stops. Either way alike.
+ * A card dragged near the board's left or right edge scrolls the board that way (views/edgescroll.ts), as long as it is
+ * held there; out of the board, or the drag over, it stops
  */
-function edgeScroll(board: HTMLElement, drag: Drag): void {
-  const at = { x: 0, when: 0, running: false, inside: false, last: 0 };
-  const view = board.ownerDocument.defaultView;
-  const step = (now: number) => {
-    if (!drag.item || !at.inside || performance.now() - at.when > EDGE_QUIET_MS || !board.isConnected) return void (at.running = false);
-    const seconds = Math.min(0.05, (now - at.last) / 1000);
-    at.last = now;
-    const box = board.getBoundingClientRect();
-    const edge = Math.min(EDGE, box.width / 6);
-    const left = at.x - box.left;
-    const right = box.right - at.x;
-    const by = (distance: number) => Math.ceil(((edge - Math.max(0, distance)) / edge) * EDGE_SPEED * seconds);
-    if (left < edge && board.scrollLeft > 0) board.scrollLeft -= by(left);
-    else if (right < edge && board.scrollLeft < board.scrollWidth - board.clientWidth) board.scrollLeft += by(right);
-    view?.requestAnimationFrame(step);
-  };
+function boardEdgeScroll(board: HTMLElement, drag: Drag): void {
+  const scroll = edgeScroll(board, { quietMs: EDGE_QUIET_MS });
   board.addEventListener("dragover", (event) => {
     if (!carries(event, drag)) return;
-    at.x = event.clientX;
-    at.when = performance.now();
-    at.inside = true;
-    if (at.running || !view) return;
-    at.running = true;
-    at.last = performance.now();
-    view.requestAnimationFrame(step);
+    scroll.at(event.clientX);
   });
   // (Out of the board: no more scrolling, at once)
   board.addEventListener("dragleave", (event) => {
-    if (!board.contains(event.relatedTarget as Node | null)) at.inside = false;
+    if (!board.contains(event.relatedTarget as Node | null)) scroll.stop();
   });
+  board.addEventListener("drop", () => scroll.stop());
+  board.addEventListener("dragend", () => scroll.stop());
 }
 
 /**
@@ -200,17 +178,15 @@ function card(host: ViewHost, by: Property, item: Item, column: ItemGroup, drag:
     doc,
     "article",
     { class: "swd-board-card", attrs: { draggable: "true", "data-item": item.key } },
-    el(doc, "button", { class: "swd-board-name", title: `Open ${item.name}`, text: item.name, run: () => void host.open(item) }),
+    el(doc, "button", { class: "swd-board-name", title: `Open ${item.name}`, run: () => void host.open(item) }, host.itemIcon(item), item.name),
     ...host.database.properties.flatMap((property) => {
       if (property.hidden || property.key === by.key) return [];
-      // A required one without a value said missing; else nothing where empty
-      if (missing(host, item, property)) return [el(doc, "span", { class: "swd-board-value", attrs: { "data-key": property.key } }, missingPill(doc, property))];
-      if (shownValue(host, item, property) === undefined) return [];
-      // (A checkbox its property's name where ticked; any other value as the views draw it: a select's as pills)
-      const shown = host.type(property).look === "check" ? [shownValue(host, item, property)!] : valueNodes(host, item, property);
-      return [el(doc, "span", { class: "swd-board-value", title: property.label, attrs: { "data-key": property.key } }, ...shown)];
+      // (As it stands alone: a required one without a value said missing, nothing where empty)
+      const shown = fieldNodes(host, item, property);
+      return shown.length ? [el(doc, "span", { class: "swd-board-value", title: property.label, attrs: { "data-key": property.key } }, ...shown)] : [];
     }),
   );
+  host.itemLook(item, box);
   box.addEventListener("dragstart", (event) => {
     drag.item = item;
     drag.from = column;

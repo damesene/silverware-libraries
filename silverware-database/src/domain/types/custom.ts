@@ -37,12 +37,14 @@ export function validateType(type: PropertyType): string | undefined {
   if (type.look !== undefined && !LOOKS.includes(type.look)) return `the type "${type.name}": its look is one of ${LOOKS.join(", ")}`;
   // (A value turned by a press is a box, and a box is turned by a press: one without the other would be drawn one way and edited another)
   if ((type.editor === "toggle") !== (type.look === "check")) return `the type "${type.name}": the editor "toggle" and the look "check" go together`;
+  // (Labels are a list's: a type of them says its values are lists, grouped so)
+  if (type.look === "labels" && type.lists !== true) return `the type "${type.name}": the look "labels" is a list's: say lists: true`;
   return undefined;
 }
 
 // The kinds of editor and of look a type may say (domain/types/type.ts)
 const EDITORS: readonly string[] = ["select", "multi-select", "date", "time", "datetime-local", "link", "toggle", "documents"];
-const LOOKS: readonly string[] = ["options", "share", "link", "check", "documents"];
+const LOOKS: readonly string[] = ["options", "share", "link", "check", "documents", "labels"];
 
 // What is done where a method failed, as the user is told
 const DONE: Readonly<Record<string, string>> = {

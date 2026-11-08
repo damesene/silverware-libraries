@@ -99,6 +99,8 @@ export const DEBUG_VIEWS: readonly ViewDefinition[] = [
   {
     name: "debug-table",
     label: "Table (debug)",
+    // (Its items drawn without their colors)
+    colors: false,
     icon: "▦",
     render(host, element) {
       drawTable(host, element);
@@ -108,6 +110,8 @@ export const DEBUG_VIEWS: readonly ViewDefinition[] = [
   {
     name: "raw",
     label: "Raw",
+    // (Its items drawn without their colors)
+    colors: false,
     icon: "{}",
     settings: [{ key: "indent", label: "Indent", hint: "Spaces of the JSON's indent", control: "number", default: 2 }],
     render(host, element) {

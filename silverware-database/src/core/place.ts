@@ -4,7 +4,7 @@
 // core's writes), the view's own data (its meta) kept in the place's state
 // under its name. What makes a place and when it goes is the binding's
 // (docs/silverware-database.md, *The core*).
-import { el, pressed } from "../../../shared/elements.ts";
+import { el } from "../../../shared/elements.ts";
 import type { Editor, Settings, UserInterface } from "../../../shared/platform.ts";
 import { type Filter, listItems, type SortKey, textOf, typeOf, validateCondition } from "../domain/listing.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
@@ -15,9 +15,10 @@ import { documentsHost, type DocumentsSource } from "./documents.ts";
 import { arrangedGroups, focusGroupList, type GroupFocus, groupedBy, groupEntry } from "./groupmenu.ts";
 import { drawGrouped } from "./groups.ts";
 import { ICONS } from "./icons.ts";
-import type { PlaceContext } from "./module.ts";
+import { type ColorBy, colorable, itemIcon, itemLook } from "./look.ts";
+import type { PlaceContext, PlaceTool } from "./module.ts";
 import type { MenuEntry, MenuNaming } from "../../../shared/menu.ts";
-import { checkedGroups, type PlaceMenuBuilder, type PlaceMenuGroup, placeMenu, toolMenu } from "./placemenu.ts";
+import { checkedGroups, type PlaceMenu, type PlaceMenuBuilder, type PlaceMenuGroup, placeMenu, toolMenu } from "./placemenu.ts";
 import type { DatabaseStore, ViewStateStore } from "./store.ts";
 import type { ViewDefinition, ViewHost, ViewInstance } from "./view.ts";
 import type { ViewRegistry } from "./views.ts";
@@ -40,6 +41,8 @@ export type PlaceOptions = {
   readonly documents?: DocumentsSource;
   /** What the modules on put in the place's menu (core/module.ts), asked as it opens */
   readonly moduleMenu?: (place: PlaceContext, menu: PlaceMenuBuilder) => readonly PlaceMenuGroup[];
+  /** What the modules on put among the place's tools (core/module.ts), asked as it is drawn */
+  readonly moduleTools?: (place: PlaceContext) => readonly PlaceTool[];
   /** Told as the place is drawn (anew: a change made elsewhere, an Undo), so what a module shows for it follows */
   readonly placeDrawn?: (place: PlaceContext) => void;
   /** The block's own text shown to edit (Edit source in ⋯, last), where the place is a block of a document */
@@ -52,6 +55,8 @@ export type PlaceOptions = {
    * as the place is first in the page
    */
   readonly takeOver?: () => PlaceKept | undefined;
+  /** Shown over the whole window from its first drawing (the place before it for the same block was: no frame in the page between) */
+  readonly overWindow?: boolean;
 };
 
 /** The settings' path of a view's setting */
@@ -81,7 +86,7 @@ function groupingOf(view: ViewDefinition, host: ViewHost): Property | undefined 
 /** What decides how a view is drawn grouped: the property and its type (changed, the view drawn anew) */
 const groupingKey = (view: ViewDefinition, host: ViewHost) => {
   const property = groupingOf(view, host);
-  return property ? `${property.key}\u0000${property.type}` : "";
+  return property ? `${property.key}\u0000${host.type(property).name}` : "";
 };
 
 // Where each database's view is scrolled, kept as it scrolls: each box the user scrolled (the place's body, any box the
@@ -103,12 +108,33 @@ export const FILTER_TYPED_MS = 300;
  */
 export type PlaceKept = {
   readonly filterOpen: boolean;
+  // Shown over the whole window: the place drawn after it for the same block (a write of the block) shown so too
+  readonly overWindow?: boolean;
   readonly typing?: { readonly key: string; readonly value: string; readonly start: number; readonly end: number };
   readonly group?: GroupFocus;
 };
 
+/** Color by in ⋯: the properties of options a view may color its items by, None, the one picked checked */
+function colorEntry(host: ViewHost, menu: PlaceMenuBuilder): MenuEntry {
+  const eligible = colorable(host.database.properties, (one) => host.type(one));
+  const by = eligible.find((one) => one.key === host.listing.colorBy);
+  const none = eligible.length ? {} : { disabled: "No property of options (a select, a multi-select)" };
+  const option = (key: string | undefined, label: string) => menu.item({ label, checked: by?.key === key, run: () => void host.listing.setColorBy(key) });
+  return menu.submenu({ label: "Color by", icon: ICONS.color, value: { text: by?.label ?? "None" }, ...none }, () => [
+    option(undefined, "None"),
+    ...eligible.map((property) => option(property.key, property.label)),
+  ]);
+}
+
 export class DatabasePlace {
   private drawn: Drawn | undefined;
+  // The view picker's menu: closed as the place is drawn anew (its box goes, an open menu's listeners with it)
+  private picker: PlaceMenu | undefined;
+  // A module's tool pressed: focused again once the place is drawn anew (it draws its pressed state so)
+  private pressedTool: string | undefined;
+  // Shown over the whole window (a module asked: full screen), Esc ending it; its listener while so
+  private overWindow = false;
+  private stopOverWindow: (() => void) | undefined;
   private body: HTMLElement | undefined;
   // Drawings one after another: a change while one is drawn waits for it, and changes meanwhile are one refresh
   private drawing: Promise<void> = Promise.resolve();
@@ -134,6 +160,12 @@ export class DatabasePlace {
     this.stopListening = options.store.onChanged((change) => {
       if (change.database === options.database) void this.refresh();
     });
+    if (options.overWindow) this.layOverWindow(true);
+  }
+
+  /** Whether it is shown over the whole window (the place drawn after it for the same block shown so from its start) */
+  get isOverWindow(): boolean {
+    return this.overWindow;
   }
 
   /** The place drawn whole: the switcher and the view its state names */
@@ -176,14 +208,57 @@ export class DatabasePlace {
     const kept = this.drawn?.keptTools?.();
     this.handedOver = true;
     this.drawn?.stopTools?.();
-    return kept;
+    return this.overWindow ? { filterOpen: false, ...kept, overWindow: true } : kept;
   }
 
   /** The place gone: its view told, nothing listened to any more, nothing drawn after */
   destroy(): void {
     this.gone = true;
     this.stopListening();
+    this.layOverWindow(false);
     this.endView();
+  }
+
+  /** What a module is told of the place: its database, whether it is over the window and the way to put it so */
+  private context(doc: Document, database: Database): PlaceContext {
+    return { document: doc, database, overWindow: this.overWindow, setOverWindow: (on) => void this.setOverWindow(on) };
+  }
+
+  /**
+   * The place shown over the whole window (its box laid over it: the style
+   * page's `swd-over-window`), or back in its document; drawn anew, so its
+   * tools show it. Esc in it ends it, where nothing in it took the key first
+   * (a menu, a field's editor: theirs)
+   */
+  private async setOverWindow(on: boolean): Promise<void> {
+    if (on === this.overWindow || this.gone) return;
+    this.layOverWindow(on);
+    await this.render();
+  }
+
+  /**
+   * Its element laid over the window or not (the class, and Esc's listener on
+   * the document while so: the focus may be on the block's wrapper or the page's
+   * body after a press in the place's empty room); Esc a key of the place, or
+   * of what holds it, nothing having taken it first (a menu, an editor, a field)
+   */
+  private layOverWindow(on: boolean): void {
+    const { element } = this.options;
+    this.overWindow = on;
+    element.classList.toggle("swd-over-window", on);
+    this.stopOverWindow?.();
+    this.stopOverWindow = undefined;
+    if (!on) return;
+    const doc = element.ownerDocument;
+    const escape = (event: KeyboardEvent) => {
+      const target = event.target instanceof Node ? event.target : null;
+      const ours = !!target && (element.contains(target) || target.contains(element));
+      if (event.key !== "Escape" || event.defaultPrevented || !ours) return;
+      event.preventDefault();
+      void this.setOverWindow(false);
+    };
+    doc.addEventListener("keydown", escape);
+    this.stopOverWindow = () => doc.removeEventListener("keydown", escape);
   }
 
   private queue(work: () => Promise<void>): Promise<void> {
@@ -205,7 +280,7 @@ export class DatabasePlace {
     if (!data) return this.note(`No database "${this.options.database}"`);
     const named = state.get(VIEW_KEY);
     const view = typeof named === "string" ? on.find((one) => one.name === named) : on[0];
-    // The database's name and how many items show, the views' tabs and the tools in one bar under it
+    // The database's name and how many items show, the view shown (its picker) and the tools in one bar under it
     const count = el(doc, "span", { class: "swd-place-count", text: String(data.items.length) });
     element.append(el(doc, "div", "swd-place-head", el(doc, "span", { class: "swd-place-name", text: data.database.name }), count));
     const bar = el(doc, "nav", { class: "swd-place-bar", attrs: { "aria-label": `${data.database.name}: views and tools` } }, this.switcher(doc, on, view?.name));
@@ -227,6 +302,11 @@ export class DatabasePlace {
     drawn.keptTools = tools.kept;
     bar.append(tools.bar);
     this.body.before(tools.panel);
+    // (The module's tool pressed has the focus again, drawn anew: the keys go on from there)
+    if (this.pressedTool !== undefined) {
+      tools.bar.querySelector<HTMLElement>(`.swd-tool[data-tool="${CSS.escape(this.pressedTool)}"]`)?.focus({ preventScroll: true });
+      this.pressedTool = undefined;
+    }
     if (own) tools.restore(own);
     else if (!this.tookOver && this.options.takeOver) {
       // The place before it for this block: what it had open, once this one is in the page (SilverBullet renders a block twice,
@@ -236,6 +316,7 @@ export class DatabasePlace {
         if (drawn !== this.drawn || this.gone) return;
         const kept = this.options.takeOver?.();
         if (kept) tools.restore(kept);
+        if (kept?.overWindow) void this.setOverWindow(true);
       });
     }
     try {
@@ -273,6 +354,8 @@ export class DatabasePlace {
   private keepScroll(box: EventTarget | null): void {
     const key = this.scrollKey();
     if (this.puttingBack || !key || !this.body?.isConnected || !(box instanceof HTMLElement) || !this.body.contains(box)) return;
+    // (A box whose scroll its view keeps itself, its own way: marked so)
+    if (box.hasAttribute("data-own-scroll")) return;
     const path = this.pathOf(box);
     if (path === undefined) return;
     const kept = scrolled.get(key) ?? new Map<string, readonly [number, number]>();
@@ -326,26 +409,34 @@ export class DatabasePlace {
     return values;
   }
 
-  /** The views' tabs: each its icon and label, the one shown marked; one row, scrolled sideways where it does not fit */
+  /**
+   * The view shown, a button: its icon, its label and a mark of a list (none
+   * shown: Pick a view); pressed, the views on in a menu (the shared one, as
+   * Sort and ⋯), the one shown checked, a view picked shown
+   */
   private switcher(doc: Document, views: readonly ViewDefinition[], current: string | undefined): HTMLElement {
-    return el(
+    const shown = views.find((view) => view.name === current);
+    // (None on: nothing to pick, said why)
+    const title = shown ? `View: ${shown.label} (pick another)` : views.length ? "Pick a view" : "No view is on: turn one on in the settings";
+    const button = el(
       doc,
-      "div",
-      { class: "swd-tabs", attrs: { role: "group", "aria-label": "Views" } },
-      ...views.map((view) =>
-        el(
-          doc,
-          "button",
-          { class: "swd-switch", title: view.label, attrs: { "aria-pressed": pressed(view.name === current), "data-view": view.name }, run: () => void this.show(view.name) },
-          el(doc, "span", { class: "swd-switch-icon", html: view.icon, attrs: { "aria-hidden": "true" } }),
-          el(doc, "span", { class: "swd-switch-label", text: view.label }),
-        ),
-      ),
+      "button",
+      { class: "swd-view-picker", title, attrs: { "data-view": shown?.name, "aria-disabled": views.length ? undefined : "true" } },
+      ...(shown ? [el(doc, "span", { class: "swd-view-picker-icon", html: shown.icon, attrs: { "aria-hidden": "true" } })] : []),
+      el(doc, "span", { class: "swd-view-picker-label", text: shown?.label ?? "Pick a view" }),
+      el(doc, "span", { class: "swd-view-picker-mark", html: ICONS.dropdown, attrs: { "aria-hidden": "true" } }),
     );
+    const menu = toolMenu(doc, button, () => "Views", () =>
+      views.map((view): MenuEntry => ({ kind: "item", label: view.label, icon: view.icon, checked: view.name === current, run: () => void (view.name === current ? undefined : this.show(view.name)) })),
+    );
+    menu.box.classList.add("swd-view-picker-box");
+    if (!views.length) button.disabled = true;
+    this.picker = menu;
+    return menu.box;
   }
 
   /**
-   * What every view has beside the tabs, as icons: the view's filter (a
+   * What every view has beside its picker, as icons: the view's filter (a
    * condition a property, in a panel under the bar: Silverware Table's filter
    * syntax; how many shown on it), its sort (a menu: a property and its
    * direction, or the order by hand; the property shown on it), Undo of the
@@ -416,6 +507,11 @@ export class DatabasePlace {
         input.addEventListener("change", () => apply(input));
         input.addEventListener("keydown", (event) => {
           if (event.key === "Enter") apply(input);
+          // (Esc leaves the field, applied as it is left, and goes no further: not out of full screen)
+          if (event.key === "Escape") {
+            event.preventDefault();
+            input.blur();
+          }
         });
         return el(doc, "label", "swd-filter-row", el(doc, "span", { text: column.label }), input);
       }),
@@ -519,6 +615,7 @@ export class DatabasePlace {
       const groups: PlaceMenuGroup[] = [];
       const group = groupEntry(view, host, menu, (focus) => (groupFocus = focus));
       if (group) groups.push(menu.slot.view([group]));
+      if (view.colors !== false) groups.push(menu.slot.view([colorEntry(host, menu)]));
       if (editSource) groups.push(menu.slot.source([menu.item({ label: "Edit source", icon: ICONS.source, hint: "Show the block's text, to edit it as markdown", run: editSource })]));
       return groups;
     };
@@ -539,7 +636,7 @@ export class DatabasePlace {
       }
       return checked;
     };
-    const moduleGroups = (menu: PlaceMenuBuilder) => this.options.moduleMenu?.({ document: doc, database }, menu) ?? [];
+    const moduleGroups = (menu: PlaceMenuBuilder) => this.options.moduleMenu?.(this.context(doc, database), menu) ?? [];
     // The database named in the menu's title: a pencil (its name only, in its record: its id, by which blocks show it, stays)
     const naming = (): MenuNaming => ({
       name: database.name,
@@ -553,13 +650,21 @@ export class DatabasePlace {
     });
     // (Always there: the database's name at least)
     const more = placeMenu(doc, () => database.name, (menu) => [...coreGroups(menu), ...moduleGroups(menu), ...viewGroups(menu)], naming, () => (groupFocus = undefined));
-    this.options.placeDrawn?.({ document: doc, database });
+    this.options.placeDrawn?.(this.context(doc, database));
 
+    // What the colors are of, after the count (Color by in ⋯), so a color reads as what it means; kept so as the data change
+    // (a property renamed, removed, its type changed)
+    const colored = el(doc, "span", { class: "swd-place-colored", attrs: { hidden: "" } });
+    count.after(colored);
     // The controls as the view's state has them now (a header's sort, a filter set by the view itself), and how many items show
     const sync = () => {
       sortLabel();
       filterLabel();
       count.textContent = host.items.length === host.total ? String(host.total) : `${host.items.length} of ${host.total}`;
+      const by = host.database.properties.find((one) => one.key === host.listing.colorBy);
+      colored.hidden = !by;
+      colored.textContent = by ? `colored by ${by.label}` : "";
+      colored.title = by ? `Each item in the color of its ${by.label} (Color by in ⋯); an item's own color first` : "";
       for (const input of panel.querySelectorAll<HTMLInputElement>("input[data-key]")) {
         if (doc.activeElement === input || held === input) continue;
         input.value = listing.filter[input.dataset.key!] ?? "";
@@ -614,7 +719,18 @@ export class DatabasePlace {
         }
       }
     };
-    return { bar: el(doc, "span", "swd-tools", filterButton, sort.box, undo, more.box), panel, sync, stop, kept, restore };
+    // The modules' icons, after Undo and before ⋯ (pressed, the place drawn anew: what they show follows)
+    const moduleTools = (this.options.moduleTools?.(this.context(doc, database)) ?? []).map((tool) =>
+      el(
+        doc,
+        "button",
+        { class: `swd-tool${tool.pressed ? " swd-tool-on" : ""}`, html: tool.icon, title: tool.label, attrs: { "aria-label": tool.label, "aria-pressed": tool.pressed === undefined ? undefined : String(tool.pressed), "data-tool": tool.key }, run: () => {
+          this.pressedTool = tool.key;
+          tool.run();
+        } },
+      ),
+    );
+    return { bar: el(doc, "span", "swd-tools", filterButton, sort.box, undo, ...moduleTools, more.box), panel, sync, stop, kept, restore };
   }
 
   /** Another view picked: written into the place's state, drawn */
@@ -661,8 +777,25 @@ export class DatabasePlace {
       return done;
     };
     const setMeta = (values: Readonly<Record<string, unknown>>) => state.set(Object.fromEntries(Object.entries(values).map(([key, value]) => [prefixed(key), value])));
+    // What the view colors its items by (Color by in ⋯): the property kept, where it is still one of options
+    const colorKey = () => {
+      const kept = state.get(prefixed("colorBy"));
+      return typeof kept === "string" && kept ? kept : undefined;
+    };
+    // (Found once per data read and key kept: asked for every item drawn)
+    let colored: { data: Data; key: string | undefined; by: ColorBy | undefined } | undefined;
+    const colorBy = (): ColorBy | undefined => {
+      const key = colorKey();
+      if (colored?.data !== data() || colored.key !== key) {
+        const property = key === undefined ? undefined : colorable(data().database.properties, (one) => typeOf(types, one)).find((one) => one.key === key);
+        colored = { data: data(), key, by: property && { property, type: typeOf(types, property) } };
+      }
+      return colored.by;
+    };
     return {
       document: this.options.element.ownerDocument,
+      itemIcon: (item) => itemIcon(this.options.element.ownerDocument, item),
+      itemLook: (item, element) => itemLook(item, element, colorBy()),
       get database() {
         return data().database;
       },
@@ -709,6 +842,15 @@ export class DatabasePlace {
         get groupArrangement() {
           return arrangement();
         },
+        get colorBy() {
+          return colorBy()?.property.key;
+        },
+        async setColorBy(key) {
+          if (key === colorKey()) return;
+          await setMeta({ colorBy: key });
+          // (Drawn whole: its head says what the colors are of)
+          if (!drawn.ended) await place.render();
+        },
         async setGroupArrangement(change) {
           const next = { ...arrangement(), ...change };
           if (JSON.stringify(next) === JSON.stringify(arrangement())) return;
@@ -745,6 +887,8 @@ export class DatabasePlace {
   }
 
   private endView(): void {
+    this.picker?.close();
+    this.picker = undefined;
     const drawn = this.drawn;
     this.drawn = undefined;
     if (!drawn) return;

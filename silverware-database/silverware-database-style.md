@@ -36,6 +36,13 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 }
 
 /* A place: the database's name and count, its views' tabs and the tools in one bar, what the view draws under it */
+/* What the items' colors are of (Color by in ⋯), after the count: quiet */
+.swd-place-colored {
+  margin-left: 4px;
+  color: var(--swd-quiet);
+  font-size: 0.8em;
+  font-weight: normal;
+}
 .swd-place {
   margin: 0.5em 0;
 }
@@ -60,52 +67,83 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   margin-bottom: 8px;
   border-bottom: 1px solid var(--swd-line);
 }
-/* The tabs: one row, scrolled sideways where they do not fit (a phone), the one shown underlined */
-.swd-tabs {
-  display: flex;
-  flex: 1 1 auto;
+/* A place over the whole window (the full screen module): its box laid over the page and SilverBullet's top bar, under the
+   peek (z-index 50) and the dialogs, its views scrolling in it; the page's look kept */
+.swd-place.swd-over-window {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  box-sizing: border-box;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  margin: 0;
+  padding: 12px 20px 20px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--root-background-color, #fff);
+}
+/* SilverBullet's editor scrolls in a box that is a stacking context under its top bar: lifted over it while it holds a place
+   shown so (as Silverware Table lifts it for a table over the window) */
+.cm-scroller:has(.swd-place.swd-over-window) {
+  z-index: 30 !important;
+}
+/* The view shown: one button (its icon, its label, a mark of its list) opening the views in a menu; the tools at the bar's end */
+.swd-view-picker-box {
+  flex: 0 1 auto;
   min-width: 0;
-  gap: 2px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  /* (Its right end fading: more tabs beyond, where they do not fit) */
-  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  margin-right: auto;
 }
-.swd-tabs::-webkit-scrollbar {
-  display: none;
+/* (Its menu under it from its left edge: the picker is at the bar's start, the tools' menus open from their right one) */
+.swd-view-picker-box > .swd-menu {
+  right: auto;
+  left: 0;
 }
-.swd-switch {
+.swd-view-picker {
   display: inline-flex;
-  flex: 0 0 auto;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  max-width: 100%;
   min-height: 34px;
-  padding: 4px 10px;
+  padding: 4px 8px 4px 10px;
   border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 6px 6px 0 0;
-  color: var(--swd-quiet);
+  border-radius: 6px;
+  color: inherit;
   background: none;
   font: inherit;
+  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
 }
-.swd-switch:hover {
-  color: inherit;
+.swd-view-picker:disabled {
+  color: var(--swd-quiet);
+  cursor: default;
+}
+.swd-view-picker:not(:disabled):hover,
+.swd-view-picker[aria-expanded="true"] {
   background: var(--swd-hover);
 }
 /* A view's icon: its own markup (an SVG of the built-in views, a character of a user's) at the text's size */
-.swd-switch-icon {
+.swd-view-picker-icon,
+.swd-view-picker-mark {
   display: inline-flex;
+  flex: none;
 }
-.swd-switch-icon svg {
+.swd-view-picker-icon svg {
   width: 16px;
   height: 16px;
 }
-.swd-switch[aria-pressed="true"] {
-  border-bottom-color: currentColor;
-  color: inherit;
-  font-weight: 600;
+.swd-view-picker-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.swd-view-picker-mark {
+  color: var(--swd-quiet);
+}
+.swd-view-picker-mark svg {
+  width: 14px;
+  height: 14px;
 }
 .swd-place-body {
   overflow-x: auto;
@@ -118,7 +156,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   margin: 0.25em 0;
   color: var(--danger-color, #c62828);
 }
-/* What every view has beside the tabs, as icons: the filter, the sort, Undo, ⋯ */
+/* What every view has beside its picker, as icons: the filter, the sort, Undo, ⋯ */
 .swd-tools {
   display: flex;
   flex: 0 0 auto;
@@ -601,6 +639,109 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   }
 }
 /* </shared-menu> */
+/* <shared-emoji> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* The emoji picker (shared/emoji.ts): its groups as tabs, its search, the emoji, the current one's name. Its search field,
+   group titles and "none" in the picker's own classes, which a plugin with a look of its own for them (the toolbar)
+   replaces by its own */
+.swd-emoji-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
+}
+.swd-emoji-field {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  background: none;
+  border: 0;
+  outline: none;
+}
+.swd-emoji-group {
+  padding: 8px 2px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.55;
+}
+.swd-emoji-none {
+  padding: 12px 8px;
+  opacity: 0.6;
+}
+/* Its groups as filters, over the search: All, then each by its first emoji */
+.swd-emoji-tabs {
+  display: flex;
+  padding: 6px 6px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.swd-emoji-tabs::-webkit-scrollbar {
+  display: none;
+}
+.swd-emoji-tab {
+  /* All ten in the panel's width, sharing what is left */
+  flex: 1 0 auto;
+  min-width: 28px;
+  height: 30px;
+  padding: 0 3px;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+}
+.swd-emoji-tab:first-child {
+  font-size: 12px;
+  font-weight: 600;
+}
+.swd-emoji-tab:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.swd-emoji-tab[aria-checked="true"] {
+  border-bottom-color: var(--ui-accent-color, #464cfc);
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 10%, transparent);
+}
+.swd-emoji-list {
+  overflow-y: auto;
+  max-height: 280px;
+  padding: 4px 6px 6px;
+}
+.swd-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+}
+.swd-emoji {
+  height: 36px;
+  padding: 0;
+  font-size: 22px;
+  line-height: 1;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swd-emoji.swd-emoji-current {
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 16%, transparent);
+}
+.swd-emoji-name {
+  min-height: 1.3em;
+  padding: 6px 10px;
+  border-top: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
+  opacity: 0.75;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* </shared-emoji> */
 /* A view drawn once per group (Group by in ⋯, core/groups.ts): each group's head, folded or not, then the view */
 .swd-group + .swd-group {
   margin-top: 12px;
@@ -777,14 +918,76 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   white-space: nowrap;
   vertical-align: baseline;
 }
-.swd-pill[data-color="0"] { --swd-pill: 120, 120, 130; }
-.swd-pill[data-color="1"] { --swd-pill: 51, 126, 169; }
-.swd-pill[data-color="2"] { --swd-pill: 68, 131, 97; }
-.swd-pill[data-color="3"] { --swd-pill: 190, 135, 30; }
-.swd-pill[data-color="4"] { --swd-pill: 210, 105, 10; }
-.swd-pill[data-color="5"] { --swd-pill: 212, 76, 71; }
-.swd-pill[data-color="6"] { --swd-pill: 144, 101, 176; }
-.swd-pill[data-color="7"] { --swd-pill: 193, 76, 138; }
+/* The palette (domain/colors.ts: gray, blue, green, yellow, orange, red, purple, pink), each `r, g, b`: a select's options
+   and an item's color by their place in it. A space-style may set them anew */
+:root {
+  --swd-palette-0: 120, 120, 130;
+  --swd-palette-1: 51, 126, 169;
+  --swd-palette-2: 68, 131, 97;
+  --swd-palette-3: 190, 135, 30;
+  --swd-palette-4: 210, 105, 10;
+  --swd-palette-5: 212, 76, 71;
+  --swd-palette-6: 144, 101, 176;
+  --swd-palette-7: 193, 76, 138;
+}
+.swd-pill[data-color="0"] { --swd-pill: var(--swd-palette-0); }
+.swd-pill[data-color="1"] { --swd-pill: var(--swd-palette-1); }
+.swd-pill[data-color="2"] { --swd-pill: var(--swd-palette-2); }
+.swd-pill[data-color="3"] { --swd-pill: var(--swd-palette-3); }
+.swd-pill[data-color="4"] { --swd-pill: var(--swd-palette-4); }
+.swd-pill[data-color="5"] { --swd-pill: var(--swd-palette-5); }
+.swd-pill[data-color="6"] { --swd-pill: var(--swd-palette-6); }
+.swd-pill[data-color="7"] { --swd-pill: var(--swd-palette-7); }
+/* An item's color (core/look.ts): `--swd-item` on the element drawing it, its place in the palette, else its own (set inline);
+   how it shows is each view's (below with the view) */
+[data-swd-item-color="0"] { --swd-item: var(--swd-palette-0); }
+[data-swd-item-color="1"] { --swd-item: var(--swd-palette-1); }
+[data-swd-item-color="2"] { --swd-item: var(--swd-palette-2); }
+[data-swd-item-color="3"] { --swd-item: var(--swd-palette-3); }
+[data-swd-item-color="4"] { --swd-item: var(--swd-palette-4); }
+[data-swd-item-color="5"] { --swd-item: var(--swd-palette-5); }
+[data-swd-item-color="6"] { --swd-item: var(--swd-palette-6); }
+[data-swd-item-color="7"] { --swd-item: var(--swd-palette-7); }
+/* An item's icon: a character as large as the text around it, the CSS of where it is sizing it */
+.swd-item-icon {
+  display: inline-block;
+  margin-right: 0.35em;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1;
+  text-decoration: none;
+}
+/* Its color in the views: a stripe by a table's name, a list's line and a card tinted, a calendar's and a timeline's bar too */
+.swd-table tr[data-swd-item-color] > td[data-key="name"] {
+  box-shadow: inset 3px 0 0 rgb(var(--swd-item));
+}
+.swd-list-item[data-swd-item-color] {
+  background: color-mix(in srgb, rgb(var(--swd-item)) 9%, transparent);
+}
+.swd-board-card[data-swd-item-color],
+.swd-cal-item[data-swd-item-color] {
+  border-color: color-mix(in srgb, rgb(var(--swd-item)) 45%, transparent);
+  background: color-mix(in srgb, rgb(var(--swd-item)) 14%, var(--root-background-color, #fff));
+}
+.swd-board-card[data-swd-item-color] {
+  border-left: 3px solid rgb(var(--swd-item));
+}
+.swd-tl-bar[data-swd-item-color] {
+  border-color: color-mix(in srgb, rgb(var(--swd-item)) 70%, transparent);
+  background: color-mix(in srgb, rgb(var(--swd-item)) 26%, var(--root-background-color, #fff));
+}
+.swd-cal-item[data-swd-item-color]:hover,
+.swd-board-card[data-swd-item-color]:hover {
+  background: color-mix(in srgb, rgb(var(--swd-item)) 24%, var(--root-background-color, #fff));
+}
+.swd-tl-bar[data-swd-item-color]:hover,
+.swd-tl-bar[data-swd-item-color]:focus-visible {
+  background: color-mix(in srgb, rgb(var(--swd-item)) 38%, var(--root-background-color, #fff));
+}
+/* A card's icon a little larger */
+.swd-board-name > .swd-item-icon {
+  font-size: 1.15em;
+}
 /* A value that is none of the options: no color, a dashed edge, why in its title */
 /* A required value missing, in a list's line or on a card: a pill of no color in the danger's color */
 .swd-pill.swd-pill-missing {
@@ -877,6 +1080,36 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 .swd-table th {
   background: var(--editor-table-head-background-color, transparent);
 }
+/* A table grouped: one table, a part per group, each its head over the whole width, its own header row (as a table's head
+   looks: SilverBullet colors `thead tr`, which a group's is not), its rows and + New; a group folded its head alone, its rows
+   kept in the layout unseen (folding moves no column). The group's head and its + New on the page's ground, not striped:
+   SilverBullet stripes every other row of a body (`tbody tr:nth-of-type(even)`, its colors.scss), these too; :is() weighs
+   as an id */
+:is(#sb-main, html) .swd-place .swd-table .swd-table-headrow {
+  background-color: var(--editor-table-head-background-color);
+  color: var(--editor-table-head-color);
+}
+:is(#sb-main, html) .swd-place .swd-table :is(.swd-table-group-head, .swd-table-group-add) {
+  background-color: transparent;
+}
+.swd-table .swd-table-group-head > th {
+  padding: 18px 0 6px;
+  border-bottom: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  font-weight: inherit;
+}
+.swd-table .swd-table-group:first-child > .swd-table-group-head > th {
+  padding-top: 0;
+}
+.swd-table .swd-table-group.swd-folded > tr:not(.swd-table-group-head) {
+  visibility: collapse;
+}
+.swd-table .swd-table-group-add > td {
+  padding: 4px 0;
+  border-bottom: 0;
+}
 /* Long text wraps, as in Notion, a cell at most --swd-cell-max-width wide (a space-style may set it on .swd-place) and at
    least a few words (a wide table in a narrow page is not squeezed to a letter a line, it scrolls sideways); the row's grip,
    its actions and a checkbox as narrow as they are. SilverBullet keeps the editor's table cells on one line
@@ -884,8 +1117,8 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 :is(#sb-main, html) .swd-place .swd-table :is(th, td) {
   white-space: normal;
 }
-.swd-table th:not(.swd-table-gripcol):not(.swd-table-actions):not([data-type="checkbox"]),
-.swd-table td:not(.swd-table-grip):not(.swd-table-actions):not([data-type="checkbox"]) {
+.swd-table th:not(.swd-table-gripcol):not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]),
+.swd-table td:not(.swd-table-grip):not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]) {
   min-width: 6em;
   max-width: var(--swd-cell-max-width, 24em);
   overflow-wrap: anywhere;
@@ -899,7 +1132,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   font-weight: 600;
   cursor: pointer;
 }
-.swd-table td:not(.swd-readonly):not(.swd-table-actions) {
+.swd-table td:not(.swd-readonly):not(.swd-table-actions):not([colspan]) {
   cursor: text;
 }
 /* A cell being edited keeps its size: what it showed stays under the editor, hidden (table.ts), and the editor lies over
@@ -1122,6 +1355,814 @@ tr:focus-within .swd-open {
 .swd-board-value {
   font-size: 0.85em;
   opacity: 0.8;
+}
+/* The calendar: a month of days, seven columns of equal width; its head (‹ month ›, Today, the property its days are of).
+   How narrow it is is the place's width, not the window's (an editor's column, a page zoomed): a container */
+.swd-cal {
+  container-type: inline-size;
+}
+.swd-cal-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-bottom: 8px;
+}
+.swd-cal-title {
+  min-width: 9em;
+  margin: 0 4px;
+  font-size: 1.1em;
+  font-weight: 600;
+  text-align: center;
+  outline: none;
+}
+.swd-cal-step,
+.swd-cal-today {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 2px 10px;
+  border: 1px solid var(--swd-line);
+  border-radius: 6px;
+  color: inherit;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.swd-cal-step {
+  padding: 2px 6px;
+}
+.swd-cal-step svg {
+  width: 16px;
+  height: 16px;
+}
+.swd-cal-step:hover,
+.swd-cal-today:hover {
+  background: var(--swd-hover);
+}
+.swd-cal-by {
+  margin-left: auto;
+  color: var(--swd-quiet);
+  font-size: 0.85em;
+}
+.swd-cal-box {
+  border: 1px solid var(--swd-line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.swd-cal-weekdays,
+.swd-cal-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+/* A week: a row of seven days, each over the whole row (its rows: the days' heads, the lanes of bars, the room left: set
+   inline, as many lanes as it shows), the items' bars over them, each across the days it lasts */
+.swd-cal-week {
+  row-gap: 2px;
+  min-height: 7.5em;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--swd-line);
+}
+.swd-cal-week:last-child {
+  border-bottom: 0;
+}
+.swd-cal-weekdays > span {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--swd-line);
+  color: var(--swd-quiet);
+  font-size: 0.8em;
+  text-align: center;
+}
+/* A day: its number and + at its top, the week's bars over the rest of it */
+.swd-cal-day {
+  grid-row: 1 / -1;
+  min-width: 0;
+  margin-bottom: -4px;
+  padding: 4px;
+  transition: background 0.1s;
+}
+.swd-cal-day + .swd-cal-day {
+  border-left: 1px solid var(--swd-line);
+}
+.swd-cal-weekend {
+  background: var(--swd-surface);
+}
+.swd-cal-other > .swd-cal-day-head .swd-cal-date {
+  opacity: 0.45;
+}
+.swd-cal-day.swd-drop {
+  background: color-mix(in srgb, var(--swd-accent) 14%, transparent);
+  outline: 2px dashed var(--swd-accent);
+  outline-offset: -3px;
+}
+.swd-cal-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+}
+.swd-cal-date {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  border-radius: 12px;
+  font-size: 0.85em;
+}
+/* Today: its number on the accent */
+.swd-cal-now .swd-cal-date {
+  color: var(--root-background-color, #fff);
+  background: var(--swd-accent);
+  font-weight: 600;
+}
+/* A day's +: shown as the day is hovered or its + focused; always on a touch screen, where nothing is hovered */
+.swd-cal-add {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--swd-quiet);
+  background: none;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+}
+.swd-cal-day:hover .swd-cal-add,
+.swd-cal-add:focus-visible {
+  opacity: 1;
+}
+.swd-cal-add:hover {
+  color: inherit;
+  background: var(--swd-hover);
+}
+@media (hover: none) {
+  .swd-cal-add {
+    opacity: 0.6;
+  }
+}
+/* An item: its time, then its name, as one text on two lines at most, cut where it does not fit (its whole name its title) */
+.swd-cal-item {
+  position: relative;
+  display: block;
+  flex: none;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--swd-line);
+  border-radius: 5px;
+  color: inherit;
+  background: var(--root-background-color, transparent);
+  font: inherit;
+  font-size: 0.85em;
+  text-align: left;
+  cursor: pointer;
+}
+.swd-cal-item[draggable="true"] {
+  cursor: grab;
+}
+.swd-cal-item:hover {
+  background: var(--swd-hover);
+}
+.swd-cal-dragged {
+  opacity: 0.4;
+}
+/* A bar across days in a week, over the days; one going on before or after the week its square end at that edge */
+.swd-cal-week > .swd-cal-item {
+  z-index: 1;
+  align-self: start;
+  margin: 0 4px;
+}
+.swd-cal-week > .swd-cal-before {
+  margin-left: 0;
+  border-left-style: dashed;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.swd-cal-week > .swd-cal-after {
+  margin-right: 0;
+  border-right-style: dashed;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+/* A bar's ends: dragged to change its start or its end (shown as it is hovered) */
+.swd-cal-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+}
+.swd-cal-handle-start {
+  left: -1px;
+  border-radius: 5px 0 0 5px;
+}
+.swd-cal-handle-end {
+  right: -1px;
+  border-radius: 0 5px 5px 0;
+}
+.swd-cal-item:hover > .swd-cal-handle {
+  background: color-mix(in srgb, var(--swd-accent) 45%, transparent);
+}
+.swd-cal-week > .swd-cal-more {
+  z-index: 1;
+  justify-self: start;
+  margin-left: 4px;
+}
+.swd-cal-days {
+  color: var(--swd-quiet);
+  font-size: 0.9em;
+}
+.swd-cal-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;
+  /* (A word broken only where it is longer than a line: else it goes whole to the next; SilverBullet's editor breaks words
+     anywhere, and lines after any white space, which its lines inherit) */
+  overflow-wrap: break-word;
+  word-break: normal;
+  line-break: auto;
+}
+.swd-cal-time {
+  color: var(--swd-quiet);
+  font-variant-numeric: tabular-nums;
+}
+/* The day picked: its items whole under the month (on a phone how they are reached) */
+
+.swd-cal-agenda {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 8px;
+  border: 1px solid var(--swd-line);
+  border-radius: 8px;
+}
+.swd-cal-agenda.swd-drop {
+  outline: 2px dashed var(--swd-accent);
+  outline-offset: -3px;
+}
+.swd-cal-agenda-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 600;
+}
+.swd-cal-agenda-add {
+  padding: 2px 8px;
+  border: 1px dashed var(--swd-line);
+  border-radius: 6px;
+  color: var(--swd-quiet);
+  background: none;
+  font: inherit;
+  font-weight: normal;
+  cursor: pointer;
+}
+.swd-cal-agenda-none {
+  margin: 0;
+  color: var(--swd-quiet);
+  font-size: 0.9em;
+}
+.swd-cal-agenda > .swd-cal-item {
+  padding: 6px 8px;
+  font-size: 0.95em;
+}
+.swd-cal-more {
+  align-self: flex-start;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--swd-quiet);
+  background: none;
+  font: inherit;
+  font-size: 0.8em;
+  cursor: pointer;
+}
+.swd-cal-more:hover {
+  color: inherit;
+  background: var(--swd-hover);
+}
+/* The items without a date: over the month, near every day they are dragged onto; a few rows at most, scrolled beyond */
+.swd-cal-undated {
+  margin-bottom: 8px;
+}
+.swd-cal-undated-label {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--swd-quiet);
+  background: none;
+  font: inherit;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+.swd-cal-undated-label::before {
+  content: "▾ ";
+}
+.swd-cal-undated.swd-folded .swd-cal-undated-label::before {
+  content: "▸ ";
+}
+.swd-cal-undated-label:hover {
+  color: inherit;
+  background: var(--swd-hover);
+}
+.swd-cal-undated-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 5.5em;
+  margin-top: 4px;
+  overflow-y: auto;
+}
+.swd-cal-undated-items > .swd-cal-item {
+  max-width: 16em;
+}
+/* A phone, a narrow page: a day's items as marks (their names too narrow to read, their buttons too small to press: a
+   press on the day picks it), its + and +N more left to the day's list under the month, which shows */
+@container (max-width: 600px) {
+  .swd-cal-week {
+    min-height: 3.6em;
+  }
+  .swd-cal-day {
+    padding: 2px;
+    cursor: pointer;
+  }
+  .swd-cal-week > .swd-cal-item {
+    margin: 0 2px;
+  }
+  .swd-cal-grid .swd-cal-item {
+    height: 5px;
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    background: var(--swd-accent);
+    pointer-events: none;
+  }
+  .swd-cal-grid .swd-cal-item > * {
+    display: none;
+  }
+  .swd-cal-grid .swd-cal-item[data-swd-item-color] {
+    background: rgb(var(--swd-item));
+  }
+  .swd-cal-grid :is(.swd-cal-add, .swd-cal-more) {
+    display: none;
+  }
+  /* (A week opened whole where the calendar was wide: closed again here too) */
+  .swd-cal-grid .swd-cal-fewer {
+    display: block;
+    justify-self: center;
+  }
+  .swd-cal-agenda {
+    display: flex;
+  }
+  .swd-cal-picked {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--swd-accent) 55%, transparent);
+  }
+  .swd-cal-by {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}
+/* The timeline: a row an item, its name on the left (kept in view as the axis scrolls sideways: sticky), its bar on an axis
+   of days; its head (Today, the scale, what the bars are of). Its width the place's: a container. The names' width in
+   pixels: the same for every element using it, whatever its font size */
+.swd-tl {
+  container-type: inline-size;
+  --swd-tl-names: 190px;
+  --swd-tl-row: 34px;
+}
+.swd-tl-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-bottom: 8px;
+}
+.swd-tl-today,
+.swd-tl-scale {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 2px 10px;
+  border: 1px solid var(--swd-line);
+  border-radius: 6px;
+  color: inherit;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.swd-tl-scales {
+  display: inline-flex;
+}
+.swd-tl-scale {
+  border-radius: 0;
+}
+.swd-tl-scale + .swd-tl-scale {
+  margin-left: -1px;
+}
+.swd-tl-scale:first-child {
+  border-radius: 6px 0 0 6px;
+}
+.swd-tl-scale:last-child {
+  border-radius: 0 6px 6px 0;
+}
+.swd-tl-scale[aria-pressed="true"] {
+  position: relative;
+  border-color: var(--swd-accent);
+  color: var(--swd-accent);
+  background: color-mix(in srgb, var(--swd-accent) 12%, transparent);
+}
+.swd-tl-today:hover,
+.swd-tl-scale:hover {
+  background: var(--swd-hover);
+}
+.swd-tl-by {
+  margin-left: auto;
+  color: var(--swd-quiet);
+  font-size: 0.85em;
+}
+/* (A stacking context of its own: its names, bars and today's line over each other, not over what is around it) */
+.swd-tl-box {
+  position: relative;
+  isolation: isolate;
+  overflow-x: auto;
+  border: 1px solid var(--swd-line);
+  border-radius: 8px;
+}
+.swd-tl-axis-row,
+.swd-tl-row {
+  display: flex;
+  width: max-content;
+}
+/* The names' column: over the bars scrolled under it */
+.swd-tl-corner,
+.swd-tl-name {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--swd-tl-names);
+  border-right: 1px solid var(--swd-line);
+  background: var(--root-background-color, #fff);
+}
+.swd-tl-corner {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 4px 4px 4px 8px;
+  border-bottom: 1px solid var(--swd-line);
+  color: var(--swd-quiet);
+  font-size: 0.8em;
+}
+.swd-tl-axis {
+  flex: none;
+  border-bottom: 1px solid var(--swd-line);
+}
+.swd-tl-months,
+.swd-tl-units {
+  position: relative;
+  height: 22px;
+}
+.swd-tl-month,
+.swd-tl-unit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 2px 6px;
+  border-left: 1px solid var(--swd-line);
+  font-size: 0.8em;
+  white-space: nowrap;
+}
+.swd-tl-month {
+  /* (Its name cut at the month's edge, never over the next month's: a clip, not overflow, which would end its stickiness;
+     the browser places a sticky name anew only once the box scrolls, so drawn scrolled it may start past its place) */
+  overflow: visible;
+  clip-path: inset(0);
+  font-weight: 600;
+}
+/* A month's name kept in view right of the names while the month is (sticky within its head) */
+.swd-tl-month > span {
+  position: sticky;
+  left: calc(var(--swd-tl-names) + 6px);
+}
+.swd-tl-unit {
+  padding: 2px 0;
+  color: var(--swd-quiet);
+  text-align: center;
+}
+.swd-tl-unit.swd-tl-weekend {
+  background: color-mix(in srgb, var(--root-color, currentColor) 3%, transparent);
+}
+.swd-tl-unit.swd-tl-now {
+  color: var(--root-background-color, #fff);
+  background: var(--swd-accent);
+  font-weight: 600;
+}
+/* The rows: today's line and the weekends (Days) or the weeks' starts (Weeks) each row's background, under its bar; the
+   weekends quiet, as the axis' heads show them */
+.swd-tl-rows {
+  --swd-tl-quiet: color-mix(in srgb, var(--root-color, currentColor) 3%, transparent);
+  --swd-tl-today: linear-gradient(
+    to right,
+    transparent calc(var(--swd-tl-now) - 1px),
+    color-mix(in srgb, var(--swd-accent) 70%, transparent) calc(var(--swd-tl-now) - 1px) calc(var(--swd-tl-now) + 1px),
+    transparent calc(var(--swd-tl-now) + 1px)
+  );
+}
+.swd-tl-rows .swd-tl-track {
+  background-image: var(--swd-tl-today), var(--swd-tl-rule);
+}
+.swd-tl-by-days .swd-tl-track {
+  background-image:
+    var(--swd-tl-today),
+    var(--swd-tl-rule),
+    repeating-linear-gradient(to right, transparent 0 calc(5 * var(--swd-tl-day)), var(--swd-tl-quiet) calc(5 * var(--swd-tl-day)) calc(7 * var(--swd-tl-day)));
+}
+.swd-tl-by-weeks .swd-tl-track {
+  background-image:
+    var(--swd-tl-today),
+    var(--swd-tl-rule),
+    repeating-linear-gradient(to right, var(--swd-line) 0 1px, transparent 1px calc(7 * var(--swd-tl-day)));
+}
+/* A row's line under it: its name's border, and in its track a background under today's line (a border of the row cut
+   that line into a piece a row); every row of one height, the names shown or folded to a strip */
+.swd-tl-row {
+  --swd-tl-rule: linear-gradient(to top, var(--swd-line) 1px, transparent 1px);
+  height: calc(var(--swd-tl-row) + 1px);
+}
+.swd-tl-row > :first-child {
+  height: 100%;
+  border-bottom: 1px solid var(--swd-line);
+}
+.swd-tl-row:last-child {
+  --swd-tl-rule: linear-gradient(transparent, transparent);
+}
+.swd-tl-row:last-child > :first-child {
+  border-bottom: 0;
+}
+.swd-tl-name {
+  overflow: hidden;
+  padding: 0 8px;
+  border-radius: 0;
+  border-top: 0;
+  border-bottom: 0;
+  border-left: 0;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9em;
+  line-height: var(--swd-tl-row);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.swd-tl-name[data-swd-item-color] {
+  box-shadow: inset 3px 0 0 rgb(var(--swd-item));
+  background: color-mix(in srgb, rgb(var(--swd-item)) 9%, var(--root-background-color, #fff));
+}
+.swd-tl-name:hover {
+  background: color-mix(in srgb, var(--root-color, #000) 5%, var(--root-background-color, #fff));
+}
+.swd-tl-track {
+  position: relative;
+  flex: none;
+  height: 100%;
+}
+/* A row without a start: a press there gives it that day */
+.swd-tl-empty {
+  cursor: copy;
+}
+.swd-tl-empty:hover {
+  background-color: color-mix(in srgb, var(--swd-accent) 4%, transparent);
+}
+/* The names' column folded to a strip (the corner's button, kept per browser; folded where the place is narrow): the items'
+   icons alone, their names their titles (the bars name them), a group's title over its row, a row without a bar naming its
+   item in what it says */
+.swd-tl-fold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  color: var(--swd-quiet);
+  background: none;
+  cursor: pointer;
+}
+.swd-tl-fold svg {
+  width: 14px;
+  height: 14px;
+}
+.swd-tl-fold:hover,
+.swd-tl-fold:focus-visible {
+  color: inherit;
+  background: var(--swd-hover);
+}
+.swd-tl-folded .swd-tl-box {
+  --swd-tl-names: 40px;
+}
+.swd-tl-folded .swd-tl-corner {
+  justify-content: center;
+  padding: 4px 0;
+}
+.swd-tl-folded :is(.swd-tl-count, .swd-tl-name-text) {
+  display: none;
+}
+.swd-tl-name-initial {
+  display: none;
+}
+.swd-tl-folded .swd-tl-name-initial {
+  display: inline;
+  color: var(--swd-quiet);
+  font-size: 0.72em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.swd-tl-folded .swd-tl-name {
+  padding: 0;
+  text-align: center;
+}
+.swd-tl-folded .swd-tl-name > .swd-item-icon {
+  margin: 0;
+}
+.swd-tl-folded .swd-tl-group-cell {
+  overflow: visible;
+}
+.swd-tl-folded .swd-tl-group-cell .swd-group-head {
+  flex: none;
+}
+.swd-tl-folded .swd-tl-group-cell .swd-group-label {
+  overflow: visible;
+}
+.swd-tl-hint-name {
+  display: none;
+}
+.swd-tl-folded .swd-tl-hint-name {
+  display: inline;
+  color: var(--root-color, inherit);
+  font-style: normal;
+}
+/* A group's head (views/groups.ts): its title in the names' column, held there as the axis scrolls, a quiet ground; the
+   axis' days and today go on through it */
+.swd-tl-group {
+  background: var(--swd-surface);
+}
+.swd-tl-group-cell {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  flex: none;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  width: var(--swd-tl-names);
+  padding: 0 4px;
+  border-right: 1px solid var(--swd-line);
+  /* (Over the bars scrolled under it: never see-through, whatever the page's ground) */
+  background: linear-gradient(var(--swd-surface), var(--swd-surface)), var(--root-background-color, #fff);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.swd-tl-none {
+  margin: 0;
+  padding: 12px;
+  color: var(--swd-quiet);
+  font-size: 0.9em;
+}
+.swd-tl-group-cell .swd-group-head {
+  min-width: 0;
+}
+.swd-tl-group-cell .swd-group-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.swd-tl-group-track {
+  height: 30px;
+}
+/* What a row without a bar says, held in view right of the names as the axis scrolls */
+.swd-tl-hint {
+  position: sticky;
+  left: calc(var(--swd-tl-names) + 8px);
+  display: inline-block;
+  padding: 0 8px;
+  color: var(--swd-quiet);
+  font-size: 0.8em;
+  font-style: italic;
+  line-height: var(--swd-tl-row);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.swd-tl-hint.swd-invalid {
+  border: 0;
+  color: var(--danger-color, #c62828);
+}
+/* The day a press gives: a bar of one day, dashed, under the pointer */
+.swd-tl-ghost {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  box-sizing: border-box;
+  border: 1px dashed var(--swd-accent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--swd-accent) 12%, transparent);
+  pointer-events: none;
+}
+.swd-tl-ghost[hidden] {
+  display: none;
+}
+/* A bar: its name in it (seen past its end where it is short: the bar's own overflow shown) */
+.swd-tl-bar {
+  position: absolute;
+  top: 5px;
+  bottom: 6px;
+  z-index: 1;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  min-width: 6px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--swd-accent) 60%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--swd-accent) 20%, var(--root-background-color, #fff));
+  font-size: 0.85em;
+  white-space: nowrap;
+  cursor: pointer;
+  /* (A finger's move scrolls the timeline, either way, until it is held on a bar: timeline.ts takes it then) */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.swd-tl-bar.swd-tl-movable {
+  cursor: grab;
+}
+.swd-tl-bar:hover,
+.swd-tl-bar:focus-visible {
+  background: color-mix(in srgb, var(--swd-accent) 32%, var(--root-background-color, #fff));
+}
+.swd-tl-bar.swd-invalid {
+  border-style: dashed;
+}
+/* A bar going on past the axis' reach: its ends dashed */
+.swd-tl-bar.swd-tl-beyond {
+  border-left-style: dashed;
+  border-right-style: dashed;
+}
+.swd-tl-dragging {
+  z-index: 2;
+  cursor: grabbing;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+}
+.swd-tl-bar-text {
+  overflow: visible;
+  pointer-events: none;
+}
+/* Its ends: dragged to change its start or its end (shown as it is hovered; on a touch screen always) */
+.swd-tl-handle {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 8px;
+  cursor: ew-resize;
+}
+.swd-tl-handle-start {
+  left: -1px;
+  border-radius: 5px 0 0 5px;
+}
+.swd-tl-handle-end {
+  right: -1px;
+  border-radius: 0 5px 5px 0;
+}
+.swd-tl-bar:hover > .swd-tl-handle {
+  background: color-mix(in srgb, var(--swd-accent) 55%, transparent);
+}
+@media (hover: none) {
+  .swd-tl-handle {
+    width: 10px;
+    background: color-mix(in srgb, var(--swd-accent) 35%, transparent);
+  }
+}
+/* A narrow place: the names' column narrower */
+@container (max-width: 600px) {
+  .swd-tl-box {
+    --swd-tl-names: 110px;
+  }
+  .swd-tl-by {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
 }
 /* The board: columns side by side, scrolled sideways where they are more than the page's width */
 .swd-board {
@@ -1491,6 +2532,8 @@ tr:focus-within .swd-open {
 /* The properties' dialog (the Properties module): a property a row (grip, type's icon, name, type), dragged to its place;
    a row open shows its details under it; options a list of their own, each with its grip, color, name and × */
 .swd-properties {
+  /* (Positioned: a picker of a property's, its icon's, opens in it under its button, past the list's clipped edge) */
+  position: relative;
   --swd-line: var(--swd-settings-line);
   --swd-quiet: color-mix(in srgb, var(--root-color, currentColor) 68%, transparent);
   --swd-hover: color-mix(in srgb, var(--root-color, currentColor) 7%, transparent);
@@ -1643,6 +2686,45 @@ tr:focus-within .swd-open {
   gap: 10px;
   padding: 12px 14px 14px 28px;
 }
+/* A property's own icon (an emoji) where its type's would be: as large as that, centered in its place */
+.swd-prop-own-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+}
+/* Its icon's field in its details: what is shown, and the way to change it */
+.swd-property-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: start;
+  padding: 4px 10px;
+  border: 1px solid var(--swd-line);
+  border-radius: 6px;
+  color: inherit;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.swd-property-icon:hover,
+.swd-property-icon[aria-expanded="true"] {
+  background: var(--swd-hover);
+}
+.swd-property-icon-shown svg {
+  width: 16px;
+  height: 16px;
+}
+.swd-property-icon-text {
+  color: var(--swd-quiet);
+  font-size: 0.9em;
+}
+/* A table's header: a property's own icon before its name */
+.swd-table-head-icon {
+  margin-right: 0.35em;
+  font-weight: normal;
+}
 /* A link (URL): opened in a tab of its own; its address without what says nothing, its path a little quieter */
 .swd-link {
   color: var(--link-color, var(--swd-accent));
@@ -1654,6 +2736,11 @@ tr:focus-within .swd-open {
 }
 .swd-link-rest {
   opacity: 0.7;
+}
+/* A property's name before its value where the value stands alone (Name in views): quieter than the value */
+.swd-field-name {
+  margin-right: 4px;
+  color: var(--swd-quiet);
 }
 /* A reference: a link to a page of the space, opened by a press, side by side with the others */
 .swd-reference {
@@ -1803,6 +2890,15 @@ button.swd-editor-document-folder:hover,
 }
 .swd-prop-field-name .swd-settings-hint {
   font-size: 0.85em;
+}
+/* A setting turned by a switch (Required, Name in views, Locked in views): its name and hint across the width, the switch
+   at the right, on a phone too (in the names' narrow column the hint broke every few words) */
+.swd-prop-field.swd-prop-switch-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+.swd-prop-switch-row .swd-prop-field-name {
+  gap: 2px;
 }
 /* A review's choice (Remove: its values too): its label and hint across the width, its switch at the right, on a phone too */
 .swd-prop-field.swd-property-choice {
@@ -2186,6 +3282,153 @@ button.swd-editor-document-folder:hover,
   padding: 8px 16px max(16px, env(safe-area-inset-bottom));
   border-left: 0;
   box-shadow: none;
+}
+/* The item's icon and color over its name (modules/peek/look.ts): the icon large, a quiet button to add one where none,
+   shown while the panel is hovered or a button of its focused; the color its swatch and name */
+.swd-peek-look {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+}
+.swd-peek-icon,
+.swd-peek-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  color: inherit;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.swd-peek-icon:hover,
+.swd-peek-color:hover,
+.swd-peek-icon[aria-expanded="true"],
+.swd-peek-color[aria-expanded="true"] {
+  background: var(--swd-hover);
+}
+.swd-peek-icon > .swd-item-icon {
+  margin: 0;
+  font-size: 2.2em;
+}
+.swd-peek-icon-none,
+.swd-peek-color-none {
+  color: var(--swd-quiet);
+  font-size: 0.85em;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.swd-peek:hover :is(.swd-peek-icon-none, .swd-peek-color-none),
+.swd-peek-look:focus-within :is(.swd-peek-icon-none, .swd-peek-color-none),
+:is(.swd-peek-icon-none, .swd-peek-color-none)[aria-expanded="true"] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .swd-peek-icon-none,
+  .swd-peek-color-none {
+    opacity: 0.8;
+  }
+}
+.swd-peek-color:not(.swd-peek-color-none) {
+  font-size: 0.85em;
+}
+/* A color's swatch: its color, none a dashed ring */
+.swd-peek-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1px dashed var(--swd-quiet);
+}
+.swd-peek-swatch[data-swd-item-color] {
+  border: 0;
+  background: rgb(var(--swd-item));
+}
+/* A picker under its button, over the panel's content */
+.swd-pop {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  width: 340px;
+  max-width: calc(100% - 16px);
+  border: 1px solid var(--swd-line);
+  border-radius: 8px;
+  background: var(--root-background-color);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  font-size: 14px;
+}
+.swd-pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px 0;
+}
+.swd-pop-title {
+  color: var(--swd-quiet);
+  font-size: 0.85em;
+  font-weight: 600;
+}
+.swd-pop-remove {
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--swd-quiet);
+  background: none;
+  font: inherit;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+.swd-pop-remove:hover {
+  color: inherit;
+  background: var(--swd-hover);
+}
+.swd-pop-emoji {
+  display: flex;
+  flex-direction: column;
+}
+.swd-peek-pop-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px 10px;
+}
+.swd-peek-pop-color {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+.swd-peek-pop-color > .swd-peek-swatch {
+  width: 20px;
+  height: 20px;
+}
+.swd-peek-pop-color:hover,
+.swd-peek-pop-color[aria-pressed="true"] {
+  background: var(--swd-hover);
+}
+.swd-peek-pop-color[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 2px var(--swd-accent);
+}
+.swd-peek-pop-own {
+  width: 30px;
+  height: 30px;
+  padding: 2px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
 }
 /* Its controls and the item's name: held at its top as the panel scrolls (its top padding above them) */
 .swd-peek-top {

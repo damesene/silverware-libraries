@@ -41,15 +41,17 @@ for (const { entry, outfile, name } of [...libraries.map((name) => ({ entry: `${
     await esbuild.build(options);
   }
 }
-// The toolbar's emoji data beside its bundle (scripts/emoji.mjs), made from the package as installed
-const emojiFile = "silverware-toolbar/silverware-toolbar-emoji.js";
-if (check) {
-  const committed = (await readFile(emojiFile, "utf8").catch(() => "")).replaceAll("\r\n", "\n");
-  if (committed !== emojiModuleText()) {
-    console.error(`${emojiFile} does not match emojibase-data: run npm run build`);
-    stale++;
-  }
-} else await writeFile(emojiFile, emojiModuleText());
+// The emoji data beside the bundle of each plugin with the emoji picker (shared/emoji.ts; scripts/emoji.mjs), made from
+// the package as installed: one each, as a plugin is installed without the others
+for (const emojiFile of ["silverware-toolbar/silverware-toolbar-emoji.js", "silverware-database/silverware-database-emoji.js"]) {
+  if (check) {
+    const committed = (await readFile(emojiFile, "utf8").catch(() => "")).replaceAll("\r\n", "\n");
+    if (committed !== emojiModuleText()) {
+      console.error(`${emojiFile} does not match emojibase-data: run npm run build`);
+      stale++;
+    }
+  } else await writeFile(emojiFile, emojiModuleText());
+}
 // The CSS of what shared/ draws, in each plugin's style page (scripts/sharedstyles.mjs)
 stale += await sharedStyles(check);
 if (stale) process.exit(1);

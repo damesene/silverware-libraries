@@ -134,6 +134,36 @@ export type LooseKey = { readonly key: string; readonly values: readonly { reado
  * values by key. In SilverBullet its block's text; in memory a map. Views know
  * no block: the core gives each view its own keys of it.
  */
+/**
+ * Where a database's places keep their states apart from its store, every
+ * place of every document (SilverBullet: a `silverware-database` block in any
+ * page): found by what their states name, and changed. The core knows no
+ * document nor block: it says what a state becomes (`change`), the binding
+ * finds, reads and writes them (through the page writer: a place written only
+ * where it is still as read).
+ */
+export interface PlaceStore {
+  /**
+   * The places of `database` whose state `change` changes (only the entries
+   * that change; undefined: none), each read now (every document read:
+   * `progress` told as they are), and what each becomes: nothing written
+   */
+  plan(database: string, change: PlaceChange, progress?: WriteProgress): Promise<PlacesPlan>;
+  /** A plan written, each place where it is still as read */
+  apply(plan: PlacesPlan): Promise<PlacesReport>;
+  /** What `apply` wrote put back, each place where it is still as written (changed since: left) */
+  undo(report: PlacesReport): Promise<PlacesReport>;
+}
+
+/** What a change makes of a place's state: the entries that change, as the place writes them (undefined: none) */
+export type PlaceChange = (state: ReadonlyMap<string, unknown>) => Readonly<Record<string, unknown>> | undefined;
+
+/** Places to change: the documents they are in (as said to the user), the rest the binding's own */
+export type PlacesPlan = { readonly documents: readonly string[] };
+
+/** Places written, and those left (changed since they were read) with why */
+export type PlacesReport = { readonly written: readonly string[]; readonly skipped: readonly { readonly document: string; readonly reason: string }[] };
+
 export interface ViewStateStore {
   /** A key's value, undefined where it has none */
   get(key: string): unknown;

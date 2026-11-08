@@ -5,7 +5,7 @@ import { textOf, typeOf } from "../domain/listing.ts";
 import { TypeRegistry } from "../domain/types/registry.ts";
 import type { Database, Item, ItemKey } from "../model/database.ts";
 import { editValue, toggle } from "./editors.ts";
-import { valueNodes } from "./values.ts";
+import { fieldNodes, valueNodes } from "./values.ts";
 
 const types = new TypeRegistry();
 const DATABASE: Database = {
@@ -195,6 +195,30 @@ describe("the built-in views' editors", () => {
     edit("refs", { ...ITEM, values: { refs: "see Alpha" } });
     expect(cell.querySelector("input")!.type).toBe("text");
     expect(writes).toEqual([]);
+  });
+
+  it("draw a value standing alone: its property's name before it where said, nothing where empty, a box its name, a required one missing its pill", () => {
+    const { host } = setup();
+    const property = (key: string, more: object = {}) => ({ ...DATABASE.properties.find((one) => one.key === key)!, ...more });
+    const text = (nodes: Node[]) => nodes.map((node) => node.textContent).join("");
+    expect(text(fieldNodes(host, ITEM, property("status", { showName: true })))).toBe("Status: Todo");
+    expect(text(fieldNodes(host, ITEM, property("status")))).toBe("Todo");
+    expect(fieldNodes(host, ITEM, property("due", { showName: true }))).toEqual([]);
+    expect(text(fieldNodes(host, { ...ITEM, values: { done: true } }, property("done", { showName: true })))).toBe("✓ Done");
+    expect(fieldNodes(host, ITEM, property("done"))).toEqual([]);
+    expect(text(fieldNodes(host, ITEM, property("due", { required: true, showName: true })))).toBe("Due required");
+    // (Under a header naming it: the value alone)
+    expect(text(valueNodes(host, ITEM, property("status", { showName: true })))).toBe("Todo");
+  });
+
+  it("show tags as quiet labels, none of them marked as none of its options", () => {
+    const { host } = setup();
+    const tags = { key: "page_tags", label: "Tags", type: "multi-select", params: {}, readonly: true, system: "tags" };
+    const nodes = valueNodes(host, { ...ITEM, values: { page_tags: ["work", "urgent"] } }, tags) as HTMLElement[];
+    expect(nodes.map((node) => [node.textContent, node.classList.contains("swd-pill-none"), node.title])).toEqual([
+      ["work", false, ""],
+      ["urgent", false, ""],
+    ]);
   });
 
   it("show references as links that open their documents, a press on one editing nothing", () => {

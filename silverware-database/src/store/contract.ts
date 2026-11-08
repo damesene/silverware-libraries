@@ -63,6 +63,13 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
       expect(await store.looseValues("none")).toEqual([]);
     });
 
+    it("keeps a property's flags as written: hidden, required, its name shown with its values", async () => {
+      const { store } = make(SEED);
+      const flagged = TASKS.properties.map((property) => (property.key === "status" ? { ...property, hidden: true, required: true, showName: true } : property));
+      await store.apply(await store.plan(changes("tasks", { kind: "setSchema", properties: flagged })));
+      expect((await store.database("tasks"))!.value.properties).toEqual(flagged);
+    });
+
     it("reads databases and their items, the keys the same at every read", async () => {
       const { store } = make(SEED);
       expect(await store.databases()).toEqual([{ id: "tasks", name: "Tasks" }]);
@@ -410,6 +417,29 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
       await store.apply(await store.planUndo(report));
       expect((await store.database("tasks"))!.value).toEqual(TASKS);
       expect((await itemOf(store, fix))!.rank).toBe("a0");
+    });
+
+    it("sets an item's look (its icon, its color), changing its revision, taken off whole or in part, each undone", async () => {
+      const { store } = make(SEED);
+      const fix = await keyOf(store, "Fix login");
+      const revision = (await itemOf(store, fix))!.revision;
+      const set = await store.apply(await store.plan(changes("tasks", { kind: "setLook", item: fix, look: { icon: "🚀", color: "blue" } })));
+      expect(set.skipped).toEqual([]);
+      expect((await itemOf(store, fix))!.look).toEqual({ icon: "🚀", color: "blue" });
+      expect((await itemOf(store, fix))!.revision).not.toBe(revision);
+      // The same look again: nothing written
+      expect((await store.plan(changes("tasks", { kind: "setLook", item: fix, look: { color: "blue", icon: "🚀" } }))).planned).toEqual([]);
+      // Its color alone kept
+      await store.apply(await store.plan(changes("tasks", { kind: "setLook", item: fix, look: { color: "blue" } })));
+      expect((await itemOf(store, fix))!.look).toEqual({ color: "blue" });
+      // None left: no look at all
+      const off = await store.apply(await store.plan(changes("tasks", { kind: "setLook", item: fix, look: {} })));
+      expect((await itemOf(store, fix))!.look).toBeUndefined();
+      await store.apply(await store.planUndo(off));
+      expect((await itemOf(store, fix))!.look).toEqual({ color: "blue" });
+      // A new item made with one
+      await store.apply(await store.plan(changes("tasks", { kind: "createItem", ref: "new", name: "Plan sprint", values: {}, look: { icon: "📅" } })));
+      expect((await store.items("tasks")).value.find((item) => item.name === "Plan sprint")!.look).toEqual({ icon: "📅" });
     });
 
     it("brings an item removed back under its key by an undo", async () => {

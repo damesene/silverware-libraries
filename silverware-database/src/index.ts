@@ -19,6 +19,7 @@ import { VIEW_HELPERS } from "./views/helpers.ts";
 import { TypeRegistry } from "./domain/types/registry.ts";
 import type { PropertyType } from "./domain/types/type.ts";
 import { BLOCK_LANGUAGE, BlockState, readBlock } from "./host/silverbullet/block.ts";
+import { blockPlaces } from "./host/silverbullet/places.ts";
 import { type Bridge, editorArea, editorLook, silverBulletPlatform } from "./host/silverbullet/platform.ts";
 import { PagesStore } from "./store/pages/store.ts";
 import { BUILT_IN_MODULES } from "./modules/builtin.ts";
@@ -116,7 +117,9 @@ export function init(bridge: Bridge): void {
   const own: Partial<App> & { home: string } = { home: "" };
   const store = new PagesStore(platform, { rootPage: (id) => (own.home ? `${own.home}/db-${id}` : `db-${id}`) });
   const ui = { notify: platform.ui.notify, ask: async (message: string) => (await platform.ui.ask?.(message)) ?? false };
-  const core = new DatabaseCore(store, types, ui, platform.space.noun);
+  // A key changed is followed into the places of every page (their blocks), as the views say what of their state names one
+  const writer = pageWriter(platform);
+  const core = new DatabaseCore(store, types, ui, platform.space.noun, { store: blockPlaces(platform.space, writer), propertyMeta: (view) => views.named(view)?.propertyMeta ?? [] });
   const modules = new Modules(
     BUILT_IN_MODULES,
     {
@@ -149,7 +152,7 @@ export function init(bridge: Bridge): void {
     },
     platform.settings,
   );
-  app = Object.assign(own, { platform, store, core, writer: pageWriter(platform), modules, shown: before }) as App;
+  app = Object.assign(own, { platform, store, core, writer, modules, shown: before }) as App;
   for (const [element, shown] of before) if (element.isConnected) start(element, shown);
   // The modules on started (their settings read), the places drawn with what they add
   void modules.start().then(redrawAll);
@@ -277,7 +280,10 @@ function start(element: HTMLElement, shown: Shown): void {
     handovers.delete(key);
     return handover.until > Date.now() && handover.from !== shown.place ? handover.from.handOver() : undefined;
   };
-  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, settings: platform.settings, ui: platform.ui, editor: platform.editor, documents: platformDocuments(app!.platform), moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database) => app!.modules.openItem(item, database), editSource: () => void editSource(element, shown), takeOver });
+  // (The place before it for this block over the window: this one so from its first drawing, no frame in the page between)
+  const before = handovers.get(JSON.stringify([shown.page, shown.current]));
+  const overWindow = !!before && before.until > Date.now() && before.from !== shown.place && before.from.isOverWindow;
+  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, overWindow, settings: platform.settings, ui: platform.ui, editor: platform.editor, documents: platformDocuments(app!.platform), moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), moduleTools: (place) => app!.modules.placeTools(place), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database) => app!.modules.openItem(item, database), editSource: () => void editSource(element, shown), takeOver });
   void shown.place.render();
 }
 
@@ -293,11 +299,16 @@ async function writeBlock(element: HTMLElement, shown: Shown, body: string, text
   const { occurrence, of: inText } = found;
   // (The place drawn as the write starts: drawn anew meanwhile, from the text its element was rendered for, it is no longer the one that wrote)
   const place = shown.place;
+  // The place drawn anew for the text written takes over from this one: told before the write, as SilverBullet may draw the
+  // block anew before the write is done (a place over the window drawn so from its start); taken back where nothing was written
+  const key = JSON.stringify([shown.page, text]);
+  if (place) handovers.set(key, { from: place, until: Date.now() + HANDOVER_MS });
   const report = await writer.write(pageChanges().page(shown.page, (p) => p.codeBlocks.replace(BLOCK_LANGUAGE, body, text, { occurrence, of: inText })).build());
   for (const left of report.skipped) platform.ui.notify(`Silverware Database: ${left.reason}`, { type: "error" });
   // Written: the block is its new text (SilverBullet draws it anew from it; the blocks alike are counted by it meanwhile)
-  if (report.written.length && shown.place === place) {
-    if (place) handovers.set(JSON.stringify([shown.page, text]), { from: place, until: Date.now() + HANDOVER_MS });
+  const written = report.written.length > 0 && shown.place === place;
+  if (!written && handovers.get(key)?.from === place) handovers.delete(key);
+  if (written) {
     shown.current = text;
     shown.wrote = { out: false };
     if (!observing) {

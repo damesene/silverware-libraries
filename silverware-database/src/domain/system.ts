@@ -5,7 +5,7 @@
 // A property says which it is (`system`, its kind); it is read only always,
 // its values never kept in an item (a store reads none of its key from a page
 // and writes none), made here from what the store knows of each item.
-import { capitalized, type Noun } from "./noun.ts";
+import { capitalized, DOCUMENT, type Noun } from "./noun.ts";
 import { inRankOrder } from "./rank.ts";
 import type { Database, Item, Value } from "../model/database.ts";
 
@@ -30,9 +30,17 @@ export function systemProperties(noun: Noun): readonly SystemProperty[] {
     { kind: "modifiedAt", label: "Modified", key: "modified_at", type: "datetime", hint: `When ${its} was last written (moving it in the order too)` },
     { kind: "order", label: "Order", key: "order", type: "number", hint: "Its place in the order by hand: 1, 2, 3…" },
     { kind: "page", label: capitalized(noun.one), key: "page", type: "text", hint: capitalized(its) },
-    { kind: "tags", label: "Tags", key: "page_tags", type: "multi-select", hint: `The tags of ${its}, but the database's own` },
+    { kind: "tags", label: "Tags", key: "page_tags", type: "tags", hint: `The tags of ${its}, but the database's own` },
     { kind: "taskProgress", label: "Task progress", key: "task_progress", type: "progress", hint: `How much of the tasks in ${its} is done (none where it has no task)` },
   ];
+}
+
+/**
+ * The type a system property's values are, by its kind (the same whatever the word for a document): its kind's, whatever its
+ * schema keeps (one added before a kind's type was its own: Tags were a multi-select, every tag then none of its options)
+ */
+export function systemType(name: string): string | undefined {
+  return systemKind(name, DOCUMENT)?.type;
 }
 
 /** Whether a database has a system property of a kind (a store asks what it needs to read: its pages' tasks) */

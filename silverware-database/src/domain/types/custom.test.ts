@@ -30,6 +30,9 @@ describe("custom types", () => {
     const grouping = guardedType({ ...fine, groupValue: () => ({ odd: true }) as unknown as string }, (message) => void told.push(message));
     expect(grouping.groupValue!("x", {})).toBe("x");
     expect(told).toHaveLength(1);
+    // (Labels a list's: said so)
+    expect(validateType({ ...fine, look: "labels" })).toContain("say lists: true");
+    expect(validateType({ ...fine, look: "labels", lists: true })).toBeUndefined();
     // (Values that are lists kept said so: grouped, an item in the group of each)
     expect(guardedType({ ...fine, lists: true }, () => {}).lists).toBe(true);
     // (Never a value's group the group of none)

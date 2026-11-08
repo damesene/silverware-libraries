@@ -1,6 +1,8 @@
-// A view drawn once per group (Group by in ⋯, as Notion does: a table per
-// group, a list per group): the place's own, so any view gets it, the user's
-// too, knowing nothing of groups. Each group a section: its head (folded or
+// A view drawn once per group (Group by in ⋯, as Notion does: a list per
+// group): the place's own, so any view gets it, the user's too, knowing
+// nothing of groups (a view drawing its groups itself, the table, gets them
+// instead: `groupBy.draws`). Its head, folding and an item added in a group
+// are views/groups.ts', the same for a view drawing them itself. Each group a section: its head (folded or
 // not, its title, how many items), then the view drawn into it with a host
 // whose items are the group's, an item added there getting the group's value.
 // The data changed: each view told (`update`) where the groups are the same,
@@ -11,19 +13,10 @@
 import { el } from "../../../shared/elements.ts";
 import { arrangeGroups, groupItems, type ItemGroup } from "../domain/grouping.ts";
 import type { Property } from "../model/database.ts";
-import { ICONS } from "./icons.ts";
+import { createInGroup, foldedOf, groupHead, setFolded } from "../views/groups.ts";
 import type { ViewDefinition, ViewHost, ViewInstance } from "./view.ts";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
-
-/** The view's own meta key of the groups folded */
-export const FOLDED_KEY = "folded";
-
-/** The keys of the groups folded, as kept */
-function foldedOf(host: ViewHost): ReadonlySet<string> {
-  const kept = host.getMeta(FOLDED_KEY);
-  return new Set(Array.isArray(kept) ? kept.filter((one): one is string => typeof one === "string") : []);
-}
 
 /** A host for one group: its items those of the group as grouped now, an item added in it with the group's value */
 function groupHost(host: ViewHost, property: Property, key: string, groups: () => readonly ItemGroup[]): ViewHost {
@@ -34,11 +27,7 @@ function groupHost(host: ViewHost, property: Property, key: string, groups: () =
   Object.defineProperty(grouped, "total", { get: () => group()?.items.length ?? 0 });
   // (Its items are one group's: grouped no further)
   Object.defineProperty(grouped, "grouping", { get: () => undefined });
-  grouped.create = (draft = {}, place) => {
-    const value = group()?.value;
-    // (A property not changed by hand, a system property's: the item added without it, as any other)
-    return host.create(value === undefined || property.readonly ? draft : { ...draft, values: { [property.key]: value, ...draft.values } }, place);
-  };
+  grouped.create = (draft = {}, place) => createInGroup(host, property, group(), draft, place);
   return grouped;
 }
 
@@ -62,12 +51,6 @@ export function drawGrouped(view: ViewDefinition, host: ViewHost, element: HTMLE
     }
     children = [];
   };
-  const fold = (key: string, folded: boolean) => {
-    const now = new Set(foldedOf(host));
-    if (folded) now.add(key);
-    else now.delete(key);
-    void host.setMeta({ [FOLDED_KEY]: now.size ? [...now] : undefined }).then(() => host.refresh());
-  };
   const draw = () => {
     destroy();
     const folded = foldedOf(host);
@@ -76,14 +59,7 @@ export function drawGrouped(view: ViewDefinition, host: ViewHost, element: HTMLE
     element.replaceChildren(
       ...groups.map((group) => {
         const open = !folded.has(group.key);
-        const head = el(
-          doc,
-          "button",
-          { class: "swd-group-head", attrs: { "aria-expanded": String(open), "data-group": group.key }, run: () => fold(group.key, open) },
-          el(doc, "span", { class: `swd-group-chevron${open ? " swd-group-open" : ""}`, html: ICONS.chevron }),
-          el(doc, "span", { class: `swd-group-label${group.known ? "" : " swd-invalid"}`, text: group.label }),
-          el(doc, "span", { class: "swd-group-count", text: String(group.items.length) }),
-        );
+        const head = groupHead(doc, group, open, () => void setFolded(host, group.key, open));
         const body = el(doc, "div", "swd-group-body");
         const section = el(doc, "section", { class: "swd-group", attrs: { "aria-label": `${property.label}: ${group.label}` } }, head, ...(open ? [body] : []));
         if (open) {

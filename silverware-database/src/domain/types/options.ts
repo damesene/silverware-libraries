@@ -4,19 +4,14 @@
 // "#c0392b" }`: a color of the palette by its name, or one of the user's own as
 // `#rrggbb`; an option without one has the color of its place among the options).
 import type { Params } from "../../model/database.ts";
+import { type Color, COLORS, colorShown, isColor, type NamedColor } from "../colors.ts";
 
-/** The colors an option may have, by name, in the order an option's place picks one */
-export const OPTION_COLORS = ["gray", "blue", "green", "yellow", "orange", "red", "purple", "pink"] as const;
-export type NamedColor = (typeof OPTION_COLORS)[number];
+// (The palette is the database's, an item's look takes it too: domain/colors.ts)
+export { COLORS as OPTION_COLORS, type NamedColor };
 /** A color of an option: a palette's by name, or the user's own, `#rrggbb` */
-export type OptionColor = NamedColor | `#${string}`;
-
-const OWN_COLOR_RE = /^#[0-9a-f]{6}$/i;
-
+export type OptionColor = Color;
 /** Whether something is a color an option may have */
-export function isOptionColor(color: unknown): color is OptionColor {
-  return typeof color === "string" && ((OPTION_COLORS as readonly string[]).includes(color) || OWN_COLOR_RE.test(color));
-}
+export const isOptionColor = isColor;
 
 /** The colors given to options, by option (none: an empty map; what is no color left out) */
 export function colorsOf(params: Params): Readonly<Record<string, OptionColor>> {
@@ -34,9 +29,9 @@ export function optionColor(params: Params, option: string): number | `#${string
   const colors = colorsOf(params);
   // (Its own key only: an option named "constructor" has no color of Object's)
   const given = Object.hasOwn(colors, option) ? colors[option] : undefined;
-  if (given) return given.startsWith("#") ? (given.toLowerCase() as `#${string}`) : OPTION_COLORS.indexOf(given as NamedColor);
+  if (given) return colorShown(given);
   const at = optionsOf(params).indexOf(option);
-  return at < 0 ? undefined : at % OPTION_COLORS.length;
+  return at < 0 ? undefined : at % COLORS.length;
 }
 
 /** A property's options as its params have them (none where they are not a list of texts) */
@@ -60,7 +55,7 @@ export function validateOptions(params: Params, rules: { readonly commas?: boole
   if (colors !== undefined) {
     if (typeof colors !== "object" || colors === null || Array.isArray(colors)) return "its colors are no map of an option to a color";
     const wrong = Object.values(colors).find((color) => !isOptionColor(color));
-    if (wrong !== undefined) return `"${String(wrong)}" is no color: ${OPTION_COLORS.join(", ")}, or #rrggbb`;
+    if (wrong !== undefined) return `"${String(wrong)}" is no color: ${COLORS.join(", ")}, or #rrggbb`;
   }
   return undefined;
 }

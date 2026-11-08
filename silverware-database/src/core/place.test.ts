@@ -82,16 +82,22 @@ function setup(views: readonly ViewDefinition[], state: Record<string, unknown> 
     ...(editSource ? { editSource } : {}),
   });
   const listed = () => [...element.querySelectorAll("li")].map((one) => one.textContent);
-  const switches = () => [...element.querySelectorAll<HTMLButtonElement>(".swd-switch")];
+  // The views on, as the picker's menu lists them (opened for it): each item's view (a test view's label is its name in capitals)
+  const switches = () => {
+    const picker = element.querySelector<HTMLButtonElement>(".swd-view-picker")!;
+    if (picker.getAttribute("aria-expanded") !== "true") picker.click();
+    return [...element.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].map((item) => Object.assign(item, { view: item.querySelector(".swd-label")!.textContent!.toLowerCase() }));
+  };
   return { store, element, viewState, place, listed, switches, opened, core, told };
 }
 
 describe("a place", () => {
-  it("draws the view its state names, the switcher listing the views on, the one shown pressed", async () => {
+  it("draws the view its state names, the picker listing the views on, the one shown checked", async () => {
     const [table, board] = [listView("table"), listView("board")];
-    const { place, listed, switches } = setup([table.view, board.view], { [VIEW_KEY]: "board" });
+    const { place, listed, switches, element } = setup([table.view, board.view], { [VIEW_KEY]: "board" });
     await place.render();
-    expect(switches().map((one) => [one.dataset.view, one.getAttribute("aria-pressed")])).toEqual([
+    expect(element.querySelector<HTMLElement>(".swd-view-picker")!.dataset.view).toBe("board");
+    expect(switches().map((one) => [one.view, one.getAttribute("aria-checked")])).toEqual([
       ["table", "false"],
       ["board", "true"],
     ]);
@@ -104,11 +110,24 @@ describe("a place", () => {
     const first = setup([table.view, board.view], {}, { [viewSettingPath("table", "enabled")]: false });
     await first.place.render();
     expect(board.seen.renders).toBe(1);
-    expect(first.switches().map((one) => one.dataset.view)).toEqual(["board"]);
+    expect(first.switches().map((one) => one.view)).toEqual(["board"]);
     const missing = setup([table.view], { [VIEW_KEY]: "calendar" });
     await missing.place.render();
     expect(missing.element.querySelector(".swd-place-note")!.textContent).toContain('No view "calendar"');
     expect(missing.switches()).toHaveLength(1);
+  });
+
+  it("closes the picker's menu as the place is drawn anew, and offers none where no view is on", async () => {
+    const [table, board] = [listView("table"), listView("board")];
+    const { place, switches, element } = setup([table.view, board.view]);
+    await place.render();
+    expect(switches()).toHaveLength(2);
+    await place.render();
+    expect(element.querySelectorAll(".swd-menu .swd-menu-item")).toHaveLength(0);
+    const none = setup([]);
+    await none.place.render();
+    const picker = none.element.querySelector<HTMLButtonElement>(".swd-view-picker")!;
+    expect([picker.disabled, picker.title]).toEqual([true, "No view is on: turn one on in the settings"]);
   });
 
   it("switches views, writing the place's state, the view left told", async () => {
@@ -259,7 +278,7 @@ describe("a place", () => {
     const { place, element, viewState, store } = setup([table.view]);
     await place.render();
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    expect(menuShown(element)).toEqual([["Group: None", null]]);
+    expect(menuShown(element)).toEqual([["Group: None", null], ["Color by: None", null]]);
     // Group, then Group by in its place: every property offered, and None, checked: nothing grouped yet
     choose(element, "Group");
     expect(menuShown(element)).toEqual([["Group by: None", null]]);
@@ -346,14 +365,14 @@ describe("a place", () => {
     const { place, element } = setup([view], {}, {}, 0, () => void asked++);
     await place.render();
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    expect(menuShown(element).map(([label]) => label)).toEqual(["Mine", "Group: None", "Density", "Edit source"]);
+    expect(menuShown(element).map(([label]) => label)).toEqual(["Mine", "Group: None", "Color by: None", "Density", "Edit source"]);
     choose(element, "Density");
     expect(ran).toEqual(["density"]);
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
     choose(element, "Edit source");
     expect(asked).toBe(1);
-    // A view never grouped, without a block: ⋯ still, its title the database's name to rename, no entry
-    const without = setup([{ ...table.view, groupBy: false }]);
+    // A view never grouped nor colored, without a block: ⋯ still, its title the database's name to rename, no entry
+    const without = setup([{ ...table.view, groupBy: false, colors: false }]);
     await without.place.render();
     without.element.querySelector<HTMLButtonElement>(".swd-more")!.click();
     expect(menuShown(without.element)).toEqual([]);
@@ -455,7 +474,7 @@ describe("a place", () => {
     const more = element.querySelector<HTMLButtonElement>(".swd-more")!;
     more.click();
     expect(told.at(-1)).toContain("its menu gave no list of groups");
-    expect(menuShown(element).map(([label]) => label)).toEqual(["Group: None"]);
+    expect(menuShown(element).map(([label]) => label)).toEqual(["Group: None", "Color by: None"]);
     choose(element, "Group");
     choose(element, "Group by");
     element.querySelector(".swd-menu [role=menu]")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));

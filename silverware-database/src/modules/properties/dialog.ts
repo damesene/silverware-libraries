@@ -8,6 +8,7 @@
 // first: how many items it changes and which values it keeps as they are,
 // applied only as the user says so. Every change goes through the core:
 // checked, said where refused, kept for Undo.
+import { typeOf } from "../../domain/listing.ts";
 import { systemKind, systemProperties } from "../../domain/system.ts";
 import { switchControl } from "../../../../shared/controls.ts";
 import { Dialogs } from "../../../../shared/dialog.ts";
@@ -19,7 +20,8 @@ import type { ModuleHost } from "../../core/module.ts";
 import { colorsOf, OPTION_COLORS, type OptionColor } from "../../domain/types/options.ts";
 import type { PropertyType } from "../../domain/types/type.ts";
 import type { Database, Params, Property } from "../../model/database.ts";
-import { typeIcon } from "../../views/icons.ts";
+import { ownIcon, propertyIcon } from "../../views/icons.ts";
+import { emojiChoice, type Popovers, popovers } from "../../views/popover.ts";
 import { optionPill, pill } from "../../views/values.ts";
 
 // The settings dialog's look: the same rows, cards and switches
@@ -91,9 +93,18 @@ function optionsOf(property: Property): readonly string[] {
 /** A choice the review of a change offers (Remove: its values too or not), the change proposed again as it is switched */
 type ReviewChoice = { readonly label: string; readonly hint: string; readonly on: boolean; readonly change: (on: boolean) => void; readonly switched?: boolean };
 
+/** The pages a change's views are on, as said: a few by name, how many more */
+function placesNamed(pages: readonly string[], noun: { readonly one: string; readonly many: string }): string {
+  const shown = pages.slice(0, 3).join(", ");
+  const more = pages.length - 3;
+  return `${pages.length === 1 ? noun.one : `${pages.length} ${noun.many}`} (${shown}${more > 0 ? ` and ${more} more` : ""})`;
+}
+
 export class PropertiesDialog {
   private readonly dialogs: Dialogs;
   private body: HTMLElement | undefined;
+  // The picker open under a button of a property's details (its icon's): closed as the dialog is drawn anew
+  private pickers: Popovers | undefined;
   private database: Database | undefined;
   // A change of items proposed, shown over the properties until applied or put aside
   private proposal: { readonly proposal: Proposal; readonly what: string; readonly draft?: string; readonly choice?: ReviewChoice } | undefined;
@@ -159,7 +170,10 @@ export class PropertiesDialog {
         }
         return (!this.drafts.size && !this.adding.label.trim()) || !!(await this.host.ui.ask?.("Close the properties? The options edited and the property typed and not saved are lost.", { destructive: true }));
       },
-      closed: () => this.closedNow(),
+      closed: () => {
+        this.pickers?.close();
+        this.closedNow();
+      },
     });
     this.draw();
     this.focusAt(at);
@@ -240,6 +254,7 @@ export class PropertiesDialog {
   }
 
   private draw(): void {
+    this.pickers?.close();
     const { document: doc } = this.host;
     const database = this.database;
     if (!this.body || !database) return;
@@ -278,14 +293,15 @@ export class PropertiesDialog {
   /** A property: its row (grip, type, name, type's name; a press opens it), its details where open */
   private property(property: Property, at: number, list: () => HTMLElement): HTMLElement {
     const { document: doc, core, types } = this.host;
-    const type = types.named(property.type);
+    // (Its type as the views have it: a system property's its kind's)
+    const type = typeOf(types, property);
     const open = this.opened === property.key;
     const grip = el(doc, "button", { class: "swd-prop-grip", html: GRIP, title: "Drag to move (Alt+↑ ↓)", attrs: { "aria-label": `Move ${property.label} (Alt+Up, Alt+Down)` } });
     const head = el(
       doc,
       "button",
       { class: "swd-prop-head", attrs: { "aria-expanded": String(open), "aria-label": `${property.label}, ${type?.label ?? property.type}${property.required ? ", required" : ""}${property.hidden ? ", hidden in views" : ""}${property.system ? ", given by the system" : property.readonly ? ", locked in views" : ""}` } },
-      el(doc, "span", { class: "swd-prop-icon", html: typeIcon(type?.name ?? "text") }),
+      propertyIcon(doc, property, type?.name ?? "text", "swd-prop-icon"),
       el(doc, "span", { class: "swd-prop-name", text: property.label }, ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", title: "Required", attrs: { "aria-hidden": "true" } })] : [])),
       ...(property.readonly ? [el(doc, "span", { class: "swd-prop-lock", html: LOCK, title: property.system ? "Given by the system" : "Locked in views" })] : []),
       el(doc, "span", { class: "swd-prop-type", text: systemKind(property.system, this.host.noun)?.label ? `System: ${systemKind(property.system, this.host.noun)!.label}` : (type?.label ?? property.type) }),
@@ -341,6 +357,41 @@ export class PropertiesDialog {
     });
     const remove = el(doc, "button", { class: "swd-property-remove", text: "Remove property", attrs: { "aria-label": `Remove ${property.label}` }, run: () => void this.removing(property) });
     const field = (name: string, control: HTMLElement, hint?: string) => el(doc, "label", "swd-prop-field", el(doc, "span", "swd-prop-field-name", name, ...(hint ? [el(doc, "span", { class: `${BASE}-hint`, text: hint })] : [])), control);
+    // Its own icon (an emoji) where the views name it, picked under its button (the emoji choice, Remove: its type's again)
+    const own = ownIcon(property);
+    const iconButton: HTMLElement = el(
+      doc,
+      "button",
+      {
+        class: "swd-property-icon",
+        title: own ? "Change its icon" : "Give it an icon of its own",
+        attrs: { "aria-label": `Icon of ${property.label}`, "aria-haspopup": "dialog", "aria-expanded": "false" },
+        run: () =>
+          (this.pickers ??= popovers(doc)).open(iconButton, this.body!, "Icon", (box) =>
+            emojiChoice(
+              doc,
+              box,
+              "Icon",
+              (emoji) => this.setIcon(property, emoji),
+              own ? () => this.setIcon(property, undefined) : undefined,
+            ),
+          ),
+      },
+      propertyIcon(doc, property, typeOf(types, property)?.name ?? "text", "swd-property-icon-shown"),
+      el(doc, "span", { class: "swd-property-icon-text", text: own ? "Change" : "Its type's: choose an emoji" }),
+    );
+    // (Not a label: a press on its name would open the picker again as it closes it)
+    const iconField = el(doc, "div", "swd-prop-field", el(doc, "span", "swd-prop-field-name", "Icon"), iconButton);
+    // Its name shown with its values where they stand alone (a card's line, a list's row), any property's, a system one's too
+    const showName = switchControl(doc, BASE, property.showName ?? false, (on) => void this.run(() => core.setPropertyShowName(this.id, property.key, on), ""));
+    showName.querySelector("input")?.setAttribute("aria-label", `${property.label}: name shown with its values`);
+    const nameShown = el(
+      doc,
+      "label",
+      { class: "swd-prop-field swd-prop-switch-row swd-property-show-name", title: `Its name before its value on a card, in a list (${property.label}: …); a table's header names it already` },
+      el(doc, "span", "swd-prop-field-name", "Name in views", el(doc, "span", { class: `${BASE}-hint`, text: `Shown as ${property.label}: value, on cards and in lists` })),
+      showName,
+    );
     // A system property: its name (and shown or hidden, its place, from the list); what it is, its key; no type, setting or value to change
     if (property.system !== undefined) {
       const kind = systemKind(property.system, this.host.noun);
@@ -349,7 +400,9 @@ export class PropertiesDialog {
         "div",
         "swd-prop-detail",
         field("Name", label),
+        iconField,
         el(doc, "p", { class: "swd-prop-system", text: kind ? `Given by the system: ${kind.hint}. Read only.` : `Given by the system ("${property.system}", not known to this version): no values.` }),
+        ...(typeOf(types, property).look === "check" ? [] : [nameShown]),
         field("Key", el(doc, "input", { class: "swd-property-key", attrs: { "aria-label": `Key of ${property.label}`, value: property.key, readonly: "" } }), "How queries name it"),
         el(doc, "div", "swd-prop-actions", remove),
       );
@@ -363,14 +416,26 @@ export class PropertiesDialog {
     const required = switchControl(doc, BASE, property.required ?? false, (on) => void this.run(() => core.setPropertyRequired(this.id, property.key, on), ""));
     required.querySelector("input")?.setAttribute("aria-label", `${property.label} required`);
     const key = el(doc, "input", { class: "swd-property-key", attrs: { "aria-label": `Key of ${property.label}`, value: property.key } });
+    // (Every view of the database that names the key looked for first, in every page: how far it is said under the field)
+    const finding = el(doc, "p", { class: "swd-property-progress", attrs: { hidden: "", "aria-live": "polite" } });
     key.addEventListener("change", () => {
-      if (key.value.trim() && key.value.trim() !== property.key) void this.run(() => core.rekeyProperty(this.id, property.key, key.value.trim()), `Change the key of ${property.label} to ${key.value.trim()}`);
+      const to = key.value.trim();
+      if (!to || to === property.key) return;
+      void this.run(
+        () =>
+          core.rekeyProperty(this.id, property.key, to, (done, of) => {
+            finding.hidden = false;
+            finding.textContent = `Looking for views of it: ${done.toLocaleString("en-US")} of ${of.toLocaleString("en-US")} ${this.host.noun.many}…`;
+          }),
+        `Change the key of ${property.label} to ${to}`,
+      );
     });
     return el(
       doc,
       "div",
       "swd-prop-detail",
       field("Name", label),
+      iconField,
       field("Type", type),
       // (Options where its values are picked from them: a select's, a multi-select's, a type of the user's so)
       ...(types.named(property.type)?.look === "options" ? [this.options(property)] : []),
@@ -381,23 +446,34 @@ export class PropertiesDialog {
             el(
               doc,
               "label",
-              { class: "swd-prop-field swd-property-required", title: "Required: an item without a value shows it missing; a value is never taken off" },
+              { class: "swd-prop-field swd-prop-switch-row swd-property-required", title: "Required: an item without a value shows it missing; a value is never taken off" },
               el(doc, "span", "swd-prop-field-name", "Required", el(doc, "span", { class: `${BASE}-hint`, text: "An item without a value shows it missing" })),
               required,
             ),
           ]),
+      // (A box shows its name already: ✓ Done)
+      ...(typeOf(types, property).look === "check" ? [] : [nameShown]),
       // What is seldom set, folded away: open while a property is (kept so as it is drawn anew)
       this.advanced(property, [
         el(
           doc,
           "label",
-          { class: "swd-prop-field swd-property-locked", title: `Locked: no view offers to change it (its ${this.host.noun.one} can still be edited by hand, a script can still write it)` },
+          { class: "swd-prop-field swd-prop-switch-row swd-property-locked", title: `Locked: no view offers to change it (its ${this.host.noun.one} can still be edited by hand, a script can still write it)` },
           el(doc, "span", "swd-prop-field-name", "Locked in views", el(doc, "span", { class: `${BASE}-hint`, text: "For values a script or another tool keeps" })),
           locked,
         ),
         field("Key", key, `How ${this.host.noun.many} and queries name it`),
+        finding,
       ]),
       el(doc, "div", "swd-prop-actions", remove),
+    );
+  }
+
+  /** A property's own icon picked (undefined: its type's again), written at once, its button focused again as drawn anew */
+  private setIcon(property: Property, icon: string | undefined): void {
+    this.pickers?.close();
+    void this.run(() => this.host.core.setPropertyIcon(this.id, property.key, icon), "").then(() =>
+      this.body?.querySelector<HTMLElement>(`[data-property="${CSS.escape(property.key)}"] .swd-property-icon`)?.focus({ preventScroll: true }),
     );
   }
 
@@ -708,7 +784,10 @@ export class PropertiesDialog {
           : `${kept === 1 ? "One value does" : `${kept} values do`} not read as the new type: kept as ${kept === 1 ? "it is" : "they are"}, shown invalid.`
         : "",
       left ? `${left === 1 ? "One part" : `${left} parts`} cannot be changed and will be left: ${[...new Set(proposal.plan.skipped.map((one) => one.reason))].join("; ")}.` : "",
-      pages ? `Writes ${pages === 1 ? `1 ${this.host.noun.one}` : `${number(pages)} ${this.host.noun.many}`}${proposal.documents?.many ? ": it takes a while; keep this window open until it is done (stopped halfway, the items not written yet keep their old values)" : ""}.` : "",
+      // The views of it that name what changes (a key changed), on the pages they are on
+      proposal.places ? `Updates the views of it on ${placesNamed(proposal.places.documents, this.host.noun)}.` : "",
+      // (Said of every change of items, however few: it is seldom made, and stopped halfway it is half written)
+      pages ? `Writes ${pages === 1 ? `1 ${this.host.noun.one}` : `${number(pages)} ${this.host.noun.many}`}, one after another: keep this window open until it is done (stopped halfway, the items not written yet keep their old values).` : "",
     ].filter(Boolean);
     // What is held still while the change is written (the choice's switch)
     const holding: HTMLInputElement[] = [];

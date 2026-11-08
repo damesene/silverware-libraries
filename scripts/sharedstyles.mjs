@@ -15,6 +15,14 @@ export const SHARED_STYLES = [
       { page: "silverware-database/silverware-database-style.md", base: "swd" },
     ],
   },
+  {
+    template: "shared/emoji.css",
+    mark: "shared-emoji",
+    pages: [
+      { page: "silverware-toolbar/silverware-toolbar-style.md", base: "swb" },
+      { page: "silverware-database/silverware-database-style.md", base: "swd" },
+    ],
+  },
 ];
 
 const begin = (mark) => `/* <${mark}> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */`;

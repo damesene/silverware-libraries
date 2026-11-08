@@ -69,6 +69,16 @@ export function checkedGroups(made: unknown): PlaceMenuGroup[] | string {
  * showed others in the menu's place (a submenu, a way back); the focus then
  * back on the tool where nothing else took it. The sort's and ⋯ alike.
  */
+/** The top on screen of the box `element` scrolls in (the nearest ancestor that scrolls up and down), the window's where none */
+function scrollTop(element: Element): number {
+  const view = element.ownerDocument.defaultView;
+  for (let one = element.parentElement; one && view; one = one.parentElement) {
+    const overflow = view.getComputedStyle(one).overflowY;
+    if ((overflow === "auto" || overflow === "scroll") && one.scrollHeight > one.clientHeight) return Math.max(0, one.getBoundingClientRect().top);
+  }
+  return 0;
+}
+
 export function toolMenu(
   doc: Document,
   button: HTMLButtonElement,
@@ -86,10 +96,63 @@ export function toolMenu(
   let stop: (() => void) | undefined;
   // What the menu shows now: an entry run that leaves it so closes it
   let shown: HTMLElement | undefined;
+  // Where the menu is against its tool (as the style page puts it under it), once measured: it is then held there over the
+  // window (position fixed), so no box around the place clips it (SilverBullet's widget scrolls and cuts what leaves it)
+  // (By the edge the style page aligns it by, the tool's left or right: a submenu of another width keeps that edge)
+  let anchor: { readonly right: boolean; readonly x: number; readonly y: number } | undefined;
+  const view = doc.defaultView;
+  const place = () => {
+    if (holder.hidden || !view) return;
+    const at = button.getBoundingClientRect();
+    if (!anchor) {
+      const was = holder.getBoundingClientRect();
+      const right = Math.abs(was.right - at.right) < Math.abs(was.left - at.left);
+      anchor = { right, x: right ? at.right - was.right : was.left - at.left, y: was.top - at.top };
+    }
+    // (Where it was scrolled kept: placed again as the page scrolls, it does not jump back to its top)
+    const scrolled = holder.scrollTop;
+    // Measured at the window's corner, as wide and tall as its content (where it was, near the window's edge, it was squeezed)
+    holder.style.position = "fixed";
+    holder.style.right = "auto";
+    holder.style.bottom = "auto";
+    holder.style.left = "0px";
+    holder.style.top = "0px";
+    const width = holder.offsetWidth;
+    const left = Math.max(8, Math.min(anchor.right ? at.right - anchor.x - width : at.left + anchor.x, view.innerWidth - width - 8));
+    // As tall as its content, at most 60% of the window; under the tool, scrolled where it does not fit there; above it where
+    // it fits whole there, or there is more room there: never past the top of the box the page scrolls in (what is over it,
+    // SilverBullet's bar, would cover it)
+    const most = view.innerHeight * 0.6;
+    const natural = Math.min(most, holder.scrollHeight + holder.offsetHeight - holder.clientHeight);
+    const below = at.top + anchor.y;
+    const roomBelow = view.innerHeight - below - 8;
+    const roomAbove = at.top - 4 - scrollTop(button) - 8;
+    const above = natural > roomBelow && (natural <= roomAbove || roomAbove > roomBelow);
+    const height = Math.max(Math.min(80, natural), Math.min(most, above ? roomAbove : roomBelow));
+    holder.style.left = `${left}px`;
+    holder.style.top = `${above ? at.top - 4 - Math.min(natural, height) : below}px`;
+    holder.style.maxHeight = `${height}px`;
+    holder.scrollTop = scrolled;
+  };
+  // (Placed again as anything but the menu itself scrolls, or the window resizes, once a frame)
+  let queued = false;
+  const follow = (event: Event) => {
+    if (event.target instanceof Node && holder.contains(event.target)) return;
+    if (queued) return;
+    queued = true;
+    view?.requestAnimationFrame(() => {
+      queued = false;
+      // (Its tool gone from the page without the menu closed, its place drawn anew: closed, nothing left listening)
+      if (!button.isConnected) return close(false, false);
+      place();
+    });
+  };
   const close = (refocus = false, byUser = true) => {
     if (holder.hidden) return;
     if (byUser) closed?.();
     holder.hidden = true;
+    anchor = undefined;
+    for (const property of ["position", "left", "top", "right", "bottom", "max-height"]) holder.style.removeProperty(property);
     holder.replaceChildren();
     shown = undefined;
     button.setAttribute("aria-expanded", "false");
@@ -112,6 +175,9 @@ export function toolMenu(
     onMenuClose(menu, LOOK, () => close(true));
     holder.replaceChildren(menu);
     shown = menu;
+    // (A submenu from its top, not where its parent was scrolled)
+    holder.scrollTop = 0;
+    place();
     focusMenu(menu, LOOK);
   };
   const open = () => {
@@ -129,14 +195,20 @@ export function toolMenu(
       };
       self();
     };
-    top();
     holder.hidden = false;
+    top();
     button.setAttribute("aria-expanded", "true");
     const beside = (event: Event) => {
       if (!box.contains(event.target as Node)) close();
     };
     doc.addEventListener("pointerdown", beside, true);
-    stop = () => doc.removeEventListener("pointerdown", beside, true);
+    doc.addEventListener("scroll", follow, true);
+    view?.addEventListener("resize", follow);
+    stop = () => {
+      doc.removeEventListener("pointerdown", beside, true);
+      doc.removeEventListener("scroll", follow, true);
+      view?.removeEventListener("resize", follow);
+    };
   };
   button.addEventListener("click", () => (holder.hidden ? open() : close()));
   box.addEventListener("focusout", (event) => {

@@ -70,7 +70,8 @@ async function setup(answer = true, withProperties = false, configured: Record<s
   const named = async (name: string) => (await store.items("tasks")).value.find((one) => one.name === name)!;
   const q = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
   const peek = async (name: string) => {
-    [...element.querySelectorAll<HTMLButtonElement>(".swd-list-name")].find((one) => one.textContent === name)!.click();
+    // (By its title: its text is its icon and its name)
+    [...element.querySelectorAll<HTMLButtonElement>(".swd-list-name")].find((one) => one.title === `Open ${name}`)!.click();
     await settle();
   };
   return { store, core, modules, place, named, q, peek, told, opened, pageOpened, saved, failItems: () => void (failItems = true) };
@@ -151,6 +152,64 @@ describe("the peek", () => {
     await peek("Write docs");
     expect(q(`.swd-peek-value[data-key="${key}"]`).querySelector(".swd-peek-edit")).toBeNull();
     expect(document.querySelector('.swd-peek-value[data-key="estimate"] .swd-peek-edit')).toBeNull();
+  });
+
+  it("shows a value written at once as its editor is left for the content, the content's field kept as it is (its text, its focus)", async () => {
+    const { q, peek, named } = await setup();
+    await peek("Fix login");
+    const body = q<HTMLTextAreaElement>(".swd-peek-body");
+    q('.swd-peek-value[data-key="estimate"]').click();
+    const input = q<HTMLInputElement>('.swd-peek-value[data-key="estimate"] input');
+    input.value = "8";
+    // (Left for the content: the press in it blurs the editor, which saves)
+    body.focus();
+    body.value = "Steps and";
+    input.dispatchEvent(new FocusEvent("blur"));
+    await settle();
+    expect((await named("Fix login")).values.estimate).toBe(8);
+    expect(q('.swd-peek-value[data-key="estimate"]').textContent).toBe("8");
+    expect([q(".swd-peek-body") === body, document.activeElement === body, body.value]).toEqual([true, true, "Steps and"]);
+  });
+
+  it("shows a body changed elsewhere while nothing is typed in it; a body typed on after a refusal kept through a value's write", async () => {
+    const { q, peek, named, store, core } = await setup();
+    await peek("Fix login");
+    const body = q<HTMLTextAreaElement>(".swd-peek-body");
+    store.changeOutside("tasks", (await named("Fix login")).key, { body: "Steps, edited elsewhere" });
+    await settle();
+    expect([q(".swd-peek-body") === body, body.value, body.readOnly]).toEqual([true, "Steps, edited elsewhere", false]);
+    // A write refused (changed since read): the text kept; typed on, then a value written elsewhere drawn under it
+    store.changeOutside("tasks", (await named("Fix login")).key, { body: "Theirs" });
+    body.focus();
+    body.value = "Mine";
+    body.blur();
+    await settle();
+    expect(q(".swd-peek-note").textContent).toContain("Not written");
+    body.focus();
+    body.value = "Mine, and more";
+    await core.update("tasks", await named("Fix login"), "estimate", 9);
+    store.changeOutside("tasks", (await named("Fix login")).key, { values: { estimate: 9 } });
+    await settle();
+    expect(q('.swd-peek-value[data-key="estimate"]').textContent).toBe("9");
+    expect([document.activeElement === body, body.value]).toEqual([true, "Mine, and more"]);
+  });
+
+  it("loads the content as it is now once asked, the text typed given up and never written", async () => {
+    const { q, peek, named, store } = await setup();
+    await peek("Fix login");
+    const body = q<HTMLTextAreaElement>(".swd-peek-body");
+    store.changeOutside("tasks", (await named("Fix login")).key, { body: "Theirs" });
+    body.focus();
+    body.value = "Mine";
+    body.blur();
+    await settle();
+    q<HTMLButtonElement>(".swd-peek-reload").click();
+    await settle();
+    expect([body.value, body.readOnly, q(".swd-peek-note").textContent]).toEqual(["Theirs", false, ""]);
+    body.focus();
+    body.blur();
+    await settle();
+    expect(await store.body("tasks", (await named("Fix login")).key)).toBe("Theirs");
   });
 
   it("writes a value, the name and the body as their fields are left, the panel following", async () => {
@@ -235,9 +294,12 @@ describe("the peek", () => {
     await core.setBody("tasks", item, "Theirs", await store.body("tasks", item.key));
     body.blur();
     await settle();
+    // (Typed on after it was refused, not left: the text as it is now said)
+    body.focus();
+    body.value = "Mine, and more";
     modules.stop();
     expect(document.querySelector(".swd-peek")).toBeNull();
-    expect(told.at(-1)).toContain("Mine");
+    expect(told.at(-1)).toContain("Mine, and more");
   });
 
   it("follows the schema changed elsewhere, as the places are drawn anew", async () => {
@@ -247,7 +309,7 @@ describe("the peek", () => {
     q<HTMLInputElement>(".swd-peek-name").focus();
     q<HTMLInputElement>(".swd-peek-name").value = "Fix login now";
     await core.addProperty("tasks", { label: "Owner", type: "text" });
-    modules.placeDrawn({ document, database: TASKS });
+    modules.placeDrawn({ document, database: TASKS, overWindow: false, setOverWindow: () => {} });
     await settle();
     expect([...document.querySelectorAll(".swd-peek-label")]).toHaveLength(3);
     expect(q<HTMLInputElement>(".swd-peek-name").value).toBe("Fix login now");
@@ -480,5 +542,44 @@ describe("the peek", () => {
     await peek("Fix login");
     modules.stop();
     expect(document.querySelector(".swd-peek")).toBeNull();
+  });
+});
+
+describe("the peek's look of an item", () => {
+  it("sets its color from the palette, its swatch and the list's line showing it; Esc closes the picker alone", async () => {
+    const { q, peek, named, place } = await setup();
+    await peek("Fix login");
+    q<HTMLButtonElement>(".swd-peek-color").click();
+    expect(q(".swd-pop")).not.toBeNull();
+    // Esc: the picker closed, the panel kept, the button focused again
+    q(".swd-pop").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    expect([document.querySelector(".swd-pop"), document.querySelector(".swd-peek") !== null, document.activeElement?.className]).toEqual([null, true, "swd-peek-color swd-peek-color-none"]);
+    q<HTMLButtonElement>(".swd-peek-color").click();
+    q<HTMLButtonElement>('.swd-peek-pop-color[aria-label="Green"]').click();
+    await settle();
+    expect((await named("Fix login")).look).toEqual({ color: "green" });
+    expect([q(".swd-peek-color-name").textContent, q(".swd-peek-color .swd-peek-swatch").dataset.swdItemColor, document.activeElement?.classList.contains("swd-peek-color")]).toEqual(["Green", "2", true]);
+    await place.refresh();
+    expect(document.querySelector<HTMLElement>('.swd-list-item[data-item] .swd-list-name')!.closest("li")!.dataset.swdItemColor).toBe("2");
+    // None: taken off
+    q<HTMLButtonElement>(".swd-peek-color").click();
+    q<HTMLButtonElement>('.swd-peek-pop-color[aria-label="None"]').click();
+    await settle();
+    expect((await named("Fix login")).look).toBeUndefined();
+  });
+
+  it("shows its icon large over its name and in the views by the name, Remove taking it off", async () => {
+    const { q, peek, named, core, place } = await setup();
+    await core.setLook("tasks", await named("Fix login"), { icon: "🚀", color: "blue" });
+    await place.refresh();
+    expect(q(".swd-list-name").textContent).toBe("🚀Fix login");
+    await peek("Fix login");
+    expect(q(".swd-peek-icon .swd-item-icon").textContent).toBe("🚀");
+    q<HTMLButtonElement>(".swd-peek-icon").click();
+    q<HTMLButtonElement>(".swd-pop-remove").click();
+    await settle();
+    // (The color kept)
+    expect((await named("Fix login")).look).toEqual({ color: "blue" });
+    expect([document.querySelector(".swd-peek-icon .swd-item-icon"), q(".swd-peek-icon").classList.contains("swd-peek-icon-none")]).toEqual([null, true]);
   });
 });

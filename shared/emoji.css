@@ -1,0 +1,101 @@
+/* The emoji picker (shared/emoji.ts): its groups as tabs, its search, the emoji, the current one's name. Its search field,
+   group titles and "none" in the picker's own classes, which a plugin with a look of its own for them (the toolbar)
+   replaces by its own */
+.__base__-emoji-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
+}
+.__base__-emoji-field {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  background: none;
+  border: 0;
+  outline: none;
+}
+.__base__-emoji-group {
+  padding: 8px 2px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.55;
+}
+.__base__-emoji-none {
+  padding: 12px 8px;
+  opacity: 0.6;
+}
+/* Its groups as filters, over the search: All, then each by its first emoji */
+.__base__-emoji-tabs {
+  display: flex;
+  padding: 6px 6px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.__base__-emoji-tabs::-webkit-scrollbar {
+  display: none;
+}
+.__base__-emoji-tab {
+  /* All ten in the panel's width, sharing what is left */
+  flex: 1 0 auto;
+  min-width: 28px;
+  height: 30px;
+  padding: 0 3px;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+}
+.__base__-emoji-tab:first-child {
+  font-size: 12px;
+  font-weight: 600;
+}
+.__base__-emoji-tab:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.__base__-emoji-tab[aria-checked="true"] {
+  border-bottom-color: var(--ui-accent-color, #464cfc);
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 10%, transparent);
+}
+.__base__-emoji-list {
+  overflow-y: auto;
+  max-height: 280px;
+  padding: 4px 6px 6px;
+}
+.__base__-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+}
+.__base__-emoji {
+  height: 36px;
+  padding: 0;
+  font-size: 22px;
+  line-height: 1;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.__base__-emoji.__base__-emoji-current {
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 16%, transparent);
+}
+.__base__-emoji-name {
+  min-height: 1.3em;
+  padding: 6px 10px;
+  border-top: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
+  opacity: 0.75;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

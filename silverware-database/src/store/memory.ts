@@ -29,7 +29,7 @@ export type MemorySeed = {
 };
 
 /** What a store in memory changes outside the core, as a page edited by hand: values set, a new name, the item gone */
-export type OutsideChange = { readonly values?: Readonly<Record<string, Value>>; readonly name?: string; readonly removed?: true };
+export type OutsideChange = { readonly values?: Readonly<Record<string, Value>>; readonly name?: string; readonly body?: string; readonly removed?: true };
 
 type KeptDatabase = {
   record: RecordState;
@@ -346,7 +346,7 @@ export class MemoryStore implements DatabaseStore {
     const now = kept?.items.get(item);
     if (!kept || !now) throw new Error(`no item ${item} in ${database}`);
     if (change.removed) kept.items.delete(item);
-    else kept.items.set(item, { ...now, name: change.name ?? now.name, values: { ...now.values, ...change.values } });
+    else kept.items.set(item, { ...now, name: change.name ?? now.name, values: { ...now.values, ...change.values }, ...(change.body === undefined ? {} : { body: change.body }) });
     kept.itemRevisions.set(item, ++this.revision);
     if (!change.removed) this.stamp(item);
     for (const listener of this.listeners) listener({ database });

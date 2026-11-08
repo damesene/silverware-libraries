@@ -11,7 +11,7 @@
 // where it is still at the revision read: a value toggled from a stale view is
 // never written over another change. An item the batch makes is changed in its
 // `createItem` alone: what is asked of it after is folded into that.
-import type { Item, ItemKey, Property, Value } from "../model/database.ts";
+import type { Item, ItemKey, ItemLook, Property, Value } from "../model/database.ts";
 import type { Changes, DatabaseChange } from "./changes.ts";
 
 /** An item's changes as they are made, one chain */
@@ -23,6 +23,8 @@ export interface ItemChanges {
   rename(name: string): ItemChanges;
   /** Its place in the order by hand (domain/rank.ts) */
   rank(rank: string): ItemChanges;
+  /** How it looks, the whole of it (what it leaves out, the item has no more) */
+  look(look: ItemLook): ItemChanges;
   /** Its body made `body`, written only where it is still `was` (as the store's `body()` read it; none: it had none) */
   body(body: string, was?: string): ItemChanges;
   /** The item removed: nothing more is asked of it */
@@ -35,10 +37,11 @@ export type NewItem = {
   readonly name: string;
   readonly values?: Readonly<Record<string, Value>>;
   readonly rank?: string;
+  readonly look?: ItemLook;
   readonly body?: string;
 };
 
-type Made = { ref: string; name: string; values: Record<string, Value>; rank?: string; body?: string; removed: boolean };
+type Made = { ref: string; name: string; values: Record<string, Value>; rank?: string; look?: ItemLook; body?: string; removed: boolean };
 
 export class DatabaseChangesBuilder {
   private created: string | undefined;
@@ -101,6 +104,7 @@ export class DatabaseChangesBuilder {
       unset: (name) => add({ kind: "setValue", item: key, key: name, value: undefined }),
       rename: (name) => add({ kind: "renameItem", item: key, name }),
       rank: (rank) => add({ kind: "setRank", item: key, rank }),
+      look: (look) => add({ kind: "setLook", item: key, look }),
       body: (body, was) => add({ kind: "setBody", item: key, body, was }),
       remove: () => add({ kind: "removeItem", item: key }),
     }));
@@ -112,7 +116,7 @@ export class DatabaseChangesBuilder {
     this.open();
     const ref = item.ref ?? `new-${++this.refs}`;
     if (this.items.some((one) => one.kind === "made" && one.made.ref === ref)) throw new Error(`an item made twice under the ref "${ref}"`);
-    const made: Made = { ref, name: item.name, values: { ...item.values }, removed: false, ...(item.rank === undefined ? {} : { rank: item.rank }), ...(item.body === undefined ? {} : { body: item.body }) };
+    const made: Made = { ref, name: item.name, values: { ...item.values }, removed: false, ...(item.rank === undefined ? {} : { rank: item.rank }), ...(item.look === undefined ? {} : { look: item.look }), ...(item.body === undefined ? {} : { body: item.body }) };
     this.items.push({ kind: "made", made });
     const change = (apply: () => void) => {
       if (made.removed) throw new Error(`the item "${ref}" was removed in this batch`);
@@ -123,6 +127,7 @@ export class DatabaseChangesBuilder {
       unset: (key) => change(() => void delete made.values[key]),
       rename: (name) => change(() => void (made.name = name)),
       rank: (rank) => change(() => void (made.rank = rank)),
+      look: (look) => change(() => void (made.look = look)),
       body: (body) => change(() => void (made.body = body)),
       remove: () => change(() => void (made.removed = true)),
     }));
@@ -140,8 +145,8 @@ export class DatabaseChangesBuilder {
     for (const one of this.items) {
       if (one.kind === "kept") changes.push(...one.changes);
       else if (!one.made.removed) {
-        const { ref, name, values, rank, body } = one.made;
-        changes.push({ kind: "createItem", ref, name, values: Object.freeze(values), ...(rank === undefined ? {} : { rank }), ...(body === undefined ? {} : { body }) });
+        const { ref, name, values, rank, look, body } = one.made;
+        changes.push({ kind: "createItem", ref, name, values: Object.freeze(values), ...(rank === undefined ? {} : { rank }), ...(look === undefined ? {} : { look }), ...(body === undefined ? {} : { body }) });
       }
     }
     const items = Object.keys(this.read).length ? { items: Object.freeze({ ...this.read }) } : {};

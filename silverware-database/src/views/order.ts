@@ -37,9 +37,12 @@ export function rowGrip(host: ViewHost, item: Item, row: () => HTMLElement, cont
     const before = byKey(others[to]);
     const after = byKey(others[to - 1]);
     const box = row().closest(".swd-place-body");
+    // (In its group, where the view draws groups: an item in several, a multi-select's, has a row in each)
+    const group = row().closest<HTMLElement>("[data-group]")?.dataset.group;
     void host.move(item, before ? { before } : after ? { after } : {}).then(() => {
       // The focus back on its grip, the view drawn anew (a keyboard's user goes on from there)
-      box?.querySelector<HTMLElement>(`[data-item="${CSS.escape(item.key)}"] .swd-row-grip`)?.focus({ preventScroll: true });
+      const within = group === undefined ? box : box?.querySelector(`[data-group="${CSS.escape(group)}"]`);
+      within?.querySelector<HTMLElement>(`[data-item="${CSS.escape(item.key)}"] .swd-row-grip`)?.focus({ preventScroll: true });
     });
   };
   grip.addEventListener("pointerdown", (event) => {

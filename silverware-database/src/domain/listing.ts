@@ -8,6 +8,7 @@ import { compareForSort, type SortDirection } from "../../../shared/compare.ts";
 import { filterMatcher, parseFilter } from "../../../shared/filter.ts";
 import { type Database, type Item, NAME_KEY, type Property } from "../model/database.ts";
 import { inRankOrder } from "./rank.ts";
+import { systemType } from "./system.ts";
 import type { TypeRegistry } from "./types/registry.ts";
 import { keptText, type PropertyType } from "./types/type.ts";
 
@@ -24,7 +25,9 @@ export function validateCondition(condition: string): string | undefined {
 
 /** A property's type, the text type for one not defined now (its values shown as kept) */
 export function typeOf(types: TypeRegistry, property: Property): PropertyType {
-  return types.named(property.type) ?? types.named("text")!;
+  // (A system property's its kind's: domain/system.ts)
+  const own = property.system === undefined ? undefined : systemType(property.system);
+  return types.named(own ?? property.type) ?? types.named("text")!;
 }
 
 /** An item's value of a property as text, as it shows: the name for `name`, nothing for a property it lacks */

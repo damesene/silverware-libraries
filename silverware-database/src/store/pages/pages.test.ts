@@ -135,6 +135,34 @@ describe("the pages store", () => {
     expect(store.validateItemName("Fix login (2)")).toBeUndefined();
   });
 
+  it("keeps a property's name shown with its values in the root page, read back so", async () => {
+    const { memory, store } = harness(SEED);
+    const read = (await store.database("tasks"))!;
+    await store.apply(await store.plan(changes("tasks", { kind: "setSchema", properties: read.value.properties.map((one) => (one.key === "status" ? { ...one, showName: true } : one)) })));
+    expect(memory.pages.get("db-tasks")).toContain("status: { type: select, label: Status, showName: true, options: [Todo, Done] }");
+    expect((await store.database("tasks"))!.value.properties[0]!.showName).toBe(true);
+  });
+
+  it("keeps a property's icon in the root page; one typed by hand that is none kept as written through a change of the schema", async () => {
+    const { memory, store } = harness(SEED);
+    const read = (await store.database("tasks"))!;
+    await store.apply(await store.plan(changes("tasks", { kind: "setSchema", properties: read.value.properties.map((one) => (one.key === "status" ? { ...one, icon: "🚦" } : one)) })));
+    expect(memory.pages.get("db-tasks")).toContain('status: { type: select, label: Status, icon: "🚦", options: [Todo, Done] }');
+    expect((await store.database("tasks"))!.value.properties[0]!.icon).toBe("🚦");
+    // A word by hand: read as written (the views show the type's), kept as another property's label changes
+    const page = memory.pages.get("db-tasks")!.replace('icon: "🚦"', "icon: traffic light");
+    memory.writeOutside("db-tasks", page);
+    const now = (await store.database("tasks"))!;
+    await store.apply(await store.plan(changes("tasks", { kind: "setSchema", properties: now.value.properties.map((one) => (one.key === "due" ? { ...one, label: "Due date" } : one)) })));
+    expect(memory.pages.get("db-tasks")).toContain("icon: traffic light");
+    // Not a text: kept as written too, read as none
+    memory.writeOutside("db-tasks", memory.pages.get("db-tasks")!.replace("icon: traffic light", "icon: 5"));
+    const after = (await store.database("tasks"))!;
+    expect(after.value.properties.find((one) => one.key === "status")!.icon).toBeUndefined();
+    await store.apply(await store.plan(changes("tasks", { kind: "setSchema", properties: after.value.properties.map((one) => (one.key === "due" ? { ...one, label: "When" } : one)) })));
+    expect(memory.pages.get("db-tasks")).toContain("icon: 5");
+  });
+
   it("writes references as a list of wiki links in quotes, read back as written", async () => {
     const { memory, store } = harness(SEED);
     const [item] = (await store.items("tasks")).value;
@@ -142,6 +170,31 @@ describe("the pages store", () => {
     await store.apply(await store.plan(changes("tasks", { kind: "setValue", item: item!.key, key: "status", value: ["[[Projects/Alpha]]", "[[People/Ada|Ada]]"] })));
     expect(memory.pages.get("db-tasks/Fix login")).toContain('status: ["[[Projects/Alpha]]", "[[People/Ada|Ada]]"]');
     expect((await store.items("tasks")).value[0]!.values.status).toEqual(["[[Projects/Alpha]]", "[[People/Ada|Ada]]"]);
+  });
+
+  it("keeps an item's look beside its rank, each part written only where it changed; one that reads as none left as written", async () => {
+    const { memory, store } = harness(SEED);
+    const item = () => store.items("tasks").then((read) => read.value[0]!);
+    await store.apply(await store.plan(changes("tasks", { kind: "setLook", item: (await item()).key, look: { icon: "🚀", color: "blue" } })));
+    expect(memory.pages.get("db-tasks/Fix login")).toBe('---\ntags: [db]\nstatus: Todo\n_database:\n  rank: a0\n  icon: "🚀"\n  color: blue\n---\n');
+    expect((await item()).look).toEqual({ icon: "🚀", color: "blue" });
+    await store.apply(await store.plan(changes("tasks", { kind: "setLook", item: (await item()).key, look: { color: "blue" } })));
+    expect(memory.pages.get("db-tasks/Fix login")).toBe("---\ntags: [db]\nstatus: Todo\n_database:\n  rank: a0\n  color: blue\n---\n");
+    // Typed by hand: an icon of two words and a color of no palette read as none, never written over by a change of the other
+    memory.writeOutside("db-tasks/Fix login", "---\ntags: [db]\nstatus: Todo\n_database:\n  rank: a0\n  icon: a rocket\n  color: navy\n---\n");
+    expect((await item()).look).toBeUndefined();
+    await store.apply(await store.plan(changes("tasks", { kind: "setValue", item: (await item()).key, key: "status", value: "Done" })));
+    expect(memory.pages.get("db-tasks/Fix login")).toBe("---\ntags: [db]\nstatus: Done\n_database:\n  rank: a0\n  icon: a rocket\n  color: navy\n---\n");
+    // Its color set (the peek's way: the look as read, the icon none): the icon typed by hand kept
+    await store.apply(await store.plan(changes("tasks", { kind: "setLook", item: (await item()).key, look: { color: "green" } })));
+    expect(memory.pages.get("db-tasks/Fix login")).toBe("---\ntags: [db]\nstatus: Done\n_database:\n  rank: a0\n  icon: a rocket\n  color: green\n---\n");
+    // An icon picked over it, then undone: the text typed by hand back
+    const picked = await store.apply(await store.plan(changes("tasks", { kind: "setLook", item: (await item()).key, look: { icon: "🚀", color: "green" } })));
+    expect((await item()).look).toEqual({ icon: "🚀", color: "green" });
+    await store.apply(await store.planUndo(picked));
+    expect(memory.pages.get("db-tasks/Fix login")).toBe("---\ntags: [db]\nstatus: Done\n_database:\n  rank: a0\n  icon: a rocket\n  color: green\n---\n");
+    // What is no look refused by the store too
+    expect((await store.plan(changes("tasks", { kind: "setLook", item: (await item()).key, look: { icon: "two words" } }))).skipped.map((one) => one.cause)).toEqual(["refused"]);
   });
 
   it("leaves a value the model cannot hold as it is, writing only what changes", async () => {

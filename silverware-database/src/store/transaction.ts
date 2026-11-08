@@ -4,14 +4,17 @@
 // (contract.ts checks it); how a part is then written is the store's own (a
 // map in memory, a page through the page writer). Pure, on the state a store
 // read.
-import { type Database, type Item, type ItemKey, NAME_KEY, type Property, validatePropertyKey, type Value } from "../model/database.ts";
+import { type Database, type Item, type ItemKey, type ItemLook, NAME_KEY, type Property, validatePropertyKey, type Value } from "../model/database.ts";
 import type { Changes, DatabaseChange } from "../core/changes.ts";
+import { lookOf, sameLook, validateLook } from "../domain/look.ts";
 import type { LooseKey, SkipCause, Skipped, Target } from "../core/store.ts";
 
 /** An item as a store keeps it, its revision apart */
 // `loose`: values it keeps under keys the schema has none of, where the store reads them apart from its values (a page's other
 // frontmatter keys): none of the model's, taken off by a `setValue` to undefined
-export type ItemState = Omit<Item, "revision"> & { readonly loose?: Readonly<Record<string, Value>> };
+// `lookKept`: a part of its look kept where it reads as none (an icon typed by hand as a word): never written over by a
+// change of the other part, put back by an undo, gone only where a change sets that part
+export type ItemState = Omit<Item, "revision"> & { readonly loose?: Readonly<Record<string, Value>>; readonly lookKept?: Readonly<Partial<Record<keyof ItemLook, Value>>> };
 
 /** A database's own record: its name, schema and the version of the form it is kept in */
 export type RecordState = { readonly database: Database; readonly version: number };
@@ -159,7 +162,7 @@ function draftItem(group: ItemGroup, state: StoreState, keys: ReadonlySet<string
   const kept = key === undefined ? undefined : state?.items.get(key);
   const before = kept?.item;
   let item: ItemState | undefined = created
-    ? { key: "" as ItemKey, name: created.name, values: created.values, rank: created.rank, ...(created.body === undefined ? {} : { body: created.body }) }
+    ? { key: "" as ItemKey, name: created.name, values: created.values, rank: created.rank, ...withLook(created.look), ...(created.body === undefined ? {} : { body: created.body }) }
     : before;
   if (!item) return skip("missing", "no such item");
   const expected = key && changes.expects?.items?.[key];
@@ -167,12 +170,14 @@ function draftItem(group: ItemGroup, state: StoreState, keys: ReadonlySet<string
   let count = created ? 1 : 0;
   let named = !!created;
   if (created) {
-    const problem = rules.validateItemName(created.name) ?? Object.keys(created.values).map((one) => validateValueKey(one, keys, true)).find(Boolean);
+    const problem = rules.validateItemName(created.name) ?? Object.keys(created.values).map((one) => validateValueKey(one, keys, true)).find(Boolean) ?? (created.look && validateLook(created.look));
     if (problem) return skip("refused", problem);
   }
   for (const change of group.changes) {
     if (!item) return skip("refused", "a change after the item is removed in the same transaction");
-    const problem = change.kind === "setValue" ? validateValueKey(change.key, keys, change.value !== undefined) : change.kind === "renameItem" ? rules.validateItemName(change.name) : undefined;
+    // (A look checked here too: what a store keeps is never one it would read as none)
+    const problem =
+      change.kind === "setValue" ? validateValueKey(change.key, keys, change.value !== undefined) : change.kind === "renameItem" ? rules.validateItemName(change.name) : change.kind === "setLook" ? validateLook(change.look) : undefined;
     if (problem) return skip("refused", problem);
     // A body written over only as it was read: a text changed since (by hand) is never lost
     if (change.kind === "setBody" && !created && (before?.body ?? undefined) !== change.was) return skip("changed", "its body changed since it was read: left alone");
@@ -205,6 +210,12 @@ function same(a: Value | undefined, b: Value | undefined): boolean {
   return a === b;
 }
 
+/** An item's look as kept: its own key where it has one, none where nothing of it is left (as an item never given one) */
+function withLook(look: ItemLook | undefined): { readonly look?: ItemLook } {
+  const kept = lookOf(look?.icon, look?.color);
+  return kept ? { look: kept } : {};
+}
+
 /** An item as one change leaves it (the same object where nothing changes; undefined: removed) */
 function changedItem(item: ItemState, change: DatabaseChange): ItemState | undefined {
   switch (change.kind) {
@@ -224,6 +235,14 @@ function changedItem(item: ItemState, change: DatabaseChange): ItemState | undef
       return change.name === item.name ? item : { ...item, name: change.name };
     case "setRank":
       return change.rank === item.rank ? item : { ...item, rank: change.rank };
+    case "setLook": {
+      // (A part kept as written goes only where this change sets that part)
+      const kept = item.lookKept && Object.fromEntries(Object.entries(item.lookKept).filter(([part]) => change.look[part as keyof ItemLook] === undefined));
+      const keptSame = Object.keys(kept ?? {}).length === Object.keys(item.lookKept ?? {}).length;
+      if (sameLook(change.look, item.look) && keptSame) return item;
+      const { look: _was, lookKept: _kept, ...rest } = item;
+      return { ...rest, ...withLook(change.look), ...(kept && Object.keys(kept).length ? { lookKept: kept } : {}) };
+    }
     case "setBody":
       return change.body === item.body ? item : { ...item, body: change.body };
     case "removeItem":

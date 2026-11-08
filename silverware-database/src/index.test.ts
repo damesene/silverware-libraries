@@ -33,7 +33,12 @@ function bridgeOf(pages: Record<string, string>, open: string) {
   return { memory, bridge, told };
 }
 
-/** Two views, "a" and "b": the place's switcher picks one */
+/** A view picked in a place: its picker's menu opened, the item of that label pressed */
+function pickView(root: ParentNode, label: string): void {
+  root.querySelector<HTMLButtonElement>(".swd-view-picker")!.click();
+  [...root.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].find((item) => item.querySelector(".swd-label")?.textContent === label)!.click();
+}
+/** Two views, "a" and "b": the place's picker picks one */
 const VIEWS: ViewDefinition[] = ["a", "b"].map((name) => ({ name, label: name, icon: name, render: (_host, element) => void element.replaceChildren(name) }));
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
@@ -51,7 +56,7 @@ describe("Silverware Database in SilverBullet", () => {
     const [first, second] = [render("id: tasks", "Page"), render("id: tasks", "Page")];
     document.body.append(first, second);
     await settle();
-    second.querySelector<HTMLButtonElement>('[data-view="b"]')!.click();
+    pickView(second, "b");
     await settle();
     expect(memory.pages.get("Page")).toBe("```silverware-database\nid: tasks\n```\n\nmiddle\n\n```silverware-database\nid: tasks\nview: b\n```\n");
     // One of two blocks alike out of view (CodeMirror keeps it out of the page): which is which cannot be told, nothing written
@@ -59,7 +64,7 @@ describe("Silverware Database in SilverBullet", () => {
     const lone = render("id: tasks", "Page");
     document.body.replaceChildren(lone);
     await settle();
-    lone.querySelector<HTMLButtonElement>('[data-view="b"]')!.click();
+    pickView(lone, "b");
     await settle();
     expect(memory.pages.get("Page")).toBe(TWICE);
     expect(told.some((one) => one.includes("out of view"))).toBe(true);
@@ -97,7 +102,7 @@ describe("Silverware Database in SilverBullet", () => {
     init(bridge);
     await settle();
     expect(element.querySelector("[inert]")).toBeNull();
-    element.querySelector<HTMLButtonElement>('[data-view="b"]')!.click();
+    pickView(element, "b");
     await settle();
     expect(memory.pages.get("Page")).toBe("```silverware-database\nid: tasks\nview: b\n```\n");
   });

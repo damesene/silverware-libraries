@@ -11,7 +11,9 @@ import type { DatabaseStore, TransactionPlan, TransactionReport, WriteProgress }
 // At most this many kept per database (a busy one pushes out none of a quiet one's)
 const KEPT = 50;
 
-export type RecordedTransaction = { readonly report: TransactionReport; readonly label: string };
+// `undoAlso`: what else the transaction changed beside the store, put back after the store's undo (a key changed: the
+// places' states naming it, renamed back)
+export type RecordedTransaction = { readonly report: TransactionReport; readonly label: string; readonly undoAlso?: () => Promise<void> };
 
 export class TransactionHistory {
   private readonly recorded: RecordedTransaction[] = [];
@@ -23,13 +25,13 @@ export class TransactionHistory {
    * the transaction it undid off instead, whatever it wrote. A report that
    * wrote nothing is not kept.
    */
-  record(report: TransactionReport, label: string): void {
+  record(report: TransactionReport, label: string, undoAlso?: () => Promise<void>): void {
     if (report.undoes) {
       this.forget(report.undoes);
       return;
     }
     if (!report.written.length) return;
-    this.recorded.push({ report, label });
+    this.recorded.push({ report, label, ...(undoAlso ? { undoAlso } : {}) });
     const own = this.recorded.filter((one) => one.report.database === report.database);
     if (own.length > KEPT) this.forget(own[0]!.report);
   }
@@ -55,10 +57,13 @@ export class TransactionHistory {
     return plan && this.applyUndo(plan);
   }
 
-  /** An undo planned (`planUndo`) written, recorded so; `progress` told as it is written */
+  /** An undo planned (`planUndo`) written, recorded so, what the transaction changed besides put back after it; `progress` told as it is written */
   async applyUndo(plan: TransactionPlan, progress?: WriteProgress): Promise<TransactionReport> {
+    const also = this.recorded.find((one) => one.report === plan.undoes)?.undoAlso;
     const undone = await this.store.apply(plan, progress);
     this.record(undone, "");
+    // (Put back only with the store's whole undo: a part left keeps the new state, and so do the places with it)
+    if (also && undone.written.length && !undone.skipped.length) await also();
     return undone;
   }
 

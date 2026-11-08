@@ -11,7 +11,7 @@ import { PLACE_MENU_SLOTS } from "../../core/placemenu.ts";
 
 /** The modules' entries in a place's menu, as items (labels, what they run) */
 const menuItems = (modules: Modules, database: Database) =>
-  modules.placeMenu({ document, database }, menuBuilder(PLACE_MENU_SLOTS, () => {})).flatMap((group) => group.entries.flatMap((entry) => (entry.kind === "item" ? [entry] : [])));
+  modules.placeMenu({ document, database, overWindow: false, setOverWindow: () => {} }, menuBuilder(PLACE_MENU_SLOTS, () => {})).flatMap((group) => group.entries.flatMap((entry) => (entry.kind === "item" ? [entry] : [])));
 
 const TASKS: Database = {
   id: "tasks",
@@ -66,7 +66,7 @@ describe("the modules", () => {
     const { modules } = await setup();
     await Promise.all([modules.start(), modules.start()]);
     expect(menuItems(modules, TASKS).map((one) => one.label)).toEqual(["Properties"]);
-    expect(modules.placeMenu({ document, database: TASKS }, menuBuilder(PLACE_MENU_SLOTS, () => {})).map((group) => group.slot)).toEqual(["data"]);
+    expect(modules.placeMenu({ document, database: TASKS, overWindow: false, setOverWindow: () => {} }, menuBuilder(PLACE_MENU_SLOTS, () => {})).map((group) => group.slot)).toEqual(["data"]);
   });
 });
 
@@ -138,6 +138,8 @@ describe("the properties' dialog", () => {
     const details = q('[data-property="order"] .swd-prop-detail');
     expect(details.querySelector(".swd-prop-system")!.textContent).toContain("Given by the system");
     expect(details.querySelector(".swd-property-type, .swd-property-required, .swd-property-locked")).toBeNull();
+    // (Its name in the views may be shown, as any property's)
+    expect(details.querySelector(".swd-property-show-name")).not.toBeNull();
     expect(details.querySelector<HTMLInputElement>(".swd-property-key")!.readOnly).toBe(true);
     // Removed: whether to take its values off is not asked (they are no item's), the change shown, no item's value changing
     details.querySelector<HTMLButtonElement>(".swd-property-remove")!.click();
@@ -205,6 +207,19 @@ describe("the properties' dialog", () => {
     expect((await schema())[0]!.required).toBe(true);
     expect(q('[data-property="status"] .swd-prop-required').textContent).toBe("*");
     expect(q('[data-property="status"] .swd-prop-head').getAttribute("aria-label")).toContain("required");
+  });
+
+  it("shows a property's name with its values in the views by its switch, a system property's too", async () => {
+    const { open, q, schema } = await setup();
+    await open();
+    expand("status");
+    q<HTMLInputElement>('[data-property="status"] .swd-property-show-name input').click();
+    await settle();
+    expect((await schema())[0]!.showName).toBe(true);
+    // (Its details still open, drawn anew)
+    q<HTMLInputElement>('[data-property="status"] .swd-property-show-name input').click();
+    await settle();
+    expect((await schema())[0]!.showName).toBeUndefined();
   });
 
   it("locks a property under Advanced, a lock then shown on its row folded", async () => {
@@ -327,22 +342,15 @@ describe("the properties' dialog", () => {
     expect((await store.database("tasks"))!.value).toEqual(TASKS);
   });
 
-  it("says how many pages a change writes where each item is a page, and that many take a while", async () => {
-    const { open, q, core } = await setup(false, {}, [PROPERTIES_MODULE], true);
+  it("says how many pages a change writes where each item is a page, and to keep the window open, however few", async () => {
+    const { open, q } = await setup(false, {}, [PROPERTIES_MODULE], true);
     await open();
     expand("status");
     typeOption(optionNames()[0]!, "To do");
     q<HTMLButtonElement>(".swd-property-options-save").click();
     await settle();
     // (One item holds Todo: its page and the database's)
-    expect(q(".swd-property-review").textContent).toContain("Writes 2 pages.");
-    expect(q(".swd-property-review").textContent).not.toContain("takes a while");
-    q<HTMLButtonElement>(".swd-property-cancel").click();
-    await settle();
-    for (let at = 0; at < 200; at++) await core.create("tasks", { name: `Item ${at}`, values: { status: "Todo" } });
-    q<HTMLButtonElement>(".swd-property-options-save").click();
-    await settle();
-    expect(q(".swd-property-review").textContent).toContain("Writes 202 pages: it takes a while; keep this window open until it is done");
+    expect(q(".swd-property-review").textContent).toContain("Writes 2 pages, one after another: keep this window open until it is done");
   });
 
   it("stays open while a change is written, said why, and closes once it is", async () => {

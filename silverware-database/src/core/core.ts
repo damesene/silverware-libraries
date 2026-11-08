@@ -13,17 +13,19 @@
 // and every transaction is undone by `undo`.
 import { guessedType, optionsOfValues } from "../domain/loose.ts";
 import { systemKind } from "../domain/system.ts";
+import { sameLook, validateIcon, validateLook } from "../domain/look.ts";
 import { DOCUMENT, type Noun } from "../domain/noun.ts";
 import type { UserInterface } from "../../../shared/platform.ts";
 import { inRankOrder, isRank, placeAt } from "../domain/rank.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
 import { optionsOf } from "../domain/types/options.ts";
 import { keptText } from "../domain/types/type.ts";
-import { type Database, type Item, type ItemKey, isEmpty, isValue, NAME_KEY, type Params, type Property, type Revised, validatePropertyKey, type Value } from "../model/database.ts";
+import { type Database, type Item, type ItemKey, type ItemLook, isEmpty, isValue, NAME_KEY, type Params, type Property, type Revised, validatePropertyKey, type Value } from "../model/database.ts";
 import { databaseChanges, type DatabaseChangesBuilder } from "./builder.ts";
 import type { Changes } from "./changes.ts";
 import { TransactionHistory } from "./history.ts";
-import type { DatabaseStore, LooseKey, Skipped, Target, TransactionPlan, TransactionReport, WriteProgress } from "./store.ts";
+import { placeStateRenamed } from "./placestate.ts";
+import type { DatabaseStore, LooseKey, PlaceChange, PlacesPlan, PlacesReport, PlaceStore, Skipped, Target, TransactionPlan, TransactionReport, WriteProgress } from "./store.ts";
 
 /** What the core asks of the user: told what was refused or left, asked before anything is removed */
 export type CoreInterface = Pick<UserInterface, "notify"> & Required<Pick<UserInterface, "ask">>;
@@ -64,7 +66,16 @@ export type Proposal = {
   readonly renamed?: readonly OptionRenamed[];
   // Written whole or not at all, proposed against the items at this revision: a key changed in part would leave items' values under the old key, out of every view
   readonly whole?: { readonly items: string };
+  /** The places whose states change with it (a key changed: those naming it), written after the store's part */
+  readonly places?: PlacesPlan;
 };
+
+/**
+ * The places' states apart from the store (`PlaceStore`) and what of a
+ * state names a property beside the place's own: each view's meta keys
+ * holding a property's key (`ViewDefinition.propertyMeta`)
+ */
+export type CorePlaces = { readonly store: PlaceStore; readonly propertyMeta: (view: string) => readonly string[] };
 
 /** A key items keep that the schema has none of, as the core shows it: how many items, a few of their values, the type they look like */
 // `options`: its values as a select's options would be (a select or multi-select added of it takes them)
@@ -110,7 +121,7 @@ function sameParams(a: unknown, b: unknown): boolean {
 }
 
 /** Names a property's settings cannot have: the property's own fields, as a store keeps them beside its settings */
-const PROPERTY_FIELDS = new Set(["key", "type", "label", "readonly", "hidden", "required", "system"]);
+const PROPERTY_FIELDS = new Set(["key", "type", "label", "readonly", "hidden", "required", "showName", "icon", "system"]);
 
 /** Why a property's settings cannot be kept (one named as a field of the property's own), undefined where they can */
 function validateParamNames(label: string, params: Params): string | undefined {
@@ -138,6 +149,8 @@ export class DatabaseCore {
     private readonly ui: CoreInterface,
     /** What the place the items are kept in calls its documents, for what is said to the user */
     readonly noun: Noun = DOCUMENT,
+    /** The places' states kept apart (none: a key changed follows in the store alone) */
+    private readonly places?: CorePlaces,
   ) {
     this.history = new TransactionHistory(store);
   }
@@ -188,6 +201,19 @@ export class DatabaseCore {
     const problem = this.validateName(trimmed, new Set(read.items.value.filter((one) => one.key !== item.key).map((one) => one.name)));
     if (problem) return this.refuse(problem);
     return this.write(databaseChanges(database).item(item, (i) => i.rename(trimmed)).build(), `Rename ${item.name} to ${trimmed}`);
+  }
+
+  /**
+   * How an item looks (its icon, its color), the whole of it: what `look`
+   * leaves out the item has no more (`{}`: none); refused where it is none
+   * (domain/look.ts)
+   */
+  async setLook(database: string, item: Item, look: ItemLook): Promise<Result> {
+    const problem = validateLook(look);
+    if (problem) return this.refuse(problem);
+    if (sameLook(look, item.look)) return unchanged("The look is the same");
+    const what = look.icon === item.look?.icon ? "color" : look.color === item.look?.color ? "icon" : "look";
+    return this.write(databaseChanges(database).item(item, (i) => i.look(look)).build(), `Change the ${what} of ${item.name}`, { item: item.key });
   }
 
   /** An item's body (its content in the markdown language), written only where it is still `was` as read (`store.body`): a body changed since is left, never written over */
@@ -336,6 +362,46 @@ export class DatabaseCore {
     );
   }
 
+  /** A property's name shown with its value where a value stands alone (a card's line, a list's row), or not: the schema alone */
+  async setPropertyShowName(database: string, key: string, shown: boolean): Promise<Result> {
+    const read = await this.store.database(database);
+    if (!read) return this.refuse(`No database "${database}"`);
+    const property = read.value.properties.find((one) => one.key === key);
+    if (!property) return this.refuse(`No property "${key}"`);
+    if ((property.showName ?? false) === shown) return unchanged("It is so already");
+    return this.writeSchema(
+      read,
+      read.value.properties.map((one) => {
+        if (one.key !== key) return one;
+        const { showName: _was, ...rest } = one;
+        return shown ? { ...rest, showName: true } : rest;
+      }),
+      `${shown ? "Show" : "Leave out"} the name of ${property.label} with its values`,
+    );
+  }
+
+  /** A property's own icon (an emoji) where the views name it, or none (undefined: its type's again): the schema alone */
+  async setPropertyIcon(database: string, key: string, icon: string | undefined): Promise<Result> {
+    const read = await this.store.database(database);
+    if (!read) return this.refuse(`No database "${database}"`);
+    const property = read.value.properties.find((one) => one.key === key);
+    if (!property) return this.refuse(`No property "${key}"`);
+    if (icon !== undefined) {
+      const problem = validateIcon(icon);
+      if (problem) return this.refuse(problem);
+    }
+    if (property.icon === icon) return unchanged("It is so already");
+    return this.writeSchema(
+      read,
+      read.value.properties.map((one) => {
+        if (one.key !== key) return one;
+        const { icon: _was, ...rest } = one;
+        return icon === undefined ? rest : { ...rest, icon };
+      }),
+      icon === undefined ? `Take the icon off ${property.label}` : `Give ${property.label} an icon`,
+    );
+  }
+
   /**
    * A property's params changed from `was` (the params the caller read and
    * changed) where no item's value reads otherwise for it (a select's colors):
@@ -380,7 +446,7 @@ export class DatabaseCore {
   }
 
   /** A property's key changed, every item's value moved to it: a proposal; refused where items still keep values under the new key */
-  async rekeyProperty(database: string, key: string, newKey: string): Promise<Proposal | Refused> {
+  async rekeyProperty(database: string, key: string, newKey: string, finding?: WriteProgress): Promise<Proposal | Refused> {
     const read = await this.read(database);
     if ("problem" in read) return read;
     const property = read.database.value.properties.find((one) => one.key === key);
@@ -394,7 +460,11 @@ export class DatabaseCore {
       const value = item.values[key];
       if (value !== undefined) changes.item(item, (i) => i.set(newKey, value).unset(key));
     }
-    return { ...(await this.propose(changes.build(), `Change the key of ${property.label} to ${newKey}`)), whole: { items: itemsRevision(read.items.value) } };
+    const proposal = await this.propose(changes.build(), `Change the key of ${property.label} to ${newKey}`);
+    // The places naming the key (a view's filter, sort, grouping, its own meta), found now: written with it, put back with its undo
+    const renamed: PlaceChange = (state) => placeStateRenamed(state, key, newKey, this.places!.propertyMeta);
+    const places = this.places && (await this.places.store.plan(database, renamed, finding));
+    return { ...proposal, whole: { items: itemsRevision(read.items.value) }, ...(places?.documents.length ? { places } : {}) };
   }
 
   /**
@@ -529,7 +599,37 @@ export class DatabaseCore {
       this.ui.notify(problem, { type: "error" });
       return { problem, cause: "left" };
     }
-    return this.settle(proposal.label, await this.store.apply(proposal.plan, progress), proposal.whole ? () => true : undefined);
+    const report = await this.store.apply(proposal.plan, progress);
+    // The places changed with it, once the store's part stands (written whole where it is to be: else none of it does)
+    const stands = !proposal.whole || !report.skipped.length;
+    const store = this.places?.store;
+    const places = stands && store ? proposal.places : undefined;
+    // What the places' write wrote, put back by the transaction's undo after the store's (exactly that: a place changed since left)
+    let wrote: PlacesReport | undefined;
+    const undoAlso =
+      places && store
+        ? async () => {
+            if (wrote) this.said(`Undo: ${proposal.label}`, await store.undo(wrote));
+          }
+        : undefined;
+    const result = await this.settle(proposal.label, report, proposal.whole ? () => true : undefined, undoAlso);
+    if (places && store && !("problem" in result)) {
+      try {
+        wrote = await store.apply(places);
+        this.said(proposal.label, wrote);
+      } catch (error) {
+        // (The items written stand: the views not, said)
+        this.ui.notify(`${proposal.label}: its views could not be updated (${error instanceof Error ? error.message : String(error)}): change their settings by hand`, { type: "error" });
+      }
+    }
+    return result;
+  }
+
+  /** What of the places' change was left (a place changed since it was read), said */
+  private said(label: string, report: PlacesReport): void {
+    if (!report.skipped.length) return;
+    const where = report.skipped.map((one) => `${one.document} (${one.reason})`).join("; ");
+    this.ui.notify(`${label}: ${report.skipped.length === 1 ? "a view was" : `${report.skipped.length} views were`} left as ${report.skipped.length === 1 ? "it was" : "they were"}: ${where}`, { type: "error" });
   }
 
   /**
@@ -572,8 +672,8 @@ export class DatabaseCore {
    * left (`needed`), what it wrote besides (neighbours ranked) is put back at
    * once, and nothing of it stands
    */
-  private async settle(label: string, report: TransactionReport, needed?: (skipped: Skipped) => boolean): Promise<Result> {
-    this.history.record(report, label);
+  private async settle(label: string, report: TransactionReport, needed?: (skipped: Skipped) => boolean, undoAlso?: () => Promise<void>): Promise<Result> {
+    this.history.record(report, label, undoAlso);
     if (!needed || !report.skipped.some(needed)) return this.outcome(label, report);
     if (report.written.length) await this.history.undo(report);
     const reasons = [...new Set(report.skipped.map((one) => one.reason))].join("; ");

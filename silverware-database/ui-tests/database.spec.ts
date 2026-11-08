@@ -4,22 +4,174 @@ import { editorText, expect, item, root, runCommand, test, waitForIndex } from "
 const BLOCK = "```silverware-database\nid: tasks\nview: names\n```\n";
 const TASKS = { "Page/db-tasks": root("tasks", "Tasks"), "Page/db-tasks/Fix login": item("Todo", "a0"), "Page/db-tasks/Write docs": item("Done", "a1") };
 
+/** A view picked in a place (the first, else the one given): its picker's menu opened, the view's item pressed */
+async function pickView(page: import("@playwright/test").Page, label: string, place = page.locator(".swd-place").first()): Promise<void> {
+  await place.locator(".swd-view-picker").click();
+  await place.locator(".swd-menu .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: new RegExp(`^${label}$`) }) }).click();
+}
+
 /** An entry of a place's menu (⋯) chosen by its label (its value after it left out); the menu open first, or a submenu of it */
 async function choose(page: import("@playwright/test").Page, label: string): Promise<void> {
   await page.locator(".swd-menu .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: new RegExp(`^${label}(:|$)`) }) }).first().click();
 }
 
-test("a block draws its database: the views on to switch, the one shown its items", async ({ page, space }) => {
+test("a block draws its database: the view shown in its picker, the views on in its menu, the one shown its items", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${BLOCK}`, ...TASKS }, "Page");
-  await expect(page.locator(".swd-switch")).toHaveCount(5);
-  expect(await page.locator(".swd-switch").evaluateAll((all) => all.map((one) => (one as HTMLElement).dataset.view))).toEqual(["table", "list", "board", "names", "count"]);
-  await expect(page.locator('.swd-switch[aria-pressed="true"]')).toHaveAttribute("data-view", "names");
+  const picker = page.locator(".swd-view-picker");
+  await expect(picker).toHaveAttribute("data-view", "names");
+  await expect(picker.locator(".swd-view-picker-label")).toHaveText("Names");
   await expect(page.locator(".test-item")).toHaveText(["Fix login", "Write docs"]);
+  await picker.click();
+  await expect(page.locator(".swd-menu .swd-menu-item .swd-label")).toHaveText(["Table", "List", "Board", "Calendar", "Timeline", "Names", "Count"]);
+  await expect(page.locator('.swd-menu .swd-menu-item[aria-checked="true"] .swd-label')).toHaveText("Names");
+  // Esc closes it, the view as it was
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swd-menu .swd-menu-item")).toHaveCount(0);
+  await expect(picker).toBeFocused();
+});
+
+test("full screen: the place over the whole window, SilverBullet's top bar under it, the same icon or Esc putting it back", async ({ page, space }) => {
+  await space.open({ Page: `# Page
+
+${BLOCK}`, ...TASKS }, "Page");
+  const place = page.locator(".swd-place");
+  await page.locator('.swd-tool[data-tool="fullscreen"]').click();
+  await expect(place).toHaveClass(/swd-over-window/);
+  const box = (await place.boundingBox())!;
+  const view = page.viewportSize()!;
+  expect([box.x, box.y, box.width, box.height]).toEqual([0, 0, view.width, view.height]);
+  // (On top: the point at the window's top left corner, where SilverBullet's top bar is, is the place's)
+  expect(await page.evaluate(() => !!document.elementFromPoint(5, 5)?.closest(".swd-place"))).toBe(true);
+  await expect(page.locator(".test-item")).toHaveText(["Fix login", "Write docs"]);
+  // Another view picked: written into the block, which SilverBullet draws anew: still over the window
+  await pickView(page, "Count");
+  await expect.poll(() => space.saved("Page")).toContain("view: count");
+  await expect(page.locator(".swd-place")).toHaveClass(/swd-over-window/);
+  await expect(page.locator(".swd-view-picker")).toHaveAttribute("data-view", "count");
+  await page.locator('.swd-tool[data-tool="fullscreen"]').focus();
+  await page.keyboard.press("Escape");
+  await expect(place).not.toHaveClass(/swd-over-window/);
+  await page.locator('.swd-tool[data-tool="fullscreen"]').click();
+  await expect(place).toHaveClass(/swd-over-window/);
+  await page.locator('.swd-tool[data-tool="fullscreen"]').click();
+  await expect(place).not.toHaveClass(/swd-over-window/);
+  // (The block's markdown not shown by any of it)
+  await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);
+});
+
+test("the calendar: items on their days, one dragged to another day keeping its time, one added by a day's +, a phone's day list", async ({ page, space }) => {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const day = (d: number) => `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(d)}`;
+  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    due: { type: datetime, label: Due }\n---\n";
+  const item = (due: string, rank: string) => `---\ntags: [db]\nstatus: Todo\ndue: "${due}"\n_database:\n  rank: ${rank}\n---\n`;
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: calendar\n```\n", "Page/db-tasks": rootPage, "Page/db-tasks/Sync": item(`${day(5)}T10:00`, "a0"), "Page/db-tasks/Someday": "---\ntags: [db]\nstatus: Todo\n_database:\n  rank: a1\n---\n" }, "Page");
+  const cell = (d: number) => page.locator(`.swd-cal-day[data-day="${day(d)}"]`);
+  const bar = (name: string) => page.locator(".swd-cal-week .swd-cal-item", { hasText: name });
+  await expect(bar("Sync")).toHaveText("10:00 Sync");
+  await expect(page.locator(".swd-cal-undated .swd-cal-item")).toHaveText("Someday");
+  // Dragged onto another day: its date that day, its time kept
+  await bar("Sync").dragTo(cell(12));
+  await expect.poll(() => space.saved("Page/db-tasks/Sync")).toMatch(/due: "?.*-12T10:00"?/);
+  await expect(bar("Sync")).toHaveText("10:00 Sync");
+  await expect(bar("Sync").locator(".swd-cal-name")).toBeVisible();
+  // One without a date dragged onto a day: given it
+  await page.locator(".swd-cal-undated .swd-cal-item").dragTo(cell(13));
+  await expect.poll(() => space.saved("Page/db-tasks/Someday")).toContain(day(13));
+  // A day's +: an item added on it
+  await cell(20).hover({ position: { x: 10, y: 10 } });
+  await cell(20).locator(".swd-cal-add").click();
+  await expect.poll(() => space.saved("Page/db-tasks/Untitled")).toContain(day(20));
+  // A phone: the days show marks, a day pressed lists its items whole under the month
+  await page.setViewportSize({ width: 390, height: 844 });
+  await cell(12).click({ position: { x: 4, y: 12 } });
+  await expect(page.locator(".swd-cal-agenda")).toBeVisible();
+  await expect(page.locator(".swd-cal-agenda .swd-cal-item")).toHaveText("10:00 Sync");
+  await expect(bar("Sync").locator(".swd-cal-name")).toBeHidden();
+});
+
+test("the calendar's spans: an item from its start to its end a bar across its days, moved whole, its end dragged by its handle", async ({ page, space }) => {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const day = (d: number) => `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(d)}`;
+  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    start: { type: date, label: Start }\n    end: { type: date, label: End }\n---\n";
+  const trip = `---\ntags: [db]\nstart: "${day(3)}"\nend: "${day(5)}"\n_database:\n  rank: a0\n---\n`;
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: calendar\ncalendar.endBy: end\n```\n", "Page/db-tasks": rootPage, "Page/db-tasks/Trip": trip }, "Page");
+  const cell = (d: number) => page.locator(`.swd-cal-day[data-day="${day(d)}"]`);
+  const bars = page.locator(".swd-cal-week .swd-cal-item", { hasText: "Trip" });
+  await expect(page.locator(".swd-cal-by")).toHaveText("by Start → End");
+  // Across its days: as wide as the days it lasts (one bar, or one a week where it crosses one)
+  const width = async () => (await bars.evaluateAll((all) => all.map((one) => one.getBoundingClientRect().width))).reduce((sum, one) => sum + one, 0);
+  const dayWidth = (await cell(3).boundingBox())!.width;
+  expect(await width()).toBeGreaterThan(dayWidth * 2.5);
+  // Moved whole: taken by its first day, dropped on the 10th: the 10th to the 12th
+  await bars.first().dragTo(cell(10), { sourcePosition: { x: 12, y: 8 } });
+  await expect.poll(() => space.saved("Page/db-tasks/Trip")).toContain(`end: "${day(12)}"`);
+  expect(await space.saved("Page/db-tasks/Trip")).toContain(`start: "${day(10)}"`);
+  // Its end's handle dragged to the 14th
+  await bars.last().hover();
+  await bars.last().locator(".swd-cal-handle-end").dragTo(cell(14));
+  await expect.poll(() => space.saved("Page/db-tasks/Trip")).toContain(`end: "${day(14)}"`);
+  expect(await space.saved("Page/db-tasks/Trip")).toContain(`start: "${day(10)}"`);
+});
+
+test("the timeline: a row an item, its bar from its start to its end, moved by a drag a day at a time, its end by its handle, today in view", async ({ page, space }) => {
+  const at = (by: number) => {
+    const one = new Date();
+    one.setDate(one.getDate() + by);
+    return `${one.getFullYear()}-${String(one.getMonth() + 1).padStart(2, "0")}-${String(one.getDate()).padStart(2, "0")}`;
+  };
+  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    start: { type: date, label: Start }\n    end: { type: date, label: End }\n---\n";
+  const trip = `---\ntags: [db]\nstart: "${at(1)}"\nend: "${at(3)}"\n_database:\n  rank: a0\n---\n`;
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: timeline\ntimeline.endBy: end\n```\n", "Page/db-tasks": rootPage, "Page/db-tasks/Trip": trip, "Page/db-tasks/Someday": "---\ntags: [db]\n_database:\n  rank: a1\n---\n" }, "Page");
+  const bar = page.locator(".swd-tl-bar", { hasText: "Trip" });
+  await expect(page.locator(".swd-tl-name-text")).toHaveText(["Trip", "Someday"]);
+  // Today in view, the bar three days wide (40px a day)
+  await expect(page.locator(".swd-tl-unit.swd-tl-now")).toBeInViewport();
+  expect(Math.round((await bar.boundingBox())!.width)).toBe(120);
+  // Dragged two days and a little right: moved two days whole
+  const box = (await bar.boundingBox())!;
+  await page.mouse.move(box.x + 60, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 60 + 30, box.y + box.height / 2, { steps: 4 });
+  await page.mouse.move(box.x + 60 + 90, box.y + box.height / 2, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(() => space.saved("Page/db-tasks/Trip")).toContain(`start: "${at(3)}"`);
+  expect(await space.saved("Page/db-tasks/Trip")).toContain(`end: "${at(5)}"`);
+  // Its end's handle a day right
+  await bar.hover();
+  const handle = (await bar.locator(".swd-tl-handle-end").boundingBox())!;
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 + 42, handle.y + handle.height / 2, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(() => space.saved("Page/db-tasks/Trip")).toContain(`end: "${at(6)}"`);
+  expect(await space.saved("Page/db-tasks/Trip")).toContain(`start: "${at(3)}"`);
+});
+
+test("a tool's menu shows whole over a short block, not cut by it, scrolled in itself where the window is low", async ({ page, space }) => {
+  await page.setViewportSize({ width: 900, height: 360 });
+  await space.open({ Page: `# Page\n\n${BLOCK}\nAfter\n`, ...TASKS }, "Page");
+  // (The block kept short, as SilverBullet's widget may be, cutting what goes past it)
+  await page.addStyleTag({ content: ".swd-widget { max-height: 120px; overflow: auto; }" });
+  await page.locator(".swd-view-picker").click();
+  const menu = page.locator(".swd-menu:not([hidden])");
+  await expect(menu.locator(".swd-menu-item")).toHaveCount(7);
+  const widget = (await page.locator(".swd-widget").boundingBox())!;
+  const box = (await menu.boundingBox())!;
+  expect(box.y + box.height).toBeGreaterThan(widget.y + widget.height);
+  // Its last item pressed where it shows (on top of whatever is under it)
+  await menu.locator(".swd-menu-item").last().scrollIntoViewIfNeeded();
+  const scrolled = await menu.evaluate((one) => one.scrollTop);
+  await page.waitForTimeout(100);
+  expect(await menu.evaluate((one) => one.scrollTop)).toBe(scrolled);
+  await menu.locator(".swd-menu-item", { hasText: "Count" }).click();
+  await expect(page.locator(".test-count")).toHaveText("2 of 2");
 });
 
 test("a view picked is written into the block it was picked in, the place drawn anew from it", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${BLOCK}`, ...TASKS }, "Page");
-  await page.locator('.swd-switch[data-view="count"]').click();
+  await pickView(page, "Count");
   await expect(page.locator(".test-count")).toHaveText("2 of 2");
   await expect.poll(() => space.saved("Page")).toBe("# Page\n\n```silverware-database\nid: tasks\nview: count\n```\n");
 });
@@ -28,11 +180,11 @@ test("actions one after another are each written into the block, SilverBullet's 
   await space.open({ Page: `# Page
 
 ${BLOCK}`, ...TASKS }, "Page");
-  await page.locator('.swd-switch[data-view="count"]').click();
+  await pickView(page, "Count");
   await expect.poll(() => space.saved("Page")).toContain("view: count");
-  await page.locator('.swd-switch[data-view="names"]').click();
+  await pickView(page, "Names");
   await expect.poll(() => space.saved("Page")).toContain("view: names");
-  await page.locator('.swd-switch[data-view="list"]').click();
+  await pickView(page, "List");
   await expect.poll(() => space.saved("Page")).toContain("view: list");
   await expect(page.locator(".swd-place")).toHaveCount(1);
   for (const control of await page.locator(".swd-widget .button-bar button, .swd-widget .sb-widget-menu-bar button, .sb-code-copy-button").all()) await expect(control).toBeHidden();
@@ -121,6 +273,95 @@ test("in SilverBullet's dark look the browser's own controls of a database are d
   expect(await page.locator(".swd-widget").evaluate((one) => getComputedStyle(one).colorScheme)).toBe("dark");
 });
 
+test("a timeline's bar dragged to its right edge scrolls it, as a board's card does, and is dropped the days further it went", async ({ page, space }) => {
+  const day = (by: number) => {
+    const one = new Date();
+    one.setDate(one.getDate() + by);
+    return `${one.getFullYear()}-${String(one.getMonth() + 1).padStart(2, "0")}-${String(one.getDate()).padStart(2, "0")}`;
+  };
+  const root = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    due: { type: date, label: Due }\n---\n";
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: timeline\n```\n", "Page/db-tasks": root, "Page/db-tasks/Trip": `---\ntags: [db]\ndue: "${day(1)}"\n_database:\n  rank: a0\n---\n` }, "Page");
+  const bar = page.locator(".swd-tl-bar", { hasText: "Trip" });
+  const scroller = page.locator(".swd-tl-box");
+  const before = await scroller.evaluate((one) => one.scrollLeft);
+  const from = (await bar.boundingBox())!;
+  const edge = (await scroller.boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(edge.x + edge.width - 6, from.y + from.height / 2, { steps: 8 });
+  // Held at the edge: it scrolls on, the pointer still
+  await page.waitForTimeout(800);
+  expect(await scroller.evaluate((one) => one.scrollLeft)).toBeGreaterThan(before + 200);
+  await page.mouse.up();
+  await expect.poll(() => space.saved("Page/db-tasks/Trip")).not.toContain(`due: "${day(1)}"`);
+  const saved = /due: "(\d{4}-\d{2}-\d{2})"/.exec((await space.saved("Page/db-tasks/Trip")) ?? "")![1]!;
+  // Further than the pointer alone went (the edge is some 15 days from the bar on this window)
+  expect(saved > day(20)).toBe(true);
+});
+
+test("a timeline's names folded to a strip by its corner's button, its rows as high, kept so as the page is opened again", async ({ page, space }) => {
+  const root = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    due: { type: date, label: Due }\n---\n";
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: timeline\n```\n", "Page/db-tasks": root, "Page/db-tasks/Someday": "---\ntags: [db]\n_database:\n  rank: a0\n---\n" }, "Page");
+  const name = page.locator(".swd-tl-name-text", { hasText: "Someday" });
+  await expect(name).toBeVisible();
+  const before = (await page.locator(".swd-tl-corner").boundingBox())!.width;
+  const high = (await page.locator(".swd-tl-row").first().boundingBox())!.height;
+  // (The row without a bar names its item only where the names are folded)
+  await expect(page.locator(".swd-tl-hint-name")).toBeHidden();
+  await page.locator(".swd-tl-fold").click();
+  await expect(name).toBeHidden();
+  expect((await page.locator(".swd-tl-corner").boundingBox())!.width).toBeLessThan(before / 3);
+  expect((await page.locator(".swd-tl-row").first().boundingBox())!.height).toBe(high);
+  await expect(page.locator(".swd-tl-hint-name")).toBeVisible();
+  await expect(page.locator(".swd-tl-hint")).toHaveText("Someday · No Due: press a day");
+  // (No icon: its name's first three letters in the strip)
+  await expect(page.locator(".swd-tl-name-initial")).toHaveText("Som");
+  await page.reload();
+  await expect(page.locator(".swd-tl")).toHaveClass(/swd-tl-folded/);
+  await page.locator(".swd-tl-fold").click();
+  await expect(name).toBeVisible();
+});
+
+test("a timeline grouped by Group by in ⋯: one axis, each group's head over its items' rows, folded by its head", async ({ page, space }) => {
+  const day = (by: number) => {
+    const one = new Date();
+    one.setDate(one.getDate() + by);
+    return `${one.getFullYear()}-${String(one.getMonth() + 1).padStart(2, "0")}-${String(one.getDate()).padStart(2, "0")}`;
+  };
+  const root = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    phase: { type: select, label: Phase, options: [Design, Build] }\n    due: { type: date, label: Due }\n---\n";
+  const item = (phase: string, due: number, rank: string) => `---\ntags: [db]\nphase: ${phase}\ndue: "${day(due)}"\n_database:\n  rank: ${rank}\n---\n`;
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: timeline\n```\n", "Page/db-tasks": root, "Page/db-tasks/Sketch": item("Design", 1, "a0"), "Page/db-tasks/Code": item("Build", 3, "a1"), "Page/db-tasks/Review": item("Design", 2, "a2") }, "Page");
+  await expect(page.locator(".swd-tl-bar")).toHaveCount(3);
+  await page.locator(".swd-more").click();
+  await choose(page, "Group");
+  await choose(page, "Group by");
+  await choose(page, "Phase");
+  await expect.poll(() => space.saved("Page")).toContain("timeline.groupBy: phase");
+  const rows = page.locator(".swd-tl-row");
+  await expect(rows.locator(".swd-group-label, .swd-tl-name-text")).toHaveText(["Design", "Sketch", "Review", "Build", "Code"]);
+  await expect(page.locator(".swd-tl")).toHaveCount(1);
+  // (Colored by it too: the bar and its name in the names' column)
+  await page.locator(".swd-more").click();
+  await choose(page, "Color by");
+  await choose(page, "Phase");
+  await expect(page.locator('.swd-tl-row[data-item] .swd-tl-name[data-swd-item-color="1"]')).toHaveCount(1);
+  await expect(page.locator('.swd-tl-bar[data-swd-item-color="1"]')).toHaveCount(1);
+  await page.locator('.swd-tl-group[data-group] .swd-group-head').first().click();
+  await expect(rows.locator(".swd-group-label, .swd-tl-name-text")).toHaveText(["Design", "Build", "Code"]);
+});
+
+test("Color by in ⋯ colors a view's items by a select's options, written into the block, its head saying so", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS }, "Page");
+  await page.locator(".swd-more").click();
+  await choose(page, "Color by");
+  await choose(page, "Status");
+  await expect.poll(() => space.saved("Page")).toContain("list.colorBy: status");
+  await expect(page.locator(".swd-place-colored")).toHaveText("colored by Status");
+  // (Todo the options' first, Done the second)
+  await expect(page.locator(".swd-list-item", { hasText: "Fix login" })).toHaveAttribute("data-swd-item-color", "0");
+  await expect(page.locator(".swd-list-item", { hasText: "Write docs" })).toHaveAttribute("data-swd-item-color", "1");
+});
+
 test("Group › Group by in ⋯ picks the board's property, written into the block", async ({ page, space }) => {
   const root = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    area: { type: select, label: Area, options: [Web, App] }\n---\n";
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: board\n```\n", ...TASKS, "Page/db-tasks": root }, "Page");
@@ -180,23 +421,33 @@ ${fence}
   await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);
 });
 
-test("a table grouped under Group by is a table per group, an item added in one with its value, a group folded kept in the block", async ({ page, space }) => {
-  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
+test("a table grouped under Group by is one table, a part per group with its own header, its columns as wide in every group, folding moving none", async ({ page, space }) => {
+  const long = "a much longer name than the other";
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS, [`Page/db-tasks/${long}`]: item("Done", "a2") }, "Page");
   await page.locator(".swd-more").click();
   await choose(page, "Group");
   await choose(page, "Group by");
   await choose(page, "Status");
   await expect.poll(() => space.saved("Page")).toContain("table.groupBy: status");
-  const groups = page.locator(".swd-group");
+  await expect(page.locator(".swd-table")).toHaveCount(1);
+  const groups = page.locator(".swd-table-group");
   await expect(groups).toHaveCount(2);
   await expect(groups.locator(".swd-group-label")).toHaveText(["Todo", "Done"]);
-  await expect(groups.nth(1).locator("tbody tr")).toHaveCount(1);
+  await expect(groups.locator(".swd-table-headrow")).toHaveCount(2);
+  // Each group's header cells where the other's are: one table's columns
+  const lefts = (at: number) => groups.nth(at).locator(".swd-table-headrow > th").evaluateAll((all) => all.map((one) => Math.round(one.getBoundingClientRect().left)));
+  expect(await lefts(0)).toEqual(await lefts(1));
+  const before = await lefts(1);
+  await expect(groups.nth(1).locator("tr[data-item]")).toHaveCount(2);
   await groups.nth(1).locator(".swd-table-add").click();
   await expect.poll(() => space.saved("Page/db-tasks/Untitled")).toContain("status: Done");
-  await expect(groups.nth(1).locator("tbody tr")).toHaveCount(2);
-  await groups.nth(0).locator(".swd-group-head").click();
+  await expect(groups.nth(1).locator("tr[data-item]")).toHaveCount(3);
+  // Folded: kept in the block, its rows unseen, no column moved (the long name still counts)
+  await groups.nth(1).locator(".swd-group-head").click();
   await expect.poll(() => space.saved("Page")).toContain("table.folded:");
-  await expect(groups.nth(0).locator("table")).toHaveCount(0);
+  await expect(groups.nth(1)).toHaveClass(/swd-folded/);
+  await expect(groups.nth(1).locator("tr[data-item]").first()).not.toBeVisible();
+  expect(await lefts(0)).toEqual(before);
 });
 
 test("long text wraps: a table's cell at most its maximum width, a board's columns each as wide as the others", async ({ page, space }) => {
@@ -211,7 +462,7 @@ test("long text wraps: a table's cell at most its maximum width, a board's colum
   expect((await cell.boundingBox())!.width).toBeLessThanOrEqual(maximum);
   // Wrapped: several lines tall
   expect((await cell.boundingBox())!.height).toBeGreaterThan(3 * (await cell.evaluate((td) => parseFloat(getComputedStyle(td).lineHeight) || 20)));
-  await page.locator('.swd-switch[data-view="board"]').click();
+  await pickView(page, "Board");
   await expect(page.locator(".swd-board-column")).toHaveCount(2);
   const widths = await page.locator(".swd-board-column").evaluateAll((all) => all.map((one) => Math.round(one.getBoundingClientRect().width)));
   expect(new Set(widths).size).toBe(1);
@@ -228,7 +479,7 @@ test("an item's long name wraps on a card and in a list, never out of it", async
     return a.x >= b.x - 1 && a.x + a.width <= b.x + b.width + 1;
   };
   expect(await inside(card.locator(".swd-board-name"), card)).toBe(true);
-  await page.locator('.swd-switch[data-view="list"]').click();
+  await pickView(page, "List");
   const line = page.locator(".swd-list-item").filter({ hasText: "1794061029592" });
   await expect(line).toBeVisible();
   expect(await inside(line.locator(".swd-list-name"), line)).toBe(true);
@@ -264,13 +515,13 @@ test("the command New database makes its root page beside the page open and its 
   await expect.poll(() => space.saved("Page/db-ideas")).toContain("  id: ideas\n  name: Ideas\n");
   expect(await editorText(page)).toBe("# Page\n\ntext\n\n```silverware-database\nid: ideas\n```\n");
   // A new database shows its first view, the table
-  await expect(page.locator('.swd-switch[aria-pressed="true"]')).toHaveAttribute("data-view", "table");
+  await expect(page.locator(".swd-view-picker")).toHaveAttribute("data-view", "table");
 });
 
 test("a block in a list item is not written, said why, the page as it was", async ({ page, space }) => {
   const listed = "# Page\n\n- item\n  ```silverware-database\n  id: tasks\n  view: names\n  ```\n- next\n";
   await space.open({ Page: listed, ...TASKS }, "Page");
-  await page.locator('.swd-switch[data-view="count"]').click();
+  await pickView(page, "Count");
   await expect(page.locator(".sb-notifications")).toContainText("indented");
   expect(await space.saved("Page")).toBe(listed);
 });
@@ -278,13 +529,15 @@ test("a block in a list item is not written, said why, the page as it was", asyn
 test("of two blocks written alike, the one a view is picked in is written", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${BLOCK}\ntext between\n\n${BLOCK}`, ...TASKS }, "Page");
   await expect(page.locator(".swd-place")).toHaveCount(2);
-  await page.locator(".swd-place").nth(1).locator('.swd-switch[data-view="count"]').click();
+  await pickView(page, "Count", page.locator(".swd-place").nth(1));
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${BLOCK}\ntext between\n\n\`\`\`silverware-database\nid: tasks\nview: count\n\`\`\`\n`);
 });
 
-test("the settings turn a view off: saved in CONFIG, the switcher without it at once", async ({ page, space }) => {
+test("the settings turn a view off: saved in CONFIG, the picker without it at once", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${BLOCK}`, ...TASKS }, "Page");
-  await expect(page.locator(".swd-switch")).toHaveCount(5);
+  await page.locator(".swd-view-picker").click();
+  await expect(page.locator(".swd-menu .swd-menu-item")).toHaveCount(7);
+  await page.keyboard.press("Escape");
   await runCommand(page, "Silverware Database: Settings");
   await page.locator('.swd-settings [data-swd-view="count"]').click();
   await page.locator(".swd-settings-save").click();
@@ -292,7 +545,8 @@ test("the settings turn a view off: saved in CONFIG, the switcher without it at 
   // (In a block of its own: the Configuration Manager writes its block anew from what its schema shows)
   await expect.poll(() => space.config()).toContain('-- managed-by: silverware-database');
   expect(await space.config()).toContain('config.set("silverware.database.views.count.enabled", false)');
-  await expect(page.locator(".swd-switch")).toHaveCount(4);
+  await page.locator(".swd-view-picker").click();
+  await expect(page.locator(".swd-menu .swd-menu-item")).toHaveCount(6);
 });
 
 test("the table edits a value in place, written into the item's page", async ({ page, space }) => {
@@ -394,6 +648,15 @@ test("a time, a date and time and a link: edited in their own fields, written an
   await web.locator(".swd-peek-edit").click();
   await expect(web.locator(".swd-link-text")).toHaveValue("Docs");
   await expect(web.locator(".swd-link-address")).toHaveValue("https://example.com/docs/");
+  // A value changed, then a press in the content: the value shown at once, the content's field keeping the focus
+  const at = page.locator('.swd-peek .swd-peek-value[data-key="at"]');
+  await at.click();
+  await at.locator("input").fill("09:15");
+  const body = page.locator(".swd-peek .swd-peek-body");
+  await body.click();
+  await expect(at).toHaveText("09:15");
+  await expect(body).toBeFocused();
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toMatch(/at: "?09:15"?/);
 });
 
 test("a reference: pages picked, kept as wiki links, opened by a press, renamed with their page by SilverBullet", async ({ page, space }) => {
@@ -440,6 +703,60 @@ test("a reference: pages picked, kept as wiki links, opened by a press, renamed 
   await expect(cell.locator("a.swd-reference")).toHaveText(`${space.folder}/Refs target renamed`);
   await cell.locator("a.swd-reference").click();
   await expect(page).toHaveURL(/Refs%20target%20renamed$|Refs target renamed$/);
+});
+
+test("a property's key changed in Properties follows into its views' blocks on every page, said in the review, its items with it", async ({ page, space }) => {
+  const other = "# Other\n\n```silverware-database\nid: tasks\nview: list\nlist.colorBy: status\nlist.filter: {\"status\":\"Todo\"}\n```\n";
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: board\nboard.groupBy: status\n```\n", "Page/Other": other, ...TASKS }, "Page");
+  await page.locator(".swd-more").click();
+  await choose(page, "Properties");
+  await page.locator('[data-property="status"] .swd-prop-head').click();
+  await page.locator('[data-property="status"] .swd-prop-advanced-summary').click();
+  await page.locator('[data-property="status"] .swd-property-key').fill("stav");
+  await page.locator('[data-property="status"] .swd-property-key').press("Enter");
+  const review = page.locator(".swd-property-review");
+  await expect(review).toContainText("Updates the views of it on 2 pages");
+  await expect(review).toContainText("keep this window open until it is done");
+  await page.locator(".swd-property-apply").click();
+  await expect.poll(() => space.saved("Page")).toContain("board.groupBy: stav");
+  await expect.poll(() => space.saved("Page/Other")).toContain('list.filter: {"stav":"Todo"}');
+  expect(await space.saved("Page/Other")).toContain("list.colorBy: stav");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("stav: Todo");
+});
+
+test("a property's icon picked in Properties: kept in the root page, before its name in a table's header and in the peek", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
+  await page.locator(".swd-more").click();
+  await choose(page, "Properties");
+  await page.locator('[data-property="status"] .swd-prop-head').click();
+  await page.locator('[data-property="status"] .swd-property-icon').click();
+  await page.locator(".swd-pop .swd-emoji-field").fill("rocket");
+  await page.locator(".swd-pop .swd-emoji", { hasText: "🚀" }).first().click();
+  await expect.poll(() => space.saved("Page/db-tasks")).toContain('icon: "🚀"');
+  await expect(page.locator('[data-property="status"] .swd-prop-head .swd-prop-own-icon')).toHaveText("🚀");
+  await expect(page.locator('[data-property="status"] .swd-property-icon')).toBeFocused();
+  // Esc in the picker closes it alone, the dialog staying
+  await page.locator('[data-property="status"] .swd-property-icon').click();
+  await expect(page.locator(".swd-pop")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swd-pop")).toHaveCount(0);
+  await expect(page.locator(".swd-properties")).toBeVisible();
+  await page.locator(".swd-settings-close").click();
+  await expect(page.locator(".swd-table th .swd-table-head-icon")).toHaveText("🚀");
+  await page.locator(".swd-table .swd-open").first().click();
+  await expect(page.locator('.swd-peek-row[data-property="status"] .swd-prop-own-icon')).toHaveText("🚀");
+});
+
+test("Name in views in Properties: kept in the root page, a list's rows showing Status: Todo", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS }, "Page");
+  await page.locator(".swd-more").click();
+  await choose(page, "Properties");
+  await page.locator('[data-property="status"] .swd-prop-head').click();
+  await page.locator('[data-property="status"] .swd-property-show-name input').click();
+  await expect.poll(() => space.saved("Page/db-tasks")).toContain("showName: true");
+  await page.locator(".swd-settings-close").click();
+  await expect(page.locator(".swd-list-item", { hasText: "Fix login" }).locator(".swd-field-name")).toHaveText("Status: ");
+  await expect(page.locator(".swd-list-item", { hasText: "Fix login" })).toContainText("Status: Todo");
 });
 
 test("a property removed in Properties: no question, the change shown with a switch taking its values off the items too", async ({ page, space }) => {
@@ -553,6 +870,27 @@ test("the peek's text looks as the page's in the editor, though it hangs outside
   expect(await look(".swd-peek")).toEqual(await look(".cm-content"));
   // Its body's field too
   expect((await look(".swd-peek-body"))[0]).toBe((await look(".cm-content"))[0]);
+});
+
+test("an item's icon picked in the peek from the emoji, its color from the palette: kept in its page, shown by its name in the views", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: board\n```\n", ...TASKS }, "Page");
+  await page.locator(".swd-board-name", { hasText: "Fix login" }).click();
+  await expect(page.locator(".swd-peek")).toBeVisible();
+  // The emoji's data loaded from the file beside the bundle, found by its name
+  await page.locator(".swd-peek-icon").click();
+  await page.locator(".swd-pop .swd-emoji-field").fill("rocket");
+  await page.locator(".swd-pop .swd-emoji", { hasText: "🚀" }).first().click();
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain('icon: "🚀"');
+  await expect(page.locator(".swd-peek-icon .swd-item-icon")).toHaveText("🚀");
+  await expect(page.locator(".swd-peek-icon")).toBeFocused();
+  await page.locator(".swd-peek-color").click();
+  await page.locator('.swd-peek-pop-color[aria-label="Green"]').click();
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("color: green");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swd-peek")).toHaveCount(0);
+  const card = page.locator(".swd-board-card", { hasText: "Fix login" });
+  await expect(card.locator(".swd-item-icon")).toHaveText("🚀");
+  await expect(card).toHaveAttribute("data-swd-item-color", "2");
 });
 
 test("the peek shows an item beside the page, its content written as it is left, no key reaching the page", async ({ page, space }) => {
@@ -670,7 +1008,7 @@ test("a type of the user's shows and reads its values, one that fails shows them
   await field.press("Enter");
   await expect.poll(() => space.saved("Page/db-rated/One")).toContain("rating: 5\n");
   await expect(page.locator('tbody tr:first-child [data-key="rating"]')).toHaveText("★★★★★");
-  await page.locator('.swd-switch[data-view="count"]').click();
+  await pickView(page, "Count");
   await expect(page.locator(".test-count")).toHaveAttribute("title", "helpers: function");
 });
 
@@ -749,6 +1087,35 @@ test("a board scrolled sideways stays where it was as a card is added", async ({
   await page.locator('.swd-board-column[data-value="Later"] .swd-board-add').dispatchEvent("click");
   await expect(page.locator(".swd-board-card")).toHaveCount(2);
   await expect.poll(() => page.locator(".swd-board").evaluate((one) => one.scrollLeft)).toBe(left);
+});
+
+test("full screen through writes of its block: a filter typed, the place drawn anew still over the window, the typing going on; Esc in the field leaves it only", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
+  await page.locator('.swd-tool[data-tool="fullscreen"]').click();
+  await page.locator(".swd-filter-button").click();
+  const name = page.locator('.swd-filter input[data-key="name"]');
+  await name.click();
+  // (Watched: was the place ever back in the page as the block was written and drawn anew)
+  await page.evaluate(() => {
+    const seen = ((window as unknown as { inPage: number }).inPage = 0);
+    const look = () => {
+      if (document.querySelector(".swd-place:not(.swd-over-window)")) (window as unknown as { inPage: number }).inPage++;
+      requestAnimationFrame(look);
+    };
+    look();
+    return seen;
+  });
+  await page.keyboard.type("Fix", { delay: 40 });
+  await expect.poll(() => space.saved("Page")).toContain("Fix");
+  await expect(page.locator(".swd-table tbody tr")).toHaveCount(1);
+  await expect(page.locator(".swd-place")).toHaveClass(/swd-over-window/);
+  await expect(name).toBeFocused();
+  expect(await page.evaluate(() => (window as unknown as { inPage: number }).inPage)).toBe(0);
+  await page.keyboard.press("Escape");
+  await expect(name).not.toBeFocused();
+  await expect(page.locator(".swd-place")).toHaveClass(/swd-over-window/);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swd-place")).not.toHaveClass(/swd-over-window/);
 });
 
 test("a filter is applied as it is typed, without Enter, the typing going on as the block is written and drawn anew", async ({ page, space }) => {
@@ -867,7 +1234,7 @@ test("options renamed in Properties rename the items' values in the same write: 
   await page.locator(".swd-property-options-save").click();
   await expect(page.locator(".swd-property-review")).toContainText("1 item: Todo → Done");
   await expect(page.locator(".swd-property-review")).toContainText("1 item: Done → Todo");
-  await expect(page.locator(".swd-property-review")).toContainText("Writes 3 pages.");
+  await expect(page.locator(".swd-property-review")).toContainText("Writes 3 pages, one after another");
   // Nothing written until applied
   expect(await space.saved("Page/db-tasks/Fix login")).toContain("status: Todo\n");
   await page.locator(".swd-property-apply").click();

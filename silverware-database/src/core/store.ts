@@ -120,6 +120,15 @@ export interface DatabaseStore {
   /** A database's own document (its root page), as last read; undefined where it has none */
   databaseDocumentOf(database: string): string | undefined;
   /**
+   * The documents `report` removed for `targets` (items' pages) that an undo
+   * could not make again, kept as documents of their own, outside the
+   * database (none written over): where none is to be kept (it is back as it
+   * was, or `report` removed none for it), nothing written. Those kept named;
+   * `left`: those it could not keep (their text still `report`'s alone). A
+   * store without it keeps none (its undo then stays to try again)
+   */
+  recoverRemoved?(report: TransactionReport, targets: readonly Target[]): Promise<{ readonly kept: readonly string[]; readonly left: readonly Target[] }>;
+  /**
    * The values items keep under keys the schema has none of (a property
    * removed with its values kept, a key typed by hand or another tool's), by
    * key: how many items, their values; none of the store's own keys. A value

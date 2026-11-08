@@ -83,6 +83,12 @@ export interface PageWriter {
   write(changes: Changes, options?: PlanOptions): Promise<ApplyReport>;
   /** What `report` wrote, put back where each page is still as it left it */
   planUndo(report: ApplyReport, options?: { readonly progress?: Progress }): Promise<PagePlan>;
+  /**
+   * The text a page of `report` had before `report` removed it (undefined: it
+   * removed none so): where its undo cannot make it again, the one copy of it
+   * left, for the plugin to give the user
+   */
+  removedText(report: ApplyReport, page: string): string | undefined;
 }
 
 // A planned page's texts, kept by the writer that planned it (a plugin has one writer): the plugin is given
@@ -269,6 +275,11 @@ export function pageWriter(platform: Pick<Platform, "editor" | "space">, options
     apply,
     write: async (changes, planOptions) => apply(await plan(changes, planOptions)),
     planUndo,
+    removedText: (report, page) => {
+      const one = report.written.find((written) => written.page === page);
+      const own = one && texts.get(one);
+      return own && own.after === undefined ? own.before : undefined;
+    },
   };
 }
 

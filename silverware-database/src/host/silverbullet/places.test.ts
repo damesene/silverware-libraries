@@ -166,6 +166,41 @@ describe("the places of a database in its space's pages, as a key changes", () =
     expect(new Map(memory.pages)).toEqual(before);
   });
 
+  it("brings back by Undo the database and its blocks where an item's name was taken since, that item kept as a page of its own outside the database, the undo then done with", async () => {
+    const { memory, core, told } = setup();
+    await core.apply(proposalOf(await core.planDeleteDatabase("tasks")));
+    memory.writeOutside("db-tasks/Fix login", "# Someone else's\n");
+    await core.undo();
+    expect(memory.pages.get("db-tasks")).toBe(ROOT);
+    expect(memory.pages.get("Notes")).toBe(NOTES);
+    expect(memory.pages.get("Plain")).toBe(PLAIN);
+    expect(memory.pages.get("db-tasks/Fix login")).toBe("# Someone else's\n");
+    expect(memory.pages.get("Recovered/db-tasks/Fix login")).toBe(ITEM);
+    expect(told.some((one) => one.includes("kept as Recovered/db-tasks/Fix login"))).toBe(true);
+    // (Done with: nothing more to undo)
+    expect(await core.undo()).toBeUndefined();
+  });
+
+  it("keeps an item removed from the database whose name was taken before its Undo as a page of its own, a second one numbered", async () => {
+    const { memory, core } = setup();
+    memory.writeOutside("Recovered/db-tasks/Fix login", "# An earlier one\n");
+    const item = (await new PagesStore(memory.platform).items("tasks")).value[0]!;
+    await core.remove("tasks", [item]);
+    memory.writeOutside("db-tasks/Fix login", "# Someone else's\n");
+    await core.undo();
+    expect(memory.pages.get("Recovered/db-tasks/Fix login")).toBe("# An earlier one\n");
+    expect(memory.pages.get("Recovered/db-tasks/Fix login (2)")).toBe(ITEM);
+  });
+
+  it("puts a key's views back with its Undo only where its schema went back too", async () => {
+    const { memory, core } = setup();
+    await core.apply(proposalOf(await core.rekeyProperty("tasks", "status", "stav")));
+    // (The root page changed by hand since: its schema stays as the rename left it, and so do the views)
+    memory.writeOutside("db-tasks", memory.pages.get("db-tasks")!.replace("name: Tasks", "name: Tasks!"));
+    await core.undo();
+    expect(memory.pages.get("Notes")).toContain("board.groupBy: stav");
+  });
+
   it("deletes none of a database whose item changed between the proposal and its apply", async () => {
     const { memory, core, told } = setup();
     const proposal = proposalOf(await core.planDeleteDatabase("tasks"));

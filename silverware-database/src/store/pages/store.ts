@@ -511,6 +511,47 @@ export class PagesStore implements DatabaseStore {
     return this.roots.get(database);
   }
 
+  async recoverRemoved(report: TransactionReport, targets: readonly Target[]): Promise<{ readonly kept: readonly string[]; readonly left: readonly Target[] }> {
+    const kept: string[] = [];
+    const left: Target[] = [];
+    for (const target of targets) {
+      const was = report.written.map((one) => this.written.get(one)).find((one) => one?.part.kind === "item" && "item" in target && one.key === target.item);
+      const text = was && this.writer.removedText(was.report, was.part.page);
+      if (!was || text === undefined) continue;
+      // (Back as it was already: an earlier undo of it made it again)
+      if ((await this.readPage(was.part.page)) === text) continue;
+      const page = await this.recoveredPage(was.part.page, text);
+      if (page) kept.push(page);
+      else left.push(target);
+    }
+    return { kept, left };
+  }
+
+  /** A page's text kept under `Recovered/<its name>` (a number after it where taken), never over a page; its name, undefined where none could be made */
+  private async recoveredPage(page: string, text: string): Promise<string | undefined> {
+    for (let at = 1; at <= 20; at++) {
+      const name = `Recovered/${page}${at === 1 ? "" : ` (${at})`}`;
+      try {
+        const report = await this.writer.write(pageChanges().create(name, (p) => p.body(text)).build());
+        if (report.written.length) return name;
+        // (Left: the name taken, the next tried; any other cause, none)
+        if (!report.skipped.every((one) => one.cause === "refused")) return undefined;
+      } catch {
+        return undefined;
+      }
+    }
+    return undefined;
+  }
+
+  /** A page's text now, undefined where it is none (gone, unreadable) */
+  private async readPage(page: string): Promise<string | undefined> {
+    try {
+      return String(await this.platform.space.read(page));
+    } catch {
+      return undefined;
+    }
+  }
+
   /**
    * A part's page written by the writer, held as written until the index has
    * it; `renamedAlone`: the page was renamed but its content left (the rename

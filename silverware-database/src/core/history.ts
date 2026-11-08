@@ -4,10 +4,12 @@
 // Undone, a transaction goes off the list, also where the undo could write
 // none of it because all of it changed since: kept, it would stand before
 // every earlier one forever, and nothing is lost, the store having left it
-// all. But where its undo was kept from putting back what only it holds (a
-// document it removed, whose name was taken since; its database not made
-// again), it stays, to be undone again once what kept it is gone: going, the
-// text of what it removed would go with it. An undo is no change to undo
+// all. But where its undo was kept from making again what it removed (a
+// document's name taken since, a write that failed, its database not made
+// again), it stays, to be undone again: going, the text of what it removed
+// would go with it. The core lets it go (`forget`) once what was left is kept
+// elsewhere (`DatabaseStore.recoverRemoved`); its database left, it stays
+// until a retry brings it all. An undo is no change to undo
 // itself. An undo puts back only what is still as the transaction left it:
 // the store's `planUndo`, whatever the store.
 import type { DatabaseStore, TransactionPlan, TransactionReport, WriteProgress } from "./store.ts";
@@ -17,7 +19,7 @@ const KEPT = 50;
 
 // `undoAlso`: what else the transaction changed beside the store, put back after the store's undo (a key changed: the
 // places' states naming it, renamed back)
-export type RecordedTransaction = { readonly report: TransactionReport; readonly label: string; readonly undoAlso?: () => Promise<void> };
+export type RecordedTransaction = { readonly report: TransactionReport; readonly label: string; undoAlso?: () => Promise<void> };
 
 export class TransactionHistory {
   private readonly recorded: RecordedTransaction[] = [];
@@ -64,10 +66,17 @@ export class TransactionHistory {
   /** An undo planned (`planUndo`) written, recorded so, what the transaction changed besides put back after it; `progress` told as it is written */
   async applyUndo(plan: TransactionPlan, progress?: WriteProgress): Promise<TransactionReport> {
     const also = this.recorded.find((one) => one.report === plan.undoes)?.undoAlso;
+    const recorded = this.recorded.find((one) => one.report === plan.undoes);
     const undone = await this.store.apply(plan, progress);
     this.record(undone, "");
-    // (Put back only with the store's whole undo: a part left keeps the new state, and so do the places with it)
-    if (also && undone.written.length && !undone.skipped.length) await also();
+    // What it changed besides (the places) put back, once, where the store's undo is whole, or put the database's own part
+    // back (a deleted database made again: its places with it; a key whose schema stayed changed keeps its places so)
+    const whole = undone.written.length > 0 && !undone.skipped.length;
+    const ownBack = undone.written.some((one) => "database" in one.target);
+    if (also && (whole || ownBack)) {
+      if (recorded) recorded.undoAlso = undefined;
+      await also();
+    }
     return undone;
   }
 
@@ -76,18 +85,18 @@ export class TransactionHistory {
     return !!report.undoes && this.has(report.undoes);
   }
 
-  private forget(report: TransactionReport): void {
+  /** A transaction let go: what its undo left is kept elsewhere */
+  forget(report: TransactionReport): void {
     const at = this.recorded.findIndex((one) => one.report === report);
     if (at >= 0) this.recorded.splice(at, 1);
   }
 }
 
 /**
- * Whether an undo was kept from putting back a part by something that may go
- * (a name taken since, the database not there to put an item back into), not
- * by the part having changed since: the transaction still holds what it would
- * put back
+ * Whether an undo was kept from putting back a part by something other than
+ * the part having changed since (a name taken, a write that failed, its
+ * database not made again): the transaction may still hold what it removed
  */
-function heldBack(undone: TransactionReport): boolean {
+export function heldBack(undone: TransactionReport): boolean {
   return undone.skipped.some((one) => one.cause === "refused" || one.cause === "missing");
 }

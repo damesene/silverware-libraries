@@ -676,7 +676,9 @@ export class DatabaseCore {
         plan = await this.history.planUndo(last.report);
         if (!plan) return undefined;
       }
-      return this.outcome(`Undo: ${last.label}`, await this.history.applyUndo(plan, progress));
+      const undone = await this.history.applyUndo(plan, progress);
+      await this.keepLeft(`Undo: ${last.label}`, undone);
+      return this.outcome(`Undo: ${last.label}`, undone);
     } finally {
       this.writing = false;
     }
@@ -697,14 +699,45 @@ export class DatabaseCore {
     this.history.record(report, label, undoAlso);
     if (!needed || !report.skipped.some(needed)) return this.outcome(label, report);
     const undone = report.written.length ? await this.history.undo(report) : undefined;
+    if (undone) await this.keepLeft(label, undone);
     const reasons = [...new Set(report.skipped.map((one) => one.reason))].join("; ");
-    // What it wrote put back, but where a part of that could not be: said, and left to undo again (nothing it removed lost)
+    // What it wrote put back, but where a part of that could not be: said (what it removed kept, or left to undo again)
     const left = undone?.skipped.length ? [...new Set(undone.skipped.map((one) => one.reason))].join("; ") : undefined;
     const problem = left
       ? `${label}: not written whole (${reasons}), and what was written could not all be put back (${left})${this.history.stillToUndo(undone!) ? ": Undo tries again" : ""}`
       : `${label}: nothing was written: ${reasons}`;
     this.ui.notify(problem, { type: "error" });
     return { problem, cause: "left", report };
+  }
+
+  /**
+   * An undo that left parts it could not put back (a name taken since, a
+   * write that failed): kept in the history to try again while its database's
+   * own part is left (a retry brings it all); else the documents it removed
+   * and could not make again kept as documents of their own (the store's
+   * `recoverRemoved`), said, and the transaction let go once nothing is left
+   * that only it holds. A store that keeps none: let go, as before
+   */
+  private async keepLeft(label: string, undone: TransactionReport): Promise<void> {
+    const report = undone.undoes;
+    if (!report || !this.history.has(report)) return;
+    const blocked = (one: Skipped) => one.cause === "refused" || one.cause === "missing";
+    if (undone.skipped.some((one) => "database" in one.target && blocked(one))) return;
+    const left = undone.skipped.filter((one) => "item" in one.target && blocked(one));
+    if (!this.store.recoverRemoved) return this.history.forget(report);
+    let kept: { readonly kept: readonly string[]; readonly left: readonly Target[] };
+    try {
+      kept = await this.store.recoverRemoved(report, left.map((one) => one.target));
+    } catch (error) {
+      kept = { kept: [], left: left.map((one) => one.target) };
+      this.ui.notify(`${label}: what could not be made again could not be kept either (${error instanceof Error ? error.message : String(error)}): Undo tries again`, { type: "error" });
+    }
+    if (kept.kept.length) {
+      const reasons = [...new Set(left.map((one) => one.reason))].join("; ");
+      this.ui.notify(`${label}: ${kept.kept.length === 1 ? `one ${this.noun.one} could not be made again (${reasons}): kept as ${kept.kept[0]}` : `${kept.kept.length} ${this.noun.many} could not be made again (${reasons}): kept as ${kept.kept.join(", ")}`}`, { type: "error", timeout: 0 });
+    }
+    if (!kept.left.length) this.history.forget(report);
+    else if (kept.kept.length || left.length) this.ui.notify(`${label}: ${kept.left.length === 1 ? "one part" : `${kept.left.length} parts`} could not be put back nor kept elsewhere: Undo tries again`, { type: "error" });
   }
 
   private async propose(changes: Changes, label: string): Promise<Proposal> {

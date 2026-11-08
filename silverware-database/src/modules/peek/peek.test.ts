@@ -31,7 +31,14 @@ async function setup(answer = true, withProperties = false, configured: Record<s
   const openedListeners = new Set<(name: string) => void>();
   let failItems = false;
   const pageOpened = (name: string) => openedListeners.forEach((listener) => listener(name));
-  const ui = { notify: (message: string) => void told.push(message), ask: () => answer };
+  let asked = 0;
+  const ui = {
+    notify: (message: string) => void told.push(message),
+    ask: () => {
+      asked++;
+      return answer;
+    },
+  };
   const core = new DatabaseCore(store, types, ui);
   const modules = new Modules(
     withProperties ? [PROPERTIES_MODULE, PEEK_MODULE] : [PEEK_MODULE],
@@ -74,7 +81,7 @@ async function setup(answer = true, withProperties = false, configured: Record<s
     [...element.querySelectorAll<HTMLButtonElement>(".swd-list-name")].find((one) => one.title === `Open ${name}`)!.click();
     await settle();
   };
-  return { store, core, modules, place, named, q, peek, told, opened, pageOpened, saved, failItems: () => void (failItems = true) };
+  return { store, core, modules, place, named, q, peek, told, opened, pageOpened, saved, asked: () => asked, failItems: () => void (failItems = true) };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
@@ -237,6 +244,72 @@ describe("the peek", () => {
     name.dispatchEvent(new Event("change"));
     await settle();
     expect((await named("Fix the login")).values.estimate).toBe(8);
+  });
+
+  it("removes its item by the bin at its top, asked first, a body typed written before it goes; Undo brings both back", async () => {
+    const { q, peek, named, store, core } = await setup();
+    await peek("Fix login");
+    const body = q<HTMLTextAreaElement>(".swd-peek-body");
+    body.focus();
+    body.value = "Steps typed";
+    q<HTMLButtonElement>(".swd-peek-remove").click();
+    await settle();
+    expect(document.querySelector(".swd-peek")).toBeNull();
+    expect((await store.items("tasks")).value.map((one) => one.name)).toEqual(["Write docs"]);
+    await core.undo("tasks");
+    expect(await store.body("tasks", (await named("Fix login")).key)).toBe("Steps typed");
+  });
+
+  it("removes its item renamed just before the bin is pressed, the rename waited for; asked once however often the bin is pressed", async () => {
+    const { q, peek, store, told, asked } = await setup();
+    await peek("Fix login");
+    const name = q<HTMLInputElement>(".swd-peek-name");
+    name.focus();
+    name.value = "Fix the login";
+    name.dispatchEvent(new Event("change"));
+    q<HTMLButtonElement>(".swd-peek-remove").click();
+    q<HTMLButtonElement>(".swd-peek-remove").click();
+    await settle();
+    await settle();
+    expect((await store.items("tasks")).value.map((one) => one.name)).toEqual(["Write docs"]);
+    expect(asked()).toBe(1);
+    expect(told).toEqual([]);
+    expect(document.querySelector(".swd-peek")).toBeNull();
+  });
+
+  it("removes its item with a value edited just before the bin is pressed, the value written first", async () => {
+    const { q, peek, store, core, named } = await setup();
+    await peek("Fix login");
+    q('.swd-peek-value[data-key="estimate"]').click();
+    const input = q<HTMLInputElement>('.swd-peek-value[data-key="estimate"] input');
+    input.value = "8";
+    q<HTMLButtonElement>(".swd-peek-remove").click();
+    await settle();
+    await settle();
+    expect((await store.items("tasks")).value.map((one) => one.name)).toEqual(["Write docs"]);
+    await core.undo("tasks");
+    expect((await named("Fix login")).values.estimate).toBe(8);
+  });
+
+  it("follows the database where the item was removed elsewhere as the bin is pressed: closed, no second removal", async () => {
+    const { q, peek, store, core, named, told } = await setup();
+    await peek("Fix login");
+    await core.remove("tasks", [await named("Fix login")]);
+    told.length = 0;
+    q<HTMLButtonElement>(".swd-peek-remove").click();
+    await settle();
+    await settle();
+    expect(document.querySelector(".swd-peek")).toBeNull();
+    expect((await store.items("tasks")).value.map((one) => one.name)).toEqual(["Write docs"]);
+  });
+
+  it("keeps its item and stays open where the removal is declined", async () => {
+    const { q, peek, store } = await setup(false);
+    await peek("Fix login");
+    q<HTMLButtonElement>(".swd-peek-remove").click();
+    await settle();
+    expect(q<HTMLInputElement>(".swd-peek-name").value).toBe("Fix login");
+    expect((await store.items("tasks")).value).toHaveLength(2);
   });
 
   it("keeps a body typed that changed elsewhere since it was read, said so, loaded anew only once asked", async () => {

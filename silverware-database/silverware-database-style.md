@@ -3469,6 +3469,11 @@ button.swd-editor-document-folder:hover,
   color: inherit;
   background: var(--swd-hover);
 }
+/* Remove: in the danger color as the pointer is on it (it takes the item away, Undo bringing it back) */
+.swd-peek-remove:hover,
+.swd-peek-remove:focus-visible {
+  color: var(--danger-color, #c62828);
+}
 .swd-peek-button svg {
   width: 18px;
   height: 18px;

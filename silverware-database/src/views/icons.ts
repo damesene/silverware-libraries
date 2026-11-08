@@ -44,6 +44,7 @@ export const VIEW_ICONS = {
   close: svg('<path d="M4 4l8 8M12 4l-8 8"/>'),
   chevron: svg('<path d="m6 4 4 4-4 4"/>'),
   edit: svg('<path d="M10.5 3.5 12.5 5.5 6 12H4v-2z"/>'),
+  remove: svg('<path d="M2.5 4.5h11M6.5 4.5V3a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1.5M4 4.5l.75 8.25a1 1 0 0 0 1 .75h4.5a1 1 0 0 0 1-.75L12 4.5M6.75 7v4M9.25 7v4"/>'),
   fullScreen: svg('<path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/>'),
   exitFullScreen: svg('<path d="M6 2.5V6H2.5M13.5 6H10V2.5M10 13.5V10h3.5M2.5 10H6v3.5"/>'),
   folder: svg('<path d="M2.5 4.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M7 9h4M9.5 7.5 11 9l-1.5 1.5"/>'),

@@ -77,6 +77,10 @@ export class PeekPanel {
   private readonly stops: (() => void)[] = [];
   // The body's write going on (the field left): waited for before the panel closes or shows another item
   private writing: Promise<void> = Promise.resolve();
+  // Writes of a value or the name going on (their editors left): waited for with the body's before the item is removed
+  private readonly edits = new Set<Promise<unknown>>();
+  // The item being removed (asked, written): a second press of the bin meanwhile asks nothing
+  private removing = false;
   // A question asked of the user: presses meanwhile are theirs, not beside the panel
   private asking = false;
   // Writes of the body going on: a body read meanwhile is not put in its field (it would replace what is being written)
@@ -314,10 +318,54 @@ export class PeekPanel {
     return active instanceof HTMLInputElement && active.matches(".swd-peek-name") && active.value !== this.shown?.item.name;
   }
 
+  /**
+   * The item removed, the user asked by the core (Undo brings it back): what is being edited written first (a body typed
+   * goes with the item and comes back with it); a body typed and not written stops it, said beside its field. Removed,
+   * the panel goes as it follows the database; declined or refused, it stays as it is
+   */
+  private async removeItem(shown: Shown): Promise<void> {
+    if (this.removing) return;
+    this.removing = true;
+    // (Where the item was opened from: the view drawn anew without it, the focus goes to its place's view picker)
+    const place = shown.opener instanceof Element ? shown.opener.closest(".swd-place") : null;
+    try {
+      if (!(await this.leave())) return;
+      // A value or the name being written as its editor was left: done first, so the item removed is the one they wrote
+      await Promise.allSettled([...this.edits]);
+      if (this.shown !== shown) return;
+      // Against the item as read right now (as the body's write is): a change made meanwhile is no reason to refuse it
+      try {
+        const now = (await this.host.items(shown.database)).find((one) => one.key === shown.latest.key);
+        if (now) shown.latest = now;
+      } catch {
+        // (Not read: the item as last read, the store's checks deciding)
+      }
+      // (The core's question: presses meanwhile are the user's answer, not beside the panel)
+      this.asking = true;
+      let done: Result;
+      try {
+        done = await this.host.core.remove(shown.database, [shown.latest]);
+      } finally {
+        this.asking = false;
+      }
+      // Declined: the panel as it is; refused (said by the core) or removed: the panel follows the database as it is now
+      if (isRefused(done) && done.cause === "declined") return;
+      this.host.refreshPlaces(shown.database);
+      await this.follow();
+      const doc = this.host.document;
+      if (!this.shown && place?.isConnected && (!doc.activeElement || doc.activeElement === doc.body)) place.querySelector<HTMLElement>(".swd-view-picker")?.focus({ preventScroll: true });
+    } finally {
+      this.removing = false;
+    }
+  }
+
   /** What an editor of a value needs, made of the module's host: the schema as last read, the core's writes, the panel and the places following them */
   private editorHost(shown: Shown): EditorHost {
     const { core, types, ui } = this.host;
     const written = async (result: Promise<Result>) => {
+      // (Kept while it goes on: the item's removal waits for it)
+      const going = result.finally(() => this.edits.delete(going));
+      this.edits.add(going);
       const done = await result;
       this.host.refreshPlaces(shown.database);
       await this.follow();
@@ -387,7 +435,16 @@ export class PeekPanel {
       el(doc, "span", { class: "swd-peek-close-x", html: VIEW_ICONS.close }),
       el(doc, "span", { class: "swd-peek-close-back", html: VIEW_ICONS.back }),
     );
-    const head = el(doc, "div", "swd-peek-head", close, el(doc, "span", "swd-peek-gap"), open);
+    const remove = el(doc, "button", {
+      class: "swd-peek-button swd-peek-remove",
+      html: VIEW_ICONS.remove,
+      title: `Remove ${item.name}`,
+      attrs: { "aria-label": `Remove ${item.name}` },
+      run: () => void this.removeItem(shown),
+    });
+    // (A value or the name being edited stays so until the bin's press is taken: its write is then waited for, the bin not drawn anew under the pointer)
+    keepFocus(remove);
+    const head = el(doc, "div", "swd-peek-head", close, el(doc, "span", "swd-peek-gap"), remove, open);
     // The properties: those shown in the views, then those hidden there under their own heading (an item's every value is
     // shown and edited in its peek); each list dragged to its order by its grips
     const group = (hidden: boolean) => {

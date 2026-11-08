@@ -908,6 +908,22 @@ test("the peek shows an item beside the page, its content written as it is left,
   expect(await space.saved("Page")).toBe("# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n");
 });
 
+test("the peek's bin removes its item, asked first: the page gone, the panel closed, Undo bringing it back", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS }, "Page");
+  await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
+  await page.locator(".swd-peek-remove").click();
+  // (SilverBullet's own question: Ok)
+  const prompt = page.locator("dialog.sb-modal-box .sb-prompt");
+  await expect(prompt).toContainText('Remove "Fix login"?');
+  await prompt.locator(".sb-prompt-buttons button", { hasText: "Ok" }).click();
+  await expect(page.locator(".swd-peek")).toHaveCount(0);
+  await expect(page.locator(".swd-list-name")).toHaveText(["Write docs"]);
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toBeUndefined();
+  await page.locator(".swd-undo").click();
+  await expect(page.locator(".swd-list-name")).toHaveText(["Fix login", "Write docs"]);
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("status: Todo");
+});
+
 test("the peek stays as its content typed is written by a press beside its fields, SilverBullet indexing the page anew; a property then edited there", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS }, "Page");
   await page.locator(".swd-list-name", { hasText: "Fix login" }).click();

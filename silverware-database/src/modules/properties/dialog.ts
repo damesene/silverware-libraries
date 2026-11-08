@@ -40,8 +40,6 @@ const isRefused = (result: Result | Proposal | Refused): result is Refused => "p
 const GRIP = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><circle cx="6" cy="4" r="1.1"/><circle cx="10" cy="4" r="1.1"/><circle cx="6" cy="8" r="1.1"/><circle cx="10" cy="8" r="1.1"/><circle cx="6" cy="12" r="1.1"/><circle cx="10" cy="12" r="1.1"/></svg>';
 const BACK = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m10 4-4 4 4 4"/></svg>';
 const CHEVRON = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 4 4-4 4"/></svg>';
-const SHOWN = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8s2.25-4.5 6-4.5S14 8 14 8s-2.25 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="1.75"/></svg>';
-const HIDDEN = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8s2.25-4.5 6-4.5S14 8 14 8s-2.25 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="1.75"/><path d="M3 13 13 3"/></svg>';
 const LOCK = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>';
 
 /** An option as it is edited: the text it was saved with (none: added now), the text it has */
@@ -300,7 +298,7 @@ export class PropertiesDialog {
     const head = el(
       doc,
       "button",
-      { class: "swd-prop-head", attrs: { "aria-expanded": String(open), "aria-label": `${property.label}, ${type?.label ?? property.type}${property.required ? ", required" : ""}${property.hidden ? ", hidden in views" : ""}${property.system ? ", given by the system" : property.readonly ? ", locked in views" : ""}` } },
+      { class: "swd-prop-head", attrs: { "aria-expanded": String(open), "aria-label": `${property.label}, ${type?.label ?? property.type}${property.required ? ", required" : ""}${property.system ? ", given by the system" : property.readonly ? ", locked in views" : ""}` } },
       propertyIcon(doc, property, type?.name ?? "text", "swd-prop-icon"),
       el(doc, "span", { class: "swd-prop-name", text: property.label }, ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", title: "Required", attrs: { "aria-hidden": "true" } })] : [])),
       ...(property.readonly ? [el(doc, "span", { class: "swd-prop-lock", html: LOCK, title: property.system ? "Given by the system" : "Locked in views" })] : []),
@@ -310,17 +308,9 @@ export class PropertiesDialog {
       this.opened = open ? undefined : property.key;
       this.draw();
     });
-    // Shown in the views or hidden, from the list itself: an eye, written at once
-    const eye = el(doc, "button", {
-      class: "swd-prop-eye",
-      html: property.hidden ? HIDDEN : SHOWN,
-      title: property.hidden ? "Hidden in views: show it" : "Shown in views: hide it (still kept, filtered and sorted by)",
-      attrs: { "aria-pressed": String(!property.hidden), "aria-label": `${property.label} shown in views` },
-      run: () => void this.run(() => core.setPropertyHidden(this.id, property.key, !property.hidden), ""),
-    });
     const chevron = el(doc, "span", { class: "swd-prop-chevron", html: CHEVRON });
     chevron.addEventListener("click", () => head.click());
-    const row = el(doc, "div", { class: `swd-prop${open ? " swd-prop-open" : ""}${property.hidden ? " swd-prop-is-hidden" : ""}`, attrs: { role: "listitem", "data-property": property.key } }, el(doc, "div", "swd-prop-row", grip, head, eye, chevron));
+    const row = el(doc, "div", { class: `swd-prop${open ? " swd-prop-open" : ""}`, attrs: { role: "listitem", "data-property": property.key } }, el(doc, "div", "swd-prop-row", grip, head, chevron));
     // Dragged by its grip to its place (written as it is let go: the order alone); Alt+↑ ↓ the same from the keys
     const moveTo = (index: number) => {
       if (index !== at) void this.run(() => core.moveProperty(this.id, property.key, index), "");

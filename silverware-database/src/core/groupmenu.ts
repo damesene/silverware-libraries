@@ -35,9 +35,8 @@ export function groupedBy(view: ViewDefinition, host: ViewHost): Property | unde
   const eligible = groupable(view, host);
   const picked = eligible.find((one) => one.key === host.listing.group);
   if (picked || !groupBy?.required) return picked;
-  // (Not one hidden in the views, where another can)
-  const shown = eligible.filter((one) => !one.hidden);
-  return [...shown, ...eligible].find((one) => groupBy.prefer?.includes(host.type(one).name)) ?? shown[0] ?? eligible[0];
+  // (Whatever the view shows: hiding a property changes no grouping)
+  return eligible.find((one) => groupBy.prefer?.includes(host.type(one).name)) ?? eligible[0];
 }
 
 /** The groups of a view's items by `property`, arranged as the view keeps them: every one in order, and those shown */

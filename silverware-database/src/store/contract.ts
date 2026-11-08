@@ -63,9 +63,9 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
       expect(await store.looseValues("none")).toEqual([]);
     });
 
-    it("keeps a property's flags as written: hidden, required, its name shown with its values", async () => {
+    it("keeps a property's flags as written: required, its name shown with its values", async () => {
       const { store } = make(SEED);
-      const flagged = TASKS.properties.map((property) => (property.key === "status" ? { ...property, hidden: true, required: true, showName: true } : property));
+      const flagged = TASKS.properties.map((property) => (property.key === "status" ? { ...property, required: true, showName: true } : property));
       await store.apply(await store.plan(changes("tasks", { kind: "setSchema", properties: flagged })));
       expect((await store.database("tasks"))!.value.properties).toEqual(flagged);
     });

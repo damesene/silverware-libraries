@@ -82,6 +82,15 @@ describe("the pages store", () => {
     expect(memory.pages.get("db-tasks")).toBe(old.replace("name: Tasks", "name: Jobs").replace("  format: 1\n", "").replace("---\n---", "---\n").replace("[Todo, Done] }\n", "[Todo, Done] }\n  version: 1\n"));
   });
 
+  it("leaves out a property's `hidden` of before (each view hides its own now): not a param, gone from a schema written", async () => {
+    const { memory, store } = harness(SEED);
+    memory.writeOutside("db-tasks", "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done], hidden: true }\n---\n");
+    const read = (await store.database("tasks"))!.value.properties[0]!;
+    expect(read.params).toEqual({ options: ["Todo", "Done"] });
+    await store.apply(await store.plan(changes("tasks", { kind: "setSchema", properties: [{ ...read, label: "State" }] })));
+    expect(memory.pages.get("db-tasks")).not.toContain("hidden");
+  });
+
   it("renames an item's page, its key kept, and refuses a name another page has in another case", async () => {
     const { memory, store } = harness(SEED);
     const [item] = (await store.items("tasks")).value;

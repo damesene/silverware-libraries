@@ -178,15 +178,15 @@ function card(host: ViewHost, by: Property, item: Item, column: ItemGroup, drag:
     doc,
     "article",
     { class: "swd-board-card", attrs: { draggable: "true", "data-item": item.key } },
-    el(doc, "button", { class: "swd-board-name", title: `Open ${item.name}`, run: () => void host.open(item) }, host.itemIcon(item), item.name),
-    ...host.database.properties.flatMap((property) => {
-      if (property.hidden || property.key === by.key) return [];
+    el(doc, "button", { class: "swd-board-name", title: `Open ${item.name}`, run: () => void host.open(item) }, host.look.icon(item), item.name),
+    ...host.look.shownProperties.flatMap((property) => {
+      if (property.key === by.key) return [];
       // (As it stands alone: a required one without a value said missing, nothing where empty)
       const shown = fieldNodes(host, item, property);
       return shown.length ? [el(doc, "span", { class: "swd-board-value", title: property.label, attrs: { "data-key": property.key } }, ...shown)] : [];
     }),
   );
-  host.itemLook(item, box);
+  host.look.item(item, box);
   box.addEventListener("dragstart", (event) => {
     drag.item = item;
     drag.from = column;

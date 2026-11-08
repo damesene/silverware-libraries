@@ -101,18 +101,14 @@ describe("the properties' dialog", () => {
     expand("estimate");
     q<HTMLInputElement>('[data-property="estimate"] .swd-property-locked input').click();
     await settle();
-    // The eye in the list: hidden at once, no row opened for it
-    q<HTMLButtonElement>('[data-property="estimate"] .swd-prop-eye').click();
-    await settle();
     // Alt+↑ on its grip: one place up
     q('[data-property="estimate"] .swd-prop-grip').dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", altKey: true, bubbles: true }));
     await settle();
-    expect((await schema()).map((one) => [one.key, one.label, one.readonly, one.hidden ?? false])).toEqual([
-      ["estimate", "Estimate", true, true],
-      ["status", "State", false, false],
-      ["due_date", "Due date", false, false],
+    expect((await schema()).map((one) => [one.key, one.label, one.readonly])).toEqual([
+      ["estimate", "Estimate", true],
+      ["status", "State", false],
+      ["due_date", "Due date", false],
     ]);
-    expect(q('[data-property="estimate"] .swd-prop-eye').getAttribute("aria-pressed")).toBe("false");
     expect(refreshed()).toBeGreaterThan(0);
   });
 

@@ -278,7 +278,7 @@ describe("a place", () => {
     const { place, element, viewState, store } = setup([table.view]);
     await place.render();
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    expect(menuShown(element)).toEqual([["Group: None", null], ["Color by: None", null]]);
+    expect(menuShown(element)).toEqual([["Visible properties: All shown", null], ["Group: None", null], ["Color by: None", null]]);
     // Group, then Group by in its place: every property offered, and None, checked: nothing grouped yet
     choose(element, "Group");
     expect(menuShown(element)).toEqual([["Group by: None", null]]);
@@ -365,14 +365,14 @@ describe("a place", () => {
     const { place, element } = setup([view], {}, {}, 0, () => void asked++);
     await place.render();
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    expect(menuShown(element).map(([label]) => label)).toEqual(["Mine", "Group: None", "Color by: None", "Density", "Edit source"]);
+    expect(menuShown(element).map(([label]) => label)).toEqual(["Mine", "Visible properties: All shown", "Group: None", "Color by: None", "Density", "Edit source"]);
     choose(element, "Density");
     expect(ran).toEqual(["density"]);
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
     choose(element, "Edit source");
     expect(asked).toBe(1);
-    // A view never grouped nor colored, without a block: ⋯ still, its title the database's name to rename, no entry
-    const without = setup([{ ...table.view, groupBy: false, colors: false }]);
+    // A view never grouped nor colored, showing no property, without a block: ⋯ still, its title the database's name to rename, no entry
+    const without = setup([{ ...table.view, groupBy: false, colors: false, properties: false }]);
     await without.place.render();
     without.element.querySelector<HTMLButtonElement>(".swd-more")!.click();
     expect(menuShown(without.element)).toEqual([]);
@@ -474,7 +474,7 @@ describe("a place", () => {
     const more = element.querySelector<HTMLButtonElement>(".swd-more")!;
     more.click();
     expect(told.at(-1)).toContain("its menu gave no list of groups");
-    expect(menuShown(element).map(([label]) => label)).toEqual(["Group: None", "Color by: None"]);
+    expect(menuShown(element).map(([label]) => label)).toEqual(["Visible properties: All shown", "Group: None", "Color by: None"]);
     choose(element, "Group");
     choose(element, "Group by");
     element.querySelector(".swd-menu [role=menu]")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));

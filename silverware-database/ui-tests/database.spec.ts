@@ -1194,15 +1194,18 @@ test("a filter is applied as it is typed, without Enter, the typing going on as 
   await expect.poll(() => space.saved("Page")).toBe('# Page\n\n```silverware-database\nid: tasks\nview: table\ntable.filter: {"name":"Fix login and more words typed quickly"}\n```\n');
 });
 
-test("a property hidden in Properties is kept in the root page, shown by no view, and still offered by the filter", async ({ page, space }) => {
+test("a property hidden under Visible properties is kept in the view's block, shown by no column of it, the filter still offering it", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
   await expect(page.locator(".swd-table th")).toContainText(["Name", "Status"]);
   await page.locator(".swd-more").click();
-  await choose(page, "Properties");
-  await page.locator('[data-property="status"] .swd-prop-eye').click();
-  await expect.poll(() => space.saved("Page/db-tasks")).toContain("hidden: true");
+  await choose(page, "Visible properties");
+  await page.locator('.swd-shown-row[data-property="status"] .swd-shown-eye').click();
+  await expect.poll(() => space.saved("Page")).toContain('table.hiddenProperties: ["status"]');
+  // (The menu stays open through the block's write, the eye now off)
+  await expect(page.locator('.swd-shown-row[data-property="status"] .swd-shown-eye')).toHaveAttribute("aria-pressed", "false");
   await page.keyboard.press("Escape");
   await expect(page.locator(".swd-table th", { hasText: "Status" })).toHaveCount(0);
+  expect(await space.saved("Page/db-tasks")).not.toContain("hidden");
   await page.locator(".swd-filter-button").click();
   await expect(page.locator('.swd-filter input[data-key="status"]')).toBeVisible();
   expect(await space.saved("Page/db-tasks/Fix login")).toContain("status: Todo");

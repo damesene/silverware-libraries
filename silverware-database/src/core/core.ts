@@ -121,7 +121,7 @@ function sameParams(a: unknown, b: unknown): boolean {
 }
 
 /** Names a property's settings cannot have: the property's own fields, as a store keeps them beside its settings */
-const PROPERTY_FIELDS = new Set(["key", "type", "label", "readonly", "hidden", "required", "showName", "icon", "system"]);
+const PROPERTY_FIELDS = new Set(["key", "type", "label", "readonly", "required", "showName", "icon", "system"]);
 
 /** Why a property's settings cannot be kept (one named as a field of the property's own), undefined where they can */
 function validateParamNames(label: string, params: Params): string | undefined {
@@ -341,24 +341,6 @@ export class DatabaseCore {
         return required ? { ...rest, required: true } : rest;
       }),
       `Make property ${property.label} ${required ? "required" : "optional"}`,
-    );
-  }
-
-  /** A property hidden in the views (its values kept, filtered and sorted by, shown in the peek) or shown: the schema alone */
-  async setPropertyHidden(database: string, key: string, hidden: boolean): Promise<Result> {
-    const read = await this.store.database(database);
-    if (!read) return this.refuse(`No database "${database}"`);
-    const property = read.value.properties.find((one) => one.key === key);
-    if (!property) return this.refuse(`No property "${key}"`);
-    if ((property.hidden ?? false) === hidden) return unchanged("It is so already");
-    return this.writeSchema(
-      read,
-      read.value.properties.map((one) => {
-        if (one.key !== key) return one;
-        const { hidden: _was, ...rest } = one;
-        return hidden ? { ...rest, hidden: true } : rest;
-      }),
-      `${hidden ? "Hide" : "Show"} property ${property.label}`,
     );
   }
 

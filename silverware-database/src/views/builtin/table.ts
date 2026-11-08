@@ -34,7 +34,7 @@ type Editing = { cell?: HTMLElement; pending: boolean; redraw: () => void };
 
 function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
   const doc = host.document;
-  const columns: Column[] = [{ key: NAME, label: "Name" }, ...host.database.properties.filter((property) => !property.hidden).map((property) => ({ key: property.key, label: property.label, property }))];
+  const columns: Column[] = [{ key: NAME, label: "Name" }, ...host.look.shownProperties.map((property) => ({ key: property.key, label: property.label, property }))];
   const sorted = host.listing.sort[0];
   // The header row: the table's, or each group's own
   const headRow = () => el(
@@ -63,7 +63,7 @@ function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
   // An item's row: its grip first, dragged to its place by hand among the rows of its part (the table's body, its group's)
   const row = (item: Item, part: () => HTMLElement) => {
     const tr: HTMLElement = el(doc, "tr", { attrs: { "data-item": item.key } });
-    host.itemLook(item, tr);
+    host.look.item(item, tr);
     tr.append(el(doc, "td", "swd-table-grip", rowGrip(host, item, () => tr, part, ":scope > tr[data-item]")), ...columns.map((column) => cell(host, item, column, editing)), actions(host, item));
     return tr;
   };
@@ -171,7 +171,7 @@ function content(host: ViewHost, item: Item, column: Column): Node[] {
     const cut = item.name.search(/\S+\s*$/);
     const head = cut > 0 ? item.name.slice(0, cut) : "";
     const last = item.name.slice(head.length);
-    return [el(doc, "span", "swd-table-name", host.itemIcon(item), head, el(doc, "span", "swd-table-name-end", last, open))];
+    return [el(doc, "span", "swd-table-name", host.look.icon(item), head, el(doc, "span", "swd-table-name-end", last, open))];
   }
   const { property } = column;
   if (property && host.type(property).look === "check") {

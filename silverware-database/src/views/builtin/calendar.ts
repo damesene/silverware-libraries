@@ -116,9 +116,9 @@ function draw(host: ViewHost, element: HTMLElement, drag: Drag): void {
         run: () => void host.open(item),
       },
       // (A space between its time and its name, not a margin: else the two are one word to the lines, broken inside)
-      el(doc, "span", "swd-cal-text", host.itemIcon(item), ...(time ? [el(doc, "span", { class: "swd-cal-time", text: time }), " "] : []), el(doc, "span", { class: "swd-cal-name", text: item.name })),
+      el(doc, "span", "swd-cal-text", host.look.icon(item), ...(time ? [el(doc, "span", { class: "swd-cal-time", text: time }), " "] : []), el(doc, "span", { class: "swd-cal-name", text: item.name })),
     );
-    host.itemLook(item, box);
+    host.look.item(item, box);
     box.addEventListener("keydown", (event) => {
       if (event.target !== box || (event.key !== "Enter" && event.key !== " ")) return;
       event.preventDefault();
@@ -389,6 +389,8 @@ export const CALENDAR_VIEW: ViewDefinition = {
   groupBy: false,
   // (Its Start and End by a property's key: followed as the key changes)
   propertyMeta: SPAN_META,
+  // (No property beside an item's name: no Visible properties in its ⋯)
+  properties: false,
   menu: (host, menu) => spanMenu(host, menu, ICON),
   render(host, element) {
     const drag: Drag = {};

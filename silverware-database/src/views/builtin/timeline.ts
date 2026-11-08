@@ -167,11 +167,11 @@ function draw(host: ViewHost, element: HTMLElement, live: Live): void {
     const unread = spans.unread(item);
     // (Its name a text of its own: the names' column folded to a strip shows the icon alone, the name its title)
     // (Folded, an item without an icon shows its name's first three letters, a strip of nothing being no button to find)
-    const icon = host.itemIcon(item);
+    const icon = host.look.icon(item);
     const initial = icon ? undefined : el(doc, "span", { class: "swd-tl-name-initial", text: [...new Intl.Segmenter().segment(item.name.trim())].slice(0, 3).map((one) => one.segment).join(""), attrs: { "aria-hidden": "true" } });
     const name = el(doc, "button", { class: `swd-tl-name${unread ? " swd-invalid" : ""}`, title: `Open ${item.name}`, run: () => void host.open(item) }, icon, initial, el(doc, "span", { class: "swd-tl-name-text", text: item.name }));
     // (Its color by its name too, as a table's stripe: the strip folded shows it where its bar is out of view)
-    host.itemLook(item, name);
+    host.look.item(item, name);
     // (What a row without a bar says names it too where the names are folded)
     const whose = () => el(doc, "span", { class: "swd-tl-hint-name", text: `${item.name} · ` });
     const track = el(doc, "div", "swd-tl-track");
@@ -225,9 +225,9 @@ function draw(host: ViewHost, element: HTMLElement, live: Live): void {
         title: `${item.name} (${lasting(span)}): open${movable ? ", drag to move it (Alt+← →)" : ""}${handled ? ", or its ends" : ""}${resizable ? " (Alt+Shift+← → its end)" : ""}`,
         attrs: { role: "button", tabindex: "0", "aria-label": `${item.name}, ${lasting(span)}`, "data-item": item.key },
       },
-      el(doc, "span", "swd-tl-bar-text", host.itemIcon(item), `${span.time ? `${span.time.slice(0, 5)} ` : ""}${item.name}`),
+      el(doc, "span", "swd-tl-bar-text", host.look.icon(item), `${span.time ? `${span.time.slice(0, 5)} ` : ""}${item.name}`),
     );
-    host.itemLook(item, box);
+    host.look.item(item, box);
     box.style.left = `${left}px`;
     box.style.width = `${width}px`;
     if (handled) box.append(...(["start", "end"] as const).map((which) => el(doc, "span", { class: `swd-tl-handle swd-tl-handle-${which}`, attrs: { "aria-hidden": "true", "data-handle": which } })));
@@ -513,6 +513,8 @@ export const TIMELINE_VIEW: ViewDefinition = {
   groupBy: { draws: true },
   // (Its Start and End by a property's key: followed as the key changes)
   propertyMeta: SPAN_META,
+  // (No property beside an item's name: no Visible properties in its ⋯)
+  properties: false,
   menu: (host, menu) => spanMenu(host, menu, ICON),
   render(host, element) {
     const live: Live = { dragging: false, pending: false };

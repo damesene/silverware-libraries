@@ -71,9 +71,8 @@ describe("the core", () => {
     expect(await core.setPropertyRequired("tasks", "order", true)).toHaveProperty("problem");
     expect(await core.setPropertyReadonly("tasks", "order", false)).toHaveProperty("problem");
     expect(told.at(-1)).toContain("Order is given by the system");
-    // Its name, its place and whether it shows: as any property's
+    // Its name and its place: as any property's
     expect(await core.renameProperty("tasks", "order", "Rank")).not.toHaveProperty("problem");
-    expect(await core.setPropertyHidden("tasks", "order", true)).not.toHaveProperty("problem");
     // Removed, its values asked off the items too: none of them written (they are no item's)
     const proposal = await core.removeProperty("tasks", "order", { values: true });
     if ("problem" in proposal) throw new Error(proposal.problem);
@@ -154,19 +153,6 @@ describe("the core", () => {
     expect(await core.setPropertyShowName("tasks", "status", true)).toMatchObject({ cause: "unchanged" });
     await core.setPropertyShowName("tasks", "status", false);
     expect((await status()).showName).toBeUndefined();
-  });
-
-  it("hides a property and shows it again, the schema alone, its values kept, undone as any change", async () => {
-    const { core, store, named } = setup();
-    const status = async () => (await store.database("tasks"))!.value.properties[0]!;
-    expect(await core.setPropertyHidden("tasks", "status", true)).not.toHaveProperty("problem");
-    expect((await status()).hidden).toBe(true);
-    expect((await named("Fix login")).values.status).toBe("Todo");
-    expect(await core.setPropertyHidden("tasks", "status", true)).toMatchObject({ cause: "unchanged" });
-    await core.setPropertyHidden("tasks", "status", false);
-    expect((await status()).hidden).toBeUndefined();
-    await core.undo("tasks");
-    expect((await status()).hidden).toBe(true);
   });
 
   it("sets a property's params at once where no value reads otherwise, refused where one would", async () => {

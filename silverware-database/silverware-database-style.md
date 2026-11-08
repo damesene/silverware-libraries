@@ -784,8 +784,10 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 .swd-group-body {
   margin-top: 4px;
 }
-/* Group in ⋯ (core/groupmenu.ts): Hide empty groups as a switch, then the groups, each its grip, name, count and eye */
-.swd-group-list {
+/* Group in ⋯ (core/groupmenu.ts): Hide empty groups as a switch, then the groups, each its grip, name, count and eye;
+   Visible properties in ⋯ (core/propertiesmenu.ts) the same look: the properties, each its name and eye */
+.swd-group-list,
+.swd-shown-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -793,7 +795,9 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 .swd-group-switch,
 .swd-group-all,
 .swd-group-grip,
-.swd-group-eye {
+.swd-group-eye,
+.swd-shown-all,
+.swd-shown-eye {
   border: 0;
   color: inherit;
   background: none;
@@ -811,7 +815,9 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 }
 .swd-group-switch:hover,
 .swd-group-row:hover,
-.swd-group-all:hover {
+.swd-group-all:hover,
+.swd-shown-row:hover,
+.swd-shown-all:hover {
   background: var(--swd-hover);
 }
 .swd-group-switch-track {
@@ -840,7 +846,8 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 .swd-group-switch[aria-checked="true"] .swd-group-switch-track::after {
   transform: translateX(12px);
 }
-.swd-group-list-head {
+.swd-group-list-head,
+.swd-shown-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -848,24 +855,28 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   color: var(--swd-quiet);
   font-size: 12px;
 }
-.swd-group-all {
+.swd-group-all,
+.swd-shown-all {
   padding: 1px 6px;
   border-radius: 4px;
   color: var(--swd-quiet);
   font-size: 12px;
 }
-.swd-group-rows {
+.swd-group-rows,
+.swd-shown-rows {
   display: flex;
   flex-direction: column;
 }
-.swd-group-row {
+.swd-group-row,
+.swd-shown-row {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 2px 4px;
   border-radius: 6px;
 }
-.swd-group-row-label {
+.swd-group-row-label,
+.swd-shown-label {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -876,6 +887,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   color: var(--danger-color, #c62828);
 }
 .swd-group-off .swd-group-row-label,
+.swd-shown-off .swd-shown-label,
 .swd-group-row-count {
   color: var(--swd-quiet);
 }
@@ -886,17 +898,20 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   cursor: grab;
   touch-action: none;
 }
-.swd-group-eye {
+.swd-group-eye,
+.swd-shown-eye {
   display: inline-flex;
   padding: 3px;
   border-radius: 4px;
   color: var(--swd-quiet);
 }
-.swd-group-eye[aria-pressed="true"] {
+.swd-group-eye[aria-pressed="true"],
+.swd-shown-eye[aria-pressed="true"] {
   color: inherit;
 }
 .swd-group-grip svg,
-.swd-group-eye svg {
+.swd-group-eye svg,
+.swd-shown-eye svg {
   width: 14px;
   height: 14px;
 }
@@ -2655,29 +2670,6 @@ tr:focus-within .swd-open {
 .swd-prop-row:hover {
   background: var(--swd-hover);
 }
-/* The eye: shown in the views or hidden, pressed from the list */
-.swd-prop-eye {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  color: var(--swd-quiet);
-  background: none;
-  cursor: pointer;
-}
-.swd-prop-eye:hover {
-  color: inherit;
-  background: var(--swd-hover);
-}
-.swd-prop-eye svg {
-  width: 16px;
-  height: 16px;
-}
 .swd-prop-icon,
 .swd-prop-lock,
 .swd-prop-chevron {
@@ -2696,11 +2688,6 @@ tr:focus-within .swd-open {
   margin-left: 3px;
   color: var(--danger-color, #c62828);
   font-weight: 600;
-}
-/* A property hidden in the views: its row quieter */
-.swd-prop-is-hidden .swd-prop-name,
-.swd-prop-is-hidden .swd-prop-icon {
-  opacity: 0.55;
 }
 .swd-prop-name {
   flex: 1 1 auto;
@@ -3723,14 +3710,6 @@ button.swd-peek-label:hover {
 }
 .swd-peek-value > .swd-editor:not(.swd-editor-choices) {
   width: 100%;
-}
-/* The properties hidden in the views: under their own quiet heading in the peek */
-.swd-peek-hidden-title {
-  margin-top: 4px;
-  color: var(--swd-quiet);
-  font-size: 0.8em;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 /* A required value missing, in the peek */
 .swd-peek-empty.swd-peek-missing {

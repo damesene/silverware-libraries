@@ -60,8 +60,10 @@ export type ViewDefinition = {
    * false where the view is never grouped
    */
   readonly groupBy?: false | { readonly types?: readonly string[]; readonly required?: boolean; readonly draws?: boolean; readonly prefer?: readonly string[] };
-  /** False where the view draws no item's color (`host.itemLook`): no Color by in its ⋯ */
+  /** False where the view draws no item's color (`host.look.item`): no Color by in its ⋯ */
   readonly colors?: false;
+  /** False where the view shows no property beside the name (`host.look.shownProperties`): no Visible properties in its ⋯ */
+  readonly properties?: false;
   /** Its own meta's keys whose value is a property's key (the calendar's `dateBy`): followed as the property's key changes */
   readonly propertyMeta?: readonly string[];
   /**
@@ -90,15 +92,37 @@ export type ViewListing = {
   readonly groupArrangement: GroupArrangement;
   /** Part of the arrangement changed, the rest kept */
   setGroupArrangement(change: Partial<GroupArrangement>): Promise<void>;
-  /** The key of the property the view colors its items by (Color by in ⋯: a property of options, each its color), as kept: undefined where none */
-  readonly colorBy: string | undefined;
-  /** The property to color the items by (undefined: none: each its own color alone); the place drawn anew */
-  setColorBy(key: string | undefined): Promise<void>;
   /** A property's condition (empty or undefined: none) */
   setFilter(key: string, condition: string | undefined): Promise<void>;
   setSort(sort: readonly SortKey[]): Promise<void>;
   /** Why a condition does not read, undefined where it does */
   validateCondition(condition: string): string | undefined;
+};
+
+/** How an item is drawn: its icon and its color, whoever draws it (a view, a module: core/look.ts) */
+export type ItemLooks = {
+  /** An item's icon drawn, its size the CSS of where it goes (1em: as the text around it); none where it has none */
+  icon(item: Item): HTMLElement | undefined;
+  /** An item's color put on the element drawing it (a card, a row, a bar: its CSS says how it shows), taken off where it has none */
+  item(item: Item, element: HTMLElement): void;
+};
+
+/**
+ * How the view shows its items, kept in its own meta: which properties
+ * (Visible properties in ⋯: `<view>.hiddenProperties`), their colors (Color by in ⋯:
+ * `<view>.colorBy`), and each item's icon and color drawn so
+ */
+export type ViewLook = ItemLooks & {
+  /** The database's properties the view shows, in the schema's order (the name always shown, not among them) */
+  readonly shownProperties: readonly Property[];
+  /** The keys of those it hides, as kept */
+  readonly hiddenProperties: readonly string[];
+  /** Those it hides (an empty list: every one shown); the place drawn anew */
+  setHiddenProperties(keys: readonly string[]): Promise<void>;
+  /** The key of the property the view colors its items by (a property of options, each its color), as kept: undefined where none */
+  readonly colorBy: string | undefined;
+  /** The property to color the items by (undefined: none: each its own color alone); the place drawn anew */
+  setColorBy(key: string | undefined): Promise<void>;
 };
 
 /** What a view gets: its database's data as it asks for it, the core's writes for that database, its own meta and settings */
@@ -117,6 +141,7 @@ export type ViewHost = DocumentsHost & {
    */
   readonly grouping: { readonly property: Property; readonly groups: readonly ItemGroup[] } | undefined;
   readonly listing: ViewListing;
+  readonly look: ViewLook;
   /** A property's type (the text type for one not defined now): how a value shows, sorts, reads from text typed */
   type(property: Property): PropertyType;
   /** An item's value as it shows: the name for `name` */
@@ -141,8 +166,4 @@ export type ViewHost = DocumentsHost & {
   refresh(): Promise<void>;
   /** A message to the user (a value typed that was not written, and why) */
   notify(message: string): void;
-  /** An item's icon drawn, its size the CSS of where it goes (1em: as the text around it); none where it has none (core/look.ts) */
-  itemIcon(item: Item): HTMLElement | undefined;
-  /** An item's color put on the element drawing it (a card, a row, a bar: its CSS says how it shows), taken off where it has none */
-  itemLook(item: Item, element: HTMLElement): void;
 };

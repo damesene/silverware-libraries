@@ -148,11 +148,10 @@ describe("the list", () => {
     expect(table.all(".swd-field-name")).toEqual([]);
   });
 
-  it("shows each item's values, those of a property hidden in the views left out, and has no Properties of its own", async () => {
+  it("shows each item's values, those of a property it hides left out", async () => {
     const { all } = await setup("list");
     expect(all(".swd-list-item")[0]!.textContent).toBe("Fix loginTodo3");
-    expect(all(".swd-list-properties")).toEqual([]);
-    const hidden = await setup("list", {}, { ...TASKS, properties: TASKS.properties.map((one) => (one.key === "estimate" ? { ...one, hidden: true } : one)) });
+    const hidden = await setup("list", { "list.hiddenProperties": ["estimate"] });
     expect(hidden.all(".swd-list-item")[0]!.textContent).toBe("Fix loginTodo");
   });
 });
@@ -421,19 +420,49 @@ describe("a property required", () => {
 });
 
 describe("a property hidden in the views", () => {
-  it("is no column, card line or list value, and is still filtered and sorted by", async () => {
-    const hidden: Database = { ...TASKS, properties: TASKS.properties.map((one) => (one.key === "estimate" ? { ...one, hidden: true } : one)) };
-    const { all, q, viewState } = await setup("table", {}, hidden);
+  it("is no column, card line or list value of the view hiding it, the others showing it; still filtered and sorted by", async () => {
+    const { all, q, viewState } = await setup("table", { "table.hiddenProperties": ["estimate"] });
     expect(all("th").map((th) => th.textContent)).not.toContain("Estimate");
     expect(q('.swd-filter input[data-key="estimate"]')).not.toBeNull();
     q<HTMLButtonElement>(".swd-sort-button").click();
     choose(document, "Estimate");
     await settle();
     expect(viewState.get("table.sort")).toEqual([{ key: "estimate", direction: "asc" }]);
-    const list = await setup("list", {}, hidden);
-    expect(list.all('.swd-list-value[data-key="estimate"]')).toHaveLength(0);
-    const board = await setup("board", {}, hidden);
+    // (Another view of the same block shows it: what is hidden is each view's own)
+    const list = await setup("list", { "table.hiddenProperties": ["estimate"] });
+    expect(list.all('.swd-list-value[data-key="estimate"]')).toHaveLength(2);
+    const board = await setup("board", { "board.hiddenProperties": ["estimate"] });
     expect(board.all('.swd-board-value[data-key="estimate"]')).toHaveLength(0);
+  });
+
+  it("hidden on a board, changes nothing of what it is grouped by", async () => {
+    const shown = await setup("board");
+    const columns = shown.all(".swd-board-title").map((one) => one.textContent);
+    expect(columns.length).toBeGreaterThan(1);
+    const hidden = await setup("board", { "board.hiddenProperties": ["status"] });
+    expect(hidden.all(".swd-board-title").map((one) => one.textContent)).toEqual(columns);
+  });
+
+  it("is hidden and shown again by its eye under Visible properties in ⋯, the menu staying open; Hide all and Show all; none for a calendar", async () => {
+    const { all, q, viewState } = await setup("table");
+    q<HTMLButtonElement>(".swd-more").click();
+    choose(document, "Visible properties");
+    const eye = () => q<HTMLButtonElement>('.swd-shown-row[data-property="estimate"] .swd-shown-eye');
+    expect(eye().getAttribute("aria-pressed")).toBe("true");
+    eye().click();
+    await settle();
+    expect(viewState.get("table.hiddenProperties")).toEqual(["estimate"]);
+    expect(all("th").map((th) => th.textContent)).not.toContain("Estimate");
+    expect(eye().getAttribute("aria-pressed")).toBe("false");
+    q<HTMLButtonElement>(".swd-shown-all").click();
+    await settle();
+    expect(viewState.get("table.hiddenProperties")).toEqual(TASKS.properties.map((one) => one.key));
+    q<HTMLButtonElement>(".swd-shown-all").click();
+    await settle();
+    expect(viewState.get("table.hiddenProperties")).toBeUndefined();
+    const calendar = await setup("calendar");
+    calendar.q<HTMLButtonElement>(".swd-more").click();
+    expect([...document.querySelectorAll(".swd-menu .swd-label")].map((one) => one.textContent)).not.toContain("Visible properties");
   });
 });
 

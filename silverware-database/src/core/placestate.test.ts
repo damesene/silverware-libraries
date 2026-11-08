@@ -37,6 +37,11 @@ describe("a place's state as a property's key changes", () => {
     expect(placeStateRenamed(state, "status", "stav", meta)).toEqual({ "my.view.groupBy": "stav" });
   });
 
+  it("renames the key among the properties a view hides, its order kept; where the new key is hidden already, the old one taken off", () => {
+    expect(placeStateRenamed(new Map<string, unknown>([["table.hiddenProperties", ["due", "status", "owner"]]]), "status", "stav", meta)).toEqual({ "table.hiddenProperties": ["due", "stav", "owner"] });
+    expect(placeStateRenamed(new Map<string, unknown>([["table.hiddenProperties", ["status", "stav"]]]), "status", "stav", meta)).toEqual({ "table.hiddenProperties": ["stav"] });
+  });
+
   it("gives none where the state names the key nowhere (a value that only reads like it left alone)", () => {
     expect(placeStateRenamed(new Map<string, unknown>([["id", "tasks"], ["board.groupBy", "due"], ["board.filter", { due: "status" }]]), "status", "stav", meta)).toBeUndefined();
   });

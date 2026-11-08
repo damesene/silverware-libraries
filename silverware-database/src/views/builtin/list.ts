@@ -1,8 +1,6 @@
-// The list: an item a line, its name and the values of its properties not
-// hidden in the views (Properties, the eye), those it has, each as its type
-// shows it. (Its own Properties button, a list's own pick of them kept as
-// `list.properties`, went on 2026-11-07: the schema hides a property for every
-// view; a block keeping the key of before is read as nothing.)
+// The list: an item a line, its name and the values of the properties it
+// shows (Visible properties in ⋯: the view's own), those it has, each as its type
+// shows it.
 import { el } from "../../../../shared/elements.ts";
 import type { ViewDefinition, ViewHost } from "../../core/view.ts";
 import type { Item } from "../../model/database.ts";
@@ -14,16 +12,16 @@ const ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 4h9M5 8h9M
 function line(host: ViewHost, item: Item, list: () => HTMLElement): HTMLElement {
   const doc = host.document;
   // (Each property's value as it stands alone, a required one without a value said missing: those showing anything)
-  const shown = host.database.properties.flatMap((property) => {
-    const nodes = property.hidden ? [] : fieldNodes(host, item, property);
+  const shown = host.look.shownProperties.flatMap((property) => {
+    const nodes = fieldNodes(host, item, property);
     return nodes.length ? [{ property, nodes }] : [];
   });
   const li: HTMLElement = el(doc, "li", { class: "swd-list-item", attrs: { "data-item": item.key } });
-  host.itemLook(item, li);
+  host.look.item(item, li);
   li.append(
     // Its grip first: dragged to its place by hand
     rowGrip(host, item, () => li, list, ":scope > li"),
-    el(doc, "button", { class: "swd-list-name", title: `Open ${item.name}`, run: () => void host.open(item) }, host.itemIcon(item), item.name),
+    el(doc, "button", { class: "swd-list-name", title: `Open ${item.name}`, run: () => void host.open(item) }, host.look.icon(item), item.name),
     ...shown.map(({ property, nodes }) => {
       const problem = problemOf(host, item, property);
       return el(doc, "span", { class: `swd-list-value${problem ? " swd-invalid" : ""}`, title: problem ?? property.label, attrs: { "data-key": property.key } }, ...nodes);

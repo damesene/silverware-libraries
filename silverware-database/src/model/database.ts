@@ -37,8 +37,6 @@ export type Property = {
   readonly params: Params;
   // No view offers to change it, and the core refuses to; it may still change outside the database
   readonly readonly: boolean;
-  // Not shown by the views (a table's column, a card's line); its values kept, filtered and sorted by, shown in the peek
-  readonly hidden?: boolean;
   // Every item is to have a value: one without shows as missing; the core takes none off (optional where not said)
   readonly required?: boolean;
   // Its name shown with its value where a value stands alone (a card's line, a list's row: `Status: Todo`), not under a header naming it

@@ -14,7 +14,7 @@ import type { Database, Item, Revised } from "../model/database.ts";
 import type { DatabaseCore } from "./core.ts";
 import { itemIcon, itemLook } from "./look.ts";
 import type { PlaceMenuBuilder, PlaceMenuGroup } from "./placemenu.ts";
-import type { ViewSetting } from "./view.ts";
+import type { ItemLooks, ViewSetting } from "./view.ts";
 
 /** A module's setting: as a view's (`silverware.database.modules.<module>.<key>`) */
 export type ModuleSetting = ViewSetting;
@@ -97,10 +97,8 @@ export type ModuleHost = DocumentsHost & {
   onDocumentOpened(listener: (name: string) => void): () => void;
   /** Places drawn anew: every one whole (a schema changed: every view of it shows it), or those of `database` with its data read anew (an item written) */
   refreshPlaces(database?: string): void;
-  /** An item's icon drawn, its size the CSS of where it goes (1em: as the text around it); none where it has none (core/look.ts) */
-  itemIcon(item: Item): HTMLElement | undefined;
-  /** An item's color put on the element drawing it (a card, a row, a bar: its CSS says how it shows), taken off where it has none */
-  itemLook(item: Item, element: HTMLElement): void;
+  /** How an item is drawn (its icon, its own color), as the views draw it */
+  readonly look: ItemLooks;
 };
 
 export type ModuleDefinition = {
@@ -140,7 +138,7 @@ export class Modules {
 
   constructor(
     readonly all: readonly ModuleDefinition[],
-    private readonly host: Omit<ModuleHost, "setting" | "saveSetting" | "offer" | "offered" | "itemIcon" | "itemLook">,
+    private readonly host: Omit<ModuleHost, "setting" | "saveSetting" | "offer" | "offered" | "look">,
     private readonly settings: Pick<Settings, "get" | "save">,
   ) {}
 
@@ -166,8 +164,7 @@ export class Modules {
         },
         offer: (api) => void this.offers.set(definition.name, api),
         offered: <T>(module: string) => this.offers.get(module) as T | undefined,
-        itemIcon: (item) => itemIcon(this.host.document, item),
-        itemLook,
+        look: { icon: (item) => itemIcon(this.host.document, item), item: (item, element) => itemLook(item, element) },
       };
       try {
         this.started.push({ definition, instance: definition.start(host) ?? {} });

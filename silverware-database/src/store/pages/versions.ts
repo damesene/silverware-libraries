@@ -68,7 +68,7 @@ export function modelValue(value: unknown): Value | undefined {
 }
 
 // A property's settings in the root page beside its params: what the model has as fields
-const PROPERTY_FIELDS = new Set(["type", "label", "readonly", "hidden", "required", "showName", "icon", "system"]);
+const PROPERTY_FIELDS = new Set(["type", "label", "readonly", "required", "showName", "icon", "system"]);
 
 /** A property as the root page keeps it under its key: its type, label, flags, a system property's kind, its params beside them */
 export function schemaEntry(property: Property): YamlMap {
@@ -79,7 +79,6 @@ export function schemaEntry(property: Property): YamlMap {
     type: property.type,
     label: property.label,
     ...(property.readonly ? { readonly: true } : {}),
-    ...(property.hidden ? { hidden: true } : {}),
     ...(property.required ? { required: true } : {}),
     ...(property.showName ? { showName: true } : {}),
     ...(property.icon !== undefined ? { icon: property.icon } : {}),
@@ -101,7 +100,8 @@ export const VERSION_1: PagesVersion = {
       if (!isObject(raw)) return { problem: `its property ${key} is no map` };
       // (`icon` the property's own only where it is a text: anything else written there kept as a param, as it was, not lost)
       const ownIcon = typeof raw.icon === "string" && raw.icon !== "";
-      const params = Object.fromEntries(Object.entries(raw).filter(([field]) => (field === "icon" ? !ownIcon : !PROPERTY_FIELDS.has(field))));
+      // (`hidden`, the schema's before each view had its own (2026-11-09): left out, so a schema written drops it)
+      const params = Object.fromEntries(Object.entries(raw).filter(([field]) => field !== "hidden" && (field === "icon" ? !ownIcon : !PROPERTY_FIELDS.has(field))));
       // (A system property is read only, whatever is written)
       const system = typeof raw.system === "string" && raw.system ? raw.system : undefined;
       properties.push({
@@ -110,7 +110,6 @@ export const VERSION_1: PagesVersion = {
         type: typeof raw.type === "string" ? raw.type : "text",
         params,
         readonly: raw.readonly === true || system !== undefined,
-        ...(raw.hidden === true ? { hidden: true } : {}),
         ...(raw.required === true ? { required: true } : {}),
         ...(raw.showName === true ? { showName: true } : {}),
         // (Its icon kept as written, one that is none too: the schema is written whole, so dropped here it would be lost)

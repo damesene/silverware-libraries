@@ -1,6 +1,6 @@
 // How an item's look shows, the one place of it (ItemLook in the model): a
 // view says only which of its elements is the item and where its icon goes,
-// through its host (`itemIcon`, `itemLook`), never reading the look itself.
+// through its host (`look.icon`, `look.item`), never reading the look itself.
 // The icon a span of its own, its size the CSS of where it is (1em: as the
 // text around it); the color a mark on the item's element (`data-swd-item-color`,
 // the palette's place or `own`) and `--swd-item` (`r, g, b`), which each

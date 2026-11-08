@@ -543,19 +543,6 @@ describe("the peek", () => {
     expect(await store.body("tasks", (await named("Fix login")).key)).toBe("Typed");
   });
 
-  it("shows the properties hidden in the views under their own heading, still edited there", async () => {
-    const { q, peek, core, named } = await setup();
-    await core.setPropertyHidden("tasks", "estimate", true);
-    await peek("Fix login");
-    expect(q(".swd-peek-hidden-title").textContent).toBe("Hidden in views");
-    q('.swd-peek-hidden .swd-peek-value[data-key="estimate"]').click();
-    const input = q<HTMLInputElement>('.swd-peek-value[data-key="estimate"] input');
-    input.value = "8";
-    key(input, "Enter");
-    await settle();
-    expect((await named("Fix login")).values.estimate).toBe(8);
-  });
-
   it("opens a property in Properties from its name, adds one from + Add a property, moves one by Alt+↑ on its grip", async () => {
     const { q, peek, store } = await setup(true, true);
     await peek("Fix login");

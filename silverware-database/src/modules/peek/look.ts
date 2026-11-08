@@ -51,12 +51,12 @@ export function lookControls(host: ModuleHost, panel: HTMLElement, item: Item, w
           ),
         ),
     },
-    host.itemIcon(item) ?? el(doc, "span", { class: "swd-peek-icon-add", text: "☺ Add icon" }),
+    host.look.icon(item) ?? el(doc, "span", { class: "swd-peek-icon-add", text: "☺ Add icon" }),
   );
 
   // The color: its swatch and name
   const swatch = el(doc, "span", "swd-peek-swatch");
-  host.itemLook(item, swatch);
+  host.look.item(item, swatch);
   const color = el(
     doc,
     "button",
@@ -69,7 +69,7 @@ export function lookControls(host: ModuleHost, panel: HTMLElement, item: Item, w
           const pick = (value: string | undefined) => done(withPart(look, "color", value), ".swd-peek-color");
           const option = (value: string | undefined, label: string) => {
             const dot = el(doc, "span", "swd-peek-swatch");
-            host.itemLook({ ...item, look: value ? { color: value } : {} }, dot);
+            host.look.item({ ...item, look: value ? { color: value } : {} }, dot);
             return el(doc, "button", { class: "swd-peek-pop-color", title: label, attrs: { "aria-label": label, "aria-pressed": String(look.color === value) }, run: () => pick(value) }, dot);
           };
           // (Its own color: the browser's picker, kept as #rrggbb)

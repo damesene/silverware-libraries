@@ -17,7 +17,7 @@ function nextSort(host: ViewHost, key: string) {
 
 function drawTable(host: ViewHost, element: HTMLElement): void {
   const doc = host.document;
-  const columns: readonly (Property | typeof NAME)[] = [NAME, ...host.database.properties];
+  const columns: readonly (Property | typeof NAME)[] = [NAME, ...host.look.shownProperties];
   const sorted = host.listing.sort[0];
   const head = el(
     doc,

@@ -13,6 +13,7 @@ import type { Database, Item, Property } from "../model/database.ts";
 import { type DatabaseCore, isRefused } from "./core.ts";
 import { documentsHost, type DocumentsSource } from "./documents.ts";
 import { arrangedGroups, focusGroupList, type GroupFocus, groupedBy, groupEntry } from "./groupmenu.ts";
+import { focusPropertyList, propertiesEntry, type PropertiesFocus } from "./propertiesmenu.ts";
 import { drawGrouped } from "./groups.ts";
 import { ICONS } from "./icons.ts";
 import { type ColorBy, colorable, itemIcon, itemLook } from "./look.ts";
@@ -114,14 +115,15 @@ export type PlaceKept = {
   readonly overWindow?: boolean;
   readonly typing?: { readonly key: string; readonly value: string; readonly start: number; readonly end: number };
   readonly group?: GroupFocus;
+  readonly properties?: PropertiesFocus;
 };
 
 /** Color by in ⋯: the properties of options a view may color its items by, None, the one picked checked */
 function colorEntry(host: ViewHost, menu: PlaceMenuBuilder): MenuEntry {
   const eligible = colorable(host.database.properties, (one) => host.type(one));
-  const by = eligible.find((one) => one.key === host.listing.colorBy);
+  const by = eligible.find((one) => one.key === host.look.colorBy);
   const none = eligible.length ? {} : { disabled: "No property of options (a select, a multi-select)" };
-  const option = (key: string | undefined, label: string) => menu.item({ label, checked: by?.key === key, run: () => void host.listing.setColorBy(key) });
+  const option = (key: string | undefined, label: string) => menu.item({ label, checked: by?.key === key, run: () => void host.look.setColorBy(key) });
   return menu.submenu({ label: "Color by", icon: ICONS.color, value: { text: by?.label ?? "None" }, ...none }, () => [
     option(undefined, "None"),
     ...eligible.map((property) => option(property.key, property.label)),
@@ -613,9 +615,20 @@ export class DatabasePlace {
     const { editSource } = this.options;
     // ⋯ open at Group, what has the focus in its list as it changed something (handed over: the place drawn after it opens it so)
     let groupFocus: GroupFocus | undefined;
+    // (Where the properties' list had the focus as it wrote: put back there in the menu opened again on the place drawn anew)
+    let propertiesFocus: PropertiesFocus | undefined;
     const coreGroups = (menu: PlaceMenuBuilder): PlaceMenuGroup[] => {
       const groups: PlaceMenuGroup[] = [];
-      const group = groupEntry(view, host, menu, (focus) => (groupFocus = focus));
+      // (One list's focus at a time: the menu opened again at the list changed last)
+      const properties = propertiesEntry(view, host, menu, (focus) => {
+        propertiesFocus = focus;
+        groupFocus = undefined;
+      });
+      if (properties) groups.push(menu.slot.view([properties]));
+      const group = groupEntry(view, host, menu, (focus) => {
+        groupFocus = focus;
+        propertiesFocus = undefined;
+      });
       if (group) groups.push(menu.slot.view([group]));
       if (view.colors !== false) groups.push(menu.slot.view([colorEntry(host, menu)]));
       if (editSource) groups.push(menu.slot.source([menu.item({ label: "Edit source", icon: ICONS.source, hint: "Show the block's text, to edit it as markdown", run: editSource })]));
@@ -653,7 +666,7 @@ export class DatabasePlace {
       },
     });
     // (Always there: the database's name at least)
-    const more = placeMenu(doc, () => database.name, (menu) => [...coreGroups(menu), ...moduleGroups(menu), ...viewGroups(menu)], naming, () => (groupFocus = undefined));
+    const more = placeMenu(doc, () => database.name, (menu) => [...coreGroups(menu), ...moduleGroups(menu), ...viewGroups(menu)], naming, () => (groupFocus = propertiesFocus = undefined));
     this.options.placeDrawn?.(this.context(doc, database));
 
     // What the colors are of, after the count (Color by in ⋯), so a color reads as what it means; kept so as the data change
@@ -665,7 +678,7 @@ export class DatabasePlace {
       sortLabel();
       filterLabel();
       count.textContent = host.items.length === host.total ? String(host.total) : `${host.items.length} of ${host.total}`;
-      const by = host.database.properties.find((one) => one.key === host.listing.colorBy);
+      const by = host.database.properties.find((one) => one.key === host.look.colorBy);
       colored.hidden = !by;
       colored.textContent = by ? `colored by ${by.label}` : "";
       colored.title = by ? `Each item in the color of its ${by.label} (Color by in ⋯); an item's own color first` : "";
@@ -694,6 +707,7 @@ export class DatabasePlace {
         filterOpen: !panel.hidden,
         ...(typing ? { typing: { key: typing.dataset.key!, value: typing.value, start: typing.selectionStart ?? typing.value.length, end: typing.selectionEnd ?? typing.value.length } } : {}),
         ...(groupFocus ? { group: groupFocus } : {}),
+        ...(propertiesFocus ? { properties: propertiesFocus } : {}),
       };
     };
     // Shown as handed over: the panel open, the field as typed (the focus and the selection in it; applied a moment after,
@@ -720,6 +734,13 @@ export class DatabasePlace {
         if (shown) {
           groupFocus = from.group;
           focusGroupList(shown, from.group);
+        }
+      }
+      if (from.properties) {
+        const shown = more.openAt(["Visible properties"]);
+        if (shown) {
+          propertiesFocus = from.properties;
+          focusPropertyList(shown, from.properties);
         }
       }
     };
@@ -796,10 +817,20 @@ export class DatabasePlace {
       }
       return colored.by;
     };
+    // The properties the view hides (Properties in ⋯), as kept: keys only
+    const hiddenKeys = (): readonly string[] => keys(state.get(prefixed("hiddenProperties")));
+    // (Found once per data read and keys kept: read for every item drawn)
+    let shownFor: { data: Data; hidden: readonly string[]; shown: readonly Property[] } | undefined;
+    const shownProperties = (): readonly Property[] => {
+      const hidden = hiddenKeys();
+      if (shownFor?.data !== data() || JSON.stringify(shownFor.hidden) !== JSON.stringify(hidden)) {
+        const off = new Set(hidden);
+        shownFor = { data: data(), hidden, shown: data().database.properties.filter((one) => !off.has(one.key)) };
+      }
+      return shownFor.shown;
+    };
     return {
       document: this.options.element.ownerDocument,
-      itemIcon: (item) => itemIcon(this.options.element.ownerDocument, item),
-      itemLook: (item, element) => itemLook(item, element, colorBy()),
       get database() {
         return data().database;
       },
@@ -846,6 +877,30 @@ export class DatabasePlace {
         get groupArrangement() {
           return arrangement();
         },
+        async setGroupArrangement(change) {
+          const next = { ...arrangement(), ...change };
+          if (JSON.stringify(next) === JSON.stringify(arrangement())) return;
+          await setMeta({ groupOrder: next.order.length ? next.order : undefined, groupHidden: next.hidden.length ? next.hidden : undefined, groupHideEmpty: next.hideEmpty || undefined });
+          await shownAgain();
+        },
+        validateCondition,
+      },
+      look: {
+        icon: (item) => itemIcon(this.options.element.ownerDocument, item),
+        item: (item, element) => itemLook(item, element, colorBy()),
+        get shownProperties() {
+          return shownProperties();
+        },
+        get hiddenProperties() {
+          return hiddenKeys();
+        },
+        async setHiddenProperties(keys) {
+          // (Of keys only, each once, in the order given)
+          const next = [...new Set(keys.filter((one) => typeof one === "string"))];
+          if (JSON.stringify(next) === JSON.stringify(hiddenKeys())) return;
+          await setMeta({ hiddenProperties: next.length ? next : undefined });
+          await shownAgain();
+        },
         get colorBy() {
           return colorBy()?.property.key;
         },
@@ -855,13 +910,6 @@ export class DatabasePlace {
           // (Drawn whole: its head says what the colors are of)
           if (!drawn.ended) await place.render();
         },
-        async setGroupArrangement(change) {
-          const next = { ...arrangement(), ...change };
-          if (JSON.stringify(next) === JSON.stringify(arrangement())) return;
-          await setMeta({ groupOrder: next.order.length ? next.order : undefined, groupHidden: next.hidden.length ? next.hidden : undefined, groupHideEmpty: next.hideEmpty || undefined });
-          await shownAgain();
-        },
-        validateCondition,
       },
       type: (property) => typeOf(types, property),
       text: (item, key) => textOf(item, key, data().database, types),

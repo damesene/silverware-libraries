@@ -445,18 +445,14 @@ export class PeekPanel {
     // (A value or the name being edited stays so until the bin's press is taken: its write is then waited for, the bin not drawn anew under the pointer)
     keepFocus(remove);
     const head = el(doc, "div", "swd-peek-head", close, el(doc, "span", "swd-peek-gap"), remove, open);
-    // The properties: those shown in the views, then those hidden there under their own heading (an item's every value is
-    // shown and edited in its peek); each list dragged to its order by its grips
-    const group = (hidden: boolean) => {
-      const list = el(doc, "div", `swd-peek-properties${hidden ? " swd-peek-hidden" : ""}`);
-      list.append(...shown.schema.properties.filter((property) => !!property.hidden === hidden).map((property) => this.row(shown, property, editor, list)));
-      return list;
-    };
+    // The properties, every one whatever a view hides (an item's every value is shown and edited in its peek), dragged to
+    // their order by their grips
+    const list = el(doc, "div", "swd-peek-properties");
+    list.append(...shown.schema.properties.map((property) => this.row(shown, property, editor, list)));
     const properties = this.host.offered<PropertiesOffer>("properties");
     // The properties in a box of their own, scrolled past a height (the style page's), so the content under them stays in
     // view however many a database has
-    const box = el(doc, "div", "swd-peek-props-box", group(false));
-    if (shown.schema.properties.some((property) => property.hidden)) box.append(el(doc, "div", { class: "swd-peek-hidden-title", text: "Hidden in views" }), group(true));
+    const box = el(doc, "div", "swd-peek-props-box", list);
     // A property added, in Properties (the peek's own way to the schema: the properties module's where it is on)
     if (properties) {
       const add = el(doc, "button", { class: "swd-peek-add-property", text: "+ Add a property", run: () => void properties.open(shown.database, { add: true }).then(() => this.refocus(".swd-peek-add-property")) });

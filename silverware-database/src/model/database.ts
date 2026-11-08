@@ -41,6 +41,8 @@ export type Property = {
   readonly hidden?: boolean;
   // Every item is to have a value: one without shows as missing; the core takes none off (optional where not said)
   readonly required?: boolean;
+  // A system property's kind (domain/system.ts: createdAt, modifiedAt, order, page, tags): its values given by the store, never kept in an item; read only
+  readonly system?: string;
 };
 
 /** A database: its id (a slug, not changed by renaming it), its name as shown, its properties in their order */

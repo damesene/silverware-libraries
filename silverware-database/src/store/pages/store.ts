@@ -6,21 +6,22 @@
 // transaction comes to is transaction.ts', the same as every store's.
 //
 // The index catches up with a write later: what the store wrote it holds
-// (`wrote`) until the index has the page so. SilverBullet tells of a page
-// indexed a moment before a query gives it (seen 2026-11-07: an item added
-// shown, then gone for that moment), so being told is not enough; what the
-// store holds goes HOLD_TOLD_MS after it was told of the page in any case,
-// so a page changed by hand right after is shown as the index has it.
+// (`wrote`) until the index has the page so, or until the index, having
+// started on the page after it was written (a change told early), tells of it
+// whole: what it has then is the page as it is (changed by hand right after,
+// maybe). A change told whole without that start (one of before the write)
+// lets nothing go: the index may not have taken the write up yet.
 import { type PageBuilder, pageChanges } from "../../../../shared/pages/changes.ts";
 import { readFrontmatter } from "../../../../shared/pages/frontmatter.ts";
 import { type ApplyReport, type PagePlan, type PageWriter, pageWriter } from "../../../../shared/pages/writer.ts";
-import type { IndexedObject, Platform } from "../../../../shared/platform.ts";
+import type { Index, IndexedObject, Platform, Space, TaskCount } from "../../../../shared/platform.ts";
 import type { Changes } from "../../core/changes.ts";
 import type { DatabaseStore, VersionStatus, MigrationScope, Planned, SkipCause, Skipped, StoreCapabilities, Target, TransactionPlan, TransactionReport, WriteProgress } from "../../core/store.ts";
 import { told } from "../../core/store.ts";
 import type { Database, DatabaseSummary, Item, ItemKey, Revised } from "../../model/database.ts";
 import { draftTransaction, type ItemState, type RecordState, type StoreRules, type StoreState, takenNames, withoutClashes } from "../transaction.ts";
-import { VERSIONS, ITEM_TAG, type PagesVersion, ROOT_TAG, systemOf, versionOf } from "./versions.ts";
+import { hasSystem, localStamp, type SystemFacts, withSystemValues } from "../../domain/system.ts";
+import { VERSIONS, ITEM_TAG, type PagesVersion, ROOT_TAG, schemaEntry, systemOf, versionOf } from "./versions.ts";
 
 export type PagesStoreOptions = {
   /** The root page a database made by the store gets (by default `db-<id>` at the space's top; the binding: beside the page showing it) */
@@ -29,18 +30,12 @@ export type PagesStoreOptions = {
   readonly versions?: readonly PagesVersion[];
 };
 
-/** Keys SilverBullet's page objects have, beside a page's frontmatter (probe 1): no property's key */
-const PAGE_KEYS = new Set(["name", "tags", "tag", "itags", "ref", "range", "aliases", "displayName", "lastModified", "created", "perm", "contentType", "size", "pageDecoration"]);
-
-/** Why a name cannot be a page's (SilverBullet's `isValidName`, and no `/`, which would make a subpage) */
-export function validatePageName(name: string): string | undefined {
+/** Why a name cannot be an item's page's, as the store keeps pages (no `/`, which would make a subpage), then as the space takes names */
+function validatePageName(name: string, space: Pick<Space, "validateName">): string | undefined {
   if (!name.trim()) return "an item needs a name";
   if (name !== name.trim()) return "a page's name starts or ends with no space";
   if (name.includes("/")) return `"${name}" holds a /, which would make a subpage`;
-  if (/[@#|<>$]/.test(name) || name.includes("[[") || name.includes("]]")) return `"${name}" holds a character a page's name cannot: @ # | < > $ [[ ]]`;
-  if (/^[.^]/.test(name)) return `"${name}" starts with . or ^, which a page's name cannot`;
-  if (/\.[A-Za-z0-9]+$/.test(name)) return `"${name}" ends as a file's extension would, which makes it no page`;
-  return undefined;
+  return space.validateName?.(name);
 }
 
 // A database as the store reads it now: its root page, which making of it this is, its record, its items by key
@@ -70,11 +65,16 @@ type Part = {
 };
 
 // A page the store wrote, as the index will have it (none: removed), the tags it had (a removed page's: let go only by a
-// query of one of them), when the index told of the page since
-type Held = { readonly object: IndexedObject | undefined; readonly tags: readonly string[]; toldAt?: number };
-
-// How long after the index told of a page the store goes on showing the page as it wrote it, at most
-const HOLD_TOLD_MS = 10_000;
+// query of one of them), what the store knows of it meanwhile (an item's page: made when it was, written now, its tags);
+// whether the write is done, whether the index has told of the page since, and started on it since the write was done
+type Held = {
+  readonly object: IndexedObject | undefined;
+  readonly tags: readonly string[];
+  readonly facts?: SystemFacts;
+  written?: boolean;
+  told?: boolean;
+  indexing?: boolean;
+};
 
 // What a part wrote: the writer's report of its page, what the store had before, the making it went into
 type Wrote = { readonly part: Part; readonly report: ApplyReport; readonly before: ItemState | RecordState | undefined; readonly made: string; readonly key?: ItemKey };
@@ -102,6 +102,12 @@ const revisionOf = (value: unknown) => {
 
 const hasTag = (object: IndexedObject, tag: string) => Array.isArray(object.tags) && object.tags.includes(tag);
 
+/** What the index has of an item's page beside its values: its dates (as the index says them), its name, its tags but the database's */
+function factsOf(object: IndexedObject, index: Pick<Index, "documentDates">): SystemFacts {
+  const tags = Array.isArray(object.tags) ? object.tags.filter((one): one is string => typeof one === "string" && one !== ITEM_TAG) : [];
+  return { ...index.documentDates?.(object), page: String(object.name), tags };
+}
+
 export class PagesStore implements DatabaseStore {
   readonly capabilities: StoreCapabilities;
   private readonly writer: PageWriter;
@@ -121,6 +127,12 @@ export class PagesStore implements DatabaseStore {
   private readonly listeners = new Set<(change: { readonly database: string }) => void>();
   // Each database's root page as last read, to tell which database a page changed is of
   private readonly roots = new Map<string, string>();
+  // Each item's page's facts as last read (its dates, its tags): its system properties' values, and what a page the store
+  // wrote keeps of them until the index has it
+  private readonly facts = new Map<string, SystemFacts>();
+  // Each database's pages' tasks as last counted (Task progress), until a page of it is indexed: a read before a write, a
+  // view's and the peek's together, count them once, not every task of the space each
+  private readonly taskCounts = new Map<string, ReadonlyMap<string, TaskCount>>();
   private counter = 0;
 
   constructor(
@@ -143,15 +155,23 @@ export class PagesStore implements DatabaseStore {
       // A page the store wrote, deleted since (by hand, renamed): gone at once; a page it removed, indexed since: made
       // again (by hand, renamed into its name); otherwise held until a query has it as the store left it
       if (held && (held.object ? change.deleted : !change.deleted)) this.wrote.delete(change.document);
-      else if (held) held.toldAt ??= Date.now();
+      else if (held) {
+        held.told = true;
+        // Started on the page after the write was done, then told whole: what the index has now is the page as it is
+        if (held.written && change.early) held.indexing = true;
+        else if (held.indexing && !change.early) this.wrote.delete(change.document);
+      }
+      // (Its readers told once the index has the change whole: read early, they would read it without it)
+      if (change.early) return;
       const tell = () => {
         for (const [id, root] of this.roots) {
-          if (change.document === root || change.document.startsWith(`${root}/`)) for (const listener of this.listeners) listener({ database: id });
+          if (change.document !== root && !change.document.startsWith(`${root}/`)) continue;
+          // (Its pages' tasks counted anew at the next read)
+          this.taskCounts.delete(id);
+          for (const listener of this.listeners) listener({ database: id });
         }
       };
       tell();
-      // Told again once what the store held of it has surely gone (the index has caught up by then, or someone else changed it)
-      if (held) setTimeout(tell, HOLD_TOLD_MS + 100);
     });
   }
 
@@ -176,13 +196,37 @@ export class PagesStore implements DatabaseStore {
   async items(id: string): Promise<Revised<readonly Item[]>> {
     const read = await this.read(id);
     if (!read) return { value: [], revision: "0" };
-    const items = [...read.items.values()].map(({ item, revision }) => ({ ...item, revision }));
-    return { value: items, revision: revisionOf(items.map((one) => one.revision)) };
+    const pages = new Map([...read.items.values()].map(({ item, page }) => [item.key, page]));
+    const plain = [...read.items.values()].map(({ item, revision }) => ({ ...item, revision }));
+    // The pages' tasks counted, only where the database shows their progress (every task of the space read)
+    const tasks = hasSystem(read.record.database, "taskProgress") ? await this.tasksOf(id, new Set(pages.values())) : undefined;
+    // The system properties' values from the pages' facts (an item's revision its own: they are not what a write checks)
+    const items = withSystemValues(plain, read.record.database, (item) => {
+      const page = pages.get(item.key) ?? "";
+      const known = this.facts.get(page) ?? {};
+      return tasks ? { ...known, tasks: tasks.get(page) ?? { done: 0, total: 0 } } : known;
+    });
+    const system = read.record.database.properties.filter((one) => one.system !== undefined);
+    return { value: items, revision: revisionOf(items.map((one) => (system.length ? [one.revision, system.map((property) => one.values[property.key] ?? null)] : one.revision))) };
   }
 
   async body(id: string, item: ItemKey): Promise<string | undefined> {
     const page = (await this.read(id))?.items.get(item)?.page;
     return page === undefined ? undefined : this.bodyOf(page);
+  }
+
+  /** A database's pages' tasks: as last counted, else counted now and kept until a page of it is indexed */
+  private async tasksOf(id: string, pages: ReadonlySet<string>): Promise<ReadonlyMap<string, TaskCount>> {
+    const kept = this.taskCounts.get(id);
+    if (kept) return kept;
+    const counted = await this.tasksByPage(pages);
+    this.taskCounts.set(id, counted);
+    return counted;
+  }
+
+  /** The tasks of the pages given, as the index counts them (none where it keeps no tasks) */
+  private async tasksByPage(pages: ReadonlySet<string>): Promise<ReadonlyMap<string, TaskCount>> {
+    return (await this.platform.index.tasks?.(pages)) ?? new Map();
   }
 
   /** A page's body as it is now (the index has none); undefined where it cannot be read (gone, the index not caught up) */
@@ -433,11 +477,11 @@ export class PagesStore implements DatabaseStore {
   }
 
   validatePropertyKey(key: string): string | undefined {
-    return PAGE_KEYS.has(key) ? `"${key}" is a key SilverBullet gives every page: name the property otherwise` : undefined;
+    return this.platform.index.reservedKeys?.has(key) ? `"${key}" is a key the index gives every page: name the property otherwise` : undefined;
   }
 
   validateItemName(name: string): string | undefined {
-    return validatePageName(name);
+    return validatePageName(name, this.platform.space);
   }
 
   documentOf(item: ItemKey): string | undefined {
@@ -455,22 +499,31 @@ export class PagesStore implements DatabaseStore {
     // Held as written before the writer writes: an index telling of the page at once (as it is written) lets it go then
     const held = new Map([planned.page, to].map((page) => [page, this.wrote.get(page)] as const));
     const tags = [part.kind === "record" ? ROOT_TAG : ITEM_TAG];
-    if (planned.renamedTo !== undefined) this.wrote.set(planned.page, { object: undefined, tags });
-    this.wrote.set(to, { object: part.after === undefined ? undefined : this.objectOf(part, to), tags });
+    // The holds this write makes (another write of the page at once makes its own: each marks and puts back its own alone)
+    const mine = new Map<string, Held>();
+    if (planned.renamedTo !== undefined) mine.set(planned.page, { object: undefined, tags });
+    mine.set(to, part.after === undefined ? { object: undefined, tags } : { object: this.objectOf(part, to, planned.page), tags, facts: this.heldFactsOf(part, to, planned.page) });
+    for (const [one, hold] of mine) this.wrote.set(one, hold);
     const report = await this.writer.apply(part.pagePlan);
+    // (The write done: what the index starts on from now has it)
+    for (const hold of mine.values()) hold.written = true;
     const page = report.written[0];
     if (!page) {
-      // Nothing written: what was held before goes back
+      // Nothing written: what was held before goes back where this write's hold is still the one (told of since: so is it)
       for (const [one, had] of held) {
-        if (had) this.wrote.set(one, had);
-        else this.wrote.delete(one);
+        const hold = mine.get(one)!;
+        if (this.wrote.get(one) !== hold) continue;
+        if (had) {
+          had.told ||= hold.told;
+          this.wrote.set(one, had);
+        } else this.wrote.delete(one);
       }
       const left = report.skipped[0];
       return { cause: left?.cause ?? "refused", reason: left?.reason ?? "not written" };
     }
     // (The writer gives back the page planned where it wrote it all, another where it renamed it alone)
     const renamedAlone = page !== planned && page.renamedTo !== undefined;
-    if (renamedAlone) this.wrote.set(to, { object: before ? this.objectOf({ ...part, after: { ...before, name: (part.after as ItemState).name } }, to) : undefined, tags });
+    if (renamedAlone) this.wrote.set(to, before ? { object: this.objectOf({ ...part, after: { ...before, name: (part.after as ItemState).name } }, to, planned.page), tags, facts: this.heldFactsOf(part, to, planned.page), written: true } : { object: undefined, tags, written: true });
     return renamedAlone ? { report, renamedAlone } : { report };
   }
 
@@ -491,15 +544,23 @@ export class PagesStore implements DatabaseStore {
     return this.keyOf(page);
   }
 
-  /** What the index will have of a page the store wrote, as the store reads pages */
-  private objectOf(part: Part, page: string): IndexedObject {
+  /** What the store knows of an item's page it wrote, until the index has it: made when it was (or now), written now, its tags as they were */
+  private heldFactsOf(part: Part, page: string, from: string): SystemFacts | undefined {
+    if (part.kind === "record") return undefined;
+    const before = this.facts.get(from);
+    const now = localStamp(new Date());
+    return { created: before?.created ?? now, modified: now, page, tags: before?.tags ?? [] };
+  }
+
+  /** What the index will have of a page the store wrote (`from` the page it was, renamed), as the store reads pages */
+  private objectOf(part: Part, page: string, from = page): IndexedObject {
     if (part.kind === "record") {
       const record = part.after as RecordState;
-      const properties = Object.fromEntries(record.database.properties.map((one) => [one.key, { type: one.type, label: one.label, ...(one.readonly ? { readonly: true } : {}), ...(one.hidden ? { hidden: true } : {}), ...(one.required ? { required: true } : {}), ...one.params }]));
+      const properties = Object.fromEntries(record.database.properties.map((one) => [one.key, schemaEntry(one)]));
       return { name: page, tags: [ROOT_TAG], _database: { id: record.database.id, name: record.database.name, version: record.version, properties } };
     }
     const item = part.after as ItemState;
-    return { name: page, tags: [ITEM_TAG], ...item.values, ...(item.rank === undefined ? {} : { _database: { rank: item.rank } }) };
+    return { name: page, tags: [ITEM_TAG, ...(this.facts.get(from)?.tags ?? [])], ...item.values, ...(item.rank === undefined ? {} : { _database: { rank: item.rank } }) };
   }
 
   /** A database as read now: the index's objects, the pages the store wrote as it wrote them */
@@ -512,12 +573,18 @@ export class PagesStore implements DatabaseStore {
       const root = String(object.name);
       this.roots.set(id, root);
       const items = new Map<ItemKey, { page: string; item: ItemState; revision: string }>();
+      // (This database's pages' facts read anew: one gone forgets its own, so a page made again under its name is not given them)
+      for (const page of [...this.facts.keys()]) if (page.startsWith(`${root}/`)) this.facts.delete(page);
       for (const one of await this.objects(ITEM_TAG)) {
         const page = String(one.name);
         if (!page.startsWith(`${root}/`) || page.slice(root.length + 1).includes("/")) continue;
         const key = this.keyOf(page);
         const item: ItemState = { key, ...reader.readItem(one, page.slice(root.length + 1), read.record) };
         items.set(key, { page, item, revision: revisionOf({ name: item.name, values: item.values, rank: item.rank }) });
+        // (A page it wrote, the index not having it yet: what it knows of it; else the index's)
+        const writing = this.wrote.get(page);
+        const held = writing?.object === one ? writing.facts : undefined;
+        this.facts.set(page, held ?? factsOf(one, this.platform.index));
       }
       return { root, folder: root, made: this.makingOf(root), version, record: read.record, recordRevision: revisionOf(read.record), items };
     }
@@ -531,15 +598,12 @@ export class PagesStore implements DatabaseStore {
   private async objects(tag: string): Promise<IndexedObject[]> {
     const out: IndexedObject[] = [];
     const seen = new Set<string>();
-    const now = Date.now();
-    // Held long enough after the index told of the page: what the index has is the page now (changed by hand, maybe)
-    const expired = (held: Held) => held.toldAt !== undefined && now - held.toldAt > HOLD_TOLD_MS;
     for (const object of await this.platform.index.objects(tag)) {
       const page = String(object.name);
       seen.add(page);
       const held = this.wrote.get(page);
-      // The index caught up (it has the page as the store wrote it), or held long enough: the index's again
-      if (!held || (held.object && caughtUp(object, held.object)) || expired(held)) {
+      // The index caught up (it has the page as the store wrote it): the index's again
+      if (!held || (held.object && caughtUp(object, held.object))) {
         this.wrote.delete(page);
         out.push(object);
       } else if (held.object && hasTag(held.object, tag)) out.push(held.object);
@@ -547,9 +611,8 @@ export class PagesStore implements DatabaseStore {
     for (const [page, held] of [...this.wrote]) {
       if (seen.has(page)) continue;
       if (held.object) {
-        if (expired(held)) this.wrote.delete(page);
-        else if (hasTag(held.object, tag)) out.push(held.object);
-      } else if (held.toldAt !== undefined && held.tags.includes(tag)) {
+        if (hasTag(held.object, tag)) out.push(held.object);
+      } else if (held.told && held.tags.includes(tag)) {
         // Removed, told, and a query of its tag has it no more: the index has caught up
         this.wrote.delete(page);
       }

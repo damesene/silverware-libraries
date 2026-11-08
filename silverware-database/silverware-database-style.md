@@ -27,8 +27,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 
 /* The look's own values, from SilverBullet's: a line, a quiet text, a surface a little apart from the page */
 .swd-place,
-.swd-peek,
-.swd-popover {
+.swd-peek {
   --swd-line: var(--button-border-color, rgba(128, 128, 128, 0.3));
   --swd-quiet: color-mix(in srgb, var(--root-color, currentColor) 68%, transparent);
   --swd-hover: color-mix(in srgb, var(--root-color, currentColor) 7%, transparent);
@@ -182,7 +181,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   position: relative;
   display: inline-flex;
 }
-.swd-popover {
+.swd-menu {
   position: absolute;
   z-index: 20;
   top: calc(100% + 4px);
@@ -198,44 +197,410 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   background: var(--root-background-color, #fff);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
-.swd-popover[hidden] {
+.swd-menu[hidden] {
   display: none;
 }
-.swd-menu-item,
-.swd-popover .swd-tool {
+/* ⋯'s menu (core/placemenu.ts): the shared menu (shared/menu.ts) in Silverware Database's look, its classes swd-menu-…:
+   its title (a way back in a submenu, its ×), then its entries one under another */
+.swd-menu {
+  min-width: 200px;
+  max-width: 320px;
+  font-family: var(--ui-font, system-ui, sans-serif);
+  font-size: 13px;
+  color: var(--root-color);
+}
+/* <shared-menu> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* The look of shared/menu.ts's menus: one template for every plugin drawing them, its classes those renderMenu gives
+   (`<base>-menu-item`…) with a placeholder for the base; scripts/sharedstyles.mjs writes it, the plugin's base (`swt`,
+   `swc`, `swd`) in place, into each plugin's style page (between its marks; npm run build), and check-build fails where
+   one differs.
+   The menu's box (where it shows, its size, its font, its background) is the plugin's own, `.<base>-menu`. */
+
+/* The menu's entries one under another */
+[role="menu"].swd-menu,
+.swd-menu > [role="menu"] {
   display: flex;
+  flex-direction: column;
+  outline: none;
+}
+/* The title centered; a submenu's back arrow at the left */
+.swd-menu-title {
+  /* No say in the menu's width: as wide as its items, a long title cut */
+  contain: inline-size;
+  display: grid;
+  /* The back arrow | the title | its pencil | the ×: the sides keep room for the arrow and the ×, the title is cut first */
+  grid-template-columns: minmax(22px, 1fr) minmax(0, max-content) auto minmax(22px, 1fr);
   align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  width: 100%;
-  min-height: 32px;
-  padding: 4px 8px;
-  border: 0;
-  border-radius: 6px;
+  gap: 4px;
+  padding: 4px 8px 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.swd-menu-title-text {
+  grid-column: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A submenu's way back: an arrow before its title */
+.swd-menu-back {
+  justify-self: start;
+  display: inline-flex;
+  margin: -3px 0 -3px -5px;
+  padding: 3px;
   color: inherit;
   background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.swd-menu-back:hover,
+.swd-menu-back:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.swd-menu .swd-menu-back svg {
+  width: 14px;
+  height: 14px;
+}
+/* The × closing the menu, at the title's right */
+.swd-menu-close {
+  grid-column: 4;
+  grid-row: 1;
+  justify-self: end;
+  display: inline-flex;
+  margin: -3px -5px -3px 0;
+  padding: 3px;
+  color: inherit;
+  opacity: 0.6;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.swd-menu-close:hover,
+.swd-menu-close:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.swd-menu .swd-menu-close svg {
+  width: 14px;
+  height: 14px;
+}
+/* What the menu is about named in its title: a pencil after the title, the title a field once pressed */
+.swd-menu-rename {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: start;
+  display: inline-flex;
+  margin: -3px 0;
+  padding: 3px;
+  color: inherit;
+  opacity: 0.6;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.swd-menu-rename:hover,
+.swd-menu-rename:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.swd-menu-rename[aria-disabled] {
+  opacity: 0.3;
+  cursor: default;
+  background: none;
+}
+.swd-menu .swd-menu-rename svg {
+  width: 14px;
+  height: 14px;
+}
+.swd-menu-title.swd-naming {
+  display: block;
+  padding: 2px 6px 6px;
+}
+.swd-menu-name {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 3px 6px;
   font: inherit;
+  font-weight: 400;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--ui-accent-color);
+  border-radius: 5px;
+  outline: none;
+}
+.swd-menu-name-clear {
+  margin: 4px 0 0;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 5px;
+  cursor: pointer;
+}
+.swd-menu-name-problem {
+  max-width: 260px;
+  padding: 0 8px 6px;
+  font-size: 12px;
+  color: var(--danger-color, #c62828);
+}
+/* An item: its icon, its label (and its value), a mark where it opens a submenu or is checked */
+.swd-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
   text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 5px;
   cursor: pointer;
 }
 .swd-menu-item:hover,
 .swd-menu-item:focus-visible,
-.swd-popover .swd-tool:hover {
-  background: var(--swd-hover);
+.swd-segment:not([aria-disabled="true"]):hover,
+.swd-segment:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
 }
-.swd-menu-check {
+/* A list opened in the menu's place: its choice highlighted (focusMenu), not
+   the item that came under the pointer, until the pointer moves */
+.swd-menu.swd-menu-still .swd-menu-item:hover:not(:focus-visible),
+.swd-menu-still .swd-menu-item:hover:not(:focus-visible) {
+  background: none;
+}
+.swd-menu-item.swd-menu-current {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+}
+.swd-menu-item[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.45;
+}
+.swd-menu-item[aria-disabled="true"]:hover {
+  background: none;
+}
+.swd-menu-item .swd-label {
+  flex: 1;
+}
+.swd-menu-item.swd-menu-sub::after {
+  content: "\203A";
+  opacity: 0.6;
+}
+.swd-menu-item[aria-checked="true"]::after {
+  content: "\2713";
+  color: var(--ui-accent-color);
+}
+.swd-menu-item.swd-danger {
+  color: var(--danger-color, #c62828);
+}
+.swd-icon {
   display: inline-flex;
-  width: 16px;
-  color: var(--swd-accent);
 }
-.swd-menu-check svg {
+.swd-menu svg {
   width: 16px;
   height: 16px;
 }
-.swd-menu-line {
-  margin: 4px 0;
-  border-top: 1px solid var(--swd-line);
+/* An item's detail: a bubble beside the menu, at the item's height */
+.swd-menu-detail {
+  position: absolute;
+  left: calc(100% + 8px);
+  width: max-content;
+  max-width: 280px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
 }
+.swd-menu-detail.swd-left {
+  left: auto;
+  right: calc(100% + 8px);
+}
+.swd-menu-detail[hidden] {
+  display: none;
+}
+.swd-menu-detail-title {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.swd-menu-detail-code {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.swd-menu-detail-code code {
+  padding: 1px 5px;
+  font-size: 11px;
+  background: color-mix(in srgb, var(--ui-accent-color) 12%, transparent);
+  border-radius: 4px;
+}
+.swd-menu-detail p {
+  margin: 0;
+}
+.swd-menu-detail .swd-menu-detail-note {
+  margin-top: 6px;
+  opacity: 0.7;
+}
+/* The icon of an item's value: Type: ☆ Stars */
+.swd-menu-value-icon {
+  display: inline-flex;
+  margin-right: 3px;
+  vertical-align: -2px;
+}
+.swd-menu .swd-menu-value-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.swd-menu-separator {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--button-border-color, rgba(128, 128, 128, 0.3));
+}
+/* A row of icon buttons after a label: a choice (Align) or a pair of actions (Move up, Move down) */
+.swd-menu-segmented {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 2px 8px;
+}
+/* A long label (a sheet's name) cut, whole in its tooltip: the menu as wide as its items */
+.swd-menu-segmented > .swd-label {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Something missing (a table shown as a sheet on none): its label in the danger color */
+.swd-menu-segmented .swd-label.swd-attention {
+  font-weight: 600;
+  color: var(--danger-color, #c62828);
+  opacity: 1;
+}
+.swd-segments {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--root-color) 6%, transparent);
+}
+.swd-segment {
+  display: inline-flex;
+  padding: 4px 6px;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swd-segment[aria-checked="true"] {
+  color: var(--ui-accent-color);
+  background: var(--root-background-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.swd-segment[aria-disabled="true"],
+.swd-action[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: default;
+}
+/* A bar of actions, a caption under each icon (Copy, Cut, Paste): first in a menu */
+.swd-menu-actions {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+}
+.swd-action {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 44px;
+  padding: 6px 2px 4px;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.2;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swd-action .swd-icon {
+  display: inline-flex;
+}
+.swd-action:not([aria-disabled="true"]):hover,
+.swd-action:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 15%, transparent);
+  outline: none;
+}
+.swd-action-caption {
+  white-space: nowrap;
+  opacity: 0.85;
+}
+/* Choices laid out as tiles, an icon over each label (a gallery: a chart's types) */
+.swd-menu-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+}
+.swd-menu-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  font: inherit;
+  font-size: 11px;
+  color: inherit;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swd-menu-tile[aria-checked="true"] {
+  border-color: var(--ui-accent-color);
+}
+.swd-menu-tile[aria-checked="true"] .swd-label::after {
+  content: " \2713";
+  color: var(--ui-accent-color);
+}
+.swd-menu-tile[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.45;
+}
+.swd-menu-tile:not([aria-disabled="true"]):hover,
+.swd-menu-tile:focus-visible,
+.swd-menu-tile.swd-menu-current {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.swd-menu-tile svg {
+  width: 22px;
+  height: 22px;
+}
+/* A finger's targets: bigger buttons in a row */
+@media (pointer: coarse) {
+  .swd-segment {
+    padding: 8px 10px;
+  }
+}
+/* </shared-menu> */
 /* A view drawn once per group (Group by in ⋯, core/groups.ts): each group's head, folded or not, then the view */
 .swd-group + .swd-group {
   margin-top: 12px;
@@ -278,42 +643,121 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 .swd-group-body {
   margin-top: 4px;
 }
-/* A section's title in a menu (Group by in ⋯), and why it offers nothing */
-.swd-menu-heading {
-  padding: 4px 8px 2px;
-  color: var(--swd-quiet);
-  font-size: 0.85em;
-}
-.swd-menu-note {
-  margin: 0;
-  padding: 4px 8px;
-  color: var(--swd-quiet);
-}
-.swd-menu-ways {
+/* Group in ⋯ (core/groupmenu.ts): Hide empty groups as a switch, then the groups, each its grip, name, count and eye */
+.swd-group-list {
   display: flex;
-  gap: 4px;
-  margin-top: 4px;
-  padding-top: 4px;
-  border-top: 1px solid var(--swd-line);
+  flex-direction: column;
+  gap: 2px;
 }
-.swd-menu-way {
-  flex: 1;
-  min-height: 30px;
-  border: 1px solid var(--swd-line);
-  border-radius: 6px;
+.swd-group-switch,
+.swd-group-all,
+.swd-group-grip,
+.swd-group-eye {
+  border: 0;
   color: inherit;
   background: none;
   font: inherit;
-  font-size: 0.9em;
   cursor: pointer;
 }
-.swd-menu-way[aria-pressed="true"] {
-  border-color: var(--swd-accent);
-  color: var(--swd-accent);
+.swd-group-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  text-align: left;
 }
-.swd-menu-way:disabled {
-  opacity: 0.4;
-  cursor: default;
+.swd-group-switch:hover,
+.swd-group-row:hover,
+.swd-group-all:hover {
+  background: var(--swd-hover);
+}
+.swd-group-switch-track {
+  position: relative;
+  flex: none;
+  width: 26px;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--swd-line);
+  transition: background 0.1s;
+}
+.swd-group-switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--root-background-color, #fff);
+  transition: transform 0.1s;
+}
+.swd-group-switch[aria-checked="true"] .swd-group-switch-track {
+  background: var(--swd-accent);
+}
+.swd-group-switch[aria-checked="true"] .swd-group-switch-track::after {
+  transform: translateX(12px);
+}
+.swd-group-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 2px;
+  color: var(--swd-quiet);
+  font-size: 12px;
+}
+.swd-group-all {
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--swd-quiet);
+  font-size: 12px;
+}
+.swd-group-rows {
+  display: flex;
+  flex-direction: column;
+}
+.swd-group-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.swd-group-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swd-group-row-label.swd-invalid {
+  color: var(--danger-color, #c62828);
+}
+.swd-group-off .swd-group-row-label,
+.swd-group-row-count {
+  color: var(--swd-quiet);
+}
+.swd-group-grip {
+  display: inline-flex;
+  padding: 2px;
+  color: var(--swd-quiet);
+  cursor: grab;
+  touch-action: none;
+}
+.swd-group-eye {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 4px;
+  color: var(--swd-quiet);
+}
+.swd-group-eye[aria-pressed="true"] {
+  color: inherit;
+}
+.swd-group-grip svg,
+.swd-group-eye svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* A select's value: a pill in its option's color, mixed from SilverBullet's text and page so it reads in light and dark */
@@ -595,9 +1039,12 @@ tr:focus-within .swd-open {
     opacity: 0;
   }
 }
-/* A board column's head: its option's pill (none: its name, quiet) and how many cards */
+/* A board column's head: its option's pill (another property's value: its text; none: its name, quiet) and how many cards */
 .swd-board-none {
   color: var(--swd-quiet);
+}
+.swd-board-label.swd-invalid {
+  color: var(--danger-color, #c62828);
 }
 .swd-board-count {
   color: var(--swd-quiet);
@@ -1198,6 +1645,27 @@ tr:focus-within .swd-open {
   flex-direction: column;
   gap: 10px;
   padding: 12px 14px 14px 28px;
+}
+/* A share done (Task progress): a short bar filled to it, before its percent */
+.swd-progress {
+  display: inline-block;
+  width: 3em;
+  height: 0.45em;
+  margin-right: 0.4em;
+  vertical-align: middle;
+  border-radius: 999px;
+  background: var(--swd-line);
+  overflow: hidden;
+}
+.swd-progress-done {
+  display: block;
+  height: 100%;
+  background: var(--swd-accent);
+}
+/* A system property's details: what gives its values, in place of its type and settings */
+.swd-prop-system {
+  margin: 0;
+  color: var(--swd-quiet);
 }
 .swd-prop-field {
   display: grid;

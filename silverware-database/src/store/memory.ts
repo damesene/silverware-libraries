@@ -11,6 +11,7 @@
 // of) is checked again as it is applied, against the store as it is then, as
 // anything may have been written between the two. What a transaction comes
 // to is transaction.ts', the same for every store.
+import { hasSystem, localStamp, tasksIn, withSystemValues } from "../domain/system.ts";
 import type { Changes } from "../core/changes.ts";
 import type { DatabaseStore, VersionStatus, MigrationScope, Planned, SkipCause, Skipped, StoreCapabilities, Target, TransactionPlan, TransactionReport, WriteProgress } from "../core/store.ts";
 import { told } from "../core/store.ts";
@@ -82,6 +83,8 @@ export class MemoryStore implements DatabaseStore {
     validateItemName: (name) => this.validateItemName(name),
     nameKey: (name) => name,
   };
+  // When each item was made and last written, as a page's dates are kept (its system properties' Created and Modified)
+  private readonly stamps = new Map<ItemKey, { readonly created: string; modified: string }>();
   private made = 0;
   private revision = 0;
   private incarnations = 0;
@@ -93,6 +96,7 @@ export class MemoryStore implements DatabaseStore {
         const key = this.newKey();
         kept.items.set(key, { ...item, key });
         kept.itemRevisions.set(key, ++this.revision);
+        this.stamp(key);
       }
     }
   }
@@ -111,7 +115,10 @@ export class MemoryStore implements DatabaseStore {
     if (!kept) return { value: [], revision: "0" };
     let latest = 0;
     for (const revision of kept.itemRevisions.values()) latest = Math.max(latest, revision);
-    const items = [...kept.items.values()].map((item) => ({ ...item, revision: String(kept.itemRevisions.get(item.key)) }));
+    const plain = [...kept.items.values()].map((item) => ({ ...item, revision: String(kept.itemRevisions.get(item.key)) }));
+    // (The tasks of an item's body counted only where the database shows their progress)
+    const tasks = hasSystem(kept.record.database, "taskProgress");
+    const items = withSystemValues(plain, kept.record.database, (item) => ({ ...this.stamps.get(item.key), ...(tasks ? { tasks: tasksIn(item.body ?? "") } : {}) }));
     return { value: items, revision: String(latest) };
   }
 
@@ -210,6 +217,7 @@ export class MemoryStore implements DatabaseStore {
       if (step.after) kept.items.set(key, { ...step.after, key });
       else kept.items.delete(key);
       kept.itemRevisions.set(key, revision);
+      if (step.after) this.stamp(key);
       if (step.ref !== undefined) created.set(step.ref, key);
       this.keep(written, one, { step, before, revision, key, incarnation: kept.incarnation });
     }
@@ -332,6 +340,7 @@ export class MemoryStore implements DatabaseStore {
     if (change.removed) kept.items.delete(item);
     else kept.items.set(item, { ...now, name: change.name ?? now.name, values: { ...now.values, ...change.values } });
     kept.itemRevisions.set(item, ++this.revision);
+    if (!change.removed) this.stamp(item);
     for (const listener of this.listeners) listener({ database });
   }
 
@@ -346,6 +355,14 @@ export class MemoryStore implements DatabaseStore {
     const one: Planned = { target, changes };
     this.steps.set(one, step);
     planned.push(one);
+  }
+
+  /** An item written now: made now where it was not known */
+  private stamp(key: ItemKey): void {
+    const now = localStamp(new Date());
+    const known = this.stamps.get(key);
+    if (known) known.modified = now;
+    else this.stamps.set(key, { created: now, modified: now });
   }
 
   private keep(written: Planned[], one: Planned, was: Written): void {

@@ -223,7 +223,7 @@ describe("the peek", () => {
     q<HTMLInputElement>(".swd-peek-name").focus();
     q<HTMLInputElement>(".swd-peek-name").value = "Fix login now";
     await core.addProperty("tasks", { label: "Owner", type: "text" });
-    modules.placeTools({ document, database: TASKS });
+    modules.placeDrawn({ document, database: TASKS });
     await settle();
     expect([...document.querySelectorAll(".swd-peek-label")]).toHaveLength(3);
     expect(q<HTMLInputElement>(".swd-peek-name").value).toBe("Fix login now");

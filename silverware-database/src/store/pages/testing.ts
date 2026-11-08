@@ -5,6 +5,7 @@
 // moment after, so the store's holding of what it wrote can be tried;
 // `toldEarly` with it: the index tells of a page as it is written, before a
 // query has it (as SilverBullet's did, seen 2026-11-07).
+import { localStamp, tasksIn } from "../../domain/system.ts";
 import { readFrontmatter } from "../../../../shared/pages/frontmatter.ts";
 import { readYamlMap } from "../../../../shared/pages/yamltree.ts";
 import type { Editor, Index, IndexChange, IndexedObject, Platform, Space } from "../../../../shared/platform.ts";
@@ -34,21 +35,33 @@ export function memoryPages(initial: Readonly<Record<string, string>> = {}, opti
   const indexed = new Map<string, IndexedObject>();
   const listeners = new Set<(change: IndexChange) => void>();
   const pending = new Set<string>();
-  const tell = (page: string) => {
-    for (const listener of listeners) listener({ document: page, deleted: !pages.has(page) });
+  // Each page's dates as SilverBullet's index has them (made once, written with each change), from a clock of its own that
+  // moves a second a change, so they differ and sort
+  const dates = new Map<string, { created: string; lastModified: string }>();
+  let clock = new Date(2026, 10, 1, 9, 0, 0).getTime();
+  const dated = (page: string, text: string) => {
+    const now = localStamp(new Date((clock += 1000)));
+    const known = dates.get(page);
+    dates.set(page, { created: known?.created ?? now, lastModified: now });
+    return { ...indexObject(page, text), ...dates.get(page) };
   };
+  const tell = (page: string, early: boolean) => {
+    for (const listener of listeners) listener({ document: page, deleted: !pages.has(page), ...(early ? { early: true } : {}) });
+  };
+  // Indexed: told as the index starts on it, then whole (told early already: whole alone)
   const index = (page: string) => {
+    if (!options.toldEarly) tell(page, true);
     const text = pages.get(page);
     if (text === undefined) indexed.delete(page);
-    else indexed.set(page, indexObject(page, text));
-    if (!options.toldEarly) tell(page);
+    else indexed.set(page, dated(page, text));
+    tell(page, false);
   };
   const changed = (page: string) => {
-    if (options.toldEarly) tell(page);
+    if (options.toldEarly) tell(page, true);
     if (options.lagging) pending.add(page);
     else index(page);
   };
-  for (const page of pages.keys()) indexed.set(page, indexObject(page, pages.get(page)!));
+  for (const page of pages.keys()) indexed.set(page, dated(page, pages.get(page)!));
   const editor: Editor = {
     documentName: () => {
       if (options.open === undefined) throw new Error("no page is open");
@@ -87,6 +100,18 @@ export function memoryPages(initial: Readonly<Record<string, string>> = {}, opti
   };
   const indexApi: Index = {
     objects: (tag) => [...indexed.values()].filter((object) => (object.tags as readonly string[]).includes(tag)),
+    // Its own: the keys its objects have beside a page's frontmatter, the dates it keeps, the tasks of a page's text
+    reservedKeys: new Set(["name", "tags", "created", "lastModified"]),
+    documentDates: (object) => ({ ...(typeof object.created === "string" ? { created: object.created } : {}), ...(typeof object.lastModified === "string" ? { modified: object.lastModified } : {}) }),
+    tasks: (documents) => {
+      const counts = new Map<string, { done: number; total: number }>();
+      for (const page of documents) {
+        const text = indexed.has(page) ? (pages.get(page) ?? "") : "";
+        const count = tasksIn(text.slice(readFrontmatter(text).bodyStart));
+        if (count.total) counts.set(page, count);
+      }
+      return counts;
+    },
     onChanged: (listener) => {
       listeners.add(listener);
       return () => void listeners.delete(listener);

@@ -9,7 +9,7 @@
 // group folded is kept in the view's meta (`<view>.folded`), drawn as its head
 // alone. A view failing in one group says so there, the others drawn.
 import { el } from "../../../shared/elements.ts";
-import { groupItems, type ItemGroup } from "../domain/grouping.ts";
+import { arrangeGroups, groupItems, type ItemGroup } from "../domain/grouping.ts";
 import type { Property } from "../model/database.ts";
 import { ICONS } from "./icons.ts";
 import type { ViewDefinition, ViewHost, ViewInstance } from "./view.ts";
@@ -32,9 +32,12 @@ function groupHost(host: ViewHost, property: Property, key: string, groups: () =
   Object.defineProperty(grouped, "items", { get: () => group()?.items ?? [] });
   // (Its own count: a view saying how many of all it shows, as filtered, says it of its group)
   Object.defineProperty(grouped, "total", { get: () => group()?.items.length ?? 0 });
+  // (Its items are one group's: grouped no further)
+  Object.defineProperty(grouped, "grouping", { get: () => undefined });
   grouped.create = (draft = {}, place) => {
     const value = group()?.value;
-    return host.create(value === undefined ? draft : { ...draft, values: { [property.key]: value, ...draft.values } }, place);
+    // (A property not changed by hand, a system property's: the item added without it, as any other)
+    return host.create(value === undefined || property.readonly ? draft : { ...draft, values: { [property.key]: value, ...draft.values } }, place);
   };
   return grouped;
 }
@@ -45,7 +48,8 @@ export function drawGrouped(view: ViewDefinition, host: ViewHost, element: HTMLE
   let groups: readonly ItemGroup[] = [];
   let shapeOf = "";
   let children: (ViewInstance | void)[] = [];
-  const regroup = () => groupItems(host.items, host.database.properties.find((one) => one.key === property.key) ?? property, host.type(property));
+  // The groups shown: in the order given them, those hidden (and empty ones, where they are hidden) left out
+  const regroup = () => arrangeGroups(groupItems(host.items, host.database.properties.find((one) => one.key === property.key) ?? property, host.type(property)), host.listing.groupArrangement).shown;
   // What decides the sections: the groups there are, in order, and which are folded
   const shape = (all: readonly ItemGroup[], folded: ReadonlySet<string>) => JSON.stringify(all.map((one) => [one.key, one.label, folded.has(one.key)]));
   const destroy = () => {

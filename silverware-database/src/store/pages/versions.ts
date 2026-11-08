@@ -5,6 +5,7 @@
 // the latest; a database of an older version is migrated first, one of a
 // newer version read (by the latest reader, as best it can) and never written.
 import type { PageBuilder } from "../../../../shared/pages/changes.ts";
+import type { YamlMap } from "../../../../shared/pages/yamltree.ts";
 import type { IndexedObject } from "../../../../shared/platform.ts";
 import type { Property, Value } from "../../model/database.ts";
 import type { ItemState, RecordState } from "../transaction.ts";
@@ -66,7 +67,22 @@ export function modelValue(value: unknown): Value | undefined {
 }
 
 // A property's settings in the root page beside its params: what the model has as fields
-const PROPERTY_FIELDS = new Set(["type", "label", "readonly", "hidden", "required"]);
+const PROPERTY_FIELDS = new Set(["type", "label", "readonly", "hidden", "required", "system"]);
+
+/** A property as the root page keeps it under its key: its type, label, flags, a system property's kind, its params beside them */
+export function schemaEntry(property: Property): YamlMap {
+  // (A param named as a field of its own, which the core refuses, left out: it would take the field's place as read)
+  const params = Object.fromEntries(Object.entries(property.params as YamlMap).filter(([name]) => !PROPERTY_FIELDS.has(name)));
+  return {
+    type: property.type,
+    label: property.label,
+    ...(property.readonly ? { readonly: true } : {}),
+    ...(property.hidden ? { hidden: true } : {}),
+    ...(property.required ? { required: true } : {}),
+    ...(property.system ? { system: property.system } : {}),
+    ...params,
+  };
+}
 
 /** Version 1: the schema under `_database.properties` by key, each property's params beside its type and label */
 export const VERSION_1: PagesVersion = {
@@ -80,14 +96,27 @@ export const VERSION_1: PagesVersion = {
     for (const [key, raw] of Object.entries(schema)) {
       if (!isObject(raw)) return { problem: `its property ${key} is no map` };
       const params = Object.fromEntries(Object.entries(raw).filter(([field]) => !PROPERTY_FIELDS.has(field)));
-      properties.push({ key, label: typeof raw.label === "string" ? raw.label : key, type: typeof raw.type === "string" ? raw.type : "text", params, readonly: raw.readonly === true, ...(raw.hidden === true ? { hidden: true } : {}), ...(raw.required === true ? { required: true } : {}) });
+      // (A system property is read only, whatever is written)
+      const system = typeof raw.system === "string" && raw.system ? raw.system : undefined;
+      properties.push({
+        key,
+        label: typeof raw.label === "string" ? raw.label : key,
+        type: typeof raw.type === "string" ? raw.type : "text",
+        params,
+        readonly: raw.readonly === true || system !== undefined,
+        ...(raw.hidden === true ? { hidden: true } : {}),
+        ...(raw.required === true ? { required: true } : {}),
+        ...(system ? { system } : {}),
+      });
     }
     const name = typeof system.name === "string" && system.name ? system.name : system.id;
     return { record: { database: { id: system.id, name, properties }, version } };
   },
   readItem(object, name, record) {
     const values: Record<string, Value> = {};
-    for (const { key } of record.database.properties) {
+    // (A system property's values are none of the page's: its key in a page is the user's own, left as it is)
+    for (const { key, system } of record.database.properties) {
+      if (system !== undefined) continue;
       const value = modelValue(object[key]);
       if (value !== undefined) values[key] = value;
     }
@@ -102,9 +131,7 @@ export const VERSION_1: PagesVersion = {
     page.properties.remove([SYSTEM_KEY, "format"]);
     const schema = (record: RecordState | undefined) => (record ? JSON.stringify(record.database.properties) : undefined);
     if (schema(before) !== schema(after)) {
-      const map = Object.fromEntries(
-        after.database.properties.map((one) => [one.key, { type: one.type, label: one.label, ...(one.readonly ? { readonly: true } : {}), ...(one.hidden ? { hidden: true } : {}), ...(one.required ? { required: true } : {}), ...(one.params as Record<string, never>) }]),
-      );
+      const map = Object.fromEntries(after.database.properties.map((one) => [one.key, schemaEntry(one)]));
       page.properties.set([SYSTEM_KEY, "properties"], map);
     }
   },

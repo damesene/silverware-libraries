@@ -8,6 +8,7 @@
 // first: how many items it changes and which values it keeps as they are,
 // applied only as the user says so. Every change goes through the core:
 // checked, said where refused, kept for Undo.
+import { SYSTEM_PROPERTIES, systemKind } from "../../domain/system.ts";
 import { switchControl } from "../../../../shared/controls.ts";
 import { Dialogs } from "../../../../shared/dialog.ts";
 import { reorder } from "../../../../shared/drag.ts";
@@ -15,11 +16,18 @@ import { el } from "../../../../shared/elements.ts";
 import type { Proposal, Refused, Result } from "../../core/core.ts";
 import type { ModuleHost } from "../../core/module.ts";
 import { colorsOf, OPTION_COLORS, type OptionColor } from "../../domain/types/options.ts";
+import type { PropertyType } from "../../domain/types/type.ts";
 import type { Database, Params, Property } from "../../model/database.ts";
 import { typeIcon } from "../../views/icons.ts";
 import { optionPill, pill } from "../../views/values.ts";
 
 // The settings dialog's look: the same rows, cards and switches
+// A system property's choice among the new property's types: `system:<kind>`
+const SYSTEM_PREFIX = "system:";
+
+/** The types offered for a property of the user's (not those only the system's properties have) */
+const offered = (all: readonly PropertyType[]) => all.filter((one) => one.offered !== false);
+
 const BASE = "swd-settings";
 const CLOSE = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>';
 
@@ -238,11 +246,11 @@ export class PropertiesDialog {
     const head = el(
       doc,
       "button",
-      { class: "swd-prop-head", attrs: { "aria-expanded": String(open), "aria-label": `${property.label}, ${type?.label ?? property.type}${property.required ? ", required" : ""}${property.hidden ? ", hidden in views" : ""}${property.readonly ? ", locked in views" : ""}` } },
+      { class: "swd-prop-head", attrs: { "aria-expanded": String(open), "aria-label": `${property.label}, ${type?.label ?? property.type}${property.required ? ", required" : ""}${property.hidden ? ", hidden in views" : ""}${property.system ? ", given by the system" : property.readonly ? ", locked in views" : ""}` } },
       el(doc, "span", { class: "swd-prop-icon", html: typeIcon(type?.name ?? "text") }),
       el(doc, "span", { class: "swd-prop-name", text: property.label }, ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", title: "Required", attrs: { "aria-hidden": "true" } })] : [])),
-      ...(property.readonly ? [el(doc, "span", { class: "swd-prop-lock", html: LOCK, title: "Locked in views" })] : []),
-      el(doc, "span", { class: "swd-prop-type", text: type?.label ?? property.type }),
+      ...(property.readonly ? [el(doc, "span", { class: "swd-prop-lock", html: LOCK, title: property.system ? "Given by the system" : "Locked in views" })] : []),
+      el(doc, "span", { class: "swd-prop-type", text: systemKind(property.system)?.label ? `System: ${systemKind(property.system)!.label}` : (type?.label ?? property.type) }),
     );
     head.addEventListener("click", () => {
       this.opened = open ? undefined : property.key;
@@ -293,9 +301,24 @@ export class PropertiesDialog {
     label.addEventListener("change", () => {
       if (label.value.trim() && label.value.trim() !== property.label) void this.run(() => core.renameProperty(this.id, property.key, label.value), "");
     });
-    const type = el(doc, "select", { class: "swd-property-type", attrs: { "aria-label": `Type of ${property.label}` } }, ...types.all().map((one) => new Option(one.label, one.name, false, one.name === property.type)));
-    // (A type not defined now kept as it is)
-    if (!types.named(property.type)) type.append(new Option(property.type, property.type, false, true));
+    const remove = el(doc, "button", { class: "swd-property-remove", text: "Remove property", attrs: { "aria-label": `Remove ${property.label}` }, run: () => void this.removing(property) });
+    const field = (name: string, control: HTMLElement, hint?: string) => el(doc, "label", "swd-prop-field", el(doc, "span", "swd-prop-field-name", name, ...(hint ? [el(doc, "span", { class: `${BASE}-hint`, text: hint })] : [])), control);
+    // A system property: its name (and shown or hidden, its place, from the list); what it is, its key; no type, setting or value to change
+    if (property.system !== undefined) {
+      const kind = systemKind(property.system);
+      return el(
+        doc,
+        "div",
+        "swd-prop-detail",
+        field("Name", label),
+        el(doc, "p", { class: "swd-prop-system", text: kind ? `Given by the system: ${kind.hint}. Read only.` : `Given by the system ("${property.system}", not known to this version): no values.` }),
+        field("Key", el(doc, "input", { class: "swd-property-key", attrs: { "aria-label": `Key of ${property.label}`, value: property.key, readonly: "" } }), "How queries name it"),
+        el(doc, "div", "swd-prop-actions", remove),
+      );
+    }
+    const type = el(doc, "select", { class: "swd-property-type", attrs: { "aria-label": `Type of ${property.label}` } }, ...offered(types.all()).map((one) => new Option(one.label, one.name, false, one.name === property.type)));
+    // (A type not defined now, or not offered, kept as it is)
+    if (!offered(types.all()).some((one) => one.name === property.type)) type.append(new Option(types.named(property.type)?.label ?? property.type, property.type, false, true));
     type.addEventListener("change", () => void this.run(() => core.retypeProperty(this.id, property.key, type.value), `Change the type of ${property.label}`));
     const locked = switchControl(doc, BASE, property.readonly, (on) => void this.run(() => core.setPropertyReadonly(this.id, property.key, on), ""));
     locked.querySelector("input")?.setAttribute("aria-label", `${property.label} locked in views`);
@@ -305,8 +328,6 @@ export class PropertiesDialog {
     key.addEventListener("change", () => {
       if (key.value.trim() && key.value.trim() !== property.key) void this.run(() => core.rekeyProperty(this.id, property.key, key.value.trim()), `Change the key of ${property.label} to ${key.value.trim()}`);
     });
-    const remove = el(doc, "button", { class: "swd-property-remove", text: "Remove property", attrs: { "aria-label": `Remove ${property.label}` }, run: () => void this.removing(property) });
-    const field = (name: string, control: HTMLElement, hint?: string) => el(doc, "label", "swd-prop-field", el(doc, "span", "swd-prop-field-name", name, ...(hint ? [el(doc, "span", { class: `${BASE}-hint`, text: hint })] : [])), control);
     const named = types.named(property.type)?.name;
     return el(
       doc,
@@ -509,6 +530,8 @@ export class PropertiesDialog {
   /** A property removed: its values kept in the items (shown again if it comes back), or taken off them too, as the user picks */
   private async removing(property: Property): Promise<void> {
     const { core, ui } = this.host;
+    // (A system property's values are none of the items': nothing to ask)
+    if (property.system !== undefined) return void (await this.run(() => core.removeProperty(this.id, property.key, { values: false }), `Remove ${property.label}`));
     const values = (await ui.ask?.(`Take ${property.label}'s values off the items too? (No: removed from the database, its values kept in the pages. Either way the change is shown before it is written.)`, { destructive: true })) ?? false;
     await this.run(() => core.removeProperty(this.id, property.key, { values }), `Remove ${property.label}${values ? " and its values" : ""}`);
   }
@@ -519,15 +542,33 @@ export class PropertiesDialog {
     const label = el(doc, "input", { class: "swd-property-new-label", attrs: { placeholder: "+ Add a property", "aria-label": "New property's name" } });
     label.value = this.adding.label;
     label.addEventListener("input", () => void (this.adding.label = label.value));
-    const type = el(doc, "select", { class: "swd-property-new-type", attrs: { "aria-label": "New property's type" } }, ...types.all().map((one) => new Option(one.label, one.name, false, one.name === this.adding.type)));
-    type.addEventListener("change", () => void (this.adding.type = type.value));
+    const there = new Set(this.database?.properties.map((one) => one.system).filter((one): one is string => one !== undefined));
+    const system = el(
+      doc,
+      "optgroup",
+      { attrs: { label: "System (read only)" } },
+      ...SYSTEM_PROPERTIES.map((one) => {
+        const option = new Option(one.label, `${SYSTEM_PREFIX}${one.kind}`, false, `${SYSTEM_PREFIX}${one.kind}` === this.adding.type);
+        option.disabled = there.has(one.kind);
+        option.title = there.has(one.kind) ? `${one.label} is there already` : one.hint;
+        return option;
+      }),
+    );
+    const type = el(doc, "select", { class: "swd-property-new-type", attrs: { "aria-label": "New property's type" } }, ...offered(types.all()).map((one) => new Option(one.label, one.name, false, one.name === this.adding.type)), system);
+    // A system property picked: its own name offered, which may be changed
+    type.addEventListener("change", () => {
+      this.adding.type = type.value;
+      const kind = type.value.startsWith(SYSTEM_PREFIX) ? systemKind(type.value.slice(SYSTEM_PREFIX.length)) : undefined;
+      if (kind && !label.value.trim()) label.value = this.adding.label = kind.label;
+    });
     const add = el(doc, "button", {
       class: "swd-property-add",
       text: "Add",
       run: async () => {
-        if (!label.value.trim()) return label.focus();
-        const wanted = { label: label.value, type: type.value };
-        this.adding = { ...wanted };
+        const kind = type.value.startsWith(SYSTEM_PREFIX) ? systemKind(type.value.slice(SYSTEM_PREFIX.length)) : undefined;
+        if (!label.value.trim() && !kind) return label.focus();
+        this.adding = { label: label.value, type: type.value };
+        const wanted = kind ? { label: label.value, type: kind.type, system: kind.kind } : { label: label.value, type: type.value };
         if (await this.run(() => core.addProperty(this.id, wanted), "")) {
           this.adding = { label: "", type: "" };
           this.draw();

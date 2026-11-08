@@ -1,0 +1,390 @@
+/* The look of shared/menu.ts's menus: one template for every plugin drawing them, its classes those renderMenu gives
+   (`<base>-menu-item`…) with a placeholder for the base; scripts/sharedstyles.mjs writes it, the plugin's base (`swt`,
+   `swc`, `swd`) in place, into each plugin's style page (between its marks; npm run build), and check-build fails where
+   one differs.
+   The menu's box (where it shows, its size, its font, its background) is the plugin's own, `.<base>-menu`. */
+
+/* The menu's entries one under another */
+[role="menu"].__base__-menu,
+.__base__-menu > [role="menu"] {
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+/* The title centered; a submenu's back arrow at the left */
+.__base__-menu-title {
+  /* No say in the menu's width: as wide as its items, a long title cut */
+  contain: inline-size;
+  display: grid;
+  /* The back arrow | the title | its pencil | the ×: the sides keep room for the arrow and the ×, the title is cut first */
+  grid-template-columns: minmax(22px, 1fr) minmax(0, max-content) auto minmax(22px, 1fr);
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.__base__-menu-title-text {
+  grid-column: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A submenu's way back: an arrow before its title */
+.__base__-menu-back {
+  justify-self: start;
+  display: inline-flex;
+  margin: -3px 0 -3px -5px;
+  padding: 3px;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.__base__-menu-back:hover,
+.__base__-menu-back:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.__base__-menu .__base__-menu-back svg {
+  width: 14px;
+  height: 14px;
+}
+/* The × closing the menu, at the title's right */
+.__base__-menu-close {
+  grid-column: 4;
+  grid-row: 1;
+  justify-self: end;
+  display: inline-flex;
+  margin: -3px -5px -3px 0;
+  padding: 3px;
+  color: inherit;
+  opacity: 0.6;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.__base__-menu-close:hover,
+.__base__-menu-close:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.__base__-menu .__base__-menu-close svg {
+  width: 14px;
+  height: 14px;
+}
+/* What the menu is about named in its title: a pencil after the title, the title a field once pressed */
+.__base__-menu-rename {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: start;
+  display: inline-flex;
+  margin: -3px 0;
+  padding: 3px;
+  color: inherit;
+  opacity: 0.6;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.__base__-menu-rename:hover,
+.__base__-menu-rename:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.__base__-menu-rename[aria-disabled] {
+  opacity: 0.3;
+  cursor: default;
+  background: none;
+}
+.__base__-menu .__base__-menu-rename svg {
+  width: 14px;
+  height: 14px;
+}
+.__base__-menu-title.__base__-naming {
+  display: block;
+  padding: 2px 6px 6px;
+}
+.__base__-menu-name {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 3px 6px;
+  font: inherit;
+  font-weight: 400;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--ui-accent-color);
+  border-radius: 5px;
+  outline: none;
+}
+.__base__-menu-name-clear {
+  margin: 4px 0 0;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 5px;
+  cursor: pointer;
+}
+.__base__-menu-name-problem {
+  max-width: 260px;
+  padding: 0 8px 6px;
+  font-size: 12px;
+  color: var(--danger-color, #c62828);
+}
+/* An item: its icon, its label (and its value), a mark where it opens a submenu or is checked */
+.__base__-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.__base__-menu-item:hover,
+.__base__-menu-item:focus-visible,
+.__base__-segment:not([aria-disabled="true"]):hover,
+.__base__-segment:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+/* A list opened in the menu's place: its choice highlighted (focusMenu), not
+   the item that came under the pointer, until the pointer moves */
+.__base__-menu.__base__-menu-still .__base__-menu-item:hover:not(:focus-visible),
+.__base__-menu-still .__base__-menu-item:hover:not(:focus-visible) {
+  background: none;
+}
+.__base__-menu-item.__base__-menu-current {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+}
+.__base__-menu-item[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.45;
+}
+.__base__-menu-item[aria-disabled="true"]:hover {
+  background: none;
+}
+.__base__-menu-item .__base__-label {
+  flex: 1;
+}
+.__base__-menu-item.__base__-menu-sub::after {
+  content: "\203A";
+  opacity: 0.6;
+}
+.__base__-menu-item[aria-checked="true"]::after {
+  content: "\2713";
+  color: var(--ui-accent-color);
+}
+.__base__-menu-item.__base__-danger {
+  color: var(--danger-color, #c62828);
+}
+.__base__-icon {
+  display: inline-flex;
+}
+.__base__-menu svg {
+  width: 16px;
+  height: 16px;
+}
+/* An item's detail: a bubble beside the menu, at the item's height */
+.__base__-menu-detail {
+  position: absolute;
+  left: calc(100% + 8px);
+  width: max-content;
+  max-width: 280px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+.__base__-menu-detail.__base__-left {
+  left: auto;
+  right: calc(100% + 8px);
+}
+.__base__-menu-detail[hidden] {
+  display: none;
+}
+.__base__-menu-detail-title {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.__base__-menu-detail-code {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.__base__-menu-detail-code code {
+  padding: 1px 5px;
+  font-size: 11px;
+  background: color-mix(in srgb, var(--ui-accent-color) 12%, transparent);
+  border-radius: 4px;
+}
+.__base__-menu-detail p {
+  margin: 0;
+}
+.__base__-menu-detail .__base__-menu-detail-note {
+  margin-top: 6px;
+  opacity: 0.7;
+}
+/* The icon of an item's value: Type: ☆ Stars */
+.__base__-menu-value-icon {
+  display: inline-flex;
+  margin-right: 3px;
+  vertical-align: -2px;
+}
+.__base__-menu .__base__-menu-value-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.__base__-menu-separator {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--button-border-color, rgba(128, 128, 128, 0.3));
+}
+/* A row of icon buttons after a label: a choice (Align) or a pair of actions (Move up, Move down) */
+.__base__-menu-segmented {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 2px 8px;
+}
+/* A long label (a sheet's name) cut, whole in its tooltip: the menu as wide as its items */
+.__base__-menu-segmented > .__base__-label {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Something missing (a table shown as a sheet on none): its label in the danger color */
+.__base__-menu-segmented .__base__-label.__base__-attention {
+  font-weight: 600;
+  color: var(--danger-color, #c62828);
+  opacity: 1;
+}
+.__base__-segments {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--root-color) 6%, transparent);
+}
+.__base__-segment {
+  display: inline-flex;
+  padding: 4px 6px;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.__base__-segment[aria-checked="true"] {
+  color: var(--ui-accent-color);
+  background: var(--root-background-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.__base__-segment[aria-disabled="true"],
+.__base__-action[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: default;
+}
+/* A bar of actions, a caption under each icon (Copy, Cut, Paste): first in a menu */
+.__base__-menu-actions {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+}
+.__base__-action {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 44px;
+  padding: 6px 2px 4px;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.2;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.__base__-action .__base__-icon {
+  display: inline-flex;
+}
+.__base__-action:not([aria-disabled="true"]):hover,
+.__base__-action:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 15%, transparent);
+  outline: none;
+}
+.__base__-action-caption {
+  white-space: nowrap;
+  opacity: 0.85;
+}
+/* Choices laid out as tiles, an icon over each label (a gallery: a chart's types) */
+.__base__-menu-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+}
+.__base__-menu-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  font: inherit;
+  font-size: 11px;
+  color: inherit;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.__base__-menu-tile[aria-checked="true"] {
+  border-color: var(--ui-accent-color);
+}
+.__base__-menu-tile[aria-checked="true"] .__base__-label::after {
+  content: " \2713";
+  color: var(--ui-accent-color);
+}
+.__base__-menu-tile[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.45;
+}
+.__base__-menu-tile:not([aria-disabled="true"]):hover,
+.__base__-menu-tile:focus-visible,
+.__base__-menu-tile.__base__-menu-current {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.__base__-menu-tile svg {
+  width: 22px;
+  height: 22px;
+}
+/* A finger's targets: bigger buttons in a row */
+@media (pointer: coarse) {
+  .__base__-segment {
+    padding: 8px 10px;
+  }
+}

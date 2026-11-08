@@ -11,6 +11,7 @@ import type { Settings, UserInterface } from "../../../shared/platform.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
 import type { Database, Item, Revised } from "../model/database.ts";
 import type { DatabaseCore } from "./core.ts";
+import type { PlaceMenuBuilder, PlaceMenuGroup } from "./placemenu.ts";
 import type { ViewSetting } from "./view.ts";
 
 /** A module's setting: as a view's (`silverware.database.modules.<module>.<key>`) */
@@ -24,8 +25,10 @@ export type PlaceContext = {
 
 /** What a started module adds; each part optional */
 export type ModuleInstance = {
-  /** Elements beside the view switcher's tools of a place (a button opening the module's dialog) */
-  placeTools?(place: PlaceContext): readonly Node[];
+  /** Its entries in a place's menu (⋯), asked as it opens: given the menu's builder, groups in its slots (`data`: Properties) or sections of their own */
+  placeMenu?(place: PlaceContext, menu: PlaceMenuBuilder): readonly PlaceMenuGroup[];
+  /** Told as a place is drawn (anew: a change made elsewhere, an Undo), so what it shows for a database follows (a dialog open, the peek) */
+  placeDrawn?(place: PlaceContext): void;
   /**
    * An item a view opens (a click on its name, its ↗): true where the module
    * shows it in its own way (the peek), the first module to say so taking it;
@@ -175,8 +178,13 @@ export class Modules {
     return false;
   }
 
-  /** What the modules on add to a place's tools */
-  placeTools(place: PlaceContext): Node[] {
-    return this.started.flatMap(({ instance }) => [...(instance.placeTools?.(place) ?? [])]);
+  /** The modules' entries in a place's menu, in their order */
+  placeMenu(place: PlaceContext, menu: PlaceMenuBuilder): PlaceMenuGroup[] {
+    return this.started.flatMap(({ instance }) => [...(instance.placeMenu?.(place, menu) ?? [])]);
+  }
+
+  /** The modules told a place was drawn */
+  placeDrawn(place: PlaceContext): void {
+    for (const { instance } of this.started) instance.placeDrawn?.(place);
   }
 }

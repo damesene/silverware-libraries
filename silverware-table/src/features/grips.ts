@@ -3,7 +3,8 @@
 // stretch them); hovering one tints its row or column, a click opens the row or
 // column menu, a drag moves the row or column. Shift+click on another grip
 // selects the rows (columns) between.
-import type { CellRef, Feature, LineDrag, LineMenuBuilder, LineMenuGroup, LineMenuSlot, MarkLayer, ModelHost, TableInfo } from "../core/feature.ts";
+import { type CellRef, type Feature, LINE_MENU_SLOTS, type LineDrag, type LineMenuBuilder, type LineMenuSlot, type MarkLayer, type ModelHost, type TableInfo } from "../core/feature.ts";
+import { customSections, menuBuilder, slotEntries } from "../../../shared/menuslots.ts";
 import { LONG_PRESS_MS } from "../core/press.ts";
 import {
   columnBlockTo,
@@ -21,7 +22,7 @@ import {
 } from "../core/structure.ts";
 import { ICONS } from "../icons.ts";
 import { type Align, parseTable, type Table } from "../markdown.ts";
-import { menuActions, type MenuEntry, menuItem, menuSegmented, menuSeparator, namingThatCloses, wrapRuns } from "../menu.ts";
+import { type MenuEntry, namingThatCloses, wrapRuns } from "../menu.ts";
 import { setAlign } from "../ops.ts";
 import { columnZone, insertColumnAt, insertRowAt, rowZone } from "../pins.ts";
 import { type ViewState, withoutSort, withSort } from "../view.ts";
@@ -47,25 +48,6 @@ const ROW_GRIP_LENGTH = 32;
 const COLUMN_GRIP_LENGTH = 44;
 
 const PIN_NEEDS_METADATA = "Pinning is stored in the table: turn on the Store table metadata setting (unpinning always works)";
-
-/**
- * The sections of their own (`custom`) of a position (primary, secondary) in a row's or a
- * column's menu, each its entries: one per name, as the names first came;
- * a section's blocks by priority (lower first; equal: as they came)
- */
-export function customSections(groups: readonly LineMenuGroup[], position: "primary" | "secondary"): MenuEntry[][] {
-  const blocks = groups.flatMap((group) => (group.slot === "custom" && (group.custom.position ?? "secondary") === position ? [group] : []));
-  const names = [...new Set(blocks.map((block) => block.custom.name))];
-  return names
-    .map((name) =>
-      blocks
-        .filter((block) => block.custom.name === name)
-        // (A stable sort)
-        .sort((a, b) => (a.custom.priority ?? 0) - (b.custom.priority ?? 0))
-        .flatMap((block) => block.entries),
-    )
-    .filter((entries) => entries.length > 0);
-}
 
 export class Grips implements Feature {
   private readonly rowGrip: HTMLButtonElement;
@@ -810,34 +792,13 @@ export class Grips implements Feature {
   ): { readonly slot: (slot: LineMenuSlot) => MenuEntry[]; readonly custom: (position: "primary" | "secondary") => MenuEntry[] } {
     const groups = this.host.lineMenu(info, { axis, at, lines: this.selectedLines(info, axis, at) }, this.builder);
     return {
-      slot: (slot) => groups.filter((group) => group.slot === slot).flatMap((group) => group.entries),
+      slot: (slot) => slotEntries(groups, slot),
       custom: (position) => customSections(groups, position).flatMap((entries) => [...this.closingUnlessReplaced(entries), { kind: "separator" } as const]),
     };
   }
 
   /** What the modules make their entries with: values; a submenu shows in this menu's place */
-  private readonly builder: LineMenuBuilder = (() => {
-    const open = (title: string, entries: readonly MenuEntry[]) => this.replaceMenu(title, entries);
-    const slot = (name: LineMenuSlot) => (entries: readonly MenuEntry[]): LineMenuGroup => ({ slot: name, entries });
-    return {
-      slot: {
-        clipboard: slot("clipboard"),
-        edit: slot("edit"),
-        insert: slot("insert"),
-        columnType: slot("columnType"),
-        view: slot("view"),
-        look: slot("look"),
-        remove: slot("remove"),
-        custom: (custom, entries) => ({ slot: "custom", custom, entries }),
-      },
-      item: menuItem,
-      submenu: (item, entries) => menuItem({ ...item, submenu: true, run: () => open(item.label, entries()) }),
-      segmented: menuSegmented,
-      actions: menuActions,
-      separator: menuSeparator,
-      open,
-    };
-  })();
+  private readonly builder: LineMenuBuilder = menuBuilder(LINE_MENU_SLOTS, (title, entries) => this.replaceMenu(title, entries));
 
   /** The features' entries as a section of the menu: run, they close it; a separator after them */
   private section(entries: readonly MenuEntry[]): MenuEntry[] {

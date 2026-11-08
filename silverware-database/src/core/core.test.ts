@@ -41,6 +41,54 @@ const applied = async (core: DatabaseCore, proposal: Proposal | { problem: strin
 };
 
 describe("the core", () => {
+  it("adds a system property of a kind once, its type and key the kind's, read only; its values shown, never written, nor its type, key or settings changed", async () => {
+    const { core, store, told, named, items } = setup();
+    expect(await core.addProperty("tasks", { label: "", type: "text", system: "order" })).not.toHaveProperty("problem");
+    expect(await core.addProperty("tasks", { label: "Made", type: "text", system: "createdAt" })).not.toHaveProperty("problem");
+    const properties = (await store.database("tasks"))!.value.properties;
+    expect(properties.slice(-2)).toEqual([
+      { key: "order", label: "Order", type: "number", params: {}, readonly: true, system: "order" },
+      { key: "created_at", label: "Made", type: "datetime", params: {}, readonly: true, system: "createdAt" },
+    ]);
+    // One of a kind; no kind of that name
+    expect(await core.addProperty("tasks", { label: "Again", type: "number", system: "order" })).toHaveProperty("problem");
+    expect(told.at(-1)).toContain("Order is there already");
+    expect(await core.addProperty("tasks", { label: "X", type: "text", system: "nothing" })).toHaveProperty("problem");
+    // Its values: the store's (the order by hand)
+    expect((await items()).map((one) => [one.name, one.values.order])).toEqual([
+      ["Fix login", 1],
+      ["Write docs", 2],
+    ]);
+    const fix = await named("Fix login");
+    // Never written: by an edit, a new item, a move to a column of it
+    expect(await core.update("tasks", fix, "order", 5)).toHaveProperty("problem");
+    expect(await core.create("tasks", { name: "New", values: { order: 9 } })).toHaveProperty("problem");
+    expect(await core.move("tasks", fix, { values: { created_at: "2026-01-01T00:00" } })).toHaveProperty("problem");
+    // Nor its type, key, settings, flags
+    expect(await core.retypeProperty("tasks", "order", "text")).toHaveProperty("problem");
+    expect(await core.rekeyProperty("tasks", "order", "place")).toHaveProperty("problem");
+    expect(await core.setPropertyParams("tasks", "order", { x: 1 }, {})).toHaveProperty("problem");
+    expect(await core.setPropertyRequired("tasks", "order", true)).toHaveProperty("problem");
+    expect(await core.setPropertyReadonly("tasks", "order", false)).toHaveProperty("problem");
+    expect(told.at(-1)).toContain("Order is given by the system");
+    // Its name, its place and whether it shows: as any property's
+    expect(await core.renameProperty("tasks", "order", "Rank")).not.toHaveProperty("problem");
+    expect(await core.setPropertyHidden("tasks", "order", true)).not.toHaveProperty("problem");
+    // Removed, its values asked off the items too: none of them written (they are no item's)
+    const proposal = await core.removeProperty("tasks", "order", { values: true });
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    expect(proposal.plan.planned.filter((one) => "item" in one.target)).toHaveLength(0);
+    expect(proposal.label).toBe("Remove property Rank");
+  });
+
+  it("refuses a property's setting named as one of its own fields (a setting `system` would make it a system property)", async () => {
+    const { core, store } = setup();
+    expect(await core.addProperty("tasks", { label: "Unit", type: "text", params: { system: "metric" } })).toHaveProperty("problem");
+    expect(await core.setPropertyParams("tasks", "estimate", { readonly: true }, {})).toHaveProperty("problem");
+    expect(await core.retypeProperty("tasks", "estimate", "text", { label: "x" })).toHaveProperty("problem");
+    expect((await store.database("tasks"))!.value.properties.map((one) => one.key)).toEqual(["status", "estimate", "created"]);
+  });
+
   it("makes a property required: a value of it never emptied, said; an item still added without one", async () => {
     const { core, store, told, named } = setup();
     expect(await core.setPropertyRequired("tasks", "status", true)).not.toHaveProperty("problem");

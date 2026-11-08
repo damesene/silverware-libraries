@@ -5,6 +5,7 @@
 // its type's text. The colors are the style page's, read from SilverBullet's own
 // so they follow its light and dark looks.
 import { el } from "../../../shared/elements.ts";
+import { wholePercent } from "../domain/types/builtin/progress.ts";
 import type { ViewHost } from "../core/view.ts";
 import { optionColor } from "../domain/types/options.ts";
 import { isEmpty, type Item, type Property, type Value } from "../model/database.ts";
@@ -147,5 +148,9 @@ export function valueNodes(host: Pick<ViewHost, "document" | "type" | "text">, i
   const kind = host.type(property).name;
   if (kind === "select" || kind === "multi-select") return chosen(item.values[property.key]).map((one) => optionPill(doc, property, one));
   const text = host.text(item, property.key);
+  // A share done: a bar filled to it beside its percent
+  const value = item.values[property.key];
+  if (kind === "progress" && typeof value === "number" && value >= 0 && value <= 1)
+    return [el(doc, "span", { class: "swd-progress", attrs: { "aria-hidden": "true" } }, el(doc, "span", { class: "swd-progress-done", attrs: { style: `width: ${wholePercent(value)}%` } })), doc.createTextNode(text)];
   return text ? [doc.createTextNode(text)] : [];
 }

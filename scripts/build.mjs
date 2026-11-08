@@ -1,8 +1,10 @@
 // Bundles each library's src/index.ts into the .js file next to its library page.
-// --check builds in memory and fails when a committed bundle differs from its sources.
+// --check builds in memory and fails when a committed bundle differs from its sources, or a style page's shared block
+// from its template (scripts/sharedstyles.mjs).
 import * as esbuild from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
 import { emojiModuleText } from "./emoji.mjs";
+import { sharedStyles } from "./sharedstyles.mjs";
 
 const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart", "silverware-database"];
 // Files bundled beside a library's, loaded by it when needed: Chart.js beside the chart's (src/chartjs.ts)
@@ -48,4 +50,6 @@ if (check) {
     stale++;
   }
 } else await writeFile(emojiFile, emojiModuleText());
+// The CSS of what shared/ draws, in each plugin's style page (scripts/sharedstyles.mjs)
+stale += await sharedStyles(check);
 if (stale) process.exit(1);

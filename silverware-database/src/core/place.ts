@@ -8,12 +8,15 @@ import { el, pressed } from "../../../shared/elements.ts";
 import type { Editor, Settings, UserInterface } from "../../../shared/platform.ts";
 import { type Filter, listItems, type SortKey, textOf, typeOf, validateCondition } from "../domain/listing.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
+import type { GroupArrangement } from "../domain/grouping.ts";
 import type { Database, Item, Property } from "../model/database.ts";
-import type { DatabaseCore } from "./core.ts";
+import { type DatabaseCore, isRefused } from "./core.ts";
+import { arrangedGroups, focusGroupList, type GroupFocus, groupedBy, groupEntry } from "./groupmenu.ts";
 import { drawGrouped } from "./groups.ts";
 import { ICONS } from "./icons.ts";
 import type { PlaceContext } from "./module.ts";
-import { popover } from "./popover.ts";
+import type { MenuEntry, MenuNaming } from "../../../shared/menu.ts";
+import { checkedGroups, type PlaceMenuBuilder, type PlaceMenuGroup, placeMenu, toolMenu } from "./placemenu.ts";
 import type { DatabaseStore, ViewStateStore } from "./store.ts";
 import type { ViewDefinition, ViewHost, ViewInstance } from "./view.ts";
 import type { ViewRegistry } from "./views.ts";
@@ -32,12 +35,20 @@ export type PlaceOptions = {
   readonly settings: Pick<Settings, "get">;
   readonly ui: Pick<UserInterface, "notify">;
   readonly editor?: Pick<Editor, "open">;
-  /** What the modules on add to the place's tools (core/module.ts), asked as the place is drawn */
-  readonly moduleTools?: (place: PlaceContext) => readonly Node[];
+  /** What the modules on put in the place's menu (core/module.ts), asked as it opens */
+  readonly moduleMenu?: (place: PlaceContext, menu: PlaceMenuBuilder) => readonly PlaceMenuGroup[];
+  /** Told as the place is drawn (anew: a change made elsewhere, an Undo), so what a module shows for it follows */
+  readonly placeDrawn?: (place: PlaceContext) => void;
   /** The block's own text shown to edit (Edit source in ⋯, last), where the place is a block of a document */
   readonly editSource?: () => void;
   /** An item opened by a module's own way (the peek, core/module.ts): whether one took it; else it opens where the store says */
   readonly openItem?: (item: Item, database: string) => boolean;
+  /**
+   * What the place drawn before for the same block hands over (`handOver`: the
+   * binding knows which place wrote the text this one is drawn for), asked once,
+   * as the place is first in the page
+   */
+  readonly takeOver?: () => PlaceKept | undefined;
 };
 
 /** The settings' path of a view's setting */
@@ -47,14 +58,21 @@ export const viewSettingPath = (view: string, key: string) => `silverware.databa
 type Data = { readonly database: Database; readonly items: readonly Item[] };
 
 // A view drawn: its own host, made for it (its name and settings fixed in it), the data it was last given, what it gave back, whether it has gone
-type Drawn = { readonly view: ViewDefinition; data: Data; instance: ViewInstance | void; ended: boolean; syncTools?: () => void; stopTools?: () => void; host?: ViewHost; grouped?: string };
+type Drawn = {
+  readonly view: ViewDefinition;
+  data: Data;
+  instance: ViewInstance | void;
+  ended: boolean;
+  syncTools?: () => void;
+  stopTools?: () => void;
+  keptTools?: () => PlaceKept;
+  host?: ViewHost;
+  grouped?: string;
+};
 
 /** The property a view is drawn once per group by (Group by picked, of a type it is grouped by, else the first where it always is; none where the view draws its own groups) */
 function groupingOf(view: ViewDefinition, host: ViewHost): Property | undefined {
-  const groupBy = view.groupBy;
-  if (groupBy === false || groupBy?.draws) return undefined;
-  const eligible = host.database.properties.filter((one) => !groupBy?.types || groupBy.types.includes(host.type(one).name));
-  return eligible.find((one) => one.key === host.listing.group) ?? (groupBy?.required ? eligible[0] : undefined);
+  return view.groupBy && view.groupBy.draws ? undefined : groupedBy(view, host);
 }
 
 /** What decides how a view is drawn grouped: the property and its type (changed, the view drawn anew) */
@@ -67,6 +85,24 @@ const groupingKey = (view: ViewDefinition, host: ViewHost) => {
 // view draws: a wide table's, a board's) by its place among the elements under the body, a path of child indexes. A view
 // drawn anew (a change), or a new place of the same block (the editor drew it anew after a write), has them put back.
 const scrolled = new Map<string, Map<string, readonly [number, number]>>();
+
+// A filter applied as it is typed, this long after the last key (each condition written draws the view anew; in
+// SilverBullet it writes the block, which is drawn anew as a new place)
+export const FILTER_TYPED_MS = 300;
+
+/**
+ * What a place has open, handed to the place drawn after it for the same
+ * block (SilverBullet draws a block anew, a new place, from the text a place
+ * wrote into it; the place itself drawn anew keeps it too): the filter's panel
+ * open, the field typed in (its text as typed, which the block may not hold
+ * yet, and its selection: read from the field as it is handed over), ⋯ open
+ * at Group with the focus in its list
+ */
+export type PlaceKept = {
+  readonly filterOpen: boolean;
+  readonly typing?: { readonly key: string; readonly value: string; readonly start: number; readonly end: number };
+  readonly group?: GroupFocus;
+};
 
 export class DatabasePlace {
   private drawn: Drawn | undefined;
@@ -81,6 +117,10 @@ export class DatabasePlace {
   private undoShown: (() => void) | undefined;
   // The view's scroll being put back: its boxes' scroll events then are not the user's
   private puttingBack = false;
+  // What it had open handed to the place drawn after it for its block: it writes nothing of its tools any more
+  private handedOver = false;
+  // Whether it asked the place before it for what that had open (once)
+  private tookOver = false;
 
   /** The id of the database the place shows */
   get database(): string {
@@ -123,6 +163,19 @@ export class DatabasePlace {
     return pending;
   }
 
+  /**
+   * What it has open, handed to the place drawn after it for the same block:
+   * its tools stopped (a filter typed and not applied yet is the next place's
+   * to apply), so it writes nothing of them after
+   */
+  handOver(): PlaceKept | undefined {
+    if (this.handedOver) return undefined;
+    const kept = this.drawn?.keptTools?.();
+    this.handedOver = true;
+    this.drawn?.stopTools?.();
+    return kept;
+  }
+
   /** The place gone: its view told, nothing listened to any more, nothing drawn after */
   destroy(): void {
     this.gone = true;
@@ -138,6 +191,8 @@ export class DatabasePlace {
   private async draw(): Promise<void> {
     const { element, state } = this.options;
     const doc = element.ownerDocument;
+    // (Drawn anew itself: what its tools had open shown again)
+    const own = this.handedOver ? undefined : this.drawn?.keptTools?.();
     this.endView();
     this.body = undefined;
     const data = await this.read();
@@ -166,8 +221,20 @@ export class DatabasePlace {
     const tools = this.tools(doc, host, count, view);
     drawn.syncTools = tools.sync;
     drawn.stopTools = tools.stop;
+    drawn.keptTools = tools.kept;
     bar.append(tools.bar);
     this.body.before(tools.panel);
+    if (own) tools.restore(own);
+    else if (!this.tookOver && this.options.takeOver) {
+      // The place before it for this block: what it had open, once this one is in the page (SilverBullet renders a block twice,
+      // one element never put in the page: that one asks nothing)
+      this.tookOver = true;
+      whenInPage(element, () => {
+        if (drawn !== this.drawn || this.gone) return;
+        const kept = this.options.takeOver?.();
+        if (kept) tools.restore(kept);
+      });
+    }
     try {
       const grouping = groupingOf(view, host);
       drawn.grouped = groupingKey(view, host);
@@ -302,11 +369,24 @@ export class DatabasePlace {
     }
   }
 
-  private tools(doc: Document, host: ViewHost, count: HTMLElement, view: ViewDefinition): { readonly bar: HTMLElement; readonly panel: HTMLElement; readonly sync: () => void; readonly stop: () => void } {
+  private tools(
+    doc: Document,
+    host: ViewHost,
+    count: HTMLElement,
+    view: ViewDefinition,
+  ): { readonly bar: HTMLElement; readonly panel: HTMLElement; readonly sync: () => void; readonly stop: () => void; readonly kept: () => PlaceKept; readonly restore: (kept: PlaceKept) => void } {
     const { listing, database } = host;
     const columns = [{ key: "name", label: "Name" }, ...database.properties.map((one) => ({ key: one.key, label: one.label }))];
     const labelOf = (key: string) => columns.find((one) => one.key === key)?.label ?? key;
     const filters = () => Object.keys(listing.filter).length;
+    let typedTimer: ReturnType<typeof setTimeout> | undefined;
+    // The field typed in last (the focus in it, or gone with the place drawn anew), and one shown as typed, not applied yet
+    // (left as it is by `sync`, which shows the conditions kept)
+    let lastField: HTMLInputElement | undefined;
+    let held: HTMLInputElement | undefined;
+    // A condition being written, and the field to apply after it (one write at a time: each builds on the block as the last left it)
+    let writing = false;
+    let again: HTMLInputElement | undefined;
 
     const filterButton = el(doc, "button", { class: "swd-tool swd-filter-button", attrs: { "aria-expanded": "false" } });
     const filterLabel = () => {
@@ -324,24 +404,60 @@ export class DatabasePlace {
       ...columns.map((column) => {
         const input = el(doc, "input", { attrs: { type: "text", placeholder: "any", "data-key": column.key, "aria-label": `Filter ${column.label}` } });
         input.value = listing.filter[column.key] ?? "";
-        const apply = () => {
-          const problem = listing.validateCondition(input.value);
-          input.classList.toggle("swd-invalid", !!problem);
-          input.title = problem ?? "";
-          if (problem || input.value === (listing.filter[column.key] ?? "")) return;
-          void listing.setFilter(column.key, input.value).then(filterLabel);
-        };
-        input.addEventListener("change", apply);
+        // Applied as it is typed, a moment after the last key; Enter and leaving the field at once
+        input.addEventListener("input", () => {
+          held = input;
+          clearTimeout(typedTimer);
+          typedTimer = setTimeout(() => apply(input), FILTER_TYPED_MS);
+        });
+        input.addEventListener("change", () => apply(input));
         input.addEventListener("keydown", (event) => {
-          if (event.key === "Enter") apply();
+          if (event.key === "Enter") apply(input);
         });
         return el(doc, "label", "swd-filter-row", el(doc, "span", { text: column.label }), input);
       }),
     );
+    // A field's condition written where it reads and differs from the one kept; not by a place that handed over (the next
+    // place applies what was typed), nor from a field gone with its place
+    const apply = (input: HTMLInputElement): void => {
+      clearTimeout(typedTimer);
+      typedTimer = undefined;
+      if (this.handedOver || !input.isConnected) return;
+      const key = input.dataset.key!;
+      const problem = listing.validateCondition(input.value);
+      input.classList.toggle("swd-invalid", !!problem);
+      input.title = problem ?? "";
+      if (problem) return;
+      if (input.value === (listing.filter[key] ?? "")) {
+        if (held === input) held = undefined;
+        return;
+      }
+      if (writing) return void (again = input);
+      writing = true;
+      void listing.setFilter(key, input.value).finally(() => {
+        writing = false;
+        filterLabel();
+        if (held === input && input.value === (listing.filter[key] ?? "")) held = undefined;
+        const next = again;
+        again = undefined;
+        if (next) apply(next);
+      });
+    };
+    const showPanel = (open: boolean) => {
+      panel.hidden = !open;
+      filterButton.setAttribute("aria-expanded", String(open));
+    };
     filterButton.addEventListener("click", () => {
-      panel.hidden = !panel.hidden;
-      filterButton.setAttribute("aria-expanded", String(!panel.hidden));
+      showPanel(panel.hidden !== false);
       if (!panel.hidden) panel.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
+    });
+    panel.addEventListener("focusin", (event) => {
+      if (event.target instanceof HTMLInputElement) lastField = event.target;
+    });
+    // The focus gone elsewhere by the user (not with the place, drawn anew: no element then): no typing to go on with
+    panel.addEventListener("focusout", (event) => {
+      const next = event.relatedTarget as Node | null;
+      if (next && !panel.contains(next)) lastField = undefined;
     });
 
     // The sort: a menu of the order by hand and the properties, each way
@@ -354,24 +470,29 @@ export class DatabasePlace {
       sortButton.classList.toggle("swd-tool-on", !!now);
     };
     sortLabel();
-    const sort = popover(doc, sortButton, "Sort", (menu, close) => {
+    // The order by hand, or a property (checked where sorted by), each way: the shared menu, as ⋯ (toolMenu)
+    const sort = toolMenu(doc, sortButton, () => "Sort", () => {
       const now = listing.sort[0];
-      const choose = (key: string, direction: "asc" | "desc") => {
-        close();
-        void listing.setSort(key ? [{ key, direction }] : []).then(sortLabel);
-      };
-      const on = (key: string) => (now?.key ?? "") === key;
-      const option = (key: string, label: string) =>
-        el(
-          doc,
-          "button",
-          { class: "swd-menu-item swd-sort-option", attrs: { "aria-pressed": pressed(on(key)), "data-key": key }, run: () => choose(key, key && now?.key === key ? now.direction : "asc") },
-          el(doc, "span", { class: "swd-menu-check", html: on(key) ? ICONS.check : "" }),
-          label,
-        );
-      const way = (direction: "asc" | "desc", label: string) =>
-        el(doc, "button", { class: `swd-menu-way swd-sort-${direction}`, text: label, attrs: { "aria-pressed": pressed(now?.direction === direction), ...(now ? {} : { disabled: "" }) }, run: () => now && choose(now.key, direction) });
-      menu.replaceChildren(option("", "Order by hand"), el(doc, "div", { class: "swd-menu-line", attrs: { "aria-hidden": "true" } }), ...columns.map((column) => option(column.key, column.label)), el(doc, "div", "swd-menu-ways", way("asc", "Ascending"), way("desc", "Descending")));
+      const choose = (key: string, direction: "asc" | "desc") => void listing.setSort(key ? [{ key, direction }] : []).then(sortLabel);
+      const option = (key: string, label: string): MenuEntry => ({ kind: "item", label, checked: (now?.key ?? "") === key, run: () => choose(key, key && now?.key === key ? now.direction : "asc") });
+      return [
+        option("", "Order by hand"),
+        { kind: "separator" },
+        ...columns.map((column) => option(column.key, column.label)),
+        { kind: "separator" },
+        {
+          kind: "segmented",
+          label: "Direction",
+          key: "direction",
+          options: (["asc", "desc"] as const).map((direction) => ({
+            icon: direction === "asc" ? ICONS.up : ICONS.down,
+            title: direction === "asc" ? "Ascending" : "Descending",
+            active: now?.direction === direction,
+            run: () => now && choose(now.key, direction),
+            ...(now ? {} : { disabled: "In the order by hand: pick a property first" }),
+          })),
+        },
+      ];
     });
 
     // Undo, and how far it is while it writes (many pages: one after another), kept by the place as it is drawn anew meanwhile
@@ -386,37 +507,50 @@ export class DatabasePlace {
     };
     this.undoShown();
 
-    // ⋯: Group by where the view groups (the properties of the types it groups by, the one it does checked), then what the
-    // modules add (Properties) and Edit source, as items of a menu
+    // ⋯: the place's menu (core/placemenu.ts): the core's entries (Group where the view is grouped, Edit source), the
+    // modules' (Properties) and the view's own, each in a slot by what it does
     const { editSource } = this.options;
-    const own = [
-      ...(this.options.moduleTools?.({ document: doc, database }) ?? []),
-      ...(editSource ? [el(doc, "button", { class: "swd-tool swd-edit-source", text: "Edit source", title: "Show the block's text, to edit it as markdown", run: editSource })] : []),
-    ];
-    const groupBy = view.groupBy === false ? undefined : (view.groupBy ?? {});
-    const grouping = (): HTMLElement[] => {
-      if (!groupBy) return [];
-      const eligible = database.properties.filter((property) => !groupBy.types || groupBy.types.includes(host.type(property).name));
-      const kept = eligible.find((property) => property.key === listing.group);
-      const current = kept?.key ?? (groupBy.required ? eligible[0]?.key : undefined);
-      const option = (key: string | undefined, label: string) =>
-        el(
-          doc,
-          "button",
-          { class: "swd-menu-item swd-group-option", attrs: { "aria-pressed": pressed(current === key), "data-key": key ?? "" }, run: () => void listing.setGroup(key) },
-          el(doc, "span", { class: "swd-menu-check", html: current === key ? ICONS.check : "" }),
-          label,
-        );
-      return [
-        el(doc, "div", { class: "swd-menu-heading", text: "Group by" }),
-        ...(groupBy.required ? [] : [option(undefined, "None")]),
-        ...eligible.map((property) => option(property.key, property.label)),
-        ...(eligible.length ? [] : [el(doc, "p", { class: "swd-menu-note", text: "No property of a type this view groups by" })]),
-        ...(own.length ? [el(doc, "div", { class: "swd-menu-line", attrs: { "aria-hidden": "true" } })] : []),
-      ];
+    // ⋯ open at Group, what has the focus in its list as it changed something (handed over: the place drawn after it opens it so)
+    let groupFocus: GroupFocus | undefined;
+    const coreGroups = (menu: PlaceMenuBuilder): PlaceMenuGroup[] => {
+      const groups: PlaceMenuGroup[] = [];
+      const group = groupEntry(view, host, menu, (focus) => (groupFocus = focus));
+      if (group) groups.push(menu.slot.view([group]));
+      if (editSource) groups.push(menu.slot.source([menu.item({ label: "Edit source", icon: ICONS.source, hint: "Show the block's text, to edit it as markdown", run: editSource })]));
+      return groups;
     };
-    // (A choice closes it, the popover's own; what it opens, a dialog, is the module's)
-    const more = own.length || groupBy ? popover(doc, el(doc, "button", { class: "swd-tool swd-more", title: "More", attrs: { "aria-label": "More" } }, el(doc, "span", { class: "swd-tool-icon", html: ICONS.more })), "More", (menu) => menu.replaceChildren(...grouping(), ...own)) : undefined;
+    // The view's own (the user's too): asked as the menu opens, what it gives checked; failing, said and left out, the others shown
+    const viewGroups = (menu: PlaceMenuBuilder): readonly PlaceMenuGroup[] => {
+      if (!view.menu) return [];
+      let made: unknown;
+      try {
+        made = view.menu(host, menu);
+      } catch (error) {
+        this.options.ui.notify(`The view "${view.label}": its menu failed: ${message(error)}`, { type: "error" });
+        return [];
+      }
+      const checked = checkedGroups(made);
+      if (typeof checked === "string") {
+        this.options.ui.notify(`The view "${view.label}": ${checked}`, { type: "error" });
+        return [];
+      }
+      return checked;
+    };
+    const moduleGroups = (menu: PlaceMenuBuilder) => this.options.moduleMenu?.({ document: doc, database }, menu) ?? [];
+    // The database named in the menu's title: a pencil (its name only, in its record: its id, by which blocks show it, stays)
+    const naming = (): MenuNaming => ({
+      name: database.name,
+      label: "Rename the database",
+      save: async (name) => {
+        const result = await this.options.core.renameDatabase(database.id, name);
+        // (Drawn whole: the name is in the place's head, which a view's update leaves)
+        if (!isRefused(result)) await this.render();
+        return isRefused(result) && result.cause === "invalid" ? result.problem : undefined;
+      },
+    });
+    // (Always there: the database's name at least)
+    const more = placeMenu(doc, () => database.name, (menu) => [...coreGroups(menu), ...moduleGroups(menu), ...viewGroups(menu)], naming, () => (groupFocus = undefined));
+    this.options.placeDrawn?.({ document: doc, database });
 
     // The controls as the view's state has them now (a header's sort, a filter set by the view itself), and how many items show
     const sync = () => {
@@ -424,7 +558,7 @@ export class DatabasePlace {
       filterLabel();
       count.textContent = host.items.length === host.total ? String(host.total) : `${host.items.length} of ${host.total}`;
       for (const input of panel.querySelectorAll<HTMLInputElement>("input[data-key]")) {
-        if (doc.activeElement === input) continue;
+        if (doc.activeElement === input || held === input) continue;
         input.value = listing.filter[input.dataset.key!] ?? "";
         // (What it shows now is the condition kept, which reads: a mark of one typed before goes)
         input.classList.remove("swd-invalid");
@@ -434,10 +568,50 @@ export class DatabasePlace {
     sync();
     // The place drawn anew: what is open closed, its listeners with it
     const stop = () => {
+      // (What was typed and not applied yet is the next place's to apply, kept as typed)
+      clearTimeout(typedTimer);
+      typedTimer = undefined;
       sort.close();
-      more?.close();
+      more.close();
     };
-    return { bar: el(doc, "span", "swd-tools", filterButton, sort.box, undo, ...(more ? [more.box] : [])), panel, sync, stop };
+    // What is open: the field typed in only while the focus is in it, or went with the place (to nothing)
+    const kept = (): PlaceKept => {
+      const active = doc.activeElement;
+      const typing = lastField && (active === lastField || !active || active === doc.body || !lastField.isConnected) ? lastField : undefined;
+      return {
+        filterOpen: !panel.hidden,
+        ...(typing ? { typing: { key: typing.dataset.key!, value: typing.value, start: typing.selectionStart ?? typing.value.length, end: typing.selectionEnd ?? typing.value.length } } : {}),
+        ...(groupFocus ? { group: groupFocus } : {}),
+      };
+    };
+    // Shown as handed over: the panel open, the field as typed (the focus and the selection in it; applied a moment after,
+    // where it differs from the condition kept), ⋯ open at Group, the focus where it was
+    const restore = (from: PlaceKept) => {
+      if (from.filterOpen) showPanel(true);
+      const typing = from.typing;
+      const input = typing && [...panel.querySelectorAll<HTMLInputElement>("input[data-key]")].find((one) => one.dataset.key === typing.key);
+      if (typing && input) {
+        input.value = typing.value;
+        lastField = input;
+        if (input.isConnected) {
+          input.focus({ preventScroll: true });
+          input.setSelectionRange(typing.start, typing.end);
+        }
+        if (typing.value !== (listing.filter[typing.key] ?? "")) {
+          held = input;
+          clearTimeout(typedTimer);
+          typedTimer = setTimeout(() => apply(input), FILTER_TYPED_MS);
+        }
+      }
+      if (from.group) {
+        const shown = more.openAt(["Group"]);
+        if (shown) {
+          groupFocus = from.group;
+          focusGroupList(shown, from.group);
+        }
+      }
+    };
+    return { bar: el(doc, "span", "swd-tools", filterButton, sort.box, undo, more.box), panel, sync, stop, kept, restore };
   }
 
   /** Another view picked: written into the place's state, drawn */
@@ -465,6 +639,8 @@ export class DatabasePlace {
       const kept = state.get(prefixed("groupBy"));
       return typeof kept === "string" && kept ? kept : undefined;
     };
+    const keys = (value: unknown) => (Array.isArray(value) ? value.filter((one): one is string => typeof one === "string") : []);
+    const arrangement = (): GroupArrangement => ({ order: keys(state.get(prefixed("groupOrder"))), hidden: keys(state.get(prefixed("groupHidden"))), hideEmpty: state.get(prefixed("groupHideEmpty")) === true });
     // The items as listed, made once per data read and listing
     let listed: { data: Data; key: string; items: readonly Item[] } | undefined;
     const items = () => {
@@ -493,6 +669,10 @@ export class DatabasePlace {
       get total() {
         return data().items.length;
       },
+      get grouping() {
+        const property = groupedBy(drawn.view, this);
+        return property && { property, groups: arrangedGroups(this, property).shown };
+      },
       listing: {
         get filter() {
           return listing().filter;
@@ -519,7 +699,17 @@ export class DatabasePlace {
         },
         async setGroup(key) {
           if (key === group()) return;
-          await setMeta({ groupBy: key });
+          // (The order and the hiding were of the groups of the property before: its values)
+          await setMeta({ groupBy: key, groupOrder: undefined, groupHidden: undefined });
+          await shownAgain();
+        },
+        get groupArrangement() {
+          return arrangement();
+        },
+        async setGroupArrangement(change) {
+          const next = { ...arrangement(), ...change };
+          if (JSON.stringify(next) === JSON.stringify(arrangement())) return;
+          await setMeta({ groupOrder: next.order.length ? next.order : undefined, groupHidden: next.hidden.length ? next.hidden : undefined, groupHideEmpty: next.hideEmpty || undefined });
           await shownAgain();
         },
         validateCondition,
@@ -569,6 +759,16 @@ export class DatabasePlace {
     const doc = this.options.element.ownerDocument;
     (this.body ?? this.options.element).append(el(doc, "p", { class: "swd-place-note", text }));
   }
+}
+
+/** `run` once `element` is in the page: at once after this task, else in one of the next frames (a block the editor puts in the page after it is drawn); never where it is not */
+function whenInPage(element: HTMLElement, run: () => void, frames = 20): void {
+  queueMicrotask(() => {
+    if (element.isConnected) return run();
+    const view = element.ownerDocument.defaultView;
+    if (!view || frames <= 0) return;
+    view.requestAnimationFrame(() => whenInPage(element, run, frames - 1));
+  });
 }
 
 /** A view's filter as kept: conditions by key (anything else none) */

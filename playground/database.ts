@@ -94,7 +94,7 @@ function start(): void {
     element.className = "swd-place";
     section.append(element);
     main.append(section);
-    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store, core, types, views, settings, ui, editor: { open: (ref) => flash(`Open ${ref}`) }, moduleTools: (where) => modules.placeTools(where), openItem: (item, database) => modules.openItem(item, database) });
+    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store, core, types, views, settings, ui, editor: { open: (ref) => flash(`Open ${ref}`) }, moduleMenu: (where, menu) => modules.placeMenu(where, menu), placeDrawn: (where) => modules.placeDrawn(where), openItem: (item, database) => modules.openItem(item, database) });
     return place;
   });
   void modules.start().then(() => places.forEach((place) => void place.render()));

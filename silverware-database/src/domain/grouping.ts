@@ -63,7 +63,8 @@ export function groupItems(items: readonly Item[], property: Property, type: Pro
       const known = !options.length || options.includes(text);
       const label = known ? type.text(part, property.params) : `${text} (none of its options)`;
       const sort = type.sortKey ? type.sortKey(part, property.params) : type.text(part, property.params);
-      add(keyOf(part), () => ({ label, value: Array.isArray(value) ? [String(part)] : part, known, sort }), item);
+      // (Its value by the property's type, whatever the item holds: a multi-select's a list of it, any other's the value alone)
+      add(keyOf(part), () => ({ label, value: list ? [String(part)] : part, known, sort }), item);
     }
   }
   const made = [...groups].map(([key, group]) => ({ key, label: group.label, value: group.value as Value | undefined, known: group.known, items: group.items as readonly Item[], sort: group.sort }));
@@ -71,4 +72,54 @@ export function groupItems(items: readonly Item[], property: Property, type: Pro
   const ordered = options.length ? [...made.filter((one) => one.known), ...made.filter((one) => !one.known)] : made.sort((a, b) => compareForSort(a.sort, b.sort, "asc"));
   const result: ItemGroup[] = ordered.map(({ sort: _sort, ...group }) => group);
   return none.length ? [{ key: NONE_KEY, label: `No ${property.label}`, value: undefined, known: true, items: none }, ...result] : result;
+}
+
+/** How a view's groups are arranged, as kept in its meta: the order given them by hand, those hidden, empty ones hidden */
+export type GroupArrangement = { readonly order: readonly string[]; readonly hidden: readonly string[]; readonly hideEmpty: boolean };
+
+export const NO_ARRANGEMENT: GroupArrangement = { order: [], hidden: [], hideEmpty: false };
+
+/**
+ * The groups arranged: `ordered` every group, those given an order by hand
+ * in it first, then the others as they come (a group new since: an option
+ * added); `shown` those of them not hidden, nor empty where empty ones are
+ */
+export function arrangeGroups(groups: readonly ItemGroup[], arrangement: GroupArrangement): { readonly ordered: readonly ItemGroup[]; readonly shown: readonly ItemGroup[] } {
+  const at = new Map(arrangement.order.map((key, index) => [key, index]));
+  const known = groups.filter((group) => at.has(group.key)).sort((a, b) => at.get(a.key)! - at.get(b.key)!);
+  const ordered = [...known, ...groups.filter((group) => !at.has(group.key))];
+  const hidden = new Set(arrangement.hidden);
+  return { ordered, shown: ordered.filter((group) => !hidden.has(group.key) && !(arrangement.hideEmpty && group.items.length === 0)) };
+}
+
+/** A group's one value (a multi-select's group holds a list of it) */
+const partOf = (group: ItemGroup | undefined): Value | undefined => (Array.isArray(group?.value) ? group.value[0] : group?.value);
+
+const same = (a: Value | undefined, b: Value | undefined) => JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * An item's value once it is moved from one group to another (a board's card
+ * dragged to another column). A value alone (or none): the other group's. A
+ * list (a multi-select's, or a list kept under any property): the value of the
+ * group it left replaced in its place by the other's (every copy of it gone,
+ * so it is out of that group), its other values kept as they are, nothing of
+ * them lost; the other's value there already, not twice; to the group of none,
+ * that value alone taken off; none left: no value (undefined: taken off)
+ */
+export function movedValue(value: Value | undefined, from: ItemGroup | undefined, to: ItemGroup): Value | undefined {
+  if (!Array.isArray(value)) return to.value;
+  const leaving = partOf(from);
+  const coming = partOf(to);
+  const has = (one: Value | undefined) => one !== undefined && value.some((each) => same(each, one) || each === String(one));
+  const kept: string[] = [];
+  let placed = has(coming);
+  for (const each of value) {
+    if (leaving === undefined || (!same(each, leaving) && each !== String(leaving))) kept.push(each);
+    else if (!placed && coming !== undefined) {
+      kept.push(String(coming));
+      placed = true;
+    }
+  }
+  if (!placed && coming !== undefined) kept.push(String(coming));
+  return kept.length ? kept : undefined;
 }

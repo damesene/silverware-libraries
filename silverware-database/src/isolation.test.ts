@@ -83,6 +83,13 @@ describe("isolation", () => {
     }
   });
 
+  it("leaves SilverBullet's names of its index and pages to its binding: the stores ask the platform", () => {
+    for (const file of files(join(SRC, "store")).filter((one) => !/(\.test|testing)\.ts$/.test(one))) {
+      const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+      expect(code.match(/\b(lastModified|itags|displayName|pageDecoration|isValidName|PAGE_KEYS)\b|["']task["']/g) ?? [], relative(SRC, file)).toEqual([]);
+    }
+  });
+
   it("leaves pages, frontmatter and SilverBullet out of the model, the domain, the views, the modules and the core", () => {
     for (const layer of ["model", "domain", "views", "modules", "core"]) {
       for (const file of files(join(SRC, layer))) {

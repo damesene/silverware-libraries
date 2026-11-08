@@ -44,6 +44,11 @@ type Shown = { readonly page: string; readonly body: string; current: string; pl
 // How long a place whose element went out of the page (CodeMirror keeps blocks out of view out of the DOM) is kept
 const KEPT_OUT_MS = 60_000;
 
+// A place that wrote its block, by its page and the text it wrote: the place SilverBullet draws for that text takes over what
+// it had open (a filter being typed, ⋯ at Group: core/place.ts `PlaceKept`), once, while it is recent
+const handovers = new Map<string, { readonly from: DatabasePlace; readonly until: number }>();
+const HANDOVER_MS = 10_000;
+
 type App = {
   readonly platform: Platform;
   readonly store: PagesStore;
@@ -67,6 +72,7 @@ let pressTaken = 0;
 const PRESS_MS = 1500;
 let indexChanged: ((change: { readonly document: string; readonly deleted: boolean }) => void) | undefined;
 let pageOpened: (() => Promise<void>) | undefined;
+let indexSettled: (() => void) | undefined;
 
 const COMMANDS: Readonly<Record<string, () => Promise<void>>> = {
   "Silverware Database: New database": newDatabase,
@@ -103,6 +109,7 @@ export function init(bridge: Bridge): void {
   const made = silverBulletPlatform(bridge);
   indexChanged = made.indexChanged;
   pageOpened = made.pageOpened;
+  indexSettled = made.indexSettled;
   bridgeCalls = bridge;
   const platform = made.platform;
   const own: Partial<App> & { home: string } = { home: "" };
@@ -164,6 +171,11 @@ export function render(body: string, page: string): HTMLElement {
 /** An index's change, from the init page's listeners (`page:index`, `page:deleted`) */
 export function pageIndexed(name: string, deleted: boolean): void {
   indexChanged?.({ document: name, deleted });
+}
+
+/** SilverBullet's index queue emptied, no page half indexed (the init page's `mq:emptyQueue:indexQueue`) */
+export function indexQueueEmptied(): void {
+  indexSettled?.();
 }
 
 /** Another page opened in the editor (the init page's `editor:pageLoaded`) */
@@ -255,7 +267,15 @@ function start(element: HTMLElement, shown: Shown): void {
     return;
   }
   const state = new BlockState(shown.current, (body, text) => writeBlock(element, shown, body, text));
-  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, settings: platform.settings, ui: platform.ui, editor: platform.editor, moduleTools: (place) => app!.modules.placeTools(place), openItem: (item, database) => app!.modules.openItem(item, database), editSource: () => void editSource(element, shown) });
+  // The place that wrote the text this one is drawn for: what it had open handed over, once
+  const takeOver = () => {
+    const key = JSON.stringify([shown.page, shown.current]);
+    const handover = handovers.get(key);
+    if (!handover) return undefined;
+    handovers.delete(key);
+    return handover.until > Date.now() && handover.from !== shown.place ? handover.from.handOver() : undefined;
+  };
+  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, settings: platform.settings, ui: platform.ui, editor: platform.editor, moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database) => app!.modules.openItem(item, database), editSource: () => void editSource(element, shown), takeOver });
   void shown.place.render();
 }
 
@@ -275,6 +295,7 @@ async function writeBlock(element: HTMLElement, shown: Shown, body: string, text
   for (const left of report.skipped) platform.ui.notify(`Silverware Database: ${left.reason}`, { type: "error" });
   // Written: the block is its new text (SilverBullet draws it anew from it; the blocks alike are counted by it meanwhile)
   if (report.written.length && shown.place === place) {
+    if (place) handovers.set(JSON.stringify([shown.page, text]), { from: place, until: Date.now() + HANDOVER_MS });
     shown.current = text;
     shown.wrote = { out: false };
     if (!observing) {

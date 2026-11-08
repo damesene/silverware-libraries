@@ -4,6 +4,11 @@ import { editorText, expect, item, root, runCommand, test, waitForIndex } from "
 const BLOCK = "```silverware-database\nid: tasks\nview: names\n```\n";
 const TASKS = { "Page/db-tasks": root("tasks", "Tasks"), "Page/db-tasks/Fix login": item("Todo", "a0"), "Page/db-tasks/Write docs": item("Done", "a1") };
 
+/** An entry of a place's menu (⋯) chosen by its label (its value after it left out); the menu open first, or a submenu of it */
+async function choose(page: import("@playwright/test").Page, label: string): Promise<void> {
+  await page.locator(".swd-menu .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: new RegExp(`^${label}(:|$)`) }) }).first().click();
+}
+
 test("a block draws its database: the views on to switch, the one shown its items", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${BLOCK}`, ...TASKS }, "Page");
   await expect(page.locator(".swd-switch")).toHaveCount(5);
@@ -80,10 +85,33 @@ test("a press in the block on what takes no focus, after a field or a menu of it
 test("Edit source in ⋯ shows the block's markdown, the cursor in its text", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${BLOCK}\nAfter\n`, ...TASKS }, "Page");
   await expect(page.locator(".test-item")).toHaveCount(2);
+  // Esc closes ⋯, its Group › Group by submenu too, the page's markdown never shown
   await page.locator(".swd-more").click();
-  await page.locator(".swd-edit-source").click();
+  await choose(page, "Group");
+  await choose(page, "Group by");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swd-menu:not([hidden])")).toHaveCount(0);
+  await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);
+  await page.locator(".swd-more").click();
+  await choose(page, "Edit source");
   await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(1);
   await expect(page.locator(".cm-line", { hasText: "id: tasks" })).toBeVisible();
+});
+
+test("the pencil in ⋯'s title renames the database in its root page, typing in it reaching neither the page nor its markdown", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${BLOCK}\nAfter\n`, ...TASKS }, "Page");
+  await expect(page.locator(".test-item")).toHaveCount(2);
+  await page.locator(".swd-more").click();
+  await page.locator(".swd-menu-rename").click();
+  const field = page.locator(".swd-menu-name");
+  await expect(field).toHaveValue("Tasks");
+  await field.fill("Jobs board");
+  await field.press("Enter");
+  await expect.poll(() => space.saved("Page/db-tasks")).toContain("name: Jobs board");
+  await expect(page.locator(".swd-place-name")).toHaveText("Jobs board");
+  // The page's text untouched, its block's markdown never shown
+  expect(await space.saved("Page")).toBe(`# Page\n\n${BLOCK}\nAfter\n`);
+  await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);
 });
 
 test("in SilverBullet's dark look the browser's own controls of a database are drawn dark (a date's calendar icon)", async ({ page, space }) => {
@@ -93,20 +121,71 @@ test("in SilverBullet's dark look the browser's own controls of a database are d
   expect(await page.locator(".swd-widget").evaluate((one) => getComputedStyle(one).colorScheme)).toBe("dark");
 });
 
-test("Group by in ⋯ picks the board's select, written into the block", async ({ page, space }) => {
+test("Group › Group by in ⋯ picks the board's property, written into the block", async ({ page, space }) => {
   const root = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    area: { type: select, label: Area, options: [Web, App] }\n---\n";
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: board\n```\n", ...TASKS, "Page/db-tasks": root }, "Page");
   await expect(page.locator(".swd-board-column")).toHaveCount(2);
   await page.locator(".swd-more").click();
-  await page.locator('.swd-group-option[data-key="area"]').click();
+  await choose(page, "Group");
+  await choose(page, "Group by");
+  await choose(page, "Area");
   await expect.poll(() => space.saved("Page")).toContain("board.groupBy: area");
   await expect(page.locator(".swd-board-column").first()).toHaveAttribute("aria-label", /^No Area/);
+});
+
+test("a board grouped by a checkbox: a card dragged ticks it; its columns ordered and hidden under Group in ⋯, the menu staying open", async ({ page, space }) => {
+  const root = `---
+tags: [db-root]
+_database:
+  id: tasks
+  name: Tasks
+  version: 1
+  properties:
+    status: { type: select, label: Status, options: [Todo, Done] }
+    done: { type: checkbox, label: Done }
+---
+`;
+  const fence = "`".repeat(3);
+  const block = `# Page
+
+${fence}silverware-database
+id: tasks
+view: board
+board.groupBy: done
+${fence}
+`;
+  await space.open({ Page: block, ...TASKS, "Page/db-tasks": root }, "Page");
+  const columns = page.locator(".swd-board-column");
+  await expect(columns.locator(".swd-board-title")).toHaveText([/^Checked/, /^Unchecked/]);
+  await columns.nth(1).locator(".swd-board-card").first().dragTo(columns.nth(0));
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("done: true");
+  // Group: Unchecked moved first by Alt+↑ on its grip, then Checked hidden by its eye, the menu open all along
+  await page.locator(".swd-more").click();
+  await choose(page, "Group");
+  const rows = page.locator(".swd-group-row");
+  await expect(rows.locator(".swd-group-row-label")).toHaveText(["Checked", "Unchecked"]);
+  await rows.nth(1).locator(".swd-group-grip").focus();
+  await page.keyboard.press("Alt+ArrowUp");
+  await expect.poll(() => space.saved("Page")).toContain("board.groupOrder:");
+  await expect(columns.locator(".swd-board-title")).toHaveText([/^Unchecked/, /^Checked/]);
+  await expect(rows.locator(".swd-group-row-label")).toHaveText(["Unchecked", "Checked"]);
+  await rows.nth(1).locator(".swd-group-eye").click();
+  await expect.poll(() => space.saved("Page")).toContain("board.groupHidden:");
+  await expect(columns).toHaveCount(1);
+  await expect(rows.nth(1)).toHaveClass(/swd-group-off/);
+  // Back from Group by to Group
+  await choose(page, "Group by");
+  await page.locator(".swd-menu-back").click();
+  await expect(page.locator(".swd-group-switch")).toBeVisible();
+  await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);
 });
 
 test("a table grouped under Group by is a table per group, an item added in one with its value, a group folded kept in the block", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
   await page.locator(".swd-more").click();
-  await page.locator('.swd-group-option[data-key="status"]').click();
+  await choose(page, "Group");
+  await choose(page, "Group by");
+  await choose(page, "Status");
   await expect.poll(() => space.saved("Page")).toContain("table.groupBy: status");
   const groups = page.locator(".swd-group");
   await expect(groups).toHaveCount(2);
@@ -244,7 +323,7 @@ test("the board moves a card to another column, its value written", async ({ pag
 test("the Properties dialog adds a property and changes a type, the change of items shown before it is written", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\n```\n", ...TASKS }, "Page");
   await page.locator(".swd-more").click();
-  await page.locator(".swd-properties-button").click();
+  await choose(page, "Properties");
   await page.locator(".swd-property-new-label").fill("Estimate");
   await page.locator(".swd-property-new-type").selectOption("number");
   await page.locator(".swd-property-add").click();
@@ -256,6 +335,45 @@ test("the Properties dialog adds a property and changes a type, the change of it
   expect(await space.saved("Page/db-tasks")).toContain("status: { type: select");
   await page.locator(".swd-property-apply").click();
   await expect.poll(() => space.saved("Page/db-tasks")).toContain("status: { type: text");
+});
+
+test("system properties added in Properties show the pages' dates, the order by hand, the page, its tags and its tasks done, written into no item's page", async ({ page, space }) => {
+  // (Write docs with tasks in its page: two of three done)
+  const tasks = ["- [x] outline", "- [x] draft", "- [ ] review", ""].join(String.fromCharCode(10));
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS, "Page/db-tasks/Write docs": TASKS["Page/db-tasks/Write docs"] + tasks }, "Page");
+  await page.locator(".swd-more").click();
+  await choose(page, "Properties");
+  for (const kind of ["createdAt", "modifiedAt", "order", "page", "tags", "taskProgress"]) {
+    await page.locator(".swd-property-new-type").selectOption(`system:${kind}`);
+    await page.locator(".swd-property-add").click();
+    await expect(page.locator(`.swd-property-new-type option[value="system:${kind}"]`)).toBeDisabled();
+  }
+  await expect.poll(() => space.saved("Page/db-tasks")).toContain("system: taskProgress");
+  await page.keyboard.press("Escape");
+  const row = page.locator(".swd-table tbody tr", { hasText: "Write docs" });
+  await expect(row.locator('[data-key="order"]')).toHaveText("2");
+  await expect(row.locator('[data-key="task_progress"]')).toHaveText("67%");
+  await expect(row.locator('[data-key="task_progress"] .swd-progress')).toBeVisible();
+  await expect(page.locator(".swd-table tbody tr", { hasText: "Fix login" }).locator('[data-key="task_progress"]')).toHaveText("");
+  // (The test's pages in a folder of their own: the page's path ends so)
+  expect(await row.locator('[data-key="page"]').textContent()).toMatch(new RegExp("/Page/db-tasks/Write docs$"));
+  await expect(row.locator('[data-key="created_at"]')).toHaveText(/^\d{4}-\d\d-\d\d \d\d:\d\d$/);
+  await expect(row.locator('[data-key="modified_at"]')).toHaveText(/^\d{4}-\d\d-\d\d \d\d:\d\d$/);
+  // Read only: a click opens no editor
+  await row.locator('[data-key="order"]').click();
+  await expect(row.locator('[data-key="order"] input')).toHaveCount(0);
+  // An item's value changed: none of them written into its page
+  await row.locator('[data-key="status"]').click();
+  await row.locator('[data-key="status"] select').selectOption("Todo");
+  await expect.poll(() => space.saved("Page/db-tasks/Write docs")).toContain("status: Todo");
+  expect(await space.saved("Page/db-tasks/Write docs")).not.toMatch(/created_at|modified_at|page_tags|^order:|^page:|task_progress/m);
+  // The last task ticked by hand in the item's own page: the database shows it all done once back
+  const itemPage = (await row.locator('[data-key="page"]').textContent())!;
+  await page.goto(`${new URL(page.url()).origin}/${itemPage.split("/").map(encodeURIComponent).join("/")}`);
+  await page.locator(".cm-line", { hasText: "review" }).locator("input[type=checkbox]").click();
+  await expect.poll(() => space.saved("Page/db-tasks/Write docs")).toContain("- [x] review");
+  await page.goBack();
+  await expect(page.locator(".swd-table tbody tr", { hasText: "Write docs" }).locator('[data-key="task_progress"]')).toHaveText("100%");
 });
 
 test("the peek is 600px wide by default, its left edge dragged setting its width in CONFIG, for every database", async ({ page, space }) => {
@@ -303,6 +421,27 @@ test("the peek shows an item beside the page, its content written as it is left,
   expect(await space.saved("Page")).toBe("# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n");
 });
 
+test("the peek stays as its content typed is written by a press beside its fields, SilverBullet indexing the page anew; a property then edited there", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS }, "Page");
+  await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
+  const peek = page.locator(".swd-peek");
+  await expect(peek).toBeVisible();
+  const body = page.locator(".swd-peek-body");
+  await expect(body).toBeEditable();
+  await body.click();
+  await page.keyboard.type("Typed in the peek");
+  // A press in the peek beside its fields: the content written as it is left, the peek still there as SilverBullet indexes
+  // the page anew (its index without the page for a moment: once read as the item removed, the peek closed)
+  await peek.locator(".swd-peek-head").click();
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("Typed in the peek");
+  await page.waitForTimeout(2000);
+  await expect(peek).toBeVisible();
+  // A press on a property's value: edited there
+  await peek.locator('.swd-peek-row[data-property="status"] .swd-peek-value').click();
+  await expect(peek.locator('.swd-peek-row[data-property="status"] :is(select, input)')).toHaveCount(1);
+  await expect(page.locator(".swd-list-name")).toHaveCount(2);
+});
+
 test("a type of the user's shows and reads its values, one that fails shows them as kept, a view's definition given HELPERS", async ({ page, space }) => {
   const rootPage = "---\ntags: [db-root]\n_database:\n  id: rated\n  name: Rated\n  version: 1\n  properties:\n    rating: { type: stars, label: Rating }\n    odd: { type: broken, label: Odd }\n---\n";
   const one = "---\ntags: [db]\nrating: 3\nodd: kept\n_database:\n  rank: a0\n---\n";
@@ -345,7 +484,7 @@ test("a cell of the table edited keeps its row and its columns where they were",
 test("an option given a color in Properties keeps it in the root page and shows in it", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
   await page.locator(".swd-more").click();
-  await page.locator(".swd-properties-button").click();
+  await choose(page, "Properties");
   await page.locator('[data-property="status"] .swd-prop-head').click();
   await page.locator('.swd-option-color[aria-label="Color of Done"]').click();
   await page.locator('.swd-option-swatch[data-color-name="red"]').click();
@@ -376,7 +515,7 @@ test("a table scrolled sideways stays where it was as a value changes, and as it
   await expect.poll(() => space.saved("Page/db-wide/One")).toContain("done: true");
   await expect.poll(() => page.locator(".swd-table-box").evaluate((one) => one.scrollLeft)).toBe(left);
   await page.locator(".swd-sort-button").click();
-  await page.locator('.swd-sort-option[data-key="name"]').click();
+  await choose(page, "Name");
   await expect.poll(() => space.saved("Page")).toContain("sort");
   await expect.poll(() => page.locator(".swd-table-box").evaluate((one) => one.scrollLeft)).toBe(left);
 });
@@ -397,11 +536,47 @@ test("a board scrolled sideways stays where it was as a card is added", async ({
   await expect.poll(() => page.locator(".swd-board").evaluate((one) => one.scrollLeft)).toBe(left);
 });
 
+test("a filter is applied as it is typed, without Enter, the typing going on as the block is written and drawn anew", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
+  await expect(page.locator(".swd-table tbody tr")).toHaveCount(2);
+  await page.locator(".swd-filter-button").click();
+  const name = page.locator('.swd-filter input[data-key="name"]');
+  await name.click();
+  await page.keyboard.type("Fix", { delay: 40 });
+  await expect.poll(() => space.saved("Page")).toContain("Fix");
+  await expect(page.locator(".swd-table tbody tr")).toHaveCount(1);
+  // The block written and drawn anew: the panel open, the field focused, the caret at its end: what is typed goes on there
+  await expect(name).toBeFocused();
+  await page.keyboard.type(" lo", { delay: 40 });
+  await expect.poll(() => space.saved("Page")).toContain("Fix lo");
+  await expect(name).toHaveValue("Fix lo");
+  await expect(page.locator(".swd-table tbody tr")).toHaveCount(1);
+  await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);
+  // Typed fast, past several writes: nothing typed lost, nothing of it in the page's text but the block's condition
+  await name.press("End");
+  await page.keyboard.type("gin and more words typed quickly", { delay: 15 });
+  await expect.poll(() => space.saved("Page")).toContain("Fix login and more words typed quickly");
+  await expect(name).toHaveValue("Fix login and more words typed quickly");
+  // A pause just long enough for a write, then keys at once, as the block is drawn anew: none of them lost
+  for (const key of ["!", "?"]) {
+    await page.keyboard.type(key);
+    await page.waitForTimeout(330);
+  }
+  await page.keyboard.type("#");
+  await expect.poll(() => space.saved("Page")).toContain("typed quickly!?#");
+  await expect(name).toHaveValue("Fix login and more words typed quickly!?#");
+  await expect(name).toBeFocused();
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await expect.poll(() => space.saved("Page")).toBe('# Page\n\n```silverware-database\nid: tasks\nview: table\ntable.filter: {"name":"Fix login and more words typed quickly"}\n```\n');
+});
+
 test("a property hidden in Properties is kept in the root page, shown by no view, and still offered by the filter", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
   await expect(page.locator(".swd-table th")).toContainText(["Name", "Status"]);
   await page.locator(".swd-more").click();
-  await page.locator(".swd-properties-button").click();
+  await choose(page, "Properties");
   await page.locator('[data-property="status"] .swd-prop-eye').click();
   await expect.poll(() => space.saved("Page/db-tasks")).toContain("hidden: true");
   await page.keyboard.press("Escape");
@@ -440,7 +615,7 @@ test("a property made required in Properties is kept in the root page, marked *,
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS, "Page/db-tasks/Plan": none }, "Page");
   await expect(page.locator(".swd-table tbody tr")).toHaveCount(3);
   await page.locator(".swd-more").click();
-  await page.locator(".swd-properties-button").click();
+  await choose(page, "Properties");
   await page.locator('[data-property="status"] .swd-prop-head').click();
   await page.locator('[data-property="status"] .swd-property-required input').click();
   await expect.poll(() => space.saved("Page/db-tasks")).toContain("required: true");
@@ -469,7 +644,7 @@ test("a table's row dragged by its grip to the top is written there, by its rank
 test("options renamed in Properties rename the items' values in the same write: two swapping names swap them", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
   await page.locator(".swd-more").click();
-  await page.locator(".swd-properties-button").click();
+  await choose(page, "Properties");
   await page.locator('[data-property="status"] .swd-prop-head').click();
   const names = page.locator('[data-property="status"] .swd-option-name');
   await names.nth(0).fill("Done");

@@ -4,6 +4,8 @@
 // platform (shared/platform.ts).
 import { saveConfigPage, withConfigSettings } from "../../../../shared/configpage.ts";
 import type { IndexChange, IndexedObject, Platform } from "../../../../shared/platform.ts";
+import { PAGE_KEYS, pageDates, tasksOfPages, validatePageName } from "./pages.ts";
+import { settledIndex } from "./settledindex.ts";
 
 /** What the init page hands over, each SilverBullet's own function or a few lines of Lua around it */
 export type Bridge = {
@@ -25,6 +27,8 @@ export type Bridge = {
   renamePrefix(from: string, to: string): Promise<unknown>;
   // The index's objects of a tag (`query[[from index.tag(tag)]]`)
   queryTag(tag: string): Promise<readonly IndexedObject[]>;
+  // Whether no page is queued or being indexed (`mq.getQueueStats("indexQueue")`): the index is whole then; left out, taken as always
+  indexIdle?(): Promise<boolean>;
   flash(message: string, type: "info" | "error", options?: { readonly timeout?: number }): void;
   confirm(message: string): Promise<boolean>;
   prompt(message: string, value?: string): Promise<string | undefined>;
@@ -47,9 +51,20 @@ function listOf<T>(value: unknown): T[] {
 // plugs/configuration-manager, 2026-11-07)
 export const OWN_MARKER = "-- managed-by: silverware-database";
 
-/** The platform over SilverBullet's API, and the events to feed it (`indexChanged`, `pageOpened`: from the init page's listeners) */
-export function silverBulletPlatform(bridge: Bridge): { readonly platform: Platform; readonly indexChanged: (change: IndexChange) => void; readonly pageOpened: () => Promise<void> } {
+/** The platform over SilverBullet's API, and the events to feed it (`indexChanged`, `indexSettled`, `pageOpened`: from the init page's listeners) */
+export function silverBulletPlatform(bridge: Bridge): {
+  readonly platform: Platform;
+  readonly indexChanged: (change: IndexChange) => void;
+  readonly indexSettled: () => void;
+  readonly pageOpened: () => Promise<void>;
+} {
   const listeners = new Set<(change: IndexChange) => void>();
+  // The index read only whole: settledindex.ts
+  const index = settledIndex(
+    async (tag) => listOf<IndexedObject>(await bridge.queryTag(tag)),
+    bridge.indexIdle ? async () => Boolean(await bridge.indexIdle!()) : undefined,
+    (change) => listeners.forEach((listener) => listener(change)),
+  );
   const openedListeners = new Set<(name: string) => void>();
   const names = async () => listOf<string>(await bridge.listPages());
   // A rename checked by what the space has after it: SilverBullet answers the same whether it renamed or not
@@ -74,6 +89,7 @@ export function silverBulletPlatform(bridge: Bridge): { readonly platform: Platf
       write: (name, text) => bridge.writePage(name, text),
       list: names,
       remove: (name) => bridge.deletePage(name),
+      validateName: validatePageName,
       rename: (from, to) => renamed(from, to, () => bridge.renamePage(from, to)),
       renamePrefix: async (from, to) => {
         await bridge.renamePrefix(from, to);
@@ -81,7 +97,10 @@ export function silverBulletPlatform(bridge: Bridge): { readonly platform: Platf
       },
     },
     index: {
-      objects: async (tag) => listOf<IndexedObject>(await bridge.queryTag(tag)),
+      objects: (tag) => index.objects(tag),
+      reservedKeys: PAGE_KEYS,
+      documentDates: pageDates,
+      tasks: async (pages) => tasksOfPages(await index.objects("task"), pages),
       onChanged: (listener) => {
         listeners.add(listener);
         return () => void listeners.delete(listener);
@@ -101,7 +120,8 @@ export function silverBulletPlatform(bridge: Bridge): { readonly platform: Platf
   };
   return {
     platform,
-    indexChanged: (change) => listeners.forEach((listener) => listener(change)),
+    indexChanged: (change) => index.changed(change),
+    indexSettled: () => void index.settled(),
     pageOpened: async () => {
       // (Its name not read: told without it, as what listens needs to know only that another page is open)
       const name = await Promise.resolve(bridge.getCurrentPage()).then(String, () => "");

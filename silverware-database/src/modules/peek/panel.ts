@@ -130,7 +130,8 @@ export class PeekPanel {
       return;
     }
     shown.latest = now;
-    if (now.revision === shown.item.revision && JSON.stringify(read.value) === JSON.stringify(shown.schema)) return;
+    // (Its values compared too: a system property's change with no change of the item's own, its order as another moves past it)
+    if (now.revision === shown.item.revision && JSON.stringify(now.values) === JSON.stringify(shown.item.values) && JSON.stringify(read.value) === JSON.stringify(shown.schema)) return;
     // Something edited: drawn once it is not, the item kept as drawn meanwhile (a value written from it is checked against it)
     if (this.editing()) {
       shown.stale = true;

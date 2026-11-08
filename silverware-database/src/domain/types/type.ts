@@ -21,6 +21,8 @@ export interface PropertyType {
   readonly name: string;
   /** What the user sees it called */
   readonly label: string;
+  /** False where it is not offered for a property of the user's (a system property's own: date and time) */
+  readonly offered?: boolean;
   /** Why a property's params are not this type's (a select's options no list of texts), undefined where they are */
   validateParams?(params: Params): string | undefined;
   /** Why a value does not read as this type (shown invalid, kept as read), undefined where it does; an empty value always does (`isEmpty`) */

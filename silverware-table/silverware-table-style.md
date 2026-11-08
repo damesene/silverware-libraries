@@ -2629,8 +2629,8 @@ html[data-theme="dark"] .swt-excel-error {
   opacity: 0.55;
 }
 /* Something missing (a table shown as a sheet on none): in the danger color, in the toolbar and the ⋯ menu alike */
-.swt-bar button.swt-bar-name.swt-attention,
-.swt-menu-segmented .swt-label.swt-attention {
+/* (In the ⋯ menu alike: the shared menu's style) */
+.swt-bar button.swt-bar-name.swt-attention {
   font-weight: 600;
   color: var(--danger-color, #c62828);
   opacity: 1;
@@ -2813,6 +2813,20 @@ html[data-theme="dark"] .swt-excel-error {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
   outline: none;
 }
+/* <shared-menu> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* The look of shared/menu.ts's menus: one template for every plugin drawing them, its classes those renderMenu gives
+   (`<base>-menu-item`…) with a placeholder for the base; scripts/sharedstyles.mjs writes it, the plugin's base (`swt`,
+   `swc`, `swd`) in place, into each plugin's style page (between its marks; npm run build), and check-build fails where
+   one differs.
+   The menu's box (where it shows, its size, its font, its background) is the plugin's own, `.<base>-menu`. */
+
+/* The menu's entries one under another */
+[role="menu"].swt-menu,
+.swt-menu > [role="menu"] {
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
 /* The title centered; a submenu's back arrow at the left */
 .swt-menu-title {
   /* No say in the menu's width: as wide as its items, a long title cut */
@@ -2826,9 +2840,6 @@ html[data-theme="dark"] .swt-excel-error {
   font-size: 12px;
   font-weight: 600;
 }
-.swt-menu-back {
-  justify-self: start;
-}
 .swt-menu-title-text {
   grid-column: 2;
   overflow: hidden;
@@ -2837,6 +2848,7 @@ html[data-theme="dark"] .swt-excel-error {
 }
 /* A submenu's way back: an arrow before its title */
 .swt-menu-back {
+  justify-self: start;
   display: inline-flex;
   margin: -3px 0 -3px -5px;
   padding: 3px;
@@ -2926,12 +2938,25 @@ html[data-theme="dark"] .swt-excel-error {
   border-radius: 5px;
   outline: none;
 }
+.swt-menu-name-clear {
+  margin: 4px 0 0;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 5px;
+  cursor: pointer;
+}
 .swt-menu-name-problem {
   max-width: 260px;
   padding: 0 8px 6px;
   font-size: 12px;
   color: var(--danger-color, #c62828);
 }
+/* An item: its icon, its label (and its value), a mark where it opens a submenu or is checked */
 .swt-menu-item {
   display: flex;
   align-items: center;
@@ -2954,7 +2979,8 @@ html[data-theme="dark"] .swt-excel-error {
 }
 /* A list opened in the menu's place: its choice highlighted (focusMenu), not
    the item that came under the pointer, until the pointer moves */
-.swt-menu.swt-menu-still .swt-menu-item:hover:not(:focus-visible) {
+.swt-menu.swt-menu-still .swt-menu-item:hover:not(:focus-visible),
+.swt-menu-still .swt-menu-item:hover:not(:focus-visible) {
   background: none;
 }
 .swt-menu-item.swt-menu-current {
@@ -2969,6 +2995,10 @@ html[data-theme="dark"] .swt-excel-error {
 }
 .swt-menu-item .swt-label {
   flex: 1;
+}
+.swt-menu-item.swt-menu-sub::after {
+  content: "\203A";
+  opacity: 0.6;
 }
 .swt-menu-item[aria-checked="true"]::after {
   content: "\2713";
@@ -2999,30 +3029,6 @@ html[data-theme="dark"] .swt-excel-error {
   border-radius: 8px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
   pointer-events: none;
-}
-/* A theme's preview in the Theme list's bubble: a small table, styled as a table
-   in the page is (SilverBullet's own rules for tables are the editor's only) */
-.swt-theme-preview {
-  display: block;
-  width: 240px;
-  margin-top: 8px;
-  overflow: hidden;
-  border-radius: 4px 4px 0 0;
-  font-weight: normal;
-}
-.swt-theme-preview table {
-  width: 100%;
-  border-spacing: 0;
-}
-.swt-theme-preview td {
-  padding: 6px 8px;
-  white-space: nowrap;
-}
-.swt-theme-preview thead tr {
-  font-weight: bold;
-}
-.swt-theme-preview td:not(:first-child) {
-  text-align: right;
 }
 .swt-menu-detail.swt-left {
   left: auto;
@@ -3064,42 +3070,12 @@ html[data-theme="dark"] .swt-excel-error {
   width: 14px;
   height: 14px;
 }
-/* The values a typed cell offers, under its editor */
-.swt-choices {
-  z-index: 57;
-  flex-direction: column;
-  max-height: 260px;
-  overflow-y: auto;
-  padding: 4px;
-  font-size: 13px;
-  color: var(--root-color);
-  background: var(--root-background-color);
-  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
-  border-radius: 8px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
-}
-.swt-choice {
-  display: flex;
-  gap: 8px;
-  padding: 4px 8px;
-  white-space: nowrap;
-  border-radius: 5px;
-  cursor: pointer;
-}
-.swt-choice:hover,
-.swt-choice.swt-active {
-  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
-}
-.swt-choice.swt-current::after {
-  content: "\2713";
-  margin-left: auto;
-  color: var(--ui-accent-color);
-}
 .swt-menu-separator {
   height: 1px;
   margin: 4px 2px;
   background: var(--button-border-color, rgba(128, 128, 128, 0.3));
 }
+/* A row of icon buttons after a label: a choice (Align) or a pair of actions (Move up, Move down) */
 .swt-menu-segmented {
   display: flex;
   align-items: center;
@@ -3113,6 +3089,12 @@ html[data-theme="dark"] .swt-excel-error {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Something missing (a table shown as a sheet on none): its label in the danger color */
+.swt-menu-segmented .swt-label.swt-attention {
+  font-weight: 600;
+  color: var(--danger-color, #c62828);
+  opacity: 1;
 }
 .swt-segments {
   display: flex;
@@ -3175,11 +3157,108 @@ html[data-theme="dark"] .swt-excel-error {
   white-space: nowrap;
   opacity: 0.85;
 }
+/* Choices laid out as tiles, an icon over each label (a gallery: a chart's types) */
+.swt-menu-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+}
+.swt-menu-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  font: inherit;
+  font-size: 11px;
+  color: inherit;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swt-menu-tile[aria-checked="true"] {
+  border-color: var(--ui-accent-color);
+}
+.swt-menu-tile[aria-checked="true"] .swt-label::after {
+  content: " \2713";
+  color: var(--ui-accent-color);
+}
+.swt-menu-tile[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.45;
+}
+.swt-menu-tile:not([aria-disabled="true"]):hover,
+.swt-menu-tile:focus-visible,
+.swt-menu-tile.swt-menu-current {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.swt-menu-tile svg {
+  width: 22px;
+  height: 22px;
+}
 /* A finger's targets: bigger buttons in a row */
 @media (pointer: coarse) {
   .swt-segment {
     padding: 8px 10px;
   }
+}
+/* </shared-menu> */
+/* A theme's preview in the Theme list's bubble: a small table, styled as a table
+   in the page is (SilverBullet's own rules for tables are the editor's only) */
+.swt-theme-preview {
+  display: block;
+  width: 240px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 4px 4px 0 0;
+  font-weight: normal;
+}
+.swt-theme-preview table {
+  width: 100%;
+  border-spacing: 0;
+}
+.swt-theme-preview td {
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+.swt-theme-preview thead tr {
+  font-weight: bold;
+}
+.swt-theme-preview td:not(:first-child) {
+  text-align: right;
+}
+/* The values a typed cell offers, under its editor */
+.swt-choices {
+  z-index: 57;
+  flex-direction: column;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+  font-size: 13px;
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+.swt-choice {
+  display: flex;
+  gap: 8px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.swt-choice:hover,
+.swt-choice.swt-active {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+}
+.swt-choice.swt-current::after {
+  content: "\2713";
+  margin-left: auto;
+  color: var(--ui-accent-color);
 }
 
 /* Middle-button autoscroll over a wide table: the start point */

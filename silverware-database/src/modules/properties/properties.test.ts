@@ -6,6 +6,12 @@ import { TypeRegistry } from "../../domain/types/registry.ts";
 import type { Database } from "../../model/database.ts";
 import { MemoryStore } from "../../store/memory.ts";
 import { PROPERTIES_MODULE } from "./index.ts";
+import { menuBuilder } from "../../../../shared/menuslots.ts";
+import { PLACE_MENU_SLOTS } from "../../core/placemenu.ts";
+
+/** The modules' entries in a place's menu, as items (labels, what they run) */
+const menuItems = (modules: Modules, database: Database) =>
+  modules.placeMenu({ document, database }, menuBuilder(PLACE_MENU_SLOTS, () => {})).flatMap((group) => group.entries.flatMap((entry) => (entry.kind === "item" ? [entry] : [])));
 
 const TASKS: Database = {
   id: "tasks",
@@ -30,9 +36,7 @@ async function setup(answer = false, configured: Record<string, unknown> = {}, a
   const schema = async () => (await store.database("tasks"))!.value.properties;
   const named = async (name: string) => (await store.items("tasks")).value.find((one) => one.name === name)!;
   const open = async () => {
-    const [button] = modules.placeTools({ document, database: (await store.database("tasks"))!.value }) as HTMLButtonElement[];
-    document.body.append(button!);
-    button!.click();
+    menuItems(modules, (await store.database("tasks"))!.value).find((one) => one.label === "Properties")!.run();
     await settle();
   };
   const q = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
@@ -52,15 +56,16 @@ describe("the modules", () => {
     const giver: ModuleDefinition = { name: "giver", label: "Giver", description: "", settings: [{ key: "word", label: "Word", control: "text", default: "hi" }], start: (host) => void host.offer({ word: host.setting("word") }) };
     const taker: ModuleDefinition = { name: "taker", label: "Taker", description: "", start: (host) => void seen.push(host.offered("giver")) };
     await setup(false, { "silverware.database.modules.properties.enabled": false }, [PROPERTIES_MODULE, giver, taker]).then(({ modules }) => {
-      expect(modules.placeTools({ document, database: TASKS })).toEqual([]);
+      expect(menuItems(modules, TASKS)).toEqual([]);
     });
     expect(seen).toEqual([{ word: "hi" }]);
   });
 
-  it("start once where a start overtakes another, each module's tools once", async () => {
+  it("start once where a start overtakes another, each module's entries once, in the slot of what they do", async () => {
     const { modules } = await setup();
     await Promise.all([modules.start(), modules.start()]);
-    expect(modules.placeTools({ document, database: TASKS })).toHaveLength(1);
+    expect(menuItems(modules, TASKS).map((one) => one.label)).toEqual(["Properties"]);
+    expect(modules.placeMenu({ document, database: TASKS }, menuBuilder(PLACE_MENU_SLOTS, () => {})).map((group) => group.slot)).toEqual(["data"]);
   });
 });
 
@@ -108,6 +113,37 @@ describe("the properties' dialog", () => {
     ]);
     expect(q('[data-property="estimate"] .swd-prop-eye').getAttribute("aria-pressed")).toBe("false");
     expect(refreshed()).toBeGreaterThan(0);
+  });
+
+  it("adds a system property from the System group of the types, its name offered; read only, its details saying what it is, offered once", async () => {
+    const { open, q, schema, named } = await setup();
+    await open();
+    const types = () => [...q<HTMLSelectElement>(".swd-property-new-type").options];
+    // (Date and time is a system property's own: not offered for one of the user's)
+    expect(types().some((one) => one.value === "datetime")).toBe(false);
+    expect(types().filter((one) => one.value.startsWith("system:")).map((one) => one.text)).toEqual(["Created", "Modified", "Order", "Page", "Tags", "Task progress"]);
+    change(q<HTMLSelectElement>(".swd-property-new-type"), "system:order");
+    expect(q<HTMLInputElement>(".swd-property-new-label").value).toBe("Order");
+    q<HTMLButtonElement>(".swd-property-add").click();
+    await settle();
+    expect((await schema()).at(-1)).toEqual({ key: "order", label: "Order", type: "number", params: {}, readonly: true, system: "order" });
+    expect((await named("Write docs")).values.order).toBe(2);
+    expect(document.querySelector('[data-property="order"] .swd-prop-type')!.textContent).toBe("System: Order");
+    // Offered once
+    expect(types().find((one) => one.value === "system:order")!.disabled).toBe(true);
+    // Its details: its name, what it is, its key read only; no type, required or locked to change
+    expand("order");
+    const details = q('[data-property="order"] .swd-prop-detail');
+    expect(details.querySelector(".swd-prop-system")!.textContent).toContain("Given by the system");
+    expect(details.querySelector(".swd-property-type, .swd-property-required, .swd-property-locked")).toBeNull();
+    expect(details.querySelector<HTMLInputElement>(".swd-property-key")!.readOnly).toBe(true);
+    // Removed: whether to take its values off is not asked (they are no item's), the change shown, no item's value changing
+    details.querySelector<HTMLButtonElement>(".swd-property-remove")!.click();
+    await settle();
+    expect(document.querySelector(".swd-properties")!.textContent).toContain("no item's value changes");
+    q<HTMLButtonElement>(".swd-property-apply").click();
+    await settle();
+    expect((await schema()).some((one) => one.key === "order")).toBe(false);
   });
 
   it("makes a property required from its details, marked * in the list", async () => {
@@ -367,10 +403,9 @@ describe("the properties' dialog", () => {
 
   it("opens one dialog a database, applies a change once, closes as the module stops", async () => {
     const { modules, q, told } = await setup();
-    const [button] = modules.placeTools({ document, database: TASKS }) as HTMLButtonElement[];
-    document.body.append(button!);
-    button!.click();
-    button!.click();
+    const [properties] = menuItems(modules, TASKS);
+    properties!.run();
+    properties!.run();
     await settle();
     expect(document.querySelectorAll(".swd-properties")).toHaveLength(1);
     expand("estimate");

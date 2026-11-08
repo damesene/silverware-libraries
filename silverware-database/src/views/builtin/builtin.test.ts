@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
 import { DatabaseCore } from "../../core/core.ts";
-import { DatabasePlace, VIEW_KEY } from "../../core/place.ts";
+import { DatabasePlace, FILTER_TYPED_MS, VIEW_KEY } from "../../core/place.ts";
 import { ViewRegistry } from "../../core/views.ts";
 import { inRankOrder } from "../../domain/rank.ts";
 import { TypeRegistry } from "../../domain/types/registry.ts";
@@ -48,6 +48,16 @@ async function setup(view: string, state: Record<string, unknown> = {}, database
 const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
 const key = (target: Element, name: string) => target.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true }));
 afterEach(() => document.body.replaceChildren());
+
+
+/** The items of the place's menu shown now: each its label (with its value) and whether it is checked */
+const menuShown = (root: ParentNode) => [...root.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].map((one) => [one.querySelector(".swd-label")!.textContent, one.getAttribute("aria-checked")]);
+/** An item of the place's menu chosen by its label (its value after it left out) */
+const choose = (root: ParentNode, label: string) => {
+  const item = [...root.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].find((one) => one.querySelector(".swd-label")!.textContent!.split(": ")[0] === label);
+  if (!item) throw new Error(`No item "${label}" in the menu`);
+  item.click();
+};
 
 describe("the table", () => {
   it("shows a row per item and a column per property, a value that does not read marked with why", async () => {
@@ -200,25 +210,112 @@ describe("the board", () => {
     expect((await items()).map((one) => one.rank)).toEqual(ranks);
   });
 
-  it("groups by the property its meta names, picked by Group by in ⋯, and says so where no property can group", async () => {
+  it("groups by the property its meta names, picked under Group in ⋯ (any property), and says so where no property can group", async () => {
     const both: Database = { ...TASKS, properties: [...TASKS.properties, { key: "area", label: "Area", type: "select", params: { options: ["Web"] }, readonly: false }] };
     const { q, viewState, all } = await setup("board", {}, both);
     q<HTMLButtonElement>(".swd-more").click();
-    // The selects alone, the one grouped by checked, no None: a board always groups
-    expect(all<HTMLButtonElement>(".swd-group-option").map((one) => [one.textContent, one.getAttribute("aria-pressed")])).toEqual([
+    choose(document, "Group");
+    choose(document, "Group by");
+    // Every property, the first select grouped by where none is picked, no None: a board always groups
+    expect(menuShown(document)).toEqual([
       ["Status", "true"],
+      ["Estimate", "false"],
+      ["Done", "false"],
       ["Area", "false"],
     ]);
-    q<HTMLButtonElement>('.swd-group-option[data-key="area"]').click();
+    choose(document, "Area");
     await settle();
     expect(viewState.get("board.groupBy")).toBe("area");
     expect(all(".swd-board-column").map((column) => column.getAttribute("aria-label"))).toEqual(["No Area", "Web"]);
-    const none = await setup("board", {}, { ...TASKS, properties: TASKS.properties.filter((one) => one.type !== "select") });
+    const none = await setup("board", {}, { ...TASKS, properties: [] });
     expect(none.q(".swd-place-note").textContent).toContain("has none");
     // A table is grouped by the place: any property, or None
     const table = await setup("table");
     table.q<HTMLButtonElement>(".swd-more").click();
-    expect(table.all(".swd-group-option").map((one) => one.textContent)[0]).toBe("None");
+    choose(document, "Group");
+    choose(document, "Group by");
+    expect(menuShown(document)[0]).toEqual(["None", "true"]);
+  });
+
+  it("groups by any property: a column per value, a card dragged setting that column's value, a multi-select's one value replaced", async () => {
+    const tagged: Database = { ...TASKS, properties: [...TASKS.properties, { key: "tags", label: "Tags", type: "multi-select", params: { options: ["web", "api", "ops"] }, readonly: false }] };
+    const drag = (card: Element, onto: Element) => {
+      card.dispatchEvent(new Event("dragstart"));
+      onto.dispatchEvent(new MouseEvent("dragover", { bubbles: true, cancelable: true, clientY: 1000 }));
+      onto.dispatchEvent(new Event("drop", { bubbles: true, cancelable: true }));
+    };
+    const columnOf = (all: (selector: string) => HTMLElement[], label: string) => all(".swd-board-column").find((one) => one.getAttribute("aria-label") === label)!;
+    const cardOf = (column: HTMLElement, name: string) => [...column.querySelectorAll(".swd-board-card")].find((one) => one.querySelector(".swd-board-name")!.textContent === name)!;
+    // A checkbox: Checked and Unchecked, a card dragged ticked
+    const ticks = await setup("board", { "board.groupBy": "done" }, tagged);
+    expect(ticks.all(".swd-board-column").map((one) => one.getAttribute("aria-label"))).toEqual(["Checked", "Unchecked"]);
+    drag(cardOf(columnOf(ticks.all, "Unchecked"), "Fix login"), columnOf(ticks.all, "Checked"));
+    await settle();
+    expect((await ticks.named("Fix login")).values.done).toBe(true);
+    // A number: a column per value, in the order sorting gives them, none first
+    const numbers = await setup("board", { "board.groupBy": "estimate" }, tagged);
+    expect(numbers.all(".swd-board-column").map((one) => one.getAttribute("aria-label"))).toEqual(["No Estimate", "3", "a lot"]);
+    // A multi-select: a card in each of its values' columns; moved from one, that value replaced in its place, the others kept
+    const tags = await setup("board", { "board.groupBy": "tags" }, tagged);
+    tags.store.changeOutside("tasks",(await tags.named("Write docs")).key, { values: { tags: ["web", "api"] } });
+    await settle();
+    expect(tags.all(".swd-board-column").map((one) => [one.getAttribute("aria-label"), one.querySelectorAll(".swd-board-card").length])).toEqual([
+      ["No Tags", 2],
+      ["web", 1],
+      ["api", 1],
+      ["ops", 0],
+    ]);
+    drag(cardOf(columnOf(tags.all, "web"), "Write docs"), columnOf(tags.all, "ops"));
+    await settle();
+    expect((await tags.named("Write docs")).values.tags).toEqual(["ops", "api"]);
+    // Onto another of its own columns: nothing written
+    drag(cardOf(columnOf(tags.all, "ops"), "Write docs"), columnOf(tags.all, "api"));
+    await settle();
+    expect((await tags.named("Write docs")).values.tags).toEqual(["ops", "api"]);
+    // From the column of none: the column's value given
+    drag(cardOf(columnOf(tags.all, "No Tags"), "Plan"), columnOf(tags.all, "web"));
+    await settle();
+    expect((await tags.named("Plan")).values.tags).toEqual(["web"]);
+  });
+
+  it("arranges its columns under Group in ⋯: dragged or Alt+↑ ↓ into an order, hidden by their eye, empty ones hidden, all kept in its meta", async () => {
+    const { q, all, viewState } = await setup("board");
+    const labels = () => all(".swd-board-column").map((column) => column.getAttribute("aria-label"));
+    q<HTMLButtonElement>(".swd-more").click();
+    choose(document, "Group");
+    const rows = () => [...document.querySelectorAll<HTMLElement>(".swd-group-row")];
+    expect(rows().map((row) => row.querySelector(".swd-group-row-label")!.textContent)).toEqual(["Todo", "Done", "Later (none of its options)"]);
+    // Alt+↓ on Todo's grip: after Done, the menu still open
+    rows()[0]!.querySelector(".swd-group-grip")!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", altKey: true, bubbles: true, cancelable: true }));
+    await settle();
+    expect(labels()).toEqual(["Done", "Todo", "Later (none of its options)"]);
+    expect(viewState.get("board.groupOrder")).toEqual(['value:"Done"', 'value:"Todo"', 'value:"Later"']);
+    expect(rows().map((row) => row.dataset.group)).toEqual(['value:"Done"', 'value:"Todo"', 'value:"Later"']);
+    // Its eye: hidden, the row kept in the list, dimmed
+    rows()[1]!.querySelector<HTMLButtonElement>(".swd-group-eye")!.click();
+    await settle();
+    expect(labels()).toEqual(["Done", "Later (none of its options)"]);
+    expect(viewState.get("board.groupHidden")).toEqual(['value:"Todo"']);
+    expect(rows()[1]!.classList.contains("swd-group-off")).toBe(true);
+    // Hide all, Show all
+    document.querySelector<HTMLButtonElement>(".swd-group-all")!.click();
+    await settle();
+    expect(labels()).toEqual([]);
+    expect(document.querySelector(".swd-group-all")!.textContent).toBe("Show all");
+    document.querySelector<HTMLButtonElement>(".swd-group-all")!.click();
+    await settle();
+    expect(labels()).toEqual(["Done", "Todo", "Later (none of its options)"]);
+    // Hide empty groups: Done emptied by a change elsewhere goes
+    const switched = document.querySelector<HTMLButtonElement>(".swd-group-switch")!;
+    switched.click();
+    await settle();
+    expect(viewState.get("board.groupHideEmpty")).toBe(true);
+    expect(document.querySelector(".swd-group-switch")!.getAttribute("aria-checked")).toBe("true");
+    // Another property picked: the order and the hiding go with the one they were for
+    choose(document, "Group by");
+    choose(document, "Done");
+    await settle();
+    expect([viewState.get("board.groupOrder"), viewState.get("board.groupHidden"), viewState.get("board.groupHideEmpty")]).toEqual([undefined, undefined, true]);
   });
 });
 
@@ -273,7 +370,7 @@ describe("a property hidden in the views", () => {
     expect(all("th").map((th) => th.textContent)).not.toContain("Estimate");
     expect(q('.swd-filter input[data-key="estimate"]')).not.toBeNull();
     q<HTMLButtonElement>(".swd-sort-button").click();
-    q<HTMLButtonElement>('.swd-sort-option[data-key="estimate"]').click();
+    choose(document, "Estimate");
     await settle();
     expect(viewState.get("table.sort")).toEqual([{ key: "estimate", direction: "asc" }]);
     const list = await setup("list", {}, hidden);
@@ -284,6 +381,28 @@ describe("a property hidden in the views", () => {
 });
 
 describe("the place's tools", () => {
+  it("applies a filter as it is typed, a moment after the last key, without Enter; one that does not read not applied", async () => {
+    const { q, all, viewState } = await setup("table");
+    q<HTMLButtonElement>(".swd-filter-button").click();
+    const name = q<HTMLInputElement>('.swd-filter input[data-key="name"]');
+    const type = (text: string) => {
+      name.value = text;
+      name.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    type("F");
+    type("Fi");
+    // (Not yet: keys still coming)
+    await new Promise((resolve) => setTimeout(resolve, FILTER_TYPED_MS / 2));
+    expect(viewState.get("table.filter")).toBeUndefined();
+    await new Promise((resolve) => setTimeout(resolve, FILTER_TYPED_MS + 50));
+    expect(viewState.get("table.filter")).toEqual({ name: "Fi" });
+    expect(all("tbody tr")).toHaveLength(1);
+    type("/unclosed(/");
+    await new Promise((resolve) => setTimeout(resolve, FILTER_TYPED_MS + 50));
+    expect(viewState.get("table.filter")).toEqual({ name: "Fi" });
+    expect(name.classList.contains("swd-invalid")).toBe(true);
+  });
+
   it("filter, sort and undo for the view shown, kept in its own state", async () => {
     const { q, all, viewState, named } = await setup("table");
     q<HTMLButtonElement>(".swd-filter-button").click();
@@ -295,18 +414,20 @@ describe("the place's tools", () => {
     expect(all("tbody tr")).toHaveLength(1);
     expect(q(".swd-filter-button").getAttribute("aria-label")).toBe("Filter (1)");
     expect(q(".swd-place-count").textContent).toBe("1 of 3");
-    // The sort's menu: a property, then the other way
+    // The sort's menu (the shared menu): the order by hand checked, the way of none to pick yet; a property, then the other way
     q<HTMLButtonElement>(".swd-sort-button").click();
-    q<HTMLButtonElement>('.swd-sort-option[data-key="name"]').click();
+    expect(menuShown(document)[0]).toEqual(["Order by hand", "true"]);
+    expect(all<HTMLButtonElement>(".swd-menu-row-direction .swd-segment").map((one) => one.getAttribute("aria-disabled"))).toEqual(["true", "true"]);
+    choose(document, "Name");
     await settle();
     expect(viewState.get("table.sort")).toEqual([{ key: "name", direction: "asc" }]);
-    expect(q<HTMLElement>(".swd-popover").hidden).toBe(true);
+    expect(document.querySelector<HTMLElement>(".swd-menu")?.hidden ?? true).toBe(true);
     q<HTMLButtonElement>(".swd-sort-button").click();
-    q<HTMLButtonElement>(".swd-sort-desc").click();
+    all<HTMLButtonElement>(".swd-menu-row-direction .swd-segment")[1]!.click();
     await settle();
     expect(viewState.get("table.sort")).toEqual([{ key: "name", direction: "desc" }]);
     q<HTMLButtonElement>(".swd-sort-button").click();
-    q<HTMLButtonElement>('.swd-sort-option[data-key=""]').click();
+    choose(document, "Order by hand");
     await settle();
     expect(viewState.get("table.sort")).toBeUndefined();
     q('tbody tr:first-child [data-key="estimate"]').click();

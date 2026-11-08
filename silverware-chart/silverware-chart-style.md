@@ -128,63 +128,150 @@ The look of [Silverware Chart](silverware-chart.md): a chart's box, its toolbar,
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
 }
 
+/* <shared-menu> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* The look of shared/menu.ts's menus: one template for every plugin drawing them, its classes those renderMenu gives
+   (`<base>-menu-item`…) with a placeholder for the base; scripts/sharedstyles.mjs writes it, the plugin's base (`swt`,
+   `swc`, `swd`) in place, into each plugin's style page (between its marks; npm run build), and check-build fails where
+   one differs.
+   The menu's box (where it shows, its size, its font, its background) is the plugin's own, `.<base>-menu`. */
+
+/* The menu's entries one under another */
+[role="menu"].swc-menu,
+.swc-menu > [role="menu"] {
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+/* The title centered; a submenu's back arrow at the left */
 .swc-menu-title {
+  /* No say in the menu's width: as wide as its items, a long title cut */
+  contain: inline-size;
   display: grid;
-  grid-template-columns: 22px 1fr 22px;
+  /* The back arrow | the title | its pencil | the ×: the sides keep room for the arrow and the ×, the title is cut first */
+  grid-template-columns: minmax(22px, 1fr) minmax(0, max-content) auto minmax(22px, 1fr);
   align-items: center;
   gap: 4px;
-  padding: 4px 4px 6px;
+  padding: 4px 8px 6px;
   font-size: 12px;
   font-weight: 600;
-  text-align: center;
 }
-
-.swc-menu-back,
-.swc-menu-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  color: inherit;
-  background: none;
-  border: 0;
-  border-radius: 4px;
-  cursor: pointer;
-  opacity: 0.7;
-}
-
-/* (The title in the middle column, the × right, whether a back arrow is there or not) */
 .swc-menu-title-text {
   grid-column: 2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.swc-menu-close {
-  grid-column: 3;
+/* A submenu's way back: an arrow before its title */
+.swc-menu-back {
+  justify-self: start;
+  display: inline-flex;
+  margin: -3px 0 -3px -5px;
+  padding: 3px;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
 }
-
 .swc-menu-back:hover,
-.swc-menu-close:hover {
-  opacity: 1;
+.swc-menu-back:focus-visible {
   background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
-}
-
-/* The menu (shared/menu.ts): its title, then its items one under another */
-.swc-menu > [role="menu"] {
-  display: flex;
-  flex-direction: column;
   outline: none;
 }
-
-/* What a view says without items (Reading the page…, No table on this page) */
-.swc-menu-line {
-  padding: 5px 8px;
-  opacity: 0.7;
+.swc-menu .swc-menu-back svg {
+  width: 14px;
+  height: 14px;
 }
-
+/* The × closing the menu, at the title's right */
+.swc-menu-close {
+  grid-column: 4;
+  grid-row: 1;
+  justify-self: end;
+  display: inline-flex;
+  margin: -3px -5px -3px 0;
+  padding: 3px;
+  color: inherit;
+  opacity: 0.6;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.swc-menu-close:hover,
+.swc-menu-close:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.swc-menu .swc-menu-close svg {
+  width: 14px;
+  height: 14px;
+}
+/* What the menu is about named in its title: a pencil after the title, the title a field once pressed */
+.swc-menu-rename {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: start;
+  display: inline-flex;
+  margin: -3px 0;
+  padding: 3px;
+  color: inherit;
+  opacity: 0.6;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.swc-menu-rename:hover,
+.swc-menu-rename:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.swc-menu-rename[aria-disabled] {
+  opacity: 0.3;
+  cursor: default;
+  background: none;
+}
+.swc-menu .swc-menu-rename svg {
+  width: 14px;
+  height: 14px;
+}
+.swc-menu-title.swc-naming {
+  display: block;
+  padding: 2px 6px 6px;
+}
+.swc-menu-name {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 3px 6px;
+  font: inherit;
+  font-weight: 400;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--ui-accent-color);
+  border-radius: 5px;
+  outline: none;
+}
+.swc-menu-name-clear {
+  margin: 4px 0 0;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 5px;
+  cursor: pointer;
+}
+.swc-menu-name-problem {
+  max-width: 260px;
+  padding: 0 8px 6px;
+  font-size: 12px;
+  color: var(--danger-color, #c62828);
+}
+/* An item: its icon, its label (and its value), a mark where it opens a submenu or is checked */
 .swc-menu-item {
   display: flex;
   align-items: center;
@@ -198,42 +285,199 @@ The look of [Silverware Chart](silverware-chart.md): a chart's box, its toolbar,
   border-radius: 5px;
   cursor: pointer;
 }
-
+.swc-menu-item:hover,
+.swc-menu-item:focus-visible,
+.swc-segment:not([aria-disabled="true"]):hover,
+.swc-segment:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+/* A list opened in the menu's place: its choice highlighted (focusMenu), not
+   the item that came under the pointer, until the pointer moves */
+.swc-menu.swc-menu-still .swc-menu-item:hover:not(:focus-visible),
+.swc-menu-still .swc-menu-item:hover:not(:focus-visible) {
+  background: none;
+}
+.swc-menu-item.swc-menu-current {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+}
+.swc-menu-item[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.45;
+}
+.swc-menu-item[aria-disabled="true"]:hover {
+  background: none;
+}
 .swc-menu-item .swc-label {
   flex: 1;
 }
-
 .swc-menu-item.swc-menu-sub::after {
   content: "\203A";
   opacity: 0.6;
 }
-
-.swc-menu-item[aria-checked="true"] .swc-label::after,
-.swc-menu-tile[aria-checked="true"] .swc-label::after {
-  content: " \2713";
+.swc-menu-item[aria-checked="true"]::after {
+  content: "\2713";
   color: var(--ui-accent-color);
 }
-
-.swc-menu-item[aria-disabled="true"],
-.swc-menu-tile[aria-disabled="true"] {
-  cursor: default;
-  opacity: 0.45;
+.swc-menu-item.swc-danger {
+  color: var(--danger-color, #c62828);
 }
-
-.swc-menu-item:not([aria-disabled="true"]):hover,
-.swc-menu-tile:not([aria-disabled="true"]):hover,
-.swc-menu-item:focus-visible,
-.swc-menu-tile:focus-visible {
-  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+.swc-icon {
+  display: inline-flex;
+}
+.swc-menu svg {
+  width: 16px;
+  height: 16px;
+}
+/* An item's detail: a bubble beside the menu, at the item's height */
+.swc-menu-detail {
+  position: absolute;
+  left: calc(100% + 8px);
+  width: max-content;
+  max-width: 280px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+.swc-menu-detail.swc-left {
+  left: auto;
+  right: calc(100% + 8px);
+}
+.swc-menu-detail[hidden] {
+  display: none;
+}
+.swc-menu-detail-title {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.swc-menu-detail-code {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.swc-menu-detail-code code {
+  padding: 1px 5px;
+  font-size: 11px;
+  background: color-mix(in srgb, var(--ui-accent-color) 12%, transparent);
+  border-radius: 4px;
+}
+.swc-menu-detail p {
+  margin: 0;
+}
+.swc-menu-detail .swc-menu-detail-note {
+  margin-top: 6px;
+  opacity: 0.7;
+}
+/* The icon of an item's value: Type: ☆ Stars */
+.swc-menu-value-icon {
+  display: inline-flex;
+  margin-right: 3px;
+  vertical-align: -2px;
+}
+.swc-menu .swc-menu-value-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.swc-menu-separator {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--button-border-color, rgba(128, 128, 128, 0.3));
+}
+/* A row of icon buttons after a label: a choice (Align) or a pair of actions (Move up, Move down) */
+.swc-menu-segmented {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 2px 8px;
+}
+/* A long label (a sheet's name) cut, whole in its tooltip: the menu as wide as its items */
+.swc-menu-segmented > .swc-label {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Something missing (a table shown as a sheet on none): its label in the danger color */
+.swc-menu-segmented .swc-label.swc-attention {
+  font-weight: 600;
+  color: var(--danger-color, #c62828);
+  opacity: 1;
+}
+.swc-segments {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--root-color) 6%, transparent);
+}
+.swc-segment {
+  display: inline-flex;
+  padding: 4px 6px;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swc-segment[aria-checked="true"] {
+  color: var(--ui-accent-color);
+  background: var(--root-background-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.swc-segment[aria-disabled="true"],
+.swc-action[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: default;
+}
+/* A bar of actions, a caption under each icon (Copy, Cut, Paste): first in a menu */
+.swc-menu-actions {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+}
+.swc-action {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 44px;
+  padding: 6px 2px 4px;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.2;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swc-action .swc-icon {
+  display: inline-flex;
+}
+.swc-action:not([aria-disabled="true"]):hover,
+.swc-action:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 15%, transparent);
   outline: none;
 }
-
+.swc-action-caption {
+  white-space: nowrap;
+  opacity: 0.85;
+}
+/* Choices laid out as tiles, an icon over each label (a gallery: a chart's types) */
 .swc-menu-tiles {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 2px;
 }
-
 .swc-menu-tile {
   display: flex;
   flex-direction: column;
@@ -248,15 +492,40 @@ The look of [Silverware Chart](silverware-chart.md): a chart's box, its toolbar,
   border-radius: 6px;
   cursor: pointer;
 }
-
 .swc-menu-tile[aria-checked="true"] {
   border-color: var(--ui-accent-color);
 }
-
+.swc-menu-tile[aria-checked="true"] .swc-label::after {
+  content: " \2713";
+  color: var(--ui-accent-color);
+}
+.swc-menu-tile[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.45;
+}
+.swc-menu-tile:not([aria-disabled="true"]):hover,
+.swc-menu-tile:focus-visible,
+.swc-menu-tile.swc-menu-current {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
 .swc-menu-tile svg {
   width: 22px;
   height: 22px;
 }
+/* A finger's targets: bigger buttons in a row */
+@media (pointer: coarse) {
+  .swc-segment {
+    padding: 8px 10px;
+  }
+}
+/* </shared-menu> */
+/* What a view says without items (Reading the page…, No table on this page) */
+.swc-menu-line {
+  padding: 5px 8px;
+  opacity: 0.7;
+}
+
 
 .swc-icon {
   display: inline-flex;

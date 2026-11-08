@@ -5,7 +5,7 @@ import type { Database } from "../model/database.ts";
 import { MemoryStore } from "../store/memory.ts";
 import { MemoryViewState } from "../store/viewstate.ts";
 import { DatabaseCore } from "./core.ts";
-import { DatabasePlace, VIEW_KEY, viewSettingPath } from "./place.ts";
+import { DatabasePlace, FILTER_TYPED_MS, VIEW_KEY, viewSettingPath } from "./place.ts";
 import type { ViewDefinition, ViewHost } from "./view.ts";
 import { ViewRegistry } from "./views.ts";
 
@@ -13,6 +13,16 @@ const TASKS: Database = {
   id: "tasks",
   name: "Tasks",
   properties: [{ key: "status", label: "Status", type: "select", params: { options: ["Todo", "Done"] }, readonly: false }],
+};
+
+
+/** The items of the place's menu shown now: each its label (with its value) and whether it is checked */
+const menuShown = (root: ParentNode) => [...root.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].map((one) => [one.querySelector(".swd-label")!.textContent, one.getAttribute("aria-checked")]);
+/** An item of the place's menu chosen by its label (its value after it left out) */
+const choose = (root: ParentNode, label: string) => {
+  const item = [...root.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].find((one) => one.querySelector(".swd-label")!.textContent!.split(": ")[0] === label);
+  if (!item) throw new Error(`No item "${label}" in the menu`);
+  item.click();
 };
 
 /** A view listing names, keeping its host for the test, counting how it was drawn and told */
@@ -51,6 +61,7 @@ function setup(views: readonly ViewDefinition[], state: Record<string, unknown> 
   const core = new DatabaseCore(store, types, { notify: () => {}, ask: () => true });
   const element = document.createElement("div");
   const viewState = new MemoryViewState(state);
+  const told: string[] = [];
   const opened: string[] = [];
   const place = new DatabasePlace({
     element,
@@ -66,13 +77,13 @@ function setup(views: readonly ViewDefinition[], state: Record<string, unknown> 
         return slowSettings ? new Promise((resolve) => setTimeout(() => resolve(value), slowSettings)) : value;
       },
     },
-    ui: { notify: () => {} },
+    ui: { notify: (message) => void told.push(message) },
     editor: { open: (ref) => void opened.push(ref) },
     ...(editSource ? { editSource } : {}),
   });
   const listed = () => [...element.querySelectorAll("li")].map((one) => one.textContent);
   const switches = () => [...element.querySelectorAll<HTMLButtonElement>(".swd-switch")];
-  return { store, element, viewState, place, listed, switches, opened, core };
+  return { store, element, viewState, place, listed, switches, opened, core, told };
 }
 
 describe("a place", () => {
@@ -248,12 +259,18 @@ describe("a place", () => {
     const { place, element, viewState, store } = setup([table.view]);
     await place.render();
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    // Every property offered, and None, checked: nothing grouped yet
-    expect([...element.querySelectorAll(".swd-group-option")].map((one) => [one.textContent, one.getAttribute("aria-pressed")])).toEqual([
+    expect(menuShown(element)).toEqual([["Group: None", null]]);
+    // Group, then Group by in its place: every property offered, and None, checked: nothing grouped yet
+    choose(element, "Group");
+    expect(menuShown(element)).toEqual([["Group by: None", null]]);
+    choose(element, "Group by");
+    expect(menuShown(element)).toEqual([
       ["None", "true"],
       ["Status", "false"],
     ]);
-    element.querySelector<HTMLButtonElement>('.swd-group-option[data-key="status"]')!.click();
+    choose(element, "Status");
+    // (Chosen, the menu closed)
+    expect(element.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(viewState.get("table.groupBy")).toBe("status");
     const sections = () => [...element.querySelectorAll(".swd-group")].map((one) => [one.querySelector(".swd-group-label")!.textContent, [...one.querySelectorAll("li")].map((li) => li.textContent)]);
@@ -277,7 +294,9 @@ describe("a place", () => {
     ]);
     // None: one view again
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    element.querySelector<HTMLButtonElement>('.swd-group-option[data-key=""]')!.click();
+    choose(element, "Group");
+    choose(element, "Group by");
+    choose(element, "None");
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(element.querySelectorAll(".swd-group")).toHaveLength(0);
     expect(element.querySelectorAll("li")).toHaveLength(3);
@@ -315,20 +334,134 @@ describe("a place", () => {
     element.remove();
   });
 
-  it("offers Edit source last in ⋯ where the place is a block, none where it is not", async () => {
+  it("offers Edit source last in ⋯ where the place is a block, none where it is not; a view's own entries in its slot", async () => {
+    // A view of its own entry in the menu's slot `view`, one in a section of its own, first (primary)
+    const ran: string[] = [];
     const table = listView("table");
+    const view: ViewDefinition = {
+      ...table.view,
+      menu: (_host, menu) => [menu.slot.view([menu.item({ label: "Density", run: () => void ran.push("density") })]), menu.slot.custom({ name: "Mine", position: "primary" }, [menu.item({ label: "Mine", run: () => void ran.push("mine") })])],
+    };
     let asked = 0;
-    const { place, element } = setup([table.view], {}, {}, 0, () => void asked++);
+    const { place, element } = setup([view], {}, {}, 0, () => void asked++);
     await place.render();
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    const item = document.querySelector<HTMLButtonElement>(".swd-edit-source") ?? element.querySelector<HTMLButtonElement>(".swd-edit-source");
-    expect(item?.textContent).toBe("Edit source");
-    item!.click();
+    expect(menuShown(element).map(([label]) => label)).toEqual(["Mine", "Group: None", "Density", "Edit source"]);
+    choose(element, "Density");
+    expect(ran).toEqual(["density"]);
+    element.querySelector<HTMLButtonElement>(".swd-more")!.click();
+    choose(element, "Edit source");
     expect(asked).toBe(1);
-    // A view never grouped, without a block: no ⋯
+    // A view never grouped, without a block: ⋯ still, its title the database's name to rename, no entry
     const without = setup([{ ...table.view, groupBy: false }]);
     await without.place.render();
-    expect(without.element.querySelector(".swd-more")).toBeNull();
+    without.element.querySelector<HTMLButtonElement>(".swd-more")!.click();
+    expect(menuShown(without.element)).toEqual([]);
+    expect(without.element.querySelector(".swd-menu-title-text")!.textContent).toBe("Tasks");
+  });
+
+  it("renames the database by the pencil in ⋯'s title, its id kept; an empty name refused under the field", async () => {
+    const table = listView("table");
+    const { place, element, store } = setup([table.view]);
+    document.body.append(element);
+    await place.render();
+    const rename = async (name: string) => {
+      element.querySelector<HTMLButtonElement>(".swd-more")!.click();
+      element.querySelector<HTMLButtonElement>(".swd-menu-rename")!.click();
+      const field = element.querySelector<HTMLInputElement>(".swd-menu-name")!;
+      expect(field.value).toBe((await store.database("tasks"))!.value.name);
+      field.value = name;
+      field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    };
+    await rename("   ");
+    expect(element.querySelector(".swd-menu-name-problem")!.textContent).toContain("needs a name");
+    expect((await store.database("tasks"))!.value.name).toBe("Tasks");
+    // Esc in the field leaves it, the menu staying
+    element.querySelector(".swd-menu-name")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    expect(element.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(false);
+    element.querySelector<HTMLButtonElement>(".swd-menu-close")!.click();
+    await rename("Jobs");
+    expect((await store.database("tasks"))!.value).toMatchObject({ id: "tasks", name: "Jobs" });
+    expect(element.querySelector(".swd-place-name")!.textContent).toBe("Jobs");
+    expect(element.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(true);
+    element.remove();
+  });
+
+  it("hands what it has open to the place drawn after it for its block: Group with the focus where it was, a filter as typed; no other place takes it", async () => {
+    const table = listView("table");
+    const { place, element, viewState, store, core } = setup([table.view], { "table.groupBy": "status" });
+    document.body.append(element);
+    await place.render();
+    // As the binding does: the place that wrote hands over to the one drawn for the text it wrote, once (another takes nothing)
+    let from: DatabasePlace | undefined = place;
+    const next = async (takes = true) => {
+      const box = document.createElement("div");
+      document.body.append(box);
+      const handing = takes ? from : undefined;
+      const made = new DatabasePlace({ element: box, database: "tasks", state: viewState, store, core, types: new TypeRegistry(), views: new ViewRegistry([table.view]), settings: { get: (_path, fallback) => fallback }, ui: { notify: () => {} }, takeOver: () => handing?.handOver() });
+      await made.render();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (takes) from = made;
+      return box;
+    };
+    element.querySelector<HTMLButtonElement>(".swd-more")!.click();
+    choose(element, "Group");
+    document.querySelector<HTMLButtonElement>(".swd-group-eye")!.click();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(viewState.get("table.groupHidden")).toEqual(['value:"Todo"']);
+    expect([...element.querySelectorAll(".swd-group-label")].map((one) => one.textContent)).toEqual(["Done"]);
+    // Another block of the database drawn meanwhile: nothing of it
+    const other = await next(false);
+    expect(other.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(true);
+    other.remove();
+    element.remove();
+    const second = await next();
+    expect(second.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(false);
+    expect(document.activeElement).toBe([...second.querySelectorAll<HTMLElement>(".swd-group-row")].find((row) => row.dataset.group === 'value:"Todo"')!.querySelector(".swd-group-eye"));
+    // Closed by the user: the place after it opens nothing
+    second.querySelector(".swd-menu [role=menu]")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    // A filter typed, written after a pause, then more typed before the block is drawn anew: the next place has it all,
+    // the panel open, the focus and the caret in the field, and applies it; the place before writes nothing more
+    second.querySelector<HTMLButtonElement>(".swd-filter-button")!.click();
+    const field = second.querySelector<HTMLInputElement>('.swd-filter input[data-key="name"]')!;
+    field.focus();
+    field.value = "F";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, FILTER_TYPED_MS + 30));
+    expect(viewState.get("table.filter")).toEqual({ name: "F" });
+    field.value = "Fi";
+    field.setSelectionRange(1, 1);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    second.remove();
+    const third = await next();
+    expect(third.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(true);
+    expect(third.querySelector<HTMLElement>(".swd-filter")!.hidden).toBe(false);
+    const typed = third.querySelector<HTMLInputElement>('.swd-filter input[data-key="name"]')!;
+    expect([typed.value, document.activeElement === typed, typed.selectionStart]).toEqual(["Fi", true, 1]);
+    await new Promise((resolve) => setTimeout(resolve, FILTER_TYPED_MS + 30));
+    expect(viewState.get("table.filter")).toEqual({ name: "Fi" });
+    expect(typed.value).toBe("Fi");
+    third.remove();
+  });
+
+  it("closes ⋯ by Esc, from a submenu too, the focus back on ⋯; a view's menu giving no groups said as it opens, the others shown", async () => {
+    const table = listView("table");
+    const broken: ViewDefinition = { ...table.view, menu: () => "nothing" as never };
+    const { place, element, told } = setup([broken]);
+    document.body.append(element);
+    await place.render();
+    expect(told).toEqual([]);
+    const more = element.querySelector<HTMLButtonElement>(".swd-more")!;
+    more.click();
+    expect(told.at(-1)).toContain("its menu gave no list of groups");
+    expect(menuShown(element).map(([label]) => label)).toEqual(["Group: None"]);
+    choose(element, "Group");
+    choose(element, "Group by");
+    element.querySelector(".swd-menu [role=menu]")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    expect(element.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(true);
+    expect(document.activeElement).toBe(more);
+    element.remove();
   });
 
   it("draws a view setting its filter or sort as it draws once: the same again writes nothing", async () => {

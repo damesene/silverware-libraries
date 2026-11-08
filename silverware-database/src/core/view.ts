@@ -3,12 +3,15 @@
 // (docs/silverware-database.md, *The core*). Views import only types from
 // here: no view leans on the core's insides, and a custom view outside the
 // bundle uses the same.
+import type { GroupArrangement, ItemGroup } from "../domain/grouping.ts";
 import type { Filter, SortKey } from "../domain/listing.ts";
 import type { PropertyType } from "../domain/types/type.ts";
 import type { Database, Item, Property, Value } from "../model/database.ts";
 import type { ItemDraft, Place, Result } from "./core.ts";
+import type { PlaceMenuBuilder, PlaceMenuGroup } from "./placemenu.ts";
 import type { WriteProgress } from "./store.ts";
 
+export type { GroupArrangement, ItemGroup } from "../domain/grouping.ts";
 export type { Filter, SortKey } from "../domain/listing.ts";
 export type { ItemDraft, Place, Refused, Result, Written } from "./core.ts";
 export { isRefused } from "./core.ts";
@@ -50,11 +53,18 @@ export type ViewDefinition = {
    * properties of `types`, every type where none are named, and None unless
    * `required`). By default the place draws the view once per group, each a
    * section of its own, the view knowing nothing of it; `draws: true` where the
-   * view draws its groups itself (a board: its columns), reading the property
-   * picked as `listing.group` (`required`: the first such where none is); false
-   * where the view is never grouped
+   * view draws its groups itself (a board: its columns), reading them as
+   * `host.grouping`; `required`: always grouped, where none is picked by the
+   * first property of a type it `prefer`s (a board: a select), else the first;
+   * false where the view is never grouped
    */
-  readonly groupBy?: false | { readonly types?: readonly string[]; readonly required?: boolean; readonly draws?: boolean };
+  readonly groupBy?: false | { readonly types?: readonly string[]; readonly required?: boolean; readonly draws?: boolean; readonly prefer?: readonly string[] };
+  /**
+   * The view's own entries in its place's menu (⋯), asked as it opens: given
+   * the menu's builder (core/placemenu.ts), groups in its slots (`view`: how
+   * the view shows its items) or in sections of their own
+   */
+  menu?(host: ViewHost, menu: PlaceMenuBuilder): readonly PlaceMenuGroup[];
   render(host: ViewHost, element: HTMLElement): ViewInstance | void;
 };
 
@@ -64,8 +74,12 @@ export type ViewListing = {
   readonly sort: readonly SortKey[];
   /** The key of the property picked to group by (Group by in ⋯), as kept: undefined where none */
   readonly group: string | undefined;
-  /** The property to group by (undefined: none) */
+  /** The property to group by (undefined: none); the groups' arrangement goes with the property it was for */
   setGroup(key: string | undefined): Promise<void>;
+  /** How the groups are arranged (Group in ⋯): their order by hand, those hidden, empty ones hidden (`<view>.groupOrder`, `groupHidden`, `groupHideEmpty`) */
+  readonly groupArrangement: GroupArrangement;
+  /** Part of the arrangement changed, the rest kept */
+  setGroupArrangement(change: Partial<GroupArrangement>): Promise<void>;
   /** A property's condition (empty or undefined: none) */
   setFilter(key: string, condition: string | undefined): Promise<void>;
   setSort(sort: readonly SortKey[]): Promise<void>;
@@ -81,6 +95,13 @@ export type ViewHost = {
   readonly items: readonly Item[];
   /** How many items the database has, the filtered out too */
   readonly total: number;
+  /**
+   * How the view is grouped (where it draws its groups itself: a board's
+   * columns): the property and its groups of `items` as shown (arranged, those
+   * hidden left out), each with the value an item put there gets; undefined
+   * where it is not grouped
+   */
+  readonly grouping: { readonly property: Property; readonly groups: readonly ItemGroup[] } | undefined;
   readonly listing: ViewListing;
   /** A property's type (the text type for one not defined now): how a value shows, sorts, reads from text typed */
   type(property: Property): PropertyType;

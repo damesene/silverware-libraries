@@ -16,10 +16,12 @@ export function validateView(view: ViewDefinition): string | undefined {
   if (typeof view.icon !== "string") return `the view "${view.name}" has no icon`;
   if (typeof view.render !== "function") return `the view "${view.name}" has no render`;
   if (view.settings !== undefined && !Array.isArray(view.settings)) return `the view "${view.name}": its settings are no list`;
-  const groupBy = view.groupBy as false | { types?: unknown; required?: unknown; draws?: unknown } | undefined;
+  if (view.menu !== undefined && typeof view.menu !== "function") return `the view "${view.name}": its menu is no function`;
+  const groupBy = view.groupBy as false | { types?: unknown; required?: unknown; draws?: unknown; prefer?: unknown } | undefined;
   const flag = (value: unknown) => value === undefined || typeof value === "boolean";
-  if (groupBy !== undefined && groupBy !== false && (typeof groupBy !== "object" || groupBy === null || (groupBy.types !== undefined && (!Array.isArray(groupBy.types) || !groupBy.types.every((one) => typeof one === "string"))) || !flag(groupBy.required) || !flag(groupBy.draws)))
-    return `the view "${view.name}": its groupBy is false or { types: [type names], required, draws: true or false }`;
+  const names = (value: unknown) => value === undefined || (Array.isArray(value) && value.every((one) => typeof one === "string"));
+  if (groupBy !== undefined && groupBy !== false && (typeof groupBy !== "object" || groupBy === null || !names(groupBy.types) || !names(groupBy.prefer) || !flag(groupBy.required) || !flag(groupBy.draws)))
+    return `the view "${view.name}": its groupBy is false or { types: [type names], prefer: [type names], required, draws: true or false }`;
   const keys = new Set<string>();
   for (const setting of view.settings ?? []) {
     if (typeof setting?.key !== "string" || !SETTING_KEY_RE.test(setting.key)) return `the view "${view.name}": "${String(setting?.key)}" is no setting's key: letters, digits, _ and -`;

@@ -17,8 +17,31 @@ describe("property keys", () => {
 });
 
 describe("the built-in types", () => {
-  it("are the first seven, in their order", () => {
-    expect(types.all().map((one) => one.name)).toEqual(["text", "number", "checkbox", "date", "select", "multi-select", "url"]);
+  it("are the first seven, in their order, then date and time, offered for no property of the user's", () => {
+    expect(types.all().map((one) => one.name)).toEqual(["text", "number", "checkbox", "date", "select", "multi-select", "url", "datetime", "progress"]);
+    expect(types.all().filter((one) => one.offered === false).map((one) => one.name)).toEqual(["datetime", "progress"]);
+  });
+
+  it("show a share done as a percent, sort it as its number, read one typed as a share or a percent", () => {
+    const done = type("progress");
+    expect(done.text(0.6667, {})).toBe("67%");
+    expect(done.validate(1.5, {})).toBe("no share (0 to 1)");
+    expect(done.parse("50 %", {})).toEqual({ value: 0.5 });
+    expect(done.parse("0,25", {})).toEqual({ value: 0.25 });
+    expect(done.parse("150%", {})).toHaveProperty("problem");
+    for (const loose of ["0x1", "1e-1", ".5", "Infinity", "50"]) expect(done.parse(loose, {})).toHaveProperty("problem");
+    // 100% only when all is done, 0% only when none is
+    expect([0.995, 0.0033, 1, 0].map((share) => done.text(share, {}))).toEqual(["99%", "1%", "100%", "0%"]);
+    expect(done.sortKey!(0.05, {}) < done.sortKey!(0.5, {}) && done.sortKey!(0.5, {}) < done.sortKey!(1, {})).toBe(true);
+  });
+
+  it("show a date and time to the minute, sort it as kept, read one typed with a space or a T", () => {
+    const moment = type("datetime");
+    expect(moment.text("2026-11-08T14:30:05.123", {})).toBe("2026-11-08 14:30");
+    expect(moment.validate("2026-11-08T14:30:05.123", {})).toBeUndefined();
+    expect(moment.validate("2026-11-08", {})).toBe("no date and time (YYYY-MM-DD HH:MM)");
+    expect(moment.parse("2026-11-08 14:30", {})).toEqual({ value: "2026-11-08T14:30" });
+    expect(moment.sortKey!("2026-11-08T09:05", {}) < moment.sortKey!("2026-11-08T14:30:05.123", {})).toBe(true);
   });
 
   it("read typed text as their values, or say why not", () => {
@@ -85,7 +108,7 @@ describe("the registry", () => {
     const mine: PropertyType = { name: "date", label: "My date", validate: () => undefined, text: String, parse: (text) => ({ value: text }) };
     const stars: PropertyType = { name: "stars", label: "Stars", validate: () => undefined, text: String, parse: (text) => ({ value: text }) };
     registry.define([stars, mine]);
-    expect(registry.all().map((one) => one.label)).toEqual(["Text", "Number", "Checkbox", "My date", "Select", "Multi-select", "URL", "Stars"]);
+    expect(registry.all().map((one) => one.label)).toEqual(["Text", "Number", "Checkbox", "My date", "Select", "Multi-select", "URL", "Date & time", "Progress", "Stars"]);
     registry.define([]);
     expect(registry.named("date")!.label).toBe("Date");
     expect(registry.named("stars")).toBeUndefined();

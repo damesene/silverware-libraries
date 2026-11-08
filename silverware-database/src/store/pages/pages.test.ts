@@ -7,6 +7,8 @@ import type { Database, ItemKey } from "../../model/database.ts";
 import { type ContractSeed, storeContract } from "../contract.ts";
 import { VERSION_1, type PagesVersion } from "./versions.ts";
 import { PagesStore } from "./store.ts";
+import { DatabaseCore } from "../../core/core.ts";
+import { TypeRegistry } from "../../domain/types/registry.ts";
 import { memoryPages } from "./testing.ts";
 
 // An older form, read as version 1 is: what a migration brings to the latest
@@ -17,7 +19,7 @@ function seedPages(seeds: readonly ContractSeed[]): Record<string, string> {
   const pages: Record<string, string> = {};
   for (const { database, items, version: kept } of seeds) {
     const version = kept === "older" ? 0 : kept === "newer" ? 2 : 1;
-    const properties = Object.fromEntries(database.properties.map((one) => [one.key, { type: one.type, label: one.label, ...(one.readonly ? { readonly: true } : {}), ...(one.params as Record<string, never>) }]));
+    const properties = Object.fromEntries(database.properties.map((one) => [one.key, { type: one.type, label: one.label, ...(one.readonly ? { readonly: true } : {}), ...(one.system ? { system: one.system } : {}), ...(one.params as Record<string, never>) }]));
     pages[`db-${database.id}`] = `---\ntags: [db-root]\n${writeYamlEntry("_database", { id: database.id, name: database.name, version, properties })}---\n`;
     for (const item of items ?? []) {
       const values = Object.entries(item.values).map(([key, value]) => writeYamlEntry(key, value as never)).join("");
@@ -121,11 +123,15 @@ describe("the pages store", () => {
     expect(again!.key).not.toBe(item!.key);
   });
 
-  it("refuses keys every page has, and names a page cannot have", () => {
-    const { store } = harness([]);
-    for (const key of ["name", "tags", "created", "aliases"]) expect(store.validatePropertyKey(key), key).toBeDefined();
+  it("refuses keys the index gives every page, and names a page cannot have: its own rules (no subpage), then the space's", () => {
+    const { store, memory } = harness([]);
+    for (const key of ["name", "tags", "created"]) expect(store.validatePropertyKey(key), key).toBeDefined();
     expect(store.validatePropertyKey("status")).toBeUndefined();
-    for (const name of ["a/b", "x|y", "#tag", "[[x]]", ".hidden", "Fix v1.2", " padded"]) expect(store.validateItemName(name), name).toBeDefined();
+    for (const name of ["a/b", " padded", ""]) expect(store.validateItemName(name), name).toBeDefined();
+    expect(store.validateItemName("x|y")).toBeUndefined();
+    // The space's own rules asked
+    (memory.platform.space as { validateName?: (name: string) => string | undefined }).validateName = (name) => (name.includes("|") ? "no |" : undefined);
+    expect(store.validateItemName("x|y")).toBe("no |");
     expect(store.validateItemName("Fix login (2)")).toBeUndefined();
   });
 
@@ -249,16 +255,144 @@ describe("the pages store", () => {
     expect(new Set(seen)).toEqual(new Set([made.created.get("n")]));
   });
 
+  it("shows a page it wrote as the index has it once the index, started on it after the write, tells of it whole: changed by hand right after, the hand's (no wait)", async () => {
+    const { memory, store } = harness(SEED, { lagging: true });
+    const [fix] = (await store.items("tasks")).value;
+    await store.apply(await store.plan(changes("tasks", { kind: "setValue", item: fix!.key, key: "status", value: "Done" })));
+    const status = async () => (await store.items("tasks")).value[0]!.values.status;
+    expect(await status()).toBe("Done");
+    // Changed by hand before the index took the store's write up: the index has the hand's once it is whole
+    memory.writeOutside("db-tasks/Fix login", memory.pages.get("db-tasks/Fix login")!.replace("status: Done", "status: Todo"));
+    expect(await status()).toBe("Done");
+    memory.catchUp();
+    expect(await status()).toBe("Todo");
+  });
+
+  it("keeps each of two writes of a page at once to its own hold: one refused puts back what it held only where its hold is still the one", async () => {
+    const { memory, store } = harness(SEED, { lagging: true });
+    const [fix] = (await store.items("tasks")).value;
+    const status = async () => (await store.items("tasks")).value[0]!.values.status;
+    // Two writes of the same page planned against it as read: the first written, the second refused (changed since it was read)
+    const first = await store.plan(changes("tasks", { kind: "setValue", item: fix!.key, key: "status", value: "Done" }));
+    const second = await store.plan(changes("tasks", { kind: "setValue", item: fix!.key, key: "estimate", value: "3" }));
+    await Promise.all([store.apply(first), store.apply(second)]);
+    expect(await status()).toBe("Done");
+    memory.catchUp();
+    expect(await status()).toBe("Done");
+  });
+
   it("shows what it wrote where the index tells of the page before a query has it, as SilverBullet's does", async () => {
     const { memory, store } = harness(SEED, { lagging: true, toldEarly: true });
     const told: string[] = [];
     store.onChanged((change) => told.push(change.database));
     const [item] = (await store.items("tasks")).value;
     await store.apply(await store.plan(changes("tasks", { kind: "createItem", ref: "n", name: "New", values: {} }, { kind: "removeItem", item: item!.key })));
-    expect(told.length).toBeGreaterThan(0);
+    // (Told early: its readers not told yet, the index not having it)
+    expect(told).toEqual([]);
     const names = async () => (await store.items("tasks")).value.map((one) => one.name);
     expect(await names()).toEqual(["New"]);
     memory.catchUp();
+    expect(told.length).toBeGreaterThan(0);
     expect(await names()).toEqual(["New"]);
+  });
+});
+describe("the pages store's system properties", () => {
+  const SYSTEM: Database = {
+    ...TASKS,
+    properties: [
+      ...TASKS.properties,
+      { key: "created_at", label: "Created", type: "datetime", params: {}, readonly: true, system: "createdAt" },
+      { key: "modified_at", label: "Modified", type: "datetime", params: {}, readonly: true, system: "modifiedAt" },
+      { key: "order", label: "Order", type: "number", params: {}, readonly: true, system: "order" },
+      { key: "page", label: "Page", type: "text", params: {}, readonly: true, system: "page" },
+      { key: "page_tags", label: "Tags", type: "multi-select", params: {}, readonly: true, system: "tags" },
+    ],
+  };
+  // B before A in the pages, A first in the order by hand; B's page has a tag of its own and an `order` typed by hand
+  const seed = (): ContractSeed[] => [{ database: SYSTEM, items: [{ name: "B", values: { status: "Todo", order: 99 } as never, rank: "a1" }, { name: "A", values: {}, rank: "a0" }] }];
+  // (Its tag given by hand, as a user adds one to the page)
+  const tagged = async (made: ReturnType<typeof harness>) => {
+    const text = made.memory.pages.get("db-tasks/B")!;
+    await made.memory.platform.space.write("db-tasks/B", text.replace("tags: [db]", "tags: [db, work]"));
+    made.memory.catchUp();
+    return made;
+  };
+  const valuesOf = async (store: PagesStore) => Object.fromEntries((await store.items("tasks")).value.map((one) => [one.name, one.values]));
+
+  it("gives their values from the index (its dates, the page, its tags but the database's) and the order by hand, their kind read from the root page", async () => {
+    const { store } = await tagged(harness(seed()));
+    expect((await store.database("tasks"))!.value.properties.find((one) => one.key === "order")).toMatchObject({ system: "order", readonly: true, type: "number" });
+    const values = await valuesOf(store);
+    expect(values.B).toMatchObject({ status: "Todo", order: 2, page: "db-tasks/B", page_tags: ["work"] });
+    expect(values.A).toMatchObject({ order: 1, page: "db-tasks/A", page_tags: [] });
+    expect(values.B!.created_at).toMatch(/^2026-11-01T09:00:\d\d\.000$/);
+    // (Its page written once more since, for its tag: modified later than made)
+    expect(String(values.B!.modified_at) > String(values.B!.created_at)).toBe(true);
+    expect(values.A!.modified_at).toBe(values.A!.created_at);
+  });
+
+  it("writes none of them into a page: a change of another value keeps them out, the date of the change the page's own", async () => {
+    const { memory, store } = await tagged(harness(seed()));
+    const before = await valuesOf(store);
+    const b = (await store.items("tasks")).value.find((one) => one.name === "B")!;
+    await store.apply(await store.plan(changes("tasks", { kind: "setValue", item: b.key, key: "status", value: "Done" }, { kind: "setRank", item: b.key, rank: "a2" })));
+    const text = memory.pages.get("db-tasks/B")!;
+    expect(text).not.toMatch(/created_at|modified_at|page_tags|^page:/m);
+    // (The order typed by hand in the page stays as it was: it is no value of the database's)
+    expect(text).toContain("order: 99");
+    const after = await valuesOf(store);
+    expect(after.B).toMatchObject({ status: "Done", created_at: before.B!.created_at });
+    expect(after.B!.modified_at! > before.B!.modified_at!).toBe(true);
+  });
+
+  it("counts the tasks of each item's page from the index for Task progress, its share done", async () => {
+    const withTasks: Database = { ...TASKS, properties: [...TASKS.properties, { key: "task_progress", label: "Task progress", type: "progress", params: {}, readonly: true, system: "taskProgress" }] };
+    const { store } = harness([{ database: withTasks, items: [{ name: "A", values: {}, rank: "a0", body: ["- [x] one", "- [ ] two", "- [x] three", ""].join(String.fromCharCode(10)) }, { name: "B", values: {}, rank: "a1", body: "No tasks" }] }]);
+    expect((await store.items("tasks")).value.map((one) => [one.name, one.values.task_progress])).toEqual([
+      ["A", 0.6667],
+      ["B", undefined],
+    ]);
+  });
+
+  it("counts the tasks once until a page of the database is indexed, a task ticked by hand then counted anew", async () => {
+    const withTasks: Database = { ...TASKS, properties: [...TASKS.properties, { key: "task_progress", label: "Task progress", type: "progress", params: {}, readonly: true, system: "taskProgress" }] };
+    const { memory, store } = harness([{ database: withTasks, items: [{ name: "A", values: {}, rank: "a0", body: ["- [x] one", "- [ ] two", ""].join(String.fromCharCode(10)) }] }]);
+    const tasks = memory.platform.index.tasks!;
+    let asked = 0;
+    (memory.platform.index as { tasks: typeof tasks }).tasks = (documents) => (asked++, tasks(documents));
+    await store.items("tasks");
+    await store.items("tasks");
+    expect(asked).toBe(1);
+    await memory.platform.space.write("db-tasks/A", memory.pages.get("db-tasks/A")!.replace("- [ ] two", "- [x] two"));
+    expect((await store.items("tasks")).value[0]!.values.task_progress).toBe(1);
+    expect(asked).toBe(2);
+  });
+
+  it("lets a change written whole be applied right after a write, the dates the index gives moving meanwhile", async () => {
+    const { memory, store } = await tagged(harness(seed(), { lagging: true }));
+    const core = new DatabaseCore(store, new TypeRegistry(), { notify: () => {}, ask: () => true });
+    const b = (await store.items("tasks")).value.find((one) => one.name === "B")!;
+    expect(await core.update("tasks", b, "status", "Done")).not.toHaveProperty("problem");
+    const proposal = await core.rekeyProperty("tasks", "status", "state");
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    // (The index has the page now: its modified date SilverBullet's, not the store's)
+    memory.catchUp();
+    expect(await core.apply(proposal)).not.toHaveProperty("problem");
+    expect(memory.pages.get("db-tasks/B")).toContain("state: Done");
+  });
+
+  it("shows a page it wrote, before the index has it, made when it was and written now", async () => {
+    const { memory, store } = await tagged(harness(seed(), { lagging: true }));
+    const before = await valuesOf(store);
+    const b = (await store.items("tasks")).value.find((one) => one.name === "B")!;
+    await store.apply(await store.plan(changes("tasks", { kind: "setValue", item: b.key, key: "status", value: "Done" })));
+    const held = await valuesOf(store);
+    expect(held.B).toMatchObject({ status: "Done", created_at: before.B!.created_at, page_tags: ["work"] });
+    expect(String(held.B!.modified_at) > String(before.B!.modified_at)).toBe(true);
+    memory.catchUp();
+    // The index caught up: its own date of writing, not the store's (the test index has a clock of its own)
+    const indexed = memory.platform.index.documentDates!((await memory.platform.index.objects("db")).find((one) => one.name === "db-tasks/B")!);
+    expect((await valuesOf(store)).B).toMatchObject({ status: "Done", created_at: before.B!.created_at, modified_at: indexed.modified });
+    expect(indexed.modified).not.toBe(held.B!.modified_at);
   });
 });

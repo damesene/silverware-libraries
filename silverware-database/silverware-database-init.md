@@ -53,6 +53,11 @@ if js and js.window then
     queryTag = function(tag)
       return query[[from index.tag(tag)]]
     end,
+    -- No page queued or being indexed: the index whole (a page indexed anew is cleared, then put back)
+    indexIdle = function()
+      local stats = mq.getQueueStats("indexQueue")
+      return stats.queued == 0 and stats.processing == 0
+    end,
     flash = function(message, type, options)
       editor.flashNotification(message, type, options)
     end,
@@ -93,6 +98,13 @@ if js and js.window then
     name = "page:index",
     run = function(e)
       if e.data and e.data.name then silverwareDatabaseJs.pageIndexed(e.data.name, false) end
+    end,
+  }
+  -- The index queue emptied: the index whole again, the pages indexed meanwhile read anew
+  event.listen {
+    name = "mq:emptyQueue:indexQueue",
+    run = function()
+      silverwareDatabaseJs.indexQueueEmptied()
     end,
   }
   -- Another page opened in the editor: what shows beside the page (the peek) is closed

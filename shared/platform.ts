@@ -75,6 +75,8 @@ export interface Space {
   rename?(from: string, to: string): Awaitable<Renamed>;
   /** Every document whose name starts with `from` renamed to start with `to` instead, links followed as by `rename` */
   renamePrefix?(from: string, to: string): Awaitable<Renamed>;
+  /** Why a name cannot be a document's (characters the platform does not take in one), undefined where it can */
+  validateName?(name: string): string | undefined;
 }
 
 /** A rename asked of the space: `problem` why nothing was renamed (a name taken, one the space cannot hold) */
@@ -86,11 +88,31 @@ export interface Index {
   objects(tag: string): Awaitable<readonly IndexedObject[]>;
   /** Told as the index changes: a document indexed anew, or deleted; the function given back stops it */
   onChanged(listener: (change: IndexChange) => void): () => void;
+  /** Keys the index gives every document's object beside the document's own data (its name, its tags, its dates): none of that data can be kept under them */
+  readonly reservedKeys?: ReadonlySet<string>;
+  /** When a document was made and last written, as the index has them in the document's own object; none where it does not say */
+  documentDates?(object: IndexedObject): DocumentDates;
+  /** The tasks in the documents given, counted per document (one without tasks left out); none where the index keeps no tasks */
+  tasks?(documents: ReadonlySet<string>): Awaitable<ReadonlyMap<string, TaskCount>>;
 }
 
+/** An object of the index: its fields as indexed, among them `name` (its document's name, for a document's own object) and `tags` (a list of texts) */
 export type IndexedObject = Readonly<Record<string, unknown>>;
 
-export type IndexChange = { readonly document: string; readonly deleted: boolean };
+/** A document's dates as local ISO text (`2026-11-08T14:30:05.123`) */
+export type DocumentDates = { readonly created?: string; readonly modified?: string };
+
+/** A document's tasks: how many, how many done */
+export type TaskCount = { readonly done: number; readonly total: number };
+
+/**
+ * A change the index told: a document indexed anew, or deleted. `early`: told
+ * as the index is still part way through it (a query may not have the
+ * document yet, or have none of it); the platform tells it again without
+ * `early` once a query has it whole. A platform whose index is always whole
+ * tells it early, then whole, at once
+ */
+export type IndexChange = { readonly document: string; readonly deleted: boolean; readonly early?: boolean };
 
 /** The user: told, asked, given a choice */
 export interface UserInterface {

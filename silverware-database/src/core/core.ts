@@ -11,6 +11,7 @@
 // a value that does not read as a property's new type is kept as read, a key
 // that items still hold values under (a property removed) is not taken over,
 // and every transaction is undone by `undo`.
+import { systemKind } from "../domain/system.ts";
 import type { UserInterface } from "../../../shared/platform.ts";
 import { inRankOrder, isRank, placeAt } from "../domain/rank.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
@@ -70,7 +71,7 @@ export type OptionRenamed = { readonly from: string; readonly to: string; readon
 export type ItemDraft = { readonly name?: string; readonly values?: Readonly<Record<string, Value>>; readonly body?: string };
 
 /** A property as one is added: its key made from its label where not given (one given may take back values items kept under it) */
-export type NewProperty = { readonly label: string; readonly type: string; readonly key?: string; readonly params?: Params; readonly readonly?: boolean };
+export type NewProperty = { readonly label: string; readonly type: string; readonly key?: string; readonly params?: Params; readonly readonly?: boolean; readonly system?: string };
 
 /**
  * Where an item goes in the order by hand: right after `after`, else right
@@ -101,6 +102,21 @@ function sameParams(a: unknown, b: unknown): boolean {
     Array.isArray(value) ? value.map(canonical) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical((value as Record<string, unknown>)[key])])) : value;
   return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 }
+
+/** Names a property's settings cannot have: the property's own fields, as a store keeps them beside its settings */
+const PROPERTY_FIELDS = new Set(["key", "type", "label", "readonly", "hidden", "required", "system"]);
+
+/** Why a property's settings cannot be kept (one named as a field of the property's own), undefined where they can */
+function validateParamNames(label: string, params: Params): string | undefined {
+  const taken = Object.keys(params).find((name) => PROPERTY_FIELDS.has(name));
+  return taken === undefined ? undefined : `${label}: a setting cannot be called "${taken}", the name of a property's own field`;
+}
+
+/** The items' own revisions (not what the system gives them, a date that moves): what a proposal written whole is checked against */
+const itemsRevision = (items: readonly Item[]) => items.map((one) => `${one.key}:${one.revision}`).join(",");
+
+/** What is refused for a system property's values, type, key and settings: the system gives them */
+const systemProperty = (property: Property) => `${property.label} is given by the system: its values, type, key and settings are not changed`;
 
 /** What is refused where a write is given something that is no value (a view's mistake: an object, NaN, a list of numbers) */
 const notValue = (label: string) => `${label}: not a value (a text, a number, true or false, a list of texts): not written`;
@@ -269,6 +285,7 @@ export class DatabaseCore {
     if (!read) return this.refuse(`No database "${database}"`);
     const property = read.value.properties.find((one) => one.key === key);
     if (!property) return this.refuse(`No property "${key}"`);
+    if (property.system !== undefined) return this.refuse(systemProperty(property));
     if (property.readonly === readonly) return unchanged("It is so already");
     return this.writeSchema(read, read.value.properties.map((one) => (one.key === key ? { ...one, readonly } : one)), `${readonly ? "Lock" : "Unlock"} property ${property.label}`);
   }
@@ -279,6 +296,7 @@ export class DatabaseCore {
     if (!read) return this.refuse(`No database "${database}"`);
     const property = read.value.properties.find((one) => one.key === key);
     if (!property) return this.refuse(`No property "${key}"`);
+    if (property.system !== undefined) return this.refuse(systemProperty(property));
     if ((property.required ?? false) === required) return unchanged("It is so already");
     return this.writeSchema(
       read,
@@ -322,12 +340,13 @@ export class DatabaseCore {
     if ("problem" in read) return read;
     const property = read.database.value.properties.find((one) => one.key === key);
     if (!property) return this.refuse(`No property "${key}"`);
+    if (property.system !== undefined) return this.refuse(systemProperty(property));
     if (!sameParams(property.params, was)) return this.refuse(`${property.label}: its settings changed meanwhile: not written, shown as they are now`);
     if (sameParams(params, property.params)) return unchanged("The settings are the same");
     const type = this.types.named(property.type);
     if (!type) return this.refuse(`${property.label}: its type "${property.type}" is not defined now`);
-    const problem = type.validateParams?.(params);
-    if (problem) return this.refuse(`${property.label}: ${problem}`);
+    const problem = validateParamNames(property.label, params) ?? (type.validateParams?.(params) === undefined ? undefined : `${property.label}: ${type.validateParams(params)}`);
+    if (problem) return this.refuse(problem);
     const reads = (value: Value, at: Params) => type.validate(value, at) === undefined;
     const changed = read.items.value.find((item) => {
       const value = item.values[key];
@@ -357,6 +376,7 @@ export class DatabaseCore {
     if ("problem" in read) return read;
     const property = read.database.value.properties.find((one) => one.key === key);
     if (!property) return this.refuse(`No property "${key}"`);
+    if (property.system !== undefined) return this.refuse(systemProperty(property));
     if (newKey === key) return unchanged("The key is the same");
     const problem = this.validateKey(newKey, read.database.value.properties) ?? validateKeptValues(newKey, read.items.value);
     if (problem) return this.refuse(problem);
@@ -365,7 +385,7 @@ export class DatabaseCore {
       const value = item.values[key];
       if (value !== undefined) changes.item(item, (i) => i.set(newKey, value).unset(key));
     }
-    return { ...(await this.propose(changes.build(), `Change the key of ${property.label} to ${newKey}`)), whole: { items: read.items.revision } };
+    return { ...(await this.propose(changes.build(), `Change the key of ${property.label} to ${newKey}`)), whole: { items: itemsRevision(read.items.value) } };
   }
 
   /**
@@ -386,11 +406,12 @@ export class DatabaseCore {
     if ("problem" in read) return read;
     const property = read.database.value.properties.find((one) => one.key === key);
     if (!property) return this.refuse(`No property "${key}"`);
+    if (property.system !== undefined) return this.refuse(systemProperty(property));
     const newType = this.types.named(type);
     if (!newType) return this.refuse(`No property type "${type}"`);
     const kept = params ?? (newType.validateParams?.(property.params) === undefined ? property.params : {});
-    const problem = newType.validateParams?.(kept);
-    if (problem) return this.refuse(`${property.label}: ${problem}`);
+    const problem = validateParamNames(property.label, kept) ?? (newType.validateParams?.(kept) === undefined ? undefined : `${property.label}: ${newType.validateParams(kept)}`);
+    if (problem) return this.refuse(problem);
     const checked = renames && Object.keys(renames).length ? validateRenames(property, type, kept, renames, read.items.value) : undefined;
     if (typeof checked === "string") return this.refuse(`${property.label}: ${checked}`);
     // (Only names alike: no rename)
@@ -430,7 +451,7 @@ export class DatabaseCore {
     const renamed = [...renaming].map(([from, to]) => ({ from, to, items: counts.get(from) ?? 0 }));
     // (Written whole against the items as read, whether or not one holds a renamed option now: an item given an old name
     // meanwhile would take the meaning of another, a swap's; checked against them too, a value held that is no option)
-    return { ...proposal, renamed, whole: { items: read.items.revision } };
+    return { ...proposal, renamed, whole: { items: itemsRevision(read.items.value) } };
   }
 
   /** A property removed from the schema (its values stay in the items unless `values`, then taken off them too): a proposal */
@@ -440,8 +461,10 @@ export class DatabaseCore {
     const property = read.database.value.properties.find((one) => one.key === key);
     if (!property) return this.refuse(`No property "${key}"`);
     const changes = databaseChanges(database).expectDatabase(read.database.revision).schema(read.database.value.properties.filter((one) => one.key !== key));
-    if (options.values) for (const item of read.items.value) if (item.values[key] !== undefined) changes.item(item, (i) => i.unset(key));
-    return this.propose(changes.build(), `Remove property ${property.label}${options.values ? " and its values" : ""}`);
+    // (A system property's values are none of the items': nothing taken off them, whatever is asked)
+    const values = options.values && property.system === undefined;
+    if (values) for (const item of read.items.value) if (item.values[key] !== undefined) changes.item(item, (i) => i.unset(key));
+    return this.propose(changes.build(), `Remove property ${property.label}${values ? " and its values" : ""}`);
   }
 
   // Proposals and Undo
@@ -462,7 +485,7 @@ export class DatabaseCore {
   }
 
   private async applyNow(proposal: Proposal, progress?: WriteProgress): Promise<Result> {
-    if (proposal.whole && (await this.store.items(proposal.plan.database)).revision !== proposal.whole.items) {
+    if (proposal.whole && itemsRevision((await this.store.items(proposal.plan.database)).value) !== proposal.whole.items) {
       const problem = `${proposal.label}: its items changed since it was proposed: nothing was written, propose it again`;
       this.ui.notify(problem, { type: "error" });
       return { problem, cause: "left" };
@@ -537,16 +560,28 @@ export class DatabaseCore {
 
   /** A property as added to `properties`, or why it cannot be; a key made from its label is one no item keeps a value under */
   private newProperty(property: NewProperty, properties: readonly Property[], items: readonly Item[]): Property | string {
+    const taken = new Set([...properties.map((one) => one.key), ...items.flatMap((item) => Object.keys(item.values))]);
+    // A system property: its type and key its kind's, read only, its label the kind's where none is given; one of a kind
+    if (property.system !== undefined) {
+      const kind = systemKind(property.system);
+      if (!kind) return `No system property "${property.system}"`;
+      const there = properties.find((one) => one.system === kind.kind);
+      if (there) return `${kind.label} is there already: ${there.label}`;
+      const label = property.label.trim() || kind.label;
+      const key = property.key ?? freeName(kind.key, taken, "_");
+      const problem = this.validateKey(key, properties);
+      if (problem) return problem;
+      return { key, label, type: kind.type, params: {}, readonly: true, system: kind.kind };
+    }
     const label = property.label.trim();
     if (!label) return "A property needs a label";
-    const taken = new Set([...properties.map((one) => one.key), ...items.flatMap((item) => Object.keys(item.values))]);
     const key = property.key ?? freeName(keyFrom(label), taken, "_");
     const problem = this.validateKey(key, properties);
     if (problem) return problem;
     const type = this.types.named(property.type);
     if (!type) return `No property type "${property.type}"`;
     const params = property.params ?? {};
-    const paramsProblem = type.validateParams?.(params);
+    const paramsProblem = validateParamNames(label, params) ?? type.validateParams?.(params);
     if (paramsProblem) return `${label}: ${paramsProblem}`;
     return { key, label, type: property.type, params, readonly: property.readonly ?? false };
   }

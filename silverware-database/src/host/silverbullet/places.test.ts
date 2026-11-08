@@ -123,4 +123,57 @@ describe("the places of a database in its space's pages, as a key changes", () =
     expect(memory.pages.get("Notes")).toContain('timeline.dateBy: when');
     expect(memory.pages.get("Notes")).toContain('"when":"<2027-01-01"');
   });
+
+  it("deletes a database: its items' pages, its root page and its blocks on every page, another database's left; Undo puts back every page as it was", async () => {
+    const { memory, core } = setup();
+    const before = new Map(memory.pages);
+    const proposal = proposalOf(await core.planDeleteDatabase("tasks"));
+    expect([...(proposal.places?.documents ?? [])].sort()).toEqual(["Notes", "Plain"]);
+    expect(proposal.plan.planned.filter((one) => "item" in one.target)).toHaveLength(1);
+    await core.apply(proposal);
+    expect(memory.pages.has("db-tasks")).toBe(false);
+    expect(memory.pages.has("db-tasks/Fix login")).toBe(false);
+    expect(memory.pages.get("Plain")).toBe("# Plain\n\n");
+    // (Another database's block and the page's text left)
+    expect(memory.pages.get("Notes")).toBe("# Notes\n\n```silverware-database\nid: other\nboard.groupBy: status\n```\n\n");
+    await core.undo();
+    expect(new Map(memory.pages)).toEqual(before);
+  });
+
+  it("leaves out of a deletion's places the pages it deletes, and a block in a list item, said as one to take out by hand", async () => {
+    const { memory, core } = setup();
+    const listed = "# Listed\n\n- one\n  ```silverware-database\n  id: tasks\n  ```\n";
+    memory.writeOutside("Listed", listed);
+    memory.writeOutside("db-tasks/Fix login", `${ITEM}\n\`\`\`silverware-database\nid: tasks\n\`\`\`\n`);
+    const proposal = proposalOf(await core.planDeleteDatabase("tasks"));
+    expect([...(proposal.places?.documents ?? [])].sort()).toEqual(["Notes", "Plain"]);
+    expect(proposal.places?.byHand).toEqual(["Listed"]);
+    await core.apply(proposal);
+    expect(memory.pages.has("db-tasks/Fix login")).toBe(false);
+    expect(memory.pages.get("Listed")).toBe(listed);
+  });
+
+  it("keeps a deletion to undo again where its undo was kept from making a page again, its name taken since: nothing of it lost", async () => {
+    const { memory, core } = setup();
+    const before = new Map(memory.pages);
+    await core.apply(proposalOf(await core.planDeleteDatabase("tasks")));
+    memory.writeOutside("db-tasks", "# Someone else's\n");
+    await core.undo();
+    expect(memory.pages.has("db-tasks/Fix login")).toBe(false);
+    // The name freed, Undo tries again: every page back as it was
+    memory.removeOutside("db-tasks");
+    await core.undo();
+    expect(new Map(memory.pages)).toEqual(before);
+  });
+
+  it("deletes none of a database whose item changed between the proposal and its apply", async () => {
+    const { memory, core, told } = setup();
+    const proposal = proposalOf(await core.planDeleteDatabase("tasks"));
+    memory.writeOutside("db-tasks/Fix login", ITEM.replace("status: Todo", "status: Done"));
+    await core.apply(proposal);
+    expect(memory.pages.has("db-tasks")).toBe(true);
+    expect(memory.pages.get("db-tasks/Fix login")).toContain("status: Done");
+    expect(memory.pages.get("Notes")).toBe(NOTES);
+    expect(told.at(-1)).toMatch(/nothing was written/);
+  });
 });

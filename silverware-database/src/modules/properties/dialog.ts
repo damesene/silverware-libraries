@@ -785,7 +785,9 @@ export class PropertiesDialog {
         : "",
       left ? `${left === 1 ? "One part" : `${left} parts`} cannot be changed and will be left: ${[...new Set(proposal.plan.skipped.map((one) => one.reason))].join("; ")}.` : "",
       // The views of it that name what changes (a key changed), on the pages they are on
-      proposal.places ? `Updates the views of it on ${placesNamed(proposal.places.documents, this.host.noun)}.` : "",
+      proposal.places?.documents.length ? `Updates the views of it on ${placesNamed(proposal.places.documents, this.host.noun)}.` : "",
+      // (A block in a list item is not written: left as it is, to change by hand)
+      proposal.places?.byHand?.length ? `Views of it in a list item are left as they are (change them by hand): ${placesNamed(proposal.places.byHand, this.host.noun)}.` : "",
       // (Said of every change of items, however few: it is seldom made, and stopped halfway it is half written)
       pages ? `Writes ${pages === 1 ? `1 ${this.host.noun.one}` : `${number(pages)} ${this.host.noun.many}`}, one after another: keep this window open until it is done (stopped halfway, the items not written yet keep their old values).` : "",
     ].filter(Boolean);

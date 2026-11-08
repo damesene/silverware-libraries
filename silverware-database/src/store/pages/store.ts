@@ -280,7 +280,8 @@ export class PagesStore implements DatabaseStore {
         target: { database: id },
         count: draft.record.count,
         part: { database: id, made: read?.made, kind: "record", page: root, after, withRecord: false },
-        write: (batch) => (before ? batch.page(root, (p) => this.latest.writeRoot(p, before, after)) : batch.create(root, (p) => this.latest.writeRoot(p, undefined, after))),
+        // (Deleted: its root page removed, only as read, its text kept for Undo)
+        write: (batch) => (!after ? batch.page(root, (p) => p.remove()) : before ? batch.page(root, (p) => this.latest.writeRoot(p, before, after)) : batch.create(root, (p) => this.latest.writeRoot(p, undefined, after))),
       });
     }
     for (const item of draft.items) {
@@ -504,6 +505,10 @@ export class PagesStore implements DatabaseStore {
 
   documentOf(item: ItemKey): string | undefined {
     return this.pages.get(item);
+  }
+
+  databaseDocumentOf(database: string): string | undefined {
+    return this.roots.get(database);
   }
 
   /**

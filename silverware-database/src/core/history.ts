@@ -2,10 +2,14 @@
 // `PageHistory` keeps a plugin's changes (shared/pages/history.ts): each the
 // store's report with a label shown to the user ("Set Status of Fix login").
 // Undone, a transaction goes off the list, also where the undo could write
-// none of it (all changed since): kept, it would stand before every earlier
-// one forever, and nothing is lost, the store having left it all. An undo is
-// no change to undo itself. An undo puts back only what is still as the
-// transaction left it: the store's `planUndo`, whatever the store.
+// none of it because all of it changed since: kept, it would stand before
+// every earlier one forever, and nothing is lost, the store having left it
+// all. But where its undo was kept from putting back what only it holds (a
+// document it removed, whose name was taken since; its database not made
+// again), it stays, to be undone again once what kept it is gone: going, the
+// text of what it removed would go with it. An undo is no change to undo
+// itself. An undo puts back only what is still as the transaction left it:
+// the store's `planUndo`, whatever the store.
 import type { DatabaseStore, TransactionPlan, TransactionReport, WriteProgress } from "./store.ts";
 
 // At most this many kept per database (a busy one pushes out none of a quiet one's)
@@ -27,7 +31,7 @@ export class TransactionHistory {
    */
   record(report: TransactionReport, label: string, undoAlso?: () => Promise<void>): void {
     if (report.undoes) {
-      this.forget(report.undoes);
+      if (!heldBack(report)) this.forget(report.undoes);
       return;
     }
     if (!report.written.length) return;
@@ -67,8 +71,23 @@ export class TransactionHistory {
     return undone;
   }
 
+  /** Whether `report` (an undo) left its transaction to be undone again: kept from putting back what only it holds */
+  stillToUndo(report: TransactionReport): boolean {
+    return !!report.undoes && this.has(report.undoes);
+  }
+
   private forget(report: TransactionReport): void {
     const at = this.recorded.findIndex((one) => one.report === report);
     if (at >= 0) this.recorded.splice(at, 1);
   }
+}
+
+/**
+ * Whether an undo was kept from putting back a part by something that may go
+ * (a name taken since, the database not there to put an item back into), not
+ * by the part having changed since: the transaction still holds what it would
+ * put back
+ */
+function heldBack(undone: TransactionReport): boolean {
+  return undone.skipped.some((one) => one.cause === "refused" || one.cause === "missing");
 }

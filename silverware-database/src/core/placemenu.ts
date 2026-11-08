@@ -14,10 +14,11 @@ import { ICONS } from "./icons.ts";
  * The slots of a place's menu, by what their entries do:
  * `view`, how the view shows its items (Group by; a view's own options);
  * `data`, the database's schema and data (Properties);
- * `source`, the place itself, its block (Edit source).
+ * `source`, the place itself, its block (Edit source);
+ * `remove`, what takes the database away (Delete database…), last.
  * Shown in this order, sections of their own (`custom`) primary first, secondary before the source
  */
-export const PLACE_MENU_SLOTS = ["view", "data", "source"] as const;
+export const PLACE_MENU_SLOTS = ["view", "data", "source", "remove"] as const;
 export type PlaceMenuSlot = (typeof PLACE_MENU_SLOTS)[number];
 /** Entries in a slot of a place's menu, or in a section of their own */
 export type PlaceMenuGroup = MenuGroup<PlaceMenuSlot>;
@@ -36,7 +37,7 @@ export type PlaceMenu = {
 
 /** The menu's entries from the groups given, in its order, a separator between the parts */
 function assembled(groups: readonly PlaceMenuGroup[]): MenuEntry[] {
-  const parts = [...customSections(groups, "primary"), slotEntries(groups, "view"), slotEntries(groups, "data"), ...customSections(groups, "secondary"), slotEntries(groups, "source")].filter((part) => part.length > 0);
+  const parts = [...customSections(groups, "primary"), slotEntries(groups, "view"), slotEntries(groups, "data"), ...customSections(groups, "secondary"), slotEntries(groups, "source"), slotEntries(groups, "remove")].filter((part) => part.length > 0);
   return parts.flatMap((part, at) => (at ? [{ kind: "separator" } as const, ...part] : part));
 }
 

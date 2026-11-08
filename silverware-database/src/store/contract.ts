@@ -211,6 +211,35 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
       expect((await store.items("more")).value.map((item) => item.name)).toEqual(["Edited by hand"]);
     });
 
+    it("deletes a database with every item of it in one transaction, its last change; Undo brings it all back", async () => {
+      const { store } = make(SEED);
+      const items = (await store.items("tasks")).value;
+      const removing = (...more: DatabaseChange[]) => changes("tasks", ...items.map((item): DatabaseChange => ({ kind: "removeItem", item: item.key })), ...more);
+      // An item left, the change not last, or one made in it: none of it
+      expect(causes(await store.plan(changes("tasks", { kind: "removeItem", item: items[0]!.key }, { kind: "removeDatabase" }))).every((one) => one === "refused")).toBe(true);
+      expect(causes(await store.plan(changes("tasks", { kind: "removeDatabase" }, ...items.map((item): DatabaseChange => ({ kind: "removeItem", item: item.key })))))).not.toEqual([]);
+      expect(causes(await store.plan(removing({ kind: "createItem", ref: "x", name: "New", values: {} }, { kind: "removeDatabase" })))).not.toEqual([]);
+      const report = await store.apply(await store.plan(removing({ kind: "removeDatabase" })));
+      expect(report.skipped).toEqual([]);
+      expect(await store.database("tasks")).toBeUndefined();
+      expect((await store.databases()).map((one) => one.id)).not.toContain("tasks");
+      const back = await store.apply(await store.planUndo(report));
+      expect(back.skipped).toEqual([]);
+      expect((await store.database("tasks"))?.value.name).toBe("Tasks");
+      expect((await store.items("tasks")).value.map((item) => item.name).sort()).toEqual(items.map((item) => item.name).sort());
+    });
+
+    it("keeps a database whose item was made between the deletion's plan and its apply: the database stays with it", async () => {
+      const { store } = make(SEED);
+      const items = (await store.items("tasks")).value;
+      const plan = await store.plan(changes("tasks", ...items.map((item): DatabaseChange => ({ kind: "removeItem", item: item.key })), { kind: "removeDatabase" }));
+      await store.apply(await store.plan(changes("tasks", { kind: "createItem", ref: "late", name: "Late", values: {} })));
+      const report = await store.apply(plan);
+      expect(causes(report)).toContain("changed");
+      expect((await store.database("tasks"))?.value.name).toBe("Tasks");
+      expect((await store.items("tasks")).value.map((item) => item.name)).toContain("Late");
+    });
+
     it("never gives two items one name, whatever was written between a plan and its apply", async () => {
       const { store } = make(SEED);
       const [fix, docs] = [await keyOf(store, "Fix login"), await keyOf(store, "Write docs")];

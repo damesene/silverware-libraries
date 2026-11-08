@@ -7,6 +7,7 @@ import { DatabaseCore } from "../silverware-database/src/core/core.ts";
 import { Modules } from "../silverware-database/src/core/module.ts";
 import { BUILT_IN_MODULES } from "../silverware-database/src/modules/builtin.ts";
 import { DatabasePlace } from "../silverware-database/src/core/place.ts";
+import { openDeleteDatabase } from "../silverware-database/src/core/deletedatabase.ts";
 import { documentsHost, type DocumentsSource } from "../silverware-database/src/core/documents.ts";
 import { ViewRegistry } from "../silverware-database/src/core/views.ts";
 import { TypeRegistry } from "../silverware-database/src/domain/types/registry.ts";
@@ -100,7 +101,7 @@ function start(): void {
     element.className = "swd-place";
     section.append(element);
     main.append(section);
-    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store, core, types, views, settings, ui, editor: { open: (ref) => flash(`Open ${ref}`) }, documents: PAGES, moduleMenu: (where, menu) => modules.placeMenu(where, menu), moduleTools: (where) => modules.placeTools(where), placeDrawn: (where) => modules.placeDrawn(where), openItem: (item, database) => modules.openItem(item, database) });
+    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store, core, types, views, settings, ui, editor: { open: (ref) => flash(`Open ${ref}`) }, documents: PAGES, moduleMenu: (where, menu) => modules.placeMenu(where, menu), moduleTools: (where) => modules.placeTools(where), placeDrawn: (where) => modules.placeDrawn(where), openItem: (item, database) => modules.openItem(item, database), deleteDatabase: (id, name) => openDeleteDatabase({ document, core, noun: core.noun, notify: (message) => flash(message), written: () => places.forEach((one) => void one.render()) }, id, name) });
     return place;
   });
   void modules.start().then(() => places.forEach((place) => void place.render()));

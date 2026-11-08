@@ -2491,6 +2491,53 @@ tr:focus-within .swd-open {
   opacity: 0.45;
   cursor: default;
 }
+/* Deleting a database (core/deletedatabase.ts): what goes, its name typed, Delete in the danger color */
+.swd-settings.swd-delete-database {
+  width: min(520px, calc(100vw - 32px));
+  height: auto;
+}
+.swd-delete-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.swd-delete-status:empty {
+  display: none;
+}
+.swd-delete-status {
+  margin: 0;
+  color: var(--swd-quiet);
+}
+.swd-delete-status.swd-delete-problem {
+  color: var(--danger-color, #c62828);
+}
+.swd-delete-lines {
+  margin: 0;
+  padding-left: 20px;
+}
+.swd-delete-lines li + li {
+  margin-top: 4px;
+}
+.swd-delete-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.swd-delete-ask[hidden] {
+  display: none;
+}
+.swd-delete-name {
+  padding: 6px 8px;
+  border: 1px solid var(--swd-settings-line);
+  border-radius: 6px;
+  color: inherit;
+  background: var(--root-background-color);
+  font: inherit;
+}
+.swd-settings-save.swd-delete-confirm {
+  background: var(--danger-color, #c62828);
+  border-color: var(--danger-color, #c62828);
+}
 @media (max-width: 480px), (pointer: coarse) and (max-height: 600px) {
   .swd-settings {
     width: 100vw;

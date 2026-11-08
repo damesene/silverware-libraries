@@ -908,6 +908,30 @@ test("the peek shows an item beside the page, its content written as it is left,
   expect(await space.saved("Page")).toBe("# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n");
 });
 
+test("Delete database… in ⋯ deletes its pages and its blocks on every page once its name is typed; Undo brings them back", async ({ page, space }) => {
+  const other = "# Other\n\nBefore.\n\n```silverware-database\nid: tasks\nview: board\n```\n\nAfter.\n";
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS, "Page/Other": other }, "Page");
+  await expect(page.locator(".swd-list-name")).toHaveCount(2);
+  await page.locator(".swd-more").click();
+  await choose(page, "Delete database…");
+  const dialog = page.locator(".swd-delete-database");
+  await expect(dialog.locator(".swd-delete-lines li").first()).toHaveText("2 items, each a page of its own, deleted with its content.");
+  await expect(dialog.locator(".swd-delete-lines")).toContainText(`${space.folder}/Page/Other`);
+  const confirm = dialog.locator(".swd-delete-confirm");
+  await expect(confirm).toBeDisabled();
+  await dialog.locator(".swd-delete-name").fill("Tasks");
+  await confirm.click();
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(() => space.saved("Page/db-tasks")).toBeUndefined();
+  expect(await space.saved("Page/db-tasks/Fix login")).toBeUndefined();
+  await expect.poll(() => space.saved("Page/Other")).toBe("# Other\n\nBefore.\n\nAfter.\n");
+  await expect.poll(() => space.saved("Page")).toBe("# Page\n\n");
+  await runCommand(page, "Silverware Database: Undo");
+  await expect.poll(() => space.saved("Page/Other")).toBe(other);
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("status: Todo");
+  await expect(page.locator(".swd-list-name")).toHaveCount(2);
+});
+
 test("the peek's bin removes its item, asked first: the page gone, the panel closed, Undo bringing it back", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS }, "Page");
   await page.locator(".swd-list-name", { hasText: "Fix login" }).click();

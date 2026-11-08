@@ -45,8 +45,10 @@ export type PlaceOptions = {
   readonly moduleTools?: (place: PlaceContext) => readonly PlaceTool[];
   /** Told as the place is drawn (anew: a change made elsewhere, an Undo), so what a module shows for it follows */
   readonly placeDrawn?: (place: PlaceContext) => void;
-  /** The block's own text shown to edit (Edit source in ⋯, last), where the place is a block of a document */
+  /** The block's own text shown to edit (Edit source in ⋯), where the place is a block of a document */
   readonly editSource?: () => void;
+  /** The database deleted, asked first (Delete database… in ⋯, last), where the host offers it */
+  readonly deleteDatabase?: (id: string, name: string) => void;
   /** An item opened by a module's own way (the peek, core/module.ts): whether one took it; else it opens where the store says */
   readonly openItem?: (item: Item, database: string) => boolean;
   /**
@@ -617,6 +619,8 @@ export class DatabasePlace {
       if (group) groups.push(menu.slot.view([group]));
       if (view.colors !== false) groups.push(menu.slot.view([colorEntry(host, menu)]));
       if (editSource) groups.push(menu.slot.source([menu.item({ label: "Edit source", icon: ICONS.source, hint: "Show the block's text, to edit it as markdown", run: editSource })]));
+      const remove = this.options.deleteDatabase;
+      if (remove) groups.push(menu.slot.remove([menu.item({ label: "Delete database…", icon: ICONS.remove, hint: "The database, its items and its views, asked first", danger: true, run: () => remove(database.id, database.name) })]));
       return groups;
     };
     // The view's own (the user's too): asked as the menu opens, what it gives checked; failing, said and left out, the others shown

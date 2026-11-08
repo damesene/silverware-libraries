@@ -50,8 +50,8 @@ export type ItemDraft = {
   readonly expects: string | undefined;
 };
 
-/** The database's own part: the record it leaves, how many changes, the revision it is to be at (none: made) */
-export type RecordDraft = { readonly after: RecordState; readonly count: number; readonly expects: string | undefined };
+/** The database's own part: the record it leaves (undefined: the database deleted), how many changes, the revision it is to be at (none: made) */
+export type RecordDraft = { readonly after: RecordState | undefined; readonly count: number; readonly expects: string | undefined };
 
 export type TransactionDraft = {
   readonly record?: RecordDraft;
@@ -83,6 +83,12 @@ export function draftTransaction(state: StoreState, changes: Changes, rules: Sto
     if (result && "cause" in result) skipped.push(result);
     else if (result) drafts.push(result);
   }
+  // A database deleted goes with every item of it, none made: else none of it does (no item left without its database)
+  if (record.draft && !record.draft.after) {
+    const removed = new Set(drafts.flatMap((draft) => (draft.key !== undefined && !draft.after ? [draft.key] : [])));
+    const kept = [...(state?.items.keys() ?? [])].some((key) => !removed.has(key));
+    if (kept || drafts.some((draft) => draft.after) || skipped.length) return all("refused", "a database is deleted with every item of it: an item would be left");
+  }
   const names = takenNames(state ? [...state.items.values()].map(({ item }) => item) : [], drafts, rules);
   const items: ItemDraft[] = [];
   for (const draft of drafts) {
@@ -97,6 +103,8 @@ export function draftTransaction(state: StoreState, changes: Changes, rules: Sto
 function validateTransaction(state: StoreState, changes: Changes, rules: StoreRules): { readonly cause: SkipCause; readonly reason: string } | undefined {
   const creates = changes.changes.findIndex((change) => change.kind === "createDatabase");
   if (creates > 0 || changes.changes.filter((change) => change.kind === "createDatabase").length > 1) return { cause: "refused", reason: "a database is made by a transaction's first change, once" };
+  const removes = changes.changes.findIndex((change) => change.kind === "removeDatabase");
+  if (removes >= 0 && (removes !== changes.changes.length - 1 || creates >= 0 || changes.changes.some((change) => change.kind === "renameDatabase" || change.kind === "setSchema"))) return { cause: "refused", reason: "a database is deleted by a transaction's last change, alone of its own changes" };
   const refs = changes.changes.flatMap((change) => (change.kind === "createItem" ? [change.ref] : []));
   if (new Set(refs).size !== refs.length) return { cause: "refused", reason: "an item made twice under one ref" };
   if (creates === 0 && state) return { cause: "refused", reason: `a database "${changes.database}" exists already` };
@@ -108,6 +116,8 @@ function validateTransaction(state: StoreState, changes: Changes, rules: StoreRu
 
 /** The database's record as the transaction leaves it, and its draft where it changes it; or why its changes are left */
 function draftRecord(state: StoreState, changes: Changes, rules: StoreRules): { readonly record: RecordState; readonly draft?: RecordDraft } | { readonly skipped: Skipped } {
+  // Deleted: its record goes as it is (its schema still what its items are read by)
+  if (changes.changes.some((change) => change.kind === "removeDatabase")) return { record: state!.record, draft: { after: undefined, count: 1, expects: state!.recordRevision } };
   const list = changes.changes.filter((change) => change.kind === "createDatabase" || change.kind === "renameDatabase" || change.kind === "setSchema");
   let record = state?.record;
   for (const change of list) {

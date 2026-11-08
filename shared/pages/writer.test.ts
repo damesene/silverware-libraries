@@ -292,7 +292,40 @@ describe("the page writer", () => {
     map.set("List", "- item\n  ```silverware-database\n  id: tasks\n  ```\n- next\n");
     const listed = await writer.plan(pageChanges().page("List", (p) => p.codeBlocks.replace("silverware-database", "  id: tasks", "  id: tasks\nview: b")).build());
     expect(listed.skipped.map((one) => one.reason)).toEqual(["its silverware-database block is indented (in a list item): it is written by hand only"]);
-  });});
+  });
+
+  it("takes a code block out whole, one blank line left where one was on both sides; the one asked of those alike; Undo puts it back", async () => {
+    const block = "```silverware-database\nid: tasks\n```\n";
+    const { map, writer } = memory({
+      A: `# A\n\n${block}\nAfter.\n`,
+      Twice: `${block}\ntext\n\n${block}`,
+      Tight: `before\n${block}after\n`,
+      First: `${block}\nrest\n`,
+      Crlf: "a\r\n\r\n```silverware-database\r\nid: tasks\r\n```\r\n\r\nb\r\n",
+    });
+    const report = await writer.write(
+      pageChanges()
+        .page("A", (p) => p.codeBlocks.remove("silverware-database", "id: tasks"))
+        .page("Twice", (p) => p.codeBlocks.remove("silverware-database", "id: tasks", { occurrence: 1, of: 2 }))
+        .page("Tight", (p) => p.codeBlocks.remove("silverware-database", "id: tasks"))
+        .page("First", (p) => p.codeBlocks.remove("silverware-database", "id: tasks"))
+        .page("Crlf", (p) => p.codeBlocks.remove("silverware-database", "id: tasks"))
+        .build(),
+    );
+    expect(report.skipped).toEqual([]);
+    expect(map.get("A")).toBe("# A\n\nAfter.\n");
+    expect(map.get("Twice")).toBe(`${block}\ntext\n\n`);
+    expect(map.get("Tight")).toBe("before\nafter\n");
+    expect(map.get("First")).toBe("rest\n");
+    expect(map.get("Crlf")).toBe("a\r\n\r\nb\r\n");
+    const back = await writer.apply(await writer.planUndo(report));
+    expect(back.skipped).toEqual([]);
+    expect(map.get("A")).toBe(`# A\n\n${block}\nAfter.\n`);
+    // A block changed since it was read: the page left alone
+    const gone = await writer.plan(pageChanges().page("A", (p) => p.codeBlocks.remove("silverware-database", "id: other")).build());
+    expect(gone.skipped.map((one) => one.reason)).toEqual(["its silverware-database block changed since it was read: left alone"]);
+  });
+});
 
 describe("the builder", () => {
   it("has every section the parts make, each a part of its own", () => {

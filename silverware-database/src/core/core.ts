@@ -25,7 +25,7 @@ import { databaseChanges, type DatabaseChangesBuilder } from "./builder.ts";
 import type { Changes } from "./changes.ts";
 import { TransactionHistory } from "./history.ts";
 import { placeStateRenamed } from "./placestate.ts";
-import type { DatabaseStore, LooseKey, PlaceChange, PlacesPlan, PlacesReport, PlaceStore, Skipped, Target, TransactionPlan, TransactionReport, WriteProgress } from "./store.ts";
+import { type DatabaseStore, type LooseKey, type PlaceChange, type PlacesPlan, type PlacesReport, type PlaceStore, REMOVE_PLACE, type Skipped, type Target, type TransactionPlan, type TransactionReport, type WriteProgress } from "./store.ts";
 
 /** What the core asks of the user: told what was refused or left, asked before anything is removed */
 export type CoreInterface = Pick<UserInterface, "notify"> & Required<Pick<UserInterface, "ask">>;
@@ -464,7 +464,28 @@ export class DatabaseCore {
     // The places naming the key (a view's filter, sort, grouping, its own meta), found now: written with it, put back with its undo
     const renamed: PlaceChange = (state) => placeStateRenamed(state, key, newKey, this.places!.propertyMeta);
     const places = this.places && (await this.places.store.plan(database, renamed, finding));
-    return { ...proposal, whole: { items: itemsRevision(read.items.value) }, ...(places?.documents.length ? { places } : {}) };
+    return { ...proposal, whole: { items: itemsRevision(read.items.value) }, ...(places?.documents.length || places?.byHand?.length ? { places } : {}) };
+  }
+
+  /**
+   * The database deleted, a proposal (nothing written: `apply` writes it):
+   * every item of it and its own record (where each is a document: every
+   * item's document and the database's own) in one transaction, written whole
+   * or not at all, put back by Undo; and its places, found in every document
+   * (`finding` told as they are read), taken out of them with it. Refused
+   * where any part of it could not be written as it stands (none of it then)
+   */
+  async planDeleteDatabase(database: string, finding?: WriteProgress): Promise<Proposal | Refused> {
+    const read = await this.read(database);
+    if ("problem" in read) return read;
+    const changes = databaseChanges(database).expectDatabase(read.database.revision);
+    for (const item of read.items.value) changes.item(item, (i) => i.remove());
+    const proposal = await this.propose(changes.removeDatabase().build(), `Delete the database "${read.database.value.name}"`);
+    if (proposal.plan.skipped.length) return this.refuse(`${proposal.label}: it cannot be deleted as it stands: ${[...new Set(proposal.plan.skipped.map((one) => one.reason))].join("; ")}`);
+    // (Not in the documents it deletes: a block there goes with its document)
+    const gone = new Set([this.store.databaseDocumentOf(database), ...read.items.value.map((item) => this.store.documentOf(item.key))].filter((one) => one !== undefined));
+    const places = this.places && (await this.places.store.plan(database, () => REMOVE_PLACE, finding, (document) => gone.has(document)));
+    return { ...proposal, whole: { items: itemsRevision(read.items.value) }, ...(places?.documents.length || places?.byHand?.length ? { places } : {}) };
   }
 
   /**
@@ -675,9 +696,13 @@ export class DatabaseCore {
   private async settle(label: string, report: TransactionReport, needed?: (skipped: Skipped) => boolean, undoAlso?: () => Promise<void>): Promise<Result> {
     this.history.record(report, label, undoAlso);
     if (!needed || !report.skipped.some(needed)) return this.outcome(label, report);
-    if (report.written.length) await this.history.undo(report);
+    const undone = report.written.length ? await this.history.undo(report) : undefined;
     const reasons = [...new Set(report.skipped.map((one) => one.reason))].join("; ");
-    const problem = `${label}: nothing was written: ${reasons}`;
+    // What it wrote put back, but where a part of that could not be: said, and left to undo again (nothing it removed lost)
+    const left = undone?.skipped.length ? [...new Set(undone.skipped.map((one) => one.reason))].join("; ") : undefined;
+    const problem = left
+      ? `${label}: not written whole (${reasons}), and what was written could not all be put back (${left})${this.history.stillToUndo(undone!) ? ": Undo tries again" : ""}`
+      : `${label}: nothing was written: ${reasons}`;
     this.ui.notify(problem, { type: "error" });
     return { problem, cause: "left", report };
   }

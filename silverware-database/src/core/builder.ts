@@ -54,6 +54,7 @@ export class DatabaseChangesBuilder {
   private readonly read: Record<string, string> = {};
   private refs = 0;
   private built = false;
+  private removed = false;
 
   constructor(private readonly database: string) {}
 
@@ -61,6 +62,13 @@ export class DatabaseChangesBuilder {
   createDatabase(name: string): this {
     this.open();
     this.created = name;
+    return this;
+  }
+
+  /** The database deleted, last of the batch's changes: every item of it is to be removed by the same batch */
+  removeDatabase(): this {
+    this.open();
+    this.removed = true;
     return this;
   }
 
@@ -151,6 +159,7 @@ export class DatabaseChangesBuilder {
     }
     const items = Object.keys(this.read).length ? { items: Object.freeze({ ...this.read }) } : {};
     const expects = this.databaseRead !== undefined || items.items ? { expects: Object.freeze({ ...items, ...(this.databaseRead === undefined ? {} : { database: this.databaseRead }) }) } : {};
+    if (this.removed) changes.push({ kind: "removeDatabase" });
     return Object.freeze({ database: this.database, changes: Object.freeze(changes.map((change) => Object.freeze(change))), ...expects });
   }
 

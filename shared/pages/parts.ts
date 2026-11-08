@@ -44,7 +44,9 @@ export type PageChange =
   // The body, all after the frontmatter (a database item's); `was`: written only where it is still that
   | { readonly kind: "setBody"; readonly text: string; readonly was?: string }
   // A fenced code block of a language and body (the `occurrence`-th of those alike, counted from 0) written anew
-  | { readonly kind: "replaceCodeBlock"; readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number; readonly text: string };
+  | { readonly kind: "replaceCodeBlock"; readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number; readonly text: string }
+  // Such a block taken out of the page whole, its fences with it
+  | { readonly kind: "removeCodeBlock"; readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number };
 
 /** The builder's sections, one per part of a page's content (their parts below make them); every method gives the page's builder back */
 export interface PageSections {
@@ -73,6 +75,12 @@ export interface PageSections {
      * many alike the plugin counted (another made since: left alone too)
      */
     replace(language: string, body: string, text: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /**
+     * Such a block taken out of the page whole (its fences and its line breaks;
+     * a blank line on both sides of it left as one), found as `replace` finds
+     * it: none so, the page left alone
+     */
+    remove(language: string, body: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
   };
 }
 
@@ -284,14 +292,21 @@ export const PARTS: readonly Part[] = [
   // A user's script editing the text itself: the page builder's own `editText`, no section
   part({ kinds: ["editText"], write: (text, change) => change.edit(text) }),
   part({
-    kinds: ["replaceCodeBlock"],
-    section: { name: "codeBlocks", make: (add) => ({ replace: (language, body, text, where = {}) => add({ kind: "replaceCodeBlock", language, body, text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }) }) },
+    kinds: ["replaceCodeBlock", "removeCodeBlock"],
+    section: {
+      name: "codeBlocks",
+      make: (add) => ({
+        replace: (language, body, text, where = {}) => add({ kind: "replaceCodeBlock", language, body, text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        remove: (language, body, where = {}) => add({ kind: "removeCodeBlock", language, body, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+      }),
+    },
     write: (text, change) => {
       const alike = codeBlocksOf(text).filter((block) => block.language === change.language && sameBody(block.body) === sameBody(change.body));
       const block = alike[change.occurrence];
       if (!block || (change.of !== undefined && alike.length !== change.of)) return { text, changes: 0, problem: `its ${change.language} block changed since it was read: left alone` };
       // A block indented (in a list item) has its lines indented: a line written without it would end the item and leave the fence open
       if (block.indent) return { text, changes: 0, problem: `its ${change.language} block is indented (in a list item): it is written by hand only` };
+      if (change.kind === "removeCodeBlock") return { text: withoutBlock(text, block.from, block.to), changes: 1 };
       const nl = lineBreakOf(text);
       const body = sameBody(change.text).replace(/\n/g, nl);
       // A block's text ends before the line break of its closing fence (its CR kept); an empty block has none, so a text
@@ -326,4 +341,19 @@ export async function written(text: string, change: PageChange, options: WriterO
   const one = partOf.get(change.kind);
   if (!one) throw new Error(`no part writes a change of the kind ${change.kind}`);
   return one.write(text, change, options);
+}
+
+/**
+ * The text without the lines from `from` to `to` (a block's, its closing
+ * fence's line break with them); where a blank line was on both sides of them,
+ * one of the two goes, so the text around reads as it would without the block
+ */
+function withoutBlock(text: string, from: number, to: number): string {
+  const end = text.startsWith("\r\n", to) ? to + 2 : text.startsWith("\n", to) ? to + 1 : to;
+  const before = text.slice(0, from);
+  let after = text.slice(end);
+  const blankBefore = from === 0 || /\r?\n\r?\n$/.test(before);
+  const blank = /^\r?\n/.exec(after);
+  if (blankBefore && blank) after = after.slice(blank[0].length);
+  return before + after;
 }

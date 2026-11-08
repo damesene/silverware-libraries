@@ -9,13 +9,14 @@ import { codeBlocksOf, sameBody } from "../../../../shared/pages/blocks.ts";
 import { pageChanges } from "../../../../shared/pages/changes.ts";
 import type { ApplyReport, PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Space } from "../../../../shared/platform.ts";
-import type { PlaceChange, PlacesPlan, PlacesReport, PlaceStore, WriteProgress } from "../../core/store.ts";
+import { type PlaceChange, type PlacesPlan, type PlacesReport, type PlaceStore, REMOVE_PLACE, type WriteProgress } from "../../core/store.ts";
 import { BLOCK_LANGUAGE, readBlock, writeBlock } from "./block.ts";
 
 // A block to write anew: its page, its text as read and as it is to be, which of the blocks alike it is as the writer finds
 // it: the page's edits written one after another, a block alike to others written first takes the first place, the
 // others' count one less (two blocks showing the same, the second found so once the first is written)
-type BlockEdit = { readonly page: string; readonly body: string; readonly text: string; readonly occurrence: number; readonly of: number };
+// `text` undefined: the block taken out whole
+type BlockEdit = { readonly page: string; readonly body: string; readonly text: string | undefined; readonly occurrence: number; readonly of: number };
 
 export function blockPlaces(space: Pick<Space, "list" | "read">, writer: PageWriter): PlaceStore {
   // What each plan writes and what each apply wrote, kept for its own (the core is given the pages alone)
@@ -27,8 +28,10 @@ export function blockPlaces(space: Pick<Space, "list" | "read">, writer: PageWri
     return made;
   };
   return {
-    async plan(database: string, change: PlaceChange, progress?: WriteProgress): Promise<PlacesPlan> {
-      const pages = [...(await space.list())];
+    async plan(database: string, change: PlaceChange, progress?: WriteProgress, leave?: (document: string) => boolean): Promise<PlacesPlan> {
+      const pages = [...(await space.list())].filter((page) => !leave?.(page));
+      // Pages holding a block the change reaches that the writer cannot write (indented in a list item): said, not planned
+      const byHand = new Set<string>();
       const found = await inBatches(
         pages,
         async (page) => {
@@ -47,16 +50,20 @@ export function blockPlaces(space: Pick<Space, "list" | "read">, writer: PageWri
             if (state.get("id") !== database) continue;
             const changed = change(state);
             if (!changed) continue;
+            if (block.indent) {
+              byHand.add(page);
+              continue;
+            }
             // (Which of the blocks showing the same it is, those before it already written: each found first, among one fewer)
             const alike = blocks.filter((one) => sameBody(one.body) === sameBody(block.body));
-            out.push({ page, body: block.body, text: writeBlock(block.body, changed), occurrence: 0, of: alike.length - alike.indexOf(block) });
+            out.push({ page, body: block.body, text: changed === REMOVE_PLACE ? undefined : writeBlock(block.body, changed), occurrence: 0, of: alike.length - alike.indexOf(block) });
           }
           return out;
         },
         progress,
       );
       const all = found.flat();
-      const plan: PlacesPlan = { documents: [...new Set(all.map((one) => one.page))] };
+      const plan: PlacesPlan = { documents: [...new Set(all.map((one) => one.page))], ...(byHand.size ? { byHand: [...byHand] } : {}) };
       edits.set(plan, all);
       return plan;
     },
@@ -66,7 +73,11 @@ export function blockPlaces(space: Pick<Space, "list" | "read">, writer: PageWri
       if (!all.length) return { written: [], skipped: [] };
       const batch = pageChanges();
       for (const page of plan.documents) batch.page(page, (p) => {
-        for (const one of all.filter((edit) => edit.page === page)) p.codeBlocks.replace(BLOCK_LANGUAGE, one.body, one.text, { occurrence: one.occurrence, of: one.of });
+        for (const one of all.filter((edit) => edit.page === page)) {
+          const where = { occurrence: one.occurrence, of: one.of };
+          if (one.text === undefined) p.codeBlocks.remove(BLOCK_LANGUAGE, one.body, where);
+          else p.codeBlocks.replace(BLOCK_LANGUAGE, one.body, one.text, where);
+        }
       });
       return reportOf(await writer.write(batch.build()));
     },

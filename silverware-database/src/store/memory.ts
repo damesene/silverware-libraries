@@ -139,7 +139,10 @@ export class MemoryStore implements DatabaseStore {
     const kept = this.kept.get(id);
     const draft = draftTransaction(this.state(kept), changes, this.rules);
     const planned: Planned[] = [];
-    if (draft.record) this.add(planned, { database: id }, draft.record.count, { kind: "record", database: id, expects: asNumber(draft.record.expects), after: draft.record.after });
+    // A record made comes before its items, one deleted after them (as `applyNow` takes them: by their order)
+    const record = draft.record;
+    const addRecord = () => record && this.add(planned, { database: id }, record.count, { kind: "record", database: id, expects: asNumber(record.expects), after: record.after });
+    if (record?.after) addRecord();
     for (const item of draft.items) {
       this.add(planned, item.target, item.count, {
         kind: "item",
@@ -153,6 +156,7 @@ export class MemoryStore implements DatabaseStore {
         ...(draft.recordRead === undefined ? {} : { record: Number(draft.recordRead) }),
       });
     }
+    if (record && !record.after) addRecord();
     return { database: id, planned, skipped: draft.skipped };
   }
 
@@ -337,6 +341,10 @@ export class MemoryStore implements DatabaseStore {
   }
 
   documentOf(): string | undefined {
+    return undefined;
+  }
+
+  databaseDocumentOf(): string | undefined {
     return undefined;
   }
 

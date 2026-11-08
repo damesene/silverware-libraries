@@ -117,6 +117,8 @@ export interface DatabaseStore {
   validateItemName(name: string): string | undefined;
   /** Where an item can be opened (a page's name), undefined where nowhere */
   documentOf(item: ItemKey): string | undefined;
+  /** A database's own document (its root page), as last read; undefined where it has none */
+  databaseDocumentOf(database: string): string | undefined;
   /**
    * The values items keep under keys the schema has none of (a property
    * removed with its values kept, a key typed by hand or another tool's), by
@@ -148,18 +150,30 @@ export interface PlaceStore {
    * that change; undefined: none), each read now (every document read:
    * `progress` told as they are), and what each becomes: nothing written
    */
-  plan(database: string, change: PlaceChange, progress?: WriteProgress): Promise<PlacesPlan>;
+  plan(database: string, change: PlaceChange, progress?: WriteProgress, leave?: (document: string) => boolean): Promise<PlacesPlan>;
   /** A plan written, each place where it is still as read */
   apply(plan: PlacesPlan): Promise<PlacesReport>;
   /** What `apply` wrote put back, each place where it is still as written (changed since: left) */
   undo(report: PlacesReport): Promise<PlacesReport>;
 }
 
-/** What a change makes of a place's state: the entries that change, as the place writes them (undefined: none) */
-export type PlaceChange = (state: ReadonlyMap<string, unknown>) => Readonly<Record<string, unknown>> | undefined;
+/**
+ * What a change makes of a place's state: the entries that change, as the
+ * place writes them (undefined: none); `REMOVE_PLACE`: the place taken out of
+ * its document whole (its database deleted)
+ */
+export type PlaceChange = (state: ReadonlyMap<string, unknown>) => Readonly<Record<string, unknown>> | typeof REMOVE_PLACE | undefined;
 
-/** Places to change: the documents they are in (as said to the user), the rest the binding's own */
-export type PlacesPlan = { readonly documents: readonly string[] };
+/** What a `PlaceChange` gives for a place to be taken out of its document whole */
+export const REMOVE_PLACE = "remove";
+
+/**
+ * Places to change: the documents they are in (as said to the user), the rest
+ * the binding's own; `byHand`: documents holding places the change would
+ * reach that cannot be written (a block indented in a list item), to be
+ * changed by hand
+ */
+export type PlacesPlan = { readonly documents: readonly string[]; readonly byHand?: readonly string[] };
 
 /** Places written, and those left (changed since they were read) with why */
 export type PlacesReport = { readonly written: readonly string[]; readonly skipped: readonly { readonly document: string; readonly reason: string }[] };

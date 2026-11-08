@@ -11,6 +11,7 @@ import { DatabaseCore } from "./core/core.ts";
 import { Modules } from "./core/module.ts";
 import { documentsHost, platformDocuments } from "./core/documents.ts";
 import { DatabasePlace } from "./core/place.ts";
+import { openDeleteDatabase } from "./core/deletedatabase.ts";
 import { SettingsDialog } from "./core/settings.ts";
 import type { ViewDefinition } from "./core/view.ts";
 import { validateView, ViewRegistry } from "./core/views.ts";
@@ -82,6 +83,15 @@ const COMMANDS: Readonly<Record<string, () => Promise<void>>> = {
   "Silverware Database: Undo": async () => {
     await app!.core.undo();
     for (const shown of app!.shown.values()) void shown.place?.refresh();
+  },
+  // A database picked and deleted, asked first (as its ⋯ menu's Delete database…)
+  "Silverware Database: Delete database": async () => {
+    const { core, platform, store } = app!;
+    const all = await store.databases();
+    if (!all.length) return void platform.ui.notify("Silverware Database: there is no database to delete", { type: "error" });
+    if (!platform.ui.pick) return void platform.ui.notify("Silverware Database: no picker here: delete a database from its menu (⋯)", { type: "error" });
+    const picked = await platform.ui.pick("The database to delete", all.map((one) => ({ name: one.name, description: one.id, id: one.id })));
+    if (picked) deleteDatabase(core, picked.id, picked.name);
   },
   "Silverware Database: Settings": async () => {
     const { platform } = app!;
@@ -283,7 +293,7 @@ function start(element: HTMLElement, shown: Shown): void {
   // (The place before it for this block over the window: this one so from its first drawing, no frame in the page between)
   const before = handovers.get(JSON.stringify([shown.page, shown.current]));
   const overWindow = !!before && before.until > Date.now() && before.from !== shown.place && before.from.isOverWindow;
-  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, overWindow, settings: platform.settings, ui: platform.ui, editor: platform.editor, documents: platformDocuments(app!.platform), moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), moduleTools: (place) => app!.modules.placeTools(place), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database) => app!.modules.openItem(item, database), editSource: () => void editSource(element, shown), takeOver });
+  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, overWindow, settings: platform.settings, ui: platform.ui, editor: platform.editor, documents: platformDocuments(app!.platform), moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), moduleTools: (place) => app!.modules.placeTools(place), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database) => app!.modules.openItem(item, database), editSource: () => void editSource(element, shown), deleteDatabase: (one, name) => deleteDatabase(core, one, name), takeOver });
   void shown.place.render();
 }
 
@@ -460,6 +470,12 @@ function tidy(): void {
 
 function redrawAll(): void {
   for (const shown of app?.shown.values() ?? []) void shown.place?.render();
+}
+
+/** The database's deletion opened (core/deletedatabase.ts): asked, written, the places shown following it once written */
+function deleteDatabase(core: DatabaseCore, id: string, name: string): void {
+  const { platform } = app!;
+  openDeleteDatabase({ document, core, noun: core.noun, notify: (message) => platform.ui.notify(message), written: () => app!.shown.forEach((shown) => void shown.place?.refresh()) }, id, name);
 }
 
 /** A database made by the command: its name asked, its root beside the page open, its block at the cursor */

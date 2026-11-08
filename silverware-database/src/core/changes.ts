@@ -22,6 +22,9 @@ export type DatabaseChange =
   // A new database of the transaction's id: its first change and only there, its schema by a `setSchema` after it
   | { readonly kind: "createDatabase"; readonly name: string }
   | { readonly kind: "renameDatabase"; readonly name: string }
+  // The database deleted: its own record (its root page), the transaction's last change and only there, every item of it
+  // removed by the same transaction (else none of it is)
+  | { readonly kind: "removeDatabase" }
   // The properties as they are to be, in their order
   | { readonly kind: "setSchema"; readonly properties: readonly Property[] };
 

@@ -147,6 +147,10 @@ export type Choice = { readonly name: string; readonly description?: string };
 export interface Settings {
   /** A setting's value, `fallback` where it has none */
   get(path: string, fallback: unknown): Awaitable<unknown>;
-  /** Settings saved where the user keeps them (in SilverBullet the CONFIG page); undefined: back to the default */
-  save?(values: Readonly<Record<string, unknown>>): Awaitable<void>;
+  /**
+   * Settings saved where the user keeps them (in SilverBullet the CONFIG page); undefined: back to the default. `reload`
+   * false: the configuration not loaded again (in SilverBullet that runs Space Lua anew, starting the plugin anew), the
+   * values set in it as it is, for a value the plugin applies itself (a module's own, as its host keeps them)
+   */
+  save?(values: Readonly<Record<string, unknown>>, options?: { readonly reload?: boolean }): Awaitable<void>;
 }

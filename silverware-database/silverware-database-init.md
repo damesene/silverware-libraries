@@ -80,16 +80,26 @@ if js and js.window then
     end,
     getConfig = config.get,
     -- The settings dialog: saved as SilverBullet's Configuration Manager saves (the CONFIG page, indexed, the configuration loaded again)
-    saveConfigPage = function(text)
+    -- `set`: written and indexed, the configuration not loaded again (that runs Space Lua anew and starts Silverware Database
+    -- anew: the item's panel closed as its width was saved), these values set in it as it is, by path (config.set)
+    saveConfigPage = function(text, set)
       space.writePage("CONFIG", text)
       local ok, err = pcall(function()
         if sync and sync.performFileSync then sync.performFileSync("CONFIG.md") end
         mq.send("indexQueue", "CONFIG.md")
         mq.awaitEmptyQueue("indexQueue")
-        editor.reloadConfigAndCommands()
-        if editor.rebuildEditorState then editor.rebuildEditorState() end
+        if set then
+          for path, value in pairs(set) do
+            config.set(path, value)
+          end
+        else
+          editor.reloadConfigAndCommands()
+          if editor.rebuildEditorState then editor.rebuildEditorState() end
+        end
       end)
-      if not ok then
+      if not ok and set then
+        editor.flashNotification("Silverware Database: the setting is saved in CONFIG, but indexing it failed (" .. tostring(err) .. ")", "error")
+      elseif not ok then
         editor.flashNotification("Silverware Database: the settings are saved in CONFIG, but loading them failed (" .. tostring(err) .. "): reload the page", "error")
       end
     end,

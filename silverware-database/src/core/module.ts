@@ -161,7 +161,8 @@ export class Modules {
           const declared = definition.settings?.find((one) => one.key === key);
           values.set(key, value === undefined ? declared?.default : value);
           if (!this.settings.save) return false;
-          await this.settings.save({ [moduleSettingPath(definition.name, key)]: value });
+          // (Held here meanwhile: saved without loading the configuration again, which would start the plugin anew)
+          await this.settings.save({ [moduleSettingPath(definition.name, key)]: value }, { reload: false });
           return true;
         },
         offer: (api) => void this.offers.set(definition.name, api),

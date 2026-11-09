@@ -75,6 +75,8 @@ export function choiceType(spec: ChoiceSpec): PropertyType {
       return { value: value === "" ? null : value };
     },
     optionShown: shown,
+    // (Where the params take any value: its editors a field to type in too, offering the options)
+    takesTyped: (params) => !!spec.anyone && takesAny(params),
   };
   const several: PropertyType = {
     ...single,

@@ -23,6 +23,9 @@ const DATABASE: Database = {
     { key: "when", label: "When", type: "datetime", params: {}, readonly: false },
     { key: "web", label: "Web", type: "url", params: {}, readonly: false },
     { key: "refs", label: "Refs", type: "reference", params: {}, readonly: false },
+    { key: "owner", label: "Owner", type: "person", params: { options: ["ada", "bob"], anyone: true }, readonly: false },
+    { key: "team", label: "Team", type: "person", params: { options: ["ada", "bob"], multiple: true, anyone: true }, readonly: false },
+    { key: "lead", label: "Lead", type: "person", params: { options: ["ada", "bob"] }, readonly: false },
   ],
 };
 const ITEM: Item = { key: "page-1" as ItemKey, name: "Fix login", values: { status: "Todo", tags: ["a", "old"], estimate: 3 }, rank: "a0", revision: "1" };
@@ -348,6 +351,46 @@ describe("the built-in views' editors", () => {
     key(cell.querySelector(".swd-editor")!, "Enter");
     await Promise.resolve();
     expect(writes).toEqual([["update", "Fix login", "tags", ["a", "old", "b"]]]);
+  });
+
+  it("offer a person's people in a field to type any name in where it takes Anyone, a list alone where it does not", async () => {
+    const { cell, writes, edit } = setup();
+    edit("owner", { ...ITEM, values: { owner: "ada" } });
+    const input = cell.querySelector<HTMLInputElement>("input.swd-editor-typed")!;
+    expect([input.value, [...cell.querySelectorAll("datalist option")].map((one) => one.getAttribute("value"))]).toEqual(["@ada", ["@ada", "@bob"]]);
+    expect(input.getAttribute("list")).toBe(cell.querySelector("datalist")!.id);
+    input.value = "@eve";
+    key(input, "Enter");
+    await Promise.resolve();
+    expect(writes).toEqual([["update", "Fix login", "owner", "eve"]]);
+    // (Without Anyone: its list only, each option as it shows)
+    edit("lead");
+    expect([...cell.querySelectorAll("select option")].map((one) => one.textContent)).toEqual(["", "@ada", "@bob"]);
+  });
+
+  it("add a name typed under a person's boxes where it takes Anyone, ticked, then saved with the rest", async () => {
+    const { cell, writes, edit } = setup();
+    edit("team", { ...ITEM, values: { team: ["ada"] } });
+    const adder = cell.querySelector<HTMLInputElement>(".swd-editor-add")!;
+    adder.value = "@eve";
+    key(adder, "Enter");
+    // (Added, the editor still open, the field empty for another; one already there ticked, not twice)
+    expect([...cell.querySelectorAll<HTMLInputElement>("input[type=checkbox]")].map((box) => [box.value, box.checked])).toEqual([
+      ["ada", true],
+      ["bob", false],
+      ["eve", true],
+    ]);
+    expect([adder.value, writes]).toEqual(["", []]);
+    adder.value = "bob";
+    key(adder, "Enter");
+    // Enter with nothing typed saves; what is typed and not added yet goes with it
+    adder.value = "zoe";
+    key(cell.querySelector(".swd-editor")!, "Enter");
+    await Promise.resolve();
+    expect(writes).toEqual([["update", "Fix login", "team", ["ada", "bob", "eve", "zoe"]]]);
+    // (Without Anyone: no field to add one)
+    edit("tags");
+    expect(cell.querySelector(".swd-editor-add")).toBeNull();
   });
 
   it("rename the item by its name, and offer no editor for a property read only", async () => {

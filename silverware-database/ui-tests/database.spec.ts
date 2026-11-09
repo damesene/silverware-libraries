@@ -1362,4 +1362,11 @@ test("a person shows as a mention, kept by the name alone, picked from its peopl
   await expect.poll(() => space.saved("Page/db-tasks")).toContain("anyone: true");
   await expect(cell(2).locator(".swd-pill")).toHaveText("@eve");
   await expect(cell(2).locator(".swd-pill")).not.toHaveClass(/swd-pill-none/);
+  // Its editor now a field taking any name, offering the people
+  await cell(1).click();
+  const field = cell(1).locator("input.swd-editor-typed");
+  await expect(field).toHaveValue("@bob");
+  await field.fill("@zoe");
+  await field.press("Enter");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("owner: zoe\n");
 });

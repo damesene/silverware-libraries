@@ -80,6 +80,8 @@ export function pickFrom(select: HTMLSelectElement, take: () => void, options: {
 // The cells an editor is open in, with it: one at a time each, while that editor is still in its cell (a view drawing
 // the cell otherwise meanwhile leaves it editable again)
 const editing = new WeakMap<HTMLElement, Element>();
+// Lists of options offered to a field typed in, each its own id
+let choiceLists = 0;
 
 /**
  * A cell's value edited in place (not where an editor is open in it already): `cell`'s content made the editor of its
@@ -124,6 +126,45 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
   const kept = now === undefined || now === null ? "" : Array.isArray(now) ? now.join(", ") : String(now);
   const type = property ? host.type(property) : undefined;
 
+  // One option, or a value typed besides them (a person's with Anyone): a field offering the options as they show
+  if (type?.editor === "select" && property && type.takesTyped?.(property.params)) {
+    const shown = (option: string) => type.optionShown?.(option) ?? option;
+    const list = el(doc, "datalist", { attrs: { id: `swd-choices-${++choiceLists}` } }, ...optionsOf(property).map((option) => el(doc, "option", { attrs: { value: shown(option) } })));
+    const input = el(doc, "input", { class: "swd-editor swd-editor-typed", attrs: { type: "text", list: list.id, "aria-label": property.label } });
+    input.value = typeof now === "string" ? shown(now) : kept;
+    const was = input.value;
+    const commit = () => {
+      // (Once: Enter saves, and the field left as it goes does not save or say anything again)
+      if (ended) return;
+      if (input.value.trim() === was.trim()) return end();
+      const parsed = type.parse(input.value, property.params, now);
+      if ("problem" in parsed) {
+        host.notify(`${property.label} of ${item.name}: ${parsed.problem}: not written`);
+        return end();
+      }
+      void save(written(parsed.value));
+    };
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        commit();
+      }
+    });
+    escape(input);
+    cell.replaceChildren(input, list);
+    editing.set(cell, input);
+    input.focus();
+    input.select();
+    // (Its options offered at once where the browser lets a page open them)
+    try {
+      (input as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
+    } catch {
+      // (Not within a user's press or key: offered as the field is typed in, or by Alt+↓)
+    }
+    return;
+  }
+
   if (type?.editor === "select" && property) {
     const select = el(doc, "select", "swd-editor");
     const options = optionsOf(property);
@@ -155,13 +196,53 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
     const was = Array.isArray(now) ? now.map(String) : now === undefined || now === null || now === "" ? [] : [String(now)];
     const options = [...optionsOf(property), ...was.filter((one) => !optionsOf(property).includes(one))];
     const panel = el(doc, "div", { class: "swd-editor swd-editor-choices", attrs: { tabindex: "-1", role: "group", "aria-label": property.label } });
-    const boxes = options.map((option) => {
+    const choice = (option: string, checked: boolean) => {
       const box = el(doc, "input", { attrs: { type: "checkbox", value: option } });
-      box.checked = was.includes(option);
-      panel.append(el(doc, "label", "swd-editor-choice", box, type.optionShown?.(option) ?? option));
-      return box;
+      box.checked = checked;
+      return { box, label: el(doc, "label", "swd-editor-choice", box, type.optionShown?.(option) ?? option) };
+    };
+    const boxes = options.map((option) => {
+      const made = choice(option, was.includes(option));
+      panel.append(made.label);
+      return made.box;
     });
+    // A value typed besides the options, where the type takes one (a person's with Anyone): a field under the boxes, Enter
+    // in it adding what it reads as (ticked, a box of its own where none is), the field empty again for another
+    const adder = type.takesTyped?.(property.params) ? el(doc, "input", { class: "swd-editor-add", attrs: { type: "text", placeholder: "Add…", "aria-label": `Add to ${property.label}` } }) : undefined;
+    const add = (): string | undefined => {
+      if (!adder || adder.value.trim() === "") return undefined;
+      const parsed = type.parse(adder.value, property.params);
+      if ("problem" in parsed) return parsed.problem;
+      for (const one of Array.isArray(parsed.value) ? parsed.value : parsed.value === null ? [] : [String(parsed.value)]) {
+        const there = boxes.find((box) => box.value === one);
+        if (there) there.checked = true;
+        else {
+          const made = choice(one, true);
+          adder.before(made.label);
+          boxes.push(made.box);
+        }
+      }
+      adder.value = "";
+      return undefined;
+    };
+    if (adder) {
+      panel.append(adder);
+      adder.addEventListener("input", () => adder.setCustomValidity(""));
+      adder.addEventListener("keydown", (event) => {
+        // (Enter with nothing typed saves, as anywhere in the panel)
+        if (event.key !== "Enter" || adder.value.trim() === "") return;
+        event.preventDefault();
+        event.stopPropagation();
+        const problem = add();
+        if (problem) {
+          adder.setCustomValidity(problem);
+          adder.reportValidity();
+        }
+      });
+    }
     const commit = () => {
+      // (What is typed and not added yet, added: the panel left with it in the field)
+      add();
       const ticked = new Set(boxes.filter((box) => box.checked).map((box) => box.value));
       // The same values: nothing written, whatever their order; else those kept in their order, the new ones after
       const had = new Set(was);
@@ -180,7 +261,7 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
     escape(panel);
     cell.replaceChildren(panel);
     editing.set(cell, panel);
-    (boxes[0] ?? panel).focus({ preventScroll: true });
+    (boxes[0] ?? adder ?? panel).focus({ preventScroll: true });
     // (Whole in view: in a box that scrolls, the peek's properties, it may open past its edge)
     panel.scrollIntoView?.({ block: "nearest" });
     return;

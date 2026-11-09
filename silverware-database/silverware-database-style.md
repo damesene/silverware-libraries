@@ -1096,6 +1096,16 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   align-items: center;
   white-space: nowrap;
 }
+/* A value typed besides the options (a person's with Anyone): a field under the boxes, a value added there ticked above it */
+.swd-editor-add {
+  margin-top: 4px;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, currentColor);
+  border-radius: 4px;
+  padding: 2px 4px;
+}
 /* The table */
 .swd-table-box {
   overflow-x: auto;

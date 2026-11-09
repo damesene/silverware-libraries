@@ -31,6 +31,8 @@ export type ChoiceSpec = {
   readonly read?: (typed: string) => string;
   /** Why an option cannot be one of this type's, beside what every type of options refuses */
   readonly validateOption?: (option: string) => string | undefined;
+  /** True where its options are people, shown and pressed as mentions (the person's) */
+  readonly mentions?: boolean;
   /** The switch taking any value, none of the options too (a person's Anyone); none: never */
   readonly anyone?: TypeSwitch;
 };
@@ -75,6 +77,7 @@ export function choiceType(spec: ChoiceSpec): PropertyType {
       return { value: value === "" ? null : value };
     },
     optionShown: shown,
+    ...(spec.mentions ? { mentions: true } : {}),
     // (Where the params take any value: its editors a field to type in too, offering the options)
     takesTyped: (params) => !!spec.anyone && takesAny(params),
   };

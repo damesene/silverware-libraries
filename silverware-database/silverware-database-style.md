@@ -1041,6 +1041,23 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   outline: 1px dashed var(--danger-color, #c62828);
   outline-offset: -1px;
 }
+/* A person: as SilverBullet draws a mention in the page (its variables, its border and corners), not in its option's color
+   (which Color by still uses); pressed where the host shows where one is mentioned. One none of the options and not taken
+   keeps the dashed edge of a value none of them */
+.swd-pill.swd-mention {
+  padding: 0 4px;
+  /* (Its edge drawn inside it, as a pill's height is a line's) */
+  box-shadow: inset 0 0 0 1px var(--editor-at-mention-border-color, currentColor);
+  border-radius: 6px;
+  color: var(--editor-at-mention-color, inherit);
+  background: var(--editor-at-mention-background-color, none);
+}
+.swd-pill.swd-mention[role="link"] {
+  cursor: pointer;
+}
+.swd-pill.swd-mention.swd-pill-none {
+  box-shadow: none;
+}
 
 .swd-filter {
   display: grid;

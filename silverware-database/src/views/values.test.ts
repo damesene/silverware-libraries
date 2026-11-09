@@ -41,3 +41,25 @@ describe("a person's pills", () => {
     expect([anyone.classList.contains("swd-pill-none"), /^\d$/.test(anyone.dataset.color ?? ""), made({ options: ["ada"], anyone: true }, "eve").dataset.color]).toEqual([false, true, anyone.dataset.color]);
   });
 });
+
+describe("a person's mentions", () => {
+  it("look as the page's mentions, and show where the person is mentioned as pressed, editing nothing, where the host shows it", () => {
+    const types = new TypeRegistry();
+    const params = { options: ["ada"] };
+    const property = { key: "owner", label: "Owner", type: "person", params, readonly: false };
+    const type = types.of("person", params);
+    const opened: string[] = [];
+    const made = optionPill(document, property, "ada", type, (name) => void opened.push(name));
+    expect([made.className.includes("swd-mention"), made.getAttribute("role"), made.tabIndex]).toEqual([true, "link", 0]);
+    const cell = document.createElement("td");
+    let edited = 0;
+    cell.addEventListener("click", () => void edited++);
+    cell.append(made);
+    made.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    made.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect([opened, edited]).toEqual([["ada", "ada"], 0]);
+    // (A host showing none: a mention's look, nothing to press; a select's: no mention)
+    expect(optionPill(document, property, "ada", type).getAttribute("role")).toBeNull();
+    expect(optionPill(document, { ...property, type: "select" }, "ada", types.of("select", params), () => {}).classList.contains("swd-mention")).toBe(false);
+  });
+});

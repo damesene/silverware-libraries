@@ -39,6 +39,8 @@ export interface PropertyType {
   readonly icon?: string;
   /** How one of its options shows, where not as it is kept (a person's `@ada`): its pills, its editors' choices, its groups */
   optionShown?(option: string): string;
+  /** True where its options are people (a person's): each value shown as the platform shows a mention, pressed where the host shows where one is mentioned */
+  readonly mentions?: boolean;
   /** Whether its editor of options takes a value typed besides them (a person's with Anyone): a field offering them, not a list alone */
   takesTyped?(params: Params): boolean;
   /** True where its values are lists (a multi-select's options, references): grouped by it, an item is in the group of each */

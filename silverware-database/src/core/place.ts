@@ -12,6 +12,7 @@ import type { GroupArrangement } from "../domain/grouping.ts";
 import type { Database, Item, Property } from "../model/database.ts";
 import { type DatabaseCore, isRefused } from "./core.ts";
 import { documentsHost, type DocumentsSource } from "./documents.ts";
+import { mentionsHost } from "./mentions.ts";
 import { arrangedGroups, focusGroupList, type GroupFocus, groupedBy, groupEntry } from "./groupmenu.ts";
 import { appliedToViews, type LookOf, type LookPart, type ToAll } from "./applyall.ts";
 import { arrangementEntries, groupEntries, hidesByDefault, propertyEntries, STATE_KEYS } from "./statekeys.ts";
@@ -40,7 +41,7 @@ export type PlaceOptions = {
   readonly views: ViewRegistry;
   readonly settings: Pick<Settings, "get">;
   readonly ui: Pick<UserInterface, "notify">;
-  readonly editor?: Pick<Editor, "open">;
+  readonly editor?: Pick<Editor, "open" | "openMention">;
   /** The documents references name (core/documents.ts); none: no document offered nor opened */
   readonly documents?: DocumentsSource;
   /** What the modules on put in the place's menu (core/module.ts), asked as it opens */
@@ -1005,6 +1006,7 @@ export class DatabasePlace {
         }
       },
       ...documentsHost(this.options.documents, core.noun, ui),
+      ...mentionsHost(editor, ui),
       getMeta: (key) => state.get(prefixed(key)),
       setMeta,
       setting: (key) => settings.get(key),

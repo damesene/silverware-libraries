@@ -19,7 +19,7 @@ import type { ViewHost } from "../core/view.ts";
 import { VIEW_ICONS } from "./icons.ts";
 
 /** What an editor needs of its host: a view's, or a module's made of the same parts (the peek's) */
-export type EditorHost = Pick<ViewHost, "document" | "database" | "type" | "text" | "update" | "rename" | "notify" | "documents" | "validateDocumentName" | "openByName" | "noun" | "folderSeparator">;
+export type EditorHost = Pick<ViewHost, "document" | "database" | "type" | "text" | "update" | "rename" | "notify" | "documents" | "validateDocumentName" | "openByName" | "openMention" | "noun" | "folderSeparator">;
 
 /** The built-in property every item has: its name */
 export const NAME = "name";

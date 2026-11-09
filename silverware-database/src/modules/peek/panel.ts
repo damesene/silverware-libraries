@@ -452,6 +452,7 @@ export class PeekPanel {
       noun: this.host.noun,
       ...(this.host.folderSeparator ? { folderSeparator: this.host.folderSeparator } : {}),
       openByName: (name) => this.host.openByName(name),
+      ...(this.host.openMention ? { openMention: this.host.openMention } : {}),
     };
   }
 

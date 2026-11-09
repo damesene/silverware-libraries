@@ -141,11 +141,31 @@ export function choiceColor(property: Property, value: string, type?: PropertyTy
   return type.validate(type.lists ? [value] : value, property.params) === undefined ? nameColor(value) : undefined;
 }
 
-/** A select's or a person's value as a pill, shown as its type shows an option (`@ada`), in its color (`choiceColor`); marked where it is none of the options and not taken */
-export function optionPill(doc: Document, property: Property, value: string, type?: PropertyType): HTMLElement {
+/**
+ * A select's or a person's value as a pill, shown as its type shows an option (`@ada`), in its color (`choiceColor`); marked
+ * where it is none of the options and not taken. A person's (`PropertyType.mentions`) looks as the page's mentions do, and
+ * where `openMention` is given a press or Enter on it shows where that person is mentioned, editing nothing
+ */
+export function optionPill(doc: Document, property: Property, value: string, type?: PropertyType, openMention?: (name: string) => unknown): HTMLElement {
   const color = choiceColor(property, value, type);
   const text = type?.optionShown?.(value) ?? value;
-  return pill(doc, text, color, color === undefined ? `${text}: none of ${property.label}'s options` : undefined);
+  const made = pill(doc, text, color, color === undefined ? `${text}: none of ${property.label}'s options` : undefined);
+  if (!type?.mentions) return made;
+  made.classList.add("swd-mention");
+  if (!openMention) return made;
+  made.setAttribute("role", "link");
+  made.tabIndex = 0;
+  if (color !== undefined) made.title = `Where ${text} is mentioned`;
+  const opened = (event: Event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void openMention(value);
+  };
+  made.addEventListener("click", opened);
+  made.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") opened(event);
+  });
+  return made;
 }
 
 /** A color of the palette for a name none of the options, the same for the same name */
@@ -167,11 +187,11 @@ function chosen(value: Value | undefined): string[] {
  * documents it names, labels as quiet pills; else its type's text; nothing where it is empty. A
  * checkbox is the view's own (a box to tick, or its property's name on a card).
  */
-export function valueNodes(host: Pick<ViewHost, "document" | "type" | "text" | "openByName" | "folderSeparator">, item: Item, property: Property): Node[] {
+export function valueNodes(host: Pick<ViewHost, "document" | "type" | "text" | "openByName" | "openMention" | "folderSeparator">, item: Item, property: Property): Node[] {
   const doc = host.document;
   const type = host.type(property);
   const value = item.values[property.key];
-  if (type.look === "options") return chosen(value).map((one) => optionPill(doc, property, one, type));
+  if (type.look === "options") return chosen(value).map((one) => optionPill(doc, property, one, type, host.openMention));
   // (Labels: each a quiet pill, none of them an option; a value that is no list shown as kept, marked by the view)
   if (type.look === "labels" && Array.isArray(value)) return value.map((one) => pill(doc, String(one), 0));
   // (Links only of a value that reads as the type: one that does not is shown as kept, marked by the view)
@@ -196,7 +216,7 @@ export function valueNodes(host: Pick<ViewHost, "document" | "type" | "text" | "
  * where it has no value (no name alone). A view drawing values under a header
  * naming them (a table's column) draws them with `valueNodes`
  */
-export function fieldNodes(host: Pick<ViewHost, "document" | "type" | "text" | "openByName" | "folderSeparator">, item: Item, property: Property): Node[] {
+export function fieldNodes(host: Pick<ViewHost, "document" | "type" | "text" | "openByName" | "openMention" | "folderSeparator">, item: Item, property: Property): Node[] {
   const doc = host.document;
   if (missing(host, item, property)) return [missingPill(doc, property)];
   if (host.type(property).look === "check") return item.values[property.key] === true ? [doc.createTextNode(`✓ ${property.label}`)] : [];

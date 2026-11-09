@@ -11,6 +11,7 @@ export const person = choiceType({
   label: "Person",
   icons: { several: "person-multiple" },
   shown: (name) => `@${name}`,
+  mentions: true,
   // (Typed or pasted as shown: `@ada` is ada)
   read: (typed) => typed.replace(/^@/, ""),
   validateOption: (name) => (name.startsWith("@") ? "write the name without @ (it shows with it)" : undefined),

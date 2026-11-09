@@ -13,6 +13,7 @@ import type { Platform } from "../../shared/platform.ts";
 import { DatabaseCore } from "./core/core.ts";
 import { Modules } from "./core/module.ts";
 import { documentsHost, platformDocuments } from "./core/documents.ts";
+import { mentionsHost } from "./core/mentions.ts";
 import { DatabasePlace } from "./core/place.ts";
 import { openDeleteDatabase } from "./core/deletedatabase.ts";
 import { SettingsDialog } from "./core/settings.ts";
@@ -163,6 +164,7 @@ export function init(bridge: Bridge): void {
           conflict,
         ),
       ...documentsHost(platformDocuments(platform), core.noun, platform.ui),
+      ...mentionsHost(platform.editor, platform.ui),
       editorArea: () => editorArea(document),
       onEditorAreaChanged: (listener) => watchEditorArea(document, listener),
       editorLook: () => editorLook(document),

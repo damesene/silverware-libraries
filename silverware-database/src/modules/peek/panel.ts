@@ -31,6 +31,8 @@ import { missing, valueNodes } from "../../views/values.ts";
 const WIDTH = 600;
 const MIN_WIDTH = 320;
 const SHARE = 0.8;
+// How long after a press beside the panel its click is waited for (a press moved away, a drag, has none)
+const CLICK_WAIT_MS = 400;
 // An editor's area narrower than this (a phone, a narrow window): the panel takes all of it, as a page of its own
 const NARROW = 720;
 // What a press there is not beside the panel: a dialog over the page (a question asked), a notification
@@ -88,6 +90,10 @@ export class PeekPanel {
   private readonly edits = new Set<Promise<unknown>>();
   // The panel's own writes of its item, one after another: each from the item as the one before it left the panel (`own`)
   private queue: Promise<unknown> = Promise.resolve();
+  // Items asked to be shown, counted: a press beside the panel closes it only where it asked for none (`beside`)
+  private asked = 0;
+  // A press beside the panel being followed to its end (its listeners, its timers): ended as the panel goes or another comes
+  private pressBeside: (() => void) | undefined;
   // The item being removed (asked, written): a second press of the bin meanwhile asks nothing
   private removing = false;
   // A question asked of the user: presses meanwhile are theirs, not beside the panel
@@ -111,6 +117,7 @@ export class PeekPanel {
 
   /** An item shown; another shown before is left first (its field written), unless its body typed could not be written: then it stays */
   async show(item: Item, database: string): Promise<void> {
+    this.asked++;
     const opener = this.shown?.opener ?? this.host.document.activeElement;
     if (!(await this.leave())) return;
     const read = await this.host.database(database);
@@ -230,14 +237,47 @@ export class PeekPanel {
         }
       }),
     );
-    // A press beside it closes it (what is typed written first); not one in a question asked meanwhile, nor in a dialog or a notification
+    // A press beside it closes it (what is typed written first); not one in a question asked meanwhile, nor in a dialog or a
+    // notification. Once the press is over, and only where it showed no other item: a press on another item's name shows
+    // that one in the panel as it is, never closed and opened anew (the panel blinked)
     const beside = (event: PointerEvent) => {
       const target = event.target;
       if (!this.element || this.asking || !(target instanceof Element) || this.element.contains(target) || target.closest(NOT_BESIDE)) return;
-      void this.close();
+      // What is being edited in it written at once, before the press does anything (as closing it would have)
+      const active = doc.activeElement;
+      if (active instanceof HTMLElement && this.element.contains(active)) active.blur();
+      this.pressBeside?.();
+      const asked = this.asked;
+      let late: ReturnType<typeof setTimeout> | undefined;
+      let after: ReturnType<typeof setTimeout> | undefined;
+      const listened = ["pointerup", "pointercancel", "click"] as const;
+      const end = () => {
+        for (const type of listened) doc.removeEventListener(type, step, true);
+        clearTimeout(late);
+        clearTimeout(after);
+        this.pressBeside = undefined;
+      };
+      // (After the click's own handlers: an item it shows asked for meanwhile, the panel then shows it as it is)
+      const settle = () => {
+        clearTimeout(late);
+        after = setTimeout(() => {
+          end();
+          if (this.asked === asked) void this.close();
+        }, 0);
+      };
+      const step = (done: Event) => {
+        if (done.type === "click") return settle();
+        // (No click comes of a press moved away, a drag: closed all the same)
+        late ??= setTimeout(settle, CLICK_WAIT_MS);
+      };
+      for (const type of listened) doc.addEventListener(type, step, true);
+      this.pressBeside = end;
     };
     doc.addEventListener("pointerdown", beside, true);
-    this.stops.push(() => doc.removeEventListener("pointerdown", beside, true));
+    this.stops.push(() => {
+      doc.removeEventListener("pointerdown", beside, true);
+      this.pressBeside?.();
+    });
     const view = doc.defaultView;
     const place = () => this.place();
     view?.addEventListener("resize", place);

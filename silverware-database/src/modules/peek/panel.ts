@@ -39,6 +39,19 @@ const GRIP = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><c
 
 const isRefused = (result: Result): result is Extract<Result, { problem: string }> => "problem" in result;
 
+/** What one of the panel's own writes writes of its item: a value by its key, its name, its look */
+type Part = { readonly key: string } | "name" | "look";
+
+/** Whether two readings of an item are alike in all but `part` (its name, values, look and place in the order) */
+function sameBeside(one: Item, other: Item, part: Part): boolean {
+  const beside = (item: Item) => {
+    const values: Record<string, unknown> = { ...item.values };
+    if (typeof part === "object") delete values[part.key];
+    return JSON.stringify([part === "name" ? null : item.name, Object.entries(values).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)), part === "look" ? null : (item.look ?? null), item.rank ?? null]);
+  };
+  return beside(one) === beside(other);
+}
+
 type Shown = {
   readonly database: string;
   schema: Database;
@@ -46,6 +59,10 @@ type Shown = {
   item: Item;
   // The item as last read: what the body is written to (its own check is `was`)
   latest: Item;
+  // The item as the panel's own last write left it while its drawing was put off (a value picked as a rename was written:
+  // the panel still drawn with the name before): what the panel's next write goes on, as its own change is no reason to
+  // refuse it; let go as the panel is drawn anew
+  written?: Item;
   // The body as read as the panel opened or last wrote it, what a write is checked against; undefined until read
   body: { readonly was: string | undefined } | undefined;
   // A change made elsewhere while something in the panel was edited: drawn anew once nothing is
@@ -79,6 +96,9 @@ export class PeekPanel {
   private writing: Promise<void> = Promise.resolve();
   // Writes of a value or the name going on (their editors left): waited for with the body's before the item is removed
   private readonly edits = new Set<Promise<unknown>>();
+  // The panel's own writes of its item (a value, the name, the look), one after another: a value picked as the name is still
+  // being written would go on the item as named before, and be refused as changed since it was read
+  private queue: Promise<unknown> = Promise.resolve();
   // The item being removed (asked, written): a second press of the bin meanwhile asks nothing
   private removing = false;
   // A question asked of the user: presses meanwhile are theirs, not beside the panel
@@ -157,6 +177,7 @@ export class PeekPanel {
       return;
     }
     shown.item = now;
+    shown.written = undefined;
     shown.schema = read.value;
     this.draw();
     void this.readBody();
@@ -315,7 +336,8 @@ export class PeekPanel {
     if (!this.element || !active || !this.element.contains(active)) return false;
     if (active.closest(".swd-editor") || active.matches(".swd-peek-body")) return true;
     // (The name focused as the panel opens is not edited until it differs)
-    return active instanceof HTMLInputElement && active.matches(".swd-peek-name") && active.value !== this.shown?.item.name;
+    const shown = this.shown;
+    return active instanceof HTMLInputElement && active.matches(".swd-peek-name") && !!shown && active.value !== (shown.written ?? shown.item).name;
   }
 
   /**
@@ -362,15 +384,7 @@ export class PeekPanel {
   /** What an editor of a value needs, made of the module's host: the schema as last read, the core's writes, the panel and the places following them */
   private editorHost(shown: Shown): EditorHost {
     const { core, types, ui } = this.host;
-    const written = async (result: Promise<Result>) => {
-      // (Kept while it goes on: the item's removal waits for it)
-      const going = result.finally(() => this.edits.delete(going));
-      this.edits.add(going);
-      const done = await result;
-      this.host.refreshPlaces(shown.database);
-      await this.follow();
-      return done;
-    };
+
     return {
       document: this.host.document,
       get database() {
@@ -378,8 +392,9 @@ export class PeekPanel {
       },
       type: (property) => typeOf(types, property),
       text: (item, key) => textOf(item, key, shown.schema, types),
-      update: (item: Item, key: string, value: Value | undefined) => written(core.update(shown.database, item, key, value)),
-      rename: (item: Item, name: string) => written(core.rename(shown.database, item, name)),
+      // (On the item as the panel's own last write left it, where the editor's is the panel's)
+      update: (item: Item, key: string, value: Value | undefined) => this.own(shown, { key }, (base) => core.update(shown.database, base.key === item.key ? base : item, key, value)),
+      rename: (item: Item, name: string) => this.own(shown, "name", () => core.rename(shown.database, item, name)),
       notify: (text) => ui.notify(text, { type: "error" }),
       documents: () => this.host.documents(),
       validateDocumentName: (name) => this.host.validateDocumentName(name),
@@ -413,7 +428,7 @@ export class PeekPanel {
     this.look?.close();
     this.look = lookControls(this.host, element, item, (look, refocus) => void this.writeLook(shown, look, refocus));
     const name = el(doc, "input", { class: "swd-peek-name", attrs: { id: "swd-peek-name", "aria-label": "Name", value: item.name } });
-    name.addEventListener("change", () => void this.rename(shown, name, editor));
+    name.addEventListener("change", () => void this.rename(shown, name));
     name.addEventListener("keydown", (event) => {
       if (event.key === "Enter") name.blur();
     });
@@ -614,21 +629,48 @@ export class PeekPanel {
     return row;
   }
 
-  private async rename(shown: Shown, field: HTMLInputElement, editor: EditorHost): Promise<void> {
+  private async rename(shown: Shown, field: HTMLInputElement): Promise<void> {
     const name = field.value.trim();
-    if (!name || name === shown.item.name) {
-      field.value = shown.item.name;
+    const was = (shown.written ?? shown.item).name;
+    if (!name || name === was) {
+      field.value = was;
       return;
     }
-    // Against the item as read now (a value changed elsewhere meanwhile is no reason to refuse it); refused where its name changed elsewhere since it was shown
-    if (shown.latest.name !== shown.item.name) {
-      this.host.ui.notify(`"${shown.item.name}" was renamed "${shown.latest.name}" elsewhere meanwhile: not renamed`, { type: "error" });
-      field.value = shown.latest.name;
-      return;
-    }
-    const result = await editor.rename(shown.latest, name);
+    const result = await this.own(shown, "name", async (base) => {
+      // Against the item as read now, once the writes before it are done (a value changed elsewhere meanwhile is no reason
+      // to refuse it); refused where its name changed elsewhere since it was shown
+      if (shown.latest.name !== base.name) {
+        const problem = `"${base.name}" was renamed "${shown.latest.name}" elsewhere meanwhile: not renamed`;
+        this.host.ui.notify(problem, { type: "error" });
+        return { problem, cause: "left" };
+      }
+      return this.host.core.rename(shown.database, shown.latest, name);
+    });
     // Refused (said to the user): the name as it is
     if (isRefused(result) && this.shown === shown && field.isConnected) field.value = shown.latest.name;
+  }
+
+  /**
+   * One of the panel's own writes of its item, after those before it (each with the places and the panel following it):
+   * `write` given the item as the panel's own last write left it, else as drawn, and checks of its own made there, once
+   * the writes before it are done. Kept while it goes on (the item's removal waits for it). Written while the panel's
+   * drawing is put off, the item as it is now is what the next write goes on, but only where nothing of it changed beside
+   * `part`, what this write wrote: a change made elsewhere meanwhile leaves the next write checked against the item as
+   * drawn, so it is refused, never written over
+   */
+  private own(shown: Shown, part: Part, write: (base: Item) => Promise<Result>): Promise<Result> {
+    const result = this.queue.then(async () => {
+      const base = shown.written ?? shown.item;
+      const done = await write(base);
+      this.host.refreshPlaces(shown.database);
+      await this.follow();
+      if (this.shown === shown && shown.item !== shown.latest) shown.written = !isRefused(done) && sameBeside(base, shown.latest, part) ? shown.latest : shown.written;
+      return done;
+    });
+    this.queue = result.catch(() => undefined);
+    const going = result.finally(() => this.edits.delete(going));
+    this.edits.add(going);
+    return result;
   }
 
   /** The item's look written (its icon, its color), against the item as drawn; the panel drawn anew, the button focused again */
@@ -636,11 +678,12 @@ export class PeekPanel {
     try {
       // Against the item as read now (a value changed elsewhere is no reason to refuse it); refused where its look changed
       // elsewhere since it was shown
-      if (JSON.stringify(shown.latest.look ?? {}) !== JSON.stringify(shown.item.look ?? {})) {
-        this.host.ui.notify(`The look of "${shown.item.name}" was changed elsewhere meanwhile: not changed`, { type: "error" });
-      } else await this.host.core.setLook(shown.database, shown.latest, look);
-      this.host.refreshPlaces(shown.database);
-      await this.follow();
+      await this.own(shown, "look", async (base) => {
+        if (JSON.stringify(shown.latest.look ?? {}) === JSON.stringify(base.look ?? {})) return this.host.core.setLook(shown.database, shown.latest, look);
+        const problem = `The look of "${base.name}" was changed elsewhere meanwhile: not changed`;
+        this.host.ui.notify(problem, { type: "error" });
+        return { problem, cause: "left" };
+      });
       if (this.shown === shown) this.refocus(refocus);
     } catch (error) {
       this.host.ui.notify(`Silverware Database: ${error instanceof Error ? error.message : String(error)}`, { type: "error" });

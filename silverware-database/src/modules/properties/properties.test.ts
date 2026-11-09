@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { DatabaseCore } from "../../core/core.ts";
+import { DatabaseCore, type ItemConflict } from "../../core/core.ts";
 import { type ModuleDefinition, Modules } from "../../core/module.ts";
 import { TypeRegistry } from "../../domain/types/registry.ts";
 import type { Database } from "../../model/database.ts";
@@ -22,7 +22,7 @@ const TASKS: Database = {
   ],
 };
 
-async function setup(answer = false, configured: Record<string, unknown> = {}, all: readonly ModuleDefinition[] = [PROPERTIES_MODULE], itemDocuments = false) {
+async function setup(answer = false, configured: Record<string, unknown> = {}, all: readonly ModuleDefinition[] = [PROPERTIES_MODULE], itemDocuments = false, showConflict?: (conflict: ItemConflict, done: () => void) => void) {
   const store = new MemoryStore([{ database: TASKS, items: [{ name: "Fix login", values: { status: "Todo", estimate: "3" }, rank: "a0" }, { name: "Write docs", values: { estimate: "a lot" }, rank: "a1" }] }]);
   // (As a store of pages: each item a document of its own)
   if (itemDocuments) Object.defineProperty(store, "capabilities", { value: { ...store.capabilities, itemDocument: true } });
@@ -32,7 +32,7 @@ async function setup(answer = false, configured: Record<string, unknown> = {}, a
   const ui = { notify: (message: string) => void told.push(message), ask: () => (asked++, answer) };
   const core = new DatabaseCore(store, types, ui);
   let refreshed = 0;
-  const modules = new Modules(all, { document, core, types, ui, database: (id) => store.database(id), items: async (id) => (await store.items(id)).value, itemBodies: true, body: (id, item) => store.body(id, item.key), openDocument: async () => {}, documents: async () => [], validateDocumentName: () => undefined, openByName: async () => {}, noun: { one: "page", many: "pages" }, editorArea: () => undefined, onChanged: (listener) => store.onChanged((one) => listener(one.database)), onDocumentOpened: () => () => {}, refreshPlaces: () => void refreshed++ }, { get: (path, fallback) => (path in configured ? configured[path] : fallback) });
+  const modules = new Modules(all, { document, core, types, ui, database: (id) => store.database(id), items: async (id) => (await store.items(id)).value, itemBodies: true, body: (id, item) => store.body(id, item.key), openDocument: async () => {}, documents: async () => [], validateDocumentName: () => undefined, openByName: async () => {}, noun: { one: "page", many: "pages" }, editorArea: () => undefined, onChanged: (listener) => store.onChanged((one) => listener(one.database)), onDocumentOpened: () => () => {}, refreshPlaces: () => void refreshed++, ...(showConflict ? { showConflict } : {}) }, { get: (path, fallback) => (path in configured ? configured[path] : fallback) });
   await modules.start();
   const schema = async () => (await store.database("tasks"))!.value.properties;
   const named = async (name: string) => (await store.items("tasks")).value.find((one) => one.name === name)!;
@@ -330,7 +330,7 @@ describe("the properties' dialog", () => {
     expand("status");
     typeOption(optionNames()[0]!, "To do");
     await save();
-    expect(q(".swd-property-review").textContent).toContain("2 items: Status: Todo → To do");
+    expect(q(".swd-property-review").textContent).toContain("2 items: Todo → To do");
     // Nothing written before Apply
     expect((await named("Fix login")).values.status).toBe("Todo");
     await apply();
@@ -383,8 +383,8 @@ describe("the properties' dialog", () => {
     typeOption(optionNames()[1]!, "Todo");
     await save();
     const review = q(".swd-property-review").textContent;
-    expect(review).toContain("1 item: Status: Todo → Done");
-    expect(review).toContain("1 item: Status: Done → Todo");
+    expect(review).toContain("1 item: Todo → Done");
+    expect(review).toContain("1 item: Done → Todo");
     await apply();
     expect([(await named("Fix login")).values.status, (await named("Write docs")).values.status]).toEqual(["Done", "Todo"]);
     expect((await schema())[0]!.params).toEqual({ options: ["Done", "Todo"], colors: { Todo: "green" } });
@@ -483,17 +483,36 @@ describe("the properties' dialog", () => {
     expect((await schema())[0]!.params).toEqual({ options: ["Todo", "Done"], colors: { Done: "green" } });
   });
 
-  it("saves no draft made of properties changed elsewhere since: said, the draft kept", async () => {
-    const { open, q, schema, core, told } = await setup();
+  it("saves no draft made of properties changed elsewhere since: said in its foot, the draft kept", async () => {
+    const { open, q, schema, core } = await setup();
     await open();
     expand("status");
     addOption("Later");
     await core.setPropertyParams("tasks", "status", { options: ["Todo", "Done"], colors: { Done: "green" } }, { options: ["Todo", "Done"] });
     await save();
     expect((await schema())[0]!.params).toEqual({ options: ["Todo", "Done"], colors: { Done: "green" } });
-    expect(told.at(-1)).toContain("changed meanwhile");
     expect(q(".swd-properties-note").textContent).toContain("changed elsewhere");
     expect(optionNames().map((one) => one.value)).toEqual(["Todo", "Done", "Later"]);
+  });
+
+  it("offers the conflict of a draft made of properties changed elsewhere: Show conflict in its foot, its Write mine writing the draft over them, the dialog closed", async () => {
+    const shown: ItemConflict[] = [];
+    const { open, q, schema, core } = await setup(false, {}, [PROPERTIES_MODULE], false, (conflict, done) => {
+      shown.push(conflict);
+      void conflict.force().then(done);
+    });
+    await open();
+    expand("status");
+    addOption("Later");
+    await core.renameProperty("tasks", "estimate", "Effort");
+    await save();
+    q<HTMLButtonElement>(".swd-properties-conflict").click();
+    await settle();
+    expect(shown).toHaveLength(1);
+    expect(document.querySelector(".swd-properties")).toBeNull();
+    // (Written over them: the draft's Estimate, its option added)
+    expect((await schema()).map((one) => one.label)).toEqual(["Status", "Estimate"]);
+    expect((await schema())[0]!.params).toEqual({ options: ["Todo", "Done", "Later"] });
   });
 
   it("gives an option a color of the user's own, shown in its pill", async () => {

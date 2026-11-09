@@ -525,9 +525,18 @@ alone with Save options / Discard of their own. Decided:
 * **One write**: Save hands the draft to the core, which plans it as one transaction (`editSchema`: the schema as the
   draft has it, each item's values moved, read as a new type, renamed with options or taken off as the draft says, the
   views naming a key changed), shown first where it changes items or views (one review), written whole, undone as one.
-  The core's transaction holds any number of changes; the operations of one change each stay for their other callers.
+  The core's transaction holds any number of changes. The operations of one change (`renameProperty`, `retypeProperty`,
+  `rekeyProperty`, `removeProperty` and the rest) keep their own checks and words and make their change an edit of the
+  schema whole (`editOne`), so the schema's rules are in `editSchema` alone (the review of 2026-11-09 found them written
+  twice).
 * **The peek's Properties too** (a property's name pressed there, + Add a property): they open the same dialog, its
-  draft written by its Save alone.
+  draft written by its Save alone. The peek's own grip moving a property stays written at once (the user's choice).
+* **The properties changed elsewhere meanwhile** (the user's choice, the same day): the draft is made of the database's
+  revision; Save against another gives back a conflict (`Refused.conflict`, made as an item's: `conflictOf`), which the
+  dialog's foot offers (**Show conflict**: the conflict dialog, each page's lines the draft writes over them, **Write mine**
+  writing it as one change, the dialog then closed); a caller showing none has the core offer it (`CoreInterface.conflict`,
+  as for items). Writing mine writes the whole draft: a property added elsewhere meanwhile goes from the schema (its values
+  kept), which the diff shows first.
 * **An eye at the top** (step 2), as the table's conditional formatting has it (shared/dialog.ts `peek`): the dialog put
   aside, the views of the page shown is drawn with the draft (names, icons, colors, order, a type's values as it would read
   them), nothing written; back to the dialog, or closed without Save, they are drawn as the database is. The page shown

@@ -43,9 +43,10 @@ const applied = async (core: DatabaseCore, proposal: Proposal | { problem: strin
 describe("the schema edited as a whole (editSchema)", () => {
   it("plans every change of a draft as one transaction: names, flags, order, a property added, options renamed, a key changed, a type read, one removed with its values; undone as one", async () => {
     const { core, store, items } = setup();
-    const was = (await store.database("tasks"))!.value.properties;
+    const read = (await store.database("tasks"))!;
+    const was = read.value.properties;
     const proposal = await core.editSchema("tasks", {
-      was,
+      revision: read.revision,
       properties: [
         // (Moved first: its type read from the text, its key changed, its name and flags)
         { from: "estimate", key: "effort", label: "Effort", type: "number", params: {}, required: true, showName: true, icon: "⏱" },
@@ -56,7 +57,7 @@ describe("the schema edited as a whole (editSchema)", () => {
     });
     if ("problem" in proposal) throw new Error(proposal.problem);
     expect(proposal.label).toBe("Change the properties of Tasks");
-    expect(proposal.renamed).toEqual([{ from: "State: Todo", to: "Open", items: 1 }]);
+    expect(proposal.renamed).toEqual([{ from: "Todo", to: "Open", items: 1 }]);
     // ("a lot" no number: kept as it is, listed)
     expect(proposal.unreadable).toHaveLength(1);
     expect(proposal.whole).toBeDefined();
@@ -82,9 +83,8 @@ describe("the schema edited as a whole (editSchema)", () => {
   it("keeps a removed property's values where not asked, a system property's own, and changes only its name and flags", async () => {
     const { core, store, items } = setup();
     expect(await core.addProperty("tasks", { label: "", type: "text", system: "order" })).not.toHaveProperty("problem");
-    const was = (await store.database("tasks"))!.value.properties;
     const proposal = await core.editSchema("tasks", {
-      was,
+      revision: (await store.database("tasks"))!.revision,
       properties: [
         { from: "status", label: "Status", type: "select", params: { options: ["Todo", "Done"] } },
         { from: "created", label: "Created", type: "date", readonly: true },
@@ -100,15 +100,33 @@ describe("the schema edited as a whole (editSchema)", () => {
     expect((await items()).map((one) => one.values.estimate)).toEqual(["3", "a lot"]);
   });
 
-  it("refuses an edit made of a schema changed since, two properties of one key, and says when nothing changes", async () => {
+  it("refuses two properties of one key, and says when nothing changes", async () => {
+    const { core, store } = setup();
+    const { value, revision } = (await store.database("tasks"))!;
+    const same = value.properties.map((one) => ({ from: one.key, label: one.label, type: one.type, params: one.params, readonly: one.readonly }));
+    expect(await core.editSchema("tasks", { revision, properties: same })).toMatchObject({ cause: "unchanged" });
+    expect(await core.editSchema("tasks", { revision, properties: [...same.slice(0, 2), { ...same[2]!, key: "status" }] })).toMatchObject({ cause: "invalid" });
+  });
+
+  it("leaves an edit made of a database changed since, its conflict given back (offered by the core unless the caller shows it): each document's lines, written over it by force, once", async () => {
     const { core, store, told } = setup();
-    const was = (await store.database("tasks"))!.value.properties;
-    const same = was.map((one) => ({ from: one.key, label: one.label, type: one.type, params: one.params, readonly: one.readonly }));
-    expect(await core.editSchema("tasks", { was, properties: same })).toMatchObject({ cause: "unchanged" });
-    expect(await core.editSchema("tasks", { was, properties: [...same.slice(0, 2), { ...same[2]!, key: "status" }] })).toMatchObject({ cause: "invalid" });
+    const { value, revision } = (await store.database("tasks"))!;
+    const was = value.properties;
+    const edit = { revision, showsConflict: true, properties: was.map((one) => ({ from: one.key, label: one.key === "estimate" ? "Effort" : one.label, type: one.type, params: one.params, readonly: one.readonly })) };
+    // Elsewhere meanwhile: Status renamed
     await core.renameProperty("tasks", "status", "State");
-    expect(await core.editSchema("tasks", { was, properties: same.slice(1) })).toMatchObject({ cause: "invalid" });
-    expect(told.at(-1)).toContain("changed meanwhile");
+    const said = told.length;
+    const left = await core.editSchema("tasks", edit);
+    if (!("problem" in left) || !left.conflict) throw new Error("not left with a conflict");
+    expect([left.cause, told.length]).toEqual(["left", said]);
+    // Its preview: the database's own document (the store in memory: no lines to show, a document planned)
+    const preview = await left.conflict.preview();
+    expect([preview.problem, preview.documents.length]).toEqual([undefined, 1]);
+    // Written over it: the draft's labels, State back to Status
+    expect(await left.conflict.force()).not.toHaveProperty("problem");
+    expect((await store.database("tasks"))!.value.properties.map((one) => one.label)).toEqual(["Status", "Effort", "Created"]);
+    expect(left.conflict.written()).toBe(true);
+    expect(await left.conflict.force()).toMatchObject({ cause: "unchanged" });
   });
 });
 

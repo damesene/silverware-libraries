@@ -1289,8 +1289,8 @@ test("options renamed in Properties rename the items' values in the same write: 
   await names.nth(0).fill("Done");
   await names.nth(1).fill("Todo");
   await page.locator(".swd-properties-save").click();
-  await expect(page.locator(".swd-property-review")).toContainText("1 item: Status: Todo → Done");
-  await expect(page.locator(".swd-property-review")).toContainText("1 item: Status: Done → Todo");
+  await expect(page.locator(".swd-property-review")).toContainText("1 item: Todo → Done");
+  await expect(page.locator(".swd-property-review")).toContainText("1 item: Done → Todo");
   await expect(page.locator(".swd-property-review")).toContainText("Writes 3 pages, one after another");
   // Nothing written until applied
   expect(await space.saved("Page/db-tasks/Fix login")).toContain("status: Todo\n");

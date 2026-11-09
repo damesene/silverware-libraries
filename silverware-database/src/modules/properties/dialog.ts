@@ -15,7 +15,7 @@ import { switchControl } from "../../../../shared/controls.ts";
 import { Dialogs } from "../../../../shared/dialog.ts";
 import { reorder } from "../../../../shared/drag.ts";
 import { el } from "../../../../shared/elements.ts";
-import type { LooseProperty, Proposal, PropertyEdit, Refused, Result, SchemaEdit } from "../../core/core.ts";
+import type { ItemConflict, LooseProperty, Proposal, PropertyEdit, Refused, Result, SchemaEdit } from "../../core/core.ts";
 import { labelOfKey } from "../../domain/loose.ts";
 import type { ModuleHost } from "../../core/module.ts";
 import { colorsOf, OPTION_COLORS, type OptionColor } from "../../domain/types/options.ts";
@@ -106,11 +106,15 @@ export class PropertiesDialog {
   // The picker open under a button of a property's details (its icon's): closed as the dialog is drawn anew
   private pickers: Popovers | undefined;
   private database: Database | undefined;
+  // The database's revision the draft is made of: Save against another is a conflict
+  private revision = "";
   // The draft: every property as edited, in its order (removed ones too, in their places, until Save)
   private entries: Entry[] = [];
   private added = 0;
   // The draft made of properties that changed elsewhere since: Save is refused, said under the list
   private stale = false;
+  // What Save left as the properties changed elsewhere since: shown by Show conflict in the foot, written over them by its Write mine
+  private conflict: ItemConflict | undefined;
   // A change of items proposed (the draft saved, or values outside the database taken off), shown over the properties until
   // applied or put aside
   private proposal: { readonly proposal: Proposal; readonly what: string; readonly saving: boolean } | undefined;
@@ -155,8 +159,10 @@ export class PropertiesDialog {
     if (!read || this.dialogs.isOpen) return this.whenClosed;
     this.whenClosed = new Promise((resolve) => (this.closedNow = resolve));
     this.database = read.value;
+    this.revision = read.revision;
     this.entries = this.entriesOf(read.value);
     this.stale = false;
+    this.conflict = undefined;
     this.proposal = undefined;
     // (Opened anew: on the properties, not on the screen of the keys outside the schema it was closed on)
     this.loose = undefined;
@@ -214,20 +220,30 @@ export class PropertiesDialog {
     this.dialogs.close();
   }
 
-  /** The database as it is now, after a change made elsewhere (another place, an Undo): a draft of no change follows it; one of changes is kept, Save then refused, said */
+  /**
+   * The database as it is now, after a change made elsewhere (another place, an Undo): a draft of no change follows it; one
+   * of changes is kept, made of the database as it was (its revision), Save then a conflict
+   */
   async follow(): Promise<void> {
     if (!this.dialogs.isOpen || this.busy) return;
     const read = await this.host.database(this.id);
     // (Drawn anew only where it changed: the focus and what is typed stay)
-    if (!read || JSON.stringify(read.value) === JSON.stringify(this.database)) return;
+    if (!read || read.revision === this.revision) return;
     if (this.dirty()) {
-      this.stale = JSON.stringify(read.value.properties) !== JSON.stringify(this.database?.properties);
-    } else {
-      this.entries = this.entriesOf(read.value);
-      this.stale = false;
+      this.stale = true;
+      return this.drawFoot();
     }
-    this.database = read.value;
+    this.adopt(read.value, read.revision);
     this.draw();
+  }
+
+  /** The draft made anew of the database as it is (no change in it) */
+  private adopt(database: Database, revision: string): void {
+    this.database = database;
+    this.revision = revision;
+    this.entries = this.entriesOf(database);
+    this.stale = false;
+    this.conflict = undefined;
   }
 
   /** A property as the draft has it: its options and their colors in its params */
@@ -275,7 +291,8 @@ export class PropertiesDialog {
         };
       });
     const removedValues = this.entries.filter((entry) => entry.saved && entry.removed?.values).map((entry) => entry.saved!.key);
-    return { was: this.database?.properties ?? [], properties, ...(removedValues.length ? { removedValues } : {}) };
+    // (A conflict shown in the foot where the host shows one, else offered by the core)
+    return { revision: this.revision, properties, ...(removedValues.length ? { removedValues } : {}), label: `Change the properties of ${this.database?.name ?? this.id}`, showsConflict: !!this.host.showConflict };
   }
 
   /** A change of the draft: drawn anew (the focus kept where it was), the foot told */
@@ -314,7 +331,11 @@ export class PropertiesDialog {
     if (isRefused(result)) {
       // (Nothing to write: closed, as Save of nothing; refused, said: the draft kept, the properties changed meanwhile marked)
       if (result.cause === "unchanged") return this.close();
-      if (result.problem.includes("changed meanwhile")) this.stale = true;
+      // (The properties changed elsewhere since: the conflict offered in the foot, the draft kept)
+      if (result.conflict) {
+        this.stale = true;
+        this.conflict = result.conflict;
+      }
       return this.draw();
     }
     const items = result.plan.planned.some((one) => "item" in one.target);
@@ -342,12 +363,12 @@ export class PropertiesDialog {
     }
     this.changed();
     if (saving && !isRefused(result)) return this.close();
-    // (Values outside the database taken off, or the draft not written: the database read again, the draft kept)
+    // (Values outside the database taken off, or the draft not written: the database read again, the draft kept, made of what
+    // it was made of)
     const read = await this.host.database(this.id);
-    if (read) {
-      if (!this.dirty()) this.entries = this.entriesOf(read.value);
-      this.stale = this.dirty() && JSON.stringify(read.value.properties) !== JSON.stringify(this.database?.properties);
-      this.database = read.value;
+    if (read && read.revision !== this.revision) {
+      if (this.dirty()) this.stale = true;
+      else this.adopt(read.value, read.revision);
     }
     if (this.loose) await this.readLoose();
     this.draw();
@@ -359,7 +380,24 @@ export class PropertiesDialog {
 
   private drawFoot(): void {
     if (this.saveButton) this.saveButton.disabled = this.busy || !!this.proposal || !this.dirty();
-    if (this.note && !this.busy) this.note.textContent = this.stale ? "The properties were changed elsewhere since: Save is refused, Cancel and open them again" : this.dirty() ? "Not saved yet" : "";
+    if (!this.note || this.busy) return;
+    const conflict = this.conflict;
+    if (this.stale && conflict && this.host.showConflict) {
+      const show = el(this.host.document, "button", { class: "swd-properties-conflict", text: "Show conflict", title: "What writing yours over them would change, each page's lines; Write mine there" });
+      show.addEventListener("click", () => this.host.showConflict!(conflict, () => this.conflictDone(conflict)));
+      this.note.replaceChildren("The properties were changed elsewhere since: ", show);
+      return;
+    }
+    this.note.textContent = this.stale ? "The properties were changed elsewhere since: Save writes nothing" : this.dirty() ? "Not saved yet" : "";
+  }
+
+  /** The conflict's Write mine done: written over them, the draft's work is done (closed); not (changed again since), the draft kept, Save offering the new one */
+  private conflictDone(conflict: ItemConflict): void {
+    if (this.conflict !== conflict) return;
+    this.changed();
+    if (conflict.written()) return this.close();
+    this.conflict = undefined;
+    this.draw();
   }
 
   /** The keys outside the schema shown, read now */

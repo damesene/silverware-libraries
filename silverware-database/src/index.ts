@@ -3,7 +3,7 @@
 // block through `render`, tells the index's changes (`indexChanged`) and runs
 // the commands; the API page defines the user's own views and types
 // (`defineViews`, `defineTypes`), before `init`, as Space Lua loads.
-import { openConflict } from "./core/conflictdialog.ts";
+import { type ConflictHost, openConflict } from "./core/conflictdialog.ts";
 import type { ItemConflict } from "./core/core.ts";
 import type { Item } from "./model/database.ts";
 import { type CodeBlock, codeBlocksOf, sameBody } from "../../shared/pages/blocks.ts";
@@ -154,6 +154,14 @@ export function init(bridge: Bridge): void {
             },
           }
         : {}),
+      showConflict: (conflict, done) =>
+        openConflict(
+          conflictHost(platform, () => {
+            redrawAll();
+            done();
+          }),
+          conflict,
+        ),
       ...documentsHost(platformDocuments(platform), core.noun, platform.ui),
       editorArea: () => editorArea(document),
       onEditorAreaChanged: (listener) => watchEditorArea(document, listener),
@@ -199,7 +207,7 @@ function keptParts(): Kept {
     platform.ui.notify(one.problem, {
       type: "error",
       timeout: 0,
-      actions: [{ name: "Show conflict", run: () => openConflict({ document, ...(platform.editor.open ? { open: (name: string) => void platform.editor.open!(name) } : {}), ...(platform.editor.href ? { href: platform.editor.href } : {}), written: redrawAll }, one) }],
+      actions: [{ name: "Show conflict", run: () => openConflict(conflictHost(platform, redrawAll), one) }],
     });
   const core = new DatabaseCore(store, types, { ...ui, conflict }, platform.space.noun, { store: blockPlaces(platform.space, writer), propertyMeta: (view) => views.named(view)?.propertyMeta ?? [] });
   return { platform, store, writer, core, ui, own };
@@ -507,6 +515,16 @@ function tidy(): void {
       if (now - shown.outSince > 10 * KEPT_OUT_MS) app.shown.delete(element);
     }
   }
+}
+
+/** What a conflict's dialog is given: the page's document, a document opened and its address where the platform has them, `written` told once it is done */
+function conflictHost(platform: Platform, written: () => void): ConflictHost {
+  return {
+    document,
+    ...(platform.editor.open ? { open: (name: string) => void platform.editor.open!(name) } : {}),
+    ...(platform.editor.href ? { href: platform.editor.href } : {}),
+    written,
+  };
 }
 
 function redrawAll(): void {

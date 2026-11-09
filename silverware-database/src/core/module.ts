@@ -11,7 +11,7 @@ import type { DocumentsHost } from "./documents.ts";
 import type { Settings, UserInterface } from "../../../shared/platform.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
 import type { Database, Item, Revised } from "../model/database.ts";
-import type { DatabaseCore } from "./core.ts";
+import type { DatabaseCore, ItemConflict } from "./core.ts";
 import { itemIcon, itemLook } from "./look.ts";
 import type { PlaceMenuBuilder, PlaceMenuGroup } from "./placemenu.ts";
 import type { ItemLooks, ViewSetting } from "./view.ts";
@@ -76,6 +76,8 @@ export type ModuleHost = DocumentsHost & {
   openDocument(item: Item): Promise<void>;
   /** The item's document's address (a link to it: a middle click opens it in a tab of the browser's), where the platform has one */
   documentHref?(item: Item): string | undefined;
+  /** A conflict the core gave back shown in its dialog (each document's lines, Write mine, Keep theirs); `done` told once the dialog is done with it, written or not (its `written()`) */
+  showConflict?(conflict: ItemConflict, done: () => void): void;
   /** The editor's area on screen, where a panel beside the document goes (undefined: the window); what the host keeps in it for its own (a toolbar docked at its top) left out */
   editorArea(): DOMRect | undefined;
   /** `listener` told as the editor's area changes (a toolbar docked over it or gone, a sidebar opened); its end given back. None: the window's resize alone */

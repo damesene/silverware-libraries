@@ -1326,6 +1326,20 @@ tr:focus-within .swd-open {
   background: none;
   font: inherit;
   opacity: 0.8;
+  cursor: pointer;
+}
+/* + New (a table's, a list's, a board's column's, a calendar's day): quiet until the pointer is on it, then plainly a
+   button, in the accent's color */
+:is(.swd-table-add, .swd-board-add, .swd-cal-agenda-add) {
+  transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+}
+:is(.swd-table-add, .swd-board-add, .swd-cal-agenda-add):hover,
+:is(.swd-table-add, .swd-board-add, .swd-cal-agenda-add):focus-visible {
+  opacity: 1;
+  border-style: solid;
+  border-color: var(--swd-accent);
+  color: var(--swd-accent);
+  background: color-mix(in srgb, var(--swd-accent) 10%, transparent);
 }
 .swd-table-count {
   font-size: 0.85em;

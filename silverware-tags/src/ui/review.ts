@@ -3,6 +3,7 @@
 // others' lines made as they are opened), the pages left alone and why.
 import { counted } from "../core/operation.ts";
 import type { Plan } from "../core/plan.ts";
+import { diffRuns } from "../../../shared/diffview.ts";
 import { el } from "../../../shared/elements.ts";
 
 // Pages shown open at the start
@@ -26,18 +27,7 @@ export function reviewList(doc: Document, plan: Plan): HTMLElement {
       // Its lines made as it is first opened (hundreds of pages: only those looked at)
       const fill = () => {
         if (diff.childElementCount) return;
-        diff.append(
-          ...change.preview().map((run) =>
-            el(
-              doc,
-              "div",
-              "swg-diff-run",
-              el(doc, "div", { class: "swg-diff-line-number", text: `line ${run.line}` }),
-              ...run.removed.map((line) => el(doc, "div", { class: "swg-diff-removed", text: line || " " })),
-              ...run.added.map((line) => el(doc, "div", { class: "swg-diff-added", text: line || " " })),
-            ),
-          ),
-        );
+        diff.append(...diffRuns(doc, "swg", change.preview()));
       };
       details.addEventListener("toggle", () => details.open && fill());
       if (i < OPEN) {

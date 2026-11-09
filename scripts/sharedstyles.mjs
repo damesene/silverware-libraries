@@ -16,6 +16,13 @@ export const SHARED_STYLES = [
     ],
   },
   {
+    template: "shared/diffview.css",
+    mark: "shared-diff",
+    pages: [
+      { page: "silverware-tags/silverware-tags-style.md", base: "swg" },
+    ],
+  },
+  {
     template: "shared/emoji.css",
     mark: "shared-emoji",
     pages: [

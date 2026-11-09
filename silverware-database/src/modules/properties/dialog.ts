@@ -463,7 +463,7 @@ export class PropertiesDialog {
     const mark = entry.removed ? "Removed" : !entry.saved ? "New" : this.changedEntry(entry) ? "Changed" : undefined;
     head.setAttribute("aria-label", `${property.label}, ${type?.label ?? property.type}${property.required ? ", required" : ""}${property.system ? ", given by the system" : property.readonly ? ", locked in views" : ""}${mark ? `, ${mark.toLowerCase()} (on Save)` : ""}`);
     head.replaceChildren(
-      propertyIcon(doc, property, type?.name ?? "text", "swd-prop-icon"),
+      propertyIcon(doc, property, type, "swd-prop-icon"),
       el(doc, "span", { class: "swd-prop-name", text: property.label || "(no name)" }, ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", title: "Required", attrs: { "aria-hidden": "true" } })] : [])),
       ...(mark ? [el(doc, "span", { class: `swd-prop-mark swd-prop-mark-${mark.toLowerCase()}`, text: mark, title: `${mark}: written on Save` })] : []),
       ...(property.readonly ? [el(doc, "span", { class: "swd-prop-lock", html: LOCK, title: property.system ? "Given by the system" : "Locked in views" })] : []),
@@ -607,7 +607,7 @@ export class PropertiesDialog {
         attrs: { "aria-label": `Icon of ${property.label}`, "aria-haspopup": "dialog", "aria-expanded": "false" },
         run: () => (this.pickers ??= popovers(doc)).open(iconButton, this.body!, "Icon", (box) => emojiChoice(doc, box, "Icon", (emoji) => setIcon(emoji), own ? () => setIcon(undefined) : undefined)),
       },
-      propertyIcon(doc, property, typeOf(types, property)?.name ?? "text", "swd-property-icon-shown"),
+      propertyIcon(doc, property, typeOf(types, property), "swd-property-icon-shown"),
       el(doc, "span", { class: "swd-property-icon-text", text: own ? "Change" : "Its type's: choose an emoji" }),
     );
     // (Not a label: a press on its name would open the picker again as it closes it)
@@ -667,10 +667,12 @@ export class PropertiesDialog {
       field("Name", label),
       iconField,
       field("Type", type),
-      // (Options where its values are picked from them: a select's, a multi-select's, a type of the user's so)
+      // (Options where its values are picked from them: a select's, a type of the user's so)
       ...(this.hasOptions(property.type) ? [this.options(entry)] : []),
+      // (Its type's switches: a select's Multiple)
+      ...this.switches(entry),
       // (A value turned by a press has no empty one to require)
-      ...(types.named(property.type)?.editor === "toggle"
+      ...(typeOf(types, property).editor === "toggle"
         ? []
         : [
             el(
@@ -696,6 +698,28 @@ export class PropertiesDialog {
       ]),
       el(doc, "div", "swd-prop-actions", remove),
     );
+  }
+
+  /** A property's type's switches (a select's Multiple), each a logical param: on, true; off, left out */
+  private switches(entry: Entry): HTMLElement[] {
+    const { document: doc, types } = this.host;
+    const property = this.built(entry);
+    return (types.named(property.type)?.settings ?? []).map((setting) => {
+      const control = switchControl(doc, BASE, property.params[setting.param] === true, (on) =>
+        this.edited(() => {
+          const { [setting.param]: _was, ...rest } = entry.property.params;
+          entry.property = { ...entry.property, params: on ? { ...rest, [setting.param]: true } : rest };
+        }),
+      );
+      control.querySelector("input")?.setAttribute("aria-label", `${property.label}: ${setting.label}`);
+      return el(
+        doc,
+        "label",
+        { class: "swd-prop-field swd-prop-switch-row swd-property-setting", attrs: { "data-param": setting.param } },
+        el(doc, "span", "swd-prop-field-name", setting.label, ...(setting.hint ? [el(doc, "span", { class: `${BASE}-hint`, text: setting.hint })] : [])),
+        control,
+      );
+    });
   }
 
   /**
@@ -907,10 +931,11 @@ export class PropertiesDialog {
         class: "swd-loose-add",
         text: "Add",
         title: `Add ${one.key} as a property: its values shown again once saved`,
-        // (A select or a multi-select taking its values as its options: none refused as it is added)
+        // (A select taking its values as its options, several where they are lists: none refused as it is added)
         run: () =>
           this.edited(() => {
-            const property: Property = { key: one.key, label: labelOfKey(one.key), type: type.value, params: types.named(type.value)?.look === "options" ? { options: [...one.options] } : {}, readonly: false };
+            const guessed = type.value === one.type ? (one.params ?? {}) : {};
+            const property: Property = { key: one.key, label: labelOfKey(one.key), type: type.value, params: types.named(type.value)?.look === "options" ? { ...guessed, options: [...one.options] } : guessed, readonly: false };
             this.entries.push({ id: `new:${++this.added}`, saved: undefined, property, options: this.hasOptions(property.type) ? optionDrafts(property) : undefined });
           }),
       });

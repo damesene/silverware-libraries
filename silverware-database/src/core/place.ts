@@ -88,10 +88,12 @@ function groupingOf(view: ViewDefinition, host: ViewHost): Property | undefined 
   return view.groupBy && view.groupBy.draws ? undefined : groupedBy(view, host);
 }
 
-/** What decides how a view is drawn grouped: the property and its type (changed, the view drawn anew) */
+/** What decides how a view is drawn grouped: the property and its type, its values lists or not (a select's Multiple turned) (changed, the view drawn anew) */
 const groupingKey = (view: ViewDefinition, host: ViewHost) => {
   const property = groupingOf(view, host);
-  return property ? `${property.key}\u0000${host.type(property).name}` : "";
+  if (!property) return "";
+  const type = host.type(property);
+  return `${property.key}\u0000${type.name}\u0000${type.lists === true}`;
 };
 
 // Where each database's view is scrolled, kept as it scrolls: each box the user scrolled (the place's body, any box the

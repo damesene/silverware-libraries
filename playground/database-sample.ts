@@ -11,7 +11,7 @@ export const SAMPLE_DATABASES: readonly MemorySeed[] = [
         { key: "status", label: "Status", type: "select", params: { options: ["Todo", "Doing", "Done"] }, readonly: false },
         { key: "due", label: "Due", type: "date", params: {}, readonly: false },
         { key: "estimate", label: "Estimate", type: "number", params: {}, readonly: false },
-        { key: "tags", label: "Tags", type: "multi-select", params: { options: ["backend", "docs", "ui"] }, readonly: false },
+        { key: "tags", label: "Tags", type: "select", params: { multiple: true, options: ["backend", "docs", "ui"] }, readonly: false },
         { key: "done", label: "Done", type: "checkbox", params: {}, readonly: false },
         { key: "link", label: "Link", type: "url", params: {}, readonly: false },
       ],

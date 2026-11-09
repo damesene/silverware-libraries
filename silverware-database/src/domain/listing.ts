@@ -23,11 +23,11 @@ export function validateCondition(condition: string): string | undefined {
   return parseFilter(condition).error;
 }
 
-/** A property's type, the text type for one not defined now (its values shown as kept) */
+/** A property's type for its params (a select of several options its own), the text type for one not defined now (its values shown as kept) */
 export function typeOf(types: TypeRegistry, property: Property): PropertyType {
   // (A system property's its kind's: domain/system.ts)
   const own = property.system === undefined ? undefined : systemType(property.system);
-  return types.named(own ?? property.type) ?? types.named("text")!;
+  return types.of(own ?? property.type, property.params) ?? types.named("text")!;
 }
 
 /** An item's value of a property as text, as it shows: the name for `name`, nothing for a property it lacks */

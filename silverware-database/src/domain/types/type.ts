@@ -13,6 +13,9 @@ export function keptText(value: Value): string {
   return Array.isArray(value) ? value.join(", ") : String(value);
 }
 
+/** A setting of a type that is a switch: the param it sets (true, or left out), its label and hint as offered */
+export type TypeSwitch = { readonly param: string; readonly label: string; readonly hint?: string };
+
 /** A text typed made a value, or why it cannot be one */
 export type Parsed = { readonly value: Value } | { readonly problem: string };
 
@@ -23,6 +26,17 @@ export interface PropertyType {
   readonly label: string;
   /** False where it is not offered for a property of the user's (a system property's own: a share done) */
   readonly offered?: boolean;
+  /**
+   * Where its shape follows its params (a select's `multiple`: one option, or a
+   * list of them): the type for those params, of its name, whatever else it
+   * says. Asked by the registry's `of`, so the views, editors and the core get
+   * the type a property's params make, never knowing which param does it
+   */
+  forParams?(params: Params): PropertyType;
+  /** Its settings that are switches, each a logical param (true where on; off: left out), offered with the property (a select's Multiple) */
+  readonly settings?: readonly TypeSwitch[];
+  /** The icon the views draw for it, where not its name's (a select of several options its own) */
+  readonly icon?: string;
   /** True where its values are lists (a multi-select's options, references): grouped by it, an item is in the group of each */
   readonly lists?: boolean;
   /**

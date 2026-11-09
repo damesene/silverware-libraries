@@ -187,7 +187,7 @@ describe("the table grouped, its edges", () => {
   });
 
   it("puts the focus back on a row moved by Alt+arrows in its own group, an item in several groups having a row in each", async () => {
-    const tagged: Database = { ...TASKS, properties: [...TASKS.properties, { key: "tags", label: "Tags", type: "multi-select", params: { options: ["a", "b"] }, readonly: false }] };
+    const tagged: Database = { ...TASKS, properties: [...TASKS.properties, { key: "tags", label: "Tags", type: "select", params: { multiple: true, options: ["a", "b"] }, readonly: false }] };
     const { all, store } = await setup("table", { "table.groupBy": "tags" }, tagged);
     const keys = (await store.items("tasks")).value.map((one) => one.key);
     for (const key of keys.slice(0, 2)) store.changeOutside("tasks", key, { values: { tags: ["a", "b"] } });
@@ -294,7 +294,7 @@ describe("the board", () => {
   });
 
   it("groups by any property: a column per value, a card dragged setting that column's value, a multi-select's one value replaced", async () => {
-    const tagged: Database = { ...TASKS, properties: [...TASKS.properties, { key: "tags", label: "Tags", type: "multi-select", params: { options: ["web", "api", "ops"] }, readonly: false }] };
+    const tagged: Database = { ...TASKS, properties: [...TASKS.properties, { key: "tags", label: "Tags", type: "select", params: { multiple: true, options: ["web", "api", "ops"] }, readonly: false }] };
     const drag = (card: Element, onto: Element) => {
       card.dispatchEvent(new Event("dragstart"));
       onto.dispatchEvent(new MouseEvent("dragover", { bubbles: true, cancelable: true, clientY: 1000 }));

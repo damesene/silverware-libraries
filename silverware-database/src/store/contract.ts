@@ -280,7 +280,7 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
     it("renames options in the schema and the items' values in one transaction, swapped and in a list's order, undone whole", async () => {
       const { store } = make(SEED);
       const [fix, docs] = [await keyOf(store, "Fix login"), await keyOf(store, "Write docs")];
-      const labels = { key: "labels", label: "Labels", type: "multi-select", params: { options: ["c", "a", "b"] }, readonly: false };
+      const labels = { key: "labels", label: "Labels", type: "select", params: { multiple: true, options: ["c", "a", "b"] }, readonly: false };
       await store.apply(await store.plan(changes("tasks", { kind: "setSchema", properties: [...TASKS.properties, labels] }, { kind: "setValue", item: fix, key: "labels", value: ["c", "a", "b"] })));
       const items = (await store.items("tasks")).value;
       const revisions = Object.fromEntries(items.map((item) => [item.key, item.revision]));

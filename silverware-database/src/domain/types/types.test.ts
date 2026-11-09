@@ -5,6 +5,7 @@ import type { PropertyType } from "./type.ts";
 
 const types = new TypeRegistry();
 const type = (name: string) => types.named(name)!;
+const several = types.of("select", { multiple: true })!;
 
 describe("property keys", () => {
   it("are what Space Lua reads bare: lower case letters, digits and _, starting with a letter", () => {
@@ -18,7 +19,7 @@ describe("property keys", () => {
 
 describe("the built-in types", () => {
   it("are in their order, a day, a time and both side by side; tags and progress, the system properties' own, offered for no property of the user's", () => {
-    expect(types.all().map((one) => one.name)).toEqual(["text", "number", "checkbox", "date", "time", "datetime", "select", "multi-select", "url", "reference", "tags", "progress"]);
+    expect(types.all().map((one) => one.name)).toEqual(["text", "number", "checkbox", "date", "time", "datetime", "select", "url", "reference", "tags", "progress"]);
     expect(types.all().filter((one) => one.offered === false).map((one) => one.name)).toEqual(["tags", "progress"]);
     // (Tags: labels, no options to check them against; a list of texts)
     const tags = type("tags");
@@ -35,7 +36,7 @@ describe("the built-in types", () => {
     expect(moment.parse("2026-11-08T14:30", {})).toEqual({ value: "2026-11-08T14:30" });
     expect(moment.parse("2026-02-30 10:00", {})).toHaveProperty("problem");
     expect([type("date").editor, time.editor, moment.editor, type("url").editor]).toEqual(["date", "time", "datetime-local", "link"]);
-    expect([type("select").look, type("multi-select").look, type("progress").look, type("url").look]).toEqual(["options", "options", "share", "link"]);
+    expect([type("select").look, several.look, type("progress").look, type("url").look]).toEqual(["options", "options", "share", "link"]);
     // (A checkbox by its kinds too: turned by a press, drawn as a box; the views know no type by name)
     expect([type("checkbox").editor, type("checkbox").look]).toEqual(["toggle", "check"]);
   });
@@ -110,7 +111,7 @@ describe("the built-in types", () => {
     expect(type("checkbox").parse("maybe", {})).toHaveProperty("problem");
     expect(type("date").parse("2026-11-10", {})).toEqual({ value: "2026-11-10" });
     expect(type("date").parse("2026-02-30", {})).toHaveProperty("problem");
-    expect(type("multi-select").parse("a, b, a,", {})).toEqual({ value: ["a", "b"] });
+    expect(several.parse("a, b, a,", {})).toEqual({ value: ["a", "b"] });
     expect(type("url").parse("https://silverbullet.md", {})).toEqual({ value: "https://silverbullet.md" });
     expect(type("url").parse("javascript:alert(1)", {})).toHaveProperty("problem");
   });
@@ -119,7 +120,7 @@ describe("the built-in types", () => {
     const options = { options: ["Todo", "Doing", "Done"] };
     expect(type("select").validate("Doing", options)).toBeUndefined();
     expect(type("select").validate("Later", options)).toBe('"Later" is none of its options');
-    expect(type("multi-select").validate(["Todo", "X", "Y"], options)).toBe('"X", "Y" are none of its options');
+    expect(several.validate(["Todo", "X", "Y"], options)).toBe('"X", "Y" are none of its options');
     expect(type("number").validate("12", {})).toBe("no number");
     for (const one of types.all()) expect(one.validate(null, options), one.name).toBeUndefined();
   });
@@ -128,7 +129,7 @@ describe("the built-in types", () => {
     const options = { options: ["Todo", "Doing", "Done"] };
     const order = ["Done", "Later", "Todo", "Doing"].sort((a, b) => type("select").sortKey!(a, options).localeCompare(type("select").sortKey!(b, options)));
     expect(order).toEqual(["Todo", "Doing", "Done", "Later"]);
-    expect(type("multi-select").text(["a", "b"], {})).toBe("a, b");
+    expect(several.text(["a", "b"], {})).toBe("a, b");
     expect(type("checkbox").text(true, {})).toBe("true");
   });
 
@@ -140,7 +141,7 @@ describe("the built-in types", () => {
     expect(type("number").text("12 pcs", {})).toBe("12 pcs");
     expect(type("text").text(2026, {})).toBe("2026");
     expect(type("date").text("soon", {})).toBe("soon");
-    expect(type("multi-select").text(["a", "b"], {})).toBe("a, b");
+    expect(several.text(["a", "b"], {})).toBe("a, b");
   });
 
   it("refuse what reads two ways or would be lost in typing", () => {
@@ -148,8 +149,8 @@ describe("the built-in types", () => {
     expect(type("number").parse("1,5", {})).toEqual({ value: 1.5 });
     expect(type("url").parse("www.example.com", {})).toEqual({ value: "https://www.example.com" });
     expect(type("url").parse("https:foo", {})).toHaveProperty("problem");
-    expect(type("multi-select").validate(["a", "a"], { options: ["a"] })).toBe("an option twice");
-    expect(type("multi-select").validateParams!({ options: ["a, b"] })).toBeDefined();
+    expect(several.validate(["a", "a"], { options: ["a"] })).toBe("an option twice");
+    expect(several.validateParams!({ multiple: true, options: ["a, b"] })).toBeDefined();
     expect(type("select").validateParams!({ options: ["a, b"] })).toBeUndefined();
   });
 
@@ -166,7 +167,7 @@ describe("the registry", () => {
     const mine: PropertyType = { name: "date", label: "My date", validate: () => undefined, text: String, parse: (text) => ({ value: text }) };
     const stars: PropertyType = { name: "stars", label: "Stars", validate: () => undefined, text: String, parse: (text) => ({ value: text }) };
     registry.define([stars, mine]);
-    expect(registry.all().map((one) => one.label)).toEqual(["Text", "Number", "Checkbox", "My date", "Time", "Date & time", "Select", "Multi-select", "URL", "Reference", "Tags", "Progress", "Stars"]);
+    expect(registry.all().map((one) => one.label)).toEqual(["Text", "Number", "Checkbox", "My date", "Time", "Date & time", "Select", "URL", "Reference", "Tags", "Progress", "Stars"]);
     registry.define([]);
     expect(registry.named("date")!.label).toBe("Date");
     expect(registry.named("stars")).toBeUndefined();

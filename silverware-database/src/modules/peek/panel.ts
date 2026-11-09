@@ -604,7 +604,7 @@ export class PeekPanel {
     } else value.classList.add("swd-peek-readonly");
     // Its name: opens it in Properties (its name, type, options, required, hidden, removed) where that module is on
     const properties = this.host.offered<PropertiesOffer>("properties");
-    const labelParts = [propertyIcon(doc, property, editor.type(property).name, "swd-peek-type"), el(doc, "span", { text: property.label }), ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", attrs: { "aria-hidden": "true" } })] : [])];
+    const labelParts = [propertyIcon(doc, property, editor.type(property), "swd-peek-type"), el(doc, "span", { text: property.label }), ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", attrs: { "aria-hidden": "true" } })] : [])];
     const label = properties
       ? el(
           doc,

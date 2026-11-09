@@ -254,6 +254,29 @@ describe("the properties' dialog", () => {
     expect((await schema())[0]!.readonly).toBe(true);
   });
 
+  it("turns a select's Multiple on, its values made lists of their option on Save, and off again: the switch a select's alone", async () => {
+    const { open, q, schema, named } = await setup();
+    await open();
+    expand("estimate");
+    expect(document.querySelector('[data-property="estimate"] .swd-property-setting')).toBeNull();
+    expand("status");
+    const multiple = () => q<HTMLInputElement>('[data-property="status"] .swd-property-setting[data-param="multiple"] input');
+    expect(multiple().checked).toBe(false);
+    multiple().click();
+    expect([multiple().checked, marks().status]).toEqual([true, "Changed"]);
+    await save();
+    await apply();
+    expect((await schema())[0]!.params).toEqual({ options: ["Todo", "Done"], multiple: true });
+    expect((await named("Fix login")).values.status).toEqual(["Todo"]);
+    await open();
+    expand("status");
+    multiple().click();
+    await save();
+    await apply();
+    expect((await schema())[0]!.params).toEqual({ options: ["Todo", "Done"] });
+    expect((await named("Fix login")).values.status).toBe("Todo");
+  });
+
   it("offers no Required for a checkbox: unticked is its value", async () => {
     const { open, q, core } = await setup();
     await core.addProperty("tasks", { label: "Done", type: "checkbox" });

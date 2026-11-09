@@ -1178,7 +1178,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   cursor: text;
 }
 /* A cell being edited keeps its size: what it showed stays under the editor, hidden (table.ts), and the editor lies over
-   it on its first line, adding nothing to the row's height nor the column's width; the multi-select's list of boxes
+   it on its first line, adding nothing to the row's height nor the column's width; a multiple select's list of boxes
    opens under it as everywhere */
 .swd-editing-held {
   visibility: hidden;

@@ -490,6 +490,29 @@ items to pages in the frontmatter as wiki links, which SilverBullet's rename fol
 only a relation gives is **its other side shown in the database's views** (a project listing its tasks, made of the links
 to it, nothing written into the project). So they stay last, perhaps never; to be asked again when a user misses that side.
 
+### The place's bar, a row's Open, a table's rows (2026-11-09, the user's choices)
+
+* **The bar**: the database's name and count at its left, quiet and smaller (a note, not a heading: a heading is the page's
+  own, written in its markdown), then the view's picker, the tools at its end. Tried and set aside: a slash, a dot and a
+  line between them (each read as more than it said); the look alone tells them apart. The picker a little quieter (weight
+  500, 0.95em). Narrow (a phone), the name gives way first, down to its first letters and the count (`min-width: 7ch`);
+  the picker's shrink so small (0.00001) that it gives none until the name can give no more, as a flex box shares what the
+  bar lacks by each item's shrink and size (with 1 the picker's label lost a quarter of a pixel, and its ellipsis showed).
+* **No "colored by …"** in the bar: Color by is a setting of the view, seen in ⋯, not a note to keep in view.
+* **A table row's Open**, as Notion's after two tries (a chip saying "↗ Open" after the name widened the name's column; a ↗
+  right after the name was far from where Notion has it, the user found): a page's icon (`VIEW_ICONS.item`: not Notion's
+  icon of a side panel) at the right end of the name's cell, in the middle of its height, laid over the name (opaque),
+  with "Open" where the cell has room. The cell cannot be the container a query measures (inline-size containment takes
+  its content out of the table's sizing), so the button is in a box laid over the whole cell (`swd-open-room`, absolute,
+  `container-type: inline-size`, taking no presses but the button's). On a touch screen the box is `display: contents`:
+  the icon right after the name, quiet, with room for a finger.
+* **A table's rows of one height**: a value's pill fits a line of the text around it (line height 1.5, no margin above or
+  below, aligned to the line's top); on the baseline its smaller font's box sat lower, and a row with a pill was 5 to 8px
+  taller than one without.
+* **A value saved by a press on another cell** (the user's report): written, but not shown until that cell's editor closed,
+  as the table holds its drawing while a cell is edited. The cell now shows the item with the value written at once
+  (`editValue`'s `show(written)`), as it was again where the write is refused.
+
 ### Properties shown per view, and the view's look (2026-11-09, decided with the user)
 
 What a view shows is its own, as Notion has it, no longer the schema's: `<view>.hiddenProperties` in its block (the keys it hides, so a property added shows everywhere), kept and handed over by the core as the other states of a view are; **Visible properties** in ⋯ (core/propertiesmenu.ts, named apart from the schema's **Properties**, as Group's list: an eye each, Hide all / Show all, the menu staying open through a write of the block). The schema's `hidden` went with its eye in Properties, `setPropertyHidden` and the peek's *Hidden in views* (the peek shows every property); nobody used a database yet, so nothing is migrated. A view says `properties: false` where it shows no property beside the name, `properties: { hiddenByDefault: true }` where none shows until the user shows it (the calendar, a line each under an item's name; the timeline, after its bar, a part of the bar laid past its end by the style page so it goes with a drag: the user's wish the same day): the core keeps those shown for it (`<view>.shownProperties`), so a property added stays hidden there, the views reading `shownProperties` alone either way. The host's look in one section, `host.look` (`ViewLook`): `shownProperties`, `hiddenProperties` / `setHiddenProperties`, `colorBy` / `setColorBy` (out of `listing`, which says which items in what order), and `icon(item)`, `item(item, element)` (were `host.itemIcon`, `host.itemLook`); a module's host has `look` too (`ItemLooks`: `icon`, `item`). A key changed follows into `hiddenProperties` and `shownProperties` (`placeStateRenamed`). **Apply to all views** (decided with the user the same day: in the block alone, not across pages), at the end of Visible properties, Group and Color by: a part of this view's look given to every other view on in the place, as each keeps it and where it takes it (core/applyall.ts, pure: `appliedToViews`, by the views' definitions: `properties`, `colors`, `groupBy`'s types), written in one write of the block, the views left named with why (a view always grouped, a board, given None keeps its own); offered disabled with why where no other view takes it; the views know nothing of it. How a place keeps a view's state (the keys, a list kept only where it is not empty, those shown or hidden) is one module's, core/statekeys.ts, which the place's host, Apply to all views and a key's change followed (`placeStateRenamed`) share.

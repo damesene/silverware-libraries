@@ -45,7 +45,7 @@ export function settledIndex(query: (tag: string) => Promise<readonly IndexedObj
     lastSettled.set(tag, found);
     return found;
   };
-  return {
+  const index: SettledIndex = {
     async objects(tag) {
       const kept = lastSettled.get(tag);
       const found = kept && idle && !(await idle()) ? kept : await read(tag);
@@ -61,17 +61,23 @@ export function settledIndex(query: (tag: string) => Promise<readonly IndexedObj
       }
       deleted.delete(change.document);
       // (Indexed anew: whole once its queue is empty, or at once where its queue is not known)
-      if (idle) pending.set(change.document, change);
-      else tell({ document: change.document, deleted: false });
+      if (!idle) return tell({ document: change.document, deleted: false });
+      pending.set(change.document, change);
+      // (Told after its queue emptied, or with no queue at all: no emptying to come for it, so told whole now where the queue
+      // is empty; a queue still busy tells it as it empties)
+      void index.settled();
     },
     async settled() {
       if (!pending.size) return;
       // (The readings read anew while the queue is still empty: else a reader told now would get one of before)
       if (idle && !(await idle())) return;
+      // (Another call told them meanwhile)
+      if (!pending.size) return;
       const changes = [...pending.values()];
       pending.clear();
       for (const tag of [...lastSettled.keys()]) await read(tag);
       for (const change of changes) tell({ document: change.document, deleted: false });
     },
   };
+  return index;
 }

@@ -74,6 +74,18 @@ describe("SilverBullet's index, read only whole", () => {
     expect(await index.objects("db")).toEqual(objects);
   });
 
+  it("tells a change told after its queue emptied whole without waiting for another emptying", async () => {
+    let objects: IndexedObject[] = [{ name: "A", tags: ["db"] }];
+    const { list, tell } = told();
+    const index = settledIndex(async () => objects, async () => true, tell);
+    await index.objects("db");
+    objects = [{ name: "A", tags: ["db"], changed: true }];
+    index.changed({ document: "A", deleted: false });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(list).toEqual(["A early", "A"]);
+    expect(await index.objects("db")).toEqual(objects);
+  });
+
   it("reads the index as it is the first time a tag is asked for, whole or not (nothing read before to answer with)", async () => {
     const index = settledIndex(async (tag) => [{ name: `page of ${tag}`, tags: [tag] }], async () => false, () => {});
     expect((await index.objects("db")).map((one) => one.name)).toEqual(["page of db"]);

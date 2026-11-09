@@ -16,7 +16,7 @@
 import { el } from "../../../../shared/elements.ts";
 import type { Result } from "../../core/core.ts";
 import type { ModuleHost } from "../../core/module.ts";
-import { type ItemPart, ItemWrites } from "../../domain/ownwrites.ts";
+import { samePart } from "../../domain/itempart.ts";
 import { textOf, typeOf } from "../../domain/listing.ts";
 import type { Database, Item, ItemLook, Property, Value } from "../../model/database.ts";
 import { type EditorHost, editValue, toggle } from "../../views/editors.ts";
@@ -40,6 +40,12 @@ const GRIP = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><c
 
 const isRefused = (result: Result): result is Extract<Result, { problem: string }> => "problem" in result;
 
+/** An item with a value set (undefined: taken off), as the panel shows it once it wrote it */
+function withValue(item: Item, key: string, value: Value | undefined): Item {
+  const { [key]: _gone, ...others } = item.values;
+  return { ...item, values: value === undefined ? others : { ...others, [key]: value } };
+}
+
 type Shown = {
   readonly database: string;
   schema: Database;
@@ -47,9 +53,6 @@ type Shown = {
   item: Item;
   // The item as last read: what the body is written to (its own check is `was`)
   latest: Item;
-  // The panel's own writes of the item (a value, the name, the look), one after another, each on the item as those before
-  // it left it while the panel's drawing is put off (domain/ownwrites.ts)
-  readonly writes: ItemWrites;
   // The body as read as the panel opened or last wrote it, what a write is checked against; undefined until read
   body: { readonly was: string | undefined } | undefined;
   // A change made elsewhere while something in the panel was edited: drawn anew once nothing is
@@ -83,6 +86,8 @@ export class PeekPanel {
   private writing: Promise<void> = Promise.resolve();
   // Writes of a value or the name going on (their editors left): waited for with the body's before the item is removed
   private readonly edits = new Set<Promise<unknown>>();
+  // The panel's own writes of its item, one after another: each from the item as the one before it left the panel (`own`)
+  private queue: Promise<unknown> = Promise.resolve();
   // The item being removed (asked, written): a second press of the bin meanwhile asks nothing
   private removing = false;
   // A question asked of the user: presses meanwhile are theirs, not beside the panel
@@ -110,8 +115,7 @@ export class PeekPanel {
     if (!(await this.leave())) return;
     const read = await this.host.database(database);
     if (!read) return;
-    const writes = new ItemWrites(async (key) => (await this.host.items(database)).find((one) => one.key === key));
-    this.shown = { database, schema: read.value, item, latest: item, writes, body: undefined, stale: false, opener };
+    this.shown = { database, schema: read.value, item, latest: item, body: undefined, stale: false, opener };
     if (!this.element) this.open();
     this.draw();
     void this.readBody();
@@ -325,7 +329,7 @@ export class PeekPanel {
     if (active.closest(".swd-editor") || active.matches(".swd-peek-body")) return true;
     // (The name focused as the panel opens is not edited until it differs)
     const shown = this.shown;
-    return active instanceof HTMLInputElement && active.matches(".swd-peek-name") && !!shown && active.value !== shown.writes.base(shown.item).name;
+    return active instanceof HTMLInputElement && active.matches(".swd-peek-name") && !!shown && active.value !== shown.item.name;
   }
 
   /**
@@ -343,18 +347,12 @@ export class PeekPanel {
       // A value or the name being written as its editor was left: done first, so the item removed is the one they wrote
       await Promise.allSettled([...this.edits]);
       if (this.shown !== shown) return;
-      // Against the item as read right now (as the body's write is): a change made meanwhile is no reason to refuse it
-      try {
-        const now = (await this.host.items(shown.database)).find((one) => one.key === shown.latest.key);
-        if (now) shown.latest = now;
-      } catch {
-        // (Not read: the item as last read, the store's checks deciding)
-      }
       // (The core's question: presses meanwhile are the user's answer, not beside the panel)
       this.asking = true;
       let done: Result;
       try {
-        done = await this.host.core.remove(shown.database, [shown.latest]);
+        // As shown (its own writes taken on, `own`): removed only where what it loses is still so, as from a view
+        done = await this.host.core.remove(shown.database, [shown.item]);
       } finally {
         this.asking = false;
       }
@@ -380,9 +378,9 @@ export class PeekPanel {
       },
       type: (property) => typeOf(types, property),
       text: (item, key) => textOf(item, key, shown.schema, types),
-      // (On the item as the panel's own last write left it, where the editor's is the panel's)
-      update: (item: Item, key: string, value: Value | undefined) => this.own(shown, { key }, (base) => core.update(shown.database, base.key === item.key ? base : item, key, value)),
-      rename: (item: Item, name: string) => this.own(shown, "name", (base) => core.rename(shown.database, base.key === item.key ? base : item, name)),
+      // (Its editors edit the item shown: written from the item the panel writes against then, `own`)
+      update: (_item: Item, key: string, value: Value | undefined) => this.own(shown, (one) => withValue(one, key, value), (base) => core.update(shown.database, base, key, value)),
+      rename: (_item: Item, name: string) => this.own(shown, (one) => ({ ...one, name: name.trim() }), (base) => core.rename(shown.database, base, name)),
       notify: (text) => ui.notify(text, { type: "error" }),
       documents: () => this.host.documents(),
       validateDocumentName: (name) => this.host.validateDocumentName(name),
@@ -619,37 +617,37 @@ export class PeekPanel {
 
   private async rename(shown: Shown, field: HTMLInputElement): Promise<void> {
     const name = field.value.trim();
-    const was = shown.writes.base(shown.item).name;
-    if (!name || name === was) {
-      field.value = was;
+    // (Empty: the name as shown again. Any other written, the core telling the same name as it is now: one typed back while
+    // a rename is written is never dropped)
+    if (!name) {
+      field.value = shown.item.name;
       return;
     }
-    const result = await this.own(shown, "name", async (base) => {
-      // Against the item as read now, once the writes before it are done (a value changed elsewhere meanwhile is no reason
-      // to refuse it); refused where its name changed elsewhere since it was shown
-      if (shown.latest.name !== base.name) {
-        const problem = `"${base.name}" was renamed "${shown.latest.name}" elsewhere meanwhile: not renamed`;
-        this.host.ui.notify(problem, { type: "error" });
-        return { problem, cause: "left" };
-      }
-      return this.host.core.rename(shown.database, shown.latest, name);
-    });
+    // (Against the item as drawn: the core writes the name on the item as it is now where its name is still as drawn)
+    const result = await this.own(shown, (one) => ({ ...one, name }), (base) => this.host.core.rename(shown.database, base, name));
     // Refused (said to the user): the name as it is
     if (isRefused(result) && this.shown === shown && field.isConnected) field.value = shown.latest.name;
   }
 
   /**
-   * One of the panel's own writes of its item (`part` what it writes), after those before it, `write` given the item it
-   * goes on (domain/ownwrites.ts) for checks of its own; the places and the panel follow it. Kept while it goes on (the
-   * item's removal waits for it)
+   * One of the panel's own writes of its item, after the one before it, `write` given the item the panel writes against
+   * (the core writes it on the item as it is now where the part written is still as given: core.ts `onItem`); the places
+   * and the panel follow it, and it is kept while it goes on (the item's removal waits for it). Written while the panel's
+   * drawing is put off (another field being edited), the panel shows what it wrote (`shows`: the item with it): where the
+   * item as it is now is just that, it is what the panel writes against next, so a second change of the same field and a
+   * name typed back go on what the panel shows; anything else of it changed meanwhile, the item as drawn stays, checked
    */
-  private own(shown: Shown, part: ItemPart, write: (base: Item) => Promise<Result>): Promise<Result> {
-    const result = shown.writes.write(shown.item, part, async (base) => {
+  private own(shown: Shown, shows: (item: Item) => Item, write: (base: Item) => Promise<Result>): Promise<Result> {
+    const result = this.queue.then(async () => {
+      const base = shown.item;
       const done = await write(base);
       this.host.refreshPlaces(shown.database);
       await this.follow();
+      const all = { allValues: true, name: true, look: true };
+      if (!isRefused(done) && this.shown === shown && shown.item === base && shown.item !== shown.latest && samePart(shown.latest, shows(base), all, shown.schema)) shown.item = shown.latest;
       return done;
     });
+    this.queue = result.catch(() => undefined);
     const going = result.finally(() => this.edits.delete(going));
     this.edits.add(going);
     return result;
@@ -658,14 +656,8 @@ export class PeekPanel {
   /** The item's look written (its icon, its color), against the item as drawn; the panel drawn anew, the button focused again */
   private async writeLook(shown: Shown, look: ItemLook, refocus: string): Promise<void> {
     try {
-      // Against the item as read now (a value changed elsewhere is no reason to refuse it); refused where its look changed
-      // elsewhere since it was shown
-      await this.own(shown, "look", async (base) => {
-        if (JSON.stringify(shown.latest.look ?? {}) === JSON.stringify(base.look ?? {})) return this.host.core.setLook(shown.database, shown.latest, look);
-        const problem = `The look of "${base.name}" was changed elsewhere meanwhile: not changed`;
-        this.host.ui.notify(problem, { type: "error" });
-        return { problem, cause: "left" };
-      });
+      // (Against the item as drawn: the core writes the look on the item as it is now where its look is still as drawn)
+      await this.own(shown, (one) => ({ ...one, look }), (base) => this.host.core.setLook(shown.database, base, look));
       if (this.shown === shown) this.refocus(refocus);
     } catch (error) {
       this.host.ui.notify(`Silverware Database: ${error instanceof Error ? error.message : String(error)}`, { type: "error" });
@@ -719,15 +711,9 @@ export class PeekPanel {
         return { problem: error instanceof Error ? error.message : String(error), cause: "invalid" };
       }
     };
-    // Against the item as read right now: a value changed elsewhere since the panel read it is no reason to leave the
-    // body (its own check, `was`, still leaves a body changed elsewhere)
-    try {
-      const now = (await this.host.items(shown.database)).find((one) => one.key === shown.latest.key);
-      if (now) shown.latest = now;
-    } catch {
-      // (Not read: the item as last read, the store's checks deciding)
-    }
-    const result = await write(shown.latest);
+    // (The core writes it on the item as it is now: a value changed elsewhere since is no reason to leave the body, its own
+    // check, `was`, still leaving a body changed elsewhere)
+    const result = await write(shown.item);
     if (isRefused(result)) {
       if (result.cause === "unchanged") return;
       // Not written (changed since it was read, or refused): what was typed stays in its field, never replaced unasked

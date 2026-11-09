@@ -11,6 +11,7 @@
 // a value that does not read as a property's new type is kept as read, a key
 // that items still hold values under (a property removed) is not taken over,
 // and every transaction is undone by `undo`.
+import { type ItemPart, samePart } from "../domain/itempart.ts";
 import { guessedType, optionsOfValues } from "../domain/loose.ts";
 import { systemKind } from "../domain/system.ts";
 import { sameLook, validateIcon, validateLook } from "../domain/look.ts";
@@ -129,6 +130,19 @@ function validateParamNames(label: string, params: Params): string | undefined {
   return taken === undefined ? undefined : `${label}: a setting cannot be called "${taken}", the name of a property's own field`;
 }
 
+/** A database as the core reads it for a write: its record and its items, each with its revision */
+type DatabaseRead = { readonly database: Revised<Database>; readonly items: Revised<readonly Item[]> };
+
+/**
+ * An item as a view showed it (`given`), as it is now (`now`, by key) where `part` of it is still as shown (core.ts
+ * `onItem`); `changed` where that part changed since; as shown where it is gone (the store says so)
+ */
+function currentOf(now: ReadonlyMap<ItemKey, Item>, given: Item, part: ItemPart, database: Database): Item | "changed" {
+  const current = now.get(given.key);
+  if (!current) return given;
+  return samePart(current, given, part, database) ? current : "changed";
+}
+
 /** The items' own revisions (not what the system gives them, a date that moves): what a proposal written whole is checked against */
 const itemsRevision = (items: readonly Item[]) => items.map((one) => `${one.key}:${one.revision}`).join(",");
 
@@ -142,6 +156,10 @@ export class DatabaseCore {
   readonly history: TransactionHistory;
   // A proposal or an undo being written (`apply`, `undo`): one at a time, as either may write thousands of pages
   private writing = false;
+  // Writes of items, by database: those of an item (by its key) one after another, so one reads the item only once the
+  // one before it is written; and those that may rank any item (a move, an item made: `all`), after every item's going
+  // on and before any item's to come. Registered as they are asked for, nothing read first, so they keep that order
+  private readonly itemWrites = new Map<string, { all: Promise<unknown> | undefined; readonly items: Map<ItemKey, Promise<unknown>> }>();
 
   constructor(
     private readonly store: DatabaseStore,
@@ -157,111 +175,192 @@ export class DatabaseCore {
 
   // Items
 
-  /** A property's value of an item as read (undefined: taken off the item) */
-  async update(database: string, item: Item, key: string, value: Value | undefined): Promise<Result> {
-    const read = await this.store.database(database);
-    if (!read) return this.refuse(`No database "${database}"`);
-    const property = writable(read.value, key);
-    if (typeof property === "string") return this.refuse(property);
-    if (value !== undefined && !isValue(value)) return this.refuse(notValue(property.label));
-    if (property.required && (value === undefined || isEmpty(value)) && !isEmpty(item.values[key])) return this.refuse(`${property.label} is required: not emptied`);
-    const changes = databaseChanges(database).item(item, (i) => (value === undefined ? i.unset(key) : i.set(key, value)));
-    return this.write(changes.build(), `Set ${property.label} of ${item.name}`);
+  /** A property's value of an item as read (undefined: taken off the item); see `onItem` */
+  async update(database: string, given: Item, key: string, value: Value | undefined): Promise<Result> {
+    return this.onItem(database, given, { values: [key] }, (item, read) => {
+      const property = writable(read.database.value, key);
+      if (typeof property === "string") return this.refuse(property);
+      if (value !== undefined && !isValue(value)) return this.refuse(notValue(property.label));
+      if (property.required && (value === undefined || isEmpty(value)) && !isEmpty(item.values[key])) return this.refuse(`${property.label} is required: not emptied`);
+      const changes = databaseChanges(database).item(item, (i) => (value === undefined ? i.unset(key) : i.set(key, value)));
+      return this.write(changes.build(), `Set ${property.label} of ${item.name}`);
+    });
   }
 
   /** An item made, at `place` (by default the end of the order); its key given back */
   async create(database: string, draft: ItemDraft = {}, place: Place = {}): Promise<(Written & { readonly key: ItemKey | undefined }) | Refused> {
-    const read = await this.read(database);
-    if ("problem" in read) return read;
-    // (A value the place takes off is none of the item's: made without it)
-    const values = Object.fromEntries(Object.entries({ ...draft.values, ...place.values }).filter((entry): entry is [string, Value] => entry[1] !== undefined));
-    for (const [key, value] of Object.entries(values)) {
-      const property = writable(read.database.value, key);
-      if (typeof property === "string") return this.refuse(property);
-      if (!isValue(value)) return this.refuse(notValue(property.label));
-    }
-    const names = new Set(read.items.value.map((one) => one.name));
-    const name = draft.name?.trim() || freeName(UNTITLED, names);
-    const problem = this.validateName(name, names);
-    if (problem) return this.refuse(problem);
-    const placing = placed(read.items.value, undefined, place);
-    if (typeof placing === "string") return this.refuse(placing);
-    const changes = databaseChanges(database).create({ ref: "item", name, values, rank: placing.rank, ...(draft.body === undefined ? {} : { body: draft.body }) });
-    rankOthers(changes, read.items.value, placing.others);
-    const result = await this.write(changes.build(), `Add ${name}`, { ref: "item" });
-    return "problem" in result ? result : { ...result, key: result.report.created.get("item") };
+    // (After every item's writes going on: its neighbours may get ranks in its transaction)
+    return this.afterAllItemWrites(database, async () => {
+      const read = await this.read(database);
+      if ("problem" in read) return read;
+      // (A value the place takes off is none of the item's: made without it)
+      const values = Object.fromEntries(Object.entries({ ...draft.values, ...place.values }).filter((entry): entry is [string, Value] => entry[1] !== undefined));
+      for (const [key, value] of Object.entries(values)) {
+        const property = writable(read.database.value, key);
+        if (typeof property === "string") return this.refuse(property);
+        if (!isValue(value)) return this.refuse(notValue(property.label));
+      }
+      const names = new Set(read.items.value.map((one) => one.name));
+      const name = draft.name?.trim() || freeName(UNTITLED, names);
+      const problem = this.validateName(name, names);
+      if (problem) return this.refuse(problem);
+      const placing = placed(read.items.value, undefined, place);
+      if (typeof placing === "string") return this.refuse(placing);
+      const changes = databaseChanges(database).create({ ref: "item", name, values, rank: placing.rank, ...(draft.body === undefined ? {} : { body: draft.body }) });
+      rankOthers(changes, read.items.value, placing.others);
+      const result = await this.write(changes.build(), `Add ${name}`, { ref: "item" });
+      return "problem" in result ? result : { ...result, key: result.report.created.get("item") };
+    });
   }
 
-  /** An item's name (refused where empty, taken, or what the store cannot keep) */
-  async rename(database: string, item: Item, name: string): Promise<Result> {
-    const read = await this.read(database);
-    if ("problem" in read) return read;
-    const trimmed = name.trim();
-    if (trimmed === item.name) return unchanged("The name is the same");
-    const problem = this.validateName(trimmed, new Set(read.items.value.filter((one) => one.key !== item.key).map((one) => one.name)));
-    if (problem) return this.refuse(problem);
-    return this.write(databaseChanges(database).item(item, (i) => i.rename(trimmed)).build(), `Rename ${item.name} to ${trimmed}`);
+  /** An item's name (refused where empty, taken, or what the store cannot keep); see `onItem` */
+  async rename(database: string, given: Item, name: string): Promise<Result> {
+    return this.onItem(database, given, { name: true }, (item, read) => {
+      const trimmed = name.trim();
+      if (trimmed === item.name) return unchanged("The name is the same");
+      const problem = this.validateName(trimmed, new Set(read.items.value.filter((one) => one.key !== item.key).map((one) => one.name)));
+      if (problem) return this.refuse(problem);
+      return this.write(databaseChanges(database).item(item, (i) => i.rename(trimmed)).build(), `Rename ${item.name} to ${trimmed}`);
+    });
   }
 
   /**
    * How an item looks (its icon, its color), the whole of it: what `look`
    * leaves out the item has no more (`{}`: none); refused where it is none
-   * (domain/look.ts)
+   * (domain/look.ts); see `onItem`
    */
-  async setLook(database: string, item: Item, look: ItemLook): Promise<Result> {
+  async setLook(database: string, given: Item, look: ItemLook): Promise<Result> {
     const problem = validateLook(look);
     if (problem) return this.refuse(problem);
-    if (sameLook(look, item.look)) return unchanged("The look is the same");
-    const what = look.icon === item.look?.icon ? "color" : look.color === item.look?.color ? "icon" : "look";
-    return this.write(databaseChanges(database).item(item, (i) => i.look(look)).build(), `Change the ${what} of ${item.name}`, { item: item.key });
+    return this.onItem(database, given, { look: true }, (item) => {
+      if (sameLook(look, item.look)) return unchanged("The look is the same");
+      const what = look.icon === item.look?.icon ? "color" : look.color === item.look?.color ? "icon" : "look";
+      return this.write(databaseChanges(database).item(item, (i) => i.look(look)).build(), `Change the ${what} of ${item.name}`, { item: item.key });
+    });
   }
 
-  /** An item's body (its content in the markdown language), written only where it is still `was` as read (`store.body`): a body changed since is left, never written over */
-  async setBody(database: string, item: Item, body: string, was: string | undefined): Promise<Result> {
+  /** An item's body (its content in the markdown language), written only where it is still `was` as read (`store.body`): a body changed since is left, never written over; see `onItem` */
+  async setBody(database: string, given: Item, body: string, was: string | undefined): Promise<Result> {
     if (!this.store.capabilities.itemBody) return this.refuse("This database keeps no body of an item");
     if (body === (was ?? "")) return unchanged("The body is the same");
-    return this.write(databaseChanges(database).item(item, (i) => i.body(body, was)).build(), `Edit the body of ${item.name}`);
+    // (Nothing of the item rests on what it shows: the body has its own check, `was`)
+    return this.onItem(database, given, {}, (item) => this.write(databaseChanges(database).item(item, (i) => i.body(body, was)).build(), `Edit the body of ${item.name}`));
   }
 
-  /** Items removed, the user asked first (an item changed since it was read is left) */
+  /** Items removed, the user asked first: each where what it loses (its name, values and look) is still as shown; see `onItem` */
   async remove(database: string, items: readonly Item[]): Promise<Result> {
     if (!items.length) return unchanged("Nothing to remove");
     const what = items.length === 1 ? `"${items[0]!.name}"` : `${items.length} items`;
     if (!(await this.ui.ask(`Remove ${what}? Undo brings ${items.length === 1 ? "it" : "them"} back.`, { destructive: true }))) return { problem: "Not removed", cause: "declined" };
-    const changes = databaseChanges(database);
-    for (const item of items) changes.item(item, (i) => i.remove());
-    return this.write(changes.build(), `Remove ${what}`);
+    return this.onItems(database, items, { allValues: true, name: true, look: true }, (now) => {
+      const changes = databaseChanges(database);
+      for (const item of now) changes.item(item, (i) => i.remove());
+      return this.write(changes.build(), `Remove ${what}`);
+    });
   }
 
   /**
    * An item moved in the order by hand, with values set where it goes; only
    * it is written, but where its neighbours' ranks do not allow its place
    * (typed by hand, missing): those get ranks in the same transaction,
-   * keeping the order shown
+   * keeping the order shown. Its place by its neighbours as they are now;
+   * the values it sets as shown (see `onItem`)
    */
-  async move(database: string, item: Item, place: Place): Promise<Result> {
-    if (place.after?.key === item.key || place.before?.key === item.key) return unchanged("An item stays beside itself");
-    const read = await this.read(database);
-    if ("problem" in read) return read;
-    for (const [key, value] of Object.entries(place.values ?? {})) {
-      const property = writable(read.database.value, key);
-      if (typeof property === "string") return this.refuse(property);
-      if (value !== undefined && !isValue(value)) return this.refuse(notValue(property.label));
-      // (A card moved to the column of none: a required value is not taken off by it)
-      if (property.required && (value === undefined || isEmpty(value)) && !isEmpty(item.values[key])) return this.refuse(`${property.label} is required: not emptied`);
-    }
-    // No neighbour named (a card dropped in an empty column, on a board sorted): its values alone, its place by hand kept
-    const placing = place.after || place.before ? placed(read.items.value, item, place) : undefined;
-    if (typeof placing === "string") return this.refuse(placing);
-    const changes = databaseChanges(database).item(item, (i) => {
-      if (placing) i.rank(placing.rank);
+  async move(database: string, given: Item, place: Place): Promise<Result> {
+    if (place.after?.key === given.key || place.before?.key === given.key) return unchanged("An item stays beside itself");
+    // (After every item's writes going on: its neighbours may get ranks in its transaction)
+    return this.afterAllItemWrites(database, async () => {
+      const read = await this.read(database);
+      if ("problem" in read) return read;
+      const item = currentOf(new Map(read.items.value.map((one) => [one.key, one] as const)), given, { values: Object.keys(place.values ?? {}) }, read.database.value);
+      if (item === "changed") return this.changedSince([given]);
       for (const [key, value] of Object.entries(place.values ?? {})) {
-        if (value === undefined) i.unset(key);
-        else i.set(key, value);
+        const property = writable(read.database.value, key);
+        if (typeof property === "string") return this.refuse(property);
+        if (value !== undefined && !isValue(value)) return this.refuse(notValue(property.label));
+        // (A card moved to the column of none: a required value is not taken off by it)
+        if (property.required && (value === undefined || isEmpty(value)) && !isEmpty(item.values[key])) return this.refuse(`${property.label} is required: not emptied`);
       }
+      // No neighbour named (a card dropped in an empty column, on a board sorted): its values alone, its place by hand kept
+      const placing = place.after || place.before ? placed(read.items.value, item, place) : undefined;
+      if (typeof placing === "string") return this.refuse(placing);
+      const changes = databaseChanges(database).item(item, (i) => {
+        if (placing) i.rank(placing.rank);
+        for (const [key, value] of Object.entries(place.values ?? {})) {
+          if (value === undefined) i.unset(key);
+          else i.set(key, value);
+        }
+      });
+      if (placing) rankOthers(changes, read.items.value, placing.others);
+      return this.write(changes.build(), `Move ${item.name}`, { item: item.key });
     });
-    if (placing) rankOthers(changes, read.items.value, placing.others);
-    return this.write(changes.build(), `Move ${item.name}`, { item: item.key });
+  }
+
+  /**
+   * A write of items (`given`, as a view showed them) resting on `part` of each (domain/itempart.ts: a value, the name,
+   * the look; what a removal loses), once their writes going on are done, given the database as read then and the items
+   * it goes on: each as it is now where its part is still as shown, so what else of it changed since, by the view's own
+   * writes (a name typed and left, a status picked at once) or elsewhere, is kept, as only the part is written. Where the
+   * part changed since (by anyone), nothing is written, said (`changedSince`): nothing a view did not show is written
+   * over, by any of the ways an item is written
+   */
+  private onItem<R>(database: string, given: Item, part: ItemPart, write: (item: Item, read: DatabaseRead) => R | Refused | Promise<R | Refused>): Promise<R | Refused> {
+    return this.onItems(database, [given], part, ([item], read) => write(item!, read));
+  }
+
+  /** `onItem` of several items at once (a removal of many): those whose part changed since left, said, the others written */
+  private onItems<R>(database: string, given: readonly Item[], part: ItemPart, write: (items: readonly Item[], read: DatabaseRead) => R | Refused | Promise<R | Refused>): Promise<R | Refused> {
+    return this.afterItemWrites(database, given, async () => {
+      const read = await this.read(database);
+      if ("problem" in read) return read;
+      const now = new Map(read.items.value.map((one) => [one.key, one] as const));
+      const items = given.map((one) => currentOf(now, one, part, read.database.value));
+      const changed = given.filter((_one, at) => items[at] === "changed");
+      const current = items.filter((one): one is Item => one !== "changed");
+      // (Those whose part changed left, said; the others written, where there are any)
+      if (!current.length) return this.changedSince(changed);
+      if (changed.length) this.changedSince(changed);
+      return write(current, read);
+    });
+  }
+
+  /** `run` once the writes of `items` going on (and one that may rank any item) are done, the items' next writes waiting for it */
+  private afterItemWrites<T>(database: string, items: readonly Item[], run: () => Promise<T>): Promise<T> {
+    const queues = this.queuesOf(database);
+    const keys = [...new Set(items.map((item) => item.key))];
+    const result = Promise.all([queues.all, ...keys.map((key) => queues.items.get(key))]).then(run);
+    const kept = result.catch(() => undefined);
+    for (const key of keys) queues.items.set(key, kept);
+    // (Let go once nothing came after it)
+    void kept.then(() => {
+      for (const key of keys) if (queues.items.get(key) === kept) queues.items.delete(key);
+      this.letGoQueues(database);
+    });
+    return result;
+  }
+
+  /** `run` once every item's writes going on are done, every item's next writes waiting for it (what may rank any item: a move, an item made) */
+  private afterAllItemWrites<T>(database: string, run: () => Promise<T>): Promise<T> {
+    const queues = this.queuesOf(database);
+    const result = Promise.all([queues.all, ...queues.items.values()]).then(run);
+    const kept = result.catch(() => undefined);
+    queues.all = kept;
+    void kept.then(() => {
+      if (queues.all === kept) queues.all = undefined;
+      this.letGoQueues(database);
+    });
+    return result;
+  }
+
+  private queuesOf(database: string): { all: Promise<unknown> | undefined; readonly items: Map<ItemKey, Promise<unknown>> } {
+    let queues = this.itemWrites.get(database);
+    if (!queues) this.itemWrites.set(database, (queues = { all: undefined, items: new Map() }));
+    return queues;
+  }
+
+  private letGoQueues(database: string): void {
+    const queues = this.itemWrites.get(database);
+    if (queues && !queues.all && !queues.items.size) this.itemWrites.delete(database);
   }
 
   // Databases
@@ -731,7 +830,7 @@ export class DatabaseCore {
     return this.write(databaseChanges(read.value.id).expectDatabase(read.revision).schema(properties).build(), label);
   }
 
-  private async read(database: string): Promise<{ readonly database: Revised<Database>; readonly items: Revised<readonly Item[]> } | Refused> {
+  private async read(database: string): Promise<DatabaseRead | Refused> {
     const read = await this.store.database(database);
     if (!read) return this.refuse(`No database "${database}"`);
     return { database: read, items: await this.store.items(database) };
@@ -787,6 +886,14 @@ export class DatabaseCore {
       this.ui.notify(`${label}: ${what}: ${reasons}`, { type: "error" });
     }
     return report.written.length ? { report } : { problem: `${label}: nothing was written`, cause: "left", report };
+  }
+
+  /** What a view writes rests on what of these items changed since it showed them (`onItem`): they are left, said */
+  private changedSince(items: readonly Item[]): Refused {
+    const what = items.length === 1 ? `"${items[0]!.name}"` : `${items.length} items`;
+    const problem = `${what} changed since ${items.length === 1 ? "it was" : "they were"} shown: left as ${items.length === 1 ? "it is" : "they are"}`;
+    this.ui.notify(problem, { type: "error" });
+    return { problem, cause: "left" };
   }
 
   private refuse(problem: string): Refused {

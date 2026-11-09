@@ -11,7 +11,6 @@ import type { TypeRegistry } from "../domain/types/registry.ts";
 import type { GroupArrangement } from "../domain/grouping.ts";
 import type { Database, Item, Property } from "../model/database.ts";
 import { type DatabaseCore, isRefused } from "./core.ts";
-import { ItemWrites } from "../domain/ownwrites.ts";
 import { documentsHost, type DocumentsSource } from "./documents.ts";
 import { arrangedGroups, focusGroupList, type GroupFocus, groupedBy, groupEntry } from "./groupmenu.ts";
 import { appliedToViews, type LookOf, type LookPart, type ToAll } from "./applyall.ts";
@@ -160,9 +159,6 @@ export class DatabasePlace {
   private handedOver = false;
   // Whether it asked the place before it for what that had open (once)
   private tookOver = false;
-  // Its views' writes of an item's value and name, one after another, each on the item as those before it left it: kept
-  // across its drawings, as a name typed and left draws the place anew while a value is picked from the row drawn before
-  private readonly writes = new ItemWrites(async (key) => (await this.options.store.items(this.options.database)).value.find((one) => one.key === key));
 
   /** The id of the database the place shows */
   get database(): string {
@@ -969,9 +965,9 @@ export class DatabasePlace {
       },
       type: (property) => typeOf(types, property),
       text: (item, key) => textOf(item, key, data().database, types),
-      update: (item, key, value) => refreshed(this.writes.write(item, { key }, (base) => core.update(id, base, key, value))),
+      update: (item, key, value) => refreshed(core.update(id, item, key, value)),
       create: (draft, where) => refreshed(core.create(id, draft, where)),
-      rename: (item, name) => refreshed(this.writes.write(item, "name", (base) => core.rename(id, base, name))),
+      rename: (item, name) => refreshed(core.rename(id, item, name)),
       remove: (items) => refreshed(core.remove(id, items)),
       move: (item, where) => refreshed(core.move(id, item, where)),
       undo: (progress) => refreshed(core.undo(id, progress)),

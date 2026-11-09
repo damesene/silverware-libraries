@@ -21,6 +21,7 @@ import { told } from "../../core/store.ts";
 import type { Database, DatabaseSummary, Item, ItemKey, Revised } from "../../model/database.ts";
 import { draftTransaction, type ItemState, looseKeys, type RecordState, type StoreRules, type StoreState, takenNames, withoutClashes } from "../transaction.ts";
 import { hasSystem, localStamp, type SystemFacts, withSystemValues } from "../../domain/system.ts";
+import { stableText } from "../../domain/itempart.ts";
 import { modelValue, VERSIONS, ITEM_TAG, type PagesVersion, ROOT_TAG, schemaEntry, systemOf, versionOf } from "./versions.ts";
 
 export type PagesStoreOptions = {
@@ -94,17 +95,10 @@ const CHANGED_READ = "changed since it was read: left alone";
 const CHANGED_WRITTEN = "changed since it was written: left as it is";
 const ANOTHER_DATABASE = "its database was removed and made again since: left alone";
 
-/** A value's text the same whatever the order of its keys */
-function stable(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
-  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stable((value as Record<string, unknown>)[key])}`).join(",")}}`;
-  return JSON.stringify(value) ?? "undefined";
-}
-
 /** A revision of what the store reads: of its content (two 32-bit hashes of its text), so the index catching up with a write changes none */
 const revisionOf = (value: unknown) => {
   let [a, b] = [0, 0x9e3779b9];
-  for (const c of stable(value)) {
+  for (const c of stableText(value)) {
     a = (Math.imul(a, 31) + c.charCodeAt(0)) | 0;
     b = Math.imul(b ^ c.charCodeAt(0), 0x01000193) | 0;
   }
@@ -734,8 +728,8 @@ export class PagesStore implements DatabaseStore {
 
 /** Whether the index has a page as the store wrote it: its own data and its values (its tags may be more), none of the keys it took off */
 function caughtUp(indexed: IndexedObject, mine: IndexedObject, gone: readonly string[] = []): boolean {
-  if (stable(systemOf(indexed)) !== stable(systemOf(mine))) return false;
+  if (stableText(systemOf(indexed)) !== stableText(systemOf(mine))) return false;
   if (gone.some((key) => key in indexed)) return false;
   // (The index's values in the model's form, as the store holds them: a list of numbers as texts, a map as its JSON)
-  return Object.entries(mine).every(([key, value]) => key === "name" || key === "tags" || key === "_database" || stable(modelValue(indexed[key])) === stable(value));
+  return Object.entries(mine).every(([key, value]) => key === "name" || key === "tags" || key === "_database" || stableText(modelValue(indexed[key])) === stableText(value));
 }

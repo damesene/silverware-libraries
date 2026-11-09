@@ -171,10 +171,10 @@ describe("a place", () => {
     expect(await setting).not.toHaveProperty("problem");
     const now = () => store.items("tasks").then(({ value }) => value.find((one) => one.key === row.key)!);
     expect(await now()).toMatchObject({ name: "Fix the login", values: { status: "Done" } });
-    // Changed elsewhere since: a value from that row again is refused, never written over
-    store.changeOutside("tasks", row.key, { values: { status: "Todo" } });
-    expect(await host.update(row, "status", "Doing")).toHaveProperty("problem");
-    expect((await now()).values.status).toBe("Todo");
+    // A value the row shows changed elsewhere since: one from that row again is refused, never written over
+    store.changeOutside("tasks", row.key, { values: { estimate: "5" } });
+    expect(await host.update(row, "estimate", "8")).toHaveProperty("problem");
+    expect((await now()).values.estimate).toBe("5");
   });
 
   it("keeps a view's filter, sort and meta under its name, its settings read with their defaults", async () => {

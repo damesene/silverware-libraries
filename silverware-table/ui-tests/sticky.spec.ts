@@ -1,6 +1,6 @@
 // The header held at the top of the page's view as a long table scrolls past
 import type { Page } from "@playwright/test";
-import { expect, setPage, table, tableIcon, test } from "./helpers.ts";
+import { expect, setPage, settled, table, tableIcon, test } from "./helpers.ts";
 
 test.describe("Rows pinned to the bottom", () => {
   test("a scroller with a bottom padding (as SilverBullet's, to scroll past the end): the row at the table's bottom while it is in view", async ({ page }) => {
@@ -34,7 +34,8 @@ test.describe("The held header and the rows pinned to the bottom", () => {
     });
     for (let step = 0; step < 14; step++) {
       await page.evaluate((top) => (document.querySelector(".cm-scroller")!.scrollTop = top), start + step * 25);
-      await page.waitForTimeout(80);
+      // (Measured once what the scroll moves is placed: its frames, not a time)
+      await settled(page);
       const at = await table(page).evaluate((w) => {
         const t = w.querySelector("table")!;
         return { head: t.tHead!.getBoundingClientRect().bottom, foot: t.tFoot!.getBoundingClientRect().top };

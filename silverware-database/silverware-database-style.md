@@ -1101,6 +1101,9 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   overflow-x: auto;
 }
 .swd-table {
+  /* A body cell's room above and below its text (SilverBullet's own for its tables' cells, said here so what is laid over a
+     cell, a row's Open, knows where its first line is) */
+  --swd-cell-pad-y: 8px;
   border-collapse: collapse;
   width: 100%;
 }
@@ -1151,6 +1154,10 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
    (`#sb-main .cm-editor td { white-space: nowrap }`, its editor.scss), which reaches a block's widget: :is() weighs as an id */
 :is(#sb-main, html) .swd-place .swd-table :is(th, td) {
   white-space: normal;
+}
+:is(#sb-main, html) .swd-place .swd-table td {
+  padding-top: var(--swd-cell-pad-y);
+  padding-bottom: var(--swd-cell-pad-y);
 }
 .swd-table th:not(.swd-table-gripcol):not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]),
 .swd-table td:not(.swd-table-grip):not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]) {
@@ -1219,9 +1226,12 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   height: 14px;
 }
 @media (hover: hover) {
+  /* (As high as the cell's first line and its room above and below: the button in its middle, by the name's first line
+     where the row is taller, another value wrapping) */
   .swd-table td[data-key="name"] .swd-open-room {
     position: absolute;
-    inset: 0;
+    inset: 0 0 auto;
+    height: min(100%, calc(1lh + 2 * var(--swd-cell-pad-y)));
     container-type: inline-size;
     pointer-events: none;
   }
@@ -1232,7 +1242,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   }
   .swd-table td[data-key="name"] .swd-open {
     position: absolute;
-    /* (In the middle of the cell's height) */
+    /* (In the middle of its box: the cell's first line) */
     top: 50%;
     right: 6px;
     transform: translateY(-50%);

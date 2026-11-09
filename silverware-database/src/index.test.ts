@@ -119,6 +119,33 @@ describe("Silverware Database in SilverBullet", () => {
     expect(memory.pages.get("Page")).toBe("```silverware-database\nid: tasks\nview: b\n```\n");
   });
 
+  it("writes a database picked at the cursor, or makes a new one first in the list (Insert database, /database)", async () => {
+    const { memory, bridge } = bridgeOf({ Page: "", "Page/db-tasks": ROOT }, "Page");
+    const inserted: string[] = [];
+    const offered: string[][] = [];
+    let pick: string | undefined;
+    init({
+      ...bridge,
+      insertAtCursor: async (text) => void inserted.push(text),
+      prompt: async () => "Ideas",
+      filterBox: async (_label, options) => {
+        offered.push(options.map((one) => one.name));
+        return options.find((one) => one.name === pick);
+      },
+    });
+    pick = "Tasks";
+    await runCommand("Silverware Database: Insert database");
+    expect(offered[0]).toEqual(["New database…", "Tasks"]);
+    expect(inserted).toEqual(["\n```silverware-database\nid: tasks\n```\n"]);
+    pick = undefined;
+    await runCommand("Silverware Database: Insert database");
+    expect(inserted).toHaveLength(1);
+    pick = "New database…";
+    await runCommand("Silverware Database: Insert database");
+    expect(memory.pages.has("Page/db-ideas")).toBe(true);
+    expect(inserted[1]).toBe("\n```silverware-database\nid: ideas\n```\n");
+  });
+
   it("keeps a change undoable as Space Lua loads again (a setting saved), its bridge a new one", async () => {
     const { memory, bridge } = bridgeOf({ Page: "text\n" }, "Page");
     init({ ...bridge, prompt: async () => "Ideas" });

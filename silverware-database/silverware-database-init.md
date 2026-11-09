@@ -91,6 +91,17 @@ if js and js.window then
       end,
     }
   end
+  -- The slash commands (/database), each running a command
+  for _, slash in ipairs(silverwareDatabaseJs.slashCommands()) do
+    local name = slash.command
+    slashCommand.define {
+      name = slash.name,
+      description = slash.description,
+      run = function()
+        silverwareDatabaseJs.runCommand(name)
+      end,
+    }
+  end
   codeWidget.define {
     language = "silverware-database",
     render = function(body, pageName)

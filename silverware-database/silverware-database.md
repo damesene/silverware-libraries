@@ -32,7 +32,7 @@ Projects/db-tasks/Write docs.md
 
 ## Showing a database
 
-Write its block where you want it (the command **Silverware Database: New database** makes a database and writes its block at the cursor):
+Write its block where you want it. **`/database`** (or the command **Silverware Database: Insert database**) lists the databases of your space, **New database…** first: the one you pick has its block written at the cursor, New database… asks a name, makes the database beside the page and writes its block (as the command **Silverware Database: New database** does). Written by hand:
 
 ````markdown
 ```silverware-database

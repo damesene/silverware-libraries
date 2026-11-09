@@ -79,6 +79,8 @@ let indexSettled: (() => void) | undefined;
 
 const COMMANDS: Readonly<Record<string, () => Promise<void>>> = {
   "Silverware Database: New database": newDatabase,
+  // A database's block at the cursor: a database picked, or a new one (also the slash command /database)
+  "Silverware Database: Insert database": insertDatabase,
   // The last change of any database put back (a view's Undo puts back its own database's)
   "Silverware Database: Undo": async () => {
     await app!.core.undo();
@@ -215,6 +217,11 @@ export function pageLoaded(): void {
 
 export function commandNames(): string[] {
   return Object.keys(COMMANDS);
+}
+
+/** The slash commands, each running a command: the init page defines them (`slashCommand.define`) */
+export function slashCommands(): { name: string; description: string; command: string }[] {
+  return [{ name: "database", description: "Show a database here, or make a new one", command: "Silverware Database: Insert database" }];
 }
 
 export async function runCommand(name: string): Promise<void> {
@@ -501,8 +508,24 @@ async function newDatabase(): Promise<void> {
   app!.home = String(await platform.editor.documentName());
   const result = await core.createDatabase(name, [{ label: "Status", type: "select", params: { options: ["Todo", "Doing", "Done"] } }]);
   if ("problem" in result) return;
-  // (A line break before it: the cursor may be at the end of a line of text)
-  await insertAtCursor(`\n\`\`\`${BLOCK_LANGUAGE}\nid: ${result.id}\n\`\`\`\n`);
+  await insertAtCursor(blockText(result.id));
+}
+
+/** A database's block as written at the cursor (a line break before it: the cursor may be at the end of a line of text) */
+const blockText = (id: string) => `\n\`\`\`${BLOCK_LANGUAGE}\nid: ${id}\n\`\`\`\n`;
+
+/** A database's block at the cursor: one of the space's picked, or New database… first (made as by its command) */
+async function insertDatabase(): Promise<void> {
+  const { platform, store } = app!;
+  if (!platform.ui.pick) return newDatabase();
+  const all = await store.databases();
+  const picked = await platform.ui.pick("Show a database here", [
+    { name: "New database…", description: "Made beside this page, shown here", id: undefined },
+    ...all.map((one) => ({ name: one.name, description: one.id, id: one.id })),
+  ]);
+  if (!picked) return;
+  if (picked.id === undefined) return newDatabase();
+  await insertAtCursor(blockText(picked.id));
 }
 
 // The bridge the init page handed over last (Space Lua loaded again hands over a new one): the platform's calls go to it,

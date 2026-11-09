@@ -3,6 +3,9 @@
 // block through `render`, tells the index's changes (`indexChanged`) and runs
 // the commands; the API page defines the user's own views and types
 // (`defineViews`, `defineTypes`), before `init`, as Space Lua loads.
+import { type ConflictHost, openConflict } from "./core/conflictdialog.ts";
+import type { ItemConflict } from "./core/core.ts";
+import type { Item } from "./model/database.ts";
 import { type CodeBlock, codeBlocksOf, sameBody } from "../../shared/pages/blocks.ts";
 import { pageChanges } from "../../shared/pages/changes.ts";
 import { pageWriter, type PageWriter } from "../../shared/pages/writer.ts";
@@ -143,6 +146,22 @@ export function init(bridge: Bridge): void {
           platform.ui.notify(`"${item.name}" could not be opened: ${error instanceof Error ? error.message : String(error)}`, { type: "error" });
         }
       },
+      ...(platform.editor.href
+        ? {
+            documentHref: (item: Item) => {
+              const name = store.documentOf(item.key);
+              return name === undefined ? undefined : platform.editor.href!(name);
+            },
+          }
+        : {}),
+      showConflict: (conflict, done) =>
+        openConflict(
+          conflictHost(platform, () => {
+            redrawAll();
+            done();
+          }),
+          conflict,
+        ),
       ...documentsHost(platformDocuments(platform), core.noun, platform.ui),
       editorArea: () => editorArea(document),
       onEditorAreaChanged: (listener) => watchEditorArea(document, listener),
@@ -183,7 +202,14 @@ function keptParts(): Kept {
   const ui: Ui = { notify: platform.ui.notify, ask: async (message: string) => (await platform.ui.ask?.(message)) ?? false };
   // A key changed is followed into the places of every page (their blocks), as the views say what of their state names one
   const writer = pageWriter(platform);
-  const core = new DatabaseCore(store, types, ui, platform.space.noun, { store: blockPlaces(platform.space, writer), propertyMeta: (view) => views.named(view)?.propertyMeta ?? [] });
+  // A write left as it rests on what changed since it was shown: said until closed, its Show conflict the dialog of it
+  const conflict = (one: ItemConflict) =>
+    platform.ui.notify(one.problem, {
+      type: "error",
+      timeout: 0,
+      actions: [{ name: "Show conflict", run: () => openConflict(conflictHost(platform, redrawAll), one) }],
+    });
+  const core = new DatabaseCore(store, types, { ...ui, conflict }, platform.space.noun, { store: blockPlaces(platform.space, writer), propertyMeta: (view) => views.named(view)?.propertyMeta ?? [] });
   return { platform, store, writer, core, ui, own };
 }
 
@@ -489,6 +515,16 @@ function tidy(): void {
       if (now - shown.outSince > 10 * KEPT_OUT_MS) app.shown.delete(element);
     }
   }
+}
+
+/** What a conflict's dialog is given: the page's document, a document opened and its address where the platform has them, `written` told once it is done */
+function conflictHost(platform: Platform, written: () => void): ConflictHost {
+  return {
+    document,
+    ...(platform.editor.open ? { open: (name: string) => void platform.editor.open!(name) } : {}),
+    ...(platform.editor.href ? { href: platform.editor.href } : {}),
+    written,
+  };
 }
 
 function redrawAll(): void {

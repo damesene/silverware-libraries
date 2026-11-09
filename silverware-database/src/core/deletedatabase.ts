@@ -8,6 +8,7 @@
 // (`swd-delete-database`).
 import { Dialogs } from "../../../shared/dialog.ts";
 import { el } from "../../../shared/elements.ts";
+import { buttons } from "./dialogparts.ts";
 import type { Noun } from "../domain/noun.ts";
 import type { DatabaseCore, Proposal } from "./core.ts";
 import { ICONS } from "./icons.ts";
@@ -55,7 +56,8 @@ export function openDeleteDatabase(host: DeleteDatabaseHost, id: string, name: s
     subtitle: `Its items, its own ${noun.one} and its views`,
     className: "swd-delete-database",
     content: el(doc, "div", "swd-delete-body", status, said, ask),
-    footer: el(doc, "div", `${BASE}-foot`, cancel, remove),
+    // (Its buttons alone: the dialog puts them in its foot)
+    footer: buttons(doc, cancel, remove),
     focus: cancel,
     dismiss: () => state !== "writing",
     closed: () => {

@@ -3,7 +3,7 @@ import { TypeRegistry } from "../domain/types/registry.ts";
 import { inRankOrder } from "../domain/rank.ts";
 import type { Database } from "../model/database.ts";
 import { MemoryStore } from "../store/memory.ts";
-import { type CoreInterface, DatabaseCore, type Proposal } from "./core.ts";
+import { type CoreInterface, DatabaseCore, type ItemConflict, type Proposal } from "./core.ts";
 
 const TASKS: Database = {
   id: "tasks",
@@ -39,6 +39,96 @@ const applied = async (core: DatabaseCore, proposal: Proposal | { problem: strin
   if ("problem" in proposal) throw new Error(proposal.problem);
   return core.apply(proposal);
 };
+
+describe("the schema edited as a whole (editSchema)", () => {
+  it("plans every change of a draft as one transaction: names, flags, order, a property added, options renamed, a key changed, a type read, one removed with its values; undone as one", async () => {
+    const { core, store, items } = setup();
+    const read = (await store.database("tasks"))!;
+    const was = read.value.properties;
+    const proposal = await core.editSchema("tasks", {
+      revision: read.revision,
+      properties: [
+        // (Moved first: its type read from the text, its key changed, its name and flags)
+        { from: "estimate", key: "effort", label: "Effort", type: "number", params: {}, required: true, showName: true, icon: "⏱" },
+        { from: "status", label: "State", type: "select", params: { options: ["Open", "Done"] }, renames: { Todo: "Open" } },
+        { label: "Owner", type: "text" },
+      ],
+      removedValues: ["created"],
+    });
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    expect(proposal.label).toBe("Change the properties of Tasks");
+    expect(proposal.renamed).toEqual([{ from: "Todo", to: "Open", items: 1 }]);
+    // ("a lot" no number: kept as it is, listed)
+    expect(proposal.unreadable).toHaveLength(1);
+    expect(proposal.whole).toBeDefined();
+    await core.apply(proposal);
+    expect((await store.database("tasks"))!.value.properties).toEqual([
+      { key: "effort", label: "Effort", type: "number", params: {}, readonly: false, required: true, showName: true, icon: "⏱" },
+      { key: "status", label: "State", type: "select", params: { options: ["Open", "Done"] }, readonly: false },
+      { key: "owner", label: "Owner", type: "text", params: {}, readonly: false },
+    ]);
+    expect((await items()).map((one) => [one.name, one.values])).toEqual([
+      ["Fix login", { status: "Open", effort: 3 }],
+      ["Write docs", { status: "Done", effort: "a lot" }],
+    ]);
+    // One Undo puts it all back
+    await core.undo("tasks");
+    expect((await store.database("tasks"))!.value.properties).toEqual(was);
+    expect((await items()).map((one) => one.values)).toEqual([
+      { status: "Todo", estimate: "3" },
+      { status: "Done", estimate: "a lot" },
+    ]);
+  });
+
+  it("keeps a removed property's values where not asked, a system property's own, and changes only its name and flags", async () => {
+    const { core, store, items } = setup();
+    expect(await core.addProperty("tasks", { label: "", type: "text", system: "order" })).not.toHaveProperty("problem");
+    const proposal = await core.editSchema("tasks", {
+      revision: (await store.database("tasks"))!.revision,
+      properties: [
+        { from: "status", label: "Status", type: "select", params: { options: ["Todo", "Done"] } },
+        { from: "created", label: "Created", type: "date", readonly: true },
+        // (A system property's type, key or lock asked otherwise: kept its kind's)
+        { from: "order", key: "rank", label: "Rank", type: "text", readonly: false, showName: true },
+      ],
+    });
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    // (The schema alone: no item written)
+    expect(proposal.plan.planned.filter((one) => "item" in one.target)).toHaveLength(0);
+    await core.apply(proposal);
+    expect((await store.database("tasks"))!.value.properties.at(-1)).toEqual({ key: "order", label: "Rank", type: "number", params: {}, readonly: true, system: "order", showName: true });
+    expect((await items()).map((one) => one.values.estimate)).toEqual(["3", "a lot"]);
+  });
+
+  it("refuses two properties of one key, and says when nothing changes", async () => {
+    const { core, store } = setup();
+    const { value, revision } = (await store.database("tasks"))!;
+    const same = value.properties.map((one) => ({ from: one.key, label: one.label, type: one.type, params: one.params, readonly: one.readonly }));
+    expect(await core.editSchema("tasks", { revision, properties: same })).toMatchObject({ cause: "unchanged" });
+    expect(await core.editSchema("tasks", { revision, properties: [...same.slice(0, 2), { ...same[2]!, key: "status" }] })).toMatchObject({ cause: "invalid" });
+  });
+
+  it("leaves an edit made of a database changed since, its conflict given back (offered by the core unless the caller shows it): each document's lines, written over it by force, once", async () => {
+    const { core, store, told } = setup();
+    const { value, revision } = (await store.database("tasks"))!;
+    const was = value.properties;
+    const edit = { revision, showsConflict: true, properties: was.map((one) => ({ from: one.key, label: one.key === "estimate" ? "Effort" : one.label, type: one.type, params: one.params, readonly: one.readonly })) };
+    // Elsewhere meanwhile: Status renamed
+    await core.renameProperty("tasks", "status", "State");
+    const said = told.length;
+    const left = await core.editSchema("tasks", edit);
+    if (!("problem" in left) || !left.conflict) throw new Error("not left with a conflict");
+    expect([left.cause, told.length]).toEqual(["left", said]);
+    // Its preview: the database's own document (the store in memory: no lines to show, a document planned)
+    const preview = await left.conflict.preview();
+    expect([preview.problem, preview.documents.length]).toEqual([undefined, 1]);
+    // Written over it: the draft's labels, State back to Status
+    expect(await left.conflict.force()).not.toHaveProperty("problem");
+    expect((await store.database("tasks"))!.value.properties.map((one) => one.label)).toEqual(["Status", "Effort", "Created"]);
+    expect(left.conflict.written()).toBe(true);
+    expect(await left.conflict.force()).toMatchObject({ cause: "unchanged" });
+  });
+});
 
 describe("the core", () => {
   it("adds a system property of a kind once, its type and key the kind's, read only; its values shown, never written, nor its type, key or settings changed", async () => {
@@ -226,6 +316,32 @@ describe("the core", () => {
     // Its body and its place changed since (neither what it loses as shown): removed
     expect(await core.remove("tasks", [await named("Fix the login")])).not.toHaveProperty("problem");
     expect((await items()).map((one) => one.name)).toEqual(["Write docs"]);
+  });
+
+  it("hands on a write left as its part changed since it was shown: what changed, and written over by force, anew refused where it changed again", async () => {
+    const { store, named } = setup();
+    const conflicts: ItemConflict[] = [];
+    const core = new DatabaseCore(store, new TypeRegistry(), { notify: () => {}, ask: () => true, conflict: (one) => void conflicts.push(one) });
+    const stale = await named("Fix login");
+    store.changeOutside("tasks", stale.key, { values: { status: "Done" } });
+    expect(await core.update("tasks", stale, "estimate", "5")).not.toHaveProperty("problem");
+    expect(await core.update("tasks", stale, "status", "Todo")).toMatchObject({ cause: "left" });
+    expect(conflicts).toHaveLength(1);
+    const [conflict] = conflicts;
+    expect(conflict!.problem).toBe('"Fix login" changed since it was shown: left as it is');
+    // (The memory store keeps no text: no lines to show)
+    expect(await conflict!.preview()).toEqual({ documents: [{ document: "", runs: [] }] });
+    // Changed again since the conflict was shown: its preview says so (nothing told), its force refused anew, its own conflict
+    store.changeOutside("tasks", stale.key, { values: { status: "Doing" } });
+    expect(await conflict!.preview()).toEqual({ documents: [], problem: "It changed again since: Write mine shows the conflict as it is now." });
+    expect(conflicts).toHaveLength(1);
+    expect(await conflict!.force()).toMatchObject({ cause: "left" });
+    expect(conflicts).toHaveLength(2);
+    // Written over as the second shows it, once: pressed again, nothing more
+    expect(await conflicts[1]!.force()).not.toHaveProperty("problem");
+    expect((await named("Fix login")).values).toEqual({ status: "Todo", estimate: "5" });
+    expect([conflicts[1]!.written(), await conflicts[1]!.force()]).toEqual([true, { problem: "Written already", cause: "unchanged" }]);
+    expect(conflicts).toHaveLength(2);
   });
 
   it("removes the items of a removal still as shown, leaves one changed since, and says so", async () => {

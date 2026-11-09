@@ -61,6 +61,20 @@ const key = (target: Element, name: string) => target.dispatchEvent(new Keyboard
 afterEach(() => document.body.replaceChildren());
 
 describe("the built-in views' editors", () => {
+  it("show a cell with the value saved at once, a view holding its drawing meanwhile (another of its cells edited); not written, as it was", async () => {
+    const { host, cell, writes } = setup();
+    const drawn: Item[] = [];
+    editValue(host, cell, ITEM, "name", (written) => void drawn.push(written ?? ITEM));
+    const field = cell.querySelector("input")!;
+    field.value = "Fix the login";
+    // (The field left by a press on another cell)
+    field.dispatchEvent(new FocusEvent("blur"));
+    await Promise.resolve();
+    expect(writes).toEqual([["rename", "Fix login", "Fix the login"]]);
+    // (This host writes nothing: the cell shown as it was again)
+    expect(drawn.map((one) => one.name)).toEqual(["Fix the login", "Fix login"]);
+  });
+
   it("edit a time and a date and time in the browser's own fields, as their types say", async () => {
     const { cell, writes, edit } = setup();
     edit("at", { ...ITEM, values: { at: "09:05" } });

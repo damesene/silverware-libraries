@@ -29,14 +29,17 @@ export type Bridge = {
   queryTag(tag: string): Promise<readonly IndexedObject[]>;
   // Whether no page is queued or being indexed (`mq.getQueueStats("indexQueue")`): the index is whole then; left out, taken as always
   indexIdle?(): Promise<boolean>;
-  flash(message: string, type: "info" | "error", options?: { readonly timeout?: number }): void;
+  // `actions`: buttons on the notification (its Lua makes each a Lua function calling `run`, as SilverBullet's takes)
+  flash(message: string, type: "info" | "error", options?: { readonly timeout?: number; readonly actions?: readonly { readonly name: string; readonly run: () => unknown }[] }): void;
   confirm(message: string): Promise<boolean>;
   prompt(message: string, value?: string): Promise<string | undefined>;
   // SilverBullet's filter box (editor.filterBox): the option picked, nothing where none was
   filterBox?(label: string, options: readonly { readonly name: string; readonly description?: string; readonly index: number }[]): Promise<unknown>;
   getConfig(path: string, fallback: unknown): Promise<unknown>;
   // The CONFIG page written as the Configuration Manager writes it (synced, indexed, the configuration loaded again)
-  saveConfigPage?(text: string): Promise<void>;
+  // `set`: written and indexed, the configuration not loaded again (which starts the plugin anew), these values set in it
+  // as it is (config.set, by path), so SilverBullet's config and the plugin read them alike
+  saveConfigPage?(text: string, set?: Readonly<Record<string, unknown>>): Promise<void>;
 };
 
 /**
@@ -81,6 +84,9 @@ export function silverBulletPlatform(bridge: Bridge): {
       text: () => bridge.getText(),
       replace: (from, to, insert) => bridge.replaceRange(from, to, insert),
       open: (ref) => bridge.navigate(ref),
+      // (As SilverBullet's own links: relative to its <base>, so it is right under a prefix too; encodePageURI in its
+      // plug-api/lib/ref.ts, the name's folders kept)
+      href: (name) => encodeURIComponent(name).replace(/%2F/g, "/"),
       onOpened: (listener) => {
         openedListeners.add(listener);
         return () => void openedListeners.delete(listener);
@@ -113,7 +119,11 @@ export function silverBulletPlatform(bridge: Bridge): {
       },
     },
     ui: {
-      notify: (message, options) => bridge.flash(message, options?.type ?? "info", options?.timeout === undefined ? undefined : { timeout: options.timeout }),
+      // (Its timeout and buttons where given, nothing else: SilverBullet's defaults for what is not)
+      notify: (message, options) => {
+        const more = { ...(options?.timeout === undefined ? {} : { timeout: options.timeout }), ...(options?.actions?.length ? { actions: options.actions } : {}) };
+        bridge.flash(message, options?.type ?? "info", Object.keys(more).length ? more : undefined);
+      },
       ask: (message) => bridge.confirm(message),
       // The filter box gives back the option picked, found by the index it was given
       ...(bridge.filterBox
@@ -130,7 +140,11 @@ export function silverBulletPlatform(bridge: Bridge): {
       get: (path, fallback) => bridge.getConfig(path, fallback),
       // Into CONFIG's managed block, as the other plugins' settings dialogs save (shared/configpage.ts)
       ...(bridge.saveConfigPage
-        ? { save: (values) => saveConfigPage({ readPage: (name) => bridge.readPage(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values, OWN_MARKER)) }
+        ? {
+            // (Not loaded again: the values set in SilverBullet's configuration as it is, as CONFIG has them now)
+            save: (values, options) =>
+              saveConfigPage({ readPage: (name) => bridge.readPage(name), saveConfigPage: (text) => bridge.saveConfigPage!(text, options?.reload === false ? values : undefined) }, (text) => withConfigSettings(text, values, OWN_MARKER)),
+          }
         : {}),
     },
   };

@@ -1,0 +1,35 @@
+/* A document's change as a review shows it (shared/diffview.ts): its runs of lines, each its first line's number, the
+   lines removed and added */
+.__base__-diff {
+  padding: 4px 10px 8px;
+  font: 12px/1.5 var(--editor-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+}
+.__base__-diff-run + .__base__-diff-run {
+  margin-top: 6px;
+}
+.__base__-diff-line-number {
+  font-family: var(--ui-font, system-ui, sans-serif);
+  font-size: 11px;
+  opacity: 0.55;
+}
+.__base__-diff-removed,
+.__base__-diff-added {
+  padding: 0 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-radius: 3px;
+}
+.__base__-diff-removed {
+  background: color-mix(in srgb, var(--danger-color, #c62828) 14%, transparent);
+}
+.__base__-diff-removed::before {
+  content: "− ";
+  opacity: 0.6;
+}
+.__base__-diff-added {
+  background: color-mix(in srgb, #2e9e4f 16%, transparent);
+}
+.__base__-diff-added::before {
+  content: "+ ";
+  opacity: 0.6;
+}

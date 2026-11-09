@@ -49,6 +49,8 @@ export interface Editor {
   focus?(): Awaitable<void>;
   /** The editor opened at a reference (a document's name, a place in it, as the platform writes one) */
   open?(ref: string): Awaitable<void>;
+  /** A document's address, as the platform's own links have it (a link: a middle click opens it in a tab of the browser's) */
+  href?(document: string): string;
   /** Told as the open document is edited (typed in, undone): its text as it is now; the function given back stops it */
   onEdited?(listener: (text: string) => void): () => void;
   /** Told as another document is opened in the editor: its name; the function given back stops it */
@@ -145,6 +147,10 @@ export type Choice = { readonly name: string; readonly description?: string };
 export interface Settings {
   /** A setting's value, `fallback` where it has none */
   get(path: string, fallback: unknown): Awaitable<unknown>;
-  /** Settings saved where the user keeps them (in SilverBullet the CONFIG page); undefined: back to the default */
-  save?(values: Readonly<Record<string, unknown>>): Awaitable<void>;
+  /**
+   * Settings saved where the user keeps them (in SilverBullet the CONFIG page); undefined: back to the default. `reload`
+   * false: the configuration not loaded again (in SilverBullet that runs Space Lua anew, starting the plugin anew), the
+   * values set in it as it is, for a value the plugin applies itself (a module's own, as its host keeps them)
+   */
+  save?(values: Readonly<Record<string, unknown>>, options?: { readonly reload?: boolean }): Awaitable<void>;
 }

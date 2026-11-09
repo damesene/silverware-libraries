@@ -290,10 +290,11 @@ export class DatabasePlace {
     if (!data) return this.note(`No database "${this.options.database}"`);
     const named = state.get(VIEW_KEY);
     const view = typeof named === "string" ? on.find((one) => one.name === named) : on[0];
-    // The database's name and how many items show, the view shown (its picker) and the tools in one bar under it
+    // One bar: the database's name and how many items show, quietly, then the view shown (its picker), the tools
+    // at its end (a note, not a heading: a heading over it is the page's own, written in its markdown)
     const count = el(doc, "span", { class: "swd-place-count", text: String(data.items.length) });
-    element.append(el(doc, "div", "swd-place-head", el(doc, "span", { class: "swd-place-name", text: data.database.name }), count));
-    const bar = el(doc, "nav", { class: "swd-place-bar", attrs: { "aria-label": `${data.database.name}: views and tools` } }, this.switcher(doc, on, view?.name));
+    const head = el(doc, "span", "swd-place-head", el(doc, "span", { class: "swd-place-name", text: data.database.name, title: data.database.name }), count);
+    const bar = el(doc, "nav", { class: "swd-place-bar", attrs: { "aria-label": `${data.database.name}: views and tools` } }, head, this.switcher(doc, on, view?.name));
     element.append(bar);
     this.body = el(doc, "div", "swd-place-body");
     element.append(this.body);
@@ -711,19 +712,11 @@ export class DatabasePlace {
     const more = placeMenu(doc, () => database.name, (menu) => [...coreGroups(menu), ...moduleGroups(menu), ...viewGroups(menu)], naming, () => (groupFocus = propertiesFocus = undefined));
     this.options.placeDrawn?.(this.context(doc, database));
 
-    // What the colors are of, after the count (Color by in ⋯), so a color reads as what it means; kept so as the data change
-    // (a property renamed, removed, its type changed)
-    const colored = el(doc, "span", { class: "swd-place-colored", attrs: { hidden: "" } });
-    count.after(colored);
     // The controls as the view's state has them now (a header's sort, a filter set by the view itself), and how many items show
     const sync = () => {
       sortLabel();
       filterLabel();
       count.textContent = host.items.length === host.total ? String(host.total) : `${host.items.length} of ${host.total}`;
-      const by = host.database.properties.find((one) => one.key === host.look.colorBy);
-      colored.hidden = !by;
-      colored.textContent = by ? `colored by ${by.label}` : "";
-      colored.title = by ? `Each item in the color of its ${by.label} (Color by in ⋯); an item's own color first` : "";
       for (const input of panel.querySelectorAll<HTMLInputElement>("input[data-key]")) {
         if (doc.activeElement === input || held === input) continue;
         input.value = listing.filter[input.dataset.key!] ?? "";

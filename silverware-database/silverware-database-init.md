@@ -58,8 +58,19 @@ if js and js.window then
       local stats = mq.getQueueStats("indexQueue")
       return stats.queued == 0 and stats.processing == 0
     end,
+    -- A notification; its buttons (`actions`, a JS list of { name, run }) made Lua functions calling the JS's, as
+    -- SilverBullet's notification takes them (a conflict's Show conflict, staying until closed: timeout 0)
     flash = function(message, type, options)
-      editor.flashNotification(message, type, options)
+      if options and options.actions then
+        local actions = {}
+        for _, action in ipairs(options.actions) do
+          local run = action.run
+          table.insert(actions, { name = action.name, run = function() run() end })
+        end
+        editor.flashNotification(message, type, { timeout = options.timeout, actions = actions })
+      else
+        editor.flashNotification(message, type, options)
+      end
     end,
     confirm = editor.confirm,
     prompt = editor.prompt,
@@ -69,16 +80,26 @@ if js and js.window then
     end,
     getConfig = config.get,
     -- The settings dialog: saved as SilverBullet's Configuration Manager saves (the CONFIG page, indexed, the configuration loaded again)
-    saveConfigPage = function(text)
+    -- `set`: written and indexed, the configuration not loaded again (that runs Space Lua anew and starts Silverware Database
+    -- anew: the item's panel closed as its width was saved), these values set in it as it is, by path (config.set)
+    saveConfigPage = function(text, set)
       space.writePage("CONFIG", text)
       local ok, err = pcall(function()
         if sync and sync.performFileSync then sync.performFileSync("CONFIG.md") end
         mq.send("indexQueue", "CONFIG.md")
         mq.awaitEmptyQueue("indexQueue")
-        editor.reloadConfigAndCommands()
-        if editor.rebuildEditorState then editor.rebuildEditorState() end
+        if set then
+          for path, value in pairs(set) do
+            config.set(path, value)
+          end
+        else
+          editor.reloadConfigAndCommands()
+          if editor.rebuildEditorState then editor.rebuildEditorState() end
+        end
       end)
-      if not ok then
+      if not ok and set then
+        editor.flashNotification("Silverware Database: the setting is saved in CONFIG, but indexing it failed (" .. tostring(err) .. ")", "error")
+      elseif not ok then
         editor.flashNotification("Silverware Database: the settings are saved in CONFIG, but loading them failed (" .. tostring(err) .. "): reload the page", "error")
       end
     end,

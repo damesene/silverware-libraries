@@ -55,6 +55,7 @@ async function setup(answer = true, withProperties = false, configured: Record<s
       itemBodies: true,
       body: (id, item) => store.body(id, item.key),
       openDocument: async (item) => void opened.push(item.name),
+      documentHref: (item) => `Tasks/${item.name}`,
       documents: async () => ["Projects/Alpha", "Projects/Beta"],
       openByName: async (name) => void opened.push(name),
       validateDocumentName: () => undefined,
@@ -82,6 +83,11 @@ async function setup(answer = true, withProperties = false, configured: Record<s
     await settle();
   };
   return { store, core, modules, place, named, q, peek, told, opened, pageOpened, saved, asked: () => asked, failItems: () => void (failItems = true) };
+}
+
+/** A press on an element: its pointer down and up, its click (a press beside the panel closes it once it is over) */
+function pressOn(target: Element): void {
+  for (const type of ["pointerdown", "pointerup", "click"]) target.dispatchEvent(new Event(type, { bubbles: true }));
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
@@ -138,6 +144,23 @@ describe("the peek", () => {
     q<HTMLButtonElement>(".swd-peek-open").click();
     await settle();
     expect(document.querySelector(".swd-peek")).toBeNull();
+    expect(opened).toEqual(["Fix login"]);
+  });
+
+  it("makes Open a link to the item's page: a plain click opens it here, Ctrl or a middle click is the browser's, the panel left open", async () => {
+    const { q, peek, opened } = await setup();
+    await peek("Fix login");
+    const open = q<HTMLAnchorElement>("a.swd-peek-open");
+    expect(open.getAttribute("href")).toBe("Tasks/Fix login");
+    const ctrl = new MouseEvent("click", { button: 0, ctrlKey: true, bubbles: true, cancelable: true });
+    open.dispatchEvent(ctrl);
+    const middle = new MouseEvent("click", { button: 1, bubbles: true, cancelable: true });
+    open.dispatchEvent(middle);
+    await settle();
+    expect([ctrl.defaultPrevented, middle.defaultPrevented, opened]).toEqual([false, false, []]);
+    expect(document.querySelector(".swd-peek")).not.toBeNull();
+    open.click();
+    await settle();
     expect(opened).toEqual(["Fix login"]);
   });
 
@@ -406,14 +429,14 @@ describe("the peek", () => {
     expect(q<HTMLTextAreaElement>(".swd-peek-body").value).toBe("Mine");
     key(q(".swd-peek-name"), "Escape");
     await settle();
-    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    pressOn(document.body);
     await settle();
     expect(q<HTMLTextAreaElement>(".swd-peek-body").value).toBe("Mine");
     expect(told.some((one) => one.includes("was not written"))).toBe(true);
     // A press in a dialog over the page (a question asked) is not beside it
     const dialog = document.createElement("dialog");
     document.body.append(dialog);
-    dialog.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    pressOn(dialog);
     await settle();
     expect(document.querySelector(".swd-peek")).not.toBeNull();
   });
@@ -611,7 +634,8 @@ describe("the peek", () => {
     await settle();
     expect(document.querySelector('.swd-prop-open[data-property="estimate"]')).not.toBeNull();
     // (A press in the dialog over it is not beside the peek)
-    document.querySelector(".swd-settings-backdrop")!.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    pressOn(document.querySelector(".swd-settings-backdrop")!);
+    await settle();
     expect(document.querySelector(".swd-peek")).not.toBeNull();
     document.querySelector<HTMLElement>(".swd-settings-close")!.click();
     await settle();
@@ -642,13 +666,44 @@ describe("the peek", () => {
     expect(told.at(-1)).toContain("Typed, not left");
   });
 
+  it("shows another item pressed in its place in the same panel, never closed and opened anew; a press elsewhere closes it", async () => {
+    const { q, peek } = await setup();
+    await peek("Fix login");
+    const panel = document.querySelector(".swd-peek");
+    // A press on another item's name: down and up, its click showing it
+    const other = [...document.querySelectorAll<HTMLElement>(".swd-list-name")].find((one) => one.title === "Open Write docs")!;
+    other.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    other.dispatchEvent(new Event("pointerup", { bubbles: true }));
+    await peek("Write docs");
+    await settle();
+    expect([document.querySelector(".swd-peek") === panel, q<HTMLInputElement>(".swd-peek-name").value]).toEqual([true, "Write docs"]);
+    pressOn(document.body);
+    await settle();
+    expect(document.querySelector(".swd-peek")).toBeNull();
+  });
+
+  it("stays open as a card or a row beside it is dragged (pressed and let go elsewhere), a press without moving closing it", async () => {
+    const { peek } = await setup();
+    await peek("Fix login");
+    const at = (type: string, x: number) => document.body.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: 40, button: 0, bubbles: true }));
+    at("pointerdown", 20);
+    at("pointerup", 220);
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    expect(document.querySelector(".swd-peek")).not.toBeNull();
+    at("pointerdown", 20);
+    at("pointerup", 22);
+    at("click", 22);
+    await settle();
+    expect(document.querySelector(".swd-peek")).toBeNull();
+  });
+
   it("writes what is typed as a press beside it closes it, and Esc closes it", async () => {
     const { q, peek, named, store } = await setup();
     await peek("Fix login");
     const body = q<HTMLTextAreaElement>(".swd-peek-body");
     body.focus();
     body.value = "Typed";
-    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    pressOn(document.body);
     await settle();
     expect(document.querySelector(".swd-peek")).toBeNull();
     expect(await store.body("tasks", (await named("Fix login")).key)).toBe("Typed");

@@ -1,6 +1,6 @@
 // What one write writes of an item, and two readings of an item compared by
 // it: the rule by which a write from an item as a view showed it goes on the
-// item as it is now (core.ts `onItem`), and by which the item's panel tells
+// item as it is now (core.ts `onItems`), and by which the item's panel tells
 // whether the item as it is now is what it shows (its own writes). A write is
 // of a part of an item (a value, its name, its look); the store writes that
 // part alone, so where the part is still as shown, nothing the view did not

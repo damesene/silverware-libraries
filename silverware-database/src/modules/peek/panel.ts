@@ -13,7 +13,7 @@
 // takes it away) until it is written or the user agrees to load the body as it
 // is now. A change made elsewhere draws the panel anew once nothing in it is
 // being edited.
-import { el } from "../../../../shared/elements.ts";
+import { el, openedHere } from "../../../../shared/elements.ts";
 import type { Result } from "../../core/core.ts";
 import type { ModuleHost } from "../../core/module.ts";
 import { samePart } from "../../domain/itempart.ts";
@@ -31,6 +31,10 @@ import { missing, valueNodes } from "../../views/values.ts";
 const WIDTH = 600;
 const MIN_WIDTH = 320;
 const SHARE = 0.8;
+// How long after a press beside the panel its click is waited for (a press moved away, a drag, has none)
+const CLICK_WAIT_MS = 400;
+// How far a press beside the panel moves before it is a drag (a card or a row dragged to its place), which leaves it open
+const DRAG_MOVE = 6;
 // An editor's area narrower than this (a phone, a narrow window): the panel takes all of it, as a page of its own
 const NARROW = 720;
 // What a press there is not beside the panel: a dialog over the page (a question asked), a notification
@@ -88,6 +92,10 @@ export class PeekPanel {
   private readonly edits = new Set<Promise<unknown>>();
   // The panel's own writes of its item, one after another: each from the item as the one before it left the panel (`own`)
   private queue: Promise<unknown> = Promise.resolve();
+  // Items asked to be shown, counted: a press beside the panel closes it only where it asked for none (`beside`)
+  private asked = 0;
+  // A press beside the panel being followed to its end (its listeners, its timers): ended as the panel goes or another comes
+  private pressBeside: (() => void) | undefined;
   // The item being removed (asked, written): a second press of the bin meanwhile asks nothing
   private removing = false;
   // A question asked of the user: presses meanwhile are theirs, not beside the panel
@@ -111,6 +119,7 @@ export class PeekPanel {
 
   /** An item shown; another shown before is left first (its field written), unless its body typed could not be written: then it stays */
   async show(item: Item, database: string): Promise<void> {
+    this.asked++;
     const opener = this.shown?.opener ?? this.host.document.activeElement;
     if (!(await this.leave())) return;
     const read = await this.host.database(database);
@@ -230,14 +239,51 @@ export class PeekPanel {
         }
       }),
     );
-    // A press beside it closes it (what is typed written first); not one in a question asked meanwhile, nor in a dialog or a notification
+    // A press beside it closes it (what is typed written first); not one in a question asked meanwhile, nor in a dialog or a
+    // notification. Once the press is over, and only where it showed no other item: a press on another item's name shows
+    // that one in the panel as it is, never closed and opened anew (the panel blinked); nor a drag (a card or a row dragged
+    // to its place, its item's rank written: the panel stays as it is)
     const beside = (event: PointerEvent) => {
       const target = event.target;
       if (!this.element || this.asking || !(target instanceof Element) || this.element.contains(target) || target.closest(NOT_BESIDE)) return;
-      void this.close();
+      // What is being edited in it written at once, before the press does anything (as closing it would have)
+      const active = doc.activeElement;
+      if (active instanceof HTMLElement && this.element.contains(active)) active.blur();
+      this.pressBeside?.();
+      const asked = this.asked;
+      const from = { x: event.clientX, y: event.clientY };
+      let late: ReturnType<typeof setTimeout> | undefined;
+      let after: ReturnType<typeof setTimeout> | undefined;
+      const listened = ["pointerup", "pointercancel", "click"] as const;
+      const end = () => {
+        for (const type of listened) doc.removeEventListener(type, step, true);
+        clearTimeout(late);
+        clearTimeout(after);
+        this.pressBeside = undefined;
+      };
+      // (After the click's own handlers: an item it shows asked for meanwhile, the panel then shows it as it is)
+      const settle = () => {
+        clearTimeout(late);
+        after = setTimeout(() => {
+          end();
+          if (this.asked === asked) void this.close();
+        }, 0);
+      };
+      const step = (done: Event) => {
+        if (done.type === "click") return settle();
+        // A drag: let go away from where it was pressed, left open
+        if (done instanceof MouseEvent && done.type === "pointerup" && Math.hypot(done.clientX - from.x, done.clientY - from.y) > DRAG_MOVE) return end();
+        // (No click comes of a press moved away a little: closed all the same)
+        late ??= setTimeout(settle, CLICK_WAIT_MS);
+      };
+      for (const type of listened) doc.addEventListener(type, step, true);
+      this.pressBeside = end;
     };
     doc.addEventListener("pointerdown", beside, true);
-    this.stops.push(() => doc.removeEventListener("pointerdown", beside, true));
+    this.stops.push(() => {
+      doc.removeEventListener("pointerdown", beside, true);
+      this.pressBeside?.();
+    });
     const view = doc.defaultView;
     const place = () => this.place();
     view?.addEventListener("resize", place);
@@ -418,16 +464,16 @@ export class PeekPanel {
     name.addEventListener("keydown", (event) => {
       if (event.key === "Enter") name.blur();
     });
-    const open = el(doc, "button", {
-      class: "swd-peek-button swd-peek-open",
-      html: VIEW_ICONS.open,
-      title: `Open its ${this.host.noun.one}`,
-      attrs: { "aria-label": `Open its ${this.host.noun.one}` },
-      run: async () => {
-        // (Its page in the editor, the panel closed first: the body is not edited in two places)
-        if (await this.close()) await this.host.openDocument(shown.item);
-      },
-    });
+    // Its page in the editor, the panel closed first (the body is not edited in two places); a link where the page has an
+    // address, so a middle click, Ctrl or Shift opens it in a tab of the browser's, the panel left as it is
+    const openHere = async () => {
+      if (await this.close()) await this.host.openDocument(shown.item);
+    };
+    const openLabel = `Open its ${this.host.noun.one}`;
+    const href = this.host.documentHref?.(shown.item);
+    const open = href
+      ? openedHere(el(doc, "a", { class: "swd-peek-button swd-peek-open", html: VIEW_ICONS.open, title: openLabel, attrs: { href, "aria-label": openLabel } }), () => void openHere())
+      : el(doc, "button", { class: "swd-peek-button swd-peek-open", html: VIEW_ICONS.open, title: openLabel, attrs: { "aria-label": openLabel }, run: () => void openHere() });
     // Closed by × beside the page, by ← where it is the whole page (a phone): the style page shows the one that fits
     const close = el(
       doc,
@@ -631,7 +677,7 @@ export class PeekPanel {
 
   /**
    * One of the panel's own writes of its item, after the one before it, `write` given the item the panel writes against
-   * (the core writes it on the item as it is now where the part written is still as given: core.ts `onItem`); the places
+   * (the core writes it on the item as it is now where the part written is still as given: core.ts `onItems`); the places
    * and the panel follow it, and it is kept while it goes on (the item's removal waits for it). Written while the panel's
    * drawing is put off (another field being edited), the panel shows what it wrote (`shows`: the item with it): where the
    * item as it is now is just that, it is what the panel writes against next, so a second change of the same field and a

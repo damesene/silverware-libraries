@@ -26,10 +26,27 @@ import { databaseChanges, type DatabaseChangesBuilder } from "./builder.ts";
 import type { Changes } from "./changes.ts";
 import { TransactionHistory } from "./history.ts";
 import { placeStateRenamed } from "./placestate.ts";
-import { type DatabaseStore, type LooseKey, type PlaceChange, type PlacesPlan, type PlacesReport, type PlaceStore, REMOVE_PLACE, type Skipped, type Target, type TransactionPlan, type TransactionReport, type WriteProgress } from "./store.ts";
+import { type DatabaseStore, type LooseKey, type PlaceChange, type PlacesPlan, type PlacesReport, type PlaceStore, type PreviewRun, REMOVE_PLACE, type Skipped, type Target, type TransactionPlan, type TransactionReport, type WriteProgress } from "./store.ts";
 
 /** What the core asks of the user: told what was refused or left, asked before anything is removed */
-export type CoreInterface = Pick<UserInterface, "notify"> & Required<Pick<UserInterface, "ask">>;
+export type CoreInterface = Pick<UserInterface, "notify"> &
+  Required<Pick<UserInterface, "ask">> & {
+    /** A write left as what it rests on changed since a view showed it, to be seen and written over (none: said by `notify`) */
+    conflict?(conflict: ItemConflict): void;
+  };
+
+/**
+ * A write left as what it rests on changed since a view showed it (core.ts `onItems`): `preview` the lines it would
+ * change on each document as it is now (planned, nothing written), `force` it written on the items as they are now
+ * (refused anew, its own conflict, where they changed again since)
+ */
+export type ItemConflict = {
+  readonly problem: string;
+  /** Whether it was written over (`force`): its notification, which stays until closed, then has nothing more to do */
+  written(): boolean;
+  preview(): Promise<{ readonly documents: readonly { readonly document: string; readonly runs: readonly PreviewRun[] }[]; readonly problem?: string }>;
+  force(): Promise<Result>;
+};
 
 /** Something written (the report says what was left besides) */
 export type Written = { readonly report: TransactionReport };
@@ -42,7 +59,8 @@ export type Written = { readonly report: TransactionReport };
  */
 export type RefusedCause = "invalid" | "left" | "declined" | "unchanged";
 
-export type Refused = { readonly problem: string; readonly cause: RefusedCause; readonly report?: TransactionReport };
+/** `conflict`: what was left offered to see and write over, where the caller shows it (an edit of the schema made of one changed since) */
+export type Refused = { readonly problem: string; readonly cause: RefusedCause; readonly report?: TransactionReport; readonly conflict?: ItemConflict };
 
 export type Result = Written | Refused;
 
@@ -92,6 +110,46 @@ export type ItemDraft = { readonly name?: string; readonly values?: Readonly<Rec
 export type NewProperty = { readonly label: string; readonly type: string; readonly key?: string; readonly params?: Params; readonly readonly?: boolean; readonly system?: string };
 
 /**
+ * A property as an edit of the schema has it (`editSchema`): `from` the key it
+ * has now (none: added by the edit, its key made from its label where `key`
+ * is not given), the rest as it is to be, whole: `required`, `showName` and
+ * `icon` left out are off (none), as a property kept as it is gives them
+ * (`propertyEdit`); `renames` its options renamed, an old name to its new one
+ * (the items' values renamed with them)
+ */
+export type PropertyEdit = NewProperty & {
+  readonly from?: string;
+  readonly required?: boolean;
+  readonly showName?: boolean;
+  readonly icon?: string;
+  readonly renames?: Readonly<Record<string, string>>;
+};
+
+/**
+ * The schema as an edit has it, whole (the properties' dialog's draft):
+ * `revision` the database's as the edit was made of it (another now: a
+ * conflict), `properties` in their order (a property of the schema none of
+ * them names by `from` is removed), `removedValues` the keys of those removed
+ * whose values are taken off the items too (else kept, shown again if the
+ * property comes back); `label` what the change is called (Undo's);
+ * `showsConflict` where the caller shows a conflict itself (the dialog's
+ * foot), else the core offers it (`CoreInterface.conflict`)
+ */
+export type SchemaEdit = {
+  readonly revision: string;
+  readonly properties: readonly PropertyEdit[];
+  readonly removedValues?: readonly string[];
+  readonly label?: string;
+  readonly showsConflict?: boolean;
+};
+
+/** A property kept as it is, as an edit of the schema names it (`change` over it) */
+export function propertyEdit(property: Property, change: Partial<PropertyEdit> = {}): PropertyEdit {
+  const { key, label, type, params, readonly, required, showName, icon, system } = property;
+  return { from: key, label, type, params, readonly, ...(required ? { required } : {}), ...(showName ? { showName } : {}), ...(icon !== undefined ? { icon } : {}), ...(system !== undefined ? { system } : {}), ...change };
+}
+
+/**
  * Where an item goes in the order by hand: right after `after`, else right
  * before `before` (items of the same database, as a view shows them, filtered
  * or not), else at the end (those without a rank, made outside the core, ranked
@@ -135,13 +193,25 @@ type DatabaseRead = { readonly database: Revised<Database>; readonly items: Revi
 
 /**
  * An item as a view showed it (`given`), as it is now (`now`, by key) where `part` of it is still as shown (core.ts
- * `onItem`); `changed` where that part changed since; as shown where it is gone (the store says so)
+ * `onItems`); `changed` where that part changed since; as shown where it is gone (the store says so)
  */
 function currentOf(now: ReadonlyMap<ItemKey, Item>, given: Item, part: ItemPart, database: Database): Item | "changed" {
   const current = now.get(given.key);
   if (!current) return given;
   return samePart(current, given, part, database) ? current : "changed";
 }
+
+/** What an item's write writes, made from the items it goes on: its changes, how it is called, the part it cannot do without */
+type ItemWrite = { readonly changes: Changes; readonly label: string; readonly needed?: Target };
+
+/** A refusal of an item's write as it is made: `invalid` (said by `onItems`), `unchanged` (said to no one) */
+type Quiet = Refused & { readonly cause: "invalid" | "unchanged" };
+
+/** An item's write made, quietly (a refusal said by `onItems`, so a conflict's preview says nothing) */
+type MakeItemWrite = (items: readonly Item[], read: DatabaseRead) => ItemWrite | Quiet;
+
+/** A refusal said by whoever gets it (an item's write made quietly) */
+const invalid = (problem: string): Quiet => ({ problem, cause: "invalid" });
 
 /** The items' own revisions (not what the system gives them, a date that moves): what a proposal written whole is checked against */
 const itemsRevision = (items: readonly Item[]) => items.map((one) => `${one.key}:${one.revision}`).join(",");
@@ -175,15 +245,15 @@ export class DatabaseCore {
 
   // Items
 
-  /** A property's value of an item as read (undefined: taken off the item); see `onItem` */
+  /** A property's value of an item as read (undefined: taken off the item); see `onItems` */
   async update(database: string, given: Item, key: string, value: Value | undefined): Promise<Result> {
-    return this.onItem(database, given, { values: [key] }, (item, read) => {
+    return this.onItems(database, [given], { values: [key] }, ([item], read) => {
       const property = writable(read.database.value, key);
-      if (typeof property === "string") return this.refuse(property);
-      if (value !== undefined && !isValue(value)) return this.refuse(notValue(property.label));
-      if (property.required && (value === undefined || isEmpty(value)) && !isEmpty(item.values[key])) return this.refuse(`${property.label} is required: not emptied`);
-      const changes = databaseChanges(database).item(item, (i) => (value === undefined ? i.unset(key) : i.set(key, value)));
-      return this.write(changes.build(), `Set ${property.label} of ${item.name}`);
+      if (typeof property === "string") return invalid(property);
+      if (value !== undefined && !isValue(value)) return invalid(notValue(property.label));
+      if (property.required && (value === undefined || isEmpty(value)) && !isEmpty(item!.values[key])) return invalid(`${property.label} is required: not emptied`);
+      const changes = databaseChanges(database).item(item!, (i) => (value === undefined ? i.unset(key) : i.set(key, value)));
+      return { changes: changes.build(), label: `Set ${property.label} of ${item!.name}` };
     });
   }
 
@@ -213,41 +283,41 @@ export class DatabaseCore {
     });
   }
 
-  /** An item's name (refused where empty, taken, or what the store cannot keep); see `onItem` */
+  /** An item's name (refused where empty, taken, or what the store cannot keep); see `onItems` */
   async rename(database: string, given: Item, name: string): Promise<Result> {
-    return this.onItem(database, given, { name: true }, (item, read) => {
-      const trimmed = name.trim();
-      if (trimmed === item.name) return unchanged("The name is the same");
-      const problem = this.validateName(trimmed, new Set(read.items.value.filter((one) => one.key !== item.key).map((one) => one.name)));
-      if (problem) return this.refuse(problem);
-      return this.write(databaseChanges(database).item(item, (i) => i.rename(trimmed)).build(), `Rename ${item.name} to ${trimmed}`);
+    const trimmed = name.trim();
+    return this.onItems(database, [given], { name: true }, ([item], read) => {
+      if (trimmed === item!.name) return unchanged("The name is the same");
+      const problem = this.validateName(trimmed, new Set(read.items.value.filter((one) => one.key !== item!.key).map((one) => one.name)));
+      if (problem) return invalid(problem);
+      return { changes: databaseChanges(database).item(item!, (i) => i.rename(trimmed)).build(), label: `Rename ${item!.name} to ${trimmed}` };
     });
   }
 
   /**
    * How an item looks (its icon, its color), the whole of it: what `look`
    * leaves out the item has no more (`{}`: none); refused where it is none
-   * (domain/look.ts); see `onItem`
+   * (domain/look.ts); see `onItems`
    */
   async setLook(database: string, given: Item, look: ItemLook): Promise<Result> {
     const problem = validateLook(look);
     if (problem) return this.refuse(problem);
-    return this.onItem(database, given, { look: true }, (item) => {
-      if (sameLook(look, item.look)) return unchanged("The look is the same");
-      const what = look.icon === item.look?.icon ? "color" : look.color === item.look?.color ? "icon" : "look";
-      return this.write(databaseChanges(database).item(item, (i) => i.look(look)).build(), `Change the ${what} of ${item.name}`, { item: item.key });
+    return this.onItems(database, [given], { look: true }, ([item]) => {
+      if (sameLook(look, item!.look)) return unchanged("The look is the same");
+      const what = look.icon === item!.look?.icon ? "color" : look.color === item!.look?.color ? "icon" : "look";
+      return { changes: databaseChanges(database).item(item!, (i) => i.look(look)).build(), label: `Change the ${what} of ${item!.name}`, needed: { item: item!.key } };
     });
   }
 
-  /** An item's body (its content in the markdown language), written only where it is still `was` as read (`store.body`): a body changed since is left, never written over; see `onItem` */
+  /** An item's body (its content in the markdown language), written only where it is still `was` as read (`store.body`): a body changed since is left, never written over; see `onItems` */
   async setBody(database: string, given: Item, body: string, was: string | undefined): Promise<Result> {
     if (!this.store.capabilities.itemBody) return this.refuse("This database keeps no body of an item");
     if (body === (was ?? "")) return unchanged("The body is the same");
     // (Nothing of the item rests on what it shows: the body has its own check, `was`)
-    return this.onItem(database, given, {}, (item) => this.write(databaseChanges(database).item(item, (i) => i.body(body, was)).build(), `Edit the body of ${item.name}`));
+    return this.onItems(database, [given], {}, ([item]) => ({ changes: databaseChanges(database).item(item!, (i) => i.body(body, was)).build(), label: `Edit the body of ${item!.name}` }));
   }
 
-  /** Items removed, the user asked first: each where what it loses (its name, values and look) is still as shown; see `onItem` */
+  /** Items removed, the user asked first: each where what it loses (its name, values and look) is still as shown, the others left, said; see `onItems` */
   async remove(database: string, items: readonly Item[]): Promise<Result> {
     if (!items.length) return unchanged("Nothing to remove");
     const what = items.length === 1 ? `"${items[0]!.name}"` : `${items.length} items`;
@@ -255,7 +325,7 @@ export class DatabaseCore {
     return this.onItems(database, items, { allValues: true, name: true, look: true }, (now) => {
       const changes = databaseChanges(database);
       for (const item of now) changes.item(item, (i) => i.remove());
-      return this.write(changes.build(), `Remove ${what}`);
+      return { changes: changes.build(), label: now.length === 1 ? `Remove "${now[0]!.name}"` : `Remove ${now.length} items` };
     });
   }
 
@@ -264,27 +334,24 @@ export class DatabaseCore {
    * it is written, but where its neighbours' ranks do not allow its place
    * (typed by hand, missing): those get ranks in the same transaction,
    * keeping the order shown. Its place by its neighbours as they are now;
-   * the values it sets as shown (see `onItem`)
+   * the values it sets as shown (see `onItems`)
    */
   async move(database: string, given: Item, place: Place): Promise<Result> {
     if (place.after?.key === given.key || place.before?.key === given.key) return unchanged("An item stays beside itself");
+    const keys = Object.keys(place.values ?? {});
     // (After every item's writes going on: its neighbours may get ranks in its transaction)
-    return this.afterAllItemWrites(database, async () => {
-      const read = await this.read(database);
-      if ("problem" in read) return read;
-      const item = currentOf(new Map(read.items.value.map((one) => [one.key, one] as const)), given, { values: Object.keys(place.values ?? {}) }, read.database.value);
-      if (item === "changed") return this.changedSince([given]);
+    return this.onItems(database, [given], { values: keys }, ([item], read) => {
       for (const [key, value] of Object.entries(place.values ?? {})) {
         const property = writable(read.database.value, key);
-        if (typeof property === "string") return this.refuse(property);
-        if (value !== undefined && !isValue(value)) return this.refuse(notValue(property.label));
+        if (typeof property === "string") return invalid(property);
+        if (value !== undefined && !isValue(value)) return invalid(notValue(property.label));
         // (A card moved to the column of none: a required value is not taken off by it)
-        if (property.required && (value === undefined || isEmpty(value)) && !isEmpty(item.values[key])) return this.refuse(`${property.label} is required: not emptied`);
+        if (property.required && (value === undefined || isEmpty(value)) && !isEmpty(item!.values[key])) return invalid(`${property.label} is required: not emptied`);
       }
       // No neighbour named (a card dropped in an empty column, on a board sorted): its values alone, its place by hand kept
-      const placing = place.after || place.before ? placed(read.items.value, item, place) : undefined;
-      if (typeof placing === "string") return this.refuse(placing);
-      const changes = databaseChanges(database).item(item, (i) => {
+      const placing = place.after || place.before ? placed(read.items.value, item!, place) : undefined;
+      if (typeof placing === "string") return invalid(placing);
+      const changes = databaseChanges(database).item(item!, (i) => {
         if (placing) i.rank(placing.rank);
         for (const [key, value] of Object.entries(place.values ?? {})) {
           if (value === undefined) i.unset(key);
@@ -292,36 +359,104 @@ export class DatabaseCore {
         }
       });
       if (placing) rankOthers(changes, read.items.value, placing.others);
-      return this.write(changes.build(), `Move ${item.name}`, { item: item.key });
-    });
+      return { changes: changes.build(), label: `Move ${item!.name}`, needed: { item: item!.key } };
+    }, { all: true });
   }
 
   /**
    * A write of items (`given`, as a view showed them) resting on `part` of each (domain/itempart.ts: a value, the name,
-   * the look; what a removal loses), once their writes going on are done, given the database as read then and the items
-   * it goes on: each as it is now where its part is still as shown, so what else of it changed since, by the view's own
-   * writes (a name typed and left, a status picked at once) or elsewhere, is kept, as only the part is written. Where the
-   * part changed since (by anyone), nothing is written, said (`changedSince`): nothing a view did not show is written
-   * over, by any of the ways an item is written
+   * the look; what a removal loses), once their writes going on are done (`all`: every item's, as it may rank any of
+   * them: a move): `make` given the items it goes on and the database as read then, each as it is now where its part is
+   * still as shown, so what else of it changed since, by the view's own writes (a name typed and left, a status picked at
+   * once) or elsewhere, is kept, as only the part is written. Where the part changed since (by anyone), those items are
+   * left, the user told, and the conflict offered to see and write over (`ItemConflict`): nothing a view did not show is
+   * written over unless the user says so, by any of the ways an item is written
    */
-  private onItem<R>(database: string, given: Item, part: ItemPart, write: (item: Item, read: DatabaseRead) => R | Refused | Promise<R | Refused>): Promise<R | Refused> {
-    return this.onItems(database, [given], part, ([item], read) => write(item!, read));
-  }
-
-  /** `onItem` of several items at once (a removal of many): those whose part changed since left, said, the others written */
-  private onItems<R>(database: string, given: readonly Item[], part: ItemPart, write: (items: readonly Item[], read: DatabaseRead) => R | Refused | Promise<R | Refused>): Promise<R | Refused> {
-    return this.afterItemWrites(database, given, async () => {
+  private onItems(database: string, given: readonly Item[], part: ItemPart, make: MakeItemWrite, options: { readonly all?: boolean } = {}): Promise<Result> {
+    const queued = (run: () => Promise<Result>) => (options.all ? this.afterAllItemWrites(database, run) : this.afterItemWrites(database, given, run));
+    return queued(async () => {
       const read = await this.read(database);
       if ("problem" in read) return read;
       const now = new Map(read.items.value.map((one) => [one.key, one] as const));
       const items = given.map((one) => currentOf(now, one, part, read.database.value));
       const changed = given.filter((_one, at) => items[at] === "changed");
       const current = items.filter((one): one is Item => one !== "changed");
-      // (Those whose part changed left, said; the others written, where there are any)
-      if (!current.length) return this.changedSince(changed);
-      if (changed.length) this.changedSince(changed);
-      return write(current, read);
+      // Those whose part changed left: said, their conflict offered, written over on the items as it shows them
+      const left = changed.length
+        ? this.conflict(database, changed, now, { part, make, options })
+        : undefined;
+      if (!current.length) return left!;
+      const written = make(current, read);
+      if (!("problem" in written)) return this.write(written.changes, written.label, written.needed);
+      // (Refused: said here, as it is made quietly, for a conflict's preview too)
+      if (written.cause === "invalid") this.ui.notify(written.problem, { type: "error" });
+      return written;
     });
+  }
+
+  /**
+   * Items whose part changed since a view showed them: left, the user told (a notification that stays until closed, as
+   * the platform has it), the conflict handed on (`CoreInterface.conflict`): `preview`, each document's lines the write
+   * would change, planned on the items as they are now where its part is still as the conflict shows it, nothing written; and
+   * `force`, the write on the items as the conflict shows them, refused anew where they changed again since. Made of
+   * what it is given alone: nothing of the read it was found in is kept for as long as it is shown
+   */
+  private conflict(database: string, shown: readonly Item[], now: ReadonlyMap<ItemKey, Item>, write: { readonly part: ItemPart; readonly make: MakeItemWrite; readonly options: { readonly all?: boolean } }): Refused {
+    const { part, make } = write;
+    // (What it keeps: the items as they are now, nothing of the read itself)
+    const items = shown.map((one) => now.get(one.key)!);
+    const single = shown.length === 1;
+    const what = single ? `"${shown[0]!.name}"` : `${shown.length} items`;
+    const problem = `${what} changed since ${single ? "it was" : "they were"} shown: left as ${single ? "it is" : "they are"}`;
+    const conflict = this.conflictOf(
+      problem,
+      async () => {
+        const read = await this.read(database);
+        if ("problem" in read) return { documents: [], problem: read.problem };
+        const now = new Map(read.items.value.map((item) => [item.key, item] as const));
+        const current = items.map((item) => currentOf(now, item, part, read.database.value));
+        if (current.includes("changed")) return { documents: [], problem: "It changed again since: Write mine shows the conflict as it is now." };
+        const written = make(current as Item[], read);
+        if ("problem" in written) return { documents: [], problem: written.problem };
+        return { documents: this.planned(database, await this.store.plan(written.changes)) };
+      },
+      () => this.onItems(database, items, part, make, write.options),
+    );
+    return this.offer(conflict, false);
+  }
+
+  /**
+   * A conflict of what `force` writes: `preview` each document's lines it
+   * would change, nothing written; `force` written once (written, the conflict
+   * is over: its notification, which stays until closed, may still be pressed)
+   */
+  private conflictOf(problem: string, preview: ItemConflict["preview"], force: () => Promise<Result>): ItemConflict {
+    let written = false;
+    return {
+      problem,
+      written: () => written,
+      preview,
+      force: async () => {
+        if (written) return unchanged("Written already");
+        const result = await force();
+        if (!("problem" in result)) written = true;
+        return result;
+      },
+    };
+  }
+
+  /** A conflict left: given back, and offered to the user by the core where the caller does not show it (a notification that stays until closed, as the platform has it) */
+  private offer(conflict: ItemConflict, shownByCaller: boolean): Refused {
+    if (!shownByCaller) {
+      if (this.ui.conflict) this.ui.conflict(conflict);
+      else this.ui.notify(conflict.problem, { type: "error" });
+    }
+    return { problem: conflict.problem, cause: "left", conflict };
+  }
+
+  /** A plan's documents as a conflict shows them: each one's name and the lines it would change */
+  private planned(database: string, plan: TransactionPlan): { readonly document: string; readonly runs: readonly PreviewRun[] }[] {
+    return plan.planned.map((planned) => ({ document: ("item" in planned.target ? this.store.documentOf(planned.target.item) : this.store.databaseDocumentOf(database)) ?? "", runs: planned.preview?.() ?? [] }));
   }
 
   /** `run` once the writes of `items` going on (and one that may rank any item) are done, the items' next writes waiting for it */
@@ -393,12 +528,10 @@ export class DatabaseCore {
 
   /** A property added at the end, its key made from its label where not given */
   async addProperty(database: string, property: NewProperty): Promise<Result> {
-    const read = await this.read(database);
-    if ("problem" in read) return read;
-    // (The keys the store keeps apart taken too: a property named so takes no values typed by hand, unless asked by its key)
-    const made = this.newProperty(property, read.database.value.properties, read.items.value, (await this.store.looseValues(database)).map((one) => one.key));
-    if (typeof made === "string") return this.refuse(made);
-    return this.writeSchema(read.database, [...read.database.value.properties, made], `Add property ${made.label}`);
+    const read = await this.store.database(database);
+    if (!read) return this.refuse(`No database "${database}"`);
+    const label = property.label.trim() || (property.system !== undefined ? (systemKind(property.system, this.noun)?.label ?? "") : "");
+    return this.writeOne(database, read, (now) => [...now.map((one) => propertyEdit(one)), property], `Add property ${label}`);
   }
 
   /** A property's label (its key, which items keep, stays) */
@@ -410,7 +543,7 @@ export class DatabaseCore {
     const trimmed = label.trim();
     if (!trimmed) return this.refuse("A property needs a label");
     if (trimmed === property.label) return unchanged("The label is the same");
-    return this.writeSchema(read, read.value.properties.map((one) => (one.key === key ? { ...one, label: trimmed } : one)), `Rename property ${property.label} to ${trimmed}`);
+    return this.writeOne(database, read, changing(key, { label: trimmed }), `Rename property ${property.label} to ${trimmed}`);
   }
 
   /** A property read only (no view offers to change it, the core refuses to) or not: the schema alone */
@@ -421,7 +554,7 @@ export class DatabaseCore {
     if (!property) return this.refuse(`No property "${key}"`);
     if (property.system !== undefined) return this.refuse(systemProperty(property));
     if (property.readonly === readonly) return unchanged("It is so already");
-    return this.writeSchema(read, read.value.properties.map((one) => (one.key === key ? { ...one, readonly } : one)), `${readonly ? "Lock" : "Unlock"} property ${property.label}`);
+    return this.writeOne(database, read, changing(key, { readonly }), `${readonly ? "Lock" : "Unlock"} property ${property.label}`);
   }
 
   /** A property required (every item is to have a value: one without shows as missing, none is taken off) or optional: the schema alone */
@@ -432,15 +565,7 @@ export class DatabaseCore {
     if (!property) return this.refuse(`No property "${key}"`);
     if (property.system !== undefined) return this.refuse(systemProperty(property));
     if ((property.required ?? false) === required) return unchanged("It is so already");
-    return this.writeSchema(
-      read,
-      read.value.properties.map((one) => {
-        if (one.key !== key) return one;
-        const { required: _was, ...rest } = one;
-        return required ? { ...rest, required: true } : rest;
-      }),
-      `Make property ${property.label} ${required ? "required" : "optional"}`,
-    );
+    return this.writeOne(database, read, changing(key, { required }), `Make property ${property.label} ${required ? "required" : "optional"}`);
   }
 
   /** A property's name shown with its value where a value stands alone (a card's line, a list's row), or not: the schema alone */
@@ -450,15 +575,7 @@ export class DatabaseCore {
     const property = read.value.properties.find((one) => one.key === key);
     if (!property) return this.refuse(`No property "${key}"`);
     if ((property.showName ?? false) === shown) return unchanged("It is so already");
-    return this.writeSchema(
-      read,
-      read.value.properties.map((one) => {
-        if (one.key !== key) return one;
-        const { showName: _was, ...rest } = one;
-        return shown ? { ...rest, showName: true } : rest;
-      }),
-      `${shown ? "Show" : "Leave out"} the name of ${property.label} with its values`,
-    );
+    return this.writeOne(database, read, changing(key, { showName: shown }), `${shown ? "Show" : "Leave out"} the name of ${property.label} with its values`);
   }
 
   /** A property's own icon (an emoji) where the views name it, or none (undefined: its type's again): the schema alone */
@@ -472,15 +589,7 @@ export class DatabaseCore {
       if (problem) return this.refuse(problem);
     }
     if (property.icon === icon) return unchanged("It is so already");
-    return this.writeSchema(
-      read,
-      read.value.properties.map((one) => {
-        if (one.key !== key) return one;
-        const { icon: _was, ...rest } = one;
-        return icon === undefined ? rest : { ...rest, icon };
-      }),
-      icon === undefined ? `Take the icon off ${property.label}` : `Give ${property.label} an icon`,
-    );
+    return this.writeOne(database, read, changing(key, { icon }), icon === undefined ? `Take the icon off ${property.label}` : `Give ${property.label} an icon`);
   }
 
   /**
@@ -501,51 +610,38 @@ export class DatabaseCore {
     if (sameParams(params, property.params)) return unchanged("The settings are the same");
     const type = this.types.named(property.type);
     if (!type) return this.refuse(`${property.label}: its type "${property.type}" is not defined now`);
-    const problem = validateParamNames(property.label, params) ?? (type.validateParams?.(params) === undefined ? undefined : `${property.label}: ${type.validateParams(params)}`);
-    if (problem) return this.refuse(problem);
     const reads = (value: Value, at: Params) => type.validate(value, at) === undefined;
     const changed = read.items.value.find((item) => {
       const value = item.values[key];
       return value !== undefined && !isEmpty(value) && reads(value, property.params) !== reads(value, params);
     });
     if (changed) return this.refuse(`${property.label}: "${changed.name}"'s value would read otherwise: change its options through its type`);
-    return this.writeSchema(read.database, read.database.value.properties.map((one) => (one.key === key ? { ...one, params } : one)), `Change the settings of ${property.label}`);
+    return this.writeOne(database, read.database, changing(key, { params }), `Change the settings of ${property.label}`);
   }
 
   /** A property moved to `index` among the properties (its order as views show them): the schema alone */
   async moveProperty(database: string, key: string, index: number): Promise<Result> {
     const read = await this.store.database(database);
     if (!read) return this.refuse(`No database "${database}"`);
-    const properties = [...read.value.properties];
-    const at = properties.findIndex((one) => one.key === key);
+    const properties = read.value.properties.map((one) => propertyEdit(one));
+    const at = properties.findIndex((one) => one.from === key);
     if (at < 0) return this.refuse(`No property "${key}"`);
     const to = Math.max(0, Math.min(properties.length - 1, index));
     if (to === at) return unchanged("It is there already");
     const [moved] = properties.splice(at, 1);
     properties.splice(to, 0, moved!);
-    return this.writeSchema(read, properties, `Move property ${moved!.label}`);
+    return this.writeOne(database, read, () => properties, `Move property ${moved!.label}`);
   }
 
-  /** A property's key changed, every item's value moved to it: a proposal; refused where items still keep values under the new key */
+  /** A property's key changed, every item's value moved to it, the views naming it with it: a proposal; refused where items still keep values under the new key */
   async rekeyProperty(database: string, key: string, newKey: string, finding?: WriteProgress): Promise<Proposal | Refused> {
-    const read = await this.read(database);
-    if ("problem" in read) return read;
-    const property = read.database.value.properties.find((one) => one.key === key);
+    const read = await this.store.database(database);
+    if (!read) return this.refuse(`No database "${database}"`);
+    const property = read.value.properties.find((one) => one.key === key);
     if (!property) return this.refuse(`No property "${key}"`);
     if (property.system !== undefined) return this.refuse(systemProperty(property));
     if (newKey === key) return unchanged("The key is the same");
-    const problem = this.validateKey(newKey, read.database.value.properties) ?? validateKeptValues(newKey, read.items.value, await this.store.looseValues(database));
-    if (problem) return this.refuse(problem);
-    const changes = databaseChanges(database).expectDatabase(read.database.revision).schema(read.database.value.properties.map((one) => (one.key === key ? { ...one, key: newKey } : one)));
-    for (const item of read.items.value) {
-      const value = item.values[key];
-      if (value !== undefined) changes.item(item, (i) => i.set(newKey, value).unset(key));
-    }
-    const proposal = await this.propose(changes.build(), `Change the key of ${property.label} to ${newKey}`);
-    // The places naming the key (a view's filter, sort, grouping, its own meta), found now: written with it, put back with its undo
-    const renamed: PlaceChange = (state) => placeStateRenamed(state, key, newKey, this.places!.propertyMeta);
-    const places = this.places && (await this.places.store.plan(database, renamed, finding));
-    return { ...proposal, whole: { items: itemsRevision(read.items.value) }, ...(places?.documents.length || places?.byHand?.length ? { places } : {}) };
+    return this.editOne(database, read, changing(key, { key: newKey }), `Change the key of ${property.label} to ${newKey}`, { finding });
   }
 
   /**
@@ -583,56 +679,19 @@ export class DatabaseCore {
    * option and a value items hold) is refused.
    */
   async retypeProperty(database: string, key: string, type: string, params?: Params, renames?: Readonly<Record<string, string>>): Promise<Proposal | Refused> {
-    const read = await this.read(database);
-    if ("problem" in read) return read;
-    const property = read.database.value.properties.find((one) => one.key === key);
+    const read = await this.store.database(database);
+    if (!read) return this.refuse(`No database "${database}"`);
+    const property = read.value.properties.find((one) => one.key === key);
     if (!property) return this.refuse(`No property "${key}"`);
     if (property.system !== undefined) return this.refuse(systemProperty(property));
     const newType = this.types.named(type);
     if (!newType) return this.refuse(`No property type "${type}"`);
     const kept = params ?? (newType.validateParams?.(property.params) === undefined ? property.params : {});
-    const problem = validateParamNames(property.label, kept) ?? (newType.validateParams?.(kept) === undefined ? undefined : `${property.label}: ${newType.validateParams(kept)}`);
-    if (problem) return this.refuse(problem);
-    const checked = renames && Object.keys(renames).length ? validateRenames(property, type, kept, renames, read.items.value) : undefined;
-    if (typeof checked === "string") return this.refuse(`${property.label}: ${checked}`);
-    // (Only names alike: no rename)
-    const renaming = checked?.size ? checked : undefined;
-    // (Options swapped and moved back to their places: the params alike, the values still to swap)
+    // (Only names alike, the params alike: nothing to change)
+    const renaming = Object.entries(renames ?? {}).some(([from, to]) => from !== to);
     if (type === property.type && !renaming && JSON.stringify(kept) === JSON.stringify(property.params)) return unchanged("The type is the same");
-    const changes = databaseChanges(database).expectDatabase(read.database.revision).schema(read.database.value.properties.map((one) => (one.key === key ? { ...one, type, params: kept } : one)));
-    const unreadable: ItemKey[] = [];
-    const counts = new Map<string, number>();
-    for (const item of read.items.value) {
-      const value = item.values[key];
-      if (value === undefined || isEmpty(value)) continue;
-      if (renaming) {
-        const renamed = renamedValue(value, renaming);
-        if (renamed) {
-          changes.item(item, (i) => i.set(key, renamed.value));
-          for (const from of renamed.from) counts.set(from, (counts.get(from) ?? 0) + 1);
-          // (Renamed, a part of it still none of the options: one taken away, kept as it was)
-          if (newType.validate(renamed.value, kept) !== undefined) unreadable.push(item.key);
-          continue;
-        }
-      }
-      if (newType.validate(value, kept) === undefined) continue;
-      // (Options renamed: a value that is none of them as it is, text typed by hand, is kept: read again by the new names, it
-      // could take an option renamed for the one it meant, a swap's)
-      if (renaming) {
-        unreadable.push(item.key);
-        continue;
-      }
-      const parsed = newType.parse(keptText(value), kept, value);
-      if ("value" in parsed && newType.validate(parsed.value, kept) === undefined) changes.item(item, (i) => i.set(key, parsed.value));
-      else unreadable.push(item.key);
-    }
     const label = renaming ? `Change the options of ${property.label}` : `Change the type of ${property.label} to ${newType.label}`;
-    const proposal: Proposal = { ...(await this.propose(changes.build(), label)), unreadable };
-    if (!renaming) return proposal;
-    const renamed = [...renaming].map(([from, to]) => ({ from, to, items: counts.get(from) ?? 0 }));
-    // (Written whole against the items as read, whether or not one holds a renamed option now: an item given an old name
-    // meanwhile would take the meaning of another, a swap's; checked against them too, a value held that is no option)
-    return { ...proposal, renamed, whole: { items: itemsRevision(read.items.value) } };
+    return this.editOne(database, read, changing(key, { type, params: kept, ...(renames ? { renames } : {}) }), label);
   }
 
   /**
@@ -665,17 +724,186 @@ export class DatabaseCore {
     return { ...(await this.propose(changes.build(), `Take "${key}" off the items`)), whole: { items: itemsRevision(read.items.value) } };
   }
 
-  /** A property removed from the schema (its values stay in the items unless `values`, then taken off them too): a proposal */
+  /** A property removed from the schema (its values stay in the items unless `values`, then taken off them too; a system property's are none of theirs): a proposal */
   async removeProperty(database: string, key: string, options: { readonly values: boolean }): Promise<Proposal | Refused> {
+    const read = await this.store.database(database);
+    if (!read) return this.refuse(`No database "${database}"`);
+    const property = read.value.properties.find((one) => one.key === key);
+    if (!property) return this.refuse(`No property "${key}"`);
+    const values = options.values && property.system === undefined;
+    return this.editOne(database, read, (now) => now.filter((one) => one.key !== key).map((one) => propertyEdit(one)), `Remove property ${property.label}${values ? " and its values" : ""}`, values ? { removedValues: [key] } : {});
+  }
+
+  /**
+   * The schema edited as a whole (the properties' dialog's Save), a proposal
+   * of one transaction: the schema as the edit has it, and each item's values
+   * as it says (renamed with their options, read as a new type where they can
+   * be, else kept as they are and listed as `unreadable`, moved to a key
+   * changed, taken off with a property removed where asked), the views naming
+   * a key changed with it (`finding` told as every document is looked
+   * through). Written whole where it changes items; undone as one. Refused
+   * where any part of it cannot be (said why); `unchanged` where it changes
+   * nothing. Where the database changed since the edit was made of it (its
+   * revision): left, its conflict given back (`conflict`: its preview each
+   * document's lines the edit would change over the schema as it is now,
+   * `force` the edit written over it, refused anew where it changed again
+   * since), offered by the core too unless the caller shows it
+   * (`showsConflict`). Every change of the schema is one of these: the
+   * operations of one change make theirs an edit of it (`editOne`)
+   */
+  async editSchema(database: string, edit: SchemaEdit, finding?: WriteProgress): Promise<Proposal | Refused> {
     const read = await this.read(database);
     if ("problem" in read) return read;
-    const property = read.database.value.properties.find((one) => one.key === key);
-    if (!property) return this.refuse(`No property "${key}"`);
-    const changes = databaseChanges(database).expectDatabase(read.database.revision).schema(read.database.value.properties.filter((one) => one.key !== key));
-    // (A system property's values are none of the items': nothing taken off them, whatever is asked)
-    const values = options.values && property.system === undefined;
-    if (values) for (const item of read.items.value) if (item.values[key] !== undefined) changes.item(item, (i) => i.unset(key));
-    return this.propose(changes.build(), `Remove property ${property.label}${values ? " and its values" : ""}`);
+    const now = read.database.value.properties;
+    if (read.database.revision !== edit.revision) return this.schemaConflict(database, read.database, edit, finding);
+    const byKey = new Map(now.map((one) => [one.key, one] as const));
+    const items = read.items.value;
+    const loose = await this.store.looseValues(database);
+    // Each property kept as it is to be, with what its values go through
+    const planned: { readonly from: Property; readonly to: Property; readonly renaming?: ReadonlyMap<string, string> }[] = [];
+    const schema: Property[] = [];
+    const named = new Set<string>();
+    for (const one of edit.properties) {
+      if (one.from === undefined) {
+        // (Its key unlike every property's, now and to be, and every key items keep)
+        const made = this.newProperty(one, [...schema, ...now.filter((p) => !schema.some((s) => s.key === p.key))], items, loose.map((l) => l.key));
+        if (typeof made === "string") return this.refuse(made);
+        schema.push(withFlags(made, made.system === undefined ? one : { showName: one.showName, icon: one.icon }));
+        continue;
+      }
+      const property = byKey.get(one.from);
+      if (!property) return this.refuse(`No property "${one.from}"`);
+      if (named.has(property.key)) return this.refuse(`${property.label} is in the edit twice`);
+      named.add(property.key);
+      const label = one.label.trim();
+      if (!label) return this.refuse("A property needs a label");
+      if (one.icon !== undefined) {
+        const iconProblem = validateIcon(one.icon);
+        if (iconProblem) return this.refuse(`${label}: ${iconProblem}`);
+      }
+      // A system property: its name, its icon and its name shown in views; nothing else is the user's
+      if (property.system !== undefined) {
+        schema.push(withFlags({ ...property, label }, { required: property.required, showName: one.showName, icon: one.icon }));
+        continue;
+      }
+      const type = this.types.named(one.type);
+      if (!type) return this.refuse(`No property type "${one.type}"`);
+      const params = one.params ?? property.params;
+      const problem = validateParamNames(label, params) ?? (type.validateParams?.(params) === undefined ? undefined : `${label}: ${type.validateParams(params)}`);
+      if (problem) return this.refuse(problem);
+      const key = one.key?.trim() || property.key;
+      if (key !== property.key) {
+        // (Unlike every other property's key as it is, and none items keep values under)
+        const keyProblem = this.validateKey(key, now.filter((other) => other.key !== property.key)) ?? validateKeptValues(key, items, loose);
+        if (keyProblem) return this.refuse(keyProblem);
+      }
+      const renames = one.renames && Object.keys(one.renames).length ? validateRenames(property, one.type, params, one.renames, items) : undefined;
+      if (typeof renames === "string") return this.refuse(`${label}: ${renames}`);
+      const to = withFlags({ ...property, key, label, type: one.type, params, readonly: one.readonly ?? property.readonly }, one);
+      planned.push({ from: property, to, ...(renames?.size ? { renaming: renames } : {}) });
+      schema.push(to);
+    }
+    const keys = schema.map((one) => one.key);
+    const twice = keys.find((one, at) => keys.indexOf(one) !== at);
+    if (twice !== undefined) return this.refuse(`Two properties have the key "${twice}": give each a key of its own`);
+    // Those of the schema the edit names nowhere: removed, their values taken off where asked (a system property's are no item's)
+    const removed = now.filter((one) => !named.has(one.key));
+    const takenOff = removed.filter((one) => one.system === undefined && edit.removedValues?.includes(one.key)).map((one) => one.key);
+    const sameSchema = JSON.stringify(schema) === JSON.stringify(now);
+    const changes = databaseChanges(database).expectDatabase(read.database.revision).schema(schema);
+    const unreadable = new Set<ItemKey>();
+    // How many items' values each option renamed renames, by property and option (every rename, none holding it too)
+    const counts = new Map<Property, Map<string, number>>(planned.filter((one) => one.renaming).map((one) => [one.to, new Map([...one.renaming!.keys()].map((from) => [from, 0]))]));
+    let itemsChanged = false;
+    for (const item of items) {
+      const sets: [string, Value][] = [];
+      const unsets: string[] = [];
+      for (const { from, to, renaming } of planned) {
+        const value = item.values[from.key];
+        if (value === undefined) continue;
+        let next = value;
+        if (!isEmpty(value)) {
+          const type = this.types.named(to.type)!;
+          const renamed = renaming ? renamedValue(value, renaming) : undefined;
+          if (renamed) {
+            next = renamed.value;
+            const of = counts.get(to)!;
+            for (const option of renamed.from) of.set(option, (of.get(option) ?? 0) + 1);
+            if (type.validate(next, to.params) !== undefined) unreadable.add(item.key);
+          } else if ((to.type !== from.type || !sameParams(to.params, from.params)) && type.validate(value, to.params) !== undefined) {
+            // (Options renamed: a value none of them as it is kept, as `retypeProperty` keeps it; else read from its text)
+            const parsed = renaming ? undefined : type.parse(keptText(value), to.params, value);
+            if (parsed && "value" in parsed && type.validate(parsed.value, to.params) === undefined) next = parsed.value;
+            else unreadable.add(item.key);
+          }
+        }
+        if (to.key !== from.key) {
+          sets.push([to.key, next]);
+          unsets.push(from.key);
+        } else if (next !== value) sets.push([to.key, next]);
+      }
+      for (const key of takenOff) if (item.values[key] !== undefined) unsets.push(key);
+      if (!sets.length && !unsets.length) continue;
+      itemsChanged = true;
+      changes.item(item, (i) => {
+        for (const [key, value] of sets) i.set(key, value);
+        for (const key of unsets) i.unset(key);
+      });
+    }
+    // (Two options swapped and moved back to their places: the schema alike, the values still to swap)
+    if (sameSchema && !itemsChanged) return unchanged("The properties are the same");
+    const proposal = await this.propose(changes.build(), edit.label ?? `Change the properties of ${read.database.value.name}`);
+    // Each option renamed with how many items' values it renames (named by its property where several have options renamed)
+    const byProperty = counts.size > 1;
+    const renamed = [...counts].flatMap(([property, of]) => [...of].map(([from, holding]) => ({ from: byProperty ? `${property.label}: ${from}` : from, to: planned.find((one) => one.to === property)!.renaming!.get(from)!, items: holding })));
+    // The places naming a key changed, each key followed in turn (none is taken while another still holds it: its values refused)
+    const rekeyed = planned.filter((one) => one.to.key !== one.from.key).map((one) => [one.from.key, one.to.key] as const);
+    const places = rekeyed.length && this.places ? await this.places.store.plan(database, rekeyedPlace(rekeyed, this.places.propertyMeta), finding) : undefined;
+    return {
+      ...proposal,
+      unreadable: [...unreadable],
+      ...(renamed.length ? { renamed } : {}),
+      // (Written whole or not at all where it changes items, moves values to a key or renames options: a part would leave
+      // values under the old key, or an item given an old name meanwhile would take the meaning of another, a swap's)
+      ...(itemsChanged || rekeyed.length || counts.size ? { whole: { items: itemsRevision(items) } } : {}),
+      ...(places?.documents.length || places?.byHand?.length ? { places } : {}),
+    };
+  }
+
+  /**
+   * An edit of the schema made of a database changed since: left, its
+   * conflict (what writing it over the database as it is now would change,
+   * each document's lines; written over it as one change where it is still
+   * so, else refused with the conflict as it is then, which its dialog says).
+   * Its preview plans the edit whole: a key changed reads every document for
+   * the views naming it (`finding` told as they are read)
+   */
+  private schemaConflict(database: string, seen: Revised<Database>, edit: SchemaEdit, finding?: WriteProgress): Refused {
+    const over: SchemaEdit = { ...edit, revision: seen.revision, showsConflict: true };
+    const conflict = this.conflictOf(
+      `The properties of ${seen.value.name} were changed elsewhere since: nothing was written`,
+      async () => {
+        const proposal = await this.editSchema(database, over, finding);
+        if ("problem" in proposal) return { documents: [], problem: proposal.conflict ? "They changed again since: Write mine shows the conflict as it is now." : proposal.problem };
+        return { documents: this.planned(database, proposal.plan) };
+      },
+      async () => {
+        const proposal = await this.editSchema(database, over, finding);
+        return "problem" in proposal ? proposal : this.applyNow(proposal);
+      },
+    );
+    return this.offer(conflict, !!edit.showsConflict);
+  }
+
+  /** A change of the schema of one operation, as an edit of it whole: the schema as read (`read`, by its revision) changed by `change` */
+  private editOne(database: string, read: Revised<Database>, change: (properties: readonly Property[]) => readonly PropertyEdit[], label: string, options: { readonly removedValues?: readonly string[]; readonly finding?: WriteProgress | undefined } = {}): Promise<Proposal | Refused> {
+    return this.editSchema(database, { revision: read.revision, properties: change(read.value.properties), label, ...(options.removedValues ? { removedValues: options.removedValues } : {}) }, options.finding);
+  }
+
+  /** The same, written at once (the schema alone: nothing to show first) */
+  private async writeOne(database: string, read: Revised<Database>, change: (properties: readonly Property[]) => readonly PropertyEdit[], label: string): Promise<Result> {
+    const proposal = await this.editOne(database, read, change, label);
+    return "problem" in proposal ? proposal : this.applyNow(proposal);
   }
 
   // Proposals and Undo
@@ -826,10 +1054,6 @@ export class DatabaseCore {
     return { label, plan, ...(this.store.capabilities.itemDocument ? { documents: manyDocuments(plan) } : {}) };
   }
 
-  private writeSchema(read: Revised<Database>, properties: readonly Property[], label: string): Promise<Result> {
-    return this.write(databaseChanges(read.value.id).expectDatabase(read.revision).schema(properties).build(), label);
-  }
-
   private async read(database: string): Promise<DatabaseRead | Refused> {
     const read = await this.store.database(database);
     if (!read) return this.refuse(`No database "${database}"`);
@@ -888,21 +1112,39 @@ export class DatabaseCore {
     return report.written.length ? { report } : { problem: `${label}: nothing was written`, cause: "left", report };
   }
 
-  /** What a view writes rests on what of these items changed since it showed them (`onItem`): they are left, said */
-  private changedSince(items: readonly Item[]): Refused {
-    const what = items.length === 1 ? `"${items[0]!.name}"` : `${items.length} items`;
-    const problem = `${what} changed since ${items.length === 1 ? "it was" : "they were"} shown: left as ${items.length === 1 ? "it is" : "they are"}`;
-    this.ui.notify(problem, { type: "error" });
-    return { problem, cause: "left" };
-  }
-
   private refuse(problem: string): Refused {
     this.ui.notify(problem, { type: "error" });
     return { problem, cause: "invalid" };
   }
 }
 
-function unchanged(problem: string): Refused {
+/** A property with the flags an edit gives it (`required`, `showName`, `icon`: set where given so, else taken off) */
+function withFlags(property: Property, flags: { readonly required?: boolean | undefined; readonly showName?: boolean | undefined; readonly icon?: string | undefined }): Property {
+  const { required: _required, showName: _showName, icon: _icon, ...rest } = property;
+  return { ...rest, ...(flags.required ? { required: true } : {}), ...(flags.showName ? { showName: true } : {}), ...(flags.icon !== undefined ? { icon: flags.icon } : {}) };
+}
+
+/** A place's state with each key of `rekeyed` (from, to) followed in turn, the entries that change (none: undefined) */
+function rekeyedPlace(rekeyed: readonly (readonly [string, string])[], metaOf: (view: string) => readonly string[]): PlaceChange {
+  return (state) => {
+    const current = new Map(state);
+    const all: Record<string, unknown> = {};
+    for (const [from, to] of rekeyed) {
+      for (const [name, value] of Object.entries(placeStateRenamed(current, from, to, metaOf) ?? {})) {
+        current.set(name, value);
+        all[name] = value;
+      }
+    }
+    return Object.keys(all).length ? all : undefined;
+  };
+}
+
+/** The schema with one property changed (`change` over it as it is), the others kept */
+function changing(key: string, change: Partial<PropertyEdit>): (properties: readonly Property[]) => readonly PropertyEdit[] {
+  return (properties) => properties.map((one) => propertyEdit(one, one.key === key ? change : {}));
+}
+
+function unchanged(problem: string): Refused & { readonly cause: "unchanged" } {
   return { problem, cause: "unchanged" };
 }
 

@@ -741,6 +741,9 @@ The look of [Silverware Tags](silverware-tags.md): its window, the review of a c
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+/* <shared-diff> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* A document's change as a review shows it (shared/diffview.ts): its runs of lines, each its first line's number, the
+   lines removed and added */
 .swg-diff {
   padding: 4px 10px 8px;
   font: 12px/1.5 var(--editor-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
@@ -761,7 +764,7 @@ The look of [Silverware Tags](silverware-tags.md): its window, the review of a c
   border-radius: 3px;
 }
 .swg-diff-removed {
-  background: color-mix(in srgb, var(--swg-danger) 14%, transparent);
+  background: color-mix(in srgb, var(--danger-color, #c62828) 14%, transparent);
 }
 .swg-diff-removed::before {
   content: "− ";
@@ -774,6 +777,7 @@ The look of [Silverware Tags](silverware-tags.md): its window, the review of a c
   content: "+ ";
   opacity: 0.6;
 }
+/* </shared-diff> */
 .swg-skipped {
   margin: 0;
   padding-left: 18px;

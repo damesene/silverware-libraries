@@ -40,6 +40,8 @@ export function typeIcon(type: string): string {
 
 export const VIEW_ICONS = {
   open: svg('<path d="M9.5 2.5h4v4M13.5 2.5 7.5 8.5M12 9.5v3a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3"/>'),
+  // An item shown (a table row's Open): its page, a corner folded
+  item: svg('<path d="M4 1.75h5.25L12.5 5v9.25H4z"/><path d="M9.25 1.75V5h3.25M6.25 8.5h4M6.25 11h2.75"/>'),
   back: svg('<path d="M10 3 5 8l5 5"/>'),
   close: svg('<path d="M4 4l8 8M12 4l-8 8"/>'),
   chevron: svg('<path d="m6 4 4 4-4 4"/>'),

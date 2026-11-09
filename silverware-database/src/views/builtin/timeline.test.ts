@@ -238,8 +238,8 @@ describe("the timeline", () => {
     expect(timeline().classList.contains("swd-tl-folded")).toBe(true);
   });
 
-  it("colors its bars by a property of options (Color by in ⋯), an item's own color first, its head saying so", async () => {
-    const { bar, element, core, place, database, store } = await setup(
+  it("colors its bars by a property of options (Color by in ⋯), an item's own color first", async () => {
+    const { bar, core, place, database, store } = await setup(
       [
         { name: "Sketch", start: "2026-11-03", phase: "Design" },
         { name: "Code", start: "2026-11-10", phase: "Build" },
@@ -249,7 +249,6 @@ describe("the timeline", () => {
     );
     // (Design the options' first, gray; Build the second, blue; none: no color)
     expect([bar("Sketch").dataset.swdItemColor, bar("Code").dataset.swdItemColor, bar("Plain").dataset.swdItemColor]).toEqual(["0", "1", undefined]);
-    expect(element.querySelector(".swd-place-colored")!.textContent).toBe("colored by Phase");
     // An item's own color first
     const code = (await store.items(database.id)).value.find((one) => one.name === "Code")!;
     await core.setLook(database.id, code, { color: "red" });

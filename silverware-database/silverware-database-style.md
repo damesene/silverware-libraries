@@ -10,7 +10,16 @@ The look of [Silverware Database](silverware-database.md): a database's place (i
    (its widget menu: Reload, Copy, Edit; .button-bar in the widget in the release 2.12.1, .sb-widget-menu-bar in main;
    the block's Copy buttons in the block's first line, .cm-line > .sb-actions) left out, as Silverware Chart leaves them
    out of a chart's: the database's own tools are its controls; .swd-widget is the class the init page gives the widget */
+/* (On a touch screen SilverBullet shows its widget menu always, `display: block !important` by
+   #sb-main .cm-editor .sb-lua-directive-block .button-bar in (hover: none) and (pointer: coarse), seen on a phone
+   2026-11-09: its id and three classes outweigh two, so this names the same path, the widget's own class beside it) */
+/* (SilverBullet's frame of a widget, #sb-main .cm-editor .sb-lua-directive-block { border: 1px solid … }: none round a
+   database, which draws its own; the same path, the widget's own class beside it, outweighs it) */
+#sb-main .cm-editor .swd-widget.sb-lua-directive-block {
+  border: none;
+}
 .swd-widget .button-bar,
+#sb-main .cm-editor .swd-widget.sb-lua-directive-block .button-bar,
 .swd-widget .sb-widget-menu-bar,
 .cm-line:has(.swd-widget) > .sb-actions {
   display: none !important;
@@ -35,30 +44,32 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   --swd-accent: var(--ui-accent-color, #4a6cf7);
 }
 
-/* A place: the database's name and count, its views' tabs and the tools in one bar, what the view draws under it */
-/* What the items' colors are of (Color by in ⋯), after the count: quiet */
-.swd-place-colored {
-  margin-left: 4px;
-  color: var(--swd-quiet);
-  font-size: 0.8em;
-  font-weight: normal;
-}
+/* A place: one bar, the database's name and count quietly, then the view's picker (Launch plan 10 Board),
+   the tools at its end; what the view draws under it */
 .swd-place {
   margin: 0.5em 0;
 }
+/* A note, not a heading: quiet, its name cut with an ellipsis where the bar is narrow (it gives way before the view's
+   picker does, down to its first letters), the tools never pushed out */
 .swd-place-head {
   display: flex;
+  flex: 0 1 auto;
   align-items: baseline;
-  gap: 8px;
-  margin-bottom: 2px;
-}
-.swd-place-name {
-  font-weight: 600;
-  font-size: 1.05em;
-}
-.swd-place-count {
+  gap: 6px;
+  /* (Its first letters and the count kept: "Lau… 10") */
+  min-width: 7ch;
+  padding-left: 2px;
   color: var(--swd-quiet);
   font-size: 0.85em;
+}
+.swd-place-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swd-place-count {
+  flex: 0 0 auto;
 }
 .swd-place-bar {
   display: flex;
@@ -90,7 +101,9 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 }
 /* The view shown: one button (its icon, its label, a mark of its list) opening the views in a menu; the tools at the bar's end */
 .swd-view-picker-box {
-  flex: 0 1 auto;
+  /* (Cut only once the database's name is down to its first letters: a shrink so small that it gets none of what the bar
+     lacks until the name can give no more, which a flex box then gives it whole) */
+  flex: 0 0.00001 auto;
   min-width: 0;
   margin-right: auto;
 }
@@ -103,6 +116,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
   min-width: 0;
   max-width: 100%;
   min-height: 34px;
@@ -112,7 +126,9 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   color: inherit;
   background: none;
   font: inherit;
-  font-weight: 600;
+  /* (Named, not shouted: a touch under the page's text, half bold) */
+  font-size: 0.95em;
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -160,6 +176,8 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 .swd-tools {
   display: flex;
   flex: 0 0 auto;
+  /* (At the bar's end, whatever is before it) */
+  margin-left: auto;
   align-items: center;
   gap: 2px;
   padding-bottom: 2px;
@@ -921,17 +939,19 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   --swd-pill: 128, 128, 128;
   display: inline-block;
   max-width: 100%;
-  margin: 1px 4px 1px 0;
+  /* (Within a line of the text around it, never taller: a table's row with one as high as one without) */
+  margin: 0 4px 0 0;
   padding: 0 7px;
   overflow: hidden;
   border-radius: 4px;
   color: color-mix(in srgb, rgb(var(--swd-pill)) 55%, var(--root-color, #000));
   background: color-mix(in srgb, rgb(var(--swd-pill)) 16%, var(--root-background-color, #fff));
   font-size: 0.9em;
-  line-height: 1.6;
+  line-height: 1.5;
   text-overflow: ellipsis;
   white-space: nowrap;
-  vertical-align: baseline;
+  /* (Its box from the line's top: on the baseline, its smaller font's box sat lower and the line grew) */
+  vertical-align: top;
 }
 /* The palette (domain/colors.ts: gray, blue, green, yellow, orange, red, purple, pink), each `r, g, b`: a select's options
    and an item's color by their place in it. A space-style may set them anew */
@@ -1081,6 +1101,9 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   overflow-x: auto;
 }
 .swd-table {
+  /* A body cell's room above and below its text (SilverBullet's own for its tables' cells, said here so what is laid over a
+     cell, a row's Open, knows where its first line is) */
+  --swd-cell-pad-y: 8px;
   border-collapse: collapse;
   width: 100%;
 }
@@ -1132,6 +1155,10 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 :is(#sb-main, html) .swd-place .swd-table :is(th, td) {
   white-space: normal;
 }
+:is(#sb-main, html) .swd-place .swd-table td {
+  padding-top: var(--swd-cell-pad-y);
+  padding-bottom: var(--swd-cell-pad-y);
+}
 .swd-table th:not(.swd-table-gripcol):not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]),
 .swd-table td:not(.swd-table-grip):not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]) {
   min-width: 6em;
@@ -1173,7 +1200,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 .swd-table td.swd-editing {
   z-index: 1;
 }
-/* The name's cell: its ↗ right after the last word, the two held on one line; never narrower than a few words (a phone) */
+/* The name's cell: its Open right after the last word, the two held on one line (a touch screen's); never narrower than a few words (a phone) */
 .swd-table-name {
   overflow-wrap: anywhere;
 }
@@ -1184,8 +1211,72 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 .swd-table-sort-end {
   white-space: nowrap;
 }
-.swd-table-name .swd-open::before {
-  content: "↗";
+/* A row's Open: with a mouse a chip at the right end of the name's cell, laid over the name (as Notion's: it takes no room
+   of the column), shown as the row is hovered (below): its icon (a page) alone in a narrow cell, with "Open" where the cell
+   has room (its box laid over the whole cell, measured as a container: a table's cell cannot be one without losing its
+   width); on a touch screen its icon alone right after the name, with room for a finger round it */
+.swd-table .swd-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: -0.15em;
+}
+.swd-table .swd-open svg {
+  width: 14px;
+  height: 14px;
+}
+@media (hover: hover) {
+  /* (As high as the cell's first line and its room above and below: the button in its middle, by the name's first line
+     where the row is taller, another value wrapping) */
+  .swd-table td[data-key="name"] .swd-open-room {
+    position: absolute;
+    inset: 0 0 auto;
+    height: min(100%, calc(1lh + 2 * var(--swd-cell-pad-y)));
+    container-type: inline-size;
+    pointer-events: none;
+  }
+  @container (min-width: 10em) {
+    .swd-table-name .swd-open::after {
+      content: "Open";
+    }
+  }
+  .swd-table td[data-key="name"] .swd-open {
+    position: absolute;
+    /* (In the middle of its box: the cell's first line) */
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    margin: 0;
+    padding: 4px 8px;
+    border: 1px solid var(--swd-line);
+    border-radius: 6px;
+    color: var(--swd-quiet);
+    /* (Opaque, over the name: the page's background a little lighter, as a surface of its own) */
+    background: color-mix(in srgb, var(--root-color, currentColor) 6%, var(--root-background-color, #fff));
+    font-size: 0.8em;
+    line-height: 1.2;
+    white-space: nowrap;
+    pointer-events: auto;
+    opacity: 1;
+    transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .swd-table td[data-key="name"] .swd-open:hover,
+  .swd-table td[data-key="name"] .swd-open:focus-visible {
+    border-color: var(--swd-accent);
+    color: var(--swd-accent);
+    background: color-mix(in srgb, var(--swd-accent) 12%, var(--root-background-color, #fff));
+  }
+}
+@media (hover: none) {
+  .swd-open-room {
+    display: contents;
+  }
+  .swd-table .swd-open {
+    margin: -10px -10px -10px -2px;
+    padding: 10px;
+    color: var(--swd-quiet);
+    opacity: 1;
+  }
 }
 .swd-table td[data-key="name"] {
   min-width: 8em;
@@ -1280,7 +1371,7 @@ li:hover .swd-row-grip,
 tr:focus-within .swd-open {
   opacity: 1;
 }
-/* With a mouse, a row's ↗ and ✕ show only as it is hovered or has the focus (a touch screen shows them always) */
+/* With a mouse, a row's Open and ✕ show only as it is hovered or has the focus (a touch screen shows them always) */
 @media (hover: hover) {
   .swd-table tbody tr:not(:hover):not(:focus-within) .swd-open,
   .swd-table tbody tr:not(:hover):not(:focus-within) .swd-remove {
@@ -1317,6 +1408,20 @@ tr:focus-within .swd-open {
   background: none;
   font: inherit;
   opacity: 0.8;
+  cursor: pointer;
+}
+/* + New (a table's, a list's, a board's column's, a calendar's day): quiet until the pointer is on it, then plainly a
+   button, in the accent's color */
+:is(.swd-table-add, .swd-board-add, .swd-cal-agenda-add) {
+  transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+}
+:is(.swd-table-add, .swd-board-add, .swd-cal-agenda-add):hover,
+:is(.swd-table-add, .swd-board-add, .swd-cal-agenda-add):focus-visible {
+  opacity: 1;
+  border-style: solid;
+  border-color: var(--swd-accent);
+  color: var(--swd-accent);
+  background: color-mix(in srgb, var(--swd-accent) 10%, transparent);
 }
 .swd-table-count {
   font-size: 0.85em;
@@ -2588,6 +2693,93 @@ tr:focus-within .swd-open {
   background: var(--danger-color, #c62828);
   border-color: var(--danger-color, #c62828);
 }
+/* The dialog of a write changed since it was shown (core/conflictdialog.ts): the lines writing it would change on each
+   page, as Silverware Tags' review shows them (shared/diffview.ts: swd-diff-*) */
+/* (Of the dialogs' one height, its body scrolling: as many items and pages as the conflict has, the dialog stays) */
+.swd-settings.swd-conflict {
+  width: min(760px, calc(100vw - 32px));
+}
+/* (Their buttons at the right of their foot, as the settings' are with a note beside them) */
+.swd-settings:is(.swd-conflict, .swd-delete-database) .swd-settings-foot {
+  justify-content: flex-end;
+}
+.swd-conflict-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+}
+.swd-conflict-section {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.swd-conflict-note {
+  margin: 0;
+  color: var(--swd-quiet);
+}
+.swd-conflict-document + .swd-conflict-document {
+  margin-top: 8px;
+}
+.swd-conflict-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.swd-conflict-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.swd-conflict-open {
+  margin-left: auto;
+  text-decoration: none;
+  padding: 2px 8px;
+  border: 1px solid var(--swd-settings-line);
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+/* <shared-diff> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* A document's change as a review shows it (shared/diffview.ts): its runs of lines, each its first line's number, the
+   lines removed and added */
+.swd-diff {
+  padding: 4px 10px 8px;
+  font: 12px/1.5 var(--editor-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+}
+.swd-diff-run + .swd-diff-run {
+  margin-top: 6px;
+}
+.swd-diff-line-number {
+  font-family: var(--ui-font, system-ui, sans-serif);
+  font-size: 11px;
+  opacity: 0.55;
+}
+.swd-diff-removed,
+.swd-diff-added {
+  padding: 0 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-radius: 3px;
+}
+.swd-diff-removed {
+  background: color-mix(in srgb, var(--danger-color, #c62828) 14%, transparent);
+}
+.swd-diff-removed::before {
+  content: "− ";
+  opacity: 0.6;
+}
+.swd-diff-added {
+  background: color-mix(in srgb, #2e9e4f 16%, transparent);
+}
+.swd-diff-added::before {
+  content: "+ ";
+  opacity: 0.6;
+}
+/* </shared-diff> */
 @media (max-width: 480px), (pointer: coarse) and (max-height: 600px) {
   .swd-settings {
     width: 100vw;
@@ -2717,6 +2909,30 @@ tr:focus-within .swd-open {
 .swd-prop-chevron svg {
   width: 16px;
   height: 16px;
+}
+/* What the draft does to a property, after its name in the list until Save: Changed, New, Removed (its name struck) */
+.swd-prop-mark {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border-radius: 4px;
+  color: var(--swd-accent);
+  background: color-mix(in srgb, var(--swd-accent) 12%, transparent);
+  font-size: 0.75em;
+  line-height: 1.6;
+}
+.swd-prop-mark-removed {
+  color: var(--danger-color, #c62828);
+  background: color-mix(in srgb, var(--danger-color, #c62828) 12%, transparent);
+}
+.swd-prop-removed .swd-prop-name,
+.swd-prop-removed .swd-prop-type {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+/* Save, nothing changed: nothing to write */
+.swd-properties-save:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 /* A property required: a * after its name in the list */
 .swd-prop-required {
@@ -2969,18 +3185,19 @@ button.swd-editor-document-folder:hover,
 .swd-prop-switch-row .swd-prop-field-name {
   gap: 2px;
 }
-/* A review's choice (Remove: its values too): its label and hint across the width, its switch at the right, on a phone too */
-.swd-prop-field.swd-property-choice {
+/* A property removed in the draft: whether its values go too, its label and hint across the width, its switch at the right,
+   on a phone too */
+.swd-prop-field.swd-property-values-off {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   padding: 0 4px;
 }
-.swd-property-choice .swd-prop-field-name {
+.swd-property-values-off .swd-prop-field-name {
   gap: 2px;
   color: inherit;
   font-size: 1em;
 }
-.swd-property-choice .swd-prop-field-name .swd-settings-hint {
+.swd-property-values-off .swd-prop-field-name .swd-settings-hint {
   color: var(--swd-quiet);
 }
 .swd-prop-options {
@@ -3166,15 +3383,6 @@ button.swd-editor-document-folder:hover,
   padding: 2px 8px;
   font-size: 0.85em;
 }
-.swd-options-foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-}
-.swd-options-foot button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
 
 /* A property added: its name, its type, Add, one line under the list */
 .swd-property-adder {
@@ -3289,7 +3497,7 @@ button.swd-editor-document-folder:hover,
   font: inherit;
   cursor: pointer;
 }
-/* A change shown before it is written: a choice of what it is (Remove: its values too), then its summary */
+/* A change shown before it is written: its summary, Back and Apply */
 .swd-property-review-box {
   display: flex;
   flex-direction: column;
@@ -3532,6 +3740,8 @@ button.swd-editor-document-folder:hover,
   border-radius: 6px;
   color: var(--swd-quiet);
   background: none;
+  /* (Open a link, to its page: a button's look, no underline) */
+  text-decoration: none;
   cursor: pointer;
 }
 .swd-peek-button:hover {

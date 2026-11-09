@@ -40,6 +40,8 @@ export function edgeScroll(box: HTMLElement, options: EdgeScrollOptions = {}): E
     const right = rect.right - inset.right - state.x;
     const by = (distance: number) => Math.ceil(((edge - Math.max(0, distance)) / edge) * EDGE_SPEED * seconds);
     const was = box.scrollLeft;
+    // (No room for an edge: the insets take the box's width; nothing to scroll by, the step's division would give NaN)
+    if (edge <= 0) return void view?.requestAnimationFrame(step);
     if (left < edge && box.scrollLeft > 0) box.scrollLeft -= by(left);
     else if (right < edge && box.scrollLeft < box.scrollWidth - box.clientWidth) box.scrollLeft += by(right);
     if (box.scrollLeft !== was) options.scrolled?.();

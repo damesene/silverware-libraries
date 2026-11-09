@@ -129,7 +129,7 @@ describe("the properties' dialog", () => {
     expect(document.querySelector('[data-property="order"] .swd-prop-type')!.textContent).toBe("System: Order");
     // Offered once
     expect(types().find((one) => one.value === "system:order")!.disabled).toBe(true);
-    // Its details: its name, what it is, its key read only; no type, required or locked to change
+    // Its details: its name, what it is, its key read only (under Advanced); no type, required or locked to change
     expand("order");
     const details = q('[data-property="order"] .swd-prop-detail');
     expect(details.querySelector(".swd-prop-system")!.textContent).toContain("Given by the system");
@@ -137,6 +137,9 @@ describe("the properties' dialog", () => {
     // (Its name in the views may be shown, as any property's)
     expect(details.querySelector(".swd-property-show-name")).not.toBeNull();
     expect(details.querySelector<HTMLInputElement>(".swd-property-key")!.readOnly).toBe(true);
+    // (Its key under Advanced, folded, as any property's: a system property's lock opens nothing)
+    expect(details.querySelector<HTMLDetailsElement>(".swd-prop-advanced")!.open).toBe(false);
+    expect(details.querySelector(".swd-prop-advanced .swd-property-key")).not.toBeNull();
     // Removed: whether to take its values off is not asked (they are no item's), the change shown, no item's value changing
     details.querySelector<HTMLButtonElement>(".swd-property-remove")!.click();
     await settle();

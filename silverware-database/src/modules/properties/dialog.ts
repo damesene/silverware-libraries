@@ -382,7 +382,8 @@ export class PropertiesDialog {
       el(doc, "span", "swd-prop-field-name", "Name in views", el(doc, "span", { class: `${BASE}-hint`, text: `Shown as ${property.label}: value, on cards and in lists` })),
       showName,
     );
-    // A system property: its name (and shown or hidden, its place, from the list); what it is, its key; no type, setting or value to change
+    // A system property: its name (and shown or hidden, its place, from the list); what it is, its key under Advanced as any
+    // property's; no type, setting or value to change
     if (property.system !== undefined) {
       const kind = systemKind(property.system, this.host.noun);
       return el(
@@ -393,7 +394,7 @@ export class PropertiesDialog {
         iconField,
         el(doc, "p", { class: "swd-prop-system", text: kind ? `Given by the system: ${kind.hint}. Read only.` : `Given by the system ("${property.system}", not known to this version): no values.` }),
         ...(typeOf(types, property).look === "check" ? [] : [nameShown]),
-        field("Key", el(doc, "input", { class: "swd-property-key", attrs: { "aria-label": `Key of ${property.label}`, value: property.key, readonly: "" } }), "How queries name it"),
+        this.advanced(property, [field("Key", el(doc, "input", { class: "swd-property-key", attrs: { "aria-label": `Key of ${property.label}`, value: property.key, readonly: "" } }), "How queries name it")]),
         el(doc, "div", "swd-prop-actions", remove),
       );
     }
@@ -467,11 +468,14 @@ export class PropertiesDialog {
     );
   }
 
-  /** Advanced: what is seldom set (locked in views, the key), folded under its summary; open as long as the dialog is for that property */
+  /**
+   * Advanced: what is seldom set (locked in views, the key), folded under its summary; open as long as the dialog is for that
+   * property, and from the start where the property is locked (so its switch is seen), not a system property's (locked always)
+   */
   private advanced(property: Property, fields: readonly HTMLElement[]): HTMLElement {
     const doc = this.host.document;
     const box = el(doc, "details", "swd-prop-advanced", el(doc, "summary", { class: "swd-prop-advanced-summary", text: "Advanced" }), ...fields);
-    if (this.advancedOpen.has(property.key) || property.readonly) box.open = true;
+    if (this.advancedOpen.has(property.key) || (property.readonly && property.system === undefined)) box.open = true;
     box.addEventListener("toggle", () => void (box.open ? this.advancedOpen.add(property.key) : this.advancedOpen.delete(property.key)));
     return box;
   }

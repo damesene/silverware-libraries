@@ -82,6 +82,9 @@ export function silverBulletPlatform(bridge: Bridge): {
       text: () => bridge.getText(),
       replace: (from, to, insert) => bridge.replaceRange(from, to, insert),
       open: (ref) => bridge.navigate(ref),
+      // (As SilverBullet's own links: relative to its <base>, so it is right under a prefix too; encodePageURI in its
+      // plug-api/lib/ref.ts, the name's folders kept)
+      href: (name) => encodeURIComponent(name).replace(/%2F/g, "/"),
       onOpened: (listener) => {
         openedListeners.add(listener);
         return () => void openedListeners.delete(listener);

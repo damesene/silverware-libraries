@@ -49,6 +49,8 @@ export interface Editor {
   focus?(): Awaitable<void>;
   /** The editor opened at a reference (a document's name, a place in it, as the platform writes one) */
   open?(ref: string): Awaitable<void>;
+  /** A document's address, as the platform's own links have it (a link: a middle click opens it in a tab of the browser's) */
+  href?(document: string): string;
   /** Told as the open document is edited (typed in, undone): its text as it is now; the function given back stops it */
   onEdited?(listener: (text: string) => void): () => void;
   /** Told as another document is opened in the editor: its name; the function given back stops it */

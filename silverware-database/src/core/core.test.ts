@@ -238,7 +238,6 @@ describe("the core", () => {
     expect(await core.update("tasks", stale, "status", "Todo")).toMatchObject({ cause: "left" });
     expect(conflicts).toHaveLength(1);
     const [conflict] = conflicts;
-    expect(conflict!.lines).toEqual([{ name: "Fix login", field: "Status", shown: "Todo", now: "Done", wanted: "Todo" }]);
     expect(conflict!.problem).toBe('"Fix login" changed since it was shown: left as it is');
     // (The memory store keeps no text: no lines to show)
     expect(await conflict!.preview()).toEqual({ documents: [{ document: "", runs: [] }] });

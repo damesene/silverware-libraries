@@ -9,7 +9,6 @@ function conflict(force: () => Promise<Result>): ItemConflict {
   return {
     problem: '"Fix login" changed since it was shown: left as it is',
     written: () => false,
-    lines: [{ name: "Fix login", document: "Tasks/Fix login", field: "Status", shown: "Todo", now: "Doing", wanted: "Done" }],
     preview: async () => ({ documents: [{ document: "Tasks/Fix login", runs: [{ line: 2, removed: ["status: Doing"], added: ["status: Done"] }] }] }),
     force,
   };
@@ -18,15 +17,32 @@ function conflict(force: () => Promise<Result>): ItemConflict {
 afterEach(() => document.body.replaceChildren());
 
 describe("a conflict's dialog", () => {
-  it("shows what changed and the lines writing it would change, a page opened from it", async () => {
+  it("shows the lines writing yours would change on each page, a page opened from it", async () => {
     const opened: string[] = [];
     openConflict({ document, open: (name) => void opened.push(name) }, conflict(async () => ({ problem: "x", cause: "left" })));
     await settle();
-    const cells = [...document.querySelectorAll(".swd-conflict-lines tbody td")].map((one) => one.textContent);
-    expect(cells).toEqual(["Fix login", "Status", "Todo", "Doing", "Done"]);
+    expect(document.querySelector(".swd-conflict-name")!.textContent).toBe("Tasks/Fix login");
     expect([...document.querySelectorAll(".swd-diff-removed, .swd-diff-added")].map((one) => one.textContent)).toEqual(["status: Doing", "status: Done"]);
     document.querySelector<HTMLButtonElement>(".swd-conflict-open")!.click();
     expect(opened).toEqual(["Tasks/Fix login"]);
+  });
+
+  it("makes Open a link to the page where it has an address: a click opens it in the editor, Ctrl or a middle click left to the browser", async () => {
+    const opened: string[] = [];
+    openConflict({ document, open: (name) => void opened.push(name), href: (name) => `/${name}` }, conflict(async () => ({ problem: "x", cause: "left" })));
+    await settle();
+    const link = document.querySelector<HTMLAnchorElement>("a.swd-conflict-open")!;
+    expect(link.getAttribute("href")).toBe("/Tasks/Fix login");
+    const plain = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+    link.dispatchEvent(plain);
+    // (Ctrl: left to the browser, its default seen before jsdom would follow it, which it cannot)
+    let left = false;
+    link.addEventListener("click", (event) => {
+      left = !event.defaultPrevented;
+      event.preventDefault();
+    });
+    link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0, ctrlKey: true }));
+    expect([opened, plain.defaultPrevented, left]).toEqual([["Tasks/Fix login"], true, true]);
   });
 
   it("opens one dialog of a conflict however often Show conflict is pressed; one written over only closes", async () => {

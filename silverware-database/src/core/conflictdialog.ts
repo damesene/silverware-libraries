@@ -1,11 +1,11 @@
 // The dialog of a write left as what it rests on changed since a view showed
 // it (core.ts `onItems`, `ItemConflict`), opened from its notification's
-// Show conflict: what changed (each item's field as the view showed it, as it
-// is now, as the write would make it), the lines the write would change on
-// each document (shared/diffview.ts, as Silverware Tags' review shows them),
-// and Write mine: the write on the items as the dialog shows them, refused
-// anew, its own conflict, where they changed again since. Keep theirs closes
-// it, nothing written. The shared dialog in the settings' look (`swd-settings`),
+// Show conflict: each document's markdown as it is now and as writing yours
+// makes it, the lines that change (shared/diffview.ts, as Silverware Tags'
+// review shows them; the text alone, decided with the user, no table of
+// fields beside it), and Write mine: the write on the items as the dialog
+// shows them, refused anew, its own conflict, where they changed again since.
+// Keep theirs closes it, nothing written. The shared dialog in the settings' look (`swd-settings`),
 // a class of its own (`swd-conflict`).
 import { Dialogs } from "../../../shared/dialog.ts";
 import { diffRuns } from "../../../shared/diffview.ts";
@@ -23,40 +23,36 @@ export type ConflictHost = {
   readonly document: Document;
   /** A document opened in the editor (an item's page), where the platform opens one */
   open?(document: string): void;
+  /** A document's address (a link: a middle click or Ctrl opens it in a tab of the browser's), where it has one */
+  href?(document: string): string;
   /** Told once the write is done (written or not): the places shown follow it */
   written?(): void;
 };
 
-/** A conflict shown: what changed, the lines the write would change, Write mine and Keep theirs */
+/**
+ * A document's Open: a link where it has an address (its click opened in the editor, as a page's link; a middle click,
+ * Ctrl or Shift left to the browser: a tab or window of its own), else a button
+ */
+function openLink(doc: Document, host: ConflictHost, document: string): HTMLElement {
+  const title = `Open ${document}`;
+  const href = host.href?.(document);
+  if (!href) return el(doc, "button", { class: "swd-conflict-open", text: "Open", title, run: () => host.open!(document) });
+  const link = el(doc, "a", { class: "swd-conflict-open", text: "Open", title, attrs: { href } });
+  link.addEventListener("click", (event) => {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    host.open!(document);
+  });
+  return link;
+}
+
+/** A conflict shown: the lines writing yours would change on each document, Write mine and Keep theirs */
 export function openConflict(host: ConflictHost, conflict: ItemConflict): void {
   if (open.has(conflict)) return;
   open.add(conflict);
   const doc = host.document;
   const dialogs = new Dialogs(doc, { base: BASE, closeIcon: ICONS.close });
   let writing = false;
-  const lines = el(
-    doc,
-    "table",
-    "swd-conflict-lines",
-    el(doc, "thead", {}, el(doc, "tr", {}, ...["Item", "Field", "As you saw it", "Now", "Yours"].map((text) => el(doc, "th", { text, attrs: { scope: "col" } })))),
-    el(
-      doc,
-      "tbody",
-      {},
-      ...conflict.lines.map((line) =>
-        el(
-          doc,
-          "tr",
-          {},
-          el(doc, "td", { text: line.name }),
-          el(doc, "td", { text: line.field }),
-          el(doc, "td", { class: "swd-conflict-shown", text: line.shown }),
-          el(doc, "td", { class: "swd-conflict-now", text: line.now }),
-          el(doc, "td", { class: "swd-conflict-wanted", text: line.wanted }),
-        ),
-      ),
-    ),
-  );
   const diffs = el(doc, "div", { class: "swd-conflict-diffs", attrs: { "aria-live": "polite" } }, el(doc, "p", { class: "swd-conflict-note", text: "Reading what writing yours would change…" }));
   const write = el(doc, "button", { class: `${BASE}-save swd-conflict-force`, text: "Write mine", run: () => void force() });
   const keep = el(doc, "button", { class: `${BASE}-cancel`, text: "Keep theirs", run: () => dialog.close() });
@@ -72,7 +68,7 @@ export function openConflict(host: ConflictHost, conflict: ItemConflict): void {
     title: "Changed since it was shown",
     subtitle: conflict.problem,
     className: "swd-conflict",
-    content: el(doc, "div", "swd-conflict-body", failed, lines, el(doc, "h3", { class: "swd-conflict-section", text: done ? "Yours was written" : "What writing yours changes" }), diffs),
+    content: el(doc, "div", "swd-conflict-body", failed, el(doc, "h3", { class: "swd-conflict-section", text: done ? "Yours was written" : "What writing yours changes" }), diffs),
     // (Its buttons alone: the dialog puts them in its foot)
     footer: buttons(doc, keep, write),
     focus: keep,
@@ -87,7 +83,7 @@ export function openConflict(host: ConflictHost, conflict: ItemConflict): void {
       const { documents: planned, problem } = await conflict.preview();
       const documents = planned.filter((one) => one.runs.length);
       // (Why there is nothing to show: the write refused as it is now, changed again; else kept where no page shows it)
-      const none = problem ?? "No lines to show: what it writes is kept where no page shows it.";
+      const none = problem ?? "No page's lines to show for it.";
       diffs.replaceChildren(
         ...(documents.length
           ? documents.map((one) =>
@@ -100,7 +96,7 @@ export function openConflict(host: ConflictHost, conflict: ItemConflict): void {
                   "summary",
                   "swd-conflict-summary",
                   el(doc, "span", { class: "swd-conflict-name", text: one.document || "(no page)" }),
-                  ...(one.document && host.open ? [el(doc, "button", { class: "swd-conflict-open", text: "Open", title: `Open ${one.document}`, run: () => host.open!(one.document) })] : []),
+                  ...(one.document && host.open ? [openLink(doc, host, one.document)] : []),
                 ),
                 el(doc, "div", "swd-diff", ...diffRuns(doc, "swd", one.runs)),
               ),

@@ -190,7 +190,7 @@ function keptParts(): Kept {
     platform.ui.notify(one.problem, {
       type: "error",
       timeout: 0,
-      actions: [{ name: "Show conflict", run: () => openConflict({ document, ...(platform.editor.open ? { open: (name: string) => void platform.editor.open!(name) } : {}), written: redrawAll }, one) }],
+      actions: [{ name: "Show conflict", run: () => openConflict({ document, ...(platform.editor.open ? { open: (name: string) => void platform.editor.open!(name) } : {}), ...(platform.editor.href ? { href: platform.editor.href } : {}), written: redrawAll }, one) }],
     });
   const core = new DatabaseCore(store, types, { ...ui, conflict }, platform.space.noun, { store: blockPlaces(platform.space, writer), propertyMeta: (view) => views.named(view)?.propertyMeta ?? [] });
   return { platform, store, writer, core, ui, own };

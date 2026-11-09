@@ -2611,40 +2611,21 @@ tr:focus-within .swd-open {
   background: var(--danger-color, #c62828);
   border-color: var(--danger-color, #c62828);
 }
-/* The dialog of a write changed since it was shown (core/conflictdialog.ts): what changed, then the lines writing it
-   would change on each page, as Silverware Tags' review shows them (shared/diffview.ts: swd-diff-*) */
+/* The dialog of a write changed since it was shown (core/conflictdialog.ts): the lines writing it would change on each
+   page, as Silverware Tags' review shows them (shared/diffview.ts: swd-diff-*) */
+/* (Of the dialogs' one height, its body scrolling: as many items and pages as the conflict has, the dialog stays) */
 .swd-settings.swd-conflict {
   width: min(760px, calc(100vw - 32px));
-  height: auto;
-  max-height: calc(100vh - 32px);
+}
+/* (Their buttons at the right of their foot, as the settings' are with a note beside them) */
+.swd-settings:is(.swd-conflict, .swd-delete-database) .swd-settings-foot {
+  justify-content: flex-end;
 }
 .swd-conflict-body {
   display: flex;
   flex-direction: column;
   gap: 12px;
   overflow: auto;
-}
-.swd-conflict-lines {
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.swd-conflict-lines th,
-.swd-conflict-lines td {
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--swd-settings-line);
-  text-align: left;
-  vertical-align: top;
-  overflow-wrap: anywhere;
-}
-.swd-conflict-lines th {
-  font-weight: 600;
-  color: var(--swd-quiet);
-}
-.swd-conflict-now {
-  background: color-mix(in srgb, var(--danger-color, #c62828) 12%, transparent);
-}
-.swd-conflict-wanted {
-  background: color-mix(in srgb, #2e9e4f 14%, transparent);
 }
 .swd-conflict-section {
   margin: 0;
@@ -2670,6 +2651,7 @@ tr:focus-within .swd-open {
 }
 .swd-conflict-open {
   margin-left: auto;
+  text-decoration: none;
   padding: 2px 8px;
   border: 1px solid var(--swd-settings-line);
   border-radius: 6px;

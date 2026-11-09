@@ -58,6 +58,9 @@ describe("a person's mentions", () => {
     made.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     made.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     expect([opened, edited]).toEqual([["ada", "ada"], 0]);
+    // A color given its option: that color, no longer the page's mentions' look, still pressed
+    const colored = optionPill(document, { ...property, params: { ...params, colors: { ada: "green" } } }, "ada", type, (name) => void opened.push(name));
+    expect([colored.classList.contains("swd-mention"), colored.dataset.color, colored.getAttribute("role")]).toEqual([false, "2", "link"]);
     // (A host showing none: a mention's look, nothing to press; a select's: no mention)
     expect(optionPill(document, property, "ada", type).getAttribute("role")).toBeNull();
     expect(optionPill(document, { ...property, type: "select" }, "ada", types.of("select", params), () => {}).classList.contains("swd-mention")).toBe(false);

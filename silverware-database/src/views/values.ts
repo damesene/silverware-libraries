@@ -10,7 +10,7 @@ import { fullAddress, isOpenable, prettyUrl, readLink } from "../domain/types/li
 import { pathOf } from "../domain/folders.ts";
 import { linkedDocument, type Reference, readReferences } from "../domain/types/reference.ts";
 import type { ViewHost } from "../core/view.ts";
-import { optionColor } from "../domain/types/options.ts";
+import { colorsOf, optionColor } from "../domain/types/options.ts";
 import type { PropertyType } from "../domain/types/type.ts";
 import { isEmpty, type Item, type Property, type Value } from "../model/database.ts";
 
@@ -143,15 +143,17 @@ export function choiceColor(property: Property, value: string, type?: PropertyTy
 
 /**
  * A select's or a person's value as a pill, shown as its type shows an option (`@ada`), in its color (`choiceColor`); marked
- * where it is none of the options and not taken. A person's (`PropertyType.mentions`) looks as the page's mentions do, and
- * where `openMention` is given a press or Enter on it shows where that person is mentioned, editing nothing
+ * where it is none of the options and not taken. A person's (`PropertyType.mentions`) looks as the page's mentions do
+ * unless its option was given a color of its own (Auto: the page's look), and where `openMention` is given a press or Enter
+ * on it shows where that person is mentioned, editing nothing
  */
 export function optionPill(doc: Document, property: Property, value: string, type?: PropertyType, openMention?: (name: string) => unknown): HTMLElement {
   const color = choiceColor(property, value, type);
   const text = type?.optionShown?.(value) ?? value;
   const made = pill(doc, text, color, color === undefined ? `${text}: none of ${property.label}'s options` : undefined);
   if (!type?.mentions) return made;
-  made.classList.add("swd-mention");
+  // (A color given its option: its own; else the page's mentions' look)
+  if (!Object.hasOwn(colorsOf(property.params), value)) made.classList.add("swd-mention");
   if (!openMention) return made;
   made.setAttribute("role", "link");
   made.tabIndex = 0;

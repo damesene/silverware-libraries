@@ -1041,9 +1041,9 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   outline: 1px dashed var(--danger-color, #c62828);
   outline-offset: -1px;
 }
-/* A person: as SilverBullet draws a mention in the page (its variables, its border and corners), not in its option's color
-   (which Color by still uses); pressed where the host shows where one is mentioned. One none of the options and not taken
-   keeps the dashed edge of a value none of them */
+/* A person whose option has no color of its own (Auto): as SilverBullet draws a mention in the page (its variables, its
+   edge and corners; one given a color is a pill of that color). Pressed where the host shows where one is mentioned. One
+   none of the options and not taken keeps the dashed edge of a value none of them */
 .swd-pill.swd-mention {
   padding: 0 4px;
   /* (Its edge drawn inside it, as a pill's height is a line's) */

@@ -97,8 +97,8 @@ export type Proposal = {
 export type CorePlaces = { readonly store: PlaceStore; readonly propertyMeta: (view: string) => readonly string[] };
 
 /** A key items keep that the schema has none of, as the core shows it: how many items, a few of their values, the type they look like */
-// `options`: its values as a select's options would be (a select or multi-select added of it takes them)
-export type LooseProperty = { readonly key: string; readonly items: number; readonly samples: readonly string[]; readonly type: string; readonly options: readonly string[] };
+// `params`: those of the type guessed (a select of several options' `multiple`); `options`: its values as a select's options would be (a select added of it takes them)
+export type LooseProperty = { readonly key: string; readonly items: number; readonly samples: readonly string[]; readonly type: string; readonly params?: Params; readonly options: readonly string[] };
 
 /** An option renamed, and how many items hold it */
 export type OptionRenamed = { readonly from: string; readonly to: string; readonly items: number };
@@ -608,9 +608,9 @@ export class DatabaseCore {
     if (property.system !== undefined) return this.refuse(systemProperty(property));
     if (!sameParams(property.params, was)) return this.refuse(`${property.label}: its settings changed meanwhile: not written, shown as they are now`);
     if (sameParams(params, property.params)) return unchanged("The settings are the same");
-    const type = this.types.named(property.type);
-    if (!type) return this.refuse(`${property.label}: its type "${property.type}" is not defined now`);
-    const reads = (value: Value, at: Params) => type.validate(value, at) === undefined;
+    if (!this.types.named(property.type)) return this.refuse(`${property.label}: its type "${property.type}" is not defined now`);
+    // (Each by the type its params make: a select's Multiple turned is a change of its values' shape)
+    const reads = (value: Value, at: Params) => this.types.of(property.type, at)!.validate(value, at) === undefined;
     const changed = read.items.value.find((item) => {
       const value = item.values[key];
       return value !== undefined && !isEmpty(value) && reads(value, property.params) !== reads(value, params);
@@ -707,7 +707,7 @@ export class DatabaseCore {
       key,
       items: values.length,
       samples: [...new Set(values.map(({ value }) => keptText(value)).filter(Boolean))].slice(0, 3),
-      type: guessedType(values.map(({ value }) => value)),
+      ...guessedType(values.map(({ value }) => value)),
       options: optionsOfValues(values.map(({ value }) => value)),
     }));
   }
@@ -786,9 +786,9 @@ export class DatabaseCore {
         schema.push(withFlags({ ...property, label }, { required: property.required, showName: one.showName, icon: one.icon }));
         continue;
       }
-      const type = this.types.named(one.type);
-      if (!type) return this.refuse(`No property type "${one.type}"`);
       const params = one.params ?? property.params;
+      const type = this.types.of(one.type, params);
+      if (!type) return this.refuse(`No property type "${one.type}"`);
       const problem = validateParamNames(label, params) ?? (type.validateParams?.(params) === undefined ? undefined : `${label}: ${type.validateParams(params)}`);
       if (problem) return this.refuse(problem);
       const key = one.key?.trim() || property.key;
@@ -823,16 +823,25 @@ export class DatabaseCore {
         if (value === undefined) continue;
         let next = value;
         if (!isEmpty(value)) {
-          const type = this.types.named(to.type)!;
+          const type = this.types.of(to.type, to.params)!;
+          // (Its values' shape changed: a select's Multiple turned, the type the same)
+          const reshaped = type !== this.types.of(from.type, from.params);
           const renamed = renaming ? renamedValue(value, renaming) : undefined;
           if (renamed) {
             next = renamed.value;
             const of = counts.get(to)!;
             for (const option of renamed.from) of.set(option, (of.get(option) ?? 0) + 1);
-            if (type.validate(next, to.params) !== undefined) unreadable.add(item.key);
+            // (Renamed in a shape it no longer has, a select's Multiple turned in the same edit: read from its text)
+            if (type.validate(next, to.params) !== undefined) {
+              const parsed = reshaped ? type.parse(keptText(next), to.params, next) : undefined;
+              if (parsed && "value" in parsed && type.validate(parsed.value, to.params) === undefined) next = parsed.value;
+              else unreadable.add(item.key);
+            }
           } else if ((to.type !== from.type || !sameParams(to.params, from.params)) && type.validate(value, to.params) !== undefined) {
-            // (Options renamed: a value none of them as it is kept, as `retypeProperty` keeps it; else read from its text)
-            const parsed = renaming ? undefined : type.parse(keptText(value), to.params, value);
+            // (Options renamed, the shape the same: a value none of them kept as it is, as `retypeProperty` keeps it, as read
+            // by the new names it could take another's meaning (a swap). Else read from its text where it reads so: a select's
+            // one option a list of it once Multiple is on; a list of several kept once it is off)
+            const parsed = renaming && !reshaped ? undefined : type.parse(keptText(value), to.params, value);
             if (parsed && "value" in parsed && type.validate(parsed.value, to.params) === undefined) next = parsed.value;
             else unreadable.add(item.key);
           }
@@ -1080,9 +1089,9 @@ export class DatabaseCore {
     const key = property.key ?? freeName(keyFrom(label), taken, "_");
     const problem = this.validateKey(key, properties);
     if (problem) return problem;
-    const type = this.types.named(property.type);
-    if (!type) return `No property type "${property.type}"`;
     const params = property.params ?? {};
+    const type = this.types.of(property.type, params);
+    if (!type) return `No property type "${property.type}"`;
     const paramsProblem = validateParamNames(label, params) ?? type.validateParams?.(params);
     if (paramsProblem) return `${label}: ${paramsProblem}`;
     return { key, label, type: property.type, params, readonly: property.readonly ?? false };

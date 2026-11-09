@@ -1308,3 +1308,20 @@ test("options renamed in Properties rename the items' values in the same write: 
   await expect.poll(() => space.saved("Page/db-tasks")).toContain("options: [Todo, Done]");
   await expect(page.locator(".swd-undo")).toHaveAttribute("aria-busy", "false");
 });
+
+test("a select's Multiple turned on in Properties writes it into the root page and each item's option as a list of it, edited by its boxes", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
+  await page.locator(".swd-more").click();
+  await choose(page, "Properties");
+  await page.locator('[data-property="status"] .swd-prop-head').click();
+  await page.locator('[data-property="status"] .swd-property-setting[data-param="multiple"] input').click();
+  await page.locator(".swd-properties-save").click();
+  await page.locator(".swd-property-apply").click();
+  await expect.poll(() => space.saved("Page/db-tasks")).toContain("multiple: true");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("status: [Todo]");
+  // Edited by its boxes now, one ticked more written as a list of both
+  await page.locator('tbody tr:first-child td[data-key="status"]').click();
+  await page.locator('tbody tr:first-child td[data-key="status"] input[type=checkbox][value="Done"]').check();
+  await page.keyboard.press("Enter");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("status: [Todo, Done]");
+});

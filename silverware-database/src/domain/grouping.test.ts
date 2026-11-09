@@ -6,7 +6,7 @@ import { TypeRegistry } from "./types/registry.ts";
 const types = new TypeRegistry();
 const item = (name: string, values: Record<string, Value>): Item => ({ key: name as ItemKey, revision: "1", name, values, rank: undefined });
 const property = (type: string, params: Record<string, unknown> = {}): Property => ({ key: "p", label: "P", type, params, readonly: false });
-const groups = (items: readonly Item[], one: Property) => groupItems(items, one, types.named(one.type)!).map((group) => [group.label, group.value, group.items.map((each) => each.name)]);
+const groups = (items: readonly Item[], one: Property) => groupItems(items, one, types.of(one.type, one.params)!).map((group) => [group.label, group.value, group.items.map((each) => each.name)]);
 
 describe("grouping a view's items", () => {
   it("groups a select by its options in their order, empty ones too, then values that are none of them, none first", () => {
@@ -21,7 +21,7 @@ describe("grouping a view's items", () => {
   });
 
   it("puts a multi-select's item in each of its values' groups, an item added there getting a list of it", () => {
-    const tags = property("multi-select", { options: ["x", "y"] });
+    const tags = property("select", { multiple: true, options: ["x", "y"] });
     expect(groups([item("a", { p: ["y", "x"] }), item("b", { p: ["x"] })], tags)).toEqual([
       ["x", ["x"], ["a", "b"]],
       ["y", ["y"], ["a"]],
@@ -90,8 +90,8 @@ describe("grouping a view's items", () => {
   });
 
   it("moves a value between groups: another group's value, a list's one value replaced in its place, the rest kept", () => {
-    const tags = property("multi-select", { options: ["x", "y", "z"] });
-    const [x, y, z] = groupItems([], tags, types.named("multi-select")!);
+    const tags = property("select", { multiple: true, options: ["x", "y", "z"] });
+    const [x, y, z] = groupItems([], tags, types.of("select", { multiple: true })!);
     expect(movedValue(["z", "x", "y"], x, z!)).toEqual(["z", "y"]);
     expect(movedValue(["x", "y"], x, z!)).toEqual(["z", "y"]);
     // From the group of none (no value yet) or to it
@@ -107,9 +107,9 @@ describe("grouping a view's items", () => {
   });
 
   it("gives a multi-select's group a list whatever form its first item holds, so a card moved there keeps its other values", () => {
-    const tags = property("multi-select", { options: ["a", "b"] });
+    const tags = property("select", { multiple: true, options: ["a", "b"] });
     // A value none of its options, written alone by hand on one page, first
-    const made = groupItems([item("one", { p: "legacy" }), item("two", { p: ["a", "b"] })], tags, types.named("multi-select")!);
+    const made = groupItems([item("one", { p: "legacy" }), item("two", { p: ["a", "b"] })], tags, types.of("select", { multiple: true })!);
     const legacy = made.find((one) => one.label.startsWith("legacy"))!;
     const a = made.find((one) => one.label === "a")!;
     expect(legacy.value).toEqual(["legacy"]);

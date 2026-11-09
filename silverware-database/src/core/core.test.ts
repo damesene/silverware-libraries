@@ -552,11 +552,23 @@ describe("the core", () => {
   });
 
   it("keeps a property's params where its type changes without new ones, the new type taking them", async () => {
-    const { core, store, named } = setup();
-    await applied(core, await core.retypeProperty("tasks", "status", "multi-select"));
-    expect((await store.database("tasks"))!.value.properties[0]!.params).toEqual({ options: ["Todo", "Done"] });
-    expect((await named("Fix login")).values.status).toEqual(["Todo"]);
+    const { core, store } = setup();
     await applied(core, await core.retypeProperty("tasks", "status", "text"));
+    expect((await store.database("tasks"))!.value.properties[0]!.params).toEqual({ options: ["Todo", "Done"] });
+    await applied(core, await core.retypeProperty("tasks", "status", "select"));
+    expect((await store.database("tasks"))!.value.properties[0]!.params).toEqual({ options: ["Todo", "Done"] });
+  });
+
+  it("makes a select's values lists as Multiple is turned on, and one option again as it is turned off, a list of several kept", async () => {
+    const { core, store, named } = setup();
+    await applied(core, await core.retypeProperty("tasks", "status", "select", { options: ["Todo", "Done"], multiple: true }));
+    expect((await store.database("tasks"))!.value.properties[0]!.params).toEqual({ options: ["Todo", "Done"], multiple: true });
+    expect((await named("Fix login")).values.status).toEqual(["Todo"]);
+    await core.update("tasks", await named("Write docs"), "status", ["Todo", "Done"]);
+    const off = await core.retypeProperty("tasks", "status", "select", { options: ["Todo", "Done"] });
+    expect("problem" in off ? [] : off.unreadable).toHaveLength(1);
+    await applied(core, off);
+    expect([(await named("Fix login")).values.status, (await named("Write docs")).values.status]).toEqual(["Todo", ["Todo", "Done"]]);
     expect((await store.database("tasks"))!.value.properties[0]!.params).toEqual({ options: ["Todo", "Done"] });
   });
 
@@ -643,7 +655,7 @@ describe("renaming options", () => {
     name: "Board",
     properties: [
       { key: "status", label: "Status", type: "select", params: { options: ["Todo", "Doing", "Done"], colors: { Todo: "red" } }, readonly: false },
-      { key: "tags", label: "Tags", type: "multi-select", params: { options: ["a", "b", "c"] }, readonly: false },
+      { key: "tags", label: "Tags", type: "select", params: { multiple: true, options: ["a", "b", "c"] }, readonly: false },
     ],
   };
   function board() {
@@ -687,7 +699,7 @@ describe("renaming options", () => {
 
   it("renames one value of a multi-select's list, its order kept", async () => {
     const { core, named } = board();
-    await applied(core, await core.retypeProperty("board", "tags", "multi-select", { options: ["alpha", "b", "c"] }, { a: "alpha" }));
+    await applied(core, await core.retypeProperty("board", "tags", "select", { multiple: true, options: ["alpha", "b", "c"] }, { a: "alpha" }));
     expect((await named("One")).values.tags).toEqual(["c", "alpha", "b"]);
     expect((await named("Two")).values.tags).toEqual(["b"]);
     expect((await named("Four")).values.tags).toEqual(["alpha", "x"]);
@@ -702,14 +714,14 @@ describe("renaming options", () => {
     ]);
     await applied(core, proposal);
     expect([(await named("One")).values.status, (await named("Two")).values.status, (await named("Three")).values.status]).toEqual(["Done", "Todo", "Done"]);
-    await applied(core, await core.retypeProperty("board", "tags", "multi-select", { options: ["b", "a", "c"] }, { a: "b", b: "a" }));
+    await applied(core, await core.retypeProperty("board", "tags", "select", { multiple: true, options: ["b", "a", "c"] }, { a: "b", b: "a" }));
     expect((await named("One")).values.tags).toEqual(["c", "b", "a"]);
     expect((await named("Two")).values.tags).toEqual(["a"]);
   });
 
   it("leaves an option taken away in the items, shown invalid, never emptied", async () => {
     const { core, named } = board();
-    const proposal = await core.retypeProperty("board", "tags", "multi-select", { options: ["alpha", "c"] }, { a: "alpha" });
+    const proposal = await core.retypeProperty("board", "tags", "select", { multiple: true, options: ["alpha", "c"] }, { a: "alpha" });
     if ("problem" in proposal) throw new Error(proposal.problem);
     // (One: renamed, its "b" none of the options now; Two: "b" alone, kept; Four: renamed, its "x" none before either)
     expect(proposal.unreadable).toEqual([(await named("One")).key, (await named("Two")).key, (await named("Four")).key]);
@@ -727,15 +739,20 @@ describe("renaming options", () => {
     // From what is no option, to what is none of the new ones, with a change of type
     expect(await core.retypeProperty("board", "status", "select", { options: ["Todo", "Doing", "Done", "S"] }, { Stray: "S" })).toMatchObject({ cause: "invalid" });
     expect(await core.retypeProperty("board", "status", "select", { options: ["Todo", "Doing", "Done"] }, { Todo: "Later" })).toMatchObject({ cause: "invalid" });
-    expect(await core.retypeProperty("board", "status", "multi-select", { options: ["To do", "Doing", "Done"] }, { Todo: "To do" })).toMatchObject({ cause: "invalid" });
-    expect(told).toHaveLength(5);
+    expect(told).toHaveLength(4);
     expect((await named("One")).values.status).toBe("Todo");
+  });
+
+  it("renames options as Multiple is turned on in the same change, each value a list of its new name, one none of the options kept as it is", async () => {
+    const { core, named } = board();
+    await applied(core, await core.retypeProperty("board", "status", "select", { multiple: true, options: ["To do", "Doing", "Done"] }, { Todo: "To do" }));
+    expect([(await named("One")).values.status, (await named("Two")).values.status, (await named("Four")).values.status]).toEqual([["To do"], ["Done"], "Stray"]);
   });
 
   it("refuses a rename onto a value items hold that is none of the options, a select's or a list's", async () => {
     const { core, named } = board();
     // ("x" and "Stray" are no options: "a" renamed "x", Four would hold "x" twice; "Todo" renamed "Stray", told from it no more)
-    expect(await core.retypeProperty("board", "tags", "multi-select", { options: ["x", "b", "c"] }, { a: "x" })).toMatchObject({ cause: "invalid" });
+    expect(await core.retypeProperty("board", "tags", "select", { multiple: true, options: ["x", "b", "c"] }, { a: "x" })).toMatchObject({ cause: "invalid" });
     expect(await core.retypeProperty("board", "status", "select", { options: ["Stray", "Doing", "Done"] }, { Todo: "Stray" })).toMatchObject({ cause: "invalid" });
     expect((await named("Four")).values.tags).toEqual(["a", "x"]);
     expect((await named("One")).values.status).toBe("Todo");
@@ -744,7 +761,7 @@ describe("renaming options", () => {
   it("keeps a value typed by hand that is none of the options as it is: read by the new names it would take a swapped one", async () => {
     const { core, store, named } = board();
     store.changeOutside("board", (await named("Two")).key, { values: { tags: "a, c", status: " Todo" } });
-    const proposal = await core.retypeProperty("board", "tags", "multi-select", { options: ["b", "a", "c"] }, { a: "b", b: "a" });
+    const proposal = await core.retypeProperty("board", "tags", "select", { multiple: true, options: ["b", "a", "c"] }, { a: "b", b: "a" });
     if ("problem" in proposal) throw new Error(proposal.problem);
     expect(proposal.unreadable).toContain((await named("Two")).key);
     await core.apply(proposal);
@@ -782,7 +799,7 @@ describe("renaming options", () => {
 
   it("swaps the values of two options swapped and moved back to their places, the params alike", async () => {
     const { core, named } = board();
-    const proposal = await core.retypeProperty("board", "tags", "multi-select", { options: ["a", "b", "c"] }, { a: "b", b: "a" });
+    const proposal = await core.retypeProperty("board", "tags", "select", { multiple: true, options: ["a", "b", "c"] }, { a: "b", b: "a" });
     expect(proposal).not.toHaveProperty("problem");
     await applied(core, proposal);
     expect((await named("One")).values.tags).toEqual(["c", "b", "a"]);

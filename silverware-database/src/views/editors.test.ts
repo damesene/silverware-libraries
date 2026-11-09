@@ -13,7 +13,7 @@ const DATABASE: Database = {
   name: "Tasks",
   properties: [
     { key: "status", label: "Status", type: "select", params: { options: ["Todo", "Done"] }, readonly: false },
-    { key: "tags", label: "Tags", type: "multi-select", params: { options: ["a", "b"] }, readonly: false },
+    { key: "tags", label: "Tags", type: "select", params: { multiple: true, options: ["a", "b"] }, readonly: false },
     { key: "estimate", label: "Estimate", type: "number", params: {}, readonly: false },
     { key: "due", label: "Due", type: "date", params: {}, readonly: false },
     { key: "done", label: "Done", type: "checkbox", params: {}, readonly: false },

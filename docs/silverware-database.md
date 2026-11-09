@@ -513,6 +513,10 @@ to it, nothing written into the project). So they stay last, perhaps never; to b
   as the table holds its drawing while a cell is edited. The cell now shows the item with the value written at once
   (`editValue`'s `show(written)`), as it was again where the write is refused.
 
+### Select and multi-select one type (2026-11-09, decided with the user)
+
+One type `select` with a switch **Multiple** (`params.multiple: true`) in place of `select` and `multi-select`, as they differed in that alone, and as a type of people to come may pick one or several the same way. No migration: no space keeps a `multi-select` yet (the user's word). How it is built, generic: a type whose shape follows its params gives the type for them (`PropertyType.forParams`; the select's two shapes, one value or a list, each a type object of the name `select`), which the registry's `of(name, params)` asks and `typeOf` (domain/listing.ts) goes through, so views, editors, grouping and the core get the shape a property's params make, knowing no param; a type's switches (`PropertyType.settings`: a logical param each, true or left out) are offered by the properties' dialog under the options, any type's; the views' icon a type names (`PropertyType.icon`: a multiple select's its own). Turning it is a change of the values' shape, through the schema's edit as a change of type: a value that no longer reads is read from its text (an option a list of it; a list of one that option), else kept and listed (a list of several once it is off), never emptied; a value none of the options, as an option renamed in the same edit, kept as before unless the shape changed. Values outside the database whose every value is a list are guessed a multiple select (`guessedType` gives the params too). Not offered to the user's own types yet (`guardedType` keeps none of the three).
+
 ### The properties' dialog saved as a whole (2026-11-09, decided with the user)
 
 Every change in **Properties** was written as it was made (a name as its field was left, a type, Required, Locked, the

@@ -13,7 +13,7 @@
 // takes it away) until it is written or the user agrees to load the body as it
 // is now. A change made elsewhere draws the panel anew once nothing in it is
 // being edited.
-import { el } from "../../../../shared/elements.ts";
+import { el, openedHere } from "../../../../shared/elements.ts";
 import type { Result } from "../../core/core.ts";
 import type { ModuleHost } from "../../core/module.ts";
 import { samePart } from "../../domain/itempart.ts";
@@ -458,16 +458,16 @@ export class PeekPanel {
     name.addEventListener("keydown", (event) => {
       if (event.key === "Enter") name.blur();
     });
-    const open = el(doc, "button", {
-      class: "swd-peek-button swd-peek-open",
-      html: VIEW_ICONS.open,
-      title: `Open its ${this.host.noun.one}`,
-      attrs: { "aria-label": `Open its ${this.host.noun.one}` },
-      run: async () => {
-        // (Its page in the editor, the panel closed first: the body is not edited in two places)
-        if (await this.close()) await this.host.openDocument(shown.item);
-      },
-    });
+    // Its page in the editor, the panel closed first (the body is not edited in two places); a link where the page has an
+    // address, so a middle click, Ctrl or Shift opens it in a tab of the browser's, the panel left as it is
+    const openHere = async () => {
+      if (await this.close()) await this.host.openDocument(shown.item);
+    };
+    const openLabel = `Open its ${this.host.noun.one}`;
+    const href = this.host.documentHref?.(shown.item);
+    const open = href
+      ? openedHere(el(doc, "a", { class: "swd-peek-button swd-peek-open", html: VIEW_ICONS.open, title: openLabel, attrs: { href, "aria-label": openLabel } }), () => void openHere())
+      : el(doc, "button", { class: "swd-peek-button swd-peek-open", html: VIEW_ICONS.open, title: openLabel, attrs: { "aria-label": openLabel }, run: () => void openHere() });
     // Closed by × beside the page, by ← where it is the whole page (a phone): the style page shows the one that fits
     const close = el(
       doc,

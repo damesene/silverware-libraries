@@ -55,6 +55,7 @@ async function setup(answer = true, withProperties = false, configured: Record<s
       itemBodies: true,
       body: (id, item) => store.body(id, item.key),
       openDocument: async (item) => void opened.push(item.name),
+      documentHref: (item) => `Tasks/${item.name}`,
       documents: async () => ["Projects/Alpha", "Projects/Beta"],
       openByName: async (name) => void opened.push(name),
       validateDocumentName: () => undefined,
@@ -143,6 +144,23 @@ describe("the peek", () => {
     q<HTMLButtonElement>(".swd-peek-open").click();
     await settle();
     expect(document.querySelector(".swd-peek")).toBeNull();
+    expect(opened).toEqual(["Fix login"]);
+  });
+
+  it("makes Open a link to the item's page: a plain click opens it here, Ctrl or a middle click is the browser's, the panel left open", async () => {
+    const { q, peek, opened } = await setup();
+    await peek("Fix login");
+    const open = q<HTMLAnchorElement>("a.swd-peek-open");
+    expect(open.getAttribute("href")).toBe("Tasks/Fix login");
+    const ctrl = new MouseEvent("click", { button: 0, ctrlKey: true, bubbles: true, cancelable: true });
+    open.dispatchEvent(ctrl);
+    const middle = new MouseEvent("click", { button: 1, bubbles: true, cancelable: true });
+    open.dispatchEvent(middle);
+    await settle();
+    expect([ctrl.defaultPrevented, middle.defaultPrevented, opened]).toEqual([false, false, []]);
+    expect(document.querySelector(".swd-peek")).not.toBeNull();
+    open.click();
+    await settle();
     expect(opened).toEqual(["Fix login"]);
   });
 

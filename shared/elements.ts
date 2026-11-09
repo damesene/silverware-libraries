@@ -49,3 +49,16 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   for (const child of children) if (child !== null && child !== undefined && child !== false) e.append(child);
   return e;
 }
+
+/**
+ * A link to a page opened by the plugin itself on a plain click (`open`: the editor's own way, as a page's link), a
+ * middle click, Ctrl, Shift or Alt left to the browser (a tab or window of its own, its address the link's)
+ */
+export function openedHere(link: HTMLAnchorElement, open: () => void): HTMLAnchorElement {
+  link.addEventListener("click", (event) => {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    open();
+  });
+  return link;
+}

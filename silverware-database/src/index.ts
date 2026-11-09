@@ -5,6 +5,7 @@
 // (`defineViews`, `defineTypes`), before `init`, as Space Lua loads.
 import { openConflict } from "./core/conflictdialog.ts";
 import type { ItemConflict } from "./core/core.ts";
+import type { Item } from "./model/database.ts";
 import { type CodeBlock, codeBlocksOf, sameBody } from "../../shared/pages/blocks.ts";
 import { pageChanges } from "../../shared/pages/changes.ts";
 import { pageWriter, type PageWriter } from "../../shared/pages/writer.ts";
@@ -145,6 +146,14 @@ export function init(bridge: Bridge): void {
           platform.ui.notify(`"${item.name}" could not be opened: ${error instanceof Error ? error.message : String(error)}`, { type: "error" });
         }
       },
+      ...(platform.editor.href
+        ? {
+            documentHref: (item: Item) => {
+              const name = store.documentOf(item.key);
+              return name === undefined ? undefined : platform.editor.href!(name);
+            },
+          }
+        : {}),
       ...documentsHost(platformDocuments(platform), core.noun, platform.ui),
       editorArea: () => editorArea(document),
       onEditorAreaChanged: (listener) => watchEditorArea(document, listener),

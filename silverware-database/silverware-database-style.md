@@ -3714,6 +3714,8 @@ button.swd-editor-document-folder:hover,
   border-radius: 6px;
   color: var(--swd-quiet);
   background: none;
+  /* (Open a link, to its page: a button's look, no underline) */
+  text-decoration: none;
   cursor: pointer;
 }
 .swd-peek-button:hover {

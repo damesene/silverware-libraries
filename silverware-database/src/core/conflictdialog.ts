@@ -9,7 +9,7 @@
 // a class of its own (`swd-conflict`).
 import { Dialogs } from "../../../shared/dialog.ts";
 import { diffRuns } from "../../../shared/diffview.ts";
-import { el } from "../../../shared/elements.ts";
+import { el, openedHere } from "../../../shared/elements.ts";
 import { buttons } from "./dialogparts.ts";
 import type { ItemConflict, Result } from "./core.ts";
 import { ICONS } from "./icons.ts";
@@ -37,13 +37,7 @@ function openLink(doc: Document, host: ConflictHost, document: string): HTMLElem
   const title = `Open ${document}`;
   const href = host.href?.(document);
   if (!href) return el(doc, "button", { class: "swd-conflict-open", text: "Open", title, run: () => host.open!(document) });
-  const link = el(doc, "a", { class: "swd-conflict-open", text: "Open", title, attrs: { href } });
-  link.addEventListener("click", (event) => {
-    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-    event.preventDefault();
-    host.open!(document);
-  });
-  return link;
+  return openedHere(el(doc, "a", { class: "swd-conflict-open", text: "Open", title, attrs: { href } }), () => host.open!(document));
 }
 
 /** A conflict shown: the lines writing yours would change on each document, Write mine and Keep theirs */

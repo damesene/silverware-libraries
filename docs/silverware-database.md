@@ -439,6 +439,8 @@ A review of the branch against `main` found, fixed the same day, each with its t
   drag now, `scrollers` in shared/drag.ts, its doc comment back on `containerAt`); the order by hand checking each rank in
   every comparison (once per item); `renamePrefix` taking `db-tasks2` for a page left under `db-tasks`.
 
+**A view's own writes refused** (found the same day, after the merge, in SilverBullet: a name typed in the table or the peek and left by a click on the row's status, the status picked at once: *Set Status of Untitled: nothing was written: changed since it was read*): a view writes against the item as drawn, and its own rename had changed it. `ItemWrites` (domain/ownwrites.ts) writes a place's and the peek's values, names (and the peek's look) one after another by item, each on the item as the writes before it from that drawing left it, where nothing else of it changed (`sameBeside`); a change made elsewhere is still refused. Left, as known: a move, a removal and a place's look go on the item as drawn; the peek's and a place's writes do not see each other's (a name typed in the peek, a value picked at once in the table behind it); each write reads the item again after it. The core checking its own last revisions of each item itself would cover all of it, every way of writing alike: weighed and put off (a first try in the core, the same day, reviewed: it covered three of its methods and kept revisions of its own beside the store's).
+
 Left: the writer's *plan* still lists the space once per plan, and the pages store plans each part apart (an undo of a
 large deletion plans as many lists): to measure with a large database before changing the store.
 

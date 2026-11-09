@@ -29,6 +29,9 @@ Then install a plugin with `Library: Install`.
   merge them everywhere, delete them, tag many pages at once (a folder's too), edit a page's tags; every change previewed.
 - **Silverware Chart** ([`silverware-chart/`](silverware-chart/silverware-chart.md)): charts written as Mermaid (other
   Mermaid renderers can draw them too), drawn in SilverBullet with Chart.js; their data from the block or from any markdown table, followed live.
+- **Silverware Database** ([`silverware-database/`](silverware-database/silverware-database.md)): databases of pages, in
+  the spirit of Notion's: each item a page, its properties the page's frontmatter, shown as a table, a list, a board, a
+  calendar or a timeline; every change reviewed where it touches many pages, and undoable.
 
 ## Layout
 

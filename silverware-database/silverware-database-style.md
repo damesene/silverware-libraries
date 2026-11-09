@@ -1202,8 +1202,53 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 .swd-table-sort-end {
   white-space: nowrap;
 }
+/* A row's Open: with a mouse a small chip right after the name's last word, shown as the row is hovered (below), laid over
+   the cell (its room kept by the cell's padding: a ↗'s, not a word's, the column hardly wider), saying "↗ Open" as it is
+   hovered itself, over what is right of it then (as Notion's); on a touch screen its ↗ alone after the name, with room for a
+   finger round it */
 .swd-table-name .swd-open::before {
   content: "↗";
+}
+@media (hover: hover) {
+  .swd-table td[data-key="name"] {
+    padding-right: 34px;
+  }
+  .swd-table td[data-key="name"] .swd-table-name-end {
+    position: relative;
+  }
+  .swd-table-name .swd-open:is(:hover, :focus-visible)::before {
+    content: "↗ Open";
+  }
+  .swd-table td[data-key="name"] .swd-open {
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 6px);
+    z-index: 2;
+    margin: 0;
+    transform: translateY(-50%);
+    padding: 1px 6px;
+    border: 1px solid var(--swd-line);
+    border-radius: 6px;
+    color: var(--swd-quiet);
+    background: var(--root-background-color, #fff);
+    font-size: 0.8em;
+    line-height: 1.6;
+    opacity: 1;
+    transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .swd-table td[data-key="name"] .swd-open:hover,
+  .swd-table td[data-key="name"] .swd-open:focus-visible {
+    border-color: var(--swd-accent);
+    color: var(--swd-accent);
+    background: color-mix(in srgb, var(--swd-accent) 10%, var(--root-background-color, #fff));
+  }
+}
+@media (hover: none) {
+  .swd-table .swd-open {
+    margin: -10px -10px -10px -2px;
+    padding: 10px;
+    opacity: 1;
+  }
 }
 .swd-table td[data-key="name"] {
   min-width: 8em;

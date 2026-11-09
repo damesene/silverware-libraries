@@ -104,11 +104,12 @@ function cell(host: ViewHost, item: Item, column: Column, editing: Editing): HTM
   const { property } = column;
   // (Its type named on it: the style page keeps a date or a number on one line)
   const td = el(doc, "td", { attrs: { "data-key": column.key, ...(property ? { "data-type": host.type(property).name } : {}) } });
-  const show = () => {
+  // (`written`: the item with the value just saved, shown so until the table is drawn anew)
+  const show = (written?: Item) => {
     const was = editing.cell === td;
     if (was) editing.cell = undefined;
     td.classList.remove("swd-editing");
-    td.replaceChildren(...content(host, item, column));
+    td.replaceChildren(...content(host, written ?? item, column));
     // An edit ended (saved or put aside) with the data changed meanwhile: drawn now
     if (was && editing.pending) {
       editing.pending = false;

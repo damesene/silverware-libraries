@@ -84,11 +84,11 @@ const editing = new WeakMap<HTMLElement, Element>();
 /**
  * A cell's value edited in place (not where an editor is open in it already): `cell`'s content made the editor of its
  * property's type, given back (as `show` draws it) once saved (Enter, the
- * field left, a choice picked) or put aside (Esc). A checkbox has no editor:
- * a click on it is its change, drawn by the views. The name is the item's
- * rename.
+ * field left, a choice picked; `show` given the item with the value written)
+ * or put aside (Esc). A checkbox has no editor: a click on it is its change,
+ * drawn by the views. The name is the item's rename.
  */
-export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: string, show: () => void): void {
+export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: string, show: (written?: Item) => void): void {
   const doc = host.document;
   // (An editor open in the cell already: a click in it, or the cell's own handler again, opens no second one over what is typed)
   const open = editing.get(cell);
@@ -106,10 +106,12 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
     if (ended) return;
     ended = true;
     editing.delete(cell);
-    // Shown as it was until the place is drawn anew with the value written (or with why it was not)
-    show();
-    if (key === NAME) await host.rename(item, typeof value === "string" ? value : "");
-    else await host.update(item, key, value);
+    // Shown with the value written until the place is drawn anew with it (or with why it was not): a view that holds its
+    // drawing while another of its cells is edited (the field left by a press on it) shows it at once
+    show(key === NAME ? { ...item, name: typeof value === "string" ? value : "" } : { ...item, values: withValue(item.values, key, value) });
+    const result = key === NAME ? await host.rename(item, typeof value === "string" ? value : "") : await host.update(item, key, value);
+    // Not written (why said to the user, or nothing to do): shown as it was again, where the cell is not edited anew meanwhile
+    if ("problem" in result && !editing.has(cell)) show();
   };
   const escape = (field: HTMLElement) =>
     field.addEventListener("keydown", (event) => {
@@ -468,4 +470,11 @@ function documentsEditor(
       if (!done) draw();
     },
   );
+}
+
+/** An item's values with one written (none: taken off, as a value cleared is) */
+function withValue(values: Item["values"], key: string, value: Value | undefined): Item["values"] {
+  if (value !== undefined) return { ...values, [key]: value };
+  const { [key]: _gone, ...rest } = values;
+  return rest;
 }

@@ -1370,3 +1370,16 @@ test("a person shows as a mention, kept by the name alone, picked from its peopl
   await field.press("Enter");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("owner: zoe\n");
 });
+
+test("a person pressed opens SilverBullet's Mention Inbox on that name, editing nothing; a multiple person's boxes laid over the page", async ({ page, space }) => {
+  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    owner: { type: person, label: Owner, options: [ada, bob] }\n    team: { type: person, label: Team, options: [ada, bob], multiple: true }\n---\n";
+  const owned = "---\ntags: [db]\nowner: ada\nteam: [bob]\n_database:\n  rank: a0\n---\n";
+  await space.open({ Page: "# Page\n\nA note for @ada.\n\n```silverware-database\nid: tasks\nview: table\n```\n", "Page/db-tasks": rootPage, "Page/db-tasks/Fix login": owned }, "Page");
+  const cell = (key: string) => page.locator(`.swd-table tbody tr:first-child td[data-key="${key}"]`);
+  await cell("owner").locator(".swd-mention").click();
+  await expect(page.getByText("Mention Inbox")).toBeVisible();
+  await expect(cell("owner").locator(".swd-editor")).toHaveCount(0);
+  // The boxes fixed to the window by their cell: no box of the page clips them
+  await cell("team").click();
+  await expect(cell("team").locator(".swd-editor-choices")).toHaveCSS("position", "fixed");
+});

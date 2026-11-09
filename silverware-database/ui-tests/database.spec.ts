@@ -1378,10 +1378,14 @@ test("a person shows as a mention, kept by the name alone, picked from its peopl
 });
 
 test("a person pressed opens SilverBullet's Mention Inbox on that name, editing nothing; a multiple person's boxes laid over the page", async ({ page, space }) => {
-  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    owner: { type: person, label: Owner, options: [ada, bob] }\n    team: { type: person, label: Team, options: [ada, bob], multiple: true }\n---\n";
+  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    owner: { type: person, label: Owner, options: [ada, bob] }\n    team: { type: person, label: Team, options: [ada, bob], multiple: true, colors: { bob: green } }\n---\n";
   const owned = "---\ntags: [db]\nowner: ada\nteam: [bob]\n_database:\n  rank: a0\n---\n";
   await space.open({ Page: "# Page\n\nA note for @ada.\n\n```silverware-database\nid: tasks\nview: table\n```\n", "Page/db-tasks": rootPage, "Page/db-tasks/Fix login": owned }, "Page");
   const cell = (key: string) => page.locator(`.swd-table tbody tr:first-child td[data-key="${key}"]`);
+  // A person shown as a mention (Auto) and one in a color of its own: both pressed, the hand over both
+  await expect(cell("owner").locator(".swd-mention")).toHaveCSS("cursor", "pointer");
+  await expect(cell("team").locator(".swd-pill")).not.toHaveClass(/swd-mention/);
+  await expect(cell("team").locator(".swd-pill")).toHaveCSS("cursor", "pointer");
   await cell("owner").locator(".swd-mention").click();
   await expect(page.getByText("Mention Inbox")).toBeVisible();
   await expect(cell("owner").locator(".swd-editor")).toHaveCount(0);

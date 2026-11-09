@@ -1052,7 +1052,8 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   color: var(--editor-at-mention-color, inherit);
   background: var(--editor-at-mention-background-color, none);
 }
-.swd-pill.swd-mention[role="link"] {
+/* (A pill pressed for something, a person's showing where it is mentioned: the hand, whatever its look) */
+.swd-pill[role="link"] {
   cursor: pointer;
 }
 .swd-pill.swd-mention.swd-pill-none {

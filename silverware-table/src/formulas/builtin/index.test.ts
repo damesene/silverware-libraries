@@ -4,6 +4,7 @@ import { BUILT_IN_FUNCTIONS as FUNCTIONS } from "./index.ts";
 import { FUNCTION_CATEGORIES } from "../function.ts";
 import { parse } from "../parser.ts";
 import { asValue, FormulaError, isError, parseClock, TimeValue, toText, type Value } from "../values.ts";
+import { asInLibraryPage } from "../../testing/librarypage.ts";
 
 // Called in the first cell (A1); ROW() tests set the place itself (a grid a function taking grids gives, as its cells)
 const call = (name: string, ...args: Value[]) => asValue(FUNCTIONS[name]!.call(args, { row: 1, column: 1 }));
@@ -15,8 +16,9 @@ describe("FUNCTIONS", () => {
     expect(f.syntax.startsWith(`${name}(`)).toBe(true);
     expect(f.description).not.toBe("");
     // The Functions table in silverware-table.md: | `SYNTAX` | Description |, an error code in it as code
-    // (`#VALUE!`: else SilverBullet indexes it as a tag); the description itself is plain text (the Functions dialog's)
-    expect(libraryPage).toContain(`| \`${f.syntax}\` | ${f.description.replace(/#(?:VALUE!|DIV\/0!|N\/A|REF!|NAME\?|NUM!|CYCLE!|SPILL!|CALC!)/g, "`$&`")} |`);
+    // (`#VALUE!`: else SilverBullet indexes it as a tag; a mention escaped, as any text of the page's tables); the description
+    // itself is plain text (the Functions dialog's)
+    expect(libraryPage).toContain(`| \`${f.syntax}\` | ${asInLibraryPage(f.description).replace(/#(?:VALUE!|DIV\/0!|N\/A|REF!|NAME\?|NUM!|CYCLE!|SPILL!|CALC!)/g, "`$&`")} |`);
     // In a group of the Functions dialog, with an example of it that formulas read
     expect(Object.keys(FUNCTION_CATEGORIES)).toContain(f.category);
     expect(f.example!.startsWith("=") && f.example!.includes(`${name}(`)).toBe(true);

@@ -4,6 +4,7 @@ import { dateTimeFormat, numberFormat } from "./format.ts";
 import { BUILT_IN_TYPES } from "./builtin/index.ts";
 import { columnTypeOf, typeNamed, typeOfTag, withColumnType } from "./index.ts";
 import { readParams } from "./registry.ts";
+import { asInLibraryPage } from "../testing/librarypage.ts";
 
 const type = (name: string) => typeNamed(name)!;
 // The parameters a type gets for what is written after its name's dash (#stars-10: "10"), as a header gives them
@@ -26,7 +27,7 @@ describe("BUILT_IN_TYPES", () => {
     expect(t.description).not.toBe("");
     expect(t.icon).toMatch(/^<svg viewBox="0 0 24 24"[^>]*>.+<\/svg>$/);
     // The Column types table in silverware-table.md: | `SYNTAX` | Description |
-    expect(libraryPage).toContain(`| \`${t.syntax}\` | ${t.description} |`);
+    expect(libraryPage).toContain(`| \`${t.syntax}\` | ${asInLibraryPage(t.description)} |`);
   });
 });
 

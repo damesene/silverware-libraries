@@ -13,6 +13,12 @@ describe("a database's block", () => {
     expect(writeBlock("", { id: "tasks", view: "yes" })).toBe('id: tasks\nview: "yes"');
   });
 
+  it("writes a key typed twice once, so a key taken off does not come back with its old value", () => {
+    const body = "id: tasks\nboard.groupBy: status\nview: board\nboard.groupBy: owner";
+    expect(writeBlock(body, { "board.groupBy": undefined })).toBe("id: tasks\nview: board");
+    expect(writeBlock(body, { "board.groupBy": "priority" })).toBe("id: tasks\nboard.groupBy: priority\nview: board");
+  });
+
   it("is a place's state: written through its writer, held as written only where it was", async () => {
     const writes: [string, string][] = [];
     let accept = true;

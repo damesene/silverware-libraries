@@ -53,16 +53,21 @@ export function readBlock(body: string): ReadonlyMap<string, unknown> {
   return values;
 }
 
-/** The block with `values` written (undefined: the key's line goes), every other line as it was, new keys at its end */
+/**
+ * The block with `values` written (undefined: the key's line goes), every other line as it was, new keys at its end; a key
+ * written there twice (typed by hand) written once, in its first line's place, its other lines gone (else one left would
+ * be read back: a key taken away coming back with its old value)
+ */
 export function writeBlock(body: string, values: Readonly<Record<string, unknown>>): string {
   const lines = linesOf(body);
   const done = new Set<string>();
   const out: string[] = [];
   for (const line of lines) {
-    if (line.key === undefined || !(line.key in values) || done.has(line.key)) {
+    if (line.key === undefined || !(line.key in values)) {
       out.push(line.raw);
       continue;
     }
+    if (done.has(line.key)) continue;
     done.add(line.key);
     const value = values[line.key];
     if (value !== undefined) out.push(written(line.key, value));

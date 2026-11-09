@@ -40,6 +40,8 @@ id: tasks
 ```
 ````
 
+A database can be shown on as many pages as you like, and more than once on one page. Two blocks written exactly alike on one page show only once in SilverBullet 2.12.1 (it renders them as one), and a view picked there is not written, as it cannot tell which of them it is: write them apart in their markdown (another `view:` line in one of them) and both show.
+
 Above it, the view shown as one button (its icon, its name, a down arrow): pressed, it lists the views (the one shown checked; arrows and Enter from the keys, Esc closes it). The one you pick is written into the block (`view: …`), and so is what a view keeps there (its filter, its sort, prefixed by its name). At the bar's other end:
 
 * **Filter**: a condition for each property, written as in Silverware Table's filter row (`Done`, `!=Done`, `>3`, `/regex/`); every condition has to hold. It applies as you type (a moment after the last key; Enter at once); one that does not read is marked red and not applied.

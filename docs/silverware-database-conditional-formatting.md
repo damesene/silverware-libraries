@@ -43,6 +43,34 @@ built-in definitions), and the table's parts around it:
 The tests that keep the domain right are its own: `conditions/conditions.test.ts` (each built-in definition loaded as a
 user's file would be, its types stripped), `builtin.test.ts`, `sample.test.ts`, `excel/conditions.test.ts`.
 
+## Rules and the colors the database has (decided with the user 2026-11-09)
+
+The database colors three ways already: an option's color (a select's value, its chip), an item's own color, and **Color by**
+(each view's own: its items in the color of a property's option; an item's own color first). Rules come with them so:
+
+* **Rules are the database's**, alike in every view: one list, in the order the user gives it. Rules of a view were set
+  aside: mixed with the database's into one order, their place among rules another view reorders cannot be kept, and a rule
+  such as *overdue in red* is wanted everywhere. What is a view's own is its Color by alone (a board by Status, a calendar by
+  Project: each view answers its own question).
+* **An item's look, one layer after another**, each property of a style (fill, color, bold, italic, strike, icon…) taken from
+  the first that sets it (the domain's `combineStyles`, an earlier rule's property kept):
+  `the item's own color → the rules, in their order → the view's Color by`. So layers add up: a timeline colored by Status
+  keeps its bars' color under a rule that only adds an icon; *Done → strike* strikes an item and leaves its color to Color
+  by; a rule's color wins over Color by, never over a color the user gave the item (the user's choice, 2026-11-09).
+* **The item's own color is a line of the rules' list**, first by default, moved among the rules like any (an item's own color
+  under *overdue* where the warning should win).
+* **Color by stays a view's setting**, in ⋯ as today, always the last layer, not moved among the rules. Inside it may be
+  evaluated as a rule of a built-in format, *option colors* (`look(cell)`: the color of the value's option), with no
+  condition; to the user it is the view's. In the rules' dialog it is either not shown at all or shown so that it is plainly
+  the view's, not the database's (apart from the list, under a line, named *This view: colored by Status*, not draggable):
+  which of the two, decided in step 3 (the user, 2026-11-09).
+* **A value's chip keeps its option's color**: a rule over a value adds what an option's color does not say (a fill of the
+  cell, bold, strike, an icon). A rule that would only color a select's value as its option already is (*Done → green*) is
+  not offered as a value's format of a select, or the dialog says the option's color does it.
+* **One palette**: rules take the database's colors (`domain/colors.ts`, the options' palette, a color of one's own as
+  `#rrggbb`, the dark look alike); the domain's palette names (`HELPERS`) map onto it (whether the two palettes match today
+  is not checked).
+
 ## The plan, in four steps
 
 Each step its branch's worth or less, reviewed, tested, committed apart; the first changes nothing a user sees.
@@ -79,6 +107,10 @@ Done when: `npm run verify` passes, the table's conditional formatting looks and
   evaluated once per data read (the items a `Placed` each: `row` the item's place, `column` the property's, `cell` its value
   as its type gives it: `text` the type's text, `number`, `date` read from the value, `rowCells` the item's other values),
   cached by the database's and items' revisions.
+* **The layers** (*Rules and the colors the database has*): the item's own color a line among the rules (stored in the order
+  with them, first by default); the view's Color by evaluated as the last layer by the format *option colors*, `colorBy`
+  staying where the block keeps it; what `host.look.item` draws today (own color, Color by) made of the same evaluation, so
+  there is one way an item gets its look.
 * **The views, alike**: the place's host gives `look(item)` (the item's style, from its `item` rules) and
   `look(item, key)` (a value's, from its `property` rules); one helper of the views, `applyLook(element, style)` in
   `views/values.ts`, sets it on an element as CSS variables (`--swd-cf-fill`, `--swd-cf-color`…) and marks (`swd-cf`),
@@ -96,6 +128,8 @@ shows as the place refreshes; Undo takes a rule's change back.
 A module, `conditions` (on by default, turned off in Settings, Modules), as the properties module is: under ⋯ beside the
 views **Conditional formatting…**, and in Properties a property's own rules (*to decide*: both, or one of them).
 
+* The item's own color a line of the list, dragged as a rule; the view's Color by not among them (not shown, or apart as the
+  view's: *to decide* with the user, *Rules and the colors the database has*).
 * The rules in their order (dragged, shared/drag.ts), each a line: *when* (a property, a condition, its params' fields made
   of its `ParamSpec`) *then* (a format, its params: the palette's colors, a color of your own as option colors have it);
   what it applies to (the whole item or the property's value); a sample of how it looks; removed.

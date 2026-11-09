@@ -148,7 +148,46 @@ export function silverBulletPlatform(bridge: Bridge): {
 
 /** SilverBullet's editor's area on screen (`#sb-editor`: not its sidebars), where a panel beside the page goes */
 export function editorArea(doc: Document): DOMRect | undefined {
-  return doc.querySelector("#sb-editor")?.getBoundingClientRect();
+  const editor = doc.querySelector<HTMLElement>("#sb-editor");
+  const view = doc.defaultView;
+  if (!editor || !view) return undefined;
+  // Its content box, inside its padding and borders: what pads it is kept for something of the editor's own, as Silverware
+  // Toolbar docked at its top or bottom pads it by its height (the editor border-box), which a panel over the whole box
+  // lay under (seen 2026-11-09). The element looked up as asked: SilverBullet keeps it for the session
+  const box = editor.getBoundingClientRect();
+  const style = view.getComputedStyle(editor);
+  const side = (name: "Top" | "Right" | "Bottom" | "Left") => (parseFloat(style.getPropertyValue(`padding-${name.toLowerCase()}`)) || 0) + (parseFloat(style.getPropertyValue(`border-${name.toLowerCase()}-width`)) || 0);
+  const [top, right, bottom, left] = [side("Top"), side("Right"), side("Bottom"), side("Left")];
+  return new DOMRect(box.left + left, box.top + top, Math.max(0, box.width - left - right), Math.max(0, box.height - top - bottom));
+}
+
+/**
+ * `listener` told as the editor's content box may have changed: its size (a sidebar narrows it), and what pads it changed
+ * without its size (a toolbar docked at its top moved to its bottom: the variables on html it pads it by, or its own
+ * style); its end given back
+ */
+export function watchEditorArea(doc: Document, listener: () => void): () => void {
+  const editor = doc.querySelector("#sb-editor");
+  const view = doc.defaultView;
+  if (!editor || !view) return () => {};
+  // (Once a frame however often they change: html's style is written often, by a toolbar following the keyboard too)
+  let pending = false;
+  const tell = () => {
+    if (pending) return;
+    pending = true;
+    view.requestAnimationFrame(() => {
+      pending = false;
+      listener();
+    });
+  };
+  const resized = view.ResizeObserver ? new view.ResizeObserver(tell) : undefined;
+  resized?.observe(editor);
+  const styled = new view.MutationObserver(tell);
+  for (const one of [doc.documentElement, editor]) styled.observe(one, { attributes: true, attributeFilter: ["style", "class"] });
+  return () => {
+    resized?.disconnect();
+    styled.disconnect();
+  };
 }
 
 /**

@@ -246,6 +246,67 @@ describe("the peek", () => {
     expect((await named("Fix the login")).values.estimate).toBe(8);
   });
 
+  it("writes a value picked as the name is still written, the panel not drawn anew meanwhile (its editor open)", async () => {
+    const { q, peek, named, told } = await setup();
+    await peek("Fix login");
+    const name = q<HTMLInputElement>(".swd-peek-name");
+    name.focus();
+    name.value = "Fix the login";
+    name.dispatchEvent(new Event("change"));
+    // A value's editor opened at once and its value given before the rename is written: the panel's drawing put off while
+    // the editor is open, the value's write waiting for the rename's
+    q('.swd-peek-value[data-key="estimate"]').click();
+    const input = q<HTMLInputElement>('.swd-peek-value[data-key="estimate"] input');
+    input.value = "8";
+    key(input, "Enter");
+    await settle();
+    expect((await named("Fix the login")).values.estimate).toBe(8);
+    expect(told.join(" ")).not.toContain("changed since");
+  });
+
+  it("writes a name typed back and a value changed twice while its drawing is put off, as the panel shows them", async () => {
+    const { q, peek, named, told } = await setup();
+    await peek("Fix login");
+    const name = q<HTMLInputElement>(".swd-peek-name");
+    name.focus();
+    name.value = "Fix the login";
+    name.dispatchEvent(new Event("change"));
+    // The estimate's editor open: the panel's drawing put off while the name is written, then typed back
+    q('.swd-peek-value[data-key="estimate"]').click();
+    await settle();
+    name.value = "Fix login";
+    name.dispatchEvent(new Event("change"));
+    await settle();
+    expect((await named("Fix login")).name).toBe("Fix login");
+    // The same value twice, its editor opened again each time from the panel as it shows it
+    for (const estimate of ["8", "9"]) {
+      if (!document.querySelector('.swd-peek-value[data-key="estimate"] input')) q('.swd-peek-value[data-key="estimate"]').click();
+      const input = q<HTMLInputElement>('.swd-peek-value[data-key="estimate"] input');
+      input.value = estimate;
+      key(input, "Enter");
+      await settle();
+    }
+    expect((await named("Fix login")).values.estimate).toBe(9);
+    expect(told.join(" ")).not.toContain("changed since");
+  });
+
+  it("still refuses a value whose item changed elsewhere after the panel's own rename, its drawing put off", async () => {
+    const { q, peek, named, store } = await setup();
+    await peek("Fix login");
+    q('.swd-peek-value[data-key="estimate"]').click();
+    const name = q<HTMLInputElement>(".swd-peek-name");
+    name.value = "Fix the login";
+    name.dispatchEvent(new Event("change"));
+    await settle();
+    store.changeOutside("tasks", (await named("Fix the login")).key, { values: { estimate: 5 } });
+    await settle();
+    const input = q<HTMLInputElement>('.swd-peek-value[data-key="estimate"] input');
+    input.value = "8";
+    key(input, "Enter");
+    await settle();
+    expect((await named("Fix the login")).values.estimate).toBe(5);
+  });
+
   it("removes its item by the bin at its top, asked first, a body typed written before it goes; Undo brings both back", async () => {
     const { q, peek, named, store, core } = await setup();
     await peek("Fix login");

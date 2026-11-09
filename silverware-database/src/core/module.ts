@@ -74,8 +74,10 @@ export type ModuleHost = DocumentsHost & {
   body(id: string, item: Item): Promise<string | undefined>;
   /** The item's document opened in the editor (its page), past every module's own way; a failure said to the user */
   openDocument(item: Item): Promise<void>;
-  /** The editor's area on screen, where a panel beside the document goes (undefined: the window) */
+  /** The editor's area on screen, where a panel beside the document goes (undefined: the window); what the host keeps in it for its own (a toolbar docked at its top) left out */
   editorArea(): DOMRect | undefined;
+  /** `listener` told as the editor's area changes (a toolbar docked over it or gone, a sidebar opened); its end given back. None: the window's resize alone */
+  onEditorAreaChanged?(listener: () => void): () => void;
   /** How the page's text looks (CSS properties: its font, size, line height, color), for what a module shows beside it; none: the style page's */
   editorLook?(): Readonly<Record<string, string>> | undefined;
   /** One of the module's settings (declared in its `settings`), its default where not set */

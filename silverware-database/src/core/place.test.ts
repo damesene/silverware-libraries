@@ -158,6 +158,25 @@ describe("a place", () => {
     expect(plain.seen.renders).toBe(2);
   });
 
+  it("writes a value picked from a row drawn before its name was written, on the item as renamed; one changed elsewhere refused", async () => {
+    const table = listView("table");
+    const { place, store } = setup([table.view]);
+    await place.render();
+    const host = table.seen.host!;
+    // The row as drawn: its name typed and left, a status picked at once from the same row
+    const row = host.items[0]!;
+    const renaming = host.rename(row, "Fix the login");
+    const setting = host.update(row, "status", "Done");
+    expect(await renaming).not.toHaveProperty("problem");
+    expect(await setting).not.toHaveProperty("problem");
+    const now = () => store.items("tasks").then(({ value }) => value.find((one) => one.key === row.key)!);
+    expect(await now()).toMatchObject({ name: "Fix the login", values: { status: "Done" } });
+    // A value the row shows changed elsewhere since: one from that row again is refused, never written over
+    store.changeOutside("tasks", row.key, { values: { estimate: "5" } });
+    expect(await host.update(row, "estimate", "8")).toHaveProperty("problem");
+    expect((await now()).values.estimate).toBe("5");
+  });
+
   it("keeps a view's filter, sort and meta under its name, its settings read with their defaults", async () => {
     const table = listView("table");
     const { place, viewState, listed } = setup([table.view], {}, { [viewSettingPath("table", "dense")]: true });

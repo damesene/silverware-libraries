@@ -195,14 +195,73 @@ describe("the core", () => {
     expect(told).toHaveLength(3);
   });
 
-  it("never writes over a change made since the item was read: a stale view's value is left, and said", async () => {
+  it("never writes over a change made since the item was read: a stale view's value of a part changed since is left, and said", async () => {
     const { core, told, named } = setup();
     const stale = await named("Fix login");
-    await core.update("tasks", stale, "estimate", "5");
+    await core.update("tasks", stale, "status", "Doing");
     const result = await core.update("tasks", stale, "status", "Done");
     expect(result).toMatchObject({ cause: "left" });
-    expect((await named("Fix login")).values).toEqual({ status: "Todo", estimate: "5" });
+    expect((await named("Fix login")).values).toEqual({ status: "Doing", estimate: "3" });
     expect(told).toHaveLength(1);
+  });
+
+  it("moves and writes a body from an item as shown before its own rename, the rename waited for; a removal refused where what it loses changed", async () => {
+    const { core, store, told, named, items } = setup();
+    const stale = await named("Fix login");
+    const docs = await named("Write docs");
+    // A move from the drawing before the rename, while the rename is written: after it, on the item renamed, before Write docs' neighbour
+    const renaming = core.rename("tasks", stale, "Fix the login");
+    const moving = core.move("tasks", stale, { after: docs, values: { status: "Done" } });
+    const body = core.setBody("tasks", stale, "Steps", undefined);
+    expect([await renaming, await moving, await body].filter((one) => "problem" in one)).toEqual([]);
+    expect(inRankOrder(await items()).map((one) => one.name)).toEqual(["Write docs", "Fix the login"]);
+    expect((await named("Fix the login")).values.status).toBe("Done");
+    expect(await store.body("tasks", stale.key)).toBe("Steps");
+    // What a removal loses (its name, a value) changed since it was shown: not removed, said
+    expect(await core.remove("tasks", [stale])).toMatchObject({ cause: "left" });
+    const shown = await named("Fix the login");
+    store.changeOutside("tasks", stale.key, { values: { estimate: "8" } });
+    expect(await core.remove("tasks", [shown])).toMatchObject({ cause: "left" });
+    expect(told).toHaveLength(2);
+    // Its body and its place changed since (neither what it loses as shown): removed
+    expect(await core.remove("tasks", [await named("Fix the login")])).not.toHaveProperty("problem");
+    expect((await items()).map((one) => one.name)).toEqual(["Write docs"]);
+  });
+
+  it("removes the items of a removal still as shown, leaves one changed since, and says so", async () => {
+    const { core, store, told, items } = setup();
+    const [fix, docs] = await items();
+    store.changeOutside("tasks", docs!.key, { values: { estimate: "a little" } });
+    expect(await core.remove("tasks", [fix!, docs!])).not.toHaveProperty("problem");
+    expect((await items()).map((one) => one.name)).toEqual(["Write docs"]);
+    expect(told).toEqual(['"Write docs" changed since it was shown: left as it is']);
+  });
+
+  it("leaves the values the system gives out of what a write rests on: a removal after its body was written, the order and Modified changed", async () => {
+    const { core, named, items } = setup();
+    await core.addProperty("tasks", { label: "Order", type: "number", system: "order" });
+    await core.addProperty("tasks", { label: "Modified", type: "datetime", system: "modifiedAt" });
+    const stale = await named("Fix login");
+    await core.setBody("tasks", stale, "Steps", undefined);
+    // Another moved ahead of it: its order number changed too
+    await core.move("tasks", await named("Write docs"), { before: stale });
+    expect(await core.remove("tasks", [stale])).not.toHaveProperty("problem");
+    expect((await items()).map((one) => one.name)).toEqual(["Write docs"]);
+  });
+
+  it("writes a stale view's value where only other parts changed since, on the item as it is now, nothing written over", async () => {
+    const { core, store, told, named } = setup();
+    const stale = await named("Fix login");
+    // Renamed by the view itself as a value is picked at once from the item as shown before, and a value changed elsewhere
+    const renaming = core.rename("tasks", stale, "Fix the login");
+    const setting = core.update("tasks", stale, "status", "Done");
+    expect(await renaming).not.toHaveProperty("problem");
+    expect(await setting).not.toHaveProperty("problem");
+    store.changeOutside("tasks", stale.key, { values: { estimate: "5" } });
+    expect(await core.setLook("tasks", stale, { icon: "🚀" })).not.toHaveProperty("problem");
+    const now = await named("Fix the login");
+    expect([now.values, now.look]).toEqual([{ status: "Done", estimate: "5" }, { icon: "🚀" }]);
+    expect(told).toHaveLength(0);
   });
 
   it("adds an item at the end of the order, named Untitled where it has no name, a free one", async () => {
@@ -443,8 +502,9 @@ describe("the core", () => {
   it("writes nothing of a move whose item changed since it was read, its neighbours' ranks put back", async () => {
     const { core, store, items, named } = setup(true, [{ name: "Loose", values: {}, rank: undefined }]);
     const stale = await named("Fix login");
-    store.changeOutside("tasks", stale.key, { values: { estimate: "4" } });
-    expect(await core.move("tasks", stale, { after: await named("Loose") })).toMatchObject({ cause: "left" });
+    // (A value the move sets, changed elsewhere since it was shown)
+    store.changeOutside("tasks", stale.key, { values: { status: "Doing" } });
+    expect(await core.move("tasks", stale, { after: await named("Loose"), values: { status: "Done" } })).toMatchObject({ cause: "left" });
     expect((await named("Loose")).rank).toBeUndefined();
     expect(inRankOrder(await items()).map((one) => one.name)).toEqual(["Fix login", "Write docs", "Loose"]);
     expect(await core.undo()).toBeUndefined();

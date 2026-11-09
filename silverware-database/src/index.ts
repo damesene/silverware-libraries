@@ -21,7 +21,7 @@ import { TypeRegistry } from "./domain/types/registry.ts";
 import type { PropertyType } from "./domain/types/type.ts";
 import { BLOCK_LANGUAGE, BlockState, readBlock } from "./host/silverbullet/block.ts";
 import { blockPlaces } from "./host/silverbullet/places.ts";
-import { type Bridge, editorArea, editorLook, silverBulletPlatform } from "./host/silverbullet/platform.ts";
+import { type Bridge, editorArea, editorLook, silverBulletPlatform, watchEditorArea } from "./host/silverbullet/platform.ts";
 import { PagesStore } from "./store/pages/store.ts";
 import { BUILT_IN_MODULES } from "./modules/builtin.ts";
 import { BUILT_IN_VIEWS } from "./views/builtin/index.ts";
@@ -145,6 +145,7 @@ export function init(bridge: Bridge): void {
       },
       ...documentsHost(platformDocuments(platform), core.noun, platform.ui),
       editorArea: () => editorArea(document),
+      onEditorAreaChanged: (listener) => watchEditorArea(document, listener),
       editorLook: () => editorLook(document),
       onChanged: (listener) => store.onChanged((change) => listener(change.database)),
       onDocumentOpened: (listener) => platform.editor.onOpened?.(listener) ?? (() => {}),

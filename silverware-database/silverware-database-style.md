@@ -1113,6 +1113,12 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   align-items: center;
   white-space: nowrap;
 }
+/* An editor's panel laid over the page by its cell or field (views/float.ts): over everything around it, scrolled where
+   it is cut to the room in the window */
+.swd-floated {
+  z-index: 50;
+  overflow-y: auto;
+}
 /* A field offering names as typed (a person's with Anyone: shared/suggest.ts): the list under the field, over what is
    below it */
 .swd-suggest-field {

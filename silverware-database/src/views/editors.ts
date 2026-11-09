@@ -11,6 +11,7 @@
 // off the item.
 import { el } from "../../../shared/elements.ts";
 import { suggestionList } from "../../../shared/suggest.ts";
+import { floatPanel } from "./float.ts";
 import { readLink, writeLink } from "../domain/types/link.ts";
 import { folderSearch, foundBy, pathOf } from "../domain/folders.ts";
 import { linkedDocument, type Reference, readReferences, validateReferenceTarget, writeReference } from "../domain/types/reference.ts";
@@ -169,6 +170,7 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
     });
     escape(input);
     cell.replaceChildren(el(doc, "div", "swd-suggest-field", input, list));
+    floatPanel(list, input, "under");
     editing.set(cell, input);
     input.focus();
     input.select();
@@ -268,6 +270,7 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
     });
     escape(panel);
     cell.replaceChildren(panel);
+    floatPanel(panel, cell, "over");
     editing.set(cell, panel);
     (boxes[0] ?? adder ?? panel).focus({ preventScroll: true });
     // (Whole in view: in a box that scrolls, the peek's properties, it may open past its edge)
@@ -403,6 +406,7 @@ function linkEditor(cell: HTMLElement, kept: string, escape: (field: HTMLElement
     if (!panel.contains(event.relatedTarget as Node | null)) commit(true);
   });
   cell.replaceChildren(panel);
+  floatPanel(panel, cell, "over");
   editing.set(cell, panel);
   address.focus();
   address.select();
@@ -546,6 +550,7 @@ function documentsEditor(
   escape(panel);
   draw();
   cell.replaceChildren(panel);
+  floatPanel(panel, cell, "over");
   editing.set(cell, panel);
   search.focus({ preventScroll: true });
   panel.scrollIntoView?.({ block: "nearest" });

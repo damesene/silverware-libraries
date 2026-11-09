@@ -420,6 +420,25 @@ export async function boxOf(target: Locator): Promise<{ x: number; y: number; wi
   return box!;
 }
 
+/**
+ * Where an element rests: its box the same before and after two frames (what
+ * a frame after a change places is placed: a tab moved after a scroll, a
+ * sheet's tables put on its grid), so a point taken from it is still where it
+ * was when the pointer gets there; waited for, never a time
+ */
+export async function stableBox(target: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
+  let box: { x: number; y: number; width: number; height: number } | null = null;
+  await expect
+    .poll(async () => {
+      const before = await target.boundingBox();
+      await target.page().evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      box = await target.boundingBox();
+      return before !== null && box !== null && before.x === box.x && before.y === box.y && before.width === box.width && before.height === box.height;
+    })
+    .toBe(true);
+  return box!;
+}
+
 /** An element's centre, once laid out (`boxOf`: drawn anew meanwhile, as the toolbar's buttons are as it is placed, it has none for a moment) */
 export async function center(target: Locator): Promise<{ x: number; y: number }> {
   const box = await boxOf(target);

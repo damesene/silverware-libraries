@@ -115,22 +115,21 @@ silverware-tags/
     bridge.ts          the SilverBullet API used (Bridge), settings, modules' names
     modules.ts         the modules in their order, created only when on
     tags/              the domain (pure, no DOM, no SilverBullet)
-      names.ts         tag names: valid, as a hashtag (#a, #<a b>), the hierarchy (parent, within, renamed)
-      scan.ts          TagScanner: the hashtags of a page's body, each with its place and context (page line, paragraph, item, task, table)
-      frontmatter.ts   the frontmatter's tags: read with their places, added, removed, renamed in the page's own form
-      edit.ts          the edits of a page's text: rename, remove, add to the page, remove from the page
       tree.ts          the tags as a tree by "/" with counts
+                       (how tags are read and written in a page: shared/pages/tags/, moved there in step 2b
+                       of docs/silverware-database.md: names.ts, scan.ts, frontmatter.ts, edit.ts)
     space/             the abstraction of SilverBullet's space
-      space.ts         Space: pages, tag uses (the index), read, write (only if unchanged), the page open, navigate
+      space.ts         Space: pages, tag uses (the index), read, the page open, navigate; nothing written:
+                       the page writer (shared/pages/writer.ts) writes through a WritingPlatform the
+                       controller gets apart (silverBulletPlatform), out of the modules' reach
       silverbullet.ts  Space over the Bridge (the page open through the editor)
       memory.ts        Space over a map of pages (tests, the playground), its tag uses by the scanner
     core/
-      operation.ts     Operation: a label, the pages it may change, its edit of a page's text
-      plan.ts          Plan: an operation over its pages (each page's text before and after, skipped and why), applied (each page checked unchanged), undone
-      history.ts       the changes applied this session, undone last first
+      operation.ts     Operation: a label, the pages it may change, what changes on each in the page writer's terms
+      plan.ts          Plan: an operation over its pages through the page writer (each page planned, skipped and why), applied (each page checked unchanged), undone
+                       (the history of changes applied: shared/pages/history.ts, PageHistory)
       catalog.ts       the tags of the space (uses by page and context), read from the Space
       module.ts        TagsModule: what a module gives (commands, a tag's actions in the manager); ModuleHost: what the core gives it
-      diff.ts          a page's change as lines before and after (the preview)
     ui/                the dialogs (shared/dialog.ts, base swg-dialog), made of Silverware Tags' own elements
       (elements)       el() of shared/elements.ts
       manager.ts       the Tag manager: a tree of tags with counts and a search, the tag picked: where it is used, the modules' actions

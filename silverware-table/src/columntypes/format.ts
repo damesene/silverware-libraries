@@ -1,5 +1,5 @@
 // What several column types share
-import { asNumber } from "../view.ts";
+import { asNumber } from "../../../shared/filter.ts";
 
 /** A cell's text as a number, read as for sorting (`12,99`, `1 000`, `15 %`) */
 export function numberOf(text: string): number | undefined {

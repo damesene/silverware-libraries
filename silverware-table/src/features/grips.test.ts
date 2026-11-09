@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LineMenuGroup } from "../core/feature.ts";
 import { bodyTexts, buttonLabel, cell, clickOn, controller, editor, flush, key, menuButtons, PAGE, setup, text, useTablePage } from "../testing/page.ts";
-import { customSections } from "./grips.ts";
+import { customSections } from "../../../shared/menuslots.ts";
 
 describe("Row and column grips", () => {
   useTablePage();

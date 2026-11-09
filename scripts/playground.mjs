@@ -4,15 +4,16 @@ import * as esbuild from "esbuild";
 import { writeFileSync } from "node:fs";
 import { emojiModuleText } from "./emoji.mjs";
 
-// The toolbar's emoji data beside its bundle, as SilverBullet has it beside the library's (not committed here)
+// The emoji data beside the bundles, as SilverBullet has it beside each library's (not committed here)
 writeFileSync("playground/silverware-toolbar-emoji.js", emojiModuleText());
+writeFileSync("playground/silverware-database-emoji.js", emojiModuleText());
 
 const port = Number(process.env.PORT ?? 8000);
 // HOST=0.0.0.0 serves it to the local network too (e.g. to try it on a phone)
 const host = process.env.HOST ?? "127.0.0.1";
 
 const ctx = await esbuild.context({
-  entryPoints: ["playground/playground.ts", "playground/toolbar.ts", "playground/tags.ts"],
+  entryPoints: ["playground/playground.ts", "playground/toolbar.ts", "playground/tags.ts", "playground/database.ts"],
   outdir: "playground",
   bundle: true,
   format: "esm",

@@ -68,14 +68,16 @@ export function reorder(e: PointerEvent, options: Reorder): void {
     if (!scrolling) scroll();
   };
 
-  // A container that scrolls (a long list in a box) scrolls while the pointer is near its top or bottom
+  // A container that scrolls, or a box around it that does (a long list in a box), scrolls while the pointer is near its top or bottom
+  const scrollerOf = scrollers();
   let last = start;
   let scrolling = 0;
   const scroll = () => {
     scrolling = 0;
     if (!ghost) return;
-    const container = containerAt(options.containers(), last.x, last.y);
-    if (!container || container.scrollHeight <= container.clientHeight) return;
+    const found = containerAt(options.containers(), last.x, last.y, scrollerOf);
+    const container = found && scrollerOf(found);
+    if (!container) return;
     const r = container.getBoundingClientRect();
     const by = last.y < r.top + SCROLL_EDGE ? -1 : last.y > r.bottom - SCROLL_EDGE ? 1 : 0;
     if (!by) return;
@@ -90,7 +92,7 @@ export function reorder(e: PointerEvent, options: Reorder): void {
   /** The element moved in the document to the gap nearest the point, the others sliding there from where they were */
   const place = (x: number, y: number) => {
     const containers = options.containers();
-    const container = containerAt(containers, x, y);
+    const container = containerAt(containers, x, y, scrollerOf);
     if (!container) return;
     const others = options.items(container).filter((item) => item !== element);
     const index = options.flow === "inline" ? inlineIndex(others, x, y) : blockIndex(others, y);
@@ -162,12 +164,45 @@ function nextItem(element: HTMLElement, others: readonly HTMLElement[]): HTMLEle
   return undefined;
 }
 
+/** How a container's scrolling box is found: one per drag, a container's boxes that may scroll found once */
+type Scrollers = (container: HTMLElement) => HTMLElement | undefined;
+
+/**
+ * The box that scrolls a container up and down: the container itself, else the nearest around it that does; none where
+ * none does. Which boxes around a container may scroll (their overflow) is read once per drag, as the pointer moves
+ * dozens of times a second; whether one scrolls now (its content taller than it: a list an item was dragged into) each time.
+ */
+function scrollers(): Scrollers {
+  const mayScroll = new WeakMap<HTMLElement, readonly HTMLElement[]>();
+  return (container) => {
+    let boxes = mayScroll.get(container);
+    if (!boxes) {
+      const found: HTMLElement[] = [];
+      for (let one: HTMLElement | null = container; one; one = one.parentElement) {
+        const overflow = one.ownerDocument.defaultView?.getComputedStyle(one).overflowY;
+        if (overflow === "auto" || overflow === "scroll") found.push(one);
+      }
+      mayScroll.set(container, (boxes = found));
+    }
+    return boxes.find((one) => one.scrollHeight > one.clientHeight);
+  };
+}
+
+/** A container's part in view: its box cut to the box that scrolls it (a list longer than its box: the part the box shows) */
+function shownRect(container: HTMLElement, scrollerOf: Scrollers): { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number } {
+  const r = container.getBoundingClientRect();
+  const scroller = scrollerOf(container);
+  if (!scroller || scroller === container) return r;
+  const s = scroller.getBoundingClientRect();
+  return { left: Math.max(r.left, s.left), right: Math.min(r.right, s.right), top: Math.max(r.top, s.top), bottom: Math.min(r.bottom, s.bottom) };
+}
+
 /** The container the point is in, else the one nearest it up or down */
-function containerAt(containers: readonly HTMLElement[], x: number, y: number): HTMLElement | undefined {
+function containerAt(containers: readonly HTMLElement[], x: number, y: number, scrollerOf: Scrollers): HTMLElement | undefined {
   let nearest: HTMLElement | undefined;
   let distance = Infinity;
   for (const container of containers) {
-    const r = container.getBoundingClientRect();
+    const r = shownRect(container, scrollerOf);
     if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return container;
     const d = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
     if (d < distance) {

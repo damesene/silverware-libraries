@@ -1,7 +1,6 @@
 // A plan as the window's review shows it: each page that changes with its
 // lines before and after (folded under its name, the first few open, the
 // others' lines made as they are opened), the pages left alone and why.
-import { diffLines } from "../core/diff.ts";
 import { counted } from "../core/operation.ts";
 import type { Plan } from "../core/plan.ts";
 import { el } from "../../../shared/elements.ts";
@@ -13,9 +12,9 @@ const LISTED = 1000;
 
 export function reviewList(doc: Document, plan: Plan): HTMLElement {
   const body = el(doc, "div", "swg-preview");
-  if (plan.changes.length) {
+  if (plan.pages.length) {
     const list = el(doc, "div", "swg-preview-pages");
-    plan.changes.slice(0, LISTED).forEach((change, i) => {
+    plan.pages.slice(0, LISTED).forEach((change, i) => {
       const diff = el(doc, "div", "swg-diff");
       const details = el(
         doc,
@@ -28,7 +27,7 @@ export function reviewList(doc: Document, plan: Plan): HTMLElement {
       const fill = () => {
         if (diff.childElementCount) return;
         diff.append(
-          ...diffLines(change.before, change.after).map((run) =>
+          ...change.preview().map((run) =>
             el(
               doc,
               "div",
@@ -47,7 +46,7 @@ export function reviewList(doc: Document, plan: Plan): HTMLElement {
       }
       list.append(details);
     });
-    if (plan.changes.length > LISTED) list.append(el(doc, "p", { class: "swg-note", text: `and ${counted(plan.changes.length - LISTED, "more page")}` }));
+    if (plan.pages.length > LISTED) list.append(el(doc, "p", { class: "swg-note", text: `and ${counted(plan.pages.length - LISTED, "more page")}` }));
     body.append(list);
   } else body.append(el(doc, "p", { class: "swg-empty", text: "Nothing to change." }));
   if (plan.skipped.length)

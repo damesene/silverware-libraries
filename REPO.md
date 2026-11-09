@@ -34,3 +34,11 @@ author: damesene
 website: https://github.com/damesene/silverware-libraries/tree/main/silverware-chart
 uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-chart/silverware-chart.md
 ```
+
+```#meta/library/remote
+name: Silverware Database
+description: "Databases of pages, in the spirit of Notion's: each item a page, its properties the page's frontmatter (so queries read them too), shown in your pages as a table, a list, a board, a calendar or a timeline; filter, sort and group, edit values in place, an item's panel, properties and their options changed with every item reviewed first, every change undoable, and views and types of your own."
+author: damesene
+website: https://github.com/damesene/silverware-libraries/tree/main/silverware-database
+uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-database/silverware-database.md
+```

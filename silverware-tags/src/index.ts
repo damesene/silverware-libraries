@@ -6,8 +6,8 @@ import { type Bridge, missingBridgeFunctions, readSettings, type Settings } from
 import { Controller } from "./core/controller.ts";
 import { PANEL_OFFER, type PanelActionInfo, type PanelOffer, type PanelRow } from "./core/offers.ts";
 import { createModules } from "./modules.ts";
-import type { Notifier, Space } from "./space/space.ts";
-import { silverBulletNotifier, silverBulletSpace } from "./space/silverbullet.ts";
+import type { Notifier, Space, WritingPlatform } from "./space/space.ts";
+import { silverBulletNotifier, silverBulletPlatform, silverBulletSpace } from "./space/silverbullet.ts";
 import { SettingsDialog, type SettingsStore } from "./settings.ts";
 import { customOperationsAnew, defineCustomOperations, operationsOf, setNewTagsForm } from "./custom.ts";
 
@@ -37,13 +37,13 @@ export async function init(bridge: Bridge): Promise<void> {
     confirm: async (question) => (bridge.confirm ? !!(await bridge.confirm(question)) : globalThis.confirm(question)),
     flash: (message, type) => notifier.flash(message, type),
   };
-  await start(space, notifier, await readSettings(bridge), store);
+  await start(space, silverBulletPlatform(bridge), notifier, await readSettings(bridge), store);
 }
 
 /** The core and the modules on, over a space (SilverBullet's, or the playground's); the settings dialog where a store is given */
-export async function start(space: Space, notifier: Notifier, settings: Settings, store?: SettingsStore): Promise<Controller> {
+export async function start(space: Space, platform: WritingPlatform, notifier: Notifier, settings: Settings, store?: SettingsStore): Promise<Controller> {
   const dialog = store ? new SettingsDialog(document, store) : undefined;
-  const controller = new Controller(document, space, notifier, { protectMeta: settings.protectMeta, newTagsForm: settings.newTagsForm, settings: dialog ? () => dialog.open() : undefined });
+  const controller = new Controller(document, space, platform, notifier, { protectMeta: settings.protectMeta, newTagsForm: settings.newTagsForm, settings: dialog ? () => dialog.open() : undefined });
   setNewTagsForm(settings.newTagsForm);
   controller.setModules(createModules(settings, (name) => controller.hostFor(name)));
   slot[GLOBAL_KEY] = controller;

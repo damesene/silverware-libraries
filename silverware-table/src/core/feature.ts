@@ -15,6 +15,7 @@ export type { Rect } from "./geometry.ts";
 import type { IndexMap } from "../ops.ts";
 import type { OtherPages, PageTable, Table } from "../markdown.ts";
 import type { MenuBack, MenuEntry, MenuNaming } from "../menu.ts";
+import type { MenuBuilder, MenuGroup, MenuSection } from "../../../shared/menuslots.ts";
 import type { CellNameAt, RowName } from "../names.ts";
 import type { Pins, ViewState } from "../view.ts";
 
@@ -498,8 +499,9 @@ export const CELL_MENU_CHANGES: ReadonlySet<number> = new Set([CELL_MENU_ORDER.e
  */
 export type LineMenuTarget = { readonly axis: "row" | "column"; readonly at: number; readonly lines: readonly number[] };
 
-/** The slots of a row's or a column's menu, by what their entries do (LineMenuSlots says each) */
-export type LineMenuSlot = "clipboard" | "edit" | "insert" | "columnType" | "view" | "look" | "remove";
+/** The slots of a row's or a column's menu, by what their entries do (LineMenuSlots says each), in no order: the grips place them */
+export const LINE_MENU_SLOTS = ["clipboard", "edit", "insert", "columnType", "view", "look", "remove"] as const;
+export type LineMenuSlot = (typeof LINE_MENU_SLOTS)[number];
 
 /**
  * A section of its own in a row's or a column's menu, by its name: the
@@ -508,12 +510,10 @@ export type LineMenuSlot = "clipboard" | "edit" | "insert" | "columnType" | "vie
  * actions are among the menu's: primary (often used, with the clipboard's and
  * Clear) or secondary (the others', the default)
  */
-export type LineMenuCustom = { readonly name: string; readonly position?: "primary" | "secondary"; readonly priority?: number };
+export type LineMenuCustom = MenuSection;
 
-/** A module's entries in a slot of a row's or a column's menu, or in a section of its own (`custom`) */
-export type LineMenuGroup =
-  | { readonly slot: LineMenuSlot; readonly entries: readonly MenuEntry[] }
-  | { readonly slot: "custom"; readonly custom: LineMenuCustom; readonly entries: readonly MenuEntry[] };
+/** A module's entries in a slot of a row's or a column's menu, or in a section of its own (`custom`): shared/menuslots.ts */
+export type LineMenuGroup = MenuGroup<LineMenuSlot>;
 
 /** Entries put in a slot, by what they do; where each slot shows is the menu's */
 export type LineMenuSlots = {
@@ -535,25 +535,13 @@ export type LineMenuSlots = {
   readonly custom: (section: LineMenuCustom, entries: readonly MenuEntry[]) => LineMenuGroup;
 };
 
-type EntryOf<K extends MenuEntry["kind"]> = Omit<Extract<MenuEntry, { readonly kind: K }>, "kind">;
-
 /**
  * What a row's or a column's menu gives the modules to make their entries
  * with: the slots, the entries (values, as the menu shows them), a submenu
- * in the menu's place. Given, not imported, so a definition outside
- * Silverware Table's bundle could use it too
+ * in the menu's place (shared/menuslots.ts, with this menu's slots). Given,
+ * not imported, so a definition outside Silverware Table's bundle could use it too
  */
-export type LineMenuBuilder = {
-  readonly slot: LineMenuSlots;
-  readonly item: (item: EntryOf<"item">) => MenuEntry;
-  /** An item showing `entries` in the menu's place (titled by its label, a way back), made as it is chosen */
-  readonly submenu: (item: Omit<EntryOf<"item">, "run" | "submenu">, entries: () => readonly MenuEntry[]) => MenuEntry;
-  readonly segmented: (row: EntryOf<"segmented">) => MenuEntry;
-  readonly actions: (bar: EntryOf<"actions">) => MenuEntry;
-  readonly separator: () => MenuEntry;
-  /** Shows `entries` in the menu's place, titled `title` (a list a row's button opens) */
-  readonly open: (title: string, entries: readonly MenuEntry[]) => void;
-};
+export type LineMenuBuilder = MenuBuilder<LineMenuSlot, LineMenuSlots>;
 
 /** A group of entries in the cell menu, between separators (CELL_MENU_ORDER) */
 export type CellMenuGroup = { readonly order: number; readonly entries: readonly MenuEntry[] };

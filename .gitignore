@@ -6,5 +6,6 @@ test-results/
 playwright-report/
 silverbullet-log/
 .env.local
-# The toolbar's emoji data the playground serves (scripts/playground.mjs)
+# The emoji data the playground serves (scripts/playground.mjs)
 playground/silverware-toolbar-emoji.js
+playground/silverware-database-emoji.js

@@ -11,10 +11,10 @@ import type { Catalog } from "./core/catalog.ts";
 import { pagesWith } from "./core/catalog.ts";
 import type { TagAction } from "./core/module.ts";
 import { counted, type Operation } from "./core/operation.ts";
-import { addPageTags, applyEdits, type EditResult, frontmatterTags, pageTags, removePageTags, removeTags, renameTags, tagUses } from "./tags/edit.ts";
-import { type FrontmatterForm, readFrontmatter } from "./tags/frontmatter.ts";
-import { hashtagOf, isMetaTag, isWithin, matches, validateName, parentOf, renamedTag } from "./tags/names.ts";
-import { scanHashtags } from "./tags/scan.ts";
+import { addPageTags, applyEdits, type EditResult, frontmatterTags, pageTags, removePageTags, removeTags, renameTags, tagUses } from "../../shared/pages/tags/edit.ts";
+import { type FrontmatterForm, readFrontmatter } from "../../shared/pages/tags/frontmatter.ts";
+import { hashtagOf, isMetaTag, isWithin, matches, validateName, parentOf, renamedTag } from "../../shared/pages/tags/names.ts";
+import { scanHashtags } from "../../shared/pages/tags/scan.ts";
 
 /** What a custom operation's functions get to tell the space by: plain lists (a JS module's, Space Lua's alike) */
 export type TagsContext = {
@@ -184,13 +184,15 @@ export function customOperation(definition: OperationDefinition, context: TagsCo
       if (!Array.isArray(pages) || !pages.every((page) => typeof page === "string")) throw new Error(`${name}'s pages did not give a list of page names`);
       return pages;
     },
-    edit: async (text, page) => {
-      try {
-        return editResultOf(await definition.edit(text, page, context), text);
-      } catch (e) {
-        throw new Error(`${name}: ${message(e)}`);
-      }
-    },
+    // A user's script edits the text itself: the one change past the page writer's model
+    change: (p, page) =>
+      p.editText(async (text) => {
+        try {
+          return editResultOf(await definition.edit(text, page, context), text);
+        } catch (e) {
+          throw new Error(`${name}: ${message(e)}`);
+        }
+      }),
     done: (pages, changes) => `${label}: ${counted(changes, "change")} on ${counted(pages, "page")}`,
   };
 }

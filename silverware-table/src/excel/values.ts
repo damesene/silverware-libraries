@@ -4,7 +4,7 @@
 // Excel's serial numbers (days since 1899-12-30), shown in their format, so
 // they are dates in Excel whatever its language.
 import { errorCodeIn, parseClock, parseDate } from "../formulas/index.ts";
-import { asNumber } from "../view.ts";
+import { asNumber } from "../../../shared/filter.ts";
 import { EXCEL_ERRORS } from "./formulas.ts";
 
 // Number formats a value is shown with in Excel (their codes: xlsx.ts)

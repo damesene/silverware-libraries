@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readCatalog } from "../core/catalog.ts";
 import type { ModuleHost, TagAction, WorkspaceHost } from "../core/module.ts";
-import { memorySpace } from "../space/memory.ts";
+import { memorySpace, writerOf } from "../space/memory.ts";
 import { pagesModule } from "./pages.ts";
 import { removeManyOperation, removeModule } from "./remove.ts";
 import { mergeOperation, validateMerge, renameOperation } from "./rename.ts";
@@ -44,7 +44,7 @@ describe("the built-in modules' actions on a tag, as data", () => {
 describe("a rename into a subtag of its own", () => {
   it("leaves the tags under the target as they are: the two merge", async () => {
     const s = memorySpace({ P: "#a #a/x #a/y" });
-    await applyPlan(s, await makePlan(s, await readCatalog(s), renameOperation("a", "a/x", true, 2)));
+    await applyPlan(writerOf(s), await makePlan(writerOf(s), await readCatalog(s), renameOperation("a", "a/x", true, 2)));
     expect(s.pages.get("P")).toBe("#a/x #a/x #a/x/y");
   });
 });
@@ -52,7 +52,7 @@ describe("a rename into a subtag of its own", () => {
 describe("several tags at once", () => {
   it("merges tags into one, their subtags under it, one under the target left", async () => {
     const s = memorySpace({ P: "#Todo #to-do #todo", Q: "- [ ] x #to-do/later", R: "#todo/now" });
-    await applyPlan(s, await makePlan(s, await readCatalog(s), mergeOperation(["Todo", "to-do", "todo"], "todo", true, 1)));
+    await applyPlan(writerOf(s), await makePlan(writerOf(s), await readCatalog(s), mergeOperation(["Todo", "to-do", "todo"], "todo", true, 1)));
     expect(s.pages.get("P")).toBe("#todo #todo #todo");
     expect(s.pages.get("Q")).toBe("- [ ] x #todo/later");
     expect(s.pages.get("R")).toBe("#todo/now");
@@ -61,13 +61,13 @@ describe("several tags at once", () => {
   });
   it("merges a tag picked under the target into it", async () => {
     const s = memorySpace({ P: "#a #a/b", Q: "#a/b/c" });
-    await applyPlan(s, await makePlan(s, await readCatalog(s), mergeOperation(["a", "a/b"], "a", true, 1)));
+    await applyPlan(writerOf(s), await makePlan(writerOf(s), await readCatalog(s), mergeOperation(["a", "a/b"], "a", true, 1)));
     expect(s.pages.get("P")).toBe("#a #a");
     expect(s.pages.get("Q")).toBe("#a/c");
   });
   it("deletes several tags", async () => {
     const s = memorySpace({ P: "Text #a and #b here, #c stays" });
-    await applyPlan(s, await makePlan(s, await readCatalog(s), removeManyOperation(["a", "b"], false, 0, { from: "all", keepWord: false })));
+    await applyPlan(writerOf(s), await makePlan(writerOf(s), await readCatalog(s), removeManyOperation(["a", "b"], false, 0, { from: "both", keepWord: false })));
     expect(s.pages.get("P")).toBe("Text and here, #c stays");
   });
 });

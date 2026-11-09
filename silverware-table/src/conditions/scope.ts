@@ -2,8 +2,7 @@
 // the cells a definition applies to (Scope), each computed only when asked.
 import type { Cell, Scope } from "./api.ts";
 import { parseDate } from "../formulas/dates.ts";
-import { normalizeForFilter } from "../filter.ts";
-import { asNumber } from "../view.ts";
+import { asNumber, normalizeForFilter } from "../../../shared/filter.ts";
 
 /** A cell from what it shows and what sorting compares (a column type's value, else the text) */
 export function cellOf(text: string, value: string, column: string): Cell {

@@ -384,6 +384,44 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
   width: 340px;
   max-width: calc(100vw - 16px);
 }
+/* The emoji picker's current one, in the toolbar's own class */
+.swb-emoji.swb-current {
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 16%, transparent);
+}
+/* <shared-emoji> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* The emoji picker (shared/emoji.ts): its groups as tabs, its search, the emoji, the current one's name. Its search field,
+   group titles and "none" in the picker's own classes, which a plugin with a look of its own for them (the toolbar)
+   replaces by its own */
+.swb-emoji-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
+}
+.swb-emoji-field {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  background: none;
+  border: 0;
+  outline: none;
+}
+.swb-emoji-group {
+  padding: 8px 2px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.55;
+}
+.swb-emoji-none {
+  padding: 12px 8px;
+  opacity: 0.6;
+}
 /* Its groups as filters, over the search: All, then each by its first emoji */
 .swb-emoji-tabs {
   display: flex;
@@ -440,7 +478,7 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
   border-radius: 6px;
   cursor: pointer;
 }
-.swb-emoji.swb-current {
+.swb-emoji.swb-emoji-current {
   background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 16%, transparent);
 }
 .swb-emoji-name {
@@ -452,6 +490,7 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+/* </shared-emoji> */
 /* Icons by the search field (the settings) */
 .swb-popup-tools {
   display: flex;

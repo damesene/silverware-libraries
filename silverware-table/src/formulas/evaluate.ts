@@ -4,7 +4,7 @@ import { columnName } from "../columns.ts";
 import { escapeCell, type Table, unescapeCell } from "../markdown.ts";
 import { setCell } from "../ops.ts";
 import { withoutTags } from "../tags.ts";
-import { asNumber } from "../view.ts";
+import { asNumber } from "../../../shared/filter.ts";
 import { type CalculatedBy, cellResult, cellsByName, errorCodeIn, type FormulaCells, hasFormulas, PLAIN_CELLS, rowsByName, withEquals } from "./cell.ts";
 import { dateArithmetic, parseDate } from "./dates.ts";
 import { type Node, parse, refersToOwnData, wholeColumnNames } from "./parser.ts";

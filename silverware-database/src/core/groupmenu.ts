@@ -11,6 +11,7 @@ import type { MenuEntry } from "../../../shared/menu.ts";
 import { arrangeGroups, groupItems, type ItemGroup } from "../domain/grouping.ts";
 import type { Property } from "../model/database.ts";
 import { ICONS } from "./icons.ts";
+import type { ToAll } from "./applyall.ts";
 import type { PlaceMenuBuilder } from "./placemenu.ts";
 import type { ViewDefinition, ViewHost } from "./view.ts";
 
@@ -57,9 +58,10 @@ export function focusGroupList(menu: HTMLElement, focus: GroupFocus): void {
 /**
  * The Group submenu's entry of ⋯ (none where the view is never grouped);
  * `changing` told before the groups' list writes a change (the place may be
- * drawn anew by it, the menu with it: opened again so)
+ * drawn anew by it, the menu with it: opened again so); `toAll`: the grouping
+ * given to every other view of the place
  */
-export function groupEntry(view: ViewDefinition, host: ViewHost, menu: PlaceMenuBuilder, changing?: (focus: GroupFocus) => void): MenuEntry | undefined {
+export function groupEntry(view: ViewDefinition, host: ViewHost, menu: PlaceMenuBuilder, changing?: (focus: GroupFocus) => void, toAll?: ToAll): MenuEntry | undefined {
   const groupBy = view.groupBy;
   if (groupBy === false) return undefined;
   const { listing } = host;
@@ -69,7 +71,8 @@ export function groupEntry(view: ViewDefinition, host: ViewHost, menu: PlaceMenu
   const option = (key: string | undefined, label: string) => menu.item({ label, checked: by?.key === key, run: () => void listing.setGroup(key) });
   const pick = () =>
     menu.submenu({ label: "Group by", value: { text: by?.label ?? "None" }, ...none }, () => [...(groupBy?.required ? [] : [option(undefined, "None")]), ...eligible.map((property) => option(property.key, property.label))]);
-  return menu.submenu({ label: "Group", icon: ICONS.group, value: { text: by?.label ?? "None" }, ...none }, () => (by ? [pick(), menu.separator(), { kind: "element", element: groupList(host, by, changing) }] : [pick()]));
+  const all = toAll ? [menu.separator(), menu.item({ label: "Apply to all views", hint: "Every other view of this block grouped so, as each can be", ...toAll })] : [];
+  return menu.submenu({ label: "Group", icon: ICONS.group, value: { text: by?.label ?? "None" }, ...none }, () => (by ? [pick(), menu.separator(), { kind: "element", element: groupList(host, by, changing) }, ...all] : [pick(), ...all]));
 }
 
 /**

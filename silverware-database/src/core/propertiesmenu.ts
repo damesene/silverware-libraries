@@ -7,6 +7,7 @@
 import { el, pressed } from "../../../shared/elements.ts";
 import type { MenuEntry } from "../../../shared/menu.ts";
 import { ICONS } from "./icons.ts";
+import type { ToAll } from "./applyall.ts";
 import type { PlaceMenuBuilder } from "./placemenu.ts";
 import type { ViewDefinition, ViewHost } from "./view.ts";
 
@@ -23,14 +24,18 @@ export function focusPropertyList(menu: HTMLElement, focus: PropertiesFocus): vo
 /**
  * The Visible properties submenu's entry of ⋯ (none where the view shows no property:
  * `properties: false`); `changing` told before the list writes a change (the
- * place may be drawn anew by it, the menu with it: opened again so)
+ * place may be drawn anew by it, the menu with it: opened again so); `toAll`:
+ * what is shown given to every other view of the place
  */
-export function propertiesEntry(view: ViewDefinition, host: ViewHost, menu: PlaceMenuBuilder, changing?: (focus: PropertiesFocus) => void): MenuEntry | undefined {
+export function propertiesEntry(view: ViewDefinition, host: ViewHost, menu: PlaceMenuBuilder, changing?: (focus: PropertiesFocus) => void, toAll?: ToAll): MenuEntry | undefined {
   if (view.properties === false) return undefined;
   const all = host.database.properties.length;
   const shown = host.look.shownProperties.length;
   const none = all ? {} : { disabled: "The database has no property" };
-  return menu.submenu({ label: "Visible properties", icon: ICONS.shown, value: { text: shown === all ? "All shown" : `${shown} of ${all} shown` }, ...none }, () => [{ kind: "element", element: propertyList(host, changing) }]);
+  return menu.submenu({ label: "Visible properties", icon: ICONS.shown, value: { text: shown === all ? "All shown" : `${shown} of ${all} shown` }, ...none }, () => [
+    { kind: "element", element: propertyList(host, changing) },
+    ...(toAll ? [menu.separator(), menu.item({ label: "Apply to all views", hint: "Every other view of this block shows the same properties", ...toAll })] : []),
+  ]);
 }
 
 /** The properties as a list in the menu: each its name and eye; Hide all or Show all. Written at once and drawn anew in place, the menu staying open */

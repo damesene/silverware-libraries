@@ -13,6 +13,8 @@ import type { Database, Item, Property } from "../model/database.ts";
 import { type DatabaseCore, isRefused } from "./core.ts";
 import { documentsHost, type DocumentsSource } from "./documents.ts";
 import { arrangedGroups, focusGroupList, type GroupFocus, groupedBy, groupEntry } from "./groupmenu.ts";
+import { appliedToViews, type LookOf, type LookPart, type ToAll } from "./applyall.ts";
+import { arrangementEntries, groupEntries, hidesByDefault, propertyEntries, STATE_KEYS } from "./statekeys.ts";
 import { focusPropertyList, propertiesEntry, type PropertiesFocus } from "./propertiesmenu.ts";
 import { drawGrouped } from "./groups.ts";
 import { ICONS } from "./icons.ts";
@@ -119,7 +121,7 @@ export type PlaceKept = {
 };
 
 /** Color by in ⋯: the properties of options a view may color its items by, None, the one picked checked */
-function colorEntry(host: ViewHost, menu: PlaceMenuBuilder): MenuEntry {
+function colorEntry(host: ViewHost, menu: PlaceMenuBuilder, toAll?: ToAll): MenuEntry {
   const eligible = colorable(host.database.properties, (one) => host.type(one));
   const by = eligible.find((one) => one.key === host.look.colorBy);
   const none = eligible.length ? {} : { disabled: "No property of options (a select, a multi-select)" };
@@ -127,11 +129,14 @@ function colorEntry(host: ViewHost, menu: PlaceMenuBuilder): MenuEntry {
   return menu.submenu({ label: "Color by", icon: ICONS.color, value: { text: by?.label ?? "None" }, ...none }, () => [
     option(undefined, "None"),
     ...eligible.map((property) => option(property.key, property.label)),
+    ...(toAll ? [menu.separator(), menu.item({ label: "Apply to all views", hint: "Every other view of this block colored so", ...toAll })] : []),
   ]);
 }
 
 export class DatabasePlace {
   private drawn: Drawn | undefined;
+  // The views on as the place was last drawn (its picker's): those Apply to all views gives to
+  private on: readonly ViewDefinition[] = [];
   // The view picker's menu: closed as the place is drawn anew (its box goes, an open menu's listeners with it)
   private picker: PlaceMenu | undefined;
   // A module's tool pressed: focused again once the place is drawn anew (it draws its pressed state so)
@@ -280,6 +285,7 @@ export class DatabasePlace {
     const data = await this.read();
     const on = await this.viewsOn();
     if (this.gone) return;
+    this.on = on;
     element.replaceChildren();
     if (!data) return this.note(`No database "${this.options.database}"`);
     const named = state.get(VIEW_KEY);
@@ -398,6 +404,31 @@ export class DatabasePlace {
     const { store, database } = this.options;
     const read = await store.database(database);
     return read && { database: read.value, items: (await store.items(database)).value };
+  }
+
+  /**
+   * A part of how `view` shows its items (its host's now) given to every other
+   * view on in this place (as its picker offers them), as each keeps it and where it takes it
+   * (core/applyall.ts), in one write of the block; what was given and what was
+   * left said
+   */
+  private async applyToAll(part: LookPart, view: ViewDefinition, host: ViewHost): Promise<void> {
+    const { entries, given, left } = this.givenToAll(part, view, host);
+    const what = part === "properties" ? "Visible properties" : part === "group" ? "Grouping" : "Color by";
+    const why = left.map((one) => `${one.view.label} (${one.why})`).join(", ");
+    if (!given.length) return void this.options.ui.notify(`${what} of ${view.label}: no other view takes it${why ? `: ${why}` : ""}`);
+    try {
+      await this.options.state.set(entries);
+    } catch (error) {
+      return void this.options.ui.notify(`${what} of ${view.label} could not be given to the other views: ${message(error)}`, { type: "error" });
+    }
+    this.options.ui.notify(`${what} of ${view.label} given to ${given.map((one) => one.label).join(", ")}${why ? `; left: ${why}` : ""}`);
+  }
+
+  /** What Apply to all views gives of `part` of `view` (its host's now) to the views on in this place, and leaves */
+  private givenToAll(part: LookPart, view: ViewDefinition, host: ViewHost): ReturnType<typeof appliedToViews> {
+    const look: LookOf = { shown: host.look.shownProperties.map((one) => one.key), colorBy: host.look.colorBy, group: groupedBy(view, host), arrangement: host.listing.groupArrangement };
+    return appliedToViews(part, view, look, this.on, host.database.properties, (one) => host.type(one).name);
   }
 
   /** The views registered and on (`silverware.database.views.<view>.enabled`) */
@@ -620,17 +651,28 @@ export class DatabasePlace {
     const coreGroups = (menu: PlaceMenuBuilder): PlaceMenuGroup[] => {
       const groups: PlaceMenuGroup[] = [];
       // (One list's focus at a time: the menu opened again at the list changed last)
+      // A part of how this view shows given to the others of the block (Apply to all views), where there are others
+      // (Its menu not opened again as the block is drawn anew by it: what the lists had the focus of let go first)
+      const toAll = (part: LookPart): ToAll | undefined => {
+        if (this.on.length < 2) return undefined;
+        const { given, left } = this.givenToAll(part, view, host);
+        const run = () => {
+          groupFocus = propertiesFocus = undefined;
+          void this.applyToAll(part, view, host);
+        };
+        return given.length ? { run } : { run, disabled: `No other view takes it: ${left.map((one) => `${one.view.label} (${one.why})`).join(", ")}` };
+      };
       const properties = propertiesEntry(view, host, menu, (focus) => {
         propertiesFocus = focus;
         groupFocus = undefined;
-      });
+      }, toAll("properties"));
       if (properties) groups.push(menu.slot.view([properties]));
       const group = groupEntry(view, host, menu, (focus) => {
         groupFocus = focus;
         propertiesFocus = undefined;
-      });
+      }, toAll("group"));
       if (group) groups.push(menu.slot.view([group]));
-      if (view.colors !== false) groups.push(menu.slot.view([colorEntry(host, menu)]));
+      if (view.colors !== false) groups.push(menu.slot.view([colorEntry(host, menu, toAll("colorBy"))]));
       if (editSource) groups.push(menu.slot.source([menu.item({ label: "Edit source", icon: ICONS.source, hint: "Show the block's text, to edit it as markdown", run: editSource })]));
       const remove = this.options.deleteDatabase;
       if (remove) groups.push(menu.slot.remove([menu.item({ label: "Delete database…", icon: ICONS.remove, hint: "The database, its items and its views, asked first", danger: true, run: () => remove(database.id, database.name) })]));
@@ -778,13 +820,13 @@ export class DatabasePlace {
     // The data this view was last given: a view gone reads what it had, never what another drawing found (none, maybe)
     const data = () => drawn.data;
     const prefixed = (key: string) => `${drawn.view.name}.${key}`;
-    const listing = () => ({ filter: filterOf(state.get(prefixed("filter"))), sort: sortOf(state.get(prefixed("sort"))) });
+    const listing = () => ({ filter: filterOf(state.get(prefixed(STATE_KEYS.filter))), sort: sortOf(state.get(prefixed(STATE_KEYS.sort))) });
     const group = () => {
-      const kept = state.get(prefixed("groupBy"));
+      const kept = state.get(prefixed(STATE_KEYS.groupBy));
       return typeof kept === "string" && kept ? kept : undefined;
     };
     const keys = (value: unknown) => (Array.isArray(value) ? value.filter((one): one is string => typeof one === "string") : []);
-    const arrangement = (): GroupArrangement => ({ order: keys(state.get(prefixed("groupOrder"))), hidden: keys(state.get(prefixed("groupHidden"))), hideEmpty: state.get(prefixed("groupHideEmpty")) === true });
+    const arrangement = (): GroupArrangement => ({ order: keys(state.get(prefixed(STATE_KEYS.groupOrder))), hidden: keys(state.get(prefixed(STATE_KEYS.groupHidden))), hideEmpty: state.get(prefixed(STATE_KEYS.groupHideEmpty)) === true });
     // The items as listed, made once per data read and listing
     let listed: { data: Data; key: string; items: readonly Item[] } | undefined;
     const items = () => {
@@ -804,7 +846,7 @@ export class DatabasePlace {
     const setMeta = (values: Readonly<Record<string, unknown>>) => state.set(Object.fromEntries(Object.entries(values).map(([key, value]) => [prefixed(key), value])));
     // What the view colors its items by (Color by in ⋯): the property kept, where it is still one of options
     const colorKey = () => {
-      const kept = state.get(prefixed("colorBy"));
+      const kept = state.get(prefixed(STATE_KEYS.colorBy));
       return typeof kept === "string" && kept ? kept : undefined;
     };
     // (Found once per data read and key kept: asked for every item drawn)
@@ -819,8 +861,8 @@ export class DatabasePlace {
     };
     // The properties the view hides (Properties in ⋯), as kept: keys only
     // (A view hiding its properties by default keeps those it shows: a property added stays hidden there)
-    const byDefault = typeof drawn.view.properties === "object" && drawn.view.properties.hiddenByDefault === true;
-    const keptKey = prefixed(byDefault ? "shownProperties" : "hiddenProperties");
+    const byDefault = hidesByDefault(drawn.view);
+    const keptKey = prefixed(byDefault ? STATE_KEYS.shownProperties : STATE_KEYS.hiddenProperties);
     // What the view shows and hides, worked out once per data read and value kept (read for every item drawn)
     let visible: { data: Data; kept: unknown; hidden: readonly string[]; shown: readonly Property[] } | undefined;
     const visibility = () => {
@@ -864,12 +906,12 @@ export class DatabasePlace {
           else delete filter[key];
           // The same filter again writes nothing and draws nothing (a view setting it as it draws would draw itself forever)
           if (JSON.stringify(filter) === JSON.stringify(listing().filter)) return;
-          await setMeta({ filter: Object.keys(filter).length ? filter : undefined });
+          await setMeta({ [STATE_KEYS.filter]: Object.keys(filter).length ? filter : undefined });
           await shownAgain();
         },
         async setSort(sort) {
           if (JSON.stringify(sort) === JSON.stringify(listing().sort)) return;
-          await setMeta({ sort: sort.length ? sort : undefined });
+          await setMeta({ [STATE_KEYS.sort]: sort.length ? sort : undefined });
           await shownAgain();
         },
         get group() {
@@ -878,7 +920,7 @@ export class DatabasePlace {
         async setGroup(key) {
           if (key === group()) return;
           // (The order and the hiding were of the groups of the property before: its values)
-          await setMeta({ groupBy: key, groupOrder: undefined, groupHidden: undefined });
+          await setMeta(groupEntries(key));
           await shownAgain();
         },
         get groupArrangement() {
@@ -887,7 +929,7 @@ export class DatabasePlace {
         async setGroupArrangement(change) {
           const next = { ...arrangement(), ...change };
           if (JSON.stringify(next) === JSON.stringify(arrangement())) return;
-          await setMeta({ groupOrder: next.order.length ? next.order : undefined, groupHidden: next.hidden.length ? next.hidden : undefined, groupHideEmpty: next.hideEmpty || undefined });
+          await setMeta(arrangementEntries(next));
           await shownAgain();
         },
         validateCondition,
@@ -905,12 +947,10 @@ export class DatabasePlace {
           // (Of keys only, each once, in the order given)
           const next = [...new Set(keys.filter((one) => typeof one === "string"))];
           if (JSON.stringify(next) === JSON.stringify(hiddenKeys())) return;
-          if (byDefault) {
-            // (Those shown as the schema has them now: a key kept of a property gone from it is let go)
-            const off = new Set(next);
-            const shown = data().database.properties.filter((one) => !off.has(one.key)).map((one) => one.key);
-            await setMeta({ shownProperties: shown.length ? shown : undefined });
-          } else await setMeta({ hiddenProperties: next.length ? next : undefined });
+          // (As the schema has them now, kept as the view keeps them: a key kept of a property gone from it is let go)
+          const off = new Set(next);
+          const { properties } = data().database;
+          await setMeta(propertyEntries(drawn.view, properties.filter((one) => !off.has(one.key)).map((one) => one.key), properties));
           await shownAgain();
         },
         get colorBy() {
@@ -918,7 +958,7 @@ export class DatabasePlace {
         },
         async setColorBy(key) {
           if (key === colorKey()) return;
-          await setMeta({ colorBy: key });
+          await setMeta({ [STATE_KEYS.colorBy]: key });
           // (Drawn whole: its head says what the colors are of)
           if (!drawn.ended) await place.render();
         },

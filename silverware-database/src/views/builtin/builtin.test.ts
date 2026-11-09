@@ -443,6 +443,19 @@ describe("a property hidden in the views", () => {
     expect(hidden.all(".swd-board-title").map((one) => one.textContent)).toEqual(columns);
   });
 
+  it("hidden in one view, given to every other view of the block by Apply to all views, each keeping it its way", async () => {
+    const { q, viewState } = await setup("table", { "table.hiddenProperties": ["estimate"] });
+    q<HTMLButtonElement>(".swd-more").click();
+    choose(document, "Visible properties");
+    choose(document, "Apply to all views");
+    await settle();
+    expect(viewState.get("list.hiddenProperties")).toEqual(["estimate"]);
+    expect(viewState.get("board.hiddenProperties")).toEqual(["estimate"]);
+    // (The calendar and the timeline keep those shown)
+    expect(viewState.get("calendar.shownProperties")).toEqual(TASKS.properties.map((one) => one.key).filter((key) => key !== "estimate"));
+    expect(viewState.get("timeline.shownProperties")).toEqual(TASKS.properties.map((one) => one.key).filter((key) => key !== "estimate"));
+  });
+
   it("is hidden and shown again by its eye under Visible properties in ⋯, the menu staying open; Hide all and Show all", async () => {
     const { all, q, viewState } = await setup("table");
     q<HTMLButtonElement>(".swd-more").click();

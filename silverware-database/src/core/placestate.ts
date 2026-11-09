@@ -3,9 +3,8 @@
 // `<view>.groupBy`, `<view>.colorBy`, `<view>.hiddenProperties`, `<view>.shownProperties`) and what a view declares of its own meta
 // (`ViewDefinition.propertyMeta`: the calendar's `dateBy`). Pure: the state as
 // read, whoever keeps it (a block in a page, the memory).
+import { NAMING_KEYS, NAMING_LIST_KEYS } from "./statekeys.ts";
 
-// The place's own keys whose value is a property's key
-const NAMING = new Set(["groupBy", "colorBy"]);
 
 const isMap = (value: unknown): value is Readonly<Record<string, unknown>> => !!value && typeof value === "object" && !Array.isArray(value);
 
@@ -27,12 +26,12 @@ export function placeStateRenamed(state: ReadonlyMap<string, unknown>, from: str
     if (key === "filter" && isMap(value) && Object.hasOwn(value, from) && !Object.hasOwn(value, to)) {
       // (Its conditions in their order, the one renamed in its place)
       changed[name] = Object.fromEntries(Object.entries(value).map(([one, condition]) => [one === from ? to : one, condition]));
-    } else if ((key === "hiddenProperties" || key === "shownProperties") && Array.isArray(value) && value.includes(from)) {
+    } else if (NAMING_LIST_KEYS.has(key) && Array.isArray(value) && value.includes(from)) {
       // (The new key there already: the old one taken off, not named twice)
       changed[name] = value.includes(to) ? value.filter((one) => one !== from) : value.map((one) => (one === from ? to : one));
     } else if (key === "sort" && Array.isArray(value) && value.some((one) => isMap(one) && one.key === from) && !value.some((one) => isMap(one) && one.key === to)) {
       changed[name] = value.map((one) => (isMap(one) && one.key === from ? { ...one, key: to } : one));
-    } else if ((NAMING.has(key) || metaOf(view).includes(key)) && value === from) {
+    } else if ((NAMING_KEYS.has(key) || metaOf(view).includes(key)) && value === from) {
       changed[name] = to;
     }
   }

@@ -1203,6 +1203,11 @@ test("a property hidden under Visible properties is kept in the view's block, sh
   await expect.poll(() => space.saved("Page")).toContain('table.hiddenProperties: ["status"]');
   // (The menu stays open through the block's write, the eye now off)
   await expect(page.locator('.swd-shown-row[data-property="status"] .swd-shown-eye')).toHaveAttribute("aria-pressed", "false");
+  // Given to the block's other views, as each keeps it: the list's hidden ones; the calendar, keeping those shown, none
+  // shown (the database's one property hidden): nothing kept for it
+  await choose(page, "Apply to all views");
+  await expect.poll(() => space.saved("Page")).toContain('list.hiddenProperties: ["status"]');
+  expect(await space.saved("Page")).not.toContain("calendar.shownProperties");
   await page.keyboard.press("Escape");
   await expect(page.locator(".swd-table th", { hasText: "Status" })).toHaveCount(0);
   expect(await space.saved("Page/db-tasks")).not.toContain("hidden");

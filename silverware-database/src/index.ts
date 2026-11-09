@@ -3,6 +3,8 @@
 // block through `render`, tells the index's changes (`indexChanged`) and runs
 // the commands; the API page defines the user's own views and types
 // (`defineViews`, `defineTypes`), before `init`, as Space Lua loads.
+import { openConflict } from "./core/conflictdialog.ts";
+import type { ItemConflict } from "./core/core.ts";
 import { type CodeBlock, codeBlocksOf, sameBody } from "../../shared/pages/blocks.ts";
 import { pageChanges } from "../../shared/pages/changes.ts";
 import { pageWriter, type PageWriter } from "../../shared/pages/writer.ts";
@@ -183,7 +185,14 @@ function keptParts(): Kept {
   const ui: Ui = { notify: platform.ui.notify, ask: async (message: string) => (await platform.ui.ask?.(message)) ?? false };
   // A key changed is followed into the places of every page (their blocks), as the views say what of their state names one
   const writer = pageWriter(platform);
-  const core = new DatabaseCore(store, types, ui, platform.space.noun, { store: blockPlaces(platform.space, writer), propertyMeta: (view) => views.named(view)?.propertyMeta ?? [] });
+  // A write left as it rests on what changed since it was shown: said until closed, its Show conflict the dialog of it
+  const conflict = (one: ItemConflict) =>
+    platform.ui.notify(one.problem, {
+      type: "error",
+      timeout: 0,
+      actions: [{ name: "Show conflict", run: () => openConflict({ document, ...(platform.editor.open ? { open: (name: string) => void platform.editor.open!(name) } : {}), written: redrawAll }, one) }],
+    });
+  const core = new DatabaseCore(store, types, { ...ui, conflict }, platform.space.noun, { store: blockPlaces(platform.space, writer), propertyMeta: (view) => views.named(view)?.propertyMeta ?? [] });
   return { platform, store, writer, core, ui, own };
 }
 

@@ -12,6 +12,7 @@
 // that items still hold values under (a property removed) is not taken over,
 // and every transaction is undone by `undo`.
 import { type ItemPart, samePart } from "../domain/itempart.ts";
+import { textOf } from "../domain/listing.ts";
 import { guessedType, optionsOfValues } from "../domain/loose.ts";
 import { systemKind } from "../domain/system.ts";
 import { sameLook, validateIcon, validateLook } from "../domain/look.ts";
@@ -26,10 +27,31 @@ import { databaseChanges, type DatabaseChangesBuilder } from "./builder.ts";
 import type { Changes } from "./changes.ts";
 import { TransactionHistory } from "./history.ts";
 import { placeStateRenamed } from "./placestate.ts";
-import { type DatabaseStore, type LooseKey, type PlaceChange, type PlacesPlan, type PlacesReport, type PlaceStore, REMOVE_PLACE, type Skipped, type Target, type TransactionPlan, type TransactionReport, type WriteProgress } from "./store.ts";
+import { type DatabaseStore, type LooseKey, type PlaceChange, type PlacesPlan, type PlacesReport, type PlaceStore, type PreviewRun, REMOVE_PLACE, type Skipped, type Target, type TransactionPlan, type TransactionReport, type WriteProgress } from "./store.ts";
 
 /** What the core asks of the user: told what was refused or left, asked before anything is removed */
-export type CoreInterface = Pick<UserInterface, "notify"> & Required<Pick<UserInterface, "ask">>;
+export type CoreInterface = Pick<UserInterface, "notify"> &
+  Required<Pick<UserInterface, "ask">> & {
+    /** A write left as what it rests on changed since a view showed it, to be seen and written over (none: said by `notify`) */
+    conflict?(conflict: ItemConflict): void;
+  };
+
+/** One thing a conflict is of: an item's field as a view showed it, as it is now, as the write would make it */
+export type ConflictLine = { readonly name: string; readonly document?: string; readonly field: string; readonly shown: string; readonly now: string; readonly wanted: string };
+
+/**
+ * A write left as what it rests on changed since a view showed it (core.ts `onItems`): `lines` what changed, `preview`
+ * the lines it would change on each document (planned, nothing written), `force` it written on the items as they are
+ * now (refused anew, its own conflict, where they changed again since)
+ */
+export type ItemConflict = {
+  readonly problem: string;
+  readonly lines: readonly ConflictLine[];
+  /** Whether it was written over (`force`): its notification, which stays until closed, then has nothing more to do */
+  written(): boolean;
+  preview(): Promise<{ readonly documents: readonly { readonly document: string; readonly runs: readonly PreviewRun[] }[]; readonly problem?: string }>;
+  force(): Promise<Result>;
+};
 
 /** Something written (the report says what was left besides) */
 export type Written = { readonly report: TransactionReport };
@@ -135,12 +157,51 @@ type DatabaseRead = { readonly database: Revised<Database>; readonly items: Revi
 
 /**
  * An item as a view showed it (`given`), as it is now (`now`, by key) where `part` of it is still as shown (core.ts
- * `onItem`); `changed` where that part changed since; as shown where it is gone (the store says so)
+ * `onItems`); `changed` where that part changed since; as shown where it is gone (the store says so)
  */
 function currentOf(now: ReadonlyMap<ItemKey, Item>, given: Item, part: ItemPart, database: Database): Item | "changed" {
   const current = now.get(given.key);
   if (!current) return given;
   return samePart(current, given, part, database) ? current : "changed";
+}
+
+/** What an item's write writes, made from the items it goes on: its changes, how it is called, the part it cannot do without */
+type ItemWrite = { readonly changes: Changes; readonly label: string; readonly needed?: Target };
+
+/** A refusal of an item's write as it is made: `invalid` (said by `onItems`), `unchanged` (said to no one) */
+type Quiet = Refused & { readonly cause: "invalid" | "unchanged" };
+
+/** An item's write made, quietly (a refusal said by `onItems`, so a conflict's preview says nothing) */
+type MakeItemWrite = (items: readonly Item[], read: DatabaseRead) => ItemWrite | Quiet;
+
+/** What a conflict is of, each item: its field as shown, as it is now, as the write would make it */
+type ConflictLines = (shown: Item, now: Item, read: DatabaseRead) => readonly ConflictLine[];
+
+/** A refusal said by whoever gets it (an item's write made quietly) */
+const invalid = (problem: string): Quiet => ({ problem, cause: "invalid" });
+
+/** An item's document where the store keeps one (a page), for a conflict's line */
+const documentOf = (store: DatabaseStore, item: Item): { readonly document?: string } => {
+  const document = store.documentOf(item.key);
+  return document ? { document } : {};
+};
+
+/** A look as a conflict says it */
+const lookText = (look: ItemLook | undefined) => [look?.icon, look?.color].filter(Boolean).join(" ") || "(none)";
+
+/** A value as a conflict says it */
+const shownText = (item: Item, key: string, read: DatabaseRead, types: TypeRegistry) => textOf(item, key, read.database.value, types) || "(empty)";
+
+/** What a removal would lose that changed since it was shown: its name, its look, each own value */
+function changedValues(shown: Item, now: Item, read: DatabaseRead, types: TypeRegistry): { field: string; shown: string; now: string }[] {
+  const lines: { field: string; shown: string; now: string }[] = [];
+  if (shown.name !== now.name) lines.push({ field: "Name", shown: shown.name, now: now.name });
+  if (!sameLook(shown.look, now.look)) lines.push({ field: "Icon and color", shown: lookText(shown.look), now: lookText(now.look) });
+  for (const property of read.database.value.properties) {
+    if (property.system || samePart(shown, now, { values: [property.key] }, read.database.value)) continue;
+    lines.push({ field: property.label, shown: shownText(shown, property.key, read, types), now: shownText(now, property.key, read, types) });
+  }
+  return lines;
 }
 
 /** The items' own revisions (not what the system gives them, a date that moves): what a proposal written whole is checked against */
@@ -175,16 +236,16 @@ export class DatabaseCore {
 
   // Items
 
-  /** A property's value of an item as read (undefined: taken off the item); see `onItem` */
+  /** A property's value of an item as read (undefined: taken off the item); see `onItems` */
   async update(database: string, given: Item, key: string, value: Value | undefined): Promise<Result> {
-    return this.onItem(database, given, { values: [key] }, (item, read) => {
+    return this.onItems(database, [given], { values: [key] }, ([item], read) => {
       const property = writable(read.database.value, key);
-      if (typeof property === "string") return this.refuse(property);
-      if (value !== undefined && !isValue(value)) return this.refuse(notValue(property.label));
-      if (property.required && (value === undefined || isEmpty(value)) && !isEmpty(item.values[key])) return this.refuse(`${property.label} is required: not emptied`);
-      const changes = databaseChanges(database).item(item, (i) => (value === undefined ? i.unset(key) : i.set(key, value)));
-      return this.write(changes.build(), `Set ${property.label} of ${item.name}`);
-    });
+      if (typeof property === "string") return invalid(property);
+      if (value !== undefined && !isValue(value)) return invalid(notValue(property.label));
+      if (property.required && (value === undefined || isEmpty(value)) && !isEmpty(item!.values[key])) return invalid(`${property.label} is required: not emptied`);
+      const changes = databaseChanges(database).item(item!, (i) => (value === undefined ? i.unset(key) : i.set(key, value)));
+      return { changes: changes.build(), label: `Set ${property.label} of ${item!.name}` };
+    }, (shown, now, read) => [this.valueConflict(shown, now, read, key, value)]);
   }
 
   /** An item made, at `place` (by default the end of the order); its key given back */
@@ -213,41 +274,41 @@ export class DatabaseCore {
     });
   }
 
-  /** An item's name (refused where empty, taken, or what the store cannot keep); see `onItem` */
+  /** An item's name (refused where empty, taken, or what the store cannot keep); see `onItems` */
   async rename(database: string, given: Item, name: string): Promise<Result> {
-    return this.onItem(database, given, { name: true }, (item, read) => {
-      const trimmed = name.trim();
-      if (trimmed === item.name) return unchanged("The name is the same");
-      const problem = this.validateName(trimmed, new Set(read.items.value.filter((one) => one.key !== item.key).map((one) => one.name)));
-      if (problem) return this.refuse(problem);
-      return this.write(databaseChanges(database).item(item, (i) => i.rename(trimmed)).build(), `Rename ${item.name} to ${trimmed}`);
-    });
+    const trimmed = name.trim();
+    return this.onItems(database, [given], { name: true }, ([item], read) => {
+      if (trimmed === item!.name) return unchanged("The name is the same");
+      const problem = this.validateName(trimmed, new Set(read.items.value.filter((one) => one.key !== item!.key).map((one) => one.name)));
+      if (problem) return invalid(problem);
+      return { changes: databaseChanges(database).item(item!, (i) => i.rename(trimmed)).build(), label: `Rename ${item!.name} to ${trimmed}` };
+    }, (shown, now) => [{ name: shown.name, ...documentOf(this.store, shown), field: "Name", shown: shown.name, now: now.name, wanted: trimmed }]);
   }
 
   /**
    * How an item looks (its icon, its color), the whole of it: what `look`
    * leaves out the item has no more (`{}`: none); refused where it is none
-   * (domain/look.ts); see `onItem`
+   * (domain/look.ts); see `onItems`
    */
   async setLook(database: string, given: Item, look: ItemLook): Promise<Result> {
     const problem = validateLook(look);
     if (problem) return this.refuse(problem);
-    return this.onItem(database, given, { look: true }, (item) => {
-      if (sameLook(look, item.look)) return unchanged("The look is the same");
-      const what = look.icon === item.look?.icon ? "color" : look.color === item.look?.color ? "icon" : "look";
-      return this.write(databaseChanges(database).item(item, (i) => i.look(look)).build(), `Change the ${what} of ${item.name}`, { item: item.key });
-    });
+    return this.onItems(database, [given], { look: true }, ([item]) => {
+      if (sameLook(look, item!.look)) return unchanged("The look is the same");
+      const what = look.icon === item!.look?.icon ? "color" : look.color === item!.look?.color ? "icon" : "look";
+      return { changes: databaseChanges(database).item(item!, (i) => i.look(look)).build(), label: `Change the ${what} of ${item!.name}`, needed: { item: item!.key } };
+    }, (shown, now) => [{ name: shown.name, ...documentOf(this.store, shown), field: "Icon and color", shown: lookText(shown.look), now: lookText(now.look), wanted: lookText(look) }]);
   }
 
-  /** An item's body (its content in the markdown language), written only where it is still `was` as read (`store.body`): a body changed since is left, never written over; see `onItem` */
+  /** An item's body (its content in the markdown language), written only where it is still `was` as read (`store.body`): a body changed since is left, never written over; see `onItems` */
   async setBody(database: string, given: Item, body: string, was: string | undefined): Promise<Result> {
     if (!this.store.capabilities.itemBody) return this.refuse("This database keeps no body of an item");
     if (body === (was ?? "")) return unchanged("The body is the same");
     // (Nothing of the item rests on what it shows: the body has its own check, `was`)
-    return this.onItem(database, given, {}, (item) => this.write(databaseChanges(database).item(item, (i) => i.body(body, was)).build(), `Edit the body of ${item.name}`));
+    return this.onItems(database, [given], {}, ([item]) => ({ changes: databaseChanges(database).item(item!, (i) => i.body(body, was)).build(), label: `Edit the body of ${item!.name}` }));
   }
 
-  /** Items removed, the user asked first: each where what it loses (its name, values and look) is still as shown; see `onItem` */
+  /** Items removed, the user asked first: each where what it loses (its name, values and look) is still as shown, the others left, said; see `onItems` */
   async remove(database: string, items: readonly Item[]): Promise<Result> {
     if (!items.length) return unchanged("Nothing to remove");
     const what = items.length === 1 ? `"${items[0]!.name}"` : `${items.length} items`;
@@ -255,8 +316,8 @@ export class DatabaseCore {
     return this.onItems(database, items, { allValues: true, name: true, look: true }, (now) => {
       const changes = databaseChanges(database);
       for (const item of now) changes.item(item, (i) => i.remove());
-      return this.write(changes.build(), `Remove ${what}`);
-    });
+      return { changes: changes.build(), label: now.length === 1 ? `Remove "${now[0]!.name}"` : `Remove ${now.length} items` };
+    }, (shown, now, read) => changedValues(shown, now, read, this.types).map((change) => ({ name: shown.name, ...documentOf(this.store, shown), ...change, wanted: "(removed)" })));
   }
 
   /**
@@ -264,27 +325,24 @@ export class DatabaseCore {
    * it is written, but where its neighbours' ranks do not allow its place
    * (typed by hand, missing): those get ranks in the same transaction,
    * keeping the order shown. Its place by its neighbours as they are now;
-   * the values it sets as shown (see `onItem`)
+   * the values it sets as shown (see `onItems`)
    */
   async move(database: string, given: Item, place: Place): Promise<Result> {
     if (place.after?.key === given.key || place.before?.key === given.key) return unchanged("An item stays beside itself");
+    const keys = Object.keys(place.values ?? {});
     // (After every item's writes going on: its neighbours may get ranks in its transaction)
-    return this.afterAllItemWrites(database, async () => {
-      const read = await this.read(database);
-      if ("problem" in read) return read;
-      const item = currentOf(new Map(read.items.value.map((one) => [one.key, one] as const)), given, { values: Object.keys(place.values ?? {}) }, read.database.value);
-      if (item === "changed") return this.changedSince([given]);
+    return this.onItems(database, [given], { values: keys }, ([item], read) => {
       for (const [key, value] of Object.entries(place.values ?? {})) {
         const property = writable(read.database.value, key);
-        if (typeof property === "string") return this.refuse(property);
-        if (value !== undefined && !isValue(value)) return this.refuse(notValue(property.label));
+        if (typeof property === "string") return invalid(property);
+        if (value !== undefined && !isValue(value)) return invalid(notValue(property.label));
         // (A card moved to the column of none: a required value is not taken off by it)
-        if (property.required && (value === undefined || isEmpty(value)) && !isEmpty(item.values[key])) return this.refuse(`${property.label} is required: not emptied`);
+        if (property.required && (value === undefined || isEmpty(value)) && !isEmpty(item!.values[key])) return invalid(`${property.label} is required: not emptied`);
       }
       // No neighbour named (a card dropped in an empty column, on a board sorted): its values alone, its place by hand kept
-      const placing = place.after || place.before ? placed(read.items.value, item, place) : undefined;
-      if (typeof placing === "string") return this.refuse(placing);
-      const changes = databaseChanges(database).item(item, (i) => {
+      const placing = place.after || place.before ? placed(read.items.value, item!, place) : undefined;
+      if (typeof placing === "string") return invalid(placing);
+      const changes = databaseChanges(database).item(item!, (i) => {
         if (placing) i.rank(placing.rank);
         for (const [key, value] of Object.entries(place.values ?? {})) {
           if (value === undefined) i.unset(key);
@@ -292,36 +350,87 @@ export class DatabaseCore {
         }
       });
       if (placing) rankOthers(changes, read.items.value, placing.others);
-      return this.write(changes.build(), `Move ${item.name}`, { item: item.key });
-    });
+      return { changes: changes.build(), label: `Move ${item!.name}`, needed: { item: item!.key } };
+    }, (shown, now, read) => keys.map((key) => this.valueConflict(shown, now, read, key, place.values![key])), { all: true });
   }
 
   /**
    * A write of items (`given`, as a view showed them) resting on `part` of each (domain/itempart.ts: a value, the name,
-   * the look; what a removal loses), once their writes going on are done, given the database as read then and the items
-   * it goes on: each as it is now where its part is still as shown, so what else of it changed since, by the view's own
-   * writes (a name typed and left, a status picked at once) or elsewhere, is kept, as only the part is written. Where the
-   * part changed since (by anyone), nothing is written, said (`changedSince`): nothing a view did not show is written
-   * over, by any of the ways an item is written
+   * the look; what a removal loses), once their writes going on are done (`all`: every item's, as it may rank any of
+   * them: a move): `make` given the items it goes on and the database as read then, each as it is now where its part is
+   * still as shown, so what else of it changed since, by the view's own writes (a name typed and left, a status picked at
+   * once) or elsewhere, is kept, as only the part is written. Where the part changed since (by anyone), those items are
+   * left, and the user told, the conflict to see and write over (`ItemConflict`, `conflicts` what each is): nothing a
+   * view did not show is written over unless the user says so, by any of the ways an item is written
    */
-  private onItem<R>(database: string, given: Item, part: ItemPart, write: (item: Item, read: DatabaseRead) => R | Refused | Promise<R | Refused>): Promise<R | Refused> {
-    return this.onItems(database, [given], part, ([item], read) => write(item!, read));
-  }
-
-  /** `onItem` of several items at once (a removal of many): those whose part changed since left, said, the others written */
-  private onItems<R>(database: string, given: readonly Item[], part: ItemPart, write: (items: readonly Item[], read: DatabaseRead) => R | Refused | Promise<R | Refused>): Promise<R | Refused> {
-    return this.afterItemWrites(database, given, async () => {
+  private onItems(database: string, given: readonly Item[], part: ItemPart, make: MakeItemWrite, conflicts: ConflictLines = () => [], options: { readonly all?: boolean } = {}): Promise<Result> {
+    const queued = (run: () => Promise<Result>) => (options.all ? this.afterAllItemWrites(database, run) : this.afterItemWrites(database, given, run));
+    return queued(async () => {
       const read = await this.read(database);
       if ("problem" in read) return read;
       const now = new Map(read.items.value.map((one) => [one.key, one] as const));
       const items = given.map((one) => currentOf(now, one, part, read.database.value));
       const changed = given.filter((_one, at) => items[at] === "changed");
       const current = items.filter((one): one is Item => one !== "changed");
-      // (Those whose part changed left, said; the others written, where there are any)
-      if (!current.length) return this.changedSince(changed);
-      if (changed.length) this.changedSince(changed);
-      return write(current, read);
+      // Those whose part changed left: said, their conflict offered, written over on the items as it shows them
+      const left = changed.length
+        ? this.conflict(database, changed, now, read, { part, make, conflicts, options })
+        : undefined;
+      if (!current.length) return left!;
+      const written = make(current, read);
+      if (!("problem" in written)) return this.write(written.changes, written.label, written.needed);
+      // (Refused: said here, as it is made quietly, for a conflict's preview too)
+      if (written.cause === "invalid") this.ui.notify(written.problem, { type: "error" });
+      return written;
     });
+  }
+
+  /**
+   * Items whose part changed since a view showed them: left, the user told (a notification that stays until closed, as
+   * the platform has it), the conflict handed on (`CoreInterface.conflict`): what changed on which document; `preview`,
+   * the write planned on the items as they are now where its part is still as the conflict shows it, nothing written; and
+   * `force`, the write on the items as the conflict shows them, refused anew where they changed again since. Made of
+   * what it is given alone: nothing of the read it was found in is kept for as long as it is shown
+   */
+  private conflict(database: string, shown: readonly Item[], now: ReadonlyMap<ItemKey, Item>, read: DatabaseRead, write: { readonly part: ItemPart; readonly make: MakeItemWrite; readonly conflicts: ConflictLines; readonly options: { readonly all?: boolean } }): Refused {
+    const { part, make } = write;
+    // (What it keeps: the items as it shows them and the lines, nothing of the read itself)
+    const items = shown.map((one) => now.get(one.key)!);
+    const lines = shown.flatMap((one) => {
+      const of = write.conflicts(one, now.get(one.key)!, read);
+      // (Its part changed in a way no line says: the item named all the same)
+      return of.length ? of : [{ name: one.name, ...documentOf(this.store, one), field: "(the item)", shown: "as you saw it", now: "changed", wanted: "yours" }];
+    });
+    const single = shown.length === 1;
+    const what = single ? `"${shown[0]!.name}"` : `${shown.length} items`;
+    const problem = `${what} changed since ${single ? "it was" : "they were"} shown: left as ${single ? "it is" : "they are"}`;
+    let written = false;
+    const conflict: ItemConflict = {
+      problem,
+      lines,
+      written: () => written,
+      preview: async () => {
+        const read = await this.read(database);
+        if ("problem" in read) return { documents: [], problem: read.problem };
+        const now = new Map(read.items.value.map((item) => [item.key, item] as const));
+        const current = items.map((item) => currentOf(now, item, part, read.database.value));
+        if (current.includes("changed")) return { documents: [], problem: "It changed again since: Write mine shows the conflict as it is now." };
+        const written = make(current as Item[], read);
+        if ("problem" in written) return { documents: [], problem: written.problem };
+        const plan = await this.store.plan(written.changes);
+        return { documents: plan.planned.map((planned) => ({ document: "item" in planned.target ? (this.store.documentOf(planned.target.item) ?? "") : "", runs: planned.preview?.() ?? [] })) };
+      },
+      // Once: written, the conflict is over (its notification, which stays until closed, may still be pressed)
+      force: async () => {
+        if (written) return unchanged("Written already");
+        const result = await this.onItems(database, items, part, make, write.conflicts, write.options);
+        if (!("problem" in result)) written = true;
+        return result;
+      },
+    };
+    if (this.ui.conflict) this.ui.conflict(conflict);
+    else this.ui.notify(problem, { type: "error" });
+    return { problem, cause: "left" };
   }
 
   /** `run` once the writes of `items` going on (and one that may rank any item) are done, the items' next writes waiting for it */
@@ -888,12 +997,11 @@ export class DatabaseCore {
     return report.written.length ? { report } : { problem: `${label}: nothing was written`, cause: "left", report };
   }
 
-  /** What a view writes rests on what of these items changed since it showed them (`onItem`): they are left, said */
-  private changedSince(items: readonly Item[]): Refused {
-    const what = items.length === 1 ? `"${items[0]!.name}"` : `${items.length} items`;
-    const problem = `${what} changed since ${items.length === 1 ? "it was" : "they were"} shown: left as ${items.length === 1 ? "it is" : "they are"}`;
-    this.ui.notify(problem, { type: "error" });
-    return { problem, cause: "left" };
+  /** A value's conflict: as the view showed it, as it is now, as the write would set it */
+  private valueConflict(shown: Item, now: Item, read: DatabaseRead, key: string, value: Value | undefined): ConflictLine {
+    const label = read.database.value.properties.find((one) => one.key === key)?.label ?? key;
+    const wanted = value === undefined ? "(empty)" : shownText({ ...shown, values: { ...shown.values, [key]: value } }, key, read, this.types);
+    return { name: shown.name, ...documentOf(this.store, shown), field: label, shown: shownText(shown, key, read, this.types), now: shownText(now, key, read, this.types), wanted };
   }
 
   private refuse(problem: string): Refused {
@@ -902,7 +1010,7 @@ export class DatabaseCore {
   }
 }
 
-function unchanged(problem: string): Refused {
+function unchanged(problem: string): Refused & { readonly cause: "unchanged" } {
   return { problem, cause: "unchanged" };
 }
 

@@ -29,7 +29,8 @@ export type Bridge = {
   queryTag(tag: string): Promise<readonly IndexedObject[]>;
   // Whether no page is queued or being indexed (`mq.getQueueStats("indexQueue")`): the index is whole then; left out, taken as always
   indexIdle?(): Promise<boolean>;
-  flash(message: string, type: "info" | "error", options?: { readonly timeout?: number }): void;
+  // `actions`: buttons on the notification (its Lua makes each a Lua function calling `run`, as SilverBullet's takes)
+  flash(message: string, type: "info" | "error", options?: { readonly timeout?: number; readonly actions?: readonly { readonly name: string; readonly run: () => unknown }[] }): void;
   confirm(message: string): Promise<boolean>;
   prompt(message: string, value?: string): Promise<string | undefined>;
   // SilverBullet's filter box (editor.filterBox): the option picked, nothing where none was
@@ -113,7 +114,11 @@ export function silverBulletPlatform(bridge: Bridge): {
       },
     },
     ui: {
-      notify: (message, options) => bridge.flash(message, options?.type ?? "info", options?.timeout === undefined ? undefined : { timeout: options.timeout }),
+      // (Its timeout and buttons where given, nothing else: SilverBullet's defaults for what is not)
+      notify: (message, options) => {
+        const more = { ...(options?.timeout === undefined ? {} : { timeout: options.timeout }), ...(options?.actions?.length ? { actions: options.actions } : {}) };
+        bridge.flash(message, options?.type ?? "info", Object.keys(more).length ? more : undefined);
+      },
       ask: (message) => bridge.confirm(message),
       // The filter box gives back the option picked, found by the index it was given
       ...(bridge.filterBox

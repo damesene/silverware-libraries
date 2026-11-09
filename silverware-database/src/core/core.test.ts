@@ -3,7 +3,7 @@ import { TypeRegistry } from "../domain/types/registry.ts";
 import { inRankOrder } from "../domain/rank.ts";
 import type { Database } from "../model/database.ts";
 import { MemoryStore } from "../store/memory.ts";
-import { type CoreInterface, DatabaseCore, type Proposal } from "./core.ts";
+import { type CoreInterface, DatabaseCore, type ItemConflict, type Proposal } from "./core.ts";
 
 const TASKS: Database = {
   id: "tasks",
@@ -226,6 +226,33 @@ describe("the core", () => {
     // Its body and its place changed since (neither what it loses as shown): removed
     expect(await core.remove("tasks", [await named("Fix the login")])).not.toHaveProperty("problem");
     expect((await items()).map((one) => one.name)).toEqual(["Write docs"]);
+  });
+
+  it("hands on a write left as its part changed since it was shown: what changed, and written over by force, anew refused where it changed again", async () => {
+    const { store, named } = setup();
+    const conflicts: ItemConflict[] = [];
+    const core = new DatabaseCore(store, new TypeRegistry(), { notify: () => {}, ask: () => true, conflict: (one) => void conflicts.push(one) });
+    const stale = await named("Fix login");
+    store.changeOutside("tasks", stale.key, { values: { status: "Done" } });
+    expect(await core.update("tasks", stale, "estimate", "5")).not.toHaveProperty("problem");
+    expect(await core.update("tasks", stale, "status", "Todo")).toMatchObject({ cause: "left" });
+    expect(conflicts).toHaveLength(1);
+    const [conflict] = conflicts;
+    expect(conflict!.lines).toEqual([{ name: "Fix login", field: "Status", shown: "Todo", now: "Done", wanted: "Todo" }]);
+    expect(conflict!.problem).toBe('"Fix login" changed since it was shown: left as it is');
+    // (The memory store keeps no text: no lines to show)
+    expect(await conflict!.preview()).toEqual({ documents: [{ document: "", runs: [] }] });
+    // Changed again since the conflict was shown: its preview says so (nothing told), its force refused anew, its own conflict
+    store.changeOutside("tasks", stale.key, { values: { status: "Doing" } });
+    expect(await conflict!.preview()).toEqual({ documents: [], problem: "It changed again since: Write mine shows the conflict as it is now." });
+    expect(conflicts).toHaveLength(1);
+    expect(await conflict!.force()).toMatchObject({ cause: "left" });
+    expect(conflicts).toHaveLength(2);
+    // Written over as the second shows it, once: pressed again, nothing more
+    expect(await conflicts[1]!.force()).not.toHaveProperty("problem");
+    expect((await named("Fix login")).values).toEqual({ status: "Todo", estimate: "5" });
+    expect([conflicts[1]!.written(), await conflicts[1]!.force()]).toEqual([true, { problem: "Written already", cause: "unchanged" }]);
+    expect(conflicts).toHaveLength(2);
   });
 
   it("removes the items of a removal still as shown, leaves one changed since, and says so", async () => {

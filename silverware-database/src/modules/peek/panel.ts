@@ -631,7 +631,7 @@ export class PeekPanel {
 
   /**
    * One of the panel's own writes of its item, after the one before it, `write` given the item the panel writes against
-   * (the core writes it on the item as it is now where the part written is still as given: core.ts `onItem`); the places
+   * (the core writes it on the item as it is now where the part written is still as given: core.ts `onItems`); the places
    * and the panel follow it, and it is kept while it goes on (the item's removal waits for it). Written while the panel's
    * drawing is put off (another field being edited), the panel shows what it wrote (`shows`: the item with it): where the
    * item as it is now is just that, it is what the panel writes against next, so a second change of the same field and a

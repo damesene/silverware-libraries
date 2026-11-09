@@ -20,6 +20,7 @@ export const SHARED_STYLES = [
     mark: "shared-diff",
     pages: [
       { page: "silverware-tags/silverware-tags-style.md", base: "swg" },
+      { page: "silverware-database/silverware-database-style.md", base: "swd" },
     ],
   },
   {

@@ -58,8 +58,19 @@ if js and js.window then
       local stats = mq.getQueueStats("indexQueue")
       return stats.queued == 0 and stats.processing == 0
     end,
+    -- A notification; its buttons (`actions`, a JS list of { name, run }) made Lua functions calling the JS's, as
+    -- SilverBullet's notification takes them (a conflict's Show conflict, staying until closed: timeout 0)
     flash = function(message, type, options)
-      editor.flashNotification(message, type, options)
+      if options and options.actions then
+        local actions = {}
+        for _, action in ipairs(options.actions) do
+          local run = action.run
+          table.insert(actions, { name = action.name, run = function() run() end })
+        end
+        editor.flashNotification(message, type, { timeout = options.timeout, actions = actions })
+      else
+        editor.flashNotification(message, type, options)
+      end
     end,
     confirm = editor.confirm,
     prompt = editor.prompt,

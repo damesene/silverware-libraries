@@ -2592,6 +2592,111 @@ tr:focus-within .swd-open {
   background: var(--danger-color, #c62828);
   border-color: var(--danger-color, #c62828);
 }
+/* The dialog of a write changed since it was shown (core/conflictdialog.ts): what changed, then the lines writing it
+   would change on each page, as Silverware Tags' review shows them (shared/diffview.ts: swd-diff-*) */
+.swd-settings.swd-conflict {
+  width: min(760px, calc(100vw - 32px));
+  height: auto;
+  max-height: calc(100vh - 32px);
+}
+.swd-conflict-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+}
+.swd-conflict-lines {
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.swd-conflict-lines th,
+.swd-conflict-lines td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--swd-settings-line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.swd-conflict-lines th {
+  font-weight: 600;
+  color: var(--swd-quiet);
+}
+.swd-conflict-now {
+  background: color-mix(in srgb, var(--danger-color, #c62828) 12%, transparent);
+}
+.swd-conflict-wanted {
+  background: color-mix(in srgb, #2e9e4f 14%, transparent);
+}
+.swd-conflict-section {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.swd-conflict-note {
+  margin: 0;
+  color: var(--swd-quiet);
+}
+.swd-conflict-document + .swd-conflict-document {
+  margin-top: 8px;
+}
+.swd-conflict-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.swd-conflict-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.swd-conflict-open {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--swd-settings-line);
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+/* <shared-diff> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* A document's change as a review shows it (shared/diffview.ts): its runs of lines, each its first line's number, the
+   lines removed and added */
+.swd-diff {
+  padding: 4px 10px 8px;
+  font: 12px/1.5 var(--editor-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+}
+.swd-diff-run + .swd-diff-run {
+  margin-top: 6px;
+}
+.swd-diff-line-number {
+  font-family: var(--ui-font, system-ui, sans-serif);
+  font-size: 11px;
+  opacity: 0.55;
+}
+.swd-diff-removed,
+.swd-diff-added {
+  padding: 0 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-radius: 3px;
+}
+.swd-diff-removed {
+  background: color-mix(in srgb, var(--danger-color, #c62828) 14%, transparent);
+}
+.swd-diff-removed::before {
+  content: "− ";
+  opacity: 0.6;
+}
+.swd-diff-added {
+  background: color-mix(in srgb, #2e9e4f 16%, transparent);
+}
+.swd-diff-added::before {
+  content: "+ ";
+  opacity: 0.6;
+}
+/* </shared-diff> */
 @media (max-width: 480px), (pointer: coarse) and (max-height: 600px) {
   .swd-settings {
     width: 100vw;

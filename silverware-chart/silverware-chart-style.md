@@ -12,7 +12,11 @@ The look of [Silverware Chart](silverware-chart.md): a chart's box, its toolbar,
    container on 2026-11-03, .sb-widget-menu-bar in main; the block's Copy button, .sb-code-copy-button in
    the block's first line, .cm-line > .sb-actions) left out, as the chart's toolbar has them; .swc-widget is the
    class the init page gives the chart's widget */
+/* (On a touch screen SilverBullet shows its widget menu always, `display: block !important` by
+   #sb-main .cm-editor .sb-lua-directive-block .button-bar in (hover: none) and (pointer: coarse), seen on a phone
+   2026-11-09: its id and three classes outweigh two, so this names the same path, the widget's own class beside it) */
 .swc-widget .button-bar,
+#sb-main .cm-editor .swc-widget.sb-lua-directive-block .button-bar,
 .swc-widget .sb-widget-menu-bar,
 .cm-line:has(.swc-widget) > .sb-actions .sb-code-copy-button {
   display: none !important;

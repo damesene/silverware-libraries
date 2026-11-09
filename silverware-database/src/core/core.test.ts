@@ -318,6 +318,22 @@ describe("the core", () => {
     expect((await items()).map((one) => one.name)).toEqual(["Write docs"]);
   });
 
+  it("takes a write that leaves an item as it is now for no change, whatever changed since it was shown: nothing written, no conflict", async () => {
+    const { store, named } = setup();
+    const conflicts: ItemConflict[] = [];
+    const told: string[] = [];
+    const core = new DatabaseCore(store, new TypeRegistry(), { notify: (message) => void told.push(message), ask: () => true, conflict: (one) => void conflicts.push(one) });
+    const stale = await named("Fix login");
+    // (The same value written twice from the view as it was, the first having written it)
+    store.changeOutside("tasks", stale.key, { values: { status: "Done" } });
+    const revision = (await named("Fix login")).revision;
+    expect(await core.update("tasks", stale, "status", "Done")).toMatchObject({ cause: "unchanged" });
+    expect([conflicts, told, (await named("Fix login")).revision]).toEqual([[], [], revision]);
+    // Another value: a conflict as before
+    expect(await core.update("tasks", stale, "status", "Doing")).toMatchObject({ cause: "left" });
+    expect(conflicts).toHaveLength(1);
+  });
+
   it("hands on a write left as its part changed since it was shown: what changed, and written over by force, anew refused where it changed again", async () => {
     const { store, named } = setup();
     const conflicts: ItemConflict[] = [];

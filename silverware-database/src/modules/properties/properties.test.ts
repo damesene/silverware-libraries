@@ -373,6 +373,20 @@ describe("the properties' dialog", () => {
     expect(document.querySelector(".swd-properties")).toBeNull();
   });
 
+  it("draws nothing anew as a field typed in is left, so a press on another field types there: the row's head and marks told", async () => {
+    const { open, q } = await setup();
+    await open();
+    expand("status");
+    const second = optionNames()[1]!;
+    const label = q<HTMLInputElement>('.swd-property-label[data-key="status"]');
+    change(optionNames()[0]!, "Open");
+    change(label, "State");
+    expect(optionNames()[1]).toBe(second);
+    expect(q<HTMLInputElement>('.swd-property-label[data-key="status"]')).toBe(label);
+    expect([q('[data-property="status"] .swd-prop-name').textContent, marks().status]).toEqual(["State", "Changed"]);
+    expect(q('.swd-option-color[aria-label="Color of Open"]')).not.toBeNull();
+  });
+
   it("swaps two options' names with their values and colors", async () => {
     const { open, q, schema, named, core } = await setup();
     await core.setPropertyParams("tasks", "status", { options: ["Todo", "Done"], colors: { Done: "green" } }, { options: ["Todo", "Done"] });

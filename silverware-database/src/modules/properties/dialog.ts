@@ -453,26 +453,42 @@ export class PropertiesDialog {
     }
   }
 
-  /** A property: its row (grip, type, name, type's name, a mark where the draft changes it; a press opens it), its details where open */
-  private property(entry: Entry, at: number, list: () => HTMLElement): HTMLElement {
+  /** A property's row's head as the draft has it: its icon, name, * where required, a mark where the draft changes it, a lock, its type */
+  private fillHead(head: HTMLElement, entry: Entry): void {
     const { document: doc, types } = this.host;
     const property = this.built(entry);
     // (Its type as the views have it: a system property's its kind's)
     const type = typeOf(types, property);
-    const open = this.opened === entry.id;
     const kind = systemKind(property.system, this.host.noun);
-    const grip = el(doc, "button", { class: "swd-prop-grip", html: GRIP, title: "Drag to move (Alt+↑ ↓)", attrs: { "aria-label": `Move ${property.label} (Alt+Up, Alt+Down)` } });
     const mark = entry.removed ? "Removed" : !entry.saved ? "New" : this.changedEntry(entry) ? "Changed" : undefined;
-    const head = el(
-      doc,
-      "button",
-      { class: "swd-prop-head", attrs: { "aria-expanded": String(open), "aria-label": `${property.label}, ${type?.label ?? property.type}${property.required ? ", required" : ""}${property.system ? ", given by the system" : property.readonly ? ", locked in views" : ""}${mark ? `, ${mark.toLowerCase()} (on Save)` : ""}` } },
+    head.setAttribute("aria-label", `${property.label}, ${type?.label ?? property.type}${property.required ? ", required" : ""}${property.system ? ", given by the system" : property.readonly ? ", locked in views" : ""}${mark ? `, ${mark.toLowerCase()} (on Save)` : ""}`);
+    head.replaceChildren(
       propertyIcon(doc, property, type?.name ?? "text", "swd-prop-icon"),
       el(doc, "span", { class: "swd-prop-name", text: property.label || "(no name)" }, ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", title: "Required", attrs: { "aria-hidden": "true" } })] : [])),
       ...(mark ? [el(doc, "span", { class: `swd-prop-mark swd-prop-mark-${mark.toLowerCase()}`, text: mark, title: `${mark}: written on Save` })] : []),
       ...(property.readonly ? [el(doc, "span", { class: "swd-prop-lock", html: LOCK, title: property.system ? "Given by the system" : "Locked in views" })] : []),
       el(doc, "span", { class: "swd-prop-type", text: kind?.label ? `System: ${kind.label}` : (type?.label ?? property.type) }),
     );
+  }
+
+  /**
+   * A text of the draft typed (a name, an option's, a key): its row's head and the foot told, nothing drawn anew (the field
+   * left by a press on another would be drawn anew under that press, the text typed next going to a field no longer there)
+   */
+  private typed(entry: Entry): void {
+    const head = this.body?.querySelector<HTMLElement>(`[data-property="${CSS.escape(entry.id)}"] > .swd-prop-row > .swd-prop-head`);
+    if (head) this.fillHead(head, entry);
+    this.drawFoot();
+  }
+
+  /** A property: its row (grip, type, name, type's name, a mark where the draft changes it; a press opens it), its details where open */
+  private property(entry: Entry, at: number, list: () => HTMLElement): HTMLElement {
+    const { document: doc } = this.host;
+    const property = this.built(entry);
+    const open = this.opened === entry.id;
+    const grip = el(doc, "button", { class: "swd-prop-grip", html: GRIP, title: "Drag to move (Alt+↑ ↓)", attrs: { "aria-label": `Move ${property.label} (Alt+Up, Alt+Down)` } });
+    const head = el(doc, "button", { class: "swd-prop-head", attrs: { "aria-expanded": String(open) } });
+    this.fillHead(head, entry);
     head.addEventListener("click", () => {
       this.opened = open ? undefined : entry.id;
       this.draw();
@@ -554,9 +570,12 @@ export class PropertiesDialog {
     // (Kept as typed; the list's row named so as the field is left)
     label.addEventListener("input", () => {
       entry.property = { ...entry.property, label: label.value };
-      this.drawFoot();
+      this.typed(entry);
     });
-    label.addEventListener("change", () => this.edited(() => (entry.property = { ...entry.property, label: label.value })));
+    label.addEventListener("change", () => {
+      entry.property = { ...entry.property, label: label.value };
+      this.typed(entry);
+    });
     const remove = el(doc, "button", {
       class: "swd-property-remove",
       text: "Remove property",
@@ -637,7 +656,10 @@ export class PropertiesDialog {
     required.querySelector("input")?.setAttribute("aria-label", `${property.label} required`);
     // Its key: one added now gets one made from its name on Save, unless typed
     const key = el(doc, "input", { class: "swd-property-key", attrs: { "aria-label": `Key of ${property.label}`, value: property.key, placeholder: entry.saved ? "" : "Made from its name on Save" } });
-    key.addEventListener("change", () => set({ key: key.value.trim() || (entry.saved?.key ?? "") }));
+    key.addEventListener("change", () => {
+      entry.property = { ...entry.property, key: key.value.trim() || (entry.saved?.key ?? "") };
+      this.typed(entry);
+    });
     return el(
       doc,
       "div",
@@ -706,10 +728,19 @@ export class PropertiesDialog {
       const name = el(doc, "input", { class: "swd-option-name", attrs: { "aria-label": "Option", value: draft.text, placeholder: "Option" } });
       name.addEventListener("input", () => {
         draft.text = name.value;
-        this.drawFoot();
+        this.typed(entry);
       });
-      // (Its pill and the list's marks as the field is left)
-      name.addEventListener("change", () => this.edited(() => (draft.text = name.value)));
+      // (Its color's button follows its name: the palette picks for the option as typed)
+      name.addEventListener("change", () => {
+        draft.text = name.value;
+        this.typed(entry);
+        if (color instanceof HTMLButtonElement && draft.text.trim()) {
+          color.dataset.option = draft.text.trim();
+          color.title = `The color of ${draft.text.trim()}`;
+          color.setAttribute("aria-label", `Color of ${draft.text.trim()}`);
+          color.replaceChildren(optionPill(doc, this.built(entry), draft.text.trim()));
+        }
+      });
       const remove = el(doc, "button", {
         class: "swd-option-remove",
         html: CLOSE,

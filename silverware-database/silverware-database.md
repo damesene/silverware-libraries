@@ -42,7 +42,7 @@ id: tasks
 
 A database can be shown on as many pages as you like, and more than once on one page. Two blocks written exactly alike on one page show only once in SilverBullet 2.12.1 (it renders them as one), and a view picked there is not written, as it cannot tell which of them it is: write them apart in their markdown (another `view:` line in one of them) and both show.
 
-Above it, the view shown as one button (its icon, its name, a down arrow): pressed, it lists the views (the one shown checked; arrows and Enter from the keys, Esc closes it). The one you pick is written into the block (`view: …`), and so is what a view keeps there (its filter, its sort, prefixed by its name). At the bar's other end:
+Above it, one bar: at its left, quietly, the database's name and how many items show (a note, not a heading: write one in the page if you want one), then the view shown as one button (its icon, its name, a down arrow), at its right its tools. Pressed, the view's button lists the views (the one shown checked; arrows and Enter from the keys, Esc closes it). The one you pick is written into the block (`view: …`), and so is what a view keeps there (its filter, its sort, prefixed by its name). Its tools:
 
 * **Filter**: a condition for each property, written as in Silverware Table's filter row (`Done`, `!=Done`, `>3`, `/regex/`); every condition has to hold. It applies as you type (a moment after the last key; Enter at once); one that does not read is marked red and not applied.
 * **Sort**: a property and its direction; *Order by hand* is the order you give items yourself (a board's cards dragged).
@@ -98,7 +98,7 @@ A click on an item's name (or its ↗) shows the item in a panel at the right of
 
 Over its name, an item gets an **icon** and a **color** (shown as you hover the panel where it has none): **Add icon** opens the emoji picker (its groups, a search by name, those used last first; **Remove** takes the icon off), **Color** a choice of the palette's colors, your own (the browser's color picker) or **None**. Every view shows them: the icon before the item's name (on a card, a calendar's or a timeline's bar too), the color as a stripe by the name in a table, a tint of a list's line, of a card and of a calendar's or a timeline's bar. They are kept in the item's page beside its order (`_database: { icon: "🚀", color: blue }`), not as properties: no filter, sort or group reads them. An icon or a color typed there by hand that is none (a word, a color of no palette) shows nothing and is left as written.
 
-**Color by** (in ⋯, each view its own, kept in its block) colors a view's items by a property of options (a select, a multi-select: its first value): each item in its value's option's color, so a bar, a card or a line says its status at a glance, and changes as the value does or as the option's color is changed in **Properties**. An item's own color comes first. The view's head says what the colors are of (*colored by Status*).
+**Color by** (in ⋯, each view its own, kept in its block) colors a view's items by a property of options (a select, a multi-select: its first value): each item in its value's option's color, so a bar, a card or a line says its status at a glance, and changes as the value does or as the option's color is changed in **Properties**. An item's own color comes first.
 
 ## Nothing lost by mistake
 

@@ -350,13 +350,12 @@ test("a timeline grouped by Group by in ⋯: one axis, each group's head over it
   await expect(rows.locator(".swd-group-label, .swd-tl-name-text")).toHaveText(["Design", "Build", "Code"]);
 });
 
-test("Color by in ⋯ colors a view's items by a select's options, written into the block, its head saying so", async ({ page, space }) => {
+test("Color by in ⋯ colors a view's items by a select's options, written into the block", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS }, "Page");
   await page.locator(".swd-more").click();
   await choose(page, "Color by");
   await choose(page, "Status");
   await expect.poll(() => space.saved("Page")).toContain("list.colorBy: status");
-  await expect(page.locator(".swd-place-colored")).toHaveText("colored by Status");
   // (Todo the options' first, Done the second)
   await expect(page.locator(".swd-list-item", { hasText: "Fix login" })).toHaveAttribute("data-swd-item-color", "0");
   await expect(page.locator(".swd-list-item", { hasText: "Write docs" })).toHaveAttribute("data-swd-item-color", "1");

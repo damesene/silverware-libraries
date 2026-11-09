@@ -44,30 +44,32 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   --swd-accent: var(--ui-accent-color, #4a6cf7);
 }
 
-/* A place: the database's name and count, its views' tabs and the tools in one bar, what the view draws under it */
-/* What the items' colors are of (Color by in ⋯), after the count: quiet */
-.swd-place-colored {
-  margin-left: 4px;
-  color: var(--swd-quiet);
-  font-size: 0.8em;
-  font-weight: normal;
-}
+/* A place: one bar, the database's name and count quietly, then the view's picker (Launch plan 10 Board),
+   the tools at its end; what the view draws under it */
 .swd-place {
   margin: 0.5em 0;
 }
+/* A note, not a heading: quiet, its name cut with an ellipsis where the bar is narrow (it gives way before the view's
+   picker does, down to its first letters), the tools never pushed out */
 .swd-place-head {
   display: flex;
+  flex: 0 1 auto;
   align-items: baseline;
-  gap: 8px;
-  margin-bottom: 2px;
-}
-.swd-place-name {
-  font-weight: 600;
-  font-size: 1.05em;
-}
-.swd-place-count {
+  gap: 6px;
+  /* (Its first letters and the count kept: "Lau… 10") */
+  min-width: 7ch;
+  padding-left: 2px;
   color: var(--swd-quiet);
   font-size: 0.85em;
+}
+.swd-place-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swd-place-count {
+  flex: 0 0 auto;
 }
 .swd-place-bar {
   display: flex;
@@ -99,7 +101,9 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 }
 /* The view shown: one button (its icon, its label, a mark of its list) opening the views in a menu; the tools at the bar's end */
 .swd-view-picker-box {
-  flex: 0 1 auto;
+  /* (Cut only once the database's name is down to its first letters: a shrink so small that it gets none of what the bar
+     lacks until the name can give no more, which a flex box then gives it whole) */
+  flex: 0 0.00001 auto;
   min-width: 0;
   margin-right: auto;
 }
@@ -112,6 +116,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
   min-width: 0;
   max-width: 100%;
   min-height: 34px;
@@ -121,7 +126,9 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   color: inherit;
   background: none;
   font: inherit;
-  font-weight: 600;
+  /* (Named, not shouted: a touch under the page's text, half bold) */
+  font-size: 0.95em;
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -169,6 +176,8 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 .swd-tools {
   display: flex;
   flex: 0 0 auto;
+  /* (At the bar's end, whatever is before it) */
+  margin-left: auto;
   align-items: center;
   gap: 2px;
   padding-bottom: 2px;

@@ -26,7 +26,13 @@ export function compareRanks(a: string | undefined, b: string | undefined): numb
 
 /** Items in the order by hand: by rank, an item without one (or with one it cannot read) after the ranked, those by name */
 export function inRankOrder(items: readonly Item[]): Item[] {
-  return [...items].sort((a, b) => compareRanks(a.rank, b.rank) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  // Each rank checked once, not in every comparison (a check makes a key: thousands of items sorted on every refresh)
+  const ranked = new Map(items.map((item) => [item, isRank(item.rank)] as const));
+  return [...items].sort((a, b) => {
+    const [hasA, hasB] = [ranked.get(a)!, ranked.get(b)!];
+    const byRank = !hasA || !hasB ? (hasA === hasB ? 0 : hasA ? -1 : 1) : a.rank! < b.rank! ? -1 : a.rank! > b.rank! ? 1 : 0;
+    return byRank || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+  });
 }
 
 /** Where an item goes: its rank, and the ranks other items need first for it to be there (none where the order allows it) */

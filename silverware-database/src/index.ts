@@ -118,18 +118,9 @@ export function init(bridge: Bridge): void {
     observing = false;
     for (const type of pressed) document.removeEventListener(type, pressBeside, true);
   };
-  const made = silverBulletPlatform(bridge);
-  indexChanged = made.indexChanged;
-  pageOpened = made.pageOpened;
-  indexSettled = made.indexSettled;
   bridgeCalls = bridge;
-  const platform = made.platform;
-  const own: Partial<App> & { home: string } = { home: "" };
-  const store = new PagesStore(platform, { rootPage: (id) => (own.home ? `${own.home}/db-${id}` : `db-${id}`) });
-  const ui = { notify: platform.ui.notify, ask: async (message: string) => (await platform.ui.ask?.(message)) ?? false };
-  // A key changed is followed into the places of every page (their blocks), as the views say what of their state names one
-  const writer = pageWriter(platform);
-  const core = new DatabaseCore(store, types, ui, platform.space.noun, { store: blockPlaces(platform.space, writer), propertyMeta: (view) => views.named(view)?.propertyMeta ?? [] });
+  kept ??= keptParts();
+  const { platform, store, writer, core, ui, own } = kept;
   const modules = new Modules(
     BUILT_IN_MODULES,
     {
@@ -162,11 +153,35 @@ export function init(bridge: Bridge): void {
     },
     platform.settings,
   );
-  app = Object.assign(own, { platform, store, core, writer, modules, shown: before }) as App;
+  app = Object.assign(own, { platform, store, core, writer, modules, shown: before });
   for (const [element, shown] of before) if (element.isConnected) start(element, shown);
   // The modules on started (their settings read), the places drawn with what they add
   void modules.start().then(redrawAll);
   timer = setInterval(tidy, 5000);
+}
+
+// What is kept as Space Lua loads again (a setting saved, a space-lua block edited): the platform, the store, the writer and
+// the core, so a change stays undoable while the window is open, and what a deletion removed, which only the writer's
+// reports hold, is not lost with them. The platform calls the bridge handed over last.
+type Kept = Pick<App, "platform" | "store" | "writer" | "core"> & { readonly ui: Ui; readonly own: { home: string } };
+type Ui = { readonly notify: Platform["ui"]["notify"]; readonly ask: (message: string) => Promise<boolean> };
+let kept: Kept | undefined;
+
+function keptParts(): Kept {
+  // Each call goes to the bridge of the last load (what it has is the same each load: one init page made it)
+  const latest = new Proxy({} as Bridge, { get: (_, member) => bridgeCalls![member as keyof Bridge] });
+  const made = silverBulletPlatform(latest);
+  indexChanged = made.indexChanged;
+  pageOpened = made.pageOpened;
+  indexSettled = made.indexSettled;
+  const platform = made.platform;
+  const own = { home: "" };
+  const store = new PagesStore(platform, { rootPage: (id) => (own.home ? `${own.home}/db-${id}` : `db-${id}`) });
+  const ui: Ui = { notify: platform.ui.notify, ask: async (message: string) => (await platform.ui.ask?.(message)) ?? false };
+  // A key changed is followed into the places of every page (their blocks), as the views say what of their state names one
+  const writer = pageWriter(platform);
+  const core = new DatabaseCore(store, types, ui, platform.space.noun, { store: blockPlaces(platform.space, writer), propertyMeta: (view) => views.named(view)?.propertyMeta ?? [] });
+  return { platform, store, writer, core, ui, own };
 }
 
 /** A block drawn: its element, its place made where it names a database */
@@ -490,8 +505,9 @@ async function newDatabase(): Promise<void> {
   await insertAtCursor(`\n\`\`\`${BLOCK_LANGUAGE}\nid: ${result.id}\n\`\`\`\n`);
 }
 
-// The bridge's own calls that are no part of the platform (a prompt, text typed at the cursor), kept as `init` runs
-let bridgeCalls: Pick<Bridge, "prompt" | "insertAtCursor" | "moveCursor"> | undefined;
+// The bridge the init page handed over last (Space Lua loaded again hands over a new one): the platform's calls go to it,
+// and its own calls that are no part of the platform (a prompt, text typed at the cursor)
+let bridgeCalls: Bridge | undefined;
 const bridgePrompt = (message: string) => bridgeCalls?.prompt(message) ?? Promise.resolve(undefined);
 const insertAtCursor = (text: string) => bridgeCalls?.insertAtCursor(text) ?? Promise.resolve();
 

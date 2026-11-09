@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ViewDefinition } from "./core/view.ts";
-import { type Bridge, defineViews, init, render, resetDefinitions } from "./index.ts";
+import type { Bridge } from "./index.ts";
 import { memoryPages } from "./store/pages/testing.ts";
 
 const ROOT = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties: {}\n---\n";
@@ -41,6 +41,18 @@ function pickView(root: ParentNode, label: string): void {
 /** Two views, "a" and "b": the place's picker picks one */
 const VIEWS: ViewDefinition[] = ["a", "b"].map((name) => ({ name, label: name, icon: name, render: (_host, element) => void element.replaceChildren(name) }));
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+
+// A module of its own for each test: what Silverware Database keeps across loads of Space Lua (its core, its history) is the
+// module's, and each test has a space of its own
+let defineViews: typeof import("./index.ts").defineViews;
+let init: typeof import("./index.ts").init;
+let render: typeof import("./index.ts").render;
+let resetDefinitions: typeof import("./index.ts").resetDefinitions;
+let runCommand: typeof import("./index.ts").runCommand;
+beforeEach(async () => {
+  vi.resetModules();
+  ({ defineViews, init, render, resetDefinitions, runCommand } = await import("./index.ts"));
+});
 
 afterEach(() => {
   vi.useRealTimers();
@@ -105,5 +117,15 @@ describe("Silverware Database in SilverBullet", () => {
     pickView(element, "b");
     await settle();
     expect(memory.pages.get("Page")).toBe("```silverware-database\nid: tasks\nview: b\n```\n");
+  });
+
+  it("keeps a change undoable as Space Lua loads again (a setting saved), its bridge a new one", async () => {
+    const { memory, bridge } = bridgeOf({ Page: "text\n" }, "Page");
+    init({ ...bridge, prompt: async () => "Ideas" });
+    await runCommand("Silverware Database: New database");
+    expect(memory.pages.has("Page/db-ideas")).toBe(true);
+    init({ ...bridge });
+    await runCommand("Silverware Database: Undo");
+    expect(memory.pages.has("Page/db-ideas")).toBe(false);
   });
 });

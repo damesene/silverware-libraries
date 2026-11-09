@@ -63,6 +63,10 @@ if js and js.window then
     end,
     confirm = editor.confirm,
     prompt = editor.prompt,
+    -- SilverBullet's picker (Insert database, /database, Delete database): the option picked, or nil
+    filterBox = function(label, options)
+      return editor.filterBox(label, options, "", "Type to find a database")
+    end,
     getConfig = config.get,
     -- The settings dialog: saved as SilverBullet's Configuration Manager saves (the CONFIG page, indexed, the configuration loaded again)
     saveConfigPage = function(text)

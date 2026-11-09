@@ -3,7 +3,7 @@
 // SilverBullet's API is called and what it answers. Everything else asks the
 // platform (shared/platform.ts).
 import { saveConfigPage, withConfigSettings } from "../../../../shared/configpage.ts";
-import type { IndexChange, IndexedObject, Platform } from "../../../../shared/platform.ts";
+import type { Choice, IndexChange, IndexedObject, Platform } from "../../../../shared/platform.ts";
 import { PAGE_KEYS, pageDates, referablePages, tasksOfPages, validatePageName } from "./pages.ts";
 import { settledIndex } from "./settledindex.ts";
 
@@ -32,6 +32,8 @@ export type Bridge = {
   flash(message: string, type: "info" | "error", options?: { readonly timeout?: number }): void;
   confirm(message: string): Promise<boolean>;
   prompt(message: string, value?: string): Promise<string | undefined>;
+  // SilverBullet's filter box (editor.filterBox): the option picked, nothing where none was
+  filterBox?(label: string, options: readonly { readonly name: string; readonly description?: string; readonly index: number }[]): Promise<unknown>;
   getConfig(path: string, fallback: unknown): Promise<unknown>;
   // The CONFIG page written as the Configuration Manager writes it (synced, indexed, the configuration loaded again)
   saveConfigPage?(text: string): Promise<void>;
@@ -113,6 +115,16 @@ export function silverBulletPlatform(bridge: Bridge): {
     ui: {
       notify: (message, options) => bridge.flash(message, options?.type ?? "info", options?.timeout === undefined ? undefined : { timeout: options.timeout }),
       ask: (message) => bridge.confirm(message),
+      // The filter box gives back the option picked, found by the index it was given
+      ...(bridge.filterBox
+        ? {
+            pick: async <T extends Choice>(label: string, choices: readonly T[]) => {
+              const options = choices.map((choice, index) => ({ name: choice.name, ...(choice.description ? { description: choice.description } : {}), index }));
+              const picked = (await bridge.filterBox!(label, options)) as { index?: unknown } | undefined;
+              return typeof picked?.index === "number" ? choices[picked.index] : undefined;
+            },
+          }
+        : {}),
     },
     settings: {
       get: (path, fallback) => bridge.getConfig(path, fallback),

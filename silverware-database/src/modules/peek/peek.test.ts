@@ -22,7 +22,7 @@ const TASKS: Database = {
   ],
 };
 
-async function setup(answer = true, withProperties = false, configured: Record<string, unknown> = {}) {
+async function setup(answer = true, withProperties = false, configured: Record<string, unknown> = {}, viewState: Record<string, unknown> = {}) {
   const saved: Record<string, unknown>[] = [];
   const store = new MemoryStore([{ database: TASKS, items: [{ name: "Fix login", values: { status: "Todo", estimate: 3 }, rank: "a0", body: "Steps" }, { name: "Write docs", values: {}, rank: "a1" }] }]);
   const types = new TypeRegistry();
@@ -73,7 +73,8 @@ async function setup(answer = true, withProperties = false, configured: Record<s
   await modules.start();
   const element = document.createElement("div");
   document.body.append(element);
-  const place = new DatabasePlace({ element, database: "tasks", state: new MemoryViewState({ [VIEW_KEY]: "list" }), store, core, types, views: new ViewRegistry(BUILT_IN_VIEWS), settings: { get: (_path, fallback) => fallback }, ui, openItem: (item, database) => modules.openItem(item, database) });
+  const state = new MemoryViewState({ [VIEW_KEY]: "list", ...viewState });
+  const place = new DatabasePlace({ element, database: "tasks", state, store, core, types, views: new ViewRegistry(BUILT_IN_VIEWS), settings: { get: (_path, fallback) => fallback }, ui, openItem: (item, database, from) => modules.openItem(item, database, from) });
   await place.render();
   const named = async (name: string) => (await store.items("tasks")).value.find((one) => one.name === name)!;
   const q = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
@@ -82,7 +83,7 @@ async function setup(answer = true, withProperties = false, configured: Record<s
     [...element.querySelectorAll<HTMLButtonElement>(".swd-list-name")].find((one) => one.title === `Open ${name}`)!.click();
     await settle();
   };
-  return { store, core, modules, place, named, q, peek, told, opened, pageOpened, saved, asked: () => asked, failItems: () => void (failItems = true) };
+  return { store, core, modules, place, state, named, q, peek, told, opened, pageOpened, saved, asked: () => asked, failItems: () => void (failItems = true) };
 }
 
 /** A press on an element: its pointer down and up, its click (a press beside the panel closes it once it is over) */
@@ -134,6 +135,33 @@ afterEach(() => {
 });
 
 describe("the peek", () => {
+  it("marks the properties the view it was opened from hides, in their places, and follows the view as it changes", async () => {
+    const { q, peek, place, state } = await setup(true, false, {}, { "list.hiddenProperties": ["estimate"] });
+    await peek("Fix login");
+    const rows = () => [...document.querySelectorAll<HTMLElement>(".swd-peek-row")].map((row) => [row.dataset.property, row.classList.contains("swd-peek-hidden")]);
+    // (Every property, in the schema's order: the hidden one marked only)
+    expect(rows()).toEqual([
+      ["status", false],
+      ["estimate", true],
+      ["done", false],
+    ]);
+    expect(q('.swd-peek-row[data-property="estimate"] .swd-peek-hidden-mark').getAttribute("title")).toBe("Hidden in List");
+    expect(q('.swd-peek-row[data-property="estimate"] .swd-peek-label').getAttribute("aria-label")).toBe("Estimate, hidden in List");
+    expect(document.querySelector('.swd-peek-row[data-property="status"] .swd-peek-hidden-mark')).toBeNull();
+    // Visible properties changed in the view: marked anew, the panel open
+    await state.set({ "list.hiddenProperties": ["status", "done"] });
+    await place.refresh();
+    expect(rows()).toEqual([
+      ["status", true],
+      ["estimate", false],
+      ["done", true],
+    ]);
+    // The place gone (its block drawn anew after a write, the next place to take it over): marked as it last was
+    place.destroy();
+    await settle();
+    expect(rows().filter(([, hidden]) => hidden).map(([key]) => key)).toEqual(["status", "done"]);
+  });
+
   it("shows an item opened from a view, its values and its body, and opens its page by Open", async () => {
     const { q, peek, opened } = await setup();
     await peek("Fix login");

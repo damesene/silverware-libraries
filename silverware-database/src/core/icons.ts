@@ -20,5 +20,5 @@ export const ICONS = {
   up: svg('<path d="M8 13V3M4 7l4-4 4 4"/>'),
   down: svg('<path d="M8 3v10M4 9l4 4 4-4"/>'),
   shown: svg('<path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/>'),
-  hidden: svg('<path d="M1.5 8s2.5-4.5 6.5-4.5c1.2 0 2.3.4 3.2 1M14.5 8s-2.5 4.5-6.5 4.5c-1.2 0-2.3-.4-3.2-1M2.5 13.5l11-11"/>'),
+  hidden: VIEW_ICONS.hidden,
 } as const;

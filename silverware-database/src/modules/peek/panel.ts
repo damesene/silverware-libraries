@@ -15,7 +15,7 @@
 // being edited.
 import { el, openedHere } from "../../../../shared/elements.ts";
 import type { Result } from "../../core/core.ts";
-import type { ModuleHost } from "../../core/module.ts";
+import type { ModuleHost, OpenedFrom } from "../../core/module.ts";
 import { samePart } from "../../domain/itempart.ts";
 import { textOf, typeOf } from "../../domain/listing.ts";
 import type { Database, Item, ItemLook, Property, Value } from "../../model/database.ts";
@@ -65,6 +65,9 @@ type Shown = {
   kept?: { readonly text: string; readonly why: string };
   // Where the focus was as the panel opened: given back as it closes
   readonly opener: Element | null;
+  // The view it was opened from, followed live: the properties it hides marked (none: nothing marked); as drawn, `hiddenAt`
+  readonly from?: OpenedFrom;
+  hiddenAt?: string;
   // The body's field and its note: made once for the item shown and left in place as the rest is drawn anew, so a value written
   // shows at once while the body is typed in (drawn anew under it, the field lost its focus and what was typed)
   field?: { readonly body: HTMLTextAreaElement; readonly note: HTMLElement };
@@ -118,13 +121,16 @@ export class PeekPanel {
   }
 
   /** An item shown; another shown before is left first (its field written), unless its body typed could not be written: then it stays */
-  async show(item: Item, database: string): Promise<void> {
+  async show(item: Item, database: string, from?: OpenedFrom): Promise<void> {
     this.asked++;
     const opener = this.shown?.opener ?? this.host.document.activeElement;
     if (!(await this.leave())) return;
     const read = await this.host.database(database);
     if (!read) return;
-    this.shown = { database, schema: read.value, item, latest: item, body: undefined, stale: false, opener };
+    this.shown = { database, schema: read.value, item, latest: item, body: undefined, stale: false, opener, ...(from ? { from } : {}) };
+    // (The view it was opened from followed: what it hides marked anew as it changes)
+    this.stopFrom?.();
+    this.stopFrom = from?.onChange(() => this.followFrom());
     if (!this.element) this.open();
     this.draw();
     void this.readBody();
@@ -150,6 +156,17 @@ export class PeekPanel {
     const kept = shown?.kept ? { ...shown.kept, text: inField ?? shown.kept.text } : typed === undefined ? undefined : { text: typed, why: "the module stopped before it was written" };
     if (shown && kept) this.host.ui.notify(`Silverware Database: the content typed for "${shown.item.name}" was not written (${kept.why}). It was:\n${kept.text}`, { type: "error" });
     this.remove();
+  }
+
+  // The view the item shown was opened from, listened to
+  private stopFrom: (() => void) | undefined;
+
+  /** The view the item was opened from changed (another shown, Visible properties): drawn anew where what it hides did, once nothing is edited */
+  private followFrom(): void {
+    const shown = this.shown;
+    if (!shown || hiddenKey(shown) === shown.hiddenAt) return;
+    if (this.drawingPutOff()) shown.stale = true;
+    else this.draw();
   }
 
   /** The database changed (here or elsewhere): the item and the schema read anew, drawn anew where nothing is edited now, else once it is not */
@@ -200,6 +217,8 @@ export class PeekPanel {
   private remove(): void {
     if (!this.element) return;
     for (const stop of this.stops.splice(0)) stop();
+    this.stopFrom?.();
+    this.stopFrom = undefined;
     this.look?.close();
     this.look = undefined;
     const opener = this.shown?.opener;
@@ -495,7 +514,11 @@ export class PeekPanel {
     // The properties, every one whatever a view hides (an item's every value is shown and edited in its peek), dragged to
     // their order by their grips
     const list = el(doc, "div", "swd-peek-properties");
-    list.append(...shown.schema.properties.map((property) => this.row(shown, property, editor, list)));
+    // (Those the view it was opened from hides marked, in their places: the list and its order the same whatever a view hides)
+    const view = shown.from?.current();
+    shown.hiddenAt = hiddenKey(shown);
+    const hidden = new Set(view?.hidden ?? []);
+    list.append(...shown.schema.properties.map((property) => this.row(shown, property, editor, list, hidden.has(property.key) ? view!.label : undefined)));
     const properties = this.host.offered<PropertiesOffer>("properties");
     // The properties in a box of their own, scrolled past a height (the style page's), so the content under them stays in
     // view however many a database has
@@ -573,7 +596,7 @@ export class PeekPanel {
   }
 
   /** A property's row: its label, its value as it shows, edited in place as the views edit it */
-  private row(shown: Shown, property: Property, editor: EditorHost, list: HTMLElement): HTMLElement {
+  private row(shown: Shown, property: Property, editor: EditorHost, list: HTMLElement, hiddenIn?: string): HTMLElement {
     const doc = this.host.document;
     const value = el(doc, "div", { class: "swd-peek-value", attrs: { "data-key": property.key, "aria-label": property.label } });
     const show = () => {
@@ -604,7 +627,10 @@ export class PeekPanel {
     } else value.classList.add("swd-peek-readonly");
     // Its name: opens it in Properties (its name, type, options, required, hidden, removed) where that module is on
     const properties = this.host.offered<PropertiesOffer>("properties");
-    const labelParts = [propertyIcon(doc, property, editor.type(property), "swd-peek-type"), el(doc, "span", { text: property.label }), ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", attrs: { "aria-hidden": "true" } })] : [])];
+    // (Hidden in the view it was opened from: an eye struck through after its name, its title saying which view)
+    const hiddenMark = hiddenIn === undefined ? [] : [el(doc, "span", { class: "swd-peek-hidden-mark", html: VIEW_ICONS.hidden, title: `Hidden in ${hiddenIn}`, attrs: { "aria-hidden": "true" } })];
+    const labelParts = [propertyIcon(doc, property, editor.type(property), "swd-peek-type"), el(doc, "span", { class: "swd-peek-label-name", text: property.label }), ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", attrs: { "aria-hidden": "true" } })] : []), ...hiddenMark];
+    const hiddenSaid = hiddenIn === undefined ? "" : `, hidden in ${hiddenIn}`;
     const label = properties
       ? el(
           doc,
@@ -612,16 +638,16 @@ export class PeekPanel {
           {
             class: "swd-peek-label",
             title: `Edit ${property.label} (name, type, options…)`,
-            attrs: { "aria-label": `Edit the property ${property.label}` },
+            attrs: { "aria-label": `Edit the property ${property.label}${hiddenSaid}` },
             run: () => void properties.open(shown.database, { property: property.key }).then(() => this.refocus(`.swd-peek-row[data-property="${CSS.escape(property.key)}"] .swd-peek-label`)),
           },
           ...labelParts,
         )
-      : el(doc, "span", "swd-peek-label", ...labelParts);
+      : el(doc, "span", { class: "swd-peek-label", ...(hiddenIn === undefined ? {} : { attrs: { "aria-label": `${property.label}${hiddenSaid}` } }) }, ...labelParts);
     if (label instanceof HTMLButtonElement) keepFocus(label);
     const grip = el(doc, "button", { class: "swd-peek-grip", html: GRIP, title: "Drag to move (Alt+↑ ↓)", attrs: { "aria-label": `Move ${property.label} (Alt+Up, Alt+Down)` } });
-    const row = el(doc, "div", { class: "swd-peek-row", attrs: { "data-property": property.key } }, grip, label, value);
-    // Its place: among its list's (the shown ones, or the hidden ones), written as the schema's order at once
+    const row = el(doc, "div", { class: `swd-peek-row${hiddenIn === undefined ? "" : " swd-peek-hidden"}`, attrs: { "data-property": property.key } }, grip, label, value);
+    // Its place among the properties (those a view hides too), written as the schema's order at once
     const keysOf = () => [...list.querySelectorAll<HTMLElement>(":scope > .swd-peek-row")].map((one) => one.dataset.property);
     // (`keys`: the list's order before the move: a drag moves the row in the list as it goes)
     const moveTo = (index: number, keys = keysOf()) => {
@@ -811,4 +837,10 @@ export class PeekPanel {
     keepFocus(reload);
     note.replaceChildren(el(doc, "p", { attrs: { role: "alert" }, text: `Not written: ${kept.why}. Your text is still here: copy it, or load the content as it is now.` }), reload);
   }
+}
+
+/** What the view an item was opened from hides, as it was drawn with (none: no view, or none now) */
+function hiddenKey(shown: Shown): string {
+  const view = shown.from?.current();
+  return view ? JSON.stringify([view.label, view.hidden]) : "";
 }

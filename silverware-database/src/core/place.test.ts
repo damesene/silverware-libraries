@@ -5,7 +5,8 @@ import type { Database } from "../model/database.ts";
 import { MemoryStore } from "../store/memory.ts";
 import { MemoryViewState } from "../store/viewstate.ts";
 import { DatabaseCore } from "./core.ts";
-import { DatabasePlace, FILTER_TYPED_MS, VIEW_KEY, viewSettingPath } from "./place.ts";
+import type { OpenedFrom } from "./module.ts";
+import { DatabasePlace, FILTER_TYPED_MS, type PlaceKept, VIEW_KEY, viewSettingPath } from "./place.ts";
 import type { ViewDefinition, ViewHost } from "./view.ts";
 import { ViewRegistry } from "./views.ts";
 
@@ -424,6 +425,43 @@ describe("a place", () => {
     expect(element.querySelector(".swd-place-name")!.textContent).toBe("Jobs");
     expect(element.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(true);
     element.remove();
+  });
+
+  it("tells an item opened where it was opened from, live: the view shown and what it hides, followed by the place drawn after it for its block", async () => {
+    const [table, board] = [listView("table"), listView("board")];
+    const store = new MemoryStore([{ database: TASKS, items: [{ name: "Fix login", values: { status: "Todo" }, rank: "a0" }] }]);
+    const core = new DatabaseCore(store, new TypeRegistry(), { notify: () => {}, ask: () => true });
+    const viewState = new MemoryViewState({ [VIEW_KEY]: "table", "table.hiddenProperties": ["status"] });
+    let from: OpenedFrom | undefined;
+    let told = 0;
+    const made = (takeOver?: () => PlaceKept | undefined) => {
+      const box = document.createElement("div");
+      document.body.append(box);
+      return new DatabasePlace({ element: box, database: "tasks", state: viewState, store, core, types: new TypeRegistry(), views: new ViewRegistry([table.view, board.view]), settings: { get: (_path, fallback) => fallback }, ui: { notify: () => {} }, openItem: (_item, _database, opened) => ((from = opened), true), ...(takeOver ? { takeOver } : {}) });
+    };
+    const first = made();
+    await first.render();
+    await table.seen.host!.open((await store.items("tasks")).value[0]!);
+    expect(from!.current()).toEqual({ label: "TABLE", hidden: ["status"] });
+    from!.onChange(() => void told++);
+    // Another view shown, what it hides changed: told
+    await viewState.set({ [VIEW_KEY]: "board" });
+    await first.render();
+    expect([from!.current(), told > 0]).toEqual([{ label: "BOARD", hidden: [] }, true]);
+    await board.seen.host!.look.setHiddenProperties(["status"]);
+    expect(from!.current()).toEqual({ label: "BOARD", hidden: ["status"] });
+    // The block drawn anew after a write of it: the new place follows it on, the one before gone
+    const second = made(() => first.handOver());
+    await second.render();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    first.destroy();
+    await viewState.set({ "board.hiddenProperties": undefined });
+    await second.refresh();
+    expect(from!.current()).toEqual({ label: "BOARD", hidden: [] });
+    // The block gone: the view as it last was, nothing told (a place drawn after it takes it over a moment later)
+    const before = told;
+    second.destroy();
+    expect([from!.current(), told]).toEqual([{ label: "BOARD", hidden: [] }, before]);
   });
 
   it("hands what it has open to the place drawn after it for its block: Group with the focus where it was, a filter as typed; no other place takes it", async () => {

@@ -19,7 +19,8 @@ import { focusPropertyList, propertiesEntry, type PropertiesFocus } from "./prop
 import { drawGrouped } from "./groups.ts";
 import { ICONS } from "./icons.ts";
 import { type ColorBy, colorable, itemIcon, itemLook } from "./look.ts";
-import type { PlaceContext, PlaceTool } from "./module.ts";
+import type { OpenedFrom, OpenedView, PlaceContext, PlaceTool } from "./module.ts";
+import { PlaceOpener } from "./opener.ts";
 import type { MenuEntry, MenuNaming } from "../../../shared/menu.ts";
 import { checkedGroups, type PlaceMenu, type PlaceMenuBuilder, type PlaceMenuGroup, placeMenu, toolMenu } from "./placemenu.ts";
 import type { DatabaseStore, ViewStateStore } from "./store.ts";
@@ -52,8 +53,8 @@ export type PlaceOptions = {
   readonly editSource?: () => void;
   /** The database deleted, asked first (Delete database… in ⋯, last), where the host offers it */
   readonly deleteDatabase?: (id: string, name: string) => void;
-  /** An item opened by a module's own way (the peek, core/module.ts): whether one took it; else it opens where the store says */
-  readonly openItem?: (item: Item, database: string) => boolean;
+  /** An item opened by a module's own way (the peek, core/module.ts): whether one took it; else it opens where the store says. `from`: the view it was opened from, followed live */
+  readonly openItem?: (item: Item, database: string, from?: OpenedFrom) => boolean;
   /**
    * What the place drawn before for the same block hands over (`handOver`: the
    * binding knows which place wrote the text this one is drawn for), asked once,
@@ -120,6 +121,8 @@ export type PlaceKept = {
   readonly typing?: { readonly key: string; readonly value: string; readonly start: number; readonly end: number };
   readonly group?: GroupFocus;
   readonly properties?: PropertiesFocus;
+  // Where items were opened from: the place drawn after it follows it on (an item's peek marking what the view hides)
+  readonly opener?: PlaceOpener;
 };
 
 /** Color by in ⋯: the properties of options a view may color its items by, None, the one picked checked */
@@ -161,6 +164,8 @@ export class DatabasePlace {
   private handedOver = false;
   // Whether it asked the place before it for what that had open (once)
   private tookOver = false;
+  // Where its items were opened from (made as the first is), told as the place is drawn or its view's state changes
+  private opener: PlaceOpener | undefined;
 
   /** The id of the database the place shows */
   get database(): string {
@@ -219,11 +224,18 @@ export class DatabasePlace {
     const kept = this.drawn?.keptTools?.();
     this.handedOver = true;
     this.drawn?.stopTools?.();
-    return this.overWindow ? { filterOpen: false, ...kept, overWindow: true } : kept;
+    const opener = this.opener;
+    this.opener = undefined;
+    if (!kept && !opener && !this.overWindow) return undefined;
+    return { filterOpen: false, ...kept, ...(this.overWindow ? { overWindow: true } : {}), ...(opener ? { opener } : {}) };
   }
 
   /** The place gone: its view told, nothing listened to any more, nothing drawn after */
   destroy(): void {
+    // (Its opener keeps the view as it last was, told nothing: SilverBullet lets the place go before the one drawn after it
+    // for its block takes the opener over, and an item's peek marked nothing for that moment, then marked it all again)
+    const last = this.openedView();
+    this.opener?.follow(() => last, { quiet: true });
     this.gone = true;
     this.stopListening();
     this.layOverWindow(false);
@@ -273,7 +285,7 @@ export class DatabasePlace {
   }
 
   private queue(work: () => Promise<void>): Promise<void> {
-    this.drawing = this.drawing.then(() => (this.gone ? undefined : work())).catch((error: unknown) => this.note(`The database could not be shown: ${message(error)}`));
+    this.drawing = this.drawing.then(() => (this.gone ? undefined : work().then(() => this.opener?.changed()))).catch((error: unknown) => this.note(`The database could not be shown: ${message(error)}`));
     return this.drawing;
   }
 
@@ -329,6 +341,10 @@ export class DatabasePlace {
         if (drawn !== this.drawn || this.gone) return;
         const kept = this.options.takeOver?.();
         if (kept) tools.restore(kept);
+        if (kept?.opener) {
+          this.opener = kept.opener;
+          kept.opener.follow(() => this.openedView());
+        }
         if (kept?.overWindow) void this.setOverWindow(true);
       });
     }
@@ -340,6 +356,18 @@ export class DatabasePlace {
       this.note(`The view "${view.label}" failed: ${message(error)}`);
     }
     this.putScroll();
+  }
+
+  /** Where its items are opened from: one for the place, made as the first is */
+  private openerOf(): PlaceOpener {
+    return (this.opener ??= new PlaceOpener(() => this.openedView()));
+  }
+
+  /** The view shown, as an item opened from it sees it (its label, the properties it hides); none where none is drawn */
+  private openedView(): OpenedView | undefined {
+    const drawn = this.drawn;
+    if (this.gone || !drawn?.host || drawn.ended) return undefined;
+    return { label: drawn.view.label, hidden: drawn.host.look.hiddenProperties };
   }
 
   /** The key a view's scroll is kept by */
@@ -967,7 +995,7 @@ export class DatabasePlace {
       move: (item, where) => refreshed(core.move(id, item, where)),
       undo: (progress) => refreshed(core.undo(id, progress)),
       open: async (item) => {
-        if (this.options.openItem?.(item, id)) return;
+        if (this.options.openItem?.(item, id, place.openerOf())) return;
         const document = store.documentOf(item.key);
         if (!document || !editor?.open) return;
         try {

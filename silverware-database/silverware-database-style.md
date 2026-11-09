@@ -3894,6 +3894,29 @@ button.swd-peek-label:hover {
 .swd-peek-type {
   display: inline-flex;
 }
+/* Its name cut with an ellipsis, so the marks after it (*, hidden) stay in view */
+.swd-peek-label-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* A property the view the peek was opened from hides: its name fainter, an eye struck through after it (its title names
+   the view); the value as any other's, edited the same */
+.swd-peek-hidden .swd-peek-label {
+  opacity: 0.6;
+}
+.swd-peek-hidden button.swd-peek-label:hover,
+.swd-peek-hidden button.swd-peek-label:focus-visible {
+  opacity: 1;
+}
+.swd-peek-hidden-mark {
+  display: inline-flex;
+  flex: none;
+}
+.swd-peek-hidden-mark svg {
+  width: 13px;
+  height: 13px;
+}
 .swd-peek-type svg {
   width: 15px;
   height: 15px;

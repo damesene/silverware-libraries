@@ -20,6 +20,20 @@ import type { ItemLooks, ViewSetting } from "./view.ts";
 export type ModuleSetting = ViewSetting;
 
 /** A place a module adds to, asked each time the place is drawn (a module's open UI may follow the database by it): the database shown, the document */
+/** The view an item was opened from, as it is now: its label, the keys of the properties it hides */
+export type OpenedView = { readonly label: string; readonly hidden: readonly string[] };
+
+/**
+ * Where an item was opened from (a view of a block), followed live: the view
+ * shown there now (another picked, Visible properties changed, the block drawn
+ * anew after a write of it), as it last was once the block is gone
+ */
+export type OpenedFrom = {
+  current(): OpenedView | undefined;
+  /** Told as what `current` gives may have changed; what it gives back stops it */
+  onChange(listener: () => void): () => void;
+};
+
 export type PlaceContext = {
   readonly document: Document;
   readonly database: Database;
@@ -54,7 +68,7 @@ export type ModuleInstance = {
    * writes the item through its own host (`items`, `core`), as of the
    * database `database` (its id).
    */
-  openItem?(item: Item, database: string): boolean;
+  openItem?(item: Item, database: string, from?: OpenedFrom): boolean;
   /** The module turned off, or started again: what it listens to stops, what it shows closes */
   stop?(): void;
 };
@@ -195,10 +209,10 @@ export class Modules {
   }
 
   /** An item a view opens taken by the first module that shows it in its own way: whether one did */
-  openItem(item: Item, database: string): boolean {
+  openItem(item: Item, database: string, from?: OpenedFrom): boolean {
     for (const { definition, instance } of this.started) {
       try {
-        if (instance.openItem?.(item, database)) return true;
+        if (instance.openItem?.(item, database, from)) return true;
       } catch (error) {
         this.host.ui.notify(`Silverware Database: the module ${definition.label} failed to open "${item.name}" (${error instanceof Error ? error.message : String(error)})`, { type: "error" });
       }

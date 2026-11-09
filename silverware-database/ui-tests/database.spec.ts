@@ -1325,3 +1325,19 @@ test("a select's Multiple turned on in Properties writes it into the root page a
   await page.keyboard.press("Enter");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("status: [Todo, Done]");
 });
+
+test("the peek marks a property the view it was opened from hides, every property still listed and edited there", async ({ page, space }) => {
+  await space.open({ Page: '# Page\n\n```silverware-database\nid: tasks\nview: table\ntable.hiddenProperties: ["status"]\n```\n', ...TASKS }, "Page");
+  await expect(page.locator(".swd-table th", { hasText: "Status" })).toHaveCount(0);
+  const row = page.locator(".swd-table tbody tr").first();
+  await row.locator(".swd-table-name").hover();
+  await row.locator(".swd-open").click();
+  const status = page.locator('.swd-peek .swd-peek-row[data-property="status"]');
+  await expect(status).toHaveClass(/swd-peek-hidden/);
+  await expect(status.locator(".swd-peek-hidden-mark")).toHaveAttribute("title", "Hidden in Table");
+  // Edited as any other, the mark kept as the panel is drawn anew
+  await status.locator(".swd-peek-value").click();
+  await status.locator("select").selectOption("Done");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("status: Done");
+  await expect(status).toHaveClass(/swd-peek-hidden/);
+});

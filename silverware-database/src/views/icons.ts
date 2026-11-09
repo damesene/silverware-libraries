@@ -45,6 +45,8 @@ export const VIEW_ICONS = {
   item: svg('<path d="M4 1.75h5.25L12.5 5v9.25H4z"/><path d="M9.25 1.75V5h3.25M6.25 8.5h4M6.25 11h2.75"/>'),
   back: svg('<path d="M10 3 5 8l5 5"/>'),
   close: svg('<path d="M4 4l8 8M12 4l-8 8"/>'),
+  // A property a view hides (an eye struck through): Visible properties' eye, the peek's mark of it
+  hidden: svg('<path d="M1.5 8s2.5-4.5 6.5-4.5c1.2 0 2.3.4 3.2 1M14.5 8s-2.5 4.5-6.5 4.5c-1.2 0-2.3-.4-3.2-1M2.5 13.5l11-11"/>'),
   chevron: svg('<path d="m6 4 4 4-4 4"/>'),
   edit: svg('<path d="M10.5 3.5 12.5 5.5 6 12H4v-2z"/>'),
   remove: svg('<path d="M2.5 4.5h11M6.5 4.5V3a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1.5M4 4.5l.75 8.25a1 1 0 0 0 1 .75h4.5a1 1 0 0 0 1-.75L12 4.5M6.75 7v4M9.25 7v4"/>'),

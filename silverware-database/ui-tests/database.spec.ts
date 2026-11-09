@@ -526,7 +526,11 @@ test("a block in a list item is not written, said why, the page as it was", asyn
   expect(await space.saved("Page")).toBe(listed);
 });
 
-test("of two blocks written alike, the one a view is picked in is written", async ({ page, space }) => {
+// SilverBullet 2.12.1 renders blocks written alike on a page as one element: its widget cache shares a widget's result by
+// its language, page and text (client/codemirror/fenced_code.ts cacheKey, client/widget_cache.ts prewarmResult, since
+// its commit 1dd7556f of 2026-10-10), so only one of them is in the page. Which block a pick is written into is covered
+// by index.test.ts; this waits for a SilverBullet that renders each block apart, or for places drawn from HTML text
+test.fixme("of two blocks written alike, the one a view is picked in is written", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${BLOCK}\ntext between\n\n${BLOCK}`, ...TASKS }, "Page");
   await expect(page.locator(".swd-place")).toHaveCount(2);
   await pickView(page, "Count", page.locator(".swd-place").nth(1));

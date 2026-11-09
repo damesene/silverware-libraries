@@ -252,6 +252,8 @@ export class PeekPanel {
     const place = () => this.place();
     view?.addEventListener("resize", place);
     this.stops.push(() => view?.removeEventListener("resize", place));
+    const watching = this.host.onEditorAreaChanged?.(place);
+    if (watching) this.stops.push(watching);
     // The page's text's look (the panel hangs in the document's body, where none of the editor's rules reach)
     for (const [name, value] of Object.entries(this.host.editorLook?.() ?? {})) element.style.setProperty(name, value);
     this.handle = this.resizer();

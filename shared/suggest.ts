@@ -41,8 +41,18 @@ export function suggestionList(doc: Document, input: HTMLInputElement, options: 
           class: `${base}-suggest-item`,
           text: options.label ? options.label(name) : name,
           attrs: { role: "option", "aria-selected": String(i === at), [`data-${base}-name`]: name },
-          // A press keeps the field's focus (a click then takes the name)
-          on: { mousedown: (e) => e.preventDefault(), click: () => pick(i) },
+          // A press keeps the field's focus (a click then takes the name); it is the list's, going no further: what holds the
+          // field would take it as its own (a table's cell, its editor closed by the name taken, opened anew by the click)
+          on: {
+            mousedown: (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            },
+            click: (e) => {
+              e.stopPropagation();
+              pick(i);
+            },
+          },
         }),
       ),
     );

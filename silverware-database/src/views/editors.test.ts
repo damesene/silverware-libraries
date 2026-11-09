@@ -375,6 +375,13 @@ describe("the built-in views' editors", () => {
     key(input, "Enter");
     await Promise.resolve();
     expect(writes).toEqual([["update", "Fix login", "owner", "bob"]]);
+    // A name clicked: written once, the press not reaching the cell (a view's cell opens its editor anew on a click)
+    let clicked = 0;
+    cell.addEventListener("click", () => void clicked++);
+    edit("owner", { ...ITEM, values: { owner: "ada" } });
+    cell.querySelectorAll<HTMLElement>(".swd-suggest-item")[1]!.click();
+    await Promise.resolve();
+    expect([writes.length, writes.at(-1), clicked]).toEqual([2, ["update", "Fix login", "owner", "bob"], 0]);
     // A name none of them typed, Enter: written as typed, its @ read off
     edit("owner", { ...ITEM, values: { owner: "ada" } });
     const again = cell.querySelector<HTMLInputElement>("input.swd-editor-typed")!;

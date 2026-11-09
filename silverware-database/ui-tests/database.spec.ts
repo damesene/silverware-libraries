@@ -1369,6 +1369,12 @@ test("a person shows as a mention, kept by the name alone, picked from its peopl
   await field.fill("zoe");
   await field.press("Enter");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("owner: zoe\n");
+  // A name clicked in the list: written, the editor closed, not opened anew by the click
+  await cell(1).click();
+  await cell(1).locator(".swd-suggest-item", { hasText: "ada" }).click();
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("owner: ada\n");
+  await expect(cell(1).locator(".swd-editor")).toHaveCount(0);
+  await expect(cell(1).locator(".swd-pill")).toHaveText("@ada");
 });
 
 test("a person pressed opens SilverBullet's Mention Inbox on that name, editing nothing; a multiple person's boxes laid over the page", async ({ page, space }) => {

@@ -66,12 +66,14 @@ describe("a list of names offered under a field", () => {
     expect(shown().length).toBe(3);
   });
 
-  it("takes a name clicked, the field keeping its focus as it is pressed", () => {
+  it("takes a name clicked, the field keeping its focus as it is pressed, the press going no further", () => {
     const { input, list, taken } = setup(true);
+    const around: string[] = [];
+    for (const type of ["mousedown", "click"]) document.body.addEventListener(type, () => void around.push(type));
     input.focus();
     const item = list.querySelectorAll("li")[1]!;
     expect(item.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }))).toBe(false);
     item.click();
-    expect([taken, list.hidden]).toEqual([["bob"], true]);
+    expect([taken, list.hidden, around]).toEqual([["bob"], true, []]);
   });
 });

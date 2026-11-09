@@ -33,6 +33,8 @@ const MIN_WIDTH = 320;
 const SHARE = 0.8;
 // How long after a press beside the panel its click is waited for (a press moved away, a drag, has none)
 const CLICK_WAIT_MS = 400;
+// How far a press beside the panel moves before it is a drag (a card or a row dragged to its place), which leaves it open
+const DRAG_MOVE = 6;
 // An editor's area narrower than this (a phone, a narrow window): the panel takes all of it, as a page of its own
 const NARROW = 720;
 // What a press there is not beside the panel: a dialog over the page (a question asked), a notification
@@ -239,7 +241,8 @@ export class PeekPanel {
     );
     // A press beside it closes it (what is typed written first); not one in a question asked meanwhile, nor in a dialog or a
     // notification. Once the press is over, and only where it showed no other item: a press on another item's name shows
-    // that one in the panel as it is, never closed and opened anew (the panel blinked)
+    // that one in the panel as it is, never closed and opened anew (the panel blinked); nor a drag (a card or a row dragged
+    // to its place, its item's rank written: the panel stays as it is)
     const beside = (event: PointerEvent) => {
       const target = event.target;
       if (!this.element || this.asking || !(target instanceof Element) || this.element.contains(target) || target.closest(NOT_BESIDE)) return;
@@ -248,6 +251,7 @@ export class PeekPanel {
       if (active instanceof HTMLElement && this.element.contains(active)) active.blur();
       this.pressBeside?.();
       const asked = this.asked;
+      const from = { x: event.clientX, y: event.clientY };
       let late: ReturnType<typeof setTimeout> | undefined;
       let after: ReturnType<typeof setTimeout> | undefined;
       const listened = ["pointerup", "pointercancel", "click"] as const;
@@ -267,7 +271,9 @@ export class PeekPanel {
       };
       const step = (done: Event) => {
         if (done.type === "click") return settle();
-        // (No click comes of a press moved away, a drag: closed all the same)
+        // A drag: let go away from where it was pressed, left open
+        if (done instanceof MouseEvent && done.type === "pointerup" && Math.hypot(done.clientX - from.x, done.clientY - from.y) > DRAG_MOVE) return end();
+        // (No click comes of a press moved away a little: closed all the same)
         late ??= setTimeout(settle, CLICK_WAIT_MS);
       };
       for (const type of listened) doc.addEventListener(type, step, true);

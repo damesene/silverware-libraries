@@ -682,6 +682,21 @@ describe("the peek", () => {
     expect(document.querySelector(".swd-peek")).toBeNull();
   });
 
+  it("stays open as a card or a row beside it is dragged (pressed and let go elsewhere), a press without moving closing it", async () => {
+    const { peek } = await setup();
+    await peek("Fix login");
+    const at = (type: string, x: number) => document.body.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: 40, button: 0, bubbles: true }));
+    at("pointerdown", 20);
+    at("pointerup", 220);
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    expect(document.querySelector(".swd-peek")).not.toBeNull();
+    at("pointerdown", 20);
+    at("pointerup", 22);
+    at("click", 22);
+    await settle();
+    expect(document.querySelector(".swd-peek")).toBeNull();
+  });
+
   it("writes what is typed as a press beside it closes it, and Esc closes it", async () => {
     const { q, peek, named, store } = await setup();
     await peek("Fix login");

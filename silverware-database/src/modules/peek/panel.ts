@@ -16,6 +16,7 @@
 import { el } from "../../../../shared/elements.ts";
 import type { Result } from "../../core/core.ts";
 import type { ModuleHost } from "../../core/module.ts";
+import { type ItemPart, ItemWrites } from "../../domain/ownwrites.ts";
 import { textOf, typeOf } from "../../domain/listing.ts";
 import type { Database, Item, ItemLook, Property, Value } from "../../model/database.ts";
 import { type EditorHost, editValue, toggle } from "../../views/editors.ts";
@@ -39,19 +40,6 @@ const GRIP = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><c
 
 const isRefused = (result: Result): result is Extract<Result, { problem: string }> => "problem" in result;
 
-/** What one of the panel's own writes writes of its item: a value by its key, its name, its look */
-type Part = { readonly key: string } | "name" | "look";
-
-/** Whether two readings of an item are alike in all but `part` (its name, values, look and place in the order) */
-function sameBeside(one: Item, other: Item, part: Part): boolean {
-  const beside = (item: Item) => {
-    const values: Record<string, unknown> = { ...item.values };
-    if (typeof part === "object") delete values[part.key];
-    return JSON.stringify([part === "name" ? null : item.name, Object.entries(values).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)), part === "look" ? null : (item.look ?? null), item.rank ?? null]);
-  };
-  return beside(one) === beside(other);
-}
-
 type Shown = {
   readonly database: string;
   schema: Database;
@@ -59,10 +47,9 @@ type Shown = {
   item: Item;
   // The item as last read: what the body is written to (its own check is `was`)
   latest: Item;
-  // The item as the panel's own last write left it while its drawing was put off (a value picked as a rename was written:
-  // the panel still drawn with the name before): what the panel's next write goes on, as its own change is no reason to
-  // refuse it; let go as the panel is drawn anew
-  written?: Item;
+  // The panel's own writes of the item (a value, the name, the look), one after another, each on the item as those before
+  // it left it while the panel's drawing is put off (domain/ownwrites.ts)
+  readonly writes: ItemWrites;
   // The body as read as the panel opened or last wrote it, what a write is checked against; undefined until read
   body: { readonly was: string | undefined } | undefined;
   // A change made elsewhere while something in the panel was edited: drawn anew once nothing is
@@ -96,9 +83,6 @@ export class PeekPanel {
   private writing: Promise<void> = Promise.resolve();
   // Writes of a value or the name going on (their editors left): waited for with the body's before the item is removed
   private readonly edits = new Set<Promise<unknown>>();
-  // The panel's own writes of its item (a value, the name, the look), one after another: a value picked as the name is still
-  // being written would go on the item as named before, and be refused as changed since it was read
-  private queue: Promise<unknown> = Promise.resolve();
   // The item being removed (asked, written): a second press of the bin meanwhile asks nothing
   private removing = false;
   // A question asked of the user: presses meanwhile are theirs, not beside the panel
@@ -126,7 +110,8 @@ export class PeekPanel {
     if (!(await this.leave())) return;
     const read = await this.host.database(database);
     if (!read) return;
-    this.shown = { database, schema: read.value, item, latest: item, body: undefined, stale: false, opener };
+    const writes = new ItemWrites(async (key) => (await this.host.items(database)).find((one) => one.key === key));
+    this.shown = { database, schema: read.value, item, latest: item, writes, body: undefined, stale: false, opener };
     if (!this.element) this.open();
     this.draw();
     void this.readBody();
@@ -177,7 +162,6 @@ export class PeekPanel {
       return;
     }
     shown.item = now;
-    shown.written = undefined;
     shown.schema = read.value;
     this.draw();
     void this.readBody();
@@ -188,6 +172,8 @@ export class PeekPanel {
     const active = this.host.document.activeElement;
     if (this.element && active instanceof HTMLElement && this.element.contains(active)) active.blur();
     await this.writing;
+    // (A value or the name being written too: done, with its following, before another item is shown)
+    await Promise.all([...this.edits]).catch(() => undefined);
     const shown = this.shown;
     if (!shown?.kept) return true;
     // Not taken away: the field and its note shown, the user told (once for one press)
@@ -339,7 +325,7 @@ export class PeekPanel {
     if (active.closest(".swd-editor") || active.matches(".swd-peek-body")) return true;
     // (The name focused as the panel opens is not edited until it differs)
     const shown = this.shown;
-    return active instanceof HTMLInputElement && active.matches(".swd-peek-name") && !!shown && active.value !== (shown.written ?? shown.item).name;
+    return active instanceof HTMLInputElement && active.matches(".swd-peek-name") && !!shown && active.value !== shown.writes.base(shown.item).name;
   }
 
   /**
@@ -396,7 +382,7 @@ export class PeekPanel {
       text: (item, key) => textOf(item, key, shown.schema, types),
       // (On the item as the panel's own last write left it, where the editor's is the panel's)
       update: (item: Item, key: string, value: Value | undefined) => this.own(shown, { key }, (base) => core.update(shown.database, base.key === item.key ? base : item, key, value)),
-      rename: (item: Item, name: string) => this.own(shown, "name", () => core.rename(shown.database, item, name)),
+      rename: (item: Item, name: string) => this.own(shown, "name", (base) => core.rename(shown.database, base.key === item.key ? base : item, name)),
       notify: (text) => ui.notify(text, { type: "error" }),
       documents: () => this.host.documents(),
       validateDocumentName: (name) => this.host.validateDocumentName(name),
@@ -633,7 +619,7 @@ export class PeekPanel {
 
   private async rename(shown: Shown, field: HTMLInputElement): Promise<void> {
     const name = field.value.trim();
-    const was = (shown.written ?? shown.item).name;
+    const was = shown.writes.base(shown.item).name;
     if (!name || name === was) {
       field.value = was;
       return;
@@ -653,23 +639,17 @@ export class PeekPanel {
   }
 
   /**
-   * One of the panel's own writes of its item, after those before it (each with the places and the panel following it):
-   * `write` given the item as the panel's own last write left it, else as drawn, and checks of its own made there, once
-   * the writes before it are done. Kept while it goes on (the item's removal waits for it). Written while the panel's
-   * drawing is put off, the item as it is now is what the next write goes on, but only where nothing of it changed beside
-   * `part`, what this write wrote: a change made elsewhere meanwhile leaves the next write checked against the item as
-   * drawn, so it is refused, never written over
+   * One of the panel's own writes of its item (`part` what it writes), after those before it, `write` given the item it
+   * goes on (domain/ownwrites.ts) for checks of its own; the places and the panel follow it. Kept while it goes on (the
+   * item's removal waits for it)
    */
-  private own(shown: Shown, part: Part, write: (base: Item) => Promise<Result>): Promise<Result> {
-    const result = this.queue.then(async () => {
-      const base = shown.written ?? shown.item;
+  private own(shown: Shown, part: ItemPart, write: (base: Item) => Promise<Result>): Promise<Result> {
+    const result = shown.writes.write(shown.item, part, async (base) => {
       const done = await write(base);
       this.host.refreshPlaces(shown.database);
       await this.follow();
-      if (this.shown === shown && shown.item !== shown.latest) shown.written = !isRefused(done) && sameBeside(base, shown.latest, part) ? shown.latest : shown.written;
       return done;
     });
-    this.queue = result.catch(() => undefined);
     const going = result.finally(() => this.edits.delete(going));
     this.edits.add(going);
     return result;

@@ -197,6 +197,11 @@ export function pageWriter(platform: Pick<Platform, "editor" | "space">, options
   };
 
   const apply = async (toApply: PagePlan, applyOptions: { readonly progress?: Progress } = {}): Promise<ApplyReport> => {
+    // The space's list read once as the apply starts, not once per page made (an undo making 2,000 pages listed the space
+    // 2,000 times); a page made meanwhile by another is still never written over: asked as the apply starts; one this apply
+    // made counted in
+    const exists = names();
+    const made = new Set<string>();
     const outcomes = await inBatches(
       toApply.pages,
       async (one): Promise<PlannedPage | Skipped> => {
@@ -205,7 +210,9 @@ export function pageWriter(platform: Pick<Platform, "editor" | "space">, options
         try {
           if (own.before === undefined) {
             // Made only where its name is still free (asked now: a page made meanwhile is never written over)
-            if (await names()(one.page)) return { page: one.page, cause: "refused", reason: toApply.undoes ? "its name was taken since it was removed: left as it is" : "exists already: left alone" };
+            const name = one.page.toLowerCase();
+            if (made.has(name) || (await exists(one.page))) return { page: one.page, cause: "refused", reason: toApply.undoes ? "its name was taken since it was removed: left as it is" : "exists already: left alone" };
+            made.add(name);
             await space.write(one.page, own.after!);
             return one;
           }

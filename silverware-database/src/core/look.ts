@@ -9,10 +9,9 @@
 // (Color by in ⋯), the color of its value's option there.
 import { colorShown, isColor } from "../domain/colors.ts";
 import { validateIcon } from "../domain/look.ts";
-import { optionColor } from "../domain/types/options.ts";
 import type { PropertyType } from "../domain/types/type.ts";
 import type { Item, Property } from "../model/database.ts";
-import { readableColor } from "../views/values.ts";
+import { choiceColor, readableColor } from "../views/values.ts";
 
 /** What a view colors its items by: a property whose values are options, each with its color (Color by in ⋯) */
 export type ColorBy = { readonly property: Property; readonly type: PropertyType };
@@ -40,7 +39,7 @@ export function itemColor(item: Item, by?: ColorBy): number | `#${string}` | und
   if (!by) return undefined;
   const value = item.values[by.property.key];
   const first = Array.isArray(value) ? value[0] : value;
-  return typeof first === "string" && first ? optionColor(by.property.params, first) : undefined;
+  return typeof first === "string" && first ? choiceColor(by.property, first, by.type) : undefined;
 }
 
 /** An item's color on the element that draws it; an item without one: what an element drawn before had of one taken off */

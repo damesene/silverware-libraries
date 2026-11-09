@@ -37,6 +37,8 @@ export interface PropertyType {
   readonly settings?: readonly TypeSwitch[];
   /** The icon the views draw for it, where not its name's (a select of several options its own) */
   readonly icon?: string;
+  /** How one of its options shows, where not as it is kept (a person's `@ada`): its pills, its editors' choices, its groups */
+  optionShown?(option: string): string;
   /** True where its values are lists (a multi-select's options, references): grouped by it, an item is in the group of each */
   readonly lists?: boolean;
   /**

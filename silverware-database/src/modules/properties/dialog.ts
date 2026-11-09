@@ -747,7 +747,7 @@ export class PropertiesDialog {
       const text = draft.text.trim();
       // Its color: picked under its row (an option of a name only: one emptied has none to show)
       const color = text
-        ? el(doc, "button", { class: "swd-option-color", title: `The color of ${text}`, attrs: { "aria-expanded": "false", "aria-label": `Color of ${text}`, "data-option": text } }, optionPill(doc, this.built(entry), text))
+        ? el(doc, "button", { class: "swd-option-color", title: `The color of ${text}`, attrs: { "aria-expanded": "false", "aria-label": `Color of ${text}`, "data-option": text } }, optionPill(doc, this.built(entry), text, typeOf(this.host.types, this.built(entry))))
         : el(doc, "span", { class: "swd-option-color swd-option-color-none", title: "Its color can be picked once it has a name" }, pill(doc, " ", undefined));
       const name = el(doc, "input", { class: "swd-option-name", attrs: { "aria-label": "Option", value: draft.text, placeholder: "Option" } });
       name.addEventListener("input", () => {
@@ -762,7 +762,7 @@ export class PropertiesDialog {
           color.dataset.option = draft.text.trim();
           color.title = `The color of ${draft.text.trim()}`;
           color.setAttribute("aria-label", `Color of ${draft.text.trim()}`);
-          color.replaceChildren(optionPill(doc, this.built(entry), draft.text.trim()));
+          color.replaceChildren(optionPill(doc, this.built(entry), draft.text.trim(), typeOf(this.host.types, this.built(entry))));
         }
       });
       const remove = el(doc, "button", {

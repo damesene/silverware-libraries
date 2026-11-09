@@ -127,9 +127,11 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
   if (type?.editor === "select" && property) {
     const select = el(doc, "select", "swd-editor");
     const options = optionsOf(property);
-    select.append(new Option("", ""), ...options.map((option) => new Option(option, option)));
+    // (Each option as it shows, kept as it is: a person's @ada is ada)
+    const shown = (option: string) => type.optionShown?.(option) ?? option;
+    select.append(new Option("", ""), ...options.map((option) => new Option(shown(option), option)));
     // A value kept that is none of the options (another kind of value too): shown as it is, so leaving it changes nothing
-    if (kept && !options.includes(kept)) select.append(new Option(kept, kept));
+    if (kept && !options.includes(kept)) select.append(new Option(typeof now === "string" ? shown(kept) : kept, kept));
     select.value = kept;
     const take = () => (select.value === kept ? end() : void save(written(select.value)));
     pickFrom(select, take, { onLeave: true });
@@ -156,7 +158,7 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
     const boxes = options.map((option) => {
       const box = el(doc, "input", { attrs: { type: "checkbox", value: option } });
       box.checked = was.includes(option);
-      panel.append(el(doc, "label", "swd-editor-choice", box, option));
+      panel.append(el(doc, "label", "swd-editor-choice", box, type.optionShown?.(option) ?? option));
       return box;
     });
     const commit = () => {

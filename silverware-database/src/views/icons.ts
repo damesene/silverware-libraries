@@ -18,7 +18,9 @@ const TYPE_ICONS: Readonly<Record<string, string>> = {
   progress: svg('<rect x="2" y="6" width="12" height="4" rx="2"/><path d="M4 8h4.5"/>'),
   select: svg('<circle cx="8" cy="8" r="5.5"/><path d="m5.75 7 2.25 2.25L10.25 7"/>'),
   "select-multiple": svg('<path d="M6 4.5h7.5M6 8h7.5M6 11.5h7.5"/><circle cx="3" cy="4.5" r=".8" fill="currentColor"/><circle cx="3" cy="8" r=".8" fill="currentColor"/><circle cx="3" cy="11.5" r=".8" fill="currentColor"/>'),
-  reference: svg('<path d="M4.5 2.5h5l3 3v8h-8z"/><path d="M9.5 2.5v3h3M6.5 9h3.5M8.5 7.5 10 9l-1.5 1.5"/>'),
+  person: svg('<circle cx="8" cy="5.5" r="2.75"/><path d="M2.75 13.5c.6-2.6 2.7-4.25 5.25-4.25s4.65 1.65 5.25 4.25"/>'),
+  "person-multiple": svg('<circle cx="6" cy="5.75" r="2.25"/><path d="M1.75 13c.5-2.2 2.2-3.5 4.25-3.5s3.75 1.3 4.25 3.5"/><path d="M10.25 3.75a2.25 2.25 0 0 1 0 4.25M11.75 9.75c1.3.45 2.2 1.6 2.5 3.25"/>'),
+    reference: svg('<path d="M4.5 2.5h5l3 3v8h-8z"/><path d="M9.5 2.5v3h3M6.5 9h3.5M8.5 7.5 10 9l-1.5 1.5"/>'),
   tags: svg('<path d="M2.5 8.25V3.5a1 1 0 0 1 1-1h4.75l5.25 5.25-5.75 5.75z"/><circle cx="5.5" cy="5.5" r=".9" fill="currentColor"/>'),
   url: svg('<path d="M6.75 9.25a2.75 2.75 0 0 0 3.9 0l2-2a2.75 2.75 0 0 0-3.9-3.9l-.75.75"/><path d="M9.25 6.75a2.75 2.75 0 0 0-3.9 0l-2 2a2.75 2.75 0 0 0 3.9 3.9l.75-.75"/>'),
 };

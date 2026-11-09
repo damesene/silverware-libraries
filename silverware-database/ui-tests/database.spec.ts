@@ -1341,3 +1341,25 @@ test("the peek marks a property the view it was opened from hides, every propert
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("status: Done");
   await expect(status).toHaveClass(/swd-peek-hidden/);
 });
+
+test("a person shows as a mention, kept by the name alone, picked from its people; with Anyone a name none of them shows as valid", async ({ page, space }) => {
+  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    owner: { type: person, label: Owner, options: [ada, bob] }\n---\n";
+  const owned = (owner: string, rank: string) => `---\ntags: [db]\nowner: ${owner}\n_database:\n  rank: ${rank}\n---\n`;
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", "Page/db-tasks": rootPage, "Page/db-tasks/Fix login": owned("ada", "a0"), "Page/db-tasks/Write docs": owned("eve", "a1") }, "Page");
+  const cell = (row: number) => page.locator(`.swd-table tbody tr:nth-child(${row}) td[data-key="owner"]`);
+  await expect(cell(1).locator(".swd-pill")).toHaveText("@ada");
+  await expect(cell(2).locator(".swd-pill")).toHaveClass(/swd-pill-none/);
+  await cell(1).click();
+  await expect(cell(1).locator("select option")).toHaveText(["", "@ada", "@bob"]);
+  await cell(1).locator("select").selectOption("bob");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("owner: bob\n");
+  // Anyone turned on in Properties: Eve valid, written into the root page
+  await page.locator(".swd-more").click();
+  await choose(page, "Properties");
+  await page.locator('[data-property="owner"] .swd-prop-head').click();
+  await page.locator('[data-property="owner"] .swd-property-setting[data-param="anyone"] input').click();
+  await page.locator(".swd-properties-save").click();
+  await expect.poll(() => space.saved("Page/db-tasks")).toContain("anyone: true");
+  await expect(cell(2).locator(".swd-pill")).toHaveText("@eve");
+  await expect(cell(2).locator(".swd-pill")).not.toHaveClass(/swd-pill-none/);
+});

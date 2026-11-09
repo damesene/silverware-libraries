@@ -53,7 +53,9 @@ export function groupItems(items: readonly Item[], property: Property, type: Pro
   const list = type.lists === true;
   // An item added in a group gets its value as the type keeps it: a multi-select's a list of it
   const valueOf = (one: string): Value => (list ? [one] : one);
-  for (const option of options) add(keyOf(option), () => ({ label: option, value: valueOf(option), known: true, sort: "" }), undefined);
+  // (An option as it shows: a person's @ada)
+  const shownOption = (option: string) => type.optionShown?.(option) ?? option;
+  for (const option of options) add(keyOf(option), () => ({ label: shownOption(option), value: valueOf(option), known: true, sort: "" }), undefined);
   // (Values of one group where the type says so: a date's day, whatever its time; else a group per value)
   const grouped = (part: Value): Value => (type.groupValue && type.validate(part, property.params) === undefined ? type.groupValue(part, property.params) : part);
   for (const item of items) {
@@ -67,8 +69,9 @@ export function groupItems(items: readonly Item[], property: Property, type: Pro
     const parts: readonly Value[] = [...new Map((Array.isArray(value) ? value : [value]).map((one) => grouped(one)).map((one) => [JSON.stringify(one), one])).values()];
     for (const part of parts) {
       const text = typeof part === "string" ? part : type.text(part, property.params);
-      const known = !options.length || options.includes(text);
-      const label = known ? type.text(part, property.params) : `${text} (none of its options)`;
+      // (None of the options but taken by the type, a person's with Anyone: a group of its own, as valid as an option's)
+      const known = !options.length || options.includes(text) || (typeof part === "string" && type.validate(valueOf(part), property.params) === undefined);
+      const label = typeof part === "string" && type.optionShown ? (known ? shownOption(part) : `${shownOption(part)} (none of its options)`) : known ? type.text(part, property.params) : `${text} (none of its options)`;
       const sort = type.sortKey ? type.sortKey(part, property.params) : type.text(part, property.params);
       // (Its value by the property's type, whatever the item holds: a multi-select's a list of it, any other's the value alone)
       add(keyOf(part), () => ({ label, value: list ? [String(part)] : part, known, sort }), item);

@@ -90,6 +90,8 @@ A **Reference** links an item to other pages of your space, one or several: pick
 
 A select's values show as colored pills. Each option has the color of its place among the options, unless you give it one: in **Properties**, press an option's pill and pick its color (**Auto** takes it back). **Custom…** picks a color of your own. Colors are kept with the property in the database's root page (`colors: { Done: green, Blocked: "#c0392b" }`: gray, blue, green, yellow, orange, red, purple or pink, or your own as `#rrggbb`; every color is mixed with your theme's; a color of your own too light or too dark to read is shown lighter or darker, its hue kept), and a change of them is written with the rest on Save and undone by Undo. An option renamed in **Options** keeps its color. A value that is none of the options shows with a dashed red edge.
 
+A **Person** is a select of people: its options are their names, picked and colored as a select's (**Multiple** too), each shown as SilverBullet writes a mention, `@ada`, and kept in the item's page by the name alone (`owner: ada`, `owner: [ada, bob]`; a name typed or pasted with its `@` is kept without it, and an option's name is written without it). With **Anyone** on (its switch beside Multiple) a name none of the options is valid too, shown in a color of its own; off, it is kept and shown as none of the options, as a select's.
+
 The table is a basic one: with [[Library/damesene/silverware-table|Silverware Table]], a table of its own over a database (formulas, column types, widths) is to come.
 
 ## Peek

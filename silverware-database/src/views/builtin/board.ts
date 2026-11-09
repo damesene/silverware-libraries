@@ -87,7 +87,7 @@ function title(host: ViewHost, by: Property, column: ItemGroup): HTMLElement {
   const doc = host.document;
   if (column.value === undefined) return el(doc, "span", { class: `swd-board-none${by.required ? " swd-board-missing" : ""}`, text: column.label, ...(by.required ? { title: `${by.label} is required: these items have none yet` } : {}) });
   const one = Array.isArray(column.value) ? column.value[0] : column.value;
-  if (host.type(by).look === "options" && typeof one === "string") return optionPill(doc, by, one);
+  if (host.type(by).look === "options" && typeof one === "string") return optionPill(doc, by, one, host.type(by));
   return el(doc, "span", { class: `swd-board-label${column.known ? "" : " swd-invalid"}`, text: column.label });
 }
 

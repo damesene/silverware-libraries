@@ -19,7 +19,7 @@ describe("property keys", () => {
 
 describe("the built-in types", () => {
   it("are in their order, a day, a time and both side by side; tags and progress, the system properties' own, offered for no property of the user's", () => {
-    expect(types.all().map((one) => one.name)).toEqual(["text", "number", "checkbox", "date", "time", "datetime", "select", "url", "reference", "tags", "progress"]);
+    expect(types.all().map((one) => one.name)).toEqual(["text", "number", "checkbox", "date", "time", "datetime", "select", "person", "url", "reference", "tags", "progress"]);
     expect(types.all().filter((one) => one.offered === false).map((one) => one.name)).toEqual(["tags", "progress"]);
     // (Tags: labels, no options to check them against; a list of texts)
     const tags = type("tags");
@@ -167,9 +167,29 @@ describe("the registry", () => {
     const mine: PropertyType = { name: "date", label: "My date", validate: () => undefined, text: String, parse: (text) => ({ value: text }) };
     const stars: PropertyType = { name: "stars", label: "Stars", validate: () => undefined, text: String, parse: (text) => ({ value: text }) };
     registry.define([stars, mine]);
-    expect(registry.all().map((one) => one.label)).toEqual(["Text", "Number", "Checkbox", "My date", "Time", "Date & time", "Select", "URL", "Reference", "Tags", "Progress", "Stars"]);
+    expect(registry.all().map((one) => one.label)).toEqual(["Text", "Number", "Checkbox", "My date", "Time", "Date & time", "Select", "Person", "URL", "Reference", "Tags", "Progress", "Stars"]);
     registry.define([]);
     expect(registry.named("date")!.label).toBe("Date");
     expect(registry.named("stars")).toBeUndefined();
+  });
+
+  it("make a person a select of names shown as mentions, kept by the name alone, Anyone taking a name none of its options", () => {
+    const one = types.of("person", { options: ["ada", "bob"] })!;
+    const many = types.of("person", { options: ["ada", "bob"], multiple: true })!;
+    expect([one.name, one.look, one.editor, many.editor, many.lists, one.icon, many.icon]).toEqual(["person", "options", "select", "multi-select", true, undefined, "person-multiple"]);
+    expect([one.text("ada", {}), many.text(["ada", "bob"], {}), one.optionShown!("ada")]).toEqual(["@ada", "@ada, @bob", "@ada"]);
+    // (Typed or pasted as shown: read as kept)
+    expect([one.parse("@ada", {}), many.parse("@ada, bob, @ada", {}), one.parse(" ", {})]).toEqual([{ value: "ada" }, { value: ["ada", "bob"] }, { value: null }]);
+    expect(one.validate("eve", { options: ["ada"] })).toBe('"eve" is none of its options');
+    expect(one.validate("eve", { options: ["ada"], anyone: true })).toBeUndefined();
+    expect(many.validate(["ada", "eve"], { options: ["ada"], multiple: true, anyone: true })).toBeUndefined();
+    expect(many.validate(["ada", "ada"], { options: ["ada"], multiple: true, anyone: true })).toBe("an option twice");
+    // Its settings: Multiple and Anyone; an option's name without @, anyone a logical value
+    expect(one.settings!.map((setting) => setting.param)).toEqual(["multiple", "anyone"]);
+    expect(one.validateParams!({ options: ["@ada"] })).toContain("without @");
+    expect(one.validateParams!({ options: ["ada"], anyone: "yes" })).toBe("its anyone is no logical value");
+    // (A select takes no Anyone: none of its settings)
+    expect(type("select").settings!.map((setting) => setting.param)).toEqual(["multiple"]);
+    expect(type("select").validate("x", { options: ["a"], anyone: true })).toBe('"x" is none of its options');
   });
 });

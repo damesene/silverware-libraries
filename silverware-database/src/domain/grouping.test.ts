@@ -9,6 +9,16 @@ const property = (type: string, params: Record<string, unknown> = {}): Property 
 const groups = (items: readonly Item[], one: Property) => groupItems(items, one, types.of(one.type, one.params)!).map((group) => [group.label, group.value, group.items.map((each) => each.name)]);
 
 describe("grouping a view's items", () => {
+  it("groups people by their options shown as mentions, a name none of them with Anyone a group as valid, without it marked", () => {
+    const owner = property("person", { options: ["ada", "bob"], multiple: true, anyone: true });
+    expect(groups([item("a", { p: ["eve", "ada"] })], owner)).toEqual([
+      ["@ada", ["ada"], ["a"]],
+      ["@bob", ["bob"], []],
+      ["@eve", ["eve"], ["a"]],
+    ]);
+    expect(groups([item("a", { p: "eve" })], property("person", { options: ["ada"] })).at(-1)).toEqual(["@eve (none of its options)", "eve", ["a"]]);
+  });
+
   it("groups a select by its options in their order, empty ones too, then values that are none of them, none first", () => {
     const status = property("select", { options: ["Todo", "Doing", "Done"] });
     expect(groups([item("a", { p: "Done" }), item("b", {}), item("c", { p: "Odd" }), item("d", { p: "Todo" }), item("e", { p: "Done" })], status)).toEqual([

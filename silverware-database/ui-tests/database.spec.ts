@@ -577,21 +577,24 @@ test("the board moves a card to another column, its value written", async ({ pag
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("status: Done\n");
 });
 
-test("the Properties dialog adds a property and changes a type, the change of items shown before it is written", async ({ page, space }) => {
+test("the Properties dialog adds a property and changes a type in its draft, both written by Save", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\n```\n", ...TASKS }, "Page");
   await page.locator(".swd-more").click();
   await choose(page, "Properties");
   await page.locator(".swd-property-new-label").fill("Estimate");
   await page.locator(".swd-property-new-type").selectOption("number");
   await page.locator(".swd-property-add").click();
-  await expect.poll(() => space.saved("Page/db-tasks")).toContain("    estimate: { type: number, label: Estimate }\n");
   await page.locator('[data-property="status"] .swd-prop-head').click();
   await page.locator('[data-property="status"] .swd-property-type').selectOption("text");
-  await expect(page.locator(".swd-property-review")).toContainText("Change the type of Status: no item's value changes");
-  // Nothing written until applied
+  await expect(page.locator('[data-property="status"] .swd-prop-mark')).toHaveText("Changed");
+  // Nothing written until Save
   expect(await space.saved("Page/db-tasks")).toContain("status: { type: select");
-  await page.locator(".swd-property-apply").click();
+  expect(await space.saved("Page/db-tasks")).not.toContain("estimate:");
+  // (Every value reads as text: the schema alone, written at once, the dialog closed)
+  await page.locator(".swd-properties-save").click();
+  await expect(page.locator(".swd-properties")).toHaveCount(0);
   await expect.poll(() => space.saved("Page/db-tasks")).toContain("status: { type: text");
+  expect(await space.saved("Page/db-tasks")).toContain("    estimate: { type: number, label: Estimate }\n");
 });
 
 test("a time, a date and time and a link: edited in their own fields, written and read back through the index; a link opened by a press", async ({ page, space }) => {
@@ -717,6 +720,7 @@ test("a property's key changed in Properties follows into its views' blocks on e
   await page.locator('[data-property="status"] .swd-prop-advanced-summary').click();
   await page.locator('[data-property="status"] .swd-property-key').fill("stav");
   await page.locator('[data-property="status"] .swd-property-key').press("Enter");
+  await page.locator(".swd-properties-save").click();
   const review = page.locator(".swd-property-review");
   await expect(review).toContainText("Updates the views of it on 2 pages");
   await expect(review).toContainText("keep this window open until it is done");
@@ -735,7 +739,6 @@ test("a property's icon picked in Properties: kept in the root page, before its 
   await page.locator('[data-property="status"] .swd-property-icon').click();
   await page.locator(".swd-pop .swd-emoji-field").fill("rocket");
   await page.locator(".swd-pop .swd-emoji", { hasText: "🚀" }).first().click();
-  await expect.poll(() => space.saved("Page/db-tasks")).toContain('icon: "🚀"');
   await expect(page.locator('[data-property="status"] .swd-prop-head .swd-prop-own-icon')).toHaveText("🚀");
   await expect(page.locator('[data-property="status"] .swd-property-icon')).toBeFocused();
   // Esc in the picker closes it alone, the dialog staying
@@ -744,7 +747,8 @@ test("a property's icon picked in Properties: kept in the root page, before its 
   await page.keyboard.press("Escape");
   await expect(page.locator(".swd-pop")).toHaveCount(0);
   await expect(page.locator(".swd-properties")).toBeVisible();
-  await page.locator(".swd-settings-close").click();
+  await page.locator(".swd-properties-save").click();
+  await expect.poll(() => space.saved("Page/db-tasks")).toContain('icon: "🚀"');
   await expect(page.locator(".swd-table th .swd-table-head-icon")).toHaveText("🚀");
   await page.locator(".swd-table .swd-open").first().click();
   await expect(page.locator('.swd-peek-row[data-property="status"] .swd-prop-own-icon')).toHaveText("🚀");
@@ -756,13 +760,13 @@ test("Name in views in Properties: kept in the root page, a list's rows showing 
   await choose(page, "Properties");
   await page.locator('[data-property="status"] .swd-prop-head').click();
   await page.locator('[data-property="status"] .swd-property-show-name input').click();
+  await page.locator(".swd-properties-save").click();
   await expect.poll(() => space.saved("Page/db-tasks")).toContain("showName: true");
-  await page.locator(".swd-settings-close").click();
   await expect(page.locator(".swd-list-item", { hasText: "Fix login" }).locator(".swd-field-name")).toHaveText("Status: ");
   await expect(page.locator(".swd-list-item", { hasText: "Fix login" })).toContainText("Status: Todo");
 });
 
-test("a property removed in Properties: no question, the change shown with a switch taking its values off the items too", async ({ page, space }) => {
+test("a property removed in Properties: no question, marked until Save, its switch taking its values off the items too, shown first", async ({ page, space }) => {
   const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    note: { type: text, label: Note }\n---\n";
   const itemPage = "---\ntags: [db]\nstatus: Todo\nnote: keep me\n_database:\n  rank: a0\n---\n";
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", "Page/db-tasks": rootPage, "Page/db-tasks/Fix login": itemPage }, "Page");
@@ -770,13 +774,13 @@ test("a property removed in Properties: no question, the change shown with a swi
   await choose(page, "Properties");
   await page.locator('[data-property="note"] .swd-prop-head').click();
   await page.locator('[data-property="note"] .swd-property-remove').click();
-  // No dialog of the browser's or SilverBullet's asked: the review at once, its switch off
-  const review = page.locator(".swd-property-review");
-  await expect(review).toContainText("Remove Note: no item's value changes");
-  const values = page.locator('.swd-property-choice input[role="switch"]');
+  // No dialog of the browser's or SilverBullet's asked: marked, its switch off
+  await expect(page.locator('[data-property="note"] .swd-prop-mark')).toHaveText("Removed");
+  const values = page.locator('[data-property="note"] .swd-property-values-off input[role="switch"]');
   await expect(values).not.toBeChecked();
-  await page.locator(".swd-property-choice .swd-settings-switch").click();
-  await expect(review).toContainText("Remove Note and its values: one item changes");
+  await page.locator('[data-property="note"] .swd-property-values-off .swd-settings-switch').click();
+  await page.locator(".swd-properties-save").click();
+  await expect(page.locator(".swd-property-review")).toContainText("Save the properties: one item changes");
   await page.locator(".swd-property-apply").click();
   await expect.poll(() => space.saved("Page/db-tasks")).not.toContain("note:");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).not.toContain("note:");
@@ -791,9 +795,8 @@ test("values outside the database, on their screen in Properties: one added back
   const rows = page.locator(".swd-loose-row");
   await expect(rows).toHaveCount(2);
   await expect(page.locator('.swd-loose-row[data-key="points"] .swd-loose-type')).toHaveValue("number");
-  // Added: a property of that key, its value in the table
+  // Added: a property of that key in the draft, gone from the screen
   await page.locator('.swd-loose-row[data-key="points"] .swd-loose-add').click();
-  await expect.poll(() => space.saved("Page/db-tasks")).toContain("points: { type: number, label: Points }");
   await expect(rows).toHaveCount(1);
   // Taken off the pages, shown first
   await page.locator('.swd-loose-row[data-key="legacy"] .swd-loose-remove').click();
@@ -802,7 +805,10 @@ test("values outside the database, on their screen in Properties: one added back
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).not.toContain("legacy:");
   expect(await space.saved("Page/db-tasks/Fix login")).toContain("_tool: kept");
   await expect(page.locator(".swd-loose-none")).toBeVisible();
-  await page.keyboard.press("Escape");
+  // Saved: the property of that key, its value in the table
+  await page.locator(".swd-loose-back").click();
+  await page.locator(".swd-properties-save").click();
+  await expect.poll(() => space.saved("Page/db-tasks")).toContain("points: { type: number, label: Points }");
   await expect(page.locator('.swd-table td[data-key="points"]').first()).toHaveText("5");
 });
 
@@ -817,8 +823,8 @@ test("system properties added in Properties show the pages' dates, the order by 
     await page.locator(".swd-property-add").click();
     await expect(page.locator(`.swd-property-new-type option[value="system:${kind}"]`)).toBeDisabled();
   }
+  await page.locator(".swd-properties-save").click();
   await expect.poll(() => space.saved("Page/db-tasks")).toContain("system: taskProgress");
-  await page.keyboard.press("Escape");
   const row = page.locator(".swd-table tbody tr", { hasText: "Write docs" });
   await expect(row.locator('[data-key="order"]')).toHaveText("2");
   await expect(row.locator('[data-key="task_progress"]')).toHaveText("67%");
@@ -1084,15 +1090,15 @@ test("an option given a color in Properties keeps it in the root page and shows 
   await page.locator('[data-property="status"] .swd-prop-head').click();
   await page.locator('.swd-option-color[aria-label="Color of Done"]').click();
   await page.locator('.swd-option-swatch[data-color-name="red"]').click();
-  await expect.poll(() => space.saved("Page/db-tasks")).toMatch(/colors:[\s\S]*Done: red/);
   // And one of your own, written in quotes (a # starts a comment in YAML)
   await page.locator('.swd-option-color[aria-label="Color of Todo"]').click();
   await page.locator(".swd-option-own-input").evaluate((input: HTMLInputElement) => {
     input.value = "#3a7bd5";
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
+  await page.locator(".swd-properties-save").click();
   await expect.poll(() => space.saved("Page/db-tasks")).toContain('Todo: "#3a7bd5"');
-  await page.keyboard.press("Escape");
+  expect(await space.saved("Page/db-tasks")).toMatch(/colors:[\s\S]*Done: red/);
   await expect(page.locator('td[data-key="status"] .swd-pill', { hasText: "Done" })).toHaveAttribute("data-color", "5");
   await expect(page.locator('td[data-key="status"] .swd-pill', { hasText: "Todo" })).toHaveAttribute("data-color", "own");
 });
@@ -1251,9 +1257,9 @@ test("a property made required in Properties is kept in the root page, marked *,
   await choose(page, "Properties");
   await page.locator('[data-property="status"] .swd-prop-head').click();
   await page.locator('[data-property="status"] .swd-property-required input').click();
-  await expect.poll(() => space.saved("Page/db-tasks")).toContain("required: true");
   await expect(page.locator('[data-property="status"] .swd-prop-required')).toHaveText("*");
-  await page.keyboard.press("Escape");
+  await page.locator(".swd-properties-save").click();
+  await expect.poll(() => space.saved("Page/db-tasks")).toContain("required: true");
   await expect(page.locator('tbody tr:nth-child(3) td[data-key="status"]')).toHaveClass(/swd-missing/);
   await expect(page.locator('tbody tr:first-child td[data-key="status"]')).not.toHaveClass(/swd-missing/);
 });
@@ -1282,9 +1288,9 @@ test("options renamed in Properties rename the items' values in the same write: 
   const names = page.locator('[data-property="status"] .swd-option-name');
   await names.nth(0).fill("Done");
   await names.nth(1).fill("Todo");
-  await page.locator(".swd-property-options-save").click();
-  await expect(page.locator(".swd-property-review")).toContainText("1 item: Todo → Done");
-  await expect(page.locator(".swd-property-review")).toContainText("1 item: Done → Todo");
+  await page.locator(".swd-properties-save").click();
+  await expect(page.locator(".swd-property-review")).toContainText("1 item: Status: Todo → Done");
+  await expect(page.locator(".swd-property-review")).toContainText("1 item: Status: Done → Todo");
   await expect(page.locator(".swd-property-review")).toContainText("Writes 3 pages, one after another");
   // Nothing written until applied
   expect(await space.saved("Page/db-tasks/Fix login")).toContain("status: Todo\n");
@@ -1292,9 +1298,7 @@ test("options renamed in Properties rename the items' values in the same write: 
   await expect.poll(() => space.saved("Page/db-tasks")).toContain("options: [Done, Todo]");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("status: Done\n");
   await expect.poll(() => space.saved("Page/db-tasks/Write docs")).toContain("status: Todo\n");
-  // (The dialog stays open while the change is written: closed once its review has gone)
-  await expect(page.locator(".swd-property-review")).toHaveCount(0);
-  await page.locator(".swd-settings-close").click();
+  // (The dialog stays open while the change is written: closed once it is)
   await expect(page.locator(".swd-properties")).toHaveCount(0);
   await expect(page.locator('td[data-key="status"] .swd-pill')).toHaveText(["Done", "Todo"]);
   // Undo puts the options and every value back in one step

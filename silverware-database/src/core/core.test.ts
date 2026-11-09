@@ -40,6 +40,78 @@ const applied = async (core: DatabaseCore, proposal: Proposal | { problem: strin
   return core.apply(proposal);
 };
 
+describe("the schema edited as a whole (editSchema)", () => {
+  it("plans every change of a draft as one transaction: names, flags, order, a property added, options renamed, a key changed, a type read, one removed with its values; undone as one", async () => {
+    const { core, store, items } = setup();
+    const was = (await store.database("tasks"))!.value.properties;
+    const proposal = await core.editSchema("tasks", {
+      was,
+      properties: [
+        // (Moved first: its type read from the text, its key changed, its name and flags)
+        { from: "estimate", key: "effort", label: "Effort", type: "number", params: {}, required: true, showName: true, icon: "⏱" },
+        { from: "status", label: "State", type: "select", params: { options: ["Open", "Done"] }, renames: { Todo: "Open" } },
+        { label: "Owner", type: "text" },
+      ],
+      removedValues: ["created"],
+    });
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    expect(proposal.label).toBe("Change the properties of Tasks");
+    expect(proposal.renamed).toEqual([{ from: "State: Todo", to: "Open", items: 1 }]);
+    // ("a lot" no number: kept as it is, listed)
+    expect(proposal.unreadable).toHaveLength(1);
+    expect(proposal.whole).toBeDefined();
+    await core.apply(proposal);
+    expect((await store.database("tasks"))!.value.properties).toEqual([
+      { key: "effort", label: "Effort", type: "number", params: {}, readonly: false, required: true, showName: true, icon: "⏱" },
+      { key: "status", label: "State", type: "select", params: { options: ["Open", "Done"] }, readonly: false },
+      { key: "owner", label: "Owner", type: "text", params: {}, readonly: false },
+    ]);
+    expect((await items()).map((one) => [one.name, one.values])).toEqual([
+      ["Fix login", { status: "Open", effort: 3 }],
+      ["Write docs", { status: "Done", effort: "a lot" }],
+    ]);
+    // One Undo puts it all back
+    await core.undo("tasks");
+    expect((await store.database("tasks"))!.value.properties).toEqual(was);
+    expect((await items()).map((one) => one.values)).toEqual([
+      { status: "Todo", estimate: "3" },
+      { status: "Done", estimate: "a lot" },
+    ]);
+  });
+
+  it("keeps a removed property's values where not asked, a system property's own, and changes only its name and flags", async () => {
+    const { core, store, items } = setup();
+    expect(await core.addProperty("tasks", { label: "", type: "text", system: "order" })).not.toHaveProperty("problem");
+    const was = (await store.database("tasks"))!.value.properties;
+    const proposal = await core.editSchema("tasks", {
+      was,
+      properties: [
+        { from: "status", label: "Status", type: "select", params: { options: ["Todo", "Done"] } },
+        { from: "created", label: "Created", type: "date", readonly: true },
+        // (A system property's type, key or lock asked otherwise: kept its kind's)
+        { from: "order", key: "rank", label: "Rank", type: "text", readonly: false, showName: true },
+      ],
+    });
+    if ("problem" in proposal) throw new Error(proposal.problem);
+    // (The schema alone: no item written)
+    expect(proposal.plan.planned.filter((one) => "item" in one.target)).toHaveLength(0);
+    await core.apply(proposal);
+    expect((await store.database("tasks"))!.value.properties.at(-1)).toEqual({ key: "order", label: "Rank", type: "number", params: {}, readonly: true, system: "order", showName: true });
+    expect((await items()).map((one) => one.values.estimate)).toEqual(["3", "a lot"]);
+  });
+
+  it("refuses an edit made of a schema changed since, two properties of one key, and says when nothing changes", async () => {
+    const { core, store, told } = setup();
+    const was = (await store.database("tasks"))!.value.properties;
+    const same = was.map((one) => ({ from: one.key, label: one.label, type: one.type, params: one.params, readonly: one.readonly }));
+    expect(await core.editSchema("tasks", { was, properties: same })).toMatchObject({ cause: "unchanged" });
+    expect(await core.editSchema("tasks", { was, properties: [...same.slice(0, 2), { ...same[2]!, key: "status" }] })).toMatchObject({ cause: "invalid" });
+    await core.renameProperty("tasks", "status", "State");
+    expect(await core.editSchema("tasks", { was, properties: same.slice(1) })).toMatchObject({ cause: "invalid" });
+    expect(told.at(-1)).toContain("changed meanwhile");
+  });
+});
+
 describe("the core", () => {
   it("adds a system property of a kind once, its type and key the kind's, read only; its values shown, never written, nor its type, key or settings changed", async () => {
     const { core, store, told, named, items } = setup();

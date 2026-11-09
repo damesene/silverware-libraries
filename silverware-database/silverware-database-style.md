@@ -2910,6 +2910,30 @@ tr:focus-within .swd-open {
   width: 16px;
   height: 16px;
 }
+/* What the draft does to a property, after its name in the list until Save: Changed, New, Removed (its name struck) */
+.swd-prop-mark {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border-radius: 4px;
+  color: var(--swd-accent);
+  background: color-mix(in srgb, var(--swd-accent) 12%, transparent);
+  font-size: 0.75em;
+  line-height: 1.6;
+}
+.swd-prop-mark-removed {
+  color: var(--danger-color, #c62828);
+  background: color-mix(in srgb, var(--danger-color, #c62828) 12%, transparent);
+}
+.swd-prop-removed .swd-prop-name,
+.swd-prop-removed .swd-prop-type {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+/* Save, nothing changed: nothing to write */
+.swd-properties-save:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
 /* A property required: a * after its name in the list */
 .swd-prop-required {
   margin-left: 3px;
@@ -3161,18 +3185,19 @@ button.swd-editor-document-folder:hover,
 .swd-prop-switch-row .swd-prop-field-name {
   gap: 2px;
 }
-/* A review's choice (Remove: its values too): its label and hint across the width, its switch at the right, on a phone too */
-.swd-prop-field.swd-property-choice {
+/* A property removed in the draft: whether its values go too, its label and hint across the width, its switch at the right,
+   on a phone too */
+.swd-prop-field.swd-property-values-off {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   padding: 0 4px;
 }
-.swd-property-choice .swd-prop-field-name {
+.swd-property-values-off .swd-prop-field-name {
   gap: 2px;
   color: inherit;
   font-size: 1em;
 }
-.swd-property-choice .swd-prop-field-name .swd-settings-hint {
+.swd-property-values-off .swd-prop-field-name .swd-settings-hint {
   color: var(--swd-quiet);
 }
 .swd-prop-options {
@@ -3358,15 +3383,6 @@ button.swd-editor-document-folder:hover,
   padding: 2px 8px;
   font-size: 0.85em;
 }
-.swd-options-foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-}
-.swd-options-foot button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
 
 /* A property added: its name, its type, Add, one line under the list */
 .swd-property-adder {
@@ -3481,7 +3497,7 @@ button.swd-editor-document-folder:hover,
   font: inherit;
   cursor: pointer;
 }
-/* A change shown before it is written: a choice of what it is (Remove: its values too), then its summary */
+/* A change shown before it is written: its summary, Back and Apply */
 .swd-property-review-box {
   display: flex;
   flex-direction: column;

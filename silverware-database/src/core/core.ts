@@ -109,6 +109,33 @@ export type ItemDraft = { readonly name?: string; readonly values?: Readonly<Rec
 export type NewProperty = { readonly label: string; readonly type: string; readonly key?: string; readonly params?: Params; readonly readonly?: boolean; readonly system?: string };
 
 /**
+ * A property as an edit of the schema has it (`editSchema`): `from` the key it
+ * has now (none: added by the edit, its key made from its label where `key`
+ * is not given), the rest as it is to be; `renames` its options renamed, an
+ * old name to its new one (the items' values renamed with them)
+ */
+export type PropertyEdit = NewProperty & {
+  readonly from?: string;
+  readonly required?: boolean;
+  readonly showName?: boolean;
+  readonly icon?: string;
+  readonly renames?: Readonly<Record<string, string>>;
+};
+
+/**
+ * The schema as an edit has it, whole (the properties' dialog's draft): `was`
+ * the schema it was made of (changed since: refused), `properties` in their
+ * order (a property of `was` none of them names by `from` is removed),
+ * `removedValues` the keys of those removed whose values are taken off the
+ * items too (else kept, shown again if the property comes back)
+ */
+export type SchemaEdit = {
+  readonly was: readonly Property[];
+  readonly properties: readonly PropertyEdit[];
+  readonly removedValues?: readonly string[];
+};
+
+/**
  * Where an item goes in the order by hand: right after `after`, else right
  * before `before` (items of the same database, as a view shows them, filtered
  * or not), else at the end (those without a rank, made outside the core, ranked
@@ -749,6 +776,130 @@ export class DatabaseCore {
     return this.propose(changes.build(), `Remove property ${property.label}${values ? " and its values" : ""}`);
   }
 
+  /**
+   * The schema edited as a whole (the properties' dialog's Save), a proposal
+   * of one transaction: the schema as the edit has it, and each item's values
+   * as it says (renamed with their options, read as a new type where they can
+   * be, else kept as they are and listed as `unreadable`, moved to a key
+   * changed, taken off with a property removed where asked), the views naming
+   * a key changed with it (`finding` told as every document is looked
+   * through). Written whole where it changes items; undone as one. Refused
+   * where the schema changed since the edit was made of it, or any part of it
+   * cannot be (said why); `unchanged` where it changes nothing
+   */
+  async editSchema(database: string, edit: SchemaEdit, finding?: WriteProgress): Promise<Proposal | Refused> {
+    const read = await this.read(database);
+    if ("problem" in read) return read;
+    const now = read.database.value.properties;
+    if (JSON.stringify(now) !== JSON.stringify(edit.was)) return this.refuse("The properties changed meanwhile: nothing was written, shown as they are now");
+    const byKey = new Map(now.map((one) => [one.key, one] as const));
+    const items = read.items.value;
+    const loose = await this.store.looseValues(database);
+    // Each property kept as it is to be, with what its values go through
+    const planned: { readonly from: Property; readonly to: Property; readonly renaming?: ReadonlyMap<string, string> }[] = [];
+    const schema: Property[] = [];
+    const named = new Set<string>();
+    for (const one of edit.properties) {
+      if (one.from === undefined) {
+        // (Its key unlike every property's, now and to be, and every key items keep)
+        const made = this.newProperty(one, [...schema, ...now.filter((p) => !schema.some((s) => s.key === p.key))], items, loose.map((l) => l.key));
+        if (typeof made === "string") return this.refuse(made);
+        schema.push(withFlags(made, made.system === undefined ? one : { showName: one.showName, icon: one.icon }));
+        continue;
+      }
+      const property = byKey.get(one.from);
+      if (!property) return this.refuse(`No property "${one.from}"`);
+      if (named.has(property.key)) return this.refuse(`${property.label} is in the edit twice`);
+      named.add(property.key);
+      const label = one.label.trim();
+      if (!label) return this.refuse("A property needs a label");
+      if (one.icon !== undefined) {
+        const iconProblem = validateIcon(one.icon);
+        if (iconProblem) return this.refuse(`${label}: ${iconProblem}`);
+      }
+      // A system property: its name, its icon and its name shown in views; nothing else is the user's
+      if (property.system !== undefined) {
+        schema.push(withFlags({ ...property, label }, { required: property.required, showName: one.showName, icon: one.icon }));
+        continue;
+      }
+      const type = this.types.named(one.type);
+      if (!type) return this.refuse(`No property type "${one.type}"`);
+      const params = one.params ?? property.params;
+      const problem = validateParamNames(label, params) ?? (type.validateParams?.(params) === undefined ? undefined : `${label}: ${type.validateParams(params)}`);
+      if (problem) return this.refuse(problem);
+      const key = one.key?.trim() || property.key;
+      if (key !== property.key) {
+        const keyProblem = validatePropertyKey(key) ?? this.store.validatePropertyKey(key) ?? validateKeptValues(key, items, loose);
+        if (keyProblem) return this.refuse(`${label}: ${keyProblem}`);
+      }
+      const renames = one.renames && Object.keys(one.renames).length ? validateRenames(property, one.type, params, one.renames, items) : undefined;
+      if (typeof renames === "string") return this.refuse(`${label}: ${renames}`);
+      const to = withFlags({ ...property, key, label, type: one.type, params, readonly: one.readonly ?? property.readonly }, one);
+      planned.push({ from: property, to, ...(renames?.size ? { renaming: renames } : {}) });
+      schema.push(to);
+    }
+    const keys = schema.map((one) => one.key);
+    const twice = keys.find((one, at) => keys.indexOf(one) !== at);
+    if (twice !== undefined) return this.refuse(`Two properties have the key "${twice}": give each a key of its own`);
+    // Those of the schema the edit names nowhere: removed, their values taken off where asked (a system property's are no item's)
+    const removed = now.filter((one) => !named.has(one.key));
+    const takenOff = removed.filter((one) => one.system === undefined && edit.removedValues?.includes(one.key)).map((one) => one.key);
+    if (JSON.stringify(schema) === JSON.stringify(now)) return unchanged("The properties are the same");
+    const changes = databaseChanges(database).expectDatabase(read.database.revision).schema(schema);
+    const unreadable = new Set<ItemKey>();
+    // How many items' values each option renamed renames, by property and option
+    const counts = new Map<Property, Map<string, number>>();
+    let itemsChanged = false;
+    for (const item of items) {
+      const sets: [string, Value][] = [];
+      const unsets: string[] = [];
+      for (const { from, to, renaming } of planned) {
+        const value = item.values[from.key];
+        if (value === undefined) continue;
+        let next = value;
+        if (!isEmpty(value)) {
+          const type = this.types.named(to.type)!;
+          const renamed = renaming ? renamedValue(value, renaming) : undefined;
+          if (renamed) {
+            next = renamed.value;
+            const of = counts.get(to) ?? new Map<string, number>();
+            counts.set(to, of);
+            for (const option of renamed.from) of.set(option, (of.get(option) ?? 0) + 1);
+            if (type.validate(next, to.params) !== undefined) unreadable.add(item.key);
+          } else if ((to.type !== from.type || !sameParams(to.params, from.params)) && type.validate(value, to.params) !== undefined) {
+            // (Options renamed: a value none of them as it is kept, as `retypeProperty` keeps it; else read from its text)
+            const parsed = renaming ? undefined : type.parse(keptText(value), to.params, value);
+            if (parsed && "value" in parsed && type.validate(parsed.value, to.params) === undefined) next = parsed.value;
+            else unreadable.add(item.key);
+          }
+        }
+        if (to.key !== from.key) {
+          sets.push([to.key, next]);
+          unsets.push(from.key);
+        } else if (next !== value) sets.push([to.key, next]);
+      }
+      for (const key of takenOff) if (item.values[key] !== undefined) unsets.push(key);
+      if (!sets.length && !unsets.length) continue;
+      itemsChanged = true;
+      changes.item(item, (i) => {
+        for (const [key, value] of sets) i.set(key, value);
+        for (const key of unsets) i.unset(key);
+      });
+    }
+    const proposal = await this.propose(changes.build(), `Change the properties of ${read.database.value.name}`);
+    const renamed = [...counts].flatMap(([property, of]) => [...of].map(([from, items]) => ({ from: `${property.label}: ${from}`, to: planned.find((one) => one.to === property)!.renaming!.get(from)!, items })));
+    // The places naming a key changed, each key followed in turn (none is taken while another still holds it: its values refused)
+    const rekeyed = planned.filter((one) => one.to.key !== one.from.key).map((one) => [one.from.key, one.to.key] as const);
+    const places = rekeyed.length && this.places ? await this.places.store.plan(database, rekeyedPlace(rekeyed, this.places.propertyMeta), finding) : undefined;
+    return {
+      ...proposal,
+      ...(unreadable.size ? { unreadable: [...unreadable] } : {}),
+      ...(renamed.length ? { renamed } : {}),
+      ...(itemsChanged ? { whole: { items: itemsRevision(items) } } : {}),
+      ...(places?.documents.length || places?.byHand?.length ? { places } : {}),
+    };
+  }
+
   // Proposals and Undo
 
   /**
@@ -963,6 +1114,27 @@ export class DatabaseCore {
     this.ui.notify(problem, { type: "error" });
     return { problem, cause: "invalid" };
   }
+}
+
+/** A property with the flags an edit gives it (`required`, `showName`, `icon`: set where given so, else taken off) */
+function withFlags(property: Property, flags: { readonly required?: boolean | undefined; readonly showName?: boolean | undefined; readonly icon?: string | undefined }): Property {
+  const { required: _required, showName: _showName, icon: _icon, ...rest } = property;
+  return { ...rest, ...(flags.required ? { required: true } : {}), ...(flags.showName ? { showName: true } : {}), ...(flags.icon !== undefined ? { icon: flags.icon } : {}) };
+}
+
+/** A place's state with each key of `rekeyed` (from, to) followed in turn, the entries that change (none: undefined) */
+function rekeyedPlace(rekeyed: readonly (readonly [string, string])[], metaOf: (view: string) => readonly string[]): PlaceChange {
+  return (state) => {
+    const current = new Map(state);
+    const all: Record<string, unknown> = {};
+    for (const [from, to] of rekeyed) {
+      for (const [name, value] of Object.entries(placeStateRenamed(current, from, to, metaOf) ?? {})) {
+        current.set(name, value);
+        all[name] = value;
+      }
+    }
+    return Object.keys(all).length ? all : undefined;
+  };
 }
 
 function unchanged(problem: string): Refused & { readonly cause: "unchanged" } {

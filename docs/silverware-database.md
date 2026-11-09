@@ -513,6 +513,26 @@ to it, nothing written into the project). So they stay last, perhaps never; to b
   as the table holds its drawing while a cell is edited. The cell now shows the item with the value written at once
   (`editValue`'s `show(written)`), as it was again where the write is refused.
 
+### The properties' dialog saved as a whole (2026-11-09, decided with the user)
+
+Every change in **Properties** was written as it was made (a name as its field was left, a type, Required, Locked, the
+key, an icon, the order, a property added or removed; what changes items shown first, one review each), a select's options
+alone with Save options / Discard of their own. Decided:
+
+* **A draft, Save and Cancel**: the dialog keeps the schema as edited (every change above, options and their colors too,
+  a property added or removed); nothing is written until **Save** at its foot; **Cancel**, Esc or × ask first where the
+  draft holds changes. A property changed is marked in the list. Save options / Discard go (the dialog's Save holds them).
+* **One write**: Save hands the draft to the core, which plans it as one transaction (`editSchema`: the schema as the
+  draft has it, each item's values moved, read as a new type, renamed with options or taken off as the draft says, the
+  views naming a key changed), shown first where it changes items or views (one review), written whole, undone as one.
+  The core's transaction holds any number of changes; the operations of one change each stay for their other callers.
+* **The peek's Properties too** (a property's name pressed there, + Add a property): they open the same dialog, its
+  draft written by its Save alone.
+* **An eye at the top** (step 2), as the table's conditional formatting has it (shared/dialog.ts `peek`): the dialog put
+  aside, the views of the page shown is drawn with the draft (names, icons, colors, order, a type's values as it would read
+  them), nothing written; back to the dialog, or closed without Save, they are drawn as the database is. The page shown
+  only: no other page is read for it.
+
 ### Properties shown per view, and the view's look (2026-11-09, decided with the user)
 
 What a view shows is its own, as Notion has it, no longer the schema's: `<view>.hiddenProperties` in its block (the keys it hides, so a property added shows everywhere), kept and handed over by the core as the other states of a view are; **Visible properties** in ⋯ (core/propertiesmenu.ts, named apart from the schema's **Properties**, as Group's list: an eye each, Hide all / Show all, the menu staying open through a write of the block). The schema's `hidden` went with its eye in Properties, `setPropertyHidden` and the peek's *Hidden in views* (the peek shows every property); nobody used a database yet, so nothing is migrated. A view says `properties: false` where it shows no property beside the name, `properties: { hiddenByDefault: true }` where none shows until the user shows it (the calendar, a line each under an item's name; the timeline, after its bar, a part of the bar laid past its end by the style page so it goes with a drag: the user's wish the same day): the core keeps those shown for it (`<view>.shownProperties`), so a property added stays hidden there, the views reading `shownProperties` alone either way. The host's look in one section, `host.look` (`ViewLook`): `shownProperties`, `hiddenProperties` / `setHiddenProperties`, `colorBy` / `setColorBy` (out of `listing`, which says which items in what order), and `icon(item)`, `item(item, element)` (were `host.itemIcon`, `host.itemLook`); a module's host has `look` too (`ItemLooks`: `icon`, `item`). A key changed follows into `hiddenProperties` and `shownProperties` (`placeStateRenamed`). **Apply to all views** (decided with the user the same day: in the block alone, not across pages), at the end of Visible properties, Group and Color by: a part of this view's look given to every other view on in the place, as each keeps it and where it takes it (core/applyall.ts, pure: `appliedToViews`, by the views' definitions: `properties`, `colors`, `groupBy`'s types), written in one write of the block, the views left named with why (a view always grouped, a board, given None keeps its own); offered disabled with why where no other view takes it; the views know nothing of it. How a place keeps a view's state (the keys, a list kept only where it is not empty, those shown or hidden) is one module's, core/statekeys.ts, which the place's host, Apply to all views and a key's change followed (`placeStateRenamed`) share.

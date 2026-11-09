@@ -95,7 +95,8 @@ export function silverBulletPlatform(bridge: Bridge): {
       rename: (from, to) => renamed(from, to, () => bridge.renamePage(from, to)),
       renamePrefix: async (from, to) => {
         await bridge.renamePrefix(from, to);
-        return (await names()).some((name) => name.startsWith(from)) ? { problem: `pages under "${from}" were not all renamed` } : {};
+        // (Under it: in its folder, not a page whose name only starts so, `db-tasks2` beside `db-tasks`)
+        return (await names()).some((name) => name.startsWith(`${from}/`)) ? { problem: `pages under "${from}" were not all renamed` } : {};
       },
     },
     index: {

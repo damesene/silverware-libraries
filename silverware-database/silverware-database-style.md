@@ -1113,6 +1113,40 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   align-items: center;
   white-space: nowrap;
 }
+/* A field offering names as typed (a person's with Anyone: shared/suggest.ts): the list under the field, over what is
+   below it */
+.swd-suggest-field {
+  position: relative;
+}
+.swd-suggest {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 2px);
+  left: 0;
+  min-width: 10em;
+  max-height: 16em;
+  margin: 0;
+  padding: 3px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, currentColor);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+.swd-suggest[hidden] {
+  display: none;
+}
+.swd-suggest-item {
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.swd-suggest-item:hover,
+.swd-suggest-item[aria-selected="true"] {
+  background: var(--swd-hover);
+}
 /* A value typed besides the options (a person's with Anyone): a field under the boxes, a value added there ticked above it */
 .swd-editor-add {
   margin-top: 4px;

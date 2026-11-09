@@ -60,7 +60,7 @@ function setup() {
 
 // (The pages listed, and what follows them, done)
 const listedNow = () => new Promise((resolve) => setTimeout(resolve));
-const key = (target: Element, name: string) => target.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true }));
+const key = (target: Element, name: string) => target.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }));
 afterEach(() => document.body.replaceChildren());
 
 describe("the built-in views' editors", () => {
@@ -357,13 +357,31 @@ describe("the built-in views' editors", () => {
     const { cell, writes, edit } = setup();
     edit("owner", { ...ITEM, values: { owner: "ada" } });
     const input = cell.querySelector<HTMLInputElement>("input.swd-editor-typed")!;
-    // (As kept, as an editor edits a value: its @ only how it shows)
-    expect([input.value, [...cell.querySelectorAll("datalist option")].map((one) => one.getAttribute("value"))]).toEqual(["ada", ["ada", "bob"]]);
-    expect(input.getAttribute("list")).toBe(cell.querySelector("datalist")!.id);
-    input.value = "@eve";
+    const offeredNow = () => [...cell.querySelectorAll<HTMLElement>(".swd-suggest:not([hidden]) .swd-suggest-item")].map((one) => one.textContent);
+    // (As kept, as an editor edits a value: its @ only how it shows; every one offered as it opens)
+    expect([input.value, offeredNow()]).toEqual(["ada", ["ada", "bob"]]);
+    const typed = (text: string) => {
+      input.value = text;
+      input.dispatchEvent(new Event("input"));
+    };
+    typed("b");
+    expect(offeredNow()).toEqual(["bob"]);
+    // Cleared: every one offered again
+    typed("");
+    expect(offeredNow()).toEqual(["ada", "bob"]);
+    // One picked by the arrows taken by Enter, written at once
+    key(input, "ArrowDown");
+    key(input, "ArrowDown");
     key(input, "Enter");
     await Promise.resolve();
-    expect(writes).toEqual([["update", "Fix login", "owner", "eve"]]);
+    expect(writes).toEqual([["update", "Fix login", "owner", "bob"]]);
+    // A name none of them typed, Enter: written as typed, its @ read off
+    edit("owner", { ...ITEM, values: { owner: "ada" } });
+    const again = cell.querySelector<HTMLInputElement>("input.swd-editor-typed")!;
+    again.value = "@eve";
+    key(again, "Enter");
+    await Promise.resolve();
+    expect(writes.at(-1)).toEqual(["update", "Fix login", "owner", "eve"]);
     // (Without Anyone: its list only, each option as it shows)
     edit("lead");
     expect([...cell.querySelectorAll("select option")].map((one) => one.textContent)).toEqual(["", "ada", "bob"]);

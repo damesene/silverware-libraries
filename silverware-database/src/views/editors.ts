@@ -10,6 +10,7 @@
 // that does not read is said so and not written. An empty value takes the key
 // off the item.
 import { el } from "../../../shared/elements.ts";
+import { suggestionList } from "../../../shared/suggest.ts";
 import { readLink, writeLink } from "../domain/types/link.ts";
 import { folderSearch, foundBy, pathOf } from "../domain/folders.ts";
 import { linkedDocument, type Reference, readReferences, validateReferenceTarget, writeReference } from "../domain/types/reference.ts";
@@ -80,8 +81,13 @@ export function pickFrom(select: HTMLSelectElement, take: () => void, options: {
 // The cells an editor is open in, with it: one at a time each, while that editor is still in its cell (a view drawing
 // the cell otherwise meanwhile leaves it editable again)
 const editing = new WeakMap<HTMLElement, Element>();
-// Lists of options offered to a field typed in, each its own id
-let choiceLists = 0;
+
+/** The options offered for what is typed: all with nothing typed, else those starting with it first, then those holding it (ignoring case) */
+function offered(options: readonly string[], typed: string): readonly string[] {
+  const q = typed.trim().toLowerCase();
+  if (!q) return options;
+  return [...options.filter((one) => one.toLowerCase().startsWith(q)), ...options.filter((one) => !one.toLowerCase().startsWith(q) && one.toLowerCase().includes(q))];
+}
 
 /**
  * A cell's value edited in place (not where an editor is open in it already): `cell`'s content made the editor of its
@@ -128,10 +134,19 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
 
   // One option, or a value typed besides them (a person's with Anyone): a field offering the options as they show
   if (type?.editor === "select" && property && type.takesTyped?.(property.params)) {
-    // (Its options as kept, as an editor edits a value: a person's ada, its @ only how it shows)
-    const list = el(doc, "datalist", { attrs: { id: `swd-choices-${++choiceLists}` } }, ...optionsOf(property).map((option) => el(doc, "option", { attrs: { value: option } })));
-    const input = el(doc, "input", { class: "swd-editor swd-editor-typed", attrs: { type: "text", list: list.id, "aria-label": property.label } });
+    const input = el(doc, "input", { class: "swd-editor swd-editor-typed", attrs: { type: "text", autocomplete: "off", "aria-label": property.label } });
     input.value = kept;
+    // Its options offered under it, all of them with nothing typed (a value cleared offers them again), as kept: a person's
+    // ada, its @ only how it shows; one taken saved at once
+    const list = suggestionList(doc, input, {
+      base: "swd",
+      whenEmpty: true,
+      suggest: (typed) => offered(optionsOf(property), typed),
+      take: (name) => {
+        input.value = name;
+        commit();
+      },
+    });
     const was = input.value;
     const commit = () => {
       // (Once: Enter saves, and the field left as it goes does not save or say anything again)
@@ -146,22 +161,17 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
     };
     input.addEventListener("blur", commit);
     input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
+      // (Not where the list took it: an option picked by the arrows taken)
+      if (event.key === "Enter" && !event.defaultPrevented) {
         event.preventDefault();
         commit();
       }
     });
     escape(input);
-    cell.replaceChildren(input, list);
+    cell.replaceChildren(el(doc, "div", "swd-suggest-field", input, list));
     editing.set(cell, input);
     input.focus();
     input.select();
-    // (Its options offered at once where the browser lets a page open them)
-    try {
-      (input as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
-    } catch {
-      // (Not within a user's press or key: offered as the field is typed in, or by Alt+↓)
-    }
     return;
   }
 

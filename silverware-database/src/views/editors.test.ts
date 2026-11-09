@@ -357,7 +357,8 @@ describe("the built-in views' editors", () => {
     const { cell, writes, edit } = setup();
     edit("owner", { ...ITEM, values: { owner: "ada" } });
     const input = cell.querySelector<HTMLInputElement>("input.swd-editor-typed")!;
-    expect([input.value, [...cell.querySelectorAll("datalist option")].map((one) => one.getAttribute("value"))]).toEqual(["@ada", ["@ada", "@bob"]]);
+    // (As kept, as an editor edits a value: its @ only how it shows)
+    expect([input.value, [...cell.querySelectorAll("datalist option")].map((one) => one.getAttribute("value"))]).toEqual(["ada", ["ada", "bob"]]);
     expect(input.getAttribute("list")).toBe(cell.querySelector("datalist")!.id);
     input.value = "@eve";
     key(input, "Enter");
@@ -365,12 +366,13 @@ describe("the built-in views' editors", () => {
     expect(writes).toEqual([["update", "Fix login", "owner", "eve"]]);
     // (Without Anyone: its list only, each option as it shows)
     edit("lead");
-    expect([...cell.querySelectorAll("select option")].map((one) => one.textContent)).toEqual(["", "@ada", "@bob"]);
+    expect([...cell.querySelectorAll("select option")].map((one) => one.textContent)).toEqual(["", "ada", "bob"]);
   });
 
   it("add a name typed under a person's boxes where it takes Anyone, ticked, then saved with the rest", async () => {
     const { cell, writes, edit } = setup();
     edit("team", { ...ITEM, values: { team: ["ada"] } });
+    expect([...cell.querySelectorAll("label.swd-editor-choice")].map((one) => one.textContent)).toEqual(["ada", "bob"]);
     const adder = cell.querySelector<HTMLInputElement>(".swd-editor-add")!;
     adder.value = "@eve";
     key(adder, "Enter");

@@ -128,10 +128,10 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
 
   // One option, or a value typed besides them (a person's with Anyone): a field offering the options as they show
   if (type?.editor === "select" && property && type.takesTyped?.(property.params)) {
-    const shown = (option: string) => type.optionShown?.(option) ?? option;
-    const list = el(doc, "datalist", { attrs: { id: `swd-choices-${++choiceLists}` } }, ...optionsOf(property).map((option) => el(doc, "option", { attrs: { value: shown(option) } })));
+    // (Its options as kept, as an editor edits a value: a person's ada, its @ only how it shows)
+    const list = el(doc, "datalist", { attrs: { id: `swd-choices-${++choiceLists}` } }, ...optionsOf(property).map((option) => el(doc, "option", { attrs: { value: option } })));
     const input = el(doc, "input", { class: "swd-editor swd-editor-typed", attrs: { type: "text", list: list.id, "aria-label": property.label } });
-    input.value = typeof now === "string" ? shown(now) : kept;
+    input.value = kept;
     const was = input.value;
     const commit = () => {
       // (Once: Enter saves, and the field left as it goes does not save or say anything again)
@@ -168,11 +168,9 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
   if (type?.editor === "select" && property) {
     const select = el(doc, "select", "swd-editor");
     const options = optionsOf(property);
-    // (Each option as it shows, kept as it is: a person's @ada is ada)
-    const shown = (option: string) => type.optionShown?.(option) ?? option;
-    select.append(new Option("", ""), ...options.map((option) => new Option(shown(option), option)));
+    select.append(new Option("", ""), ...options.map((option) => new Option(option, option)));
     // A value kept that is none of the options (another kind of value too): shown as it is, so leaving it changes nothing
-    if (kept && !options.includes(kept)) select.append(new Option(typeof now === "string" ? shown(kept) : kept, kept));
+    if (kept && !options.includes(kept)) select.append(new Option(kept, kept));
     select.value = kept;
     const take = () => (select.value === kept ? end() : void save(written(select.value)));
     pickFrom(select, take, { onLeave: true });
@@ -199,7 +197,7 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
     const choice = (option: string, checked: boolean) => {
       const box = el(doc, "input", { attrs: { type: "checkbox", value: option } });
       box.checked = checked;
-      return { box, label: el(doc, "label", "swd-editor-choice", box, type.optionShown?.(option) ?? option) };
+      return { box, label: el(doc, "label", "swd-editor-choice", box, option) };
     };
     const boxes = options.map((option) => {
       const made = choice(option, was.includes(option));

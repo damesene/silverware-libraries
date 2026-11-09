@@ -1350,7 +1350,7 @@ test("a person shows as a mention, kept by the name alone, picked from its peopl
   await expect(cell(1).locator(".swd-pill")).toHaveText("@ada");
   await expect(cell(2).locator(".swd-pill")).toHaveClass(/swd-pill-none/);
   await cell(1).click();
-  await expect(cell(1).locator("select option")).toHaveText(["", "@ada", "@bob"]);
+  await expect(cell(1).locator("select option")).toHaveText(["", "ada", "bob"]);
   await cell(1).locator("select").selectOption("bob");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("owner: bob\n");
   // Anyone turned on in Properties: Eve valid, written into the root page
@@ -1365,8 +1365,8 @@ test("a person shows as a mention, kept by the name alone, picked from its peopl
   // Its editor now a field taking any name, offering the people
   await cell(1).click();
   const field = cell(1).locator("input.swd-editor-typed");
-  await expect(field).toHaveValue("@bob");
-  await field.fill("@zoe");
+  await expect(field).toHaveValue("bob");
+  await field.fill("zoe");
   await field.press("Enter");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("owner: zoe\n");
 });

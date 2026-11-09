@@ -1,6 +1,6 @@
 # Silverware Database (plan)
 
-Talked through with the user on 2026-11-06; its layers (apart from SilverBullet and from where a database is kept) decided on 2026-11-07. Nothing of it is built yet; this is the plan to agree on before the first step.
+Talked through with the user on 2026-11-06; its layers (apart from SilverBullet and from where a database is kept) decided on 2026-11-07. Status (2026-11-09): steps 1 to 8 are done (below, *Steps*) and the branch `feat/database` is being made ready for `main`; what comes after it is in *What next (2026-11-09)*.
 
 A new plugin (`silverware-database/`, prefix `swd-`, settings and API under `silverware.database`, commands `Silverware Database: …`): databases in the spirit of Notion, where in SilverBullet **one item is one page** and its properties are the page's frontmatter (the pages store's form: *Layers*). Built as the other plugins: a core that knows no module and no view by name, modules turned off not loaded (`silverware.database.modules.<name>.enabled`), views added (built-in and the user's or another plugin's alike) without changing the core.
 
@@ -267,7 +267,7 @@ Each a branch's worth, with its tests (unit tests of the domain and the core, Pl
 6. **Peek**: the item's panel.
 7. **Properties**: the schema's dialog, changes over items reviewed, `readonly`.
 8. **Custom views and types** from Space Lua; the library page's API.
-9. **Later** (none of it in the first version): relations and rollups; formulas in a database (a formula property calculated per item, by Silverware Table's formulas' language, after the views plan's sources and grids); the database as a source of Silverware Table's formulas (`@tasks`; its id then shares the `@` names with `defineSource`'s, which one wins to decide then); several saved views in one block as tabs; a template for a new item's body; grouping in the table and list views.
+9. **Later** (none of it in the first version; weighed again on 2026-11-09, *What next (2026-11-09)*): relations and rollups; formulas in a database (a formula property calculated per item, by Silverware Table's formulas' language, after the views plan's sources and grids); the database as a source of Silverware Table's formulas (`@tasks`; its id then shares the `@` names with `defineSource`'s, which one wins to decide then); several saved views in one block as tabs; a template for a new item's body; grouping in the table and list views.
 
 ### Step 3 done (2026-11-07)
 
@@ -414,11 +414,77 @@ phone); each piece reviewed, fixed and tested (unit and Playwright against Silve
   added elsewhere meanwhile goes unless the user adds it again; the notice could say which.
 * **Required and Locked together**: a missing value can be filled in from no view; a hint in the dialog where both are on.
 * **The peek** does not close as the place it was opened from goes.
-* **History**: the commit `feat(database): required properties, properties edited from the peek, Advanced in Properties, a
-  board without Move to and new items at the end` holds several features (their files overlapped); the user was offered to
-  split it before the branch is merged into main.
-* **Merging `feat/database` into main**: list the database in REPO.md, CI green, a pull request (offered, not started).
+* **History**: the branch's history was squashed on another machine (2026-11-09); its commits still hold several features
+  each (`8fd763a`, `2b01f77`, `5c205f3`), against the rule of one a commit. Not rewritten: the branch is pushed, and its
+  parts overlap in their files.
+* **Merging `feat/database` into main**: listed in REPO.md and the README (2026-11-09), the review's fixes made the same day
+  (*The review before the merge*); left: CI green, a pull request.
 * **Conditional formatting**: planned, docs/silverware-database-conditional-formatting.md.
+
+### The review before the merge (2026-11-09)
+
+A review of the branch against `main` found, fixed the same day, each with its test:
+
+* **Undo kept as Space Lua loads again** (a setting saved, a space-lua block edited): `init` made a new store, writer and
+  core each time, so the history went, and with it the text of the pages a deletion removed, which only the writer's
+  reports hold (the deletion's dialog promises Undo while the window is open). They are made once now (`keptParts` in
+  index.ts), the platform calling the bridge handed over last; the modules are made anew (their settings). Still in memory
+  only: closing the window ends it, as the dialog says (the user: closing the window is not to be covered).
+* **A page indexed after its queue emptied** was told whole only at the next emptying: told now where the queue is empty
+  (`settledindex.ts`).
+* **A key typed twice in a block**: a write kept its second line, so a key taken off came back; written once now
+  (`writeBlock`).
+* Smaller: a timeline's edge scrolling in a box its insets fill (NaN); the writer listing the space once per page it makes
+  (once per apply now, the pages it made counted in); a drag reading every box's computed style on each move (once per
+  drag now, `scrollers` in shared/drag.ts, its doc comment back on `containerAt`); the order by hand checking each rank in
+  every comparison (once per item); `renamePrefix` taking `db-tasks2` for a page left under `db-tasks`.
+
+Left: the writer's *plan* still lists the space once per plan, and the pages store plans each part apart (an undo of a
+large deletion plans as many lists): to measure with a large database before changing the store.
+
+### What next (2026-11-09, talked over with the user)
+
+**The order**, and why:
+
+1. **`feat/database` into `main`**: the platform and the page writer (`shared/platform.ts`, `shared/pages/`), which the
+   other plugins are to stand on, are only on this branch; every week more makes the merge dearer.
+2. **The store plan brought up to date** (docs/silverware-table-store-plan.md on `refactor/table-store`): its status (it
+   waits for views, which are on main), the platform and the writer as done, sources (`defineSource`) as its second store,
+   its list of modules (views, calculated tables, choice lists by formula, sources came since), and its scope widened: the
+   user's aim is that **no plugin depends on where it runs**, not the table alone.
+3. **The platform for every plugin** (the store plan's step 1, widened): Silverware Toolbar and Chart have small bridges,
+   Silverware Tags reads pages through a `Space` of its own (*Left open after step 2b*); the cheapest step to the aim.
+4. **The table's store** (the store plan's steps 2 to 7).
+5. **Formulas in a database**, after the store: their work is to take the formulas' domain off markdown (`TableSource`,
+   the metadata, names: about 6,100 lines tied to the table in many places, the conditions' domain about 1,800 tied in
+   two), which is the store plan's step 3 (*domains on the model*); done before it, the formulas' interface to tables would
+   be designed twice.
+
+**Conditional formatting** (docs/silverware-database-conditional-formatting.md) is apart from that order and smaller: any
+time between its steps. It does not wait for formulas: the domain's 20 conditions with their parameters cover the usual
+rules (a number over 500, a date before today or within 7 days, a status of a value, top 10 %, empty); what only a formula
+says is two properties compared (`[@spent] > [@budget]`), conditions joined in one rule, a calculation. Nothing is written
+twice: a rule is stored as its condition and parameters, never as a formula, and formulas add the domain's condition
+`formula` beside the others, as the table has both.
+
+**Formulas in a database**, when they come (talked over, not decided in detail):
+
+* A database as a source of Silverware Table's formulas (`@tasks`, `defineSource`'s shape): small, and much at once (pivots,
+  views, `SUMIFS`/`COUNTIFS` over a database: what rollups would give, matched by text).
+* A formula property: `[@due]` the item's value, `[hours]` the property over every item, the table's language; to decide
+  then: calculated as shown, or written into the item's frontmatter (a query sees it, a change writes many pages);
+  following a property's key changed; cycles.
+* **A select's options by a formula** (as the table's choice lists by a formula: `options: '=@clients[name]'`,
+  `=FILTER(@users[name], @users[active])`, `=SORT(UNIQUE([project]))`): renaming an option is then its source's, not
+  Options' (an item holding an old value shows as none of the options, nothing lost); colors stay by value; the order is
+  the formula's. A cheaper form with no formulas, where options come from another database: `options: { from: clients,
+  property: name }`, doable at any time.
+
+**Relations and rollups**, weighed again: most of what they give is there or comes otherwise. A **Reference** already links
+items to pages in the frontmatter as wiki links, which SilverBullet's rename follows (probe 2, main's build of 2026-10, not
+2.12.1); a database as a source with `SUMIFS` gives a rollup's numbers; formulas in a database would give the rest. What
+only a relation gives is **its other side shown in the database's views** (a project listing its tasks, made of the links
+to it, nothing written into the project). So they stay last, perhaps never; to be asked again when a user misses that side.
 
 ### Properties shown per view, and the view's look (2026-11-09, decided with the user)
 

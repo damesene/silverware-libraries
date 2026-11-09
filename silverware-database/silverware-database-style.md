@@ -13,6 +13,11 @@ The look of [Silverware Database](silverware-database.md): a database's place (i
 /* (On a touch screen SilverBullet shows its widget menu always, `display: block !important` by
    #sb-main .cm-editor .sb-lua-directive-block .button-bar in (hover: none) and (pointer: coarse), seen on a phone
    2026-11-09: its id and three classes outweigh two, so this names the same path, the widget's own class beside it) */
+/* (SilverBullet's frame of a widget, #sb-main .cm-editor .sb-lua-directive-block { border: 1px solid … }: none round a
+   database, which draws its own; the same path, the widget's own class beside it, outweighs it) */
+#sb-main .cm-editor .swd-widget.sb-lua-directive-block {
+  border: none;
+}
 .swd-widget .button-bar,
 #sb-main .cm-editor .swd-widget.sb-lua-directive-block .button-bar,
 .swd-widget .sb-widget-menu-bar,

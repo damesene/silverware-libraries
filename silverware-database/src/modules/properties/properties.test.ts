@@ -314,6 +314,16 @@ describe("the properties' dialog", () => {
     typeOption(optionNames()[1]!, "Finished");
     addOption("Doing");
     expect(optionNames().map((one) => one.value)).toEqual(["Todo", "Finished", "Doing"]);
+    // Add beside the field, as Enter: off while nothing is typed, the field focused again for another
+    const field = () => document.querySelector<HTMLInputElement>('[data-property="status"] .swd-option-new')!;
+    const add = () => document.querySelector<HTMLButtonElement>('[data-property="status"] .swd-option-add')!;
+    expect(add().disabled).toBe(true);
+    field().value = "Later";
+    field().dispatchEvent(new Event("input"));
+    expect(add().disabled).toBe(false);
+    add().click();
+    expect([optionNames().map((one) => one.value), document.activeElement, add().disabled]).toEqual([["Todo", "Finished", "Doing", "Later"], field(), true]);
+    document.querySelectorAll<HTMLButtonElement>('[data-property="status"] .swd-option-remove')[3]!.click();
     // (No item holds Done: the schema alone, written at once)
     await save();
     expect((await schema())[0]!.params).toEqual({ options: ["Todo", "Finished", "Doing"], colors: { Finished: "green" } });

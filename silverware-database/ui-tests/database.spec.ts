@@ -1315,9 +1315,14 @@ test("a select's Multiple turned on in Properties writes it into the root page a
   await choose(page, "Properties");
   await page.locator('[data-property="status"] .swd-prop-head').click();
   await page.locator('[data-property="status"] .swd-property-setting[data-param="multiple"] input').click();
+  // An option added by Add beside its field, as Enter adds one
+  await page.locator('[data-property="status"] .swd-option-new').fill("Later");
+  await page.locator('[data-property="status"] .swd-option-add').click();
+  await expect(page.locator('[data-property="status"] .swd-option-name').last()).toHaveValue("Later");
   await page.locator(".swd-properties-save").click();
   await page.locator(".swd-property-apply").click();
   await expect.poll(() => space.saved("Page/db-tasks")).toContain("multiple: true");
+  expect(await space.saved("Page/db-tasks")).toContain("options: [Todo, Done, Later]");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("status: [Todo]");
   // Edited by its boxes now, one ticked more written as a list of both
   await page.locator('tbody tr:first-child td[data-key="status"]').click();

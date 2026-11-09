@@ -3437,9 +3437,34 @@ button.swd-editor-document-folder:hover,
   width: 14px;
   height: 14px;
 }
-.swd-properties .swd-option-new {
+/* A new option: its field and Add beside it, as high as the field, off while nothing is typed */
+.swd-option-add-row {
+  display: flex;
+  gap: 6px;
   margin-left: 28px;
+}
+.swd-properties .swd-option-new {
+  flex: 1 1 auto;
+  min-width: 0;
   border-style: dashed;
+}
+.swd-option-add {
+  flex: none;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--swd-line);
+  border-radius: 6px;
+  color: inherit;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.swd-option-add:hover:not(:disabled) {
+  background: var(--swd-hover);
+}
+.swd-option-add:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .swd-option-palette {
   display: flex;

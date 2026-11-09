@@ -810,15 +810,27 @@ export class PropertiesDialog {
       return row;
     };
     drawRows();
+    // A new option: typed, then Enter or Add beside the field (off while nothing is typed); the field focused again, for another
     const added = el(doc, "input", { class: "swd-option-new", attrs: { placeholder: "+ Add option", "aria-label": `Add an option to ${property.label}` } });
+    const addButton = el(doc, "button", { class: "swd-option-add", text: "Add", title: "Add the option typed (Enter)", attrs: { disabled: "", "aria-label": `Add the option typed to ${property.label}` } });
+    const add = () => {
+      const text = added.value.trim();
+      if (!text) return;
+      this.edited(() => drafts.push({ was: undefined, text, color: undefined }));
+      this.body?.querySelector<HTMLElement>(`[data-property="${CSS.escape(entry.id)}"] .swd-option-new`)?.focus();
+    };
+    added.addEventListener("input", () => (addButton.disabled = !added.value.trim()));
     added.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" || !added.value.trim()) return;
       event.preventDefault();
-      const text = added.value.trim();
-      this.edited(() => drafts.push({ was: undefined, text, color: undefined }));
-      this.body?.querySelector<HTMLElement>(`[data-property="${CSS.escape(entry.id)}"] .swd-option-new`)?.focus();
+      add();
     });
-    return el(doc, "div", "swd-prop-field swd-prop-options", el(doc, "span", "swd-prop-field-name", "Options"), el(doc, "div", "swd-options-box", rows, palette, added));
+    addButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      add();
+    });
+    const addRow = el(doc, "div", "swd-option-add-row", added, addButton);
+    return el(doc, "div", "swd-prop-field swd-prop-options", el(doc, "span", "swd-prop-field-name", "Options"), el(doc, "div", "swd-options-box", rows, palette, addRow));
   }
 
   /** An option's colors to pick, under its row (Auto: its place's; Custom…: one of your own) */

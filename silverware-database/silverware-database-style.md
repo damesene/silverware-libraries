@@ -1153,9 +1153,30 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 .swd-suggest-item[aria-selected="true"] {
   background: var(--swd-hover);
 }
-/* A value typed besides the options (a person's with Anyone): a field under the boxes, a value added there ticked above it */
-.swd-editor-add {
+/* A value typed besides the options (a person's with Anyone): a field under the boxes and Add beside it, a value added
+   there ticked above them */
+.swd-editor-add-row {
+  display: flex;
+  gap: 4px;
   margin-top: 4px;
+}
+.swd-editor-add-button {
+  flex: none;
+  padding: 2px 8px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--button-border-color, currentColor);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swd-editor-add-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.swd-editor-add {
+  flex: 1 1 auto;
+  min-width: 0;
   font: inherit;
   color: inherit;
   background: var(--root-background-color);

@@ -217,8 +217,10 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
       return made.box;
     });
     // A value typed besides the options, where the type takes one (a person's with Anyone): a field under the boxes, Enter
-    // in it adding what it reads as (ticked, a box of its own where none is), the field empty again for another
+    // in it or Add beside it adding what it reads as (ticked, a box of its own where none is), the field empty again for another
     const adder = type.takesTyped?.(property.params) ? el(doc, "input", { class: "swd-editor-add", attrs: { type: "text", placeholder: "Add…", "aria-label": `Add to ${property.label}` } }) : undefined;
+    const addButton = adder ? el(doc, "button", { class: "swd-editor-add-button", text: "Add", title: "Add what is typed (Enter)", attrs: { disabled: "" } }) : undefined;
+    const addRow = adder && addButton ? el(doc, "div", "swd-editor-add-row", adder, addButton) : undefined;
     const add = (): string | undefined => {
       if (!adder || adder.value.trim() === "") return undefined;
       const parsed = type.parse(adder.value, property.params);
@@ -228,26 +230,41 @@ export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: 
         if (there) there.checked = true;
         else {
           const made = choice(one, true);
-          adder.before(made.label);
+          addRow!.before(made.label);
           boxes.push(made.box);
         }
       }
       adder.value = "";
+      addButton!.disabled = true;
       return undefined;
     };
-    if (adder) {
-      panel.append(adder);
-      adder.addEventListener("input", () => adder.setCustomValidity(""));
-      adder.addEventListener("keydown", (event) => {
-        // (Enter with nothing typed saves, as anywhere in the panel)
-        if (event.key !== "Enter" || adder.value.trim() === "") return;
-        event.preventDefault();
-        event.stopPropagation();
+    if (adder && addButton && addRow) {
+      panel.append(addRow);
+      // (Added as Enter does, the problem said in the field; the focus left in it, for another)
+      const addTyped = () => {
         const problem = add();
         if (problem) {
           adder.setCustomValidity(problem);
           adder.reportValidity();
         }
+      };
+      adder.addEventListener("input", () => {
+        adder.setCustomValidity("");
+        addButton.disabled = adder.value.trim() === "";
+      });
+      adder.addEventListener("keydown", (event) => {
+        // (Enter with nothing typed saves, as anywhere in the panel)
+        if (event.key !== "Enter" || adder.value.trim() === "") return;
+        event.preventDefault();
+        event.stopPropagation();
+        addTyped();
+      });
+      // (A press keeps the field's focus: the panel is not left, nothing saved by it)
+      addButton.addEventListener("mousedown", (event) => event.preventDefault());
+      addButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        addTyped();
+        adder.focus({ preventScroll: true });
       });
     }
     const commit = () => {

@@ -401,8 +401,14 @@ describe("the built-in views' editors", () => {
       ["eve", true],
     ]);
     expect([adder.value, writes]).toEqual(["", []]);
+    // Add beside the field, as Enter: off while nothing is typed
+    const button = cell.querySelector<HTMLButtonElement>(".swd-editor-add-button")!;
+    expect(button.disabled).toBe(true);
     adder.value = "bob";
-    key(adder, "Enter");
+    adder.dispatchEvent(new Event("input"));
+    expect(button.disabled).toBe(false);
+    button.click();
+    expect([adder.value, button.disabled, document.activeElement]).toEqual(["", true, adder]);
     // Enter with nothing typed saves; what is typed and not added yet goes with it
     adder.value = "zoe";
     key(cell.querySelector(".swd-editor")!, "Enter");

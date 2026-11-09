@@ -939,17 +939,19 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   --swd-pill: 128, 128, 128;
   display: inline-block;
   max-width: 100%;
-  margin: 1px 4px 1px 0;
+  /* (Within a line of the text around it, never taller: a table's row with one as high as one without) */
+  margin: 0 4px 0 0;
   padding: 0 7px;
   overflow: hidden;
   border-radius: 4px;
   color: color-mix(in srgb, rgb(var(--swd-pill)) 55%, var(--root-color, #000));
   background: color-mix(in srgb, rgb(var(--swd-pill)) 16%, var(--root-background-color, #fff));
   font-size: 0.9em;
-  line-height: 1.6;
+  line-height: 1.5;
   text-overflow: ellipsis;
   white-space: nowrap;
-  vertical-align: baseline;
+  /* (Its box from the line's top: on the baseline, its smaller font's box sat lower and the line grew) */
+  vertical-align: top;
 }
 /* The palette (domain/colors.ts: gray, blue, green, yellow, orange, red, purple, pink), each `r, g, b`: a select's options
    and an item's color by their place in it. A space-style may set them anew */

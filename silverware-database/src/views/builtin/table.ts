@@ -14,7 +14,7 @@ import type { ViewDefinition, ViewHost } from "../../core/view.ts";
 import type { Item, Property } from "../../model/database.ts";
 import { editValue, NAME, toggle } from "../editors.ts";
 import { createInGroup, foldedOf, groupHead, setFolded } from "../groups.ts";
-import { ownIcon } from "../icons.ts";
+import { ownIcon, VIEW_ICONS } from "../icons.ts";
 import { rowGrip } from "../order.ts";
 import { missing, problemOf, valueNodes } from "../values.ts";
 
@@ -164,15 +164,17 @@ function headLabel(doc: Document, label: string, arrow: string | undefined): Nod
 /** What a cell shows: the name with a button opening its page, a checkbox turned by a click, else the value's text */
 function content(host: ViewHost, item: Item, column: Column): Node[] {
   const doc = host.document;
-  // The name and its ↗ in one line of text: the ↗ right after the name's last word, held to it (never on a line of its own,
-  // never off at the cell's edge where the name wraps)
+  // The name and its Open in one line of text: Open right after the name's last word, held to it (never on a line of its own,
+  // never off at the cell's edge where the name wraps), as a touch screen shows it; a mouse's laid over the cell's right end
   if (column.key === NAME) {
-    // (Its ↗ drawn by the style page: the name's text is the name alone)
-    const open = el(doc, "button", { class: "swd-open", title: `Open ${item.name}`, attrs: { "aria-label": `Open ${item.name}` }, run: () => void host.open(item) });
+    // (Its icon, a page's; its word "Open" the style page's, where the cell has room: the name's text is the name alone)
+    const open = el(doc, "button", { class: "swd-open", title: `Open ${item.name}`, html: VIEW_ICONS.item, attrs: { "aria-label": `Open ${item.name}` }, run: () => void host.open(item) });
     const cut = item.name.search(/\S+\s*$/);
     const head = cut > 0 ? item.name.slice(0, cut) : "";
     const last = item.name.slice(head.length);
-    return [el(doc, "span", "swd-table-name", host.look.icon(item), head, el(doc, "span", "swd-table-name-end", last, open))];
+    // (In a box of its own, which a mouse's style page lays over the whole cell: the button at its right end, its label as
+    // the cell's width allows)
+    return [el(doc, "span", "swd-table-name", host.look.icon(item), head, el(doc, "span", "swd-table-name-end", last, el(doc, "span", "swd-open-room", open)))];
   }
   const { property } = column;
   if (property && host.type(property).look === "check") {

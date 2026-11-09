@@ -1191,7 +1191,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 .swd-table td.swd-editing {
   z-index: 1;
 }
-/* The name's cell: its ↗ right after the last word, the two held on one line; never narrower than a few words (a phone) */
+/* The name's cell: its Open right after the last word, the two held on one line (a touch screen's); never narrower than a few words (a phone) */
 .swd-table-name {
   overflow-wrap: anywhere;
 }
@@ -1202,37 +1202,49 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 .swd-table-sort-end {
   white-space: nowrap;
 }
-/* A row's Open: with a mouse a small chip right after the name's last word, shown as the row is hovered (below), laid over
-   the cell (its room kept by the cell's padding: a ↗'s, not a word's, the column hardly wider), saying "↗ Open" as it is
-   hovered itself, over what is right of it then (as Notion's); on a touch screen its ↗ alone after the name, with room for a
-   finger round it */
-.swd-table-name .swd-open::before {
-  content: "↗";
+/* A row's Open: with a mouse a chip at the right end of the name's cell, laid over the name (as Notion's: it takes no room
+   of the column), shown as the row is hovered (below): its icon (a page) alone in a narrow cell, with "Open" where the cell
+   has room (its box laid over the whole cell, measured as a container: a table's cell cannot be one without losing its
+   width); on a touch screen its icon alone right after the name, with room for a finger round it */
+.swd-table .swd-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: -0.15em;
+}
+.swd-table .swd-open svg {
+  width: 14px;
+  height: 14px;
 }
 @media (hover: hover) {
-  .swd-table td[data-key="name"] {
-    padding-right: 34px;
+  .swd-table td[data-key="name"] .swd-open-room {
+    position: absolute;
+    inset: 0;
+    container-type: inline-size;
+    pointer-events: none;
   }
-  .swd-table td[data-key="name"] .swd-table-name-end {
-    position: relative;
-  }
-  .swd-table-name .swd-open:is(:hover, :focus-visible)::before {
-    content: "↗ Open";
+  @container (min-width: 10em) {
+    .swd-table-name .swd-open::after {
+      content: "Open";
+    }
   }
   .swd-table td[data-key="name"] .swd-open {
     position: absolute;
+    /* (In the middle of the cell's height) */
     top: 50%;
-    left: calc(100% + 6px);
-    z-index: 2;
-    margin: 0;
+    right: 6px;
     transform: translateY(-50%);
-    padding: 1px 6px;
+    margin: 0;
+    padding: 4px 8px;
     border: 1px solid var(--swd-line);
     border-radius: 6px;
     color: var(--swd-quiet);
-    background: var(--root-background-color, #fff);
+    /* (Opaque, over the name: the page's background a little lighter, as a surface of its own) */
+    background: color-mix(in srgb, var(--root-color, currentColor) 6%, var(--root-background-color, #fff));
     font-size: 0.8em;
-    line-height: 1.6;
+    line-height: 1.2;
+    white-space: nowrap;
+    pointer-events: auto;
     opacity: 1;
     transition: background-color 0.12s, border-color 0.12s, color 0.12s;
   }
@@ -1240,13 +1252,17 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   .swd-table td[data-key="name"] .swd-open:focus-visible {
     border-color: var(--swd-accent);
     color: var(--swd-accent);
-    background: color-mix(in srgb, var(--swd-accent) 10%, var(--root-background-color, #fff));
+    background: color-mix(in srgb, var(--swd-accent) 12%, var(--root-background-color, #fff));
   }
 }
 @media (hover: none) {
+  .swd-open-room {
+    display: contents;
+  }
   .swd-table .swd-open {
     margin: -10px -10px -10px -2px;
     padding: 10px;
+    color: var(--swd-quiet);
     opacity: 1;
   }
 }
@@ -1343,7 +1359,7 @@ li:hover .swd-row-grip,
 tr:focus-within .swd-open {
   opacity: 1;
 }
-/* With a mouse, a row's ↗ and ✕ show only as it is hovered or has the focus (a touch screen shows them always) */
+/* With a mouse, a row's Open and ✕ show only as it is hovered or has the focus (a touch screen shows them always) */
 @media (hover: hover) {
   .swd-table tbody tr:not(:hover):not(:focus-within) .swd-open,
   .swd-table tbody tr:not(:hover):not(:focus-within) .swd-remove {

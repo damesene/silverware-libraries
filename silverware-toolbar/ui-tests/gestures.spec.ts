@@ -1,6 +1,6 @@
 // The gestures module's button with a mouse: a click runs its first action, dragged up its second
 import type { Page } from "@playwright/test";
-import { addGesture, barButton, boxOf, expect, gestureButton, popup, select, selected, test, text } from "./helpers.ts";
+import { addGesture, bar, barButton, boxOf, expect, gestureButton, popup, select, selected, test, text } from "./helpers.ts";
 
 /** The gesture button dragged from its middle up by `dy` px (negative: down), in steps, then let go where `back` says */
 async function dragUp(page: Page, dy: number, back = 0): Promise<void> {
@@ -123,6 +123,44 @@ test.describe("The gesture button", () => {
     await dragUp(page, (await boxOf(gestureButton(page))).height);
     await expect.poll(() => text(page)).toContain("Select %%some text%% in this page");
     expect(await selected(page)).toBe("some text");
+  });
+
+  test("Toolbar on a swipe: picked for the slot, its slot's panel open at its parameter; the swipe switches to that toolbar at once", async ({ page }) => {
+    await addGesture(page, "bold", undefined);
+    await barButton(page, "actions.more").click();
+    await popup(page).locator(".swb-search-field").fill("settings");
+    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
+    const dialog = page.locator(".swb-settings");
+    await dialog.locator('[data-swb-tab="toolbars"]').click();
+    const gesture = dialog.locator(".swb-settings-kind").last();
+    const look = dialog.locator("[data-swb-look]");
+    const slot = look.locator('[data-swb-slot="up"]');
+    await gesture.click();
+    await slot.click();
+    await look.locator(".swb-settings-look-change").click();
+    // Toolbar alone, its toolbars not offered apart
+    await dialog.locator(".swb-settings-pick-field").fill("test touch");
+    await expect(dialog.locator(".swb-settings-pick", { hasText: "Test touch" })).toHaveCount(0);
+    await dialog.locator(".swb-settings-pick-field").fill("toolbar");
+    await dialog.locator(".swb-settings-pick").filter({ has: page.locator(".swb-settings-pick-label", { hasText: /^Toolbar$/ }) }).click();
+    // The slot's panel, at the switch's parameter, focused: none given yet
+    await expect(look.locator(".swb-settings-look-action")).toHaveText("Toolbar");
+    const param = look.locator('[data-swb-param="toolbar"] select');
+    await expect(param).toBeFocused();
+    await expect(param).toHaveValue("");
+    await param.selectOption("Test touch");
+    // Back in the item's panel: the slot named by its toolbar
+    await look.locator(".swb-settings-look-close").click();
+    await expect(slot).toContainText("Test touch");
+    await dialog.locator(".swb-settings-save").click();
+    await expect(dialog).toHaveCount(0);
+    await select(page, "some text");
+    await expect(gestureButton(page)).toHaveAttribute("aria-label", "Bold (swipe up: Test touch)");
+    await expect(bar(page)).not.toHaveClass(/swb-docked/);
+    await dragUp(page, (await boxOf(gestureButton(page))).height);
+    // No list: Test touch's, docked at the bottom, at once
+    await expect(page.locator(".swb-menu.swb-visible")).toHaveCount(0);
+    await expect(bar(page)).toHaveClass(/swb-docked/);
   });
 
   test("dragged up past half its height: its second face rolls in, lit, and let go runs the second action", async ({ page }) => {

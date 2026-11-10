@@ -19,7 +19,9 @@ describe("Excel", () => {
       },
       revokeObjectURL: () => {},
     });
+    // As a browser: the link's click dispatched, the file downloaded unless something cancelled it
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      if (!this.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }))) return;
       const blob = blobs.get(this.href)!;
       void blob.arrayBuffer().then((buffer) => downloads.push({ name: this.download, bytes: new Uint8Array(buffer) }));
     });

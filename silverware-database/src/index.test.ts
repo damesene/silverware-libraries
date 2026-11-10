@@ -45,13 +45,14 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 // A module of its own for each test: what Silverware Database keeps across loads of Space Lua (its core, its history) is the
 // module's, and each test has a space of its own
 let defineViews: typeof import("./index.ts").defineViews;
+let defineConverters: typeof import("./index.ts").defineConverters;
 let init: typeof import("./index.ts").init;
 let render: typeof import("./index.ts").render;
 let resetDefinitions: typeof import("./index.ts").resetDefinitions;
 let runCommand: typeof import("./index.ts").runCommand;
 beforeEach(async () => {
   vi.resetModules();
-  ({ defineViews, init, render, resetDefinitions, runCommand } = await import("./index.ts"));
+  ({ defineConverters, defineViews, init, render, resetDefinitions, runCommand } = await import("./index.ts"));
 });
 
 afterEach(() => {
@@ -102,6 +103,13 @@ describe("Silverware Database in SilverBullet", () => {
     init(bridge);
     expect(defineViews([...VIEWS, VIEWS[0]!])).toContain("defined twice");
     expect(defineViews([{ ...VIEWS[0]!, name: "c" }])).toBeUndefined();
+  });
+
+  it("says what of the converters defined cannot be one, the definitions a list or a function giving one", () => {
+    const tasks = { name: "tasks", label: "Tasks", read: () => undefined };
+    expect(defineConverters([tasks, { name: "Bad" }])).toContain(`"Bad" is no converter's name`);
+    expect(defineConverters(() => [tasks])).toBeUndefined();
+    expect(defineConverters("nope")).toBe("Silverware Database: definitions are a list, or a function giving one");
   });
 
   it("takes the blocks shown over as it starts again, drawn and written as before", async () => {

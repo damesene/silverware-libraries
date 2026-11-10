@@ -1,8 +1,9 @@
 // Silverware Database in SilverBullet: what the library's pages call. The init
 // page hands over SilverBullet's API (`init`), draws each `silverware-database`
 // block through `render`, tells the index's changes (`indexChanged`) and runs
-// the commands; the API page defines the user's own views and types
-// (`defineViews`, `defineTypes`), before `init`, as Space Lua loads.
+// the commands; the API page defines the user's own views, types and
+// converters (`defineViews`, `defineTypes`, `defineConverters`), before
+// `init`, as Space Lua loads.
 import { iconsOf } from "../../shared/icons.ts";
 import { type ConflictHost, openConflict } from "./core/conflictdialog.ts";
 import type { ItemConflict } from "./core/core.ts";
@@ -19,6 +20,8 @@ import { DatabasePlace } from "./core/place.ts";
 import { openDeleteDatabase } from "./core/deletedatabase.ts";
 import { SettingsDialog } from "./core/settings.ts";
 import type { ViewDefinition } from "./core/view.ts";
+import { type ConverterDefinition, ConverterRegistry, validateConverter } from "./core/converter.ts";
+import type { Named } from "./core/registry.ts";
 import { validateView, ViewRegistry } from "./core/views.ts";
 import { guardedType, TYPE_HELPERS, validateType } from "./domain/types/custom.ts";
 import { VIEW_HELPERS } from "./views/helpers.ts";
@@ -30,15 +33,18 @@ import { type Bridge, editorArea, editorLook, silverBulletPlatform, watchEditorA
 import { PagesStore } from "./store/pages/store.ts";
 import { BUILT_IN_MODULES } from "./modules/builtin.ts";
 import { BUILT_IN_VIEWS } from "./views/builtin/index.ts";
+import { BUILT_IN_CONVERTERS } from "./converters/builtin/index.ts";
 
 export type { Bridge } from "./host/silverbullet/platform.ts";
 
 // The registries, defined into as Space Lua loads (before `init`: the API page has priority 50)
 const views = new ViewRegistry(BUILT_IN_VIEWS);
 const types = new TypeRegistry();
-// The user's views by name (one defined again: the last), in the order first defined
+const converters = new ConverterRegistry(BUILT_IN_CONVERTERS);
+// The user's views (and converters) by name (one defined again: the last), in the order first defined
 let customViews = new Map<string, ViewDefinition>();
 let customTypes = new Map<string, PropertyType>();
+let customConverters = new Map<string, ConverterDefinition>();
 // A failure of a custom type told once per page load (a view asks a type for every value it shows)
 const typeFailures = new Set<string>();
 
@@ -263,28 +269,50 @@ export async function runCommand(name: string): Promise<void> {
 export function resetDefinitions(): void {
   customViews = new Map();
   customTypes = new Map();
+  customConverters = new Map();
   typeFailures.clear();
   views.define([]);
   types.define([]);
+  converters.define([]);
 }
 
 /** The user's views (a JS module's: a list, or a function giving one); what cannot be a view said, the others defined */
 export function defineViews(definitions: unknown): string | undefined {
   const list = listOf(definitions, VIEW_HELPERS);
   if (typeof list === "string") return list;
-  // Only the views that can be one kept, by name: a mistake (a view defined twice in this call) said once, not with later ones
-  const problems: string[] = [];
-  const named = new Set<string>();
-  for (const one of list as ViewDefinition[]) {
-    const problem = validateView(one) ?? (named.has(one.name) ? `the view "${one.name}" is defined twice: the last kept` : undefined);
-    if (problem) problems.push(problem);
-    if (validateView(one)) continue;
-    named.add(one.name);
-    customViews.set(one.name, one);
-  }
+  const problems = keepDefined(list as ViewDefinition[], customViews, validateView, "view");
   views.define([...customViews.values()]);
   redrawAll();
   return problems.length ? `Silverware Database: ${problems.join("; ")}` : undefined;
+}
+
+/** The user's converters (a JS module's: a list, or a function giving one); what cannot be a converter said, the others defined */
+export function defineConverters(definitions: unknown): string | undefined {
+  const list = listOf(definitions, {});
+  if (typeof list === "string") return list;
+  const problems = keepDefined(list as ConverterDefinition[], customConverters, validateConverter, "converter");
+  converters.define([...customConverters.values()]);
+  return problems.length ? `Silverware Database: ${problems.join("; ")}` : undefined;
+}
+
+/**
+ * A call's definitions kept by name (one defined again, in this call or an earlier one: the last), in the order first
+ * defined; what cannot be one, and one defined twice in this call, said once
+ */
+function keepDefined<T extends Named>(list: readonly T[], kept: Map<string, T>, validate: (one: T) => string | undefined, kind: string): string[] {
+  const problems: string[] = [];
+  const named = new Set<string>();
+  for (const one of list) {
+    const problem = validate(one);
+    if (problem) {
+      problems.push(problem);
+      continue;
+    }
+    if (named.has(one.name)) problems.push(`the ${kind} "${one.name}" is defined twice: the last kept`);
+    named.add(one.name);
+    kept.set(one.name, one);
+  }
+  return problems;
 }
 
 /** The user's property types (a JS module's: a list, or a function giving one) */

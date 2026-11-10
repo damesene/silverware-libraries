@@ -96,11 +96,12 @@ database to markdown, starts as *Copy as tasks* to the clipboard; a conversion i
 
 ## Shape
 
-* **A converter reads, a target writes.** A converter: `{ name, label, description, read(text) → rows, write?(items,
-  properties) → text }`; rows are neutral (`{ name, values, body }` and the values seen by key), knowing no database.
-  Inferring the schema from rows is a step of its own; writing goes through a target. The one target now is *a new
-  database* (the schema inferred, `createDatabase` and the items in one transaction); *an existing database* comes later
-  (keys mapped onto its properties, values converted), the converters unchanged.
+* **A converter reads, a target writes.** A converter (core/converter.ts): `{ name, label, description, read(text) }`,
+  `read` giving `{ properties, items }` (the properties the items need, each with its key, label, type; items
+  `{ name, values, body, tags }`), knowing no database; `write(items, properties) → text` comes with *Copy as tasks*.
+  What is made of it goes through a target. The one target now is *a new database* (`createDatabase` with the items, one
+  transaction); *an existing database* comes later (keys mapped onto its properties, values converted), the converters
+  unchanged.
 * **The core** gets generic steps only (a database made with its items in one transaction, definitions checked as
   `defineViews` / `defineTypes` are). Converters are a layer of their own, `converters/` beside `views/` (built-in ones in
   `converters/builtin/`, one per file, through the same API as a user's): like views they import only the core's types,
@@ -126,6 +127,7 @@ database to markdown, starts as *Copy as tasks* to the clipboard; a conversion i
    Silverware Table~~ (done 2026-11-10).
 3. ~~a) The store: an item made with its document's tags (`createItem`'s `tags`, beside `db`; `StoreRules.validateTag`);
    the core: `createDatabase(name, properties, items)`, a new database with its items in one transaction~~ (done
-   2026-11-10). b) `defineConverters`: the `converters/` layer, its registry and checks, the API page.
+   2026-11-10). ~~b) `defineConverters`: the `converters/` layer, its registry and checks (`core/converter.ts`; the
+   views' registry made one of any definitions, `core/registry.ts`), the API page~~ (done 2026-11-10).
 4. The tasks converter, the command, the block under the selection; a UI test.
 5. *Copy as tasks* from ⋯.

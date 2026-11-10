@@ -5,6 +5,7 @@
 // converters (`defineViews`, `defineTypes`, `defineConverters`), before
 // `init`, as Space Lua loads.
 import { iconsOf } from "../../shared/icons.ts";
+import { linesOf, linesUnder } from "../../shared/markdown/lines.ts";
 import { type ConflictHost, openConflict } from "./core/conflictdialog.ts";
 import type { ItemConflict } from "./core/core.ts";
 import type { Item } from "./model/database.ts";
@@ -92,6 +93,8 @@ const COMMANDS: Readonly<Record<string, () => Promise<void>>> = {
   "Silverware Database: New database": newDatabase,
   // A database's block at the cursor: a database picked, or a new one (also the slash command /database)
   "Silverware Database: Insert database": insertDatabase,
+  // The lines selected (or the cursor's line and those under it) made a new database, its block put under them
+  "Silverware Database: Convert selection to database": convertSelection,
   // The last change of any database put back (a view's Undo puts back its own database's)
   "Silverware Database: Undo": async () => {
     await app!.core.undo();
@@ -582,6 +585,61 @@ async function newDatabase(): Promise<void> {
 
 /** A database's block as written at the cursor (a line break before it: the cursor may be at the end of a line of text) */
 const blockText = (id: string) => `\n\`\`\`${BLOCK_LANGUAGE}\nid: ${id}\n\`\`\`\n`;
+
+/**
+ * The lines selected, whole (a cursor: its line with those under it), read by the converters; what one of them read
+ * (picked where several read anything) made a new database beside the page, its block put under the lines, and the
+ * lines selected again, so Delete takes them away where they are not wanted (docs/silverware-database-converters.md)
+ */
+async function convertSelection(): Promise<void> {
+  const { core, platform } = app!;
+  const { editor, ui } = platform;
+  if (!editor.selection || !editor.select) return void ui.notify("Silverware Database: this editor tells no selection", { type: "error" });
+  const text = await editor.text();
+  const selected = await editor.selection();
+  const range = selected.from === selected.to ? linesUnder(text, selected.from) : wholeLines(text, selected.from, selected.to);
+  const lines = text.slice(range.from, range.to);
+  const read = converters.all().flatMap((converter) => {
+    try {
+      const converted = converter.read(lines);
+      if (converted instanceof Promise) throw new Error("its read gives a promise: it is to give what it read at once");
+      return converted?.items.length ? [{ converter, converted }] : [];
+    } catch (error) {
+      ui.notify(`Silverware Database: the converter "${converter.name}" failed: ${error instanceof Error ? error.message : String(error)}`, { type: "error" });
+      return [];
+    }
+  });
+  if (!read.length) return void ui.notify("Silverware Database: nothing here to convert (select a list of tasks)", { type: "error" });
+  let chosen = read[0]!;
+  if (read.length > 1 && ui.pick) {
+    const picked = await ui.pick("Convert the lines as", read.map((one, at) => ({ name: one.converter.label, description: one.converter.description ?? "", at })));
+    if (!picked) return;
+    chosen = read[picked.at]!;
+  }
+  const name = await bridgePrompt("The new database's name");
+  if (!name?.trim()) return;
+  app!.home = String(await editor.documentName());
+  const result = await core.createDatabaseOf(name, chosen.converted);
+  if ("problem" in result) return;
+  // Under the lines as they are now (changed meanwhile: at the cursor, nothing selected), a blank line between: a selection
+  // touching the block shows its markdown, not the database
+  const now = await editor.text();
+  const block = `\`\`\`${BLOCK_LANGUAGE}\nid: ${result.id}\n\`\`\`\n`;
+  if (now.slice(range.from, range.to) !== lines) return insertAtCursor(blockText(result.id));
+  if (range.to < now.length) {
+    await editor.replace(range.to + 1, range.to + 1, `\n${block}`);
+    await editor.select(range.from, range.to + 1);
+  } else {
+    await editor.replace(range.to, range.to, `\n\n${block}`);
+    await editor.select(range.from, range.to);
+  }
+}
+
+/** The lines `from`..`to` touches, whole: where the first starts and the last ends */
+function wholeLines(text: string, from: number, to: number): { readonly from: number; readonly to: number } {
+  const lines = linesOf(text, Math.min(from, to), Math.max(from, to));
+  return { from: lines[0]!.from, to: lines.at(-1)!.to };
+}
 
 /** A database's block at the cursor: one of the space's picked, or New database… first (made as by its command) */
 async function insertDatabase(): Promise<void> {

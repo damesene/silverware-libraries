@@ -15,8 +15,8 @@ import { hasSystem, localStamp, tasksIn, withSystemValues } from "../domain/syst
 import type { Changes } from "../core/changes.ts";
 import type { DatabaseStore, LooseKey, VersionStatus, MigrationScope, Planned, SkipCause, Skipped, StoreCapabilities, Target, TransactionPlan, TransactionReport, WriteProgress } from "../core/store.ts";
 import { told } from "../core/store.ts";
-import type { Database, DatabaseSummary, Item, ItemKey, Revised, Value } from "../model/database.ts";
-import { draftTransaction, type ItemState, looseKeys, type RecordState, type StoreRules, type StoreState, takenNames, validateTagForm, withoutClashes } from "./transaction.ts";
+import { type Database, type DatabaseSummary, type Item, type ItemKey, type Revised, UNTITLED, type Value } from "../model/database.ts";
+import { draftTransaction, type ItemState, looseKeys, type RecordState, type StoreRules, type StoreState, takenNames, untakenName, validateTagForm, withoutClashes } from "./transaction.ts";
 
 /** The version of the form this store writes (a store in memory has one; a database seeded older or newer stands for one kept so) */
 export const MEMORY_VERSION = 1;
@@ -81,7 +81,7 @@ export class MemoryStore implements DatabaseStore {
     latestVersion: MEMORY_VERSION,
     validatePropertyKey: () => this.validatePropertyKey(),
     validateItemName: (name) => this.validateItemName(name),
-    validateTag: (name) => validateTagForm(name),
+    validateTag: (name) => this.validateTag(name),
     nameKey: (name) => name,
   };
   // When each item was made and last written, as a page's dates are kept (its system properties' Created and Modified)
@@ -340,6 +340,14 @@ export class MemoryStore implements DatabaseStore {
 
   validateItemName(name: string): string | undefined {
     return name.trim() === "" ? "an item needs a name" : undefined;
+  }
+
+  validateTag(name: string): string | undefined {
+    return validateTagForm(name);
+  }
+
+  keepableName(name: string, taken: readonly string[]): string {
+    return untakenName(name.trim() || UNTITLED, taken, this.rules.nameKey);
   }
 
   documentOf(): string | undefined {

@@ -154,6 +154,31 @@ describe("Silverware Database in SilverBullet", () => {
     expect(inserted[1]).toBe("\n```silverware-database\nid: ideas\n```\n");
   });
 
+  it("converts the lines selected into a new database, its block under them, the lines still selected", async () => {
+    const text = "Intro\n- [ ] Call @ada [due: 2026-11-12]\n  - [ ] sub\n- [x] Done #sales\nAfter\n";
+    const { memory, bridge } = bridgeOf({ Page: text }, "Page");
+    let selection = { from: text.indexOf("Call"), to: text.indexOf("#sales") };
+    init({ ...bridge, prompt: async () => "Calls", getSelection: async () => selection, setSelection: async (from, to) => void (selection = { from, to }) });
+    await runCommand("Silverware Database: Convert selection to database");
+    const page = memory.pages.get("Page")!;
+    const lines = "- [ ] Call @ada [due: 2026-11-12]\n  - [ ] sub\n- [x] Done #sales\n";
+    expect(page).toBe(`Intro\n${lines}\n\`\`\`silverware-database\nid: calls\n\`\`\`\nAfter\n`);
+    expect(page.slice(selection.from, selection.to)).toBe(lines);
+    expect(memory.pages.get("Page/db-calls/Call")).toContain("- [ ] sub");
+    expect(memory.pages.get("Page/db-calls/Done")).toMatch(/^---\ntags: \[db, sales\]/);
+  });
+
+  it("converts the cursor's line with those under it, and says where nothing is to convert", async () => {
+    const text = "- [ ] One\n  more\n- [ ] Two";
+    const { memory, bridge, told } = bridgeOf({ Page: text, Other: "plain text" }, "Page");
+    init({ ...bridge, prompt: async () => "One", getSelection: async () => ({ from: 3, to: 3 }), setSelection: async () => {} });
+    await runCommand("Silverware Database: Convert selection to database");
+    expect([...memory.pages.keys()].filter((name) => name.startsWith("Page/db-one/"))).toEqual(["Page/db-one/One"]);
+    init({ ...bridge, getText: async () => "plain text", getSelection: async () => ({ from: 0, to: 5 }), setSelection: async () => {} });
+    await runCommand("Silverware Database: Convert selection to database");
+    expect(told.at(-1)).toContain("nothing here to convert");
+  });
+
   it("keeps a change undoable as Space Lua loads again (a setting saved), its bridge a new one", async () => {
     const { memory, bridge } = bridgeOf({ Page: "text\n" }, "Page");
     init({ ...bridge, prompt: async () => "Ideas" });

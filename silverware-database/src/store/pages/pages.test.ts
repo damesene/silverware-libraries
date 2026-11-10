@@ -144,6 +144,16 @@ describe("the pages store", () => {
     expect(store.validateItemName("Fix login (2)")).toBeUndefined();
   });
 
+  it("makes a name one a page can have, none taken whatever its case, and refuses its own tags and SilverBullet's forbidden ones", () => {
+    const { store } = harness([]);
+    expect(store.keepableName("Ask @jana about #budget / Q4 [[x]] v1.2", [])).toBe("Ask jana about budget Q4 x v1-2");
+    expect(store.keepableName(".hidden", [])).toBe("hidden");
+    expect(store.keepableName("#@|", [])).toBe("Untitled");
+    expect(store.keepableName("Call", ["call", "Call (2)"])).toBe("Call (3)");
+    for (const tag of ["db", "db-root", "a//b", "#a"]) expect(store.validateTag(tag), tag).toBeDefined();
+    expect(store.validateTag("q4/plan")).toBeUndefined();
+  });
+
   it("keeps a property's name shown with its values in the root page, read back so", async () => {
     const { memory, store } = harness(SEED);
     const read = (await store.database("tasks"))!;

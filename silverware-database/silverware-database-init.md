@@ -34,6 +34,8 @@ if js and js.window then
     getText = editor.getText,
     replaceRange = editor.replaceRange,
     insertAtCursor = editor.insertAtCursor,
+    getSelection = editor.getSelection,
+    setSelection = editor.setSelection,
     moveCursor = editor.moveCursor,
     navigate = editor.navigate,
     -- A mention pressed: SilverBullet's Mention Inbox on that identity, the focus left in the editor (none before its inbox)

@@ -16,6 +16,9 @@ export type Bridge = {
   getText(): Promise<string>;
   replaceRange(from: number, to: number, text: string): Promise<void>;
   insertAtCursor(text: string): Promise<void>;
+  // What is selected in the page open, and a part of it selected (a text converted: its lines kept selected)
+  getSelection?(): Promise<{ readonly from: number; readonly to: number }>;
+  setSelection?(from: number, to: number): Promise<void>;
   // The cursor put at an offset of the page open (Edit source: a block with the cursor in it shows its markdown)
   moveCursor?(at: number): Promise<void>;
   navigate(ref: string): Promise<void>;
@@ -89,6 +92,8 @@ export function silverBulletPlatform(bridge: Bridge): {
       documentName: () => bridge.getCurrentPage(),
       text: () => bridge.getText(),
       replace: (from, to, insert) => bridge.replaceRange(from, to, insert),
+      ...(bridge.getSelection ? { selection: () => bridge.getSelection!() } : {}),
+      ...(bridge.setSelection ? { select: (from: number, to: number) => bridge.setSelection!(from, to) } : {}),
       open: (ref) => bridge.navigate(ref),
       ...(bridge.openMentions ? { openMention: (name: string) => bridge.openMentions!(`@${name.replace(/^@/, "").toLowerCase()}`) } : {}),
       // (As SilverBullet's own links: relative to its <base>, so it is right under a prefix too; encodePageURI in its

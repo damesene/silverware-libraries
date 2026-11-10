@@ -129,5 +129,24 @@ database to markdown, starts as *Copy as tasks* to the clipboard; a conversion i
    the core: `createDatabase(name, properties, items)`, a new database with its items in one transaction~~ (done
    2026-11-10). ~~b) `defineConverters`: the `converters/` layer, its registry and checks (`core/converter.ts`; the
    views' registry made one of any definitions, `core/registry.ts`), the API page~~ (done 2026-11-10).
-4. The tasks converter, the command, the block under the selection; a UI test.
+4. ~~The tasks converter, the command, the block under the selection; a UI test~~ (done 2026-11-10). As built:
+   * `converters/builtin/tasks.ts`; a key's type from its values in `converters/infer.ts` (people and links told by
+     their marks, a date and time, then `guessedType` as for loose values; several values in any item a select of
+     several options). Done tasks have Status *Done* where there is a Status.
+   * The text put at the top of an item's body is the task's text after its checkbox, not the whole line: the item's
+     page would hold a second task of the same.
+   * The body is dedented by the common indentation of the lines under the task (not by the task's own): a subtask
+     indented four spaces under its task stays a task, not indented code. A line under a task at the top level that is
+     no task (a paragraph after the list) goes into the body of the task before it too.
+   * A task of marks alone (`- [ ] [[Project X]]`) is named by their words. A person quoted (`[owner: "@ada"]`) is a
+     person. Days, some with a time: a date and time. A tag the store cannot give a page (`#db`) is left out of the
+     item's tags (its text keeps it); a key the model or the store refuses (`name`) and a label shown twice are made
+     others (`name_2`, `Tags 2`). The block goes after a blank line: a selection touching it shows its markdown.
+   * A name made one the store keeps is the store's: `DatabaseStore.keepableName(name, taken)` (the pages store: what a
+     page cannot hold a space, a dot before an end read as an extension a dash, `(2)` by its names whatever their
+     case). `DatabaseCore.createDatabaseOf(name, converted)` is the target *a new database*: names kept so, the source
+     put first in the body where the name is not it, a key the store refuses made another.
+   * The command *Silverware Database: Convert selection to database*: the lines selected whole, or the cursor's line
+     with those under it (`shared/markdown/lines.ts` `linesUnder`); the block put on the line after them, the lines
+     selected again (with their last line break); the text changed meanwhile: the block at the cursor.
 5. *Copy as tasks* from ⋯.

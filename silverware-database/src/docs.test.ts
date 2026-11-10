@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-// The library page's examples of a view and a type of your own, run as a space's
+// The library page's examples of a view, a type and a converter of your own, run as a space's
 // module would be: defined, then used, so the page shows what works.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { type ConverterDefinition, validateConverted, validateConverter } from "./core/converter.ts";
 import { DatabaseCore } from "./core/core.ts";
 import { DatabasePlace, VIEW_KEY } from "./core/place.ts";
 import type { ViewDefinition } from "./core/view.ts";
@@ -36,6 +37,18 @@ describe("the library page's examples", () => {
       throw new Error(problem);
     });
     expect([type.text(3, {}), type.parse("4", {}), type.parse("9", {}), type.validate(7, {}), type.validate(null, {})]).toEqual(["★★★", { value: 4 }, { problem: "1 to 5" }, "1 to 5", undefined]);
+  });
+
+  it("define a converter whose items make a database", async () => {
+    const [lines] = example("Library/me/converters.js", {}) as ConverterDefinition[];
+    expect(validateConverter(lines!)).toBeUndefined();
+    const converted = lines!.read("- First\n- Second\n");
+    expect(validateConverted(converted)).toBeUndefined();
+    const store = new MemoryStore();
+    const core = new DatabaseCore(store, new TypeRegistry(), { notify: () => {}, ask: () => true });
+    await core.createDatabaseOf("Ideas", converted!);
+    expect((await store.items("ideas")).value.map((item) => item.name)).toEqual(["First", "Second"]);
+    expect(lines!.read("\n")).toBeUndefined();
   });
 
   it("define a view that lists the items and edits a value in place", async () => {

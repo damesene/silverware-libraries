@@ -41,6 +41,16 @@ export type StoreRules = {
   nameKey(name: string): string;
 };
 
+/** A name none of `taken` is as `key` tells names apart: the name, else with (2), (3)… after it */
+export function untakenName(name: string, taken: readonly string[], key: (name: string) => string): string {
+  const keys = new Set(taken.map(key));
+  if (!keys.has(key(name))) return name;
+  for (let n = 2; ; n++) {
+    const one = `${name} (${n})`;
+    if (!keys.has(key(one))) return one;
+  }
+}
+
 /** Why a tag's name is none in any store (empty, spaces at an end, written with its #), undefined where it may be one */
 export function validateTagForm(name: string): string | undefined {
   if (!name.trim()) return "a tag needs a name";

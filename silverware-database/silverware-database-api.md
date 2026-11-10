@@ -33,7 +33,8 @@ if js and js.window then
     end
   end
   --- Your own converters of selected text into a database, from a JS module of the space; a mistake is shown, the others are defined.
-  --- @param definitions table a JS module's converters, e.g. js.importFromSpace("Library/me/csv.js")
+  --- @param definitions table a JS module's converters, e.g. js.importFromSpace("Library/me/converters.js")
+  --- @see Library/damesene/silverware-database#Your own views and types
   function silverware.database.defineConverters(definitions)
     local problem = silverwareDatabaseJs.defineConverters(definitions)
     if problem then

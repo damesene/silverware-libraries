@@ -12,6 +12,7 @@
 // that items still hold values under (a property removed) is not taken over,
 // and every transaction is undone by `undo`.
 import { type ItemPart, samePart } from "../domain/itempart.ts";
+import { keyFromLabel, slug } from "../domain/keys.ts";
 import { guessedType, optionsOfValues } from "../domain/loose.ts";
 import { systemKind } from "../domain/system.ts";
 import { sameLook, validateIcon, validateLook } from "../domain/look.ts";
@@ -21,8 +22,9 @@ import { inRankOrder, isRank, placeAt, ranksInOrder } from "../domain/rank.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
 import { optionsOf } from "../domain/types/options.ts";
 import { keptText } from "../domain/types/type.ts";
-import { type Database, type Item, type ItemKey, type ItemLook, isEmpty, isValue, NAME_KEY, type Params, type Property, type Revised, validatePropertyKey, type Value } from "../model/database.ts";
+import { type Database, type Item, type ItemKey, type ItemLook, isEmpty, isValue, NAME_KEY, type Params, UNTITLED, type Property, type Revised, validatePropertyKey, type Value } from "../model/database.ts";
 import { databaseChanges, type DatabaseChangesBuilder } from "./builder.ts";
+import { type Converted, validateConverted } from "./converter.ts";
 import type { Changes } from "./changes.ts";
 import { TransactionHistory } from "./history.ts";
 import { placeStateRenamed } from "./placestate.ts";
@@ -159,7 +161,6 @@ export function propertyEdit(property: Property, change: Partial<PropertyEdit> =
  */
 export type Place = { readonly after?: Item; readonly before?: Item; readonly values?: Readonly<Record<string, Value | undefined>> };
 
-const UNTITLED = "Untitled";
 
 /** From how many documents (pages) a write says it takes a while, not to be stopped: a change shown first, an undo asked first */
 const MANY_DOCUMENTS = 200;
@@ -531,6 +532,47 @@ export class DatabaseCore {
     if (plan.skipped.length) return this.refuse(`${label}: nothing was written: ${[...new Set(plan.skipped.map((one) => one.reason))].join("; ")}`);
     const result = await this.settle(label, await this.store.apply(plan), () => true);
     return "problem" in result ? result : { ...result, id };
+  }
+
+  /**
+   * A database made of what a converter read (a new one: the one target now; items added to one come later), as
+   * `createDatabase` makes one: each item named as the store keeps names, none twice; the text it was read from at the
+   * top of its body where its name is not that text; a property's key the store cannot keep made another, the items'
+   * values following it
+   */
+  async createDatabaseOf(name: string, converted: Converted): Promise<(Written & { readonly id: string }) | Refused> {
+    const problem = validateConverted(converted);
+    if (problem) return this.refuse(`What was read makes no database: ${problem}`);
+    const keys = new Map<string, string>();
+    const labels = new Set<string>();
+    const properties = converted.properties.map((one): NewProperty => {
+      // (A system property's key is its kind's, whatever is given; another's one the model and the store take, none twice)
+      let key = one.key;
+      if (one.system === undefined) {
+        const base = validatePropertyKey(one.key) ? keyFromLabel(one.key) : one.key;
+        key = base;
+        const taken = new Set(keys.values());
+        for (let n = 2; validatePropertyKey(key) || this.store.validatePropertyKey(key) || taken.has(key); n++) key = `${base}_${n}`;
+      }
+      keys.set(one.key, key);
+      // A label shown twice (an attribute's key clear of a property of the same name) told apart
+      let label = one.label;
+      for (let n = 2; labels.has(label.toLowerCase()); n++) label = `${one.label} ${n}`;
+      labels.add(label.toLowerCase());
+      return { label, type: one.type, key, ...(one.params ? { params: one.params } : {}), ...(one.system === undefined ? {} : { system: one.system }) };
+    });
+    const taken: string[] = [];
+    const items = converted.items.map((one): ItemDraft => {
+      const kept = this.store.keepableName(one.name, taken);
+      taken.push(kept);
+      const values = Object.fromEntries(Object.entries(one.values ?? {}).map(([key, value]) => [keys.get(key) ?? key, value]));
+      const source = one.source?.trim();
+      const body = source && source !== kept ? [source, one.body].filter(Boolean).join("\n\n") : one.body;
+      // (A tag the store cannot give a document, the database's own one, left: the text it was read from keeps it)
+      const tags = [...new Set(one.tags ?? [])].filter((tag) => !this.store.validateTag(tag));
+      return { name: kept, values, ...(body ? { body } : {}), ...(tags.length ? { tags } : {}) };
+    });
+    return this.createDatabase(name, properties, items);
   }
 
   /** Items made in a batch, at the end of the order in theirs (a database's first: `database` has none yet); why one cannot be */
@@ -1126,7 +1168,7 @@ export class DatabaseCore {
     }
     const label = property.label.trim();
     if (!label) return "A property needs a label";
-    const key = property.key ?? freeName(keyFrom(label), taken, "_");
+    const key = property.key ?? freeName(keyFromLabel(label), taken, "_");
     const problem = this.validateKey(key, properties);
     if (problem) return problem;
     const params = property.params ?? {};
@@ -1235,19 +1277,6 @@ function rankOthers(changes: DatabaseChangesBuilder, items: readonly Item[], oth
     const rank = others.get(item.key);
     if (rank !== undefined) changes.item(item, (i) => i.rank(rank));
   }
-}
-
-/** A text made a slug: ASCII letters and digits, lower case, the rest one separator */
-function slug(text: string, separator: string): string {
-  const parts = text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
-  return parts.join(separator);
-}
-
-/** A property's key from its label: `Due date` → `due_date`, starting with a letter */
-function keyFrom(label: string): string {
-  const key = slug(label, "_");
-  if (!key) return "property";
-  return /^[a-z]/.test(key) ? key : `p_${key}`;
 }
 
 /** A name none of `taken` is: the name, else with 2, 3… after it */

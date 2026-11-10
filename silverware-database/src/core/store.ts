@@ -115,6 +115,13 @@ export interface DatabaseStore {
   validatePropertyKey(key: string): string | undefined;
   /** Why an item's name cannot be kept by this store (a page's name: no `|`), undefined where it can */
   validateItemName(name: string): string | undefined;
+  /**
+   * A name made one this store keeps (what it cannot hold taken out, *Untitled* where nothing is left) and none of
+   * `taken`'s as the store tells names apart (`(2)`, `(3)`… after it): items named from a text (a converter's)
+   */
+  keepableName(name: string, taken: readonly string[]): string;
+  /** Why a document this store keeps an item in cannot have a tag of that name, undefined where it can */
+  validateTag(name: string): string | undefined;
   /** Where an item can be opened (a page's name), undefined where nowhere */
   documentOf(item: ItemKey): string | undefined;
   /** A database's own document (its root page), as last read; undefined where it has none */

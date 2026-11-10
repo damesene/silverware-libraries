@@ -23,6 +23,27 @@ export function linesOf(text: string, from: number, to: number): Line[] {
   return lines;
 }
 
+/** How wide a line's indentation is, a tab as four spaces */
+export const indentWidth = (line: string) => /^[ \t]*/.exec(line)![0].replace(/\t/g, "    ").length;
+
+/**
+ * The line at `at` with the lines under it, as a list's item holds its own (those indented more, blank lines among
+ * them): where they start and end (the last one's end, before its line break)
+ */
+export function linesUnder(text: string, at: number): { readonly from: number; readonly to: number } {
+  const [line] = linesOf(text, at, at);
+  const lines = linesOf(text, line!.from, text.length);
+  const width = indentWidth(line!.text);
+  let last = 0;
+  for (let i = 1; i < lines.length; i++) {
+    const { text: one } = lines[i]!;
+    if (!one.trim()) continue;
+    if (indentWidth(one) <= width) break;
+    last = i;
+  }
+  return { from: line!.from, to: lines[last]!.to };
+}
+
 // A fence: its character and how many (a block opened by ``` ends at a line of
 // as many backticks or more, not at ~~~); indented any amount, as in a list's item
 const FENCE_RE = /^\s*(`{3,}|~{3,})/;

@@ -101,6 +101,15 @@ Over its name, an item gets an **icon** and a **color** (shown as you hover the 
 
 **Color by** (in ⋯, each view its own, kept in its block) colors a view's items by a property of options (a select; a multiple select its first value): each item in its value's option's color, so a bar, a card or a line says its status at a glance, and changes as the value does or as the option's color is changed in **Properties**. An item's own color comes first.
 
+## Tasks made a database
+
+Select a list of tasks and run **Silverware Database: Convert selection to database** (with nothing selected: the task at the cursor and what is under it). You are asked for the database's name; it is made beside the page, its block is put under the lines, and the lines stay selected: press Delete where you no longer want them.
+
+* Each task at the list's top level is an item; what is under it (subtasks of any depth, other lines) is the item's text.
+* Its name is the task's text without its attributes; a hashtag, mention or link within a sentence stays as a word, those at its end are left out. Where the name is not the task's text, that text is the first line of the item's, so nothing is lost. What a page's name cannot hold (`/`, `#`, `@`…) becomes a space; a name taken gets `(2)`.
+* Its properties: **Done** (`[x]`); **Status** where a task has a state of its own (`[IN PROGRESS]`); one for each attribute, its type from the values (`[due: 2026-11-12]` a date, `[estimate: 3]` a number, `[owner: @ada]` a person, `[project: [[Web]]]` a reference, `[area: [web, api]]` or one name given twice a select of several options, anything else a text); **People** (the mentions), **Links** (the wiki links) and the page's **Tags** (the hashtags), where a task has any.
+* All of it is one change: **Silverware Database: Undo** takes the database away again (its block stays in the page, to remove by hand). A hashtag a page cannot have as a tag (`#db`, the database's own) stays in the item's text only.
+
 ## Nothing lost by mistake
 
 * A change is written only where what it changes is still as it was shown: a value, a name or a look changed meanwhile (by hand, elsewhere) is left as it is, and you are told. What else of the item changed meanwhile is kept, as only that one thing is written, so a name typed and left and a status picked at once are both written. The notification stays until you close it; its **Show conflict** shows each page's markdown as writing yours would change it (the lines as they are now and as they would be), **Open** for the page (a link: a middle click opens it in a tab of its own), **Keep theirs** and **Write mine**, which writes yours over it (undoable; where it changed again meanwhile, a new conflict is shown instead).
@@ -114,6 +123,7 @@ Views and property types of your own are JS modules of your space, given to Silv
 ```lua
 silverware.database.defineViews(js.importFromSpace("Library/me/views.js"))
 silverware.database.defineTypes(js.importFromSpace("Library/me/types.js"))
+silverware.database.defineConverters(js.importFromSpace("Library/me/converters.js"))
 ```
 
 A module gives a list of definitions, or a function that is given `HELPERS` and gives the list. A definition with a mistake is shown in a notification and left out; the others are defined. When Space Lua loads again (a script changed), the definitions it makes replace those of before. A view of a built-in one's name replaces it; a type needs a name of its own (the views draw and edit the built-in types, a list of options or a checkbox, by their names).
@@ -208,6 +218,32 @@ A property of it is `type: stars` in the database's properties (or chosen in **P
 A value is a text, a number, `true`/`false`, `null` or a list of texts. `HELPERS` are `keptText(value)` (a value as it is kept, as text), `isEmpty(value)` and `isValue(value)`.
 
 A type that throws or gives back the wrong kind of answer breaks nothing: the value shows as it is kept, a text typed is not written, and what failed is said once for each of its methods.
+
+### Converters
+
+A converter reads the lines selected for **Silverware Database: Convert selection to database**; where more than one reads anything, you pick which.
+
+```js
+// Library/me/converters.js: each line an item, named by it
+export default [
+  {
+    name: "lines",
+    label: "Lines",
+    description: "Each line an item",
+    read: (text) => {
+      const names = text.split("\n").map((line) => line.replace(/^[-*+] +/, "").trim()).filter(Boolean);
+      return names.length ? { properties: [], items: names.map((name) => ({ name })) } : undefined;
+    },
+  },
+];
+```
+
+| Field | What it is |
+|---|---|
+| `name`, `label`, `description` | How it is named (lower case letters, digits and `-`; one of a built-in one's name replaces it: `tasks`), shown and described when you pick |
+| `read(text)` | The lines selected, whole, read: `{ properties, items }`, or `undefined` where they hold nothing it reads |
+
+`properties` are those the items need: `{ key, label, type, params }` (`type` a property type's name, `params` its settings, as `{ options: ["a", "b"], multiple: true }`). `items` are `{ name, values, body, tags, source }`: `values` by a property's key; `body` the item's text; `tags` its page's tags (with a property `{ key: "page_tags", label: "Tags", type: "tags", system: "tags" }` to show them); `source` the text it was read from, put first in its text where its name is not that text. A name a page cannot have, or one taken, is made one, as for tasks.
 
 ## Settings
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closesFence, fenceOf, fenceOpenAt, linesOf, nextFence } from "./lines.ts";
+import { closesFence, fenceOf, fenceOpenAt, linesOf, linesUnder, nextFence } from "./lines.ts";
 
 const TEXT = "# Title\n\nOne line\n- item a\n- item b\n\n```\ncode here\n```\nlast";
 
@@ -17,6 +17,22 @@ describe("linesOf", () => {
     expect(linesOf(TEXT, TEXT.length, TEXT.length)).toEqual([{ from: TEXT.length - 4, to: TEXT.length, text: "last" }]);
     // A text starting with an empty line, the caret on it
     expect(linesOf("\nabc", 0, 0)).toEqual([{ from: 0, to: 0, text: "" }]);
+  });
+});
+
+describe("linesUnder", () => {
+  it("gives a line with those indented more under it, blank lines among them, not those after", () => {
+    const text = "a\n- [ ] task\n  - [ ] sub\n\n    deeper\n- [ ] next";
+    const under = linesUnder(text, text.indexOf("task"));
+    expect(text.slice(under.from, under.to)).toBe("- [ ] task\n  - [ ] sub\n\n    deeper");
+    const last = linesUnder(text, text.length);
+    expect(text.slice(last.from, last.to)).toBe("- [ ] next");
+  });
+
+  it("leaves a blank line at the end out", () => {
+    const text = "- [ ] task\n  sub\n\n";
+    const under = linesUnder(text, 0);
+    expect(text.slice(under.from, under.to)).toBe("- [ ] task\n  sub");
   });
 });
 

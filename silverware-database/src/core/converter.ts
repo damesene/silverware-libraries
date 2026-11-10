@@ -11,8 +11,11 @@ import { DefinitionRegistry } from "./registry.ts";
 /** A property the items read need: its key (what their values are under), label, type and the type's settings */
 export type ConvertedProperty = { readonly key: string; readonly label: string; readonly type: string; readonly params?: Params; readonly system?: string };
 
-/** An item read: its name, its values by property key, its body (markdown), the tags of the document it is kept in */
-export type ConvertedItem = { readonly name: string; readonly values?: Readonly<Record<string, Value>>; readonly body?: string; readonly tags?: readonly string[] };
+/**
+ * An item read: its name, its values by property key, its body (markdown), the tags of the document it is kept in; its
+ * `source`, the text it was read from, is put at the top of its body where its name (as kept) is not that text
+ */
+export type ConvertedItem = { readonly name: string; readonly values?: Readonly<Record<string, Value>>; readonly body?: string; readonly tags?: readonly string[]; readonly source?: string };
 
 /** What a converter read of a text: the properties and the items, in the text's order */
 export type Converted = { readonly properties: readonly ConvertedProperty[]; readonly items: readonly ConvertedItem[] };
@@ -34,6 +37,23 @@ export function validateConverter(converter: ConverterDefinition): string | unde
   if (typeof converter.label !== "string" || !converter.label.trim()) return `the converter "${converter.name}" has no label`;
   if (converter.description !== undefined && typeof converter.description !== "string") return `the converter "${converter.name}": its description is no text`;
   if (typeof converter.read !== "function") return `the converter "${converter.name}" has no read`;
+  return undefined;
+}
+
+/** Why what a converter read is none (a user's converter giving something else), undefined where it is */
+export function validateConverted(converted: unknown): string | undefined {
+  const read = converted as Converted | undefined;
+  if (typeof read !== "object" || read === null || !Array.isArray(read.properties) || !Array.isArray(read.items)) return "it gave no { properties, items }";
+  const text = (value: unknown) => typeof value === "string";
+  const maybe = (value: unknown, test: (value: unknown) => boolean) => value === undefined || test(value);
+  const record = (value: unknown) => typeof value === "object" && value !== null && !Array.isArray(value);
+  for (const one of read.properties) {
+    if (!record(one) || !text(one.key) || !text(one.label) || !text(one.type) || !maybe(one.params, record) || !maybe(one.system, text)) return `a property is no { key, label, type, params }: ${JSON.stringify(one)}`;
+  }
+  for (const one of read.items) {
+    const tags = (value: unknown) => Array.isArray(value) && value.every(text);
+    if (!record(one) || !text(one.name) || !maybe(one.values, record) || !maybe(one.body, text) || !maybe(one.tags, tags) || !maybe(one.source, text)) return `an item is no { name, values, body, tags }: ${JSON.stringify(one)}`;
+  }
   return undefined;
 }
 

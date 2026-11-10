@@ -39,6 +39,7 @@ npm run deploy -- <space folder>   # copy every plugin into a local space's Libr
 
 ## Working rules
 
+- **A plan is always a file of its own in docs/** (`docs/silverware-<name>-<topic>.md`), never written into a CLAUDE.md: a CLAUDE.md says what the code is and how to work in it, not what is to be built.
 - **Commit only when the user says so**; never push unless asked, never to `main`. A change spanning several fixes is split into commits, each with the bundles built from its own changes.
 - **Every commit**: `npm run build`, then `npm run verify` passes. A stale committed bundle ships old code; check-build fails on it.
 - **Commit messages**: [Conventional Commits](https://www.conventionalcommits.org), one line `<type>(<scope>): <description>`, imperative, lowercase, no period, no body, **no AI co-author trailer**. Types `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `chore`, `style`; scope the plugin (`table`, `toolbar`, `tags`, `chart`, `database`, `icons`), `playground`, or none for the repository. A change that breaks what a space has (settings, the Space Lua API, a theme's selectors or variables, stored markdown) is marked `!`: `feat(toolbar)!: …`. History before 2026-10-22 uses `Table Plus: …` / `Silverware: …` subjects.

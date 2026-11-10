@@ -78,8 +78,12 @@ database to markdown, starts as *Copy as tasks* to the clipboard; a conversion i
 * The database is shown first as a board by Status: `Converted.view` (`{ name, groupBy }`), which the command writes
   into the block (`view: board`, `board.groupBy: status`) where that view exists.
 * *Copy as tasks*: *Todo* `[ ]`, *Done* `[x]` (and, in a database without a Status, its own checkbox `done` ticked: in
-  one converted, `done` is a task's attribute), another the state, one no
-  state can be `[status: …]`, read back as the status.
+  one converted, `done` is a task's attribute), another `[ ]` with `[status: …]` after the name (the user's choice,
+  2026-11-11: a task's own state, `- [In progress]`, is no markdown task outside SilverBullet), read back as the status.
+  Not `[state: …]`: verified in SilverBullet 2.12.1 (2026-11-11), an attribute `state` takes the place of the task's own
+  field `state` in the index (`- [x] B [state: Waiting]`: `state: Waiting`, `done: true`), `status` is a field of its
+  own. A property of another type keyed `state` or `status` is written with `_2` after its key (read, either would be
+  the status).
 * A state attribute's value YAML reads as no text (a list, a map, `@ada`) is taken as written; an empty one leaves the
   checkbox's state.
 * The view asked for is written only where it is there and on (`silverware.database.views.<view>.enabled`): else the
@@ -183,12 +187,13 @@ written (a paragraph's attribute there still gives the page its value, as in any
    offers *Copy as* and its label (slot `data`) for each converter that writes, given `host.items` (filtered, in the view's
    order) and written onto the clipboard at once (nothing awaited before it: `shared/clipboard.ts` over http). An item's
    text is not copied: the pages store reads no bodies with the items, and reading them first would await before the
-   copy. The tasks converter writes Done (or Status *Done*) as `[x]`, another Status as the state, People, Links and
+   copy. The tasks converter writes Status *Done* as `[x]`, *Todo* `[ ]`, another `[ ]` with `[status: …]` (since
+   2026-11-11, *Status instead of Done*; before, the task's own state), People, Links and
    the page's Tags as marks after the name (`hashtagOf`, moved to `shared/markdown/inline.ts` with `hashtagBefore`),
    the other properties but the system's as attributes (`writeAttribute`; a person `"@ada"`, a reference its links
    bare); read back, the values are the same, but for what a task cannot hold as the property had it (after the
-   review, 2026-11-10): a Status no state can be (`:`, `]`, `x`) and a person no mention can name (`Ada Lovelace`)
-   are written as attributes, read back under keys of their own (`status_2`, `people_2`); a tag no hashtag can be
+   review, 2026-11-10): a person no mention can name (`Ada Lovelace`) is written as an attribute, read back under a
+   key of its own (`people_2`); a tag no hashtag can be
    (holding `>`) is left out; a reference not written `[[…]]` is made one; the name's characters reading takes as
    syntax are escaped (`\[`, `` \` ``, `\#`, `\@`…), read back without the backslash. Labels, types and settings come
    back from the values, not as they were. A view showing no item copies nothing.

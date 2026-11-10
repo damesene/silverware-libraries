@@ -136,7 +136,7 @@ describe("The tasks converter", () => {
     const written = TASKS_CONVERTER.write!(items, properties);
     expect(written).toBe(
       [
-        '- [IN PROGRESS] Call the client [due: "2026-11-12"] [owner: "@ada"] [ref: [[Web]]] [note: "a \\u005d b"] @jana [[Acme]] #sales #<two words>',
+        '- [ ] Call the client [status: IN PROGRESS] [due: "2026-11-12"] [owner: "@ada"] [ref: [[Web]]] [note: "a \\u005d b"] @jana [[Acme]] #sales #<two words>',
         "- [x] Send offer",
         "- [ ] Plain",
         "",
@@ -153,7 +153,7 @@ describe("The tasks converter", () => {
     expect(TASKS_CONVERTER.write!([], properties)).toBe("");
   });
 
-  it("writes what a task cannot hold so it still reads back: a status no state can be, a person no mention can name, a name of syntax", () => {
+  it("writes what a task cannot hold so it still reads back: a status as an attribute, a person no mention can name, a name of syntax", () => {
     const prop = (key: string, type: string, params = {}): Property => ({ key, label: key, type, params, readonly: false });
     const properties = [prop("status", "select"), prop("people", "person", { multiple: true }), prop("ref", "reference"), prop("page_tags", "tags")].map((one) => (one.key === "page_tags" ? { ...one, system: "tags" } : one));
     const item = (name: string, values: Item["values"]): Item => ({ key: name as ItemKey, name, values, rank: undefined, revision: "1" });
@@ -170,6 +170,17 @@ describe("The tasks converter", () => {
     const back = TASKS_CONVERTER.read(written)!;
     expect(back.items[0]).toMatchObject({ name: "[x: y] Use `a` #not @not", tags: ["ok"], values: { status: "Waiting: for x", people: ["bob"], ref: ["[[Plain]]", "[[Web]]"], people_2: "Ada Lovelace" } });
     expect(back.items[1]!.values).toMatchObject({ status: "x" });
+  });
+
+  it("writes any status so it reads back the same, and a property keyed state or status clear of it", () => {
+    const prop = (key: string, type: string): Property => ({ key, label: key, type, params: {}, readonly: false });
+    const item = (name: string, values: Item["values"]): Item => ({ key: name as ItemKey, name, values, rank: undefined, revision: "1" });
+    const statuses = ["a ] b", 'say "hi"', "  ", "IN progress", "done", "TODO", "x", "Waiting: for x"];
+    const written = TASKS_CONVERTER.write!(statuses.map((status, at) => item(`T${at}`, { status })), [prop("status", "select")]);
+    expect(TASKS_CONVERTER.read(written)!.items.map((one) => one.values?.status)).toEqual(["a ] b", 'say "hi"', "Todo", "In progress", "Done", "Todo", "x", "Waiting: for x"]);
+    const clash = TASKS_CONVERTER.write!([item("A", { status: "Blocked", state: "open" })], [prop("status", "select"), prop("state", "text")]);
+    expect(clash).toBe("- [ ] A [status: Blocked] [state_2: open]\n");
+    expect(TASKS_CONVERTER.read(clash)!.items[0]!.values).toMatchObject({ status: "Blocked", state_2: "open" });
   });
 
   it("keeps a value YAML does not read as written, as text", () => {

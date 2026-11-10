@@ -10,7 +10,7 @@
 // (shared/markdown/); tasks in fenced code are none.
 import { escapedAttributes, hashtagOf, type InlineMark, inlineMarks } from "../../../../shared/markdown/inline.ts";
 import { indentWidth, nextFence } from "../../../../shared/markdown/lines.ts";
-import { readAttributeValue, readTaskLine, type TaskLine, validateTaskState, writeAttribute, writeTaskLine } from "../../../../shared/markdown/task.ts";
+import { readAttributeValue, readTaskLine, type TaskLine, writeAttribute, writeTaskLine } from "../../../../shared/markdown/task.ts";
 import type { Converted, ConvertedItem, ConvertedProperty, ConverterDefinition } from "../../core/converter.ts";
 import { keyFromLabel } from "../../domain/keys.ts";
 import { labelOfKey } from "../../domain/loose.ts";
@@ -237,10 +237,12 @@ const linksOf = (value: Value): string[] =>
 /**
  * Items written back as tasks, as `read` reads them (lossy: a type, a property's settings and an item's text are no
  * part of a task): Status *Done* (or a checkbox `done` ticked, a database's of its own) `[x]`, *Todo* `[ ]`, another
- * the task's state (one a state cannot be: the attribute `status`, which reads back as the state); People, Links and
- * the page's Tags as marks after the name (a person no mention can name, a tag no hashtag can: in an attribute, left
- * out); every other property, but those the system gives, an attribute of its key. The name's characters reading
- * would take as syntax are escaped
+ * `[ ]` with the attribute `status` (`[status: In progress]`: a task's own state, `- [In progress]`, is no task outside
+ * SilverBullet, and an attribute `state` would be SilverBullet's task's own field, verified 2026-11-11; the user's
+ * choice); People, Links and the page's Tags as marks after the name (a person no mention can name, a tag no hashtag
+ * can: in an attribute, left out); every other property, but those the system gives, an attribute of its key (one
+ * read as the status, `state` or `status`, with `_2` after it). The name's characters reading would take as syntax
+ * are escaped
  */
 function write(items: readonly Item[], properties: readonly Property[]): string {
   const status = properties.find((one) => one.key === STATUS && one.type === "select");
@@ -250,28 +252,27 @@ function write(items: readonly Item[], properties: readonly Property[]): string 
     const stated = status && typeof item.values[STATUS] === "string" && item.values[STATUS] ? (item.values[STATUS] as string) : undefined;
     const finished = (done !== undefined && item.values[done.key] === true) || (stated !== undefined && sameState(stated, DONE_STATE));
     const other = stated !== undefined && !finished && !sameState(stated, TODO_STATE) ? stated : undefined;
-    // (`x` a state reads as done: a status so named, as one no state can be, an attribute)
-    const asState = other !== undefined && !validateTaskState(other) && !/^[xX]$/.test(other.trim());
-    const state = finished ? "x" : asState ? other : " ";
     const parts = [item.name.replace(/\s+/g, " ").trim().replace(SYNTAX_RE, (c) => `\\${c}`)];
-    if (other !== undefined && !asState) parts.push(writeAttribute(STATUS, other));
+    if (other !== undefined) parts.push(writeAttribute(STATUS, other));
     for (const property of properties) {
       if (property === done || property === status) continue;
       const value = item.values[property.key];
       if (value === undefined || value === null || value === "" || (Array.isArray(value) && !value.length)) continue;
+      // (A key read as the status, `state` or `status` of another type, would take its place: written with `_2`)
+      const key = /^(state|status)$/i.test(property.key) ? `${property.key}_2` : property.key;
       if (property.system === "tags") parts.push(...texts(value).filter((tag) => !/[>\n]/.test(tag)).map(hashtagOf));
       else if (property.system !== undefined) continue;
       else if (property.key === LINKS && property.type === "reference") parts.push(...linksOf(value));
-      else if (property.type === "reference") parts.push(`[${property.key}: ${linksOf(value).join(", ")}]`);
+      else if (property.type === "reference") parts.push(`[${key}: ${linksOf(value).join(", ")}]`);
       else if (property.type === "person") {
         const names = texts(value);
         const marked = property.key === PEOPLE ? names.filter((name) => markOf(`@${name}`, "mention")) : [];
         const others = names.filter((name) => !marked.includes(name));
         parts.push(...marked.map((name) => `@${name}`));
-        if (others.length) parts.push(writeAttribute(property.key, Array.isArray(value) ? others.map((name) => `@${name}`) : `@${others[0]}`));
-      } else parts.push(writeAttribute(property.key, value));
+        if (others.length) parts.push(writeAttribute(key, Array.isArray(value) ? others.map((name) => `@${name}`) : `@${others[0]}`));
+      } else parts.push(writeAttribute(key, value));
     }
-    return writeTaskLine(state, parts.filter(Boolean).join(" "));
+    return writeTaskLine(finished ? "x" : " ", parts.filter(Boolean).join(" "));
   });
   return lines.length ? `${lines.join("\n")}\n` : "";
 }

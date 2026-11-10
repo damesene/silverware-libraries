@@ -42,3 +42,11 @@ author: damesene
 website: https://github.com/damesene/silverware-libraries/tree/main/silverware-database
 uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-database/silverware-database.md
 ```
+
+```#meta/library/remote
+name: Silverware Icons
+description: "Monochrome icons (Lucide) and emoji for the other Silverware plugins, drawn in the colors of your theme, and sets of icons of your own."
+author: damesene
+website: https://github.com/damesene/silverware-libraries/tree/main/silverware-icons
+uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-icons/silverware-icons.md
+```

@@ -48,8 +48,8 @@ toolbar, and a set must be easy to add or replace.
 silverware-icons/
   silverware-icons.md          library page: what it is, the sets, a set of your own; `files:` the pages and files below
   silverware-icons-api.md      `-- priority: 50`: silverware.icons (`api`: the JS API object; defineSets, resetDefinitions)
-  silverware-icons-init.md     config.define, the JS loaded
-  silverware-icons-style.md    the picker's CSS (swi-), the icon box, the stand-in
+  silverware-icons-style.md    the picker's CSS (swi-), the icon box (`swi-icon`), the stand-in (`swi-missing`)
+                               (no init page: nothing to set and nothing to start, the API page imports the JS)
   silverware-icons.js          the bundle: the manifest, registry, drawing, picker
   silverware-icons-lucide.js           a set's icons: names, nodes, aliases (what drawing needs)
   silverware-icons-lucide-search.js    its keywords and groups (what the picker needs)
@@ -285,10 +285,12 @@ this file) in step with the code, the local SilverBullet after each.
 
 ## To verify
 
-- In the local SilverBullet (step 2): the API object handed over through Lua,
-  its methods called from JS synchronously; the observer's cost while a set
-  loads; that a library installs several `.js` files beside its page (it does
-  for the emoji file now).
+- Verified in the local SilverBullet (step 2, 2026-11-10): the API page's
+  `silverware.icons.api` called from Lua (`markup`, `text`), the set's file
+  loaded beside the bundle (`import.meta.url`, as the emoji file), Lucide's
+  aliases followed (`lucide:home`). Still to see in step 5: the object handed
+  to the toolbar through its bridge, called from its JS synchronously; the
+  observer's cost while a set loads.
 - Lucide's repository at the tag of 1.71.0 (seen on `main`, 2026-11-10:
   `icons/house.json` with `categories` and `aliases`, `categories/home.json`
   with `title` and `icon`).

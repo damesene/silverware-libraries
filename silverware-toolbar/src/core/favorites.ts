@@ -122,8 +122,8 @@ export const DEFAULT_TOUCH_FAVORITES: Favorites = [
     { type: "gesture", tap: "formats.code", up: "formats.codeBlock" },
     { type: "separator" },
     { id: "actions.emoji" },
-    // … pinned at the right end, a swipe down on it hiding the keyboard
-    { type: "gesture", tap: "actions.more", down: "actions.hideKeyboard", pin: "right" },
+    // … pinned at the right end, a swipe up on it SilverBullet's slash commands, a swipe down hiding the keyboard
+    { type: "gesture", tap: "actions.more", up: "actions.slashCommands", down: "actions.hideKeyboard", pin: "right" },
   ],
 ];
 

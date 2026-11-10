@@ -36,8 +36,8 @@ test.describe("The toolbar's defaults on a phone", () => {
     expect(await of(1)).toEqual(["formats.strikethrough", "", "formats.underline"]);
     expect(await of(2)).toEqual(["formats.link", "formats.wikiLink", ""]);
     expect(await of(3)).toEqual(["formats.code", "formats.codeBlock", ""]);
-    // …, a swipe down hiding the keyboard
-    expect(await of(4)).toEqual(["actions.more", "", "actions.hideKeyboard"]);
+    // …, a swipe up SilverBullet's slash commands, a swipe down hiding the keyboard
+    expect(await of(4)).toEqual(["actions.more", "actions.slashCommands", "actions.hideKeyboard"]);
     await expect(bar(page).locator('[data-swb-action^="formats.heading"], [data-swb-gesture^="formats.heading"]')).toHaveCount(0);
     await expect(barButton(page, "actions.turnInto")).toBeVisible();
     await expect(barButton(page, "actions.emoji")).toHaveCount(1);

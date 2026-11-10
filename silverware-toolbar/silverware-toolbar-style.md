@@ -109,15 +109,40 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
   background: color-mix(in srgb, currentColor 4%, transparent);
   border-radius: 4px;
 }
-/* Its items in a box faded out at each end it scrolls further to (swb-more-left / -right) */
+/* Its items in a box faded out and shaded at each end it scrolls further to (swb-more-left / -right) */
 .swb-bar.swb-docked .swb-dock-scroll {
   position: relative;
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
 }
-/* At an end it scrolls further to, its items fade out there (a mask: alike on a light and a dark bar, where a
-   shadow of black did not show); scrolled to that end, they do not */
+/* At an end it scrolls further to, its items fade out there (a mask), a faint shade over it: darker on a light bar,
+   lighter on a dark one (SilverBullet's data-theme), where black alone did not show; scrolled to that end, neither */
+.swb-dock-shade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms;
+  --swb-shade: rgba(0, 0, 0, 0.1);
+}
+html[data-theme="dark"] .swb-dock-shade {
+  --swb-shade: rgba(255, 255, 255, 0.1);
+}
+.swb-dock-shade-left {
+  left: 0;
+  background: linear-gradient(to right, var(--swb-shade), transparent);
+}
+.swb-dock-shade-right {
+  right: 0;
+  background: linear-gradient(to left, var(--swb-shade), transparent);
+}
+.swb-dock-scroll.swb-more-left .swb-dock-shade-left,
+.swb-dock-scroll.swb-more-right .swb-dock-shade-right {
+  opacity: 1;
+}
 .swb-bar.swb-docked .swb-dock-scroll.swb-more-right .swb-dock-items {
   -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
   mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
@@ -157,15 +182,20 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
 .swb-bar.swb-docked .swb-dock-pinned {
   flex: none;
 }
+/* (No margin past the line: the room is the scrolled items' own, so their shade and fade start right at it) */
 .swb-bar.swb-docked .swb-dock-pinned-left {
   padding-right: 4px;
-  margin-right: 4px;
   border-right: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
 }
 .swb-bar.swb-docked .swb-dock-pinned-right {
   padding-left: 4px;
-  margin-left: 4px;
   border-left: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
+}
+.swb-bar.swb-docked .swb-dock-pinned-left + .swb-dock-scroll .swb-dock-items {
+  padding-left: 4px;
+}
+.swb-bar.swb-docked .swb-dock-scroll:has(+ .swb-dock-pinned-right) .swb-dock-items {
+  padding-right: 4px;
 }
 .swb-bar.swb-docked .swb-dock-pinned-right .swb-more {
   margin-left: 0;

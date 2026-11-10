@@ -6,7 +6,6 @@ import { type Bridge, missingBridgeFunctions, OWN_MARKER, PATHS, readSettings, t
 import type { Action } from "./core/action.ts";
 import type { ItemKind } from "./core/items.ts";
 import { type Toolbar, toolbarsSetting } from "./core/toolbars.ts";
-import { SETTINGS_VERSION } from "./migrations/index.ts";
 import { Controller, MORE_ACTION, SETTINGS_ACTION } from "./core/controller.ts";
 import { customFormatsAnew, defineCustomFormats, formatsOf } from "./formats/index.ts";
 import { createModules } from "./modules.ts";
@@ -29,7 +28,9 @@ export async function init(bridge: Bridge): Promise<void> {
     console.error(`Silverware Toolbar: the init page did not hand over ${missing.join(", ")}`);
     return;
   }
-  const settings = await readSettings(bridge);
+  const read = await readSettings(bridge);
+  // (A switch being written: the configuration read may not have it yet, the switch's toolbars count)
+  const settings = pendingSwitch ? { ...read, toolbars: pendingSwitch } : read;
   const running = slot[GLOBAL_KEY];
   // SilverBullet loads its configuration again (CONFIG saved) and hands a new bridge over: with the same settings
   // the toolbar as it is takes it, a popup open staying open
@@ -55,7 +56,7 @@ export async function init(bridge: Bridge): Promise<void> {
   // The toolbar's: those for a touch screen only where this is one (the settings get every action)
   const touch = touchScreen();
   const offered = () => actions().filter((action) => touch || !action.touchOnly);
-  const controller = new Controller(document, bridge, settings, offered, kinds, refresh, () => void openSettings(), (toolbars) => keepSwitched(bridge, toolbars));
+  const controller = new Controller(document, bridge, settings, offered, kinds, refresh, () => void openSettings(), (toolbars) => keepSwitched(made?.bridge ?? bridge, toolbars));
   made = controller;
   slot[GLOBAL_KEY] = controller;
   current = { bridge, actions, kinds };
@@ -63,34 +64,48 @@ export async function init(bridge: Bridge): Promise<void> {
   if (Object.keys(settings.migrated).length) void writeMigrated(bridge, settings.migrated);
 }
 
-// A switch of the toolbar being written, and the toolbars of a later one to write after it (the last one counts)
-let switching: Promise<void> | undefined;
-let nextSwitch: readonly Toolbar[] | undefined;
+// The toolbars of the last switch not written yet (a reload meanwhile reads them in place of the configuration's)
+let pendingSwitch: readonly Toolbar[] | undefined;
+// The switch's write queued already (a later switch only changes what it writes)
+let switchQueued = false;
 
 /**
  * The toolbars after a switch (`actions.switchToolbar`) kept: written as the
- * settings dialog writes them, one write at a time, only the last of switches
- * made meanwhile; SilverBullet then loads its configuration again and the
- * toolbar started for it finds the settings it runs (`sameSettings`), so it
- * goes on as it is. Where nothing can be written, the switch holds for this
- * visit; a failed write is said
+ * settings dialog writes them, after any write before it (`queued`), only the
+ * last of switches made meanwhile; SilverBullet then loads its configuration
+ * again and the toolbar started for it finds the settings it runs
+ * (`sameSettings`, a switch not written yet counting), so it goes on as it is.
+ * The toolbars alone: what else a migration changed is the migration's to
+ * write. Where nothing can be written, the switch holds for this visit; a
+ * failed write is said
  */
 function keepSwitched(bridge: Bridge, toolbars: readonly Toolbar[]): void {
   if (!canSaveIn(bridge)) return;
-  nextSwitch = toolbars;
-  if (switching) return;
-  switching = (async () => {
-    while (nextSwitch) {
-      const write = nextSwitch;
-      nextSwitch = undefined;
-      try {
-        await saveSettings(bridge, { [PATHS.favorites]: toolbarsSetting(write), [PATHS.version]: SETTINGS_VERSION });
-      } catch (e) {
-        void bridge.flash(`Silverware Toolbar: the toolbar switched to could not be kept (${String(e)})`, "error");
-      }
+  pendingSwitch = toolbars;
+  if (switchQueued) return;
+  switchQueued = true;
+  void queued(async () => {
+    switchQueued = false;
+    const write = pendingSwitch;
+    if (!write) return;
+    try {
+      await saveSettings(bridge, { [PATHS.favorites]: toolbarsSetting(write) });
+    } catch (e) {
+      void bridge.flash(`Silverware Toolbar: the toolbar switched to could not be kept (${String(e)})`, "error");
+    } finally {
+      // (A later switch meanwhile: its own write is queued, it stays pending)
+      if (pendingSwitch === write) pendingSwitch = undefined;
     }
-    switching = undefined;
-  })();
+  });
+}
+
+// Writes of the configuration one after another (a switch, the settings dialog's Save, a migration): each reads the
+// page the one before wrote, none overwriting another's
+let writes: Promise<unknown> = Promise.resolve();
+function queued<T>(write: () => Promise<T>): Promise<T> {
+  const done = writes.then(write, write);
+  writes = done.catch(() => undefined);
+  return done;
 }
 
 // The migrated settings being written (init may be called again meanwhile: Space Lua loaded twice, CONFIG saved)
@@ -105,7 +120,7 @@ async function writeMigrated(bridge: Bridge, values: Readonly<Record<string, unk
   if (migrating || !canSaveIn(bridge)) return;
   migrating = true;
   try {
-    await saveSettings(bridge, values);
+    await queued(() => saveSettings(bridge, values));
     void bridge.flash(`Silverware Toolbar: your settings were updated to its version ${String(values[PATHS.version])} (CONFIG)`, "info");
   } catch (e) {
     console.error("Silverware Toolbar: the settings migrated could not be written", e);
@@ -130,7 +145,8 @@ function sameSettings(running: Controller, settings: Settings): boolean {
   return (
     modules === [...settings.modules].sort().join() &&
     running.settings.wordAtCaret === settings.wordAtCaret &&
-    JSON.stringify(running.settings.toolbars) === JSON.stringify(settings.toolbars)
+    // (As written: rows left empty count for nothing)
+    JSON.stringify(toolbarsSetting(running.settings.toolbars)) === JSON.stringify(toolbarsSetting(settings.toolbars))
   );
 }
 
@@ -161,7 +177,7 @@ export async function openSettings(): Promise<void> {
     actions: () => [...actions(), ...(slot[GLOBAL_KEY] ? [slot[GLOBAL_KEY]!.switchAction()] : []), MORE_ACTION, SETTINGS_ACTION],
     kinds,
     canSave: canSaveIn(bridge),
-    save: (values) => saveSettings(bridge, values),
+    save: (values) => queued(() => saveSettings(bridge, values)),
     // The toolbar started anew with them (favourites need no reload)
     saved: () => void init(bridge),
   });

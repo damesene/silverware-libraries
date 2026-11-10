@@ -283,8 +283,12 @@ test.describe("Switching the toolbar", () => {
     await page.keyboard.press("Enter");
     // At once: Test touch's, docked at the bottom
     await expect(bar(page)).toHaveClass(/swb-docked/);
-    // Kept: the configuration written, read again as the page loads
-    await page.waitForTimeout(500);
+    // Kept: the configuration written (the playground's store: Test touch now Click's too), read again as the page loads
+    if (onSilverBullet) await page.waitForTimeout(1500);
+    else
+      await expect
+        .poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem("silverware.toolbar.playground.settings") ?? "{}")["silverware.toolbar.favorites"] as { name: string; useFor?: string[] }[]).find((one) => one.name === "Test touch")?.useFor))
+        .toEqual(["click", "touch"]);
     await page.reload();
     await ready(page);
     await select(page, "some text");

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Favorites, hasAction, slotItemOf } from "../core/favorites.ts";
-import { addItem, moveItem, pinOrdered, placeItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setPin, setSlotField, setSlotOwn, stepOf, unpinnedOutOfOrder } from "./favorites.ts";
+import { addItem, moveItem, pinOrdered, placeItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setPin, setSlotField, setSlotOwn, stepOf, unpinnedOutOfOrder, withActionRenamed } from "./favorites.ts";
 
 const ROWS: Favorites = [[{ id: "actions.turnInto", show: "label" }], [{ id: "formats.bold" }, { type: "separator" }, { id: "formats.link" }]];
 
@@ -156,5 +156,10 @@ describe("The favourites as the settings edit them", () => {
     expect(unpinnedOutOfOrder([[left, { id: "b" }, right]])).toEqual([[left, { id: "b" }, right]]);
     expect(unpinnedOutOfOrder([[{ id: "b" }, left, right, { id: "c" }]])).toEqual([[{ id: "b" }, { id: "a" }, { id: "z" }, { id: "c" }]]);
     expect(unpinnedOutOfOrder([[left, left, { type: "separator" }, right]])).toEqual([[left, left, { type: "separator" }, right]]);
+  });
+
+  it("renames an action's id wherever it is held: an action's item, a slot alone or with its own look; nothing else", () => {
+    const rows: Favorites = [[{ id: "toolbars.A", show: "label" }, { type: "gesture", tap: "formats.bold", up: "toolbars.A", down: { id: "toolbars.A", icon: "★" } }, { type: "gesture", tap: { type: "snippet", text: "toolbars.A" } }]];
+    expect(withActionRenamed(rows, "toolbars.A", "toolbars.B")).toEqual([[{ id: "toolbars.B", show: "label" }, { type: "gesture", tap: "formats.bold", up: "toolbars.B", down: { id: "toolbars.B", icon: "★" } }, { type: "gesture", tap: { type: "snippet", text: "toolbars.A" } }]]);
   });
 });

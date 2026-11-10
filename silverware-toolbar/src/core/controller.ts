@@ -19,7 +19,7 @@ import { Docking } from "./dock.ts";
 import { isActionItem, isSeparator, type Look, orderedByPins, ownIconHtml, type Pin, type SlotRef, slotItemOf, slotOf } from "./favorites.ts";
 import type { ItemKind } from "./items.ts";
 import { hideKeyboard } from "./keyboard.ts";
-import { docks, type Input, inputOf, type Toolbar, toolbarFor, useToolbarFor } from "./toolbars.ts";
+import { docks, type Input, inputOf, SWITCH_ID, type Toolbar, toolbarActionId, toolbarFor, useToolbarFor } from "./toolbars.ts";
 import { marked } from "./cursor.ts";
 import type { Box } from "./place.ts";
 import { Panel } from "./panel.ts";
@@ -55,8 +55,7 @@ export const SETTINGS_ACTION: Action = {
   listed: false,
 };
 
-// The core's own action switching the toolbar this way of working shows: its choices the toolbars (`toolbars.<name>`)
-export const SWITCH_ID = "actions.switchToolbar";
+export { SWITCH_ID } from "./toolbars.ts";
 
 export class Controller {
   private readonly watcher: SelectionWatcher;
@@ -232,7 +231,7 @@ export class Controller {
       group: "Silverware Toolbar",
       keywords: ["switch", "toolbars", "change", "favorites"],
       choices: this.settings.toolbars.map((toolbar) => ({
-        id: `toolbars.${toolbar.name}`,
+        id: toolbarActionId(toolbar.name),
         label: toolbar.name,
         icon: ICONS.toolbars,
         group: "Toolbar",
@@ -258,6 +257,10 @@ export class Controller {
     this.bar.hide();
     this.switched?.(toolbars);
     void this.showStaying();
+    // (Shown while writing, the caret in the text: at the caret now, not as it next moves; a selection: `perform`'s
+    // `again` shows it by the selection)
+    const caret = this.watcher.caret();
+    if (caret && !this.watcher.current() && this.persistent() && this.writing()) void this.caretMoved(caret);
   }
 
   private owns(node: Node): boolean {

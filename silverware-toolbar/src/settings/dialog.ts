@@ -15,6 +15,7 @@ import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
 import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, readSettings, readShortcut } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
+import { SWITCH_ID, toolbarActionId } from "../core/toolbars.ts";
 import { type FavoriteItem, type Favorites, hasAction, pinOf, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Pin, type Show as ItemShow, slotItemOf, slotOf, widthOf } from "../core/favorites.ts";
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
 import { defaultToolbars, docks, freeToolbarName, toolbarsSetting, type Input, inputOf, MAX_TOOLBARS, type Placement, PLACEMENTS, type ShowWhen, SHOWS, type Toolbar, toolbarFor, useToolbarFor, validateToolbarName } from "../core/toolbars.ts";
@@ -22,7 +23,7 @@ import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
 import { SETTINGS_VERSION } from "../migrations/index.ts";
 import { reorder } from "../../../shared/drag.ts";
-import { addItem, type At, moveItem, moveRow, pinOrdered, placeItem, removeItem, unpinnedOutOfOrder, removeRow, sameRows, setLook, setOwn, setPin, setSlot, setSlotField, setSlotOwn, stepOf } from "./favorites.ts";
+import { addItem, type At, withActionRenamed, moveItem, moveRow, pinOrdered, placeItem, removeItem, unpinnedOutOfOrder, removeRow, sameRows, setLook, setOwn, setPin, setSlot, setSlotField, setSlotOwn, stepOf } from "./favorites.ts";
 
 // A zone of a docked toolbar's row: its items pinned left, the others, those pinned right
 type Zone = "left" | "middle" | "right";
@@ -253,10 +254,22 @@ export class SettingsDialog {
 
   // ---- Favorites -------------------------------------------------------------
 
+  /**
+   * Every action offered, the switch of toolbars with a choice for each of
+   * the toolbars edited (made or renamed here: offered as they are, before
+   * they are saved)
+   */
+  private actions(): readonly Action[] {
+    const toolbars = this.values?.toolbars ?? [];
+    return this.context.actions().map((action) =>
+      action.id === SWITCH_ID ? { ...action, choices: toolbars.map((toolbar) => ({ id: toolbarActionId(toolbar.name), label: toolbar.name, icon: action.icon, group: "Toolbar" })) } : action,
+    );
+  }
+
   /** Every action and every list's choice, by id (the popup's search finds them the same way) */
   private known(): Map<string, Action> {
     const known = new Map<string, Action>();
-    for (const action of this.context.actions()) {
+    for (const action of this.actions()) {
       known.set(action.id, action);
       for (const choice of action.choices ?? []) known.set(choice.id, choice);
     }
@@ -376,7 +389,11 @@ export class SettingsDialog {
       this.naming = undefined;
       problem.textContent = "";
       if (name.value.trim() === toolbar.name) return;
-      this.setToolbars(values.toolbars.map((one, i) => (i === index ? { ...one, name: name.value.trim() } : one)), `.${BASE}-toolbar-name`, true);
+      // (Buttons switching to it, in any toolbar, follow it)
+      const from = toolbarActionId(toolbar.name);
+      const to = toolbarActionId(name.value.trim());
+      const renamed = values.toolbars.map((one, i) => ({ ...one, ...(i === index ? { name: name.value.trim() } : {}), rows: withActionRenamed(one.rows, from, to) }));
+      this.setToolbars(renamed, `.${BASE}-toolbar-name`, true);
     };
     name.addEventListener("change", rename);
     name.addEventListener("keydown", (e) => {
@@ -1249,7 +1266,7 @@ export class SettingsDialog {
     const entries: Entry[] = [];
     // (An action for a touch screen only: for a toolbar a finger may show, used for Touch or for none yet)
     const touchToo = this.edited.useFor.includes("touch") || !this.edited.useFor.length;
-    for (const action of this.context.actions().filter((a) => touchToo || !a.touchOnly)) {
+    for (const action of this.actions().filter((a) => touchToo || !a.touchOnly)) {
       if (!action.choices) entries.push({ action, group: action.group });
       else entries.push({ action, group: action.group }, ...action.choices.map((choice) => ({ action: choice, group: action.label })));
     }

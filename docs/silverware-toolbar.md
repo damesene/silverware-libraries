@@ -660,3 +660,24 @@ joined as its one line showed them; the keys of before taken out of either
 block of CONFIG (index.ts saveSettings takes a setting out wherever it was). A toolbar without *Every action*
 says so with a button putting it at the end of its last row (docked: pinned
 right).
+
+### Switching the toolbar (2026-11-10)
+
+Asked by the user: a command switching the toolbar of the way of working now
+to another, which may be a button of the toolbar too. `actions.switchToolbar`
+(the core's, `switchAction`): a choice per toolbar (`toolbars.<name>`, so one
+toolbar may be a button of its own, switching to it with no list), the one on
+checked; the command *Silverware Toolbar: Switch toolbar* opens the popup at
+them. A switch is that way of working's toolbar at once (`switchTo`: the
+controller's settings, the bar shown anew as the new one shows: by the
+selection, at the caret while writing, or always) and kept in `useFor` in
+CONFIG (the user's choice over this device alone), written in the background
+(`keepSwitched`, through the one queue of every write of the configuration,
+`queued`: a switch, the dialog's Save, a migration; the last switch made
+meanwhile counting; the toolbars alone). SilverBullet loading its
+configuration again after it, the toolbar started for it reads the switch not
+written yet in place of what it read (`pendingSwitch`) and compares the
+toolbars as written (`sameSettings`), so it goes on as it is. Not offered: a
+toolbar's own icon, a Next toolbar action (both set aside by the user). A
+toolbar renamed in the dialog takes the buttons switching to it along
+(`withActionRenamed`).

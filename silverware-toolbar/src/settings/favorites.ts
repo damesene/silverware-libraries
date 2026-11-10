@@ -41,6 +41,27 @@ export function moveRow(rows: Favorites, from: number, to: number): FavoriteItem
   return next;
 }
 
+/**
+ * Rows with an action's id renamed wherever they hold it: an action's item, a
+ * slot of a kind's item (its id, alone or with its own look); the rest as it is
+ */
+export function withActionRenamed(rows: Favorites, from: string, to: string): FavoriteItem[][] {
+  if (from === to) return copy(rows);
+  return rows.map((row) =>
+    row.map((item) => {
+      if (isSeparator(item)) return item;
+      if (!isKindItem(item)) return item.id === from ? ({ ...item, id: to } as FavoriteItem) : item;
+      const fields = Object.entries(item).map(([key, value]) => {
+        if (key === "type") return [key, value];
+        if (value === from) return [key, to];
+        const ref = value && typeof value === "object" && !Array.isArray(value) && !slotItemOf(value) ? slotOf(value) : undefined;
+        return [key, ref?.id === from ? { ...(value as object), id: to } : value];
+      });
+      return Object.fromEntries(fields) as KindItem;
+    }),
+  );
+}
+
 /** An item added at a row's end, or at `index` */
 export function addItem(rows: Favorites, row: number, item: FavoriteItem, index?: number): FavoriteItem[][] {
   const next = copy(rows);

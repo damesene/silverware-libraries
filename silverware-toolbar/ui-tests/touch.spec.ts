@@ -36,8 +36,8 @@ test.describe("The toolbar's defaults on a phone", () => {
     expect(await of(1)).toEqual(["formats.strikethrough", "", "formats.underline"]);
     expect(await of(2)).toEqual(["formats.link", "formats.wikiLink", ""]);
     expect(await of(3)).toEqual(["formats.code", "formats.codeBlock", ""]);
-    // …, a swipe down hiding the keyboard
-    expect(await of(4)).toEqual(["actions.more", "", "actions.hideKeyboard"]);
+    // …, a swipe up SilverBullet's slash commands, a swipe down hiding the keyboard
+    expect(await of(4)).toEqual(["actions.more", "actions.slashCommands", "actions.hideKeyboard"]);
     await expect(bar(page).locator('[data-swb-action^="formats.heading"], [data-swb-gesture^="formats.heading"]')).toHaveCount(0);
     await expect(barButton(page, "actions.turnInto")).toBeVisible();
     await expect(barButton(page, "actions.emoji")).toHaveCount(1);
@@ -67,7 +67,7 @@ test.describe("The toolbar's defaults on a phone", () => {
 });
 
 test.describe("The toolbar on a phone", () => {
-  test("docked at the bottom as one row across the window, the rows one after another, … at its end", async ({ page }) => {
+  test("docked at the bottom across the window, each row a line of its own one under another, … at the last one's end", async ({ page }) => {
     await selectByTouch(page, "some text");
     await expect(bar(page)).toHaveClass(/swb-docked/);
     const box = (await bar(page).boundingBox())!;
@@ -76,9 +76,13 @@ test.describe("The toolbar on a phone", () => {
     expect(Math.round(box.width)).toBe(view.width);
     // Right on the window's bottom edge: no line of the page showing under it
     expect(Math.abs(box.y + box.height - view.height)).toBeLessThan(0.5);
-    await expect(bar(page).locator(".swb-row")).toHaveCount(1);
-    await expect(bar(page).locator(".swb-row [data-swb-action]").first()).toHaveAttribute("data-swb-action", "actions.turnInto");
-    await expect(barButton(page, "actions.more")).toBeVisible();
+    const lines = bar(page).locator(".swb-dock-line");
+    await expect(lines).toHaveCount(2);
+    await expect(lines.first().locator("[data-swb-action]")).toHaveCount(1);
+    await expect(lines.first().locator('[data-swb-action="actions.turnInto"]')).toBeVisible();
+    await expect(lines.last().locator('[data-swb-action="actions.more"]')).toBeVisible();
+    // One under the other
+    expect((await lines.first().boundingBox())!.y + (await lines.first().boundingBox())!.height).toBeLessThanOrEqual((await lines.last().boundingBox())!.y + 0.5);
     // A tap applies to the selection
     await barButton(page, "formats.bold").tap();
     await expect.poll(() => text(page)).toContain("Select **some text** in this page");
@@ -186,8 +190,7 @@ test.describe("The toolbar on a phone", () => {
     await popup(page).locator(".swb-search-field").fill("settings");
     await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
     const dialog = page.locator(".swb-settings");
-    await dialog.locator('[data-swb-tab="favorites"]').tap();
-    await dialog.locator('[data-swb-device="click"]').tap();
+    await dialog.locator('[data-swb-tab="toolbars"]').tap();
     await dialog.locator('[data-swb-row="1"] .swb-settings-add').tap();
     await expect(dialog.locator(".swb-settings-pick-field")).toBeFocused();
     // The keyboard: the view half as tall (the emulation shows none)
@@ -201,61 +204,64 @@ test.describe("The toolbar on a phone", () => {
     await expect.poll(async () => (await dialog.boundingBox())!.height).toBeLessThanOrEqual(view.height / 2 + 1);
   });
 
-  test("Touch's own favourites show by finger; turned off, Click's, its own kept", async ({ page }) => {
+  test("by finger the list used for Touch shows; another given Touch shows in its place, and the dialog opens on it", async ({ page }) => {
+    const openSettings = async () => {
+      await barButton(page, "actions.more").tap();
+      await popup(page).locator(".swb-search-field").fill("settings");
+      await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
+      await page.locator(".swb-settings").locator('[data-swb-tab="toolbars"]').tap();
+    };
     await selectByTouch(page, "some text");
-    await barButton(page, "actions.more").tap();
-    await popup(page).locator(".swb-search-field").fill("settings");
-    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
+    await openSettings();
     const dialog = page.locator(".swb-settings");
-    await dialog.locator('[data-swb-tab="favorites"]').tap();
-    // Click's first while Touch has none of its own on
-    await expect(dialog.locator('[data-swb-device="click"]')).toHaveAttribute("aria-checked", "true");
-    await dialog.locator('[data-swb-device="touch"]').tap();
-    const own = dialog.locator(".swb-settings-devices .swb-settings-switch");
-    await own.tap();
-    // (Its rows after the boxes of its pinned items)
-    await dialog.locator('[data-swb-item="3:0"] .swb-settings-remove').tap();
+    // A copy of the one shown, without Bold, given Touch
+    await dialog.locator(".swb-settings-toolbar-duplicate").tap();
+    await dialog.locator('[data-swb-item="1:0"] .swb-settings-remove').tap();
+    await dialog.locator('.swb-settings-toolbar-use[data-swb-use="touch"]').tap();
     await dialog.locator(".swb-settings-save").tap();
     await expect(dialog).toHaveCount(0);
     await select(page, "Plain", 0);
     await selectByTouch(page, "some text");
     await expect(barButton(page, "formats.italic")).toBeVisible();
     await expect(barButton(page, "formats.bold")).toHaveCount(0);
-    // Off: Click's, the own kept
-    await barButton(page, "actions.more").tap();
-    await popup(page).locator(".swb-search-field").fill("settings");
-    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
-    await dialog.locator('[data-swb-tab="favorites"]').tap();
-    // On: Touch's first
-    await expect(dialog.locator('[data-swb-device="touch"]')).toHaveAttribute("aria-checked", "true");
-    await own.tap();
-    await dialog.locator(".swb-settings-save").tap();
-    await select(page, "Plain", 0);
-    await selectByTouch(page, "some text");
-    await expect(barButton(page, "formats.bold")).toBeVisible();
-    await barButton(page, "actions.more").tap();
-    await popup(page).locator(".swb-search-field").fill("settings");
-    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
-    await dialog.locator('[data-swb-tab="favorites"]').tap();
-    // Off: Click's first
-    await expect(dialog.locator('[data-swb-device="click"]')).toHaveAttribute("aria-checked", "true");
-    await dialog.locator('[data-swb-device="touch"]').tap();
-    await own.tap();
-    await expect(dialog.locator('[data-swb-items="3"] .swb-settings-item-name').first()).toHaveText("Italic");
+    // Opened by finger: on the list Touch shows
+    await openSettings();
+    await expect(dialog.locator('.swb-settings-toolbar-tab[aria-checked="true"] .swb-settings-toolbar-tab-name')).toHaveText("Test touch copy");
+    await expect(dialog.locator('[data-swb-items="1"] .swb-settings-item-name').first()).toHaveText("Italic");
   });
 
   test("a shade at each end it scrolls further to, gone at its ends", async ({ page }) => {
-    // Enough to scroll: another row of the favourites
-    await page.setViewportSize({ width: 300, height: page.viewportSize()!.height });
+    // Narrow enough for the second row's line to scroll
+    await page.setViewportSize({ width: 240, height: page.viewportSize()!.height });
     await selectByTouch(page, "some text");
-    const scroll = bar(page).locator(".swb-dock-scroll");
+    // (The second row's line: the longer one; the first, Turn into alone, does not scroll)
+    const scroll = bar(page).locator(".swb-dock-scroll").last();
     await expect(scroll).toHaveClass(/swb-more-right/);
     await expect(scroll).not.toHaveClass(/swb-more-left/);
-    await bar(page).locator(".swb-dock-items").evaluate((items) => (items.scrollLeft = 30));
+    await expect(bar(page).locator(".swb-dock-scroll").first()).not.toHaveClass(/swb-more-right/);
+    const items = bar(page).locator(".swb-dock-items").last();
+    await items.evaluate((e) => (e.scrollLeft = 30));
     await expect(scroll).toHaveClass(/swb-more-left/);
     await expect(scroll).toHaveClass(/swb-more-right/);
-    await bar(page).locator(".swb-dock-items").evaluate((items) => (items.scrollLeft = items.scrollWidth));
+    await items.evaluate((e) => (e.scrollLeft = e.scrollWidth));
     await expect(scroll).not.toHaveClass(/swb-more-right/);
+  });
+
+  test("scrolled sideways, it stays so as the text is tapped and the toolbar is drawn anew", async ({ page }) => {
+    await page.setViewportSize({ width: 240, height: page.viewportSize()!.height });
+    await selectByTouch(page, "some text");
+    const items = bar(page).locator(".swb-dock-items").last();
+    await items.evaluate((e) => (e.scrollLeft = 20));
+    await expect.poll(() => items.evaluate((e) => e.scrollLeft)).toBe(20);
+    // A tap elsewhere in the text (the paragraph's start, in view): the caret moved, the toolbar shown anew for it
+    const line = await lineBox(page, "in this page");
+    await page.touchscreen.tap(line.x + 4, line.y + 10);
+    await expect(bar(page)).toBeVisible();
+    await page.waitForTimeout(300);
+    // (As far as it goes now: what the line holds may be a little narrower for the text tapped)
+    const [left, most] = await bar(page).locator(".swb-dock-items").last().evaluate((e) => [e.scrollLeft, e.scrollWidth - e.clientWidth]);
+    expect(left).toBe(Math.min(20, most));
+    expect(left).toBeGreaterThan(0);
   });
 
   test("over the on-screen keyboard where it overlays the page (SilverBullet's keyboard bar off), else over that bar, both as they come and go", async ({ page }) => {
@@ -351,5 +357,67 @@ test.describe("The toolbar on a phone", () => {
     const toolbar = (await bar(page).boundingBox())!;
     const keyboardBar = (await page.locator(".sb-keyboard-bar").boundingBox())!;
     expect(Math.abs(toolbar.y + toolbar.height - keyboardBar.y)).toBeLessThanOrEqual(1);
+  });
+});
+
+test.describe("The settings by finger", () => {
+  test("a finger moved over the favourites scrolls them; held a moment on an item, it drags it", async ({ page }) => {
+    // Low enough for the favourites to scroll
+    await page.setViewportSize({ width: page.viewportSize()!.width, height: 520 });
+    await selectByTouch(page, "some text");
+    await barButton(page, "actions.more").tap();
+    await popup(page).locator(".swb-search-field").fill("settings");
+    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
+    const dialog = page.locator(".swb-settings");
+    await dialog.locator('[data-swb-tab="toolbars"]').tap();
+    const body = dialog.locator(".swb-settings-body");
+    // Moved at once on an item in view (the first row's): the list scrolls, nothing taken (moves a frame apart, as a
+    // finger's: Chrome scrolls by them)
+    const first = dialog.locator('[data-swb-item="0:0"] .swb-settings-item-icon');
+    await first.scrollIntoViewIfNeeded();
+    const before = await body.evaluate((e) => e.scrollTop);
+    const box = (await first.boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    const fling = await page.context().newCDPSession(page);
+    await fling.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    for (let i = 1; i <= 15; i++) {
+      await fling.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - i * 10 }] });
+      await page.waitForTimeout(16);
+    }
+    await fling.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await fling.detach();
+    await expect.poll(() => body.evaluate((e) => e.scrollTop)).toBeGreaterThan(before);
+    await expect(page.locator(".swb-settings-ghost")).toHaveCount(0);
+    await expect(dialog.locator('[data-swb-items="1"] .swb-settings-item-name')).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
+    // Held on Bold: taken, and moved past Italic beside it (the scroll's momentum over first: a touch then stops it)
+    const settled = async () => {
+      let last = -1;
+      await expect.poll(async () => {
+        const now = await body.evaluate((e) => e.scrollTop);
+        const still = now === last;
+        last = now;
+        return still;
+      }, { intervals: [150] }).toBe(true);
+    };
+    await settled();
+    // (Click's items show their icon alone: pressed there)
+    const bold = dialog.locator('[data-swb-item="1:0"] .swb-settings-item-icon');
+    await bold.scrollIntoViewIfNeeded();
+    await settled();
+    const from = (await bold.boundingBox())!;
+    const past = (await dialog.locator('[data-swb-item="1:1"]').boundingBox())!;
+    const cdp = await page.context().newCDPSession(page);
+    const at = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+    const to = { x: past.x + past.width - 4, y: past.y + past.height / 2 };
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [at] });
+    await expect(page.locator(".swb-settings-ghost")).toHaveCount(1);
+    for (let i = 1; i <= 10; i++) {
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: at.x + ((to.x - at.x) * i) / 10, y: at.y + ((to.y - at.y) * i) / 10 }] });
+    }
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await cdp.detach();
+    await expect(dialog.locator('[data-swb-items="1"] .swb-settings-item-name').first()).toHaveText("Italic");
+    await expect(dialog.locator('[data-swb-items="1"] .swb-settings-item-name').nth(1)).toHaveText("Bold");
   });
 });

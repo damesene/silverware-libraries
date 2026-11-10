@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type Bridge, DEFAULT_SHORTCUT, missingBridgeFunctions, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, readSettings, readShortcut } from "./bridge.ts";
 import initPage from "../silverware-toolbar-init.md?raw";
 import { DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES } from "./core/favorites.ts";
+import { defaultToolbars } from "./core/toolbars.ts";
 
 const bridge = (config: Record<string, unknown>, extra: Partial<Bridge> = {}): Bridge => ({
   getSelection: () => ({ from: 0, to: 0, text: "" }),
@@ -13,54 +14,64 @@ const bridge = (config: Record<string, unknown>, extra: Partial<Bridge> = {}): B
   ...extra,
 });
 
+/** One toolbar configured, used for both ways of working */
+const one = (rows: unknown) => ({ "silverware.toolbar.favorites": [{ name: "Mine", useFor: ["click", "touch"], rows }] });
+/** The rows of the first toolbar read */
+const rowsOf = async (config: Record<string, unknown>) => (await readSettings(bridge(config))).toolbars[0]!.rows;
+
 describe("Settings", () => {
-  it("are the defaults where nothing is configured, every module on", async () => {
+  it("are the defaults where nothing is configured, every module on: a toolbar by the selection for Click, one docked for Touch", async () => {
     const settings = await readSettings(bridge({}));
-    expect(settings.favorites).toEqual(DEFAULT_FAVORITES);
+    expect(settings.toolbars).toEqual(defaultToolbars());
+    expect(settings.toolbars.map((list) => [list.name, list.useFor])).toEqual([["Float", ["click"]], ["Docked", ["touch"]]]);
+    expect(settings.toolbars[0]!.rows).toEqual(DEFAULT_FAVORITES);
+    expect(settings.toolbars[1]!.rows).toEqual(DEFAULT_TOUCH_FAVORITES);
     expect([...settings.modules]).toEqual([...MODULE_NAMES]);
+    // Without the Gestures module the docked one shows none of them: the first for both
+    expect((await readSettings(bridge({ "silverware.toolbar.modules.gestures.enabled": false }))).toolbars.map((list) => list.useFor)).toEqual([["click", "touch"], []]);
   });
 
   it("take what is configured, a module turned off left out; what is not valid is its default", async () => {
-    const settings = await readSettings(bridge({ "silverware.toolbar.favorites": [[{ id: "formats.bold" }]], "silverware.toolbar.modules.clear.enabled": false }));
-    expect(settings.favorites).toEqual([[{ id: "formats.bold" }]]);
+    const settings = await readSettings(bridge({ ...one([[{ id: "formats.bold" }]]), "silverware.toolbar.modules.clear.enabled": false }));
+    expect(settings.toolbars).toEqual([{ name: "Mine", useFor: ["click", "touch"], placement: "selection", show: "selection", rows: [[{ id: "formats.bold" }]] }]);
     expect(settings.modules.has("clear")).toBe(false);
-    expect((await readSettings(bridge({ "silverware.toolbar.favorites": [1, 2] }))).favorites).toEqual(DEFAULT_FAVORITES);
+    expect((await readSettings(bridge(one([1, 2])))).toolbars).toEqual(defaultToolbars());
+    // The rows of before (the model of 1): migrated to toolbars, said to be written back with the version
+    const before = await readSettings(bridge({ "silverware.toolbar.favorites": [[{ id: "formats.bold" }]] }));
+    expect(before.toolbars.map((toolbar) => [toolbar.name, toolbar.useFor, toolbar.rows])).toEqual([["Float", ["click"], [[{ id: "formats.bold" }]]], ["Docked", ["touch"], [[{ id: "formats.bold" }]]]]);
+    expect(before.migrated["silverware.toolbar.version"]).toBe(2);
+  });
+
+  it("read lists leniently: a name taken, one without a name or rows, more than 5 left out; what each is used for normalized", async () => {
+    const list = (name: unknown, useFor?: unknown) => ({ name, ...(useFor === undefined ? {} : { useFor }), rows: [[{ id: "formats.bold" }]] });
+    const settings = await readSettings(bridge({ "silverware.toolbar.favorites": [list(" A ", ["click", "pen"]), list("a", ["touch"]), list(3), { name: "No rows" }, list("B", ["click", "touch"]), list("C"), list("D"), list("E"), list("F")] }));
+    expect(settings.toolbars.map((one) => [one.name, one.useFor])).toEqual([["A", ["click"]], ["B", ["touch"]], ["C", []], ["D", []], ["E", []]]);
+    // None used for a way of working: the first is
+    expect((await readSettings(bridge({ "silverware.toolbar.favorites": [list("A"), list("B", ["touch"])] }))).toolbars.map((one) => one.useFor)).toEqual([["click"], ["touch"]]);
   });
 
   it("take a list handed over from Lua as an object of 1, 2, …", async () => {
-    const settings = await readSettings(bridge({ "silverware.toolbar.favorites": { 1: { 1: { id: "formats.code" }, 2: { type: "separator" } }, 2: {} } }));
-    expect(settings.favorites).toEqual([[{ id: "formats.code" }, { type: "separator" }], []]);
-    expect((await readSettings(bridge({ "silverware.toolbar.favorites": { a: "formats.code" } }))).favorites).toEqual(DEFAULT_FAVORITES);
+    expect(await rowsOf({ "silverware.toolbar.favorites": { 1: { name: "Mine", useFor: { 1: "click" }, rows: { 1: { 1: { id: "formats.code" }, 2: { type: "separator" } }, 2: {} } } } })).toEqual([[{ id: "formats.code" }, { type: "separator" }], []]);
+    expect(await rowsOf(one({ a: "formats.code" }))).toEqual(DEFAULT_FAVORITES);
   });
 
   it("leave out an item that is none: not an object, without its id, a show not known, an action's or a separator's property more", async () => {
-    const settings = await readSettings(
-      bridge({
-        "silverware.toolbar.favorites": [
-          ["formats.bold", { id: "formats.italic", show: "label" }, { show: "icon" }, { id: "formats.code", show: "big" }, { id: "x", shwo: "label" }, { type: "separator", id: "x" }, { type: "action", id: "formats.link" }],
-        ],
-      }),
-    );
-    expect(settings.favorites).toEqual([[{ id: "formats.italic", show: "label" }, { id: "formats.link" }]]);
+    expect(await rowsOf(one([["formats.bold", { id: "formats.italic", show: "label" }, { show: "icon" }, { id: "formats.code", show: "big" }, { id: "x", shwo: "label" }, { type: "separator", id: "x" }, { type: "action", id: "formats.link" }]]))).toEqual([
+      [{ id: "formats.italic", show: "label" }, { id: "formats.link" }],
+    ]);
   });
 
   it("take an action's own icon and label, a width within 3 and 30, a pin; an empty one none, one not text the item none", async () => {
-    const settings = await readSettings(
-      bridge({
-        "silverware.toolbar.favorites": [
-          [
-            { id: "formats.bold", icon: " ★ ", label: "Tučně", show: "label", width: 1, pin: "left" },
-            { id: "formats.italic", icon: "", label: "  " },
-            { id: "formats.code", label: 5 },
-            { id: "formats.link", width: 99, pin: "middle" },
-            { id: "formats.highlight", width: 99 },
-          ],
-        ],
-      }),
-    );
-    expect(settings.favorites).toEqual([
-      [{ id: "formats.bold", icon: "★", label: "Tučně", show: "label", width: 3, pin: "left" }, { id: "formats.italic" }, { id: "formats.highlight", width: 30 }],
-    ]);
+    const rows = [
+      [
+        { id: "formats.bold", icon: " ★ ", label: "Tučně", show: "label", width: 1, pin: "left" },
+        { id: "formats.italic", icon: "", label: "  " },
+        { id: "formats.code", label: 5 },
+        { id: "formats.link", width: 99, pin: "middle" },
+        { id: "formats.highlight", width: 99 },
+      ],
+    ];
+    expect(await rowsOf(one(rows))).toEqual([[{ id: "formats.bold", icon: "★", label: "Tučně", show: "label", width: 3, pin: "left" }, { id: "formats.italic" }, { id: "formats.highlight", width: 30 }]]);
   });
 
   it("read a kind's slot as an action's id, or one with its own icon and label", async () => {
@@ -74,31 +85,14 @@ describe("Settings", () => {
 
   it("keep an item of another kind whole, its fields for its kind to read; its show checked", async () => {
     const gesture = { type: "gesture", tap: "formats.bold", up: "formats.italic", show: "label" };
-    const settings = await readSettings(bridge({ "silverware.toolbar.favorites": [[gesture, { type: "gesture", show: "big" }, { type: "" }]] }));
-    expect(settings.favorites).toEqual([[gesture]]);
-  });
-
-  it("read touch's own favourites: the defaults for touch, else as set (not valid: none, Click's show); on unless turned off", async () => {
-    expect((await readSettings(bridge({}))).touchFavorites).toEqual(DEFAULT_TOUCH_FAVORITES);
-    // A space's own favourites and none for touch: its own by finger too (as before), the defaults for touch kept
-    const own = await readSettings(bridge({ "silverware.toolbar.favorites": [[{ id: "formats.bold" }]] }));
-    expect([own.touchOn, own.touchFavorites]).toEqual([false, DEFAULT_TOUCH_FAVORITES]);
-    // Both set (the defaults written, as the settings save them): on
-    expect((await readSettings(bridge({ "silverware.toolbar.favorites": DEFAULT_FAVORITES, "silverware.toolbar.favorites-touch": DEFAULT_TOUCH_FAVORITES }))).touchOn).toBe(true);
-    // Gesture buttons without the Gestures module: no defaults for touch
-    expect((await readSettings(bridge({ "silverware.toolbar.modules.gestures.enabled": false }))).touchFavorites).toBeUndefined();
-    expect((await readSettings(bridge({}))).touchOn).toBe(true);
-    const settings = await readSettings(bridge({ "silverware.toolbar.favorites-touch": [[{ id: "formats.code" }]], "silverware.toolbar.favorites-touch-enabled": false }));
-    expect(settings.touchFavorites).toEqual([[{ id: "formats.code" }]]);
-    expect(settings.touchOn).toBe(false);
-    expect((await readSettings(bridge({ "silverware.toolbar.favorites-touch": 3 }))).touchFavorites).toBeUndefined();
+    expect(await rowsOf(one([[gesture, { type: "gesture", show: "big" }, { type: "" }]]))).toEqual([[gesture]]);
   });
 
   it("are the defaults when reading them fails, or without getConfig", async () => {
     const failing = bridge({}, { getConfig: () => Promise.reject(new Error("no config")) });
-    expect((await readSettings(failing)).favorites).toEqual(DEFAULT_FAVORITES);
+    expect((await readSettings(failing)).toolbars).toEqual(defaultToolbars());
     const { getConfig: _, ...without } = bridge({});
-    expect((await readSettings(without)).favorites).toEqual(DEFAULT_FAVORITES);
+    expect((await readSettings(without)).toolbars).toEqual(defaultToolbars());
   });
 
   it("names what the init page did not hand over", () => {
@@ -109,10 +103,10 @@ describe("Settings", () => {
 describe("The init page", () => {
   const page = initPage;
 
-  it("defines no default for the favourites, and the same key and modules as the code", () => {
-    // The favourites have no default in config.define (left out, the toolbar's own apply: SilverBullet would copy a
+  it("defines no default for the toolbars, and the same key and modules as the code", () => {
+    // The toolbars have no default in config.define (left out, the toolbar's own apply: SilverBullet would copy a
     // default in, and a space's own could not be told); the page names them for the user
-    for (const name of ["favorites", '\\["favorites-touch"\\]', '\\["favorites-touch-enabled"\\]']) {
+    for (const name of ["favorites"]) {
       const definition = new RegExp(`\\n    ${name} = \\{([\\s\\S]*?)\\n    \\},`).exec(page)?.[1];
       expect(definition, name).toBeDefined();
       expect(definition, name).not.toContain("default =");
@@ -130,22 +124,10 @@ describe("The init page", () => {
     }
   });
 
-  it("read where the toolbar shows, each device's: by the selection on a computer, docked at the bottom by touch, by default and where it is none of the values", async () => {
-    expect((await readSettings(bridge({}))).placement).toEqual({ click: "selection", touch: "bottom" });
-    expect((await readSettings(bridge({ "silverware.toolbar.placement": "top", "silverware.toolbar.placement-touch": "selection" }))).placement).toEqual({ click: "top", touch: "selection" });
-    // As before: auto
-    expect((await readSettings(bridge({ "silverware.toolbar.placement": "auto" }))).placement).toEqual({ click: "selection", touch: "bottom" });
-    expect(page).toContain('placement = {\n      type = "string",\n      enum = { "selection", "bottom", "top" },\n      default = "selection"');
-    expect(page).toContain('["placement-touch"] = {\n      type = "string",\n      enum = { "selection", "bottom", "top" },\n      default = "bottom"');
-  });
-
-  it("read when the toolbar shows, each device's: after a selection on a computer, while writing by touch, by default and where it is none of the values", async () => {
-    expect((await readSettings(bridge({}))).show).toEqual({ click: "selection", touch: "writing" });
-    expect((await readSettings(bridge({ "silverware.toolbar.show": "always", "silverware.toolbar.show-touch": "selection" }))).show).toEqual({ click: "always", touch: "selection" });
-    // As before: mobile
-    expect((await readSettings(bridge({ "silverware.toolbar.show": "mobile" }))).show).toEqual({ click: "selection", touch: "writing" });
-    expect(page).toContain('show = {\n      type = "string",\n      enum = { "always", "writing", "selection" },\n      default = "selection"');
-    expect(page).toContain('["show-touch"] = {\n      type = "string",\n      enum = { "always", "writing", "selection" },\n      default = "writing"');
+  it("read where and when each toolbar shows: Float by the selection after selecting text, Docked at the bottom always; unknown or none: by the selection, after selecting text", async () => {
+    expect((await readSettings(bridge({}))).toolbars.map((list) => [list.name, list.placement, list.show])).toEqual([["Float", "selection", "selection"], ["Docked", "bottom", "always"]]);
+    const read = await readSettings(bridge({ "silverware.toolbar.favorites": [{ name: "A", useFor: ["click"], placement: "top", show: "always", rows: [] }, { name: "B", placement: "auto", show: "mobile", rows: [] }] }));
+    expect(read.toolbars.map((list) => [list.placement, list.show])).toEqual([["top", "always"], ["selection", "selection"]]);
   });
 
   it("read a word at the caret as if selected: on by default", async () => {

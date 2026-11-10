@@ -9,16 +9,17 @@
 // its buttons show the formats around the caret; it goes as the caret moves
 // or text is typed. The modules (modules.ts) give the actions; the core knows
 // none of them. The popup ends with the core's own item, the settings dialog.
-import type { Bridge, Device, Settings } from "../bridge.ts";
+import type { Bridge, Settings } from "../bridge.ts";
 import { CONTENT_SELECTOR, inEditor, pageContentOf, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
 import type { Action, ActionEditor, Change, Context } from "./action.ts";
 import { Bar, type Dock, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
 import { Docking } from "./dock.ts";
-import { byTouch, isActionItem, isSeparator, type Look, ownIconHtml, type Pin, type SlotRef, slotOf } from "./favorites.ts";
+import { isActionItem, isSeparator, type Look, orderedByPins, ownIconHtml, type Pin, type SlotRef, slotItemOf, slotOf } from "./favorites.ts";
 import type { ItemKind } from "./items.ts";
 import { hideKeyboard } from "./keyboard.ts";
+import { docks, type Input, inputOf, type Toolbar, toolbarFor } from "./toolbars.ts";
 import { marked } from "./cursor.ts";
 import type { Box } from "./place.ts";
 import { Panel } from "./panel.ts";
@@ -246,10 +247,9 @@ export class Controller {
     const actions = this.offered();
     const all = [...actions, ...actions.flatMap((a) => a.choices ?? [])];
     const kinds = this.kinds();
-    // Worked by a finger: touch's own where they are set
-    const { touchFavorites, touchOn } = this.settings;
-    const favorites = (byTouch(this.doc.defaultView) && touchOn && touchFavorites) || this.settings.favorites;
-    return favorites
+    // (In the order its pins say: docked, they are the line's ends; by the selection the row's first and last)
+    return this.toolbar()
+      .rows.map((row) => orderedByPins(row))
       .map((row) => {
         const items = row.flatMap((item): Shown[] => {
           if (isSeparator(item)) return [{ separator: true }];
@@ -261,7 +261,13 @@ export class Controller {
           const kind = kinds.find((k) => k.type === item.type);
           if (!kind || kind.check?.(item)) return [];
           // A slot's action with its own icon and label where the slot has them: the kind draws it as it is given
+          // (An item of a kind that is one action in a slot: that action, where nothing is wrong with it)
           const slots = kind.slots.map(({ key, optional }) => {
+            const inner = slotItemOf(item[key]);
+            if (inner) {
+              const of = kinds.find((k) => k.type === inner.type);
+              return { key, optional, action: of?.action && !of.check?.(inner) ? of.action(inner) : undefined };
+            }
             const ref = slotOf(item[key]);
             const found = ref && all.find((a) => a.id === ref.id);
             return { key, optional, action: found && ref ? withOwnLook(found, ref) : found };
@@ -434,6 +440,15 @@ export class Controller {
       select: (from, to) => void bridge.setSelection(from, to),
       // (The selection set again once the keyboard has gone: a phone may drop it as it goes)
       hideKeyboard: () => hideKeyboard(pageContentOf(this.doc.activeElement) ?? this.doc.querySelector<HTMLElement>(CONTENT_SELECTOR), () => void bridge.setSelection(context.from, context.to)),
+      write: async (from, to, text) => {
+        await bridge.replaceRange(from, to, text);
+        await bridge.setSelection(from + text.length, from + text.length);
+      },
+      startCompletion: async () => {
+        if (!bridge.startCompletion) throw missing("startCompletion");
+        await bridge.startCompletion();
+      },
+      completes: !!bridge.startCompletion,
     };
     try {
       await action.perform!(context, editor);
@@ -499,14 +514,14 @@ export class Controller {
     this.hideBar(e.target instanceof Node && inEditor(e.target));
   };
 
-  /** Whether the toolbar shows while the page's text is edited, with nothing selected too (the show setting, this device's: writing, always) */
+  /** Whether the toolbar shows while the page's text is edited, with nothing selected too (the toolbar's show: writing, always) */
   private persistent(): boolean {
-    return this.settings.show[this.device()] !== "selection";
+    return this.toolbar().show !== "selection";
   }
 
-  /** Whether the toolbar shows always, the page's text edited or not (the show setting, this device's) */
+  /** Whether the toolbar shows always, the page's text edited or not (the toolbar's show) */
   private stays(): boolean {
-    return this.settings.show[this.device()] === "always";
+    return this.toolbar().show === "always";
   }
 
   /** Shown always: the toolbar at once, as the caret is (docked, also where the page's text has no focus) */
@@ -521,9 +536,9 @@ export class Controller {
     this.showBar(context, range);
   }
 
-  /** This device as the settings tell them apart (worked by a finger or not) */
-  private device(): Device {
-    return byTouch(this.doc.defaultView) ? "touch" : "click";
+  /** The way this device is worked, as the toolbars tell them apart (by a finger or not) */
+  private device(): Input {
+    return inputOf(this.doc.defaultView);
   }
 
   /** Whether the page's text has the keyboard (its editor focused) */
@@ -562,14 +577,19 @@ export class Controller {
     });
   };
 
-  /** Whether the toolbar docks, at the bottom or the top (the placement setting, this device's) */
-  private docks(): boolean {
-    return this.settings.placement[this.device()] !== "selection";
+  /** The toolbar this way of working it uses (a mouse's, a finger's): its rows, where and when it shows */
+  private toolbar(): Toolbar {
+    return toolbarFor(this.settings.toolbars, this.device());
   }
 
-  /** Where the toolbar docks now (the placement setting's edge) */
+  /** Whether the toolbar docks, at the bottom or the top (the toolbar's placement) */
+  private docks(): boolean {
+    return docks(this.toolbar().placement);
+  }
+
+  /** Where the toolbar docks now (the toolbar's placement's edge) */
   private dockAt(): Dock {
-    return this.docking.at(this.settings.placement[this.device()] === "top" ? "top" : "bottom");
+    return this.docking.at(this.toolbar().placement === "top" ? "top" : "bottom");
   }
 
   // The page scrolled or the window resized: the toolbar and the popup under it follow the selection (docked: the keyboard)

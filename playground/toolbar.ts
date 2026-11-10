@@ -5,6 +5,7 @@
 // command's key bound as SilverBullet binds a command's (a keymap of the editor).
 // Settings are the playground's own store (no CONFIG page here), which the
 // settings dialog writes through `saveSettings`.
+import { autocompletion, type CompletionContext, startCompletion } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { EditorState } from "@codemirror/state";
@@ -41,6 +42,23 @@ try {
 }
 const shortcut = typeof settings[PATHS.shortcut] === "string" ? (settings[PATHS.shortcut] as string) : DEFAULT_SHORTCUT;
 
+/**
+ * A few slash commands, completed after "/" as SilverBullet completes its own
+ * (its slashCommandRegexp: "/" at a line's start or after no letter, digit,
+ * "_" or ":"); one picked takes the "/" and what was typed after it, and writes
+ * its text
+ */
+function slashCommands(context: CompletionContext) {
+  const prefix = context.matchBefore(/([^\w:]|^)\/[\w#-]*/);
+  if (!prefix) return null;
+  const slash = prefix.from + prefix.text.indexOf("/");
+  const command = (label: string, insert: string) => ({
+    label,
+    apply: (view: EditorView) => view.dispatch({ changes: { from: slash, to: view.state.selection.main.head, insert }, selection: { anchor: slash + insert.length } }),
+  });
+  return { from: slash + 1, options: [command("today", "2026-11-10"), command("hr", "---"), command("task", "* [ ] ")] };
+}
+
 const view = new EditorView({
   parent: document.getElementById("sb-editor")!,
   state: EditorState.create({
@@ -59,6 +77,7 @@ const view = new EditorView({
         ...historyKeymap,
       ]),
       markdown(),
+      autocompletion({ override: [slashCommands] }),
       EditorView.lineWrapping,
       EditorView.updateListener.of((update) => {
         if (!update.docChanged) return;
@@ -104,6 +123,7 @@ void init({
     "Navigate: Home": { name: "Navigate: Home" },
     "Hidden command": { name: "Hidden command", hide: true },
   }),
+  startCompletion: () => startCompletion(view),
   // No pages to open here: said so
   navigate: (page) => flash(`Playground: would open ${page}`),
   invokeCommand: (name) => {
@@ -118,6 +138,13 @@ void init({
 
 document.getElementById("swb-settings")!.addEventListener("click", () => void openSettings());
 
+// The sample and the toolbar's settings as they start (its settings are read once it starts: the page loaded anew)
 document.getElementById("reset")!.addEventListener("click", () => {
-  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: sample } });
+  try {
+    localStorage.removeItem(STORE);
+    localStorage.removeItem(SETTINGS_STORE);
+  } catch {
+    // A private window: nothing kept to take back
+  }
+  location.reload();
 });

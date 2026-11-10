@@ -1,10 +1,9 @@
 // The favourites as the settings dialog edits them: rows of items, each change
 // a new value (the dialog draws it again). An item is at a row and an index.
-// Touch's own are edited laid out with their pinned items in two lists before
-// the rows (`splitPins`: left, right, the rows), written back with each one's
-// `pin` (`joinPins`).
+// A docked toolbar's are edited with each row's pinned items at its ends
+// (`pinOrdered`, `placeItem`), as it shows each row a line of its own.
 
-import { type FavoriteItem, type Favorites, iconOf, isKindItem, type SlotRef, slotOf, isSeparator, type KindItem, type Pin, type Show, type SeparatorItem } from "../core/favorites.ts";
+import { type FavoriteItem, type Favorites, iconOf, isKindItem, orderedByPins, pinOf, type SlotRef, slotItemOf, slotOf, isSeparator, type KindItem, type Pin, type Show, type SeparatorItem } from "../core/favorites.ts";
 
 export type At = { readonly row: number; readonly index: number };
 
@@ -42,10 +41,10 @@ export function moveRow(rows: Favorites, from: number, to: number): FavoriteItem
   return next;
 }
 
-/** An item added at a row's end */
-export function addItem(rows: Favorites, row: number, item: FavoriteItem): FavoriteItem[][] {
+/** An item added at a row's end, or at `index` */
+export function addItem(rows: Favorites, row: number, item: FavoriteItem, index?: number): FavoriteItem[][] {
   const next = copy(rows);
-  next[row]?.push(item);
+  next[row]?.splice(index ?? next[row]!.length, 0, item);
   return next;
 }
 
@@ -99,56 +98,104 @@ export function setSlotOwn(rows: Favorites, at: At, slot: string, key: "icon" | 
   return next;
 }
 
-/** An item without its pin */
-function unpinned(item: FavoriteItem): FavoriteItem {
-  if (isSeparator(item) || !("pin" in item)) return item;
-  const { pin: _, ...rest } = item as Exclude<FavoriteItem, SeparatorItem>;
-  return rest as FavoriteItem;
-}
-
 /**
- * The favourites laid out for editing their pins: the items pinned left, those
- * pinned right (each in their order), then the rows without them (a row of
- * pinned items alone, none: an empty row stays, being edited)
+ * Rows ordered by hand where the toolbar is not docked (its pins only order a row there): an item pinned left
+ * that no longer leads the row, or pinned right that no longer ends it, unpinned, so the order stays as made
  */
-export function splitPins(rows: Favorites): FavoriteItem[][] {
-  const left: FavoriteItem[] = [];
-  const right: FavoriteItem[] = [];
-  const rest = rows.flatMap((row) => {
-    const kept = row.filter((item) => {
-      const pin = isSeparator(item) ? undefined : item.pin;
-      if (pin === "left") left.push(item);
-      else if (pin === "right") right.push(item);
-      return !pin;
+export function unpinnedOutOfOrder(rows: Favorites): FavoriteItem[][] {
+  return rows.map((row) => {
+    const out = [...row];
+    const unpin = (i: number) => {
+      const { pin: _, ...rest } = out[i] as Exclude<FavoriteItem, SeparatorItem>;
+      out[i] = rest as FavoriteItem;
+    };
+    let leading = true;
+    out.forEach((item, i) => {
+      if (pinOf(item) !== "left") leading = false;
+      else if (!leading) unpin(i);
     });
-    return kept.length || !row.length ? [kept] : [];
+    let trailing = true;
+    for (let i = out.length - 1; i >= 0; i--) {
+      if (pinOf(out[i]!) !== "right") trailing = false;
+      else if (!trailing) unpin(i);
+    }
+    return out;
   });
-  return [left, right, ...rest];
+}
+
+const ZONES: readonly (Pin | undefined)[] = ["left", undefined, "right"];
+
+/**
+ * The favourites each row in the order the docked toolbar shows it: its items
+ * pinned left, the others, those pinned right (each in their order), as
+ * Touch's are edited: a row's pinned items in boxes at its ends
+ */
+export function pinOrdered(rows: Favorites): FavoriteItem[][] {
+  return rows.map((row) => orderedByPins(row));
+}
+
+/** The index in a row (pin ordered) where the items of a zone start (left, the others: undefined, right) */
+function zoneStart(row: readonly FavoriteItem[], zone: Pin | undefined): number {
+  const before = ZONES.slice(0, ZONES.indexOf(zone));
+  return row.filter((item) => before.includes(pinOf(item))).length;
 }
 
 /**
- * The favourites written back from their layout: the items of the two lists
- * pinned (at the first row's start and the last one's end, where they read in
- * order; a separator there left out, as it cannot be pinned), the others not
+ * An item moved into a zone of a row (pinned left, not pinned, pinned right),
+ * at an index among that zone's items, pinned so or not; the rows pin
+ * ordered. A separator is not pinned: into a pinned zone, nothing moves.
+ * Where it lands too.
  */
-export function joinPins(layout: Favorites): FavoriteItem[][] {
-  const [left = [], right = [], ...rows] = layout;
-  const pinned = (items: readonly FavoriteItem[], pin: Pin) => items.flatMap((item) => (isSeparator(item) ? [] : [{ ...(item as Exclude<FavoriteItem, SeparatorItem>), pin } as FavoriteItem]));
-  const out = rows.map((row) => row.map(unpinned));
-  if (!out.length) out.push([]);
-  out[0] = [...pinned(left, "left"), ...out[0]!];
-  out[out.length - 1] = [...out[out.length - 1]!, ...pinned(right, "right")];
-  return out;
+export function placeItem(rows: Favorites, from: At, to: { readonly row: number; readonly zone: Pin | undefined; readonly index: number }): { readonly rows: FavoriteItem[][]; readonly at: At } {
+  const next = pinOrdered(rows);
+  const item = next[from.row]?.[from.index];
+  if (!item || !next[to.row] || (to.zone && isSeparator(item))) return { rows: next, at: from };
+  next[from.row]!.splice(from.index, 1);
+  const { pin: _, ...rest } = item as Exclude<FavoriteItem, SeparatorItem>;
+  const placed = (isSeparator(item) ? item : to.zone ? { ...rest, pin: to.zone } : rest) as FavoriteItem;
+  const target = next[to.row]!;
+  const start = zoneStart(target, to.zone);
+  const size = target.filter((other) => pinOf(other) === to.zone).length;
+  const index = start + Math.max(0, Math.min(to.index, size));
+  target.splice(index, 0, placed);
+  return { rows: next, at: { row: to.row, index } };
 }
 
-/** A kind's item with an action's id in one of its slots (undefined: none there) */
-export function setSlot(rows: Favorites, at: At, key: string, id: string | undefined): FavoriteItem[][] {
+/** An item pinned at an end of its row, or not (undefined); the rows pin ordered, and where it is then */
+export function setPin(rows: Favorites, at: At, pin: Pin | undefined): { readonly rows: FavoriteItem[][]; readonly at: At } {
+  const item = rows[at.row]?.[at.index];
+  if (!item || isSeparator(item)) return { rows: pinOrdered(rows), at };
+  const ordered = pinOrdered(rows);
+  const from = { row: at.row, index: ordered[at.row]!.indexOf(item) };
+  // Pinned left: at the end of the items pinned left; right or none: at the start of theirs
+  return placeItem(ordered, from, { row: at.row, zone: pin, index: pin === "left" ? Infinity : 0 });
+}
+
+/**
+ * A kind's item with a value in one of its fields (undefined: none there): a
+ * slot's action's id, or an item of a kind that is one action; a field's text
+ */
+export function setSlot(rows: Favorites, at: At, key: string, value: unknown): FavoriteItem[][] {
   const next = copy(rows);
   const item = next[at.row]?.[at.index];
   if (!item || !isKindItem(item)) return next;
   const { [key]: _, ...rest } = item;
-  next[at.row]![at.index] = (id === undefined ? rest : { ...rest, [key]: id }) as KindItem;
+  next[at.row]![at.index] = (value === undefined ? rest : { ...rest, [key]: value }) as KindItem;
   return next;
+}
+
+/**
+ * A field of the item a kind's slot holds (a snippet in a gesture button's
+ * swipe: its text, its own icon or label), undefined or empty taking it off;
+ * an icon its first characters only, a label trimmed
+ */
+export function setSlotField(rows: Favorites, at: At, slot: string, key: string, value: string | undefined): FavoriteItem[][] {
+  const item = rows[at.row]?.[at.index];
+  const inner = item && isKindItem(item) ? slotItemOf(item[slot]) : undefined;
+  if (!inner) return copy(rows);
+  const { [key]: _, ...rest } = inner;
+  const own = value === undefined ? undefined : key === "icon" ? iconOf(value) : key === "label" ? value.trim() : value;
+  return setSlot(rows, at, slot, own ? { ...rest, [key]: own } : rest);
 }
 
 /** The favourites as saved: rows left empty left out */

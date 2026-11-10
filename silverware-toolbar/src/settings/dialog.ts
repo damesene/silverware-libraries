@@ -1,25 +1,38 @@
 // The settings dialog: the command "Silverware Toolbar: Settings" and the last
-// item of the popup of every action. Tabs General (the key), Favorites (the
-// toolbar's rows: items dragged within a row or into another, Alt+arrows with
-// the keyboard; an action shown as its icon or with its label; removed; added
-// from a search of every action, or a separator), Modules (each one's switch).
+// item of the popup of every action. Tabs General (the key, the word at the
+// cursor), Toolbars (core/toolbars.ts: one edited at a time, named, used for
+// Click, Touch, both or neither, where and when it shows, made, duplicated,
+// deleted; its rows: items dragged within a row or into another, Alt+arrows
+// with the keyboard, a docked one's pinned items in boxes at its rows' ends;
+// an action shown as its icon or with its label; removed; added from a search
+// of every action, or a separator), Modules (each one's switch).
 // It reads the configuration when it opens and writes nothing until Save; a
 // module or the key changed: Save and reload (modules are created and the
 // command defined when the toolbar starts). The shared dialog, tabs and
 // controls (shared/), in the table's settings' look (classes `swb-settings-*`).
-import { settingLabel, settingRow, switchControl } from "../../../shared/controls.ts";
+import { settingRow, switchControl } from "../../../shared/controls.ts";
 import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
-import { type Bridge, DEFAULT_SHORTCUT, type Device, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
+import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, readSettings, readShortcut } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
-import { byTouch, DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type FavoriteItem, type Favorites, hasAction, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Show as ItemShow, slotOf, widthOf } from "../core/favorites.ts";
+import { type FavoriteItem, type Favorites, hasAction, pinOf, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Pin, type Show as ItemShow, slotItemOf, slotOf, widthOf } from "../core/favorites.ts";
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
+import { defaultToolbars, docks, freeToolbarName, type Input, inputOf, MAX_TOOLBARS, type Placement, PLACEMENTS, type ShowWhen, SHOWS, type Toolbar, toolbarFor, useToolbarFor, validateToolbarName } from "../core/toolbars.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
+import { SETTINGS_VERSION } from "../migrations/index.ts";
 import { reorder } from "../../../shared/drag.ts";
-import { addItem, type At, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setSlotOwn, splitPins, stepOf } from "./favorites.ts";
+import { addItem, type At, moveItem, moveRow, pinOrdered, placeItem, removeItem, unpinnedOutOfOrder, removeRow, sameRows, savedRows, setLook, setOwn, setPin, setSlot, setSlotField, setSlotOwn, stepOf } from "./favorites.ts";
+
+// A zone of a docked toolbar's row: its items pinned left, the others, those pinned right
+type Zone = "left" | "middle" | "right";
 
 const BASE = "swb-settings";
+
+// What the dialog calls the values of a toolbar
+const PLACEMENT_LABELS: Readonly<Record<Placement, string>> = { selection: "By the selection", bottom: "Docked at the bottom", top: "Docked at the top" };
+const SHOW_LABELS: Readonly<Record<ShowWhen, string>> = { always: "Always", writing: "While writing", selection: "After selecting text" };
+const INPUT_LABELS: Readonly<Record<Input, string>> = { click: "Click", touch: "Touch" };
 
 // SilverBullet's command turning its keyboard bar on or off on this device (plugs/editor/editor.plug.yaml)
 const KEYBOARD_BAR_COMMAND = "Editor: Toggle Keyboard Bar";
@@ -43,14 +56,9 @@ type Picking = { readonly row: number } | { readonly at: At; readonly key: strin
 
 type Values = {
   shortcut: string;
-  placement: Readonly<Record<Device, Placement>>;
-  show: Readonly<Record<Device, Show>>;
   wordAtCaret: boolean;
-  favorites: Favorites;
-  // Touch's own (the defaults for touch where not set); undefined: none, an invalid one (Click's show)
-  touchFavorites: Favorites | undefined;
-  // Whether Touch's own show; off, Click's do (its own kept)
-  touchOn: boolean;
+  // The toolbars, each way of working used by one (core/toolbars.ts)
+  toolbars: readonly Toolbar[];
   modules: Record<ModuleName, boolean>;
 };
 
@@ -58,17 +66,21 @@ export class SettingsDialog {
   private readonly dialogs: Dialogs;
   private dialog: Dialog | undefined;
   private initial: Values | undefined;
+  // What the migrations changed as the settings were read (where the toolbar could not write it back): written with the version
+  private migrated: Readonly<Record<string, unknown>> = {};
   private values: Values | undefined;
   private saving = false;
-  private favoritesPanel: HTMLElement | undefined;
+  private toolbarsPanel: HTMLElement | undefined;
   private saveButton: HTMLButtonElement | undefined;
   private note: HTMLElement | undefined;
   // The search of actions open: to add to a row, or for a slot of a kind's item
   private picking: Picking | undefined;
   // The item whose look is being set (a panel under its row): its icon or label, the label's width
   private adjusting: (At & { readonly key?: string }) | undefined;
-  // The favourites edited: this device's first
-  private device: Device = "click";
+  // The toolbar edited, by its index: the one this device uses first
+  private toolbarIndex = 0;
+  // A name typed for the toolbar edited that cannot be its (said under its field; Save waits for one that can)
+  private naming: { readonly toolbar: number; readonly text: string; readonly problem: string } | undefined;
   // SilverBullet's keyboard bar on, on a touch screen: the docked toolbar goes over it, its turning off offered
   private keyboardBar = false;
 
@@ -86,11 +98,13 @@ export class SettingsDialog {
     const { bridge } = this.context;
     const settings = await readSettings(bridge);
     const modules = Object.fromEntries(MODULE_NAMES.map((name) => [name, settings.modules.has(name)])) as Record<ModuleName, boolean>;
-    this.initial = { shortcut: await readShortcut(bridge), placement: settings.placement, show: settings.show, wordAtCaret: settings.wordAtCaret, favorites: settings.favorites, touchFavorites: settings.touchFavorites, touchOn: settings.touchOn, modules };
-    // Touch's first by finger where they show there (on, with their own), else Click's
-    this.device = byTouch(this.context.doc.defaultView) && settings.touchOn && settings.touchFavorites ? "touch" : "click";
+    this.migrated = settings.migrated;
+    this.initial = { shortcut: await readShortcut(bridge), wordAtCaret: settings.wordAtCaret, toolbars: settings.toolbars, modules };
+    // The toolbar this device shows first
+    this.toolbarIndex = Math.max(0, settings.toolbars.indexOf(toolbarFor(settings.toolbars, inputOf(this.context.doc.defaultView))));
+    this.naming = undefined;
     this.keyboardBar = await this.keyboardBarOn();
-    this.values = { ...this.initial, favorites: settings.favorites.map((row) => [...row]), touchFavorites: settings.touchFavorites?.map((row) => [...row]), modules: { ...modules } };
+    this.values = { ...this.initial, toolbars: settings.toolbars.map((toolbar) => ({ ...toolbar, rows: toolbar.rows.map((row) => [...row]) })), modules: { ...modules } };
     this.render();
   }
 
@@ -151,35 +165,19 @@ export class SettingsDialog {
     });
     const keyRow = settingRow(doc, BASE, "Key for every action", "As SilverBullet writes keys (Ctrl-Shift-q, Alt-k); with nothing selected it shows the toolbar at the cursor. Applies after a reload.", key);
     keyRow.dataset.swbSetting = PATHS.shortcut;
-    const placementRow = this.byDevice(
-      "Where the toolbar shows",
-      "Docked: one row across the editor, at the bottom over the keyboard (a phone's own menu of the selection, Cut, Copy, Paste, is by the selection) or at the top.",
-      PATHS.placement,
-      PLACEMENTS.map((value) => [value, PLACEMENT_LABELS[value]]),
-      values.placement,
-      (placement) => (values.placement = placement),
-    );
-    const showRow = this.byDevice(
-      "When the toolbar shows",
-      "While writing: with nothing selected too, its buttons the formats around the cursor; Esc leaves it. Always: also where the page's text has no focus.",
-      PATHS.show,
-      SHOWS.map((value) => [value, SHOW_LABELS[value]]),
-      values.show,
-      (show) => (values.show = show),
-    );
     const word = switchControl(doc, BASE, values.wordAtCaret, (on) => {
       values.wordAtCaret = on;
       this.update();
     });
     const wordRow = settingRow(doc, BASE, "A word at the cursor as if selected", "With nothing selected, Bold (any inline format) and Clear formatting work on the word the cursor is in or touches: what spaces separate, without the punctuation at its ends (a period, a comma, quotes). The cursor stays where it was.", word);
     wordRow.dataset.swbSetting = PATHS.wordAtCaret;
-    card.append(keyRow, placementRow, showRow, wordRow);
+    card.append(keyRow, wordRow);
     // SilverBullet's keyboard bar on: said first, as it decides how the docked toolbar looks
     if (this.keyboardBar) general.append(this.keyboardBarNote());
     general.append(card);
 
-    this.favoritesPanel = this.el("div");
-    this.drawFavorites();
+    this.toolbarsPanel = this.el("div");
+    this.drawToolbars();
 
     const modules = this.el("div");
     const moduleCard = this.el("div", `${BASE}-card`);
@@ -195,7 +193,7 @@ export class SettingsDialog {
 
     const { bar, panels } = tabs(doc, BASE, "swb", [
       { id: "general", title: "General", panel: general },
-      { id: "favorites", title: "Favorites", panel: this.favoritesPanel },
+      { id: "toolbars", title: "Toolbars", panel: this.toolbarsPanel },
       { id: "modules", title: "Modules", panel: modules },
     ]);
     const content = doc.createDocumentFragment();
@@ -218,34 +216,6 @@ export class SettingsDialog {
       dismiss: () => this.dismiss(),
     });
     this.update();
-  }
-
-  /**
-   * A setting of each device's own: its name and hint, a choice for Click and
-   * one for Touch (Touch where the screen is worked by a finger, as the
-   * favourites)
-   */
-  private byDevice<T extends string>(name: string, hint: string, path: string, choices: readonly (readonly [T, string])[], value: Readonly<Record<Device, T>>, set: (value: Readonly<Record<Device, T>>) => void): HTMLElement {
-    const { doc } = this.context;
-    const row = this.el("div", `${BASE}-row ${BASE}-by-device`);
-    row.dataset.swbSetting = path;
-    const pair = this.el("div", `${BASE}-devices-pair`);
-    let now = value;
-    for (const [device, label] of [["click", "Click"], ["touch", "Touch"]] as const) {
-      const select = this.el("select");
-      for (const [choice, text] of choices) select.append(new Option(text, choice, false, choice === now[device]));
-      select.dataset.swbFor = device;
-      select.addEventListener("change", () => {
-        now = { ...now, [device]: select.value as T };
-        set(now);
-        this.update();
-      });
-      const field = this.el("label", `${BASE}-device-choice`);
-      field.append(this.el("span", `${BASE}-device-name`, label), select);
-      pair.append(field);
-    }
-    row.append(settingLabel(doc, BASE, name, hint), pair);
-    return row;
   }
 
   /** Whether SilverBullet's keyboard bar is on, on a touch screen (its UI option; a release without it: off) */
@@ -293,161 +263,229 @@ export class SettingsDialog {
     return known;
   }
 
-  /**
-   * The favourites the tab edits: Click's, or Touch's (its own while on, else
-   * Click's, which it shows); Touch's own laid out with the items pinned left
-   * and right in two lists before the rows (`pins`)
-   */
+  /** The toolbar edited */
+  private get edited(): Toolbar {
+    const toolbars = this.values!.toolbars;
+    return toolbars[Math.min(this.toolbarIndex, toolbars.length - 1)]!;
+  }
+
+  /** Whether the toolbar edited docks: its rows lines, its pinned items at their ends (by the selection, pins only order a row) */
+  private get docked(): boolean {
+    return docks(this.edited.placement);
+  }
+
+  /** The rows of the toolbar edited, each in the order its pins say (as it shows them): its pinned items at its ends */
   private get rows(): Favorites {
-    const values = this.values!;
-    if (this.pins) return splitPins(values.touchFavorites!);
-    return (this.device === "touch" && values.touchOn && values.touchFavorites) || values.favorites;
+    return pinOrdered(this.edited.rows);
   }
 
-  /** Whether Touch's own are edited: pinned at the docked toolbar's ends in boxes of their own (Click's toolbar does not scroll) */
-  private get pins(): boolean {
-    const values = this.values!;
-    return this.device === "touch" && values.touchOn && !!values.touchFavorites;
-  }
-
-  /** The index of the first row in what the tab edits (after the two lists of pinned items, where they are) */
-  private get first(): number {
-    return this.pins ? 2 : 0;
-  }
-
-  /** Whether Touch shows Click's (off, or none of its own) */
-  private get sameForTouch(): boolean {
-    const values = this.values!;
-    return this.device === "touch" && !(values.touchOn && values.touchFavorites);
-  }
-
-  /** The switch between the favourites for a mouse (Click) and for a finger (Touch), and Touch's own or Click's */
-  private deviceBar(): HTMLElement {
-    const bar = this.el("div", `${BASE}-devices`);
-    const tabs = this.el("div", `${BASE}-device-tabs`);
-    tabs.setAttribute("role", "radiogroup");
-    tabs.setAttribute("aria-label", "Favourites of");
-    for (const [device, label] of [["click", "Click"], ["touch", "Touch"]] as const) {
-      const button = this.button(`${BASE}-device`, label, () => {
-        this.device = device;
-        this.picking = undefined;
-        this.adjusting = undefined;
-        this.drawFavorites(`.${BASE}-device[data-swb-device="${device}"]`);
-      });
-      button.dataset.swbDevice = device;
-      button.setAttribute("role", "radio");
-      button.setAttribute("aria-checked", String(this.device === device));
-      tabs.append(button);
-    }
-    const values = this.values!;
-    const copy = (rows: Favorites) => rows.map((row) => [...row]);
-    // The other's copied over this one's (Touch's: on, as it is to be seen)
-    const other = this.device === "click" ? values.touchFavorites : values.favorites;
-    const from = this.device === "click" ? "Touch" : "Click";
-    const copyButton = this.button(`${BASE}-copy-from`, `Copy from ${from}`, () => {
-      if (!other) return;
-      if (this.device === "touch") {
-        values.touchFavorites = copy(other);
-        values.touchOn = true;
-      } else values.favorites = copy(other);
+  /**
+   * The toolbars changed, the tab drawn anew; `rowsKept`: the rows edited are
+   * the same (renamed, its use, where or when changed), so an item's panel
+   * or a search open stays
+   */
+  private setToolbars(toolbars: readonly Toolbar[], focus?: string, rowsKept = false): void {
+    this.values!.toolbars = toolbars;
+    if (!rowsKept) {
       this.picking = undefined;
       this.adjusting = undefined;
-      this.changedFavorites(`.${BASE}-copy-from`);
-    });
-    // (Click from Touch: Touch with none of its own, an invalid one, has nothing to give)
-    copyButton.disabled = !other;
-    // The defaults, asked first (written only on Save): each its own
-    const resetButton = this.button(`${BASE}-reset`, "Reset to defaults", () => {
-      void (async () => {
-        const question =
-          this.device === "click"
-            ? "Reset the favourites for Click to the defaults?"
-            : "Reset the favourites for Touch to the defaults?";
-        if (!(await this.ask(question))) return;
-        if (this.device === "click") values.favorites = copy(DEFAULT_FAVORITES);
-        // Touch's are gesture buttons: without the Gestures module, none of its own (Click's show)
-        else if (!values.modules.gestures) values.touchFavorites = undefined;
-        else {
-          values.touchFavorites = copy(DEFAULT_TOUCH_FAVORITES);
-          values.touchOn = true;
-        }
+    }
+    this.changedToolbars(focus);
+  }
+
+  /**
+   * The toolbars: one tab each (its name and, small, what shows it; the one
+   * edited checked), New toolbar, Reset to defaults (every toolbar, asked
+   * first); under them the one edited's card
+   */
+  private toolbarBar(): HTMLElement {
+    const values = this.values!;
+    const bar = this.el("div", `${BASE}-toolbars-bar`);
+    const top = this.el("div", `${BASE}-toolbars-top`);
+    const tabs = this.el("div", `${BASE}-toolbar-tabs`);
+    tabs.setAttribute("role", "radiogroup");
+    tabs.setAttribute("aria-label", "Toolbars");
+    values.toolbars.forEach((toolbar, i) => {
+      const button = this.button(`${BASE}-toolbar-tab`, toolbar.name, () => {
+        this.toolbarIndex = i;
+        this.naming = undefined;
         this.picking = undefined;
-        this.changedFavorites(`.${BASE}-reset`);
+        this.adjusting = undefined;
+        this.drawToolbars(`.${BASE}-toolbar[data-swb-toolbar="${i}"]`);
+      });
+      button.dataset.swbToolbar = String(i);
+      // What it is used for, small after its name (none: kept to switch to)
+      const uses = toolbar.useFor.map((input) => (INPUT_LABELS[input])).join(" · ");
+      button.replaceChildren(this.el("span", `${BASE}-toolbar-tab-name`, toolbar.name), ...(uses ? [this.el("span", `${BASE}-toolbar-tab-for`, uses)] : []));
+      button.setAttribute("aria-label", uses ? `${toolbar.name}, used for ${uses.replace(" · ", " and ")}` : `${toolbar.name}, not used`);
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-checked", String(i === this.toolbarIndex));
+      tabs.append(button);
+    });
+    const add = this.button(`${BASE}-toolbar-new`, "+ New toolbar", () => {
+      const toolbars = [...values.toolbars, { name: freeToolbarName(values.toolbars, "Toolbar"), useFor: [], placement: "selection" as const, show: "selection" as const, rows: [[]] }];
+      this.toolbarIndex = toolbars.length - 1;
+      this.setToolbars(toolbars, `.${BASE}-toolbar-name`);
+    });
+    add.disabled = values.toolbars.length >= MAX_TOOLBARS;
+    if (add.disabled) add.title = `${MAX_TOOLBARS} toolbars at most`;
+    const reset = this.button(`${BASE}-reset`, "Reset to defaults", () => {
+      void (async () => {
+        if (!(await this.ask("Put the default toolbars back (Float and Docked), in place of every toolbar?"))) return;
+        const toolbars = defaultToolbars(values.modules.gestures);
+        this.toolbarIndex = toolbars.indexOf(toolbarFor(toolbars, inputOf(this.context.doc.defaultView)));
+        this.naming = undefined;
+        this.setToolbars(toolbars.map((toolbar) => ({ ...toolbar, rows: toolbar.rows.map((row) => [...row]) })), `.${BASE}-reset`);
       })();
     });
-    const actions = this.el("div", `${BASE}-device-actions`);
-    actions.append(resetButton, copyButton);
-    const top = this.el("div", `${BASE}-devices-top`);
-    top.append(tabs, actions);
-    bar.append(top);
-    if (this.device === "touch") {
-      const own = switchControl(this.context.doc, BASE, values.touchOn && !!values.touchFavorites, (on) => {
-        // On without any of its own (an invalid one): Click's copied to start from; off: Click's shown, its own kept for when it is on again
-        values.touchOn = on;
-        if (on && !values.touchFavorites) values.touchFavorites = copy(values.favorites);
-        this.picking = undefined;
-        this.changedFavorites(`.${BASE}-devices input`);
-      });
-      bar.append(settingRow(this.context.doc, BASE, "Own favourites for touch", "On a phone or tablet. Off: Click's favourites show there, these are kept.", own));
-    }
+    const actions = this.el("div", `${BASE}-toolbars-actions`);
+    actions.append(reset);
+    const toolbars = this.el("div", `${BASE}-toolbar-tabs-line`);
+    toolbars.append(tabs, add);
+    top.append(toolbars, actions);
+    bar.append(top, this.toolbarCard());
     return bar;
   }
 
-  /** The Favorites tab drawn anew from the values; `focus`: the element to focus after it (a selector) */
-  private drawFavorites(focus?: string): void {
-    const panel = this.favoritesPanel;
+  /**
+   * The toolbar edited: its name (a field: renamed), what it is used for
+   * (Click, Touch: given here, the toolbar showing it before no longer does),
+   * where and when it shows, Duplicate, Delete (not the last; one in use asked
+   * first, what it was used for going to the first left)
+   */
+  private toolbarCard(): HTMLElement {
+    const values = this.values!;
+    const index = Math.min(this.toolbarIndex, values.toolbars.length - 1);
+    const toolbar = values.toolbars[index]!;
+    const line = this.el("div", `${BASE}-toolbar-line`);
+    const naming = this.naming?.toolbar === index ? this.naming : undefined;
+    const name = this.el("input", `${BASE}-toolbar-name`);
+    name.type = "text";
+    name.value = naming?.text ?? toolbar.name;
+    name.spellcheck = false;
+    name.setAttribute("aria-label", "The toolbar's name");
+    const problem = this.el("span", `${BASE}-toolbar-problem`, naming?.problem ?? "");
+    problem.setAttribute("role", "status");
+    const rename = () => {
+      const wrong = validateToolbarName(name.value, values.toolbars, index);
+      if (wrong) {
+        this.naming = { toolbar: index, text: name.value, problem: wrong };
+        problem.textContent = wrong;
+        return;
+      }
+      this.naming = undefined;
+      problem.textContent = "";
+      if (name.value.trim() === toolbar.name) return;
+      this.setToolbars(values.toolbars.map((one, i) => (i === index ? { ...one, name: name.value.trim() } : one)), `.${BASE}-toolbar-name`, true);
+    };
+    name.addEventListener("change", rename);
+    name.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      rename();
+    });
+    const label = this.el("label", `${BASE}-toolbar-label`);
+    label.append(this.el("span", `${BASE}-look-name`, "Name"), name);
+    // What it is used for: picked here (the toolbar using it before no longer is); used already: told how to change it
+    const uses = this.el("div", `${BASE}-look-shows ${BASE}-toolbar-uses`);
+    uses.setAttribute("aria-label", "Used for");
+    for (const input of ["click", "touch"] as const) {
+      const text = INPUT_LABELS[input];
+      const on = toolbar.useFor.includes(input);
+      const button = this.button(`${BASE}-look-show ${BASE}-toolbar-use`, text, () => {
+        if (!on) this.setToolbars(useToolbarFor(values.toolbars, index, input), `.${BASE}-toolbar-use[data-swb-use="${input}"]`, true);
+      });
+      button.dataset.swbUse = input;
+      button.setAttribute("aria-pressed", String(on));
+      button.title = on ? `${text} shows this toolbar: pick another for ${text} to change it` : `Show this toolbar for ${text} (in place of ${toolbarFor(values.toolbars, input).name})`;
+      uses.append(button);
+    }
+    const use = this.el("div", `${BASE}-toolbar-use-line`);
+    use.append(this.el("span", `${BASE}-look-name`, "Used for"), uses);
+    const duplicate = this.button(`${BASE}-toolbar-duplicate`, "Duplicate", () => {
+      const toolbars = [...values.toolbars, { ...toolbar, name: freeToolbarName(values.toolbars, `${toolbar.name} copy`), useFor: [], rows: toolbar.rows.map((row) => [...row]) }];
+      this.toolbarIndex = toolbars.length - 1;
+      this.setToolbars(toolbars, `.${BASE}-toolbar-name`);
+    });
+    duplicate.disabled = values.toolbars.length >= MAX_TOOLBARS;
+    const remove = this.button(`${BASE}-toolbar-delete`, "Delete", () => {
+      void (async () => {
+        const used = toolbar.useFor.map((input) => (INPUT_LABELS[input])).join(" and ");
+        const question = used ? `Delete the toolbar ${toolbar.name}? ${used} then show ${values.toolbars.find((_, i) => i !== index)!.name}.` : `Delete the toolbar ${toolbar.name}?`;
+        if (!(await this.ask(question))) return;
+        let toolbars = values.toolbars.filter((_, i) => i !== index);
+        for (const input of toolbar.useFor) toolbars = useToolbarFor(toolbars, 0, input);
+        this.toolbarIndex = Math.max(0, index - 1);
+        this.naming = undefined;
+        this.setToolbars(toolbars, `.${BASE}-toolbar[data-swb-toolbar="${this.toolbarIndex}"]`);
+      })();
+    });
+    remove.disabled = values.toolbars.length <= 1;
+    if (remove.disabled) remove.title = "One toolbar at least";
+    const buttons = this.el("div", `${BASE}-toolbar-buttons`);
+    buttons.append(duplicate, remove);
+    const head = this.el("div", `${BASE}-toolbar-head`);
+    head.append(label, buttons);
+    // Where and when it shows (docked: its rows lines, its pinned items at their ends)
+    const choice = <T extends string>(key: "placement" | "show", text: string, options: readonly T[], labels: Readonly<Record<T, string>>, value: T) => {
+      const select = this.el("select", `${BASE}-toolbar-${key}`);
+      for (const option of options) select.append(new Option(labels[option], option, false, option === value));
+      select.addEventListener("change", () => {
+        // (Docked or not: its rows drawn otherwise, its pinned items in boxes or not; an item's panel open stays)
+        this.setToolbars(values.toolbars.map((one, i) => (i === index ? { ...one, [key]: select.value } : one)), `.${BASE}-toolbar-${key}`, true);
+      });
+      const field = this.el("label", `${BASE}-toolbar-choice`);
+      field.append(this.el("span", `${BASE}-look-name`, text), select);
+      return field;
+    };
+    const shows = this.el("div", `${BASE}-toolbar-choices`);
+    shows.append(choice("placement", "Where", PLACEMENTS, PLACEMENT_LABELS, toolbar.placement), choice("show", "When", SHOWS, SHOW_LABELS, toolbar.show));
+    line.append(head, problem, use, shows);
+    return line;
+  }
+
+  /** The Toolbars tab drawn anew from the values; `focus`: the element to focus after it (a selector) */
+  private drawToolbars(focus?: string): void {
+    const panel = this.toolbarsPanel;
     const values = this.values;
     if (!panel || !values) return;
     const known = this.known();
     const parts: HTMLElement[] = [
-      this.deviceBar(),
-      // … is the toolbar's: favourites without it anywhere get it at the end
-      ...(this.sameForTouch || hasAction(this.rows, "actions.more", this.context.kinds())
+      this.toolbarBar(),
+      // … is a toolbar's: one without it anywhere gets it at its end
+      ...(hasAction(this.rows, "actions.more", this.context.kinds())
         ? []
-        : [this.el("p", `${BASE}-warning`, "Every action (…) is required: these favourites do not have it, so it is added at the end of the toolbar. Add it anywhere (a gesture button's swipe too) to put it there.")]),
-      this.el("p", `${BASE}-intro`, "Click an item to change how it shows. Drag items and rows to reorder them."),
+        : [this.moreWarning()]),
+      this.el("p", `${BASE}-intro`, "Click an item to change how it shows. Drag items and rows to reorder them (by finger, hold an item a moment first)."),
     ];
-    if (this.pins) parts.push(this.pinBoxes(known));
     const rows = this.el("div", `${BASE}-rows`);
-    // Click's shown for Touch where it has none of its own: not edited here
-    if (this.sameForTouch) {
-      rows.classList.add(`${BASE}-rows-same`);
-      rows.setAttribute("inert", "");
-    }
-    const first = this.first;
     this.rows.forEach((row, r) => {
-      // (The pinned items' lists: drawn above)
-      if (r < first) return;
       const block = this.el("div", `${BASE}-favrow`);
       block.dataset.swbRow = String(r);
       const head = this.el("div", `${BASE}-favhead`);
       head.append(
         this.rowGrip(r, block, rows),
-        this.el("span", "", `Row ${r - first + 1}`),
+        this.el("span", "", `Row ${r + 1}`),
         // The row gone, its items with it
-        this.button(`${BASE}-row-remove`, `Remove row ${r - first + 1}`, () => {
+        this.button(`${BASE}-row-remove`, `Remove row ${r + 1}`, () => {
           this.picking = undefined;
           this.edit(removeRow(this.rows, r), `.${BASE}-add-row`);
         }, ICONS.close),
       );
       block.append(head);
-      const items = this.el("div", `${BASE}-items`);
-      items.setAttribute("role", "list");
-      items.dataset.swbItems = String(r);
-      row.forEach((item, i) => items.append(this.itemElement(item, { row: r, index: i }, known)));
-      if (!row.length) items.append(this.el("span", `${BASE}-empty`, "Empty"));
       const picking = this.picking;
       const open = !!picking && "row" in picking && picking.row === r;
       const add = this.button(`${BASE}-add`, open ? "Close" : "Add", () => this.openPicking({ row: r }));
       add.setAttribute("aria-expanded", String(open));
-      block.append(items, add);
-      if (this.adjusting?.row === r) block.append(this.lookPanel(this.adjusting));
-      if (picking && ("row" in picking ? picking.row : picking.at.row) === r) block.append(this.picker(picking));
+      // Docked: its pinned items in boxes at its ends; by the selection one list (a pinned item marked)
+      block.append(this.docked ? this.zones(row, r, known) : this.itemList(row, r, undefined, known), add);
+      this.placeDetail(block, r);
+      // The search for the row (Add): under its Add
+      if (picking && "row" in picking && picking.row === r) block.append(this.picker(picking));
       rows.append(block);
     });
     parts.push(rows);
-    if (!this.sameForTouch)
-      parts.push(
+    parts.push(
         this.button(`${BASE}-add-row`, "Add row", () => {
           const rows = [...this.rows, []];
           this.picking = { row: rows.length - 1 };
@@ -455,10 +493,119 @@ export class SettingsDialog {
         }),
       );
     panel.replaceChildren(...parts);
+    this.pointDetail();
     const focused = focus ? panel.querySelector<HTMLElement>(focus) : null;
     focused?.focus({ preventScroll: true });
-    // A search opened: in view with its list, above an on-screen keyboard already there
-    focused?.closest<HTMLElement>("[data-sw-reveal]")?.scrollIntoView?.({ block: "nearest" });
+    // A search opened: in view with its list, above an on-screen keyboard already there; an item's panel in view
+    (focused?.closest<HTMLElement>("[data-sw-reveal]") ?? focused?.closest<HTMLElement>(`.${BASE}-detail`))?.scrollIntoView?.({ block: "nearest" });
+  }
+
+  /** The open item's panel's arrow at the middle of the item (or of its slot) it is for, once laid out */
+  private pointDetail(): void {
+    const detail = this.toolbarsPanel?.querySelector<HTMLElement>(`.${BASE}-detail`);
+    const adjusting = this.adjusting;
+    const picking = this.picking;
+    const at = adjusting ?? (picking && "at" in picking ? picking.at : undefined);
+    const key = adjusting ? adjusting.key : picking && "at" in picking ? picking.key : undefined;
+    if (!detail || !at) return;
+    const item = this.toolbarsPanel!.querySelector<HTMLElement>(`[data-swb-item="${at.row}:${at.index}"]`);
+    const target = (key && item?.querySelector<HTMLElement>(`[data-swb-slot="${key}"]`)) || item;
+    if (!target) return;
+    const box = detail.getBoundingClientRect();
+    const of = target.getBoundingClientRect();
+    // (Not laid out: jsdom, a hidden tab; the CSS's default)
+    if (!box.width) return;
+    const x = Math.max(14, Math.min(box.width - 14, of.left + of.width / 2 - box.left));
+    detail.style.setProperty("--swb-pointer-x", `${Math.round(x)}px`);
+  }
+
+  /**
+   * An item's panel (its look, a slot's) and the search for its slot, where
+   * the row's item is: under its line in its list (the panel a line of its
+   * own there, the items after it below it), or for an item pinned, under the
+   * row's two boxes of pinned items, as they are narrow
+   */
+  private placeDetail(block: HTMLElement, r: number): void {
+    const adjusting = this.adjusting;
+    const picking = this.picking;
+    const slotPicking = picking && "at" in picking && picking.at.row === r ? picking : undefined;
+    if (adjusting?.row !== r && !slotPicking) return;
+    const at = adjusting?.row === r ? adjusting : slotPicking!.at;
+    const key = adjusting?.row === r ? adjusting.key : slotPicking!.key;
+    const item = block.querySelector<HTMLElement>(`[data-swb-item="${at.row}:${at.index}"]`);
+    const detail = this.el("div", `${BASE}-detail`);
+    // Said whose it is: the item's icon and name (a slot's: its name after the item's), as the item shows them
+    const head = this.el("div", `${BASE}-detail-head`);
+    const icon = this.el("span", `${BASE}-item-icon`);
+    icon.innerHTML = item?.querySelector(`.${BASE}-item-icon`)?.innerHTML ?? "";
+    const slot = key ? item?.querySelector<HTMLElement>(`[data-swb-slot="${key}"] .${BASE}-slot-name`)?.textContent : undefined;
+    const name = item?.querySelector(`.${BASE}-item-name`)?.textContent ?? "";
+    head.append(icon, this.el("span", `${BASE}-detail-name`, slot ? `${name} · ${slot}` : name));
+    detail.append(head);
+    if (adjusting?.row === r) detail.append(this.lookPanel(adjusting));
+    if (slotPicking) detail.append(this.picker(slotPicking));
+    const pinned = item?.closest<HTMLElement>(`.${BASE}-pins`);
+    if (pinned) pinned.after(detail);
+    else if (item) item.after(detail);
+    else block.append(detail);
+  }
+
+  /**
+   * … missing from the toolbar edited: said so (it shows at the toolbar's end), and a button putting it there in the
+   * last row (docked: pinned right, at its line's end)
+   */
+  private moreWarning(): HTMLElement {
+    const warning = this.el("p", `${BASE}-warning`, "Every action (…) is required: this toolbar does not have it, so it is added at its end. Add it anywhere (a gesture button's swipe too) to put it there.");
+    const add = this.button(`${BASE}-warning-add`, "Add it at the end", () => {
+      const rows = this.rows.length ? this.rows : [[]];
+      const row = rows.length - 1;
+      const item: FavoriteItem = this.docked ? { id: "actions.more", pin: "right" } : { id: "actions.more" };
+      this.edit(addItem(rows, row, item), `[data-swb-row="${row}"] .${BASE}-add`);
+    });
+    warning.append(" ", add);
+    return warning;
+  }
+
+  /**
+   * A row's items as a list (`zone`: a docked toolbar's, those of one zone of
+   * it: pinned left, the others, pinned right), each at its index in the row
+   */
+  private itemList(row: readonly FavoriteItem[], r: number, zone: Zone | undefined, known: Map<string, Action>): HTMLElement {
+    const items = this.el("div", `${BASE}-items`);
+    items.setAttribute("role", "list");
+    items.dataset.swbItems = String(r);
+    if (zone) {
+      items.dataset.swbZone = zone;
+      items.classList.add(`${BASE}-zone-${zone}`);
+    }
+    const pin = zone === "middle" ? undefined : zone;
+    row.forEach((item, i) => {
+      if (!zone || pinOf(item) === pin) items.append(this.itemElement(item, { row: r, index: i }, known));
+    });
+    // (A pinned box empty: its name over it says what it is)
+    if (!items.childElementCount && (!zone || zone === "middle")) items.append(this.el("span", `${BASE}-empty`, "Empty"));
+    if (zone && zone !== "middle") {
+      items.setAttribute("aria-label", zone === "left" ? `Row ${r + 1}, pinned left` : `Row ${r + 1}, pinned right`);
+      items.title = `At the ${zone} end of this row's line where the toolbar is docked, out of what scrolls`;
+    }
+    return items;
+  }
+
+  /**
+   * A docked toolbar's row: on top its two boxes of items pinned left and right, side
+   * by side as the ends of its docked line (shown empty too, named, to drag
+   * an item into), under them its other items
+   */
+  private zones(row: readonly FavoriteItem[], r: number, known: Map<string, Action>): HTMLElement {
+    const zones = this.el("div", `${BASE}-zones`);
+    const pins = this.el("div", `${BASE}-pins`);
+    for (const zone of ["left", "right"] as const) {
+      const box = this.el("div", `${BASE}-pin-box ${BASE}-pin-box-${zone}`);
+      box.append(this.el("span", `${BASE}-pin-name`, zone === "left" ? "Pinned left" : "Pinned right"), this.itemList(row, r, zone, known));
+      pins.append(box);
+    }
+    zones.append(pins, this.itemList(row, r, "middle", known));
+    return zones;
   }
 
   private itemElement(item: FavoriteItem, at: At, known: Map<string, Action>): HTMLElement {
@@ -486,14 +633,14 @@ export class SettingsDialog {
         name.textContent = ownLabel ?? kind?.label ?? item.type;
         element.append(icon, name);
         element.classList.add(`${BASE}-kind`);
-        const problem = kind?.check?.(item);
+        const problem = kind && this.itemProblem(item, kind);
         if (!kind) {
           element.classList.add(`${BASE}-unknown`);
           element.title = `No module turned on gives the kind ${item.type}: the toolbar leaves it out`;
         } else {
           if (problem) element.title = `${problem}: the toolbar leaves it out`;
           slots = this.el("div", `${BASE}-slots`);
-          slots.append(...kind.slots.map((slot) => this.slotButton(item, at, slot, known)), ...(kind.fields ?? []).map((field) => this.fieldInput(item, at, field)));
+          slots.append(...kind.slots.map((slot) => this.slotButton(item, at, slot, known)), ...(kind.fields ?? []).map((field) => this.fieldInput(item, field, (value) => setSlot(this.rows, at, field.key, value), () => this.refreshProblems(at))));
         }
       } else {
         const action = known.get(item.id);
@@ -521,18 +668,31 @@ export class SettingsDialog {
       // Its look set in a panel under its row: a click, Enter
       element.setAttribute("aria-expanded", String(this.adjusting?.row === at.row && this.adjusting.index === at.index));
     }
-    element.setAttribute("aria-label", `${name.textContent}, row ${at.row + 1}, item ${at.index + 1}`);
-    element.append(this.button(`${BASE}-remove`, `Remove ${name.textContent}`, () => this.edit(removeItem(this.rows, at), `[data-swb-row="${at.row}"] .${BASE}-add`), ICONS.close));
+    // Pinned, by the selection: a pin by its name (what it does where docked)
+    const pin = isSeparator(item) ? undefined : item.pin;
+    if (pin && !this.docked) {
+      const mark = this.el("span", `${BASE}-item-pin`);
+      mark.innerHTML = ICONS.pin;
+      mark.title = `Pinned ${pin} when docked`;
+      name.after(mark);
+    }
+    element.setAttribute("aria-label", `${name.textContent}${pin ? `, pinned ${pin}` : ""}, row ${at.row + 1}, item ${at.index + 1}`);
+    element.append(this.button(`${BASE}-remove`, `Remove ${name.textContent}`, () => this.removeAt(at), ICONS.close));
     if (slots) element.append(slots);
     element.addEventListener("keydown", (e) => {
       if (e.target !== element) return;
       if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown")) {
         e.preventDefault();
-        const to = this.stepTo(at, e.key);
-        if (to) this.edit(moveItem(this.rows, at, to), `[data-swb-item="${to.row}:${to.index}"]`);
+        const moved = this.step(at, e.key);
+        if (!moved) return;
+        // Its panel open: with it where it went (its pin changed, it is another object)
+        const adjusting = this.adjusting;
+        const open = adjusting?.row === at.row && adjusting.index === at.index;
+        if (open) this.adjusting = { ...moved.at, ...(adjusting.key ? { key: adjusting.key } : {}) };
+        this.edit(moved.rows, `[data-swb-item="${moved.at.row}:${moved.at.index}"]`, !open);
       } else if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
-        this.edit(removeItem(this.rows, at), `[data-swb-row="${at.row}"] .${BASE}-add`);
+        this.removeAt(at);
       } else if (e.key === "Enter" && !isSeparator(item)) {
         e.preventDefault();
         this.toggleLook(at);
@@ -541,21 +701,27 @@ export class SettingsDialog {
     element.addEventListener("pointerdown", (e) => {
       // (Not from its controls: its buttons, a field typed in)
       if (e.button !== 0 || (e.target instanceof Element && e.target.closest("button, input, textarea"))) return;
-      const panel = this.favoritesPanel!;
+      const panel = this.toolbarsPanel!;
       reorder(e, {
         element,
         base: BASE,
         layer: this.dialog?.element,
         flow: "inline",
+        // A finger takes it once held: moved before, it scrolls the tab
+        hold: true,
         containers: () => Array.from(panel.querySelectorAll<HTMLElement>(`.${BASE}-items`)),
         items: (container) => Array.from(container.querySelectorAll<HTMLElement>(`:scope > .${BASE}-item`)),
         done: (to) => {
-          // (A separator is not pinned: not into the pinned items' lists)
-          if (to && isSeparator(item) && to.container < this.first) this.drawFavorites();
-          else if (to && (to.container !== at.row || to.index !== at.index)) {
-            this.adjusting = undefined;
-            this.edit(moveItem(this.rows, at, { row: to.container, index: to.index }), `[data-swb-item="${to.container}:${to.index}"]`);
-          } else this.drawFavorites();
+          // The list let go in: its row, and a docked toolbar's its zone (pinned left, the others, pinned right)
+          const list = to ? panel.querySelectorAll<HTMLElement>(`.${BASE}-items`)[to.container] : undefined;
+          const row = Number(list?.dataset.swbItems);
+          const zone = list?.dataset.swbZone as Zone | undefined;
+          if (!to || !list || !Number.isInteger(row)) return this.drawToolbars();
+          // (By the selection: the order as made, a pin that would undo it gone)
+          const moved = zone ? placeItem(this.rows, at, { row, zone: zone === "middle" ? undefined : zone, index: to.index }) : { rows: unpinnedOutOfOrder(moveItem(this.rows, at, { row, index: to.index })), at: { row, index: to.index } };
+          if (sameRows(moved.rows, this.rows)) return this.drawToolbars();
+          this.adjusting = undefined;
+          this.edit(moved.rows, `[data-swb-item="${moved.at.row}:${moved.at.index}"]`);
         },
         // A click (a tap): its look's panel opened or closed (a separator has none)
         ...(isSeparator(item) ? {} : { clicked: () => this.toggleLook(at) }),
@@ -565,55 +731,28 @@ export class SettingsDialog {
   }
 
   /**
-   * Touch's pinned items: two boxes as rows are (Pinned left, Pinned right),
-   * the items at the docked toolbar's ends, out of what scrolls; an item
-   * dragged in is pinned, dragged out is not
+   * Where Alt+arrows move an item, and the rows then: ← → within its row (a
+   * docked toolbar's: within its zone, pinned or not), ↑ ↓ into the row above or below (the
+   * same zone, at the same place in it); undefined: nowhere
    */
-  private pinBoxes(known: Map<string, Action>): HTMLElement {
-    const boxes = this.el("div", `${BASE}-pins`);
+  private step(at: At, key: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown"): { readonly rows: Favorites; readonly at: At } | undefined {
     const rows = this.rows;
-    const sides = [
-      [0, "Pinned left", "At the left end of the toolbar docked at the bottom, out of what scrolls"],
-      [1, "Pinned right", "At the right end of the toolbar docked at the bottom, out of what scrolls"],
-    ] as const;
-    for (const [r, title, hint] of sides) {
-      const box = this.el("div", `${BASE}-favrow ${BASE}-pin-box`);
-      box.dataset.swbRow = String(r);
-      box.title = hint;
-      const head = this.el("div", `${BASE}-favhead`);
-      head.append(this.el("span", "", title));
-      const items = this.el("div", `${BASE}-items`);
-      items.setAttribute("role", "list");
-      items.setAttribute("aria-label", title);
-      items.dataset.swbItems = String(r);
-      const row = rows[r] ?? [];
-      row.forEach((item, i) => items.append(this.itemElement(item, { row: r, index: i }, known)));
-      if (!row.length) items.append(this.el("span", `${BASE}-empty`, "Drag an item here"));
-      const picking = this.picking;
-      const open = !!picking && "row" in picking && picking.row === r;
-      const add = this.button(`${BASE}-add`, open ? "Close" : "Add", () => this.openPicking({ row: r }));
-      add.setAttribute("aria-expanded", String(open));
-      box.append(head, items, add);
-      if (this.adjusting?.row === r) box.append(this.lookPanel(this.adjusting));
-      if (picking && ("row" in picking ? picking.row : picking.at.row) === r) box.append(this.picker(picking));
-      boxes.append(box);
+    if (!this.docked) {
+      const to = stepOf(rows, at, key);
+      return to && { rows: unpinnedOutOfOrder(moveItem(rows, at, to)), at: to };
     }
-    return boxes;
-  }
-
-  /**
-   * Where an item goes with Alt+arrows: as `stepOf` says, but Touch's pinned
-   * items' boxes side by side above the rows: ↓ from either into the first
-   * row, ↑ from the first row into Pinned left, never from one box to the other
-   */
-  private stepTo(at: At, key: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown"): At | undefined {
-    const rows = this.rows;
-    const first = this.first;
-    const into = (row: number) => ({ row, index: Math.min(at.index, rows[row]?.length ?? 0) });
-    if (first && at.row < first && key === "ArrowDown") return rows.length > first ? into(first) : undefined;
-    if (first && at.row < first && key === "ArrowUp") return undefined;
-    if (first && at.row === first && key === "ArrowUp") return into(0);
-    return stepOf(rows, at, key);
+    const row = rows[at.row];
+    const item = row?.[at.index];
+    if (!row || !item) return undefined;
+    const pin = pinOf(item);
+    const zone = row.filter((other) => pinOf(other) === pin);
+    const place = zone.indexOf(item);
+    if (key === "ArrowLeft" || key === "ArrowRight") {
+      const index = place + (key === "ArrowLeft" ? -1 : 1);
+      return index >= 0 && index < zone.length ? placeItem(rows, at, { row: at.row, zone: pin, index }) : undefined;
+    }
+    const other = at.row + (key === "ArrowUp" ? -1 : 1);
+    return rows[other] ? placeItem(rows, at, { row: other, zone: pin, index: place }) : undefined;
   }
 
   /** An item's look's panel opened, or closed where open (one at a time) */
@@ -621,7 +760,7 @@ export class SettingsDialog {
     const open = this.adjusting?.row === at.row && this.adjusting.index === at.index && !this.adjusting.key;
     this.adjusting = open ? undefined : at;
     this.picking = undefined;
-    this.drawFavorites(open ? `[data-swb-item="${at.row}:${at.index}"]` : `[data-swb-look] .${BASE}-look-show[aria-checked="true"]`);
+    this.drawToolbars(open ? `[data-swb-item="${at.row}:${at.index}"]` : `[data-swb-look] .${BASE}-look-show[aria-checked="true"]`);
   }
 
   /** A slot's panel opened (its action, its own icon and label), or closed where open */
@@ -629,7 +768,7 @@ export class SettingsDialog {
     const open = this.adjusting?.row === at.row && this.adjusting.index === at.index && this.adjusting.key === key;
     this.adjusting = open ? undefined : { ...at, key };
     this.picking = undefined;
-    this.drawFavorites(open ? `[data-swb-item="${at.row}:${at.index}"] [data-swb-slot="${key}"]` : `[data-swb-look] .${BASE}-look-change`);
+    this.drawToolbars(open ? `[data-swb-item="${at.row}:${at.index}"] [data-swb-slot="${key}"]` : `[data-swb-look] .${BASE}-look-change`);
   }
 
   /**
@@ -677,6 +816,8 @@ export class SettingsDialog {
       label.append(this.el("span", `${BASE}-look-name`, "Width"), field, this.el("span", `${BASE}-look-unit`, "characters"));
       panel.append(label);
     }
+    // Pinned at an end of its row's line where docked (the keyboard's way to what dragging into a zone does)
+    panel.append(this.pinLine(at, item.pin));
     // An action's own icon and label (its label whatever it shows: its tooltip too), or a kind's whose items have their own
     const kind = isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type) : undefined;
     if (isActionItem(item) || kind?.ownLook) {
@@ -686,6 +827,29 @@ export class SettingsDialog {
       panel.append(this.ownLine("icon", "Icon", own("icon"), "★", set("icon")), this.ownLine("label", "Label", own("label"), placeholder, set("label")));
     }
     return this.closing(panel, () => this.toggleLook(at));
+  }
+
+  /** Where an item is pinned in its row: None, Left, Right (by the selection, for when the toolbar docks) */
+  private pinLine(at: At, pin: Pin | undefined): HTMLElement {
+    const pins = this.el("div", `${BASE}-look-shows`);
+    pins.setAttribute("role", "radiogroup");
+    pins.setAttribute("aria-label", "Pinned");
+    for (const [value, label] of [[undefined, "None"], ["left", "Left"], ["right", "Right"]] as const) {
+      const button = this.button(`${BASE}-look-show ${BASE}-look-pin`, label, () => {
+        const moved = setPin(this.rows, at, value);
+        // Its panel follows it (made anew where it goes)
+        this.adjusting = moved.at;
+        this.edit(moved.rows, `[data-swb-look] [data-swb-pin="${value ?? "none"}"]`, false);
+      });
+      button.dataset.swbPin = value ?? "none";
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-checked", String(value === pin));
+      pins.append(button);
+    }
+    const line = this.el("div", `${BASE}-look-line`);
+    line.title = "At an end of this row's line where the toolbar is docked, out of what scrolls";
+    line.append(this.el("span", `${BASE}-look-name`, "Pin"), pins, ...(this.docked ? [] : [this.el("span", `${BASE}-look-unit`, "applies when docked")]));
+    return line;
   }
 
   /**
@@ -699,6 +863,8 @@ export class SettingsDialog {
     const item = this.rows[at.row]?.[at.index];
     const slot = item && isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type)?.slots.find((s) => s.key === key) : undefined;
     if (!item || !isKindItem(item) || !slot) return panel;
+    const inner = slotItemOf(item[key]);
+    if (inner) return this.closing(this.slotItemPanel(panel, at, key, inner), () => this.toggleSlot(at, key));
     const ref = slotOf(item[key]);
     const action = ref ? this.known().get(ref.id) : undefined;
     const line = this.el("div", `${BASE}-look-line`);
@@ -716,6 +882,71 @@ export class SettingsDialog {
       panel.append(this.ownLine("icon", "Icon", ref.icon, "★", set("icon")), this.ownLine("label", "Label", ref.label, action?.label ?? ref.id, set("label")));
     }
     return this.closing(panel, () => this.toggleSlot(at, key));
+  }
+
+  /**
+   * A slot holding an item of a kind that is one action (a snippet): the kind
+   * and Change…, its own icon and label where its kind has them, its fields
+   */
+  private slotItemPanel(panel: HTMLElement, at: At, key: string, inner: KindItem): HTMLElement {
+    const kind = this.context.kinds().find((k) => k.type === inner.type);
+    const line = this.el("div", `${BASE}-look-line`);
+    const current = this.el("span", `${BASE}-look-action`);
+    current.innerHTML = `<span class="${BASE}-item-icon">${kind?.icon ?? ""}</span><span></span>`;
+    current.lastElementChild!.textContent = kind?.label ?? inner.type;
+    const picking = this.picking;
+    const open = !!picking && "at" in picking && picking.key === key && picking.at.row === at.row && picking.at.index === at.index;
+    const change = this.button(`${BASE}-look-change`, open ? "Close" : "Change…", () => this.openPicking({ at, key }));
+    change.setAttribute("aria-expanded", String(open));
+    line.append(this.el("span", `${BASE}-look-name`, "Action"), current, change);
+    panel.append(line);
+    if (!kind) return panel;
+    const set = (field: string) => (value: string | undefined) => setSlotField(this.rows, at, key, field, value);
+    if (kind.ownLook) {
+      const own = (field: "icon" | "label") => (typeof inner[field] === "string" && inner[field] ? (inner[field] as string) : undefined);
+      panel.append(this.ownLine("icon", "Icon", own("icon"), "★", set("icon")), this.ownLine("label", "Label", own("label"), "Its name", set("label")));
+    }
+    panel.append(...(kind.fields ?? []).map((field) => this.fieldInput(inner, field, set(field.key), () => this.refreshProblems(at))));
+    return panel;
+  }
+
+  /** What is wrong with the item a slot holds, where the toolbar leaves it out: its kind not given, no action, or the kind's `check` (a snippet without its text) */
+  private slotItemProblem(inner: KindItem): string | undefined {
+    const kind = this.context.kinds().find((k) => k.type === inner.type);
+    return !kind ? `No module turned on gives the kind ${inner.type}` : !kind.action ? `${kind.label} is no action` : kind.check?.(inner);
+  }
+
+  /** What is wrong with a kind's item, where the toolbar leaves it out: its kind's `check`, or a slot it needs holding an item with something wrong */
+  private itemProblem(item: KindItem, kind: ItemKind): string | undefined {
+    const own = kind.check?.(item);
+    if (own) return own;
+    for (const slot of kind.slots) {
+      const inner = slot.optional ? undefined : slotItemOf(item[slot.key]);
+      const problem = inner && this.slotItemProblem(inner);
+      if (problem) return `${slot.label}: ${problem}`;
+    }
+    return undefined;
+  }
+
+  /** A slot's button or an item marked for what is wrong with it, or no longer */
+  private markProblem(element: HTMLElement, problem: string | undefined, dimmed: boolean): void {
+    if (dimmed) element.classList.toggle(`${BASE}-unknown`, !!problem);
+    if (problem) element.title = `${problem}: the toolbar leaves it out`;
+    else if (element.title.endsWith(": the toolbar leaves it out")) element.removeAttribute("title");
+  }
+
+  /** A kind's item's warnings drawn again as a field of it (or of the item a slot holds) is typed in, the tab not drawn anew */
+  private refreshProblems(at: At): void {
+    const item = this.rows[at.row]?.[at.index];
+    const kind = item && isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type) : undefined;
+    const element = this.toolbarsPanel?.querySelector<HTMLElement>(`[data-swb-item="${at.row}:${at.index}"]`);
+    if (!item || !isKindItem(item) || !kind || !element) return;
+    this.markProblem(element, this.itemProblem(item, kind), false);
+    for (const slot of kind.slots) {
+      const inner = slotItemOf(item[slot.key]);
+      const button = element.querySelector<HTMLElement>(`[data-swb-slot="${slot.key}"]`);
+      if (inner && button) this.markProblem(button, this.slotItemProblem(inner), true);
+    }
   }
 
   /** A panel's × and Esc closing it (Esc: the panel's, not the dialog's) */
@@ -760,8 +991,7 @@ export class SettingsDialog {
 
   /** A row's handle: dragged, the row moves up or down (the others sliding aside); Alt+↑ ↓ on it the same */
   private rowGrip(r: number, block: HTMLElement, rows: HTMLElement): HTMLElement {
-    const first = this.first;
-    const grip = this.button(`${BASE}-row-grip`, `Move row ${r - first + 1} (drag, or Alt+↑ ↓)`, () => undefined, ICONS.grip);
+    const grip = this.button(`${BASE}-row-grip`, `Move row ${r + 1} (drag, or Alt+↑ ↓)`, () => undefined, ICONS.grip);
     grip.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       reorder(e, {
@@ -771,11 +1001,11 @@ export class SettingsDialog {
         flow: "block",
         containers: () => [rows],
         items: (container) => Array.from(container.querySelectorAll<HTMLElement>(`:scope > .${BASE}-favrow`)),
-        // (Its index among the rows: after the pinned items' lists, where they are)
+        // (Its index among the rows)
         done: (to) => {
-          const index = to ? to.index + first : r;
+          const index = to ? to.index : r;
           if (index !== r) this.edit(moveRow(this.rows, r, index), `[data-swb-row="${index}"] .${BASE}-row-grip`);
-          else this.drawFavorites();
+          else this.drawToolbars();
         },
       });
     });
@@ -783,28 +1013,55 @@ export class SettingsDialog {
       if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
       e.preventDefault();
       const to = r + (e.key === "ArrowUp" ? -1 : 1);
-      if (to >= first && to < this.rows.length) this.edit(moveRow(this.rows, r, to), `[data-swb-row="${to}"] .${BASE}-row-grip`);
+      if (to >= 0 && to < this.rows.length) this.edit(moveRow(this.rows, r, to), `[data-swb-row="${to}"] .${BASE}-row-grip`);
     });
     return grip;
   }
 
-  /** The favourites edited changed (Click's, or Touch's own) */
-  private edit(favorites: Favorites, focus?: string): void {
+  /**
+   * The rows edited changed; an item's panel open (and the search for one's
+   * slot) following its item where the edit moved it (an item added or
+   * removed before it, its row moved), gone with it; `follow` false: the
+   * caller set where they are after it (an item added, made anew elsewhere)
+   */
+  private edit(favorites: Favorites, focus?: string, follow = true): void {
+    if (!follow) {
+      this.store(favorites);
+      this.changedToolbars(focus);
+      return;
+    }
+    const before = this.rows;
+    const moved = <T extends At>(at: T | undefined): T | undefined => {
+      if (!at) return undefined;
+      const item = before[at.row]?.[at.index];
+      const after = this.rows;
+      for (let row = 0; item && row < after.length; row++) {
+        const index = after[row]!.indexOf(item);
+        if (index >= 0) return { ...at, row, index };
+      }
+      // Made anew in its place (its look set: another object), else gone
+      return after[at.row]?.[at.index] && !isSeparator(after[at.row]![at.index]!) ? at : undefined;
+    };
+    const adjusting = this.adjusting;
+    const picking = this.picking;
     this.store(favorites);
-    this.changedFavorites(focus);
+    this.adjusting = moved(adjusting);
+    if (picking && "at" in picking) {
+      const at = moved(picking.at);
+      this.picking = at ? { at, key: picking.key } : undefined;
+    }
+    this.changedToolbars(focus);
   }
 
-  /** What the tab edits written back: Touch's own from their layout (each pinned item with its pin) */
+  /** What the tab edits written back into the toolbar edited, each row in the order the docked toolbar shows it */
   private store(favorites: Favorites): void {
     const values = this.values!;
-    if (this.device === "touch") {
-      values.touchFavorites = this.pins ? joinPins(favorites) : favorites;
-      values.touchOn = true;
-    } else values.favorites = favorites;
+    const index = Math.min(this.toolbarIndex, values.toolbars.length - 1);
+    values.toolbars = values.toolbars.map((toolbar, i) => (i === index ? { ...toolbar, rows: pinOrdered(favorites) } : toolbar));
   }
 
-  private changedFavorites(focus?: string): void {
-    this.drawFavorites(focus);
+  private changedToolbars(focus?: string): void {
+    this.drawToolbars(focus);
     this.update();
   }
 
@@ -814,6 +1071,8 @@ export class SettingsDialog {
    * opens its panel (a slot needing one and without it: the search at once)
    */
   private slotButton(item: KindItem, at: At, slot: ItemSlot, known: Map<string, Action>): HTMLButtonElement {
+    const inner = slotItemOf(item[slot.key]);
+    if (inner) return this.slotItemButton(inner, at, slot);
     const ref = slotOf(item[slot.key]);
     const action = ref ? known.get(ref.id) : undefined;
     const unset = !ref;
@@ -832,8 +1091,38 @@ export class SettingsDialog {
     return button;
   }
 
-  /** A field of a kind's item: its text edited in place (written as typed, the tab not drawn anew: the field keeps the keyboard) */
-  private fieldInput(item: KindItem, at: At, field: ItemField): HTMLElement {
+  /** A slot holding an item of a kind that is one action (a snippet): its own icon and label where set, else its kind's; a click opens its panel */
+  private slotItemButton(inner: KindItem, at: At, slot: ItemSlot): HTMLButtonElement {
+    const kind = this.context.kinds().find((k) => k.type === inner.type);
+    const own = (field: "icon" | "label") => (kind?.ownLook && typeof inner[field] === "string" && inner[field] ? (inner[field] as string) : undefined);
+    const what = own("label") ?? kind?.label ?? inner.type;
+    const button = this.button(`${BASE}-slot`, `${slot.label}: ${what}`, () => this.toggleSlot(at, slot.key));
+    button.innerHTML = `<span class="${BASE}-slot-name"></span><span class="${BASE}-item-icon"></span><span class="${BASE}-slot-action"></span>`;
+    const icon = button.querySelector(`.${BASE}-item-icon`)!;
+    const glyph = own("icon");
+    if (glyph) icon.textContent = glyph;
+    else icon.innerHTML = kind?.icon ?? "";
+    button.querySelector(`.${BASE}-slot-name`)!.textContent = slot.label;
+    button.querySelector(`.${BASE}-slot-action`)!.textContent = what;
+    button.setAttribute("aria-label", `${slot.label}: ${what}`);
+    button.dataset.swbSlot = slot.key;
+    // A kind no module on gives, or one that is no action, or an item with something wrong (a snippet without its text): left out
+    this.markProblem(button, this.slotItemProblem(inner), true);
+    const adjusting = this.adjusting;
+    button.setAttribute("aria-expanded", String(!!adjusting && adjusting.key === slot.key && adjusting.row === at.row && adjusting.index === at.index));
+    return button;
+  }
+
+  /** An item removed, its panel (and its slot's search) closed with it */
+  private removeAt(at: At): void {
+    const same = (other: At | undefined) => other?.row === at.row && other.index === at.index;
+    if (same(this.adjusting)) this.adjusting = undefined;
+    if (this.picking && "at" in this.picking && same(this.picking.at)) this.picking = undefined;
+    this.edit(removeItem(this.rows, at), `[data-swb-row="${at.row}"] .${BASE}-add`);
+  }
+
+  /** A field of a kind's item (or of the item a slot holds): its text edited in place (written as typed, the tab not drawn anew: the field keeps the keyboard) */
+  private fieldInput(item: KindItem, field: ItemField, set: (value: string | undefined) => Favorites, changed: () => void): HTMLElement {
     const value = item[field.key];
     const input = field.multiline ? this.el("textarea", `${BASE}-field-input`) : this.el("input", `${BASE}-field-input`);
     if (input instanceof HTMLInputElement) input.type = "text";
@@ -843,7 +1132,8 @@ export class SettingsDialog {
     input.spellcheck = false;
     input.setAttribute("aria-label", field.label);
     input.addEventListener("input", () => {
-      this.setQuietly(setSlot(this.rows, at, field.key, input.value || undefined));
+      this.setQuietly(set(input.value || undefined));
+      changed();
     });
     const label = this.el("label", `${BASE}-field${field.multiline ? ` ${BASE}-field-multiline` : ""}`);
     label.dataset.swbField = field.key;
@@ -851,7 +1141,7 @@ export class SettingsDialog {
     return label;
   }
 
-  /** The favourites edited changed, the tab left as it is (a field being typed in) */
+  /** The rows edited changed, the tab left as it is (a field being typed in) */
   private setQuietly(favorites: Favorites): void {
     this.store(favorites);
     this.update();
@@ -861,9 +1151,18 @@ export class SettingsDialog {
   private openPicking(target: Picking): void {
     const open = !!this.picking && JSON.stringify(this.picking) === JSON.stringify(target);
     this.picking = open ? undefined : target;
+    // A slot's search for another item than the one whose panel is open: that panel closed (one item's at a time)
+    const adjusting = this.adjusting;
+    if (!open && "at" in target && adjusting && (adjusting.row !== target.at.row || adjusting.index !== target.at.index)) this.adjusting = undefined;
     const row = "row" in target ? target.row : target.at.row;
     const back = "row" in target ? `[data-swb-row="${row}"] .${BASE}-add` : `[data-swb-item="${target.at.row}:${target.at.index}"] [data-swb-slot="${target.key}"]`;
-    this.drawFavorites(open ? back : `[data-swb-row="${row}"] .${BASE}-pick-field`);
+    this.drawToolbars(open ? back : `[data-swb-row="${row}"] .${BASE}-pick-field`);
+  }
+
+  /** Where Add puts an item in a row: before its items pinned right (not pinned) */
+  private addAt(row: number): number {
+    const items = this.rows[row] ?? [];
+    return items.filter((item) => pinOf(item) !== "right").length;
   }
 
   /** The kind of the item at a place, where a module turned on gives it */
@@ -893,22 +1192,37 @@ export class SettingsDialog {
     const list = this.el("div", `${BASE}-pick-list`);
     list.setAttribute("role", "listbox");
     const entries: Entry[] = [];
-    // (An action for a touch screen only: for Touch's favourites alone)
-    for (const action of this.context.actions().filter((a) => this.device === "touch" || !a.touchOnly)) {
+    // (An action for a touch screen only: for a toolbar a finger may show, used for Touch or for none yet)
+    const touchToo = this.edited.useFor.includes("touch") || !this.edited.useFor.length;
+    for (const action of this.context.actions().filter((a) => touchToo || !a.touchOnly)) {
       if (!action.choices) entries.push({ action, group: action.group });
       else entries.push({ action, group: action.group }, ...action.choices.map((choice) => ({ action: choice, group: action.label })));
     }
     const add = (item: FavoriteItem) => {
       this.picking = undefined;
-      this.edit(addItem(this.rows, row, item), `[data-swb-row="${row}"] .${BASE}-add`);
+      this.edit(addItem(this.rows, row, item, this.addAt(row)), `[data-swb-row="${row}"] .${BASE}-add`);
     };
     // A kind's item added: the search goes on for its first slot
     const addKind = (kind: ItemKind) => {
-      const favorites = addItem(this.rows, row, { type: kind.type });
-      const at = { row, index: favorites[row]!.length - 1 };
+      const index = this.addAt(row);
+      const favorites = addItem(this.rows, row, { type: kind.type }, index);
+      const at = { row, index };
+      // (Another item's panel closed: the new one's slot searched under it)
+      this.adjusting = undefined;
       this.picking = kind.slots[0] ? { at, key: kind.slots[0].key } : undefined;
       // No slot: its first field to type in
-      this.edit(favorites, this.picking ? `[data-swb-row="${row}"] .${BASE}-pick-field` : kind.fields?.length ? `[data-swb-item="${at.row}:${at.index}"] .${BASE}-field-input` : `[data-swb-item="${at.row}:${at.index}"]`);
+      this.edit(favorites, this.picking ? `[data-swb-row="${row}"] .${BASE}-pick-field` : kind.fields?.length ? `[data-swb-item="${at.row}:${at.index}"] .${BASE}-field-input` : `[data-swb-item="${at.row}:${at.index}"]`, false);
+    };
+    // A kind's item for the slot (a snippet): its panel opened at its first field to type in
+    const fillKind = (kind: ItemKind) => {
+      if (forRow) return;
+      // (The kind it holds already, picked again: kept as it is, its text too)
+      const item = this.rows[target.at.row]?.[target.at.index];
+      const held = item && isKindItem(item) ? slotItemOf(item[target.key]) : undefined;
+      const favorites = setSlot(this.rows, target.at, target.key, held?.type === kind.type ? held : { type: kind.type });
+      this.picking = undefined;
+      this.adjusting = { ...target.at, key: target.key };
+      this.edit(favorites, kind.fields?.length ? `[data-swb-look] .${BASE}-field-input` : `[data-swb-look] .${BASE}-look-change`);
     };
     // An action for the slot (an optional one: or none): the search goes on for the next slot after it without one
     const fill = (id: string | undefined) => {
@@ -917,7 +1231,7 @@ export class SettingsDialog {
       const item = favorites[target.at.row]?.[target.at.index];
       const slots = this.kindOf(target.at)?.slots ?? [];
       const after = slots.slice(slots.findIndex((s) => s.key === target.key) + 1);
-      const next = item && isKindItem(item) ? after.find((s) => !slotOf(item[s.key])) : undefined;
+      const next = item && isKindItem(item) ? after.find((s) => !slotOf(item[s.key]) && !slotItemOf(item[s.key])) : undefined;
       this.picking = next ? { at: target.at, key: next.key } : undefined;
       this.edit(favorites, next ? `[data-swb-row="${row}"] .${BASE}-pick-field` : `[data-swb-item="${target.at.row}:${target.at.index}"] [data-swb-slot="${target.key}"]`);
     };
@@ -925,16 +1239,18 @@ export class SettingsDialog {
     const draw = () => {
       const found = findEntries(entries, field.value);
       const query = field.value.trim().toLowerCase();
-      // (Not for the pinned items' lists: a separator is not pinned)
-      const separator = forRow && row >= this.first && (!query || "separator".startsWith(query));
-      const kinds = forRow ? this.context.kinds().filter((kind) => wordsStart(kind.label, query)) : [];
+      // (Added into a row's items not pinned: a separator is not pinned)
+      const separator = forRow && (!query || "separator".startsWith(query));
+      // (For a slot: the kinds whose item is one action, a snippet)
+      const kinds = this.context.kinds().filter((kind) => (forRow || kind.action) && wordsStart(kind.label, query));
+      const pickKind = (kind: ItemKind) => (forRow ? addKind(kind) : fillKind(kind));
       // An optional slot may hold no action
       const none = !!slot?.optional && (!query || "none".startsWith(query));
-      shown = [...(separator ? [() => add({ type: "separator" })] : []), ...(none ? [() => fill(undefined)] : []), ...kinds.map((kind) => () => addKind(kind)), ...found.map((entry) => () => fill(entry.action.id))];
+      shown = [...(separator ? [() => add({ type: "separator" })] : []), ...(none ? [() => fill(undefined)] : []), ...kinds.map((kind) => () => pickKind(kind)), ...found.map((entry) => () => fill(entry.action.id))];
       const options = [
         ...(separator ? [this.option(`${BASE}-pick-separator`, "", "Separator", "", () => add({ type: "separator" }))] : []),
         ...(none ? [this.option(`${BASE}-pick-unset`, "", "None", `No action for ${slot!.label}`, () => fill(undefined))] : []),
-        ...kinds.map((kind) => this.option(`${BASE}-pick-kind`, kind.icon, kind.label, kind.description, () => addKind(kind))),
+        ...kinds.map((kind) => this.option(`${BASE}-pick-kind`, kind.icon, kind.label, kind.description, () => pickKind(kind))),
         ...found.map((entry) => this.option("", entry.action.icon, entry.action.label, entry.group, () => fill(entry.action.id))),
       ];
       list.replaceChildren(...(options.length ? options : [this.el("div", `${BASE}-pick-none`, "No action found")]));
@@ -977,30 +1293,29 @@ export class SettingsDialog {
     if (!initial || !values) return {};
     const changed: Record<string, unknown> = {};
     if (values.shortcut !== initial.shortcut) changed[PATHS.shortcut] = values.shortcut;
-    if (values.placement.click !== initial.placement.click) changed[PATHS.placement] = values.placement.click;
-    if (values.placement.touch !== initial.placement.touch) changed[PATHS.placementTouch] = values.placement.touch;
-    if (values.show.click !== initial.show.click) changed[PATHS.show] = values.show.click;
-    if (values.show.touch !== initial.show.touch) changed[PATHS.showTouch] = values.show.touch;
     if (values.wordAtCaret !== initial.wordAtCaret) changed[PATHS.wordAtCaret] = values.wordAtCaret;
-    const favorites = savedRows(values.favorites);
-    if (!sameRows(favorites, initial.favorites)) changed[PATHS.favorites] = favorites;
-    const touch = values.touchFavorites && savedRows(values.touchFavorites);
-    if (JSON.stringify(touch) !== JSON.stringify(initial.touchFavorites)) changed[PATHS.touchFavorites] = touch;
-    // With either favourites written too: as it is now, not as told again from them (readSettings)
-    if (values.touchOn !== initial.touchOn || PATHS.favorites in changed || PATHS.touchFavorites in changed) changed[PATHS.touchOn] = values.touchOn;
+    const lists = savedToolbars(values.toolbars);
+    if (JSON.stringify(lists) !== JSON.stringify(savedToolbars(initial.toolbars))) changed[PATHS.favorites] = lists;
+    // With the favourites, the model's version they are written in, so they are never migrated (migrations/index.ts),
+    // and what the migrations changed and the toolbar did not write back yet (else the version would mark it done)
+    if (PATHS.favorites in changed) {
+      for (const [path, value] of Object.entries(this.migrated)) if (!(path in changed)) changed[path] = value;
+      changed[PATHS.version] = SETTINGS_VERSION;
+    }
     for (const name of MODULE_NAMES) if (values.modules[name] !== initial.modules[name]) changed[PATHS.module(name)] = values.modules[name];
     return changed;
   }
 
   /** Whether saving needs the page loaded anew: a module turned on or off, the key (the command's) */
   private reloads(changed: Readonly<Record<string, unknown>>): boolean {
-    return Object.keys(changed).some((path) => path !== PATHS.favorites && path !== PATHS.touchFavorites && path !== PATHS.touchOn && path !== PATHS.placement && path !== PATHS.placementTouch && path !== PATHS.show && path !== PATHS.showTouch && path !== PATHS.wordAtCaret);
+    return Object.keys(changed).some((path) => path !== PATHS.favorites && path !== PATHS.wordAtCaret && path !== PATHS.version);
   }
 
   private update(): void {
     const changed = this.changed();
     const reload = this.reloads(changed);
-    const invalid = !this.values?.shortcut;
+    // (No key, or a toolbar's name typed that cannot be its)
+    const invalid = !this.values?.shortcut || !!this.naming;
     const save = this.saveButton;
     if (save) {
       save.textContent = this.saving ? "Saving…" : reload ? "Save and reload" : "Save";
@@ -1042,6 +1357,11 @@ export class SettingsDialog {
     }
     this.context.saved();
   }
+}
+
+/** The toolbars as written to the configuration: `{ name, useFor, placement, show, rows }`, `useFor` left out where empty, empty rows left out */
+function savedToolbars(lists: readonly Toolbar[]): unknown[] {
+  return lists.map((list) => ({ name: list.name, ...(list.useFor.length ? { useFor: [...list.useFor] } : {}), placement: list.placement, show: list.show, rows: savedRows(list.rows) }));
 }
 
 /** Whether each word typed starts a word of a label, ignoring case (nothing typed: yes) */

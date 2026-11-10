@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { type Favorites, hasAction } from "../core/favorites.ts";
-import { addItem, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setSlotOwn, splitPins, stepOf } from "./favorites.ts";
+import { type Favorites, hasAction, slotItemOf } from "../core/favorites.ts";
+import { addItem, moveItem, pinOrdered, placeItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setPin, setSlotField, setSlotOwn, stepOf, unpinnedOutOfOrder } from "./favorites.ts";
 
 const ROWS: Favorites = [[{ id: "actions.turnInto", show: "label" }], [{ id: "formats.bold" }, { type: "separator" }, { id: "formats.link" }]];
 
@@ -70,23 +70,43 @@ describe("The favourites as the settings edit them", () => {
     expect(setSlot(ROWS, { row: 1, index: 0 }, "tap", "x")).toEqual(ROWS);
   });
 
-  it("lays Touch's pinned items out in two lists before the rows, and writes them back pinned at the ends, wherever they were", () => {
+  it("orders each row of Touch's own as the docked toolbar shows its line: pinned left, the others, pinned right", () => {
     const rows: Favorites = [
-      [{ id: "formats.bold" }, { id: "actions.turnInto", show: "label", pin: "left" }],
-      [{ id: "actions.more", pin: "right" }, { id: "formats.link" }],
+      [{ id: "formats.bold" }, { id: "actions.more", pin: "right" }, { id: "actions.turnInto", show: "label", pin: "left" }, { id: "formats.italic" }],
+      [{ id: "formats.link", pin: "right" }, { type: "separator" }],
     ];
-    const layout = splitPins(rows);
-    expect(layout).toEqual([[{ id: "actions.turnInto", show: "label", pin: "left" }], [{ id: "actions.more", pin: "right" }], [{ id: "formats.bold" }], [{ id: "formats.link" }]]);
-    expect(joinPins(layout)).toEqual([
-      [{ id: "actions.turnInto", show: "label", pin: "left" }, { id: "formats.bold" }],
-      [{ id: "formats.link" }, { id: "actions.more", pin: "right" }],
+    expect(pinOrdered(rows)).toEqual([
+      [{ id: "actions.turnInto", show: "label", pin: "left" }, { id: "formats.bold" }, { id: "formats.italic" }, { id: "actions.more", pin: "right" }],
+      [{ type: "separator" }, { id: "formats.link", pin: "right" }],
     ]);
-    // An item moved out of a list: no longer pinned; into one: pinned; a separator there is not
-    const moved = moveItem(moveItem(layout, { row: 0, index: 0 }, { row: 2, index: 1 }), { row: 3, index: 0 }, { row: 0, index: 0 });
-    expect(joinPins(moved)).toEqual([[{ id: "formats.link", pin: "left" }, { id: "formats.bold" }, { id: "actions.turnInto", show: "label" }], [{ id: "actions.more", pin: "right" }]]);
-    expect(joinPins([[{ type: "separator" }], [], [{ id: "formats.bold" }]])).toEqual([[{ id: "formats.bold" }]]);
-    // A row of pinned items alone is not shown as an empty row; an empty row being edited is
-    expect(splitPins([[{ id: "actions.turnInto", pin: "left" }], [{ id: "formats.bold" }], []])).toEqual([[{ id: "actions.turnInto", pin: "left" }], [], [{ id: "formats.bold" }], []]);
+  });
+
+  it("places an item into a zone of a row, pinned so or not, at its place there; a separator into no pinned zone", () => {
+    const rows: Favorites = pinOrdered([
+      [{ id: "actions.turnInto", pin: "left" }, { id: "formats.bold" }, { id: "formats.italic" }, { id: "actions.more", pin: "right" }],
+      [{ id: "formats.link" }, { type: "separator" }, { id: "formats.code" }],
+    ]);
+    // Bold pinned left, after Turn into
+    expect(placeItem(rows, { row: 0, index: 1 }, { row: 0, zone: "left", index: 5 })).toEqual({
+      rows: [[{ id: "actions.turnInto", pin: "left" }, { id: "formats.bold", pin: "left" }, { id: "formats.italic" }, { id: "actions.more", pin: "right" }], rows[1]],
+      at: { row: 0, index: 1 },
+    });
+    // … unpinned into the second row's middle, first
+    expect(placeItem(rows, { row: 0, index: 3 }, { row: 1, zone: undefined, index: 0 })).toEqual({
+      rows: [rows[0]!.slice(0, 3), [{ id: "actions.more" }, ...rows[1]!]],
+      at: { row: 1, index: 0 },
+    });
+    // Link pinned right in the first row: before …
+    expect(placeItem(rows, { row: 1, index: 0 }, { row: 0, zone: "right", index: 0 }).rows[0]).toEqual([...rows[0]!.slice(0, 3), { id: "formats.link", pin: "right" }, { id: "actions.more", pin: "right" }]);
+    // A separator is not pinned
+    expect(placeItem(rows, { row: 1, index: 1 }, { row: 0, zone: "left", index: 0 })).toEqual({ rows, at: { row: 1, index: 1 } });
+  });
+
+  it("pins an item at an end of its row or unpins it, and says where it is then", () => {
+    const rows: Favorites = [[{ id: "actions.turnInto", pin: "left" }, { id: "formats.bold" }, { id: "formats.italic" }, { id: "actions.more", pin: "right" }]];
+    expect(setPin(rows, { row: 0, index: 2 }, "left")).toEqual({ rows: [[{ id: "actions.turnInto", pin: "left" }, { id: "formats.italic", pin: "left" }, { id: "formats.bold" }, { id: "actions.more", pin: "right" }]], at: { row: 0, index: 1 } });
+    expect(setPin(rows, { row: 0, index: 1 }, "right")).toEqual({ rows: [[{ id: "actions.turnInto", pin: "left" }, { id: "formats.italic" }, { id: "formats.bold", pin: "right" }, { id: "actions.more", pin: "right" }]], at: { row: 0, index: 2 } });
+    expect(setPin(rows, { row: 0, index: 0 }, undefined)).toEqual({ rows: [[{ id: "actions.turnInto" }, { id: "formats.bold" }, { id: "formats.italic" }, { id: "actions.more", pin: "right" }]], at: { row: 0, index: 0 } });
   });
 
   it("gives an item its own icon and label (an action's, a kind's whose items have them), an empty one none; nothing to a separator", () => {
@@ -112,5 +132,29 @@ describe("The favourites as the settings edit them", () => {
     expect(setSlot(own, at, "tap", "formats.code")[0]![0]).toEqual({ type: "gesture", tap: "formats.code", up: "formats.italic" });
     // No action in the slot: nothing to give a look
     expect(setSlotOwn(rows, at, "down", "label", "x")).toEqual(rows);
+  });
+
+  it("puts an item of a kind in a slot (a snippet), its fields set there: an icon its first characters, a label trimmed, empty ones gone", () => {
+    const rows: Favorites = [[{ type: "gesture", tap: "formats.bold" }]];
+    const at = { row: 0, index: 0 };
+    const snippet = setSlot(rows, at, "up", { type: "snippet" });
+    const filled = setSlotField(setSlotField(setSlotField(snippet, at, "up", "text", "%%{s}%%"), at, "up", "icon", "💬💬💬💬"), at, "up", "label", " Comment ");
+    expect(filled[0]![0]).toEqual({ type: "gesture", tap: "formats.bold", up: { type: "snippet", text: "%%{s}%%", icon: "💬💬💬", label: "Comment" } });
+    expect(setSlotField(filled, at, "up", "label", " ")[0]![0]).toEqual({ type: "gesture", tap: "formats.bold", up: { type: "snippet", text: "%%{s}%%", icon: "💬💬💬" } });
+    // A slot holding an action's id: no item's fields to set
+    expect(setSlotField(rows, at, "tap", "text", "x")).toEqual(rows);
+    // Only an item of a kind is one: not an action's id, its own look, a separator
+    expect(slotItemOf({ type: "snippet" })).toEqual({ type: "snippet" });
+    expect(slotItemOf("formats.bold")).toBeUndefined();
+    expect(slotItemOf({ id: "formats.bold", icon: "★" })).toBeUndefined();
+    expect(slotItemOf({ type: "separator" })).toBeUndefined();
+  });
+
+  it("keeps an order made by hand where the toolbar does not dock: a pin that would move an item back to an end gone", () => {
+    const left = { id: "a", pin: "left" } as const;
+    const right = { id: "z", pin: "right" } as const;
+    expect(unpinnedOutOfOrder([[left, { id: "b" }, right]])).toEqual([[left, { id: "b" }, right]]);
+    expect(unpinnedOutOfOrder([[{ id: "b" }, left, right, { id: "c" }]])).toEqual([[{ id: "b" }, { id: "a" }, { id: "z" }, { id: "c" }]]);
+    expect(unpinnedOutOfOrder([[left, left, { type: "separator" }, right]])).toEqual([[left, left, { type: "separator" }, right]]);
   });
 });

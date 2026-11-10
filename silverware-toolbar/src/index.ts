@@ -58,6 +58,28 @@ export async function init(bridge: Bridge): Promise<void> {
   slot[GLOBAL_KEY] = controller;
   current = { bridge, actions, kinds };
   controller.start();
+  if (Object.keys(settings.migrated).length) void writeMigrated(bridge, settings.migrated);
+}
+
+// The migrated settings being written (init may be called again meanwhile: Space Lua loaded twice, CONFIG saved)
+let migrating = false;
+
+/**
+ * Settings of an older model, migrated as they were read, written back with
+ * the model's version, so they are migrated once (migrations/index.ts); where
+ * nothing can be written, they are migrated again as they are read
+ */
+async function writeMigrated(bridge: Bridge, values: Readonly<Record<string, unknown>>): Promise<void> {
+  if (migrating || !canSaveIn(bridge)) return;
+  migrating = true;
+  try {
+    await saveSettings(bridge, values);
+    void bridge.flash(`Silverware Toolbar: your settings were updated to its version ${String(values[PATHS.version])} (CONFIG)`, "info");
+  } catch (e) {
+    console.error("Silverware Toolbar: the settings migrated could not be written", e);
+  } finally {
+    migrating = false;
+  }
 }
 
 /** Whether this is a touch screen (an on-screen keyboard to hide), as the toolbar starts */
@@ -75,12 +97,8 @@ function sameSettings(running: Controller, settings: Settings): boolean {
   const modules = [...running.settings.modules].sort().join();
   return (
     modules === [...settings.modules].sort().join() &&
-    JSON.stringify(running.settings.placement) === JSON.stringify(settings.placement) &&
-    JSON.stringify(running.settings.show) === JSON.stringify(settings.show) &&
     running.settings.wordAtCaret === settings.wordAtCaret &&
-    JSON.stringify(running.settings.favorites) === JSON.stringify(settings.favorites) &&
-    JSON.stringify(running.settings.touchFavorites) === JSON.stringify(settings.touchFavorites) &&
-    running.settings.touchOn === settings.touchOn
+    JSON.stringify(running.settings.toolbars) === JSON.stringify(settings.toolbars)
   );
 }
 
@@ -123,9 +141,11 @@ async function saveSettings(bridge: Bridge, values: Readonly<Record<string, unkn
     return;
   }
   if (!bridge.readPage || !bridge.saveConfigPage) throw new Error("no configuration page to save to");
-  // Tables (the favourites, touch's: undefined removes it) in the toolbar's own block
-  const { [PATHS.favorites]: favorites, [PATHS.touchFavorites]: touch, ...scalars } = values;
-  const tables = { ...(PATHS.favorites in values ? { [PATHS.favorites]: favorites } : {}), ...(PATHS.touchFavorites in values ? { [PATHS.touchFavorites]: touch } : {}) };
+  // Tables (the toolbars) in the toolbar's own block, the rest in the Configuration Manager's; a setting taken out
+  // (undefined: a key of before, migrated) out of either, wherever it was written
+  const { [PATHS.favorites]: favorites, ...scalars } = values;
+  const gone = Object.fromEntries(Object.entries(values).filter(([, value]) => value === undefined));
+  const tables = { ...gone, ...(PATHS.favorites in values ? { [PATHS.favorites]: favorites } : {}) };
   await saveConfigPage(
     { readPage: (name) => bridge.readPage!(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) },
     (text) => withConfigSettings(withConfigSettings(text, scalars), tables, OWN_MARKER),

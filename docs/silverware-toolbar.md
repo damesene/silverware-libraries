@@ -389,6 +389,17 @@ config.set("silverware.toolbar.favorites", {
   as a click on an item opens the item's: Action (Change… opens the search,
   another action drops the own look), Icon, Label; a slot needing an action
   and without one opens the search at once.
+- A text snippet on a gesture button's slot (2026-11-10, asked by the user:
+  a snippet is a kind of item, not an action, so no slot offered it): a kind
+  whose item is one action says so (`ItemKind.action(item)`: the snippet's),
+  and a slot may hold such an item in place of an action's id
+  (`up = { type = "snippet", text = "%%{s}%%", icon = "💬" }`, `slotItemOf`);
+  the core makes the slot's action of it where the kind's `check` finds
+  nothing wrong, else the slot is as one without an action. The settings
+  offer those kinds for a slot beside the actions; picked, the slot's panel
+  shows the kind, Change…, its own icon and label (its kind's `ownLook`) and
+  its fields (`setSlotField`). Generic: the core and the dialog know no kind
+  by name.
 
 ### Kinds of favourites: the gesture button (decided and built 2026-10-26)
 
@@ -574,3 +585,78 @@ pointer or keys, UI tests (`npm run test:ui`):
      `readPage`, `saveConfigPage`, `reloadUI`, `confirm`. The playground
      gets a *Settings* button and a store, as the table's playground has.
 3. Then step 6 (the user, in a live SilverBullet) and step 7.
+
+### Slash commands from the toolbar (2026-11-10)
+
+Asked by the user: SilverBullet's slash commands from the toolbar, as a
+phone's keyboard has "/" a page away. A snippet writing "/" did not do it: a
+"/" written through the editor's API opens no completion (CodeMirror starts
+it on typing). So an action of a module of its own (`slash`, off with
+`silverware.toolbar.modules.slash.enabled`): `actions.slashCommands` writes
+"/" at the selection's end (`ActionEditor.write`, one edit, the caret after
+it), a space before it where SilverBullet's `slashCommandRegexp`
+(`([^\w:]|^)\/[\w#-]*`, client/plugos/hooks/slash_command.ts of 2.12.1)
+would not match, and starts the completion (`ActionEditor.startCompletion`,
+`editor.startCompletion`, a syscall of 2.12.1; asked first, `completes`, so
+a SilverBullet without it gets no stray "/"). Text selected stays as text,
+"/" after it and the caret after the "/", as replacing it would lose it.
+
+### Rows docked as lines, and the settings' migrations (2026-11-10)
+
+Asked by the user: the favourites for touch had pinned items for the whole
+toolbar (two boxes above the rows in the settings) and every row shown in one
+docked line. Now each row is a line of its own where the toolbar is docked,
+one under another, each scrolled sideways, its items pinned left and right at
+its own ends (`Bar.dockLine`; … at the last line's end). The settings edit
+Touch's own so: each row three lists, pinned left, the others, pinned right
+(`pinOrdered`, `placeItem`; Pin in an item's panel, `setPin`). The default
+for touch is one row, the same line as before.
+
+What a space wrote before would change its look (several rows: several
+lines), so the user asked for a migration, kept apart and easy to add to or
+take out: `src/migrations/`, a file per migration named by its version, a
+list in `index.ts`, each reading settings by path and giving what to write.
+The model's version is `silverware.toolbar.version` (not set: 1);
+a migration runs where the space's is lower, the toolbar reads the result
+(`Settings.migrated`) and writes it back with the version once
+(`writeMigrated`), and the settings dialog writes the version with any
+favourites it saves, so rows written in the new model are never joined.
+Nothing is written where nothing changes (a space with no favourites of its
+own). Version 2 joins touch's rows into one, a separator between rows whose
+items are not all pinned, as the docked line showed them, where Touch's
+placement docks (its default); Click's too where Click's placement docks (the
+same change of look), not otherwise (by the selection, rows are rows
+already). Where a finger showed Click's docked (no favourites for touch of the
+space's own, their switch not set on), Click's joined become its own for touch,
+turned on, so a computer keeps Click's rows; with its own kept off (switch
+false), a finger's Click's are not joined (that would change a computer's).
+Where the toolbar could not write the migration back, the settings
+dialog writes it with the version the next time it saves favourites.
+
+### Toolbars: rows, where and when one thing (2026-11-10)
+
+Asked by the user: favourites by device (Click, Touch) made switching a
+phone between a docked toolbar and one by the selection hard, as each wants
+rows of its own (one line docked, several by the selection). Decided with
+the user, step by step: a toolbar is a named thing of its own, `{ name, useFor,
+placement, show, rows }` in `silverware.toolbar.favorites`, up to 5 (names
+unique), `useFor` an array of the ways of working showing it (`"click"`,
+`"touch"`; a later one, a pen's, would join it; a condition of another kind,
+the screen's size, would be a key of its own); every way of working shows
+exactly one, a toolbar for none kept to switch to. Where and when it shows
+are the toolbar's, no longer a device's setting: General keeps the key and
+the word at the cursor. The settings' tab is *Toolbars* (a tab per toolbar,
+New, Duplicate, Delete, Reset to defaults; Used for, Where, When on its card).
+Defaults: *Float* (by the selection, after selecting text, Click) and
+*Docked* (at the bottom, always, Touch; the user's change of the same day from while writing). Pinned items' boxes only for
+a docked toolbar; by the selection a pin orders its row only, kept for when
+it docks, marked by a pin, and an item moved by hand loses a pin that would
+undo the order. The settings of before (version 1) migrate to version 2
+(migrations/2-toolbars.ts, the user's call after first deciding against one):
+Click's and Touch's favourites each a toolbar where and when that way of
+working showed them, one for both where alike, a finger without its own
+given Click's, Touch's own turned off kept for none, a docked one's rows
+joined as its one line showed them; the keys of before taken out of either
+block of CONFIG (index.ts saveSettings takes a setting out wherever it was). A toolbar without *Every action*
+says so with a button putting it at the end of its last row (docked: pinned
+right).

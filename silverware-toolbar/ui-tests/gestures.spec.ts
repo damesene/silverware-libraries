@@ -93,6 +93,14 @@ test.describe("The gesture button", () => {
     await expect(look.locator('[data-swb-field="text"] textarea')).toBeFocused();
     await expect(gesture.locator('[data-swb-slot="up"]')).toHaveAttribute("title", /No text yet/);
     await page.keyboard.type("%%{s}%%");
+    // Its warning gone as it is typed (the tab not drawn anew)
+    await expect(gesture.locator('[data-swb-slot="up"]')).not.toHaveAttribute("title", /No text yet/);
+    await expect(gesture.locator('[data-swb-slot="up"]')).not.toHaveClass(/swb-settings-unknown/);
+    // Picked again: kept, its text too
+    await look.locator(".swb-settings-look-change").click();
+    await dialog.locator(".swb-settings-pick-field").fill("snippet");
+    await page.keyboard.press("Enter");
+    await expect(look.locator('[data-swb-field="text"] textarea')).toHaveValue("%%{s}%%");
     await look.locator('[data-swb-own="icon"]').fill("💬");
     await look.locator('[data-swb-own="icon"]').press("Enter");
     await look.locator('[data-swb-own="label"]').fill("Comment");

@@ -486,14 +486,14 @@ export class SettingsDialog {
         name.textContent = ownLabel ?? kind?.label ?? item.type;
         element.append(icon, name);
         element.classList.add(`${BASE}-kind`);
-        const problem = kind?.check?.(item);
+        const problem = kind && this.itemProblem(item, kind);
         if (!kind) {
           element.classList.add(`${BASE}-unknown`);
           element.title = `No module turned on gives the kind ${item.type}: the toolbar leaves it out`;
         } else {
           if (problem) element.title = `${problem}: the toolbar leaves it out`;
           slots = this.el("div", `${BASE}-slots`);
-          slots.append(...kind.slots.map((slot) => this.slotButton(item, at, slot, known)), ...(kind.fields ?? []).map((field) => this.fieldInput(item, field, (value) => setSlot(this.rows, at, field.key, value))));
+          slots.append(...kind.slots.map((slot) => this.slotButton(item, at, slot, known)), ...(kind.fields ?? []).map((field) => this.fieldInput(item, field, (value) => setSlot(this.rows, at, field.key, value), () => this.refreshProblems(at))));
         }
       } else {
         const action = known.get(item.id);
@@ -742,8 +742,47 @@ export class SettingsDialog {
       const own = (field: "icon" | "label") => (typeof inner[field] === "string" && inner[field] ? (inner[field] as string) : undefined);
       panel.append(this.ownLine("icon", "Icon", own("icon"), "★", set("icon")), this.ownLine("label", "Label", own("label"), "Its name", set("label")));
     }
-    panel.append(...(kind.fields ?? []).map((field) => this.fieldInput(inner, field, set(field.key))));
+    panel.append(...(kind.fields ?? []).map((field) => this.fieldInput(inner, field, set(field.key), () => this.refreshProblems(at))));
     return panel;
+  }
+
+  /** What is wrong with the item a slot holds, where the toolbar leaves it out: its kind not given, no action, or the kind's `check` (a snippet without its text) */
+  private slotItemProblem(inner: KindItem): string | undefined {
+    const kind = this.context.kinds().find((k) => k.type === inner.type);
+    return !kind ? `No module turned on gives the kind ${inner.type}` : !kind.action ? `${kind.label} is no action` : kind.check?.(inner);
+  }
+
+  /** What is wrong with a kind's item, where the toolbar leaves it out: its kind's `check`, or a slot it needs holding an item with something wrong */
+  private itemProblem(item: KindItem, kind: ItemKind): string | undefined {
+    const own = kind.check?.(item);
+    if (own) return own;
+    for (const slot of kind.slots) {
+      const inner = slot.optional ? undefined : slotItemOf(item[slot.key]);
+      const problem = inner && this.slotItemProblem(inner);
+      if (problem) return `${slot.label}: ${problem}`;
+    }
+    return undefined;
+  }
+
+  /** A slot's button or an item marked for what is wrong with it, or no longer */
+  private markProblem(element: HTMLElement, problem: string | undefined, dimmed: boolean): void {
+    if (dimmed) element.classList.toggle(`${BASE}-unknown`, !!problem);
+    if (problem) element.title = `${problem}: the toolbar leaves it out`;
+    else if (element.title.endsWith(": the toolbar leaves it out")) element.removeAttribute("title");
+  }
+
+  /** A kind's item's warnings drawn again as a field of it (or of the item a slot holds) is typed in, the tab not drawn anew */
+  private refreshProblems(at: At): void {
+    const item = this.rows[at.row]?.[at.index];
+    const kind = item && isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type) : undefined;
+    const element = this.favoritesPanel?.querySelector<HTMLElement>(`[data-swb-item="${at.row}:${at.index}"]`);
+    if (!item || !isKindItem(item) || !kind || !element) return;
+    this.markProblem(element, this.itemProblem(item, kind), false);
+    for (const slot of kind.slots) {
+      const inner = slotItemOf(item[slot.key]);
+      const button = element.querySelector<HTMLElement>(`[data-swb-slot="${slot.key}"]`);
+      if (inner && button) this.markProblem(button, this.slotItemProblem(inner), true);
+    }
   }
 
   /** A panel's × and Esc closing it (Esc: the panel's, not the dialog's) */
@@ -878,18 +917,14 @@ export class SettingsDialog {
     button.setAttribute("aria-label", `${slot.label}: ${what}`);
     button.dataset.swbSlot = slot.key;
     // A kind no module on gives, or one that is no action, or an item with something wrong (a snippet without its text): left out
-    const problem = !kind ? `No module turned on gives the kind ${inner.type}` : !kind.action ? `${kind.label} is no action` : kind.check?.(inner);
-    if (problem) {
-      button.classList.add(`${BASE}-unknown`);
-      button.title = `${problem}: the toolbar leaves it out`;
-    }
+    this.markProblem(button, this.slotItemProblem(inner), true);
     const adjusting = this.adjusting;
     button.setAttribute("aria-expanded", String(!!adjusting && adjusting.key === slot.key && adjusting.row === at.row && adjusting.index === at.index));
     return button;
   }
 
   /** A field of a kind's item (or of the item a slot holds): its text edited in place (written as typed, the tab not drawn anew: the field keeps the keyboard) */
-  private fieldInput(item: KindItem, field: ItemField, set: (value: string | undefined) => Favorites): HTMLElement {
+  private fieldInput(item: KindItem, field: ItemField, set: (value: string | undefined) => Favorites, changed: () => void): HTMLElement {
     const value = item[field.key];
     const input = field.multiline ? this.el("textarea", `${BASE}-field-input`) : this.el("input", `${BASE}-field-input`);
     if (input instanceof HTMLInputElement) input.type = "text";
@@ -900,6 +935,7 @@ export class SettingsDialog {
     input.setAttribute("aria-label", field.label);
     input.addEventListener("input", () => {
       this.setQuietly(set(input.value || undefined));
+      changed();
     });
     const label = this.el("label", `${BASE}-field${field.multiline ? ` ${BASE}-field-multiline` : ""}`);
     label.dataset.swbField = field.key;
@@ -969,7 +1005,10 @@ export class SettingsDialog {
     // A kind's item for the slot (a snippet): its panel opened at its first field to type in
     const fillKind = (kind: ItemKind) => {
       if (forRow) return;
-      const favorites = setSlot(this.rows, target.at, target.key, { type: kind.type });
+      // (The kind it holds already, picked again: kept as it is, its text too)
+      const item = this.rows[target.at.row]?.[target.at.index];
+      const held = item && isKindItem(item) ? slotItemOf(item[target.key]) : undefined;
+      const favorites = setSlot(this.rows, target.at, target.key, held?.type === kind.type ? held : { type: kind.type });
       this.picking = undefined;
       this.adjusting = { ...target.at, key: target.key };
       this.edit(favorites, kind.fields?.length ? `[data-swb-look] .${BASE}-field-input` : `[data-swb-look] .${BASE}-look-change`);

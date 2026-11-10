@@ -63,6 +63,8 @@ export class SettingsDialog {
   private readonly dialogs: Dialogs;
   private dialog: Dialog | undefined;
   private initial: Values | undefined;
+  // What the migrations changed as the settings were read (where the toolbar could not write it back): written with the version
+  private migrated: Readonly<Record<string, unknown>> = {};
   private values: Values | undefined;
   private saving = false;
   private favoritesPanel: HTMLElement | undefined;
@@ -91,6 +93,7 @@ export class SettingsDialog {
     const { bridge } = this.context;
     const settings = await readSettings(bridge);
     const modules = Object.fromEntries(MODULE_NAMES.map((name) => [name, settings.modules.has(name)])) as Record<ModuleName, boolean>;
+    this.migrated = settings.migrated;
     this.initial = { shortcut: await readShortcut(bridge), placement: settings.placement, show: settings.show, wordAtCaret: settings.wordAtCaret, favorites: settings.favorites, touchFavorites: settings.touchFavorites, touchOn: settings.touchOn, modules };
     // Touch's first by finger where they show there (on, with their own), else Click's
     this.device = byTouch(this.context.doc.defaultView) && settings.touchOn && settings.touchFavorites ? "touch" : "click";
@@ -1123,7 +1126,11 @@ export class SettingsDialog {
     // With either favourites written too: as it is now, not as told again from them (readSettings); and the model's
     // version they are written in, so they are never migrated (migrations/index.ts)
     if (values.touchOn !== initial.touchOn || PATHS.favorites in changed || PATHS.touchFavorites in changed) changed[PATHS.touchOn] = values.touchOn;
-    if (PATHS.favorites in changed || PATHS.touchFavorites in changed) changed[PATHS.version] = SETTINGS_VERSION;
+    // (With what the migrations changed and the toolbar did not write back yet: else the version would mark them done)
+    if (PATHS.favorites in changed || PATHS.touchFavorites in changed) {
+      for (const [path, value] of Object.entries(this.migrated)) if (!(path in changed)) changed[path] = value;
+      changed[PATHS.version] = SETTINGS_VERSION;
+    }
     for (const name of MODULE_NAMES) if (values.modules[name] !== initial.modules[name]) changed[PATHS.module(name)] = values.modules[name];
     return changed;
   }

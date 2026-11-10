@@ -2,8 +2,8 @@
 // favourites as a line of its own, its items pinned left and right at that
 // line's ends; before, it was one line, the rows one after another with a
 // separator between them, every item pinned at that line's ends. So the
-// favourites for touch (the device the toolbar docks on by default), and
-// Click's where Click's toolbar is docked, are joined into one row as it
+// favourites for touch where Touch's toolbar is docked (its default: bottom),
+// and Click's where Click's is, are joined into one row as it
 // showed them: a separator between two rows where both have items that are
 // not pinned (one of pinned items alone added none), the pinned ones staying
 // pinned. The new model's rows are kept as they are: this runs once.
@@ -13,16 +13,21 @@ import type { Migration, ReadSetting } from "./index.ts";
 const TOUCH = "silverware.toolbar.favorites-touch";
 const CLICK = "silverware.toolbar.favorites";
 const CLICK_PLACEMENT = "silverware.toolbar.placement";
+const TOUCH_PLACEMENT = "silverware.toolbar.placement-touch";
+
+/** Whether a placement as configured docks the toolbar (`fallback`: the device's default where not set) */
+const docks = (placement: unknown, fallback: boolean) => (placement === undefined ? fallback : placement === "bottom" || placement === "top");
 
 export const touchRowsJoined: Migration = {
   version: 2,
   name: "favourites docked in one row",
   migrate: async (read: ReadSetting) => {
     const changes: Record<string, unknown> = {};
-    const touch = joined(await read(TOUCH));
-    if (touch) changes[TOUCH] = touch;
-    const placement = await read(CLICK_PLACEMENT);
-    if (placement === "bottom" || placement === "top") {
+    if (docks(await read(TOUCH_PLACEMENT), true)) {
+      const touch = joined(await read(TOUCH));
+      if (touch) changes[TOUCH] = touch;
+    }
+    if (docks(await read(CLICK_PLACEMENT), false)) {
       const click = joined(await read(CLICK));
       if (click) changes[CLICK] = click;
     }

@@ -119,7 +119,9 @@ export class Bar {
    */
   dock(rows: readonly (readonly Shown[])[], at: Dock, more: Extract<Shown, { action: Action }> | undefined, room: boolean): void {
     this.closeMenu();
-    const all = rows.length ? rows : [[]];
+    // Rows that show nothing (separators alone) left out, a line kept for … where none is left
+    const shown = rows.filter((row) => row.some((item) => !("separator" in item)));
+    const all = shown.length ? shown : [[]];
     const lines = all.map((row, i) => this.dockLine(row, i === all.length - 1 ? more : undefined));
     this.shadeScroll = () => {
       for (const line of lines) line.shade();

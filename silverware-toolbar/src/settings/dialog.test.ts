@@ -80,3 +80,28 @@ describe("The settings dialog's Favorites tab", () => {
     dialog.close();
   });
 });
+
+describe("The settings dialog's saving", () => {
+  it("writes what the migrations changed and the toolbar did not write back, with the version, as it saves any favourites", async () => {
+    byFinger(false);
+    const touch = [[{ id: "formats.bold" }], [{ id: "formats.code" }]];
+    let saved: Readonly<Record<string, unknown>> | undefined;
+    const dialog = new SettingsDialog({
+      doc: document,
+      bridge: { ...bridge({}), getConfig: (path, fallback) => (path === "silverware.toolbar.favorites-touch" ? touch : fallback) },
+      actions: () => [],
+      kinds: () => [],
+      canSave: true,
+      save: async (values) => void (saved = values),
+      saved: () => undefined,
+    });
+    await dialog.open();
+    // Click's: an item removed
+    document.querySelector<HTMLElement>('[data-swb-panel="favorites"] [data-swb-item="1:0"] .swb-settings-remove')!.click();
+    document.querySelector<HTMLElement>(".swb-settings-save")!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(saved?.["silverware.toolbar.favorites-touch"]).toEqual([[{ id: "formats.bold" }, { type: "separator" }, { id: "formats.code" }]]);
+    expect(saved?.["silverware.toolbar.settings-version"]).toBe(2);
+    dialog.close();
+  });
+});

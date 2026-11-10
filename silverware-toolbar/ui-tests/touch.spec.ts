@@ -248,8 +248,8 @@ test.describe("The toolbar on a phone", () => {
   });
 
   test("a shade at each end it scrolls further to, gone at its ends", async ({ page }) => {
-    // Enough to scroll: another row of the favourites
-    await page.setViewportSize({ width: 300, height: page.viewportSize()!.height });
+    // Narrow enough for the second row's line to scroll
+    await page.setViewportSize({ width: 240, height: page.viewportSize()!.height });
     await selectByTouch(page, "some text");
     // (The second row's line: the longer one; the first, Turn into alone, does not scroll)
     const scroll = bar(page).locator(".swb-dock-scroll").last();

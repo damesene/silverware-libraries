@@ -62,10 +62,11 @@ describe("Version 2: favourites docked in one row", () => {
     expect(joined([[{ id: "a" }], "x"])).toBeUndefined();
   });
 
-  it("joins Click's only where Click's toolbar is docked", async () => {
+  it("joins each device's only where its toolbar is docked (Touch's by default, Click's not)", async () => {
     const rows = [[{ id: "a" }], [{ id: "b" }]];
     expect(await touchRowsJoined.migrate(reader({ [TOUCH]: rows, [CLICK]: rows }))).toEqual({ [TOUCH]: [[{ id: "a" }, { type: "separator" }, { id: "b" }]] });
     expect(await touchRowsJoined.migrate(reader({ [CLICK]: rows, "silverware.toolbar.placement": "bottom" }))).toEqual({ [CLICK]: [[{ id: "a" }, { type: "separator" }, { id: "b" }]] });
+    expect(await touchRowsJoined.migrate(reader({ [TOUCH]: rows, "silverware.toolbar.placement-touch": "selection" }))).toEqual({});
     expect(await touchRowsJoined.migrate(reader({}))).toEqual({});
   });
 

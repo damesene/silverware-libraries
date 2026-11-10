@@ -623,6 +623,8 @@ a migration runs where the space's is lower, the toolbar reads the result
 favourites it saves, so rows written in the new model are never joined.
 Nothing is written where nothing changes (a space with no favourites of its
 own). Version 2 joins touch's rows into one, a separator between rows whose
-items are not all pinned, as the docked line showed them; Click's too where
-Click's placement is docked (the same change of look), not otherwise (by the
-selection, Click's rows are rows already).
+items are not all pinned, as the docked line showed them, where Touch's
+placement docks (its default); Click's too where Click's placement docks (the
+same change of look), not otherwise (by the selection, rows are rows
+already). Where the toolbar could not write the migration back, the settings
+dialog writes it with the version the next time it saves favourites.

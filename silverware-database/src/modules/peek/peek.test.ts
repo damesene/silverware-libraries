@@ -677,6 +677,20 @@ describe("the peek", () => {
     expect((await store.database("tasks"))!.value.properties.map((one) => one.key)).toEqual(["estimate", "status", "done"]);
   });
 
+  it("draws nothing anew while a property's row is dragged, a change told meanwhile drawn once it is let go", async () => {
+    const { q, peek, named, store } = await setup();
+    await peek("Fix login");
+    const list = q(".swd-peek-properties");
+    q('.swd-peek-row[data-property="status"] .swd-peek-grip').dispatchEvent(new MouseEvent("pointerdown", { button: 0, clientX: 10, clientY: 10, bubbles: true, cancelable: true }));
+    // (The item's page written elsewhere, as SilverBullet tells of it indexed anew: the list stays the drag's)
+    store.changeOutside("tasks", (await named("Fix login")).key, { values: { estimate: 9 } });
+    await settle();
+    expect([q(".swd-peek-properties") === list, q('.swd-peek-value[data-key="estimate"]').textContent]).toEqual([true, "3"]);
+    window.dispatchEvent(new MouseEvent("pointerup", { button: 0, clientX: 10, clientY: 10, bubbles: true }));
+    await settle();
+    expect(q('.swd-peek-value[data-key="estimate"]').textContent).toBe("9");
+  });
+
   it("offers no editing of properties where the properties module is off: names are no buttons, no + Add a property", async () => {
     const { q, peek } = await setup();
     await peek("Fix login");

@@ -1,6 +1,6 @@
 // The sheet view: the table over the window with empty cells past it, which grow it
 import type { Page } from "@playwright/test";
-import { cell, expect, expectNavigatedTo, hoverCell, markdown, notification, reload, rendersAnew, replaceInPage, setPage, setSettings, table, tableIcon, test } from "../helpers.ts";
+import { cell, expect, expectNavigatedTo, hoverCell, markdown, notification, reload, rendersAnew, replaceInPage, setPage, setSettings, settled, stableBox, table, tableIcon, test } from "../helpers.ts";
 
 /** The table the sheet shows: the one it drew itself (in SilverBullet's form), standing for the page's */
 const sheetTable = (page: Page) => page.locator(".sb-table-widget.swt-table.swt-drawn:not(.swt-stand-in)");
@@ -25,7 +25,9 @@ async function openSheet(page: Page): Promise<void> {
 
 /** A point in the empty cells: `right` empty columns right of the table at a row's middle, or `below` empty rows under it in a column */
 async function emptyCell(page: Page, at: { right?: number; below?: number; row?: number; column?: number }): Promise<{ x: number; y: number }> {
-  const box = (await sheetTable(page).locator("table").boundingBox())!;
+  // (The table resting on the grid: the sheet lays its tables out and evens its rows the frame after it shows them, so a
+  // box read at once put the point rows away from the cell meant)
+  const box = await stableBox(sheetTable(page).locator("table"));
   // The empty rows are as high as the table's body rows
   const rowHeight = (await sheetCell(page, 1, 0).boundingBox())!.height;
   const rowBox = at.row !== undefined ? (await sheetCell(page, at.row, 0).boundingBox())! : undefined;
@@ -800,12 +802,12 @@ test.describe("Sheet view", () => {
     await setSettings(page, { "silverware.table.metadata": false });
     await openSheet(page);
     const before = await markdown(page);
-    const box = (await sheetTable(page).locator("table").boundingBox())!;
+    const box = await stableBox(sheetTable(page).locator("table"));
     await page.mouse.click(box.x + box.width + 250, box.y + box.height + 200);
     await page.keyboard.type("lost");
     await expect(notification(page, "Store table metadata")).toBeVisible();
     // What is typed goes nowhere: not into the page under the board, which keeps the focus
-    await page.waitForTimeout(200);
+    await settled(page);
     expect(await markdown(page)).toBe(before);
     await expect(page.locator(".swt-sheet-board")).toBeFocused();
   });
@@ -813,7 +815,7 @@ test.describe("Sheet view", () => {
   test("cells pasted into a far cell go into no table (the one its editor belongs to, past its end, either): a table of their own", async ({ page }) => {
     await openSheet(page);
     const before = (await markdown(page)).split("\n").filter((line) => line.startsWith("|") && !line.includes("<meta")).map((line) => line.replace(/ +/g, "").replace(/-+/g, "-"));
-    const box = (await sheetTable(page).locator("table").boundingBox())!;
+    const box = await stableBox(sheetTable(page).locator("table"));
     await page.mouse.click(box.x + box.width + 250, box.y + box.height + 200);
     await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.evaluate(() => navigator.clipboard.writeText(""));
@@ -975,8 +977,12 @@ test("a write on the sheet lays out the sheet's table only: the page's under the
   const underneath = page.locator(".sb-table-widget:not(.swt-drawn)", { hasText: "Quince" });
   await expect(underneath).toHaveCount(1);
   await expect(underneath).not.toHaveClass(/swt-table/);
-  // (Enter edits the cell below: its editor left first)
+  // (Enter edits the cell below: its editor left first, once it is open; an Esc before it opens, after the write, reaches
+  // the board, which it closes)
+  await expect(page.locator(".swt-cell-editor")).toBeFocused();
   await page.keyboard.press("Escape");
+  await expect(page.locator(".swt-cell-editor")).toHaveCount(0);
+  await expect(page.locator(".swt-sheet-board")).toHaveCount(1);
   await drawn.locator("tr[data-swt-row='2'] > td").first().hover();
   await (await tableIcon(page, "Exit sheet view")).click();
   await expect(page.locator(".swt-sheet-board")).toHaveCount(0);
@@ -1168,7 +1174,8 @@ test.describe("Pins on the sheet", () => {
       b.scrollTop = 400;
       b.scrollLeft = 150;
     });
-    await page.waitForTimeout(200);
+    // (Measured once what the scroll moves is placed: its frames, not a time)
+    await settled(page);
     const view = await board.evaluate((b) => {
       const r = b.getBoundingClientRect();
       const s = getComputedStyle(b);
@@ -1183,7 +1190,7 @@ test.describe("Pins on the sheet", () => {
     await board.evaluate((b) => {
       b.scrollTop = b.scrollHeight;
     });
-    await page.waitForTimeout(200);
+    await settled(page);
     const table = (await drawn.boundingBox())!;
     const head = (await drawn.locator("thead").boundingBox())!;
     expect(head.y + head.height).toBeLessThanOrEqual(table.y + table.height + 1);

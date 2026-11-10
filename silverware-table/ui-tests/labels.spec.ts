@@ -1,6 +1,6 @@
 // A named table's tab with its name at its top right corner (the tableLabels module), in the page and on the sheet
 import type { Locator, Page } from "@playwright/test";
-import { cell, expect, hoverCell, openPage, setOtherPage, setPage, table, tableIcon, target, test } from "./helpers.ts";
+import { cell, expect, hoverCell, openPage, setOtherPage, setPage, settled, stableBox, table, tableIcon, target, test } from "./helpers.ts";
 
 const filler = (lines: number) => Array.from({ length: lines }, (_, i) => `Line ${i + 1}.`).join("\n\n");
 // Text above the tables for the page to scroll, not so much that SilverBullet's editor leaves them out of
@@ -76,7 +76,8 @@ test.describe("Table labels", () => {
       scroller.scrollTop += t.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 120;
     });
     await expect(labels(page)).toHaveText(["fruit", "codes"]);
-    expect(await onCorner(label(page, "fruit"), table(page, 0))).toEqual(ON);
+    // (Placed the frame after the scroll: waited for, as the page's other scrolls are)
+    await expect.poll(() => onCorner(label(page, "fruit"), table(page, 0))).toEqual(ON);
     await hoverCell(page, cell(page, 1, 0));
     await expect(labels(page)).toHaveText(["codes"]);
     await page.mouse.move(2, 2);
@@ -93,8 +94,10 @@ test.describe("Table labels", () => {
     });
     const tab = label(page, "fruit");
     await expect(tab).toHaveCount(1);
-    const box = (await tab.boundingBox())!;
-    const head = (await table(page, 0).locator("table tr").first().boundingBox())!;
+    // (Measured once placed after the scroll and resting: a point taken before it moved was beside the table)
+    await expect.poll(() => onCorner(tab, table(page, 0))).toEqual(ON);
+    const box = await stableBox(tab);
+    const head = await stableBox(table(page, 0).locator("table tr").first());
     const bar = page.locator(".swt-bar.swt-visible");
     // Over the tab, then elsewhere where it was and along the header's width: the table stays hovered, no tab
     for (const [x, y] of [
@@ -103,7 +106,9 @@ test.describe("Table labels", () => {
       [head.x + 4, head.y - 4],
     ] as const) {
       await page.mouse.move(x, y);
-      await page.waitForTimeout(400);
+      await expect(bar).toHaveCount(1);
+      // (Still so once what the move started is done: hovered, not shown for a moment)
+      await settled(page);
       await expect(bar).toHaveCount(1);
       await expect(labels(page)).toHaveText(["codes"]);
     }

@@ -5,6 +5,9 @@
 // answers, it prints READY, which Playwright waits for.
 //   SB_IMAGE  another image, e.g. ghcr.io/silverbulletmd/silverbullet:latest-slim
 //   SB_BIN    a silverbullet binary to run instead of Docker
+// On Windows without SB_BIN: SilverBullet's own release of the image's version
+// for Windows instead of Docker (none needed, nothing installed): downloaded
+// once into .cache/silverbullet/<version>/ (git ignores it), run from there.
 //   SW_SB_SERVERS  the servers, a JSON list of { port, space } (set by playwright.config.ts
 //             from scripts/silverbullet-servers.ts)
 //   SW_SB_LOGS  a folder each server's output is written to as well, server-<port>.log
@@ -20,12 +23,12 @@ const READY = "SilverBullet servers ready";
 
 const servers = JSON.parse(process.env.SW_SB_SERVERS ?? "[]");
 const image = process.env.SB_IMAGE || readFileSync(join(import.meta.dirname, "silverbullet", "Dockerfile"), "utf8").match(/^FROM\s+(\S+)/m)[1];
-const binary = process.env.SB_BIN;
 const logs = process.env.SW_SB_LOGS;
 if (!servers.length) {
   console.error("SW_SB_SERVERS is not set: the servers to start, a JSON list of { port, space }");
   process.exit(1);
 }
+const binary = process.env.SB_BIN || (process.platform === "win32" ? await releaseBinary(image) : undefined);
 if (logs) mkdirSync(logs, { recursive: true });
 
 out(
@@ -101,6 +104,30 @@ function start({ port, space }) {
     void stop().then(() => process.exit(code || 1));
   });
   return { port, server, exited };
+}
+
+/**
+ * SilverBullet's release for Windows of the image's version (its tag, `2.12.1-slim` → 2.12.1), the same SilverBullet as
+ * the tests run in Docker elsewhere: downloaded once from its GitHub release into .cache/silverbullet/<version>/, then
+ * taken from there. Windows' own tar (System32) reads the zip; Git's on the PATH would not
+ */
+async function releaseBinary(of) {
+  const version = /:(\d+\.\d+\.\d+)/.exec(of)?.[1];
+  if (!version) throw new Error(`No release of SilverBullet for the image ${of} (its tag is no version): set SB_BIN to a binary`);
+  const folder = join(import.meta.dirname, "..", ".cache", "silverbullet", version);
+  const exe = join(folder, "silverbullet.exe");
+  if (existsSync(exe)) return exe;
+  mkdirSync(folder, { recursive: true });
+  const url = `https://github.com/silverbulletmd/silverbullet/releases/download/${version}/silverbullet-server-windows-x86_64.zip`;
+  out(`SilverBullet ${version}: downloading ${url}\n`);
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`SilverBullet ${version} could not be downloaded (${response.status}): set SB_BIN to a binary`);
+  const zip = join(folder, "server.zip");
+  writeFileSync(zip, Buffer.from(await response.arrayBuffer()));
+  execFileSync(join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe"), ["-xf", zip, "-C", folder]);
+  rmSync(zip, { force: true });
+  if (!existsSync(exe)) throw new Error(`SilverBullet ${version}'s release holds no silverbullet.exe: set SB_BIN to a binary`);
+  return exe;
 }
 
 /** Waits for a server to answer its ping */

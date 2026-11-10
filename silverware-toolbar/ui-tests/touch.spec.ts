@@ -87,8 +87,10 @@ test.describe("The toolbar on a phone", () => {
   test("shown as soon as you write, nothing selected: its buttons the formats around the cursor; it stays as you type, goes as the text is left", async ({ page }) => {
     const line = await lineBox(page, "Select some text");
     await page.touchscreen.tap(line.x + 4, line.y + line.height / 2);
-    await caret(page, "bold**", 2);
+    // (The tap done first, the editor focused and the toolbar docked for it: a caret put before put back by the tap's own)
+    await expect(page.locator(".cm-content")).toBeFocused();
     await expect(bar(page)).toHaveClass(/swb-docked/);
+    await caret(page, "bold**", 2);
     await expect(barButton(page, "formats.bold")).toHaveAttribute("aria-pressed", "true");
     await caret(page, "Plain paragraph one", 3);
     await expect(barButton(page, "formats.bold")).toHaveAttribute("aria-pressed", "false");

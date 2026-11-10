@@ -381,8 +381,16 @@ export class PeekPanel {
     return handle;
   }
 
-  /** Whether what is drawn anew is being edited (a value's editor open, the name changed): the panel's drawing put off until it is not */
+  // A property's row being dragged by its grip: the list it is dragged in is the drag's, drawn anew only once it is let go
+  private dragging = false;
+
+  /**
+   * Whether what is drawn anew is being edited (a value's editor open, the name changed) or a row of it dragged: the panel's
+   * drawing put off until it is not (a change told meanwhile, the item's page indexed anew after a write, drew the list anew
+   * under the drag, which then held a list gone: it stopped scrolling the box)
+   */
   private drawingPutOff(): boolean {
+    if (this.dragging) return true;
     const active = this.host.document.activeElement;
     return this.editing() && !(active instanceof HTMLElement && active.matches(".swd-peek-body"));
   }
@@ -669,6 +677,7 @@ export class PeekPanel {
       // (No focus moved yet: a field being edited is written, and the panel drawn anew, only once the row is let go)
       event.preventDefault();
       const before = keysOf();
+      this.dragging = true;
       reorder(event, {
         element: row,
         base: "swd-props",
@@ -676,7 +685,19 @@ export class PeekPanel {
         flow: "block",
         containers: () => [list],
         items: (container) => [...container.querySelectorAll<HTMLElement>(":scope > .swd-peek-row")],
-        done: (to) => (to ? moveTo(to.index, before) : this.draw()),
+        done: (to) => {
+          this.dragging = false;
+          // (Moved: written, then followed. Not: the list as it was, and a change told meanwhile read and drawn now)
+          if (to) {
+            shown.stale = false;
+            return moveTo(to.index, before);
+          }
+          this.draw();
+          if (shown.stale && this.shown === shown && !this.drawingPutOff()) {
+            shown.stale = false;
+            void this.follow();
+          }
+        },
       });
     });
     grip.addEventListener("keydown", (event) => {

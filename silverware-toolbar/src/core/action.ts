@@ -30,6 +30,10 @@ export type ActionEditor = {
   select(from: number, to: number): void;
   // The on-screen keyboard hidden, the selection kept (core/keyboard.ts)
   hideKeyboard(): void;
+  // Text written over from..to as one edit, the caret after it
+  write(from: number, to: number, text: string): Promise<void>;
+  // The editor's completion started at the caret, as typing starts it (SilverBullet's slash commands after a "/")
+  startCompletion(): Promise<void>;
 };
 
 /**

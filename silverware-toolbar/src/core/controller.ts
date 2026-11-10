@@ -440,6 +440,14 @@ export class Controller {
       select: (from, to) => void bridge.setSelection(from, to),
       // (The selection set again once the keyboard has gone: a phone may drop it as it goes)
       hideKeyboard: () => hideKeyboard(pageContentOf(this.doc.activeElement) ?? this.doc.querySelector<HTMLElement>(CONTENT_SELECTOR), () => void bridge.setSelection(context.from, context.to)),
+      write: async (from, to, text) => {
+        await bridge.replaceRange(from, to, text);
+        await bridge.setSelection(from + text.length, from + text.length);
+      },
+      startCompletion: async () => {
+        if (!bridge.startCompletion) throw missing("startCompletion");
+        await bridge.startCompletion();
+      },
     };
     try {
       await action.perform!(context, editor);

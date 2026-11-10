@@ -43,7 +43,7 @@ describe("Custom actions", () => {
 
   it("perform: something done with the context and the editor's API, awaited; its failure named; not with edit too", async () => {
     const done: string[] = [];
-    const editor: ActionEditor = { invokeCommand: async (name) => void done.push(`command ${name}`), navigate: async (page) => void done.push(`open ${page}`), flash: () => {}, select: () => {}, hideKeyboard: () => {} };
+    const editor: ActionEditor = { invokeCommand: async (name) => void done.push(`command ${name}`), navigate: async (page) => void done.push(`open ${page}`), flash: () => {}, select: () => {}, hideKeyboard: () => {}, write: async () => {}, startCompletion: async () => {} };
     const { actions, problems } = actionsOf([
       { name: "open", label: "Open selected", listed: false, perform: async (c: Context, e: ActionEditor) => e.navigate(c.text.slice(c.from, c.to)) },
       { name: "both", label: "Both", edit: () => undefined, perform: () => undefined },
@@ -79,7 +79,7 @@ describe("Custom actions", () => {
 
   it("offer choices that are any actions, nothing of formats: one editing, one running a command (a Space Lua one too), as the library page's example", async () => {
     const run: string[] = [];
-    const editor: ActionEditor = { invokeCommand: async (name) => void run.push(name), navigate: async () => {}, flash: () => {}, select: () => {}, hideKeyboard: () => {} };
+    const editor: ActionEditor = { invokeCommand: async (name) => void run.push(name), navigate: async () => {}, flash: () => {}, select: () => {}, hideKeyboard: () => {}, write: async () => {}, startCompletion: async () => {} };
     const { actions, problems } = actionsOf({
       name: "tools",
       label: "Tools",

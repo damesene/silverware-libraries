@@ -28,6 +28,8 @@ export type Bridge = {
   readonly invokeCommand?: (name: string) => unknown;
   // Optional, for actions that open a page: editor.navigate
   readonly navigate?: (page: string) => unknown;
+  // Optional, for the slash module: the editor's completion started at the caret (editor.startCompletion)
+  readonly startCompletion?: () => unknown;
   // Optional: one of SilverBullet's UI options (editor.getUiOption: `keyboardBar`, its bar over the on-screen keyboard)
   readonly getUiOption?: (key: string) => unknown;
 };
@@ -40,16 +42,17 @@ export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
 }
 
 /** The modules: the parts that can be turned off with `silverware.toolbar.modules.<name>.enabled` (default on) */
-export const MODULE_NAMES = ["inline", "blocks", "clear", "commands", "keyboard", "gestures", "snippets", "emoji"] as const;
+export const MODULE_NAMES = ["inline", "blocks", "clear", "commands", "slash", "keyboard", "gestures", "snippets", "emoji"] as const;
 export type ModuleName = (typeof MODULE_NAMES)[number];
 
 /** A module's name and what it does, as the settings dialog shows them (the init page's config.define says the same) */
-export const MODULE_LABELS: Readonly<Record<ModuleName, string>> = { inline: "Inline formats", blocks: "Turn into", clear: "Clear formatting", commands: "Commands", keyboard: "Hide the keyboard", gestures: "Gestures", snippets: "Snippets", emoji: "Emoji" };
+export const MODULE_LABELS: Readonly<Record<ModuleName, string>> = { inline: "Inline formats", blocks: "Turn into", clear: "Clear formatting", commands: "Commands", slash: "Slash commands", keyboard: "Hide the keyboard", gestures: "Gestures", snippets: "Snippets", emoji: "Emoji" };
 export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
   inline: "Bold, italic, strikethrough, highlight, code, links and wiki links.",
   blocks: "Turn lines into a paragraph, a heading, a list, a task or a quote.",
   clear: "Remove the inline formats of the selection.",
   commands: "Every SilverBullet command, found by typing its name in the list of every action, and as a favourite.",
+  slash: "An action opening SilverBullet's slash commands at the cursor, as typing / does (a phone's keyboard has / a page away).",
   keyboard: "On a phone or tablet: an action hiding the on-screen keyboard, the selection kept as it is (to see more of the page while you format it).",
   gestures: "A gesture button among the favourites: two actions in one, a click runs the first, swiping it up the second.",
   emoji: "An action picking an emoji to write at the cursor, found by its name and keywords.",

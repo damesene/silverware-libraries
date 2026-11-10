@@ -121,6 +121,7 @@ config.define("silverware.toolbar", {
         blocks = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Turn lines into a paragraph, a heading, a list, a task or a quote.", ui = { category = "Silverware Toolbar", label = "Turn into", priority = 0.8 } } } },
         clear = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Remove the inline formats of the selection.", ui = { category = "Silverware Toolbar", label = "Clear formatting", priority = 0.6 } } } },
         commands = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "Every SilverBullet command, found by typing its name in the list of every action, and as a favourite.", ui = { category = "Silverware Toolbar", label = "Commands", priority = 0.5 } } } },
+        slash = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "An action opening SilverBullet's slash commands at the cursor, as typing / does (a phone's keyboard has / a page away).", ui = { category = "Silverware Toolbar", label = "Slash commands", priority = 0.45 } } } },
         keyboard = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "On a phone or tablet: an action hiding the on-screen keyboard, the selection kept as it is (to see more of the page while you format it).", ui = { category = "Silverware Toolbar", label = "Hide the keyboard", priority = 0.4 } } } },
         emoji = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "An action picking an emoji to write at the cursor, found by its name and keywords.", ui = { category = "Silverware Toolbar", label = "Emoji", priority = 0.1 } } } },
         snippets = { type = "object", additionalProperties = false, properties = { enabled = { type = "boolean", default = true, description = "A text snippet among the favourites: a button of your own character (an emoji too) and label writing your text at the cursor, {s} in it the text selected, {c} where the cursor goes.", ui = { category = "Silverware Toolbar", label = "Snippets", priority = 0.2 } } } },
@@ -165,6 +166,8 @@ if js and js.window then
     invokeCommand = editor.invokeCommand,
     -- Actions that open a page (custom ones' perform)
     navigate = editor.navigate,
+    -- The slash module: SilverBullet's completion started at the cursor (its slash commands after a "/")
+    startCompletion = editor.startCompletion,
     -- Whether SilverBullet's keyboard bar is on (the settings offer to turn it off on a phone)
     getUiOption = editor.getUiOption,
   })

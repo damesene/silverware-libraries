@@ -12,6 +12,7 @@ import { emojiModule } from "./modules/emoji.ts";
 import { gesturesModule } from "./modules/gestures.ts";
 import { inlineModule } from "./modules/inline.ts";
 import { keyboardModule } from "./modules/keyboard.ts";
+import { slashModule } from "./modules/slash.ts";
 import { snippetsModule } from "./modules/snippets.ts";
 
 const FACTORIES: readonly (readonly [ModuleName, (host: ModuleHost) => ToolbarModule])[] = [
@@ -19,6 +20,7 @@ const FACTORIES: readonly (readonly [ModuleName, (host: ModuleHost) => ToolbarMo
   ["clear", clearModule],
   ["blocks", blocksModule],
   ["commands", commandsModule],
+  ["slash", () => slashModule()],
   ["keyboard", keyboardModule],
   ["gestures", gesturesModule],
   ["snippets", snippetsModule],

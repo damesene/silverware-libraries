@@ -38,6 +38,8 @@ export const ICONS = {
   chevronDown: svg('<path d="m6 9 6 6 6-6"/>'),
   back: svg('<path d="M19 12H5M11 6l-6 6 6 6"/>'),
   search: svg('<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/>'),
+  // A slash in a box: SilverBullet's slash commands
+  slash: svg('<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M14.5 7 9.5 17"/>'),
   keyboardHide: svg('<rect x="3" y="4" width="18" height="10" rx="2"/><path d="M7 8h.01M11 8h.01M15 8h.01M7 11h10M9 18l3 3 3-3"/>'),
   // A button and a finger's swipe up: the gesture button
   gesture: svg('<rect x="3" y="12" width="18" height="9" rx="2"/><path d="M12 9V3M9 6l3-3 3 3"/>'),

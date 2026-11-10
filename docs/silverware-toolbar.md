@@ -585,3 +585,17 @@ pointer or keys, UI tests (`npm run test:ui`):
      `readPage`, `saveConfigPage`, `reloadUI`, `confirm`. The playground
      gets a *Settings* button and a store, as the table's playground has.
 3. Then step 6 (the user, in a live SilverBullet) and step 7.
+
+### Slash commands from the toolbar (2026-11-10)
+
+Asked by the user: SilverBullet's slash commands from the toolbar, as a
+phone's keyboard has "/" a page away. A snippet writing "/" did not do it: a
+"/" written through the editor's API opens no completion (CodeMirror starts
+it on typing). So an action of a module of its own (`slash`, off with
+`silverware.toolbar.modules.slash.enabled`): `actions.slashCommands` writes
+"/" at the selection's end (`ActionEditor.write`, one edit, the caret after
+it), a space before it where SilverBullet's `slashCommandRegexp`
+(`([^\w:]|^)\/[\w#-]*`, client/plugos/hooks/slash_command.ts of 2.12.1)
+would not match, and starts the completion (`ActionEditor.startCompletion`,
+`editor.startCompletion`, a syscall of 2.12.1). The selection is kept, "/"
+after it, as replacing the text selected would lose it.

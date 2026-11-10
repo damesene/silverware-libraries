@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
 import { DatabaseCore } from "../../core/core.ts";
-import { DatabasePlace, FILTER_TYPED_MS, VIEW_KEY } from "../../core/place.ts";
+import { DatabasePlace, VIEW_KEY } from "../../core/place.ts";
 import { ViewRegistry } from "../../core/views.ts";
 import { inRankOrder } from "../../domain/rank.ts";
 import { TypeRegistry } from "../../domain/types/registry.ts";
@@ -477,7 +477,7 @@ describe("a property hidden in the views", () => {
 });
 
 describe("the place's tools", () => {
-  it("applies a filter as it is typed, a moment after the last key, without Enter; one that does not read not applied", async () => {
+  it("shows a filter as it is typed, nothing written, and keeps it once the field is left; one that does not read neither", async () => {
     const { q, all, viewState } = await setup("table");
     q<HTMLButtonElement>(".swd-filter-button").click();
     const name = q<HTMLInputElement>('.swd-filter input[data-key="name"]');
@@ -485,18 +485,29 @@ describe("the place's tools", () => {
       name.value = text;
       name.dispatchEvent(new Event("input", { bubbles: true }));
     };
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
+    name.focus();
     type("F");
     type("Fi");
-    // (Not yet: keys still coming)
-    await new Promise((resolve) => setTimeout(resolve, FILTER_TYPED_MS / 2));
-    expect(viewState.get("table.filter")).toBeUndefined();
-    await new Promise((resolve) => setTimeout(resolve, FILTER_TYPED_MS + 50));
-    expect(viewState.get("table.filter")).toEqual({ name: "Fi" });
-    expect(all("tbody tr")).toHaveLength(1);
+    // Shown at once, written not yet (a write draws the block anew, the field with it)
+    await settle();
+    expect([all("tbody tr").length, viewState.get("table.filter"), viewState.writes]).toEqual([1, undefined, 0]);
+    // Left: kept, once
+    name.blur();
+    await settle();
+    expect([viewState.get("table.filter"), viewState.writes]).toEqual([{ name: "Fi" }, 1]);
+    // One that does not read: marked, the view as kept, nothing written as it is left
+    name.focus();
     type("/unclosed(/");
-    await new Promise((resolve) => setTimeout(resolve, FILTER_TYPED_MS + 50));
-    expect(viewState.get("table.filter")).toEqual({ name: "Fi" });
-    expect(name.classList.contains("swd-invalid")).toBe(true);
+    name.blur();
+    await settle();
+    expect([viewState.get("table.filter"), name.classList.contains("swd-invalid"), all("tbody tr").length]).toEqual([{ name: "Fi" }, true, 1]);
+    // Typed back to what is kept and left: nothing written
+    name.focus();
+    type("Fi");
+    name.blur();
+    await settle();
+    expect(viewState.writes).toBe(1);
   });
 
   it("filter, sort and undo for the view shown, kept in its own state", async () => {

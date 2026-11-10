@@ -6,7 +6,7 @@ import { MemoryStore } from "../store/memory.ts";
 import { MemoryViewState } from "../store/viewstate.ts";
 import { DatabaseCore } from "./core.ts";
 import type { OpenedFrom } from "./module.ts";
-import { DatabasePlace, FILTER_TYPED_MS, type PlaceKept, VIEW_KEY, viewSettingPath } from "./place.ts";
+import { DatabasePlace, type PlaceKept, VIEW_KEY, viewSettingPath } from "./place.ts";
 import type { ViewDefinition, ViewHost } from "./view.ts";
 import { ViewRegistry } from "./views.ts";
 
@@ -497,25 +497,26 @@ describe("a place", () => {
     expect(document.activeElement).toBe([...second.querySelectorAll<HTMLElement>(".swd-group-row")].find((row) => row.dataset.group === 'value:"Todo"')!.querySelector(".swd-group-eye"));
     // Closed by the user: the place after it opens nothing
     second.querySelector(".swd-menu [role=menu]")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
-    // A filter typed, written after a pause, then more typed before the block is drawn anew: the next place has it all,
-    // the panel open, the focus and the caret in the field, and applies it; the place before writes nothing more
+    // A filter typed (shown, nothing written while it is typed in), the block drawn anew meanwhile (a write of another
+    // part of it): the next place has it all, the panel open, the focus and the caret in the field, shown as typed, and
+    // keeps it once the field is left; the place before writes nothing
     second.querySelector<HTMLButtonElement>(".swd-filter-button")!.click();
     const field = second.querySelector<HTMLInputElement>('.swd-filter input[data-key="name"]')!;
     field.focus();
-    field.value = "F";
-    field.dispatchEvent(new Event("input", { bubbles: true }));
-    await new Promise((resolve) => setTimeout(resolve, FILTER_TYPED_MS + 30));
-    expect(viewState.get("table.filter")).toEqual({ name: "F" });
     field.value = "Fi";
     field.setSelectionRange(1, 1);
     field.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(viewState.get("table.filter")).toBeUndefined();
     second.remove();
     const third = await next();
     expect(third.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(true);
     expect(third.querySelector<HTMLElement>(".swd-filter")!.hidden).toBe(false);
     const typed = third.querySelector<HTMLInputElement>('.swd-filter input[data-key="name"]')!;
     expect([typed.value, document.activeElement === typed, typed.selectionStart]).toEqual(["Fi", true, 1]);
-    await new Promise((resolve) => setTimeout(resolve, FILTER_TYPED_MS + 30));
+    expect(viewState.get("table.filter")).toBeUndefined();
+    typed.blur();
+    await new Promise((resolve) => setTimeout(resolve, 10));
     expect(viewState.get("table.filter")).toEqual({ name: "Fi" });
     expect(typed.value).toBe("Fi");
     third.remove();

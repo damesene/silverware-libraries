@@ -1157,8 +1157,10 @@ test("full screen through writes of its block: a filter typed, the place drawn a
     return seen;
   });
   await page.keyboard.type("Fix", { delay: 40 });
-  await expect.poll(() => space.saved("Page")).toContain("Fix");
   await expect(page.locator(".swd-table tbody tr")).toHaveCount(1);
+  // Kept by Enter: the block written and drawn anew, still over the window, the field focused for more
+  await page.keyboard.press("Enter");
+  await expect.poll(() => space.saved("Page")).toContain("Fix");
   await expect(page.locator(".swd-place")).toHaveClass(/swd-over-window/);
   await expect(name).toBeFocused();
   expect(await page.evaluate(() => (window as unknown as { inPage: number }).inPage)).toBe(0);
@@ -1169,39 +1171,28 @@ test("full screen through writes of its block: a filter typed, the place drawn a
   await expect(page.locator(".swd-place")).not.toHaveClass(/swd-over-window/);
 });
 
-test("a filter is applied as it is typed, without Enter, the typing going on as the block is written and drawn anew", async ({ page, space }) => {
+test("a filter is applied as it is typed, nothing written while it is typed in, kept by Enter or as the field is left; no key lost", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
   await expect(page.locator(".swd-table tbody tr")).toHaveCount(2);
+  const written = await space.saved("Page");
   await page.locator(".swd-filter-button").click();
   const name = page.locator('.swd-filter input[data-key="name"]');
   await name.click();
-  await page.keyboard.type("Fix", { delay: 40 });
-  await expect.poll(() => space.saved("Page")).toContain("Fix");
-  await expect(page.locator(".swd-table tbody tr")).toHaveCount(1);
-  // The block written and drawn anew: the panel open, the field focused, the caret at its end: what is typed goes on there
-  await expect(name).toBeFocused();
-  await page.keyboard.type(" lo", { delay: 40 });
-  await expect.poll(() => space.saved("Page")).toContain("Fix lo");
-  await expect(name).toHaveValue("Fix lo");
-  await expect(page.locator(".swd-table tbody tr")).toHaveCount(1);
-  await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);
-  // Typed fast, past several writes: nothing typed lost, nothing of it in the page's text but the block's condition
-  await name.press("End");
-  await page.keyboard.type("gin and more words typed quickly", { delay: 15 });
-  await expect.poll(() => space.saved("Page")).toContain("Fix login and more words typed quickly");
-  await expect(name).toHaveValue("Fix login and more words typed quickly");
-  // A pause just long enough for a write, then keys at once, as the block is drawn anew: none of them lost
-  for (const key of ["!", "?"]) {
-    await page.keyboard.type(key);
-    await page.waitForTimeout(330);
-  }
-  await page.keyboard.type("#");
-  await expect.poll(() => space.saved("Page")).toContain("typed quickly!?#");
+  // Shown as it is typed, fast: every key in the field, the view filtered, the block not written (a write draws it anew,
+  // the field with it: keys typed meanwhile were lost)
+  await page.keyboard.type("Fix login and more words typed quickly!?#", { delay: 15 });
   await expect(name).toHaveValue("Fix login and more words typed quickly!?#");
+  await expect(page.locator(".swd-table tbody tr")).toHaveCount(0);
+  expect(await space.saved("Page")).toBe(written);
+  // Kept by Enter, once: the block drawn anew, the panel open, the field focused, the caret at its end, typing going on there
+  await page.keyboard.press("Enter");
+  await expect.poll(() => space.saved("Page")).toContain('table.filter: {"name":"Fix login and more words typed quickly!?#"}');
   await expect(name).toBeFocused();
-  await page.keyboard.press("Backspace");
-  await page.keyboard.press("Backspace");
-  await page.keyboard.press("Backspace");
+  await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);
+  for (let n = 0; n < 3; n++) await page.keyboard.press("Backspace");
+  await expect(name).toHaveValue("Fix login and more words typed quickly");
+  // Kept as the field is left
+  await page.locator(".swd-place-count").click();
   await expect.poll(() => space.saved("Page")).toBe('# Page\n\n```silverware-database\nid: tasks\nview: table\ntable.filter: {"name":"Fix login and more words typed quickly"}\n```\n');
 });
 

@@ -376,7 +376,7 @@ test.describe("Settings of an older model", () => {
     await expect(bar(page).locator(".swb-dock-pinned-left [data-swb-action]")).toHaveAttribute("data-swb-action", "actions.turnInto");
     await expect(bar(page).locator(".swb-dock-items .swb-divider")).toHaveCount(1);
     const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem("silverware.toolbar.playground.settings") ?? "{}"));
-    await expect.poll(async () => (await stored())["silverware.toolbar.settings-version"]).toBe(2);
+    await expect.poll(async () => (await stored())["silverware.toolbar.version"]).toBe(2);
     expect((await stored())["silverware.toolbar.favorites-touch"]).toEqual([[rows[0]![0], ...rows[1]!, { type: "separator" }, ...rows[2]!]]);
   });
 });

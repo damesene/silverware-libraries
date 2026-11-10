@@ -98,8 +98,8 @@ describe("Settings", () => {
     const rows = [[{ id: "formats.bold" }], [{ id: "formats.code" }]];
     const old = await readSettings(bridge({ "silverware.toolbar.favorites-touch": rows }));
     expect(old.touchFavorites).toEqual([[{ id: "formats.bold" }, { type: "separator" }, { id: "formats.code" }]]);
-    expect(old.migrated).toEqual({ "silverware.toolbar.favorites-touch": old.touchFavorites, "silverware.toolbar.settings-version": 2 });
-    const now = await readSettings(bridge({ "silverware.toolbar.favorites-touch": rows, "silverware.toolbar.settings-version": 2 }));
+    expect(old.migrated).toEqual({ "silverware.toolbar.favorites-touch": old.touchFavorites, "silverware.toolbar.version": 2 });
+    const now = await readSettings(bridge({ "silverware.toolbar.favorites-touch": rows, "silverware.toolbar.version": 2 }));
     expect([now.touchFavorites, now.migrated]).toEqual([rows, {}]);
   });
 

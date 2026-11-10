@@ -4,14 +4,14 @@
 // settings by their paths only and gives what to write, so adding one is a
 // file and a line, and removing one (once no space can have its older model)
 // is taking that line and its file out. The model's version is
-// `silverware.toolbar.settings-version`: a migration runs where the space's
+// `silverware.toolbar.version`: a migration runs where the space's
 // is lower than its own, and the changes are written back with the version,
 // so what is set in the new model is never migrated again. A space that set
 // nothing has nothing to migrate: nothing is written.
 import { touchRowsJoined } from "./2-touch-rows-joined.ts";
 
 /** The setting holding the model's version (not set: 1, the model before any migration) */
-export const VERSION_PATH = "silverware.toolbar.settings-version";
+export const VERSION_PATH = "silverware.toolbar.version";
 
 /** A setting as configured, by its path (undefined: not set) */
 export type ReadSetting = (path: string) => Promise<unknown>;

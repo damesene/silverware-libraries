@@ -616,7 +616,7 @@ What a space wrote before would change its look (several rows: several
 lines), so the user asked for a migration, kept apart and easy to add to or
 take out: `src/migrations/`, a file per migration named by its version, a
 list in `index.ts`, each reading settings by path and giving what to write.
-The model's version is `silverware.toolbar.settings-version` (not set: 1);
+The model's version is `silverware.toolbar.version` (not set: 1);
 a migration runs where the space's is lower, the toolbar reads the result
 (`Settings.migrated`) and writes it back with the version once
 (`writeMigrated`), and the settings dialog writes the version with any

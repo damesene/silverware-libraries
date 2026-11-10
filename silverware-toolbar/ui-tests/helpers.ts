@@ -56,7 +56,7 @@ const favoriteSettings = (favorites: Favorites) => ({
   "silverware.toolbar.favorites": favorites,
   "silverware.toolbar.favorites-touch": favorites,
   "silverware.toolbar.favorites-touch-enabled": false,
-  "silverware.toolbar.settings-version": SETTINGS_VERSION,
+  "silverware.toolbar.version": SETTINGS_VERSION,
 });
 
 /** Tests get `page` with the toolbar's sample open and the favourites asked for; an error in the page (thrown or logged) fails the test */
@@ -81,8 +81,8 @@ export const test = base.extend<{ favorites: Favorites | null }>({
         await writeFile(path, sample);
         // The favourites in the toolbar's own block, the rest in the Configuration Manager's: as the settings save them
         if (favorites) {
-          const { "silverware.toolbar.favorites-touch-enabled": enabled, "silverware.toolbar.settings-version": version, ...tables } = favoriteSettings(favorites);
-          await writeFile(config, withConfigSettings(withConfigSettings("", tables, OWN_MARKER), { "silverware.toolbar.favorites-touch-enabled": enabled, "silverware.toolbar.settings-version": version }));
+          const { "silverware.toolbar.favorites-touch-enabled": enabled, "silverware.toolbar.version": version, ...tables } = favoriteSettings(favorites);
+          await writeFile(config, withConfigSettings(withConfigSettings("", tables, OWN_MARKER), { "silverware.toolbar.favorites-touch-enabled": enabled, "silverware.toolbar.version": version }));
         }
         await watchReloads(page);
         await page.goto(`/${name}`);

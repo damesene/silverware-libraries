@@ -68,7 +68,7 @@ config.define("silverware.toolbar", {
       ui = { category = "Silverware Toolbar", label = "Favourite actions for touch", priority = 1.9 },
     },
     -- No default: left out, the settings are of the first model (1), which the toolbar migrates (its migrations/)
-    ["settings-version"] = {
+    version = {
       type = "number",
       description = "The version of the model the toolbar's settings are written in: settings of an older one are migrated once and written back with it. The settings dialog writes it; set it yourself (2) with favourites you write by hand.",
     },

@@ -101,7 +101,7 @@ describe("The settings dialog's saving", () => {
     document.querySelector<HTMLElement>(".swb-settings-save")!.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(saved?.["silverware.toolbar.favorites-touch"]).toEqual([[{ id: "formats.bold" }, { type: "separator" }, { id: "formats.code" }]]);
-    expect(saved?.["silverware.toolbar.settings-version"]).toBe(2);
+    expect(saved?.["silverware.toolbar.version"]).toBe(2);
     dialog.close();
   });
 });

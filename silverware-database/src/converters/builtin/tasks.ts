@@ -8,7 +8,7 @@
 // values), mentions People, wiki links Links, hashtags the page's tags; shown
 // first on a board by Status. Read as SilverBullet reads markdown
 // (shared/markdown/); tasks in fenced code are none.
-import { hashtagOf, type InlineMark, inlineMarks } from "../../../../shared/markdown/inline.ts";
+import { escapedAttributes, hashtagOf, type InlineMark, inlineMarks } from "../../../../shared/markdown/inline.ts";
 import { indentWidth, nextFence } from "../../../../shared/markdown/lines.ts";
 import { readAttributeValue, readTaskLine, type TaskLine, validateTaskState, writeAttribute, writeTaskLine } from "../../../../shared/markdown/task.ts";
 import type { Converted, ConvertedItem, ConvertedProperty, ConverterDefinition } from "../../core/converter.ts";
@@ -174,7 +174,7 @@ function read(text: string): Converted | undefined {
       byItem.set(at, was ? joined(was, value) : value);
     }
     const body = dedented(under);
-    items.push({ name: nameOf(task.text, marks), values, ...(body ? { body } : {}), ...(tags.length ? { tags } : {}), source: task.text.trim() });
+    items.push({ name: nameOf(task.text, marks), values, ...(body ? { body } : {}), ...(tags.length ? { tags } : {}), source: escapedAttributes(task.text.trim()) });
   });
   // (Done last: the states of its own met between In progress and it)
   const options = [...states.filter((one) => one !== DONE_STATE), DONE_STATE];

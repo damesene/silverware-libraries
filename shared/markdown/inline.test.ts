@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type InlineMark, inlineMarks } from "./inline.ts";
+import { escapedAttributes, type InlineMark, inlineMarks } from "./inline.ts";
 
 const kinds = (line: string) => inlineMarks(line).map((mark) => `${mark.kind}:${mark.name}`);
 const at = (line: string, mark: InlineMark) => line.slice(mark.from, mark.to);
@@ -40,6 +40,15 @@ describe("inlineMarks", () => {
 
   it("finds nothing escaped, in inline code, a URL, HTML, a link's target or Space Lua", () => {
     expect(kinds(String.raw`\#no \@no ${"`"}#no${"`"} https://x.dev/#no <a href="#no"> [t](#no) ${"${"}x#no}`)).toEqual([]);
+  });
+
+  it("escapes a line's attributes, nothing else, so it reads as none", () => {
+    const backslash = String.fromCharCode(92);
+    const escaped = escapedAttributes("A [status: x] [[Link]] [a](b) [due: [1]] #t");
+    expect(escaped).toBe(`A ${backslash}[status: x] [[Link]] [a](b) ${backslash}[due: ${backslash}[1]] #t`);
+    expect(kinds(escaped)).toEqual(["link:Link", "tag:t"]);
+    // What a value holds stays no mark of its own once its attribute is none
+    for (const line of ["[a: [b: c]]", "[a: #t]", "[who: @ada]", "[a: [[X]]]", "[a: `b`]"]) expect(kinds(escapedAttributes(line)), line).toEqual([]);
   });
 
   it("reads a tag in < > and from where it is asked", () => {

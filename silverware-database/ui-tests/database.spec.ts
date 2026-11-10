@@ -539,7 +539,8 @@ test("Convert selection to database makes a database of the tasks selected, its 
   await expect.poll(() => editorText(page)).toBe(`# Page\n\n${tasks}\n${block}\nAfter\n`);
   await expect(page.locator(".swd-view-picker")).toHaveAttribute("data-view", "board");
   await expect.poll(() => space.saved("Page/db-calls/Send the offer")).toMatch(/^---\ntags: \[db, sales\]\nstatus: Done\n/);
-  expect(await space.saved("Page/db-calls/Call")).toContain("Call @ada [due: 2026-11-12]\n\n- [ ] Prepare notes");
+  // (The task's text first in the item's, its attribute escaped: the page's own value is the frontmatter's)
+  expect(await space.saved("Page/db-calls/Call")).toContain("Call @ada \\[due: 2026-11-12]\n\n- [ ] Prepare notes");
   // The tasks still selected: Delete takes them away, the block staying
   const selected = await page.evaluate(() => {
     const editor = (window as unknown as { client: { editorView: View } }).client.editorView;

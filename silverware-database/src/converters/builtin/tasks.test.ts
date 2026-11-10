@@ -26,7 +26,9 @@ describe("The tasks converter", () => {
 
   it("names an item by its text: attributes out, marks in a sentence words, marks at its end out", () => {
     const converted = read(["- [ ] Ask @jana about #budget [due: 2026-11-12] and [[Some Page|the page]] today #sales @ada [[Ref]]"]);
-    expect(converted.items[0]).toMatchObject({ name: "Ask jana about budget and the page today", source: "Ask @jana about #budget [due: 2026-11-12] and [[Some Page|the page]] today #sales @ada [[Ref]]", tags: ["budget", "sales"] });
+    // (The source with its attribute escaped: in the item's text it would give the page its value, over the frontmatter's)
+    const backslash = String.fromCharCode(92);
+    expect(converted.items[0]).toMatchObject({ name: "Ask jana about budget and the page today", source: `Ask @jana about #budget ${backslash}[due: 2026-11-12] and [[Some Page|the page]] today #sales @ada [[Ref]]`, tags: ["budget", "sales"] });
     expect(converted.items[0]!.values).toMatchObject({ people: ["jana", "ada"], links: ["[[Some Page]]", "[[Ref]]"], due: "2026-11-12" });
   });
 

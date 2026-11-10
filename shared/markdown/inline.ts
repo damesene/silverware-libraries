@@ -62,6 +62,18 @@ export function hashtagBefore(name: string, after: string): string {
   return START_TAG_RE.exec(tag + after)?.[0].length === tag.length ? tag : `#<${name}>`;
 }
 
+/**
+ * A line with its attributes escaped (`\[status: x]`): shown the same, read as no attribute. SilverBullet gives the
+ * attributes of a page's paragraph to the page, over its frontmatter's values (verified in 2.12.1, 2026-11-11). What
+ * an attribute's value holds is escaped too (`[`, `#`, `@`, a backtick): no longer in an attribute, it would read as a
+ * mark of its own (`[a: [b: c]]` an attribute `b`, `[who: @ada]` a mention)
+ */
+export function escapedAttributes(line: string): string {
+  return inlineMarks(line)
+    .filter((mark) => mark.kind === "attribute")
+    .reduceRight((text, mark) => `${text.slice(0, mark.from)}${text.slice(mark.from, mark.to).replace(/[[#@`]/g, (c) => `\\${c}`)}${text.slice(mark.to)}`, line);
+}
+
 /** Where a run of brackets opened at `at` closes (the index after its `]`), counting brackets inside; -1 where it does not */
 function closingBracket(text: string, at: number): number {
   let depth = 0;

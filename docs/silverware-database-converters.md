@@ -88,6 +88,16 @@ database to markdown, starts as *Copy as tasks* to the clipboard; a conversion i
   with its view, at the cursor.
 * This replaces what steps 4 and 5 say of **Done** below.
 
+## The task's text in the item's page: its attributes escaped (2026-11-11, the user's report)
+
+Verified in SilverBullet 2.12.1: an attribute in a paragraph of a page's body is given to the page, over its frontmatter's
+value (`status: In progress` in the frontmatter, `[status: in progress]` in the body: the index has `in progress`; with
+`\[status: in progress]`, the frontmatter's). The task's text put first in the item's page (`source`) had its attributes
+as written, so a status read ignoring case, a key made another or a value typed otherwise showed wrong (an option
+`in progress` none of Status's). The source is written with its attributes escaped (`shared/markdown/inline.ts`
+`escapedAttributes`): shown the same, read as no attribute. Lines under the task are the user's own text and are kept as
+written (a paragraph's attribute there still gives the page its value, as in any page).
+
 ## Probed in SilverBullet (2.12.1, 2026-11-10: a page written through `space.writePage`, its `task` objects read)
 
 * **A key given twice: the last wins** (`[prop: a] [prop: b]` → `prop: "b"`). Merging them into a list (*Decided*, 6)

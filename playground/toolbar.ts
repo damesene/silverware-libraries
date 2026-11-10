@@ -138,6 +138,13 @@ void init({
 
 document.getElementById("swb-settings")!.addEventListener("click", () => void openSettings());
 
+// The sample and the toolbar's settings as they start (its settings are read once it starts: the page loaded anew)
 document.getElementById("reset")!.addEventListener("click", () => {
-  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: sample } });
+  try {
+    localStorage.removeItem(STORE);
+    localStorage.removeItem(SETTINGS_STORE);
+  } catch {
+    // A private window: nothing kept to take back
+  }
+  location.reload();
 });

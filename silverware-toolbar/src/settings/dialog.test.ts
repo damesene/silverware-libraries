@@ -57,7 +57,7 @@ describe("The settings dialog's Favorites tab", () => {
     const favorites = [[{ type: "gesture", tap: { type: "snippet", icon: "💬" } }]];
     const dialog = new SettingsDialog({
       doc: document,
-      bridge: { ...bridge({}), getConfig: (path, fallback) => (path === "silverware.toolbar.favorites" ? favorites : fallback) },
+      bridge: { ...bridge({}), getConfig: (path, fallback) => (path === "silverware.toolbar.favorites" ? [{ name: "Mine", useFor: ["click", "touch"], rows: favorites }] : fallback) },
       actions: () => [],
       kinds,
       canSave: false,
@@ -65,7 +65,7 @@ describe("The settings dialog's Favorites tab", () => {
       saved: () => undefined,
     });
     await dialog.open();
-    const item = document.querySelector<HTMLElement>('[data-swb-panel="favorites"] [data-swb-item="0:0"]')!;
+    const item = document.querySelector<HTMLElement>('[data-swb-panel="toolbars"] [data-swb-item="0:0"]')!;
     const slot = item.querySelector<HTMLElement>('[data-swb-slot="tap"]')!;
     expect(item.title).toBe("Click: No text yet: the toolbar leaves it out");
     expect(slot.classList.contains("swb-settings-unknown")).toBe(true);
@@ -74,7 +74,7 @@ describe("The settings dialog's Favorites tab", () => {
     const field = document.querySelector<HTMLTextAreaElement>('[data-swb-look] [data-swb-field="text"] textarea')!;
     field.value = "%%{s}%%";
     field.dispatchEvent(new Event("input"));
-    const again = document.querySelector<HTMLElement>('[data-swb-panel="favorites"] [data-swb-item="0:0"]')!;
+    const again = document.querySelector<HTMLElement>('[data-swb-panel="toolbars"] [data-swb-item="0:0"]')!;
     expect(again.title).toBe("");
     expect(again.querySelector('[data-swb-slot="tap"]')!.classList.contains("swb-settings-unknown")).toBe(false);
     dialog.close();
@@ -82,26 +82,43 @@ describe("The settings dialog's Favorites tab", () => {
 });
 
 describe("The settings dialog's saving", () => {
-  it("writes what the migrations changed and the toolbar did not write back, with the version, as it saves any favourites", async () => {
+  it("writes the toolbars as { name, useFor, placement, show, rows } with the model's version, as it saves any", async () => {
     byFinger(false);
-    const touch = [[{ id: "formats.bold" }], [{ id: "formats.code" }]];
     let saved: Readonly<Record<string, unknown>> | undefined;
-    const dialog = new SettingsDialog({
-      doc: document,
-      bridge: { ...bridge({}), getConfig: (path, fallback) => (path === "silverware.toolbar.favorites-touch" ? touch : fallback) },
-      actions: () => [],
-      kinds: () => [],
-      canSave: true,
-      save: async (values) => void (saved = values),
-      saved: () => undefined,
-    });
+    const dialog = new SettingsDialog({ doc: document, bridge: bridge({}), actions: () => [], kinds: () => [], canSave: true, save: async (values) => void (saved = values), saved: () => undefined });
     await dialog.open();
-    // Click's: an item removed
-    document.querySelector<HTMLElement>('[data-swb-panel="favorites"] [data-swb-item="1:0"] .swb-settings-remove')!.click();
+    // Float (Click's, the one edited first): its first row's item removed
+    document.querySelector<HTMLElement>('[data-swb-panel="toolbars"] [data-swb-item="0:0"] .swb-settings-remove')!.click();
     document.querySelector<HTMLElement>(".swb-settings-save")!.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(saved?.["silverware.toolbar.favorites-touch"]).toEqual([[{ id: "formats.bold" }, { type: "separator" }, { id: "formats.code" }]]);
+    const lists = saved?.["silverware.toolbar.favorites"] as { name: string; useFor?: string[]; rows: unknown[] }[];
+    expect(lists.map((list) => [list.name, list.useFor])).toEqual([["Float", ["click"]], ["Docked", ["touch"]]]);
+    expect(lists[0]!.rows).toHaveLength(3);
     expect(saved?.["silverware.toolbar.version"]).toBe(2);
+    dialog.close();
+  });
+
+  it("makes, renames, uses and deletes lists: a new one used for nothing, a name taken refused, Click given to it, deleted back to the first", async () => {
+    byFinger(false);
+    let saved: Readonly<Record<string, unknown>> | undefined;
+    const confirm = () => true;
+    const dialog = new SettingsDialog({ doc: document, bridge: { ...bridge({}), confirm }, actions: () => [], kinds: () => [], canSave: true, save: async (values) => void (saved = values), saved: () => undefined });
+    await dialog.open();
+    const panel = () => document.querySelector('[data-swb-panel="toolbars"]')!;
+    panel().querySelector<HTMLElement>(".swb-settings-toolbar-new")!.click();
+    expect([...panel().querySelectorAll(".swb-settings-toolbar-tab-name")].map((tab) => tab.textContent)).toEqual(["Float", "Docked", "Toolbar"]);
+    const name = panel().querySelector<HTMLInputElement>(".swb-settings-toolbar-name")!;
+    name.value = "docked";
+    name.dispatchEvent(new Event("change"));
+    expect(panel().querySelector(".swb-settings-toolbar-problem")!.textContent).toBe("Another toolbar is named docked");
+    name.value = "Writing";
+    name.dispatchEvent(new Event("change"));
+    panel().querySelector<HTMLElement>('.swb-settings-toolbar-use[data-swb-use="click"]')!.click();
+    expect(panel().querySelector('.swb-settings-toolbar-use[data-swb-use="click"]')!.getAttribute("aria-pressed")).toBe("true");
+    document.querySelector<HTMLElement>(".swb-settings-save")!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const lists = saved?.["silverware.toolbar.favorites"] as { name: string; useFor?: string[] }[];
+    expect(lists.map((list) => [list.name, list.useFor])).toEqual([["Float", undefined], ["Docked", ["touch"]], ["Writing", ["click"]]]);
     dialog.close();
   });
 });
@@ -112,7 +129,7 @@ describe("The settings dialog's item panel", () => {
     const favorites = [[{ id: "formats.bold" }, { id: "formats.italic" }, { id: "formats.code" }]];
     const dialog = new SettingsDialog({
       doc: document,
-      bridge: { ...bridge({}), getConfig: (path, fallback) => (path === "silverware.toolbar.favorites" ? favorites : fallback) },
+      bridge: { ...bridge({}), getConfig: (path, fallback) => (path === "silverware.toolbar.favorites" ? [{ name: "Mine", useFor: ["click", "touch"], rows: favorites }] : fallback) },
       actions: () => [],
       kinds: () => [],
       canSave: false,
@@ -120,7 +137,7 @@ describe("The settings dialog's item panel", () => {
       saved: () => undefined,
     });
     await dialog.open();
-    const panel = () => document.querySelector('[data-swb-panel="favorites"]')!;
+    const panel = () => document.querySelector('[data-swb-panel="toolbars"]')!;
     // Code's panel: under it
     panel().querySelector<HTMLElement>('[data-swb-item="0:2"]')!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     expect(panel().querySelector("[data-swb-look]")?.getAttribute("data-swb-look")).toBe("0:2");

@@ -7,7 +7,7 @@ test.describe("The text snippet", () => {
     await barButton(page, "actions.more").click();
     await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
     const dialog = page.locator(".swb-settings");
-    await dialog.locator('[data-swb-tab="favorites"]').click();
+    await dialog.locator('[data-swb-tab="toolbars"]').click();
     await dialog.locator('[data-swb-row="1"] .swb-settings-add').click();
     await dialog.locator(".swb-settings-pick-field").fill("snippet");
     await page.keyboard.press("Enter");

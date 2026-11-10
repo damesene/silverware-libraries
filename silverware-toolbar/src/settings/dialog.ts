@@ -1,24 +1,28 @@
 // The settings dialog: the command "Silverware Toolbar: Settings" and the last
-// item of the popup of every action. Tabs General (the key), Favorites (the
-// toolbar's rows: items dragged within a row or into another, Alt+arrows with
-// the keyboard; an action shown as its icon or with its label; removed; added
-// from a search of every action, or a separator), Modules (each one's switch).
+// item of the popup of every action. Tabs General (the key, where and when the
+// toolbar shows, and which list of favourites, each way of working it apart),
+// Favorites (the lists of favourites, core/toolbars.ts: one edited at a time, named,
+// used for Click, Touch, both or neither, made, duplicated, deleted; its rows:
+// items dragged within a row or into another, Alt+arrows with the keyboard; an
+// action shown as its icon or with its label; removed; added from a search of
+// every action, or a separator), Modules (each one's switch).
 // It reads the configuration when it opens and writes nothing until Save; a
 // module or the key changed: Save and reload (modules are created and the
 // command defined when the toolbar starts). The shared dialog, tabs and
 // controls (shared/), in the table's settings' look (classes `swb-settings-*`).
-import { settingLabel, settingRow, switchControl } from "../../../shared/controls.ts";
+import { settingRow, switchControl } from "../../../shared/controls.ts";
 import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
-import { type Bridge, DEFAULT_SHORTCUT, type Device, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
+import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, SHOW_LABELS, SHOWS } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
-import { byTouch, DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type FavoriteItem, type Favorites, hasAction, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Pin, type Show as ItemShow, slotItemOf, slotOf, widthOf } from "../core/favorites.ts";
+import { byTouch, type FavoriteItem, type Favorites, hasAction, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Pin, type Show as ItemShow, slotItemOf, slotOf, widthOf } from "../core/favorites.ts";
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
+import { defaultToolbars, docks, type Toolbar, freeToolbarName, toolbarFor, MAX_TOOLBARS, useToolbarFor, validateToolbarName } from "../core/toolbars.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
 import { SETTINGS_VERSION } from "../migrations/index.ts";
 import { reorder } from "../../../shared/drag.ts";
-import { addItem, type At, moveItem, moveRow, pinOf, pinOrdered, placeItem, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setPin, setSlot, setSlotField, setSlotOwn, stepOf } from "./favorites.ts";
+import { addItem, type At, moveItem, moveRow, pinOf, pinOrdered, placeItem, removeItem, unpinnedOutOfOrder, removeRow, sameRows, savedRows, setLook, setOwn, setPin, setSlot, setSlotField, setSlotOwn, stepOf } from "./favorites.ts";
 
 // A zone of a row of Touch's own: its items pinned left, the others, those pinned right
 type Zone = "left" | "middle" | "right";
@@ -47,14 +51,9 @@ type Picking = { readonly row: number } | { readonly at: At; readonly key: strin
 
 type Values = {
   shortcut: string;
-  placement: Readonly<Record<Device, Placement>>;
-  show: Readonly<Record<Device, Show>>;
   wordAtCaret: boolean;
-  favorites: Favorites;
-  // Touch's own (the defaults for touch where not set); undefined: none, an invalid one (Click's show)
-  touchFavorites: Favorites | undefined;
-  // Whether Touch's own show; off, Click's do (its own kept)
-  touchOn: boolean;
+  // The lists of favourites, each way of working the toolbar used by one (core/toolbars.ts)
+  toolbars: readonly Toolbar[];
   modules: Record<ModuleName, boolean>;
 };
 
@@ -73,8 +72,10 @@ export class SettingsDialog {
   private picking: Picking | undefined;
   // The item whose look is being set (a panel under its row): its icon or label, the label's width
   private adjusting: (At & { readonly key?: string }) | undefined;
-  // The favourites edited: this device's first
-  private device: Device = "click";
+  // The list of favourites edited, by its index: the one this device uses first
+  private toolbarIndex = 0;
+  // A name typed for the list edited that cannot be its (said under its field), kept as typed while it is not taken
+  private naming: { readonly list: number; readonly text: string; readonly problem: string } | undefined;
   // SilverBullet's keyboard bar on, on a touch screen: the docked toolbar goes over it, its turning off offered
   private keyboardBar = false;
 
@@ -93,11 +94,12 @@ export class SettingsDialog {
     const settings = await readSettings(bridge);
     const modules = Object.fromEntries(MODULE_NAMES.map((name) => [name, settings.modules.has(name)])) as Record<ModuleName, boolean>;
     this.migrated = settings.migrated;
-    this.initial = { shortcut: await readShortcut(bridge), placement: settings.placement, show: settings.show, wordAtCaret: settings.wordAtCaret, favorites: settings.favorites, touchFavorites: settings.touchFavorites, touchOn: settings.touchOn, modules };
-    // Touch's first by finger where they show there (on, with their own), else Click's
-    this.device = byTouch(this.context.doc.defaultView) && settings.touchOn && settings.touchFavorites ? "touch" : "click";
+    this.initial = { shortcut: await readShortcut(bridge), wordAtCaret: settings.wordAtCaret, toolbars: settings.toolbars, modules };
+    // The list this device uses first
+    this.toolbarIndex = Math.max(0, settings.toolbars.indexOf(toolbarFor(settings.toolbars, byTouch(this.context.doc.defaultView) ? "touch" : "click")));
+    this.naming = undefined;
     this.keyboardBar = await this.keyboardBarOn();
-    this.values = { ...this.initial, favorites: settings.favorites.map((row) => [...row]), touchFavorites: settings.touchFavorites?.map((row) => [...row]), modules: { ...modules } };
+    this.values = { ...this.initial, toolbars: settings.toolbars.map((list) => ({ ...list, rows: list.rows.map((row) => [...row]) })), modules: { ...modules } };
     this.render();
   }
 
@@ -158,29 +160,13 @@ export class SettingsDialog {
     });
     const keyRow = settingRow(doc, BASE, "Key for every action", "As SilverBullet writes keys (Ctrl-Shift-q, Alt-k); with nothing selected it shows the toolbar at the cursor. Applies after a reload.", key);
     keyRow.dataset.swbSetting = PATHS.shortcut;
-    const placementRow = this.byDevice(
-      "Where the toolbar shows",
-      "Docked: one row across the editor, at the bottom over the keyboard (a phone's own menu of the selection, Cut, Copy, Paste, is by the selection) or at the top.",
-      PATHS.placement,
-      PLACEMENTS.map((value) => [value, PLACEMENT_LABELS[value]]),
-      values.placement,
-      (placement) => (values.placement = placement),
-    );
-    const showRow = this.byDevice(
-      "When the toolbar shows",
-      "While writing: with nothing selected too, its buttons the formats around the cursor; Esc leaves it. Always: also where the page's text has no focus.",
-      PATHS.show,
-      SHOWS.map((value) => [value, SHOW_LABELS[value]]),
-      values.show,
-      (show) => (values.show = show),
-    );
     const word = switchControl(doc, BASE, values.wordAtCaret, (on) => {
       values.wordAtCaret = on;
       this.update();
     });
     const wordRow = settingRow(doc, BASE, "A word at the cursor as if selected", "With nothing selected, Bold (any inline format) and Clear formatting work on the word the cursor is in or touches: what spaces separate, without the punctuation at its ends (a period, a comma, quotes). The cursor stays where it was.", word);
     wordRow.dataset.swbSetting = PATHS.wordAtCaret;
-    card.append(keyRow, placementRow, showRow, wordRow);
+    card.append(keyRow, wordRow);
     // SilverBullet's keyboard bar on: said first, as it decides how the docked toolbar looks
     if (this.keyboardBar) general.append(this.keyboardBarNote());
     general.append(card);
@@ -202,7 +188,7 @@ export class SettingsDialog {
 
     const { bar, panels } = tabs(doc, BASE, "swb", [
       { id: "general", title: "General", panel: general },
-      { id: "favorites", title: "Favorites", panel: this.favoritesPanel },
+      { id: "toolbars", title: "Toolbars", panel: this.favoritesPanel },
       { id: "modules", title: "Modules", panel: modules },
     ]);
     const content = doc.createDocumentFragment();
@@ -225,34 +211,6 @@ export class SettingsDialog {
       dismiss: () => this.dismiss(),
     });
     this.update();
-  }
-
-  /**
-   * A setting of each device's own: its name and hint, a choice for Click and
-   * one for Touch (Touch where the screen is worked by a finger, as the
-   * favourites)
-   */
-  private byDevice<T extends string>(name: string, hint: string, path: string, choices: readonly (readonly [T, string])[], value: Readonly<Record<Device, T>>, set: (value: Readonly<Record<Device, T>>) => void): HTMLElement {
-    const { doc } = this.context;
-    const row = this.el("div", `${BASE}-row ${BASE}-by-device`);
-    row.dataset.swbSetting = path;
-    const pair = this.el("div", `${BASE}-devices-pair`);
-    let now = value;
-    for (const [device, label] of [["click", "Click"], ["touch", "Touch"]] as const) {
-      const select = this.el("select");
-      for (const [choice, text] of choices) select.append(new Option(text, choice, false, choice === now[device]));
-      select.dataset.swbFor = device;
-      select.addEventListener("change", () => {
-        now = { ...now, [device]: select.value as T };
-        set(now);
-        this.update();
-      });
-      const field = this.el("label", `${BASE}-device-choice`);
-      field.append(this.el("span", `${BASE}-device-name`, label), select);
-      pair.append(field);
-    }
-    row.append(settingLabel(doc, BASE, name, hint), pair);
-    return row;
   }
 
   /** Whether SilverBullet's keyboard bar is on, on a touch screen (its UI option; a release without it: off) */
@@ -300,99 +258,174 @@ export class SettingsDialog {
     return known;
   }
 
-  /**
-   * The favourites the tab edits: Click's, or Touch's (its own while on, else
-   * Click's, which it shows); Touch's own each row in the order the docked
-   * toolbar shows it, its pinned items at its ends (`pins`)
-   */
+  /** The list of favourites edited */
+  private get edited(): Toolbar {
+    const lists = this.values!.toolbars;
+    return lists[Math.min(this.toolbarIndex, lists.length - 1)]!;
+  }
+
+  /** Whether the toolbar edited docks: its rows lines, its pinned items at their ends (by the selection, pins only order a row) */
+  private get docked(): boolean {
+    return docks(this.edited.placement);
+  }
+
+  /** The rows of the list edited, each in the order the docked toolbar shows it: its pinned items at its ends */
   private get rows(): Favorites {
-    const values = this.values!;
-    if (this.pins) return pinOrdered(values.touchFavorites!);
-    return (this.device === "touch" && values.touchOn && values.touchFavorites) || values.favorites;
+    return pinOrdered(this.edited.rows);
   }
 
-  /** Whether Touch's own are edited: each row's pinned items in boxes at its ends, as the docked toolbar shows each row a line (Click's toolbar does not scroll) */
-  private get pins(): boolean {
-    const values = this.values!;
-    return this.device === "touch" && values.touchOn && !!values.touchFavorites;
+  /** The lists changed: kept, the tab and General's choice of a list drawn anew */
+  private setToolbars(lists: readonly Toolbar[], focus?: string): void {
+    this.values!.toolbars = lists;
+    this.picking = undefined;
+    this.adjusting = undefined;
+    this.changedFavorites(focus);
   }
 
-  /** Whether Touch shows Click's (off, or none of its own) */
-  private get sameForTouch(): boolean {
+  /**
+   * The lists of favourites: one tab each (the one edited checked), New list;
+   * the one edited: its name (a field: renamed), what it is used for (Click,
+   * Touch: picked here, the list using it before no longer does), Duplicate,
+   * Delete (not the last; one in use asked first, what it was used for going
+   * to the first left), and Reset to defaults (every list, asked first)
+   */
+  private toolbarBar(): HTMLElement {
     const values = this.values!;
-    return this.device === "touch" && !(values.touchOn && values.touchFavorites);
-  }
-
-  /** The switch between the favourites for a mouse (Click) and for a finger (Touch), and Touch's own or Click's */
-  private deviceBar(): HTMLElement {
     const bar = this.el("div", `${BASE}-devices`);
-    const tabs = this.el("div", `${BASE}-device-tabs`);
+    const top = this.el("div", `${BASE}-devices-top`);
+    const tabs = this.el("div", `${BASE}-device-tabs ${BASE}-toolbar-tabs`);
     tabs.setAttribute("role", "radiogroup");
-    tabs.setAttribute("aria-label", "Favourites of");
-    for (const [device, label] of [["click", "Click"], ["touch", "Touch"]] as const) {
-      const button = this.button(`${BASE}-device`, label, () => {
-        this.device = device;
+    tabs.setAttribute("aria-label", "Toolbars");
+    values.toolbars.forEach((list, i) => {
+      const button = this.button(`${BASE}-device ${BASE}-toolbar`, list.name, () => {
+        this.toolbarIndex = i;
+        this.naming = undefined;
         this.picking = undefined;
         this.adjusting = undefined;
-        this.drawFavorites(`.${BASE}-device[data-swb-device="${device}"]`);
+        this.drawFavorites(`.${BASE}-toolbar[data-swb-toolbar="${i}"]`);
       });
-      button.dataset.swbDevice = device;
+      button.dataset.swbToolbar = String(i);
+      // What it is used for, small after its name (none: kept to switch to)
+      const uses = list.useFor.map((input) => (input === "click" ? "Click" : "Touch")).join(" · ");
+      button.replaceChildren(this.el("span", `${BASE}-toolbar-tab-name`, list.name), ...(uses ? [this.el("span", `${BASE}-toolbar-tab-for`, uses)] : []));
+      button.setAttribute("aria-label", uses ? `${list.name}, used for ${uses.replace(" · ", " and ")}` : `${list.name}, not used`);
       button.setAttribute("role", "radio");
-      button.setAttribute("aria-checked", String(this.device === device));
+      button.setAttribute("aria-checked", String(i === this.toolbarIndex));
       tabs.append(button);
-    }
-    const values = this.values!;
-    const copy = (rows: Favorites) => rows.map((row) => [...row]);
-    // The other's copied over this one's (Touch's: on, as it is to be seen)
-    const other = this.device === "click" ? values.touchFavorites : values.favorites;
-    const from = this.device === "click" ? "Touch" : "Click";
-    const copyButton = this.button(`${BASE}-copy-from`, `Copy from ${from}`, () => {
-      if (!other) return;
-      if (this.device === "touch") {
-        values.touchFavorites = copy(other);
-        values.touchOn = true;
-      } else values.favorites = copy(other);
-      this.picking = undefined;
-      this.adjusting = undefined;
-      this.changedFavorites(`.${BASE}-copy-from`);
     });
-    // (Click from Touch: Touch with none of its own, an invalid one, has nothing to give)
-    copyButton.disabled = !other;
-    // The defaults, asked first (written only on Save): each its own
-    const resetButton = this.button(`${BASE}-reset`, "Reset to defaults", () => {
+    const add = this.button(`${BASE}-toolbar-new`, "+ New toolbar", () => {
+      const lists = [...values.toolbars, { name: freeToolbarName(values.toolbars, "Toolbar"), useFor: [], placement: "selection" as const, show: "selection" as const, rows: [[]] }];
+      this.toolbarIndex = lists.length - 1;
+      this.setToolbars(lists, `.${BASE}-toolbar-name`);
+    });
+    add.disabled = values.toolbars.length >= MAX_TOOLBARS;
+    if (add.disabled) add.title = `${MAX_TOOLBARS} toolbars at most`;
+    const reset = this.button(`${BASE}-reset`, "Reset to defaults", () => {
       void (async () => {
-        const question =
-          this.device === "click"
-            ? "Reset the favourites for Click to the defaults?"
-            : "Reset the favourites for Touch to the defaults?";
-        if (!(await this.ask(question))) return;
-        if (this.device === "click") values.favorites = copy(DEFAULT_FAVORITES);
-        // Touch's are gesture buttons: without the Gestures module, none of its own (Click's show)
-        else if (!values.modules.gestures) values.touchFavorites = undefined;
-        else {
-          values.touchFavorites = copy(DEFAULT_TOUCH_FAVORITES);
-          values.touchOn = true;
-        }
-        this.picking = undefined;
-        this.changedFavorites(`.${BASE}-reset`);
+        if (!(await this.ask("Put the default toolbars back (Float and Docked), in place of every toolbar?"))) return;
+        const lists = defaultToolbars(values.modules.gestures);
+        this.toolbarIndex = lists.indexOf(toolbarFor(lists, byTouch(this.context.doc.defaultView) ? "touch" : "click"));
+        this.naming = undefined;
+        this.setToolbars(lists.map((list) => ({ ...list, rows: list.rows.map((row) => [...row]) })), `.${BASE}-reset`);
       })();
     });
     const actions = this.el("div", `${BASE}-device-actions`);
-    actions.append(resetButton, copyButton);
-    const top = this.el("div", `${BASE}-devices-top`);
-    top.append(tabs, actions);
-    bar.append(top);
-    if (this.device === "touch") {
-      const own = switchControl(this.context.doc, BASE, values.touchOn && !!values.touchFavorites, (on) => {
-        // On without any of its own (an invalid one): Click's copied to start from; off: Click's shown, its own kept for when it is on again
-        values.touchOn = on;
-        if (on && !values.touchFavorites) values.touchFavorites = copy(values.favorites);
-        this.picking = undefined;
-        this.changedFavorites(`.${BASE}-devices input`);
-      });
-      bar.append(settingRow(this.context.doc, BASE, "Own favourites for touch", "On a phone or tablet. Off: Click's favourites show there, these are kept.", own));
-    }
+    actions.append(reset);
+    const lists = this.el("div", `${BASE}-toolbar-tabs-line`);
+    lists.append(tabs, add);
+    top.append(lists, actions);
+    bar.append(top, this.toolbarCard());
     return bar;
+  }
+
+  /** The list edited: its name, what it is used for, Duplicate, Delete */
+  private toolbarCard(): HTMLElement {
+    const values = this.values!;
+    const index = Math.min(this.toolbarIndex, values.toolbars.length - 1);
+    const list = values.toolbars[index]!;
+    const line = this.el("div", `${BASE}-toolbar-line`);
+    const naming = this.naming?.list === index ? this.naming : undefined;
+    const name = this.el("input", `${BASE}-toolbar-name`);
+    name.type = "text";
+    name.value = naming?.text ?? list.name;
+    name.spellcheck = false;
+    name.setAttribute("aria-label", "The toolbar's name");
+    const problem = this.el("span", `${BASE}-toolbar-problem`, naming?.problem ?? "");
+    problem.setAttribute("role", "status");
+    const rename = () => {
+      const wrong = validateToolbarName(name.value, values.toolbars, index);
+      if (wrong) {
+        this.naming = { list: index, text: name.value, problem: wrong };
+        problem.textContent = wrong;
+        return;
+      }
+      this.naming = undefined;
+      problem.textContent = "";
+      if (name.value.trim() === list.name) return;
+      this.setToolbars(values.toolbars.map((one, i) => (i === index ? { ...one, name: name.value.trim() } : one)), `.${BASE}-toolbar-name`);
+    };
+    name.addEventListener("change", rename);
+    name.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      rename();
+    });
+    const label = this.el("label", `${BASE}-toolbar-label`);
+    label.append(this.el("span", `${BASE}-look-name`, "Name"), name);
+    // What it is used for: picked here (the list using it before no longer is); used already: told how to change it
+    const uses = this.el("div", `${BASE}-look-shows ${BASE}-toolbar-uses`);
+    uses.setAttribute("aria-label", "Used for");
+    for (const [input, text] of [["click", "Click"], ["touch", "Touch"]] as const) {
+      const on = list.useFor.includes(input);
+      const button = this.button(`${BASE}-look-show ${BASE}-toolbar-use`, text, () => {
+        if (!on) this.setToolbars(useToolbarFor(values.toolbars, index, input), `.${BASE}-toolbar-use[data-swb-use="${input}"]`);
+      });
+      button.dataset.swbUse = input;
+      button.setAttribute("aria-pressed", String(on));
+      button.title = on ? `${text} shows this toolbar: pick another for ${text} to change it` : `Show this toolbar for ${text} (in place of ${toolbarFor(values.toolbars, input).name})`;
+      uses.append(button);
+    }
+    const use = this.el("div", `${BASE}-toolbar-use-line`);
+    use.append(this.el("span", `${BASE}-look-name`, "Used for"), uses);
+    const duplicate = this.button(`${BASE}-toolbar-duplicate`, "Duplicate", () => {
+      const lists = [...values.toolbars, { ...list, name: freeToolbarName(values.toolbars, `${list.name} copy`), useFor: [], rows: list.rows.map((row) => [...row]) }];
+      this.toolbarIndex = lists.length - 1;
+      this.setToolbars(lists, `.${BASE}-toolbar-name`);
+    });
+    duplicate.disabled = values.toolbars.length >= MAX_TOOLBARS;
+    const remove = this.button(`${BASE}-toolbar-delete`, "Delete", () => {
+      void (async () => {
+        const used = list.useFor.map((input) => (input === "click" ? "Click" : "Touch")).join(" and ");
+        const question = used ? `Delete the toolbar ${list.name}? ${used} then show ${values.toolbars.find((_, i) => i !== index)!.name}.` : `Delete the toolbar ${list.name}?`;
+        if (!(await this.ask(question))) return;
+        let lists = values.toolbars.filter((_, i) => i !== index);
+        for (const input of list.useFor) lists = useToolbarFor(lists, 0, input);
+        this.toolbarIndex = Math.max(0, index - 1);
+        this.naming = undefined;
+        this.setToolbars(lists, `.${BASE}-toolbar[data-swb-toolbar="${this.toolbarIndex}"]`);
+      })();
+    });
+    remove.disabled = values.toolbars.length <= 1;
+    if (remove.disabled) remove.title = "One toolbar at least";
+    const buttons = this.el("div", `${BASE}-toolbar-buttons`);
+    buttons.append(duplicate, remove);
+    const head = this.el("div", `${BASE}-toolbar-head`);
+    head.append(label, buttons);
+    // Where and when it shows (docked: its rows lines, its pinned items at their ends)
+    const choice = <T extends string>(key: "placement" | "show", text: string, options: readonly T[], labels: Readonly<Record<T, string>>, value: T) => {
+      const select = this.el("select", `${BASE}-toolbar-${key}`);
+      for (const option of options) select.append(new Option(labels[option], option, false, option === value));
+      select.addEventListener("change", () => {
+        this.setToolbars(values.toolbars.map((one, i) => (i === index ? { ...one, [key]: select.value } : one)), `.${BASE}-toolbar-${key}`);
+      });
+      const field = this.el("label", `${BASE}-toolbar-choice`);
+      field.append(this.el("span", `${BASE}-look-name`, text), select);
+      return field;
+    };
+    const shows = this.el("div", `${BASE}-toolbar-choices`);
+    shows.append(choice("placement", "Where", PLACEMENTS, PLACEMENT_LABELS, list.placement), choice("show", "When", SHOWS, SHOW_LABELS, list.show));
+    line.append(head, problem, use, shows);
+    return line;
   }
 
   /** The Favorites tab drawn anew from the values; `focus`: the element to focus after it (a selector) */
@@ -402,19 +435,14 @@ export class SettingsDialog {
     if (!panel || !values) return;
     const known = this.known();
     const parts: HTMLElement[] = [
-      this.deviceBar(),
+      this.toolbarBar(),
       // … is the toolbar's: favourites without it anywhere get it at the end
-      ...(this.sameForTouch || hasAction(this.rows, "actions.more", this.context.kinds())
+      ...(hasAction(this.rows, "actions.more", this.context.kinds())
         ? []
-        : [this.el("p", `${BASE}-warning`, "Every action (…) is required: these favourites do not have it, so it is added at the end of the toolbar. Add it anywhere (a gesture button's swipe too) to put it there.")]),
+        : [this.moreWarning()]),
       this.el("p", `${BASE}-intro`, "Click an item to change how it shows. Drag items and rows to reorder them (by finger, hold an item a moment first)."),
     ];
     const rows = this.el("div", `${BASE}-rows`);
-    // Click's shown for Touch where it has none of its own: not edited here
-    if (this.sameForTouch) {
-      rows.classList.add(`${BASE}-rows-same`);
-      rows.setAttribute("inert", "");
-    }
     this.rows.forEach((row, r) => {
       const block = this.el("div", `${BASE}-favrow`);
       block.dataset.swbRow = String(r);
@@ -433,15 +461,15 @@ export class SettingsDialog {
       const open = !!picking && "row" in picking && picking.row === r;
       const add = this.button(`${BASE}-add`, open ? "Close" : "Add", () => this.openPicking({ row: r }));
       add.setAttribute("aria-expanded", String(open));
-      block.append(this.pins ? this.zones(row, r, known) : this.itemList(row, r, undefined, known), add);
+      // Docked: its pinned items in boxes at its ends; by the selection one list (a pinned item marked)
+      block.append(this.docked ? this.zones(row, r, known) : this.itemList(row, r, undefined, known), add);
       this.placeDetail(block, r);
       // The search for the row (Add): under its Add
       if (picking && "row" in picking && picking.row === r) block.append(this.picker(picking));
       rows.append(block);
     });
     parts.push(rows);
-    if (!this.sameForTouch)
-      parts.push(
+    parts.push(
         this.button(`${BASE}-add-row`, "Add row", () => {
           const rows = [...this.rows, []];
           this.picking = { row: rows.length - 1 };
@@ -504,6 +532,22 @@ export class SettingsDialog {
     if (pinned) pinned.after(detail);
     else if (item) item.after(detail);
     else block.append(detail);
+  }
+
+  /**
+   * … missing from the toolbar edited: said so (it shows at the toolbar's end), and a button putting it there in the
+   * last row (docked: pinned right, at its line's end)
+   */
+  private moreWarning(): HTMLElement {
+    const warning = this.el("p", `${BASE}-warning`, "Every action (…) is required: this toolbar does not have it, so it is added at its end. Add it anywhere (a gesture button's swipe too) to put it there.");
+    const add = this.button(`${BASE}-warning-add`, "Add it at the end", () => {
+      const rows = this.rows.length ? this.rows : [[]];
+      const row = rows.length - 1;
+      const item: FavoriteItem = this.docked ? { id: "actions.more", pin: "right" } : { id: "actions.more" };
+      this.edit(addItem(rows, row, item), `[data-swb-row="${row}"] .${BASE}-add`);
+    });
+    warning.append(" ", add);
+    return warning;
   }
 
   /**
@@ -608,7 +652,15 @@ export class SettingsDialog {
       // Its look set in a panel under its row: a click, Enter
       element.setAttribute("aria-expanded", String(this.adjusting?.row === at.row && this.adjusting.index === at.index));
     }
-    element.setAttribute("aria-label", `${name.textContent}, row ${at.row + 1}, item ${at.index + 1}`);
+    // Pinned, by the selection: a pin by its name (what it does where docked)
+    const pin = isSeparator(item) ? undefined : item.pin;
+    if (pin && !this.docked) {
+      const mark = this.el("span", `${BASE}-item-pin`);
+      mark.innerHTML = ICONS.pin;
+      mark.title = `Pinned ${pin} when docked`;
+      name.after(mark);
+    }
+    element.setAttribute("aria-label", `${name.textContent}${pin ? `, pinned ${pin}` : ""}, row ${at.row + 1}, item ${at.index + 1}`);
     element.append(this.button(`${BASE}-remove`, `Remove ${name.textContent}`, () => this.removeAt(at), ICONS.close));
     if (slots) element.append(slots);
     element.addEventListener("keydown", (e) => {
@@ -644,7 +696,8 @@ export class SettingsDialog {
           const row = Number(list?.dataset.swbItems);
           const zone = list?.dataset.swbZone as Zone | undefined;
           if (!to || !list || !Number.isInteger(row)) return this.drawFavorites();
-          const moved = zone ? placeItem(this.rows, at, { row, zone: zone === "middle" ? undefined : zone, index: to.index }) : { rows: moveItem(this.rows, at, { row, index: to.index }), at: { row, index: to.index } };
+          // (By the selection: the order as made, a pin that would undo it gone)
+          const moved = zone ? placeItem(this.rows, at, { row, zone: zone === "middle" ? undefined : zone, index: to.index }) : { rows: unpinnedOutOfOrder(moveItem(this.rows, at, { row, index: to.index })), at: { row, index: to.index } };
           if (sameRows(moved.rows, this.rows)) return this.drawFavorites();
           this.adjusting = undefined;
           this.edit(moved.rows, `[data-swb-item="${moved.at.row}:${moved.at.index}"]`);
@@ -663,9 +716,9 @@ export class SettingsDialog {
    */
   private step(at: At, key: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown"): { readonly rows: Favorites; readonly at: At } | undefined {
     const rows = this.rows;
-    if (!this.pins) {
+    if (!this.docked) {
       const to = stepOf(rows, at, key);
-      return to && { rows: moveItem(rows, at, to), at: to };
+      return to && { rows: unpinnedOutOfOrder(moveItem(rows, at, to)), at: to };
     }
     const row = rows[at.row];
     const item = row?.[at.index];
@@ -743,7 +796,7 @@ export class SettingsDialog {
       panel.append(label);
     }
     // Touch's own: pinned at an end of its row's line (the keyboard's way to what dragging into a zone does)
-    if (this.pins) panel.append(this.pinLine(at, item.pin));
+    panel.append(this.pinLine(at, item.pin));
     // An action's own icon and label (its label whatever it shows: its tooltip too), or a kind's whose items have their own
     const kind = isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type) : undefined;
     if (isActionItem(item) || kind?.ownLook) {
@@ -774,7 +827,7 @@ export class SettingsDialog {
     }
     const line = this.el("div", `${BASE}-look-line`);
     line.title = "At an end of this row's line where the toolbar is docked, out of what scrolls";
-    line.append(this.el("span", `${BASE}-look-name`, "Pin"), pins);
+    line.append(this.el("span", `${BASE}-look-name`, "Pin"), pins, ...(this.docked ? [] : [this.el("span", `${BASE}-look-unit`, "applies when docked")]));
     return line;
   }
 
@@ -980,13 +1033,11 @@ export class SettingsDialog {
     this.changedFavorites(focus);
   }
 
-  /** What the tab edits written back: Touch's own from their layout (each pinned item with its pin) */
+  /** What the tab edits written back into the list edited, each row in the order the docked toolbar shows it */
   private store(favorites: Favorites): void {
     const values = this.values!;
-    if (this.device === "touch") {
-      values.touchFavorites = this.pins ? pinOrdered(favorites) : favorites;
-      values.touchOn = true;
-    } else values.favorites = favorites;
+    const index = Math.min(this.toolbarIndex, values.toolbars.length - 1);
+    values.toolbars = values.toolbars.map((list, i) => (i === index ? { ...list, rows: pinOrdered(favorites) } : list));
   }
 
   private changedFavorites(focus?: string): void {
@@ -1088,10 +1139,10 @@ export class SettingsDialog {
     this.drawFavorites(open ? back : `[data-swb-row="${row}"] .${BASE}-pick-field`);
   }
 
-  /** Where Add puts an item in a row: its end; Touch's own, before its items pinned right (not pinned) */
+  /** Where Add puts an item in a row: before its items pinned right (not pinned) */
   private addAt(row: number): number {
     const items = this.rows[row] ?? [];
-    return this.pins ? items.filter((item) => pinOf(item) !== "right").length : items.length;
+    return items.filter((item) => pinOf(item) !== "right").length;
   }
 
   /** The kind of the item at a place, where a module turned on gives it */
@@ -1122,7 +1173,9 @@ export class SettingsDialog {
     list.setAttribute("role", "listbox");
     const entries: Entry[] = [];
     // (An action for a touch screen only: for Touch's favourites alone)
-    for (const action of this.context.actions().filter((a) => this.device === "touch" || !a.touchOnly)) {
+    // (An action for a touch screen only: for a list a finger may show, used for Touch or for nothing yet)
+    const touchToo = this.edited.useFor.includes("touch") || !this.edited.useFor.length;
+    for (const action of this.context.actions().filter((a) => touchToo || !a.touchOnly)) {
       if (!action.choices) entries.push({ action, group: action.group });
       else entries.push({ action, group: action.group }, ...action.choices.map((choice) => ({ action: choice, group: action.label })));
     }
@@ -1221,20 +1274,12 @@ export class SettingsDialog {
     if (!initial || !values) return {};
     const changed: Record<string, unknown> = {};
     if (values.shortcut !== initial.shortcut) changed[PATHS.shortcut] = values.shortcut;
-    if (values.placement.click !== initial.placement.click) changed[PATHS.placement] = values.placement.click;
-    if (values.placement.touch !== initial.placement.touch) changed[PATHS.placementTouch] = values.placement.touch;
-    if (values.show.click !== initial.show.click) changed[PATHS.show] = values.show.click;
-    if (values.show.touch !== initial.show.touch) changed[PATHS.showTouch] = values.show.touch;
     if (values.wordAtCaret !== initial.wordAtCaret) changed[PATHS.wordAtCaret] = values.wordAtCaret;
-    const favorites = savedRows(values.favorites);
-    if (!sameRows(favorites, initial.favorites)) changed[PATHS.favorites] = favorites;
-    const touch = values.touchFavorites && savedRows(values.touchFavorites);
-    if (JSON.stringify(touch) !== JSON.stringify(initial.touchFavorites)) changed[PATHS.touchFavorites] = touch;
-    // With either favourites written too: as it is now, not as told again from them (readSettings); and the model's
-    // version they are written in, so they are never migrated (migrations/index.ts)
-    if (values.touchOn !== initial.touchOn || PATHS.favorites in changed || PATHS.touchFavorites in changed) changed[PATHS.touchOn] = values.touchOn;
-    // (With what the migrations changed and the toolbar did not write back yet: else the version would mark them done)
-    if (PATHS.favorites in changed || PATHS.touchFavorites in changed) {
+    const lists = savedLists(values.toolbars);
+    if (JSON.stringify(lists) !== JSON.stringify(savedLists(initial.toolbars))) changed[PATHS.favorites] = lists;
+    // With the favourites, the model's version they are written in, so they are never migrated (migrations/index.ts),
+    // and what the migrations changed and the toolbar did not write back yet (else the version would mark it done)
+    if (PATHS.favorites in changed) {
       for (const [path, value] of Object.entries(this.migrated)) if (!(path in changed)) changed[path] = value;
       changed[PATHS.version] = SETTINGS_VERSION;
     }
@@ -1244,7 +1289,7 @@ export class SettingsDialog {
 
   /** Whether saving needs the page loaded anew: a module turned on or off, the key (the command's) */
   private reloads(changed: Readonly<Record<string, unknown>>): boolean {
-    return Object.keys(changed).some((path) => path !== PATHS.favorites && path !== PATHS.touchFavorites && path !== PATHS.touchOn && path !== PATHS.placement && path !== PATHS.placementTouch && path !== PATHS.show && path !== PATHS.showTouch && path !== PATHS.wordAtCaret && path !== PATHS.version);
+    return Object.keys(changed).some((path) => path !== PATHS.favorites && path !== PATHS.wordAtCaret && path !== PATHS.version);
   }
 
   private update(): void {
@@ -1292,6 +1337,11 @@ export class SettingsDialog {
     }
     this.context.saved();
   }
+}
+
+/** The toolbars as written to the configuration: `{ name, useFor, placement, show, rows }`, `useFor` left out where empty, empty rows left out */
+function savedLists(lists: readonly Toolbar[]): unknown[] {
+  return lists.map((list) => ({ name: list.name, ...(list.useFor.length ? { useFor: [...list.useFor] } : {}), placement: list.placement, show: list.show, rows: savedRows(list.rows) }));
 }
 
 /** Whether each word typed starts a word of a label, ignoring case (nothing typed: yes) */

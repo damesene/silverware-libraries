@@ -19,6 +19,7 @@ import { Docking } from "./dock.ts";
 import { byTouch, isActionItem, isSeparator, type Look, ownIconHtml, type Pin, type SlotRef, slotItemOf, slotOf } from "./favorites.ts";
 import type { ItemKind } from "./items.ts";
 import { hideKeyboard } from "./keyboard.ts";
+import { type Toolbar, toolbarFor } from "./toolbars.ts";
 import { marked } from "./cursor.ts";
 import type { Box } from "./place.ts";
 import { Panel } from "./panel.ts";
@@ -246,10 +247,7 @@ export class Controller {
     const actions = this.offered();
     const all = [...actions, ...actions.flatMap((a) => a.choices ?? [])];
     const kinds = this.kinds();
-    // Worked by a finger: touch's own where they are set
-    const { touchFavorites, touchOn } = this.settings;
-    const favorites = (byTouch(this.doc.defaultView) && touchOn && touchFavorites) || this.settings.favorites;
-    return favorites
+    return this.toolbar().rows
       .map((row) => {
         const items = row.flatMap((item): Shown[] => {
           if (isSeparator(item)) return [{ separator: true }];
@@ -514,14 +512,14 @@ export class Controller {
     this.hideBar(e.target instanceof Node && inEditor(e.target));
   };
 
-  /** Whether the toolbar shows while the page's text is edited, with nothing selected too (the show setting, this device's: writing, always) */
+  /** Whether the toolbar shows while the page's text is edited, with nothing selected too (the toolbar's show: writing, always) */
   private persistent(): boolean {
-    return this.settings.show[this.device()] !== "selection";
+    return this.toolbar().show !== "selection";
   }
 
-  /** Whether the toolbar shows always, the page's text edited or not (the show setting, this device's) */
+  /** Whether the toolbar shows always, the page's text edited or not (the toolbar's show) */
   private stays(): boolean {
-    return this.settings.show[this.device()] === "always";
+    return this.toolbar().show === "always";
   }
 
   /** Shown always: the toolbar at once, as the caret is (docked, also where the page's text has no focus) */
@@ -577,14 +575,19 @@ export class Controller {
     });
   };
 
-  /** Whether the toolbar docks, at the bottom or the top (the placement setting, this device's) */
-  private docks(): boolean {
-    return this.settings.placement[this.device()] !== "selection";
+  /** The toolbar this way of working it uses (a mouse's, a finger's): its rows, where and when it shows */
+  private toolbar(): Toolbar {
+    return toolbarFor(this.settings.toolbars, this.device());
   }
 
-  /** Where the toolbar docks now (the placement setting's edge) */
+  /** Whether the toolbar docks, at the bottom or the top (the toolbar's placement) */
+  private docks(): boolean {
+    return this.toolbar().placement !== "selection";
+  }
+
+  /** Where the toolbar docks now (the toolbar's placement's edge) */
   private dockAt(): Dock {
-    return this.docking.at(this.settings.placement[this.device()] === "top" ? "top" : "bottom");
+    return this.docking.at(this.toolbar().placement === "top" ? "top" : "bottom");
   }
 
   // The page scrolled or the window resized: the toolbar and the popup under it follow the selection (docked: the keyboard)

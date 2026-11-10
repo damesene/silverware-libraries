@@ -190,8 +190,7 @@ test.describe("The toolbar on a phone", () => {
     await popup(page).locator(".swb-search-field").fill("settings");
     await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
     const dialog = page.locator(".swb-settings");
-    await dialog.locator('[data-swb-tab="favorites"]').tap();
-    await dialog.locator('[data-swb-device="click"]').tap();
+    await dialog.locator('[data-swb-tab="toolbars"]').tap();
     await dialog.locator('[data-swb-row="1"] .swb-settings-add').tap();
     await expect(dialog.locator(".swb-settings-pick-field")).toBeFocused();
     // The keyboard: the view half as tall (the emulation shows none)
@@ -205,45 +204,29 @@ test.describe("The toolbar on a phone", () => {
     await expect.poll(async () => (await dialog.boundingBox())!.height).toBeLessThanOrEqual(view.height / 2 + 1);
   });
 
-  test("Touch's own favourites show by finger; turned off, Click's, its own kept", async ({ page }) => {
+  test("by finger the list used for Touch shows; another given Touch shows in its place, and the dialog opens on it", async ({ page }) => {
+    const openSettings = async () => {
+      await barButton(page, "actions.more").tap();
+      await popup(page).locator(".swb-search-field").fill("settings");
+      await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
+      await page.locator(".swb-settings").locator('[data-swb-tab="toolbars"]').tap();
+    };
     await selectByTouch(page, "some text");
-    await barButton(page, "actions.more").tap();
-    await popup(page).locator(".swb-search-field").fill("settings");
-    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
+    await openSettings();
     const dialog = page.locator(".swb-settings");
-    await dialog.locator('[data-swb-tab="favorites"]').tap();
-    // Click's first while Touch has none of its own on
-    await expect(dialog.locator('[data-swb-device="click"]')).toHaveAttribute("aria-checked", "true");
-    await dialog.locator('[data-swb-device="touch"]').tap();
-    const own = dialog.locator(".swb-settings-devices .swb-settings-switch");
-    await own.tap();
+    // A copy of the one shown, without Bold, given Touch
+    await dialog.locator(".swb-settings-toolbar-duplicate").tap();
     await dialog.locator('[data-swb-item="1:0"] .swb-settings-remove').tap();
+    await dialog.locator('.swb-settings-toolbar-use[data-swb-use="touch"]').tap();
     await dialog.locator(".swb-settings-save").tap();
     await expect(dialog).toHaveCount(0);
     await select(page, "Plain", 0);
     await selectByTouch(page, "some text");
     await expect(barButton(page, "formats.italic")).toBeVisible();
     await expect(barButton(page, "formats.bold")).toHaveCount(0);
-    // Off: Click's, the own kept
-    await barButton(page, "actions.more").tap();
-    await popup(page).locator(".swb-search-field").fill("settings");
-    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
-    await dialog.locator('[data-swb-tab="favorites"]').tap();
-    // On: Touch's first
-    await expect(dialog.locator('[data-swb-device="touch"]')).toHaveAttribute("aria-checked", "true");
-    await own.tap();
-    await dialog.locator(".swb-settings-save").tap();
-    await select(page, "Plain", 0);
-    await selectByTouch(page, "some text");
-    await expect(barButton(page, "formats.bold")).toBeVisible();
-    await barButton(page, "actions.more").tap();
-    await popup(page).locator(".swb-search-field").fill("settings");
-    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
-    await dialog.locator('[data-swb-tab="favorites"]').tap();
-    // Off: Click's first
-    await expect(dialog.locator('[data-swb-device="click"]')).toHaveAttribute("aria-checked", "true");
-    await dialog.locator('[data-swb-device="touch"]').tap();
-    await own.tap();
+    // Opened by finger: on the list Touch shows
+    await openSettings();
+    await expect(dialog.locator('.swb-settings-toolbar[aria-checked="true"] .swb-settings-toolbar-tab-name')).toHaveText("Test touch copy");
     await expect(dialog.locator('[data-swb-items="1"] .swb-settings-item-name').first()).toHaveText("Italic");
   });
 
@@ -377,27 +360,6 @@ test.describe("The toolbar on a phone", () => {
   });
 });
 
-test.describe("Settings of an older model", () => {
-  test.use({ favorites: null });
-
-  test("favourites for touch of several rows, without a version: one line as before, written back once with the version @playground", async ({ page }) => {
-    const rows = [[{ id: "actions.turnInto", show: "label", pin: "left" }], [{ id: "formats.bold" }, { id: "formats.italic" }], [{ id: "formats.code" }, { id: "actions.more", pin: "right" }]];
-    await page.evaluate(
-      ({ key, rows }) => localStorage.setItem(key, JSON.stringify({ "silverware.toolbar.favorites-touch": rows })),
-      { key: "silverware.toolbar.playground.settings", rows },
-    );
-    await page.reload();
-    await ready(page);
-    await selectByTouch(page, "some text");
-    await expect(bar(page).locator(".swb-dock-line")).toHaveCount(1);
-    await expect(bar(page).locator(".swb-dock-pinned-left [data-swb-action]")).toHaveAttribute("data-swb-action", "actions.turnInto");
-    await expect(bar(page).locator(".swb-dock-items .swb-divider")).toHaveCount(1);
-    const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem("silverware.toolbar.playground.settings") ?? "{}"));
-    await expect.poll(async () => (await stored())["silverware.toolbar.version"]).toBe(2);
-    expect((await stored())["silverware.toolbar.favorites-touch"]).toEqual([[rows[0]![0], ...rows[1]!, { type: "separator" }, ...rows[2]!]]);
-  });
-});
-
 test.describe("The settings by finger", () => {
   test("a finger moved over the favourites scrolls them; held a moment on an item, it drags it", async ({ page }) => {
     // Low enough for the favourites to scroll
@@ -407,7 +369,7 @@ test.describe("The settings by finger", () => {
     await popup(page).locator(".swb-search-field").fill("settings");
     await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
     const dialog = page.locator(".swb-settings");
-    await dialog.locator('[data-swb-tab="favorites"]').tap();
+    await dialog.locator('[data-swb-tab="toolbars"]').tap();
     const body = dialog.locator(".swb-settings-body");
     // Moved at once on an item in view (the first row's): the list scrolls, nothing taken (moves a frame apart, as a
     // finger's: Chrome scrolls by them)

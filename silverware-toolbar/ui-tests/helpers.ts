@@ -53,9 +53,12 @@ export const TEST_FAVORITES: Favorites = [
 // The settings that give a test its favourites, by path (the playground's store, SilverBullet's CONFIG), in the
 // model's version now (else migrated as the toolbar starts: migrations/)
 const favoriteSettings = (favorites: Favorites) => ({
-  "silverware.toolbar.favorites": favorites,
-  "silverware.toolbar.favorites-touch": favorites,
-  "silverware.toolbar.favorites-touch-enabled": false,
+  // The same rows for a mouse (by the selection, after selecting text) and a finger (docked at the bottom while
+  // writing), as the defaults show them
+  "silverware.toolbar.favorites": [
+    { name: "Test", useFor: ["click"], placement: "selection", show: "selection", rows: favorites },
+    { name: "Test touch", useFor: ["touch"], placement: "bottom", show: "writing", rows: favorites },
+  ],
   "silverware.toolbar.version": SETTINGS_VERSION,
 });
 
@@ -81,8 +84,8 @@ export const test = base.extend<{ favorites: Favorites | null }>({
         await writeFile(path, sample);
         // The favourites in the toolbar's own block, the rest in the Configuration Manager's: as the settings save them
         if (favorites) {
-          const { "silverware.toolbar.favorites-touch-enabled": enabled, "silverware.toolbar.version": version, ...tables } = favoriteSettings(favorites);
-          await writeFile(config, withConfigSettings(withConfigSettings("", tables, OWN_MARKER), { "silverware.toolbar.favorites-touch-enabled": enabled, "silverware.toolbar.version": version }));
+          const { "silverware.toolbar.version": version, ...tables } = favoriteSettings(favorites);
+          await writeFile(config, withConfigSettings(withConfigSettings("", tables, OWN_MARKER), { "silverware.toolbar.version": version }));
         }
         await watchReloads(page);
         await page.goto(`/${name}`);
@@ -219,9 +222,7 @@ export async function addGesture(page: Page, tap: string, up: string | undefined
   await popup(page).locator(".swb-search-field").fill("settings");
   await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
   const dialog = page.locator(".swb-settings");
-  await dialog.locator('[data-swb-tab="favorites"]').click();
-  // Click's (by finger the tab opens on Touch's, which show Click's while they have none of their own)
-  await dialog.locator('[data-swb-device="click"]').click();
+  await dialog.locator('[data-swb-tab="toolbars"]').click();
   await dialog.locator('[data-swb-row="1"] .swb-settings-add').click();
   const field = dialog.locator(".swb-settings-pick-field");
   await field.fill("gesture");

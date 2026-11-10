@@ -98,6 +98,31 @@ export function setSlotOwn(rows: Favorites, at: At, slot: string, key: "icon" | 
   return next;
 }
 
+/**
+ * Rows ordered by hand where the toolbar is not docked (its pins only order a row there): an item pinned left
+ * that no longer leads the row, or pinned right that no longer ends it, unpinned, so the order stays as made
+ */
+export function unpinnedOutOfOrder(rows: Favorites): FavoriteItem[][] {
+  return rows.map((row) => {
+    const out = [...row];
+    const unpin = (i: number) => {
+      const { pin: _, ...rest } = out[i] as Exclude<FavoriteItem, SeparatorItem>;
+      out[i] = rest as FavoriteItem;
+    };
+    let leading = true;
+    out.forEach((item, i) => {
+      if (pinOf(item) !== "left") leading = false;
+      else if (!leading) unpin(i);
+    });
+    let trailing = true;
+    for (let i = out.length - 1; i >= 0; i--) {
+      if (pinOf(out[i]!) !== "right") trailing = false;
+      else if (!trailing) unpin(i);
+    }
+    return out;
+  });
+}
+
 /** Where an item is pinned in its row (a separator: nowhere) */
 export function pinOf(item: FavoriteItem): Pin | undefined {
   return isSeparator(item) ? undefined : item.pin;

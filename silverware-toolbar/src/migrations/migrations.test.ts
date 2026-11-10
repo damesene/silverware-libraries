@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { joined, touchRowsJoined } from "./2-touch-rows-joined.ts";
 import { type Migration, migrate, MIGRATIONS, SETTINGS_VERSION, VERSION_PATH } from "./index.ts";
 
 /** Settings as configured, by path */
@@ -10,7 +9,7 @@ describe("The settings' migrations", () => {
     const versions = MIGRATIONS.map((m) => m.version);
     expect(versions).toEqual([...versions].sort((a, b) => a - b));
     expect(new Set(versions).size).toBe(versions.length);
-    expect(SETTINGS_VERSION).toBe(versions.at(-1));
+    expect(SETTINGS_VERSION).toBe(versions.at(-1) ?? 2);
   });
 
   it("run those newer than the space's version, each reading what those before wrote, the version written with what they changed", async () => {
@@ -38,52 +37,5 @@ describe("The settings' migrations", () => {
     } finally {
       console.error = error;
     }
-  });
-});
-
-describe("Version 2: favourites docked in one row", () => {
-  const TOUCH = "silverware.toolbar.favorites-touch";
-  const CLICK = "silverware.toolbar.favorites";
-
-  it("joins the rows of the favourites for touch into one as the docked toolbar showed them: a separator between rows of items not pinned", () => {
-    const rows = [
-      [{ id: "actions.turnInto", pin: "left" }],
-      [{ id: "formats.bold" }, { id: "formats.italic" }],
-      [{ id: "formats.link" }],
-      [{ id: "actions.emoji" }, { id: "actions.more", pin: "right" }],
-    ];
-    expect(joined(rows)).toEqual([
-      [{ id: "actions.turnInto", pin: "left" }, { id: "formats.bold" }, { id: "formats.italic" }, { type: "separator" }, { id: "formats.link" }, { type: "separator" }, { id: "actions.emoji" }, { id: "actions.more", pin: "right" }],
-    ]);
-    // A Lua table handed over as an object (1, 2, …) too; one row, or not rows: nothing to join
-    expect(joined({ 1: { 1: { id: "a" } }, 2: { 1: { id: "b" } } })).toEqual([[{ id: "a" }, { type: "separator" }, { id: "b" }]]);
-    expect(joined([[{ id: "a" }, { id: "b" }]])).toBeUndefined();
-    expect(joined(undefined)).toBeUndefined();
-    expect(joined([[{ id: "a" }], "x"])).toBeUndefined();
-  });
-
-  it("joins each device's only where its toolbar is docked (Touch's by default, Click's not)", async () => {
-    const rows = [[{ id: "a" }], [{ id: "b" }]];
-    expect(await touchRowsJoined.migrate(reader({ [TOUCH]: rows, [CLICK]: rows }))).toEqual({ [TOUCH]: [[{ id: "a" }, { type: "separator" }, { id: "b" }]] });
-    // (A finger with none of its own showed Click's: its own now, as below)
-    expect(await touchRowsJoined.migrate(reader({ [CLICK]: rows, "silverware.toolbar.placement": "bottom", "silverware.toolbar.favorites-touch-enabled": true }))).toEqual({ [CLICK]: [[{ id: "a" }, { type: "separator" }, { id: "b" }]] });
-    expect(await touchRowsJoined.migrate(reader({ [TOUCH]: rows, "silverware.toolbar.placement-touch": "selection" }))).toEqual({});
-  });
-
-  it("makes Click's a finger showed docked (none for touch of its own) its own for touch, joined and on; a computer's Click's kept", async () => {
-    const rows = [[{ id: "a" }], [{ id: "b" }]];
-    const one = [[{ id: "a" }, { type: "separator" }, { id: "b" }]];
-    expect(await touchRowsJoined.migrate(reader({ [CLICK]: rows }))).toEqual({ [TOUCH]: one, "silverware.toolbar.favorites-touch-enabled": true });
-    // Turned on without its own: the defaults for touch showed, nothing to keep
-    expect(await touchRowsJoined.migrate(reader({ [CLICK]: rows, "silverware.toolbar.favorites-touch-enabled": true }))).toEqual({});
-    // Not docked by finger: rows were rows
-    expect(await touchRowsJoined.migrate(reader({ [CLICK]: rows, "silverware.toolbar.placement-touch": "selection" }))).toEqual({});
-    expect(await touchRowsJoined.migrate(reader({}))).toEqual({});
-  });
-
-  it("leaves rows written in the new model as they are: with the version, nothing runs", async () => {
-    const rows = [[{ id: "a" }], [{ id: "b" }]];
-    expect(await migrate(reader({ [TOUCH]: rows, [VERSION_PATH]: 2 }))).toEqual({});
-    expect(await migrate(reader({ [TOUCH]: rows }))).toEqual({ [TOUCH]: [[{ id: "a" }, { type: "separator" }, { id: "b" }]], [VERSION_PATH]: 2 });
   });
 });

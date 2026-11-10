@@ -97,12 +97,8 @@ function sameSettings(running: Controller, settings: Settings): boolean {
   const modules = [...running.settings.modules].sort().join();
   return (
     modules === [...settings.modules].sort().join() &&
-    JSON.stringify(running.settings.placement) === JSON.stringify(settings.placement) &&
-    JSON.stringify(running.settings.show) === JSON.stringify(settings.show) &&
     running.settings.wordAtCaret === settings.wordAtCaret &&
-    JSON.stringify(running.settings.favorites) === JSON.stringify(settings.favorites) &&
-    JSON.stringify(running.settings.touchFavorites) === JSON.stringify(settings.touchFavorites) &&
-    running.settings.touchOn === settings.touchOn
+    JSON.stringify(running.settings.toolbars) === JSON.stringify(settings.toolbars)
   );
 }
 
@@ -145,9 +141,9 @@ async function saveSettings(bridge: Bridge, values: Readonly<Record<string, unkn
     return;
   }
   if (!bridge.readPage || !bridge.saveConfigPage) throw new Error("no configuration page to save to");
-  // Tables (the favourites, touch's: undefined removes it) in the toolbar's own block
-  const { [PATHS.favorites]: favorites, [PATHS.touchFavorites]: touch, ...scalars } = values;
-  const tables = { ...(PATHS.favorites in values ? { [PATHS.favorites]: favorites } : {}), ...(PATHS.touchFavorites in values ? { [PATHS.touchFavorites]: touch } : {}) };
+  // Tables (the lists of favourites) in the toolbar's own block
+  const { [PATHS.favorites]: favorites, ...scalars } = values;
+  const tables = PATHS.favorites in values ? { [PATHS.favorites]: favorites } : {};
   await saveConfigPage(
     { readPage: (name) => bridge.readPage!(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) },
     (text) => withConfigSettings(withConfigSettings(text, scalars), tables, OWN_MARKER),

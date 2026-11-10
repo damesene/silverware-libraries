@@ -632,3 +632,26 @@ turned on, so a computer keeps Click's rows; with its own kept off (switch
 false), a finger's Click's are not joined (that would change a computer's).
 Where the toolbar could not write the migration back, the settings
 dialog writes it with the version the next time it saves favourites.
+
+### Toolbars: rows, where and when one thing (2026-11-10)
+
+Asked by the user: favourites by device (Click, Touch) made switching a
+phone between a docked toolbar and one by the selection hard, as each wants
+rows of its own (one line docked, several by the selection). Decided with
+the user, step by step: a toolbar is a named thing of its own, `{ name, useFor,
+placement, show, rows }` in `silverware.toolbar.favorites`, up to 5 (names
+unique), `useFor` an array of the ways of working showing it (`"click"`,
+`"touch"`; a later one, a pen's, would join it; a condition of another kind,
+the screen's size, would be a key of its own); every way of working shows
+exactly one, a toolbar for none kept to switch to. Where and when it shows
+are the toolbar's, no longer a device's setting: General keeps the key and
+the word at the cursor. The settings' tab is *Toolbars* (a tab per toolbar,
+New, Duplicate, Delete, Reset to defaults; Used for, Where, When on its card).
+Defaults: *Float* (by the selection, after selecting text, Click) and
+*Docked* (at the bottom, while writing, Touch). Pinned items' boxes only for
+a docked toolbar; by the selection a pin orders its row only, kept for when
+it docks, marked by a pin, and an item moved by hand loses a pin that would
+undo the order. No migration: nobody used the settings of before, the model
+of toolbars is version 2 (the user's call). A toolbar without *Every action*
+says so with a button putting it at the end of its last row (docked: pinned
+right).

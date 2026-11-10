@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Favorites, hasAction, slotItemOf } from "../core/favorites.ts";
-import { addItem, moveItem, pinOrdered, placeItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setPin, setSlotField, setSlotOwn, stepOf } from "./favorites.ts";
+import { addItem, moveItem, pinOrdered, placeItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setPin, setSlotField, setSlotOwn, stepOf, unpinnedOutOfOrder } from "./favorites.ts";
 
 const ROWS: Favorites = [[{ id: "actions.turnInto", show: "label" }], [{ id: "formats.bold" }, { type: "separator" }, { id: "formats.link" }]];
 
@@ -148,5 +148,13 @@ describe("The favourites as the settings edit them", () => {
     expect(slotItemOf("formats.bold")).toBeUndefined();
     expect(slotItemOf({ id: "formats.bold", icon: "★" })).toBeUndefined();
     expect(slotItemOf({ type: "separator" })).toBeUndefined();
+  });
+
+  it("keeps an order made by hand where the toolbar does not dock: a pin that would move an item back to an end gone", () => {
+    const left = { id: "a", pin: "left" } as const;
+    const right = { id: "z", pin: "right" } as const;
+    expect(unpinnedOutOfOrder([[left, { id: "b" }, right]])).toEqual([[left, { id: "b" }, right]]);
+    expect(unpinnedOutOfOrder([[{ id: "b" }, left, right, { id: "c" }]])).toEqual([[{ id: "b" }, { id: "a" }, { id: "z" }, { id: "c" }]]);
+    expect(unpinnedOutOfOrder([[left, left, { type: "separator" }, right]])).toEqual([[left, left, { type: "separator" }, right]]);
   });
 });

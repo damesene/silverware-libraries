@@ -1447,7 +1447,10 @@ html[data-theme="dark"] .swb-dock-shade {
   gap: 6px;
 }
 .swb-settings-reset,
-.swb-settings-copy-from {
+.swb-settings-copy-from,
+.swb-settings-toolbar-new,
+.swb-settings-toolbar-duplicate,
+.swb-settings-toolbar-delete {
   padding: 4px 10px;
   font: inherit;
   color: inherit;
@@ -1456,6 +1459,9 @@ html[data-theme="dark"] .swb-dock-shade {
   border-radius: 6px;
   cursor: pointer;
 }
+.swb-settings-toolbar-new:disabled,
+.swb-settings-toolbar-duplicate:disabled,
+.swb-settings-toolbar-delete:disabled,
 .swb-settings-copy-from:disabled {
   opacity: 0.45;
   cursor: default;
@@ -1479,6 +1485,125 @@ html[data-theme="dark"] .swb-dock-shade {
 .swb-settings-device[aria-checked="true"] {
   color: #fff;
   background: var(--ui-accent-color, #464cfc);
+}
+/* The lists of favourites: their tabs (each its name and, small, what it is used for) and + New list beside them */
+.swb-settings-toolbar-tabs-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.swb-settings-toolbar-tabs {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.swb-settings-toolbar {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.swb-settings-toolbar-tab-for {
+  font-size: 11px;
+  opacity: 0.7;
+}
+/* The list edited: a card, its name and buttons on a line, what it is used for under them */
+.swb-settings-toolbar-line {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 8px;
+}
+.swb-settings-toolbar-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.swb-settings-toolbar-label {
+  display: flex;
+  flex: 1 1 220px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.swb-settings-toolbar-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 8px;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 6px;
+}
+.swb-settings-toolbar-buttons {
+  display: flex;
+  gap: 6px;
+}
+.swb-settings-toolbar-delete:not(:disabled) {
+  color: var(--ui-danger-color, #c0392b);
+}
+.swb-settings-toolbar-problem:empty {
+  display: none;
+}
+.swb-settings-toolbar-problem {
+  font-size: 12px;
+  color: var(--ui-danger-color, #c0392b);
+}
+.swb-settings-toolbar-use-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.swb-settings-toolbar-use[aria-pressed="true"] {
+  color: var(--ui-accent-color, #464cfc);
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 12%, transparent);
+}
+/* Where and when the toolbar edited shows */
+.swb-settings-toolbar-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+.swb-settings-toolbar-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.swb-settings-toolbar-choice select {
+  padding: 3px 6px;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 6px;
+}
+/* An item pinned, the toolbar by the selection: a pin by its name */
+.swb-settings-item-pin {
+  display: inline-flex;
+  opacity: 0.6;
+}
+.swb-settings-item-pin svg {
+  width: 13px;
+  height: 13px;
+}
+/* … missing: the button putting it at the end */
+.swb-settings-warning-add {
+  margin-left: 4px;
+  padding: 2px 8px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--ui-accent-color, #464cfc);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swb-settings-toolbar-line .swb-settings-look-name {
+  min-width: 4.5em;
 }
 /* … not in the favourites: added at the end, said so */
 .swb-settings-warning {

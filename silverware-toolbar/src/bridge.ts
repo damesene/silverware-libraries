@@ -1,7 +1,8 @@
 // The SilverBullet API Silverware Toolbar uses, handed over by the library
 // page's Space Lua (`editor.*` and `config.get`), so no SilverBullet internals
 // are needed.
-import { DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, favoriteItemOf, type FavoriteItem, type Favorites } from "./core/favorites.ts";
+import { favoriteItemOf, type FavoriteItem, type Favorites } from "./core/favorites.ts";
+import { defaultToolbars, type Toolbar, type Input, INPUTS, MAX_TOOLBARS, normalizedToolbars, type Placement, PLACEMENTS, type Show, SHOWS, validateToolbarName } from "./core/toolbars.ts";
 import { listOf } from "./lists.ts";
 import { migrate, VERSION_PATH } from "./migrations/index.ts";
 
@@ -65,29 +66,11 @@ export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
 export const DEFAULT_SHORTCUT = "Ctrl-Shift-q";
 
 /** A device as the settings tell them apart: worked by a finger (`byTouch` in core/favorites.ts) or not */
-export type Device = "click" | "touch";
+export type Device = Input;
 
-/**
- * Where the toolbar shows: by the selection, or docked at the bottom over the
- * on-screen keyboard (on a phone the system's menu of a selection, Cut / Copy /
- * Paste, is where the toolbar would be) or at the top, under SilverBullet's top
- * bar, across its editor
- */
-export const PLACEMENTS = ["selection", "bottom", "top"] as const;
-export type Placement = (typeof PLACEMENTS)[number];
-/**
- * When the toolbar shows: always, the page's text edited or not (docked, or
- * by the caret); while the page's text is edited; or only after a selection
- */
-export const SHOWS = ["always", "writing", "selection"] as const;
-export type Show = (typeof SHOWS)[number];
+export { type Placement, PLACEMENTS, type Show, SHOWS } from "./core/toolbars.ts";
 export const SHOW_LABELS: Readonly<Record<Show, string>> = { always: "Always", writing: "While writing", selection: "After selecting text" };
-
 export const PLACEMENT_LABELS: Readonly<Record<Placement, string>> = { selection: "By the selection", bottom: "Docked at the bottom", top: "Docked at the top" };
-
-// By touch docked at the bottom while writing (a phone's own menu of the selection is by it), else by the selection after one
-export const DEFAULT_PLACEMENT: Readonly<Record<Device, Placement>> = { click: "selection", touch: "bottom" };
-export const DEFAULT_SHOW: Readonly<Record<Device, Show>> = { click: "selection", touch: "writing" };
 
 // The toolbar's own block of the CONFIG page, for tables (the favourites): the Configuration Manager's block
 // would lose them on its next save (shared/configpage.ts)
@@ -95,16 +78,9 @@ export const OWN_MARKER = "-- managed-by: silverware-toolbar";
 
 /** Where each setting is in SilverBullet's configuration */
 export const PATHS = {
+  // The toolbars (core/toolbars.ts): each its rows, where and when it shows, what it is used for
   favorites: "silverware.toolbar.favorites",
-  // For a device worked by a finger (byTouch in core/favorites.ts); not set: the same as the favourites
-  touchFavorites: "silverware.toolbar.favorites-touch",
-  // Off: touch shows the favourites, its own kept for when it is on again
-  touchOn: "silverware.toolbar.favorites-touch-enabled",
   shortcut: "silverware.toolbar.shortcut",
-  placement: "silverware.toolbar.placement",
-  placementTouch: "silverware.toolbar.placement-touch",
-  show: "silverware.toolbar.show",
-  showTouch: "silverware.toolbar.show-touch",
   wordAtCaret: "silverware.toolbar.wordAtCaret",
   // The settings' model's version (migrations/index.ts)
   version: VERSION_PATH,
@@ -113,15 +89,9 @@ export const PATHS = {
 
 /** Silverware Toolbar's settings, read once it starts (a change applies on reload) */
 export type Settings = {
-  readonly favorites: Favorites;
-  // For a device worked by a finger (the defaults for touch where not set); undefined: the favourites there too
-  readonly touchFavorites: Favorites | undefined;
-  // Whether touch's own show (they are kept while off)
-  readonly touchOn: boolean;
+  // The toolbars, every way of working one used by one (normalized: core/toolbars.ts)
+  readonly toolbars: readonly Toolbar[];
   readonly modules: ReadonlySet<ModuleName>;
-  // Each device's own
-  readonly placement: Readonly<Record<Device, Placement>>;
-  readonly show: Readonly<Record<Device, Show>>;
   // A caret touching a word stands for the word, as if selected (inline formats, Clear formatting)
   readonly wordAtCaret: boolean;
   // What the migrations changed of the settings as configured (read so already), by path, the version among them,
@@ -143,29 +113,12 @@ export async function readSettings(bridge: Bridge): Promise<Settings> {
   const get = async (path: string, fallback: unknown) => (path in migrated ? (migrated[path] ?? fallback) : configured(path, fallback));
   // Not set: undefined (config.define gives them no default, so SilverBullet copies none in)
   const favorites = await get(PATHS.favorites, undefined);
-  const touch = await get(PATHS.touchFavorites, undefined);
-  const touchOn = await get(PATHS.touchOn, undefined);
   const modules = new Set<ModuleName>();
   for (const name of MODULE_NAMES) if ((await get(PATHS.module(name), true)) !== false) modules.add(name);
-  // A space's own: set
-  const ownFavorites = favorites != null;
-  const ownTouch = touch != null;
-  // Each its device's default where it is none of the values (as before: auto, mobile)
-  const one = async <T extends string>(path: string, values: readonly T[], fallback: T): Promise<T> => {
-    const value = await get(path, fallback);
-    return values.includes(value as T) ? (value as T) : fallback;
-  };
   return {
-    favorites: ownFavorites ? favoritesOf(favorites) : DEFAULT_FAVORITES,
-    // Not set: the defaults for touch, gesture buttons, so without the Gestures module none (Click's show)
-    touchFavorites: ownTouch ? rowsOf(touch) : modules.has("gestures") ? DEFAULT_TOUCH_FAVORITES : undefined,
-    // Not set: on, unless the favourites are a space's own and those for touch are not (its own show by finger too,
-    // as before there were favourites for touch); the settings dialog writes it with the favourites, so editing
-    // them does not change it
-    touchOn: touchOn == null ? !(ownFavorites && !ownTouch) : touchOn !== false,
+    // Not set or none valid: the defaults (without the Gestures module, the one by the selection for both)
+    toolbars: toolbarsOf(favorites) ?? defaultToolbars(modules.has("gestures")),
     modules,
-    placement: { click: await one(PATHS.placement, PLACEMENTS, DEFAULT_PLACEMENT.click), touch: await one(PATHS.placementTouch, PLACEMENTS, DEFAULT_PLACEMENT.touch) },
-    show: { click: await one(PATHS.show, SHOWS, DEFAULT_SHOW.click), touch: await one(PATHS.showTouch, SHOWS, DEFAULT_SHOW.touch) },
     wordAtCaret: (await get(PATHS.wordAtCaret, true)) !== false,
     migrated,
   };
@@ -182,11 +135,30 @@ export async function readShortcut(bridge: Bridge): Promise<string> {
 }
 
 /**
- * The favourites as configured: rows of items, an item that is none left out
- * (logged); not rows at all: the defaults
+ * The toolbars as configured (`{ name, useFor, placement, show, rows }`, `useFor` a list of "click" and "touch",
+ * left out: used for none; `placement` and `show` not set or unknown: by the selection, after selecting text),
+ * normalized: one that is none, a name taken already or more than MAX_TOOLBARS left out (logged), an unknown way of
+ * working left out; undefined where none is left (the defaults then)
  */
-export function favoritesOf(value: unknown): Favorites {
-  return rowsOf(value) ?? DEFAULT_FAVORITES;
+export function toolbarsOf(value: unknown): Toolbar[] | undefined {
+  const lists: Toolbar[] = [];
+  for (const entry of listOf(value) ?? []) {
+    const { name, useFor, placement, show, rows } = (entry && typeof entry === "object" ? entry : {}) as Record<string, unknown>;
+    const favorites = rowsOf(rows);
+    const inputs = useFor === undefined ? [] : listOf(useFor);
+    if (typeof name !== "string" || !favorites || !inputs || validateToolbarName(name, lists) || lists.length >= MAX_TOOLBARS) {
+      console.warn("Silverware Toolbar: a list of favourites is not { name = …, useFor = { … }, rows = { … } } (or its name is taken, or there are more than 5):", entry);
+      continue;
+    }
+    lists.push({
+      name: name.trim(),
+      useFor: INPUTS.filter((input) => inputs.includes(input)),
+      placement: PLACEMENTS.includes(placement as Placement) ? (placement as Placement) : "selection",
+      show: SHOWS.includes(show as Show) ? (show as Show) : "selection",
+      rows: favorites,
+    });
+  }
+  return lists.length ? normalizedToolbars(lists) : undefined;
 }
 
 /** Rows of favourites as configured, an item that is none left out (logged); not rows at all: undefined */

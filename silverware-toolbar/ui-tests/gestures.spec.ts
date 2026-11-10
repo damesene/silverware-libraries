@@ -38,8 +38,7 @@ test.describe("The gesture button", () => {
     await popup(page).locator(".swb-search-field").fill("settings");
     await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
     const dialog = page.locator(".swb-settings");
-    await dialog.locator('[data-swb-tab="favorites"]').click();
-    await dialog.locator('[data-swb-device="click"]').click();
+    await dialog.locator('[data-swb-tab="toolbars"]').click();
     const gesture = dialog.locator(".swb-settings-kind").last();
     // Its Click: its panel, its action, its own icon and label
     await gesture.locator('[data-swb-slot="tap"]').click();
@@ -63,8 +62,7 @@ test.describe("The gesture button", () => {
     await barButton(page, "actions.more").click();
     await popup(page).locator(".swb-search-field").fill("settings");
     await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
-    await dialog.locator('[data-swb-tab="favorites"]').click();
-    await dialog.locator('[data-swb-device="click"]').click();
+    await dialog.locator('[data-swb-tab="toolbars"]').click();
     await gesture.locator('[data-swb-slot="tap"]').click();
     await look.locator(".swb-settings-look-change").click();
     await dialog.locator(".swb-settings-pick-field").fill("code");
@@ -79,8 +77,7 @@ test.describe("The gesture button", () => {
     await popup(page).locator(".swb-search-field").fill("settings");
     await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
     const dialog = page.locator(".swb-settings");
-    await dialog.locator('[data-swb-tab="favorites"]').click();
-    await dialog.locator('[data-swb-device="click"]').click();
+    await dialog.locator('[data-swb-tab="toolbars"]').click();
     const gesture = dialog.locator(".swb-settings-kind").last();
     await gesture.locator('[data-swb-slot="up"]').click();
     const look = dialog.locator("[data-swb-look]");
@@ -171,7 +168,7 @@ test.describe("The gesture button", () => {
     await barButton(page, "actions.more").click();
     await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
     const dialog = page.locator(".swb-settings");
-    await dialog.locator('[data-swb-tab="favorites"]').click();
+    await dialog.locator('[data-swb-tab="toolbars"]').click();
     await dialog.locator('[data-swb-item="1:7"] .swb-settings-remove').click();
     await expect(dialog.locator(".swb-settings-warning")).toHaveCount(0);
     await dialog.locator(".swb-settings-save").click();

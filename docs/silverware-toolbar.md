@@ -665,9 +665,10 @@ right).
 
 Asked by the user: a command switching the toolbar of the way of working now
 to another, which may be a button of the toolbar too. `actions.switchToolbar`
-(the core's, `switchAction`): a choice per toolbar (`toolbars.<name>`, so one
-toolbar may be a button of its own, switching to it with no list), the one on
-checked; the command *Silverware Toolbar: Switch toolbar* opens the popup at
+(the core's, core/switch.ts): a choice per toolbar, the one on checked (one
+toolbar a button of its own, switching to it with no list: its parameter
+`toolbar`, see *Actions' parameters* below; at first a choice's id,
+`toolbars.<name>`, replaced the same day); the command *Silverware Toolbar: Switch toolbar* opens the popup at
 them. A switch is that way of working's toolbar at once (`switchTo`: the
 controller's settings, the bar shown anew as the new one shows: by the
 selection, at the caret while writing, or always) and kept in `useFor` in
@@ -681,3 +682,22 @@ toolbars as written (`sameSettings`), so it goes on as it is. Not offered: a
 toolbar's own icon, a Next toolbar action (both set aside by the user). A
 toolbar renamed in the dialog takes the buttons switching to it along
 (`withActionRenamed`).
+
+### Actions' parameters (2026-11-10)
+
+Asked by the user after the switch of toolbars, its toolbars at first a
+choice each (`toolbars.<name>`, a parameter written into an id): a general
+way for an action to take parameters, as clean as the rest. An action declares
+them (`params`: a key, a label, `choices` or a text typed; `describe` its name
+by their values); a favourite gives their values (`args`, texts by key, on an
+action's item or a kind's slot); the controller binds them (`withArgs`: the
+action's functions given them, its choices dropped, so it runs), so the bar,
+the popup and the gesture button know nothing of them; the settings show each
+in the item's or the slot's panel as declared; a choice of a list that is an
+action with values (`addsAs`) is added to a toolbar as that action with them.
+The switch of toolbars moved onto it, one way of writing it: `{ id =
+"actions.switchToolbar", args = { toolbar = "Float" } }` (a toolbar renamed in
+the settings takes those values along: `withArgRenamed`). Custom actions
+declare them too. Values are texts (a number or true/false written in CONFIG
+read as text), so a parameter's type is the action's to read.
+

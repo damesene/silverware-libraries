@@ -47,6 +47,8 @@ config.define("silverware.toolbar", {
                   -- An item's own icon (up to 3 characters, an emoji too) and label: an action's, a snippet's
                   icon = { type = "string" },
                   label = { type = "string" },
+                  -- The values of its action's parameters, by key (the switch's toolbar = "Float")
+                  args = { type = "object" },
                 },
               },
             },

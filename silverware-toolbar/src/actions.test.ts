@@ -104,4 +104,24 @@ describe("Custom actions", () => {
     defineCustomActions(actionsOf({ name: "b", label: "B", edit: () => undefined }).actions);
     expect(withCustomActions([]).map((a) => a.id)).toEqual(["actions.b"]);
   });
+
+  it("take parameters (texts typed or picked from choices), their values given to their functions, named by them; parameters not right refused", async () => {
+    const done: unknown[] = [];
+    const { actions, problems } = actionsOf({
+      name: "template",
+      label: "Template",
+      params: [{ key: "name", label: "Template", choices: ["Meeting", { value: "daily", label: "Daily note" }] }, { key: "note", label: "Note", placeholder: "Any" }],
+      describe: (args: { name?: string }) => (args.name ? `Template: ${args.name}` : undefined),
+      perform: (_context: unknown, _editor: unknown, args: unknown) => void done.push(args),
+    });
+    expect(problems).toEqual([]);
+    const [template] = actions;
+    expect(template!.params!.map((param) => [param.key, param.choices?.()])).toEqual([["name", [{ value: "Meeting", label: "Meeting" }, { value: "daily", label: "Daily note" }]], ["note", undefined]]);
+    expect(template!.describe!({ name: "daily" })).toBe("Template: daily");
+    await template!.perform!(contextOf("", 0, 0), {} as ActionEditor, { name: "daily" });
+    await template!.perform!(contextOf("", 0, 0), {} as ActionEditor);
+    expect(done).toEqual([{ name: "daily" }, {}]);
+    expect(actionsOf({ name: "x", label: "X", params: [{ key: "a b", label: "A" }], edit: () => undefined }).problems[0]).toContain("its param 1");
+    expect(actionsOf({ name: "x", label: "X", params: [{ key: "a", label: "A" }, { key: "a", label: "B" }], edit: () => undefined }).problems[0]).toContain("twice");
+  });
 });

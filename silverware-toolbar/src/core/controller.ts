@@ -12,14 +12,15 @@
 import type { Bridge, Settings } from "../bridge.ts";
 import { CONTENT_SELECTOR, inEditor, pageContentOf, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
-import type { Action, ActionEditor, Change, Context } from "./action.ts";
+import { type Action, type ActionEditor, type Change, type Context, withArgs } from "./action.ts";
 import { Bar, type Dock, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
 import { Docking } from "./dock.ts";
 import { isActionItem, isSeparator, type Look, orderedByPins, ownIconHtml, type Pin, type SlotRef, slotItemOf, slotOf } from "./favorites.ts";
 import type { ItemKind } from "./items.ts";
 import { hideKeyboard } from "./keyboard.ts";
-import { docks, type Input, inputOf, SWITCH_ID, type Toolbar, toolbarActionId, toolbarFor, useToolbarFor } from "./toolbars.ts";
+import { switchToolbarAction } from "./switch.ts";
+import { docks, type Input, inputOf, type Toolbar, toolbarFor, useToolbarFor } from "./toolbars.ts";
 import { marked } from "./cursor.ts";
 import type { Box } from "./place.ts";
 import { Panel } from "./panel.ts";
@@ -215,29 +216,12 @@ export class Controller {
   }
 
   /**
-   * The toolbar switched (`actions.switchToolbar`, the command Switch toolbar):
-   * a choice of every toolbar, the one this way of working shows on (its name
-   * the action's label in the toolbar); one picked is this way of working's,
-   * at once (`switchTo`)
+   * The toolbar switched (`actions.switchToolbar`, the command Switch toolbar;
+   * core/switch.ts): every toolbar to pick from, or the one a favourite gives;
+   * one picked is this way of working's, at once (`switchTo`)
    */
   switchAction(): Action {
-    const current = this.toolbar();
-    return {
-      id: SWITCH_ID,
-      label: "Toolbar",
-      icon: ICONS.toolbars,
-      group: "Silverware Toolbar",
-      keywords: ["switch", "toolbars", "change", "favorites"],
-      choices: this.settings.toolbars.map((toolbar) => ({
-        id: toolbarActionId(toolbar.name),
-        label: toolbar.name,
-        icon: ICONS.toolbars,
-        group: "Toolbar",
-        keywords: ["switch", "toolbar"],
-        active: () => toolbar === current,
-        perform: () => this.switchTo(toolbar.name),
-      })),
-    };
+    return switchToolbarAction(this.settings.toolbars, this.toolbar(), (name) => this.switchTo(name));
   }
 
   /**
@@ -304,7 +288,9 @@ export class Controller {
         const items = row.flatMap((item): Shown[] => {
           if (isSeparator(item)) return [{ separator: true }];
           if (isActionItem(item)) {
-            const action = all.find((a) => a.id === item.id);
+            // (With its parameters' values where the item gives them)
+            const found = all.find((a) => a.id === item.id);
+            const action = found && withArgs(found, item.args);
             return action ? [{ action, ...lookOf(item), ...(item.icon ? { ownIcon: item.icon } : {}), ...(item.label ? { ownLabel: item.label } : {}), ...this.state(action, context) }] : [];
           }
           // A kind's: a kind no module on gives, or a slot without an action, left out
@@ -320,7 +306,7 @@ export class Controller {
             }
             const ref = slotOf(item[key]);
             const found = ref && all.find((a) => a.id === ref.id);
-            return { key, optional, action: found && ref ? withOwnLook(found, ref) : found };
+            return { key, optional, action: found && ref ? withOwnLook(withArgs(found, ref.args), ref) : found };
           });
           if (slots.some(({ optional, action }) => !optional && !action)) return [];
           const found = Object.fromEntries(slots.flatMap(({ key, action }) => (action ? [[key, action]] : [])));

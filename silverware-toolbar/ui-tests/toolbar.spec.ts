@@ -279,7 +279,7 @@ test.describe("Switching the toolbar", () => {
     await expect(bar(page)).not.toHaveClass(/swb-docked/);
     await barButton(page, "actions.more").click();
     await popup(page).locator(".swb-search-field").fill("test touch");
-    await expect(popup(page).locator('[data-swb-action="toolbars.Test touch"]')).toBeVisible();
+    await expect(popup(page).locator('[data-swb-action="actions.switchToolbar.Test touch"]')).toBeVisible();
     await page.keyboard.press("Enter");
     // At once: Test touch's, docked at the bottom
     await expect(bar(page)).toHaveClass(/swb-docked/);
@@ -296,8 +296,35 @@ test.describe("Switching the toolbar", () => {
     // Back with the toolbar's own choice in the list (the one on checked)
     await barButton(page, "actions.more").click();
     await popup(page).locator(".swb-search-field").fill("toolbar");
-    await expect(popup(page).locator('[data-swb-action="toolbars.Test touch"]')).toBeVisible();
-    await popup(page).locator('[data-swb-action="toolbars.Test"]').click();
+    await expect(popup(page).locator('[data-swb-action="actions.switchToolbar.Test touch"]')).toBeVisible();
+    await popup(page).locator('[data-swb-action="actions.switchToolbar.Test"]').click();
     await expect(bar(page)).not.toHaveClass(/swb-docked/);
+  });
+});
+
+test.describe("An action's parameter", () => {
+  test("a toolbar of Toolbar's added in the settings: the switch with that toolbar given, its value in its panel; its button switches at once, no list", async ({ page }) => {
+    await select(page, "some text");
+    await barButton(page, "actions.more").click();
+    await popup(page).locator(".swb-search-field").fill("settings");
+    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
+    const dialog = page.locator(".swb-settings");
+    await dialog.locator('[data-swb-tab="toolbars"]').click();
+    await dialog.locator('[data-swb-row="1"] .swb-settings-add').click();
+    await dialog.locator(".swb-settings-pick-field").fill("test touch");
+    await page.keyboard.press("Enter");
+    // Its panel: the switch's parameter, the toolbar given
+    const added = dialog.locator('[data-swb-row="1"] .swb-settings-item').last();
+    await expect(added).toHaveAttribute("title", "Test touch");
+    await added.click();
+    await expect(dialog.locator('[data-swb-look] [data-swb-param="toolbar"] select')).toHaveValue("Test touch");
+    await dialog.locator(".swb-settings-save").click();
+    await expect(dialog).toHaveCount(0);
+    await select(page, "some text");
+    await expect(bar(page)).not.toHaveClass(/swb-docked/);
+    // No list: switched at once
+    await barButton(page, "actions.switchToolbar").click();
+    await expect(page.locator(".swb-menu.swb-visible")).toHaveCount(0);
+    await expect(bar(page)).toHaveClass(/swb-docked/);
   });
 });

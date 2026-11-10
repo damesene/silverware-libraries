@@ -80,10 +80,9 @@ export function useToolbarFor(toolbars: readonly Toolbar[], index: number, input
   });
 }
 
-// The core's own action switching the toolbar a way of working shows (core/controller.ts `switchAction`): its choices
-// the toolbars, each `toolbars.<its name>` (a button of its own switching to it)
+// The core's own action switching the toolbar a way of working shows (core/switch.ts): a toolbar given as its
+// parameter, or its choices
 export const SWITCH_ID = "actions.switchToolbar";
-export const toolbarActionId = (name: string): string => `toolbars.${name}`;
 
 /** The toolbars as written to the configuration: `{ name, useFor, placement, show, rows }`, `useFor` left out where empty, empty rows left out */
 export function toolbarsSetting(toolbars: readonly Toolbar[]): unknown[] {

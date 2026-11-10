@@ -188,8 +188,18 @@ pages say what needs Silverware Icons.
   modules/emoji.ts) and `silverware.database.recentEmoji` (database
   views/popover.ts), read into it once (the toolbar's first, then the
   database's not in it yet) and removed.
-- A set's picking data loaded as its tab first opens; its place shown
-  meanwhile, `shown` called once it is in.
+- A set's picking data loaded as its tab first opens (an SVG set's drawing
+  data with it: its grid is drawn at once); its place shown meanwhile, `shown`
+  called once it is in.
+- Lucide's *All*, its 2046 icons, drawn in about 106 ms in the playground
+  (Chrome on a laptop, 2026-11-10), the emoji picker's order of cost: no
+  windowing of the grid.
+- Done in step 3: silverware-icons/src/picker.ts, its CSS in the style page,
+  `api.pick`; playground/icons.html (the picker in a panel, the icon picked
+  drawn as the plugins draw it) and silverware-icons/ui-tests/ (the picker on
+  the playground, `@playground`; the API from Space Lua against
+  SilverBullet). shared/emoji.ts stays until the toolbar and the database
+  move off it (steps 5, 6).
 
 ## Data
 

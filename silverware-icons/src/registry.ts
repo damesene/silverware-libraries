@@ -66,6 +66,12 @@ export class Registry {
     return this.search(name);
   }
 
+  /** A set's drawing data loaded where it has a file of it (the picker draws a grid of its icons at once) */
+  async drawLoaded(name: string): Promise<void> {
+    const entry = this.own.has(name) ? undefined : this.builtIn.find((one) => one.name === name);
+    if (entry?.draw && !this.draws.has(name)) await this.loadFile(entry.draw, (value) => this.draws.set(name, value as DrawData), true);
+  }
+
   /** The user's sets given (one, or a list), each checked; a set again replaces the one before; what was wrong said */
   define(value: unknown): { problems: string[]; again: string[] } {
     const before = this.anew ? new Map<string, DefinedSet>() : this.own;

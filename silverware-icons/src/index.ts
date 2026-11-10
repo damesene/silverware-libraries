@@ -3,6 +3,7 @@
 // per module, as js.importFromSpace gives the same module on each load of Space Lua.
 import { Drawing } from "./draw.ts";
 import { BUILT_IN_SETS } from "./manifest.ts";
+import { type PickOptions, picker } from "./picker.ts";
 import { type Loader, Registry } from "./registry.ts";
 
 /** What the other plugins get (shared/icons.ts `Icons`: its version the one they were written for) */
@@ -23,6 +24,7 @@ export const api = {
   version: API_VERSION,
   markup: (value: string, base: string): string => drawing.markup(value, base),
   text: (value: string): string => drawing.text(value),
+  pick: (into: HTMLElement, options: PickOptions): (() => void) => picker(registry, drawing, into, options),
 };
 
 /** The user's sets (`silverware.icons.defineSets`): what was wrong, as one text to show; none where all is well */

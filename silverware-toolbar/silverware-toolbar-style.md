@@ -103,11 +103,20 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
   align-items: center;
   min-width: 0;
 }
-/* Lines one under another told apart by a faint tint of every other one, no line drawn (the bar has enough: its
-   edge, the pinned items', the separators) */
-.swb-bar.swb-docked .swb-dock-line:nth-child(even) {
-  background: color-mix(in srgb, currentColor 4%, transparent);
-  border-radius: 4px;
+/* Lines one under another: a faint hairline between them, short of the bar's ends (fainter than the bar's other
+   lines, the pinned items' and the separators, so it does not compete with them) */
+.swb-bar.swb-docked .swb-dock-line + .swb-dock-line {
+  position: relative;
+}
+.swb-bar.swb-docked .swb-dock-line + .swb-dock-line::before {
+  content: "";
+  position: absolute;
+  top: -1.5px;
+  left: 10px;
+  right: 10px;
+  height: 1px;
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  pointer-events: none;
 }
 /* Its items in a box faded out and shaded at each end it scrolls further to (swb-more-left / -right) */
 .swb-bar.swb-docked .swb-dock-scroll {

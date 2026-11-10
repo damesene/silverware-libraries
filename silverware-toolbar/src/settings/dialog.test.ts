@@ -78,8 +78,8 @@ describe("The settings dialog's Favorites tab", () => {
     const field = document.querySelector<HTMLTextAreaElement>('[data-swb-look] [data-swb-field="text"] textarea')!;
     field.value = "%%{s}%%";
     field.dispatchEvent(new Event("input"));
-    // As it is typed: the item's warning gone
-    expect(item().title).toBe("");
+    // As it is typed: the item's warning gone, what it holds said again
+    expect(item().title).toBe("Gesture button (Click: Text snippet)");
     expect(item().classList.contains("swb-settings-unknown")).toBe(false);
     // Back in its item's panel: the slot's gone too
     panel().querySelector<HTMLElement>("[data-swb-look] .swb-settings-look-close")!.click();

@@ -538,8 +538,11 @@ export class SettingsDialog {
     const head = this.el("div", `${BASE}-detail-head`);
     const icon = this.el("span", `${BASE}-item-icon`);
     icon.innerHTML = item?.querySelector(`.${BASE}-item-icon`)?.innerHTML ?? "";
-    const slot = key ? item?.querySelector<HTMLElement>(`[data-swb-slot="${key}"] .${BASE}-slot-name`)?.textContent : undefined;
-    const name = item?.querySelector(`.${BASE}-item-name`)?.textContent ?? "";
+    const shown = this.rows[at.row]?.[at.index];
+    const kind = shown && isKindItem(shown) ? this.context.kinds().find((k) => k.type === shown.type) : undefined;
+    const slot = key ? kind?.slots.find((one) => one.key === key)?.label : undefined;
+    // (A kind's item by its kind: its chip's name is its first slot's action)
+    const name = kind?.label ?? item?.querySelector(`.${BASE}-item-name`)?.textContent ?? "";
     head.append(icon, this.el("span", `${BASE}-detail-name`, slot ? `${name} · ${slot}` : name));
     detail.append(head);
     if (adjusting?.row === r) detail.append(this.lookPanel(adjusting));
@@ -648,18 +651,11 @@ export class SettingsDialog {
           face.append(hint);
         });
         element.append(face, name);
-        // What it holds, said: its kind, then each slot's action
-        const held = kind ? kind.slots.flatMap((slot, i) => (looks[i] ? [`${slot.label}: ${looks[i]!.label}`] : [])) : [];
-        element.title = held.length ? `${kind!.label} (${held.join(", ")})` : (kind?.label ?? item.type);
         if (item.show !== "label") element.classList.add(`${BASE}-iconly`);
-        const problem = kind && this.itemProblem(item, kind);
         if (!kind) {
           element.classList.add(`${BASE}-unknown`);
           element.title = `No module turned on gives the kind ${item.type}: the toolbar leaves it out`;
-        } else if (problem) {
-          element.classList.add(`${BASE}-unknown`);
-          element.title = `${problem}: the toolbar leaves it out`;
-        }
+        } else this.markProblem(element, this.itemProblem(item, kind), true, this.kindTitle(item, kind, known));
       } else {
         const action = known.get(item.id);
         // Its own icon and label, as the toolbar shows them
@@ -694,8 +690,11 @@ export class SettingsDialog {
       mark.title = `Pinned ${pin} when docked`;
       name.after(mark);
     }
-    element.setAttribute("aria-label", `${name.textContent}${pin ? `, pinned ${pin}` : ""}, row ${at.row + 1}, item ${at.index + 1}`);
-    element.append(this.button(`${BASE}-remove`, `Remove ${name.textContent}`, () => this.removeAt(at), ICONS.close));
+    // (A kind's: what it is and what it holds, its corners' icons not read out)
+    const kindItem = isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type) : undefined;
+    const said = kindItem && isKindItem(item) ? this.kindTitle(item, kindItem, known) : (name.textContent ?? "");
+    element.setAttribute("aria-label", `${said}${pin ? `, pinned ${pin}` : ""}, row ${at.row + 1}, item ${at.index + 1}`);
+    element.append(this.button(`${BASE}-remove`, `Remove ${said}`, () => this.removeAt(at), ICONS.close));
     element.addEventListener("keydown", (e) => {
       if (e.target !== element) return;
       if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown")) {
@@ -953,9 +952,11 @@ export class SettingsDialog {
   }
 
   /** A slot's button or an item marked for what is wrong with it, or no longer */
-  private markProblem(element: HTMLElement, problem: string | undefined, dimmed: boolean): void {
+  /** A slot's button or an item marked for what is wrong with it, or no longer: `title` its own then (a kind's item's) */
+  private markProblem(element: HTMLElement, problem: string | undefined, dimmed: boolean, title?: string): void {
     if (dimmed) element.classList.toggle(`${BASE}-unknown`, !!problem);
     if (problem) element.title = `${problem}: the toolbar leaves it out`;
+    else if (title) element.title = title;
     else if (element.title.endsWith(": the toolbar leaves it out")) element.removeAttribute("title");
   }
 
@@ -965,7 +966,7 @@ export class SettingsDialog {
     const kind = item && isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type) : undefined;
     const element = this.toolbarsPanel?.querySelector<HTMLElement>(`[data-swb-item="${at.row}:${at.index}"]`);
     if (!item || !isKindItem(item) || !kind || !element) return;
-    this.markProblem(element, this.itemProblem(item, kind), true);
+    this.markProblem(element, this.itemProblem(item, kind), true, this.kindTitle(item, kind, this.known()));
     // (Its slots' buttons: in its panel)
     const panel = this.toolbarsPanel?.querySelector<HTMLElement>(`[data-swb-look="${at.row}:${at.index}"]`);
     for (const slot of kind.slots) {
@@ -1091,6 +1092,15 @@ export class SettingsDialog {
     this.update();
   }
 
+  /** A kind's item said: its kind, then each slot's action ("Gesture button (Click: Bold, Swipe up: Italic)") */
+  private kindTitle(item: KindItem, kind: ItemKind, known: Map<string, Action>): string {
+    const held = kind.slots.flatMap((slot) => {
+      const look = this.slotLook(item, slot, known);
+      return look ? [`${slot.label}: ${look.label}`] : [];
+    });
+    return held.length ? `${kind.label} (${held.join(", ")})` : kind.label;
+  }
+
   /**
    * How a slot of a kind's item shows (its action with its own icon and label,
    * or the item of a kind it holds: a snippet's character); undefined: none
@@ -1199,7 +1209,8 @@ export class SettingsDialog {
     const adjusting = this.adjusting;
     if (!open && "at" in target && adjusting && (adjusting.row !== target.at.row || adjusting.index !== target.at.index)) this.adjusting = undefined;
     const row = "row" in target ? target.row : target.at.row;
-    const back = "row" in target ? `[data-swb-row="${row}"] .${BASE}-add` : `[data-swb-item="${target.at.row}:${target.at.index}"] [data-swb-slot="${target.key}"]`;
+    // (Back to what opened it: Add, the slot's Change…, or the slot in its item's panel)
+    const back = "row" in target ? `[data-swb-row="${row}"] .${BASE}-add` : this.adjusting?.key ? `[data-swb-look] .${BASE}-look-change` : `[data-swb-look] [data-swb-slot="${target.key}"]`;
     this.drawToolbars(open ? back : `[data-swb-row="${row}"] .${BASE}-pick-field`);
   }
 
@@ -1276,9 +1287,9 @@ export class SettingsDialog {
       const after = slots.slice(slots.findIndex((s) => s.key === target.key) + 1);
       const next = item && isKindItem(item) ? after.find((s) => !slotOf(item[s.key]) && !slotItemOf(item[s.key])) : undefined;
       this.picking = next ? { at: target.at, key: next.key } : undefined;
-      // Every slot asked: its item's panel, where its slots are
-      if (!next) this.adjusting = { row: target.at.row, index: target.at.index };
-      this.edit(favorites, next ? `[data-swb-row="${row}"] .${BASE}-pick-field` : `[data-swb-look] [data-swb-slot="${target.key}"]`);
+      // Every slot asked after Add: its item's panel, where its slots are (Change… in a slot's panel: that panel stays)
+      if (!next && this.adjusting?.key !== target.key) this.adjusting = { row: target.at.row, index: target.at.index };
+      this.edit(favorites, next ? `[data-swb-row="${row}"] .${BASE}-pick-field` : this.adjusting?.key ? `[data-swb-look] .${BASE}-look-change` : `[data-swb-look] [data-swb-slot="${target.key}"]`);
     };
     let shown: (() => void)[] = [];
     const draw = () => {

@@ -1360,8 +1360,6 @@ html[data-theme="dark"] .swb-dock-shade {
   top: 4px;
   right: 6px;
 }
-/* A kind's item (the gesture button): its name, look and × on the first line, its slots under them,
-   side by side where they fit, else one under another (a phone) */
 /* A kind's item as the toolbar shows it: its first slot's icon, the others' small in its corners (a gesture
    button's swipes: up top right, down bottom right) */
 .swb-settings-item-face {
@@ -1401,12 +1399,10 @@ html[data-theme="dark"] .swb-dock-shade {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* A kind's slots one under another, each a line as wide as the item (a gesture button's Click, Swipe up, Swipe
-   down: the same on a phone and a desktop, whatever their actions' names), their names in a column of their own so
-   the actions line up */
+/* A kind's slots in its item's panel, one under another (a gesture button's Click, Swipe up, Swipe down), their
+   names in a column of their own so the actions line up */
 .swb-settings-slots {
   display: flex;
-  flex: 1 1 100%;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
@@ -1424,12 +1420,7 @@ html[data-theme="dark"] .swb-dock-shade {
   min-width: 5.5em;
   text-align: left;
 }
-/* (A pinned box, narrow: the action's name the room) */
-.swb-settings-pin-box .swb-settings-slots > .swb-settings-slot > .swb-settings-slot-name {
-  min-width: 0;
-}
-/* A slot of a kind's item (the gesture button's Click, Swipe up): the action picked for it */
-/* The favourites for a mouse (Click) or for a finger (Touch): two segments; Touch the same as Click shown dimmed, not edited */
+/* The toolbars' bar: their tabs, New toolbar, Reset to defaults; the toolbar edited's card under them */
 .swb-settings-toolbars-bar {
   display: flex;
   flex-direction: column;

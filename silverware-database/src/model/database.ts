@@ -96,6 +96,9 @@ const KEY_RE = /^[a-z][a-z0-9_]*$/;
 /** The built-in property every database has, whatever its schema says */
 export const NAME_KEY = "name";
 
+/** The name of an item made without one (and with a number where it is taken: core and stores alike) */
+export const UNTITLED = "Untitled";
+
 /** Why a property's key cannot be one (a store may refuse more: its own `validatePropertyKey`), undefined where it can */
 export function validatePropertyKey(key: string): string | undefined {
   if (!KEY_RE.test(key)) return `"${key}" is no property key: lower case letters, digits and _, starting with a letter (due_date)`;

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { copyingFromMenu, writeClipboard } from "./clipboard.ts";
+import { writingClipboard, writeClipboard } from "./clipboard.ts";
 
 describe("writeClipboard", () => {
   afterEach(() => {
@@ -35,7 +35,7 @@ describe("writeClipboard", () => {
     expect(document.querySelector("textarea")).toBeNull();
     // An empty text (nothing selected in the field): still this copy's, whatever else listens
     const other = vi.fn();
-    window.addEventListener("copy", (e) => !copyingFromMenu() && other(e), true);
+    window.addEventListener("copy", (e) => !writingClipboard() && other(e), true);
     await writeClipboard(document, "");
     expect(data["text/plain"]).toBe("");
     expect(other).not.toHaveBeenCalled();

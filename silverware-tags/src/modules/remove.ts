@@ -9,7 +9,7 @@ import { pagesWith, subtagsOf } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule } from "../core/module.ts";
 import { counted, type Operation, type OperationOption } from "../core/operation.ts";
 import type { TagsFrom } from "../../../shared/pages/changes.ts";
-import { hashtagOf } from "../../../shared/pages/tags/names.ts";
+import { hashtagOf } from "../../../shared/markdown/inline.ts";
 
 /** How a removal goes, as the review's choices set it: where from (the page writer's `TagsFrom`), the word kept in the text or not */
 export type Removal = { readonly from: TagsFrom; readonly keepWord: boolean };

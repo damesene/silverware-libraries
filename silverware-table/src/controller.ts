@@ -19,7 +19,7 @@ import type { TableAdapter } from "./core/adapter.ts";
 import { mergeLooks } from "./core/looks.ts";
 import { Panels } from "./core/panel.ts";
 import { type DragContext, followDrag } from "./core/drag.ts";
-import { copyingFromMenu } from "./clipboard.ts";
+import { writingClipboard } from "../../shared/clipboard.ts";
 import { markTable, renderedMeta, SilverBulletAdapter } from "./core/silverbullet/adapter.ts";
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { SettingsDialog } from "./settings.ts";
@@ -1560,7 +1560,7 @@ export class Controller implements TableHost {
    * a menu (Copy, Copy as CSV) puts its own text there.
    */
   private onClipboard = (e: ClipboardEvent): void => {
-    if (copyingFromMenu()) return;
+    if (writingClipboard()) return;
     const kind = e.type === "cut" ? "cut" : "copy";
     const active = this.doc.activeElement;
     const field = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;

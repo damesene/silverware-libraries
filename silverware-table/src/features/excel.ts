@@ -13,7 +13,7 @@
 // the dialog lists them, with why, before the file is made. Functions of the
 // user's are written by the templates of silverware.table.modules.excel.functions
 // ({1}, {2}… their arguments; false: as their values).
-import { writeClipboard } from "../clipboard.ts";
+import { writeClipboard } from "../../../shared/clipboard.ts";
 import type { Feature, ModelHost, ToolbarButton, TableInfo } from "../core/feature.ts";
 import type { ConditionsOffer } from "../conditions/index.ts";
 import { excelHtml, excelText } from "../excel/clipboard.ts";

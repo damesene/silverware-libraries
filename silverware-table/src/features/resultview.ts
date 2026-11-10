@@ -5,7 +5,8 @@
 // window: no table of the page, so nothing is written, sorted or selected.
 // Copy (and the cell menu's Copy result) copies the whole result.
 import type { Dialog, ModelHost } from "../core/feature.ts";
-import { clipboardHtml, clipboardText, writeClipboard } from "../clipboard.ts";
+import { writeClipboard } from "../../../shared/clipboard.ts";
+import { clipboardHtml, clipboardText } from "../clipboard.ts";
 import { el } from "../../../shared/elements.ts";
 import { columnLetters, type Grid, scalarText } from "../formulas/index.ts";
 import { ICONS } from "../icons.ts";

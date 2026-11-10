@@ -16,8 +16,9 @@ export type DatabaseChange =
   | { readonly kind: "setLook"; readonly item: ItemKey; readonly look: ItemLook }
   // Its body (where the store keeps one: `capabilities.itemBody`), written only where it is still `was` (as `body()` read it; undefined: it had none)
   | { readonly kind: "setBody"; readonly item: ItemKey; readonly body: string; readonly was: string | undefined }
-  // A new item; `ref` names it in this transaction (what its key is once made, in the report)
-  | { readonly kind: "createItem"; readonly ref: string; readonly name: string; readonly values: Readonly<Record<string, Value>>; readonly rank?: string; readonly look?: ItemLook; readonly body?: string }
+  // A new item; `ref` names it in this transaction (what its key is once made, in the report). `tags`: those of the document
+  // it is kept in, beside the database's own (the system property Tags shows them), made with it
+  | { readonly kind: "createItem"; readonly ref: string; readonly name: string; readonly values: Readonly<Record<string, Value>>; readonly rank?: string; readonly look?: ItemLook; readonly body?: string; readonly tags?: readonly string[] }
   | { readonly kind: "removeItem"; readonly item: ItemKey }
   // A new database of the transaction's id: its first change and only there, its schema by a `setSchema` after it
   | { readonly kind: "createDatabase"; readonly name: string }

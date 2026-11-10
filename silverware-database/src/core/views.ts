@@ -1,7 +1,7 @@
 // Which views exist: the built-in ones and those defined besides (the user's,
-// `silverware.database.defineViews`, later), one of a built-in view's name in
-// its place, the others after in the order defined, as the property types'
-// registry has them. The core knows no view by name.
+// `silverware.database.defineViews`), in a registry of definitions
+// (registry.ts). The core knows no view by name.
+import { DefinitionRegistry } from "./registry.ts";
 import type { ViewDefinition } from "./view.ts";
 
 // A view's name as its settings and a place's state name it
@@ -36,37 +36,8 @@ export function validateView(view: ViewDefinition): string | undefined {
   return undefined;
 }
 
-export class ViewRegistry {
-  private offered: readonly ViewDefinition[];
-
-  constructor(private readonly builtIn: readonly ViewDefinition[] = []) {
-    this.offered = builtIn;
-  }
-
-  /** The views as offered: the built-in ones (each replaced by a defined one of its name), then the others defined */
-  all(): readonly ViewDefinition[] {
-    return this.offered;
-  }
-
-  named(name: string): ViewDefinition | undefined {
-    return this.offered.find((view) => view.name === name);
-  }
-
-  /** Views defined besides the built-in ones, in place of those defined before; what cannot be a view left out, said why */
-  define(views: readonly ViewDefinition[]): readonly string[] {
-    const problems: string[] = [];
-    const byName = new Map<string, ViewDefinition>();
-    for (const view of views) {
-      const problem = validateView(view);
-      if (problem) {
-        problems.push(problem);
-        continue;
-      }
-      if (byName.has(view.name)) problems.push(`the view "${view.name}" is defined twice: the last kept`);
-      byName.set(view.name, view);
-    }
-    const names = new Set(this.builtIn.map((view) => view.name));
-    this.offered = [...this.builtIn.map((view) => byName.get(view.name) ?? view), ...[...byName.values()].filter((view) => !names.has(view.name))];
-    return problems;
+export class ViewRegistry extends DefinitionRegistry<ViewDefinition> {
+  constructor(builtIn: readonly ViewDefinition[] = []) {
+    super(builtIn, validateView, "view");
   }
 }

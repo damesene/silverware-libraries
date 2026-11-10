@@ -1,8 +1,9 @@
 // The layers, by what each folder imports (docs/silverware-database.md,
 // *Layers*): each imports only from itself and the layers above it in LAYERS,
 // so the model knows no store, the core no page, and nothing outside
-// host/silverbullet/ names SilverBullet. Views and modules sit above the core
-// but are written against its API: they may import its types, never its code.
+// host/silverbullet/ names SilverBullet. Views, converters and modules sit
+// above the core but are written against its API: they may import its types,
+// never its code. Markdown (shared/markdown/) is read by the converters and the host.
 // Checked from the first commit, folders not made yet included: what is added
 // later falls under the rule as it comes.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -12,7 +13,7 @@ import { describe, expect, it } from "vitest";
 const SRC = import.meta.dirname;
 
 // Top down: a layer imports from itself and the layers before it only; files at src/'s root (the entry) are the host's
-const LAYERS = ["model", "domain", "views", "modules", "core", "store", "host"] as const;
+const LAYERS = ["model", "domain", "views", "converters", "modules", "core", "store", "host"] as const;
 type Layer = (typeof LAYERS)[number] | "root";
 
 // Where an import goes: a package (npm), a file outside src/ (by its path from the repository's root), a file of src/
@@ -51,17 +52,21 @@ function wrong(layer: Layer, file: string, one: Import): string | undefined {
   if (one.kind === "package") return undefined;
   if (one.kind === "outside" && !one.path.startsWith("shared/")) return `${one.path}: nothing outside src/ but shared/`;
   if (one.path.startsWith("shared/")) {
-    if (/^shared\/(filter|compare|iconref)\.ts$/.test(one.path)) return undefined;
+    // Pure data: a filter's and a comparison's rules, an icon's reference, YAML's forms
+    if (/^shared\/(filter|compare|iconref)\.ts$/.test(one.path) || one.path.startsWith("shared/yaml/")) return undefined;
     if (one.path.startsWith("shared/pages/")) return file.startsWith("store/pages/") || layer === "host" || layer === "root" ? undefined : `${one.path}: the page writer is the pages store's and the host's`;
+    if (one.path.startsWith("shared/markdown/")) return ["converters", "host", "root"].includes(layer) ? undefined : `${one.path}: markdown is the converters' and the host's`;
     if (one.path === "shared/platform.ts") return ["core", "store", "host", "root"].includes(layer) ? undefined : `${one.path}: the platform is the core's, the stores' and the host's`;
     return ["views", "modules", "core", "host", "root"].includes(layer) ? undefined : `${one.path}: shared UI is for what draws`;
   }
   const other = one.path.split("/")[0] as Layer;
   const at = LAYERS.indexOf(other as (typeof LAYERS)[number]);
   if (at < 0) return `${one.path}: no layer`;
+  // A converter reads text: nothing of what draws (views) is its
+  if (layer === "converters" && other === "views") return `${one.path}: views are not the converters'`;
   if (at <= layerIndex(layer)) return undefined;
   // Only `import type { … }` counts as types: `import { type A }` reads as a value import, the stricter side
-  if ((layer === "views" || layer === "modules") && other === "core" && one.typeOnly) return undefined;
+  if ((layer === "views" || layer === "converters" || layer === "modules") && other === "core" && one.typeOnly) return undefined;
   return `${one.path}: a layer below`;
 }
 
@@ -90,8 +95,8 @@ describe("isolation", () => {
     }
   });
 
-  it("leaves pages, frontmatter and SilverBullet out of the model, the domain, the views, the modules and the core", () => {
-    for (const layer of ["model", "domain", "views", "modules", "core"]) {
+  it("leaves pages, frontmatter and SilverBullet out of the model, the domain, the views, the converters, the modules and the core", () => {
+    for (const layer of ["model", "domain", "views", "converters", "modules", "core"]) {
       for (const file of files(join(SRC, layer))) {
         const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
         expect(/shared\/pages\//.test(code), relative(SRC, file)).toBe(false);

@@ -37,7 +37,8 @@ import type { LineMenuBuilder, LineMenuGroup, LineMenuTarget } from "../core/fea
 import { watchPress } from "../core/press.ts";
 import { insertRowWith } from "../core/structure.ts";
 import { appendRowAt } from "../pins.ts";
-import { clipboardHtml, clipboardText, writeClipboard } from "../clipboard.ts";
+import { writeClipboard } from "../../../shared/clipboard.ts";
+import { clipboardHtml, clipboardText } from "../clipboard.ts";
 import {
   columnBlockTo,
   deleteColumnsAt,

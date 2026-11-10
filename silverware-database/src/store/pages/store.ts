@@ -13,13 +13,14 @@
 // lets nothing go: the index may not have taken the write up yet.
 import { type PageBuilder, pageChanges } from "../../../../shared/pages/changes.ts";
 import { readFrontmatter } from "../../../../shared/pages/frontmatter.ts";
+import { validateName as validateTagName } from "../../../../shared/pages/tags/names.ts";
 import { type ApplyReport, type PagePlan, type PageWriter, pageWriter } from "../../../../shared/pages/writer.ts";
 import type { Index, IndexedObject, Platform, Space, TaskCount } from "../../../../shared/platform.ts";
 import type { Changes } from "../../core/changes.ts";
 import type { DatabaseStore, LooseKey, VersionStatus, MigrationScope, Planned, SkipCause, Skipped, StoreCapabilities, Target, TransactionPlan, TransactionReport, WriteProgress } from "../../core/store.ts";
 import { told } from "../../core/store.ts";
-import type { Database, DatabaseSummary, Item, ItemKey, Revised } from "../../model/database.ts";
-import { draftTransaction, type ItemState, looseKeys, type RecordState, type StoreRules, type StoreState, takenNames, withoutClashes } from "../transaction.ts";
+import { type Database, type DatabaseSummary, type Item, type ItemKey, type Revised, UNTITLED } from "../../model/database.ts";
+import { draftTransaction, type ItemState, looseKeys, type RecordState, type StoreRules, type StoreState, takenNames, untakenName, validateTagForm, withoutClashes } from "../transaction.ts";
 import { hasSystem, localStamp, type SystemFacts, withSystemValues } from "../../domain/system.ts";
 import { stableText } from "../../domain/itempart.ts";
 import { modelValue, VERSIONS, ITEM_TAG, type PagesVersion, ROOT_TAG, schemaEntry, systemOf, versionOf } from "./versions.ts";
@@ -37,6 +38,21 @@ function validatePageName(name: string, space: Pick<Space, "validateName">): str
   if (name !== name.trim()) return "a page's name starts or ends with no space";
   if (name.includes("/")) return `"${name}" holds a /, which would make a subpage`;
   return space.validateName?.(name);
+}
+
+/**
+ * A name made one a page can have: what it cannot hold (`@ # | < > $`, `[[ ]]`, a `/`, which would make a subpage)
+ * made a space, a start of `.` or `^` taken off, an end read as a file's extension (`v1.2`) joined by a dash; *Untitled*
+ * where nothing is left or the space still refuses it
+ */
+function keepablePageName(name: string, space: Pick<Space, "validateName">): string {
+  const made = name
+    .replace(/\[\[|\]\]|[@#|<>$\/]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[.^\s]+/, "")
+    .trim()
+    .replace(/\.([A-Za-z0-9]+)$/, "-$1");
+  return made && !validatePageName(made, space) ? made : UNTITLED;
 }
 
 // A database as the store reads it now: its root page, which making of it this is, its record, its items by key
@@ -152,6 +168,7 @@ export class PagesStore implements DatabaseStore {
       latestVersion: this.latest.version,
       validatePropertyKey: (key) => this.validatePropertyKey(key),
       validateItemName: (name) => this.validateItemName(name),
+      validateTag: (name) => this.validateTag(name),
       // A page's name whatever its case: a disk that ignores case has one page of the two
       nameKey: (name) => name.toLowerCase(),
     };
@@ -497,6 +514,15 @@ export class PagesStore implements DatabaseStore {
     return validatePageName(name, this.platform.space);
   }
 
+  /** A tag's form first, as every store's; then one SilverBullet can have, none of the database's own */
+  validateTag(name: string): string | undefined {
+    return validateTagForm(name) ?? validateTagName(name) ?? (name === ITEM_TAG || name === ROOT_TAG ? `"${name}" is the database's own tag` : undefined);
+  }
+
+  keepableName(name: string, taken: readonly string[]): string {
+    return untakenName(keepablePageName(name, this.platform.space), taken, this.rules.nameKey);
+  }
+
   documentOf(item: ItemKey): string | undefined {
     return this.pages.get(item);
   }
@@ -607,7 +633,7 @@ export class PagesStore implements DatabaseStore {
     if (part.kind === "record") return undefined;
     const before = this.facts.get(from);
     const now = localStamp(new Date());
-    return { created: before?.created ?? now, modified: now, page, tags: before?.tags ?? [] };
+    return { created: before?.created ?? now, modified: now, page, tags: before?.tags ?? (part.after as ItemState | undefined)?.tags ?? [] };
   }
 
   /** What the index will have of a page the store wrote (`from` the page it was, renamed), as the store reads pages */
@@ -619,7 +645,7 @@ export class PagesStore implements DatabaseStore {
     }
     const item = part.after as ItemState;
     const system = { ...(item.rank === undefined ? {} : { rank: item.rank }), ...item.lookKept, ...item.look };
-    return { name: page, tags: [ITEM_TAG, ...(this.facts.get(from)?.tags ?? [])], ...item.loose, ...item.values, ...(Object.keys(system).length ? { _database: system } : {}) };
+    return { name: page, tags: [ITEM_TAG, ...(this.facts.get(from)?.tags ?? item.tags ?? [])], ...item.loose, ...item.values, ...(Object.keys(system).length ? { _database: system } : {}) };
   }
 
   /** A database as read now: the index's objects, the pages the store wrote as it wrote them */

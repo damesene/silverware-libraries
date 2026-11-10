@@ -14,7 +14,8 @@ import type { Catalog } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule } from "../core/module.ts";
 import { type PanelOffer, type PanelRow, RENAME_OFFER, type RenameOffer } from "../core/offers.ts";
 import { pageTags } from "../../../shared/pages/tags/edit.ts";
-import { hashtagOf, isMetaTag, isWithin } from "../../../shared/pages/tags/names.ts";
+import { hashtagOf } from "../../../shared/markdown/inline.ts";
+import { isMetaTag, isWithin } from "../../../shared/pages/tags/names.ts";
 
 /**
  * The rows of a catalog's tags: each tag, and each level above tags (a row of

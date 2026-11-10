@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { addPageTags, pageTags, removePageTags, removeTags, renameTags, tagUses } from "./edit.ts";
 import { readFrontmatter, writeTags } from "./frontmatter.ts";
-import { cleanName, hashtagOf, isMetaTag, isWithin, validateName, renamedTag } from "./names.ts";
+import { hashtagOf } from "../../markdown/inline.ts";
+import { cleanName, isMetaTag, isWithin, validateName, renamedTag } from "./names.ts";
 import { scanHashtags } from "./scan.ts";
 
 const names = (text: string) => scanHashtags(text, readFrontmatter(text).bodyStart).map((t) => `${t.name}:${t.context}`);
@@ -47,6 +48,12 @@ describe("scanning", () => {
       "    #indented",
     ].join("\n");
     expect(names(text)).toEqual(["yes:paragraph", "real:paragraph"]);
+  });
+  it("leaves out an attribute's value, as SilverBullet does", () => {
+    expect(names("- [ ] task [x: #no] #yes")).toEqual(["yes:task"]);
+  });
+  it("reads a task of a state of its own as a task, as SilverBullet does", () => {
+    expect(names("- [IN PROGRESS] task #a")).toEqual(["a:task"]);
   });
   it("takes a paragraph's leading lines of tags alone as the page's", () => {
     expect(names("#a\n#b\ntext #c\n#d")).toEqual(["a:page", "b:page", "c:paragraph", "d:paragraph"]);

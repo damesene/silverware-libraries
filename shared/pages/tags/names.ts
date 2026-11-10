@@ -2,35 +2,7 @@
 // what follows its `#` (or what is in its `#<…>`), "/" parts it into levels
 // (`project/alpha` is under `project`), a convention SilverBullet shows
 // nowhere. Names are compared as written: SilverBullet's index keeps them so.
-
-// SilverBullet's tag (tagRegex, client/markdown_parser/constants.ts of 2.12.1
-// and of main 2026-10-16): a name of characters that are not spaces nor
-// punctuation, not of digits alone, not ending in a hyphen; or any text in < >
-export const TAG_SOURCE = String.raw`#(?:(?:\d*[^\d\s!@#$%^&*(),.?":{}|<>\\';\/–—][^\s!@#$%^&*(),.?":{}|<>\\]*)|(?:<[^>\n]+>))(?<!-)`;
-const WHOLE_RE = new RegExp(`^${TAG_SOURCE}$`);
-const START_RE = new RegExp(`^${TAG_SOURCE}`);
-
-/** A tag's name of its hashtag: what is in its < >, else after its # */
-export function nameOfHashtag(hashtag: string): string {
-  return hashtag.startsWith("#<") ? hashtag.slice(2, -1) : hashtag.slice(1);
-}
-
-/** A name as a hashtag: `#name`, or `#<name>` where `#name` would not read as all of it (spaces, punctuation) */
-export function hashtagOf(name: string): string {
-  const plain = `#${name}`;
-  return WHOLE_RE.test(plain) ? plain : `#<${name}>`;
-}
-
-/**
- * A name as a hashtag written before `after` (the text that follows it): in
- * < > also where `#name` would read on into that text (`#<my tag>foo` renamed
- * `b` is `#<b>foo`, not `#bfoo`)
- */
-export function hashtagBefore(name: string, after: string): string {
-  const tag = hashtagOf(name);
-  if (tag.startsWith("#<") || !after) return tag;
-  return START_RE.exec(tag + after)?.[0].length === tag.length ? tag : `#<${name}>`;
-}
+// How a name is written as a hashtag is markdown's (shared/markdown/inline.ts).
 
 /** What is wrong with a name for a tag (nothing: undefined) */
 export function validateName(name: string): string | undefined {

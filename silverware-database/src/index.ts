@@ -1,9 +1,11 @@
 // Silverware Database in SilverBullet: what the library's pages call. The init
 // page hands over SilverBullet's API (`init`), draws each `silverware-database`
 // block through `render`, tells the index's changes (`indexChanged`) and runs
-// the commands; the API page defines the user's own views and types
-// (`defineViews`, `defineTypes`), before `init`, as Space Lua loads.
+// the commands; the API page defines the user's own views, types and
+// converters (`defineViews`, `defineTypes`, `defineConverters`), before
+// `init`, as Space Lua loads.
 import { iconsOf } from "../../shared/icons.ts";
+import { linesOf, linesUnder } from "../../shared/markdown/lines.ts";
 import { type ConflictHost, openConflict } from "./core/conflictdialog.ts";
 import type { ItemConflict } from "./core/core.ts";
 import type { Item } from "./model/database.ts";
@@ -15,30 +17,36 @@ import { DatabaseCore } from "./core/core.ts";
 import { Modules } from "./core/module.ts";
 import { documentsHost, platformDocuments } from "./core/documents.ts";
 import { mentionsHost } from "./core/mentions.ts";
-import { DatabasePlace } from "./core/place.ts";
+import { DatabasePlace, VIEW_KEY, viewSettingPath } from "./core/place.ts";
+import { STATE_KEYS } from "./core/statekeys.ts";
 import { openDeleteDatabase } from "./core/deletedatabase.ts";
 import { SettingsDialog } from "./core/settings.ts";
 import type { ViewDefinition } from "./core/view.ts";
+import { type ConvertedView, type ConverterDefinition, ConverterRegistry, validateConverter } from "./core/converter.ts";
+import type { Named } from "./core/registry.ts";
 import { validateView, ViewRegistry } from "./core/views.ts";
 import { guardedType, TYPE_HELPERS, validateType } from "./domain/types/custom.ts";
 import { VIEW_HELPERS } from "./views/helpers.ts";
 import { TypeRegistry } from "./domain/types/registry.ts";
 import type { PropertyType } from "./domain/types/type.ts";
-import { BLOCK_LANGUAGE, BlockState, readBlock } from "./host/silverbullet/block.ts";
+import { BLOCK_LANGUAGE, BlockState, readBlock, writeBlock as blockWithState } from "./host/silverbullet/block.ts";
 import { blockPlaces } from "./host/silverbullet/places.ts";
 import { type Bridge, editorArea, editorLook, silverBulletPlatform, watchEditorArea } from "./host/silverbullet/platform.ts";
 import { PagesStore } from "./store/pages/store.ts";
 import { BUILT_IN_MODULES } from "./modules/builtin.ts";
 import { BUILT_IN_VIEWS } from "./views/builtin/index.ts";
+import { BUILT_IN_CONVERTERS } from "./converters/builtin/index.ts";
 
 export type { Bridge } from "./host/silverbullet/platform.ts";
 
 // The registries, defined into as Space Lua loads (before `init`: the API page has priority 50)
 const views = new ViewRegistry(BUILT_IN_VIEWS);
 const types = new TypeRegistry();
-// The user's views by name (one defined again: the last), in the order first defined
+const converters = new ConverterRegistry(BUILT_IN_CONVERTERS);
+// The user's views (and converters) by name (one defined again: the last), in the order first defined
 let customViews = new Map<string, ViewDefinition>();
 let customTypes = new Map<string, PropertyType>();
+let customConverters = new Map<string, ConverterDefinition>();
 // A failure of a custom type told once per page load (a view asks a type for every value it shows)
 const typeFailures = new Set<string>();
 
@@ -86,6 +94,8 @@ const COMMANDS: Readonly<Record<string, () => Promise<void>>> = {
   "Silverware Database: New database": newDatabase,
   // A database's block at the cursor: a database picked, or a new one (also the slash command /database)
   "Silverware Database: Insert database": insertDatabase,
+  // The lines selected (or the cursor's line and those under it) made a new database, its block put under them
+  "Silverware Database: Convert selection to database": convertSelection,
   // The last change of any database put back (a view's Undo puts back its own database's)
   "Silverware Database: Undo": async () => {
     await app!.core.undo();
@@ -263,28 +273,50 @@ export async function runCommand(name: string): Promise<void> {
 export function resetDefinitions(): void {
   customViews = new Map();
   customTypes = new Map();
+  customConverters = new Map();
   typeFailures.clear();
   views.define([]);
   types.define([]);
+  converters.define([]);
 }
 
 /** The user's views (a JS module's: a list, or a function giving one); what cannot be a view said, the others defined */
 export function defineViews(definitions: unknown): string | undefined {
   const list = listOf(definitions, VIEW_HELPERS);
   if (typeof list === "string") return list;
-  // Only the views that can be one kept, by name: a mistake (a view defined twice in this call) said once, not with later ones
-  const problems: string[] = [];
-  const named = new Set<string>();
-  for (const one of list as ViewDefinition[]) {
-    const problem = validateView(one) ?? (named.has(one.name) ? `the view "${one.name}" is defined twice: the last kept` : undefined);
-    if (problem) problems.push(problem);
-    if (validateView(one)) continue;
-    named.add(one.name);
-    customViews.set(one.name, one);
-  }
+  const problems = keepDefined(list as ViewDefinition[], customViews, validateView, "view");
   views.define([...customViews.values()]);
   redrawAll();
   return problems.length ? `Silverware Database: ${problems.join("; ")}` : undefined;
+}
+
+/** The user's converters (a JS module's: a list, or a function giving one); what cannot be a converter said, the others defined */
+export function defineConverters(definitions: unknown): string | undefined {
+  const list = listOf(definitions, {});
+  if (typeof list === "string") return list;
+  const problems = keepDefined(list as ConverterDefinition[], customConverters, validateConverter, "converter");
+  converters.define([...customConverters.values()]);
+  return problems.length ? `Silverware Database: ${problems.join("; ")}` : undefined;
+}
+
+/**
+ * A call's definitions kept by name (one defined again, in this call or an earlier one: the last), in the order first
+ * defined; what cannot be one, and one defined twice in this call, said once
+ */
+function keepDefined<T extends Named>(list: readonly T[], kept: Map<string, T>, validate: (one: T) => string | undefined, kind: string): string[] {
+  const problems: string[] = [];
+  const named = new Set<string>();
+  for (const one of list) {
+    const problem = validate(one);
+    if (problem) {
+      problems.push(problem);
+      continue;
+    }
+    if (named.has(one.name)) problems.push(`the ${kind} "${one.name}" is defined twice: the last kept`);
+    named.add(one.name);
+    kept.set(one.name, one);
+  }
+  return problems;
 }
 
 /** The user's property types (a JS module's: a list, or a function giving one) */
@@ -346,7 +378,7 @@ function start(element: HTMLElement, shown: Shown): void {
   // (The place before it for this block over the window: this one so from its first drawing, no frame in the page between)
   const before = handovers.get(JSON.stringify([shown.page, shown.current]));
   const overWindow = !!before && before.until > Date.now() && before.from !== shown.place && before.from.isOverWindow;
-  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, overWindow, settings: platform.settings, ui: platform.ui, editor: platform.editor, documents: platformDocuments(app!.platform), moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), moduleTools: (place) => app!.modules.placeTools(place), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database, from) => app!.modules.openItem(item, database, from), editSource: () => void editSource(element, shown), deleteDatabase: (one, name) => deleteDatabase(core, one, name), takeOver });
+  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, converters: () => converters.all(), overWindow, settings: platform.settings, ui: platform.ui, editor: platform.editor, documents: platformDocuments(app!.platform), moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), moduleTools: (place) => app!.modules.placeTools(place), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database, from) => app!.modules.openItem(item, database, from), editSource: () => void editSource(element, shown), deleteDatabase: (one, name) => deleteDatabase(core, one, name), takeOver });
   void shown.place.render();
 }
 
@@ -554,6 +586,76 @@ async function newDatabase(): Promise<void> {
 
 /** A database's block as written at the cursor (a line break before it: the cursor may be at the end of a line of text) */
 const blockText = (id: string) => `\n\`\`\`${BLOCK_LANGUAGE}\nid: ${id}\n\`\`\`\n`;
+
+/**
+ * The lines selected, whole (a cursor: its line with those under it), read by the converters; what one of them read
+ * (picked where several read anything) made a new database beside the page, its block put under the lines, and the
+ * lines selected again, so Delete takes them away where they are not wanted (docs/silverware-database-converters.md)
+ */
+async function convertSelection(): Promise<void> {
+  const { core, platform } = app!;
+  const { editor, ui } = platform;
+  if (!editor.selection || !editor.select) return void ui.notify("Silverware Database: this editor tells no selection", { type: "error" });
+  const text = await editor.text();
+  const selected = await editor.selection();
+  const range = selected.from === selected.to ? linesUnder(text, selected.from) : wholeLines(text, selected.from, selected.to);
+  const lines = text.slice(range.from, range.to);
+  const read = converters.all().flatMap((converter) => {
+    try {
+      const converted = converter.read(lines);
+      if (converted instanceof Promise) throw new Error("its read gives a promise: it is to give what it read at once");
+      return converted?.items.length ? [{ converter, converted }] : [];
+    } catch (error) {
+      ui.notify(`Silverware Database: the converter "${converter.name}" failed: ${error instanceof Error ? error.message : String(error)}`, { type: "error" });
+      return [];
+    }
+  });
+  if (!read.length) return void ui.notify("Silverware Database: nothing here to convert (select a list of tasks)", { type: "error" });
+  let chosen = read[0]!;
+  if (read.length > 1 && ui.pick) {
+    const picked = await ui.pick("Convert the lines as", read.map((one, at) => ({ name: one.converter.label, description: one.converter.description ?? "", at })));
+    if (!picked) return;
+    chosen = read[picked.at]!;
+  }
+  const name = await bridgePrompt("The new database's name");
+  if (!name?.trim()) return;
+  app!.home = String(await editor.documentName());
+  const result = await core.createDatabaseOf(name, chosen.converted);
+  if ("problem" in result) return;
+  // Under the lines as they are now (changed meanwhile: at the cursor, nothing selected), a blank line between: a selection
+  // touching the block shows its markdown, not the database
+  const body = await convertedBlock(result.id, chosen.converted.view, result.keys);
+  const block = `\`\`\`${BLOCK_LANGUAGE}\n${body}\n\`\`\`\n`;
+  const now = await editor.text();
+  if (now.slice(range.from, range.to) !== lines) return insertAtCursor(`\n${block}`);
+  if (range.to < now.length) {
+    await editor.replace(range.to + 1, range.to + 1, `\n${block}`);
+    await editor.select(range.from, range.to + 1);
+  } else {
+    await editor.replace(range.to, range.to, `\n\n${block}`);
+    await editor.select(range.from, range.to);
+  }
+}
+
+/**
+ * A converted database's block: its id, the view the converter asks for first where that view is there and on (else
+ * none: the place shows the first on), grouped by the property it names under the key that property got (`keys`)
+ */
+async function convertedBlock(id: string, view: ConvertedView | undefined, keys: Readonly<Record<string, string>>): Promise<string> {
+  const on = view !== undefined && views.named(view.name) !== undefined && (await app!.platform.settings.get(viewSettingPath(view.name, "enabled"), true)) !== false;
+  const shown = on ? view : undefined;
+  const groupBy = shown?.groupBy === undefined ? undefined : (keys[shown.groupBy] ?? shown.groupBy);
+  return blockWithState(`id: ${id}`, {
+    ...(shown ? { [VIEW_KEY]: shown.name } : {}),
+    ...(shown && groupBy ? { [`${shown.name}.${STATE_KEYS.groupBy}`]: groupBy } : {}),
+  }).replace(/\n+$/, "");
+}
+
+/** The lines `from`..`to` touches, whole: where the first starts and the last ends */
+function wholeLines(text: string, from: number, to: number): { readonly from: number; readonly to: number } {
+  const lines = linesOf(text, Math.min(from, to), Math.max(from, to));
+  return { from: lines[0]!.from, to: lines.at(-1)!.to };
+}
 
 /** A database's block at the cursor: one of the space's picked, or New database… first (made as by its command) */
 async function insertDatabase(): Promise<void> {

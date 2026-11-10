@@ -1,6 +1,6 @@
 # Silverware Database
 
-Databases in the spirit of Notion: one item one page, its properties the page's frontmatter, shown by a ```` ```silverware-database ```` code block in table, list, board, calendar and timeline views. Prefix `swd-`, settings and API under `silverware.database` (`defineViews`, `defineTypes` on the API page). On `main` since PR #13 (`feat/database`) was merged, listed in REPO.md; still growing.
+Databases in the spirit of Notion: one item one page, its properties the page's frontmatter, shown by a ```` ```silverware-database ```` code block in table, list, board, calendar and timeline views. Prefix `swd-`, settings and API under `silverware.database` (`defineViews`, `defineTypes`, `defineConverters` on the API page). On `main` since PR #13 (`feat/database`) was merged, listed in REPO.md; still growing.
 
 - The plan, the probes' results, every step's decisions and what each review left open: [docs/silverware-database.md](../docs/silverware-database.md) (*Layers*, *The pages store*, *Probes*, then the dated sections). Read the relevant section before changing a part.
 - Conditional formatting: planned, nothing built ([docs/silverware-database-conditional-formatting.md](../docs/silverware-database-conditional-formatting.md): Silverware Table's `conditions/` domain shared, one evaluation for every view).
@@ -8,11 +8,12 @@ Databases in the spirit of Notion: one item one page, its properties the page's 
 
 ## Layers (decided 2026-11-07)
 
-The database knows neither SilverBullet nor pages. `src/isolation.test.ts` checks by folder, in the order `model`, `domain`, `views`, `modules`, `core`, `store`, `host` (then src/'s root files, the entry): each imports only itself and the folders before it.
+The database knows neither SilverBullet nor pages. `src/isolation.test.ts` checks by folder, in the order `model`, `domain`, `views`, `converters`, `modules`, `core`, `store`, `host` (then src/'s root files, the entry): each imports only itself and the folders before it.
 
-- `views/` and `modules/` may import the core's **types only** (`import type`), never its code; they are written against `ViewHost` / `ModuleHost`.
+- `views/`, `converters/` and `modules/` may import the core's **types only** (`import type`), never its code; they are written against `ViewHost` / `ModuleHost` / `ConverterDefinition`.
+- **Converters** (`core/converter.ts`, `converters/builtin/`): text selected read as items and the properties they need; what is made of it is the core's (`createDatabase(name, properties, items)`, one transaction). Only they (and the host) read markdown (`shared/markdown/`).
 - `shared/pages/` (the page writer) only from `store/pages/`, `host/` and the root; `shared/platform.ts` only from core, store, host, root; other shared UI only from what draws (views, modules, core, host).
-- No `frontmatter`, `silverbullet` nor `shared/pages/` in model, domain, views, modules or core; no SilverBullet index names (`lastModified`, `itags`, `PAGE_KEYS`…) in `store/`: the store asks the platform (`Index.reservedKeys`, `documentDates`, `tasks`; `Space.validateName`), the binding (`host/silverbullet/`) answers.
+- No `frontmatter`, `silverbullet` nor `shared/pages/` in model, domain, views, converters, modules or core; no SilverBullet index names (`lastModified`, `itags`, `PAGE_KEYS`…) in `store/`: the store asks the platform (`Index.reservedKeys`, `documentDates`, `tasks`; `Space.validateName`), the binding (`host/silverbullet/`) answers.
 - **An item is an `ItemKey`, opaque**: held, compared, given back, never made or read outside the store. That an item is a page is the pages store's alone.
 
 ## Invariants

@@ -519,6 +519,57 @@ test("the command New database makes its root page beside the page open and its 
   await expect(page.locator(".swd-view-picker")).toHaveAttribute("data-view", "table");
 });
 
+test("Convert selection to database makes a database of the tasks selected, its block under them, the tasks still selected", async ({ page, space }) => {
+  const tasks = "- [ ] Call @ada [due: 2026-11-12]\n  - [ ] Prepare notes\n- [x] Send the offer #sales\n";
+  await space.open({ Page: `# Page\n\n${tasks}\nAfter\n` }, "Page");
+  await expect.poll(() => editorText(page)).toBe(`# Page\n\n${tasks}\nAfter\n`);
+  type View = { state: { doc: { toString(): string }; selection: { main: { from: number; to: number } } }; dispatch(spec: unknown): void };
+  await page.evaluate((selected) => {
+    const editor = (window as unknown as { client: { editorView: View } }).client.editorView;
+    const text = editor.state.doc.toString();
+    const from = text.indexOf(selected);
+    editor.dispatch({ selection: { anchor: from + 2, head: from + selected.length - 3 } });
+  }, tasks);
+  await runCommand(page, "Silverware Database: Convert selection to database");
+  const field = page.locator(".sb-modal-box input").first();
+  await field.fill("Calls");
+  await field.press("Enter");
+  await expect(page.locator(".swd-place")).toHaveCount(1);
+  const block = "```silverware-database\nid: calls\nview: board\nboard.groupBy: status\n```\n";
+  await expect.poll(() => editorText(page)).toBe(`# Page\n\n${tasks}\n${block}\nAfter\n`);
+  await expect(page.locator(".swd-view-picker")).toHaveAttribute("data-view", "board");
+  await expect.poll(() => space.saved("Page/db-calls/Send the offer")).toMatch(/^---\ntags: \[db, sales\]\nstatus: Done\n/);
+  // (The task's text first in the item's, its attribute escaped: the page's own value is the frontmatter's)
+  expect(await space.saved("Page/db-calls/Call")).toContain("Call @ada \\[due: 2026-11-12]\n\n- [ ] Prepare notes");
+  // The tasks still selected: Delete takes them away, the block staying
+  const selected = await page.evaluate(() => {
+    const editor = (window as unknown as { client: { editorView: View } }).client.editorView;
+    const { from, to } = editor.state.selection.main;
+    return editor.state.doc.toString().slice(from, to);
+  });
+  expect(selected).toBe(tasks);
+  await page.keyboard.press("Delete");
+  await expect.poll(() => editorText(page)).toBe(`# Page\n\n\n${block}\nAfter\n`);
+});
+
+test("Copy as tasks in ⋯ puts the items shown on the clipboard as tasks", async ({ page, space }) => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await space.open(
+    {
+      Page: "# Page\n\n```silverware-database\nid: tasks\n```\n",
+      "Page/db-tasks": "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    done: { type: checkbox, label: Done }\n    due: { type: date, label: Due }\n---\n",
+      "Page/db-tasks/Call": "---\ntags: [db]\ndone: false\ndue: \"2026-11-12\"\n_database:\n  rank: a0\n---\n",
+      "Page/db-tasks/Send": "---\ntags: [db]\ndone: true\n_database:\n  rank: a1\n---\n",
+    },
+    "Page",
+  );
+  await expect(page.locator(".swd-place")).toHaveCount(1);
+  await page.locator(".swd-more").click();
+  await page.locator(".swd-menu .swd-menu-item", { hasText: "Copy as tasks" }).click();
+  // (Read back as the system keeps it: Windows' line breaks CRLF)
+  await expect.poll(async () => (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, "\n")).toBe('- [ ] Call [due: "2026-11-12"]\n- [x] Send\n');
+});
+
 test("a block in a list item is not written, said why, the page as it was", async ({ page, space }) => {
   const listed = "# Page\n\n- item\n  ```silverware-database\n  id: tasks\n  view: names\n  ```\n- next\n";
   await space.open({ Page: listed, ...TASKS }, "Page");

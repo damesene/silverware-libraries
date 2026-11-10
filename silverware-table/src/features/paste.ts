@@ -9,7 +9,8 @@
 // module's (the core tells of the copy: the cells are outlined here). Reading the
 // clipboard's text and planning the paste is paste.ts; this is the editor's
 // and the menu's side.
-import { clipboardHtml, clipboardText, writeClipboard } from "../clipboard.ts";
+import { writeClipboard } from "../../../shared/clipboard.ts";
+import { clipboardHtml, clipboardText } from "../clipboard.ts";
 import {
   CELL_MENU_ORDER,
   type CellEditor,

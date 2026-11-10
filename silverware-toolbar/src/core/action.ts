@@ -5,10 +5,10 @@
 // shows it, nor how the change is written (one edit, one undo step).
 
 import type { Icons } from "../../../shared/icons.ts";
+import type { Line } from "../../../shared/markdown/lines.ts";
 import type { ItemKind } from "./items.ts";
 
-/** A line of the page's text: where it is (its end before the line break) and its text */
-export type Line = { readonly from: number; readonly to: number; readonly text: string };
+export type { Line } from "../../../shared/markdown/lines.ts";
 
 /** The selection an action works on, and the page around it */
 export type Context = {

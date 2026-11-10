@@ -4,7 +4,7 @@
 // rows as plain markdown, each cell's markdown kept (links, formatting, a
 // formula's result) without the hidden tags and the metadata row, so the copy
 // is the table as any renderer shows it, nothing of Silverware Table's in it.
-import { writeClipboard } from "../clipboard.ts";
+import { writeClipboard } from "../../../shared/clipboard.ts";
 import type { Feature, ModelHost, ToolbarButton, TableInfo } from "../core/feature.ts";
 import { currentTable, exportedTable } from "../export/table.ts";
 import { ICONS } from "../icons.ts";

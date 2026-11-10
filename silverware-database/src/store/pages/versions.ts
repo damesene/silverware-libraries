@@ -5,7 +5,7 @@
 // the latest; a database of an older version is migrated first, one of a
 // newer version read (by the latest reader, as best it can) and never written.
 import type { PageBuilder } from "../../../../shared/pages/changes.ts";
-import type { YamlMap } from "../../../../shared/pages/yamltree.ts";
+import type { YamlMap } from "../../../../shared/yaml/tree.ts";
 import type { IndexedObject } from "../../../../shared/platform.ts";
 import type { Property, Value } from "../../model/database.ts";
 import { readLook } from "../../domain/look.ts";
@@ -161,7 +161,7 @@ export const VERSION_1: PagesVersion = {
     }
   },
   writeItem(page, before, after) {
-    if (!before) page.tags.add(ITEM_TAG);
+    if (!before) page.tags.add([ITEM_TAG, ...(after.tags ?? [])]);
     for (const [key, value] of Object.entries(after.values)) if (JSON.stringify(before?.values[key]) !== JSON.stringify(value)) page.properties.set(key, value);
     for (const key of Object.keys(before?.values ?? {})) if (!(key in after.values)) page.properties.remove(key);
     // (A key the schema has none of, taken off)

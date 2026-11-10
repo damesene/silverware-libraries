@@ -1,17 +1,20 @@
 // The hashtags of a page's body, found as SilverBullet's parser finds them
 // (`Hashtag`, an inline element wherever a `#` starts one): not in the
-// frontmatter (frontmatter.ts reads it), fenced or indented code, inline code,
-// wiki links, a link's target, URLs, HTML tags and comments, entities, Space
-// Lua's `${…}`, nor a `#` escaped. Each with its place in the text and its
-// context, as SilverBullet's index tells them apart (plugs/index/tags.ts and
-// frontmatter.ts): a page's tag line (a paragraph directly under the document
-// of hashtags alone: its lines up to the first holding anything else), a
-// paragraph (a quote's too), an item, a task, a table, a heading.
+// frontmatter (frontmatter.ts reads it), fenced or indented code, nor where a
+// line's marks leave none (shared/markdown/inline.ts: inline code, wiki links,
+// attributes' values, a link's target, URLs, HTML, a `#` escaped). Each with
+// its place in the text and its context, as SilverBullet's index tells them
+// apart (plugs/index/tags.ts and frontmatter.ts): a page's tag line (a
+// paragraph directly under the document of hashtags alone: its lines up to the
+// first holding anything else), a paragraph (a quote's too), an item, a task,
+// a table, a heading.
 //
 // A line-by-line reading, not a markdown parser: lists, quotes and code are
 // told by their lines' starts. Behind `TagScanner`, so another (SilverBullet's
 // own parser) could take its place.
-import { nameOfHashtag, TAG_SOURCE } from "./names.ts";
+import { inlineMarks } from "../../markdown/inline.ts";
+import type { Line } from "../../markdown/lines.ts";
+import { readTaskLine } from "../../markdown/task.ts";
 
 export type TagContext = "page" | "paragraph" | "item" | "task" | "table" | "heading";
 
@@ -27,19 +30,15 @@ export type Hashtag = {
 
 export type TagScanner = (text: string, bodyStart: number) => readonly Hashtag[];
 
-const TAG_RE = new RegExp(TAG_SOURCE, "y");
+// A fence read over a whole page, in a quote too (`> ````), which shared/markdown/lines.ts' fences, read over the
+// lines a selection touches, leave to the caller
 const FENCE_RE = /^ {0,3}(?:>\s?)*\s*(`{3,}|~{3,})/;
 const LIST_RE = /^(\s*)(?:[-*+]|\d{1,9}[.)])(?:\s+|$)/;
-const TASK_RE = /^\s*(?:[-*+]|\d{1,9}[.)])\s+\[[^\]\n]\](?:\s|$)/;
 const HEADING_RE = /^ {0,3}#{1,6}(?=\s|$)/;
 const QUOTE_RE = /^ {0,3}>/;
 const TABLE_RE = /^\s*\|/;
-const ENTITY_RE = /&(?:#\d{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});/y;
-const URL_RE = /https?:\/\/[^\s<>]*/y;
-const HTML_RE = /<\/?[A-Za-z][^>\n]*>|<![^>\n]*>/y;
 
-type Line = { readonly from: number; readonly to: number; readonly text: string };
-
+/** Every line of the text from `start` (a line's start), the last one after a final line break too */
 function linesOf(text: string, start: number): Line[] {
   const lines: Line[] = [];
   let from = start;
@@ -93,7 +92,7 @@ export const scanHashtags: TagScanner = (text, bodyStart) => {
     }
     indentedCode = false;
     let context: TagContext;
-    if (TASK_RE.test(t)) context = inList = "task";
+    if (readTaskLine(t)) context = inList = "task";
     else if (LIST_RE.test(t)) context = inList = "item";
     else if (inList && (indent.length > 0 || !blankBefore)) context = inList;
     else {
@@ -105,7 +104,7 @@ export const scanHashtags: TagScanner = (text, bodyStart) => {
     }
     const own: Hashtag[] = [];
     const start = context === "heading" ? HEADING_RE.exec(t)![0].length : 0;
-    const rest = inline(text, line, start, own);
+    const rest = inline(line, start, own);
     // A paragraph directly under the document: its leading lines of hashtags alone are the page's tags
     if (context === "paragraph" && !QUOTE_RE.test(t) && indent.length < 4) {
       paragraph ??= { tagsOnly: true };
@@ -122,94 +121,14 @@ export const scanHashtags: TagScanner = (text, bodyStart) => {
  * The hashtags of a line from `start` (in its own text) into `found`, their
  * context to be set; gives the line's text without them (what else it holds)
  */
-function inline(text: string, line: Line, start: number, found: Hashtag[]): string {
-  const t = line.text;
-  let rest = t.slice(0, start);
-  let i = start;
-  const skipTo = (end: number) => {
-    rest += t.slice(i, end);
-    i = end;
-  };
-  while (i < t.length) {
-    const c = t[i]!;
-    if (c === "\\" && i + 1 < t.length) {
-      skipTo(i + 2);
-      continue;
-    }
-    if (c === "`") {
-      const run = /`+/y;
-      run.lastIndex = i;
-      const ticks = run.exec(t)![0];
-      const close = t.indexOf(ticks, i + ticks.length);
-      skipTo(close < 0 ? i + ticks.length : close + ticks.length);
-      continue;
-    }
-    if (t.startsWith("[[", i)) {
-      const close = t.indexOf("]]", i + 2);
-      if (close >= 0) {
-        skipTo(close + 2);
-        continue;
-      }
-    }
-    if (t.startsWith("](", i)) {
-      let depth = 0;
-      let j = i + 1;
-      for (; j < t.length; j++) {
-        if (t[j] === "(") depth++;
-        else if (t[j] === ")" && --depth === 0) break;
-      }
-      skipTo(Math.min(j + 1, t.length));
-      continue;
-    }
-    if (t.startsWith("<!--", i)) {
-      const close = t.indexOf("-->", i + 4);
-      skipTo(close < 0 ? t.length : close + 3);
-      continue;
-    }
-    if (t.startsWith("${", i)) {
-      let depth = 0;
-      let j = i + 1;
-      for (; j < t.length; j++) {
-        if (t[j] === "{") depth++;
-        else if (t[j] === "}" && --depth === 0) break;
-      }
-      skipTo(Math.min(j + 1, t.length));
-      continue;
-    }
-    const sticky = (re: RegExp) => {
-      re.lastIndex = i;
-      return re.exec(t)?.[0];
-    };
-    if (c === "<") {
-      const tag = sticky(HTML_RE);
-      if (tag) {
-        skipTo(i + tag.length);
-        continue;
-      }
-    }
-    if (c === "&") {
-      const entity = sticky(ENTITY_RE);
-      if (entity) {
-        skipTo(i + entity.length);
-        continue;
-      }
-    }
-    if (c === "h") {
-      const url = sticky(URL_RE);
-      if (url) {
-        skipTo(i + url.length);
-        continue;
-      }
-    }
-    if (c === "#") {
-      const tag = sticky(TAG_RE);
-      if (tag) {
-        found.push({ name: nameOfHashtag(tag), from: line.from + i, to: line.from + i + tag.length, context: "paragraph", line: { from: line.from, to: line.to } });
-        i += tag.length;
-        continue;
-      }
-    }
-    skipTo(i + 1);
+function inline(line: Line, start: number, found: Hashtag[]): string {
+  let rest = "";
+  let at = 0;
+  for (const mark of inlineMarks(line.text, start)) {
+    if (mark.kind !== "tag") continue;
+    found.push({ name: mark.name, from: line.from + mark.from, to: line.from + mark.to, context: "paragraph", line: { from: line.from, to: line.to } });
+    rest += line.text.slice(at, mark.from);
+    at = mark.to;
   }
-  return rest;
+  return rest + line.text.slice(at);
 }

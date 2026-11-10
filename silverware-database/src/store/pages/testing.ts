@@ -7,7 +7,7 @@
 // query has it (as SilverBullet's did, seen 2026-11-07).
 import { localStamp, tasksIn } from "../../domain/system.ts";
 import { readFrontmatter } from "../../../../shared/pages/frontmatter.ts";
-import { readYamlMap } from "../../../../shared/pages/yamltree.ts";
+import { readYamlMap } from "../../../../shared/yaml/tree.ts";
 import type { Editor, Index, IndexChange, IndexedObject, Platform, Space } from "../../../../shared/platform.ts";
 
 export type MemoryPages = {

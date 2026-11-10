@@ -39,6 +39,7 @@ npm run deploy -- <space folder>   # copy every plugin into a local space's Libr
 
 ## Working rules
 
+- **A plan is always a file of its own in docs/** (`docs/silverware-<name>-<topic>.md`), never written into a CLAUDE.md: a CLAUDE.md says what the code is and how to work in it, not what is to be built.
 - **Commit only when the user says so**; never push unless asked, never to `main`. A change spanning several fixes is split into commits, each with the bundles built from its own changes.
 - **Every commit**: `npm run build`, then `npm run verify` passes. A stale committed bundle ships old code; check-build fails on it.
 - **Commit messages**: [Conventional Commits](https://www.conventionalcommits.org), one line `<type>(<scope>): <description>`, imperative, lowercase, no period, no body, **no AI co-author trailer**. Types `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `chore`, `style`; scope the plugin (`table`, `toolbar`, `tags`, `chart`, `database`, `icons`), `playground`, or none for the repository. A change that breaks what a space has (settings, the Space Lua API, a theme's selectors or variables, stored markdown) is marked `!`: `feat(toolbar)!: …`. History before 2026-10-22 uses `Table Plus: …` / `Silverware: …` subjects.
@@ -61,6 +62,9 @@ Bundled into each plugin (nothing is shared at run time); its classes by a base 
 
 - CSS of what shared/ draws is a template per part (`menu.css`, `diffview.css`, `icons.css`; `__base__` the plugin's base), written by `scripts/sharedstyles.mjs` into each style page using it between `/* <shared-…> */` marks; check-build fails where a block differs. Edit the template, never a page's block.
 - `pages/` is the page writer, the one place that knows how anything is written in a page (Silverware Tags and Silverware Database write through it, never a page's text themselves). `platform.ts` is interfaces only (`Platform = { editor, space, index, ui, settings }`): each plugin's binding makes it.
+- `markdown/` reads markdown as SilverBullet's parser does, pure and line by line: the lines a selection touches and fenced code (`lines.ts`), a line's hashtags, mentions, wiki links and attributes (`inline.ts`, which `pages/tags/scan.ts` reads hashtags by), a task's line and its attributes written back (`task.ts`). It writes no page: that is `pages/`.
+- `yaml/`: YAML's scalars (`scalar.ts`) and the few nested forms a plugin writes (`tree.ts`), pure; `pages/` and `markdown/` stand on it.
+- `clipboard.ts`: text (and HTML) onto the clipboard from a menu or a button, by the copy command where a page over http has no Clipboard API.
 - `configpage.ts`: settings in the CONFIG page. Tables (the toolbar's favourites) go in a plugin's own block, not the Configuration Manager's: it reads no table back (`parseLuaLiteral`) and rewrites its block from what it read on any save, so a table there would be lost (its source, 2026-10-26: `ui/use_config_editor.ts`, `configuration.ts`).
 - `icons.ts` / `iconref.ts`: how a plugin draws and picks its user's icons (Silverware Icons' API or a stand-in) and how a value is written (`<set>:<name>` or text); see silverware-icons/CLAUDE.md.
 - `elements.ts` `el(...)`: a plugin's own elements in one synchronous expression; no reactive library (weighed, docs/ui-without-framework.md).

@@ -486,6 +486,75 @@ describe("the core", () => {
     expect(await core.createDatabase("x", [{ label: "Status", type: "nope" }])).toHaveProperty("problem");
   });
 
+  it("makes a database with its items in their order, in one transaction undone whole", async () => {
+    const { core, store, told } = setup();
+    const made = await core.createDatabase("Ideas", [{ label: "Done", type: "checkbox" }, { label: "Tags", type: "tags", system: "tags" }], [
+      { name: "First", values: { done: true }, body: "Notes\n", tags: ["sales"] },
+      { name: "Second", values: {} },
+      {},
+    ]);
+    expect(made).toMatchObject({ id: "ideas" });
+    const items = inRankOrder((await store.items("ideas")).value);
+    expect(items.map((one) => [one.name, one.values.done, one.values.page_tags, one.body])).toEqual([
+      ["First", true, ["sales"], "Notes\n"],
+      ["Second", undefined, [], undefined],
+      ["Untitled", undefined, [], undefined],
+    ]);
+    await core.undo();
+    expect((await store.databases()).map((one) => one.id)).toEqual(["tasks"]);
+    expect(told).toEqual([]);
+  });
+
+  it("refuses a database whole where an item cannot be made as given", async () => {
+    const { core, store } = setup();
+    const tags = { label: "Tags", type: "tags", system: "tags" };
+    expect(await core.createDatabase("Ideas", [], [{ name: "A", values: { nope: "x" } }])).toMatchObject({ problem: 'No property "nope"' });
+    expect(await core.createDatabase("Ideas", [tags], [{ name: "A", values: { page_tags: ["x"] } }])).toMatchObject({ problem: "Tags is read only" });
+    expect(await core.createDatabase("Ideas", [], [{ name: "A" }, { name: "A" }])).toMatchObject({ problem: 'An item named "A" exists already' });
+    // Refused by the store as planned (a tag it cannot keep): nothing written
+    expect(await core.createDatabase("Ideas", [], [{ name: "A" }, { name: "B", tags: ["#b"] }])).toMatchObject({ problem: expect.stringContaining("Add database Ideas with 2 items: nothing was written") });
+    expect((await store.databases()).map((one) => one.id)).toEqual(["tasks"]);
+  });
+
+  it("makes a database of what a converter read: names kept as the store keeps them, the source first where the name is not it", async () => {
+    const { core, store } = setup();
+    const made = await core.createDatabaseOf("Ideas", {
+      properties: [
+        { key: "name", label: "Name", type: "text" },
+        { key: "Due", label: "Done", type: "date" },
+        { key: "done", label: "Done", type: "checkbox" },
+        { key: "page_tags", label: "Tags", type: "tags", system: "tags" },
+      ],
+      items: [
+        { name: "Call", values: { name: "x", Due: "2026-11-12", done: true }, source: "Call @ada", body: "- [ ] sub", tags: ["sales", " bad"] },
+        { name: "Call", source: "Call" },
+        { name: "  " },
+      ],
+    });
+    expect(made).toMatchObject({ id: "ideas" });
+    const schema = (await store.database("ideas"))!.value.properties;
+    expect(schema.map((one) => [one.key, one.label])).toEqual([
+      ["name_2", "Name"],
+      ["due", "Done"],
+      ["done", "Done 2"],
+      ["page_tags", "Tags"],
+    ]);
+    const items = inRankOrder((await store.items("ideas")).value);
+    expect(items.map((one) => [one.name, one.body, one.values.page_tags])).toEqual([
+      ["Call", "Call @ada\n\n- [ ] sub", ["sales"]],
+      ["Call (2)", "Call", []],
+      ["Untitled", undefined, []],
+    ]);
+    expect(items[0]!.values).toMatchObject({ name_2: "x", due: "2026-11-12", done: true });
+    expect(await core.createDatabaseOf("Bad", { properties: [], items: [{ name: 1 }] } as never)).toMatchObject({ problem: expect.stringContaining("What was read makes no database: an item is no") });
+  });
+
+  it("names an item without a name freely of those given, whichever comes first", async () => {
+    const { core, store } = setup();
+    await core.createDatabase("Ideas", [], [{}, { name: "Untitled" }]);
+    expect(inRankOrder((await store.items("ideas")).value).map((one) => one.name)).toEqual(["Untitled 2", "Untitled"]);
+  });
+
   it("adds, renames and refuses properties, the schema written only where still as read", async () => {
     const { core, store } = setup();
     await core.addProperty("tasks", { label: "Due", type: "date" });

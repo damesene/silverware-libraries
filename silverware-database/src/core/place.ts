@@ -5,6 +5,7 @@
 // under its name. What makes a place and when it goes is the binding's
 // (docs/silverware-database.md, *The core*).
 import { type Icons, iconsOf, isReference } from "../../../shared/icons.ts";
+import { writeClipboard } from "../../../shared/clipboard.ts";
 import { el } from "../../../shared/elements.ts";
 import type { Editor, Settings, UserInterface } from "../../../shared/platform.ts";
 import { type Filter, listItems, type SortKey, textOf, typeOf, validateCondition } from "../domain/listing.ts";
@@ -26,6 +27,7 @@ import { PlaceOpener } from "./opener.ts";
 import type { MenuEntry, MenuNaming } from "../../../shared/menu.ts";
 import { checkedGroups, type PlaceMenu, type PlaceMenuBuilder, type PlaceMenuGroup, placeMenu, toolMenu } from "./placemenu.ts";
 import type { DatabaseStore, ViewStateStore } from "./store.ts";
+import type { ConverterDefinition } from "./converter.ts";
 import type { ViewDefinition, ViewHost, ViewInstance } from "./view.ts";
 import type { ViewRegistry } from "./views.ts";
 
@@ -40,6 +42,8 @@ export type PlaceOptions = {
   readonly core: DatabaseCore;
   readonly types: TypeRegistry;
   readonly views: ViewRegistry;
+  /** The converters, those writing items back offered in the menu (*Copy as …*); none: none offered */
+  readonly converters?: () => readonly ConverterDefinition[];
   readonly settings: Pick<Settings, "get">;
   readonly ui: Pick<UserInterface, "notify" | "icons">;
   readonly editor?: Pick<Editor, "open" | "openMention">;
@@ -449,6 +453,27 @@ export class DatabasePlace {
   }
 
   /**
+   * The items shown, as the view orders them, written by a converter onto the clipboard (*Copy as …*), what it gave
+   * said. Copied at once, nothing awaited first, so a page over http may still copy from the click (shared/clipboard.ts)
+   */
+  private copyAs(converter: ConverterDefinition, doc: Document, items: readonly Item[], database: Database): void {
+    if (!items.length) return void this.options.ui.notify("No item shown: nothing copied");
+    let text: string;
+    try {
+      text = converter.write!(items, database.properties);
+      if (typeof text !== "string") throw new Error("its write gave no text");
+    } catch (error) {
+      this.options.ui.notify(`The converter "${converter.name}" did not write: ${message(error)}`, { type: "error" });
+      return;
+    }
+    const count = `${items.length} ${items.length === 1 ? "item" : "items"}`;
+    writeClipboard(doc, text).then(
+      () => this.options.ui.notify(`${count} copied as ${converter.label.toLowerCase()}`),
+      (error) => this.options.ui.notify(`Not copied: ${message(error)}`, { type: "error" }),
+    );
+  }
+
+  /**
    * A part of how `view` shows its items (its host's now) given to every other
    * view on in this place (as its picker offers them), as each keeps it and where it takes it
    * (core/applyall.ts), in one write of the block; what was given and what was
@@ -719,6 +744,8 @@ export class DatabasePlace {
       }, toAll("group"));
       if (group) groups.push(menu.slot.view([group]));
       if (view.colors !== false) groups.push(menu.slot.view([colorEntry(host, menu, toAll("colorBy"))]));
+      const copies = (this.options.converters?.() ?? []).filter((one) => one.write);
+      if (copies.length) groups.push(menu.slot.data(copies.map((one) => menu.item({ label: `Copy as ${one.label.toLowerCase()}`, icon: ICONS.copy, hint: `The items shown, as ${one.label.toLowerCase()} on the clipboard`, run: () => this.copyAs(one, doc, host.items, database) }))));
       if (editSource) groups.push(menu.slot.source([menu.item({ label: "Edit source", icon: ICONS.source, hint: "Show the block's text, to edit it as markdown", run: editSource })]));
       const remove = this.options.deleteDatabase;
       if (remove) groups.push(menu.slot.remove([menu.item({ label: "Delete database…", icon: ICONS.remove, hint: "The database, its items and its views, asked first", danger: true, run: () => remove(database.id, database.name) })]));

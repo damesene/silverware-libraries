@@ -3,7 +3,7 @@
 // the library `fractional-indexing`, CC0, as the plan says, a known algorithm
 // over one of our own). A query of the index orders the same texts the same
 // way (docs/silverware-database.md, probe 5).
-import { generateKeyBetween } from "fractional-indexing";
+import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import type { Item, ItemKey } from "../model/database.ts";
 
 /** Whether a rank is one this order can place another beside (a rank typed by hand may be none) */
@@ -71,4 +71,9 @@ export function placeAt(ordered: readonly Item[], index: number): Placing {
     others.set(key, (last = generateKeyBetween(last, above(j + 1))));
   }
   return { rank, others };
+}
+
+/** Ranks for `count` items in their order, where none is ranked yet (a database's first items) */
+export function ranksInOrder(count: number): string[] {
+  return count > 0 ? generateNKeysBetween(null, null, count) : [];
 }

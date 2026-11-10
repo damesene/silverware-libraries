@@ -276,8 +276,11 @@ the API the user's operations use.
   index (`plugs/index/tags.ts` takes only paragraphs, items and tasks): the
   rows' (`index.tag "table"`) and headings' (`index.tag "header"`) own `tags`
   are read too, else a rename missed them.
-- Not verified: SilverBullet 2.12.1 (the release CI runs), the notification's
-  Undo button there (its options came later), a phone.
+- Since then the UI tests (silverware-tags/ui-tests/tags.spec.ts) run against
+  SilverBullet 2.12.1 in CI, a job of their own (scripts/ui-test-groups.mjs),
+  and on the playground: the window, renames and merges, Remove tag, by page,
+  the panel, meta pages, Cleanup. Not verified: the notification's Undo button
+  in 2.12.1 (its options came later), a phone.
 - Hundreds of pages to a tag (the same day): pages read and written six at a
   time (each a call into SilverBullet), a progress dialog while a preview's
   pages are read and while a change is undone (shown after 300 ms), the
@@ -285,6 +288,6 @@ the API the user's operations use.
   manager's pages a hundred at first (*Show all*), a notification naming three
   pages left alone and counting the rest, ten changes kept for Undo (each holds
   every page's text twice). Not measured in SilverBullet with that many pages.
-- Next: the UI tests against SilverBullet in CI; the playground's toolbar page
-  has no link to the tags playground (one in its header broke the toolbar's
-  touch tests: the header's width on a phone).
+- Done since: the UI tests against SilverBullet in CI (above); every
+  playground's header links the others, the toolbar's to the tags playground
+  too (the header kept within a phone's width).

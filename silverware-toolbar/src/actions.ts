@@ -7,8 +7,10 @@
 // gives or throws is checked when it runs, a mistake shown, nothing written.
 // Or it does something (`perform`: a command run, a page opened) with the
 // editor's API the core gives, nothing written by the core; or it offers
-// choices. `listed: false`: found by the popup's search only.
-import type { Action, ActionEditor, Change, Context } from "./core/action.ts";
+// choices. `listed: false`: found by the popup's search only. It may take
+// parameters (`params`), their values set by the favourite holding it
+// (`args`, given to its functions), named by them (`describe`).
+import type { Action, ActionArgs, ActionEditor, ActionParam, Change, Context } from "./core/action.ts";
 import { HELPERS, message } from "./formats/index.ts";
 import { letters } from "./icons.ts";
 
@@ -21,17 +23,29 @@ export type ActionDefinition = {
   readonly icon?: string;
   readonly group?: string;
   readonly keywords?: readonly string[];
-  readonly active?: (context: Context) => boolean;
-  readonly enabled?: (context: Context) => boolean;
+  // `args`: its parameters' values a favourite gives (none given: {})
+  readonly active?: (context: Context, args: ActionArgs) => boolean;
+  readonly enabled?: (context: Context, args: ActionArgs) => boolean;
   // What it does; or instead, a list of actions to pick from (`choices`), the one on shown in the toolbar (none: `mixed`)
-  readonly edit?: (context: Context) => Edit | undefined;
+  readonly edit?: (context: Context, args: ActionArgs) => Edit | undefined;
   // Instead: something it does, awaited (a promise may be given)
-  readonly perform?: (context: Context, editor: ActionEditor) => unknown;
+  readonly perform?: (context: Context, editor: ActionEditor, args: ActionArgs) => unknown;
+  // Its parameters: a key, a label, and a list of choices to pick from (texts, or { value, label }) or a text typed
+  readonly params?: readonly ParamDefinition[];
+  // What it is named with its parameters' values (none: its label)
+  readonly describe?: (args: ActionArgs) => string | undefined;
   // false: not listed as the popup opens, found by its search only
   readonly listed?: boolean;
   readonly choices?: readonly ActionDefinition[];
   readonly mixed?: string;
   readonly afterWrite?: (written: { readonly text: string }, editor: { select(from: number, to: number): void }) => void;
+};
+
+export type ParamDefinition = {
+  readonly key: string;
+  readonly label: string;
+  readonly choices?: readonly (string | { readonly value: string; readonly label?: string })[];
+  readonly placeholder?: string;
 };
 
 const NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/;
@@ -76,14 +90,23 @@ function actionOf(definition: unknown): Action | string {
   if (icon !== undefined && typeof icon !== "string") return "its icon is not text (an SVG)";
   if (group !== undefined && typeof group !== "string") return "its group is not text";
   if (keywords !== undefined && !(Array.isArray(keywords) && keywords.every((k) => typeof k === "string"))) return "its keywords are not a list of texts";
-  for (const fn of ["active", "enabled", "edit", "perform", "afterWrite"] as const) if (d[fn] !== undefined && typeof d[fn] !== "function") return `its ${fn} is not a function`;
-  const { active, enabled, edit, perform, afterWrite } = d;
+  for (const fn of ["active", "enabled", "edit", "perform", "afterWrite", "describe"] as const) if (d[fn] !== undefined && typeof d[fn] !== "function") return `its ${fn} is not a function`;
+  const { active, enabled, edit, perform, afterWrite, describe } = d;
+  const params = paramsOf(d.params);
+  if (typeof params === "string") return params;
+  // Its parameters, and its name by their values (a throw: its label)
+  const taking = {
+    ...(params.length ? { params } : {}),
+    ...(describe ? { describe: (args: ActionArgs) => tried(() => describe(args)) } : {}),
+  };
   if (listed !== undefined && typeof listed !== "boolean") return "its listed is not true or false";
   const kinds = [edit, perform, choices].filter((k) => k !== undefined).length;
   if (kinds > 1) return "it has more than one of edit, perform and choices";
   if (kinds === 0) return "it has none of edit, perform and choices";
   const shown = listed === false ? { listed: false } : {};
   if (mixed !== undefined && typeof mixed !== "string") return "its mixed is not text";
+  // (Its values given, an action runs: one offering choices has nothing to run with them)
+  if (choices !== undefined && params.length) return "it has params and choices: params are for an action that runs (edit or perform)";
   if (choices !== undefined) {
     if (!Array.isArray(choices) || !choices.length) return "its choices are not a list of actions";
     const own = choices.map(actionOf);
@@ -92,6 +115,7 @@ function actionOf(definition: unknown): Action | string {
     return {
       ...base(name, label, icon, group, keywords, active, enabled),
       ...shown,
+      ...taking,
       choices: own as Action[],
       ...(mixed ? { mixed } : {}),
     };
@@ -100,9 +124,10 @@ function actionOf(definition: unknown): Action | string {
     return {
       ...base(name, label, icon, group, keywords, active, enabled),
       ...shown,
-      perform: async (context, editor) => {
+      ...taking,
+      perform: async (context, editor, args) => {
         try {
-          await perform(context, editor);
+          await perform(context, editor, args);
         } catch (e) {
           throw new Error(`${name}'s perform failed: ${message(e)}`);
         }
@@ -113,8 +138,9 @@ function actionOf(definition: unknown): Action | string {
   return {
     ...base(name, label, icon, group, keywords, active, enabled),
     ...shown,
-    edit: (context) => {
-      const given = call(name, "edit", () => edit(context));
+    ...taking,
+    edit: (context, args) => {
+      const given = call(name, "edit", () => edit(context, args));
       if (given === undefined) return undefined;
       if (!isEdit(given, context.text.length)) throw new Error(`${name}'s edit did not give { from, to, text } within the page`);
       const change: Change = { from: given.from, to: given.to, insert: given.text };
@@ -140,9 +166,40 @@ function base(
     icon: icon ?? letters(label.charAt(0).toUpperCase().replace(/[&<>"]/g, "")),
     group: group ?? "Custom",
     keywords: keywords ?? [],
-    ...(active ? { active: (context: Context) => !!call(name, "active", () => active(context)) } : {}),
-    ...(enabled ? { enabled: (context: Context) => !!call(name, "enabled", () => enabled(context)) } : {}),
+    ...(active ? { active: (context: Context, args: ActionArgs) => !!call(name, "active", () => active(context, args)) } : {}),
+    ...(enabled ? { enabled: (context: Context, args: ActionArgs) => !!call(name, "enabled", () => enabled(context, args)) } : {}),
   };
+}
+
+/** A definition's parameters made the action's (none: none), or what is wrong with them */
+function paramsOf(value: unknown): ActionParam[] | string {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) return "its params are not a list";
+  const params: ActionParam[] = [];
+  for (const [i, param] of value.entries()) {
+    if (!isObject(param) || typeof param.key !== "string" || !NAME_RE.test(param.key) || typeof param.label !== "string" || !param.label) return `its param ${i + 1} is not { key = <letters, digits, _>, label = <text> }`;
+    if (params.some((one) => one.key === param.key)) return `its params have the key ${param.key} twice`;
+    if (param.placeholder !== undefined && typeof param.placeholder !== "string") return `its param ${param.key}'s placeholder is not text`;
+    let choices: ActionParam["choices"];
+    if (param.choices !== undefined) {
+      const list = Array.isArray(param.choices) ? param.choices.map((c) => (typeof c === "string" ? { value: c, label: c } : isObject(c) && typeof c.value === "string" ? { value: c.value, label: typeof c.label === "string" ? c.label : c.value } : undefined)) : undefined;
+      if (!list || list.some((c) => !c)) return `its param ${param.key}'s choices are not a list of texts or { value, label }`;
+      const fixed = list as { value: string; label: string }[];
+      choices = () => fixed;
+    }
+    params.push({ key: param.key, label: param.label, ...(choices ? { choices } : {}), ...(param.placeholder ? { placeholder: param.placeholder } : {}) });
+  }
+  return params;
+}
+
+/** A name a definition's `describe` gives; a throw or no text: none (its label) */
+function tried(describe: () => unknown): string | undefined {
+  try {
+    const name = describe();
+    return typeof name === "string" && name ? name : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function isEdit(value: unknown, length: number): value is Edit {

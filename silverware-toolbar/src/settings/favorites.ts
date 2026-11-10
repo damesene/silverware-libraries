@@ -3,7 +3,8 @@
 // A docked toolbar's are edited with each row's pinned items at its ends
 // (`pinOrdered`, `placeItem`), as it shows each row a line of its own.
 
-import { type FavoriteItem, type Favorites, iconOf, isKindItem, orderedByPins, pinOf, type SlotRef, slotItemOf, slotOf, isSeparator, type KindItem, type Pin, type Show, type SeparatorItem } from "../core/favorites.ts";
+import type { ActionArgs } from "../core/action.ts";
+import { type FavoriteItem, type Favorites, iconOf, isActionItem, isKindItem, orderedByPins, pinOf, type SlotRef, slotItemOf, slotOf, isSeparator, type KindItem, type Pin, type Show, type SeparatorItem } from "../core/favorites.ts";
 
 export type At = { readonly row: number; readonly index: number };
 
@@ -39,6 +40,59 @@ export function moveRow(rows: Favorites, from: number, to: number): FavoriteItem
   next.splice(from, 1);
   next.splice(to, 0, row);
   return next;
+}
+
+/** Arguments with one set to a value, or taken out (undefined, empty); undefined where none is left */
+function withArg(args: ActionArgs | undefined, key: string, value: string | undefined): ActionArgs | undefined {
+  const { [key]: _, ...rest } = args ?? {};
+  const next = value ? { ...rest, [key]: value } : rest;
+  return Object.keys(next).length ? next : undefined;
+}
+
+/** An action's item with a value of one of its action's parameters (undefined, or empty: none) */
+export function setArg(rows: Favorites, at: At, key: string, value: string | undefined): FavoriteItem[][] {
+  const next = copy(rows);
+  const item = next[at.row]?.[at.index];
+  if (!item || !isActionItem(item)) return next;
+  const { args: _, ...rest } = item;
+  const args = withArg(item.args, key, value);
+  next[at.row]![at.index] = args ? { ...rest, args } : rest;
+  return next;
+}
+
+/** A kind's slot holding an action with a value of one of that action's parameters (the slot `{ id, …, args }`, its id alone where nothing else is left) */
+export function setSlotArg(rows: Favorites, at: At, slot: string, key: string, value: string | undefined): FavoriteItem[][] {
+  const item = rows[at.row]?.[at.index];
+  const ref = item && isKindItem(item) ? slotOf(item[slot]) : undefined;
+  if (!ref) return copy(rows);
+  const { args: _, ...rest } = ref;
+  const args = withArg(ref.args, key, value);
+  const updated: SlotRef = args ? { ...rest, args } : rest;
+  return setSlot(rows, at, slot, slotValue(updated));
+}
+
+/** A slot as written: its action's id alone, else `{ id, icon, label, args }` with what it has */
+function slotValue(ref: SlotRef): unknown {
+  return ref.icon || ref.label || ref.args ? ref : ref.id;
+}
+
+/**
+ * Rows where an action's parameter held one value holds another (a toolbar
+ * renamed: the switch's `toolbar`), in an action's item and in a kind's slot
+ */
+export function withArgRenamed(rows: Favorites, id: string, key: string, from: string, to: string): FavoriteItem[][] {
+  const renamed = (args: ActionArgs | undefined) => (args?.[key] === from ? { ...args, [key]: to } : args);
+  return rows.map((row) =>
+    row.map((item) => {
+      if (isSeparator(item)) return item;
+      if (isActionItem(item)) return item.id === id && item.args?.[key] === from ? { ...item, args: renamed(item.args)! } : item;
+      const fields = Object.entries(item).map(([field, value]) => {
+        const ref = field === "type" || slotItemOf(value) ? undefined : slotOf(value);
+        return [field, ref?.id === id && ref.args?.[key] === from ? slotValue({ ...ref, args: renamed(ref.args)! }) : value];
+      });
+      return Object.fromEntries(fields) as KindItem;
+    }),
+  );
 }
 
 /** An item added at a row's end, or at `index` */
@@ -94,7 +148,7 @@ export function setSlotOwn(rows: Favorites, at: At, slot: string, key: "icon" | 
   const { [key]: _, ...rest } = ref;
   const own = value === undefined ? undefined : key === "icon" ? iconOf(value) : value.trim();
   const updated: SlotRef = own ? { ...rest, [key]: own } : rest;
-  next[at.row]![at.index] = { ...item, [slot]: updated.icon || updated.label ? updated : updated.id } as KindItem;
+  next[at.row]![at.index] = { ...item, [slot]: slotValue(updated) } as KindItem;
   return next;
 }
 

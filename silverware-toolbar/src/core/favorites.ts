@@ -18,11 +18,13 @@
 // left out of the toolbar; a test keeps the defaults equal to the library
 // page's config.define.
 
+import type { ActionArgs } from "./action.ts";
+
 export type Show = "icon" | "label";
 export type Pin = "left" | "right";
 /** What an action's and a kind's item have alike: how it shows, its label's width, where it is pinned */
 export type Look = { readonly show?: Show; readonly width?: number; readonly pin?: Pin };
-export type ActionItem = Look & { readonly type?: "action"; readonly id: string; readonly icon?: string; readonly label?: string };
+export type ActionItem = Look & { readonly type?: "action"; readonly id: string; readonly icon?: string; readonly label?: string; readonly args?: ActionArgs };
 export type SeparatorItem = { readonly type: "separator" };
 /** An item of a kind a module gives: its type, its look, and its own fields (its slots' ids, what else its kind reads) */
 export type KindItem = Look & { readonly type: string; readonly [field: string]: unknown };
@@ -48,15 +50,29 @@ export function iconOf(text: string): string | undefined {
  * label of its own (`{ id, icon, label }`, as an action's item has them); what
  * it holds, else undefined (none, or not of that shape)
  */
-export type SlotRef = { readonly id: string; readonly icon?: string; readonly label?: string };
+export type SlotRef = { readonly id: string; readonly icon?: string; readonly label?: string; readonly args?: ActionArgs };
 export function slotOf(value: unknown): SlotRef | undefined {
   if (typeof value === "string") return value ? { id: value } : undefined;
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const { id, icon, label } = value as Record<string, unknown>;
+  const { id, icon, label, args } = value as Record<string, unknown>;
   if (typeof id !== "string" || !id) return undefined;
   const glyph = typeof icon === "string" ? iconOf(icon) : undefined;
   const name = typeof label === "string" ? label.trim() : "";
-  return { id, ...(glyph ? { icon: glyph } : {}), ...(name ? { label: name } : {}) };
+  const given = argsOf(args);
+  return { id, ...(glyph ? { icon: glyph } : {}), ...(name ? { label: name } : {}), ...(given ? { args: given } : {}) };
+}
+
+/**
+ * The values of an action's parameters as configured: an object of texts (a
+ * number or true/false written as one: a text), others left out; undefined:
+ * none (empty, or not an object)
+ */
+export function argsOf(value: unknown): ActionArgs | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const args = Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).flatMap(([key, one]) => (typeof one === "string" ? [[key, one]] : typeof one === "number" || typeof one === "boolean" ? [[key, String(one)]] : [])),
+  );
+  return Object.keys(args).length ? args : undefined;
 }
 
 /**
@@ -167,13 +183,14 @@ export function favoriteItemOf(value: unknown): FavoriteItem | undefined {
   if (type === "separator") return id === undefined && show === undefined && width === undefined && pin === undefined && !Object.keys(rest).length ? { type: "separator" } : undefined;
   const look = { ...(show ? { show } : {}), ...(width !== undefined ? { width: widthOf(width) } : {}), ...(pin ? { pin } : {}) } as Look;
   if (type === undefined || type === "action") {
-    const { icon, label, ...more } = rest;
+    const { icon, label, args, ...more } = rest;
     if (Object.keys(more).length || typeof id !== "string" || !id) return undefined;
     if ((icon !== undefined && typeof icon !== "string") || (label !== undefined && typeof label !== "string")) return undefined;
     // (An empty one: none)
     const glyph = icon === undefined ? undefined : iconOf(icon);
     const own = { ...(glyph ? { icon: glyph } : {}), ...(label?.trim() ? { label: label.trim() } : {}) };
-    return { id, ...look, ...own };
+    const given = argsOf(args);
+    return { id, ...look, ...own, ...(given ? { args: given } : {}) };
   }
   if (typeof type !== "string" || !type) return undefined;
   return { ...rest, ...(id !== undefined ? { id } : {}), type, ...look } as KindItem;

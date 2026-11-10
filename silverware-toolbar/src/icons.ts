@@ -38,6 +38,8 @@ export const ICONS = {
   chevronDown: svg('<path d="m6 9 6 6 6-6"/>'),
   back: svg('<path d="M19 12H5M11 6l-6 6 6 6"/>'),
   search: svg('<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/>'),
+  // Bars one over another: the toolbars, one switched to
+  toolbars: svg('<rect x="3" y="5" width="18" height="5" rx="1.5"/><rect x="3" y="14" width="12" height="5" rx="1.5"/>'),
   // A pin: an item pinned at an end of its row where docked
   pin: svg('<path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/>'),
   // A slash in a box: SilverBullet's slash commands

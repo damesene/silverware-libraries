@@ -1182,10 +1182,21 @@ html[data-theme="dark"] .swb-dock-shade {
   align-items: center;
   gap: 6px;
 }
+/* Names line up as a column; a longer one (an action's parameter: Toolbar) widens its line, never meets its field */
 .swb-settings-look-name {
   flex: none;
-  width: 3.5em;
+  min-width: 4.5em;
   opacity: 0.8;
+}
+/* An action's parameter picked from its choices, in the look of the panel's other fields */
+.swb-settings-param-choice {
+  min-width: 8em;
+  padding: 3px 6px;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 6px;
 }
 .swb-settings-look-own-line {
   display: inline-flex;

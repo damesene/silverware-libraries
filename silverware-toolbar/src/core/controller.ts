@@ -12,14 +12,15 @@
 import type { Bridge, Settings } from "../bridge.ts";
 import { CONTENT_SELECTOR, inEditor, pageContentOf, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
-import type { Action, ActionEditor, Change, Context } from "./action.ts";
+import { type Action, type ActionEditor, type Change, type Context, NO_ARGS, withArgs } from "./action.ts";
 import { Bar, type Dock, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
 import { Docking } from "./dock.ts";
 import { isActionItem, isSeparator, type Look, orderedByPins, ownIconHtml, type Pin, type SlotRef, slotItemOf, slotOf } from "./favorites.ts";
 import type { ItemKind } from "./items.ts";
 import { hideKeyboard } from "./keyboard.ts";
-import { docks, type Input, inputOf, type Toolbar, toolbarFor } from "./toolbars.ts";
+import { switchToolbarAction } from "./switch.ts";
+import { docks, type Input, inputOf, type Toolbar, toolbarFor, useToolbarFor } from "./toolbars.ts";
 import { marked } from "./cursor.ts";
 import type { Box } from "./place.ts";
 import { Panel } from "./panel.ts";
@@ -85,7 +86,8 @@ export class Controller {
     readonly doc: Document,
     // Handed over anew when SilverBullet loads its configuration again (the settings the same)
     public bridge: Bridge,
-    readonly settings: Settings,
+    // (Its toolbars changed by a switch, the rest as read)
+    public settings: Settings,
     // The actions offered, asked for each time they show (definitions made later count)
     private readonly actions: () => readonly Action[],
     // The kinds of favourites the modules give (core/items.ts)
@@ -94,6 +96,8 @@ export class Controller {
     private readonly refresh: () => Promise<void>,
     // The settings dialog opened (none: not offered)
     private readonly openSettings?: () => void,
+    // The toolbars after a switch, to be kept (written to the configuration; none: the switch for this visit)
+    private readonly switched?: (toolbars: readonly Toolbar[]) => void,
   ) {
     this.watcher = new SelectionWatcher(
       doc,
@@ -208,7 +212,37 @@ export class Controller {
 
   /** The modules' actions, and the core's own (… and, where it has them, the settings) */
   private offered(): readonly Action[] {
-    return [...this.actions(), MORE_ACTION, ...(this.openSettings ? [SETTINGS_ACTION] : [])];
+    return [...this.actions(), this.switchAction(), MORE_ACTION, ...(this.openSettings ? [SETTINGS_ACTION] : [])];
+  }
+
+  /**
+   * The toolbar switched (`actions.switchToolbar`, the command Switch toolbar;
+   * core/switch.ts): every toolbar to pick from, or the one a favourite gives;
+   * one picked is this way of working's, at once (`switchTo`)
+   */
+  switchAction(): Action {
+    return switchToolbarAction(this.settings.toolbars, this.toolbar(), (name) => this.switchTo(name));
+  }
+
+  /**
+   * This way of working's toolbar switched to another: shown at once (its rows,
+   * where and when), then kept (`switched`: the configuration written in the
+   * background; the toolbar started anew for it finds the same, and goes on)
+   */
+  switchTo(name: string): void {
+    const index = this.settings.toolbars.findIndex((toolbar) => toolbar.name === name);
+    if (index < 0 || this.settings.toolbars[index] === this.toolbar()) return;
+    const toolbars = useToolbarFor(this.settings.toolbars, index, this.device());
+    this.settings = { ...this.settings, toolbars };
+    // (Its room given back where the one before was docked: the next shows as it shows)
+    this.panel.close(true);
+    this.bar.hide();
+    this.switched?.(toolbars);
+    void this.showStaying();
+    // (Shown while writing, the caret in the text: at the caret now, not as it next moves; a selection: `perform`'s
+    // `again` shows it by the selection)
+    const caret = this.watcher.caret();
+    if (caret && !this.watcher.current() && this.persistent() && this.writing()) void this.caretMoved(caret);
   }
 
   private owns(node: Node): boolean {
@@ -218,7 +252,7 @@ export class Controller {
   /** An action's state for a context; one whose own functions fail is off and not offered */
   private state(action: Action, context: Context): State {
     try {
-      return { active: !!action.active?.(context), enabled: action.enabled?.(context) ?? true };
+      return { active: !!action.active?.(context, NO_ARGS), enabled: action.enabled?.(context, NO_ARGS) ?? true };
     } catch (e) {
       console.error(`Silverware Toolbar: ${action.label}:`, e);
       return { active: false, enabled: false };
@@ -254,7 +288,9 @@ export class Controller {
         const items = row.flatMap((item): Shown[] => {
           if (isSeparator(item)) return [{ separator: true }];
           if (isActionItem(item)) {
-            const action = all.find((a) => a.id === item.id);
+            // (With its parameters' values where the item gives them)
+            const found = all.find((a) => a.id === item.id);
+            const action = found && withArgs(found, item.args);
             return action ? [{ action, ...lookOf(item), ...(item.icon ? { ownIcon: item.icon } : {}), ...(item.label ? { ownLabel: item.label } : {}), ...this.state(action, context) }] : [];
           }
           // A kind's: a kind no module on gives, or a slot without an action, left out
@@ -270,7 +306,7 @@ export class Controller {
             }
             const ref = slotOf(item[key]);
             const found = ref && all.find((a) => a.id === ref.id);
-            return { key, optional, action: found && ref ? withOwnLook(found, ref) : found };
+            return { key, optional, action: found && ref ? withOwnLook(withArgs(found, ref.args), ref) : found };
           });
           if (slots.some(({ optional, action }) => !optional && !action)) return [];
           const found = Object.fromEntries(slots.flatMap(({ key, action }) => (action ? [[key, action]] : [])));
@@ -363,7 +399,7 @@ export class Controller {
       return;
     }
     try {
-      const change = action.edit(context);
+      const change = action.edit(context, NO_ARGS);
       if (change) await this.write(change, context);
     } catch (e) {
       void this.bridge.flash(`Silverware Toolbar: ${action.label} failed: ${e instanceof Error ? e.message : String(e)}`, "error");
@@ -451,7 +487,7 @@ export class Controller {
       completes: !!bridge.startCompletion,
     };
     try {
-      await action.perform!(context, editor);
+      await action.perform!(context, editor, NO_ARGS);
     } catch (e) {
       void this.bridge.flash(`Silverware Toolbar: ${action.label} failed: ${e instanceof Error ? e.message : String(e)}`, "error");
     }

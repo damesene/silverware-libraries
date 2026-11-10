@@ -74,6 +74,27 @@ export type Change = {
   readonly after?: (editor: Editor, written: string) => void;
 };
 
+/**
+ * A parameter of an action, its value set by the favourite holding the
+ * action (`args`, a text by key: `{ id = "actions.switchToolbar", args = {
+ * toolbar = "Float" } }`), in the settings by what it declares here: a text
+ * typed, or one of `choices` (asked as the settings show them)
+ */
+export type ActionParam = {
+  readonly key: string;
+  readonly label: string;
+  readonly choices?: () => readonly { readonly value: string; readonly label: string }[];
+  readonly placeholder?: string;
+  // What its values name, so they follow it (a toolbar renamed in the settings: the values naming it renamed too)
+  readonly refersTo?: "toolbar";
+};
+
+/** The values of an action's parameters a favourite gives, by key */
+export type ActionArgs = Readonly<Record<string, string>>;
+
+/** No values: what an action's functions get where no favourite gives any (an action not bound: `withArgs`) */
+export const NO_ARGS: ActionArgs = Object.freeze({});
+
 export type Action = {
   // Unique: what it is, a dot, its name (formats.bold, actions.clear); favourites list them
   readonly id: string;
@@ -84,15 +105,21 @@ export type Action = {
   readonly group: string;
   // More words the popup's search finds it by
   readonly keywords?: readonly string[];
-  // Shown as on (bold around the selection already)
-  readonly active?: (context: Context) => boolean;
+  // Shown as on (bold around the selection already); `args`: its parameters' values where a favourite gives them
+  // (`withArgs`; none: NO_ARGS, which an action without parameters leaves out)
+  readonly active?: (context: Context, args: ActionArgs) => boolean;
   // Offered (else shown dimmed, not run)
-  readonly enabled?: (context: Context) => boolean;
+  readonly enabled?: (context: Context, args: ActionArgs) => boolean;
   // The change it makes of the page's text, which the core writes; undefined: nothing. A throw is shown as the action failing
-  readonly edit?: (context: Context) => Change | undefined;
+  readonly edit?: (context: Context, args: ActionArgs) => Change | undefined;
   // Instead of a change: something it does (a SilverBullet command, a page opened), the editor focused first, with the
   // selection's context and the editor's API; a throw or a rejection is shown as it failing
-  readonly perform?: (context: Context, editor: ActionEditor) => unknown;
+  readonly perform?: (context: Context, editor: ActionEditor, args: ActionArgs) => unknown;
+  // Its parameters, set by the favourite holding it (`withArgs`); with values given, an action offering `choices`
+  // runs instead (its `perform` or `edit` with them: the switch of toolbars, its list without, that toolbar with)
+  readonly params?: readonly ActionParam[];
+  // What it is named with its parameters' values (Toolbar with { toolbar = "Float" }: Float); none: its label
+  readonly describe?: (args: ActionArgs) => string | undefined;
   // false: found by the popup's search only, not listed as it opens (there are many: the commands)
   readonly listed?: boolean;
   // Only where the screen is worked by finger (hiding the on-screen keyboard): left out elsewhere, but offered by
@@ -125,3 +152,26 @@ export type ModuleHost = {
   // A caret touching a word stands for the word, as if selected (the setting wordAtCaret)
   readonly wordAtCaret?: boolean;
 };
+
+/**
+ * An action with its parameters' values a favourite gives: its functions given
+ * them, named by `describe`, and run where it offered choices (the values say
+ * which); the values of no parameter it declares left out, so a favourite of
+ * an action without parameters is that action as it is
+ */
+export function withArgs(action: Action, given: ActionArgs | undefined): Action {
+  const keys = new Set((action.params ?? []).map((param) => param.key));
+  const args = Object.fromEntries(Object.entries(given ?? {}).filter(([key, value]) => keys.has(key) && value !== ""));
+  if (!Object.keys(args).length) return action;
+  const { choices: _choices, mixed: _mixed, ...rest } = action;
+  const { active, enabled, edit, perform } = action;
+  return {
+    ...rest,
+    label: action.describe?.(args) ?? action.label,
+    ...(active ? { active: (context: Context) => active(context, args) } : {}),
+    ...(enabled ? { enabled: (context: Context) => enabled(context, args) } : {}),
+    ...(edit ? { edit: (context: Context) => edit(context, args) } : {}),
+    ...(perform ? { perform: (context: Context, editor: ActionEditor) => perform(context, editor, args) } : {}),
+  };
+}
+

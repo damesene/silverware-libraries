@@ -42,6 +42,7 @@ Select text in a page and a toolbar shows beside it: make it bold, italic or cod
 | Slash commands | `actions.slashCommands` | SilverBullet's slash commands at the cursor, as typing `/` does: writes `/` (after the text selected; a space before it after a word, where SilverBullet would offer none) and opens the list. Handy in a phone's toolbar, where `/` is a keyboard page away. Comes from the *Slash commands* module |
 | Hide the keyboard | `actions.hideKeyboard` | On a phone or tablet: hides the on-screen keyboard, the selection kept as it is, the toolbar staying (to see more of the page while you format it); the next tap in the text brings the keyboard back. Put it in your favourites to have it in the bar at the bottom: the settings offer it in *Touch*'s favourites on any device, a computer too. (Where the browser cannot hide it alone, Safari on iOS, the text is left: the keyboard and the bar go.) |
 | Emoji | `actions.emoji` | A picker of every emoji, its groups over the search as filters (*All*, then each group by its emoji: only that group's shown, and searched): type to find one by its name or keywords (in English: `heart`, `thumb`, `party`), the arrows and Enter, or click it; those you used last come first. It is written at the cursor, replacing the text selected. The emoji themselves are not in the **…** list. Names and keywords are Unicode's (CLDR), through emojibase-data |
+| Toolbar | `actions.switchToolbar` | The toolbar you work with now (with a mouse, or by finger) switched to another of yours: the list of your toolbars, the one shown checked. It shows at once, and is kept in `CONFIG` (its *Used for*). With its parameter *Toolbar* set (in its panel in the settings, or `args = { toolbar = "Float" }`) it switches to that one at once, no list: in the settings, *Add* and *Toolbar* opens its panel at that parameter. The toolbars themselves are found by the popup's search, not offered apart under *Add*. Also the command *Silverware Toolbar: Switch toolbar*. Put it in each toolbar you switch between, or find it in the **…** list |
 | Silverware Toolbar settings… | `actions.settings` | The settings dialog (see *Settings*): the gear by the search field of the **…** list, found by typing too |
 | Paragraph | `formats.paragraph` | Plain lines: a list's, a heading's or a quote's marker taken off |
 | Heading 1, 2, 3 | `formats.heading1` … `formats.heading3` | `# `, `## `, `### ` |
@@ -219,6 +220,18 @@ export default (helpers) => [
     ],
   },
 ];
+```
+
+An action may take parameters, their values set by the favourite holding it: `params`, each a `key`, a `label`, and either `choices` (texts, or `{ value, label }`) to pick from or a text typed (`placeholder`). The settings show them in the item's panel; in `CONFIG` they are `args = { <key> = <value> }` on the item (or on a gesture button's slot: `{ id = …, args = { … } }`). The action's functions get them as their last argument (`edit(context, args)`, `perform(context, editor, args)`, `active(context, args)`, `enabled(context, args)`; none set: `{}`), and `describe(args)` names it by them (none: its label).
+
+```js
+{
+  name: "template",
+  label: "Template",
+  params: [{ key: "name", label: "Template", choices: ["Meeting", "Daily note"] }],
+  describe: (args) => args.name,
+  perform: (context, editor, args) => editor.invokeCommand(`Template: ${args.name ?? "Pick"}`),
+}
 ```
 
 `listed: false` keeps an action out of the list of every action as it opens: typing in its search finds it (SilverBullet's commands are so). It can be a favourite all the same.

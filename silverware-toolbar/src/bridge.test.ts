@@ -74,6 +74,14 @@ describe("Settings", () => {
     expect(await rowsOf(one(rows))).toEqual([[{ id: "formats.bold", icon: "★", label: "Tučně", show: "label", width: 3, pin: "left" }, { id: "formats.italic" }, { id: "formats.highlight", width: 30 }]]);
   });
 
+  it("read an action's parameters' values (args: texts, a number or true/false as text, others left out), on an item and a slot", async () => {
+    expect(await rowsOf(one([[{ id: "actions.switchToolbar", args: { toolbar: "Float", level: 2, on: true, list: ["x"] } }, { id: "formats.bold", args: {} }]]))).toEqual([
+      [{ id: "actions.switchToolbar", args: { toolbar: "Float", level: "2", on: "true" } }, { id: "formats.bold" }],
+    ]);
+    const { slotOf } = await import("./core/favorites.ts");
+    expect(slotOf({ id: "actions.switchToolbar", args: { toolbar: "Docked" } })).toEqual({ id: "actions.switchToolbar", args: { toolbar: "Docked" } });
+  });
+
   it("read a kind's slot as an action's id, or one with its own icon and label", async () => {
     const { slotOf } = await import("./core/favorites.ts");
     expect(slotOf("formats.bold")).toEqual({ id: "formats.bold" });

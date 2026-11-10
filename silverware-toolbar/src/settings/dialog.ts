@@ -14,19 +14,21 @@ import { settingRow, switchControl } from "../../../shared/controls.ts";
 import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
 import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, readSettings, readShortcut } from "../bridge.ts";
-import type { Action } from "../core/action.ts";
+import { type Action, type ActionParam, withArgs } from "../core/action.ts";
 import { type FavoriteItem, type Favorites, hasAction, pinOf, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Pin, type Show as ItemShow, slotItemOf, slotOf, widthOf } from "../core/favorites.ts";
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
-import { defaultToolbars, docks, freeToolbarName, type Input, inputOf, MAX_TOOLBARS, type Placement, PLACEMENTS, type ShowWhen, SHOWS, type Toolbar, toolbarFor, useToolbarFor, validateToolbarName } from "../core/toolbars.ts";
+import { defaultToolbars, docks, freeToolbarName, toolbarsSetting, type Input, inputOf, MAX_TOOLBARS, type Placement, PLACEMENTS, type ShowWhen, SHOWS, type Toolbar, toolbarFor, useToolbarFor, validateToolbarName } from "../core/toolbars.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
 import { SETTINGS_VERSION } from "../migrations/index.ts";
 import { reorder } from "../../../shared/drag.ts";
-import { addItem, type At, moveItem, moveRow, pinOrdered, placeItem, removeItem, unpinnedOutOfOrder, removeRow, sameRows, savedRows, setLook, setOwn, setPin, setSlot, setSlotField, setSlotOwn, stepOf } from "./favorites.ts";
+import { addItem, type At, moveItem, moveRow, pinOrdered, placeItem, removeItem, unpinnedOutOfOrder, removeRow, sameRows, setLook, setOwn, setPin, setArg, setSlot, setSlotArg, setSlotField, setSlotOwn, stepOf, withArgRenamed } from "./favorites.ts";
 
 // A zone of a docked toolbar's row: its items pinned left, the others, those pinned right
 type Zone = "left" | "middle" | "right";
 
+// The first field of a parameter in the panel open (an action with parameters just added: its values asked)
+const PARAM_FIELD = `[data-swb-look] [data-swb-param] select, [data-swb-look] [data-swb-param] input`;
 const BASE = "swb-settings";
 
 // What the dialog calls the values of a toolbar
@@ -40,8 +42,9 @@ const KEYBOARD_BAR_COMMAND = "Editor: Toggle Keyboard Bar";
 export type SettingsContext = {
   readonly doc: Document;
   readonly bridge: Bridge;
-  // Every action offered now (the modules turned on, the custom ones)
-  readonly actions: () => readonly Action[];
+  // Every action offered now (the modules turned on, the custom ones, the core's), over the toolbars edited (the
+  // switch of toolbars offering and naming them: made or renamed here, before they are saved)
+  readonly actions: (toolbars: readonly Toolbar[]) => readonly Action[];
   // The kinds of favourites the modules turned on give (core/items.ts)
   readonly kinds: () => readonly ItemKind[];
   // Whether the settings can be saved here (else the dialog only shows them)
@@ -253,10 +256,15 @@ export class SettingsDialog {
 
   // ---- Favorites -------------------------------------------------------------
 
+  /** Every action offered, over the toolbars edited */
+  private actions(): readonly Action[] {
+    return this.context.actions(this.values?.toolbars ?? []);
+  }
+
   /** Every action and every list's choice, by id (the popup's search finds them the same way) */
   private known(): Map<string, Action> {
     const known = new Map<string, Action>();
-    for (const action of this.context.actions()) {
+    for (const action of this.actions()) {
       known.set(action.id, action);
       for (const choice of action.choices ?? []) known.set(choice.id, choice);
     }
@@ -376,7 +384,11 @@ export class SettingsDialog {
       this.naming = undefined;
       problem.textContent = "";
       if (name.value.trim() === toolbar.name) return;
-      this.setToolbars(values.toolbars.map((one, i) => (i === index ? { ...one, name: name.value.trim() } : one)), `.${BASE}-toolbar-name`, true);
+      // (Values of actions' parameters naming it, in any toolbar, follow it: a button switching to it)
+      const refs = this.actions().flatMap((action) => (action.params ?? []).filter((param) => param.refersTo === "toolbar").map((param) => [action.id, param.key] as const));
+      const follow = (rows: Favorites) => refs.reduce((all, [id, key]) => withArgRenamed(all, id, key, toolbar.name, name.value.trim()), rows);
+      const renamed = values.toolbars.map((one, i) => ({ ...one, ...(i === index ? { name: name.value.trim() } : {}), rows: follow(one.rows) }));
+      this.setToolbars(renamed, `.${BASE}-toolbar-name`, true);
     };
     name.addEventListener("change", rename);
     name.addEventListener("keydown", (e) => {
@@ -657,7 +669,9 @@ export class SettingsDialog {
           element.title = `No module turned on gives the kind ${item.type}: the toolbar leaves it out`;
         } else this.markProblem(element, this.itemProblem(item, kind), true, this.kindTitle(item, kind, known));
       } else {
-        const action = known.get(item.id);
+        // (With its parameters' values: named by them, as the toolbar names it)
+        const found = known.get(item.id);
+        const action = found && withArgs(found, item.args);
         // Its own icon and label, as the toolbar shows them
         if (item.icon) icon.textContent = item.icon;
         else icon.innerHTML = action?.icon ?? "";
@@ -835,6 +849,11 @@ export class SettingsDialog {
     }
     // Pinned at an end of its row's line where docked (the keyboard's way to what dragging into a zone does)
     panel.append(this.pinLine(at, item.pin));
+    // Its action's parameters, a line each (as the action declares them)
+    if (isActionItem(item)) {
+      const params = this.known().get(item.id)?.params ?? [];
+      panel.append(...params.map((param) => this.paramLine(param, item.args?.[param.key], (value) => setArg(this.rows, at, param.key, value))));
+    }
     // A kind's slots (each its action, its own panel opened by a click) and fields, a line each
     const kind = isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type) : undefined;
     if (kind && isKindItem(item) && (kind.slots.length || kind.fields?.length)) {
@@ -889,7 +908,9 @@ export class SettingsDialog {
     const inner = slotItemOf(item[key]);
     if (inner) return this.closing(this.slotItemPanel(panel, at, key, inner), () => this.toggleSlot(at, key));
     const ref = slotOf(item[key]);
-    const action = ref ? this.known().get(ref.id) : undefined;
+    const found = ref ? this.known().get(ref.id) : undefined;
+    // (Named with its parameters' values, as the toolbar names it; its parameters are the action's)
+    const action = found && withArgs(found, ref?.args);
     const line = this.el("div", `${BASE}-look-line`);
     const current = this.el("span", `${BASE}-look-action`);
     current.innerHTML = `<span class="${BASE}-item-icon">${action?.icon ?? ""}</span><span></span>`;
@@ -901,6 +922,7 @@ export class SettingsDialog {
     line.append(this.el("span", `${BASE}-look-name`, "Action"), current, change);
     panel.append(line);
     if (ref) {
+      panel.append(...(found?.params ?? []).map((param) => this.paramLine(param, ref.args?.[param.key], (value) => setSlotArg(this.rows, at, key, param.key, value))));
       const set = (field: "icon" | "label") => (value: string | undefined) => setSlotOwn(this.rows, at, key, field, value);
       panel.append(this.ownLine("icon", "Icon", ref.icon, "★", set("icon")), this.ownLine("label", "Label", ref.label, action?.label ?? ref.id, set("label")));
     }
@@ -974,6 +996,36 @@ export class SettingsDialog {
       const button = panel?.querySelector<HTMLElement>(`[data-swb-slot="${slot.key}"]`);
       if (inner && button) this.markProblem(button, this.slotItemProblem(inner), true);
     }
+  }
+
+  /**
+   * A line of an action's parameter: its value picked (`choices`, None first:
+   * none given, the action as without it) or typed; `set` the favourites with
+   * it (empty: none)
+   */
+  private paramLine(param: ActionParam, value: string | undefined, set: (value: string | undefined) => Favorites): HTMLElement {
+    const line = this.el("label", `${BASE}-look-line ${BASE}-param`);
+    line.dataset.swbParam = param.key;
+    let field: HTMLInputElement | HTMLSelectElement;
+    if (param.choices) {
+      const select = this.el("select", `${BASE}-param-choice`);
+      select.append(new Option("None", "", false, !value));
+      const choices = param.choices();
+      for (const choice of choices) select.append(new Option(choice.label, choice.value, false, choice.value === value));
+      // (A value of before no choice has now: kept, shown as it is)
+      if (value && !choices.some((choice) => choice.value === value)) select.append(new Option(`${value} (none such)`, value, false, true));
+      field = select;
+    } else {
+      const input = this.el("input", `${BASE}-look-own ${BASE}-param-text`);
+      input.type = "text";
+      input.value = value ?? "";
+      input.placeholder = param.placeholder ?? "";
+      input.spellcheck = false;
+      field = input;
+    }
+    field.addEventListener("change", () => this.edit(set(field.value.trim() || undefined), `[data-swb-look] [data-swb-param="${param.key}"] select, [data-swb-look] [data-swb-param="${param.key}"] input`));
+    line.append(this.el("span", `${BASE}-look-name`, param.label), field);
+    return line;
   }
 
   /** A panel's × and Esc closing it (Esc: the panel's, not the dialog's) */
@@ -1115,7 +1167,8 @@ export class SettingsDialog {
     }
     const ref = slotOf(item[slot.key]);
     if (!ref) return undefined;
-    const action = known.get(ref.id);
+    const found = known.get(ref.id);
+    const action = found && withArgs(found, ref.args);
     return { icon: action?.icon ?? "", ...(ref.icon ? { glyph: ref.icon } : {}), label: ref.label ?? action?.label ?? ref.id };
   }
 
@@ -1128,7 +1181,8 @@ export class SettingsDialog {
     const inner = slotItemOf(item[slot.key]);
     if (inner) return this.slotItemButton(inner, at, slot);
     const ref = slotOf(item[slot.key]);
-    const action = ref ? known.get(ref.id) : undefined;
+    const found = ref ? known.get(ref.id) : undefined;
+    const action = found && withArgs(found, ref?.args);
     const unset = !ref;
     const what = ref?.label ?? action?.label ?? (unset ? (slot.optional ? "None" : "Choose…") : ref.id);
     const button = this.button(`${BASE}-slot`, `${slot.label}: ${what}`, () => (unset && !slot.optional ? this.openPicking({ at, key: slot.key }) : this.toggleSlot(at, slot.key)));
@@ -1249,13 +1303,18 @@ export class SettingsDialog {
     const entries: Entry[] = [];
     // (An action for a touch screen only: for a toolbar a finger may show, used for Touch or for none yet)
     const touchToo = this.edited.useFor.includes("touch") || !this.edited.useFor.length;
-    for (const action of this.context.actions().filter((a) => touchToo || !a.touchOnly)) {
-      if (!action.choices) entries.push({ action, group: action.group });
+    // (An action with parameters alone, its choices left out: its values are set in its panel, which opens as it is
+    // added; the popup offers its choices, the switch's toolbars)
+    for (const action of this.actions().filter((a) => touchToo || !a.touchOnly)) {
+      if (!action.choices || action.params?.length) entries.push({ action, group: action.group });
       else entries.push({ action, group: action.group }, ...action.choices.map((choice) => ({ action: choice, group: action.label })));
     }
     const add = (item: FavoriteItem) => {
+      const index = this.addAt(row);
+      const params = isActionItem(item) ? this.known().get(item.id)?.params : undefined;
       this.picking = undefined;
-      this.edit(addItem(this.rows, row, item, this.addAt(row)), `[data-swb-row="${row}"] .${BASE}-add`);
+      if (params?.length) this.adjusting = { row, index };
+      this.edit(addItem(this.rows, row, item, index), params?.length ? PARAM_FIELD : `[data-swb-row="${row}"] .${BASE}-add`);
     };
     // A kind's item added: the search goes on for its first slot
     const addKind = (kind: ItemKind) => {
@@ -1278,10 +1337,16 @@ export class SettingsDialog {
       this.adjusting = { ...target.at, key: target.key };
       this.edit(favorites, kind.fields?.length ? `[data-swb-look] .${BASE}-field-input` : `[data-swb-look] .${BASE}-look-change`);
     };
-    // An action for the slot (an optional one: or none): the search goes on for the next slot after it without one
-    const fill = (id: string | undefined) => {
-      if (forRow) return id === undefined ? undefined : add({ id });
-      const favorites = setSlot(this.rows, target.at, target.key, id);
+    // An action for the slot (an optional one: or none): the search goes on for the next slot after it without one;
+    // one with parameters: its slot's panel, where they are set
+    const fill = (action: Action | undefined) => {
+      if (forRow) return action === undefined ? undefined : add({ id: action.id });
+      const favorites = setSlot(this.rows, target.at, target.key, action?.id);
+      if (action?.params?.length) {
+        this.picking = undefined;
+        this.adjusting = { ...target.at, key: target.key };
+        return this.edit(favorites, PARAM_FIELD);
+      }
       const item = favorites[target.at.row]?.[target.at.index];
       const slots = this.kindOf(target.at)?.slots ?? [];
       const after = slots.slice(slots.findIndex((s) => s.key === target.key) + 1);
@@ -1302,12 +1367,12 @@ export class SettingsDialog {
       const pickKind = (kind: ItemKind) => (forRow ? addKind(kind) : fillKind(kind));
       // An optional slot may hold no action
       const none = !!slot?.optional && (!query || "none".startsWith(query));
-      shown = [...(separator ? [() => add({ type: "separator" })] : []), ...(none ? [() => fill(undefined)] : []), ...kinds.map((kind) => () => pickKind(kind)), ...found.map((entry) => () => fill(entry.action.id))];
+      shown = [...(separator ? [() => add({ type: "separator" })] : []), ...(none ? [() => fill(undefined)] : []), ...kinds.map((kind) => () => pickKind(kind)), ...found.map((entry) => () => fill(entry.action))];
       const options = [
         ...(separator ? [this.option(`${BASE}-pick-separator`, "", "Separator", "", () => add({ type: "separator" }))] : []),
         ...(none ? [this.option(`${BASE}-pick-unset`, "", "None", `No action for ${slot!.label}`, () => fill(undefined))] : []),
         ...kinds.map((kind) => this.option(`${BASE}-pick-kind`, kind.icon, kind.label, kind.description, () => pickKind(kind))),
-        ...found.map((entry) => this.option("", entry.action.icon, entry.action.label, entry.group, () => fill(entry.action.id))),
+        ...found.map((entry) => this.option("", entry.action.icon, entry.action.label, entry.group, () => fill(entry.action))),
       ];
       list.replaceChildren(...(options.length ? options : [this.el("div", `${BASE}-pick-none`, "No action found")]));
     };
@@ -1350,8 +1415,8 @@ export class SettingsDialog {
     const changed: Record<string, unknown> = {};
     if (values.shortcut !== initial.shortcut) changed[PATHS.shortcut] = values.shortcut;
     if (values.wordAtCaret !== initial.wordAtCaret) changed[PATHS.wordAtCaret] = values.wordAtCaret;
-    const lists = savedToolbars(values.toolbars);
-    if (JSON.stringify(lists) !== JSON.stringify(savedToolbars(initial.toolbars))) changed[PATHS.favorites] = lists;
+    const lists = toolbarsSetting(values.toolbars);
+    if (JSON.stringify(lists) !== JSON.stringify(toolbarsSetting(initial.toolbars))) changed[PATHS.favorites] = lists;
     // With the favourites, the model's version they are written in, so they are never migrated (migrations/index.ts),
     // and what the migrations changed and the toolbar did not write back yet (else the version would mark it done)
     if (PATHS.favorites in changed) {
@@ -1413,11 +1478,6 @@ export class SettingsDialog {
     }
     this.context.saved();
   }
-}
-
-/** The toolbars as written to the configuration: `{ name, useFor, placement, show, rows }`, `useFor` left out where empty, empty rows left out */
-function savedToolbars(lists: readonly Toolbar[]): unknown[] {
-  return lists.map((list) => ({ name: list.name, ...(list.useFor.length ? { useFor: [...list.useFor] } : {}), placement: list.placement, show: list.show, rows: savedRows(list.rows) }));
 }
 
 /** Whether each word typed starts a word of a label, ignoring case (nothing typed: yes) */

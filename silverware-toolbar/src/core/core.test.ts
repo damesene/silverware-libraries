@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import type { Action } from "./action.ts";
+import { type Action, NO_ARGS, withArgs } from "./action.ts";
 import { contextOf, linesOf } from "./context.ts";
 import { cursor, marked } from "./cursor.ts";
 import { placeBy } from "./place.ts";
@@ -99,3 +99,30 @@ describe("Placing by the selection", () => {
     expect(placeBy({ left: 400, right: 600, top: 740, bottom: 780 }, size, view, true)).toEqual({ left: 400, top: 692, below: false });
   });
 });
+
+describe("An action with its parameters' values", () => {
+  const seen: unknown[] = [];
+  const action: Action = {
+    id: "actions.switchToolbar",
+    label: "Toolbar",
+    icon: "",
+    group: "Silverware Toolbar",
+    params: [{ key: "toolbar", label: "Toolbar" }],
+    describe: (args) => args.toolbar,
+    active: (_context, args) => args.toolbar === "Float",
+    perform: (_context, _editor, args) => void seen.push(args),
+    choices: [{ id: "a.b", label: "B", icon: "", group: "" }],
+  };
+
+  it("is run with them, named by them, its choices not offered; values of no parameter it has, or empty, left out", () => {
+    const bound = withArgs(action, { toolbar: "Float", other: "x" });
+    expect([bound.label, bound.choices, bound.active!(contextOf("", 0, 0), NO_ARGS)]).toEqual(["Float", undefined, true]);
+    void bound.perform!(contextOf("", 0, 0), {} as never, NO_ARGS);
+    expect(seen).toEqual([{ toolbar: "Float" }]);
+    // None given (or only empty, or unknown ones): the action as it is
+    expect(withArgs(action, undefined)).toBe(action);
+    expect(withArgs(action, { toolbar: "" })).toBe(action);
+    expect(withArgs({ ...action, params: undefined }, { toolbar: "Float" }).choices).toHaveLength(1);
+  });
+});
+

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Favorites, hasAction, slotItemOf } from "../core/favorites.ts";
-import { addItem, moveItem, pinOrdered, placeItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setPin, setSlotField, setSlotOwn, stepOf, unpinnedOutOfOrder } from "./favorites.ts";
+import { addItem, moveItem, pinOrdered, placeItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setPin, setSlotField, setSlotOwn, stepOf, unpinnedOutOfOrder, setArg, setSlotArg, withArgRenamed } from "./favorites.ts";
 
 const ROWS: Favorites = [[{ id: "actions.turnInto", show: "label" }], [{ id: "formats.bold" }, { type: "separator" }, { id: "formats.link" }]];
 
@@ -156,5 +156,21 @@ describe("The favourites as the settings edit them", () => {
     expect(unpinnedOutOfOrder([[left, { id: "b" }, right]])).toEqual([[left, { id: "b" }, right]]);
     expect(unpinnedOutOfOrder([[{ id: "b" }, left, right, { id: "c" }]])).toEqual([[{ id: "b" }, { id: "a" }, { id: "z" }, { id: "c" }]]);
     expect(unpinnedOutOfOrder([[left, left, { type: "separator" }, right]])).toEqual([[left, left, { type: "separator" }, right]]);
+  });
+
+  it("sets an action's parameter on its item and on a kind's slot, an empty value taking it out", () => {
+    const rows: Favorites = [[{ id: "actions.switchToolbar" }, { type: "gesture", tap: "actions.switchToolbar" }]];
+    const set = setArg(rows, { row: 0, index: 0 }, "toolbar", "Float");
+    expect(set[0]![0]).toEqual({ id: "actions.switchToolbar", args: { toolbar: "Float" } });
+    expect(setArg(set, { row: 0, index: 0 }, "toolbar", undefined)[0]![0]).toEqual({ id: "actions.switchToolbar" });
+    const slot = setSlotArg(rows, { row: 0, index: 1 }, "tap", "toolbar", "Docked");
+    expect(slot[0]![1]).toEqual({ type: "gesture", tap: { id: "actions.switchToolbar", args: { toolbar: "Docked" } } });
+    // None left: its id alone again
+    expect(setSlotArg(slot, { row: 0, index: 1 }, "tap", "toolbar", "")[0]![1]).toEqual(rows[0]![1]);
+  });
+
+  it("renames a parameter's value where an action holds it (a toolbar renamed: the switch's), its item and a kind's slot; nothing else", () => {
+    const rows: Favorites = [[{ id: "actions.switchToolbar", args: { toolbar: "A" } }, { type: "gesture", tap: { id: "actions.switchToolbar", args: { toolbar: "A" }, icon: "★" }, up: "formats.bold" }, { id: "actions.other", args: { toolbar: "A" } }]];
+    expect(withArgRenamed(rows, "actions.switchToolbar", "toolbar", "A", "B")).toEqual([[{ id: "actions.switchToolbar", args: { toolbar: "B" } }, { type: "gesture", tap: { id: "actions.switchToolbar", args: { toolbar: "B" }, icon: "★" }, up: "formats.bold" }, { id: "actions.other", args: { toolbar: "A" } }]]);
   });
 });

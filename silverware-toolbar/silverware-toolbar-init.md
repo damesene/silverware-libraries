@@ -47,6 +47,8 @@ config.define("silverware.toolbar", {
                   -- An item's own icon (up to 3 characters, an emoji too) and label: an action's, a snippet's
                   icon = { type = "string" },
                   label = { type = "string" },
+                  -- The values of its action's parameters, by key (the switch's toolbar = "Float")
+                  args = { type = "object" },
                 },
               },
             },
@@ -131,6 +133,13 @@ if js and js.window then
     -- Whether SilverBullet's keyboard bar is on (the settings offer to turn it off on a phone)
     getUiOption = editor.getUiOption,
   })
+  -- The toolbar this way of working (a mouse's, a finger's) shows, switched to another: the list of every action open at them
+  command.define {
+    name = "Silverware Toolbar: Switch toolbar",
+    run = function()
+      silverwareToolbarJs.switchToolbar()
+    end,
+  }
   command.define {
     name = "Silverware Toolbar: Settings",
     run = function()

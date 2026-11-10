@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NO_ARGS } from "../core/action.ts";
 import { contextOf } from "../core/context.ts";
 import { marked } from "../core/cursor.ts";
 import { snippetChange, snippetsModule } from "./snippets.ts";
@@ -28,7 +29,7 @@ describe("A text snippet", () => {
     const action = kind!.action!({ type: "snippet", text: "%%{s}%%", icon: " 💬 ", label: " Comment " });
     expect(action.label).toBe("Comment");
     expect(action.icon).toContain("💬");
-    expect(action.edit!(contextOf("a b", 2, 3))).toEqual(snippetChange("%%{s}%%", contextOf("a b", 2, 3)));
+    expect(action.edit!(contextOf("a b", 2, 3), NO_ARGS)).toEqual(snippetChange("%%{s}%%", contextOf("a b", 2, 3)));
     expect(kind!.action!({ type: "snippet", text: "<b>" }).label).toBe("<b>");
     expect(kind!.action!({ type: "snippet", text: "x", icon: "<i>" }).icon).toContain("&lt;i&gt;");
   });

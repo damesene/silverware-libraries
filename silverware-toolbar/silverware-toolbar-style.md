@@ -1026,6 +1026,8 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
 .swb-settings-items {
   display: flex;
   flex-wrap: wrap;
+  /* Each item as tall as it is (an action beside a gesture button not stretched) */
+  align-items: flex-start;
   gap: 6px;
   min-height: 34px;
   padding: 2px;
@@ -1046,8 +1048,11 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
   border: 1px solid var(--swb-settings-line);
   border-radius: 6px;
   cursor: grab;
-  touch-action: none;
+  /* A finger's move scrolls the tab; held still a moment, it takes the item (shared/drag.ts hold) */
+  touch-action: pan-x pan-y;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 .swb-settings-item:focus-visible {
   outline: 2px solid var(--ui-accent-color, #464cfc);
@@ -1115,6 +1120,8 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
 }
 .swb-settings-item[aria-expanded="true"] {
   border-color: var(--ui-accent-color, #464cfc);
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 12%, var(--root-background-color));
+  box-shadow: 0 0 0 1px var(--ui-accent-color, #464cfc);
 }
 /* An item's look, under its row: each setting on a line of its own (icon or icon and label; the label's
    width), its × in the top right corner */
@@ -1257,42 +1264,130 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
   width: 14px;
   height: 14px;
 }
-/* A row of Touch's own: its items pinned left, the others, those pinned right, side by side as the docked toolbar
-   shows its line (one under another where they do not fit: a phone); the pinned ones in dashed boxes */
+/* A row of Touch's own: on top its boxes of items pinned left and right side by side (the ends of its docked line,
+   shown empty too, named), under them its other items */
 .swb-settings-zones {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 6px;
 }
-.swb-settings-zones > .swb-settings-items {
+.swb-settings-pins {
+  display: flex;
+  gap: 6px;
+}
+.swb-settings-pin-box {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
   min-width: 0;
-}
-.swb-settings-zones > .swb-settings-zone-middle {
-  flex: 1 1 160px;
-}
-.swb-settings-zones > .swb-settings-zone-left,
-.swb-settings-zones > .swb-settings-zone-right {
-  flex: 0 1 auto;
-  min-width: 90px;
+  padding: 2px 4px 4px;
   border: 1px dashed var(--button-border-color, rgba(128, 128, 128, 0.45));
+  border-radius: 6px;
+}
+.swb-settings-pin-name {
+  padding: 0 4px;
+  font-size: 11px;
+  opacity: 0.6;
+}
+/* Room to drag an item into, empty too; its items as tall as they are, at its top */
+.swb-settings-pin-box > .swb-settings-items {
+  flex: 1 1 auto;
+  align-items: flex-start;
+  align-content: flex-start;
+  min-height: 36px;
+}
+/* An item's panel and its slot's search under its line, a line of their own (the items after it under them): in
+   the accent's border and tint as the item open, its arrow pointing at it (--swb-pointer-x, set as it is laid out),
+   its head naming it */
+.swb-settings-detail {
+  position: relative;
+  flex: 1 1 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 8px 0 4px;
+  padding: 6px 8px 8px;
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 7%, var(--root-background-color));
+  border: 1px solid var(--ui-accent-color, #464cfc);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+.swb-settings-detail::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: calc(var(--swb-pointer-x, 24px) - 6px);
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  border-top: 1px solid var(--ui-accent-color, #464cfc);
+  border-left: 1px solid var(--ui-accent-color, #464cfc);
+  transform: rotate(45deg);
+}
+.swb-settings-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 30px 2px 2px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.swb-settings-detail-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Its settings within it: no box of their own, their × in its top right corner, by its head */
+.swb-settings-detail > .swb-settings-look {
+  position: static;
+  margin-top: 0;
+  padding: 4px 28px 0 2px;
+  background: none;
+  border: 0;
+}
+.swb-settings-detail > .swb-settings-look .swb-settings-look-close {
+  top: 4px;
+  right: 6px;
 }
 /* A kind's item (the gesture button): its name, look and × on the first line, its slots under them,
    side by side where they fit, else one under another (a phone) */
 .swb-settings-item.swb-settings-kind {
+  /* As wide as its slots need, side by side where two fit (a desktop), one per line on a phone */
+  flex: 1 1 260px;
   flex-wrap: wrap;
   max-width: 100%;
   box-sizing: border-box;
 }
 .swb-settings-kind .swb-settings-item-name {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  /* (Narrow, a pinned box: cut, its × beside it) */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+/* A kind's slots one under another, each a line as wide as the item (a gesture button's Click, Swipe up, Swipe
+   down: the same on a phone and a desktop, whatever their actions' names), their names in a column of their own so
+   the actions line up */
 .swb-settings-slots {
   display: flex;
   flex: 1 1 100%;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 4px;
   min-width: 0;
   padding-bottom: 2px;
+}
+.swb-settings-slots > .swb-settings-slot,
+.swb-settings-slots > .swb-settings-field {
+  flex: none;
+}
+.swb-settings-slots > .swb-settings-slot > .swb-settings-slot-name {
+  min-width: 5.5em;
+  text-align: left;
+}
+/* (A pinned box, narrow: the action's name the room) */
+.swb-settings-pin-box .swb-settings-slots > .swb-settings-slot > .swb-settings-slot-name {
+  min-width: 0;
 }
 /* A slot of a kind's item (the gesture button's Click, Swipe up): the action picked for it */
 /* The favourites for a mouse (Click) or for a finger (Touch): two segments; Touch the same as Click shown dimmed, not edited */

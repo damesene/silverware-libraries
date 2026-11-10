@@ -380,3 +380,47 @@ test.describe("Settings of an older model", () => {
     expect((await stored())["silverware.toolbar.favorites-touch"]).toEqual([[rows[0]![0], ...rows[1]!, { type: "separator" }, ...rows[2]!]]);
   });
 });
+
+test.describe("The settings by finger", () => {
+  test("a finger moved over the favourites scrolls them; held a moment on an item, it drags it", async ({ page }) => {
+    // Low enough for the favourites to scroll
+    await page.setViewportSize({ width: page.viewportSize()!.width, height: 520 });
+    await selectByTouch(page, "some text");
+    await barButton(page, "actions.more").tap();
+    await popup(page).locator(".swb-search-field").fill("settings");
+    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').tap();
+    const dialog = page.locator(".swb-settings");
+    await dialog.locator('[data-swb-tab="favorites"]').tap();
+    const body = dialog.locator(".swb-settings-body");
+    const name = dialog.locator('[data-swb-item="1:1"] .swb-settings-item-name');
+    const box = (await name.boundingBox())!;
+    const x = box.x + 6;
+    const y = box.y + box.height / 2;
+    // Moved at once: the list scrolls, nothing taken (moves a frame apart, as a finger's: Chrome scrolls by them)
+    const fling = await page.context().newCDPSession(page);
+    await fling.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    for (let i = 1; i <= 15; i++) {
+      await fling.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - i * 10 }] });
+      await page.waitForTimeout(16);
+    }
+    await fling.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await fling.detach();
+    await expect.poll(() => body.evaluate((e) => e.scrollTop)).toBeGreaterThan(0);
+    await expect(page.locator(".swb-settings-ghost")).toHaveCount(0);
+    await expect(dialog.locator('[data-swb-items="1"] .swb-settings-item-name')).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
+    // Held: taken, and moved into the row above
+    await body.evaluate((e) => (e.scrollTop = 0));
+    const italic = (await name.boundingBox())!;
+    const target = (await dialog.locator('[data-swb-items="0"]').boundingBox())!;
+    const cdp = await page.context().newCDPSession(page);
+    const at = { x: italic.x + 6, y: italic.y + italic.height / 2 };
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [at] });
+    await expect(page.locator(".swb-settings-ghost")).toHaveCount(1);
+    for (let i = 1; i <= 10; i++) {
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: at.x + ((target.x + target.width - 10 - at.x) * i) / 10, y: at.y + ((target.y + target.height / 2 - at.y) * i) / 10 }] });
+    }
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await cdp.detach();
+    await expect(dialog.locator('[data-swb-items="0"] .swb-settings-item-name')).toHaveText(["Turn into", "Italic"]);
+  });
+});

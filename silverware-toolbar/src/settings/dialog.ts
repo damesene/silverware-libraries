@@ -22,7 +22,6 @@ import { addItem, type At, moveItem, moveRow, pinOf, pinOrdered, placeItem, remo
 
 // A zone of a row of Touch's own: its items pinned left, the others, those pinned right
 type Zone = "left" | "middle" | "right";
-const ZONE_NAMES: readonly Zone[] = ["left", "middle", "right"];
 
 const BASE = "swb-settings";
 
@@ -408,7 +407,7 @@ export class SettingsDialog {
       ...(this.sameForTouch || hasAction(this.rows, "actions.more", this.context.kinds())
         ? []
         : [this.el("p", `${BASE}-warning`, "Every action (…) is required: these favourites do not have it, so it is added at the end of the toolbar. Add it anywhere (a gesture button's swipe too) to put it there.")]),
-      this.el("p", `${BASE}-intro`, "Click an item to change how it shows. Drag items and rows to reorder them."),
+      this.el("p", `${BASE}-intro`, "Click an item to change how it shows. Drag items and rows to reorder them (by finger, hold an item a moment first)."),
     ];
     const rows = this.el("div", `${BASE}-rows`);
     // Click's shown for Touch where it has none of its own: not edited here
@@ -435,8 +434,9 @@ export class SettingsDialog {
       const add = this.button(`${BASE}-add`, open ? "Close" : "Add", () => this.openPicking({ row: r }));
       add.setAttribute("aria-expanded", String(open));
       block.append(this.pins ? this.zones(row, r, known) : this.itemList(row, r, undefined, known), add);
-      if (this.adjusting?.row === r) block.append(this.lookPanel(this.adjusting));
-      if (picking && ("row" in picking ? picking.row : picking.at.row) === r) block.append(this.picker(picking));
+      this.placeDetail(block, r);
+      // The search for the row (Add): under its Add
+      if (picking && "row" in picking && picking.row === r) block.append(this.picker(picking));
       rows.append(block);
     });
     parts.push(rows);
@@ -449,10 +449,61 @@ export class SettingsDialog {
         }),
       );
     panel.replaceChildren(...parts);
+    this.pointDetail();
     const focused = focus ? panel.querySelector<HTMLElement>(focus) : null;
     focused?.focus({ preventScroll: true });
-    // A search opened: in view with its list, above an on-screen keyboard already there
-    focused?.closest<HTMLElement>("[data-sw-reveal]")?.scrollIntoView?.({ block: "nearest" });
+    // A search opened: in view with its list, above an on-screen keyboard already there; an item's panel in view
+    (focused?.closest<HTMLElement>("[data-sw-reveal]") ?? focused?.closest<HTMLElement>(`.${BASE}-detail`))?.scrollIntoView?.({ block: "nearest" });
+  }
+
+  /** The open item's panel's arrow at the middle of the item (or of its slot) it is for, once laid out */
+  private pointDetail(): void {
+    const detail = this.favoritesPanel?.querySelector<HTMLElement>(`.${BASE}-detail`);
+    const adjusting = this.adjusting;
+    const picking = this.picking;
+    const at = adjusting ?? (picking && "at" in picking ? picking.at : undefined);
+    const key = adjusting ? adjusting.key : picking && "at" in picking ? picking.key : undefined;
+    if (!detail || !at) return;
+    const item = this.favoritesPanel!.querySelector<HTMLElement>(`[data-swb-item="${at.row}:${at.index}"]`);
+    const target = (key && item?.querySelector<HTMLElement>(`[data-swb-slot="${key}"]`)) || item;
+    if (!target) return;
+    const box = detail.getBoundingClientRect();
+    const of = target.getBoundingClientRect();
+    // (Not laid out: jsdom, a hidden tab; the CSS's default)
+    if (!box.width) return;
+    const x = Math.max(14, Math.min(box.width - 14, of.left + of.width / 2 - box.left));
+    detail.style.setProperty("--swb-pointer-x", `${Math.round(x)}px`);
+  }
+
+  /**
+   * An item's panel (its look, a slot's) and the search for its slot, where
+   * the row's item is: under its line in its list (the panel a line of its
+   * own there, the items after it below it), or for an item pinned, under the
+   * row's two boxes of pinned items, as they are narrow
+   */
+  private placeDetail(block: HTMLElement, r: number): void {
+    const adjusting = this.adjusting;
+    const picking = this.picking;
+    const slotPicking = picking && "at" in picking && picking.at.row === r ? picking : undefined;
+    if (adjusting?.row !== r && !slotPicking) return;
+    const at = adjusting?.row === r ? adjusting : slotPicking!.at;
+    const key = adjusting?.row === r ? adjusting.key : slotPicking!.key;
+    const item = block.querySelector<HTMLElement>(`[data-swb-item="${at.row}:${at.index}"]`);
+    const detail = this.el("div", `${BASE}-detail`);
+    // Said whose it is: the item's icon and name (a slot's: its name after the item's), as the item shows them
+    const head = this.el("div", `${BASE}-detail-head`);
+    const icon = this.el("span", `${BASE}-item-icon`);
+    icon.innerHTML = item?.querySelector(`.${BASE}-item-icon`)?.innerHTML ?? "";
+    const slot = key ? item?.querySelector<HTMLElement>(`[data-swb-slot="${key}"] .${BASE}-slot-name`)?.textContent : undefined;
+    const name = item?.querySelector(`.${BASE}-item-name`)?.textContent ?? "";
+    head.append(icon, this.el("span", `${BASE}-detail-name`, slot ? `${name} · ${slot}` : name));
+    detail.append(head);
+    if (adjusting?.row === r) detail.append(this.lookPanel(adjusting));
+    if (slotPicking) detail.append(this.picker(slotPicking));
+    const pinned = item?.closest<HTMLElement>(`.${BASE}-pins`);
+    if (pinned) pinned.after(detail);
+    else if (item) item.after(detail);
+    else block.append(detail);
   }
 
   /**
@@ -471,7 +522,8 @@ export class SettingsDialog {
     row.forEach((item, i) => {
       if (!zone || pinOf(item) === pin) items.append(this.itemElement(item, { row: r, index: i }, known));
     });
-    if (!items.childElementCount) items.append(this.el("span", `${BASE}-empty`, zone === "left" ? "Pinned left" : zone === "right" ? "Pinned right" : "Empty"));
+    // (A pinned box empty: its name over it says what it is)
+    if (!items.childElementCount && (!zone || zone === "middle")) items.append(this.el("span", `${BASE}-empty`, "Empty"));
     if (zone && zone !== "middle") {
       items.setAttribute("aria-label", zone === "left" ? `Row ${r + 1}, pinned left` : `Row ${r + 1}, pinned right`);
       items.title = `At the ${zone} end of this row's line where the toolbar is docked, out of what scrolls`;
@@ -479,10 +531,20 @@ export class SettingsDialog {
     return items;
   }
 
-  /** Touch's own row: its items pinned left, the others, those pinned right, side by side, as the docked toolbar shows its line */
+  /**
+   * Touch's own row: on top its two boxes of items pinned left and right, side
+   * by side as the ends of its docked line (shown empty too, named, to drag
+   * an item into), under them its other items
+   */
   private zones(row: readonly FavoriteItem[], r: number, known: Map<string, Action>): HTMLElement {
     const zones = this.el("div", `${BASE}-zones`);
-    zones.append(...ZONE_NAMES.map((zone) => this.itemList(row, r, zone, known)));
+    const pins = this.el("div", `${BASE}-pins`);
+    for (const zone of ["left", "right"] as const) {
+      const box = this.el("div", `${BASE}-pin-box ${BASE}-pin-box-${zone}`);
+      box.append(this.el("span", `${BASE}-pin-name`, zone === "left" ? "Pinned left" : "Pinned right"), this.itemList(row, r, zone, known));
+      pins.append(box);
+    }
+    zones.append(pins, this.itemList(row, r, "middle", known));
     return zones;
   }
 
@@ -572,6 +634,8 @@ export class SettingsDialog {
         base: BASE,
         layer: this.dialog?.element,
         flow: "inline",
+        // A finger takes it once held: moved before, it scrolls the tab
+        hold: true,
         containers: () => Array.from(panel.querySelectorAll<HTMLElement>(`.${BASE}-items`)),
         items: (container) => Array.from(container.querySelectorAll<HTMLElement>(`:scope > .${BASE}-item`)),
         done: (to) => {

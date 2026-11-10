@@ -8,6 +8,9 @@
 // not only over another element; a container that scrolls scrolls near its
 // top or bottom. Esc cancels. Let go, the caller is told the
 // container and the index it ended at, and draws the list anew from its values.
+// An element dragged by itself, not by a handle (`hold`), is taken by a finger
+// only once held still a moment, so a finger's move over the list scrolls it
+// (as a database board's card and a timeline's bar are taken).
 
 export type Reorder = {
   // The element dragged
@@ -26,6 +29,9 @@ export type Reorder = {
   readonly done: (to: { readonly container: number; readonly index: number } | undefined) => void;
   // Let go without moving (a click, a tap): told after `done`
   readonly clicked?: () => void;
+  // A finger's press takes it only once held still HOLD_MS (moved before: the page's scroll, nothing told; let go
+  // before: a tap, `clicked`); the element's CSS lets a finger pan (touch-action), a mouse's and a pen's take it at once
+  readonly hold?: boolean;
 };
 
 // How far the pointer goes before it is a drag (a press without it is a click or a focus)
@@ -35,6 +41,9 @@ const SCROLL_EDGE = 28;
 const SCROLL_STEP = 12;
 // The others sliding aside
 const SLIDE_MS = 150;
+// A finger held this long, moved less than HOLD_PX, takes the element (`hold`)
+const HOLD_MS = 400;
+const HOLD_PX = 8;
 
 export function reorder(e: PointerEvent, options: Reorder): void {
   const { element, base } = options;
@@ -44,25 +53,46 @@ export function reorder(e: PointerEvent, options: Reorder): void {
   const box = element.getBoundingClientRect();
   const grab = { x: e.clientX - box.left, y: e.clientY - box.top };
   let ghost: HTMLElement | undefined;
+  // Its copy made, following the pointer from now on, where the pointer is
+  const lift = (x: number, y: number) => {
+    ghost = element.cloneNode(true) as HTMLElement;
+    ghost.classList.add(`${base}-ghost`);
+    ghost.removeAttribute("id");
+    // A picture of it: no second field or button for a screen reader, nor for what counts them
+    ghost.setAttribute("aria-hidden", "true");
+    ghost.inert = true;
+    ghost.style.width = `${box.width}px`;
+    ghost.style.height = `${box.height}px`;
+    ghost.style.left = `${x - grab.x}px`;
+    ghost.style.top = `${y - grab.y}px`;
+    (options.layer ?? doc.body).append(ghost);
+    element.classList.add(`${base}-placeholder`);
+  };
+  // A finger's press with `hold`: waiting to be held (taken once the timer runs out)
+  const waiting = !!options.hold && e.pointerType === "touch";
+  let holding = 0;
+  // Its moves, once taken, the drag's: kept from scrolling (told for every move: the browser asks as it may scroll)
+  const keep = (t: TouchEvent) => {
+    if (ghost && t.cancelable) t.preventDefault();
+  };
+  // A long press's own menu (the system's), never while a finger holds it
+  const noMenu = (c: Event) => c.preventDefault();
 
   const move = (m: PointerEvent) => {
     if (m.pointerId !== e.pointerId) return;
     if (!ghost) {
-      if (Math.hypot(m.clientX - start.x, m.clientY - start.y) < THRESHOLD) return;
-      ghost = element.cloneNode(true) as HTMLElement;
-      ghost.classList.add(`${base}-ghost`);
-      ghost.removeAttribute("id");
-      // A picture of it: no second field or button for a screen reader, nor for what counts them
-      ghost.setAttribute("aria-hidden", "true");
-      ghost.inert = true;
-      ghost.style.width = `${box.width}px`;
-      ghost.style.height = `${box.height}px`;
-      (options.layer ?? doc.body).append(ghost);
-      element.classList.add(`${base}-placeholder`);
+      const far = Math.hypot(m.clientX - start.x, m.clientY - start.y);
+      if (waiting) {
+        // Moved before it was held: the page's scroll, not a drag
+        if (far > HOLD_PX) leave();
+        return;
+      }
+      if (far < THRESHOLD) return;
+      lift(m.clientX, m.clientY);
     }
     m.preventDefault();
-    ghost.style.left = `${m.clientX - grab.x}px`;
-    ghost.style.top = `${m.clientY - grab.y}px`;
+    ghost!.style.left = `${m.clientX - grab.x}px`;
+    ghost!.style.top = `${m.clientY - grab.y}px`;
     last = { x: m.clientX, y: m.clientY };
     place(m.clientX, m.clientY);
     if (!scrolling) scroll();
@@ -120,12 +150,19 @@ export function reorder(e: PointerEvent, options: Reorder): void {
     }
   };
 
-  const finish = (dropped: boolean) => {
+  // Its listeners gone, nothing told (a finger's scroll before it was held)
+  const leave = () => {
+    win.clearTimeout(holding);
     win.removeEventListener("pointermove", move, true);
     win.removeEventListener("pointerup", up, true);
     win.removeEventListener("pointercancel", cancel, true);
     win.removeEventListener("keydown", key, true);
+    win.removeEventListener("touchmove", keep, true);
+    win.removeEventListener("contextmenu", noMenu, true);
     win.cancelAnimationFrame(scrolling);
+  };
+  const finish = (dropped: boolean) => {
+    leave();
     const moved = !!ghost;
     ghost?.remove();
     element.classList.remove(`${base}-placeholder`);
@@ -143,7 +180,10 @@ export function reorder(e: PointerEvent, options: Reorder): void {
     if (u.pointerId === e.pointerId) finish(true);
   };
   const cancel = (c: PointerEvent) => {
-    if (c.pointerId === e.pointerId) finish(false);
+    if (c.pointerId !== e.pointerId) return;
+    // (The browser took a finger's move not held yet for a scroll: nothing to tell)
+    if (waiting && !ghost) leave();
+    else finish(false);
   };
   // Esc cancels the drag, not the dialog
   const key = (k: KeyboardEvent) => {
@@ -156,6 +196,16 @@ export function reorder(e: PointerEvent, options: Reorder): void {
   win.addEventListener("pointerup", up, true);
   win.addEventListener("pointercancel", cancel, true);
   win.addEventListener("keydown", key, true);
+  if (waiting) {
+    win.addEventListener("touchmove", keep, { capture: true, passive: false });
+    win.addEventListener("contextmenu", noMenu, true);
+    holding = win.setTimeout(() => {
+      // (Drawn anew meanwhile: nothing to take)
+      if (!element.isConnected) return leave();
+      lift(last.x, last.y);
+      place(last.x, last.y);
+    }, HOLD_MS);
+  }
 }
 
 /** The item after the element among the others, if any (whether it is already last) */

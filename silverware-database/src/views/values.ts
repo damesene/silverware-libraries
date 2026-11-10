@@ -10,7 +10,8 @@ import { fullAddress, isOpenable, prettyUrl, readLink } from "../domain/types/li
 import { pathOf } from "../domain/folders.ts";
 import { linkedDocument, type Reference, readReferences } from "../domain/types/reference.ts";
 import type { ViewHost } from "../core/view.ts";
-import { optionColor } from "../domain/types/options.ts";
+import { colorsOf, optionColor } from "../domain/types/options.ts";
+import type { PropertyType } from "../domain/types/type.ts";
 import { isEmpty, type Item, type Property, type Value } from "../model/database.ts";
 
 /** Why an item's value of a property is wrong, as the views mark it: none where it is required, else its type's reason; none where it is right */
@@ -130,10 +131,50 @@ function fromHsl(h: number, s: number, l: number): [number, number, number] {
   return [channel(h + 1 / 3), channel(h), channel(h - 1 / 3)];
 }
 
-/** A select's value as a pill: in the color given its option, else its option's place's; marked where it is none of them */
-export function optionPill(doc: Document, property: Property, value: string): HTMLElement {
-  const color = optionColor(property.params, value);
-  return pill(doc, value, color, color === undefined ? `${value}: none of ${property.label}'s options` : undefined);
+/**
+ * A value's color among a property's options: the one given its option, else its option's place's; one none of them but
+ * taken by its type (a person's with Anyone) a color of the palette by its name; none where it is none of them
+ */
+export function choiceColor(property: Property, value: string, type?: PropertyType): number | `#${string}` | undefined {
+  const listed = optionColor(property.params, value);
+  if (listed !== undefined || type === undefined) return listed;
+  return type.validate(type.lists ? [value] : value, property.params) === undefined ? nameColor(value) : undefined;
+}
+
+/**
+ * A select's or a person's value as a pill, shown as its type shows an option (`@ada`), in its color (`choiceColor`); marked
+ * where it is none of the options and not taken. A person's (`PropertyType.mentions`) looks as the page's mentions do
+ * unless its option was given a color of its own (Auto: the page's look), and where `openMention` is given a press or Enter
+ * on it shows where that person is mentioned, editing nothing
+ */
+export function optionPill(doc: Document, property: Property, value: string, type?: PropertyType, openMention?: (name: string) => unknown): HTMLElement {
+  const color = choiceColor(property, value, type);
+  const text = type?.optionShown?.(value) ?? value;
+  const made = pill(doc, text, color, color === undefined ? `${text}: none of ${property.label}'s options` : undefined);
+  if (!type?.mentions) return made;
+  // (A color given its option: its own; else the page's mentions' look)
+  if (!Object.hasOwn(colorsOf(property.params), value)) made.classList.add("swd-mention");
+  if (!openMention) return made;
+  made.setAttribute("role", "link");
+  made.tabIndex = 0;
+  if (color !== undefined) made.title = `Where ${text} is mentioned`;
+  const opened = (event: Event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void openMention(value);
+  };
+  made.addEventListener("click", opened);
+  made.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") opened(event);
+  });
+  return made;
+}
+
+/** A color of the palette for a name none of the options, the same for the same name */
+function nameColor(name: string): number {
+  let hash = 0;
+  for (const char of name) hash = (hash * 31 + char.codePointAt(0)!) >>> 0;
+  return hash % PILL_COLORS;
 }
 
 /** The values of a select or a multi-select, as kept (a list, or one value of another kind as its text) */
@@ -148,11 +189,11 @@ function chosen(value: Value | undefined): string[] {
  * documents it names, labels as quiet pills; else its type's text; nothing where it is empty. A
  * checkbox is the view's own (a box to tick, or its property's name on a card).
  */
-export function valueNodes(host: Pick<ViewHost, "document" | "type" | "text" | "openByName" | "folderSeparator">, item: Item, property: Property): Node[] {
+export function valueNodes(host: Pick<ViewHost, "document" | "type" | "text" | "openByName" | "openMention" | "folderSeparator">, item: Item, property: Property): Node[] {
   const doc = host.document;
   const type = host.type(property);
   const value = item.values[property.key];
-  if (type.look === "options") return chosen(value).map((one) => optionPill(doc, property, one));
+  if (type.look === "options") return chosen(value).map((one) => optionPill(doc, property, one, type, host.openMention));
   // (Labels: each a quiet pill, none of them an option; a value that is no list shown as kept, marked by the view)
   if (type.look === "labels" && Array.isArray(value)) return value.map((one) => pill(doc, String(one), 0));
   // (Links only of a value that reads as the type: one that does not is shown as kept, marked by the view)
@@ -177,7 +218,7 @@ export function valueNodes(host: Pick<ViewHost, "document" | "type" | "text" | "
  * where it has no value (no name alone). A view drawing values under a header
  * naming them (a table's column) draws them with `valueNodes`
  */
-export function fieldNodes(host: Pick<ViewHost, "document" | "type" | "text" | "openByName" | "folderSeparator">, item: Item, property: Property): Node[] {
+export function fieldNodes(host: Pick<ViewHost, "document" | "type" | "text" | "openByName" | "openMention" | "folderSeparator">, item: Item, property: Property): Node[] {
   const doc = host.document;
   if (missing(host, item, property)) return [missingPill(doc, property)];
   if (host.type(property).look === "check") return item.values[property.key] === true ? [doc.createTextNode(`✓ ${property.label}`)] : [];

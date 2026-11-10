@@ -286,11 +286,14 @@ test("a timeline's bar dragged to its right edge scrolls it, as a board's card d
   const before = await scroller.evaluate((one) => one.scrollLeft);
   const from = (await bar.boundingBox())!;
   const edge = (await scroller.boundingBox())!;
-  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  const [start, end] = [from.x + from.width / 2, edge.x + edge.width - 6];
+  await page.mouse.move(start, from.y + from.height / 2);
   await page.mouse.down();
-  await page.mouse.move(edge.x + edge.width - 6, from.y + from.height / 2, { steps: 8 });
-  // Held at the edge: it scrolls on, the pointer still (waited for as it goes, frame by frame)
-  await expect.poll(() => scroller.evaluate((one) => one.scrollLeft)).toBeGreaterThan(before + 200);
+  await page.mouse.move(end, from.y + from.height / 2, { steps: 8 });
+  // Held at the edge: it scrolls on, the pointer still; let go once the pointer's way and the scroll come to past the 20th
+  // day (a day as wide as the bar of one: waited for as it scrolls, not for a time, which let it go short on a fast runner)
+  const days = async () => (end - start + (await scroller.evaluate((one) => one.scrollLeft)) - before) / from.width;
+  await expect.poll(days).toBeGreaterThan(21);
   await page.mouse.up();
   await expect.poll(() => space.saved("Page/db-tasks/Trip")).not.toContain(`due: "${day(1)}"`);
   const saved = /due: "(\d{4}-\d{2}-\d{2})"/.exec((await space.saved("Page/db-tasks/Trip")) ?? "")![1]!;
@@ -1154,8 +1157,10 @@ test("full screen through writes of its block: a filter typed, the place drawn a
     return seen;
   });
   await page.keyboard.type("Fix", { delay: 40 });
-  await expect.poll(() => space.saved("Page")).toContain("Fix");
   await expect(page.locator(".swd-table tbody tr")).toHaveCount(1);
+  // Kept by Enter: the block written and drawn anew, still over the window, the field focused for more
+  await page.keyboard.press("Enter");
+  await expect.poll(() => space.saved("Page")).toContain("Fix");
   await expect(page.locator(".swd-place")).toHaveClass(/swd-over-window/);
   await expect(name).toBeFocused();
   expect(await page.evaluate(() => (window as unknown as { inPage: number }).inPage)).toBe(0);
@@ -1166,39 +1171,28 @@ test("full screen through writes of its block: a filter typed, the place drawn a
   await expect(page.locator(".swd-place")).not.toHaveClass(/swd-over-window/);
 });
 
-test("a filter is applied as it is typed, without Enter, the typing going on as the block is written and drawn anew", async ({ page, space }) => {
+test("a filter is applied as it is typed, nothing written while it is typed in, kept by Enter or as the field is left; no key lost", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS }, "Page");
   await expect(page.locator(".swd-table tbody tr")).toHaveCount(2);
+  const written = await space.saved("Page");
   await page.locator(".swd-filter-button").click();
   const name = page.locator('.swd-filter input[data-key="name"]');
   await name.click();
-  await page.keyboard.type("Fix", { delay: 40 });
-  await expect.poll(() => space.saved("Page")).toContain("Fix");
-  await expect(page.locator(".swd-table tbody tr")).toHaveCount(1);
-  // The block written and drawn anew: the panel open, the field focused, the caret at its end: what is typed goes on there
-  await expect(name).toBeFocused();
-  await page.keyboard.type(" lo", { delay: 40 });
-  await expect.poll(() => space.saved("Page")).toContain("Fix lo");
-  await expect(name).toHaveValue("Fix lo");
-  await expect(page.locator(".swd-table tbody tr")).toHaveCount(1);
-  await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);
-  // Typed fast, past several writes: nothing typed lost, nothing of it in the page's text but the block's condition
-  await name.press("End");
-  await page.keyboard.type("gin and more words typed quickly", { delay: 15 });
-  await expect.poll(() => space.saved("Page")).toContain("Fix login and more words typed quickly");
-  await expect(name).toHaveValue("Fix login and more words typed quickly");
-  // A pause just long enough for a write, then keys at once, as the block is drawn anew: none of them lost
-  for (const key of ["!", "?"]) {
-    await page.keyboard.type(key);
-    await page.waitForTimeout(330);
-  }
-  await page.keyboard.type("#");
-  await expect.poll(() => space.saved("Page")).toContain("typed quickly!?#");
+  // Shown as it is typed, fast: every key in the field, the view filtered, the block not written (a write draws it anew,
+  // the field with it: keys typed meanwhile were lost)
+  await page.keyboard.type("Fix login and more words typed quickly!?#", { delay: 15 });
   await expect(name).toHaveValue("Fix login and more words typed quickly!?#");
+  await expect(page.locator(".swd-table tbody tr")).toHaveCount(0);
+  expect(await space.saved("Page")).toBe(written);
+  // Kept by Enter, once: the block drawn anew, the panel open, the field focused, the caret at its end, typing going on there
+  await page.keyboard.press("Enter");
+  await expect.poll(() => space.saved("Page")).toContain('table.filter: {"name":"Fix login and more words typed quickly!?#"}');
   await expect(name).toBeFocused();
-  await page.keyboard.press("Backspace");
-  await page.keyboard.press("Backspace");
-  await page.keyboard.press("Backspace");
+  await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);
+  for (let n = 0; n < 3; n++) await page.keyboard.press("Backspace");
+  await expect(name).toHaveValue("Fix login and more words typed quickly");
+  // Kept as the field is left
+  await page.locator(".swd-place-count").click();
   await expect.poll(() => space.saved("Page")).toBe('# Page\n\n```silverware-database\nid: tasks\nview: table\ntable.filter: {"name":"Fix login and more words typed quickly"}\n```\n');
 });
 
@@ -1314,9 +1308,14 @@ test("a select's Multiple turned on in Properties writes it into the root page a
   await choose(page, "Properties");
   await page.locator('[data-property="status"] .swd-prop-head').click();
   await page.locator('[data-property="status"] .swd-property-setting[data-param="multiple"] input').click();
+  // An option added by Add beside its field, as Enter adds one
+  await page.locator('[data-property="status"] .swd-option-new').fill("Later");
+  await page.locator('[data-property="status"] .swd-option-add').click();
+  await expect(page.locator('[data-property="status"] .swd-option-name').last()).toHaveValue("Later");
   await page.locator(".swd-properties-save").click();
   await page.locator(".swd-property-apply").click();
   await expect.poll(() => space.saved("Page/db-tasks")).toContain("multiple: true");
+  expect(await space.saved("Page/db-tasks")).toContain("options: [Todo, Done, Later]");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("status: [Todo]");
   // Edited by its boxes now, one ticked more written as a list of both
   await page.locator('tbody tr:first-child td[data-key="status"]').click();
@@ -1339,4 +1338,56 @@ test("the peek marks a property the view it was opened from hides, every propert
   await status.locator("select").selectOption("Done");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("status: Done");
   await expect(status).toHaveClass(/swd-peek-hidden/);
+});
+
+test("a person shows as a mention, kept by the name alone, picked from its people; with Anyone a name none of them shows as valid", async ({ page, space }) => {
+  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    owner: { type: person, label: Owner, options: [ada, bob] }\n---\n";
+  const owned = (owner: string, rank: string) => `---\ntags: [db]\nowner: ${owner}\n_database:\n  rank: ${rank}\n---\n`;
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", "Page/db-tasks": rootPage, "Page/db-tasks/Fix login": owned("ada", "a0"), "Page/db-tasks/Write docs": owned("eve", "a1") }, "Page");
+  const cell = (row: number) => page.locator(`.swd-table tbody tr:nth-child(${row}) td[data-key="owner"]`);
+  await expect(cell(1).locator(".swd-pill")).toHaveText("@ada");
+  await expect(cell(2).locator(".swd-pill")).toHaveClass(/swd-pill-none/);
+  await cell(1).click();
+  await expect(cell(1).locator("select option")).toHaveText(["", "ada", "bob"]);
+  await cell(1).locator("select").selectOption("bob");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("owner: bob\n");
+  // Anyone turned on in Properties: Eve valid, written into the root page
+  await page.locator(".swd-more").click();
+  await choose(page, "Properties");
+  await page.locator('[data-property="owner"] .swd-prop-head').click();
+  await page.locator('[data-property="owner"] .swd-property-setting[data-param="anyone"] input').click();
+  await page.locator(".swd-properties-save").click();
+  await expect.poll(() => space.saved("Page/db-tasks")).toContain("anyone: true");
+  await expect(cell(2).locator(".swd-pill")).toHaveText("@eve");
+  await expect(cell(2).locator(".swd-pill")).not.toHaveClass(/swd-pill-none/);
+  // Its editor now a field taking any name, offering the people
+  await cell(1).click();
+  const field = cell(1).locator("input.swd-editor-typed");
+  await expect(field).toHaveValue("bob");
+  await field.fill("zoe");
+  await field.press("Enter");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("owner: zoe\n");
+  // A name clicked in the list: written, the editor closed, not opened anew by the click
+  await cell(1).click();
+  await cell(1).locator(".swd-suggest-item", { hasText: "ada" }).click();
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("owner: ada\n");
+  await expect(cell(1).locator(".swd-editor")).toHaveCount(0);
+  await expect(cell(1).locator(".swd-pill")).toHaveText("@ada");
+});
+
+test("a person pressed opens SilverBullet's Mention Inbox on that name, editing nothing; a multiple person's boxes laid over the page", async ({ page, space }) => {
+  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    owner: { type: person, label: Owner, options: [ada, bob] }\n    team: { type: person, label: Team, options: [ada, bob], multiple: true, colors: { bob: green } }\n---\n";
+  const owned = "---\ntags: [db]\nowner: ada\nteam: [bob]\n_database:\n  rank: a0\n---\n";
+  await space.open({ Page: "# Page\n\nA note for @ada.\n\n```silverware-database\nid: tasks\nview: table\n```\n", "Page/db-tasks": rootPage, "Page/db-tasks/Fix login": owned }, "Page");
+  const cell = (key: string) => page.locator(`.swd-table tbody tr:first-child td[data-key="${key}"]`);
+  // A person shown as a mention (Auto) and one in a color of its own: both pressed, the hand over both
+  await expect(cell("owner").locator(".swd-mention")).toHaveCSS("cursor", "pointer");
+  await expect(cell("team").locator(".swd-pill")).not.toHaveClass(/swd-mention/);
+  await expect(cell("team").locator(".swd-pill")).toHaveCSS("cursor", "pointer");
+  await cell("owner").locator(".swd-mention").click();
+  await expect(page.getByText("Mention Inbox")).toBeVisible();
+  await expect(cell("owner").locator(".swd-editor")).toHaveCount(0);
+  // The boxes fixed to the window by their cell: no box of the page clips them
+  await cell("team").click();
+  await expect(cell("team").locator(".swd-editor-choices")).toHaveCSS("position", "fixed");
 });

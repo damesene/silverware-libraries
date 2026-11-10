@@ -12,6 +12,7 @@ import type { GroupArrangement } from "../domain/grouping.ts";
 import type { Database, Item, Property } from "../model/database.ts";
 import { type DatabaseCore, isRefused } from "./core.ts";
 import { documentsHost, type DocumentsSource } from "./documents.ts";
+import { mentionsHost } from "./mentions.ts";
 import { arrangedGroups, focusGroupList, type GroupFocus, groupedBy, groupEntry } from "./groupmenu.ts";
 import { appliedToViews, type LookOf, type LookPart, type ToAll } from "./applyall.ts";
 import { arrangementEntries, groupEntries, hidesByDefault, propertyEntries, STATE_KEYS } from "./statekeys.ts";
@@ -40,7 +41,7 @@ export type PlaceOptions = {
   readonly views: ViewRegistry;
   readonly settings: Pick<Settings, "get">;
   readonly ui: Pick<UserInterface, "notify">;
-  readonly editor?: Pick<Editor, "open">;
+  readonly editor?: Pick<Editor, "open" | "openMention">;
   /** The documents references name (core/documents.ts); none: no document offered nor opened */
   readonly documents?: DocumentsSource;
   /** What the modules on put in the place's menu (core/module.ts), asked as it opens */
@@ -82,6 +83,10 @@ type Drawn = {
   keptTools?: () => PlaceKept;
   host?: ViewHost;
   grouped?: string;
+  // Conditions of the filter being typed, by key ("" none), shown at once and kept only once the field is left: the view
+  // filters by them meanwhile, nothing written (a write draws the block anew in SilverBullet, the field going with it, and
+  // keys typed before the next one was focused were lost)
+  typed?: Record<string, string>;
 };
 
 /** The property a view is drawn once per group by (Group by picked, of a type it is grouped by, else the first where it always is; none where the view draws its own groups) */
@@ -102,9 +107,6 @@ const groupingKey = (view: ViewDefinition, host: ViewHost) => {
 // drawn anew (a change), or a new place of the same block (the editor drew it anew after a write), has them put back.
 const scrolled = new Map<string, Map<string, readonly [number, number]>>();
 
-// A filter applied as it is typed, this long after the last key (each condition written draws the view anew; in
-// SilverBullet it writes the block, which is drawn anew as a new place)
-export const FILTER_TYPED_MS = 300;
 
 /**
  * What a place has open, handed to the place drawn after it for the same
@@ -321,7 +323,12 @@ export class DatabasePlace {
     this.drawn = drawn;
     const host = this.host(drawn, settings);
     drawn.host = host;
-    const tools = this.tools(doc, host, count, view);
+    // (A condition being typed shown at once: the view drawn anew by it, nothing written until the field is left)
+    const tools = this.tools(doc, host, count, view, (key, condition) => {
+      if (drawn.ended) return;
+      (drawn.typed ??= {})[key] = condition;
+      void this.refresh();
+    });
     drawn.syncTools = tools.sync;
     drawn.stopTools = tools.stop;
     drawn.keptTools = tools.kept;
@@ -534,13 +541,20 @@ export class DatabasePlace {
     host: ViewHost,
     count: HTMLElement,
     view: ViewDefinition,
+    typing: (key: string, condition: string) => void,
   ): { readonly bar: HTMLElement; readonly panel: HTMLElement; readonly sync: () => void; readonly stop: () => void; readonly kept: () => PlaceKept; readonly restore: (kept: PlaceKept) => void } {
     const { listing, database } = host;
     const columns = [{ key: "name", label: "Name" }, ...database.properties.map((one) => ({ key: one.key, label: one.label }))];
     const labelOf = (key: string) => columns.find((one) => one.key === key)?.label ?? key;
     const filters = () => Object.keys(listing.filter).length;
-    let typedTimer: ReturnType<typeof setTimeout> | undefined;
-    // The field typed in last (the focus in it, or gone with the place drawn anew), and one shown as typed, not applied yet
+    // A field's condition shown as it is typed (`typing`: the view filters by it, nothing written), where it reads
+    const preview = (input: HTMLInputElement): void => {
+      const problem = listing.validateCondition(input.value);
+      input.classList.toggle("swd-invalid", !!problem);
+      input.title = problem ?? "";
+      if (!problem) typing(input.dataset.key!, input.value);
+    };
+    // The field typed in last (the focus in it, or gone with the place drawn anew), and one shown as typed, not kept yet
     // (left as it is by `sync`, which shows the conditions kept)
     let lastField: HTMLInputElement | undefined;
     let held: HTMLInputElement | undefined;
@@ -564,13 +578,16 @@ export class DatabasePlace {
       ...columns.map((column) => {
         const input = el(doc, "input", { attrs: { type: "text", placeholder: "any", "data-key": column.key, "aria-label": `Filter ${column.label}` } });
         input.value = listing.filter[column.key] ?? "";
-        // Applied as it is typed, a moment after the last key; Enter and leaving the field at once
+        // Shown as it is typed; kept (written) once the field is left, by Enter or Esc too: no write, and so no block drawn
+        // anew, while it is typed in
         input.addEventListener("input", () => {
           held = input;
-          clearTimeout(typedTimer);
-          typedTimer = setTimeout(() => apply(input), FILTER_TYPED_MS);
+          preview(input);
         });
+        // (Changed and left: `change`; left with a condition shown as handed over by the place before, which no change of
+        // this field's own typed: `blur`. Either a second time writes nothing, kept so already)
         input.addEventListener("change", () => apply(input));
+        input.addEventListener("blur", () => apply(input));
         input.addEventListener("keydown", (event) => {
           if (event.key === "Enter") apply(input);
           // (Esc leaves the field, applied as it is left, and goes no further: not out of full screen)
@@ -582,21 +599,15 @@ export class DatabasePlace {
         return el(doc, "label", "swd-filter-row", el(doc, "span", { text: column.label }), input);
       }),
     );
-    // A field's condition written where it reads and differs from the one kept; not by a place that handed over (the next
-    // place applies what was typed), nor from a field gone with its place
+    // A field's condition kept (written) where it reads (`setFilter` writes nothing where it is kept so already); not by a
+    // place that handed over (the next place keeps what was typed), nor from a field gone with its place
     const apply = (input: HTMLInputElement): void => {
-      clearTimeout(typedTimer);
-      typedTimer = undefined;
       if (this.handedOver || !input.isConnected) return;
       const key = input.dataset.key!;
       const problem = listing.validateCondition(input.value);
       input.classList.toggle("swd-invalid", !!problem);
       input.title = problem ?? "";
       if (problem) return;
-      if (input.value === (listing.filter[key] ?? "")) {
-        if (held === input) held = undefined;
-        return;
-      }
       if (writing) return void (again = input);
       writing = true;
       void listing.setFilter(key, input.value).finally(() => {
@@ -758,9 +769,7 @@ export class DatabasePlace {
     sync();
     // The place drawn anew: what is open closed, its listeners with it
     const stop = () => {
-      // (What was typed and not applied yet is the next place's to apply, kept as typed)
-      clearTimeout(typedTimer);
-      typedTimer = undefined;
+      // (What was typed and not kept yet is the next place's to keep, handed over as typed)
       sort.close();
       more.close();
     };
@@ -775,8 +784,8 @@ export class DatabasePlace {
         ...(propertiesFocus ? { properties: propertiesFocus } : {}),
       };
     };
-    // Shown as handed over: the panel open, the field as typed (the focus and the selection in it; applied a moment after,
-    // where it differs from the condition kept), ⋯ open at Group, the focus where it was
+    // Shown as handed over: the panel open, the field as typed (the focus and the selection in it; shown as typed where it
+    // differs from the condition kept, kept once the field is left), ⋯ open at Group, the focus where it was
     const restore = (from: PlaceKept) => {
       if (from.filterOpen) showPanel(true);
       const typing = from.typing;
@@ -790,8 +799,7 @@ export class DatabasePlace {
         }
         if (typing.value !== (listing.filter[typing.key] ?? "")) {
           held = input;
-          clearTimeout(typedTimer);
-          typedTimer = setTimeout(() => apply(input), FILTER_TYPED_MS);
+          preview(input);
         }
       }
       if (from.group) {
@@ -843,7 +851,17 @@ export class DatabasePlace {
     // The data this view was last given: a view gone reads what it had, never what another drawing found (none, maybe)
     const data = () => drawn.data;
     const prefixed = (key: string) => `${drawn.view.name}.${key}`;
-    const listing = () => ({ filter: filterOf(state.get(prefixed(STATE_KEYS.filter))), sort: sortOf(state.get(prefixed(STATE_KEYS.sort))) });
+    // The filter kept, and as shown: with the conditions being typed over it
+    const keptFilter = () => filterOf(state.get(prefixed(STATE_KEYS.filter)));
+    const shownFilter = (): Filter => {
+      const filter: Record<string, string> = { ...keptFilter() };
+      for (const [key, condition] of Object.entries(drawn.typed ?? {})) {
+        if (condition.trim()) filter[key] = condition;
+        else delete filter[key];
+      }
+      return filter;
+    };
+    const listing = () => ({ filter: shownFilter(), sort: sortOf(state.get(prefixed(STATE_KEYS.sort))) });
     const group = () => {
       const kept = state.get(prefixed(STATE_KEYS.groupBy));
       return typeof kept === "string" && kept ? kept : undefined;
@@ -924,11 +942,18 @@ export class DatabasePlace {
           return listing().sort;
         },
         async setFilter(key, condition) {
-          const filter: Record<string, string> = { ...listing().filter };
+          // (Kept, so no longer typed: what was shown of it is what is written)
+          const typed = drawn.typed && key in drawn.typed;
+          if (typed) delete drawn.typed![key];
+          const filter: Record<string, string> = { ...keptFilter() };
           if (condition?.trim()) filter[key] = condition;
           else delete filter[key];
           // The same filter again writes nothing and draws nothing (a view setting it as it draws would draw itself forever)
-          if (JSON.stringify(filter) === JSON.stringify(listing().filter)) return;
+          if (JSON.stringify(filter) === JSON.stringify(keptFilter())) {
+            // (Typed back to what is kept: nothing written, the view as kept)
+            if (typed) await shownAgain();
+            return;
+          }
           await setMeta({ [STATE_KEYS.filter]: Object.keys(filter).length ? filter : undefined });
           await shownAgain();
         },
@@ -1005,6 +1030,7 @@ export class DatabasePlace {
         }
       },
       ...documentsHost(this.options.documents, core.noun, ui),
+      ...mentionsHost(editor, ui),
       getMeta: (key) => state.get(prefixed(key)),
       setMeta,
       setting: (key) => settings.get(key),

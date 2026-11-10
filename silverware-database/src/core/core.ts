@@ -252,6 +252,8 @@ export class DatabaseCore {
       if (typeof property === "string") return invalid(property);
       if (value !== undefined && !isValue(value)) return invalid(notValue(property.label));
       if (property.required && (value === undefined || isEmpty(value)) && !isEmpty(item!.values[key])) return invalid(`${property.label} is required: not emptied`);
+      // (The item has it so already: nothing to write, written twice or changed so elsewhere)
+      if (value === undefined ? !(key in item!.values) : JSON.stringify(item!.values[key]) === JSON.stringify(value)) return unchanged(`${property.label} is so already`);
       const changes = databaseChanges(database).item(item!, (i) => (value === undefined ? i.unset(key) : i.set(key, value)));
       return { changes: changes.build(), label: `Set ${property.label} of ${item!.name}` };
     });
@@ -378,14 +380,19 @@ export class DatabaseCore {
       const read = await this.read(database);
       if ("problem" in read) return read;
       const now = new Map(read.items.value.map((one) => [one.key, one] as const));
-      const items = given.map((one) => currentOf(now, one, part, read.database.value));
+      // (Changed since shown, but the write leaves it as it is now, the same value written twice: nothing to write, no conflict)
+      const asNow = (one: Item) => {
+        const made = make([now.get(one.key)!], read);
+        return "problem" in made && made.cause === "unchanged";
+      };
+      const items = given.map((one) => currentOf(now, one, part, read.database.value)).map((one, at) => (one === "changed" && asNow(given[at]!) ? undefined : one));
       const changed = given.filter((_one, at) => items[at] === "changed");
-      const current = items.filter((one): one is Item => one !== "changed");
+      const current = items.filter((one): one is Item => one !== "changed" && one !== undefined);
       // Those whose part changed left: said, their conflict offered, written over on the items as it shows them
       const left = changed.length
         ? this.conflict(database, changed, now, { part, make, options })
         : undefined;
-      if (!current.length) return left!;
+      if (!current.length) return left ?? unchanged("It is so already");
       const written = make(current, read);
       if (!("problem" in written)) return this.write(written.changes, written.label, written.needed);
       // (Refused: said here, as it is made quietly, for a conflict's preview too)

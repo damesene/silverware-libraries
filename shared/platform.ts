@@ -51,6 +51,8 @@ export interface Editor {
   open?(ref: string): Awaitable<void>;
   /** A document's address, as the platform's own links have it (a link: a middle click opens it in a tab of the browser's) */
   href?(document: string): string;
+  /** Where a person is mentioned shown, as the platform shows a mention pressed (SilverBullet: its Mention Inbox on that name, the focus left in the editor) */
+  openMention?(name: string): Awaitable<void>;
   /** Told as the open document is edited (typed in, undone): its text as it is now; the function given back stops it */
   onEdited?(listener: (text: string) => void): () => void;
   /** Told as another document is opened in the editor: its name; the function given back stops it */

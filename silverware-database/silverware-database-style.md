@@ -1041,6 +1041,24 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   outline: 1px dashed var(--danger-color, #c62828);
   outline-offset: -1px;
 }
+/* A person whose option has no color of its own (Auto): as SilverBullet draws a mention in the page (its variables, its
+   edge and corners; one given a color is a pill of that color). Pressed where the host shows where one is mentioned. One
+   none of the options and not taken keeps the dashed edge of a value none of them */
+.swd-pill.swd-mention {
+  padding: 0 4px;
+  /* (Its edge drawn inside it, as a pill's height is a line's) */
+  box-shadow: inset 0 0 0 1px var(--editor-at-mention-border-color, currentColor);
+  border-radius: 6px;
+  color: var(--editor-at-mention-color, inherit);
+  background: var(--editor-at-mention-background-color, none);
+}
+/* (A pill pressed for something, a person's showing where it is mentioned: the hand, whatever its look) */
+.swd-pill[role="link"] {
+  cursor: pointer;
+}
+.swd-pill.swd-mention.swd-pill-none {
+  box-shadow: none;
+}
 
 .swd-filter {
   display: grid;
@@ -1095,6 +1113,77 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   gap: 6px;
   align-items: center;
   white-space: nowrap;
+}
+/* An editor's panel laid over the page by its cell or field (views/float.ts): over everything around it, scrolled where
+   it is cut to the room in the window */
+.swd-floated {
+  z-index: 50;
+  overflow-y: auto;
+}
+/* A field offering names as typed (a person's with Anyone: shared/suggest.ts): the list under the field, over what is
+   below it */
+.swd-suggest-field {
+  position: relative;
+}
+.swd-suggest {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 2px);
+  left: 0;
+  min-width: 10em;
+  max-height: 16em;
+  margin: 0;
+  padding: 3px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, currentColor);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+.swd-suggest[hidden] {
+  display: none;
+}
+.swd-suggest-item {
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.swd-suggest-item:hover,
+.swd-suggest-item[aria-selected="true"] {
+  background: var(--swd-hover);
+}
+/* A value typed besides the options (a person's with Anyone): a field under the boxes and Add beside it, a value added
+   there ticked above them */
+.swd-editor-add-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.swd-editor-add-button {
+  flex: none;
+  padding: 2px 8px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--button-border-color, currentColor);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swd-editor-add-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.swd-editor-add {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, currentColor);
+  border-radius: 4px;
+  padding: 2px 4px;
 }
 /* The table */
 .swd-table-box {
@@ -3348,9 +3437,34 @@ button.swd-editor-document-folder:hover,
   width: 14px;
   height: 14px;
 }
-.swd-properties .swd-option-new {
+/* A new option: its field and Add beside it, as high as the field, off while nothing is typed */
+.swd-option-add-row {
+  display: flex;
+  gap: 6px;
   margin-left: 28px;
+}
+.swd-properties .swd-option-new {
+  flex: 1 1 auto;
+  min-width: 0;
   border-style: dashed;
+}
+.swd-option-add {
+  flex: none;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--swd-line);
+  border-radius: 6px;
+  color: inherit;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.swd-option-add:hover:not(:disabled) {
+  background: var(--swd-hover);
+}
+.swd-option-add:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .swd-option-palette {
   display: flex;

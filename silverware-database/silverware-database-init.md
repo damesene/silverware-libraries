@@ -33,6 +33,10 @@ if js and js.window then
     insertAtCursor = editor.insertAtCursor,
     moveCursor = editor.moveCursor,
     navigate = editor.navigate,
+    -- A mention pressed: SilverBullet's Mention Inbox on that identity, the focus left in the editor (none before its inbox)
+    openMentions = editor.openNavigator and function(identity)
+      editor.openNavigator("inbox", { dropdown = identity, focus = false })
+    end or nil,
     readPage = space.readPage,
     writePage = space.writePage,
     deletePage = space.deletePage,

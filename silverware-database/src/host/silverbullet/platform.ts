@@ -16,6 +16,9 @@ export type Bridge = {
   // The cursor put at an offset of the page open (Edit source: a block with the cursor in it shows its markdown)
   moveCursor?(at: number): Promise<void>;
   navigate(ref: string): Promise<void>;
+  // SilverBullet's Mention Inbox opened on an identity (`@` and the name in lower case, its identityId), the focus left in the
+  // editor: what a mention pressed does (editor.openNavigator, SilverBullet 2.12.1 on); none where it has no such view
+  openMentions?(identity: string): Promise<void>;
   readPage(name: string): Promise<string>;
   writePage(name: string, text: string): Promise<void>;
   deletePage(name: string): Promise<void>;
@@ -84,6 +87,7 @@ export function silverBulletPlatform(bridge: Bridge): {
       text: () => bridge.getText(),
       replace: (from, to, insert) => bridge.replaceRange(from, to, insert),
       open: (ref) => bridge.navigate(ref),
+      ...(bridge.openMentions ? { openMention: (name: string) => bridge.openMentions!(`@${name.replace(/^@/, "").toLowerCase()}`) } : {}),
       // (As SilverBullet's own links: relative to its <base>, so it is right under a prefix too; encodePageURI in its
       // plug-api/lib/ref.ts, the name's folders kept)
       href: (name) => encodeURIComponent(name).replace(/%2F/g, "/"),

@@ -4,6 +4,7 @@
 // here: no view leans on the core's insides, and a custom view outside the
 // bundle uses the same.
 import type { DocumentsHost } from "./documents.ts";
+import type { MentionsHost } from "./mentions.ts";
 import type { GroupArrangement, ItemGroup } from "../domain/grouping.ts";
 import type { Filter, SortKey } from "../domain/listing.ts";
 import type { PropertyType } from "../domain/types/type.ts";
@@ -132,7 +133,7 @@ export type ViewLook = ItemLooks & {
 };
 
 /** What a view gets: its database's data as it asks for it, the core's writes for that database, its own meta and settings */
-export type ViewHost = DocumentsHost & {
+export type ViewHost = DocumentsHost & MentionsHost & {
   readonly document: Document;
   readonly database: Database;
   /** The items as the view shows them: filtered and sorted by its listing, else in the order by hand */

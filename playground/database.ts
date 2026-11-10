@@ -9,6 +9,7 @@ import { BUILT_IN_MODULES } from "../silverware-database/src/modules/builtin.ts"
 import { DatabasePlace } from "../silverware-database/src/core/place.ts";
 import { openDeleteDatabase } from "../silverware-database/src/core/deletedatabase.ts";
 import { documentsHost, type DocumentsSource } from "../silverware-database/src/core/documents.ts";
+import { mentionsHost } from "../silverware-database/src/core/mentions.ts";
 import { ViewRegistry } from "../silverware-database/src/core/views.ts";
 import { TypeRegistry } from "../silverware-database/src/domain/types/registry.ts";
 import { MemoryStore } from "../silverware-database/src/store/memory.ts";
@@ -59,6 +60,8 @@ const settings = { get: (_path: string, fallback: unknown) => fallback };
 let store: MemoryStore;
 // The pages a reference may name: the playground has no space of its own
 const PAGES: DocumentsSource = { list: () => ["Projects/Alpha", "Projects/Beta", "People/Ada", "People/Linus", "Notes/Weekly"], open: (name) => flash(`Open ${name}`), folderSeparator: "/" };
+// The editor as the playground has one: a page opened and a person's mentions said, not shown
+const EDITOR = { open: (ref: string) => flash(`Open ${ref}`), openMention: (name: string) => flash(`Where @${name} is mentioned`) };
 
 let places: DatabasePlace[] = [];
 
@@ -83,6 +86,7 @@ function start(): void {
       body: (id, item) => store.body(id, item.key),
       openDocument: async (item) => flash(`Open ${store.documentOf(item.key) ?? item.name}`),
       ...documentsHost(PAGES, core.noun, ui),
+      ...mentionsHost(EDITOR, ui),
       // (The playground's page has no editor apart: the window)
       editorArea: () => undefined,
       onChanged: (listener) => store.onChanged((change) => listener(change.database)),
@@ -101,7 +105,7 @@ function start(): void {
     element.className = "swd-place";
     section.append(element);
     main.append(section);
-    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store, core, types, views, settings, ui, editor: { open: (ref) => flash(`Open ${ref}`) }, documents: PAGES, moduleMenu: (where, menu) => modules.placeMenu(where, menu), moduleTools: (where) => modules.placeTools(where), placeDrawn: (where) => modules.placeDrawn(where), openItem: (item, database, from) => modules.openItem(item, database, from), deleteDatabase: (id, name) => openDeleteDatabase({ document, core, noun: core.noun, notify: (message) => flash(message), written: () => places.forEach((one) => void one.render()) }, id, name) });
+    const place = new DatabasePlace({ element, database: database.id, state: new StoredViewState(`silverware-playground.database.state.${database.id}`), store, core, types, views, settings, ui, editor: EDITOR, documents: PAGES, moduleMenu: (where, menu) => modules.placeMenu(where, menu), moduleTools: (where) => modules.placeTools(where), placeDrawn: (where) => modules.placeDrawn(where), openItem: (item, database, from) => modules.openItem(item, database, from), deleteDatabase: (id, name) => openDeleteDatabase({ document, core, noun: core.noun, notify: (message) => flash(message), written: () => places.forEach((one) => void one.render()) }, id, name) });
     return place;
   });
   void modules.start().then(() => places.forEach((place) => void place.render()));

@@ -23,6 +23,9 @@ const DATABASE: Database = {
     { key: "when", label: "When", type: "datetime", params: {}, readonly: false },
     { key: "web", label: "Web", type: "url", params: {}, readonly: false },
     { key: "refs", label: "Refs", type: "reference", params: {}, readonly: false },
+    { key: "owner", label: "Owner", type: "person", params: { options: ["ada", "bob"], anyone: true }, readonly: false },
+    { key: "team", label: "Team", type: "person", params: { options: ["ada", "bob"], multiple: true, anyone: true }, readonly: false },
+    { key: "lead", label: "Lead", type: "person", params: { options: ["ada", "bob"] }, readonly: false },
   ],
 };
 const ITEM: Item = { key: "page-1" as ItemKey, name: "Fix login", values: { status: "Todo", tags: ["a", "old"], estimate: 3 }, rank: "a0", revision: "1" };
@@ -57,7 +60,7 @@ function setup() {
 
 // (The pages listed, and what follows them, done)
 const listedNow = () => new Promise((resolve) => setTimeout(resolve));
-const key = (target: Element, name: string) => target.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true }));
+const key = (target: Element, name: string) => target.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }));
 afterEach(() => document.body.replaceChildren());
 
 describe("the built-in views' editors", () => {
@@ -348,6 +351,79 @@ describe("the built-in views' editors", () => {
     key(cell.querySelector(".swd-editor")!, "Enter");
     await Promise.resolve();
     expect(writes).toEqual([["update", "Fix login", "tags", ["a", "old", "b"]]]);
+  });
+
+  it("offer a person's people in a field to type any name in where it takes Anyone, a list alone where it does not", async () => {
+    const { cell, writes, edit } = setup();
+    edit("owner", { ...ITEM, values: { owner: "ada" } });
+    const input = cell.querySelector<HTMLInputElement>("input.swd-editor-typed")!;
+    const offeredNow = () => [...cell.querySelectorAll<HTMLElement>(".swd-suggest:not([hidden]) .swd-suggest-item")].map((one) => one.textContent);
+    // (As kept, as an editor edits a value: its @ only how it shows; every one offered as it opens)
+    expect([input.value, offeredNow()]).toEqual(["ada", ["ada", "bob"]]);
+    const typed = (text: string) => {
+      input.value = text;
+      input.dispatchEvent(new Event("input"));
+    };
+    typed("b");
+    expect(offeredNow()).toEqual(["bob"]);
+    // Cleared: every one offered again
+    typed("");
+    expect(offeredNow()).toEqual(["ada", "bob"]);
+    // One picked by the arrows taken by Enter, written at once
+    key(input, "ArrowDown");
+    key(input, "ArrowDown");
+    key(input, "Enter");
+    await Promise.resolve();
+    expect(writes).toEqual([["update", "Fix login", "owner", "bob"]]);
+    // A name clicked: written once, the press not reaching the cell (a view's cell opens its editor anew on a click)
+    let clicked = 0;
+    cell.addEventListener("click", () => void clicked++);
+    edit("owner", { ...ITEM, values: { owner: "ada" } });
+    cell.querySelectorAll<HTMLElement>(".swd-suggest-item")[1]!.click();
+    await Promise.resolve();
+    expect([writes.length, writes.at(-1), clicked]).toEqual([2, ["update", "Fix login", "owner", "bob"], 0]);
+    // A name none of them typed, Enter: written as typed, its @ read off
+    edit("owner", { ...ITEM, values: { owner: "ada" } });
+    const again = cell.querySelector<HTMLInputElement>("input.swd-editor-typed")!;
+    again.value = "@eve";
+    key(again, "Enter");
+    await Promise.resolve();
+    expect(writes.at(-1)).toEqual(["update", "Fix login", "owner", "eve"]);
+    // (Without Anyone: its list only, each option as it shows)
+    edit("lead");
+    expect([...cell.querySelectorAll("select option")].map((one) => one.textContent)).toEqual(["", "ada", "bob"]);
+  });
+
+  it("add a name typed under a person's boxes where it takes Anyone, ticked, then saved with the rest", async () => {
+    const { cell, writes, edit } = setup();
+    edit("team", { ...ITEM, values: { team: ["ada"] } });
+    expect([...cell.querySelectorAll("label.swd-editor-choice")].map((one) => one.textContent)).toEqual(["ada", "bob"]);
+    const adder = cell.querySelector<HTMLInputElement>(".swd-editor-add")!;
+    adder.value = "@eve";
+    key(adder, "Enter");
+    // (Added, the editor still open, the field empty for another; one already there ticked, not twice)
+    expect([...cell.querySelectorAll<HTMLInputElement>("input[type=checkbox]")].map((box) => [box.value, box.checked])).toEqual([
+      ["ada", true],
+      ["bob", false],
+      ["eve", true],
+    ]);
+    expect([adder.value, writes]).toEqual(["", []]);
+    // Add beside the field, as Enter: off while nothing is typed
+    const button = cell.querySelector<HTMLButtonElement>(".swd-editor-add-button")!;
+    expect(button.disabled).toBe(true);
+    adder.value = "bob";
+    adder.dispatchEvent(new Event("input"));
+    expect(button.disabled).toBe(false);
+    button.click();
+    expect([adder.value, button.disabled, document.activeElement]).toEqual(["", true, adder]);
+    // Enter with nothing typed saves; what is typed and not added yet goes with it
+    adder.value = "zoe";
+    key(cell.querySelector(".swd-editor")!, "Enter");
+    await Promise.resolve();
+    expect(writes).toEqual([["update", "Fix login", "team", ["ada", "bob", "eve", "zoe"]]]);
+    // (Without Anyone: no field to add one)
+    edit("tags");
+    expect(cell.querySelector(".swd-editor-add")).toBeNull();
   });
 
   it("rename the item by its name, and offer no editor for a property read only", async () => {

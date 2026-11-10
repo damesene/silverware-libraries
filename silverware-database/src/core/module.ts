@@ -8,6 +8,7 @@
 // only through what one offers (`offer`, `offered`), as Silverware Table's and
 // Silverware Tags' do. Modules import only types from here.
 import type { DocumentsHost } from "./documents.ts";
+import type { MentionsHost } from "./mentions.ts";
 import type { Settings, UserInterface } from "../../../shared/platform.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
 import type { Database, Item, Revised } from "../model/database.ts";
@@ -74,7 +75,7 @@ export type ModuleInstance = {
 };
 
 /** What a module gets: the core's writes, the store's reads, the types, the user, its own settings, the others' offers */
-export type ModuleHost = DocumentsHost & {
+export type ModuleHost = DocumentsHost & MentionsHost & {
   readonly document: Document;
   /** The core's writes (each checked, said where refused, kept for Undo) */
   readonly core: DatabaseCore;

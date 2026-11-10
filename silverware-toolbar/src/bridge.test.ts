@@ -14,9 +14,9 @@ const bridge = (config: Record<string, unknown>, extra: Partial<Bridge> = {}): B
   ...extra,
 });
 
-/** The favourites configured as one list, used for both ways of working the toolbar */
+/** One toolbar configured, used for both ways of working */
 const one = (rows: unknown) => ({ "silverware.toolbar.favorites": [{ name: "Mine", useFor: ["click", "touch"], rows }] });
-/** The rows of the first list read */
+/** The rows of the first toolbar read */
 const rowsOf = async (config: Record<string, unknown>) => (await readSettings(bridge(config))).toolbars[0]!.rows;
 
 describe("Settings", () => {

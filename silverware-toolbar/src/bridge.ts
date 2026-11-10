@@ -2,7 +2,7 @@
 // page's Space Lua (`editor.*` and `config.get`), so no SilverBullet internals
 // are needed.
 import { favoriteItemOf, type FavoriteItem, type Favorites } from "./core/favorites.ts";
-import { defaultToolbars, type Toolbar, type Input, INPUTS, MAX_TOOLBARS, normalizedToolbars, type Placement, PLACEMENTS, type Show, SHOWS, validateToolbarName } from "./core/toolbars.ts";
+import { defaultToolbars, type Toolbar, INPUTS, MAX_TOOLBARS, normalizedToolbars, type Placement, PLACEMENTS, type ShowWhen, SHOWS, validateToolbarName } from "./core/toolbars.ts";
 import { listOf } from "./lists.ts";
 import { migrate, VERSION_PATH } from "./migrations/index.ts";
 
@@ -65,12 +65,6 @@ export const MODULE_DESCRIPTIONS: Readonly<Record<ModuleName, string>> = {
 // The key of the command showing every action (the init page gives it to the command: SilverBullet handles it)
 export const DEFAULT_SHORTCUT = "Ctrl-Shift-q";
 
-/** A device as the settings tell them apart: worked by a finger (`byTouch` in core/favorites.ts) or not */
-export type Device = Input;
-
-export { type Placement, PLACEMENTS, type Show, SHOWS } from "./core/toolbars.ts";
-export const SHOW_LABELS: Readonly<Record<Show, string>> = { always: "Always", writing: "While writing", selection: "After selecting text" };
-export const PLACEMENT_LABELS: Readonly<Record<Placement, string>> = { selection: "By the selection", bottom: "Docked at the bottom", top: "Docked at the top" };
 
 // The toolbar's own block of the CONFIG page, for tables (the favourites): the Configuration Manager's block
 // would lose them on its next save (shared/configpage.ts)
@@ -141,24 +135,25 @@ export async function readShortcut(bridge: Bridge): Promise<string> {
  * working left out; undefined where none is left (the defaults then)
  */
 export function toolbarsOf(value: unknown): Toolbar[] | undefined {
-  const lists: Toolbar[] = [];
+  const toolbars: Toolbar[] = [];
   for (const entry of listOf(value) ?? []) {
     const { name, useFor, placement, show, rows } = (entry && typeof entry === "object" ? entry : {}) as Record<string, unknown>;
     const favorites = rowsOf(rows);
-    const inputs = useFor === undefined ? [] : listOf(useFor);
-    if (typeof name !== "string" || !favorites || !inputs || validateToolbarName(name, lists) || lists.length >= MAX_TOOLBARS) {
-      console.warn("Silverware Toolbar: a list of favourites is not { name = …, useFor = { … }, rows = { … } } (or its name is taken, or there are more than 5):", entry);
+    // (One way of working written alone, "touch": as a list of it)
+    const inputs = useFor === undefined ? [] : typeof useFor === "string" ? [useFor] : listOf(useFor);
+    if (typeof name !== "string" || !favorites || !inputs || validateToolbarName(name, toolbars) || toolbars.length >= MAX_TOOLBARS) {
+      console.warn("Silverware Toolbar: a toolbar is not { name = …, useFor = { … }, placement = …, show = …, rows = { … } } (or its name is taken, or there are more than 5): left out", entry);
       continue;
     }
-    lists.push({
+    toolbars.push({
       name: name.trim(),
       useFor: INPUTS.filter((input) => inputs.includes(input)),
       placement: PLACEMENTS.includes(placement as Placement) ? (placement as Placement) : "selection",
-      show: SHOWS.includes(show as Show) ? (show as Show) : "selection",
+      show: SHOWS.includes(show as ShowWhen) ? (show as ShowWhen) : "selection",
       rows: favorites,
     });
   }
-  return lists.length ? normalizedToolbars(lists) : undefined;
+  return toolbars.length ? normalizedToolbars(toolbars) : undefined;
 }
 
 /** Rows of favourites as configured, an item that is none left out (logged); not rows at all: undefined */

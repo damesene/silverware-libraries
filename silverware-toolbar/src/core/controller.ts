@@ -9,17 +9,17 @@
 // its buttons show the formats around the caret; it goes as the caret moves
 // or text is typed. The modules (modules.ts) give the actions; the core knows
 // none of them. The popup ends with the core's own item, the settings dialog.
-import type { Bridge, Device, Settings } from "../bridge.ts";
+import type { Bridge, Settings } from "../bridge.ts";
 import { CONTENT_SELECTOR, inEditor, pageContentOf, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
 import type { Action, ActionEditor, Change, Context } from "./action.ts";
 import { Bar, type Dock, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
 import { Docking } from "./dock.ts";
-import { byTouch, isActionItem, isSeparator, type Look, ownIconHtml, type Pin, type SlotRef, slotItemOf, slotOf } from "./favorites.ts";
+import { isActionItem, isSeparator, type Look, orderedByPins, ownIconHtml, type Pin, type SlotRef, slotItemOf, slotOf } from "./favorites.ts";
 import type { ItemKind } from "./items.ts";
 import { hideKeyboard } from "./keyboard.ts";
-import { type Toolbar, toolbarFor } from "./toolbars.ts";
+import { docks, type Input, inputOf, type Toolbar, toolbarFor } from "./toolbars.ts";
 import { marked } from "./cursor.ts";
 import type { Box } from "./place.ts";
 import { Panel } from "./panel.ts";
@@ -247,7 +247,9 @@ export class Controller {
     const actions = this.offered();
     const all = [...actions, ...actions.flatMap((a) => a.choices ?? [])];
     const kinds = this.kinds();
-    return this.toolbar().rows
+    // (In the order its pins say: docked, they are the line's ends; by the selection the row's first and last)
+    return this.toolbar()
+      .rows.map((row) => orderedByPins(row))
       .map((row) => {
         const items = row.flatMap((item): Shown[] => {
           if (isSeparator(item)) return [{ separator: true }];
@@ -534,9 +536,9 @@ export class Controller {
     this.showBar(context, range);
   }
 
-  /** This device as the settings tell them apart (worked by a finger or not) */
-  private device(): Device {
-    return byTouch(this.doc.defaultView) ? "touch" : "click";
+  /** The way this device is worked, as the toolbars tell them apart (by a finger or not) */
+  private device(): Input {
+    return inputOf(this.doc.defaultView);
   }
 
   /** Whether the page's text has the keyboard (its editor focused) */
@@ -582,7 +584,7 @@ export class Controller {
 
   /** Whether the toolbar docks, at the bottom or the top (the toolbar's placement) */
   private docks(): boolean {
-    return this.toolbar().placement !== "selection";
+    return docks(this.toolbar().placement);
   }
 
   /** Where the toolbar docks now (the toolbar's placement's edge) */

@@ -35,19 +35,19 @@ config.define("silverware.toolbar", {
               type = "array",
               items = {
                 type = "object",
-              -- An item of a module's kind (the gestures module's button) has fields of its own, which its kind reads;
-              -- a slot of it (tap, up, down) an action's id, { id, icon, label }, or a text snippet { type = "snippet", text = … }
-              properties = {
-                type = { type = "string" },
-                id = { type = "string" },
-                show = { type = "string", enum = { "icon", "label" } },
-                -- (Kept within 3 and 30 as it is read: not refused here, which would fail the whole setting)
-                width = { type = "number" },
-                pin = { type = "string", enum = { "left", "right" } },
-                -- An item's own icon (up to 3 characters, an emoji too) and label: an action's, a snippet's
-                icon = { type = "string" },
-                label = { type = "string" },
-              },
+                -- An item of a module's kind (the gestures module's button) has fields of its own, which its kind reads;
+                -- a slot of it (tap, up, down) an action's id, { id, icon, label }, or a text snippet { type = "snippet", text = … }
+                properties = {
+                  type = { type = "string" },
+                  id = { type = "string" },
+                  show = { type = "string", enum = { "icon", "label" } },
+                  -- (Kept within 3 and 30 as it is read: not refused here, which would fail the whole setting)
+                  width = { type = "number" },
+                  pin = { type = "string", enum = { "left", "right" } },
+                  -- An item's own icon (up to 3 characters, an emoji too) and label: an action's, a snippet's
+                  icon = { type = "string" },
+                  label = { type = "string" },
+                },
               },
             },
           },

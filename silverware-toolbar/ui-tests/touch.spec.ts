@@ -226,7 +226,7 @@ test.describe("The toolbar on a phone", () => {
     await expect(barButton(page, "formats.bold")).toHaveCount(0);
     // Opened by finger: on the list Touch shows
     await openSettings();
-    await expect(dialog.locator('.swb-settings-toolbar[aria-checked="true"] .swb-settings-toolbar-tab-name')).toHaveText("Test touch copy");
+    await expect(dialog.locator('.swb-settings-toolbar-tab[aria-checked="true"] .swb-settings-toolbar-tab-name')).toHaveText("Test touch copy");
     await expect(dialog.locator('[data-swb-items="1"] .swb-settings-item-name').first()).toHaveText("Italic");
   });
 

@@ -1,9 +1,9 @@
 // The favourites as the settings dialog edits them: rows of items, each change
 // a new value (the dialog draws it again). An item is at a row and an index.
-// Touch's own are edited with each row's pinned items at its ends (`pinOrdered`,
-// `placeItem`), as the docked toolbar shows each row a line of its own.
+// A docked toolbar's are edited with each row's pinned items at its ends
+// (`pinOrdered`, `placeItem`), as it shows each row a line of its own.
 
-import { type FavoriteItem, type Favorites, iconOf, isKindItem, type SlotRef, slotItemOf, slotOf, isSeparator, type KindItem, type Pin, type Show, type SeparatorItem } from "../core/favorites.ts";
+import { type FavoriteItem, type Favorites, iconOf, isKindItem, orderedByPins, pinOf, type SlotRef, slotItemOf, slotOf, isSeparator, type KindItem, type Pin, type Show, type SeparatorItem } from "../core/favorites.ts";
 
 export type At = { readonly row: number; readonly index: number };
 
@@ -123,11 +123,6 @@ export function unpinnedOutOfOrder(rows: Favorites): FavoriteItem[][] {
   });
 }
 
-/** Where an item is pinned in its row (a separator: nowhere) */
-export function pinOf(item: FavoriteItem): Pin | undefined {
-  return isSeparator(item) ? undefined : item.pin;
-}
-
 const ZONES: readonly (Pin | undefined)[] = ["left", undefined, "right"];
 
 /**
@@ -136,7 +131,7 @@ const ZONES: readonly (Pin | undefined)[] = ["left", undefined, "right"];
  * Touch's are edited: a row's pinned items in boxes at its ends
  */
 export function pinOrdered(rows: Favorites): FavoriteItem[][] {
-  return rows.map((row) => ZONES.flatMap((zone) => row.filter((item) => pinOf(item) === zone)));
+  return rows.map((row) => orderedByPins(row));
 }
 
 /** The index in a row (pin ordered) where the items of a zone start (left, the others: undefined, right) */

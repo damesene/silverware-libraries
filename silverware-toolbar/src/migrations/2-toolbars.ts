@@ -12,7 +12,7 @@
 // one's rows are joined into one as it showed them (a separator between rows
 // whose items are not all pinned). The keys of before are taken out.
 import { DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES } from "../core/favorites.ts";
-import { type Placement, PLACEMENTS, type Show, SHOWS } from "../core/toolbars.ts";
+import { type Placement, PLACEMENTS, type ShowWhen, SHOWS } from "../core/toolbars.ts";
 import { listOf } from "../lists.ts";
 import type { Migration, ReadSetting } from "./index.ts";
 
@@ -50,7 +50,7 @@ export const toolbars: Migration = {
     const touchAt = { placement: valueOf(PLACEMENTS, placementTouch, "bottom"), show: valueOf(SHOWS, showTouch, "writing") };
     const byFinger = touchShown ? touchRows! : clickRows;
     const names = new Set<string>();
-    const toolbar = (rows: readonly unknown[], at: { placement: Placement; show: Show }, useFor: readonly string[], name?: string) => ({
+    const toolbar = (rows: readonly unknown[], at: { placement: Placement; show: ShowWhen }, useFor: readonly string[], name?: string) => ({
       name: unique(name ?? (at.placement === "selection" ? "Float" : "Docked"), names),
       ...(useFor.length ? { useFor: [...useFor] } : {}),
       ...at,

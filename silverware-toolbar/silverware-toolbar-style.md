@@ -788,33 +788,6 @@ html[data-theme="dark"] .swb-dock-shade {
 .swb-settings-row input.swb-settings-invalid {
   border-color: var(--danger-color, #c62828);
 }
-/* A setting of each device's own: under its name and hint, a choice for Click and one for Touch side by side, each named above it */
-.swb-settings-row.swb-settings-by-device {
-  flex-wrap: wrap;
-}
-.swb-settings-by-device .swb-settings-label {
-  flex: 1 1 100%;
-}
-.swb-settings-devices-pair {
-  flex: 1 1 100%;
-  display: flex;
-  gap: 12px;
-}
-.swb-settings-device-choice {
-  flex: 1 1 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.swb-settings-device-name {
-  font-size: 12px;
-  opacity: 0.62;
-}
-.swb-settings-row .swb-settings-devices-pair select {
-  width: 100%;
-  max-width: 100%;
-}
 /* A switch: the checkbox (invisible, still focusable) drawn as a track and a knob */
 .swb-settings-switch {
   position: relative;
@@ -1429,25 +1402,24 @@ html[data-theme="dark"] .swb-dock-shade {
 }
 /* A slot of a kind's item (the gesture button's Click, Swipe up): the action picked for it */
 /* The favourites for a mouse (Click) or for a finger (Touch): two segments; Touch the same as Click shown dimmed, not edited */
-.swb-settings-devices {
+.swb-settings-toolbars-bar {
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin: 8px 0 10px;
 }
-.swb-settings-devices-top {
+.swb-settings-toolbars-top {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
-.swb-settings-device-actions {
+.swb-settings-toolbars-actions {
   display: flex;
   gap: 6px;
 }
 .swb-settings-reset,
-.swb-settings-copy-from,
 .swb-settings-toolbar-new,
 .swb-settings-toolbar-duplicate,
 .swb-settings-toolbar-delete {
@@ -1461,19 +1433,18 @@ html[data-theme="dark"] .swb-dock-shade {
 }
 .swb-settings-toolbar-new:disabled,
 .swb-settings-toolbar-duplicate:disabled,
-.swb-settings-toolbar-delete:disabled,
-.swb-settings-copy-from:disabled {
+.swb-settings-toolbar-delete:disabled {
   opacity: 0.45;
   cursor: default;
 }
-.swb-settings-device-tabs {
+.swb-settings-toolbar-tabs {
   display: inline-flex;
   align-self: flex-start;
   padding: 2px;
   border: 1px solid var(--swb-settings-line);
   border-radius: 7px;
 }
-.swb-settings-device {
+.swb-settings-toolbar-tab {
   padding: 4px 14px;
   font: inherit;
   color: inherit;
@@ -1482,11 +1453,11 @@ html[data-theme="dark"] .swb-dock-shade {
   border-radius: 5px;
   cursor: pointer;
 }
-.swb-settings-device[aria-checked="true"] {
+.swb-settings-toolbar-tab[aria-checked="true"] {
   color: #fff;
   background: var(--ui-accent-color, #464cfc);
 }
-/* The lists of favourites: their tabs (each its name and, small, what it is used for) and + New list beside them */
+/* The toolbars: their tabs (each its name and, small, what shows it) and + New toolbar beside them */
 .swb-settings-toolbar-tabs-line {
   display: flex;
   flex-wrap: wrap;
@@ -1498,7 +1469,7 @@ html[data-theme="dark"] .swb-dock-shade {
   flex-wrap: wrap;
   max-width: 100%;
 }
-.swb-settings-toolbar {
+.swb-settings-toolbar-tab {
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
@@ -1507,7 +1478,7 @@ html[data-theme="dark"] .swb-dock-shade {
   font-size: 11px;
   opacity: 0.7;
 }
-/* The list edited: a card, its name and buttons on a line, what it is used for under them */
+/* The toolbar edited: a card, its name and buttons on a line, what it is used for, where and when under them */
 .swb-settings-toolbar-line {
   display: flex;
   flex-direction: column;
@@ -1612,9 +1583,6 @@ html[data-theme="dark"] .swb-dock-shade {
   border-left: 3px solid var(--ui-accent-color, #464cfc);
   border-radius: 4px;
   background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 8%, transparent);
-}
-.swb-settings-rows-same {
-  opacity: 0.5;
 }
 .swb-settings-slot {
   display: inline-flex !important;

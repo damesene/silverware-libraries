@@ -87,7 +87,7 @@ export type Favorites = readonly (readonly FavoriteItem[])[];
 
 /**
  * Whether this device is worked by a finger (its main pointer coarse: a phone,
- * a tablet), which shows the favourites for touch where they are set; a
+ * a tablet), which shows the toolbar used for Touch (core/toolbars.ts); a
  * laptop's touch screen is not (its touchpad is its main pointer)
  */
 export function byTouch(win: Window | null | undefined): boolean {
@@ -95,11 +95,19 @@ export function byTouch(win: Window | null | undefined): boolean {
 }
 
 export const isSeparator = (item: FavoriteItem): item is SeparatorItem => item.type === "separator";
+
+/** Where an item is pinned in its row (a separator: nowhere) */
+export const pinOf = (item: FavoriteItem): Pin | undefined => (item.type === "separator" ? undefined : (item as ActionItem | KindItem).pin);
+
+/** A row in the order its pins say: the items pinned left, the others, those pinned right (each in their order) */
+export function orderedByPins<T extends FavoriteItem>(row: readonly T[]): T[] {
+  return (["left", undefined, "right"] as const).flatMap((pin) => row.filter((item) => pinOf(item) === pin));
+}
 export const isActionItem = (item: FavoriteItem): item is ActionItem => item.type === undefined || item.type === "action";
 /** An item of a kind a module gives (neither an action nor a separator) */
 export const isKindItem = (item: FavoriteItem): item is KindItem => !isSeparator(item) && !isActionItem(item);
 
-/** The favourites for a mouse (Click, and the default): a row of each kind of action */
+/** The rows of the default toolbar for a mouse (Float): a row of each kind of action */
 export const DEFAULT_FAVORITES: Favorites = [
   [{ id: "actions.turnInto", show: "label", width: 8 }],
   [{ id: "formats.bold" }, { id: "formats.italic" }, { id: "formats.highlight" }, { id: "formats.underline" }, { id: "formats.strikethrough" }],
@@ -108,9 +116,9 @@ export const DEFAULT_FAVORITES: Favorites = [
 ];
 
 /**
- * The favourites for a finger (Touch): the same actions, the kin of one a
- * swipe of its gesture button, in one row, so the bar docked at the bottom is
- * one line
+ * The rows of the default toolbar for a finger (Docked): the same actions,
+ * the kin of one a swipe of its gesture button, in one row, so the bar docked
+ * at the bottom is one line
  */
 export const DEFAULT_TOUCH_FAVORITES: Favorites = [
   [

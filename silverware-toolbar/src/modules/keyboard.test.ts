@@ -4,7 +4,7 @@ import { contextOf } from "../core/context.ts";
 import { keyboardModule } from "./keyboard.ts";
 
 describe("The keyboard module", () => {
-  it("offers hiding the keyboard, for a touch screen only (touchOnly: left out elsewhere but in Touch's favourites), through the editor's API", () => {
+  it("offers hiding the keyboard, for a touch screen only (touchOnly: left out elsewhere but offered for a toolbar a finger may show), through the editor's API", () => {
     const [hide] = keyboardModule().actions();
     expect(hide!.id).toBe("actions.hideKeyboard");
     expect(hide!.touchOnly).toBe(true);

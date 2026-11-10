@@ -204,12 +204,12 @@ test.describe("The settings dialog", () => {
     await expect(lists).toHaveText(["Test", "Test touch"]);
     // By the selection: no boxes of pinned items; docked, each row its own
     await expect(dialog(page).locator(".swb-settings-zones")).toHaveCount(0);
-    await dialog(page).locator('.swb-settings-toolbar[data-swb-toolbar="1"]').click();
+    await dialog(page).locator('.swb-settings-toolbar-tab[data-swb-toolbar="1"]').click();
     await expect(dialog(page).locator(".swb-settings-zones")).toHaveCount(2);
     await expect(dialog(page).locator('[data-swb-zone="left"]')).toHaveCount(2);
     await dialog(page).locator(".swb-settings-toolbar-new").click();
     await expect(lists).toHaveText(["Test", "Test touch", "Toolbar"]);
-    await expect(dialog(page).locator('.swb-settings-toolbar[data-swb-toolbar="2"] .swb-settings-toolbar-tab-for')).toHaveCount(0);
+    await expect(dialog(page).locator('.swb-settings-toolbar-tab[data-swb-toolbar="2"] .swb-settings-toolbar-tab-for')).toHaveCount(0);
     const name = dialog(page).locator(".swb-settings-toolbar-name");
     await expect(name).toBeFocused();
     await name.fill("test");
@@ -223,8 +223,8 @@ test.describe("The settings dialog", () => {
     await dialog(page).locator(".swb-settings-pick-field").fill("bold");
     await page.keyboard.press("Enter");
     await dialog(page).locator('.swb-settings-toolbar-use[data-swb-use="click"]').click();
-    await expect(dialog(page).locator('.swb-settings-toolbar[data-swb-toolbar="2"] .swb-settings-toolbar-tab-for')).toHaveText("Click");
-    await expect(dialog(page).locator('.swb-settings-toolbar[data-swb-toolbar="0"] .swb-settings-toolbar-tab-for')).toHaveCount(0);
+    await expect(dialog(page).locator('.swb-settings-toolbar-tab[data-swb-toolbar="2"] .swb-settings-toolbar-tab-for')).toHaveText("Click");
+    await expect(dialog(page).locator('.swb-settings-toolbar-tab[data-swb-toolbar="0"] .swb-settings-toolbar-tab-for')).toHaveCount(0);
     await save(page).click();
     await expect(dialog(page)).toHaveCount(0);
     await select(page, "some text");
@@ -233,7 +233,7 @@ test.describe("The settings dialog", () => {
     // Deleted (asked: Click then shows Test)
     await openSettings(page);
     await tab(page, "toolbars").click();
-    await dialog(page).locator('.swb-settings-toolbar[data-swb-toolbar="2"]').click();
+    await dialog(page).locator('.swb-settings-toolbar-tab[data-swb-toolbar="2"]').click();
     await answerConfirm(page, true, () => dialog(page).locator(".swb-settings-toolbar-delete").click());
     await expect(lists).toHaveText(["Test", "Test touch"]);
     await save(page).click();
@@ -245,7 +245,7 @@ test.describe("The settings dialog", () => {
   test("a docked toolbar: an item dragged into its row's Pinned left is pinned there, saved so; unpinned in its panel; Alt+arrows keep it in its zone", async ({ page }) => {
     await openSettings(page);
     await tab(page, "toolbars").click();
-    await dialog(page).locator('.swb-settings-toolbar[data-swb-toolbar="1"]').click();
+    await dialog(page).locator('.swb-settings-toolbar-tab[data-swb-toolbar="1"]').click();
     // (Its second row in view: the toolbar's card above it)
     await dialog(page).locator('[data-swb-row="1"]').scrollIntoViewIfNeeded();
     const left = dialog(page).locator('[data-swb-items="1"][data-swb-zone="left"]');
@@ -264,7 +264,7 @@ test.describe("The settings dialog", () => {
     // Read back: pinned in its row
     await openSettings(page);
     await tab(page, "toolbars").click();
-    await dialog(page).locator('.swb-settings-toolbar[data-swb-toolbar="1"]').click();
+    await dialog(page).locator('.swb-settings-toolbar-tab[data-swb-toolbar="1"]').click();
     await expect(zoneItems(page, 1, "left")).toHaveText(["Code"]);
     // Alt+↑ into the row above, its own Pinned left
     await item(page, 1, 0).focus();
@@ -293,7 +293,7 @@ test.describe("The settings dialog", () => {
     await dialog(page).locator(".swb-settings-pick-field").fill("hide the keyboard");
     await expect(dialog(page).locator(".swb-settings-pick")).toHaveCount(0);
     // The one for Touch: offered
-    await dialog(page).locator('.swb-settings-toolbar[data-swb-toolbar="0"]').click();
+    await dialog(page).locator('.swb-settings-toolbar-tab[data-swb-toolbar="0"]').click();
     await dialog(page).locator('[data-swb-row="1"] .swb-settings-add').click();
     await dialog(page).locator(".swb-settings-pick-field").fill("hide the keyboard");
     await page.keyboard.press("Enter");
@@ -438,7 +438,7 @@ test.describe("The settings dialog", () => {
     await expect(dialog(page).locator(".swb-settings-warning")).toHaveCount(0);
     await expect(rowItems(page, 1).last()).toHaveText("Every action");
     // Docked: pinned right
-    await dialog(page).locator('.swb-settings-toolbar[data-swb-toolbar="1"]').click();
+    await dialog(page).locator('.swb-settings-toolbar-tab[data-swb-toolbar="1"]').click();
     await item(page, 1, 7).locator(".swb-settings-remove").click();
     await dialog(page).locator(".swb-settings-warning-add").click();
     await expect(zoneItems(page, 1, "right")).toHaveText(["Every action"]);

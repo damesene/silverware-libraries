@@ -6,7 +6,7 @@
 // and one by the selection want rows of their own (one line docked, several by the selection): switching where a
 // device's toolbar shows is giving it another toolbar.
 
-import { DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type Favorites } from "./favorites.ts";
+import { byTouch, DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type Favorites } from "./favorites.ts";
 
 /**
  * Where a toolbar shows: by the selection, or docked at the bottom over the
@@ -21,16 +21,19 @@ export type Placement = (typeof PLACEMENTS)[number];
  * the caret); while the page's text is edited; or only after a selection
  */
 export const SHOWS = ["always", "writing", "selection"] as const;
-export type Show = (typeof SHOWS)[number];
+export type ShowWhen = (typeof SHOWS)[number];
 
 /** Whether a toolbar shown there is docked (its rows lines, its pinned items at their ends) */
 export const docks = (placement: Placement): boolean => placement !== "selection";
 
-/** The ways of working the toolbar a toolbar is used for (later perhaps a pen's) */
+/** The ways of working a toolbar is used for (later perhaps a pen's) */
 export const INPUTS = ["click", "touch"] as const;
 export type Input = (typeof INPUTS)[number];
 
-export type Toolbar = { readonly name: string; readonly useFor: readonly Input[]; readonly placement: Placement; readonly show: Show; readonly rows: Favorites };
+/** The way this device is worked: by a finger (`byTouch`), else a mouse or a touchpad */
+export const inputOf = (win: Window | null | undefined): Input => (byTouch(win) ? "touch" : "click");
+
+export type Toolbar = { readonly name: string; readonly useFor: readonly Input[]; readonly placement: Placement; readonly show: ShowWhen; readonly rows: Favorites };
 
 // As many toolbars at most: more is more to choose from than to tell apart
 export const MAX_TOOLBARS = 5;
@@ -49,7 +52,8 @@ export function defaultToolbars(gestures = true): readonly Toolbar[] {
 
 /** The toolbar a way of working the toolbar uses (normalized toolbars have one for each: `normalizedToolbars`) */
 export function toolbarFor(toolbars: readonly Toolbar[], input: Input): Toolbar {
-  return toolbars.find((toolbar) => toolbar.useFor.includes(input)) ?? toolbars[0]!;
+  // (None: the defaults' first, as reading the settings gives one at least)
+  return toolbars.find((toolbar) => toolbar.useFor.includes(input)) ?? toolbars[0] ?? defaultToolbars()[0]!;
 }
 
 /**

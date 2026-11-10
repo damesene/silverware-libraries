@@ -95,8 +95,8 @@ export type Action = {
   readonly perform?: (context: Context, editor: ActionEditor) => unknown;
   // false: found by the popup's search only, not listed as it opens (there are many: the commands)
   readonly listed?: boolean;
-  // Only where the screen is worked by finger (hiding the on-screen keyboard): left out elsewhere, but for
-  // the settings' favourites for touch, which are set on any device
+  // Only where the screen is worked by finger (hiding the on-screen keyboard): left out elsewhere, but offered by
+  // the settings for a toolbar a finger may show (used for Touch, or for none yet), which are set on any device
   readonly touchOnly?: boolean;
   // Instead of running: a list to pick from (Turn into: the block formats). The toolbar shows the choice on
   // (its icon and label; none on: `mixed`, else the label), a click opens the list under it

@@ -264,6 +264,23 @@ test.describe("The toolbar on a phone", () => {
     await expect(scroll).not.toHaveClass(/swb-more-right/);
   });
 
+  test("scrolled sideways, it stays so as the text is tapped and the toolbar is drawn anew", async ({ page }) => {
+    await page.setViewportSize({ width: 240, height: page.viewportSize()!.height });
+    await selectByTouch(page, "some text");
+    const items = bar(page).locator(".swb-dock-items").last();
+    await items.evaluate((e) => (e.scrollLeft = 20));
+    await expect.poll(() => items.evaluate((e) => e.scrollLeft)).toBe(20);
+    // A tap elsewhere in the text (the paragraph's start, in view): the caret moved, the toolbar shown anew for it
+    const line = await lineBox(page, "in this page");
+    await page.touchscreen.tap(line.x + 4, line.y + 10);
+    await expect(bar(page)).toBeVisible();
+    await page.waitForTimeout(300);
+    // (As far as it goes now: what the line holds may be a little narrower for the text tapped)
+    const [left, most] = await bar(page).locator(".swb-dock-items").last().evaluate((e) => [e.scrollLeft, e.scrollWidth - e.clientWidth]);
+    expect(left).toBe(Math.min(20, most));
+    expect(left).toBeGreaterThan(0);
+  });
+
   test("over the on-screen keyboard where it overlays the page (SilverBullet's keyboard bar off), else over that bar, both as they come and go", async ({ page }) => {
     // The VirtualKeyboard API as SilverBullet sets it on a phone (overlaysContent: the window keeps its size);
     // the emulation shows no keyboard, so its rectangle is given

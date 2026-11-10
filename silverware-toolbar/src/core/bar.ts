@@ -54,6 +54,8 @@ export class Bar {
   private shadeScroll: (() => void) | undefined;
   // Docked: room kept for it at the editor's edge (`keepRoom`)
   private room = false;
+  // Docked: how far each line is scrolled sideways, by its index, as the user left it
+  private scrolls: number[] = [];
 
   constructor(
     private readonly doc: Document,
@@ -130,12 +132,19 @@ export class Bar {
     this.element.classList.add("swb-docked");
     if (!this.element.isConnected) this.doc.body.append(this.element);
     this.element.classList.add("swb-visible");
+    // Drawn anew (a press in the text, the caret moved, hidden and shown again): each line scrolled sideways as far as
+    // the user left it, not back to its start (kept as it scrolls: a line hidden reads none)
+    lines.forEach((line, i) => {
+      const left = this.scrolls[i];
+      if (left) line.items.scrollLeft = left;
+      line.items.addEventListener("scroll", () => (this.scrolls[i] = line.items.scrollLeft), { passive: true });
+    });
     this.placeDocked(at);
     this.keepRoom(room);
   }
 
   /** A row docked: a line, its items pinned left and right at its ends, the others scrolled sideways between them, shaded at an end it scrolls further to */
-  private dockLine(row: readonly Shown[], more: Extract<Shown, { action: Action }> | undefined): { readonly element: HTMLElement; readonly shade: () => void } {
+  private dockLine(row: readonly Shown[], more: Extract<Shown, { action: Action }> | undefined): { readonly element: HTMLElement; readonly items: HTMLElement; readonly shade: () => void } {
     const doc = this.doc;
     const left = row.filter((item) => pinOf(item) === "left");
     const right = row.filter((item) => pinOf(item) === "right");
@@ -174,7 +183,7 @@ export class Bar {
       scroll,
       ...(right.length || more ? [end("right", [...ofItems(right), ...(more ? [this.pinned(more)] : [])])] : []),
     );
-    return { element: line, shade };
+    return { element: line, items, shade };
   }
 
   /**

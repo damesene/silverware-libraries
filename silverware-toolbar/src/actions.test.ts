@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { ICONS_VERSION } from "../../shared/icons.ts";
 import { actionsOf, customActionsAnew, defineCustomActions, resetCustomActions, withCustomActions } from "./actions.ts";
 import { type Action, type ActionEditor, type Context, NO_ARGS } from "./core/action.ts";
 import { contextOf } from "./core/context.ts";
@@ -124,5 +125,15 @@ describe("Custom actions", () => {
     expect(actionsOf({ name: "x", label: "X", params: [{ key: "a b", label: "A" }], edit: () => undefined }).problems[0]).toContain("its param 1");
     expect(actionsOf({ name: "x", label: "X", params: [{ key: "a", label: "A" }, { key: "a", label: "B" }], edit: () => undefined }).problems[0]).toContain("twice");
     expect(actionsOf({ name: "x", label: "X", params: [{ key: "a", label: "A" }], choices: [{ name: "y", label: "Y", edit: () => undefined }] }).problems[0]).toContain("params and choices");
+  });
+});
+
+describe("A custom action's icon of Silverware Icons", () => {
+  it("drawn as an own icon is, where the modules offer their actions; an SVG as it is", async () => {
+    const { createModules } = await import("./modules.ts");
+    const icons = { version: ICONS_VERSION, markup: (value: string, base: string) => `<i class="${base}-icon">${value}</i>`, text: (value: string) => value, pick: () => () => undefined };
+    defineCustomActions(actionsOf([{ name: "rocket", label: "Rocket", icon: "lucide:rocket", edit: () => undefined }, { name: "plain", label: "Plain", icon: "<svg></svg>", edit: () => undefined }]).actions);
+    const offered = createModules(new Set(), { icons }).actions();
+    expect(offered.map((a) => a.icon)).toEqual(['<i class="swb-own-icon">lucide:rocket</i>', "<svg></svg>"]);
   });
 });

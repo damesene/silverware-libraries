@@ -1,6 +1,7 @@
 // The picker of icons (docs/silverware-icons.md, *The picker*), for any plugin (the toolbar's own icons and its Emoji
-// action, a database item's icon): a tab per set (the one used last first), the set's groups as a filter (a row of
-// their icons, or a dropdown of their names where there are more than ROW_GROUPS), a search by label and keywords,
+// action, a database item's icon): a tab per set (the one used last open), the set's groups as a filter (a row of
+// their icons, or a dropdown of their names where there are more than ROW_GROUPS), a search by label, keywords and
+// groups,
 // the set's icons (those used last first), the keys (↓ into the icons, arrows, Enter). It fills an element the caller
 // gives and tells it the value picked, as it is written (an emoji's character, `lucide:house`); what is done with it
 // is the caller's. Its markup and look are its own (`swi-`, its style page), the same wherever it opens.
@@ -17,12 +18,15 @@ const RECENT_KEY = "silverware.icons.recent";
 const SET_KEY = "silverware.icons.lastSet";
 // The emoji pickers' lists of before (the toolbar's and the database's), read once into RECENT_KEY
 const OLD_RECENT_KEYS = ["silverware.toolbar.recentEmoji", "silverware.database.recentEmoji"];
+// Each picker's own prefix of its items' ids (two open at once: `aria-activedescendant` names one)
+let pickers = 0;
 
 
 /** The picker in `into` (its children replaced), its search focused; the function given back ends it */
 export function picker(registry: Registry, drawing: Drawing, into: HTMLElement, options: PickOptions): () => void {
   const doc = into.ownerDocument;
   const win = doc.defaultView!;
+  const prefix = `swi-${++pickers}-item`;
   const sets = registry.sets().filter((set) => !options.sets || options.sets.includes(set.name));
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string) => {
     const e = doc.createElement(tag);
@@ -90,7 +94,7 @@ export function picker(registry: Registry, drawing: Drawing, into: HTMLElement, 
     b.type = "button";
     b.innerHTML = drawing.markup(value, "swi-item");
     b.title = icon[1];
-    b.id = `swi-item-${shown.length}`;
+    b.id = `${prefix}-${shown.length}`;
     b.dataset.swiValue = value;
     b.setAttribute("role", "option");
     b.setAttribute("aria-label", icon[1]);
@@ -113,7 +117,8 @@ export function picker(registry: Registry, drawing: Drawing, into: HTMLElement, 
     const group = data.groups.find((one) => one.id === only);
     const icons = group ? data.icons.filter((icon) => icon[3].includes(group.id)) : data.icons;
     if (query.trim()) {
-      const found = findByWords(icons, query, (icon) => `${icon[1]} ${icon[2]}`, (icon) => icon[1]);
+      const groupLabels = new Map(data.groups.map((one) => [one.id, one.label]));
+      const found = findByWords(icons, query, (icon) => `${icon[1]} ${icon[2]} ${icon[3].map((id) => groupLabels.get(id) ?? "").join(" ")}`, (icon) => icon[1]);
       list.replaceChildren(...(found.length ? section(group ? `Found in ${group.label}` : "Found", found) : [el("div", "swi-none", "Nothing found")]));
     } else if (group) list.replaceChildren(...section(group.label, icons));
     else {
@@ -121,9 +126,14 @@ export function picker(registry: Registry, drawing: Drawing, into: HTMLElement, 
       const recent = readRecent(win)
         .map((value) => byValue.get(value))
         .filter((icon): icon is SearchIcon => !!icon);
-      // A set of characters by its groups, as its data orders them (an emoji in one); an SVG set's in one grid by name
-      // (an icon in several groups shown once)
-      const all = set?.kind === "text" ? data.groups.flatMap((one) => section(one.label, data!.icons.filter((icon) => icon[3][0] === one.id))) : section(set?.label ?? "", data.icons);
+      // A set of characters by its groups, as its data orders them (an emoji in one), those in none after them; an SVG
+      // set's in one grid by name (an icon in several groups shown once)
+      const ids = new Set(data.groups.map((one) => one.id));
+      const loose = data.icons.filter((icon) => !ids.has(icon[3][0] ?? ""));
+      const all =
+        set?.kind === "text"
+          ? [...data.groups.flatMap((one) => section(one.label, data!.icons.filter((icon) => icon[3][0] === one.id))), ...(loose.length ? section(data.groups.length ? "Other" : set.label, loose) : [])]
+          : section(set?.label ?? "", data.icons);
       list.replaceChildren(...(recent.length ? section("Used last", recent) : []), ...all);
     }
     list.scrollTop = 0;

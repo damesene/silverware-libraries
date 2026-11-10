@@ -18,7 +18,6 @@ export function emojiModule(host: ModuleHost = {}): ToolbarModule {
         group: "Insert",
         keywords: ["smiley", "emoticon", "symbol", "icon"],
         panel: (panel) => {
-          panel.element.classList.add("swb-emoji-panel");
           return icons.pick(panel.element, {
             sets: ["emoji"],
             picked: (emoji) => panel.write((context) => emojiChange(emoji, context)),

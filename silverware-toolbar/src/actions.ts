@@ -87,7 +87,7 @@ function actionOf(definition: unknown): Action | string {
   const { name, label, icon, group, keywords, choices, mixed, listed } = d;
   if (typeof name !== "string" || !NAME_RE.test(name)) return `its name ${JSON.stringify(name)} is not letters, digits and _ starting with a letter`;
   if (typeof label !== "string" || !label) return "it has no label";
-  if (icon !== undefined && typeof icon !== "string") return "its icon is not text (an SVG)";
+  if (icon !== undefined && typeof icon !== "string") return "its icon is not text (an SVG, or an icon of Silverware Icons: lucide:rocket)";
   if (group !== undefined && typeof group !== "string") return "its group is not text";
   if (keywords !== undefined && !(Array.isArray(keywords) && keywords.every((k) => typeof k === "string"))) return "its keywords are not a list of texts";
   for (const fn of ["active", "enabled", "edit", "perform", "afterWrite", "describe"] as const) if (d[fn] !== undefined && typeof d[fn] !== "function") return `its ${fn} is not a function`;

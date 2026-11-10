@@ -94,6 +94,19 @@ describe("The picker", () => {
     expect(again.into.querySelector(".swi-section")?.textContent).toBe("Used last");
   });
 
+  it("a user's set of characters without groups: its icons in one grid under All", async () => {
+    const registry: Registry = new Registry([], async () => undefined, () => undefined, () => undefined);
+    registry.define({ name: "marks", label: "Marks", kind: "text", icons: [{ name: "★" }, { name: "✓" }] });
+    const drawing = new Drawing(registry, () => document);
+    const into = document.createElement("div");
+    document.body.replaceChildren(into);
+    const shown = vi.fn();
+    picker(registry, drawing, into, { picked: () => undefined, shown });
+    await vi.waitFor(() => expect(shown).toHaveBeenCalled());
+    expect([...into.querySelectorAll<HTMLElement>(".swi-item")].map((b) => b.dataset.swiValue)).toEqual(["★", "✓"]);
+    expect(into.querySelector(".swi-section")?.textContent).toBe("Marks");
+  });
+
   it("narrowed to sets: one, no tabs", async () => {
     const { into, items } = await open({ sets: ["emoji"] });
     expect(into.querySelector(".swi-sets")).toBeNull();

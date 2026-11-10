@@ -739,8 +739,10 @@ test("a property's icon picked in Properties: kept in the root page, before its 
   await choose(page, "Properties");
   await page.locator('[data-property="status"] .swd-prop-head').click();
   await page.locator('[data-property="status"] .swd-property-icon').click();
-  await page.locator(".swd-pop .swd-emoji-field").fill("rocket");
-  await page.locator(".swd-pop .swd-emoji", { hasText: "🚀" }).first().click();
+  // Silverware Icons' picker: its Emoji tab
+  await page.locator('.swd-pop .swi-set[data-swi-set="emoji"]').click();
+  await page.locator(".swd-pop .swi-field").fill("rocket");
+  await page.locator(".swd-pop .swi-item", { hasText: "🚀" }).first().click();
   await expect(page.locator('[data-property="status"] .swd-prop-head .swd-prop-own-icon')).toHaveText("🚀");
   await expect(page.locator('[data-property="status"] .swd-property-icon')).toBeFocused();
   // Esc in the picker closes it alone, the dialog staying
@@ -883,14 +885,23 @@ test("the peek's text looks as the page's in the editor, though it hangs outside
   expect((await look(".swd-peek-body"))[0]).toBe((await look(".cm-content"))[0]);
 });
 
-test("an item's icon picked in the peek from the emoji, its color from the palette: kept in its page, shown by its name in the views", async ({ page, space }) => {
+test("an item's icon picked in the peek, an icon of Silverware Icons then an emoji, its color from the palette: kept in its page, shown by its name in the views", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: board\n```\n", ...TASKS }, "Page");
   await page.locator(".swd-board-name", { hasText: "Fix login" }).click();
   await expect(page.locator(".swd-peek")).toBeVisible();
-  // The emoji's data loaded from the file beside the bundle, found by its name
+  // Silverware Icons' picker: Lucide's icons first, drawn in the text's color on the card and in the peek
   await page.locator(".swd-peek-icon").click();
-  await page.locator(".swd-pop .swd-emoji-field").fill("rocket");
-  await page.locator(".swd-pop .swd-emoji", { hasText: "🚀" }).first().click();
+  await page.locator('.swd-pop .swi-set[data-swi-set="lucide"]').click();
+  await page.locator(".swd-pop .swi-field").fill("rocket");
+  await page.locator('.swd-pop .swi-item[data-swi-value="lucide:rocket"]').click();
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("lucide:rocket");
+  await expect(page.locator(".swd-peek-icon .swd-item-icon svg")).toBeVisible();
+  await expect(page.locator(".swd-board-card", { hasText: "Fix login" }).locator(".swd-item-icon svg")).toBeVisible();
+  // Then an emoji, its set's data loaded from the file beside Silverware Icons' bundle, found by its name
+  await page.locator(".swd-peek-icon").click();
+  await page.locator('.swd-pop .swi-set[data-swi-set="emoji"]').click();
+  await page.locator(".swd-pop .swi-field").fill("rocket");
+  await page.locator(".swd-pop .swi-item", { hasText: "🚀" }).first().click();
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain('icon: "🚀"');
   await expect(page.locator(".swd-peek-icon .swd-item-icon")).toHaveText("🚀");
   await expect(page.locator(".swd-peek-icon")).toBeFocused();

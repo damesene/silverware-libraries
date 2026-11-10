@@ -123,8 +123,10 @@ type Icons = {
 - **Placeholders are filled by Silverware Icons**, not by the plugins: as a set
   is loaded, the placeholders of its icons in the document are given their
   SVG (one pass over `[data-swi-icon]`), and while any set is loading a
-  MutationObserver fills those added meanwhile, ended once none is left
-  unfilled. So a plugin writes markup and knows nothing of loading. To check in
+  MutationObserver fills those added meanwhile, ended LINGER_MS (1 s) after the
+  last load (what is out of the document cannot be asked whether it waits:
+  `Icons.markup` says markup is put into the page as it is made, not kept).
+  So a plugin writes markup and knows nothing of loading. To check in
   step 2: the observer's cost in SilverBullet's editor (it is on only while a
   set loads, a moment at start).
 - **How a plugin gets it**: the API page sets `silverware.icons.api` (one
@@ -206,7 +208,7 @@ files and the build's emoji loop gone.
   toolbar's and the database's style pages go. What stays shared is the icon
   box and the stand-in (`<base>-icon`, a template written into each consumer's
   style page, as the menu's).
-- A tab per set (its `label`), the one used last open first (localStorage
+- A tab per set (its `label`), in the sets' order, the one used last open (localStorage
   `silverware.icons.lastSet`, per browser, a convenience); `sets` narrows
   them (one: no tabs).
 - The search (shared/search.ts `findByWords`: labels, keywords, groups'
@@ -323,6 +325,15 @@ this file) in step with the code, the local SilverBullet after each.
 6. **Silverware Database** onto it (`Icons` through the platform, items' and
    properties' icons drawn and picked); the same.
 7. The library pages, the announcement.
+
+## Left as it is (the review of 2026-11-10)
+
+- A toolbar's own icon of text that has a reference's form (`a:1`, lower
+  case letters, a colon, letters or digits) is read as an icon of a set,
+  drawn as a dotted box naming the set it lacks: three characters of that
+  form are unlikely as an icon; said on the toolbar's library page.
+- A set of characters without groups (a user's) shows its icons in one grid
+  under *All*; icons of no group in a set that has groups under *Other*.
 
 ## To verify
 

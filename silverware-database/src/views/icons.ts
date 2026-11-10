@@ -3,6 +3,7 @@
 // back, closing, editing (a pencil).
 import type { ItemLooks } from "../core/view.ts";
 import { el } from "../../../shared/elements.ts";
+import { isReference } from "../../../shared/icons.ts";
 import { validateIcon } from "../domain/look.ts";
 import type { Property } from "../model/database.ts";
 import type { PropertyType } from "../domain/types/type.ts";
@@ -34,7 +35,10 @@ export function ownIcon(property: Property): string | undefined {
 /** A property's icon where the views name it: its own (as large as the text, drawn by `looks`), else its type's; `className` the place's */
 export function propertyIcon(doc: Document, looks: Pick<ItemLooks, "ownIcon">, property: Property, type: Pick<PropertyType, "name" | "icon">, className: string): HTMLElement {
   const own = ownIcon(property);
-  return own ? looks.ownIcon(own, `${className} swd-prop-own-icon`) : el(doc, "span", { class: className, html: typeIcon(type.icon ?? type.name) });
+  if (own) return looks.ownIcon(own, `${className} swd-prop-own-icon`);
+  // (A custom type's icon of Silverware Icons, `lucide:rocket`, drawn as an own icon is; else a built-in type's by name)
+  if (type.icon && isReference(type.icon)) return looks.ownIcon(type.icon, className);
+  return el(doc, "span", { class: className, html: typeIcon(type.icon ?? type.name) });
 }
 
 /** A property type's icon (a type the views do not know: the text's) */

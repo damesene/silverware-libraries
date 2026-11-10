@@ -7,15 +7,19 @@ The look of [Silverware Icons](silverware-icons.md): an icon in the plugins' but
 
 ```space-style
 /* Silverware Icons (prefix swi-): an icon drawn in a box of the text's size, in the
-   text's color; the plugins size the box for their places (their <base>-icon) */
+   text's color; the plugins size the box for their places (their <base>-icon). Text
+   ("H1", an emoji) as wide as it is, an icon of a set a square */
 .swi-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1em;
+  min-width: 1em;
   height: 1em;
   line-height: 1;
   vertical-align: -0.125em;
+}
+.swi-icon[data-swi-icon] {
+  width: 1em;
 }
 .swi-icon > svg {
   width: 100%;

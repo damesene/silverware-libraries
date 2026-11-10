@@ -2,7 +2,7 @@
 // hands it over, or its stand-in without it (`iconsOf`); how a value is written (`<set>:<name>` or text) is
 // iconref.ts's, pure, which this file gives on.
 
-import { isReference, referenceOf } from "./iconref.ts";
+import { iconLabelOf, isReference, referenceOf } from "./iconref.ts";
 
 export { type IconReference, iconLabelOf, isReference, referenceOf } from "./iconref.ts";
 
@@ -24,7 +24,8 @@ export type PickOptions = {
 export type Icons = {
   readonly version: number;
   // A value's markup in `<base>-icon`: text as itself; a set's icon its SVG, a placeholder filled once its set is in,
-  // or a stand-in (a dotted box, its title why)
+  // or a stand-in (a dotted box, its title why). Put into the page as it is made, not kept for later: a placeholder is
+  // filled in the page, while its set loads and a moment after
   markup(value: string, base: string): string;
   // A value as text (a tooltip, a screen reader): text itself, an icon its label
   text(value: string): string;
@@ -52,7 +53,10 @@ const STAND_IN: Icons = {
   version: ICONS_VERSION,
   markup: (value, base) =>
     isReference(value) ? `<span class="${base}-icon ${base}-icon-missing" title="Needs Silverware Icons"></span>` : `<span class="${base}-icon">${escapeMarkup(value)}</span>`,
-  text: (value) => referenceOf(value)?.name ?? value,
+  text: (value) => {
+    const reference = referenceOf(value);
+    return reference ? iconLabelOf(reference.name) : value;
+  },
   pick: (into) => {
     const doc = into.ownerDocument;
     // (Styled here: without Silverware Icons, no style page of it is installed)

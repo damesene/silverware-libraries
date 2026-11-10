@@ -24,7 +24,7 @@ describe("The icons a plugin gets", () => {
     expect(icons.markup("🏠", "swb")).toBe('<span class="swb-icon">🏠</span>');
     expect(icons.markup("<b>", "swb")).toBe('<span class="swb-icon">&lt;b&gt;</span>');
     expect(icons.markup("lucide:house", "swb")).toBe('<span class="swb-icon swb-icon-missing" title="Needs Silverware Icons"></span>');
-    expect(icons.text("lucide:house")).toBe("house");
+    expect(icons.text("lucide:arrow-up")).toBe("Arrow up");
     expect(icons.text("H1")).toBe("H1");
   });
 

@@ -2,7 +2,7 @@
 //   npm run playground
 import * as esbuild from "esbuild";
 import { writeFileSync } from "node:fs";
-import { emojiModuleText } from "./emoji.mjs";
+import { emojiModuleText } from "./icons/emoji.mjs";
 
 // The emoji data beside the bundles, as SilverBullet has it beside each library's (not committed here)
 writeFileSync("playground/silverware-toolbar-emoji.js", emojiModuleText());

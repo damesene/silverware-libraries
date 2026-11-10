@@ -13,7 +13,7 @@ toolbar, and a set must be easy to add or replace.
    Silverware Database use it (later others), none of them needing it
    installed (see *Without Silverware Icons*).
 2. **Sets are data, files of their own**, beside the bundle:
-   `silverware-icons-lucide.js`, `silverware-icons-emoji.js`; the plugin's code
+   `silverware-icons-lucide.js`, `silverware-icons-emoji-search.js`; the plugin's code
    knows no set by name, a manifest the build writes lists them (*The sets*).
 3. **Lucide** is the first set of icons (ISC; 24×24, stroke 2, round caps and
    joins, `currentColor`: the grammar the plugins' own icons are drawn in,
@@ -53,7 +53,7 @@ silverware-icons/
   silverware-icons.js          the bundle: the manifest, registry, drawing, picker
   silverware-icons-lucide.js           a set's icons: names, nodes, aliases (what drawing needs)
   silverware-icons-lucide-search.js    its keywords and groups (what the picker needs)
-  silverware-icons-emoji.js            emoji (moved from the toolbar's and the database's)
+  silverware-icons-emoji-search.js     emoji (moved from the toolbar's and the database's; a character needs no drawing data)
   src/
     index.ts                   the API object, one per module (js.importFromSpace gives the same module on each load of Space Lua)
     set.ts                     the shape of a set and its checks (built-in and the user's alike)
@@ -199,7 +199,9 @@ pages say what needs Silverware Icons.
   categories and aliases are in no npm package** (checked 2026-11-10: not in
   lucide-static, lucide or `@lucide/lab`): they are in Lucide's repository,
   `icons/<name>.json` (`categories`, `aliases`: `{ name, deprecated, … }`) and
-  `categories/<id>.json` (`title`, `icon`; 43 of them). A script
+  `categories/<id>.json` (`title`, `icon`; 43 of them; an icon's category
+  `$extends:<icon>` is that icon's categories, followed by the script; a
+  category's icon is not always of that category). A script
   (`scripts/icons/lucide-meta.mjs`) reads them at the tag of the version
   installed and writes `scripts/icons/lucide-meta.json`, committed; the build
   reads it, so building and `check-build` need no network. Run again with each
@@ -207,10 +209,16 @@ pages say what needs Silverware Icons.
   an entry names no icon (as scripts/emoji.mjs fails on a group's icon).
 - **Emoji** from emojibase-data as now (scripts/emoji.mjs moved to
   scripts/icons/emoji.mjs, its output in the set's shape).
-- The files minified (nodes as short arrays, the defaults left out) and
-  checked by check-build as the emoji file is now. The sizes measured in step
-  1; the drawing file is what every start pays for where a favourite has an
-  icon.
+- The files minified (a path's node its `d` alone, the most of them) and
+  checked by check-build as the emoji file is now (scripts/build.mjs,
+  `iconFiles`; the manifest `silverware-icons/src/manifest.ts` with them).
+- **Sizes** (measured 2026-11-10, Lucide 1.71.0): `silverware-icons-lucide.js`
+  356 kB (92 kB gzipped), what a start pays for once where a favourite has an
+  icon of it (the browser's cache after); `silverware-icons-lucide-search.js`
+  370 kB (73 kB), as the picker's tab first opens;
+  `silverware-icons-emoji-search.js` 141 kB (39 kB). Writing a path's node as
+  its text saved 100 kB of the drawing file but 4 kB gzipped: smaller forms
+  would not pay.
 
 ## The repository
 

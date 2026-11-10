@@ -3,7 +3,8 @@
 // from its template (scripts/sharedstyles.mjs).
 import * as esbuild from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
-import { emojiModuleText } from "./emoji.mjs";
+import { emojiModuleText } from "./icons/emoji.mjs";
+import { iconFiles } from "./icons/index.mjs";
 import { sharedStyles } from "./sharedstyles.mjs";
 
 const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart", "silverware-database"];
@@ -41,7 +42,7 @@ for (const { entry, outfile, name } of [...libraries.map((name) => ({ entry: `${
     await esbuild.build(options);
   }
 }
-// The emoji data beside the bundle of each plugin with the emoji picker (shared/emoji.ts; scripts/emoji.mjs), made from
+// The emoji data beside the bundle of each plugin with the emoji picker (shared/emoji.ts; scripts/icons/emoji.mjs), made from
 // the package as installed: one each, as a plugin is installed without the others
 for (const emojiFile of ["silverware-toolbar/silverware-toolbar-emoji.js", "silverware-database/silverware-database-emoji.js"]) {
   if (check) {
@@ -51,6 +52,16 @@ for (const emojiFile of ["silverware-toolbar/silverware-toolbar-emoji.js", "silv
       stale++;
     }
   } else await writeFile(emojiFile, emojiModuleText());
+}
+// Silverware Icons' sets beside its bundle and its manifest (scripts/icons/index.mjs), made from the packages as installed
+for (const { path, text } of iconFiles()) {
+  if (check) {
+    const committed = (await readFile(path, "utf8").catch(() => "")).replaceAll("\r\n", "\n");
+    if (committed !== text) {
+      console.error(`${path} does not match its set's sources: run npm run build`);
+      stale++;
+    }
+  } else await writeFile(path, text);
 }
 // The CSS of what shared/ draws, in each plugin's style page (scripts/sharedstyles.mjs)
 stale += await sharedStyles(check);

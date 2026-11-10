@@ -161,7 +161,7 @@ export const VERSION_1: PagesVersion = {
     }
   },
   writeItem(page, before, after) {
-    if (!before) page.tags.add(ITEM_TAG);
+    if (!before) page.tags.add([ITEM_TAG, ...(after.tags ?? [])]);
     for (const [key, value] of Object.entries(after.values)) if (JSON.stringify(before?.values[key]) !== JSON.stringify(value)) page.properties.set(key, value);
     for (const key of Object.keys(before?.values ?? {})) if (!(key in after.values)) page.properties.remove(key);
     // (A key the schema has none of, taken off)

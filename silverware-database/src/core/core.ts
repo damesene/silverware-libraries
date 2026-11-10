@@ -17,7 +17,7 @@ import { systemKind } from "../domain/system.ts";
 import { sameLook, validateIcon, validateLook } from "../domain/look.ts";
 import { DOCUMENT, type Noun } from "../domain/noun.ts";
 import type { UserInterface } from "../../../shared/platform.ts";
-import { inRankOrder, isRank, placeAt } from "../domain/rank.ts";
+import { inRankOrder, isRank, placeAt, ranksInOrder } from "../domain/rank.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
 import { optionsOf } from "../domain/types/options.ts";
 import { keptText } from "../domain/types/type.ts";
@@ -103,8 +103,8 @@ export type LooseProperty = { readonly key: string; readonly items: number; read
 /** An option renamed, and how many items hold it */
 export type OptionRenamed = { readonly from: string; readonly to: string; readonly items: number };
 
-/** An item as one is added: its name (none: a free *Untitled*), values, body */
-export type ItemDraft = { readonly name?: string; readonly values?: Readonly<Record<string, Value>>; readonly body?: string };
+/** An item as one is added: its name (none: a free *Untitled*), values, body, the tags of the document it is kept in (beside the database's own) */
+export type ItemDraft = { readonly name?: string; readonly values?: Readonly<Record<string, Value>>; readonly body?: string; readonly tags?: readonly string[] };
 
 /** A property as one is added: its key made from its label where not given (one given may take back values items kept under it) */
 export type NewProperty = { readonly label: string; readonly type: string; readonly key?: string; readonly params?: Params; readonly readonly?: boolean; readonly system?: string };
@@ -278,7 +278,7 @@ export class DatabaseCore {
       if (problem) return this.refuse(problem);
       const placing = placed(read.items.value, undefined, place);
       if (typeof placing === "string") return this.refuse(placing);
-      const changes = databaseChanges(database).create({ ref: "item", name, values, rank: placing.rank, ...(draft.body === undefined ? {} : { body: draft.body }) });
+      const changes = databaseChanges(database).create({ ref: "item", name, values, rank: placing.rank, ...(draft.body === undefined ? {} : { body: draft.body }), ...(draft.tags === undefined ? {} : { tags: draft.tags }) });
       rankOthers(changes, read.items.value, placing.others);
       const result = await this.write(changes.build(), `Add ${name}`, { ref: "item" });
       return "problem" in result ? result : { ...result, key: result.report.created.get("item") };
@@ -507,8 +507,11 @@ export class DatabaseCore {
 
   // Databases
 
-  /** A database made, its id from its name (unique among the store's), with its properties */
-  async createDatabase(name: string, properties: readonly NewProperty[] = []): Promise<(Written & { readonly id: string }) | Refused> {
+  /**
+   * A database made, its id from its name (unique among the store's), with its properties and its items in their order
+   * (a text converted): all in one transaction, undone as one; a value, a name or a tag one item cannot have refuses it whole
+   */
+  async createDatabase(name: string, properties: readonly NewProperty[] = [], items: readonly ItemDraft[] = []): Promise<(Written & { readonly id: string }) | Refused> {
     const trimmed = name.trim();
     if (!trimmed) return this.refuse("A database needs a name");
     const id = freeName(slug(trimmed, "-") || "database", new Set((await this.store.databases()).map((one) => one.id)), "-");
@@ -518,8 +521,38 @@ export class DatabaseCore {
       if (typeof property === "string") return this.refuse(property);
       schema.push(property);
     }
-    const result = await this.write(databaseChanges(id).createDatabase(trimmed).schema(schema).build(), `Add database ${trimmed}`);
+    const changes = databaseChanges(id).createDatabase(trimmed).schema(schema);
+    const made = this.madeItems(changes, { id, name: trimmed, properties: schema }, items);
+    if (typeof made === "string") return this.refuse(made);
+    const label = items.length ? `Add database ${trimmed} with ${items.length} ${items.length === 1 ? "item" : "items"}` : `Add database ${trimmed}`;
+    // Whole or not at all: a part the store refuses as planned (two names one page's, a tag it cannot keep) writes nothing,
+    // and one left as it is written puts back what was
+    const { plan } = await this.propose(changes.build(), label);
+    if (plan.skipped.length) return this.refuse(`${label}: nothing was written: ${[...new Set(plan.skipped.map((one) => one.reason))].join("; ")}`);
+    const result = await this.settle(label, await this.store.apply(plan), () => true);
     return "problem" in result ? result : { ...result, id };
+  }
+
+  /** Items made in a batch, at the end of the order in theirs (a database's first: `database` has none yet); why one cannot be */
+  private madeItems(changes: DatabaseChangesBuilder, database: Database, items: readonly ItemDraft[]): string | undefined {
+    const names = new Set<string>();
+    // (An item without a name gets a free one, of those given too, whichever comes first)
+    const given = new Set(items.flatMap((one) => one.name?.trim() || []));
+    const ranks = ranksInOrder(items.length);
+    for (const [at, draft] of items.entries()) {
+      const values = Object.fromEntries(Object.entries(draft.values ?? {}).filter((entry): entry is [string, Value] => entry[1] !== undefined));
+      for (const [key, value] of Object.entries(values)) {
+        const property = writable(database, key);
+        if (typeof property === "string") return property;
+        if (!isValue(value)) return notValue(property.label);
+      }
+      const name = draft.name?.trim() || freeName(UNTITLED, new Set([...names, ...given]));
+      const problem = this.validateName(name, names);
+      if (problem) return problem;
+      names.add(name);
+      changes.create({ ref: `item-${at}`, name, values, rank: ranks[at], ...(draft.body === undefined ? {} : { body: draft.body }), ...(draft.tags?.length ? { tags: draft.tags } : {}) });
+    }
+    return undefined;
   }
 
   async renameDatabase(database: string, name: string): Promise<Result> {

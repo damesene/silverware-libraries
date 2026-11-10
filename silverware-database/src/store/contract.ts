@@ -50,7 +50,7 @@ const causes = (plan: Pick<TransactionPlan, "skipped">) => plan.skipped.map((one
 export function storeContract(name: string, make: (seeds: readonly ContractSeed[]) => ContractHarness): void {
   describe(`${name}: the store contract`, () => {
     const keyOf = async (store: DatabaseStore, itemName: string) => (await store.items("tasks")).value.find((item) => item.name === itemName)!.key;
-    const itemOf = async (store: DatabaseStore, key: ItemKey) => (await store.items("tasks")).value.find((item) => item.key === key);
+    const itemOf = async (store: DatabaseStore, key: ItemKey, database = "tasks") => (await store.items(database)).value.find((item) => item.key === key);
 
     it("gives the values items keep under keys the schema has none of, and takes one off as any value", async () => {
       const { store } = make([{ database: TASKS, items: [{ name: "Fix login", values: { status: "Todo", legacy: "kept" }, rank: "a0" }, { name: "Write docs", values: { status: "Done" }, rank: "a1" }] }]);
@@ -510,6 +510,27 @@ export function storeContract(name: string, make: (seeds: readonly ContractSeed[
       for (const cause of causes(undo)) expect(["changed", "missing"]).toContain(cause);
       await store.apply(undo);
       expect((await store.items("more")).value.map((item) => item.name)).toEqual(["Y"]);
+    });
+
+    it("makes an item with its document's tags, shown by the system property Tags, and refuses a tag of no name", async () => {
+      const { store } = make(SEED);
+      const tagsProperty = { key: "page_tags", label: "Tags", type: "tags", params: {}, readonly: true, system: "tags" };
+      const made = changes("ideas", { kind: "createDatabase", name: "Ideas" }, { kind: "setSchema", properties: [tagsProperty] }, { kind: "createItem", ref: "one", name: "First idea", values: {}, tags: ["sales", "q4/plan"] }, { kind: "createItem", ref: "two", name: "Second", values: {} });
+      const report = await store.apply(await store.plan(made));
+      expect(report.skipped).toEqual([]);
+      expect((await store.items("ideas")).value.map((item) => [item.name, item.values.page_tags])).toEqual([
+        ["First idea", ["sales", "q4/plan"]],
+        ["Second", []],
+      ]);
+      for (const tag of [" ", " a", "#a"]) expect(causes(await store.plan(changes("ideas", { kind: "createItem", ref: "x", name: "X", values: {}, tags: [tag] }))), tag).toEqual(["refused"]);
+      // A tag given twice: once
+      await store.apply(await store.plan(changes("ideas", { kind: "createItem", ref: "x", name: "Third", values: {}, tags: ["a", "a"] })));
+      expect((await store.items("ideas")).value.find((item) => item.name === "Third")!.values.page_tags).toEqual(["a"]);
+      // An item removed and brought back by an undo keeps its tags
+      const first = report.created.get("one")!;
+      const removed = await store.apply(await store.plan(changes("ideas", { kind: "removeItem", item: first })));
+      await store.apply(await store.planUndo(removed));
+      expect((await itemOf(store, first, "ideas"))!.values.page_tags).toEqual(["sales", "q4/plan"]);
     });
 
     it("refuses a transaction making a database anywhere but at its start", async () => {

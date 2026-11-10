@@ -13,13 +13,14 @@
 // lets nothing go: the index may not have taken the write up yet.
 import { type PageBuilder, pageChanges } from "../../../../shared/pages/changes.ts";
 import { readFrontmatter } from "../../../../shared/pages/frontmatter.ts";
+import { validateName as validateTagName } from "../../../../shared/pages/tags/names.ts";
 import { type ApplyReport, type PagePlan, type PageWriter, pageWriter } from "../../../../shared/pages/writer.ts";
 import type { Index, IndexedObject, Platform, Space, TaskCount } from "../../../../shared/platform.ts";
 import type { Changes } from "../../core/changes.ts";
 import type { DatabaseStore, LooseKey, VersionStatus, MigrationScope, Planned, SkipCause, Skipped, StoreCapabilities, Target, TransactionPlan, TransactionReport, WriteProgress } from "../../core/store.ts";
 import { told } from "../../core/store.ts";
 import type { Database, DatabaseSummary, Item, ItemKey, Revised } from "../../model/database.ts";
-import { draftTransaction, type ItemState, looseKeys, type RecordState, type StoreRules, type StoreState, takenNames, withoutClashes } from "../transaction.ts";
+import { draftTransaction, type ItemState, looseKeys, type RecordState, type StoreRules, type StoreState, takenNames, validateTagForm, withoutClashes } from "../transaction.ts";
 import { hasSystem, localStamp, type SystemFacts, withSystemValues } from "../../domain/system.ts";
 import { stableText } from "../../domain/itempart.ts";
 import { modelValue, VERSIONS, ITEM_TAG, type PagesVersion, ROOT_TAG, schemaEntry, systemOf, versionOf } from "./versions.ts";
@@ -152,6 +153,8 @@ export class PagesStore implements DatabaseStore {
       latestVersion: this.latest.version,
       validatePropertyKey: (key) => this.validatePropertyKey(key),
       validateItemName: (name) => this.validateItemName(name),
+      // (Its form first, as every store's; then a tag SilverBullet can have, none of the database's own)
+      validateTag: (name) => validateTagForm(name) ?? validateTagName(name) ?? (name === ITEM_TAG || name === ROOT_TAG ? `"${name}" is the database's own tag` : undefined),
       // A page's name whatever its case: a disk that ignores case has one page of the two
       nameKey: (name) => name.toLowerCase(),
     };
@@ -607,7 +610,7 @@ export class PagesStore implements DatabaseStore {
     if (part.kind === "record") return undefined;
     const before = this.facts.get(from);
     const now = localStamp(new Date());
-    return { created: before?.created ?? now, modified: now, page, tags: before?.tags ?? [] };
+    return { created: before?.created ?? now, modified: now, page, tags: before?.tags ?? (part.after as ItemState | undefined)?.tags ?? [] };
   }
 
   /** What the index will have of a page the store wrote (`from` the page it was, renamed), as the store reads pages */
@@ -619,7 +622,7 @@ export class PagesStore implements DatabaseStore {
     }
     const item = part.after as ItemState;
     const system = { ...(item.rank === undefined ? {} : { rank: item.rank }), ...item.lookKept, ...item.look };
-    return { name: page, tags: [ITEM_TAG, ...(this.facts.get(from)?.tags ?? [])], ...item.loose, ...item.values, ...(Object.keys(system).length ? { _database: system } : {}) };
+    return { name: page, tags: [ITEM_TAG, ...(this.facts.get(from)?.tags ?? item.tags ?? [])], ...item.loose, ...item.values, ...(Object.keys(system).length ? { _database: system } : {}) };
   }
 
   /** A database as read now: the index's objects, the pages the store wrote as it wrote them */

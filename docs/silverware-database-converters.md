@@ -124,7 +124,8 @@ database to markdown, starts as *Copy as tasks* to the clipboard; a conversion i
 1. ~~The probes above~~ (done 2026-11-10).
 2. ~~`shared/markdown/`: whole lines and fences, a line's marks, a task's line read and written; the clipboard out of
    Silverware Table~~ (done 2026-11-10).
-3. The store: an item made with page tags beside `db`; the core: `defineConverters`, a new database made with its items
-   in one transaction.
+3. ~~a) The store: an item made with its document's tags (`createItem`'s `tags`, beside `db`; `StoreRules.validateTag`);
+   the core: `createDatabase(name, properties, items)`, a new database with its items in one transaction~~ (done
+   2026-11-10). b) `defineConverters`: the `converters/` layer, its registry and checks, the API page.
 4. The tasks converter, the command, the block under the selection; a UI test.
 5. *Copy as tasks* from ⋯.

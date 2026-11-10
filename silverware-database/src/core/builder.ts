@@ -39,9 +39,11 @@ export type NewItem = {
   readonly rank?: string;
   readonly look?: ItemLook;
   readonly body?: string;
+  // The tags of the document it is kept in, beside the database's own
+  readonly tags?: readonly string[];
 };
 
-type Made = { ref: string; name: string; values: Record<string, Value>; rank?: string; look?: ItemLook; body?: string; removed: boolean };
+type Made = { ref: string; name: string; values: Record<string, Value>; rank?: string; look?: ItemLook; body?: string; tags?: readonly string[]; removed: boolean };
 
 export class DatabaseChangesBuilder {
   private created: string | undefined;
@@ -124,7 +126,7 @@ export class DatabaseChangesBuilder {
     this.open();
     const ref = item.ref ?? `new-${++this.refs}`;
     if (this.items.some((one) => one.kind === "made" && one.made.ref === ref)) throw new Error(`an item made twice under the ref "${ref}"`);
-    const made: Made = { ref, name: item.name, values: { ...item.values }, removed: false, ...(item.rank === undefined ? {} : { rank: item.rank }), ...(item.look === undefined ? {} : { look: item.look }), ...(item.body === undefined ? {} : { body: item.body }) };
+    const made: Made = { ref, name: item.name, values: { ...item.values }, removed: false, ...(item.rank === undefined ? {} : { rank: item.rank }), ...(item.look === undefined ? {} : { look: item.look }), ...(item.body === undefined ? {} : { body: item.body }), ...(item.tags?.length ? { tags: [...item.tags] } : {}) };
     this.items.push({ kind: "made", made });
     const change = (apply: () => void) => {
       if (made.removed) throw new Error(`the item "${ref}" was removed in this batch`);
@@ -153,8 +155,8 @@ export class DatabaseChangesBuilder {
     for (const one of this.items) {
       if (one.kind === "kept") changes.push(...one.changes);
       else if (!one.made.removed) {
-        const { ref, name, values, rank, look, body } = one.made;
-        changes.push({ kind: "createItem", ref, name, values: Object.freeze(values), ...(rank === undefined ? {} : { rank }), ...(look === undefined ? {} : { look }), ...(body === undefined ? {} : { body }) });
+        const { ref, name, values, rank, look, body, tags } = one.made;
+        changes.push({ kind: "createItem", ref, name, values: Object.freeze(values), ...(rank === undefined ? {} : { rank }), ...(look === undefined ? {} : { look }), ...(body === undefined ? {} : { body }), ...(tags === undefined ? {} : { tags: Object.freeze(tags) }) });
       }
     }
     const items = Object.keys(this.read).length ? { items: Object.freeze({ ...this.read }) } : {};

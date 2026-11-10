@@ -14,7 +14,9 @@ import type { LooseKey, SkipCause, Skipped, Target } from "../core/store.ts";
 // frontmatter keys): none of the model's, taken off by a `setValue` to undefined
 // `lookKept`: a part of its look kept where it reads as none (an icon typed by hand as a word): never written over by a
 // change of the other part, put back by an undo, gone only where a change sets that part
-export type ItemState = Omit<Item, "revision"> & { readonly loose?: Readonly<Record<string, Value>>; readonly lookKept?: Readonly<Partial<Record<keyof ItemLook, Value>>> };
+// `tags`: those of the document it is kept in, beside the database's own, given as it is made (`createItem`); a store
+// reads them as facts (the system property Tags), not into the item
+export type ItemState = Omit<Item, "revision"> & { readonly loose?: Readonly<Record<string, Value>>; readonly lookKept?: Readonly<Partial<Record<keyof ItemLook, Value>>>; readonly tags?: readonly string[] };
 
 /** A database's own record: its name, schema and the version of the form it is kept in */
 export type RecordState = { readonly database: Database; readonly version: number };
@@ -33,9 +35,18 @@ export type StoreRules = {
   readonly latestVersion: number;
   validatePropertyKey(key: string): string | undefined;
   validateItemName(name: string): string | undefined;
+  /** Why a document cannot have a tag of that name, undefined where it can */
+  validateTag(name: string): string | undefined;
   /** What two names are compared by (a page's name: whatever its case, as a disk may ignore it) */
   nameKey(name: string): string;
 };
+
+/** Why a tag's name is none in any store (empty, spaces at an end, written with its #), undefined where it may be one */
+export function validateTagForm(name: string): string | undefined {
+  if (!name.trim()) return "a tag needs a name";
+  if (name !== name.trim()) return `a tag's name cannot start or end with a space: "${name}"`;
+  return name.startsWith("#") ? `a tag's name is given without its #: "${name}"` : undefined;
+}
 
 /** An item's part: where it lands, what it leaves (undefined: removed), how many things change, whether its name does */
 export type ItemDraft = {
@@ -172,7 +183,7 @@ function draftItem(group: ItemGroup, state: StoreState, keys: ReadonlySet<string
   const kept = key === undefined ? undefined : state?.items.get(key);
   const before = kept?.item;
   let item: ItemState | undefined = created
-    ? { key: "" as ItemKey, name: created.name, values: created.values, rank: created.rank, ...withLook(created.look), ...(created.body === undefined ? {} : { body: created.body }) }
+    ? { key: "" as ItemKey, name: created.name, values: created.values, rank: created.rank, ...withLook(created.look), ...(created.body === undefined ? {} : { body: created.body }), ...(created.tags?.length ? { tags: [...new Set(created.tags)] } : {}) }
     : before;
   if (!item) return skip("missing", "no such item");
   const expected = key && changes.expects?.items?.[key];
@@ -180,7 +191,7 @@ function draftItem(group: ItemGroup, state: StoreState, keys: ReadonlySet<string
   let count = created ? 1 : 0;
   let named = !!created;
   if (created) {
-    const problem = rules.validateItemName(created.name) ?? Object.keys(created.values).map((one) => validateValueKey(one, keys, true)).find(Boolean) ?? (created.look && validateLook(created.look));
+    const problem = rules.validateItemName(created.name) ?? Object.keys(created.values).map((one) => validateValueKey(one, keys, true)).find(Boolean) ?? (created.look && validateLook(created.look)) ?? created.tags?.map((one) => rules.validateTag(one)).find(Boolean);
     if (problem) return skip("refused", problem);
   }
   for (const change of group.changes) {

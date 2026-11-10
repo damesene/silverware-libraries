@@ -55,8 +55,6 @@ export const SETTINGS_ACTION: Action = {
   listed: false,
 };
 
-export { SWITCH_ID } from "./toolbars.ts";
-
 export class Controller {
   private readonly watcher: SelectionWatcher;
   private readonly bar: Bar;

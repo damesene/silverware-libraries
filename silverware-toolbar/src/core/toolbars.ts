@@ -40,13 +40,13 @@ export const MAX_TOOLBARS = 5;
 
 /**
  * The toolbars where none are configured: Float, by the selection after one (a mouse's: several rows), and Docked,
- * at the bottom while writing (a finger's: one line of gesture buttons; there a phone's own menu of the selection is
+ * at the bottom always (a finger's: one line of gesture buttons; there a phone's own menu of the selection is
  * by it); without the Gestures module Docked shows none of them, so Float is for both
  */
 export function defaultToolbars(gestures = true): readonly Toolbar[] {
   return [
     { name: "Float", useFor: gestures ? ["click"] : ["click", "touch"], placement: "selection", show: "selection", rows: DEFAULT_FAVORITES },
-    { name: "Docked", useFor: gestures ? ["touch"] : [], placement: "bottom", show: "writing", rows: DEFAULT_TOUCH_FAVORITES },
+    { name: "Docked", useFor: gestures ? ["touch"] : [], placement: "bottom", show: "always", rows: DEFAULT_TOUCH_FAVORITES },
   ];
 }
 

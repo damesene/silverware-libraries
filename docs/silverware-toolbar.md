@@ -648,7 +648,7 @@ are the toolbar's, no longer a device's setting: General keeps the key and
 the word at the cursor. The settings' tab is *Toolbars* (a tab per toolbar,
 New, Duplicate, Delete, Reset to defaults; Used for, Where, When on its card).
 Defaults: *Float* (by the selection, after selecting text, Click) and
-*Docked* (at the bottom, while writing, Touch). Pinned items' boxes only for
+*Docked* (at the bottom, always, Touch; the user's change of the same day from while writing). Pinned items' boxes only for
 a docked toolbar; by the selection a pin orders its row only, kept for when
 it docks, marked by a pin, and an item moved by hand loses a pin that would
 undo the order. The settings of before (version 1) migrate to version 2

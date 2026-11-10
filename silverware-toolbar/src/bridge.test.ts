@@ -124,8 +124,8 @@ describe("The init page", () => {
     }
   });
 
-  it("read where and when each toolbar shows: Float by the selection after selecting text, Docked at the bottom while writing; unknown or none: by the selection, after selecting text", async () => {
-    expect((await readSettings(bridge({}))).toolbars.map((list) => [list.name, list.placement, list.show])).toEqual([["Float", "selection", "selection"], ["Docked", "bottom", "writing"]]);
+  it("read where and when each toolbar shows: Float by the selection after selecting text, Docked at the bottom always; unknown or none: by the selection, after selecting text", async () => {
+    expect((await readSettings(bridge({}))).toolbars.map((list) => [list.name, list.placement, list.show])).toEqual([["Float", "selection", "selection"], ["Docked", "bottom", "always"]]);
     const read = await readSettings(bridge({ "silverware.toolbar.favorites": [{ name: "A", useFor: ["click"], placement: "top", show: "always", rows: [] }, { name: "B", placement: "auto", show: "mobile", rows: [] }] }));
     expect(read.toolbars.map((list) => [list.placement, list.show])).toEqual([["top", "always"], ["selection", "selection"]]);
   });

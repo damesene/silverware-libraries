@@ -477,7 +477,7 @@ The *Functions* dialog shows them all: **Functions…** (fx) under a formula bei
 | `MROUND(number, multiple)` | Rounds to the nearest multiple, halves away from zero. Of a time, a time: MROUND("9:08", "0:15") is 09:15. |
 | `CEILING(number, [significance])` | Rounds up to a multiple of the significance (default 1). Of a time, a time: CEILING("9:07", "0:15") is 09:15. |
 | `FLOOR(number, [significance])` | Rounds down to a multiple of the significance (default 1). Of a time, a time: FLOOR("9:07", "0:15") is 09:00. |
-| `MOD(number, divisor)` | The remainder after dividing the number by the divisor, with the divisor's sign. Of a time, a time: MOD([@end] - [@start], 1) is the length of a shift past midnight. |
+| `MOD(number, divisor)` | The remainder after dividing the number by the divisor, with the divisor's sign. Of a time, a time: MOD([\@end] - [\@start], 1) is the length of a shift past midnight. |
 | `ABS(number)` | The number without its sign. |
 | `IF(condition, value_if_true, [value_if_false])` | One value if the condition is true, another if it is false (default FALSE). |
 | `IFERROR(value, value_if_error)` | The value, or the second value if the first is an error. |
@@ -714,7 +714,7 @@ shows `$12.99`, `★★★★☆` and `☑`.
 | `#unit-kg` | A number with a unit: the unit after the dash. |
 | `#stars, #stars-10` | A rating as stars: a whole number from 0 to the most stars after the dash (default 5). |
 | `#check` | Yes or no as a check box: yes, true, x, ☑ or a number above 0 shows ☑; no, false, ☐, 0 or a number below it shows ☐. |
-| `#choice, #choice-name` | One of a list's values: the list named after the dash, kept in the table as values or as a formula making them (=@projects; picking Choice opens a dialog to set it up). A value not in the list is marked, and the column sorts in the list's order. Without a list the editor offers the values the column has. |
+| `#choice, #choice-name` | One of a list's values: the list named after the dash, kept in the table as values or as a formula making them (=\@projects; picking Choice opens a dialog to set it up). A value not in the list is marked, and the column sorts in the list's order. Without a list the editor offers the values the column has. |
 | `#date, #date-long` | A date written as 2025-11-06 (with a time: 2025-11-06 14:30), shown as the locale writes it: short, medium (default) or long after the dash. |
 | `#time` | A time of day written as 14:30 or 14:30:15 (or as a fraction of a day, 0.5 is 12:00), shown as the locale writes times. |
 | `#trend` | A trend as an arrow: + or a number above 0 shows ↑, - or one below 0 shows ↓, = or 0 shows =. |
@@ -997,7 +997,7 @@ Formats you set up in the dialog, without code:
 | Above average | Cells whose number is above the average of the rule's cells |
 | Below average | Cells whose number is below the average of the rule's cells |
 | Date occurring | Cells whose date is in a period around today (weeks start on Monday) |
-| Formula | Cells of the rows a formula of one row is true for (=[@due] < TODAY()); needs the formulas module |
+| Formula | Cells of the rows a formula of one row is true for (=[\@due] < TODAY()); needs the formulas module |
 
 | Format | How the cells look |
 |---|---|

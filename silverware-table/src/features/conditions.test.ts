@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { allConditions, allFormats, clearCustomDefinitions } from "../conditions/index.ts";
 import { defineFormats } from "../index.ts";
 import { cell, controller, cursorMoves, editor, flashes, flush, renderPage, setText, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
+import { asInLibraryPage } from "../testing/librarypage.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -307,7 +308,7 @@ describe("Conditional formatting", () => {
 
   it("documents every built-in condition and format on the library page", () => {
     const page = readFileSync(join(here, "../../silverware-table.md"), "utf8");
-    for (const c of allConditions()) expect(page, c.name).toContain(`| ${c.label} | ${(c.description ?? "").replace(/\|/g, "\\|")} |`);
+    for (const c of allConditions()) expect(page, c.name).toContain(`| ${c.label} | ${asInLibraryPage(c.description ?? "")} |`);
     for (const f of allFormats()) expect(page, f.name).toContain(`| ${f.label} |`);
   });
 });

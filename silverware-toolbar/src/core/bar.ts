@@ -143,7 +143,7 @@ export class Bar {
     this.keepRoom(room);
   }
 
-  /** A row docked: a line, its items pinned left and right at its ends, the others scrolled sideways between them, shaded at an end it scrolls further to */
+  /** A row docked: a line, its items pinned left and right at its ends, the others scrolled sideways between them, fading out at an end it scrolls further to */
   private dockLine(row: readonly Shown[], more: Extract<Shown, { action: Action }> | undefined): { readonly element: HTMLElement; readonly items: HTMLElement; readonly shade: () => void } {
     const doc = this.doc;
     const left = row.filter((item) => pinOf(item) === "left");
@@ -156,13 +156,8 @@ export class Bar {
     items.append(...rest.flatMap((item) => this.elementOf(item, true)));
     const scroll = doc.createElement("div");
     scroll.className = "swb-dock-scroll";
-    const shadeOf = (side: string) => {
-      const element = doc.createElement("span");
-      element.className = `swb-dock-shade swb-dock-shade-${side}`;
-      element.setAttribute("aria-hidden", "true");
-      return element;
-    };
-    scroll.append(items, shadeOf("left"), shadeOf("right"));
+    // (Its items fade out at an end it scrolls further to: the style page's CSS, by swb-more-left / -right)
+    scroll.append(items);
     const shade = () => {
       const further = items.scrollWidth - items.clientWidth - items.scrollLeft;
       scroll.classList.toggle("swb-more-left", items.scrollLeft > 1);

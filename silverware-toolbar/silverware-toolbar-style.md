@@ -103,47 +103,32 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
   align-items: center;
   min-width: 0;
 }
-/* Lines one under another: a hairline between them, short of the bar's ends, as the line by the pinned items */
-.swb-bar.swb-docked .swb-dock-line + .swb-dock-line {
-  position: relative;
+/* Lines one under another told apart by a faint tint of every other one, no line drawn (the bar has enough: its
+   edge, the pinned items', the separators) */
+.swb-bar.swb-docked .swb-dock-line:nth-child(even) {
+  background: color-mix(in srgb, currentColor 4%, transparent);
+  border-radius: 4px;
 }
-.swb-bar.swb-docked .swb-dock-line + .swb-dock-line::before {
-  content: "";
-  position: absolute;
-  top: -1.5px;
-  left: 10px;
-  right: 10px;
-  height: 1px;
-  background: var(--button-border-color, rgba(128, 128, 128, 0.35));
-  pointer-events: none;
-}
-/* Its items in a box shaded at each end it scrolls further to (swb-more-left / -right) */
+/* Its items in a box faded out at each end it scrolls further to (swb-more-left / -right) */
 .swb-bar.swb-docked .swb-dock-scroll {
   position: relative;
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
 }
-.swb-dock-shade {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 18px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 150ms;
+/* At an end it scrolls further to, its items fade out there (a mask: alike on a light and a dark bar, where a
+   shadow of black did not show); scrolled to that end, they do not */
+.swb-bar.swb-docked .swb-dock-scroll.swb-more-right .swb-dock-items {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
 }
-.swb-dock-shade-left {
-  left: 0;
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.14), transparent);
+.swb-bar.swb-docked .swb-dock-scroll.swb-more-left .swb-dock-items {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 22px), transparent);
 }
-.swb-dock-shade-right {
-  right: 0;
-  background: linear-gradient(to left, rgba(0, 0, 0, 0.14), transparent);
-}
-.swb-dock-scroll.swb-more-left .swb-dock-shade-left,
-.swb-dock-scroll.swb-more-right .swb-dock-shade-right {
-  opacity: 1;
+.swb-bar.swb-docked .swb-dock-scroll.swb-more-left.swb-more-right .swb-dock-items {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 22px, #000 calc(100% - 22px), transparent);
 }
 .swb-bar.swb-docked .swb-dock-items {
   flex: 1 1 auto;

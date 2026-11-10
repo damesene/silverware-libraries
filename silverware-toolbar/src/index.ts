@@ -5,6 +5,8 @@ import { actionsOf, customActionsAnew, defineCustomActions } from "./actions.ts"
 import { type Bridge, missingBridgeFunctions, OWN_MARKER, PATHS, readSettings, type Settings } from "./bridge.ts";
 import type { Action } from "./core/action.ts";
 import type { ItemKind } from "./core/items.ts";
+import { type Toolbar, toolbarsSetting } from "./core/toolbars.ts";
+import { SETTINGS_VERSION } from "./migrations/index.ts";
 import { Controller, MORE_ACTION, SETTINGS_ACTION } from "./core/controller.ts";
 import { customFormatsAnew, defineCustomFormats, formatsOf } from "./formats/index.ts";
 import { createModules } from "./modules.ts";
@@ -53,12 +55,42 @@ export async function init(bridge: Bridge): Promise<void> {
   // The toolbar's: those for a touch screen only where this is one (the settings get every action)
   const touch = touchScreen();
   const offered = () => actions().filter((action) => touch || !action.touchOnly);
-  const controller = new Controller(document, bridge, settings, offered, kinds, refresh, () => void openSettings());
+  const controller = new Controller(document, bridge, settings, offered, kinds, refresh, () => void openSettings(), (toolbars) => keepSwitched(bridge, toolbars));
   made = controller;
   slot[GLOBAL_KEY] = controller;
   current = { bridge, actions, kinds };
   controller.start();
   if (Object.keys(settings.migrated).length) void writeMigrated(bridge, settings.migrated);
+}
+
+// A switch of the toolbar being written, and the toolbars of a later one to write after it (the last one counts)
+let switching: Promise<void> | undefined;
+let nextSwitch: readonly Toolbar[] | undefined;
+
+/**
+ * The toolbars after a switch (`actions.switchToolbar`) kept: written as the
+ * settings dialog writes them, one write at a time, only the last of switches
+ * made meanwhile; SilverBullet then loads its configuration again and the
+ * toolbar started for it finds the settings it runs (`sameSettings`), so it
+ * goes on as it is. Where nothing can be written, the switch holds for this
+ * visit; a failed write is said
+ */
+function keepSwitched(bridge: Bridge, toolbars: readonly Toolbar[]): void {
+  if (!canSaveIn(bridge)) return;
+  nextSwitch = toolbars;
+  if (switching) return;
+  switching = (async () => {
+    while (nextSwitch) {
+      const write = nextSwitch;
+      nextSwitch = undefined;
+      try {
+        await saveSettings(bridge, { [PATHS.favorites]: toolbarsSetting(write), [PATHS.version]: SETTINGS_VERSION });
+      } catch (e) {
+        void bridge.flash(`Silverware Toolbar: the toolbar switched to could not be kept (${String(e)})`, "error");
+      }
+    }
+    switching = undefined;
+  })();
 }
 
 // The migrated settings being written (init may be called again meanwhile: Space Lua loaded twice, CONFIG saved)
@@ -107,6 +139,12 @@ export function scriptsLoaded(): void {
   slot[GLOBAL_KEY]?.refreshActions();
 }
 
+/** The "Silverware Toolbar: Switch toolbar" command: the popup open at the toolbars to switch to (as *Toolbar*'s choices) */
+export function switchToolbar(): void {
+  const controller = slot[GLOBAL_KEY];
+  if (controller) void controller.showActions(controller.switchAction());
+}
+
 /** The "Silverware Toolbar: Show actions" command (its key too): the popup of every action, under the toolbar by the selection or the caret */
 export function showActions(): void {
   void slot[GLOBAL_KEY]?.showActions();
@@ -119,8 +157,8 @@ export async function openSettings(): Promise<void> {
   settingsDialog = new SettingsDialog({
     doc: document,
     bridge,
-    // The modules' and the core's own (… and the settings: favourites too)
-    actions: () => [...actions(), MORE_ACTION, SETTINGS_ACTION],
+    // The modules' and the core's own (switching the toolbar, … and the settings: favourites too)
+    actions: () => [...actions(), ...(slot[GLOBAL_KEY] ? [slot[GLOBAL_KEY]!.switchAction()] : []), MORE_ACTION, SETTINGS_ACTION],
     kinds,
     canSave: canSaveIn(bridge),
     save: (values) => saveSettings(bridge, values),

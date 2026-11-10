@@ -17,12 +17,12 @@ import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODU
 import type { Action } from "../core/action.ts";
 import { type FavoriteItem, type Favorites, hasAction, pinOf, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Pin, type Show as ItemShow, slotItemOf, slotOf, widthOf } from "../core/favorites.ts";
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
-import { defaultToolbars, docks, freeToolbarName, type Input, inputOf, MAX_TOOLBARS, type Placement, PLACEMENTS, type ShowWhen, SHOWS, type Toolbar, toolbarFor, useToolbarFor, validateToolbarName } from "../core/toolbars.ts";
+import { defaultToolbars, docks, freeToolbarName, toolbarsSetting, type Input, inputOf, MAX_TOOLBARS, type Placement, PLACEMENTS, type ShowWhen, SHOWS, type Toolbar, toolbarFor, useToolbarFor, validateToolbarName } from "../core/toolbars.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
 import { SETTINGS_VERSION } from "../migrations/index.ts";
 import { reorder } from "../../../shared/drag.ts";
-import { addItem, type At, moveItem, moveRow, pinOrdered, placeItem, removeItem, unpinnedOutOfOrder, removeRow, sameRows, savedRows, setLook, setOwn, setPin, setSlot, setSlotField, setSlotOwn, stepOf } from "./favorites.ts";
+import { addItem, type At, moveItem, moveRow, pinOrdered, placeItem, removeItem, unpinnedOutOfOrder, removeRow, sameRows, setLook, setOwn, setPin, setSlot, setSlotField, setSlotOwn, stepOf } from "./favorites.ts";
 
 // A zone of a docked toolbar's row: its items pinned left, the others, those pinned right
 type Zone = "left" | "middle" | "right";
@@ -1350,8 +1350,8 @@ export class SettingsDialog {
     const changed: Record<string, unknown> = {};
     if (values.shortcut !== initial.shortcut) changed[PATHS.shortcut] = values.shortcut;
     if (values.wordAtCaret !== initial.wordAtCaret) changed[PATHS.wordAtCaret] = values.wordAtCaret;
-    const lists = savedToolbars(values.toolbars);
-    if (JSON.stringify(lists) !== JSON.stringify(savedToolbars(initial.toolbars))) changed[PATHS.favorites] = lists;
+    const lists = toolbarsSetting(values.toolbars);
+    if (JSON.stringify(lists) !== JSON.stringify(toolbarsSetting(initial.toolbars))) changed[PATHS.favorites] = lists;
     // With the favourites, the model's version they are written in, so they are never migrated (migrations/index.ts),
     // and what the migrations changed and the toolbar did not write back yet (else the version would mark it done)
     if (PATHS.favorites in changed) {
@@ -1413,11 +1413,6 @@ export class SettingsDialog {
     }
     this.context.saved();
   }
-}
-
-/** The toolbars as written to the configuration: `{ name, useFor, placement, show, rows }`, `useFor` left out where empty, empty rows left out */
-function savedToolbars(lists: readonly Toolbar[]): unknown[] {
-  return lists.map((list) => ({ name: list.name, ...(list.useFor.length ? { useFor: [...list.useFor] } : {}), placement: list.placement, show: list.show, rows: savedRows(list.rows) }));
 }
 
 /** Whether each word typed starts a word of a label, ignoring case (nothing typed: yes) */

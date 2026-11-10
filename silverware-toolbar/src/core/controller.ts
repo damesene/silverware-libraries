@@ -19,7 +19,7 @@ import { Docking } from "./dock.ts";
 import { isActionItem, isSeparator, type Look, orderedByPins, ownIconHtml, type Pin, type SlotRef, slotItemOf, slotOf } from "./favorites.ts";
 import type { ItemKind } from "./items.ts";
 import { hideKeyboard } from "./keyboard.ts";
-import { docks, type Input, inputOf, type Toolbar, toolbarFor } from "./toolbars.ts";
+import { docks, type Input, inputOf, type Toolbar, toolbarFor, useToolbarFor } from "./toolbars.ts";
 import { marked } from "./cursor.ts";
 import type { Box } from "./place.ts";
 import { Panel } from "./panel.ts";
@@ -55,6 +55,9 @@ export const SETTINGS_ACTION: Action = {
   listed: false,
 };
 
+// The core's own action switching the toolbar this way of working shows: its choices the toolbars (`toolbars.<name>`)
+export const SWITCH_ID = "actions.switchToolbar";
+
 export class Controller {
   private readonly watcher: SelectionWatcher;
   private readonly bar: Bar;
@@ -85,7 +88,8 @@ export class Controller {
     readonly doc: Document,
     // Handed over anew when SilverBullet loads its configuration again (the settings the same)
     public bridge: Bridge,
-    readonly settings: Settings,
+    // (Its toolbars changed by a switch, the rest as read)
+    public settings: Settings,
     // The actions offered, asked for each time they show (definitions made later count)
     private readonly actions: () => readonly Action[],
     // The kinds of favourites the modules give (core/items.ts)
@@ -94,6 +98,8 @@ export class Controller {
     private readonly refresh: () => Promise<void>,
     // The settings dialog opened (none: not offered)
     private readonly openSettings?: () => void,
+    // The toolbars after a switch, to be kept (written to the configuration; none: the switch for this visit)
+    private readonly switched?: (toolbars: readonly Toolbar[]) => void,
   ) {
     this.watcher = new SelectionWatcher(
       doc,
@@ -208,7 +214,50 @@ export class Controller {
 
   /** The modules' actions, and the core's own (… and, where it has them, the settings) */
   private offered(): readonly Action[] {
-    return [...this.actions(), MORE_ACTION, ...(this.openSettings ? [SETTINGS_ACTION] : [])];
+    return [...this.actions(), this.switchAction(), MORE_ACTION, ...(this.openSettings ? [SETTINGS_ACTION] : [])];
+  }
+
+  /**
+   * The toolbar switched (`actions.switchToolbar`, the command Switch toolbar):
+   * a choice of every toolbar, the one this way of working shows on (its name
+   * the action's label in the toolbar); one picked is this way of working's,
+   * at once (`switchTo`)
+   */
+  switchAction(): Action {
+    const current = this.toolbar();
+    return {
+      id: SWITCH_ID,
+      label: "Toolbar",
+      icon: ICONS.toolbars,
+      group: "Silverware Toolbar",
+      keywords: ["switch", "toolbars", "change", "favorites"],
+      choices: this.settings.toolbars.map((toolbar) => ({
+        id: `toolbars.${toolbar.name}`,
+        label: toolbar.name,
+        icon: ICONS.toolbars,
+        group: "Toolbar",
+        keywords: ["switch", "toolbar"],
+        active: () => toolbar === current,
+        perform: () => this.switchTo(toolbar.name),
+      })),
+    };
+  }
+
+  /**
+   * This way of working's toolbar switched to another: shown at once (its rows,
+   * where and when), then kept (`switched`: the configuration written in the
+   * background; the toolbar started anew for it finds the same, and goes on)
+   */
+  switchTo(name: string): void {
+    const index = this.settings.toolbars.findIndex((toolbar) => toolbar.name === name);
+    if (index < 0 || this.settings.toolbars[index] === this.toolbar()) return;
+    const toolbars = useToolbarFor(this.settings.toolbars, index, this.device());
+    this.settings = { ...this.settings, toolbars };
+    // (Its room given back where the one before was docked: the next shows as it shows)
+    this.panel.close(true);
+    this.bar.hide();
+    this.switched?.(toolbars);
+    void this.showStaying();
   }
 
   private owns(node: Node): boolean {

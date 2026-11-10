@@ -1,5 +1,5 @@
 // The toolbar by a selection (or at the caret) and the popup of every action under it
-import { bar, barButton, caret, expect, lineBox, onSilverBullet, popup, select, selected, test, text } from "./helpers.ts";
+import { bar, barButton, caret, expect, lineBox, onSilverBullet, popup, ready, select, selected, test, text } from "./helpers.ts";
 
 // The command's key, as the playground binds it (SilverBullet binds the init page's command so)
 const KEY = "Control+Shift+Q";
@@ -270,5 +270,30 @@ test.describe("The toolbar at the caret", () => {
     await page.keyboard.type("x");
     await expect(bar(page)).toBeHidden();
     expect(await text(page)).toContain("Thex end");
+  });
+});
+
+test.describe("Switching the toolbar", () => {
+  test("Toolbar's choice in the list of every action: the other toolbar shows at once (docked: its rows, where it shows), kept after a reload", async ({ page }) => {
+    await select(page, "some text");
+    await expect(bar(page)).not.toHaveClass(/swb-docked/);
+    await barButton(page, "actions.more").click();
+    await popup(page).locator(".swb-search-field").fill("test touch");
+    await expect(popup(page).locator('[data-swb-action="toolbars.Test touch"]')).toBeVisible();
+    await page.keyboard.press("Enter");
+    // At once: Test touch's, docked at the bottom
+    await expect(bar(page)).toHaveClass(/swb-docked/);
+    // Kept: the configuration written, read again as the page loads
+    await page.waitForTimeout(500);
+    await page.reload();
+    await ready(page);
+    await select(page, "some text");
+    await expect(bar(page)).toHaveClass(/swb-docked/);
+    // Back with the toolbar's own choice in the list (the one on checked)
+    await barButton(page, "actions.more").click();
+    await popup(page).locator(".swb-search-field").fill("toolbar");
+    await expect(popup(page).locator('[data-swb-action="toolbars.Test touch"]')).toBeVisible();
+    await popup(page).locator('[data-swb-action="toolbars.Test"]').click();
+    await expect(bar(page)).not.toHaveClass(/swb-docked/);
   });
 });

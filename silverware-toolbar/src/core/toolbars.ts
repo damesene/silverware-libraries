@@ -80,6 +80,17 @@ export function useToolbarFor(toolbars: readonly Toolbar[], index: number, input
   });
 }
 
+/** The toolbars as written to the configuration: `{ name, useFor, placement, show, rows }`, `useFor` left out where empty, empty rows left out */
+export function toolbarsSetting(toolbars: readonly Toolbar[]): unknown[] {
+  return toolbars.map((toolbar) => ({
+    name: toolbar.name,
+    ...(toolbar.useFor.length ? { useFor: [...toolbar.useFor] } : {}),
+    placement: toolbar.placement,
+    show: toolbar.show,
+    rows: toolbar.rows.filter((row) => row.length > 0).map((row) => [...row]),
+  }));
+}
+
 /** Why a name cannot be a toolbar's (empty, another toolbar's, whatever its case); undefined: it can. `except`: the toolbar renamed */
 export function validateToolbarName(name: string, toolbars: readonly Toolbar[], except?: number): string | undefined {
   const trimmed = name.trim();

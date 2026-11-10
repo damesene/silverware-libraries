@@ -389,6 +389,17 @@ config.set("silverware.toolbar.favorites", {
   as a click on an item opens the item's: Action (Change… opens the search,
   another action drops the own look), Icon, Label; a slot needing an action
   and without one opens the search at once.
+- A text snippet on a gesture button's slot (2026-11-10, asked by the user:
+  a snippet is a kind of item, not an action, so no slot offered it): a kind
+  whose item is one action says so (`ItemKind.action(item)`: the snippet's),
+  and a slot may hold such an item in place of an action's id
+  (`up = { type = "snippet", text = "%%{s}%%", icon = "💬" }`, `slotItemOf`);
+  the core makes the slot's action of it where the kind's `check` finds
+  nothing wrong, else the slot is as one without an action. The settings
+  offer those kinds for a slot beside the actions; picked, the slot's panel
+  shows the kind, Change…, its own icon and label (its kind's `ownLook`) and
+  its fields (`setSlotField`). Generic: the core and the dialog know no kind
+  by name.
 
 ### Kinds of favourites: the gesture button (decided and built 2026-10-26)
 

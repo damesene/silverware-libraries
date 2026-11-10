@@ -16,7 +16,7 @@ import type { Action, ActionEditor, Change, Context } from "./action.ts";
 import { Bar, type Dock, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
 import { Docking } from "./dock.ts";
-import { byTouch, isActionItem, isSeparator, type Look, ownIconHtml, type Pin, type SlotRef, slotOf } from "./favorites.ts";
+import { byTouch, isActionItem, isSeparator, type Look, ownIconHtml, type Pin, type SlotRef, slotItemOf, slotOf } from "./favorites.ts";
 import type { ItemKind } from "./items.ts";
 import { hideKeyboard } from "./keyboard.ts";
 import { marked } from "./cursor.ts";
@@ -261,7 +261,13 @@ export class Controller {
           const kind = kinds.find((k) => k.type === item.type);
           if (!kind || kind.check?.(item)) return [];
           // A slot's action with its own icon and label where the slot has them: the kind draws it as it is given
+          // (An item of a kind that is one action in a slot: that action, where nothing is wrong with it)
           const slots = kind.slots.map(({ key, optional }) => {
+            const inner = slotItemOf(item[key]);
+            if (inner) {
+              const of = kinds.find((k) => k.type === inner.type);
+              return { key, optional, action: of?.action && !of.check?.(inner) ? of.action(inner) : undefined };
+            }
             const ref = slotOf(item[key]);
             const found = ref && all.find((a) => a.id === ref.id);
             return { key, optional, action: found && ref ? withOwnLook(found, ref) : found };

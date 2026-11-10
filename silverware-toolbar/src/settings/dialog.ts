@@ -12,12 +12,12 @@ import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
 import { type Bridge, DEFAULT_SHORTCUT, type Device, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
-import { byTouch, DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type FavoriteItem, type Favorites, hasAction, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Show as ItemShow, slotOf, widthOf } from "../core/favorites.ts";
+import { byTouch, DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type FavoriteItem, type Favorites, hasAction, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Show as ItemShow, slotItemOf, slotOf, widthOf } from "../core/favorites.ts";
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
 import { reorder } from "../../../shared/drag.ts";
-import { addItem, type At, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setSlotOwn, splitPins, stepOf } from "./favorites.ts";
+import { addItem, type At, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setSlotField, setSlotOwn, splitPins, stepOf } from "./favorites.ts";
 
 const BASE = "swb-settings";
 
@@ -493,7 +493,7 @@ export class SettingsDialog {
         } else {
           if (problem) element.title = `${problem}: the toolbar leaves it out`;
           slots = this.el("div", `${BASE}-slots`);
-          slots.append(...kind.slots.map((slot) => this.slotButton(item, at, slot, known)), ...(kind.fields ?? []).map((field) => this.fieldInput(item, at, field)));
+          slots.append(...kind.slots.map((slot) => this.slotButton(item, at, slot, known)), ...(kind.fields ?? []).map((field) => this.fieldInput(item, field, (value) => setSlot(this.rows, at, field.key, value))));
         }
       } else {
         const action = known.get(item.id);
@@ -699,6 +699,8 @@ export class SettingsDialog {
     const item = this.rows[at.row]?.[at.index];
     const slot = item && isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type)?.slots.find((s) => s.key === key) : undefined;
     if (!item || !isKindItem(item) || !slot) return panel;
+    const inner = slotItemOf(item[key]);
+    if (inner) return this.closing(this.slotItemPanel(panel, at, key, inner), () => this.toggleSlot(at, key));
     const ref = slotOf(item[key]);
     const action = ref ? this.known().get(ref.id) : undefined;
     const line = this.el("div", `${BASE}-look-line`);
@@ -716,6 +718,32 @@ export class SettingsDialog {
       panel.append(this.ownLine("icon", "Icon", ref.icon, "★", set("icon")), this.ownLine("label", "Label", ref.label, action?.label ?? ref.id, set("label")));
     }
     return this.closing(panel, () => this.toggleSlot(at, key));
+  }
+
+  /**
+   * A slot holding an item of a kind that is one action (a snippet): the kind
+   * and Change…, its own icon and label where its kind has them, its fields
+   */
+  private slotItemPanel(panel: HTMLElement, at: At, key: string, inner: KindItem): HTMLElement {
+    const kind = this.context.kinds().find((k) => k.type === inner.type);
+    const line = this.el("div", `${BASE}-look-line`);
+    const current = this.el("span", `${BASE}-look-action`);
+    current.innerHTML = `<span class="${BASE}-item-icon">${kind?.icon ?? ""}</span><span></span>`;
+    current.lastElementChild!.textContent = kind?.label ?? inner.type;
+    const picking = this.picking;
+    const open = !!picking && "at" in picking && picking.key === key && picking.at.row === at.row && picking.at.index === at.index;
+    const change = this.button(`${BASE}-look-change`, open ? "Close" : "Change…", () => this.openPicking({ at, key }));
+    change.setAttribute("aria-expanded", String(open));
+    line.append(this.el("span", `${BASE}-look-name`, "Action"), current, change);
+    panel.append(line);
+    if (!kind) return panel;
+    const set = (field: string) => (value: string | undefined) => setSlotField(this.rows, at, key, field, value);
+    if (kind.ownLook) {
+      const own = (field: "icon" | "label") => (typeof inner[field] === "string" && inner[field] ? (inner[field] as string) : undefined);
+      panel.append(this.ownLine("icon", "Icon", own("icon"), "★", set("icon")), this.ownLine("label", "Label", own("label"), "Its name", set("label")));
+    }
+    panel.append(...(kind.fields ?? []).map((field) => this.fieldInput(inner, field, set(field.key))));
+    return panel;
   }
 
   /** A panel's × and Esc closing it (Esc: the panel's, not the dialog's) */
@@ -814,6 +842,8 @@ export class SettingsDialog {
    * opens its panel (a slot needing one and without it: the search at once)
    */
   private slotButton(item: KindItem, at: At, slot: ItemSlot, known: Map<string, Action>): HTMLButtonElement {
+    const inner = slotItemOf(item[slot.key]);
+    if (inner) return this.slotItemButton(inner, at, slot);
     const ref = slotOf(item[slot.key]);
     const action = ref ? known.get(ref.id) : undefined;
     const unset = !ref;
@@ -832,8 +862,34 @@ export class SettingsDialog {
     return button;
   }
 
-  /** A field of a kind's item: its text edited in place (written as typed, the tab not drawn anew: the field keeps the keyboard) */
-  private fieldInput(item: KindItem, at: At, field: ItemField): HTMLElement {
+  /** A slot holding an item of a kind that is one action (a snippet): its own icon and label where set, else its kind's; a click opens its panel */
+  private slotItemButton(inner: KindItem, at: At, slot: ItemSlot): HTMLButtonElement {
+    const kind = this.context.kinds().find((k) => k.type === inner.type);
+    const own = (field: "icon" | "label") => (kind?.ownLook && typeof inner[field] === "string" && inner[field] ? (inner[field] as string) : undefined);
+    const what = own("label") ?? kind?.label ?? inner.type;
+    const button = this.button(`${BASE}-slot`, `${slot.label}: ${what}`, () => this.toggleSlot(at, slot.key));
+    button.innerHTML = `<span class="${BASE}-slot-name"></span><span class="${BASE}-item-icon"></span><span class="${BASE}-slot-action"></span>`;
+    const icon = button.querySelector(`.${BASE}-item-icon`)!;
+    const glyph = own("icon");
+    if (glyph) icon.textContent = glyph;
+    else icon.innerHTML = kind?.icon ?? "";
+    button.querySelector(`.${BASE}-slot-name`)!.textContent = slot.label;
+    button.querySelector(`.${BASE}-slot-action`)!.textContent = what;
+    button.setAttribute("aria-label", `${slot.label}: ${what}`);
+    button.dataset.swbSlot = slot.key;
+    // A kind no module on gives, or one that is no action, or an item with something wrong (a snippet without its text): left out
+    const problem = !kind ? `No module turned on gives the kind ${inner.type}` : !kind.action ? `${kind.label} is no action` : kind.check?.(inner);
+    if (problem) {
+      button.classList.add(`${BASE}-unknown`);
+      button.title = `${problem}: the toolbar leaves it out`;
+    }
+    const adjusting = this.adjusting;
+    button.setAttribute("aria-expanded", String(!!adjusting && adjusting.key === slot.key && adjusting.row === at.row && adjusting.index === at.index));
+    return button;
+  }
+
+  /** A field of a kind's item (or of the item a slot holds): its text edited in place (written as typed, the tab not drawn anew: the field keeps the keyboard) */
+  private fieldInput(item: KindItem, field: ItemField, set: (value: string | undefined) => Favorites): HTMLElement {
     const value = item[field.key];
     const input = field.multiline ? this.el("textarea", `${BASE}-field-input`) : this.el("input", `${BASE}-field-input`);
     if (input instanceof HTMLInputElement) input.type = "text";
@@ -843,7 +899,7 @@ export class SettingsDialog {
     input.spellcheck = false;
     input.setAttribute("aria-label", field.label);
     input.addEventListener("input", () => {
-      this.setQuietly(setSlot(this.rows, at, field.key, input.value || undefined));
+      this.setQuietly(set(input.value || undefined));
     });
     const label = this.el("label", `${BASE}-field${field.multiline ? ` ${BASE}-field-multiline` : ""}`);
     label.dataset.swbField = field.key;
@@ -910,6 +966,14 @@ export class SettingsDialog {
       // No slot: its first field to type in
       this.edit(favorites, this.picking ? `[data-swb-row="${row}"] .${BASE}-pick-field` : kind.fields?.length ? `[data-swb-item="${at.row}:${at.index}"] .${BASE}-field-input` : `[data-swb-item="${at.row}:${at.index}"]`);
     };
+    // A kind's item for the slot (a snippet): its panel opened at its first field to type in
+    const fillKind = (kind: ItemKind) => {
+      if (forRow) return;
+      const favorites = setSlot(this.rows, target.at, target.key, { type: kind.type });
+      this.picking = undefined;
+      this.adjusting = { ...target.at, key: target.key };
+      this.edit(favorites, kind.fields?.length ? `[data-swb-look] .${BASE}-field-input` : `[data-swb-look] .${BASE}-look-change`);
+    };
     // An action for the slot (an optional one: or none): the search goes on for the next slot after it without one
     const fill = (id: string | undefined) => {
       if (forRow) return id === undefined ? undefined : add({ id });
@@ -917,7 +981,7 @@ export class SettingsDialog {
       const item = favorites[target.at.row]?.[target.at.index];
       const slots = this.kindOf(target.at)?.slots ?? [];
       const after = slots.slice(slots.findIndex((s) => s.key === target.key) + 1);
-      const next = item && isKindItem(item) ? after.find((s) => !slotOf(item[s.key])) : undefined;
+      const next = item && isKindItem(item) ? after.find((s) => !slotOf(item[s.key]) && !slotItemOf(item[s.key])) : undefined;
       this.picking = next ? { at: target.at, key: next.key } : undefined;
       this.edit(favorites, next ? `[data-swb-row="${row}"] .${BASE}-pick-field` : `[data-swb-item="${target.at.row}:${target.at.index}"] [data-swb-slot="${target.key}"]`);
     };
@@ -927,14 +991,16 @@ export class SettingsDialog {
       const query = field.value.trim().toLowerCase();
       // (Not for the pinned items' lists: a separator is not pinned)
       const separator = forRow && row >= this.first && (!query || "separator".startsWith(query));
-      const kinds = forRow ? this.context.kinds().filter((kind) => wordsStart(kind.label, query)) : [];
+      // (For a slot: the kinds whose item is one action, a snippet)
+      const kinds = this.context.kinds().filter((kind) => (forRow || kind.action) && wordsStart(kind.label, query));
+      const pickKind = (kind: ItemKind) => (forRow ? addKind(kind) : fillKind(kind));
       // An optional slot may hold no action
       const none = !!slot?.optional && (!query || "none".startsWith(query));
-      shown = [...(separator ? [() => add({ type: "separator" })] : []), ...(none ? [() => fill(undefined)] : []), ...kinds.map((kind) => () => addKind(kind)), ...found.map((entry) => () => fill(entry.action.id))];
+      shown = [...(separator ? [() => add({ type: "separator" })] : []), ...(none ? [() => fill(undefined)] : []), ...kinds.map((kind) => () => pickKind(kind)), ...found.map((entry) => () => fill(entry.action.id))];
       const options = [
         ...(separator ? [this.option(`${BASE}-pick-separator`, "", "Separator", "", () => add({ type: "separator" }))] : []),
         ...(none ? [this.option(`${BASE}-pick-unset`, "", "None", `No action for ${slot!.label}`, () => fill(undefined))] : []),
-        ...kinds.map((kind) => this.option(`${BASE}-pick-kind`, kind.icon, kind.label, kind.description, () => addKind(kind))),
+        ...kinds.map((kind) => this.option(`${BASE}-pick-kind`, kind.icon, kind.label, kind.description, () => pickKind(kind))),
         ...found.map((entry) => this.option("", entry.action.icon, entry.action.label, entry.group, () => fill(entry.action.id))),
       ];
       list.replaceChildren(...(options.length ? options : [this.el("div", `${BASE}-pick-none`, "No action found")]));

@@ -90,6 +90,8 @@ A gesture button holds up to three actions in one place: a click (a tap) runs th
 
 Each of its actions may have an icon and a label of its own, as an action's item has: write it as `{ id, icon, label }` in place of its id (`tap = { id = "formats.bold", icon = "★", label = "Tučně" }`). In the settings, click an action in the button: its panel shows the action (*Change…* picks another, which drops its own icon and label), and its own icon and label.
 
+Any of them may be a text snippet instead of an action: write the snippet in its place (`up = { type = "snippet", icon = "💬", label = "Comment", text = "%%{s}%%" }`). In the settings, *Change…* offers *Text snippet* beside the actions; its panel then has its text, icon and label. A snippet without its text is left out, as on its own.
+
 The button shows as pressed when its first action is on for the selection; a swipe's action not offered there is dimmed and does nothing. Gesture buttons come from the *Gestures* module: with it off they are left out.
 
 ## Settings

@@ -8,9 +8,10 @@ import type { Action } from "./action.ts";
 import type { Pin } from "./favorites.ts";
 
 /**
- * A slot of a kind of favourite: a field holding an action's id, and what it
- * is for, as the settings dialog names it; `optional`: it may hold none (the
- * dialog offers None), and one whose action is not there is left out alone
+ * A slot of a kind of favourite: a field holding an action's id (or an item of
+ * a kind that is one action: `ItemKind.action`), and what it is for, as the
+ * settings dialog names it; `optional`: it may hold none (the dialog offers
+ * None), and one whose action is not there is left out alone
  */
 export type ItemSlot = { readonly key: string; readonly label: string; readonly optional?: boolean };
 
@@ -63,6 +64,10 @@ export type ItemKind = {
   readonly ownLook?: boolean;
   // What is wrong with an item, where it cannot show (a snippet without its text): left out, the settings say why
   readonly check?: (item: Readonly<Record<string, unknown>>) => string | undefined;
+  // Its item is one action (a snippet's text written): a slot of another kind's item may hold such an item in place
+  // of an action's id (`up = { type = "snippet", text = "…" }`), which the core makes the slot's action by this
+  // (where `check` finds nothing wrong); the settings dialog offers the kind for a slot beside the actions
+  readonly action?: (item: Readonly<Record<string, unknown>>) => Action;
   // Its button in the toolbar
   readonly render: (shown: ShownItem, host: ItemHost) => HTMLButtonElement;
 };

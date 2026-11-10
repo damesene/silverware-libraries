@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { type Favorites, hasAction } from "../core/favorites.ts";
-import { addItem, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setSlotOwn, splitPins, stepOf } from "./favorites.ts";
+import { type Favorites, hasAction, slotItemOf } from "../core/favorites.ts";
+import { addItem, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setSlotField, setSlotOwn, splitPins, stepOf } from "./favorites.ts";
 
 const ROWS: Favorites = [[{ id: "actions.turnInto", show: "label" }], [{ id: "formats.bold" }, { type: "separator" }, { id: "formats.link" }]];
 
@@ -112,5 +112,21 @@ describe("The favourites as the settings edit them", () => {
     expect(setSlot(own, at, "tap", "formats.code")[0]![0]).toEqual({ type: "gesture", tap: "formats.code", up: "formats.italic" });
     // No action in the slot: nothing to give a look
     expect(setSlotOwn(rows, at, "down", "label", "x")).toEqual(rows);
+  });
+
+  it("puts an item of a kind in a slot (a snippet), its fields set there: an icon its first characters, a label trimmed, empty ones gone", () => {
+    const rows: Favorites = [[{ type: "gesture", tap: "formats.bold" }]];
+    const at = { row: 0, index: 0 };
+    const snippet = setSlot(rows, at, "up", { type: "snippet" });
+    const filled = setSlotField(setSlotField(setSlotField(snippet, at, "up", "text", "%%{s}%%"), at, "up", "icon", "💬💬💬💬"), at, "up", "label", " Comment ");
+    expect(filled[0]![0]).toEqual({ type: "gesture", tap: "formats.bold", up: { type: "snippet", text: "%%{s}%%", icon: "💬💬💬", label: "Comment" } });
+    expect(setSlotField(filled, at, "up", "label", " ")[0]![0]).toEqual({ type: "gesture", tap: "formats.bold", up: { type: "snippet", text: "%%{s}%%", icon: "💬💬💬" } });
+    // A slot holding an action's id: no item's fields to set
+    expect(setSlotField(rows, at, "tap", "text", "x")).toEqual(rows);
+    // Only an item of a kind is one: not an action's id, its own look, a separator
+    expect(slotItemOf({ type: "snippet" })).toEqual({ type: "snippet" });
+    expect(slotItemOf("formats.bold")).toBeUndefined();
+    expect(slotItemOf({ id: "formats.bold", icon: "★" })).toBeUndefined();
+    expect(slotItemOf({ type: "separator" })).toBeUndefined();
   });
 });

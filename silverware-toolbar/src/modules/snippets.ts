@@ -8,7 +8,9 @@
 // what `{s}` wrote stays selected (nothing selected: the cursor there), and
 // without either the cursor goes to the text's end. `{{s}}` and `{{c}}` write
 // `{s}` and `{c}` as they are. Its text is the kind's field (`fields`), which
-// the settings dialog edits knowing nothing of what it is for.
+// the settings dialog edits knowing nothing of what it is for. A snippet is one
+// action (`action`), so a gesture button's slot may hold one: `up = { type =
+// "snippet", text = "%%{s}%%", icon = "💬" }`.
 import type { Action, Change, Context, ToolbarModule } from "../core/action.ts";
 import { cursor } from "../core/cursor.ts";
 import { iconOf } from "../core/favorites.ts";
@@ -28,6 +30,8 @@ const SNIPPET: ItemKind = {
   fields: [{ key: "text", label: "Text", placeholder: "Written at the cursor: %%{s}%% ({s} the text selected, {c} the cursor)", multiline: true }],
   ownLook: true,
   check: (item) => (typeof item.text === "string" && item.text ? undefined : "No text yet"),
+  // One action: a gesture button's swipe may write it
+  action: snippetAction,
   render,
 };
 
@@ -67,13 +71,14 @@ function escaped(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-function render(shown: ShownItem, host: ItemHost): HTMLButtonElement {
-  const { icon, label } = shown.item;
+/** A snippet's item as the action it is: its text written, its own character its icon, its label its name (none: its text) */
+function snippetAction(item: Readonly<Record<string, unknown>>): Action {
+  const { icon, label } = item;
   // (Its text there: `check`)
-  const text = shown.item.text as string;
+  const text = item.text as string;
   const glyph = (typeof icon === "string" && iconOf(icon)) || "✎";
   const name = typeof label === "string" && label.trim() ? label.trim() : text;
-  const action: Action = {
+  return {
     id: "snippets.item",
     label: name,
     // Its character as the icon a toolbar's button shows
@@ -81,12 +86,16 @@ function render(shown: ShownItem, host: ItemHost): HTMLButtonElement {
     group: "Snippets",
     edit: (context) => snippetChange(text, context),
   };
+}
+
+function render(shown: ShownItem, host: ItemHost): HTMLButtonElement {
+  const action = snippetAction(shown.item);
   const button = host.button();
   button.classList.add("swb-snippet");
   if (shown.labeled) button.classList.add("swb-labeled");
   button.append(host.content(action, shown.labeled));
-  button.title = name;
-  button.setAttribute("aria-label", name);
+  button.title = action.label;
+  button.setAttribute("aria-label", action.label);
   button.addEventListener("click", (e) => {
     e.preventDefault();
     host.activate(action, button);

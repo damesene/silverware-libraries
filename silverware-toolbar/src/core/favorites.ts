@@ -58,6 +58,17 @@ export function slotOf(value: unknown): SlotRef | undefined {
   return { id, ...(glyph ? { icon: glyph } : {}), ...(name ? { label: name } : {}) };
 }
 
+/**
+ * A kind's slot holding an item of a kind instead of an action's id (`{ type =
+ * "snippet", text = "…" }`: a kind that is one action, `ItemKind.action`), its
+ * fields as configured; else undefined
+ */
+export function slotItemOf(value: unknown): KindItem | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const { type } = value as Record<string, unknown>;
+  return typeof type === "string" && type && type !== "action" && type !== "separator" ? (value as KindItem) : undefined;
+}
+
 /** An own icon as HTML, as an action's icon is (an SVG): its characters as they are */
 export function ownIconHtml(icon: string): string {
   const text = icon.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");

@@ -23,6 +23,16 @@ describe("A text snippet", () => {
     expect(kind!.check!({ type: "snippet", text: "x" })).toBeUndefined();
   });
 
+  it("is one action, so a gesture button's slot may hold it: its text written, its own character and label, else its text its name", () => {
+    const [kind] = snippetsModule().itemKinds!();
+    const action = kind!.action!({ type: "snippet", text: "%%{s}%%", icon: " 💬 ", label: " Comment " });
+    expect(action.label).toBe("Comment");
+    expect(action.icon).toContain("💬");
+    expect(action.edit!(contextOf("a b", 2, 3))).toEqual(snippetChange("%%{s}%%", contextOf("a b", 2, 3)));
+    expect(kind!.action!({ type: "snippet", text: "<b>" }).label).toBe("<b>");
+    expect(kind!.action!({ type: "snippet", text: "x", icon: "<i>" }).icon).toContain("&lt;i&gt;");
+  });
+
   it("writes the selection for {s}, which stays selected; nothing selected: the cursor there", () => {
     expect(write("%%{s}%%", "a word b", 2, 6)).toEqual({ text: "a %%word%% b", selected: "word", at: 4 });
     expect(write("%%{s}%%", "a  b", 2, 2)).toEqual({ text: "a %%%% b", selected: "", at: 4 });

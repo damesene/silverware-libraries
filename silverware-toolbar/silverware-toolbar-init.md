@@ -40,7 +40,7 @@ config.define("silverware.toolbar", {
           },
         },
       },
-      description = "The toolbar's rows, each a list of items: { id = <its id>, show = \"icon\" or \"label\", width = <its label's width in characters, 3 to 30>, pin = \"left\" or \"right\" (where the toolbar is docked at the bottom), icon = <up to 3 characters, an emoji too>, label = <its own label> }, { type = \"separator\" }, or a module's kind: { type = \"gesture\", tap = <an id>, up = <an id>, down = <an id> } (every action is in the list of the … button).",
+      description = "The toolbar's rows, each a list of items: { id = <its id>, show = \"icon\" or \"label\", width = <its label's width in characters, 3 to 30>, pin = \"left\" or \"right\" (where the toolbar is docked at the bottom), icon = <up to 3 characters, an emoji too>, label = <its own label> }, { type = \"separator\" }, or a module's kind: { type = \"gesture\", tap = <an id>, up = <an id>, down = <an id> } (a slot may hold a text snippet instead: { type = \"snippet\", text = ... }) (every action is in the list of the … button).",
       ui = { category = "Silverware Toolbar", label = "Favourite actions", priority = 2 },
     },
     ["favorites-touch"] = {

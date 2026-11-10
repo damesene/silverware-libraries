@@ -4,7 +4,7 @@
 // the rows (`splitPins`: left, right, the rows), written back with each one's
 // `pin` (`joinPins`).
 
-import { type FavoriteItem, type Favorites, iconOf, isKindItem, type SlotRef, slotOf, isSeparator, type KindItem, type Pin, type Show, type SeparatorItem } from "../core/favorites.ts";
+import { type FavoriteItem, type Favorites, iconOf, isKindItem, type SlotRef, slotItemOf, slotOf, isSeparator, type KindItem, type Pin, type Show, type SeparatorItem } from "../core/favorites.ts";
 
 export type At = { readonly row: number; readonly index: number };
 
@@ -141,14 +141,31 @@ export function joinPins(layout: Favorites): FavoriteItem[][] {
   return out;
 }
 
-/** A kind's item with an action's id in one of its slots (undefined: none there) */
-export function setSlot(rows: Favorites, at: At, key: string, id: string | undefined): FavoriteItem[][] {
+/**
+ * A kind's item with a value in one of its fields (undefined: none there): a
+ * slot's action's id, or an item of a kind that is one action; a field's text
+ */
+export function setSlot(rows: Favorites, at: At, key: string, value: unknown): FavoriteItem[][] {
   const next = copy(rows);
   const item = next[at.row]?.[at.index];
   if (!item || !isKindItem(item)) return next;
   const { [key]: _, ...rest } = item;
-  next[at.row]![at.index] = (id === undefined ? rest : { ...rest, [key]: id }) as KindItem;
+  next[at.row]![at.index] = (value === undefined ? rest : { ...rest, [key]: value }) as KindItem;
   return next;
+}
+
+/**
+ * A field of the item a kind's slot holds (a snippet in a gesture button's
+ * swipe: its text, its own icon or label), undefined or empty taking it off;
+ * an icon its first characters only, a label trimmed
+ */
+export function setSlotField(rows: Favorites, at: At, slot: string, key: string, value: string | undefined): FavoriteItem[][] {
+  const item = rows[at.row]?.[at.index];
+  const inner = item && isKindItem(item) ? slotItemOf(item[slot]) : undefined;
+  if (!inner) return copy(rows);
+  const { [key]: _, ...rest } = inner;
+  const own = value === undefined ? undefined : key === "icon" ? iconOf(value) : key === "label" ? value.trim() : value;
+  return setSlot(rows, at, slot, own ? { ...rest, [key]: own } : rest);
 }
 
 /** The favourites as saved: rows left empty left out */

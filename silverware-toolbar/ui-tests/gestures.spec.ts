@@ -73,6 +73,42 @@ test.describe("The gesture button", () => {
     await expect(gesture.locator('[data-swb-slot="tap"]')).not.toContainText("★");
   });
 
+  test("a text snippet on a swipe: picked for the slot in the settings, its text and icon typed in its panel; the swipe writes it", async ({ page }) => {
+    await addGesture(page, "bold", undefined);
+    await barButton(page, "actions.more").click();
+    await popup(page).locator(".swb-search-field").fill("settings");
+    await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
+    const dialog = page.locator(".swb-settings");
+    await dialog.locator('[data-swb-tab="favorites"]').click();
+    await dialog.locator('[data-swb-device="click"]').click();
+    const gesture = dialog.locator(".swb-settings-kind").last();
+    await gesture.locator('[data-swb-slot="up"]').click();
+    const look = dialog.locator("[data-swb-look]");
+    await look.locator(".swb-settings-look-change").click();
+    // Offered beside the actions
+    await dialog.locator(".swb-settings-pick-field").fill("snippet");
+    await page.keyboard.press("Enter");
+    // Its panel: its text to type in, focused; without it the toolbar leaves it out, said so
+    await expect(look.locator(".swb-settings-look-action")).toHaveText("Text snippet");
+    await expect(look.locator('[data-swb-field="text"] textarea')).toBeFocused();
+    await expect(gesture.locator('[data-swb-slot="up"]')).toHaveAttribute("title", /No text yet/);
+    await page.keyboard.type("%%{s}%%");
+    await look.locator('[data-swb-own="icon"]').fill("💬");
+    await look.locator('[data-swb-own="icon"]').press("Enter");
+    await look.locator('[data-swb-own="label"]').fill("Comment");
+    await look.locator('[data-swb-own="label"]').press("Enter");
+    await expect(gesture.locator('[data-swb-slot="up"]')).toContainText("💬");
+    await expect(gesture.locator('[data-swb-slot="up"]')).toContainText("Comment");
+    await dialog.locator(".swb-settings-save").click();
+    await expect(dialog).toHaveCount(0);
+    await select(page, "some text");
+    await expect(gestureButton(page)).toHaveAttribute("aria-label", "Bold (swipe up: Comment)");
+    await expect(gestureButton(page).locator(".swb-hint-up")).toContainText("💬");
+    await dragUp(page, (await boxOf(gestureButton(page))).height);
+    await expect.poll(() => text(page)).toContain("Select %%some text%% in this page");
+    expect(await selected(page)).toBe("some text");
+  });
+
   test("dragged up past half its height: its second face rolls in, lit, and let go runs the second action", async ({ page }) => {
     await addGesture(page, "bold", "italic");
     const box = (await boxOf(gestureButton(page)));

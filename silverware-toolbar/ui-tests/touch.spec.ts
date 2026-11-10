@@ -392,11 +392,14 @@ test.describe("The settings by finger", () => {
     const dialog = page.locator(".swb-settings");
     await dialog.locator('[data-swb-tab="favorites"]').tap();
     const body = dialog.locator(".swb-settings-body");
-    const name = dialog.locator('[data-swb-item="1:1"] .swb-settings-item-name');
-    const box = (await name.boundingBox())!;
-    const x = box.x + 6;
+    // Moved at once on an item in view (the first row's): the list scrolls, nothing taken (moves a frame apart, as a
+    // finger's: Chrome scrolls by them)
+    const first = dialog.locator('[data-swb-item="0:0"] .swb-settings-item-icon');
+    await first.scrollIntoViewIfNeeded();
+    const before = await body.evaluate((e) => e.scrollTop);
+    const box = (await first.boundingBox())!;
+    const x = box.x + box.width / 2;
     const y = box.y + box.height / 2;
-    // Moved at once: the list scrolls, nothing taken (moves a frame apart, as a finger's: Chrome scrolls by them)
     const fling = await page.context().newCDPSession(page);
     await fling.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
     for (let i = 1; i <= 15; i++) {
@@ -405,22 +408,37 @@ test.describe("The settings by finger", () => {
     }
     await fling.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     await fling.detach();
-    await expect.poll(() => body.evaluate((e) => e.scrollTop)).toBeGreaterThan(0);
+    await expect.poll(() => body.evaluate((e) => e.scrollTop)).toBeGreaterThan(before);
     await expect(page.locator(".swb-settings-ghost")).toHaveCount(0);
     await expect(dialog.locator('[data-swb-items="1"] .swb-settings-item-name')).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
-    // Held: taken, and moved into the row above
-    await body.evaluate((e) => (e.scrollTop = 0));
-    const italic = (await name.boundingBox())!;
-    const target = (await dialog.locator('[data-swb-items="0"]').boundingBox())!;
+    // Held on Bold: taken, and moved past Italic beside it (the scroll's momentum over first: a touch then stops it)
+    const settled = async () => {
+      let last = -1;
+      await expect.poll(async () => {
+        const now = await body.evaluate((e) => e.scrollTop);
+        const still = now === last;
+        last = now;
+        return still;
+      }, { intervals: [150] }).toBe(true);
+    };
+    await settled();
+    // (Click's items show their icon alone: pressed there)
+    const bold = dialog.locator('[data-swb-item="1:0"] .swb-settings-item-icon');
+    await bold.scrollIntoViewIfNeeded();
+    await settled();
+    const from = (await bold.boundingBox())!;
+    const past = (await dialog.locator('[data-swb-item="1:1"]').boundingBox())!;
     const cdp = await page.context().newCDPSession(page);
-    const at = { x: italic.x + 6, y: italic.y + italic.height / 2 };
+    const at = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+    const to = { x: past.x + past.width - 4, y: past.y + past.height / 2 };
     await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [at] });
     await expect(page.locator(".swb-settings-ghost")).toHaveCount(1);
     for (let i = 1; i <= 10; i++) {
-      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: at.x + ((target.x + target.width - 10 - at.x) * i) / 10, y: at.y + ((target.y + target.height / 2 - at.y) * i) / 10 }] });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: at.x + ((to.x - at.x) * i) / 10, y: at.y + ((to.y - at.y) * i) / 10 }] });
     }
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     await cdp.detach();
-    await expect(dialog.locator('[data-swb-items="0"] .swb-settings-item-name')).toHaveText(["Turn into", "Italic"]);
+    await expect(dialog.locator('[data-swb-items="1"] .swb-settings-item-name').first()).toHaveText("Italic");
+    await expect(dialog.locator('[data-swb-items="1"] .swb-settings-item-name').nth(1)).toHaveText("Bold");
   });
 });

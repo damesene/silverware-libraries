@@ -626,5 +626,9 @@ own). Version 2 joins touch's rows into one, a separator between rows whose
 items are not all pinned, as the docked line showed them, where Touch's
 placement docks (its default); Click's too where Click's placement docks (the
 same change of look), not otherwise (by the selection, rows are rows
-already). Where the toolbar could not write the migration back, the settings
+already). Where a finger showed Click's docked (no favourites for touch of the
+space's own, their switch not set on), Click's joined become its own for touch,
+turned on, so a computer keeps Click's rows; with its own kept off (switch
+false), a finger's Click's are not joined (that would change a computer's).
+Where the toolbar could not write the migration back, the settings
 dialog writes it with the version the next time it saves favourites.

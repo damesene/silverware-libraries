@@ -609,7 +609,7 @@ export class SettingsDialog {
       element.setAttribute("aria-expanded", String(this.adjusting?.row === at.row && this.adjusting.index === at.index));
     }
     element.setAttribute("aria-label", `${name.textContent}, row ${at.row + 1}, item ${at.index + 1}`);
-    element.append(this.button(`${BASE}-remove`, `Remove ${name.textContent}`, () => this.edit(removeItem(this.rows, at), `[data-swb-row="${at.row}"] .${BASE}-add`), ICONS.close));
+    element.append(this.button(`${BASE}-remove`, `Remove ${name.textContent}`, () => this.removeAt(at), ICONS.close));
     if (slots) element.append(slots);
     element.addEventListener("keydown", (e) => {
       if (e.target !== element) return;
@@ -619,7 +619,7 @@ export class SettingsDialog {
         if (moved) this.edit(moved.rows, `[data-swb-item="${moved.at.row}:${moved.at.index}"]`);
       } else if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
-        this.edit(removeItem(this.rows, at), `[data-swb-row="${at.row}"] .${BASE}-add`);
+        this.removeAt(at);
       } else if (e.key === "Enter" && !isSeparator(item)) {
         e.preventDefault();
         this.toggleLook(at);
@@ -763,9 +763,9 @@ export class SettingsDialog {
     for (const [value, label] of [[undefined, "None"], ["left", "Left"], ["right", "Right"]] as const) {
       const button = this.button(`${BASE}-look-show ${BASE}-look-pin`, label, () => {
         const moved = setPin(this.rows, at, value);
-        // Its panel follows it
+        // Its panel follows it (made anew where it goes)
         this.adjusting = moved.at;
-        this.edit(moved.rows, `[data-swb-look] [data-swb-pin="${value ?? "none"}"]`);
+        this.edit(moved.rows, `[data-swb-look] [data-swb-pin="${value ?? "none"}"]`, false);
       });
       button.dataset.swbPin = value ?? "none";
       button.setAttribute("role", "radio");
@@ -945,8 +945,38 @@ export class SettingsDialog {
   }
 
   /** The favourites edited changed (Click's, or Touch's own) */
-  private edit(favorites: Favorites, focus?: string): void {
+  /**
+   * The favourites edited; an item's panel open (and the search for one's
+   * slot) following its item where the edit moved it (an item added or
+   * removed before it, its row moved), gone with it; `follow` false: the
+   * caller set where they are after it (an item added, made anew elsewhere)
+   */
+  private edit(favorites: Favorites, focus?: string, follow = true): void {
+    if (!follow) {
+      this.store(favorites);
+      this.changedFavorites(focus);
+      return;
+    }
+    const before = this.rows;
+    const moved = <T extends At>(at: T | undefined): T | undefined => {
+      if (!at) return undefined;
+      const item = before[at.row]?.[at.index];
+      const after = this.rows;
+      for (let row = 0; item && row < after.length; row++) {
+        const index = after[row]!.indexOf(item);
+        if (index >= 0) return { ...at, row, index };
+      }
+      // Made anew in its place (its look set: another object), else gone
+      return after[at.row]?.[at.index] && !isSeparator(after[at.row]![at.index]!) ? at : undefined;
+    };
+    const adjusting = this.adjusting;
+    const picking = this.picking;
     this.store(favorites);
+    this.adjusting = moved(adjusting);
+    if (picking && "at" in picking) {
+      const at = moved(picking.at);
+      this.picking = at ? { at, key: picking.key } : undefined;
+    }
     this.changedFavorites(focus);
   }
 
@@ -1012,6 +1042,14 @@ export class SettingsDialog {
     return button;
   }
 
+  /** An item removed, its panel (and its slot's search) closed with it */
+  private removeAt(at: At): void {
+    const same = (other: At | undefined) => other?.row === at.row && other.index === at.index;
+    if (same(this.adjusting)) this.adjusting = undefined;
+    if (this.picking && "at" in this.picking && same(this.picking.at)) this.picking = undefined;
+    this.edit(removeItem(this.rows, at), `[data-swb-row="${at.row}"] .${BASE}-add`);
+  }
+
   /** A field of a kind's item (or of the item a slot holds): its text edited in place (written as typed, the tab not drawn anew: the field keeps the keyboard) */
   private fieldInput(item: KindItem, field: ItemField, set: (value: string | undefined) => Favorites, changed: () => void): HTMLElement {
     const value = item[field.key];
@@ -1042,6 +1080,9 @@ export class SettingsDialog {
   private openPicking(target: Picking): void {
     const open = !!this.picking && JSON.stringify(this.picking) === JSON.stringify(target);
     this.picking = open ? undefined : target;
+    // A slot's search for another item than the one whose panel is open: that panel closed (one item's at a time)
+    const adjusting = this.adjusting;
+    if (!open && "at" in target && adjusting && (adjusting.row !== target.at.row || adjusting.index !== target.at.index)) this.adjusting = undefined;
     const row = "row" in target ? target.row : target.at.row;
     const back = "row" in target ? `[data-swb-row="${row}"] .${BASE}-add` : `[data-swb-item="${target.at.row}:${target.at.index}"] [data-swb-slot="${target.key}"]`;
     this.drawFavorites(open ? back : `[data-swb-row="${row}"] .${BASE}-pick-field`);
@@ -1094,9 +1135,11 @@ export class SettingsDialog {
       const index = this.addAt(row);
       const favorites = addItem(this.rows, row, { type: kind.type }, index);
       const at = { row, index };
+      // (Another item's panel closed: the new one's slot searched under it)
+      this.adjusting = undefined;
       this.picking = kind.slots[0] ? { at, key: kind.slots[0].key } : undefined;
       // No slot: its first field to type in
-      this.edit(favorites, this.picking ? `[data-swb-row="${row}"] .${BASE}-pick-field` : kind.fields?.length ? `[data-swb-item="${at.row}:${at.index}"] .${BASE}-field-input` : `[data-swb-item="${at.row}:${at.index}"]`);
+      this.edit(favorites, this.picking ? `[data-swb-row="${row}"] .${BASE}-pick-field` : kind.fields?.length ? `[data-swb-item="${at.row}:${at.index}"] .${BASE}-field-input` : `[data-swb-item="${at.row}:${at.index}"]`, false);
     };
     // A kind's item for the slot (a snippet): its panel opened at its first field to type in
     const fillKind = (kind: ItemKind) => {

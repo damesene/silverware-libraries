@@ -105,3 +105,32 @@ describe("The settings dialog's saving", () => {
     dialog.close();
   });
 });
+
+describe("The settings dialog's item panel", () => {
+  it("follows its item as one before it is removed, and goes with its own", async () => {
+    byFinger(false);
+    const favorites = [[{ id: "formats.bold" }, { id: "formats.italic" }, { id: "formats.code" }]];
+    const dialog = new SettingsDialog({
+      doc: document,
+      bridge: { ...bridge({}), getConfig: (path, fallback) => (path === "silverware.toolbar.favorites" ? favorites : fallback) },
+      actions: () => [],
+      kinds: () => [],
+      canSave: false,
+      save: async () => undefined,
+      saved: () => undefined,
+    });
+    await dialog.open();
+    const panel = () => document.querySelector('[data-swb-panel="favorites"]')!;
+    // Code's panel: under it
+    panel().querySelector<HTMLElement>('[data-swb-item="0:2"]')!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(panel().querySelector("[data-swb-look]")?.getAttribute("data-swb-look")).toBe("0:2");
+    // Bold removed: Code now at 1, its panel with it
+    panel().querySelector<HTMLElement>('[data-swb-item="0:0"] .swb-settings-remove')!.click();
+    expect(panel().querySelector("[data-swb-look]")?.getAttribute("data-swb-look")).toBe("0:1");
+    expect(panel().querySelector('[data-swb-item="0:1"]')!.nextElementSibling?.classList.contains("swb-settings-detail")).toBe(true);
+    // Code removed: its panel gone
+    panel().querySelector<HTMLElement>('[data-swb-item="0:1"] .swb-settings-remove')!.click();
+    expect(panel().querySelector("[data-swb-look]")).toBeNull();
+    dialog.close();
+  });
+});

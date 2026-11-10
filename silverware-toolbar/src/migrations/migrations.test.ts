@@ -65,8 +65,19 @@ describe("Version 2: favourites docked in one row", () => {
   it("joins each device's only where its toolbar is docked (Touch's by default, Click's not)", async () => {
     const rows = [[{ id: "a" }], [{ id: "b" }]];
     expect(await touchRowsJoined.migrate(reader({ [TOUCH]: rows, [CLICK]: rows }))).toEqual({ [TOUCH]: [[{ id: "a" }, { type: "separator" }, { id: "b" }]] });
-    expect(await touchRowsJoined.migrate(reader({ [CLICK]: rows, "silverware.toolbar.placement": "bottom" }))).toEqual({ [CLICK]: [[{ id: "a" }, { type: "separator" }, { id: "b" }]] });
+    // (A finger with none of its own showed Click's: its own now, as below)
+    expect(await touchRowsJoined.migrate(reader({ [CLICK]: rows, "silverware.toolbar.placement": "bottom", "silverware.toolbar.favorites-touch-enabled": true }))).toEqual({ [CLICK]: [[{ id: "a" }, { type: "separator" }, { id: "b" }]] });
     expect(await touchRowsJoined.migrate(reader({ [TOUCH]: rows, "silverware.toolbar.placement-touch": "selection" }))).toEqual({});
+  });
+
+  it("makes Click's a finger showed docked (none for touch of its own) its own for touch, joined and on; a computer's Click's kept", async () => {
+    const rows = [[{ id: "a" }], [{ id: "b" }]];
+    const one = [[{ id: "a" }, { type: "separator" }, { id: "b" }]];
+    expect(await touchRowsJoined.migrate(reader({ [CLICK]: rows }))).toEqual({ [TOUCH]: one, "silverware.toolbar.favorites-touch-enabled": true });
+    // Turned on without its own: the defaults for touch showed, nothing to keep
+    expect(await touchRowsJoined.migrate(reader({ [CLICK]: rows, "silverware.toolbar.favorites-touch-enabled": true }))).toEqual({});
+    // Not docked by finger: rows were rows
+    expect(await touchRowsJoined.migrate(reader({ [CLICK]: rows, "silverware.toolbar.placement-touch": "selection" }))).toEqual({});
     expect(await touchRowsJoined.migrate(reader({}))).toEqual({});
   });
 

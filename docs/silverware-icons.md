@@ -166,6 +166,13 @@ type Icons = {
 Typing a character into a field works without it. The consumers' library
 pages say what needs Silverware Icons.
 
+Done in step 4: shared/icons.ts (`referenceOf`, `isReference`, `ICONS_VERSION`,
+`Icons`, `PickOptions`, `iconsOf` and the stand-in, `escapeMarkup`, which
+Silverware Icons' drawing uses too), shared/icons.css (the `<base>-icon` box and
+`<base>-icon-missing`, written by scripts/sharedstyles.mjs into the style pages
+of the plugins as they move onto it, `shared-icons` marks). The stand-in's
+note is styled in place: without Silverware Icons none of its CSS is there.
+
 ## The picker
 
 - Its markup and CSS are Silverware Icons' (`swi-*`, its style page), one look

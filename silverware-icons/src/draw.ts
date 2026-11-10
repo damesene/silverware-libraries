@@ -3,7 +3,7 @@
 // placeholder of its size, which this file fills once the set is in: one pass over the page as a set loads (or a
 // user's set is defined), and while a set loads a watch of what is added to the page (markup made before the set
 // was in, inserted after the pass), ended LINGER_MS after the last load. A plugin knows nothing of loading.
-import { iconLabelOf, referenceOf } from "../../shared/icons.ts";
+import { escapeMarkup, iconLabelOf, referenceOf } from "../../shared/icons.ts";
 import type { Registry } from "./registry.ts";
 import { ALLOWED_ATTRIBUTES, ALLOWED_ELEMENTS, type IconNode } from "./set.ts";
 
@@ -26,12 +26,12 @@ export class Drawing {
   markup(value: string, base: string): string {
     const box = BASE_RE.test(base) ? `${base}-icon swi-icon` : "swi-icon";
     const reference = referenceOf(value);
-    if (!reference) return `<span class="${box}">${escape(value)}</span>`;
+    if (!reference) return `<span class="${box}">${escapeMarkup(value)}</span>`;
     const found = this.registry.find(reference);
-    const at = `${ICON}="${escape(value)}"`;
+    const at = `${ICON}="${escapeMarkup(value)}"`;
     if ("nodes" in found) return `<span class="${box}" ${at} ${STATE}="drawn">${svgOf(found.nodes)}</span>`;
     if ("loading" in found) return `<span class="${box}" ${at} ${STATE}="pending"></span>`;
-    return `<span class="${box} swi-missing" ${at} ${STATE}="missing" title="${escape(found.missing)}"></span>`;
+    return `<span class="${box} swi-missing" ${at} ${STATE}="missing" title="${escapeMarkup(found.missing)}"></span>`;
   }
 
   /** A value as text: itself, an icon its label (its set's, else made of its name) */
@@ -98,14 +98,10 @@ export function svgOf(nodes: readonly IconNode[]): string {
       if (!ALLOWED_ELEMENTS.has(tag)) return "";
       const own = Object.entries(attrs)
         .filter(([key]) => ALLOWED_ATTRIBUTES.has(key))
-        .map(([key, value]) => ` ${key}="${escape(String(value))}"`)
+        .map(([key, value]) => ` ${key}="${escapeMarkup(String(value))}"`)
         .join("");
       return `<${tag}${own}/>`;
     })
     .join("");
   return `<svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
-}
-
-function escape(text: string): string {
-  return text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }

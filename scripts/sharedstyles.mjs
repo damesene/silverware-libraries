@@ -24,6 +24,12 @@ export const SHARED_STYLES = [
     ],
   },
   {
+    // (The pages of the plugins drawing their own icons through shared/icons.ts, as each moves onto it)
+    template: "shared/icons.css",
+    mark: "shared-icons",
+    pages: [],
+  },
+  {
     template: "shared/emoji.css",
     mark: "shared-emoji",
     pages: [

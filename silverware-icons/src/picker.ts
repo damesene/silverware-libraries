@@ -4,6 +4,7 @@
 // the set's icons (those used last first), the keys (↓ into the icons, arrows, Enter). It fills an element the caller
 // gives and tells it the value picked, as it is written (an emoji's character, `lucide:house`); what is done with it
 // is the caller's. Its markup and look are its own (`swi-`, its style page), the same wherever it opens.
+import type { PickOptions } from "../../shared/icons.ts";
 import { findByWords } from "../../shared/search.ts";
 import type { Drawing } from "./draw.ts";
 import type { Registry, SetInfo } from "./registry.ts";
@@ -17,16 +18,6 @@ const SET_KEY = "silverware.icons.lastSet";
 // The emoji pickers' lists of before (the toolbar's and the database's), read once into RECENT_KEY
 const OLD_RECENT_KEYS = ["silverware.toolbar.recentEmoji", "silverware.database.recentEmoji"];
 
-export type PickOptions = {
-  // The tabs: these sets (none: all; one: no tabs)
-  readonly sets?: readonly string[];
-  // A value picked (pressed, or Enter), as it is written
-  readonly picked: (value: string) => void;
-  // Told once a set's icons are shown (the picker grew: the caller places its panel again)
-  readonly shown?: () => void;
-  // The search field's icon (markup of the caller's icons)
-  readonly searchIcon?: string;
-};
 
 /** The picker in `into` (its children replaced), its search focused; the function given back ends it */
 export function picker(registry: Registry, drawing: Drawing, into: HTMLElement, options: PickOptions): () => void {

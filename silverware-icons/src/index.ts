@@ -1,13 +1,11 @@
 // Silverware Icons (docs/silverware-icons.md): sets of icons the other plugins draw and offer to pick from. Its API
 // page hands `api` to Space Lua (`silverware.icons.api`), the other plugins' init pages hand it to theirs; one object
 // per module, as js.importFromSpace gives the same module on each load of Space Lua.
+import { ICONS_VERSION, type Icons, type PickOptions } from "../../shared/icons.ts";
 import { Drawing } from "./draw.ts";
 import { BUILT_IN_SETS } from "./manifest.ts";
-import { type PickOptions, picker } from "./picker.ts";
+import { picker } from "./picker.ts";
 import { type Loader, Registry } from "./registry.ts";
-
-/** What the other plugins get (shared/icons.ts `Icons`: its version the one they were written for) */
-export const API_VERSION = 1;
 
 // The sets' files beside the bundle: the bundle's own URL is the space's (js.importFromSpace imports /.fs/<path>)
 const loadBeside: Loader = async (file) => ((await import(new URL(`./${file}`, import.meta.url).href)) as { default: unknown }).default;
@@ -20,8 +18,9 @@ const registry: Registry = new Registry(
 );
 const drawing: Drawing = new Drawing(registry, () => (typeof document === "undefined" ? undefined : document));
 
-export const api = {
-  version: API_VERSION,
+/** What the other plugins get (shared/icons.ts `Icons`: its version the one they were written for) */
+export const api: Icons = {
+  version: ICONS_VERSION,
   markup: (value: string, base: string): string => drawing.markup(value, base),
   text: (value: string): string => drawing.text(value),
   pick: (into: HTMLElement, options: PickOptions): (() => void) => picker(registry, drawing, into, options),

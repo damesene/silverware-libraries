@@ -24,7 +24,7 @@ const FACTORIES: readonly (readonly [ModuleName, (host: ModuleHost) => ToolbarMo
   ["keyboard", keyboardModule],
   ["gestures", gesturesModule],
   ["snippets", snippetsModule],
-  ["emoji", () => emojiModule()],
+  ["emoji", emojiModule],
 ];
 
 /**

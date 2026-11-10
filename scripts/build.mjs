@@ -44,7 +44,7 @@ for (const { entry, outfile, name } of [...libraries.map((name) => ({ entry: `${
 }
 // The emoji data beside the bundle of each plugin with the emoji picker (shared/emoji.ts; scripts/icons/emoji.mjs), made from
 // the package as installed: one each, as a plugin is installed without the others
-for (const emojiFile of ["silverware-toolbar/silverware-toolbar-emoji.js", "silverware-database/silverware-database-emoji.js"]) {
+for (const emojiFile of ["silverware-database/silverware-database-emoji.js"]) {
   if (check) {
     const committed = (await readFile(emojiFile, "utf8").catch(() => "")).replaceAll("\r\n", "\n");
     if (committed !== emojiModuleText()) {

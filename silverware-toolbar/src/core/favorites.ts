@@ -9,7 +9,8 @@
 // place), and be pinned (`pin`: "left" or "right") at an end of its row where
 // the toolbar is docked (each row a line of its own there), out of what
 // scrolls, wherever it is in its row. An
-// action's item may have its own `icon` (a character, an emoji) and `label`
+// action's item may have its own `icon` (a character, an emoji, an icon of
+// Silverware Icons: `lucide:house`, drawn by its API) and `label`
 // in place of the action's, as a text snippet has (its label also its
 // tooltip; an action offering choices shows the choice on, its own label its
 // tooltip only).
@@ -18,6 +19,7 @@
 // left out of the toolbar; a test keeps the defaults equal to the library
 // page's config.define.
 
+import { isReference } from "../../../shared/icons.ts";
 import type { ActionArgs } from "./action.ts";
 
 export type Show = "icon" | "label";
@@ -36,10 +38,14 @@ export const MAX_WIDTH = 30;
 // An item's own icon: as many characters at most (an emoji of several code points one), so a button stays a button
 export const MAX_ICON = 3;
 
-/** An own icon as configured or typed: its first MAX_ICON characters (graphemes), its spaces at the ends left out; undefined: none (empty) */
+/**
+ * An own icon as configured or typed: an icon of a set of Silverware Icons whole (`lucide:house`, shared/icons.ts),
+ * else its first MAX_ICON characters (graphemes), its spaces at the ends left out; undefined: none (empty)
+ */
 export function iconOf(text: string): string | undefined {
   const trimmed = text.trim();
   if (!trimmed) return undefined;
+  if (isReference(trimmed)) return trimmed;
   const Segmenter = (Intl as { Segmenter?: new (locale?: string, options?: { granularity: string }) => { segment(t: string): Iterable<{ segment: string }> } }).Segmenter;
   const characters = Segmenter ? Array.from(new Segmenter(undefined, { granularity: "grapheme" }).segment(trimmed), (s) => s.segment) : Array.from(trimmed);
   return characters.slice(0, MAX_ICON).join("");
@@ -86,11 +92,8 @@ export function slotItemOf(value: unknown): KindItem | undefined {
   return typeof type === "string" && type && type !== "action" && type !== "separator" ? (value as KindItem) : undefined;
 }
 
-/** An own icon as HTML, as an action's icon is (an SVG): its characters as they are */
-export function ownIconHtml(icon: string): string {
-  const text = icon.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  return `<span class="swb-own-icon">${text}</span>`;
-}
+// The class base of an own icon's box (`swb-own-icon`: shared/icons.css, the style page's shared-icons block)
+export const OWN_ICON = "swb-own";
 
 /** A width as configured or typed, kept within MIN_WIDTH and MAX_WIDTH, whole; undefined: none (not a number) */
 export function widthOf(value: unknown): number | undefined {

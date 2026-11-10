@@ -1,6 +1,7 @@
 // The snippets module: a kind of favourite, the text snippet
 // (`{ type = "snippet", icon = "📌", label = "Comment", text = "%%{s}%%", show }`):
-// a button showing a character of the user's (an emoji too) that writes its
+// a button showing a character of the user's (an emoji too, an icon of
+// Silverware Icons: `lucide:pin`, drawn by its API) that writes its
 // text at the cursor. Its icon and label are an item's own (`ownLook`, set in
 // the item's panel as an action's are); its text its field. `{s}` in the text
 // stands for the text selected (none: the selection is replaced), `{c}` for
@@ -11,17 +12,20 @@
 // the settings dialog edits knowing nothing of what it is for. A snippet is one
 // action (`action`), so a gesture button's slot may hold one: `up = { type =
 // "snippet", text = "%%{s}%%", icon = "💬" }`.
-import type { Action, Change, Context, ToolbarModule } from "../core/action.ts";
+import { type Icons, iconsOf } from "../../../shared/icons.ts";
+import type { Action, Change, Context, ModuleHost, ToolbarModule } from "../core/action.ts";
 import { cursor } from "../core/cursor.ts";
-import { iconOf } from "../core/favorites.ts";
+import { iconOf, OWN_ICON } from "../core/favorites.ts";
 import type { ItemHost, ItemKind, ShownItem } from "../core/items.ts";
 import { ICONS } from "../icons.ts";
 
-export function snippetsModule(): ToolbarModule {
-  return { actions: () => [], itemKinds: () => [SNIPPET] };
+export function snippetsModule(host: ModuleHost = {}): ToolbarModule {
+  const kind = snippetKind(host.icons ?? iconsOf(undefined));
+  return { actions: () => [], itemKinds: () => [kind] };
 }
 
-const SNIPPET: ItemKind = {
+/** The kind, its icons drawn by `icons` */
+const snippetKind = (icons: Icons): ItemKind => ({
   type: "snippet",
   label: "Text snippet",
   description: "Your text written at the cursor",
@@ -31,9 +35,9 @@ const SNIPPET: ItemKind = {
   ownLook: true,
   check: (item) => (typeof item.text === "string" && item.text ? undefined : "No text yet"),
   // One action: a gesture button's swipe may write it
-  action: snippetAction,
-  render,
-};
+  action: (item) => snippetAction(item, icons),
+  render: (shown, host) => render(shown, host, icons),
+});
 
 // The placeholders and their escapes, as the text has them
 const TOKENS = /\{\{[sc]\}\}|\{[sc]\}/g;
@@ -67,12 +71,8 @@ export function snippetChange(text: string, context: Context): Change {
 }
 
 /** A text as HTML, its characters as they are */
-function escaped(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-/** A snippet's item as the action it is: its text written, its own character its icon, its label its name (none: its text) */
-function snippetAction(item: Readonly<Record<string, unknown>>): Action {
+/** A snippet's item as the action it is: its text written, its own icon its icon, its label its name (none: its text) */
+function snippetAction(item: Readonly<Record<string, unknown>>, icons: Icons): Action {
   const { icon, label } = item;
   // (Its text there: `check`)
   const text = item.text as string;
@@ -81,15 +81,15 @@ function snippetAction(item: Readonly<Record<string, unknown>>): Action {
   return {
     id: "snippets.item",
     label: name,
-    // Its character as the icon a toolbar's button shows
-    icon: `<span class="swb-glyph">${escaped(glyph)}</span>`,
+    // Its own icon, as an action's own icon is drawn
+    icon: icons.markup(glyph, OWN_ICON),
     group: "Snippets",
     edit: (context) => snippetChange(text, context),
   };
 }
 
-function render(shown: ShownItem, host: ItemHost): HTMLButtonElement {
-  const action = snippetAction(shown.item);
+function render(shown: ShownItem, host: ItemHost, icons: Icons): HTMLButtonElement {
+  const action = snippetAction(shown.item, icons);
   const button = host.button();
   button.classList.add("swb-snippet");
   if (shown.labeled) button.classList.add("swb-labeled");

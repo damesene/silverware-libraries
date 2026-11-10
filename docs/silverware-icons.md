@@ -173,6 +173,19 @@ Silverware Icons' drawing uses too), shared/icons.css (the `<base>-icon` box and
 of the plugins as they move onto it, `shared-icons` marks). The stand-in's
 note is styled in place: without Silverware Icons none of its CSS is there.
 
+Done in step 5 (Silverware Toolbar): the init page hands `icons =
+silverware.icons and silverware.icons.api` over (bridge.ts `icons`), index.ts
+makes `iconsOf(bridge.icons)` once and gives it to the modules (`ModuleHost.icons`),
+the controller (the bar's `ownIcon`, a slot's `withOwnLook`) and the settings
+dialog (`SettingsContext.icons`); an own icon is drawn as markup in
+`swb-own-icon` (OWN_ICON) everywhere, a snippet's too (`swb-glyph` gone);
+*Choose…* by the icon's field opens the picker in a box under its line (Esc or
+Choose… again closes it, the dialog stays); the Emoji action opens it with
+`sets: ["emoji"]`. Seen in the playground: an icon of a favourite is a blank
+box for the moment its set loads the first time (356 kB unpacked from the dev
+server), then drawn. The picker's rules are scoped under `.swi-picker`: the
+toolbar's dialog sets `button { font: inherit }`, which shrank the emoji.
+
 ## The picker
 
 - Its markup and CSS are Silverware Icons' (`swi-*`, its style page), one look

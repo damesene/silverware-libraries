@@ -14,13 +14,16 @@ import { DEFAULT_SHORTCUT, PATHS } from "../silverware-toolbar/src/bridge.ts";
 import { init, openSettings, showActions } from "../silverware-toolbar/src/index.ts";
 import { SETTINGS_STORE } from "./toolbar-store.ts";
 import stylePage from "../silverware-toolbar/silverware-toolbar-style.md";
+// Silverware Icons beside it, as a space with both installed: its API handed over, its style applied
+import iconsStylePage from "../silverware-icons/silverware-icons-style.md";
+import { api as icons } from "../silverware-icons/src/index.ts";
 import { flash, setUpTheme } from "./common.ts";
 import sample from "./toolbar-sample.md";
 
 setUpTheme();
 
 const style = document.createElement("style");
-style.textContent = /```space-style\r?\n([\s\S]*?)```/.exec(stylePage)?.[1] ?? "";
+style.textContent = [stylePage, iconsStylePage].map((page) => /```space-style\r?\n([\s\S]*?)```/.exec(page)?.[1] ?? "").join("\n");
 document.head.append(style);
 
 const STORE = "silverware.toolbar.playground.text";
@@ -94,6 +97,7 @@ const view = new EditorView({
 (window as unknown as { playgroundView: EditorView }).playgroundView = view;
 
 void init({
+  icons,
   getSelection: () => {
     const { from, to } = view.state.selection.main;
     return { from, to, text: view.state.sliceDoc(from, to) };

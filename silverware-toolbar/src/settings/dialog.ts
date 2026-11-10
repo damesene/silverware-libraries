@@ -12,10 +12,11 @@
 // controls (shared/), in the table's settings' look (classes `swb-settings-*`).
 import { settingRow, switchControl } from "../../../shared/controls.ts";
 import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
+import { type Icons, iconsOf } from "../../../shared/icons.ts";
 import { tabs } from "../../../shared/tabs.ts";
 import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, readSettings, readShortcut } from "../bridge.ts";
 import { type Action, type ActionParam, withArgs } from "../core/action.ts";
-import { type FavoriteItem, type Favorites, hasAction, pinOf, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Pin, type Show as ItemShow, slotItemOf, slotOf, widthOf } from "../core/favorites.ts";
+import { type FavoriteItem, type Favorites, hasAction, pinOf, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, OWN_ICON, type Pin, type Show as ItemShow, slotItemOf, slotOf, widthOf } from "../core/favorites.ts";
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
 import { defaultToolbars, docks, freeToolbarName, toolbarsSetting, type Input, inputOf, MAX_TOOLBARS, type Placement, PLACEMENTS, type ShowWhen, SHOWS, type Toolbar, toolbarFor, useToolbarFor, validateToolbarName } from "../core/toolbars.ts";
 import { type Entry, findEntries } from "../core/search.ts";
@@ -47,6 +48,8 @@ export type SettingsContext = {
   readonly actions: (toolbars: readonly Toolbar[]) => readonly Action[];
   // The kinds of favourites the modules turned on give (core/items.ts)
   readonly kinds: () => readonly ItemKind[];
+  // What draws and picks the favourites' own icons (Silverware Icons, or its stand-in); none: the stand-in
+  readonly icons?: Icons;
   // Whether the settings can be saved here (else the dialog only shows them)
   readonly canSave: boolean;
   // Saves settings by path (undefined removes one)
@@ -89,6 +92,14 @@ export class SettingsDialog {
 
   constructor(private readonly context: SettingsContext) {
     this.dialogs = new Dialogs(context.doc, { base: BASE, closeIcon: ICONS.close });
+    this.icons = context.icons ?? iconsOf(undefined);
+  }
+
+  private readonly icons: Icons;
+
+  /** An item's own icon as the toolbar draws it (an emoji, `lucide:house`) */
+  private ownIcon(value: string): string {
+    return this.icons.markup(value, OWN_ICON);
   }
 
   get isOpen(): boolean {
@@ -647,9 +658,9 @@ export class SettingsDialog {
         const main = looks[0];
         const ownIcon = kind?.ownLook && typeof item.icon === "string" && item.icon ? item.icon : undefined;
         const ownLabel = kind?.ownLook && typeof item.label === "string" && item.label ? item.label : undefined;
-        if (main?.glyph) icon.textContent = main.glyph;
+        if (main?.glyph) icon.innerHTML = this.ownIcon(main.glyph);
         else if (main) icon.innerHTML = main.icon;
-        else if (ownIcon) icon.textContent = ownIcon;
+        else if (ownIcon) icon.innerHTML = this.ownIcon(ownIcon);
         else icon.innerHTML = kind?.icon ?? "";
         name.textContent = main?.label ?? ownLabel ?? kind?.label ?? item.type;
         const face = this.el("span", `${BASE}-item-face`);
@@ -657,7 +668,7 @@ export class SettingsDialog {
         looks.slice(1).forEach((look, i) => {
           if (!look) return;
           const hint = this.el("span", `${BASE}-item-hint ${BASE}-item-hint-${i + 1}`);
-          if (look.glyph) hint.textContent = look.glyph;
+          if (look.glyph) hint.innerHTML = this.ownIcon(look.glyph);
           else hint.innerHTML = look.icon;
           hint.setAttribute("aria-hidden", "true");
           face.append(hint);
@@ -673,7 +684,7 @@ export class SettingsDialog {
         const found = known.get(item.id);
         const action = found && withArgs(found, item.args);
         // Its own icon and label, as the toolbar shows them
-        if (item.icon) icon.textContent = item.icon;
+        if (item.icon) icon.innerHTML = this.ownIcon(item.icon);
         else icon.innerHTML = action?.icon ?? "";
         name.textContent = item.label ?? action?.label ?? item.id;
         element.append(icon, name);
@@ -1053,19 +1064,74 @@ export class SettingsDialog {
     field.placeholder = placeholder;
     field.spellcheck = false;
     field.dataset.swbOwn = key;
-    field.setAttribute("aria-label", key === "icon" ? `Its own icon: up to ${MAX_ICON} characters, an emoji too (empty: the default)` : "Its own label (empty: the default)");
+    field.setAttribute("aria-label", key === "icon" ? `Its own icon: up to ${MAX_ICON} characters, an emoji too, or an icon picked (empty: the default)` : "Its own label (empty: the default)");
     if (key === "icon") field.classList.add(`${BASE}-look-own-icon`);
     field.addEventListener("change", () => this.edit(set(field.value), `[data-swb-look] [data-swb-own="${key}"]`));
     // (The reset outside the label: a press on it is no press on the field)
     const label = this.el("label", `${BASE}-look-own-line`);
     label.append(this.el("span", `${BASE}-look-name`, name), field);
     line.append(label);
+    // An icon: what it shows now beside its field (an icon of a set is a name in the field), Choose… the picker
+    if (key === "icon") {
+      if (value) {
+        const shown = this.el("span", `${BASE}-look-own-shown`);
+        shown.innerHTML = this.ownIcon(value);
+        label.insertBefore(shown, field);
+      }
+      line.append(this.iconChoice(set));
+    }
     if (value) {
       const reset = this.button(`${BASE}-look-reset`, key === "icon" ? "Back to the default icon" : "Back to the default label", () => this.edit(set(undefined), `[data-swb-look] [data-swb-own="${key}"]`), ICONS.reset);
       reset.dataset.swbReset = key;
       line.append(reset);
     }
     return line;
+  }
+
+  /**
+   * Choose…: Silverware Icons' picker (its icons and emoji; without it, a note
+   * that it is needed) in a box under the icon's line, the one picked set as
+   * the icon; Esc or Choose… again closes it, Esc there no further
+   */
+  private iconChoice(set: (value: string | undefined) => Favorites): HTMLElement {
+    const choose = this.button(`${BASE}-look-choose`, "Choose…", () => toggle());
+    choose.dataset.swbChoose = "";
+    choose.setAttribute("aria-expanded", "false");
+    let stop: (() => void) | undefined;
+    let box: HTMLElement | undefined;
+    const close = () => {
+      stop?.();
+      box?.remove();
+      stop = box = undefined;
+      choose.setAttribute("aria-expanded", "false");
+    };
+    const toggle = () => {
+      if (box) {
+        close();
+        choose.focus({ preventScroll: true });
+        return;
+      }
+      const line = choose.closest(`.${BASE}-look-line`);
+      box = this.el("div", `${BASE}-icon-picker`);
+      box.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        e.stopPropagation();
+        e.preventDefault();
+        close();
+        choose.focus({ preventScroll: true });
+      });
+      line?.after(box);
+      choose.setAttribute("aria-expanded", "true");
+      stop = this.icons.pick(box, {
+        picked: (value) => {
+          close();
+          this.edit(set(value), `[data-swb-look] [data-swb-own="icon"]`);
+        },
+        searchIcon: ICONS.search,
+        shown: () => box?.scrollIntoView?.({ block: "nearest" }),
+      });
+    };
+    return choose;
   }
 
   /** A row's handle: dragged, the row moves up or down (the others sliding aside); Alt+↑ ↓ on it the same */
@@ -1186,8 +1252,7 @@ export class SettingsDialog {
     const unset = !ref;
     const what = ref?.label ?? action?.label ?? (unset ? (slot.optional ? "None" : "Choose…") : ref.id);
     const button = this.button(`${BASE}-slot`, `${slot.label}: ${what}`, () => (unset && !slot.optional ? this.openPicking({ at, key: slot.key }) : this.toggleSlot(at, slot.key)));
-    button.innerHTML = `<span class="${BASE}-slot-name"></span><span class="${BASE}-item-icon">${ref?.icon ? "" : (action?.icon ?? "")}</span><span class="${BASE}-slot-action"></span>`;
-    if (ref?.icon) button.querySelector(`.${BASE}-item-icon`)!.textContent = ref.icon;
+    button.innerHTML = `<span class="${BASE}-slot-name"></span><span class="${BASE}-item-icon">${ref?.icon ? this.ownIcon(ref.icon) : (action?.icon ?? "")}</span><span class="${BASE}-slot-action"></span>`;
     button.querySelector(`.${BASE}-slot-name`)!.textContent = slot.label;
     button.querySelector(`.${BASE}-slot-action`)!.textContent = what;
     button.setAttribute("aria-label", `${slot.label}: ${what}`);
@@ -1208,8 +1273,7 @@ export class SettingsDialog {
     button.innerHTML = `<span class="${BASE}-slot-name"></span><span class="${BASE}-item-icon"></span><span class="${BASE}-slot-action"></span>`;
     const icon = button.querySelector(`.${BASE}-item-icon`)!;
     const glyph = own("icon");
-    if (glyph) icon.textContent = glyph;
-    else icon.innerHTML = kind?.icon ?? "";
+    icon.innerHTML = glyph ? this.ownIcon(glyph) : (kind?.icon ?? "");
     button.querySelector(`.${BASE}-slot-name`)!.textContent = slot.label;
     button.querySelector(`.${BASE}-slot-action`)!.textContent = what;
     button.setAttribute("aria-label", `${slot.label}: ${what}`);

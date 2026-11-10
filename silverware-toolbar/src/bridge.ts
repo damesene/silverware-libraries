@@ -7,6 +7,8 @@ import { listOf } from "./lists.ts";
 import { migrate, VERSION_PATH } from "./migrations/index.ts";
 
 export type Bridge = {
+  // Silverware Icons' API where it is installed (`silverware.icons.api`; shared/icons.ts `iconsOf` reads it)
+  readonly icons?: unknown;
   // The main selection: where it is in the page's text, and its text
   readonly getSelection: () => Selection | Promise<Selection>;
   readonly setSelection: (from: number, to: number) => unknown;

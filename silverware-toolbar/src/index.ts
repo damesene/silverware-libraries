@@ -1,5 +1,6 @@
 // Silverware Toolbar entry point, loaded by the init page's Space Lua:
 //   js.importFromSpace("Library/damesene/silverware-toolbar.js").init({ ... editor functions ... })
+import { iconsOf } from "../../shared/icons.ts";
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { actionsOf, customActionsAnew, defineCustomActions } from "./actions.ts";
 import { type Bridge, missingBridgeFunctions, OWN_MARKER, PATHS, readSettings, type Settings } from "./bridge.ts";
@@ -48,7 +49,10 @@ export async function init(bridge: Bridge): Promise<void> {
   // again: the controller's); before it is made, the one given
   let made: Controller | undefined;
   const latest = () => made?.bridge ?? bridge;
+  // What draws and picks the favourites' icons: Silverware Icons where it is installed, else its stand-in
+  const icons = iconsOf(bridge.icons);
   const { actions, kinds, refresh } = createModules(settings.modules, {
+    icons,
     // (A bridge without them: the first one's, which has them)
     ...(bridge.listCommands ? { listCommands: () => (latest().listCommands ?? bridge.listCommands!)() } : {}),
     ...(bridge.invokeCommand ? { invokeCommand: (name: string) => (latest().invokeCommand ?? bridge.invokeCommand!)(name) } : {}),
@@ -57,7 +61,7 @@ export async function init(bridge: Bridge): Promise<void> {
   // The toolbar's: those for a touch screen only where this is one (the settings get every action)
   const touch = touchScreen();
   const offered = () => actions().filter((action) => touch || !action.touchOnly);
-  const controller = new Controller(document, bridge, settings, offered, kinds, refresh, () => void openSettings(), (toolbars) => keepSwitched(made?.bridge ?? bridge, toolbars));
+  const controller = new Controller(document, bridge, settings, offered, kinds, refresh, () => void openSettings(), (toolbars) => keepSwitched(made?.bridge ?? bridge, toolbars), icons);
   made = controller;
   slot[GLOBAL_KEY] = controller;
   current = { bridge, actions, kinds };
@@ -174,6 +178,7 @@ export async function openSettings(): Promise<void> {
   settingsDialog = new SettingsDialog({
     doc: document,
     bridge,
+    icons: iconsOf(bridge.icons),
     // The modules' and the core's own (the switch over the toolbars the dialog edits, … and the settings: favourites too)
     actions: (toolbars) => [...actions(), switchToolbarAction(toolbars, undefined, () => undefined), MORE_ACTION, SETTINGS_ACTION],
     kinds,

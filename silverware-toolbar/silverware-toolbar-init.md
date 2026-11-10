@@ -128,6 +128,9 @@ if js and js.window then
     invokeCommand = editor.invokeCommand,
     -- Actions that open a page (custom ones' perform)
     navigate = editor.navigate,
+    -- Silverware Icons, where it is installed (its API page, priority 50, has run by now): the icons and emoji of
+    -- the favourites drawn and picked
+    icons = silverware.icons and silverware.icons.api,
     -- The slash module: SilverBullet's completion started at the cursor (its slash commands after a "/")
     startCompletion = editor.startCompletion,
     -- Whether SilverBullet's keyboard bar is on (the settings offer to turn it off on a phone)

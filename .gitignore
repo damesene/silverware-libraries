@@ -7,7 +7,6 @@ playwright-report/
 silverbullet-log/
 .env.local
 # The emoji data the playground serves (scripts/playground.mjs)
-playground/silverware-toolbar-emoji.js
 playground/silverware-database-emoji.js
 playground/silverware-icons-*.js
 # SilverBullet's release the interaction tests run on Windows (scripts/silverbullet.mjs)

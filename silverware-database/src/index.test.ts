@@ -162,10 +162,20 @@ describe("Silverware Database in SilverBullet", () => {
     await runCommand("Silverware Database: Convert selection to database");
     const page = memory.pages.get("Page")!;
     const lines = "- [ ] Call @ada [due: 2026-11-12]\n  - [ ] sub\n- [x] Done #sales\n";
-    expect(page).toBe(`Intro\n${lines}\n\`\`\`silverware-database\nid: calls\n\`\`\`\nAfter\n`);
+    // (Shown first as the converter asks: a board by Status)
+    expect(page).toBe(`Intro\n${lines}\n\`\`\`silverware-database\nid: calls\nview: board\nboard.groupBy: status\n\`\`\`\nAfter\n`);
     expect(page.slice(selection.from, selection.to)).toBe(lines);
     expect(memory.pages.get("Page/db-calls/Call")).toContain("- [ ] sub");
     expect(memory.pages.get("Page/db-calls/Done")).toMatch(/^---\ntags: \[db, sales\]/);
+  });
+
+  it("writes no view the converter asks for where it is turned off: the place shows the first one on", async () => {
+    const text = "- [ ] One\n";
+    const { memory, bridge } = bridgeOf({ Page: text }, "Page");
+    const getConfig = async (path: string, fallback: unknown) => (path === "silverware.database.views.board.enabled" ? false : fallback);
+    init({ ...bridge, getConfig, prompt: async () => "One", getSelection: async () => ({ from: 0, to: 0 }), setSelection: async () => {} });
+    await runCommand("Silverware Database: Convert selection to database");
+    expect(memory.pages.get("Page")).toBe("- [ ] One\n\n```silverware-database\nid: one\n```\n");
   });
 
   it("converts the cursor's line with those under it, and says where nothing is to convert", async () => {

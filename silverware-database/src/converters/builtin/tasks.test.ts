@@ -14,9 +14,9 @@ describe("The tasks converter", () => {
 
   it("makes each task of the top level an item, what is under it its body, dedented", () => {
     const converted = read(["Before", "- [ ] Parent", "  - [x] Child", "    more text", "", "  > a quote", "- [x] Second", "Text after"]);
-    expect(converted.items.map((item) => [item.name, item.values?.done, item.body])).toEqual([
-      ["Parent", false, "- [x] Child\n  more text\n\n> a quote"],
-      ["Second", true, "Text after"],
+    expect(converted.items.map((item) => [item.name, item.values?.status, item.body])).toEqual([
+      ["Parent", "Todo", "- [x] Child\n  more text\n\n> a quote"],
+      ["Second", "Done", "Text after"],
     ]);
   });
 
@@ -36,19 +36,26 @@ describe("The tasks converter", () => {
     expect(name.endsWith("word")).toBe(true);
   });
 
-  it("gives Done always, Status where a task has a state of its own (done ones Done), People, Links and Tags where any has them", () => {
+  it("gives Status always (Todo, In progress, Done), People, Links and Tags where any has them, shown on a board by Status", () => {
     const converted = read(["- [IN PROGRESS] One @ada #a", "- [x] Two [[P]]", "- [ ] Three"]);
     expect(converted.properties.map((one) => [one.key, one.type])).toEqual([
-      ["done", "checkbox"],
       ["status", "select"],
       ["people", "person"],
       ["links", "reference"],
       ["page_tags", "tags"],
     ]);
-    expect(property(converted, "status")!.params).toEqual({ options: ["IN PROGRESS", "Done"] });
+    expect(property(converted, "status")!.params).toEqual({ options: ["Todo", "In progress", "Done"] });
     expect(property(converted, "people")!.params).toEqual({ options: ["ada"], multiple: true, anyone: true });
     expect(property(converted, "page_tags")).toMatchObject({ system: "tags" });
-    expect(converted.items.map((item) => item.values?.status)).toEqual(["IN PROGRESS", "Done", undefined]);
+    expect(converted.items.map((item) => item.values?.status)).toEqual(["In progress", "Done", "Todo"]);
+    expect(converted.view).toEqual({ name: "board", groupBy: "status" });
+  });
+
+  it("reads the status from [state: …] or [status: …] before the checkbox, whatever the case, a state of its own added before Done", () => {
+    const converted = read(["- [ ] A [state: in  progress]", "- [x] B [Status: TODO]", "- [Waiting] C", "- [ ] D [status: waiting]", "- [in progress] E"]);
+    expect(converted.items.map((item) => item.values?.status)).toEqual(["In progress", "Todo", "Waiting", "Waiting", "In progress"]);
+    expect(property(converted, "status")!.params).toEqual({ options: ["Todo", "In progress", "Waiting", "Done"] });
+    expect(converted.properties.map((one) => one.key)).toEqual(["status"]);
   });
 
   it("types each attribute by its values across the items", () => {
@@ -74,9 +81,21 @@ describe("The tasks converter", () => {
     ]);
   });
 
+  it("takes the state attribute over the checkbox, as written where YAML reads no text of it, and none when empty", () => {
+    const converted = read(["- [x] A [status: todo]", "- [X] B", "- [ ] C [STATE: @ada]", "- [ ] D [status: [a, b]]", "- [x] E [status: ]"]);
+    expect(converted.items.map((item) => item.values?.status)).toEqual(["Todo", "Done", "@ada", "[a, b]", "Done"]);
+  });
+
+  it("writes no task done by a checkbox `done` where there is a Status (a task's attribute so named)", () => {
+    const converted = read(["- [ ] A [done: true]"]);
+    const props = converted.properties.map((one): Property => ({ params: {}, readonly: false, ...one }));
+    const item: Item = { key: "a" as ItemKey, name: "A", values: converted.items[0]!.values!, rank: undefined, revision: "1" };
+    expect(TASKS_CONVERTER.write!([item], props)).toBe("- [ ] A [done: true]\n");
+  });
+
   it("joins a key given twice into one list, and keeps a key clear of the task's own", () => {
     const converted = read(["- [ ] A [prop: a] [prop: b] [done: maybe] [people: x]"]);
-    expect(converted.items[0]!.values).toMatchObject({ done: false, prop: ["a", "b"], done_2: "maybe", people_2: "x" });
+    expect(converted.items[0]!.values).toMatchObject({ status: "Todo", prop: ["a", "b"], done: "maybe", people_2: "x" });
     expect(property(converted, "prop")).toMatchObject({ type: "select", params: { multiple: true, options: ["a", "b"] } });
   });
 
@@ -96,7 +115,6 @@ describe("The tasks converter", () => {
 
   it("writes items back as tasks that read back the same: states, marks, attributes; what the system gives left out", () => {
     const properties: Property[] = [
-      { key: "done", label: "Done", type: "checkbox", params: {}, readonly: false },
       { key: "status", label: "Status", type: "select", params: { options: ["IN PROGRESS", "Done"] }, readonly: false },
       { key: "due", label: "Due", type: "date", params: {}, readonly: false },
       { key: "owner", label: "Owner", type: "person", params: {}, readonly: false },
@@ -109,8 +127,8 @@ describe("The tasks converter", () => {
     ];
     const item = (name: string, values: Item["values"]): Item => ({ key: name as ItemKey, name, values, rank: undefined, revision: "1" });
     const items = [
-      item("Call the client", { done: false, status: "IN PROGRESS", due: "2026-11-12", owner: "ada", ref: ["[[Web]]"], note: "a ] b", people: ["jana"], links: ["[[Acme]]"], page_tags: ["sales", "two words"], created_at: "2026-11-10T10:00" }),
-      item("Send offer", { done: true, status: "Done" }),
+      item("Call the client", { status: "IN PROGRESS", due: "2026-11-12", owner: "ada", ref: ["[[Web]]"], note: "a ] b", people: ["jana"], links: ["[[Acme]]"], page_tags: ["sales", "two words"], created_at: "2026-11-10T10:00" }),
+      item("Send offer", { status: "Done" }),
       item("Plain", {}),
     ];
     const written = TASKS_CONVERTER.write!(items, properties);
@@ -123,8 +141,13 @@ describe("The tasks converter", () => {
       ].join("\n"),
     );
     const back = TASKS_CONVERTER.read(written)!;
-    expect(back.items[0]).toMatchObject({ name: "Call the client", tags: ["sales", "two words"], values: { status: "IN PROGRESS", due: "2026-11-12", owner: "ada", ref: ["[[Web]]"], note: "a ] b", people: ["jana"], links: ["[[Acme]]"] } });
-    expect(back.items.map((one) => one.values?.done)).toEqual([false, true, false]);
+    // (A state read whatever its case: IN PROGRESS is In progress)
+    expect(back.items[0]).toMatchObject({ name: "Call the client", tags: ["sales", "two words"], values: { status: "In progress", due: "2026-11-12", owner: "ada", ref: ["[[Web]]"], note: "a ] b", people: ["jana"], links: ["[[Acme]]"] } });
+    expect(back.items.map((one) => one.values?.status)).toEqual(["In progress", "Done", "Todo"]);
+    // A status of Todo a task not done; a checkbox `done` of a database's own, without a Status, ticked done
+    expect(TASKS_CONVERTER.write!([item("A", { status: "todo" })], properties)).toBe("- [ ] A\n");
+    const done: Property = { key: "done", label: "Done", type: "checkbox", params: {}, readonly: false };
+    expect(TASKS_CONVERTER.write!([item("B", { done: true }), item("C", { done: false })], [done])).toBe("- [x] B\n- [ ] C\n");
     expect(TASKS_CONVERTER.write!([], properties)).toBe("");
   });
 
@@ -143,8 +166,8 @@ describe("The tasks converter", () => {
 - [ ] B [status: x]
 `);
     const back = TASKS_CONVERTER.read(written)!;
-    expect(back.items[0]).toMatchObject({ name: "[x: y] Use `a` #not @not", tags: ["ok"], values: { people: ["bob"], ref: ["[[Plain]]", "[[Web]]"], status_2: "Waiting: for x", people_2: "Ada Lovelace" } });
-    expect(back.items[1]!.values).toMatchObject({ done: false, status_2: "x" });
+    expect(back.items[0]).toMatchObject({ name: "[x: y] Use `a` #not @not", tags: ["ok"], values: { status: "Waiting: for x", people: ["bob"], ref: ["[[Plain]]", "[[Web]]"], people_2: "Ada Lovelace" } });
+    expect(back.items[1]!.values).toMatchObject({ status: "x" });
   });
 
   it("keeps a value YAML does not read as written, as text", () => {

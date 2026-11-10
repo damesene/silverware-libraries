@@ -540,7 +540,7 @@ export class DatabaseCore {
    * top of its body where its name is not that text; a property's key the store cannot keep made another, the items'
    * values following it
    */
-  async createDatabaseOf(name: string, converted: Converted): Promise<(Written & { readonly id: string }) | Refused> {
+  async createDatabaseOf(name: string, converted: Converted): Promise<(Written & { readonly id: string; readonly keys: Readonly<Record<string, string>> }) | Refused> {
     const problem = validateConverted(converted);
     if (problem) return this.refuse(`What was read makes no database: ${problem}`);
     const keys = new Map<string, string>();
@@ -572,7 +572,9 @@ export class DatabaseCore {
       const tags = [...new Set(one.tags ?? [])].filter((tag) => !this.store.validateTag(tag));
       return { name: kept, values, ...(body ? { body } : {}), ...(tags.length ? { tags } : {}) };
     });
-    return this.createDatabase(name, properties, items);
+    const made = await this.createDatabase(name, properties, items);
+    // (Each key as given, the one its property got: what names a property besides, a view's grouping, follows it)
+    return "problem" in made ? made : { ...made, keys: Object.fromEntries(keys) };
   }
 
   /** Items made in a batch, at the end of the order in theirs (a database's first: `database` has none yet); why one cannot be */

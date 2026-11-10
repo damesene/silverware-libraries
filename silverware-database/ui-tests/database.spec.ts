@@ -535,8 +535,10 @@ test("Convert selection to database makes a database of the tasks selected, its 
   await field.fill("Calls");
   await field.press("Enter");
   await expect(page.locator(".swd-place")).toHaveCount(1);
-  await expect.poll(() => editorText(page)).toBe(`# Page\n\n${tasks}\n\`\`\`silverware-database\nid: calls\n\`\`\`\n\nAfter\n`);
-  await expect.poll(() => space.saved("Page/db-calls/Send the offer")).toMatch(/^---\ntags: \[db, sales\]\ndone: true\n/);
+  const block = "```silverware-database\nid: calls\nview: board\nboard.groupBy: status\n```\n";
+  await expect.poll(() => editorText(page)).toBe(`# Page\n\n${tasks}\n${block}\nAfter\n`);
+  await expect(page.locator(".swd-view-picker")).toHaveAttribute("data-view", "board");
+  await expect.poll(() => space.saved("Page/db-calls/Send the offer")).toMatch(/^---\ntags: \[db, sales\]\nstatus: Done\n/);
   expect(await space.saved("Page/db-calls/Call")).toContain("Call @ada [due: 2026-11-12]\n\n- [ ] Prepare notes");
   // The tasks still selected: Delete takes them away, the block staying
   const selected = await page.evaluate(() => {
@@ -546,7 +548,7 @@ test("Convert selection to database makes a database of the tasks selected, its 
   });
   expect(selected).toBe(tasks);
   await page.keyboard.press("Delete");
-  await expect.poll(() => editorText(page)).toBe("# Page\n\n\n```silverware-database\nid: calls\n```\n\nAfter\n");
+  await expect.poll(() => editorText(page)).toBe(`# Page\n\n\n${block}\nAfter\n`);
 });
 
 test("Copy as tasks in ⋯ puts the items shown on the clipboard as tasks", async ({ page, space }) => {

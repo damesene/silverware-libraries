@@ -29,8 +29,7 @@ database to markdown, starts as *Copy as tasks* to the clipboard; a conversion i
 
 | In the task | Property | Type |
 | --- | --- | --- |
-| `[ ]` / `[x]` | `done` | toggle |
-| a state of its own (`[IN PROGRESS]`) | `status`, only where some task has one (`x` is then a state too) | select |
+| `[ ]` / `[x]`, a state of its own (`[IN PROGRESS]`), `[status: …]` / `[state: …]` | `status`, always (*Status instead of Done*, below) | select |
 | `#tag` (any number) | the page's tags (`tags: [db, sales]`), shown by the system property `page_tags` | tags |
 | `@name` (any number) | `people`, Multiple, *Anyone* on, its options the names found | person |
 | `[[link]]` in the text | `links`, Multiple | reference |
@@ -67,6 +66,27 @@ database to markdown, starts as *Copy as tasks* to the clipboard; a conversion i
 * **Written back** (*Copy as tasks*): a key that is no attribute's name is left out (or written as text, to decide in
   that step), a value as a YAML flow value, quoted where it is not plain or its brackets do not balance, a space after
   each attribute; a list as `[key: [a, b]]`, never a key twice.
+
+## Status instead of Done (2026-11-10, the user's choice after step 5)
+
+* No checkbox **Done**: one select **Status**, always with *Todo*, *In progress*, *Done* (a status added or renamed in
+  Properties, a board by it). `[ ]` is *Todo*, `[x]` *Done*, a state of its own (`[Waiting]`) as written.
+* An attribute `[status: …]` or `[state: …]` (its name whatever its case) gives the status over the checkbox; it is no
+  property of its own.
+* A status is matched to the options whatever its case and spaces (`[IN PROGRESS]`, `[status: in  progress]` are *In
+  progress*); one not among them is added as first written, before *Done*.
+* The database is shown first as a board by Status: `Converted.view` (`{ name, groupBy }`), which the command writes
+  into the block (`view: board`, `board.groupBy: status`) where that view exists.
+* *Copy as tasks*: *Todo* `[ ]`, *Done* `[x]` (and, in a database without a Status, its own checkbox `done` ticked: in
+  one converted, `done` is a task's attribute), another the state, one no
+  state can be `[status: …]`, read back as the status.
+* A state attribute's value YAML reads as no text (a list, a map, `@ada`) is taken as written; an empty one leaves the
+  checkbox's state.
+* The view asked for is written only where it is there and on (`silverware.database.views.<view>.enabled`): else the
+  block names none and the place shows the first view on. `groupBy` names the converter's key, followed to the key the
+  property got (`createDatabaseOf` gives them back as `keys`). A text changed while the name was asked: the block,
+  with its view, at the cursor.
+* This replaces what steps 4 and 5 say of **Done** below.
 
 ## Probed in SilverBullet (2.12.1, 2026-11-10: a page written through `space.writePage`, its `task` objects read)
 

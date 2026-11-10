@@ -17,8 +17,11 @@ export type ConvertedProperty = { readonly key: string; readonly label: string; 
  */
 export type ConvertedItem = { readonly name: string; readonly values?: Readonly<Record<string, Value>>; readonly body?: string; readonly tags?: readonly string[]; readonly source?: string };
 
-/** What a converter read of a text: the properties and the items, in the text's order */
-export type Converted = { readonly properties: readonly ConvertedProperty[]; readonly items: readonly ConvertedItem[] };
+/** How a database of what was read is shown first: a view's name and the property it groups by (none: as the view picks) */
+export type ConvertedView = { readonly name: string; readonly groupBy?: string };
+
+/** What a converter read of a text: the properties and the items, in the text's order; optional, the view first shown */
+export type Converted = { readonly properties: readonly ConvertedProperty[]; readonly items: readonly ConvertedItem[]; readonly view?: ConvertedView };
 
 export type ConverterDefinition = {
   // Lower case letters, digits and -, starting with a letter
@@ -50,6 +53,7 @@ export function validateConverted(converted: unknown): string | undefined {
   const text = (value: unknown) => typeof value === "string";
   const maybe = (value: unknown, test: (value: unknown) => boolean) => value === undefined || test(value);
   const record = (value: unknown) => typeof value === "object" && value !== null && !Array.isArray(value);
+  if (read.view !== undefined && (!record(read.view) || !text(read.view.name) || !read.view.name || !maybe(read.view.groupBy, text))) return `its view is no { name, groupBy }: ${JSON.stringify(read.view)}`;
   for (const one of read.properties) {
     if (!record(one) || !text(one.key) || !text(one.label) || !text(one.type) || !maybe(one.params, record) || !maybe(one.system, text)) return `a property is no { key, label, type, params }: ${JSON.stringify(one)}`;
   }

@@ -17,18 +17,19 @@ import { DatabaseCore } from "./core/core.ts";
 import { Modules } from "./core/module.ts";
 import { documentsHost, platformDocuments } from "./core/documents.ts";
 import { mentionsHost } from "./core/mentions.ts";
-import { DatabasePlace } from "./core/place.ts";
+import { DatabasePlace, VIEW_KEY, viewSettingPath } from "./core/place.ts";
+import { STATE_KEYS } from "./core/statekeys.ts";
 import { openDeleteDatabase } from "./core/deletedatabase.ts";
 import { SettingsDialog } from "./core/settings.ts";
 import type { ViewDefinition } from "./core/view.ts";
-import { type ConverterDefinition, ConverterRegistry, validateConverter } from "./core/converter.ts";
+import { type ConvertedView, type ConverterDefinition, ConverterRegistry, validateConverter } from "./core/converter.ts";
 import type { Named } from "./core/registry.ts";
 import { validateView, ViewRegistry } from "./core/views.ts";
 import { guardedType, TYPE_HELPERS, validateType } from "./domain/types/custom.ts";
 import { VIEW_HELPERS } from "./views/helpers.ts";
 import { TypeRegistry } from "./domain/types/registry.ts";
 import type { PropertyType } from "./domain/types/type.ts";
-import { BLOCK_LANGUAGE, BlockState, readBlock } from "./host/silverbullet/block.ts";
+import { BLOCK_LANGUAGE, BlockState, readBlock, writeBlock as blockWithState } from "./host/silverbullet/block.ts";
 import { blockPlaces } from "./host/silverbullet/places.ts";
 import { type Bridge, editorArea, editorLook, silverBulletPlatform, watchEditorArea } from "./host/silverbullet/platform.ts";
 import { PagesStore } from "./store/pages/store.ts";
@@ -623,9 +624,10 @@ async function convertSelection(): Promise<void> {
   if ("problem" in result) return;
   // Under the lines as they are now (changed meanwhile: at the cursor, nothing selected), a blank line between: a selection
   // touching the block shows its markdown, not the database
+  const body = await convertedBlock(result.id, chosen.converted.view, result.keys);
+  const block = `\`\`\`${BLOCK_LANGUAGE}\n${body}\n\`\`\`\n`;
   const now = await editor.text();
-  const block = `\`\`\`${BLOCK_LANGUAGE}\nid: ${result.id}\n\`\`\`\n`;
-  if (now.slice(range.from, range.to) !== lines) return insertAtCursor(blockText(result.id));
+  if (now.slice(range.from, range.to) !== lines) return insertAtCursor(`\n${block}`);
   if (range.to < now.length) {
     await editor.replace(range.to + 1, range.to + 1, `\n${block}`);
     await editor.select(range.from, range.to + 1);
@@ -633,6 +635,20 @@ async function convertSelection(): Promise<void> {
     await editor.replace(range.to, range.to, `\n\n${block}`);
     await editor.select(range.from, range.to);
   }
+}
+
+/**
+ * A converted database's block: its id, the view the converter asks for first where that view is there and on (else
+ * none: the place shows the first on), grouped by the property it names under the key that property got (`keys`)
+ */
+async function convertedBlock(id: string, view: ConvertedView | undefined, keys: Readonly<Record<string, string>>): Promise<string> {
+  const on = view !== undefined && views.named(view.name) !== undefined && (await app!.platform.settings.get(viewSettingPath(view.name, "enabled"), true)) !== false;
+  const shown = on ? view : undefined;
+  const groupBy = shown?.groupBy === undefined ? undefined : (keys[shown.groupBy] ?? shown.groupBy);
+  return blockWithState(`id: ${id}`, {
+    ...(shown ? { [VIEW_KEY]: shown.name } : {}),
+    ...(shown && groupBy ? { [`${shown.name}.${STATE_KEYS.groupBy}`]: groupBy } : {}),
+  }).replace(/\n+$/, "");
 }
 
 /** The lines `from`..`to` touches, whole: where the first starts and the last ends */

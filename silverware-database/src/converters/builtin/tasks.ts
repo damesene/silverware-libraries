@@ -2,9 +2,11 @@
 // task at the selection's top level an item; what is under it (subtasks of any
 // depth, other lines) its body. Its name the task's text, its marks in a
 // sentence kept as words, those at its end and its attributes left out;
-// `[ ]` / `[x]` the property Done, a state of its own Status, each attribute a
-// property of its key (its type from its values), mentions People, wiki links
-// Links, hashtags the page's tags. Read as SilverBullet reads markdown
+// Status (always Todo, In progress, Done) from an attribute `state`/`status`,
+// else its checkbox (`[ ]` Todo, `[x]` Done) or its state of its own, whatever
+// the case; each other attribute a property of its key (its type from its
+// values), mentions People, wiki links Links, hashtags the page's tags; shown
+// first on a board by Status. Read as SilverBullet reads markdown
 // (shared/markdown/); tasks in fenced code are none.
 import { hashtagOf, type InlineMark, inlineMarks } from "../../../../shared/markdown/inline.ts";
 import { indentWidth, nextFence } from "../../../../shared/markdown/lines.ts";
@@ -18,8 +20,11 @@ import { inferProperty, type ReadValue } from "../infer.ts";
 // An item's name: about this long at most, cut at a word
 const NAME_LENGTH = 100;
 // The properties of the task itself, before its attributes', each key its own
-const DONE = "done";
 const STATUS = "status";
+// Status's options always there, in their order (Done last; states of a text's own between): a task's checkbox read so
+const TODO_STATE = "Todo";
+const DONE_STATE = "Done";
+const STATES = [TODO_STATE, "In progress", DONE_STATE];
 const PEOPLE = "people";
 const LINKS = "links";
 // The system property showing a page's tags (domain/system.ts)
@@ -127,7 +132,7 @@ function attributeKey(name: string, keys: Map<string, string>): string {
   const known = keys.get(name);
   if (known) return known;
   const base = keyFromLabel(name);
-  const taken = new Set([DONE, STATUS, PEOPLE, LINKS, TAGS.key, ...keys.values()]);
+  const taken = new Set([STATUS, PEOPLE, LINKS, TAGS.key, ...keys.values()]);
   let key = base;
   for (let n = 2; taken.has(key); n++) key = `${base}_${n}`;
   keys.set(name, key);
@@ -142,18 +147,13 @@ function read(text: string): Converted | undefined {
   const attributes = new Map<string, Map<number, ReadValue>>();
   const labels = new Map<string, string>();
   const keys = new Map<string, string>();
-  const states: string[] = [];
+  const states = [...STATES];
   let anyPeople = false;
   let anyLinks = false;
   let anyTags = false;
   tasks.forEach(({ task, under }, at) => {
     const marks = inlineMarks(task.text);
-    const values: Record<string, Value> = { [DONE]: task.done };
-    const state = task.state.trim();
-    if (state && !task.done) {
-      values[STATUS] = state;
-      if (!states.includes(state)) states.push(state);
-    }
+    const values: Record<string, Value> = { [STATUS]: stateOf(task, marks, states) };
     const people = [...new Set(marks.flatMap((mark) => (mark.kind === "mention" ? [mark.name] : [])))];
     const links = [...new Set(marks.flatMap((mark) => (mark.kind === "link" ? [mark.name] : [])))];
     const tags = [...new Set(marks.flatMap((mark) => (mark.kind === "tag" ? [mark.name] : [])))];
@@ -163,7 +163,7 @@ function read(text: string): Converted | undefined {
     anyLinks ||= links.length > 0;
     anyTags ||= tags.length > 0;
     for (const mark of marks) {
-      if (mark.kind !== "attribute") continue;
+      if (mark.kind !== "attribute" || isStateAttribute(mark)) continue;
       const value = readValue(mark.value);
       if (!value) continue;
       const key = attributeKey(mark.name, keys);
@@ -176,14 +176,9 @@ function read(text: string): Converted | undefined {
     const body = dedented(under);
     items.push({ name: nameOf(task.text, marks), values, ...(body ? { body } : {}), ...(tags.length ? { tags } : {}), source: task.text.trim() });
   });
-  const properties: ConvertedProperty[] = [{ key: DONE, label: "Done", type: "checkbox" }];
-  const done = tasks.some(({ task }) => task.done);
-  if (states.length) {
-    properties.push({ key: STATUS, label: "Status", type: "select", params: { options: [...new Set(done ? [...states, "Done"] : states)] } });
-    tasks.forEach(({ task }, at) => {
-      if (task.done) items[at]!.values[STATUS] = "Done";
-    });
-  }
+  // (Done last: the states of its own met between In progress and it)
+  const options = [...states.filter((one) => one !== DONE_STATE), DONE_STATE];
+  const properties: ConvertedProperty[] = [{ key: STATUS, label: "Status", type: "select", params: { options } }];
   for (const [key, byItem] of attributes) {
     const inferred = inferProperty(key, labels.get(key)!, byItem);
     properties.push(inferred.property);
@@ -195,7 +190,31 @@ function read(text: string): Converted | undefined {
   }
   if (anyLinks) properties.push({ key: LINKS, label: "Links", type: "reference" });
   if (anyTags) properties.push(TAGS);
-  return { properties, items: items satisfies ConvertedItem[] };
+  return { properties, items: items satisfies ConvertedItem[], view: { name: "board", groupBy: STATUS } };
+}
+
+/** Two states the same whatever their case and spaces (`in  Progress` is `In progress`) */
+const sameState = (a: string, b: string) => a.replace(/\s+/g, " ").trim().toLowerCase() === b.replace(/\s+/g, " ").trim().toLowerCase();
+
+/** Whether an attribute gives the task's state (`[state: …]`, `[status: …]`, whatever their case) */
+const isStateAttribute = (mark: InlineMark) => mark.kind === "attribute" && /^(state|status)$/i.test(mark.name);
+
+/**
+ * A task's status: its attribute `state` or `status` where it has one (the last), else its checkbox (`[ ]` Todo, `[x]`
+ * Done) or the state of its own; one of `states` whatever its case, else added to them as first written
+ */
+function stateOf(task: TaskLine, marks: readonly InlineMark[], states: string[]): string {
+  const attribute = marks.filter(isStateAttribute).at(-1);
+  const given = attribute?.kind === "attribute" ? readAttributeValue(attribute.value) : undefined;
+  // (A value YAML reads as a scalar that; another, a list or a map or none it reads, as written; none: the checkbox)
+  const scalar = given && "value" in given && given.value !== null && typeof given.value !== "object";
+  const fromAttribute = attribute?.kind !== "attribute" ? "" : scalar ? String((given as { value: unknown }).value).trim() : attribute.value.trim();
+  const written = fromAttribute || (task.done ? DONE_STATE : task.state.trim() || TODO_STATE);
+  const known = states.find((one) => sameState(one, written));
+  if (known) return known;
+  const state = written.replace(/\s+/g, " ");
+  states.push(state);
+  return state;
 }
 
 /** A mark written after the text where it reads back as all of it (a mention, a hashtag), else none */
@@ -217,22 +236,25 @@ const linksOf = (value: Value): string[] =>
 
 /**
  * Items written back as tasks, as `read` reads them (lossy: a type, a property's settings and an item's text are no
- * part of a task): Done (or Status *Done*) `[x]`, another Status the task's state (one a state cannot be: the
- * attribute `status`); People, Links and the page's Tags as marks after the name (a person no mention can name, a
- * tag no hashtag can: in an attribute, left out); every other property, but those the system gives, an attribute of
- * its key. The name's characters reading would take as syntax are escaped
+ * part of a task): Status *Done* (or a checkbox `done` ticked, a database's of its own) `[x]`, *Todo* `[ ]`, another
+ * the task's state (one a state cannot be: the attribute `status`, which reads back as the state); People, Links and
+ * the page's Tags as marks after the name (a person no mention can name, a tag no hashtag can: in an attribute, left
+ * out); every other property, but those the system gives, an attribute of its key. The name's characters reading
+ * would take as syntax are escaped
  */
 function write(items: readonly Item[], properties: readonly Property[]): string {
-  const done = properties.find((one) => one.key === DONE && one.type === "checkbox");
   const status = properties.find((one) => one.key === STATUS && one.type === "select");
+  // (A checkbox `done` ticks a task only where there is no Status: in a database converted, it is an attribute's)
+  const done = status ? undefined : properties.find((one) => one.key === "done" && one.type === "checkbox");
   const lines = items.map((item) => {
-    const stated = status && typeof item.values[STATUS] === "string" ? (item.values[STATUS] as string) : undefined;
-    const finished = (done && item.values[DONE] === true) || stated === "Done";
+    const stated = status && typeof item.values[STATUS] === "string" && item.values[STATUS] ? (item.values[STATUS] as string) : undefined;
+    const finished = (done !== undefined && item.values[done.key] === true) || (stated !== undefined && sameState(stated, DONE_STATE));
+    const other = stated !== undefined && !finished && !sameState(stated, TODO_STATE) ? stated : undefined;
     // (`x` a state reads as done: a status so named, as one no state can be, an attribute)
-    const asState = stated !== undefined && !validateTaskState(stated) && !/^[xX]$/.test(stated.trim());
-    const state = finished ? "x" : asState ? stated : " ";
+    const asState = other !== undefined && !validateTaskState(other) && !/^[xX]$/.test(other.trim());
+    const state = finished ? "x" : asState ? other : " ";
     const parts = [item.name.replace(/\s+/g, " ").trim().replace(SYNTAX_RE, (c) => `\\${c}`)];
-    if (!finished && stated && !asState) parts.push(writeAttribute(STATUS, stated));
+    if (other !== undefined && !asState) parts.push(writeAttribute(STATUS, other));
     for (const property of properties) {
       if (property === done || property === status) continue;
       const value = item.values[property.key];

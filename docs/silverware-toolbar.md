@@ -681,7 +681,7 @@ written yet in place of what it read (`pendingSwitch`) and compares the
 toolbars as written (`sameSettings`), so it goes on as it is. Not offered: a
 toolbar's own icon, a Next toolbar action (both set aside by the user). A
 toolbar renamed in the dialog takes the buttons switching to it along
-(`withActionRenamed`).
+(`withArgRenamed`: the values of a parameter that `refersTo` a toolbar).
 
 ### Actions' parameters (2026-11-10)
 
@@ -693,8 +693,10 @@ by their values); a favourite gives their values (`args`, texts by key, on an
 action's item or a kind's slot); the controller binds them (`withArgs`: the
 action's functions given them, its choices dropped, so it runs), so the bar,
 the popup and the gesture button know nothing of them; the settings show each
-in the item's or the slot's panel as declared; a choice of a list that is an
-action with values (`addsAs`) is added to a toolbar as that action with them.
+in the item's or the slot's panel as declared; the add-action search offers
+such an action alone, its choices left to the popup (asked by the user: the
+toolbars listed under Toolbar only repeated its parameter), and opens its
+panel at them once it is added.
 The switch of toolbars moved onto it, one way of writing it: `{ id =
 "actions.switchToolbar", args = { toolbar = "Float" } }` (a toolbar renamed in
 the settings takes those values along: `withArgRenamed`). Custom actions

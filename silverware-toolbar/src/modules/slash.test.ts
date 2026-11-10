@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ActionEditor } from "../core/action.ts";
+import { type ActionEditor, NO_ARGS } from "../core/action.ts";
 import { contextOf } from "../core/context.ts";
 import { slashModule, slashText } from "./slash.ts";
 
@@ -33,11 +33,11 @@ describe("The slash module", () => {
       startCompletion: async () => void done.push("complete"),
       completes: true,
     };
-    await action!.perform!(contextOf("see it", 0, 3), editor);
+    await action!.perform!(contextOf("see it", 0, 3), editor, NO_ARGS);
     expect(done).toEqual(["write 3-3  /", "complete"]);
     // The completion not to be started: nothing written, a failure said
     done.length = 0;
-    await expect(action!.perform!(contextOf("see it", 0, 3), { ...editor, completes: false })).rejects.toThrow("editor.startCompletion");
+    await expect(action!.perform!(contextOf("see it", 0, 3), { ...editor, completes: false }, NO_ARGS)).rejects.toThrow("editor.startCompletion");
     expect(done).toEqual([]);
   });
 });

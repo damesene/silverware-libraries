@@ -105,6 +105,8 @@ function actionOf(definition: unknown): Action | string {
   if (kinds === 0) return "it has none of edit, perform and choices";
   const shown = listed === false ? { listed: false } : {};
   if (mixed !== undefined && typeof mixed !== "string") return "its mixed is not text";
+  // (Its values given, an action runs: one offering choices has nothing to run with them)
+  if (choices !== undefined && params.length) return "it has params and choices: params are for an action that runs (edit or perform)";
   if (choices !== undefined) {
     if (!Array.isArray(choices) || !choices.length) return "its choices are not a list of actions";
     const own = choices.map(actionOf);
@@ -125,7 +127,7 @@ function actionOf(definition: unknown): Action | string {
       ...taking,
       perform: async (context, editor, args) => {
         try {
-          await perform(context, editor, args ?? {});
+          await perform(context, editor, args);
         } catch (e) {
           throw new Error(`${name}'s perform failed: ${message(e)}`);
         }
@@ -138,7 +140,7 @@ function actionOf(definition: unknown): Action | string {
     ...shown,
     ...taking,
     edit: (context, args) => {
-      const given = call(name, "edit", () => edit(context, args ?? {}));
+      const given = call(name, "edit", () => edit(context, args));
       if (given === undefined) return undefined;
       if (!isEdit(given, context.text.length)) throw new Error(`${name}'s edit did not give { from, to, text } within the page`);
       const change: Change = { from: given.from, to: given.to, insert: given.text };
@@ -164,8 +166,8 @@ function base(
     icon: icon ?? letters(label.charAt(0).toUpperCase().replace(/[&<>"]/g, "")),
     group: group ?? "Custom",
     keywords: keywords ?? [],
-    ...(active ? { active: (context: Context, args?: ActionArgs) => !!call(name, "active", () => active(context, args ?? {})) } : {}),
-    ...(enabled ? { enabled: (context: Context, args?: ActionArgs) => !!call(name, "enabled", () => enabled(context, args ?? {})) } : {}),
+    ...(active ? { active: (context: Context, args: ActionArgs) => !!call(name, "active", () => active(context, args)) } : {}),
+    ...(enabled ? { enabled: (context: Context, args: ActionArgs) => !!call(name, "enabled", () => enabled(context, args)) } : {}),
   };
 }
 

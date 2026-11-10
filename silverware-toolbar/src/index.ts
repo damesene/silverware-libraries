@@ -5,6 +5,7 @@ import { actionsOf, customActionsAnew, defineCustomActions } from "./actions.ts"
 import { type Bridge, missingBridgeFunctions, OWN_MARKER, PATHS, readSettings, type Settings } from "./bridge.ts";
 import type { Action } from "./core/action.ts";
 import type { ItemKind } from "./core/items.ts";
+import { switchToolbarAction } from "./core/switch.ts";
 import { type Toolbar, toolbarsSetting } from "./core/toolbars.ts";
 import { Controller, MORE_ACTION, SETTINGS_ACTION } from "./core/controller.ts";
 import { customFormatsAnew, defineCustomFormats, formatsOf } from "./formats/index.ts";
@@ -173,8 +174,8 @@ export async function openSettings(): Promise<void> {
   settingsDialog = new SettingsDialog({
     doc: document,
     bridge,
-    // The modules' and the core's own (switching the toolbar, … and the settings: favourites too)
-    actions: () => [...actions(), ...(slot[GLOBAL_KEY] ? [slot[GLOBAL_KEY]!.switchAction()] : []), MORE_ACTION, SETTINGS_ACTION],
+    // The modules' and the core's own (the switch over the toolbars the dialog edits, … and the settings: favourites too)
+    actions: (toolbars) => [...actions(), switchToolbarAction(toolbars, undefined, () => undefined), MORE_ACTION, SETTINGS_ACTION],
     kinds,
     canSave: canSaveIn(bridge),
     save: (values) => queued(() => saveSettings(bridge, values)),

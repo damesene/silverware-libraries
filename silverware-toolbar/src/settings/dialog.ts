@@ -15,8 +15,6 @@ import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
 import { type Bridge, DEFAULT_SHORTCUT, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, readSettings, readShortcut } from "../bridge.ts";
 import { type Action, type ActionParam, withArgs } from "../core/action.ts";
-import { switchToolbarAction } from "../core/switch.ts";
-import { SWITCH_ID } from "../core/toolbars.ts";
 import { type FavoriteItem, type Favorites, hasAction, pinOf, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Pin, type Show as ItemShow, slotItemOf, slotOf, widthOf } from "../core/favorites.ts";
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
 import { defaultToolbars, docks, freeToolbarName, toolbarsSetting, type Input, inputOf, MAX_TOOLBARS, type Placement, PLACEMENTS, type ShowWhen, SHOWS, type Toolbar, toolbarFor, useToolbarFor, validateToolbarName } from "../core/toolbars.ts";
@@ -29,6 +27,8 @@ import { addItem, type At, moveItem, moveRow, pinOrdered, placeItem, removeItem,
 // A zone of a docked toolbar's row: its items pinned left, the others, those pinned right
 type Zone = "left" | "middle" | "right";
 
+// The first field of a parameter in the panel open (an action with parameters just added: its values asked)
+const PARAM_FIELD = `[data-swb-look] [data-swb-param] select, [data-swb-look] [data-swb-param] input`;
 const BASE = "swb-settings";
 
 // What the dialog calls the values of a toolbar
@@ -42,8 +42,9 @@ const KEYBOARD_BAR_COMMAND = "Editor: Toggle Keyboard Bar";
 export type SettingsContext = {
   readonly doc: Document;
   readonly bridge: Bridge;
-  // Every action offered now (the modules turned on, the custom ones)
-  readonly actions: () => readonly Action[];
+  // Every action offered now (the modules turned on, the custom ones, the core's), over the toolbars edited (the
+  // switch of toolbars offering and naming them: made or renamed here, before they are saved)
+  readonly actions: (toolbars: readonly Toolbar[]) => readonly Action[];
   // The kinds of favourites the modules turned on give (core/items.ts)
   readonly kinds: () => readonly ItemKind[];
   // Whether the settings can be saved here (else the dialog only shows them)
@@ -255,14 +256,9 @@ export class SettingsDialog {
 
   // ---- Favorites -------------------------------------------------------------
 
-  /**
-   * Every action offered, the switch of toolbars over the toolbars edited (made
-   * or renamed here: offered and named as they are, before they are saved; run
-   * from here never)
-   */
+  /** Every action offered, over the toolbars edited */
   private actions(): readonly Action[] {
-    const toolbars = this.values?.toolbars ?? [];
-    return this.context.actions().map((action) => (action.id === SWITCH_ID ? switchToolbarAction(toolbars, undefined, () => undefined) : action));
+    return this.context.actions(this.values?.toolbars ?? []);
   }
 
   /** Every action and every list's choice, by id (the popup's search finds them the same way) */
@@ -388,8 +384,10 @@ export class SettingsDialog {
       this.naming = undefined;
       problem.textContent = "";
       if (name.value.trim() === toolbar.name) return;
-      // (Buttons switching to it, in any toolbar, follow it)
-      const renamed = values.toolbars.map((one, i) => ({ ...one, ...(i === index ? { name: name.value.trim() } : {}), rows: withArgRenamed(one.rows, SWITCH_ID, "toolbar", toolbar.name, name.value.trim()) }));
+      // (Values of actions' parameters naming it, in any toolbar, follow it: a button switching to it)
+      const refs = this.actions().flatMap((action) => (action.params ?? []).filter((param) => param.refersTo === "toolbar").map((param) => [action.id, param.key] as const));
+      const follow = (rows: Favorites) => refs.reduce((all, [id, key]) => withArgRenamed(all, id, key, toolbar.name, name.value.trim()), rows);
+      const renamed = values.toolbars.map((one, i) => ({ ...one, ...(i === index ? { name: name.value.trim() } : {}), rows: follow(one.rows) }));
       this.setToolbars(renamed, `.${BASE}-toolbar-name`, true);
     };
     name.addEventListener("change", rename);
@@ -1305,13 +1303,18 @@ export class SettingsDialog {
     const entries: Entry[] = [];
     // (An action for a touch screen only: for a toolbar a finger may show, used for Touch or for none yet)
     const touchToo = this.edited.useFor.includes("touch") || !this.edited.useFor.length;
+    // (An action with parameters alone, its choices left out: its values are set in its panel, which opens as it is
+    // added; the popup offers its choices, the switch's toolbars)
     for (const action of this.actions().filter((a) => touchToo || !a.touchOnly)) {
-      if (!action.choices) entries.push({ action, group: action.group });
+      if (!action.choices || action.params?.length) entries.push({ action, group: action.group });
       else entries.push({ action, group: action.group }, ...action.choices.map((choice) => ({ action: choice, group: action.label })));
     }
     const add = (item: FavoriteItem) => {
+      const index = this.addAt(row);
+      const params = isActionItem(item) ? this.known().get(item.id)?.params : undefined;
       this.picking = undefined;
-      this.edit(addItem(this.rows, row, item, this.addAt(row)), `[data-swb-row="${row}"] .${BASE}-add`);
+      if (params?.length) this.adjusting = { row, index };
+      this.edit(addItem(this.rows, row, item, index), params?.length ? PARAM_FIELD : `[data-swb-row="${row}"] .${BASE}-add`);
     };
     // A kind's item added: the search goes on for its first slot
     const addKind = (kind: ItemKind) => {
@@ -1334,12 +1337,16 @@ export class SettingsDialog {
       this.adjusting = { ...target.at, key: target.key };
       this.edit(favorites, kind.fields?.length ? `[data-swb-look] .${BASE}-field-input` : `[data-swb-look] .${BASE}-look-change`);
     };
-    // An action for the slot (an optional one: or none): the search goes on for the next slot after it without one
-    // (A choice that is an action with values, the switch's toolbar: added as that action with them)
+    // An action for the slot (an optional one: or none): the search goes on for the next slot after it without one;
+    // one with parameters: its slot's panel, where they are set
     const fill = (action: Action | undefined) => {
-      const as = action?.addsAs;
-      if (forRow) return action === undefined ? undefined : add(as ? { id: as.id, args: as.args } : { id: action.id });
-      const favorites = setSlot(this.rows, target.at, target.key, as ? { id: as.id, args: as.args } : action?.id);
+      if (forRow) return action === undefined ? undefined : add({ id: action.id });
+      const favorites = setSlot(this.rows, target.at, target.key, action?.id);
+      if (action?.params?.length) {
+        this.picking = undefined;
+        this.adjusting = { ...target.at, key: target.key };
+        return this.edit(favorites, PARAM_FIELD);
+      }
       const item = favorites[target.at.row]?.[target.at.index];
       const slots = this.kindOf(target.at)?.slots ?? [];
       const after = slots.slice(slots.findIndex((s) => s.key === target.key) + 1);

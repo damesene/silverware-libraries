@@ -18,13 +18,13 @@
 // left out of the toolbar; a test keeps the defaults equal to the library
 // page's config.define.
 
+import type { ActionArgs } from "./action.ts";
+
 export type Show = "icon" | "label";
 export type Pin = "left" | "right";
 /** What an action's and a kind's item have alike: how it shows, its label's width, where it is pinned */
 export type Look = { readonly show?: Show; readonly width?: number; readonly pin?: Pin };
-/** The values of an action's parameters an item gives it (`args`), texts by key (core/action.ts `ActionParam`) */
-export type ItemArgs = Readonly<Record<string, string>>;
-export type ActionItem = Look & { readonly type?: "action"; readonly id: string; readonly icon?: string; readonly label?: string; readonly args?: ItemArgs };
+export type ActionItem = Look & { readonly type?: "action"; readonly id: string; readonly icon?: string; readonly label?: string; readonly args?: ActionArgs };
 export type SeparatorItem = { readonly type: "separator" };
 /** An item of a kind a module gives: its type, its look, and its own fields (its slots' ids, what else its kind reads) */
 export type KindItem = Look & { readonly type: string; readonly [field: string]: unknown };
@@ -50,7 +50,7 @@ export function iconOf(text: string): string | undefined {
  * label of its own (`{ id, icon, label }`, as an action's item has them); what
  * it holds, else undefined (none, or not of that shape)
  */
-export type SlotRef = { readonly id: string; readonly icon?: string; readonly label?: string; readonly args?: ItemArgs };
+export type SlotRef = { readonly id: string; readonly icon?: string; readonly label?: string; readonly args?: ActionArgs };
 export function slotOf(value: unknown): SlotRef | undefined {
   if (typeof value === "string") return value ? { id: value } : undefined;
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
@@ -67,7 +67,7 @@ export function slotOf(value: unknown): SlotRef | undefined {
  * number or true/false written as one: a text), others left out; undefined:
  * none (empty, or not an object)
  */
-export function argsOf(value: unknown): ItemArgs | undefined {
+export function argsOf(value: unknown): ActionArgs | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const args = Object.fromEntries(
     Object.entries(value as Record<string, unknown>).flatMap(([key, one]) => (typeof one === "string" ? [[key, one]] : typeof one === "number" || typeof one === "boolean" ? [[key, String(one)]] : [])),

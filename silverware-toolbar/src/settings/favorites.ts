@@ -3,7 +3,8 @@
 // A docked toolbar's are edited with each row's pinned items at its ends
 // (`pinOrdered`, `placeItem`), as it shows each row a line of its own.
 
-import { type FavoriteItem, type Favorites, iconOf, isActionItem, isKindItem, type ItemArgs, orderedByPins, pinOf, type SlotRef, slotItemOf, slotOf, isSeparator, type KindItem, type Pin, type Show, type SeparatorItem } from "../core/favorites.ts";
+import type { ActionArgs } from "../core/action.ts";
+import { type FavoriteItem, type Favorites, iconOf, isActionItem, isKindItem, orderedByPins, pinOf, type SlotRef, slotItemOf, slotOf, isSeparator, type KindItem, type Pin, type Show, type SeparatorItem } from "../core/favorites.ts";
 
 export type At = { readonly row: number; readonly index: number };
 
@@ -42,7 +43,7 @@ export function moveRow(rows: Favorites, from: number, to: number): FavoriteItem
 }
 
 /** Arguments with one set to a value, or taken out (undefined, empty); undefined where none is left */
-function withArg(args: ItemArgs | undefined, key: string, value: string | undefined): ItemArgs | undefined {
+function withArg(args: ActionArgs | undefined, key: string, value: string | undefined): ActionArgs | undefined {
   const { [key]: _, ...rest } = args ?? {};
   const next = value ? { ...rest, [key]: value } : rest;
   return Object.keys(next).length ? next : undefined;
@@ -80,7 +81,7 @@ function slotValue(ref: SlotRef): unknown {
  * renamed: the switch's `toolbar`), in an action's item and in a kind's slot
  */
 export function withArgRenamed(rows: Favorites, id: string, key: string, from: string, to: string): FavoriteItem[][] {
-  const renamed = (args: ItemArgs | undefined) => (args?.[key] === from ? { ...args, [key]: to } : args);
+  const renamed = (args: ActionArgs | undefined) => (args?.[key] === from ? { ...args, [key]: to } : args);
   return rows.map((row) =>
     row.map((item) => {
       if (isSeparator(item)) return item;

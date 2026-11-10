@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { actionsOf, customActionsAnew, defineCustomActions, resetCustomActions, withCustomActions } from "./actions.ts";
-import type { Action, ActionEditor, Context } from "./core/action.ts";
+import { type Action, type ActionEditor, type Context, NO_ARGS } from "./core/action.ts";
 import { contextOf } from "./core/context.ts";
 
 afterEach(() => resetCustomActions());
@@ -28,7 +28,7 @@ describe("Custom actions", () => {
       label: "Wrap",
       edit: (context: { from: number; to: number }) => ({ from: context.from, to: context.to, text: `<${helpers.cursor()}>` }),
     }));
-    const change = actions[0]!.edit!(contextOf("a b", 1, 2));
+    const change = actions[0]!.edit!(contextOf("a b", 1, 2), NO_ARGS);
     expect(change).toMatchObject({ from: 1, to: 2 });
     expect(change?.insert).toMatch(/^<.+>$/u);
   });
@@ -36,9 +36,9 @@ describe("Custom actions", () => {
   it("are refused with what is wrong; an edit giving the wrong thing or failing fails the action", () => {
     const { actions, problems } = actionsOf([{ name: "x" }, { name: "y", label: "Y" }, { name: "bad", label: "Bad", edit: () => ({ from: 0, to: 99, text: "" }) }]);
     expect(problems).toEqual(["action x: it has no label", "action y: it has none of edit, perform and choices"]);
-    expect(() => actions[0]!.edit!(contextOf("abc", 0, 1))).toThrow("bad's edit did not give { from, to, text } within the page");
+    expect(() => actions[0]!.edit!(contextOf("abc", 0, 1), NO_ARGS)).toThrow("bad's edit did not give { from, to, text } within the page");
     const failing = actionsOf({ name: "boom", label: "Boom", edit: () => { throw new Error("no"); } }).actions[0]!;
-    expect(() => failing.edit!(contextOf("abc", 0, 1))).toThrow("boom's edit failed: no");
+    expect(() => failing.edit!(contextOf("abc", 0, 1), NO_ARGS)).toThrow("boom's edit failed: no");
   });
 
   it("perform: something done with the context and the editor's API, awaited; its failure named; not with edit too", async () => {
@@ -54,10 +54,10 @@ describe("Custom actions", () => {
     const [open, boom] = actions;
     expect(open!.listed).toBe(false);
     expect(open!.edit).toBeUndefined();
-    await open!.perform!(contextOf("see Notes here", 4, 9), editor);
+    await open!.perform!(contextOf("see Notes here", 4, 9), editor, NO_ARGS);
     expect(done).toEqual(["open Notes"]);
     expect(boom!.listed).toBeUndefined();
-    await expect(boom!.perform!(contextOf("x", 0, 0), editor)).rejects.toThrow("boom's perform failed: no page");
+    await expect(boom!.perform!(contextOf("x", 0, 0), editor, NO_ARGS)).rejects.toThrow("boom's perform failed: no page");
   });
 
   it("offer choices: a list as Turn into is, each choice an action of its own", () => {
@@ -73,7 +73,7 @@ describe("Custom actions", () => {
     expect(problems).toEqual([]);
     expect(actions[0]).toMatchObject({ id: "actions.size", mixed: "Mixed sizes" });
     expect(actions[0]!.choices!.map((c) => c.id)).toEqual(["actions.small", "actions.large"]);
-    expect(actions[0]!.choices![1]!.active!(contextOf("x", 0, 1))).toBe(true);
+    expect(actions[0]!.choices![1]!.active!(contextOf("x", 0, 1), NO_ARGS)).toBe(true);
     expect(actionsOf({ name: "bad", label: "Bad", choices: [{ name: "c" }] }).problems).toEqual(["action bad: its choice 1: it has no label"]);
   });
 
@@ -91,8 +91,8 @@ describe("Custom actions", () => {
     });
     expect(problems).toEqual([]);
     const [upper, hello] = actions[0]!.choices!;
-    expect(upper!.edit!(contextOf("a word", 2, 6))).toMatchObject({ from: 2, to: 6, insert: "WORD" });
-    await hello!.perform!(contextOf("x", 0, 0), editor);
+    expect(upper!.edit!(contextOf("a word", 2, 6), NO_ARGS)).toMatchObject({ from: 2, to: 6, insert: "WORD" });
+    await hello!.perform!(contextOf("x", 0, 0), editor, NO_ARGS);
     expect(run).toEqual(["Say hello"]);
   });
 
@@ -119,9 +119,10 @@ describe("Custom actions", () => {
     expect(template!.params!.map((param) => [param.key, param.choices?.()])).toEqual([["name", [{ value: "Meeting", label: "Meeting" }, { value: "daily", label: "Daily note" }]], ["note", undefined]]);
     expect(template!.describe!({ name: "daily" })).toBe("Template: daily");
     await template!.perform!(contextOf("", 0, 0), {} as ActionEditor, { name: "daily" });
-    await template!.perform!(contextOf("", 0, 0), {} as ActionEditor);
+    await template!.perform!(contextOf("", 0, 0), {} as ActionEditor, NO_ARGS);
     expect(done).toEqual([{ name: "daily" }, {}]);
     expect(actionsOf({ name: "x", label: "X", params: [{ key: "a b", label: "A" }], edit: () => undefined }).problems[0]).toContain("its param 1");
     expect(actionsOf({ name: "x", label: "X", params: [{ key: "a", label: "A" }, { key: "a", label: "B" }], edit: () => undefined }).problems[0]).toContain("twice");
+    expect(actionsOf({ name: "x", label: "X", params: [{ key: "a", label: "A" }], choices: [{ name: "y", label: "Y", edit: () => undefined }] }).problems[0]).toContain("params and choices");
   });
 });

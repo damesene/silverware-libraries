@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ActionEditor } from "../core/action.ts";
+import { type ActionEditor, NO_ARGS } from "../core/action.ts";
 import { contextOf } from "../core/context.ts";
 import { commandActions, commandsModule } from "./commands.ts";
 
@@ -16,7 +16,7 @@ describe("The commands module", () => {
       ["commands.Navigate: Home", "Navigate: Home", "Commands", false],
       ["commands.Text: Bold", "Text: Bold", "Commands", false],
     ]);
-    actions[1]!.perform!(contextOf("", 0, 0), EDITOR);
+    actions[1]!.perform!(contextOf("", 0, 0), EDITOR, NO_ARGS);
     expect(run).toEqual(["Text: Bold"]);
     expect(commandActions(undefined, () => undefined)).toEqual([]);
   });

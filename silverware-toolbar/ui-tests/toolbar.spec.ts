@@ -303,7 +303,7 @@ test.describe("Switching the toolbar", () => {
 });
 
 test.describe("An action's parameter", () => {
-  test("a toolbar of Toolbar's added in the settings: the switch with that toolbar given, its value in its panel; its button switches at once, no list", async ({ page }) => {
+  test("Toolbar added in the settings: its toolbars not offered apart, its panel open at its parameter; its button switches at once, no list", async ({ page }) => {
     await select(page, "some text");
     await barButton(page, "actions.more").click();
     await popup(page).locator(".swb-search-field").fill("settings");
@@ -312,12 +312,17 @@ test.describe("An action's parameter", () => {
     await dialog.locator('[data-swb-tab="toolbars"]').click();
     await dialog.locator('[data-swb-row="1"] .swb-settings-add').click();
     await dialog.locator(".swb-settings-pick-field").fill("test touch");
-    await page.keyboard.press("Enter");
-    // Its panel: the switch's parameter, the toolbar given
+    // (The switch's choices are the popup's: here Toolbar alone, its toolbar set in its panel)
+    await expect(dialog.locator(".swb-settings-pick", { hasText: "Test touch" })).toHaveCount(0);
+    await dialog.locator(".swb-settings-pick-field").fill("toolbar");
+    await dialog.locator(".swb-settings-pick").filter({ has: page.locator(".swb-settings-pick-label", { hasText: /^Toolbar$/ }) }).click();
+    // Its panel open at the switch's parameter, focused: none given yet
+    const param = dialog.locator('[data-swb-look] [data-swb-param="toolbar"] select');
+    await expect(param).toBeFocused();
+    await expect(param).toHaveValue("");
+    await param.selectOption("Test touch");
     const added = dialog.locator('[data-swb-row="1"] .swb-settings-item').last();
     await expect(added).toHaveAttribute("title", "Test touch");
-    await added.click();
-    await expect(dialog.locator('[data-swb-look] [data-swb-param="toolbar"] select')).toHaveValue("Test touch");
     await dialog.locator(".swb-settings-save").click();
     await expect(dialog).toHaveCount(0);
     await select(page, "some text");

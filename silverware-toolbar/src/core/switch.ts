@@ -14,12 +14,13 @@ export function switchToolbarAction(toolbars: readonly Toolbar[], current: Toolb
     icon: ICONS.toolbars,
     group: "Silverware Toolbar",
     keywords: ["switch", "toolbars", "change", "favorites"],
-    params: [{ key: "toolbar", label: "Toolbar", choices: () => toolbars.map((toolbar) => ({ value: toolbar.name, label: toolbar.name })) }],
+    params: [{ key: "toolbar", label: "Toolbar", refersTo: "toolbar", choices: () => toolbars.map((toolbar) => ({ value: toolbar.name, label: toolbar.name })) }],
     describe: (args) => args.toolbar,
-    // (With a toolbar given: that one; without, its choices are offered instead)
-    active: (_context, args) => !!args?.toolbar && args.toolbar === current?.name,
+    // With a toolbar given (`withArgs`, which drops the choices) it runs: that one; without, the bar, the popup and
+    // their search offer its choices, as for any action that has them, and never run it
+    active: (_context, args) => !!args.toolbar && args.toolbar === current?.name,
     perform: (_context, _editor, args) => {
-      if (args?.toolbar) switchTo(args.toolbar);
+      if (args.toolbar) switchTo(args.toolbar);
     },
     choices: toolbars.map((toolbar) => ({
       id: `${SWITCH_ID}.${toolbar.name}`,
@@ -29,8 +30,6 @@ export function switchToolbarAction(toolbars: readonly Toolbar[], current: Toolb
       keywords: ["switch", "toolbar"],
       active: () => toolbar === current,
       perform: () => switchTo(toolbar.name),
-      // (Added to a toolbar: the switch with this toolbar given, one way of writing it)
-      addsAs: { id: SWITCH_ID, args: { toolbar: toolbar.name } },
     })),
   };
 }

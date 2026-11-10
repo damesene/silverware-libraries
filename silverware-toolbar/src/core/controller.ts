@@ -12,7 +12,7 @@
 import type { Bridge, Settings } from "../bridge.ts";
 import { CONTENT_SELECTOR, inEditor, pageContentOf, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
-import { type Action, type ActionEditor, type Change, type Context, withArgs } from "./action.ts";
+import { type Action, type ActionEditor, type Change, type Context, NO_ARGS, withArgs } from "./action.ts";
 import { Bar, type Dock, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
 import { Docking } from "./dock.ts";
@@ -252,7 +252,7 @@ export class Controller {
   /** An action's state for a context; one whose own functions fail is off and not offered */
   private state(action: Action, context: Context): State {
     try {
-      return { active: !!action.active?.(context), enabled: action.enabled?.(context) ?? true };
+      return { active: !!action.active?.(context, NO_ARGS), enabled: action.enabled?.(context, NO_ARGS) ?? true };
     } catch (e) {
       console.error(`Silverware Toolbar: ${action.label}:`, e);
       return { active: false, enabled: false };
@@ -399,7 +399,7 @@ export class Controller {
       return;
     }
     try {
-      const change = action.edit(context);
+      const change = action.edit(context, NO_ARGS);
       if (change) await this.write(change, context);
     } catch (e) {
       void this.bridge.flash(`Silverware Toolbar: ${action.label} failed: ${e instanceof Error ? e.message : String(e)}`, "error");
@@ -487,7 +487,7 @@ export class Controller {
       completes: !!bridge.startCompletion,
     };
     try {
-      await action.perform!(context, editor);
+      await action.perform!(context, editor, NO_ARGS);
     } catch (e) {
       void this.bridge.flash(`Silverware Toolbar: ${action.label} failed: ${e instanceof Error ? e.message : String(e)}`, "error");
     }

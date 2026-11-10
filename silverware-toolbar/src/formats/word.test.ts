@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Change } from "../core/action.ts";
+import { type Change, NO_ARGS } from "../core/action.ts";
 import { contextOf } from "../core/context.ts";
 import { marked } from "../core/cursor.ts";
 import { clearModule } from "../modules/clear.ts";
@@ -12,7 +12,7 @@ function run(withCaret: string, id: string, wordAtCaret = true): string {
   const text = withCaret.replace("|", "");
   const context = contextOf(text, at, at);
   const actions = [...inlineModule({ wordAtCaret }).actions(), ...clearModule({ wordAtCaret }).actions()];
-  const change = actions.find((a) => a.id === id)!.edit!(context) as Change;
+  const change = actions.find((a) => a.id === id)!.edit!(context, NO_ARGS) as Change;
   const { text: insert, select: marks } = marked(change.insert);
   const out = text.slice(0, change.from) + insert + text.slice(change.to);
   const select = marks ? { from: change.from + marks.from, to: change.from + marks.to } : change.select!;

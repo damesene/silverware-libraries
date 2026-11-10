@@ -2817,14 +2817,12 @@ export class Controller implements TableHost {
   download(file: string, data: Uint8Array, type: string): void {
     const win = this.doc.defaultView!;
     const url = win.URL.createObjectURL(new Blob([data as BlobPart], { type }));
-    // A link clicked at once: the browser's download, under the file's name
+    // A link clicked at once: the browser's download, under the file's name. Not put into the page: its click would
+    // reach the window's listeners, and with a dialog open (Export to Excel's) a click beside it is cancelled
     const link = this.doc.createElement("a");
     link.href = url;
     link.download = file;
-    link.style.display = "none";
-    this.doc.body.append(link);
     link.click();
-    link.remove();
     // Once the browser has taken the file
     win.setTimeout(() => win.URL.revokeObjectURL(url), 60_000);
   }

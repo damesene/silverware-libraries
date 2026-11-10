@@ -73,7 +73,7 @@ Probe pages: a test table and an inline `${(function() … end)()}` listing `que
 - SilverBullet's scroller has 360 px bottom padding, which `position: sticky` leaves out (bottom-pinned rows correct for it).
 - `editor.flashNotification(msg, type, { timeout = 0, actions = {…} })` stays until closed, with buttons (main; older releases ignore the options).
 - Commands defined from `commandList()` by their whole names and `/<slash>` work (2026-11-03). `editor:complete` completions show as typed.
-- Without `navigator.clipboard` (a page over http, a phone on the LAN) Copy must use the copy command on a selected field before anything is awaited (`clipboard.ts`).
+- Without `navigator.clipboard` (a page over http, a phone on the LAN) Copy must use the copy command on a selected field before anything is awaited (`shared/clipboard.ts`; the cells' formats are `src/clipboard.ts`).
 - MdTableRender hides header hashtags with JS, which flickers; Silverware Table hides type hashtags with CSS.
 
 ## Decisions (and why)

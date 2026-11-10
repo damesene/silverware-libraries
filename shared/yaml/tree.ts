@@ -1,12 +1,14 @@
 // Nested YAML, in the few forms a plugin writes its own data in (Silverware
 // Database's `_database`: maps by indent, maps and lists in brackets on one
-// line), read and written by the page writer alone. Not a YAML parser: what
-// is not one of these forms (an anchor, a block scalar, a list item holding a
-// block) is said so, and the key it is under is left as written, never
-// rewritten from a guess. Decided 2026-11-07 over a YAML library: the data are
-// ours, so a few forms suffice and the bundle stays small. Maps are objects of
-// no prototype, so a key named `constructor` or `__proto__` is a key as any.
-import { readScalar, type YamlScalar, yamlString } from "./frontmatter.ts";
+// line): a plugin's data in a page (the page writer, shared/pages/) and a
+// value on one line (a task's attribute, shared/markdown/task.ts). Not a YAML
+// parser: what is not one of these forms (an anchor, a block scalar, a list
+// item holding a block) is said so, and the key it is under is left as
+// written, never rewritten from a guess. Decided 2026-11-07 over a YAML
+// library: the data are ours, so a few forms suffice and the bundle stays
+// small. Maps are objects of no prototype, so a key named `constructor` or
+// `__proto__` is a key as any.
+import { readScalar, stripComment, type YamlScalar, yamlString } from "./scalar.ts";
 
 export type YamlMap = { readonly [key: string]: YamlValue };
 export type YamlValue = YamlScalar | readonly YamlValue[] | YamlMap;
@@ -121,6 +123,20 @@ function keyOf(raw: string): string {
   return read.text;
 }
 
+/** A value on one line (a scalar, or a list or map in brackets: an attribute's in a task), or why it is none read here */
+export function readYamlInline(text: string): YamlRead {
+  try {
+    return { value: inline(text.trim()) };
+  } catch (error) {
+    return { problem: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** A value on one line, as `readYamlInline` reads it back: a list or map in brackets, a text quoted where a bracket's comma or bracket would end it */
+export function writeYamlInline(value: YamlValue): string {
+  return flowWritten(value);
+}
+
 /** A value on one line: a scalar, or a list or map in brackets */
 function inline(text: string): YamlValue {
   if (text.startsWith("[") || text.startsWith("{")) {
@@ -201,20 +217,6 @@ const skipSpace = (text: string, at: number) => {
   while (text[i] === " " || text[i] === "\t") i++;
   return i;
 };
-
-/** A value without a comment after it (` # …`, outside quotes and brackets' texts) */
-function stripComment(value: string): string {
-  let quote: string | undefined;
-  for (let i = 0; i < value.length; i++) {
-    const c = value[i]!;
-    if (quote) {
-      if (c === "\\" && quote === '"') i++;
-      else if (c === quote) quote = undefined;
-    } else if (c === '"' || c === "'") quote = c;
-    else if (c === "#" && (i === 0 || /\s/.test(value[i - 1]!))) return value.slice(0, i).trim();
-  }
-  return value.trim();
-}
 
 /** A key as written: as it is where YAML reads it back so, else in quotes */
 function writtenKey(key: string): string {

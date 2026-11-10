@@ -48,6 +48,12 @@ describe("scanning", () => {
     ].join("\n");
     expect(names(text)).toEqual(["yes:paragraph", "real:paragraph"]);
   });
+  it("leaves out an attribute's value, as SilverBullet does", () => {
+    expect(names("- [ ] task [x: #no] #yes")).toEqual(["yes:task"]);
+  });
+  it("reads a task of a state of its own as a task, as SilverBullet does", () => {
+    expect(names("- [IN PROGRESS] task #a")).toEqual(["a:task"]);
+  });
   it("takes a paragraph's leading lines of tags alone as the page's", () => {
     expect(names("#a\n#b\ntext #c\n#d")).toEqual(["a:page", "b:page", "c:paragraph", "d:paragraph"]);
     expect(names("text\n#a")).toEqual(["a:paragraph"]);

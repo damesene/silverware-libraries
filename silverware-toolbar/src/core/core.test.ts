@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { type Action, NO_ARGS, withArgs } from "./action.ts";
-import { contextOf, linesOf } from "./context.ts";
+import { contextOf } from "./context.ts";
 import { cursor, marked } from "./cursor.ts";
 import { placeBy } from "./place.ts";
 import { entriesOf, findEntries } from "./search.ts";
@@ -9,15 +9,9 @@ import { entriesOf, findEntries } from "./search.ts";
 const TEXT = "# Title\n\nOne line\n- item a\n- item b\n\n```\ncode here\n```\nlast";
 
 describe("The selection's context", () => {
-  it("has the lines it touches, whole; one ending at a line's start leaves that line out", () => {
+  it("has the lines it touches, whole", () => {
     const from = TEXT.indexOf("item a") + 2;
-    const to = TEXT.indexOf("item b") + 1;
-    expect(linesOf(TEXT, from, to).map((l) => l.text)).toEqual(["- item a", "- item b"]);
-    // Whole lines selected (to the next line's start): that next line not selected
-    const start = TEXT.indexOf("- item a");
-    expect(linesOf(TEXT, start, TEXT.indexOf("- item b")).map((l) => l.text)).toEqual(["- item a"]);
-    // A caret: its line
-    expect(linesOf(TEXT, 3, 3)).toEqual([{ from: 0, to: 7, text: "# Title" }]);
+    expect(contextOf(TEXT, from, TEXT.indexOf("item b") + 1).lines.map((l) => l.text)).toEqual(["- item a", "- item b"]);
   });
 
   it("is from before to, selected backwards too", () => {

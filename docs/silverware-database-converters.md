@@ -82,9 +82,13 @@ database to markdown, starts as *Copy as tasks* to the clipboard; a conversion i
 * **`[owner: @ada]` gives no attribute at all**: `@` cannot start a YAML value, so the value fails to parse and the key
   is left out, silently. A converter reads `@name` in an attribute as a person all the same (the user wrote it so);
   written back, a person is `[owner: "@ada"]`.
+* **Inside an attribute's value nothing is a mark**: `[x: #a]` gives no tag (and `x: null`: `#` starts a YAML comment),
+  `[y: '@a']` no mention, `[n: [[Linked]]]` no link (`n: [["Linked"]]`). `a#b` is the tag `b`; `mail@x.dev` is no mention;
+  marks in inline code are none. `[a-b: y]` is no attribute (it stays in the name); `[$s: z]` and `[Name: x]` are.
+  `[k: a: b]` is the map `{ a: b }` (our reader refuses it: the converter takes it as text).
 * A subtask has `parent` (the parent's ref); the parent's range covers its subtasks; a line under a task without a mark
   belongs to the task's `text` (`"Child [c: 1]\n    more text"`).
-* **The clipboard** needs no probe: Silverware Table's `src/clipboard.ts` writes it in SilverBullet over http in a local
+* **The clipboard** needs no probe: `shared/clipboard.ts` (moved out of Silverware Table) writes it in SilverBullet over http in a local
   network too (where `navigator.clipboard` is undefined, a copy event through `execCommand("copy")`); it moves to
   `shared/` for *Copy as tasks*.
 * Read by our own parser, not from the index: the selection is converted as the editor has it (the index has the page as
@@ -98,23 +102,28 @@ database to markdown, starts as *Copy as tasks* to the clipboard; a conversion i
   database* (the schema inferred, `createDatabase` and the items in one transaction); *an existing database* comes later
   (keys mapped onto its properties, values converted), the converters unchanged.
 * **The core** gets generic steps only (a database made with its items in one transaction, definitions checked as
-  `defineViews` / `defineTypes` are); the tasks converter is a module (the core knows no markdown).
+  `defineViews` / `defineTypes` are). Converters are a layer of their own, `converters/` beside `views/` (built-in ones in
+  `converters/builtin/`, one per file, through the same API as a user's): like views they import only the core's types,
+  and they may read markdown through `shared/markdown/`, which the core, the model and the domain never do.
 * **One command**, *Silverware Database: Convert selection to database*, with a choice of converter (or the one whose
   `read` finds anything): commands are defined at start from `commandNames()`, so a converter defined later in Space Lua
   would get no command of its own. Silverware Toolbar needs no code for it: its `commands` module finds the command, a
   user puts it among favourites.
-* **`shared/`**: the selection's whole lines and the fenced code blocks (tasks inside code are not converted) move out of
-  Silverware Toolbar (`core/context.ts` `linesOf`, `formats/lines.ts` fences); reading and writing a task's line with its
-  attributes goes into `shared/pages/` (the one place that knows how anything is written in a page), its tests by
-  SilverBullet's rules above.
+* **`shared/markdown/`** (step 2, done): reading markdown as SilverBullet does, pure, writing no page. `lines.ts`: the
+  selection's whole lines and fenced code (tasks inside code are not converted), out of Silverware Toolbar (`linesOf`,
+  its two copies of the fences). `inline.ts`: a line's hashtags, mentions, wiki links and attributes, one scanner, which
+  `shared/pages/tags/scan.ts` now reads hashtags by (it had its own; a hashtag in an attribute's value no longer counts,
+  as in SilverBullet). `task.ts`: a task's line and state, attributes' values read and written as YAML on one line
+  (`shared/yaml/tree.ts`, YAML moved out of `shared/pages/` so markdown does not stand on the page writer). Not in `shared/pages/` as first planned: the converters may not
+  import the page writer, and none of this writes a page. `shared/clipboard.ts`: out of Silverware Table.
 * **Copy as tasks**: an entry of the place's ⋯ (a menu slot), the view's listing as shown (filtered, sorted) through the
   converter's `write`.
 
 ## Steps
 
 1. ~~The probes above~~ (done 2026-11-10).
-2. `shared/`: whole lines and fences; a task's line read and written (`shared/pages/`); the clipboard out of Silverware
-   Table.
+2. ~~`shared/markdown/`: whole lines and fences, a line's marks, a task's line read and written; the clipboard out of
+   Silverware Table~~ (done 2026-11-10).
 3. The store: an item made with page tags beside `db`; the core: `defineConverters`, a new database made with its items
    in one transaction.
 4. The tasks converter, the command, the block under the selection; a UI test.

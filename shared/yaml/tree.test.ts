@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readYamlMap, writeYamlEntry } from "./yamltree.ts";
+import { readYamlMap, writeYamlEntry } from "./tree.ts";
 
 const SCHEMA = `_database:
   id: tasks

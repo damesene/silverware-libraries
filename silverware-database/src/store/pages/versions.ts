@@ -5,7 +5,7 @@
 // the latest; a database of an older version is migrated first, one of a
 // newer version read (by the latest reader, as best it can) and never written.
 import type { PageBuilder } from "../../../../shared/pages/changes.ts";
-import type { YamlMap } from "../../../../shared/pages/yamltree.ts";
+import type { YamlMap } from "../../../../shared/yaml/tree.ts";
 import type { IndexedObject } from "../../../../shared/platform.ts";
 import type { Property, Value } from "../../model/database.ts";
 import { readLook } from "../../domain/look.ts";

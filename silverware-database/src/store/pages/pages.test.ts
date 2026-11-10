@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { pageChanges } from "../../../../shared/pages/changes.ts";
 import { pageWriter } from "../../../../shared/pages/writer.ts";
-import { writeYamlEntry } from "../../../../shared/pages/yamltree.ts";
+import { writeYamlEntry } from "../../../../shared/yaml/tree.ts";
 import type { Changes } from "../../core/changes.ts";
 import type { Database, ItemKey } from "../../model/database.ts";
 import { type ContractSeed, storeContract } from "../contract.ts";

@@ -51,7 +51,8 @@ function wrong(layer: Layer, file: string, one: Import): string | undefined {
   if (one.kind === "package") return undefined;
   if (one.kind === "outside" && !one.path.startsWith("shared/")) return `${one.path}: nothing outside src/ but shared/`;
   if (one.path.startsWith("shared/")) {
-    if (/^shared\/(filter|compare|iconref)\.ts$/.test(one.path)) return undefined;
+    // Pure data: a filter's and a comparison's rules, an icon's reference, YAML's forms
+    if (/^shared\/(filter|compare|iconref)\.ts$/.test(one.path) || one.path.startsWith("shared/yaml/")) return undefined;
     if (one.path.startsWith("shared/pages/")) return file.startsWith("store/pages/") || layer === "host" || layer === "root" ? undefined : `${one.path}: the page writer is the pages store's and the host's`;
     if (one.path === "shared/platform.ts") return ["core", "store", "host", "root"].includes(layer) ? undefined : `${one.path}: the platform is the core's, the stores' and the host's`;
     return ["views", "modules", "core", "host", "root"].includes(layer) ? undefined : `${one.path}: shared UI is for what draws`;

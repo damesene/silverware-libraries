@@ -6,18 +6,9 @@
 // one for its language; nothing selected on an empty line: the cursor between
 // them. Lines within one code block (its fences too): its fences taken off,
 // its lines left as they are.
+import { closesFence, fenceOf } from "../../../shared/markdown/lines.ts";
 import type { Change, Context } from "../core/action.ts";
 import { cursor } from "../core/cursor.ts";
-
-// A fence: its character and how many; indented any amount (as lines.ts reads them)
-const FENCE_RE = /^\s*(`{3,}|~{3,})/;
-
-/** A line's fence, if it is one (a backtick fence has no backtick after it) */
-function fenceOf(text: string): string | undefined {
-  const fence = FENCE_RE.exec(text)?.[1];
-  if (!fence || (fence[0] === "`" && text.slice(text.indexOf(fence) + fence.length).includes("`"))) return undefined;
-  return fence;
-}
 
 type Block = { readonly open: number; readonly close: number; readonly closed: boolean };
 
@@ -29,7 +20,7 @@ function blocksOf(lines: readonly string[]): Block[] {
     const fence = fenceOf(text);
     if (!fence) return;
     if (!open) open = { index: i, fence };
-    else if (fence[0] === open.fence[0] && fence.length >= open.fence.length && text.trim() === fence) {
+    else if (closesFence(text, open.fence)) {
       blocks.push({ open: open.index, close: i, closed: true });
       open = undefined;
     }

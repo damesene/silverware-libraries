@@ -8,12 +8,13 @@
 // `PageSections` (TypeScript's interface merging for the latter).
 import { codeBlocksOf, sameBody } from "./blocks.ts";
 import type { PageBuilder } from "./changes.ts";
-import { type FrontmatterValue, readFrontmatter, readKey, readScalar, validateFrontmatterKey, writeKey } from "./frontmatter.ts";
+import { type FrontmatterValue, readFrontmatter, readKey, validateFrontmatterKey, writeKey } from "./frontmatter.ts";
 import { addPageTags, applyEdits, type EditResult, removeTags, type RemoveHow, renameTags } from "./tags/edit.ts";
 import type { FrontmatterForm } from "./tags/frontmatter.ts";
 import { isWithin, matches, renamedTag } from "./tags/names.ts";
 import type { TagContext } from "./tags/scan.ts";
-import { emptyMap, isYamlMap, readYamlMap, validateYamlValue, writeYamlEntry, type YamlMap, type YamlValue } from "./yamltree.ts";
+import { readScalar } from "../yaml/scalar.ts";
+import { emptyMap, isYamlMap, readYamlMap, validateYamlValue, writeYamlEntry, type YamlMap, type YamlValue } from "../yaml/tree.ts";
 
 /** A property's value: a scalar, a list, or a map (a plugin's own data, `_database`), nested as deep as needed */
 export type PropertyValue = YamlValue;

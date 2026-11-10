@@ -4,7 +4,7 @@
 // or a map (`board.filter: {"status": "!=Done"}`), so the block stays
 // readable and a diff of it small. A line it does not read (typed by hand) is
 // kept as written, as are the lines of keys a write leaves alone.
-import { readScalar, yamlString } from "../../../../shared/pages/frontmatter.ts";
+import { readScalar, yamlString } from "../../../../shared/yaml/scalar.ts";
 import type { ViewStateStore } from "../../core/store.ts";
 
 /** The block's language: the code widget it is shown by */

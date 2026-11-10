@@ -2,18 +2,10 @@
 // what follows its `#` (or what is in its `#<…>`), "/" parts it into levels
 // (`project/alpha` is under `project`), a convention SilverBullet shows
 // nowhere. Names are compared as written: SilverBullet's index keeps them so.
+import { TAG_SOURCE } from "../../markdown/inline.ts";
 
-// SilverBullet's tag (tagRegex, client/markdown_parser/constants.ts of 2.12.1
-// and of main 2026-10-16): a name of characters that are not spaces nor
-// punctuation, not of digits alone, not ending in a hyphen; or any text in < >
-export const TAG_SOURCE = String.raw`#(?:(?:\d*[^\d\s!@#$%^&*(),.?":{}|<>\\';\/–—][^\s!@#$%^&*(),.?":{}|<>\\]*)|(?:<[^>\n]+>))(?<!-)`;
 const WHOLE_RE = new RegExp(`^${TAG_SOURCE}$`);
 const START_RE = new RegExp(`^${TAG_SOURCE}`);
-
-/** A tag's name of its hashtag: what is in its < >, else after its # */
-export function nameOfHashtag(hashtag: string): string {
-  return hashtag.startsWith("#<") ? hashtag.slice(2, -1) : hashtag.slice(1);
-}
 
 /** A name as a hashtag: `#name`, or `#<name>` where `#name` would not read as all of it (spaces, punctuation) */
 export function hashtagOf(name: string): string {

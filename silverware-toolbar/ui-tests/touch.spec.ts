@@ -67,7 +67,7 @@ test.describe("The toolbar's defaults on a phone", () => {
 });
 
 test.describe("The toolbar on a phone", () => {
-  test("docked at the bottom as one row across the window, the rows one after another, … at its end", async ({ page }) => {
+  test("docked at the bottom across the window, each row a line of its own one under another, … at the last one's end", async ({ page }) => {
     await selectByTouch(page, "some text");
     await expect(bar(page)).toHaveClass(/swb-docked/);
     const box = (await bar(page).boundingBox())!;
@@ -76,9 +76,13 @@ test.describe("The toolbar on a phone", () => {
     expect(Math.round(box.width)).toBe(view.width);
     // Right on the window's bottom edge: no line of the page showing under it
     expect(Math.abs(box.y + box.height - view.height)).toBeLessThan(0.5);
-    await expect(bar(page).locator(".swb-row")).toHaveCount(1);
-    await expect(bar(page).locator(".swb-row [data-swb-action]").first()).toHaveAttribute("data-swb-action", "actions.turnInto");
-    await expect(barButton(page, "actions.more")).toBeVisible();
+    const lines = bar(page).locator(".swb-dock-line");
+    await expect(lines).toHaveCount(2);
+    await expect(lines.first().locator("[data-swb-action]")).toHaveCount(1);
+    await expect(lines.first().locator('[data-swb-action="actions.turnInto"]')).toBeVisible();
+    await expect(lines.last().locator('[data-swb-action="actions.more"]')).toBeVisible();
+    // One under the other
+    expect((await lines.first().boundingBox())!.y + (await lines.first().boundingBox())!.height).toBeLessThanOrEqual((await lines.last().boundingBox())!.y + 0.5);
     // A tap applies to the selection
     await barButton(page, "formats.bold").tap();
     await expect.poll(() => text(page)).toContain("Select **some text** in this page");
@@ -213,8 +217,7 @@ test.describe("The toolbar on a phone", () => {
     await dialog.locator('[data-swb-device="touch"]').tap();
     const own = dialog.locator(".swb-settings-devices .swb-settings-switch");
     await own.tap();
-    // (Its rows after the boxes of its pinned items)
-    await dialog.locator('[data-swb-item="3:0"] .swb-settings-remove').tap();
+    await dialog.locator('[data-swb-item="1:0"] .swb-settings-remove').tap();
     await dialog.locator(".swb-settings-save").tap();
     await expect(dialog).toHaveCount(0);
     await select(page, "Plain", 0);
@@ -241,20 +244,23 @@ test.describe("The toolbar on a phone", () => {
     await expect(dialog.locator('[data-swb-device="click"]')).toHaveAttribute("aria-checked", "true");
     await dialog.locator('[data-swb-device="touch"]').tap();
     await own.tap();
-    await expect(dialog.locator('[data-swb-items="3"] .swb-settings-item-name').first()).toHaveText("Italic");
+    await expect(dialog.locator('[data-swb-items="1"] .swb-settings-item-name').first()).toHaveText("Italic");
   });
 
   test("a shade at each end it scrolls further to, gone at its ends", async ({ page }) => {
     // Enough to scroll: another row of the favourites
     await page.setViewportSize({ width: 300, height: page.viewportSize()!.height });
     await selectByTouch(page, "some text");
-    const scroll = bar(page).locator(".swb-dock-scroll");
+    // (The second row's line: the longer one; the first, Turn into alone, does not scroll)
+    const scroll = bar(page).locator(".swb-dock-scroll").last();
     await expect(scroll).toHaveClass(/swb-more-right/);
     await expect(scroll).not.toHaveClass(/swb-more-left/);
-    await bar(page).locator(".swb-dock-items").evaluate((items) => (items.scrollLeft = 30));
+    await expect(bar(page).locator(".swb-dock-scroll").first()).not.toHaveClass(/swb-more-right/);
+    const items = bar(page).locator(".swb-dock-items").last();
+    await items.evaluate((e) => (e.scrollLeft = 30));
     await expect(scroll).toHaveClass(/swb-more-left/);
     await expect(scroll).toHaveClass(/swb-more-right/);
-    await bar(page).locator(".swb-dock-items").evaluate((items) => (items.scrollLeft = items.scrollWidth));
+    await items.evaluate((e) => (e.scrollLeft = e.scrollWidth));
     await expect(scroll).not.toHaveClass(/swb-more-right/);
   });
 
@@ -351,5 +357,26 @@ test.describe("The toolbar on a phone", () => {
     const toolbar = (await bar(page).boundingBox())!;
     const keyboardBar = (await page.locator(".sb-keyboard-bar").boundingBox())!;
     expect(Math.abs(toolbar.y + toolbar.height - keyboardBar.y)).toBeLessThanOrEqual(1);
+  });
+});
+
+test.describe("Settings of an older model", () => {
+  test.use({ favorites: null });
+
+  test("favourites for touch of several rows, without a version: one line as before, written back once with the version @playground", async ({ page }) => {
+    const rows = [[{ id: "actions.turnInto", show: "label", pin: "left" }], [{ id: "formats.bold" }, { id: "formats.italic" }], [{ id: "formats.code" }, { id: "actions.more", pin: "right" }]];
+    await page.evaluate(
+      ({ key, rows }) => localStorage.setItem(key, JSON.stringify({ "silverware.toolbar.favorites-touch": rows })),
+      { key: "silverware.toolbar.playground.settings", rows },
+    );
+    await page.reload();
+    await ready(page);
+    await selectByTouch(page, "some text");
+    await expect(bar(page).locator(".swb-dock-line")).toHaveCount(1);
+    await expect(bar(page).locator(".swb-dock-pinned-left [data-swb-action]")).toHaveAttribute("data-swb-action", "actions.turnInto");
+    await expect(bar(page).locator(".swb-dock-items .swb-divider")).toHaveCount(1);
+    const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem("silverware.toolbar.playground.settings") ?? "{}"));
+    await expect.poll(async () => (await stored())["silverware.toolbar.settings-version"]).toBe(2);
+    expect((await stored())["silverware.toolbar.favorites-touch"]).toEqual([[rows[0]![0], ...rows[1]!, { type: "separator" }, ...rows[2]!]]);
   });
 });

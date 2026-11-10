@@ -69,10 +69,12 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
   align-items: center;
   gap: 2px;
 }
-/* Docked at the bottom (a phone): one row across the window over the keyboard, scrolled sideways, … at its end */
+/* Docked at the bottom (a phone): across the window over the keyboard, each row a line scrolled sideways, one under
+   another, … at the last one's end */
 .swb-bar.swb-docked {
-  flex-direction: row;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
   box-sizing: border-box;
   width: 100vw;
   max-width: none;
@@ -94,6 +96,12 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
 .swb-bar.swb-docked.swb-docked-top {
   border-width: 0 0 1px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+/* A row docked: its pinned items at its ends, the others between them */
+.swb-bar.swb-docked .swb-dock-line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 /* Its items in a box shaded at each end it scrolls further to (swb-more-left / -right) */
 .swb-bar.swb-docked .swb-dock-scroll {
@@ -1249,15 +1257,24 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
   width: 14px;
   height: 14px;
 }
-/* Touch's pinned items: two boxes side by side (one under the other on a phone), above the rows */
-.swb-settings-pins {
+/* A row of Touch's own: its items pinned left, the others, those pinned right, side by side as the docked toolbar
+   shows its line (one under another where they do not fit: a phone); the pinned ones in dashed boxes */
+.swb-settings-zones {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 12px;
+  gap: 6px;
 }
-.swb-settings-pins > .swb-settings-pin-box {
-  flex: 1 1 200px;
+.swb-settings-zones > .swb-settings-items {
   min-width: 0;
+}
+.swb-settings-zones > .swb-settings-zone-middle {
+  flex: 1 1 160px;
+}
+.swb-settings-zones > .swb-settings-zone-left,
+.swb-settings-zones > .swb-settings-zone-right {
+  flex: 0 1 auto;
+  min-width: 90px;
+  border: 1px dashed var(--button-border-color, rgba(128, 128, 128, 0.45));
 }
 /* A kind's item (the gesture button): its name, look and × on the first line, its slots under them,
    side by side where they fit, else one under another (a phone) */

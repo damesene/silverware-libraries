@@ -94,6 +94,15 @@ describe("Settings", () => {
     expect((await readSettings(bridge({ "silverware.toolbar.favorites-touch": 3 }))).touchFavorites).toBeUndefined();
   });
 
+  it("are read as the model is now: touch's rows of an older one joined into one, what changed said to be written back with the version", async () => {
+    const rows = [[{ id: "formats.bold" }], [{ id: "formats.code" }]];
+    const old = await readSettings(bridge({ "silverware.toolbar.favorites-touch": rows }));
+    expect(old.touchFavorites).toEqual([[{ id: "formats.bold" }, { type: "separator" }, { id: "formats.code" }]]);
+    expect(old.migrated).toEqual({ "silverware.toolbar.favorites-touch": old.touchFavorites, "silverware.toolbar.settings-version": 2 });
+    const now = await readSettings(bridge({ "silverware.toolbar.favorites-touch": rows, "silverware.toolbar.settings-version": 2 }));
+    expect([now.touchFavorites, now.migrated]).toEqual([rows, {}]);
+  });
+
   it("are the defaults when reading them fails, or without getConfig", async () => {
     const failing = bridge({}, { getConfig: () => Promise.reject(new Error("no config")) });
     expect((await readSettings(failing)).favorites).toEqual(DEFAULT_FAVORITES);

@@ -600,3 +600,29 @@ would not match, and starts the completion (`ActionEditor.startCompletion`,
 `editor.startCompletion`, a syscall of 2.12.1; asked first, `completes`, so
 a SilverBullet without it gets no stray "/"). Text selected stays as text,
 "/" after it and the caret after the "/", as replacing it would lose it.
+
+### Rows docked as lines, and the settings' migrations (2026-11-10)
+
+Asked by the user: the favourites for touch had pinned items for the whole
+toolbar (two boxes above the rows in the settings) and every row shown in one
+docked line. Now each row is a line of its own where the toolbar is docked,
+one under another, each scrolled sideways, its items pinned left and right at
+its own ends (`Bar.dockLine`; … at the last line's end). The settings edit
+Touch's own so: each row three lists, pinned left, the others, pinned right
+(`pinOrdered`, `placeItem`; Pin in an item's panel, `setPin`). The default
+for touch is one row, the same line as before.
+
+What a space wrote before would change its look (several rows: several
+lines), so the user asked for a migration, kept apart and easy to add to or
+take out: `src/migrations/`, a file per migration named by its version, a
+list in `index.ts`, each reading settings by path and giving what to write.
+The model's version is `silverware.toolbar.settings-version` (not set: 1);
+a migration runs where the space's is lower, the toolbar reads the result
+(`Settings.migrated`) and writes it back with the version once
+(`writeMigrated`), and the settings dialog writes the version with any
+favourites it saves, so rows written in the new model are never joined.
+Nothing is written where nothing changes (a space with no favourites of its
+own). Version 2 joins touch's rows into one, a separator between rows whose
+items are not all pinned, as the docked line showed them; Click's too where
+Click's placement is docked (the same change of look), not otherwise (by the
+selection, Click's rows are rows already).

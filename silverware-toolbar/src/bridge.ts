@@ -2,6 +2,8 @@
 // page's Space Lua (`editor.*` and `config.get`), so no SilverBullet internals
 // are needed.
 import { DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, favoriteItemOf, type FavoriteItem, type Favorites } from "./core/favorites.ts";
+import { listOf } from "./lists.ts";
+import { migrate, VERSION_PATH } from "./migrations/index.ts";
 
 export type Bridge = {
   // The main selection: where it is in the page's text, and its text
@@ -104,6 +106,8 @@ export const PATHS = {
   show: "silverware.toolbar.show",
   showTouch: "silverware.toolbar.show-touch",
   wordAtCaret: "silverware.toolbar.wordAtCaret",
+  // The settings' model's version (migrations/index.ts)
+  version: VERSION_PATH,
   module: (name: ModuleName) => `silverware.toolbar.modules.${name}.enabled`,
 } as const;
 
@@ -120,30 +124,23 @@ export type Settings = {
   readonly show: Readonly<Record<Device, Show>>;
   // A caret touching a word stands for the word, as if selected (inline formats, Clear formatting)
   readonly wordAtCaret: boolean;
+  // What the migrations changed of the settings as configured (read so already), by path, the version among them,
+  // to be written back; empty: nothing (migrations/index.ts)
+  readonly migrated: Readonly<Record<string, unknown>>;
 };
-
-/**
- * A list as configured: an array, or a Lua table handed over as an object
- * with its items under 1, 2, … (not verified how SilverBullet's config.get
- * gives a list from Space Lua to JS: both are taken)
- */
-function listOf(value: unknown): unknown[] | undefined {
-  if (Array.isArray(value)) return value;
-  if (!value || typeof value !== "object") return undefined;
-  const entries = Object.entries(value as Record<string, unknown>);
-  if (!entries.every(([key], i) => key === String(i + 1))) return undefined;
-  return entries.map(([, item]) => item);
-}
 
 /** The settings as configured, each its default where it is not set or not valid */
 export async function readSettings(bridge: Bridge): Promise<Settings> {
-  const get = async (path: string, fallback: unknown) => {
+  const configured = async (path: string, fallback: unknown) => {
     try {
       return await bridge.getConfig?.(path, fallback);
     } catch {
       return fallback;
     }
   };
+  // Read as the model is now: what an older one set migrated (not written back here: the caller writes `migrated`)
+  const migrated = await migrate((path) => configured(path, undefined));
+  const get = async (path: string, fallback: unknown) => (path in migrated ? (migrated[path] ?? fallback) : configured(path, fallback));
   // Not set: undefined (config.define gives them no default, so SilverBullet copies none in)
   const favorites = await get(PATHS.favorites, undefined);
   const touch = await get(PATHS.touchFavorites, undefined);
@@ -170,6 +167,7 @@ export async function readSettings(bridge: Bridge): Promise<Settings> {
     placement: { click: await one(PATHS.placement, PLACEMENTS, DEFAULT_PLACEMENT.click), touch: await one(PATHS.placementTouch, PLACEMENTS, DEFAULT_PLACEMENT.touch) },
     show: { click: await one(PATHS.show, SHOWS, DEFAULT_SHOW.click), touch: await one(PATHS.showTouch, SHOWS, DEFAULT_SHOW.touch) },
     wordAtCaret: (await get(PATHS.wordAtCaret, true)) !== false,
+    migrated,
   };
 }
 

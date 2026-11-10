@@ -58,6 +58,28 @@ export async function init(bridge: Bridge): Promise<void> {
   slot[GLOBAL_KEY] = controller;
   current = { bridge, actions, kinds };
   controller.start();
+  if (Object.keys(settings.migrated).length) void writeMigrated(bridge, settings.migrated);
+}
+
+// The migrated settings being written (init may be called again meanwhile: Space Lua loaded twice, CONFIG saved)
+let migrating = false;
+
+/**
+ * Settings of an older model, migrated as they were read, written back with
+ * the model's version, so they are migrated once (migrations/index.ts); where
+ * nothing can be written, they are migrated again as they are read
+ */
+async function writeMigrated(bridge: Bridge, values: Readonly<Record<string, unknown>>): Promise<void> {
+  if (migrating || !canSaveIn(bridge)) return;
+  migrating = true;
+  try {
+    await saveSettings(bridge, values);
+    void bridge.flash(`Silverware Toolbar: your settings were updated to its version ${String(values[PATHS.version])} (CONFIG)`, "info");
+  } catch (e) {
+    console.error("Silverware Toolbar: the settings migrated could not be written", e);
+  } finally {
+    migrating = false;
+  }
 }
 
 /** Whether this is a touch screen (an on-screen keyboard to hide), as the toolbar starts */

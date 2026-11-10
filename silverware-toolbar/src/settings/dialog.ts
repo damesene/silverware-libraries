@@ -12,12 +12,17 @@ import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { tabs } from "../../../shared/tabs.ts";
 import { type Bridge, DEFAULT_SHORTCUT, type Device, MODULE_DESCRIPTIONS, MODULE_LABELS, MODULE_NAMES, type ModuleName, PATHS, type Placement, PLACEMENT_LABELS, PLACEMENTS, readSettings, readShortcut, type Show, SHOW_LABELS, SHOWS } from "../bridge.ts";
 import type { Action } from "../core/action.ts";
-import { byTouch, DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type FavoriteItem, type Favorites, hasAction, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Show as ItemShow, slotItemOf, slotOf, widthOf } from "../core/favorites.ts";
+import { byTouch, DEFAULT_FAVORITES, DEFAULT_TOUCH_FAVORITES, type FavoriteItem, type Favorites, hasAction, isActionItem, isKindItem, isSeparator, type KindItem, MAX_ICON, MAX_WIDTH, MIN_WIDTH, type Pin, type Show as ItemShow, slotItemOf, slotOf, widthOf } from "../core/favorites.ts";
 import type { ItemField, ItemKind, ItemSlot } from "../core/items.ts";
 import { type Entry, findEntries } from "../core/search.ts";
 import { ICONS } from "../icons.ts";
+import { SETTINGS_VERSION } from "../migrations/index.ts";
 import { reorder } from "../../../shared/drag.ts";
-import { addItem, type At, joinPins, moveItem, moveRow, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setSlot, setSlotField, setSlotOwn, splitPins, stepOf } from "./favorites.ts";
+import { addItem, type At, moveItem, moveRow, pinOf, pinOrdered, placeItem, removeItem, removeRow, sameRows, savedRows, setLook, setOwn, setPin, setSlot, setSlotField, setSlotOwn, stepOf } from "./favorites.ts";
+
+// A zone of a row of Touch's own: its items pinned left, the others, those pinned right
+type Zone = "left" | "middle" | "right";
+const ZONE_NAMES: readonly Zone[] = ["left", "middle", "right"];
 
 const BASE = "swb-settings";
 
@@ -295,24 +300,19 @@ export class SettingsDialog {
 
   /**
    * The favourites the tab edits: Click's, or Touch's (its own while on, else
-   * Click's, which it shows); Touch's own laid out with the items pinned left
-   * and right in two lists before the rows (`pins`)
+   * Click's, which it shows); Touch's own each row in the order the docked
+   * toolbar shows it, its pinned items at its ends (`pins`)
    */
   private get rows(): Favorites {
     const values = this.values!;
-    if (this.pins) return splitPins(values.touchFavorites!);
+    if (this.pins) return pinOrdered(values.touchFavorites!);
     return (this.device === "touch" && values.touchOn && values.touchFavorites) || values.favorites;
   }
 
-  /** Whether Touch's own are edited: pinned at the docked toolbar's ends in boxes of their own (Click's toolbar does not scroll) */
+  /** Whether Touch's own are edited: each row's pinned items in boxes at its ends, as the docked toolbar shows each row a line (Click's toolbar does not scroll) */
   private get pins(): boolean {
     const values = this.values!;
     return this.device === "touch" && values.touchOn && !!values.touchFavorites;
-  }
-
-  /** The index of the first row in what the tab edits (after the two lists of pinned items, where they are) */
-  private get first(): number {
-    return this.pins ? 2 : 0;
   }
 
   /** Whether Touch shows Click's (off, or none of its own) */
@@ -407,40 +407,31 @@ export class SettingsDialog {
         : [this.el("p", `${BASE}-warning`, "Every action (…) is required: these favourites do not have it, so it is added at the end of the toolbar. Add it anywhere (a gesture button's swipe too) to put it there.")]),
       this.el("p", `${BASE}-intro`, "Click an item to change how it shows. Drag items and rows to reorder them."),
     ];
-    if (this.pins) parts.push(this.pinBoxes(known));
     const rows = this.el("div", `${BASE}-rows`);
     // Click's shown for Touch where it has none of its own: not edited here
     if (this.sameForTouch) {
       rows.classList.add(`${BASE}-rows-same`);
       rows.setAttribute("inert", "");
     }
-    const first = this.first;
     this.rows.forEach((row, r) => {
-      // (The pinned items' lists: drawn above)
-      if (r < first) return;
       const block = this.el("div", `${BASE}-favrow`);
       block.dataset.swbRow = String(r);
       const head = this.el("div", `${BASE}-favhead`);
       head.append(
         this.rowGrip(r, block, rows),
-        this.el("span", "", `Row ${r - first + 1}`),
+        this.el("span", "", `Row ${r + 1}`),
         // The row gone, its items with it
-        this.button(`${BASE}-row-remove`, `Remove row ${r - first + 1}`, () => {
+        this.button(`${BASE}-row-remove`, `Remove row ${r + 1}`, () => {
           this.picking = undefined;
           this.edit(removeRow(this.rows, r), `.${BASE}-add-row`);
         }, ICONS.close),
       );
       block.append(head);
-      const items = this.el("div", `${BASE}-items`);
-      items.setAttribute("role", "list");
-      items.dataset.swbItems = String(r);
-      row.forEach((item, i) => items.append(this.itemElement(item, { row: r, index: i }, known)));
-      if (!row.length) items.append(this.el("span", `${BASE}-empty`, "Empty"));
       const picking = this.picking;
       const open = !!picking && "row" in picking && picking.row === r;
       const add = this.button(`${BASE}-add`, open ? "Close" : "Add", () => this.openPicking({ row: r }));
       add.setAttribute("aria-expanded", String(open));
-      block.append(items, add);
+      block.append(this.pins ? this.zones(row, r, known) : this.itemList(row, r, undefined, known), add);
       if (this.adjusting?.row === r) block.append(this.lookPanel(this.adjusting));
       if (picking && ("row" in picking ? picking.row : picking.at.row) === r) block.append(this.picker(picking));
       rows.append(block);
@@ -459,6 +450,37 @@ export class SettingsDialog {
     focused?.focus({ preventScroll: true });
     // A search opened: in view with its list, above an on-screen keyboard already there
     focused?.closest<HTMLElement>("[data-sw-reveal]")?.scrollIntoView?.({ block: "nearest" });
+  }
+
+  /**
+   * A row's items as a list (`zone`: Touch's own, those of one zone of it:
+   * pinned left, the others, pinned right), each at its index in the row
+   */
+  private itemList(row: readonly FavoriteItem[], r: number, zone: Zone | undefined, known: Map<string, Action>): HTMLElement {
+    const items = this.el("div", `${BASE}-items`);
+    items.setAttribute("role", "list");
+    items.dataset.swbItems = String(r);
+    if (zone) {
+      items.dataset.swbZone = zone;
+      items.classList.add(`${BASE}-zone-${zone}`);
+    }
+    const pin = zone === "middle" ? undefined : zone;
+    row.forEach((item, i) => {
+      if (!zone || pinOf(item) === pin) items.append(this.itemElement(item, { row: r, index: i }, known));
+    });
+    if (!items.childElementCount) items.append(this.el("span", `${BASE}-empty`, zone === "left" ? "Pinned left" : zone === "right" ? "Pinned right" : "Empty"));
+    if (zone && zone !== "middle") {
+      items.setAttribute("aria-label", zone === "left" ? `Row ${r + 1}, pinned left` : `Row ${r + 1}, pinned right`);
+      items.title = `At the ${zone} end of this row's line where the toolbar is docked, out of what scrolls`;
+    }
+    return items;
+  }
+
+  /** Touch's own row: its items pinned left, the others, those pinned right, side by side, as the docked toolbar shows its line */
+  private zones(row: readonly FavoriteItem[], r: number, known: Map<string, Action>): HTMLElement {
+    const zones = this.el("div", `${BASE}-zones`);
+    zones.append(...ZONE_NAMES.map((zone) => this.itemList(row, r, zone, known)));
+    return zones;
   }
 
   private itemElement(item: FavoriteItem, at: At, known: Map<string, Action>): HTMLElement {
@@ -528,8 +550,8 @@ export class SettingsDialog {
       if (e.target !== element) return;
       if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown")) {
         e.preventDefault();
-        const to = this.stepTo(at, e.key);
-        if (to) this.edit(moveItem(this.rows, at, to), `[data-swb-item="${to.row}:${to.index}"]`);
+        const moved = this.step(at, e.key);
+        if (moved) this.edit(moved.rows, `[data-swb-item="${moved.at.row}:${moved.at.index}"]`);
       } else if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         this.edit(removeItem(this.rows, at), `[data-swb-row="${at.row}"] .${BASE}-add`);
@@ -550,12 +572,15 @@ export class SettingsDialog {
         containers: () => Array.from(panel.querySelectorAll<HTMLElement>(`.${BASE}-items`)),
         items: (container) => Array.from(container.querySelectorAll<HTMLElement>(`:scope > .${BASE}-item`)),
         done: (to) => {
-          // (A separator is not pinned: not into the pinned items' lists)
-          if (to && isSeparator(item) && to.container < this.first) this.drawFavorites();
-          else if (to && (to.container !== at.row || to.index !== at.index)) {
-            this.adjusting = undefined;
-            this.edit(moveItem(this.rows, at, { row: to.container, index: to.index }), `[data-swb-item="${to.container}:${to.index}"]`);
-          } else this.drawFavorites();
+          // The list let go in: its row, and Touch's own its zone (pinned left, the others, pinned right)
+          const list = to ? panel.querySelectorAll<HTMLElement>(`.${BASE}-items`)[to.container] : undefined;
+          const row = Number(list?.dataset.swbItems);
+          const zone = list?.dataset.swbZone as Zone | undefined;
+          if (!to || !list || !Number.isInteger(row)) return this.drawFavorites();
+          const moved = zone ? placeItem(this.rows, at, { row, zone: zone === "middle" ? undefined : zone, index: to.index }) : { rows: moveItem(this.rows, at, { row, index: to.index }), at: { row, index: to.index } };
+          if (sameRows(moved.rows, this.rows)) return this.drawFavorites();
+          this.adjusting = undefined;
+          this.edit(moved.rows, `[data-swb-item="${moved.at.row}:${moved.at.index}"]`);
         },
         // A click (a tap): its look's panel opened or closed (a separator has none)
         ...(isSeparator(item) ? {} : { clicked: () => this.toggleLook(at) }),
@@ -565,55 +590,28 @@ export class SettingsDialog {
   }
 
   /**
-   * Touch's pinned items: two boxes as rows are (Pinned left, Pinned right),
-   * the items at the docked toolbar's ends, out of what scrolls; an item
-   * dragged in is pinned, dragged out is not
+   * Where Alt+arrows move an item, and the rows then: ← → within its row (Touch's
+   * own: within its zone, pinned or not), ↑ ↓ into the row above or below (the
+   * same zone, at the same place in it); undefined: nowhere
    */
-  private pinBoxes(known: Map<string, Action>): HTMLElement {
-    const boxes = this.el("div", `${BASE}-pins`);
+  private step(at: At, key: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown"): { readonly rows: Favorites; readonly at: At } | undefined {
     const rows = this.rows;
-    const sides = [
-      [0, "Pinned left", "At the left end of the toolbar docked at the bottom, out of what scrolls"],
-      [1, "Pinned right", "At the right end of the toolbar docked at the bottom, out of what scrolls"],
-    ] as const;
-    for (const [r, title, hint] of sides) {
-      const box = this.el("div", `${BASE}-favrow ${BASE}-pin-box`);
-      box.dataset.swbRow = String(r);
-      box.title = hint;
-      const head = this.el("div", `${BASE}-favhead`);
-      head.append(this.el("span", "", title));
-      const items = this.el("div", `${BASE}-items`);
-      items.setAttribute("role", "list");
-      items.setAttribute("aria-label", title);
-      items.dataset.swbItems = String(r);
-      const row = rows[r] ?? [];
-      row.forEach((item, i) => items.append(this.itemElement(item, { row: r, index: i }, known)));
-      if (!row.length) items.append(this.el("span", `${BASE}-empty`, "Drag an item here"));
-      const picking = this.picking;
-      const open = !!picking && "row" in picking && picking.row === r;
-      const add = this.button(`${BASE}-add`, open ? "Close" : "Add", () => this.openPicking({ row: r }));
-      add.setAttribute("aria-expanded", String(open));
-      box.append(head, items, add);
-      if (this.adjusting?.row === r) box.append(this.lookPanel(this.adjusting));
-      if (picking && ("row" in picking ? picking.row : picking.at.row) === r) box.append(this.picker(picking));
-      boxes.append(box);
+    if (!this.pins) {
+      const to = stepOf(rows, at, key);
+      return to && { rows: moveItem(rows, at, to), at: to };
     }
-    return boxes;
-  }
-
-  /**
-   * Where an item goes with Alt+arrows: as `stepOf` says, but Touch's pinned
-   * items' boxes side by side above the rows: ↓ from either into the first
-   * row, ↑ from the first row into Pinned left, never from one box to the other
-   */
-  private stepTo(at: At, key: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown"): At | undefined {
-    const rows = this.rows;
-    const first = this.first;
-    const into = (row: number) => ({ row, index: Math.min(at.index, rows[row]?.length ?? 0) });
-    if (first && at.row < first && key === "ArrowDown") return rows.length > first ? into(first) : undefined;
-    if (first && at.row < first && key === "ArrowUp") return undefined;
-    if (first && at.row === first && key === "ArrowUp") return into(0);
-    return stepOf(rows, at, key);
+    const row = rows[at.row];
+    const item = row?.[at.index];
+    if (!row || !item) return undefined;
+    const pin = pinOf(item);
+    const zone = row.filter((other) => pinOf(other) === pin);
+    const place = zone.indexOf(item);
+    if (key === "ArrowLeft" || key === "ArrowRight") {
+      const index = place + (key === "ArrowLeft" ? -1 : 1);
+      return index >= 0 && index < zone.length ? placeItem(rows, at, { row: at.row, zone: pin, index }) : undefined;
+    }
+    const other = at.row + (key === "ArrowUp" ? -1 : 1);
+    return rows[other] ? placeItem(rows, at, { row: other, zone: pin, index: place }) : undefined;
   }
 
   /** An item's look's panel opened, or closed where open (one at a time) */
@@ -677,6 +675,8 @@ export class SettingsDialog {
       label.append(this.el("span", `${BASE}-look-name`, "Width"), field, this.el("span", `${BASE}-look-unit`, "characters"));
       panel.append(label);
     }
+    // Touch's own: pinned at an end of its row's line (the keyboard's way to what dragging into a zone does)
+    if (this.pins) panel.append(this.pinLine(at, item.pin));
     // An action's own icon and label (its label whatever it shows: its tooltip too), or a kind's whose items have their own
     const kind = isKindItem(item) ? this.context.kinds().find((k) => k.type === item.type) : undefined;
     if (isActionItem(item) || kind?.ownLook) {
@@ -686,6 +686,29 @@ export class SettingsDialog {
       panel.append(this.ownLine("icon", "Icon", own("icon"), "★", set("icon")), this.ownLine("label", "Label", own("label"), placeholder, set("label")));
     }
     return this.closing(panel, () => this.toggleLook(at));
+  }
+
+  /** Where an item of Touch's own is pinned in its row: None, Left, Right */
+  private pinLine(at: At, pin: Pin | undefined): HTMLElement {
+    const pins = this.el("div", `${BASE}-look-shows`);
+    pins.setAttribute("role", "radiogroup");
+    pins.setAttribute("aria-label", "Pinned");
+    for (const [value, label] of [[undefined, "None"], ["left", "Left"], ["right", "Right"]] as const) {
+      const button = this.button(`${BASE}-look-show ${BASE}-look-pin`, label, () => {
+        const moved = setPin(this.rows, at, value);
+        // Its panel follows it
+        this.adjusting = moved.at;
+        this.edit(moved.rows, `[data-swb-look] [data-swb-pin="${value ?? "none"}"]`);
+      });
+      button.dataset.swbPin = value ?? "none";
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-checked", String(value === pin));
+      pins.append(button);
+    }
+    const line = this.el("div", `${BASE}-look-line`);
+    line.title = "At an end of this row's line where the toolbar is docked, out of what scrolls";
+    line.append(this.el("span", `${BASE}-look-name`, "Pin"), pins);
+    return line;
   }
 
   /**
@@ -827,8 +850,7 @@ export class SettingsDialog {
 
   /** A row's handle: dragged, the row moves up or down (the others sliding aside); Alt+↑ ↓ on it the same */
   private rowGrip(r: number, block: HTMLElement, rows: HTMLElement): HTMLElement {
-    const first = this.first;
-    const grip = this.button(`${BASE}-row-grip`, `Move row ${r - first + 1} (drag, or Alt+↑ ↓)`, () => undefined, ICONS.grip);
+    const grip = this.button(`${BASE}-row-grip`, `Move row ${r + 1} (drag, or Alt+↑ ↓)`, () => undefined, ICONS.grip);
     grip.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       reorder(e, {
@@ -840,7 +862,7 @@ export class SettingsDialog {
         items: (container) => Array.from(container.querySelectorAll<HTMLElement>(`:scope > .${BASE}-favrow`)),
         // (Its index among the rows: after the pinned items' lists, where they are)
         done: (to) => {
-          const index = to ? to.index + first : r;
+          const index = to ? to.index : r;
           if (index !== r) this.edit(moveRow(this.rows, r, index), `[data-swb-row="${index}"] .${BASE}-row-grip`);
           else this.drawFavorites();
         },
@@ -850,7 +872,7 @@ export class SettingsDialog {
       if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
       e.preventDefault();
       const to = r + (e.key === "ArrowUp" ? -1 : 1);
-      if (to >= first && to < this.rows.length) this.edit(moveRow(this.rows, r, to), `[data-swb-row="${to}"] .${BASE}-row-grip`);
+      if (to >= 0 && to < this.rows.length) this.edit(moveRow(this.rows, r, to), `[data-swb-row="${to}"] .${BASE}-row-grip`);
     });
     return grip;
   }
@@ -865,7 +887,7 @@ export class SettingsDialog {
   private store(favorites: Favorites): void {
     const values = this.values!;
     if (this.device === "touch") {
-      values.touchFavorites = this.pins ? joinPins(favorites) : favorites;
+      values.touchFavorites = this.pins ? pinOrdered(favorites) : favorites;
       values.touchOn = true;
     } else values.favorites = favorites;
   }
@@ -958,6 +980,12 @@ export class SettingsDialog {
     this.drawFavorites(open ? back : `[data-swb-row="${row}"] .${BASE}-pick-field`);
   }
 
+  /** Where Add puts an item in a row: its end; Touch's own, before its items pinned right (not pinned) */
+  private addAt(row: number): number {
+    const items = this.rows[row] ?? [];
+    return this.pins ? items.filter((item) => pinOf(item) !== "right").length : items.length;
+  }
+
   /** The kind of the item at a place, where a module turned on gives it */
   private kindOf(at: At): ItemKind | undefined {
     const item = this.rows[at.row]?.[at.index];
@@ -992,12 +1020,13 @@ export class SettingsDialog {
     }
     const add = (item: FavoriteItem) => {
       this.picking = undefined;
-      this.edit(addItem(this.rows, row, item), `[data-swb-row="${row}"] .${BASE}-add`);
+      this.edit(addItem(this.rows, row, item, this.addAt(row)), `[data-swb-row="${row}"] .${BASE}-add`);
     };
     // A kind's item added: the search goes on for its first slot
     const addKind = (kind: ItemKind) => {
-      const favorites = addItem(this.rows, row, { type: kind.type });
-      const at = { row, index: favorites[row]!.length - 1 };
+      const index = this.addAt(row);
+      const favorites = addItem(this.rows, row, { type: kind.type }, index);
+      const at = { row, index };
       this.picking = kind.slots[0] ? { at, key: kind.slots[0].key } : undefined;
       // No slot: its first field to type in
       this.edit(favorites, this.picking ? `[data-swb-row="${row}"] .${BASE}-pick-field` : kind.fields?.length ? `[data-swb-item="${at.row}:${at.index}"] .${BASE}-field-input` : `[data-swb-item="${at.row}:${at.index}"]`);
@@ -1029,7 +1058,7 @@ export class SettingsDialog {
       const found = findEntries(entries, field.value);
       const query = field.value.trim().toLowerCase();
       // (Not for the pinned items' lists: a separator is not pinned)
-      const separator = forRow && row >= this.first && (!query || "separator".startsWith(query));
+      const separator = forRow && (!query || "separator".startsWith(query));
       // (For a slot: the kinds whose item is one action, a snippet)
       const kinds = this.context.kinds().filter((kind) => (forRow || kind.action) && wordsStart(kind.label, query));
       const pickKind = (kind: ItemKind) => (forRow ? addKind(kind) : fillKind(kind));
@@ -1091,15 +1120,17 @@ export class SettingsDialog {
     if (!sameRows(favorites, initial.favorites)) changed[PATHS.favorites] = favorites;
     const touch = values.touchFavorites && savedRows(values.touchFavorites);
     if (JSON.stringify(touch) !== JSON.stringify(initial.touchFavorites)) changed[PATHS.touchFavorites] = touch;
-    // With either favourites written too: as it is now, not as told again from them (readSettings)
+    // With either favourites written too: as it is now, not as told again from them (readSettings); and the model's
+    // version they are written in, so they are never migrated (migrations/index.ts)
     if (values.touchOn !== initial.touchOn || PATHS.favorites in changed || PATHS.touchFavorites in changed) changed[PATHS.touchOn] = values.touchOn;
+    if (PATHS.favorites in changed || PATHS.touchFavorites in changed) changed[PATHS.version] = SETTINGS_VERSION;
     for (const name of MODULE_NAMES) if (values.modules[name] !== initial.modules[name]) changed[PATHS.module(name)] = values.modules[name];
     return changed;
   }
 
   /** Whether saving needs the page loaded anew: a module turned on or off, the key (the command's) */
   private reloads(changed: Readonly<Record<string, unknown>>): boolean {
-    return Object.keys(changed).some((path) => path !== PATHS.favorites && path !== PATHS.touchFavorites && path !== PATHS.touchOn && path !== PATHS.placement && path !== PATHS.placementTouch && path !== PATHS.show && path !== PATHS.showTouch && path !== PATHS.wordAtCaret);
+    return Object.keys(changed).some((path) => path !== PATHS.favorites && path !== PATHS.touchFavorites && path !== PATHS.touchOn && path !== PATHS.placement && path !== PATHS.placementTouch && path !== PATHS.show && path !== PATHS.showTouch && path !== PATHS.wordAtCaret && path !== PATHS.version);
   }
 
   private update(): void {

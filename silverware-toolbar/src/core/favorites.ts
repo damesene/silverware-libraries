@@ -6,8 +6,9 @@
 // that kind reads. An action's or a kind's item may have a fixed `width` of
 // its label (in characters, MIN_WIDTH to MAX_WIDTH: a longer one cut with an
 // ellipsis, a shorter one leaving the room, so what comes after it keeps its
-// place), and be pinned (`pin`: "left" or "right") at an end of the toolbar
-// docked at the bottom, out of what scrolls, wherever it is in its rows. An
+// place), and be pinned (`pin`: "left" or "right") at an end of its row where
+// the toolbar is docked (each row a line of its own there), out of what
+// scrolls, wherever it is in its row. An
 // action's item may have its own `icon` (a character, an emoji) and `label`
 // in place of the action's, as a text snippet has (its label also its
 // tooltip; an action offering choices shows the choice on, its own label its
@@ -106,19 +107,24 @@ export const DEFAULT_FAVORITES: Favorites = [
   [{ id: "actions.emoji", show: "label" }, { type: "separator" }, { id: "actions.more" }],
 ];
 
-/** The favourites for a finger (Touch): the same actions, the kin of one a swipe of its gesture button, so the bar at the bottom is short */
+/**
+ * The favourites for a finger (Touch): the same actions, the kin of one a
+ * swipe of its gesture button, in one row, so the bar docked at the bottom is
+ * one line
+ */
 export const DEFAULT_TOUCH_FAVORITES: Favorites = [
-  [{ id: "actions.turnInto", show: "label", width: 8, pin: "left" }],
   [
+    { id: "actions.turnInto", show: "label", width: 8, pin: "left" },
     { type: "gesture", tap: "formats.bold", up: "formats.italic", down: "formats.highlight" },
     { type: "gesture", tap: "formats.strikethrough", down: "formats.underline" },
-  ],
-  [
+    { type: "separator" },
     { type: "gesture", tap: "formats.link", up: "formats.wikiLink" },
     { type: "gesture", tap: "formats.code", up: "formats.codeBlock" },
+    { type: "separator" },
+    { id: "actions.emoji" },
+    // … pinned at the right end, a swipe down on it hiding the keyboard
+    { type: "gesture", tap: "actions.more", down: "actions.hideKeyboard", pin: "right" },
   ],
-  // … pinned at the right end, a swipe down on it hiding the keyboard
-  [{ id: "actions.emoji" }, { type: "gesture", tap: "actions.more", down: "actions.hideKeyboard", pin: "right" }],
 ];
 
 /**

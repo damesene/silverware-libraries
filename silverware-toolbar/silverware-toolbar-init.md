@@ -67,6 +67,11 @@ config.define("silverware.toolbar", {
       description = "The toolbar's rows where the screen is worked by finger (a phone, a tablet), as the favourites are written (gesture buttons need the Gestures module).",
       ui = { category = "Silverware Toolbar", label = "Favourite actions for touch", priority = 1.9 },
     },
+    -- No default: left out, the settings are of the first model (1), which the toolbar migrates (its migrations/)
+    ["settings-version"] = {
+      type = "number",
+      description = "The version of the model the toolbar's settings are written in: settings of an older one are migrated once and written back with it. The settings dialog writes it; set it yourself (2) with favourites you write by hand.",
+    },
     -- No default either: left out, on unless the favourites are the space's own and those for touch are not
     ["favorites-touch-enabled"] = {
       type = "boolean",

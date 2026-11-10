@@ -22,6 +22,7 @@ import { SETTINGS_STORE } from "../../playground/toolbar-store.ts";
 import { withConfigSettings } from "../../shared/configpage.ts";
 import { OWN_MARKER } from "../src/bridge.ts";
 import type { Favorites } from "../src/core/favorites.ts";
+import { SETTINGS_VERSION } from "../src/migrations/index.ts";
 
 export { expect };
 
@@ -49,11 +50,13 @@ export const TEST_FAVORITES: Favorites = [
   [{ id: "formats.bold" }, { id: "formats.italic" }, { id: "formats.code" }, { type: "separator" }, { id: "formats.link" }, { id: "formats.highlight" }, { type: "separator" }, { id: "actions.more" }],
 ];
 
-// The settings that give a test its favourites, by path (the playground's store, SilverBullet's CONFIG)
+// The settings that give a test its favourites, by path (the playground's store, SilverBullet's CONFIG), in the
+// model's version now (else migrated as the toolbar starts: migrations/)
 const favoriteSettings = (favorites: Favorites) => ({
   "silverware.toolbar.favorites": favorites,
   "silverware.toolbar.favorites-touch": favorites,
   "silverware.toolbar.favorites-touch-enabled": false,
+  "silverware.toolbar.settings-version": SETTINGS_VERSION,
 });
 
 /** Tests get `page` with the toolbar's sample open and the favourites asked for; an error in the page (thrown or logged) fails the test */
@@ -78,8 +81,8 @@ export const test = base.extend<{ favorites: Favorites | null }>({
         await writeFile(path, sample);
         // The favourites in the toolbar's own block, the rest in the Configuration Manager's: as the settings save them
         if (favorites) {
-          const { "silverware.toolbar.favorites-touch-enabled": enabled, ...tables } = favoriteSettings(favorites);
-          await writeFile(config, withConfigSettings(withConfigSettings("", tables, OWN_MARKER), { "silverware.toolbar.favorites-touch-enabled": enabled }));
+          const { "silverware.toolbar.favorites-touch-enabled": enabled, "silverware.toolbar.settings-version": version, ...tables } = favoriteSettings(favorites);
+          await writeFile(config, withConfigSettings(withConfigSettings("", tables, OWN_MARKER), { "silverware.toolbar.favorites-touch-enabled": enabled, "silverware.toolbar.settings-version": version }));
         }
         await watchReloads(page);
         await page.goto(`/${name}`);

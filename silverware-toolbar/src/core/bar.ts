@@ -4,11 +4,11 @@
 // it; separators between. … (the popup of every action) is an item as any
 // other; favourites without it get it pinned at the end of the last row. Pressing it keeps the editor's selection and focus (its mousedown
 // is prevented), so an action works on what is selected. Docked (a phone: the
-// system's menu of a selection is where it would be by it), it is one row
-// across the bottom of the window, over the on-screen keyboard: the rows one
-// after another, a separator between them, scrolled sideways, … at its end
-// always in view; items pinned left or right stay at its ends, out of what
-// scrolls; a list of choices opens over it. A label of a fixed width keeps
+// system's menu of a selection is where it would be by it), it is across the
+// bottom of the window, over the on-screen keyboard (or at the top), each row
+// a line of its own scrolled sideways, its items pinned left or right at its
+// ends, out of what scrolls, … at the last line's end always in view; a list
+// of choices opens over it. A label of a fixed width keeps
 // it, cut with an ellipsis where longer, so what follows keeps its place.
 import { ICONS } from "../icons.ts";
 import type { Action } from "./action.ts";
@@ -111,62 +111,68 @@ export class Bar {
   }
 
   /**
-   * Docked: one row across SilverBullet's editor (else the window) at its
-   * bottom or its top, the rows one after another; the items pinned left and
-   * right at its ends, out of what scrolls; `more`: … pinned at its end;
-   * `room`: room kept for it at the editor's edge, so it covers no text
+   * Docked: across SilverBullet's editor (else the window) at its bottom or
+   * its top, each row a line of its own, one under another: its items pinned
+   * left and right at the line's ends, out of what scrolls, the rest scrolled
+   * sideways; `more`: … pinned at the last line's end; `room`: room kept for
+   * it at the editor's edge, so it covers no text
    */
   dock(rows: readonly (readonly Shown[])[], at: Dock, more: Extract<Shown, { action: Action }> | undefined, room: boolean): void {
     this.closeMenu();
-    const pinned = (side: Pin) => rows.flatMap((row) => row.filter((item) => pinOf(item) === side));
-    const left = pinned("left");
-    const right = pinned("right");
-    // The rows without them, a separator then at a row's end or twice left out
-    const rest = rows
-      .map((row) => {
-        const kept = row.filter((item) => !pinOf(item));
-        return kept.filter((item, i) => !("separator" in item) || (i > 0 && i < kept.length - 1 && !("separator" in kept[i - 1]!)));
-      })
-      .filter((row) => row.some((item) => !("separator" in item)));
-    const items = this.doc.createElement("div");
-    items.className = "swb-row swb-dock-items";
-    rest.forEach((row, i) => {
-      if (i > 0 && row.length) items.append(this.divider());
-      items.append(...row.flatMap((item) => this.elementOf(item, true)));
-    });
-    // A shade at each end it scrolls further to (none at its ends)
-    const scroll = this.doc.createElement("div");
-    scroll.className = "swb-dock-scroll";
-    const shade = (side: string) => {
-      const element = this.doc.createElement("span");
-      element.className = `swb-dock-shade swb-dock-shade-${side}`;
-      element.setAttribute("aria-hidden", "true");
-      return element;
-    };
-    scroll.append(items, shade("left"), shade("right"));
+    const all = rows.length ? rows : [[]];
+    const lines = all.map((row, i) => this.dockLine(row, i === all.length - 1 ? more : undefined));
     this.shadeScroll = () => {
-      const more = items.scrollWidth - items.clientWidth - items.scrollLeft;
-      scroll.classList.toggle("swb-more-left", items.scrollLeft > 1);
-      scroll.classList.toggle("swb-more-right", more > 1);
+      for (const line of lines) line.shade();
     };
-    items.addEventListener("scroll", this.shadeScroll, { passive: true });
-    const end = (side: Pin, elements: readonly HTMLElement[]) => {
-      const group = this.doc.createElement("div");
-      group.className = `swb-row swb-dock-pinned swb-dock-pinned-${side}`;
-      group.append(...elements);
-      return group;
-    };
-    const ofItems = (shown: readonly Shown[]) => shown.flatMap((item) => this.elementOf(item, true));
-    this.element.replaceChildren(
-      ...(left.length ? [end("left", ofItems(left))] : []),
-      scroll,
-      ...(right.length || more ? [end("right", [...ofItems(right), ...(more ? [this.pinned(more)] : [])])] : []),
-    );
+    this.element.replaceChildren(...lines.map((line) => line.element));
     this.element.classList.add("swb-docked");
     if (!this.element.isConnected) this.doc.body.append(this.element);
     this.element.classList.add("swb-visible");
     this.placeDocked(at);
     this.keepRoom(room);
+  }
+
+  /** A row docked: a line, its items pinned left and right at its ends, the others scrolled sideways between them, shaded at an end it scrolls further to */
+  private dockLine(row: readonly Shown[], more: Extract<Shown, { action: Action }> | undefined): { readonly element: HTMLElement; readonly shade: () => void } {
+    const doc = this.doc;
+    const left = row.filter((item) => pinOf(item) === "left");
+    const right = row.filter((item) => pinOf(item) === "right");
+    // Without them, a separator then at an end or twice left out
+    const kept = row.filter((item) => !pinOf(item));
+    const rest = kept.filter((item, i) => !("separator" in item) || (i > 0 && i < kept.length - 1 && !("separator" in kept[i - 1]!)));
+    const items = doc.createElement("div");
+    items.className = "swb-row swb-dock-items";
+    items.append(...rest.flatMap((item) => this.elementOf(item, true)));
+    const scroll = doc.createElement("div");
+    scroll.className = "swb-dock-scroll";
+    const shadeOf = (side: string) => {
+      const element = doc.createElement("span");
+      element.className = `swb-dock-shade swb-dock-shade-${side}`;
+      element.setAttribute("aria-hidden", "true");
+      return element;
+    };
+    scroll.append(items, shadeOf("left"), shadeOf("right"));
+    const shade = () => {
+      const further = items.scrollWidth - items.clientWidth - items.scrollLeft;
+      scroll.classList.toggle("swb-more-left", items.scrollLeft > 1);
+      scroll.classList.toggle("swb-more-right", further > 1);
+    };
+    items.addEventListener("scroll", shade, { passive: true });
+    const end = (side: Pin, elements: readonly HTMLElement[]) => {
+      const group = doc.createElement("div");
+      group.className = `swb-row swb-dock-pinned swb-dock-pinned-${side}`;
+      group.append(...elements);
+      return group;
+    };
+    const ofItems = (shown: readonly Shown[]) => shown.flatMap((item) => this.elementOf(item, true));
+    const line = doc.createElement("div");
+    line.className = "swb-dock-line";
+    line.append(
+      ...(left.length ? [end("left", ofItems(left))] : []),
+      scroll,
+      ...(right.length || more ? [end("right", [...ofItems(right), ...(more ? [this.pinned(more)] : [])])] : []),
+    );
+    return { element: line, shade };
   }
 
   /**

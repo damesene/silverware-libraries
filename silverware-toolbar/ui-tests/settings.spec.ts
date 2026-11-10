@@ -6,6 +6,8 @@ const dialog = (page: Page): Locator => page.locator(".swb-settings");
 const tab = (page: Page, id: string): Locator => dialog(page).locator(`[data-swb-tab="${id}"]`);
 const item = (page: Page, row: number, index: number): Locator => dialog(page).locator(`[data-swb-item="${row}:${index}"]`);
 const rowItems = (page: Page, row: number): Locator => dialog(page).locator(`[data-swb-items="${row}"] .swb-settings-item-name`);
+// Touch's own: a zone of a row (pinned left, the others: middle, pinned right)
+const zoneItems = (page: Page, row: number, zone: string): Locator => dialog(page).locator(`[data-swb-items="${row}"][data-swb-zone="${zone}"] .swb-settings-item-name`);
 const save = (page: Page): Locator => dialog(page).locator(".swb-settings-save");
 
 /** The settings opened as a user would: the popup of every action, its last item */
@@ -203,11 +205,12 @@ test.describe("The settings dialog", () => {
     await expect(dialog(page).locator(".swb-settings-rows-same")).toBeVisible();
     await dialog(page).locator(".swb-settings-devices .swb-settings-switch").click();
     await expect(dialog(page).locator(".swb-settings-rows-same")).toHaveCount(0);
-    // Touch's own: its rows after the boxes of its pinned items (none pinned yet)
-    await expect(dialog(page).locator(".swb-settings-pin-box")).toHaveCount(2);
-    await expect(rowItems(page, 3)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
-    await item(page, 3, 0).locator(".swb-settings-remove").click();
-    await expect(rowItems(page, 3)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
+    // Touch's own: each row with its boxes of items pinned left and right (none pinned yet)
+    await expect(dialog(page).locator(".swb-settings-zones")).toHaveCount(2);
+    await expect(dialog(page).locator('[data-swb-zone="left"]')).toHaveCount(2);
+    await expect(rowItems(page, 1)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
+    await item(page, 1, 0).locator(".swb-settings-remove").click();
+    await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
     // Click's as they were; then Touch's copied over them, and back from Touch
     await dialog(page).locator('[data-swb-device="click"]').click();
     await expect(rowItems(page, 1)).toHaveText(["Bold", "Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
@@ -221,39 +224,42 @@ test.describe("The settings dialog", () => {
     await dialog(page).locator(".swb-settings-copy-from").click();
     await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
     await dialog(page).locator('[data-swb-device="touch"]').click();
-    await expect(rowItems(page, 3)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
+    await expect(rowItems(page, 1)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
   });
 
-  test("Touch: an item dragged into Pinned left is pinned there, saved so; dragged out, it is not", async ({ page }) => {
+  test("Touch: an item dragged into its row's Pinned left is pinned there, saved so; unpinned in its panel; Alt+arrows keep it in its zone", async ({ page }) => {
     await openSettings(page);
     await tab(page, "favorites").click();
     await dialog(page).locator('[data-swb-device="touch"]').click();
     await dialog(page).locator(".swb-settings-devices .swb-settings-switch").click();
-    const left = dialog(page).locator('[data-swb-items="0"]');
+    const left = dialog(page).locator('[data-swb-items="1"][data-swb-zone="left"]');
     const box = (await left.boundingBox())!;
-    const bold = (await item(page, 3, 0).boundingBox())!;
-    await page.mouse.move(bold.x + 4, bold.y + bold.height / 2);
+    const code = (await item(page, 1, 2).boundingBox())!;
+    await page.mouse.move(code.x + 4, code.y + code.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + 10, box.y + box.height / 2, { steps: 8 });
     await page.mouse.up();
-    await expect(rowItems(page, 0)).toHaveText(["Bold"]);
-    await expect(rowItems(page, 3)).toHaveText(["Italic", "Code", "Separator", "Link", "Highlight", "Separator", "Every action"]);
+    await expect(zoneItems(page, 1, "left")).toHaveText(["Code"]);
+    await expect(zoneItems(page, 1, "middle")).toHaveText(["Bold", "Italic", "Separator", "Link", "Highlight", "Separator", "Every action"]);
+    // The first row's own zones untouched
+    await expect(zoneItems(page, 0, "left")).toHaveCount(0);
     await save(page).click();
     await expect(dialog(page)).toHaveCount(0);
-    // Read back: pinned
+    // Read back: pinned in its row; docked, at that row's line's left end (a finger's: Touch's)
     await openSettings(page);
     await tab(page, "favorites").click();
     await dialog(page).locator('[data-swb-device="touch"]').click();
-    await expect(rowItems(page, 0)).toHaveText(["Bold"]);
-    // Out again with the keyboard, into the first row (not into Pinned right): no longer pinned
-    await item(page, 0, 0).focus();
-    await page.keyboard.press("Alt+ArrowDown");
-    await expect(rowItems(page, 0)).toHaveCount(0);
-    await expect(rowItems(page, 1)).toHaveCount(0);
-    await expect(rowItems(page, 2)).toHaveText(["Bold", "Turn into"]);
-    // And back up into Pinned left
+    await expect(zoneItems(page, 1, "left")).toHaveText(["Code"]);
+    // Alt+↑ into the row above, its own Pinned left
+    await item(page, 1, 0).focus();
     await page.keyboard.press("Alt+ArrowUp");
-    await expect(rowItems(page, 0)).toHaveText(["Bold"]);
+    await expect(zoneItems(page, 0, "left")).toHaveText(["Code"]);
+    await expect(zoneItems(page, 1, "left")).toHaveCount(0);
+    // Unpinned in its panel: Pin, None
+    await item(page, 0, 0).click();
+    await dialog(page).locator('[data-swb-look] [data-swb-pin="none"]').click();
+    await expect(zoneItems(page, 0, "left")).toHaveCount(0);
+    await expect(rowItems(page, 0)).toHaveText(["Code", "Turn into"]);
   });
 
   test("with a mouse: an action for a touch screen only (Hide the keyboard) not in the popup nor Click's search, but in Touch's, to set them here", async ({ page }) => {
@@ -269,12 +275,12 @@ test.describe("The settings dialog", () => {
     await expect(dialog(page).locator(".swb-settings-pick")).toHaveCount(0);
     await dialog(page).locator('[data-swb-device="touch"]').click();
     await dialog(page).locator(".swb-settings-devices .swb-settings-switch").click();
-    await dialog(page).locator('[data-swb-row="3"] .swb-settings-add').click();
+    await dialog(page).locator('[data-swb-row="1"] .swb-settings-add').click();
     await dialog(page).locator(".swb-settings-pick-field").fill("hide the keyboard");
     await page.keyboard.press("Enter");
-    await expect(rowItems(page, 3).last()).toHaveText("Hide the keyboard");
+    await expect(rowItems(page, 1).last()).toHaveText("Hide the keyboard");
     // Known: not dimmed as an action no module gives
-    await expect(item(page, 3, 8)).not.toHaveClass(/swb-settings-unknown/);
+    await expect(item(page, 1, 8)).not.toHaveClass(/swb-settings-unknown/);
   });
 
   test("Every action removed: the editor says it is required, and the toolbar has it pinned at its end", async ({ page }) => {

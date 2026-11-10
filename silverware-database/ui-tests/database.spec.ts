@@ -286,11 +286,14 @@ test("a timeline's bar dragged to its right edge scrolls it, as a board's card d
   const before = await scroller.evaluate((one) => one.scrollLeft);
   const from = (await bar.boundingBox())!;
   const edge = (await scroller.boundingBox())!;
-  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  const [start, end] = [from.x + from.width / 2, edge.x + edge.width - 6];
+  await page.mouse.move(start, from.y + from.height / 2);
   await page.mouse.down();
-  await page.mouse.move(edge.x + edge.width - 6, from.y + from.height / 2, { steps: 8 });
-  // Held at the edge: it scrolls on, the pointer still (waited for as it goes, frame by frame)
-  await expect.poll(() => scroller.evaluate((one) => one.scrollLeft)).toBeGreaterThan(before + 200);
+  await page.mouse.move(end, from.y + from.height / 2, { steps: 8 });
+  // Held at the edge: it scrolls on, the pointer still; let go once the pointer's way and the scroll come to past the 20th
+  // day (a day as wide as the bar of one: waited for as it scrolls, not for a time, which let it go short on a fast runner)
+  const days = async () => (end - start + (await scroller.evaluate((one) => one.scrollLeft)) - before) / from.width;
+  await expect.poll(days).toBeGreaterThan(21);
   await page.mouse.up();
   await expect.poll(() => space.saved("Page/db-tasks/Trip")).not.toContain(`due: "${day(1)}"`);
   const saved = /due: "(\d{4}-\d{2}-\d{2})"/.exec((await space.saved("Page/db-tasks/Trip")) ?? "")![1]!;

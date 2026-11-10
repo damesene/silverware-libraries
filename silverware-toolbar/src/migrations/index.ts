@@ -7,10 +7,8 @@
 // `silverware.toolbar.version`: a migration runs where the space's
 // is lower than its own, and the changes are written back with the version,
 // so what is set in the new model is never migrated again. A space that set
-// nothing has nothing to migrate: nothing is written. Version 2 is the model
-// of lists of favourites (core/toolbars.ts, 2026-11-10); nobody used the one
-// before, so there is no migration to it (the user's decision): the first one
-// written will lead to 3.
+// nothing has nothing to migrate: nothing is written.
+import { toolbars } from "./2-toolbars.ts";
 
 /** The setting holding the model's version (not set: 1, the model before any migration) */
 export const VERSION_PATH = "silverware.toolbar.version";
@@ -25,11 +23,11 @@ export type Migration = {
   readonly migrate: (read: ReadSetting) => Promise<Readonly<Record<string, unknown>>>;
 };
 
-/** In the order they run, their versions rising (none yet: the model's first version written is 2) */
-export const MIGRATIONS: readonly Migration[] = [];
+/** In the order they run, their versions rising */
+export const MIGRATIONS: readonly Migration[] = [toolbars];
 
-/** The model's version now: the last migration's, else the first one written */
-export const SETTINGS_VERSION = MIGRATIONS.reduce((version, m) => Math.max(version, m.version), 2);
+/** The model's version now: the last migration's */
+export const SETTINGS_VERSION = MIGRATIONS.reduce((version, m) => Math.max(version, m.version), 1);
 
 /**
  * What the migrations a space's settings need write, by path, with the

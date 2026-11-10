@@ -651,7 +651,12 @@ Defaults: *Float* (by the selection, after selecting text, Click) and
 *Docked* (at the bottom, while writing, Touch). Pinned items' boxes only for
 a docked toolbar; by the selection a pin orders its row only, kept for when
 it docks, marked by a pin, and an item moved by hand loses a pin that would
-undo the order. No migration: nobody used the settings of before, the model
-of toolbars is version 2 (the user's call). A toolbar without *Every action*
+undo the order. The settings of before (version 1) migrate to version 2
+(migrations/2-toolbars.ts, the user's call after first deciding against one):
+Click's and Touch's favourites each a toolbar where and when that way of
+working showed them, one for both where alike, a finger without its own
+given Click's, Touch's own turned off kept for none, a docked one's rows
+joined as its one line showed them; the keys of before taken out of either
+block of CONFIG (index.ts saveSettings takes a setting out wherever it was). A toolbar without *Every action*
 says so with a button putting it at the end of its last row (docked: pinned
 right).

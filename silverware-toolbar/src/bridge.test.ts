@@ -36,8 +36,10 @@ describe("Settings", () => {
     expect(settings.toolbars).toEqual([{ name: "Mine", useFor: ["click", "touch"], placement: "selection", show: "selection", rows: [[{ id: "formats.bold" }]] }]);
     expect(settings.modules.has("clear")).toBe(false);
     expect((await readSettings(bridge(one([1, 2])))).toolbars).toEqual(defaultToolbars());
-    // The rows of before (no lists): the defaults
-    expect((await readSettings(bridge({ "silverware.toolbar.favorites": [[{ id: "formats.bold" }]] }))).toolbars).toEqual(defaultToolbars());
+    // The rows of before (the model of 1): migrated to toolbars, said to be written back with the version
+    const before = await readSettings(bridge({ "silverware.toolbar.favorites": [[{ id: "formats.bold" }]] }));
+    expect(before.toolbars.map((toolbar) => [toolbar.name, toolbar.useFor, toolbar.rows])).toEqual([["Float", ["click"], [[{ id: "formats.bold" }]]], ["Docked", ["touch"], [[{ id: "formats.bold" }]]]]);
+    expect(before.migrated["silverware.toolbar.version"]).toBe(2);
   });
 
   it("read lists leniently: a name taken, one without a name or rows, more than 5 left out; what each is used for normalized", async () => {

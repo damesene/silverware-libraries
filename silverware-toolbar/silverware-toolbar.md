@@ -73,7 +73,7 @@ config.set("silverware.toolbar.favorites", {
 config.set("silverware.toolbar.version", 2)
 ```
 
-The settings carry the version of their model, `silverware.toolbar.version` (the settings dialog writes it): settings of an older version are updated once, as the toolbar starts, and written back to CONFIG with the new version. Write it with toolbars you write by hand.
+The settings carry the version of their model, `silverware.toolbar.version` (the settings dialog writes it): settings of an older version are updated once, as the toolbar starts, and written back to CONFIG with the new version. Version 1, the favourites of each device and where and when each device's toolbar showed, becomes toolbars showing the same: Click's and Touch's favourites each a toolbar where and when they showed (one for both where they showed alike; a phone without favourites of its own gets Click's; favourites for touch you had turned off kept as a toolbar for none), a docked one's rows one row as it showed them in one line; the keys of before are taken out. Write `version = 2` with toolbars you write by hand.
 
 ### Text snippets
 

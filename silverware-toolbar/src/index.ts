@@ -141,9 +141,11 @@ async function saveSettings(bridge: Bridge, values: Readonly<Record<string, unkn
     return;
   }
   if (!bridge.readPage || !bridge.saveConfigPage) throw new Error("no configuration page to save to");
-  // Tables (the lists of favourites) in the toolbar's own block
+  // Tables (the toolbars) in the toolbar's own block, the rest in the Configuration Manager's; a setting taken out
+  // (undefined: a key of before, migrated) out of either, wherever it was written
   const { [PATHS.favorites]: favorites, ...scalars } = values;
-  const tables = PATHS.favorites in values ? { [PATHS.favorites]: favorites } : {};
+  const gone = Object.fromEntries(Object.entries(values).filter(([, value]) => value === undefined));
+  const tables = { ...gone, ...(PATHS.favorites in values ? { [PATHS.favorites]: favorites } : {}) };
   await saveConfigPage(
     { readPage: (name) => bridge.readPage!(name), saveConfigPage: (text) => bridge.saveConfigPage!(text) },
     (text) => withConfigSettings(withConfigSettings(text, scalars), tables, OWN_MARKER),

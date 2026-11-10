@@ -186,6 +186,17 @@ box for the moment its set loads the first time (356 kB unpacked from the dev
 server), then drawn. The picker's rules are scoped under `.swi-picker`: the
 toolbar's dialog sets `button { font: inherit }`, which shrank the emoji.
 
+Done in step 6 (Silverware Database): `UserInterface.icons` (shared/platform.ts),
+which the binding fills from its bridge (`iconsOf(bridge.icons)`, the init page
+handing `silverware.icons.api` over); `ModuleHost.icons` for the pickers;
+`ItemLooks.ownIcon(value, className)` beside `icon(item)`, so a view and a
+module draw a property's own icon as an item's (core/look.ts `ownIconElement`,
+`swd-own-icon`); `validateIcon` takes a reference by its form (shared/iconref.ts,
+pure, which the domain may import: its isolation test allows it); the peek's
+and the properties dialog's pickers `iconChoice` (views/popover.ts) over
+`Icons.pick`, every set. shared/emoji.ts, shared/emoji.css, both plugins' emoji
+files and the build's emoji loop gone.
+
 ## The picker
 
 - Its markup and CSS are Silverware Icons' (`swi-*`, its style page), one look
@@ -318,9 +329,10 @@ this file) in step with the code, the local SilverBullet after each.
 - Verified in the local SilverBullet (step 2, 2026-11-10): the API page's
   `silverware.icons.api` called from Lua (`markup`, `text`), the set's file
   loaded beside the bundle (`import.meta.url`, as the emoji file), Lucide's
-  aliases followed (`lucide:home`). Still to see in step 5: the object handed
-  to the toolbar through its bridge, called from its JS synchronously; the
-  observer's cost while a set loads.
+  aliases followed (`lucide:home`); (step 5) the object handed to the toolbar
+  through its bridge and called from its JS synchronously (the Emoji action's
+  picker drawn, 1898 emoji). Not measured: the observer's cost while a set
+  loads.
 - Lucide's repository at the tag of 1.71.0 (seen on `main`, 2026-11-10:
   `icons/house.json` with `categories` and `aliases`, `categories/home.json`
   with `title` and `icon`).

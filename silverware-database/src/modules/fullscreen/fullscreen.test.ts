@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { iconsOf } from "../../../../shared/icons.ts";
 import { afterEach, describe, expect, it } from "vitest";
 import { DatabaseCore } from "../../core/core.ts";
 import { documentsHost } from "../../core/documents.ts";
@@ -24,6 +25,7 @@ async function setup(on = true) {
     on ? [FULLSCREEN_MODULE] : [],
     {
       document,
+      icons: iconsOf(undefined),
       core,
       types,
       ui,

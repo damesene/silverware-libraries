@@ -1,7 +1,9 @@
 // How an item looks besides its values (model/database.ts `ItemLook`): an
-// icon, one character (an emoji, as the picker gives it), and a color of the
+// icon, one character (an emoji, as the picker gives it) or an icon of a set of
+// Silverware Icons (`lucide:house`, shared/icons.ts), and a color of the
 // palette (domain/colors.ts). What may be one is the domain's; where it is
 // kept, the store's; how it shows, the core's (core/look.ts).
+import { isReference } from "../../../shared/iconref.ts";
 import type { ItemLook } from "../model/database.ts";
 import { isColor } from "./colors.ts";
 
@@ -12,7 +14,9 @@ const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 /** Why something cannot be an item's icon, undefined where it can */
 export function validateIcon(icon: unknown): string | undefined {
   if (typeof icon !== "string" || !icon) return "An icon is a character";
-  if (icon.length > ICON_MAX || [...segmenter.segment(icon)].length !== 1) return "An icon is one character (an emoji)";
+  // (Whether its set is installed or loaded is not asked: a value read is never dropped for it)
+  if (isReference(icon)) return undefined;
+  if (icon.length > ICON_MAX || [...segmenter.segment(icon)].length !== 1) return "An icon is one character (an emoji) or an icon picked";
   if (/^[\s\p{C}]/u.test(icon)) return "An icon is a character that shows";
   return undefined;
 }

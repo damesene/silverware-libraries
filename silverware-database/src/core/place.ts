@@ -4,6 +4,7 @@
 // core's writes), the view's own data (its meta) kept in the place's state
 // under its name. What makes a place and when it goes is the binding's
 // (docs/silverware-database.md, *The core*).
+import { iconsOf } from "../../../shared/icons.ts";
 import { el } from "../../../shared/elements.ts";
 import type { Editor, Settings, UserInterface } from "../../../shared/platform.ts";
 import { type Filter, listItems, type SortKey, textOf, typeOf, validateCondition } from "../domain/listing.ts";
@@ -19,7 +20,7 @@ import { arrangementEntries, groupEntries, hidesByDefault, propertyEntries, STAT
 import { focusPropertyList, propertiesEntry, type PropertiesFocus } from "./propertiesmenu.ts";
 import { drawGrouped } from "./groups.ts";
 import { ICONS } from "./icons.ts";
-import { type ColorBy, colorable, itemIcon, itemLook } from "./look.ts";
+import { type ColorBy, colorable, itemIcon, itemLook, ownIconElement } from "./look.ts";
 import type { OpenedFrom, OpenedView, PlaceContext, PlaceTool } from "./module.ts";
 import { PlaceOpener } from "./opener.ts";
 import type { MenuEntry, MenuNaming } from "../../../shared/menu.ts";
@@ -40,7 +41,7 @@ export type PlaceOptions = {
   readonly types: TypeRegistry;
   readonly views: ViewRegistry;
   readonly settings: Pick<Settings, "get">;
-  readonly ui: Pick<UserInterface, "notify">;
+  readonly ui: Pick<UserInterface, "notify" | "icons">;
   readonly editor?: Pick<Editor, "open" | "openMention">;
   /** The documents references name (core/documents.ts); none: no document offered nor opened */
   readonly documents?: DocumentsSource;
@@ -983,7 +984,8 @@ export class DatabasePlace {
         validateCondition,
       },
       look: {
-        icon: (item) => itemIcon(this.options.element.ownerDocument, item),
+        icon: (item) => itemIcon(this.options.element.ownerDocument, item, iconsOf(this.options.ui.icons)),
+        ownIcon: (value, className) => ownIconElement(this.options.element.ownerDocument, value, iconsOf(this.options.ui.icons), className),
         item: (item, element) => itemLook(item, element, colorBy()),
         get shownProperties() {
           return shownProperties();

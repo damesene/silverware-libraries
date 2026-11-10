@@ -2,6 +2,7 @@
 // editor, space, index, config and UI API): the one place that knows what
 // SilverBullet's API is called and what it answers. Everything else asks the
 // platform (shared/platform.ts).
+import { iconsOf } from "../../../../shared/icons.ts";
 import { saveConfigPage, withConfigSettings } from "../../../../shared/configpage.ts";
 import type { Choice, IndexChange, IndexedObject, Platform } from "../../../../shared/platform.ts";
 import { PAGE_KEYS, pageDates, referablePages, tasksOfPages, validatePageName } from "./pages.ts";
@@ -9,6 +10,8 @@ import { settledIndex } from "./settledindex.ts";
 
 /** What the init page hands over, each SilverBullet's own function or a few lines of Lua around it */
 export type Bridge = {
+  // Silverware Icons' API where it is installed (`silverware.icons.api`; shared/icons.ts `iconsOf` reads it)
+  readonly icons?: unknown;
   getCurrentPage(): Promise<string>;
   getText(): Promise<string>;
   replaceRange(from: number, to: number, text: string): Promise<void>;
@@ -123,6 +126,7 @@ export function silverBulletPlatform(bridge: Bridge): {
       },
     },
     ui: {
+      icons: iconsOf(bridge.icons),
       // (Its timeout and buttons where given, nothing else: SilverBullet's defaults for what is not)
       notify: (message, options) => {
         const more = { ...(options?.timeout === undefined ? {} : { timeout: options.timeout }), ...(options?.actions?.length ? { actions: options.actions } : {}) };

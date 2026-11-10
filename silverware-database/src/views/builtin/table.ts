@@ -53,7 +53,7 @@ function draw(host: ViewHost, element: HTMLElement, editing: Editing): void {
           doc,
           "button",
           { class: "swd-table-sort", title: `Sort by ${column.label}`, run: () => void host.listing.setSort(nextSort(host, column.key)) },
-          ...((own) => (own ? [el(doc, "span", { class: "swd-table-head-icon", text: own, attrs: { "aria-hidden": "true" } })] : []))(column.property && ownIcon(column.property)),
+          ...((own) => (own ? [host.look.ownIcon(own, "swd-table-head-icon")] : []))(column.property && ownIcon(column.property)),
           ...headLabel(doc, column.label, sorted?.key === column.key ? (sorted.direction === "asc" ? "↑" : "↓") : undefined),
         ),
       ),

@@ -1,15 +1,10 @@
 // A picker opened under its button, in a box the caller names (the peek's top,
 // a property's details): one at a time, closed by Esc (the place around it
 // staying open), a press beside it, or what is picked, its button focused
-// again; and the emoji choice drawn in one (the emoji picker of shared/, a
-// title, Remove), as an item's icon and a property's are picked.
-import { emojiLoader, emojiPicker } from "../../../shared/emoji.ts";
+// again; and the icons' choice drawn in one (Silverware Icons' picker, its
+// icons and emoji; a title, Remove), as an item's icon and a property's are picked.
 import { el } from "../../../shared/elements.ts";
-
-// The emoji's data beside the bundle, as SilverBullet installs the library's files (scripts/emoji.mjs)
-const loadEmoji = emojiLoader(new URL("./silverware-database-emoji.js", import.meta.url));
-// Those used last, kept per browser (not a setting)
-const RECENT_KEY = "silverware.database.recentEmoji";
+import type { Icons } from "../../../shared/icons.ts";
 
 export type Popovers = {
   /**
@@ -70,11 +65,11 @@ export function popovers(doc: Document): Popovers {
   };
 }
 
-/** The emoji choice in a picker's box: its title, Remove where there is one to take off (`remove`), the emoji picker */
-export function emojiChoice(doc: Document, box: HTMLElement, title: string, pick: (emoji: string) => void, remove?: () => void): () => void {
+/** The icons' choice in a picker's box: its title, Remove where there is one to take off (`remove`), Silverware Icons' picker (its stand-in saying it is needed) */
+export function iconChoice(doc: Document, icons: Icons, box: HTMLElement, title: string, pick: (icon: string) => void, remove?: () => void): () => void {
   const head = el(doc, "div", "swd-pop-head", el(doc, "span", { class: "swd-pop-title", text: title }));
   if (remove) head.append(el(doc, "button", { class: "swd-pop-remove", text: "Remove", run: remove }));
-  const picker = el(doc, "div", "swd-pop-emoji");
+  const picker = el(doc, "div", "swd-pop-icons");
   box.append(head, picker);
-  return emojiPicker({ doc, element: picker, base: "swd", load: loadEmoji, recentKey: RECENT_KEY, pick });
+  return icons.pick(picker, { picked: pick });
 }

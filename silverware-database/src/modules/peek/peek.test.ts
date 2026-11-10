@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { iconsOf } from "../../../../shared/icons.ts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DatabaseCore } from "../../core/core.ts";
 import { Modules } from "../../core/module.ts";
@@ -44,6 +45,7 @@ async function setup(answer = true, withProperties = false, configured: Record<s
     withProperties ? [PROPERTIES_MODULE, PEEK_MODULE] : [PEEK_MODULE],
     {
       document,
+      icons: iconsOf(undefined),
       core,
       types,
       ui,

@@ -3,7 +3,6 @@
 // from its template (scripts/sharedstyles.mjs).
 import * as esbuild from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
-import { emojiModuleText } from "./icons/emoji.mjs";
 import { iconFiles } from "./icons/index.mjs";
 import { sharedStyles } from "./sharedstyles.mjs";
 
@@ -41,17 +40,6 @@ for (const { entry, outfile, name } of [...libraries.map((name) => ({ entry: `${
   } else {
     await esbuild.build(options);
   }
-}
-// The emoji data beside the bundle of each plugin with the emoji picker (shared/emoji.ts; scripts/icons/emoji.mjs), made from
-// the package as installed: one each, as a plugin is installed without the others
-for (const emojiFile of ["silverware-database/silverware-database-emoji.js"]) {
-  if (check) {
-    const committed = (await readFile(emojiFile, "utf8").catch(() => "")).replaceAll("\r\n", "\n");
-    if (committed !== emojiModuleText()) {
-      console.error(`${emojiFile} does not match emojibase-data: run npm run build`);
-      stale++;
-    }
-  } else await writeFile(emojiFile, emojiModuleText());
 }
 // Silverware Icons' sets beside its bundle and its manifest (scripts/icons/index.mjs), made from the packages as installed
 for (const { path, text } of iconFiles()) {

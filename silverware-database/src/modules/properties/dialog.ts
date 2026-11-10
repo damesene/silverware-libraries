@@ -22,7 +22,7 @@ import { colorsOf, OPTION_COLORS, type OptionColor } from "../../domain/types/op
 import type { PropertyType } from "../../domain/types/type.ts";
 import type { Database, Property } from "../../model/database.ts";
 import { ownIcon, propertyIcon } from "../../views/icons.ts";
-import { emojiChoice, type Popovers, popovers } from "../../views/popover.ts";
+import { iconChoice, type Popovers, popovers } from "../../views/popover.ts";
 import { optionPill, pill } from "../../views/values.ts";
 
 // A system property's choice among the new property's types: `system:<kind>`
@@ -463,7 +463,7 @@ export class PropertiesDialog {
     const mark = entry.removed ? "Removed" : !entry.saved ? "New" : this.changedEntry(entry) ? "Changed" : undefined;
     head.setAttribute("aria-label", `${property.label}, ${type?.label ?? property.type}${property.required ? ", required" : ""}${property.system ? ", given by the system" : property.readonly ? ", locked in views" : ""}${mark ? `, ${mark.toLowerCase()} (on Save)` : ""}`);
     head.replaceChildren(
-      propertyIcon(doc, property, type, "swd-prop-icon"),
+      propertyIcon(doc, this.host.look, property, type, "swd-prop-icon"),
       el(doc, "span", { class: "swd-prop-name", text: property.label || "(no name)" }, ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", title: "Required", attrs: { "aria-hidden": "true" } })] : [])),
       ...(mark ? [el(doc, "span", { class: `swd-prop-mark swd-prop-mark-${mark.toLowerCase()}`, text: mark, title: `${mark}: written on Save` })] : []),
       ...(property.readonly ? [el(doc, "span", { class: "swd-prop-lock", html: LOCK, title: property.system ? "Given by the system" : "Locked in views" })] : []),
@@ -588,7 +588,7 @@ export class PropertiesDialog {
         }),
     });
     const field = (name: string, control: HTMLElement, hint?: string) => el(doc, "label", "swd-prop-field", el(doc, "span", "swd-prop-field-name", name, ...(hint ? [el(doc, "span", { class: `${BASE}-hint`, text: hint })] : [])), control);
-    // Its own icon (an emoji) where the views name it, picked under its button (the emoji choice, Remove: its type's again)
+    // Its own icon (an emoji, an icon picked) where the views name it, picked under its button (the icons' choice, Remove: its type's again)
     const own = ownIcon(property);
     const setIcon = (icon: string | undefined) => {
       this.pickers?.close();
@@ -605,10 +605,10 @@ export class PropertiesDialog {
         class: "swd-property-icon",
         title: own ? "Change its icon" : "Give it an icon of its own",
         attrs: { "aria-label": `Icon of ${property.label}`, "aria-haspopup": "dialog", "aria-expanded": "false" },
-        run: () => (this.pickers ??= popovers(doc)).open(iconButton, this.body!, "Icon", (box) => emojiChoice(doc, box, "Icon", (emoji) => setIcon(emoji), own ? () => setIcon(undefined) : undefined)),
+        run: () => (this.pickers ??= popovers(doc)).open(iconButton, this.body!, "Icon", (box) => iconChoice(doc, this.host.icons, box, "Icon", (icon) => setIcon(icon), own ? () => setIcon(undefined) : undefined)),
       },
-      propertyIcon(doc, property, typeOf(types, property), "swd-property-icon-shown"),
-      el(doc, "span", { class: "swd-property-icon-text", text: own ? "Change" : "Its type's: choose an emoji" }),
+      propertyIcon(doc, this.host.look, property, typeOf(types, property), "swd-property-icon-shown"),
+      el(doc, "span", { class: "swd-property-icon-text", text: own ? "Change" : "Its type's: choose an icon" }),
     );
     // (Not a label: a press on its name would open the picker again as it closes it)
     const iconField = el(doc, "div", "swd-prop-field", el(doc, "span", "swd-prop-field-name", "Icon"), iconButton);

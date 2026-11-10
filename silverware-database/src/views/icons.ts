@@ -1,6 +1,7 @@
 // Icons the views and modules draw, 16 × 16 in the text's color: a property
 // type's (by its name, or the icon it names; a type of the user's the text's), opening an item, going
 // back, closing, editing (a pencil).
+import type { ItemLooks } from "../core/view.ts";
 import { el } from "../../../shared/elements.ts";
 import { validateIcon } from "../domain/look.ts";
 import type { Property } from "../model/database.ts";
@@ -25,15 +26,15 @@ const TYPE_ICONS: Readonly<Record<string, string>> = {
   url: svg('<path d="M6.75 9.25a2.75 2.75 0 0 0 3.9 0l2-2a2.75 2.75 0 0 0-3.9-3.9l-.75.75"/><path d="M9.25 6.75a2.75 2.75 0 0 0-3.9 0l-2 2a2.75 2.75 0 0 0 3.9 3.9l.75-.75"/>'),
 };
 
-/** A property's own icon (an emoji, as its schema keeps it) where it is one, else none: its type's then (`typeIcon`) */
+/** A property's own icon (an emoji, `lucide:house`, as its schema keeps it) where it is one, else none: its type's then (`typeIcon`) */
 export function ownIcon(property: Property): string | undefined {
   return property.icon && !validateIcon(property.icon) ? property.icon : undefined;
 }
 
-/** A property's icon where the views name it: its own (an emoji, as large as the text), else its type's; `className` the place's */
-export function propertyIcon(doc: Document, property: Property, type: Pick<PropertyType, "name" | "icon">, className: string): HTMLElement {
+/** A property's icon where the views name it: its own (as large as the text, drawn by `looks`), else its type's; `className` the place's */
+export function propertyIcon(doc: Document, looks: Pick<ItemLooks, "ownIcon">, property: Property, type: Pick<PropertyType, "name" | "icon">, className: string): HTMLElement {
   const own = ownIcon(property);
-  return own ? el(doc, "span", { class: `${className} swd-prop-own-icon`, text: own, attrs: { "aria-hidden": "true" } }) : el(doc, "span", { class: className, html: typeIcon(type.icon ?? type.name) });
+  return own ? looks.ownIcon(own, `${className} swd-prop-own-icon`) : el(doc, "span", { class: className, html: typeIcon(type.icon ?? type.name) });
 }
 
 /** A property type's icon (a type the views do not know: the text's) */

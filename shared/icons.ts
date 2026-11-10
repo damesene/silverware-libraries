@@ -1,28 +1,10 @@
-// Icons as the plugins keep them (docs/silverware-icons.md): an icon of a set of Silverware Icons is written
-// `<set>:<name>` (`lucide:house`), anything else is text shown as it is (an emoji, "H1"). Its form alone tells
-// them apart, so a plugin reads, checks and keeps a value without Silverware Icons installed or its sets loaded.
+// Icons as the plugins draw and pick them (docs/silverware-icons.md): Silverware Icons' API as a plugin's init page
+// hands it over, or its stand-in without it (`iconsOf`); how a value is written (`<set>:<name>` or text) is
+// iconref.ts's, pure, which this file gives on.
 
-const REFERENCE_RE = /^([a-z][a-z0-9-]*):([a-z0-9][a-z0-9-]*)$/;
+import { isReference, referenceOf } from "./iconref.ts";
 
-/** An icon of a set: its set's name and its name */
-export type IconReference = { readonly set: string; readonly name: string };
-
-/** A value's reference to an icon of a set, undefined where it is text */
-export function referenceOf(value: string): IconReference | undefined {
-  const match = REFERENCE_RE.exec(value);
-  return match ? { set: match[1]!, name: match[2]! } : undefined;
-}
-
-/** Whether a value is a reference to an icon of a set (`lucide:house`), by its form */
-export function isReference(value: string): boolean {
-  return REFERENCE_RE.test(value);
-}
-
-/** A name of an icon as people read it: `arrow-big-down` Arrow big down (as scripts/icons/lucide.mjs labels them) */
-export function iconLabelOf(name: string): string {
-  const words = name.split("-").join(" ");
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
+export { type IconReference, iconLabelOf, isReference, referenceOf } from "./iconref.ts";
 
 /** The version of Silverware Icons' API this file is written for: another is taken as none (updated apart) */
 export const ICONS_VERSION = 1;

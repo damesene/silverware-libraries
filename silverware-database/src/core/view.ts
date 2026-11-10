@@ -110,6 +110,8 @@ export type ViewListing = {
 export type ItemLooks = {
   /** An item's icon drawn, its size the CSS of where it goes (1em: as the text around it); none where it has none */
   icon(item: Item): HTMLElement | undefined;
+  /** An icon of the user's (a property's own: an emoji, `lucide:house`) drawn in a span of `className`, as an item's is */
+  ownIcon(value: string, className: string): HTMLElement;
   /** An item's color put on the element drawing it (a card, a row, a bar: its CSS says how it shows), taken off where it has none */
   item(item: Item, element: HTMLElement): void;
 };

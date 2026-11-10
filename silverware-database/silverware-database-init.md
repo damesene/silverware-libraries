@@ -27,6 +27,9 @@ config.define("silverware.database", {
 if js and js.window then
   local silverwareDatabaseJs = js.importFromSpace("Library/damesene/silverware-database.js")
   silverwareDatabaseJs.init({
+    -- Silverware Icons, where it is installed (its API page, priority 50, has run by now): items' and properties'
+    -- icons drawn and picked
+    icons = silverware.icons and silverware.icons.api,
     getCurrentPage = editor.getCurrentPage,
     getText = editor.getText,
     replaceRange = editor.replaceRange,

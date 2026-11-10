@@ -638,7 +638,7 @@ export class PeekPanel {
     const properties = this.host.offered<PropertiesOffer>("properties");
     // (Hidden in the view it was opened from: an eye struck through after its name, its title saying which view)
     const hiddenMark = hiddenIn === undefined ? [] : [el(doc, "span", { class: "swd-peek-hidden-mark", html: VIEW_ICONS.hidden, title: `Hidden in ${hiddenIn}`, attrs: { "aria-hidden": "true" } })];
-    const labelParts = [propertyIcon(doc, property, editor.type(property), "swd-peek-type"), el(doc, "span", { class: "swd-peek-label-name", text: property.label }), ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", attrs: { "aria-hidden": "true" } })] : []), ...hiddenMark];
+    const labelParts = [propertyIcon(doc, this.host.look, property, editor.type(property), "swd-peek-type"), el(doc, "span", { class: "swd-peek-label-name", text: property.label }), ...(property.required ? [el(doc, "span", { class: "swd-prop-required", text: "*", attrs: { "aria-hidden": "true" } })] : []), ...hiddenMark];
     const hiddenSaid = hiddenIn === undefined ? "" : `, hidden in ${hiddenIn}`;
     const label = properties
       ? el(

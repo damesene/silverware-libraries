@@ -16,6 +16,9 @@ import { MemoryStore } from "../silverware-database/src/store/memory.ts";
 import { MemoryViewState } from "../silverware-database/src/store/viewstate.ts";
 
 import stylePage from "../silverware-database/silverware-database-style.md";
+// Silverware Icons beside it, as a space with both installed: its API given, its style applied
+import iconsStylePage from "../silverware-icons/silverware-icons-style.md";
+import { api as icons } from "../silverware-icons/src/index.ts";
 import { flash, setUpTheme } from "./common.ts";
 import { SAMPLE_DATABASES } from "./database-sample.ts";
 import { BUILT_IN_VIEWS } from "../silverware-database/src/views/builtin/index.ts";
@@ -47,10 +50,11 @@ setUpTheme();
 
 // The library's style page applied as SilverBullet applies its space-style block
 const style = document.createElement("style");
-style.textContent = /```space-style\r?\n([\s\S]*?)```/.exec(stylePage)?.[1] ?? "";
+style.textContent = [stylePage, iconsStylePage].map((page) => /```space-style\r?\n([\s\S]*?)```/.exec(page)?.[1] ?? "").join("\n");
 document.head.append(style);
 
 const ui = {
+  icons,
   notify: (message: string, options?: { readonly type?: "info" | "error" }) => flash(message, options?.type ?? "info"),
   ask: (message: string) => confirm(message),
 };
@@ -77,6 +81,7 @@ function start(): void {
     BUILT_IN_MODULES,
     {
       document,
+      icons,
       core,
       types,
       ui,

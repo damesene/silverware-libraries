@@ -27,12 +27,10 @@ export const SHARED_STYLES = [
     // (The pages of the plugins drawing their own icons through shared/icons.ts, as each moves onto it)
     template: "shared/icons.css",
     mark: "shared-icons",
-    pages: [{ page: "silverware-toolbar/silverware-toolbar-style.md", base: "swb-own" }],
-  },
-  {
-    template: "shared/emoji.css",
-    mark: "shared-emoji",
-    pages: [{ page: "silverware-database/silverware-database-style.md", base: "swd" }],
+    pages: [
+      { page: "silverware-toolbar/silverware-toolbar-style.md", base: "swb-own" },
+      { page: "silverware-database/silverware-database-style.md", base: "swd-own" },
+    ],
   },
 ];
 

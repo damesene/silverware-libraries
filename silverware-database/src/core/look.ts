@@ -7,6 +7,7 @@
 // view's CSS uses its way (a card tinted, a row's stripe). Its color: its own
 // (set in its peek), else, where the view colors its items by a property
 // (Color by in ⋯), the color of its value's option there.
+import type { Icons } from "../../../shared/icons.ts";
 import { colorShown, isColor } from "../domain/colors.ts";
 import { validateIcon } from "../domain/look.ts";
 import type { PropertyType } from "../domain/types/type.ts";
@@ -22,15 +23,26 @@ export function colorable(properties: readonly Property[], typeOf: (property: Pr
 }
 
 /** An item's icon as drawn, hidden from a screen reader (its name says the item); none where it has none */
-export function itemIcon(doc: Document, item: Item): HTMLElement | undefined {
+export function itemIcon(doc: Document, item: Item, icons: Icons): HTMLElement | undefined {
   const icon = item.look?.icon;
   if (!icon || validateIcon(icon)) return undefined;
+  return ownIconElement(doc, icon, icons, "swd-item-icon");
+}
+
+/**
+ * An icon of the user's (an emoji, `lucide:house`) drawn in a span of `className`, by Silverware Icons (its stand-in
+ * without it), hidden from a screen reader: what it is for says it
+ */
+export function ownIconElement(doc: Document, value: string, icons: Icons, className: string): HTMLElement {
   const made = doc.createElement("span");
-  made.className = "swd-item-icon";
+  made.className = className;
   made.setAttribute("aria-hidden", "true");
-  made.textContent = icon;
+  made.innerHTML = icons.markup(value, OWN_ICON);
   return made;
 }
+
+// The class base of an icon of the user's (`swd-own-icon`: shared/icons.css, the style page's shared-icons block)
+const OWN_ICON = "swd-own";
 
 /** The color an item shows: its own, else its value's option's where the view colors by a property (a list's first value); none */
 export function itemColor(item: Item, by?: ColorBy): number | `#${string}` | undefined {

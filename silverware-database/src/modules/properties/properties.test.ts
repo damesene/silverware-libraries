@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { iconsOf } from "../../../../shared/icons.ts";
 import { afterEach, describe, expect, it } from "vitest";
 import { DatabaseCore, type ItemConflict } from "../../core/core.ts";
 import { type ModuleDefinition, Modules } from "../../core/module.ts";
@@ -32,7 +33,7 @@ async function setup(answer = false, configured: Record<string, unknown> = {}, a
   const ui = { notify: (message: string) => void told.push(message), ask: () => (asked++, answer) };
   const core = new DatabaseCore(store, types, ui);
   let refreshed = 0;
-  const modules = new Modules(all, { document, core, types, ui, database: (id) => store.database(id), items: async (id) => (await store.items(id)).value, itemBodies: true, body: (id, item) => store.body(id, item.key), openDocument: async () => {}, documents: async () => [], validateDocumentName: () => undefined, openByName: async () => {}, noun: { one: "page", many: "pages" }, editorArea: () => undefined, onChanged: (listener) => store.onChanged((one) => listener(one.database)), onDocumentOpened: () => () => {}, refreshPlaces: () => void refreshed++, ...(showConflict ? { showConflict } : {}) }, { get: (path, fallback) => (path in configured ? configured[path] : fallback) });
+  const modules = new Modules(all, { document, icons: iconsOf(undefined), core, types, ui, database: (id) => store.database(id), items: async (id) => (await store.items(id)).value, itemBodies: true, body: (id, item) => store.body(id, item.key), openDocument: async () => {}, documents: async () => [], validateDocumentName: () => undefined, openByName: async () => {}, noun: { one: "page", many: "pages" }, editorArea: () => undefined, onChanged: (listener) => store.onChanged((one) => listener(one.database)), onDocumentOpened: () => () => {}, refreshPlaces: () => void refreshed++, ...(showConflict ? { showConflict } : {}) }, { get: (path, fallback) => (path in configured ? configured[path] : fallback) });
   await modules.start();
   const schema = async () => (await store.database("tasks"))!.value.properties;
   const named = async (name: string) => (await store.items("tasks")).value.find((one) => one.name === name)!;

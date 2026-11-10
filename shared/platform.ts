@@ -14,6 +14,7 @@
 // `Space.write` are for the page writer alone (`shared/pages/`,
 // docs/silverware-database.md, *Shared with Silverware Table and Silverware
 // Tags*), so that one place knows how anything is written in a document.
+import type { Icons } from "./icons.ts";
 
 /** A value now or later: SilverBullet answers with promises, memory at once */
 export type Awaitable<T> = T | Promise<T>;
@@ -134,6 +135,8 @@ export interface UserInterface {
   pick?<T extends Choice>(label: string, choices: readonly T[]): Awaitable<T | undefined>;
   /** The platform's UI loaded anew (for settings read only as a plugin starts) */
   reload?(): Awaitable<void>;
+  /** What draws and picks icons (Silverware Icons, shared/icons.ts); none: its stand-in */
+  readonly icons?: Icons;
 }
 
 export type NotifyOptions = {

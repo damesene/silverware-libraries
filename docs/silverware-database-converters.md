@@ -220,8 +220,10 @@ Converters are given, as `HELPERS` (a module's function form, as views and types
 
 Steps (a commit each, reviewed; unit tests, the UI tests not run, at the user's word):
 
-1. `readLine` and `readBlocks` in `shared/markdown/blocks.ts`, tested.
-2. The tasks converter on `readBlocks` (its behaviour unchanged: its tests pass as they are).
+1. ~~`readLine` and `readBlocks` in `shared/markdown/blocks.ts`, tested~~ (done 2026-11-11).
+2. ~~The tasks converter on `readBlocks` (its behaviour unchanged: its tests pass as they are)~~ (done 2026-11-11: a
+   task under a heading, or under a list's item that is no task, is one of the top level; a heading's line goes into
+   the body of the task before it, as any line between two tasks).
 3. `CONVERTER_HELPERS` given to `defineConverters`; the library page's *Converters* with them, its example using them.
 4. Silverware Toolbar's built-in block formats read through `readLine` (*Turn into* then knows a task of a state of its
    own, `[IN PROGRESS]`); its user's formats unchanged.

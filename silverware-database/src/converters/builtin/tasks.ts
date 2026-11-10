@@ -6,11 +6,13 @@
 // else its checkbox (`[ ]` Todo, `[x]` Done) or its state of its own, whatever
 // the case; each other attribute a property of its key (its type from its
 // values), mentions People, wiki links Links, hashtags the page's tags; shown
-// first on a board by Status. Read as SilverBullet reads markdown
-// (shared/markdown/); tasks in fenced code are none.
+// first on a board by Status. Read as SilverBullet reads markdown, through
+// the blocks every converter is given (shared/markdown/blocks.ts `readBlocks`);
+// tasks in fenced code are none.
 import { escapedAttributes, hashtagOf, type InlineMark, inlineMarks } from "../../../../shared/markdown/inline.ts";
-import { indentWidth, nextFence } from "../../../../shared/markdown/lines.ts";
-import { readAttributeValue, readTaskLine, type TaskLine, writeAttribute, writeTaskLine } from "../../../../shared/markdown/task.ts";
+import { type Block, dedentedLines, readBlocks } from "../../../../shared/markdown/blocks.ts";
+import { indentWidth } from "../../../../shared/markdown/lines.ts";
+import { readAttributeValue, writeAttribute, writeTaskLine } from "../../../../shared/markdown/task.ts";
 import type { Converted, ConvertedItem, ConvertedProperty, ConverterDefinition } from "../../core/converter.ts";
 import { keyFromLabel } from "../../domain/keys.ts";
 import { labelOfKey } from "../../domain/loose.ts";
@@ -30,32 +32,36 @@ const LINKS = "links";
 // The system property showing a page's tags (domain/system.ts)
 const TAGS = { key: "page_tags", label: "Tags", type: "tags", system: "tags" } as const;
 
-/** A task of the text's top level, and the lines under it */
-type Read = { readonly task: TaskLine; readonly under: string[] };
+type TaskItem = Extract<Block, { kind: "item" }> & { readonly task: { readonly state: string; readonly done: boolean } };
 
-/** The tasks at the top level of a text, each with the lines under it (a line before the first task is no task's) */
+/** A task of the text's top level, and its body: the lines under it and those after it up to the next task, dedented */
+type Read = { readonly task: TaskItem; readonly body: string };
+
+/**
+ * The tasks at the top level of a text (`readBlocks`), each with what is under it and what follows it up to the next
+ * task (any markdown, a heading's lines too): a task inside another is the other's, and so is one indented more than
+ * the task before it (`- [ ] A`, `text`, `  - [ ] B`: B is A's, as the line between is A's text going on); one under
+ * a heading or a list's item that is no task (nothing before it) one of the top level; what is before the first task is
+ * none's; a task under a list's item that is no task, after a task, the task's body as the item is
+ */
 function topTasks(text: string): Read[] {
-  const read: Read[] = [];
-  let fence: string | undefined;
-  for (const line of text.split(/\r?\n/)) {
-    const before = fence;
-    fence = nextFence(line, fence);
-    const task = before === undefined && fence === undefined ? readTaskLine(line) : undefined;
-    const current = read.at(-1);
-    if (task && (!current || indentWidth(task.indent) <= indentWidth(current.task.indent))) read.push({ task, under: [] });
-    else current?.under.push(line);
-  }
-  return read;
-}
-
-/** Lines without their common indentation (a blank line empty, others' ends as written: a hard line break), blank lines at the ends taken off */
-function dedented(lines: readonly string[]): string {
-  const given = lines.filter((line) => line.trim());
-  const common = given.length ? Math.min(...given.map((line) => /^[ \t]*/.exec(line)![0].length)) : 0;
-  const out = lines.map((line) => (line.trim() ? line.slice(common) : ""));
-  while (out.length && !out[0]) out.shift();
-  while (out.length && !out.at(-1)) out.pop();
-  return out.join("\n");
+  const lines = text.split(/\r?\n/);
+  const found: { task: TaskItem; to: number }[] = [];
+  const indentOf = (block: Block) => indentWidth(lines[block.lines.from]!);
+  const visit = (blocks: readonly Block[]) => {
+    for (const block of blocks) {
+      const current = found.at(-1);
+      if (block.kind === "item" && block.task && !(current && indentOf(block) > indentOf(current.task))) found.push({ task: block as TaskItem, to: block.lines.to });
+      else if (block.kind === "heading") {
+        // (Its own lines the task's before it, a setext heading's underline too; its section read on, a task in it one of its own)
+        if (current) current.to = block.title.to;
+        visit(block.children);
+      } else if (current) current.to = block.lines.to;
+      else if (block.kind === "item") visit(block.children);
+    }
+  };
+  visit(readBlocks(text));
+  return found.map(({ task, to }) => ({ task, body: dedentedLines(lines.slice(task.lines.from + 1, to)).join("\n") }));
 }
 
 /** A mark as a word in a sentence: a tag's or a person's name, a link's alias or target */
@@ -151,9 +157,9 @@ function read(text: string): Converted | undefined {
   let anyPeople = false;
   let anyLinks = false;
   let anyTags = false;
-  tasks.forEach(({ task, under }, at) => {
+  tasks.forEach(({ task, body }, at) => {
     const marks = inlineMarks(task.text);
-    const values: Record<string, Value> = { [STATUS]: stateOf(task, marks, states) };
+    const values: Record<string, Value> = { [STATUS]: stateOf(task.task, marks, states) };
     const people = [...new Set(marks.flatMap((mark) => (mark.kind === "mention" ? [mark.name] : [])))];
     const links = [...new Set(marks.flatMap((mark) => (mark.kind === "link" ? [mark.name] : [])))];
     const tags = [...new Set(marks.flatMap((mark) => (mark.kind === "tag" ? [mark.name] : [])))];
@@ -173,7 +179,6 @@ function read(text: string): Converted | undefined {
       const was = byItem.get(at);
       byItem.set(at, was ? joined(was, value) : value);
     }
-    const body = dedented(under);
     items.push({ name: nameOf(task.text, marks), values, ...(body ? { body } : {}), ...(tags.length ? { tags } : {}), source: escapedAttributes(task.text.trim()) });
   });
   // (Done last: the states of its own met between In progress and it)
@@ -203,7 +208,7 @@ const isStateAttribute = (mark: InlineMark) => mark.kind === "attribute" && /^(s
  * A task's status: its attribute `state` or `status` where it has one (the last), else its checkbox (`[ ]` Todo, `[x]`
  * Done) or the state of its own; one of `states` whatever its case, else added to them as first written
  */
-function stateOf(task: TaskLine, marks: readonly InlineMark[], states: string[]): string {
+function stateOf(task: { readonly state: string; readonly done: boolean }, marks: readonly InlineMark[], states: string[]): string {
   const attribute = marks.filter(isStateAttribute).at(-1);
   const given = attribute?.kind === "attribute" ? readAttributeValue(attribute.value) : undefined;
   // (A value YAML reads as a scalar that; another, a list or a map or none it reads, as written; none: the checkbox)

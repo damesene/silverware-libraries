@@ -20,6 +20,28 @@ describe("The tasks converter", () => {
     ]);
   });
 
+  it("reads tasks under a heading or a list's item that is no task, a heading's line the body of the task before it", () => {
+    const converted = read(["# Plan", "- [ ] A", "## Later", "- [ ] B", "- notes", "  - [ ] C", "Before none"]);
+    expect(converted.items.map((item) => [item.name, item.body])).toEqual([
+      ["A", "## Later"],
+      ["B", "- notes\n  - [ ] C\nBefore none"],
+    ]);
+    expect(read(["- notes", "  - [ ] Only"]).items.map((item) => item.name)).toEqual(["Only"]);
+  });
+
+  it("keeps a setext heading's underline and a rule in the body, and a task indented under the text after a task that task's", () => {
+    const bodies = (lines: readonly string[]) => read(lines).items.map((item) => [item.name, item.body]);
+    expect(bodies(["- [ ] A", "Title", "===", "- [ ] B"])).toEqual([
+      ["A", "Title\n==="],
+      ["B", undefined],
+    ]);
+    expect(bodies(["- [ ] A", "text", "---", "- [ ] B"])).toEqual([
+      ["A", "text\n---"],
+      ["B", undefined],
+    ]);
+    expect(bodies(["- [ ] A", "text", "  - [ ] B"])).toEqual([["A", "text\n  - [ ] B"]]);
+  });
+
   it("takes a task indented less than the first as one of the top level too", () => {
     expect(read(["  - [ ] A", "    - [ ] A1", "- [ ] B"]).items.map((item) => item.name)).toEqual(["A", "B"]);
   });

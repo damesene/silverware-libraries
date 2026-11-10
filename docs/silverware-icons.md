@@ -141,9 +141,10 @@ type Icons = {
   given where its `version` is the one shared/icons.ts was written for, else
   the stand-in below (a plugin and Silverware Icons are updated apart). A
   plugin calls `iconsOf(…)` once and uses what it gets; nothing in a plugin
-  asks whether Silverware Icons is installed. Each consumer's isolation test
-  (as silverware-chart/src/isolation.test.ts) refuses an import of
-  `silverware-icons/src`.
+  asks whether Silverware Icons is installed. The consumers' isolation tests
+  refuse any other plugin's code (silverware-toolbar/src/isolation.test.ts:
+  any `silverware-<other>/` import; the database's: nothing outside src/ but
+  shared/), so `silverware-icons/src` among it.
 - **The plugins' own rules for a value stay theirs**, each also taking a
   reference whole: the toolbar's `iconOf` (any text of up to MAX_ICON
   graphemes: "H1", "✎"; a reference one), the database's `validateIcon` (one

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Silverware Icons playground</title>
+    <link rel="stylesheet" href="common.css" />
+    <link rel="stylesheet" href="icons-playground.css" />
+  </head>
+  <body>
+    <header>
+      <strong>Silverware Icons<span class="long"> playground</span></strong>
+      <nav class="playgrounds" aria-label="Playgrounds">
+        <a href="./">Table</a>
+        <a href="toolbar.html">Toolbar</a>
+        <a href="tags.html">Tags</a>
+        <a href="database.html">Database</a>
+        <a href="icons.html" aria-current="page">Icons</a>
+      </nav>
+      <span class="hint">The picker of icons as a plugin opens it; an icon picked shown as the plugins draw it</span>
+      <span class="spacer"></span>
+      <button id="theme" type="button" title="Dark / light"><span class="icon">◐</span><span class="label">Dark / light</span></button>
+    </header>
+    <main id="sb-main">
+      <section class="card">
+        <label class="choice"><input id="emoji-only" type="checkbox" /> Emoji only (as the toolbar's Emoji action opens it)</label>
+        <div id="picker" class="panel"></div>
+      </section>
+      <section class="card">
+        <div>Picked: <code id="value">–</code></div>
+        <div class="samples">
+          <span id="sample-text" class="sample">Text <span class="slot"></span> beside it</span>
+          <button id="sample-button" class="sample button" type="button"><span class="slot"></span> A button</button>
+          <button class="sample button on" type="button"><span class="slot"></span> On</button>
+          <span class="sample big"><span class="slot"></span></span>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="icons.js"></script>
+  </body>
+</html>

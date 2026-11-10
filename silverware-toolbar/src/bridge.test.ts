@@ -91,6 +91,13 @@ describe("Settings", () => {
     expect(slotOf({ icon: "★" })).toBeUndefined();
   });
 
+  it("take an own icon of Silverware Icons whole (lucide:house is one, not its first 3 characters); text its first 3", async () => {
+    const { iconOf } = await import("./core/favorites.ts");
+    expect(iconOf(" lucide:arrow-big-down ")).toBe("lucide:arrow-big-down");
+    expect(iconOf("H1X2")).toBe("H1X");
+    expect(iconOf("👨‍👩‍👧ab")).toBe("👨‍👩‍👧ab");
+  });
+
   it("keep an item of another kind whole, its fields for its kind to read; its show checked", async () => {
     const gesture = { type: "gesture", tap: "formats.bold", up: "formats.italic", show: "label" };
     expect(await rowsOf(one([[gesture, { type: "gesture", show: "big" }, { type: "" }]]))).toEqual([[gesture]]);

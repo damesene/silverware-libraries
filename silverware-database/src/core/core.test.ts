@@ -434,7 +434,7 @@ describe("the core", () => {
     expect((await named("Fix login")).look).toEqual({ icon: "🚀" });
     await core.undo("tasks");
     expect((await named("Fix login")).look).toEqual({ icon: "🚀", color: "green" });
-    expect(told).toEqual(["An icon is one character (an emoji)", '"navy" is no color']);
+    expect(told).toEqual(["An icon is one character (an emoji) or an icon picked", '"navy" is no color']);
   });
 
   it("gives a property an icon of its own, refusing what is no icon, taken off again, one step of Undo each", async () => {
@@ -447,7 +447,7 @@ describe("the core", () => {
     expect(await icon()).toBeUndefined();
     await core.undo("tasks");
     expect(await icon()).toBe("🚦");
-    expect(told).toEqual(["An icon is one character (an emoji)"]);
+    expect(told).toEqual(["An icon is one character (an emoji) or an icon picked"]);
   });
 
   it("removes items only once the user says yes, and Undo brings them back", async () => {

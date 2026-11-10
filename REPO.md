@@ -13,7 +13,7 @@ uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-table
 
 ```#meta/library/remote
 name: Silverware Toolbar
-description: A toolbar by the text you select (docked over the keyboard on a phone) to format it, turn lines into lists, headings, quotes or code blocks, and run any action or command, with gesture buttons, text snippets and an emoji picker.
+description: A toolbar by the text you select (docked over the keyboard on a phone) to format it, turn lines into lists, headings, quotes or code blocks, and run any action or command, with gesture buttons, text snippets, and icons and emoji of your own (with Silverware Icons).
 author: damesene
 website: https://github.com/damesene/silverware-libraries/tree/main/silverware-toolbar
 uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-toolbar/silverware-toolbar.md
@@ -41,4 +41,12 @@ description: "Databases of pages, in the spirit of Notion's: each item a page, i
 author: damesene
 website: https://github.com/damesene/silverware-libraries/tree/main/silverware-database
 uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-database/silverware-database.md
+```
+
+```#meta/library/remote
+name: Silverware Icons
+description: "Monochrome icons (Lucide) and emoji for the other Silverware plugins, drawn in the colors of your theme, and sets of icons of your own."
+author: damesene
+website: https://github.com/damesene/silverware-libraries/tree/main/silverware-icons
+uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-icons/silverware-icons.md
 ```

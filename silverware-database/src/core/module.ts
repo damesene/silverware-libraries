@@ -7,13 +7,14 @@
 // binding defines its commands as it starts, before the modules are). Modules use each other's
 // only through what one offers (`offer`, `offered`), as Silverware Table's and
 // Silverware Tags' do. Modules import only types from here.
+import type { Icons } from "../../../shared/icons.ts";
 import type { DocumentsHost } from "./documents.ts";
 import type { MentionsHost } from "./mentions.ts";
 import type { Settings, UserInterface } from "../../../shared/platform.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
 import type { Database, Item, Revised } from "../model/database.ts";
 import type { DatabaseCore, ItemConflict } from "./core.ts";
-import { itemIcon, itemLook } from "./look.ts";
+import { itemIcon, itemLook, ownIconElement } from "./look.ts";
 import type { PlaceMenuBuilder, PlaceMenuGroup } from "./placemenu.ts";
 import type { ItemLooks, ViewSetting } from "./view.ts";
 
@@ -77,6 +78,8 @@ export type ModuleInstance = {
 /** What a module gets: the core's writes, the store's reads, the types, the user, its own settings, the others' offers */
 export type ModuleHost = DocumentsHost & MentionsHost & {
   readonly document: Document;
+  /** What draws and picks icons (Silverware Icons, or its stand-in saying it is needed: shared/icons.ts) */
+  readonly icons: Icons;
   /** The core's writes (each checked, said where refused, kept for Undo) */
   readonly core: DatabaseCore;
   readonly types: TypeRegistry;
@@ -186,7 +189,11 @@ export class Modules {
         },
         offer: (api) => void this.offers.set(definition.name, api),
         offered: <T>(module: string) => this.offers.get(module) as T | undefined,
-        look: { icon: (item) => itemIcon(this.host.document, item), item: (item, element) => itemLook(item, element) },
+        look: {
+          icon: (item) => itemIcon(this.host.document, item, this.host.icons),
+          ownIcon: (value, className) => ownIconElement(this.host.document, value, this.host.icons, className),
+          item: (item, element) => itemLook(item, element),
+        },
       };
       try {
         this.started.push({ definition, instance: definition.start(host) ?? {} });

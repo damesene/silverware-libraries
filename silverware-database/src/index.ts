@@ -3,6 +3,7 @@
 // block through `render`, tells the index's changes (`indexChanged`) and runs
 // the commands; the API page defines the user's own views and types
 // (`defineViews`, `defineTypes`), before `init`, as Space Lua loads.
+import { iconsOf } from "../../shared/icons.ts";
 import { type ConflictHost, openConflict } from "./core/conflictdialog.ts";
 import type { ItemConflict } from "./core/core.ts";
 import type { Item } from "./model/database.ts";
@@ -131,6 +132,7 @@ export function init(bridge: Bridge): void {
     BUILT_IN_MODULES,
     {
       document,
+      icons: iconsOf(platform.ui.icons),
       core,
       types,
       ui,

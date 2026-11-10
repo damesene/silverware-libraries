@@ -3,10 +3,10 @@
 // from its template (scripts/sharedstyles.mjs).
 import * as esbuild from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
-import { emojiModuleText } from "./emoji.mjs";
+import { iconFiles } from "./icons/index.mjs";
 import { sharedStyles } from "./sharedstyles.mjs";
 
-const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart", "silverware-database"];
+const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart", "silverware-database", "silverware-icons"];
 // Files bundled beside a library's, loaded by it when needed: Chart.js beside the chart's (src/chartjs.ts)
 const beside = [{ entry: "silverware-chart/src/chartjs.ts", outfile: "silverware-chart/silverware-chart-chartjs.js" }];
 const watch = process.argv.includes("--watch");
@@ -41,16 +41,15 @@ for (const { entry, outfile, name } of [...libraries.map((name) => ({ entry: `${
     await esbuild.build(options);
   }
 }
-// The emoji data beside the bundle of each plugin with the emoji picker (shared/emoji.ts; scripts/emoji.mjs), made from
-// the package as installed: one each, as a plugin is installed without the others
-for (const emojiFile of ["silverware-toolbar/silverware-toolbar-emoji.js", "silverware-database/silverware-database-emoji.js"]) {
+// Silverware Icons' sets beside its bundle and its manifest (scripts/icons/index.mjs), made from the packages as installed
+for (const { path, text } of iconFiles()) {
   if (check) {
-    const committed = (await readFile(emojiFile, "utf8").catch(() => "")).replaceAll("\r\n", "\n");
-    if (committed !== emojiModuleText()) {
-      console.error(`${emojiFile} does not match emojibase-data: run npm run build`);
+    const committed = (await readFile(path, "utf8").catch(() => "")).replaceAll("\r\n", "\n");
+    if (committed !== text) {
+      console.error(`${path} does not match its set's sources: run npm run build`);
       stale++;
     }
-  } else await writeFile(emojiFile, emojiModuleText());
+  } else await writeFile(path, text);
 }
 // The CSS of what shared/ draws, in each plugin's style page (scripts/sharedstyles.mjs)
 stale += await sharedStyles(check);

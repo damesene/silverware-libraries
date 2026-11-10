@@ -4,6 +4,7 @@
 // core's writes), the view's own data (its meta) kept in the place's state
 // under its name. What makes a place and when it goes is the binding's
 // (docs/silverware-database.md, *The core*).
+import { type Icons, iconsOf, isReference } from "../../../shared/icons.ts";
 import { el } from "../../../shared/elements.ts";
 import type { Editor, Settings, UserInterface } from "../../../shared/platform.ts";
 import { type Filter, listItems, type SortKey, textOf, typeOf, validateCondition } from "../domain/listing.ts";
@@ -19,7 +20,7 @@ import { arrangementEntries, groupEntries, hidesByDefault, propertyEntries, STAT
 import { focusPropertyList, propertiesEntry, type PropertiesFocus } from "./propertiesmenu.ts";
 import { drawGrouped } from "./groups.ts";
 import { ICONS } from "./icons.ts";
-import { type ColorBy, colorable, itemIcon, itemLook } from "./look.ts";
+import { type ColorBy, colorable, itemIcon, itemLook, ownIconElement } from "./look.ts";
 import type { OpenedFrom, OpenedView, PlaceContext, PlaceTool } from "./module.ts";
 import { PlaceOpener } from "./opener.ts";
 import type { MenuEntry, MenuNaming } from "../../../shared/menu.ts";
@@ -40,7 +41,7 @@ export type PlaceOptions = {
   readonly types: TypeRegistry;
   readonly views: ViewRegistry;
   readonly settings: Pick<Settings, "get">;
-  readonly ui: Pick<UserInterface, "notify">;
+  readonly ui: Pick<UserInterface, "notify" | "icons">;
   readonly editor?: Pick<Editor, "open" | "openMention">;
   /** The documents references name (core/documents.ts); none: no document offered nor opened */
   readonly documents?: DocumentsSource;
@@ -142,6 +143,8 @@ function colorEntry(host: ViewHost, menu: PlaceMenuBuilder, toAll?: ToAll): Menu
 
 export class DatabasePlace {
   private drawn: Drawn | undefined;
+  // What draws its items' and properties' own icons (Silverware Icons, or its stand-in), resolved once
+  private readonly icons: Icons;
   // The views on as the place was last drawn (its picker's): those Apply to all views gives to
   private on: readonly ViewDefinition[] = [];
   // The view picker's menu: closed as the place is drawn anew (its box goes, an open menu's listeners with it)
@@ -175,6 +178,7 @@ export class DatabasePlace {
   }
 
   constructor(private readonly options: PlaceOptions) {
+    this.icons = iconsOf(options.ui.icons);
     this.stopListening = options.store.onChanged((change) => {
       if (change.database === options.database) void this.refresh();
     });
@@ -500,7 +504,7 @@ export class DatabasePlace {
       el(doc, "span", { class: "swd-view-picker-mark", html: ICONS.dropdown, attrs: { "aria-hidden": "true" } }),
     );
     const menu = toolMenu(doc, button, () => "Views", () =>
-      views.map((view): MenuEntry => ({ kind: "item", label: view.label, icon: view.icon, checked: view.name === current, run: () => void (view.name === current ? undefined : this.show(view.name)) })),
+      views.map((view): MenuEntry => ({ kind: "item", label: view.label, icon: isReference(view.icon) ? this.icons.markup(view.icon, "swd-own") : view.icon, checked: view.name === current, run: () => void (view.name === current ? undefined : this.show(view.name)) })),
     );
     menu.box.classList.add("swd-view-picker-box");
     if (!views.length) button.disabled = true;
@@ -983,7 +987,8 @@ export class DatabasePlace {
         validateCondition,
       },
       look: {
-        icon: (item) => itemIcon(this.options.element.ownerDocument, item),
+        icon: (item) => itemIcon(this.options.element.ownerDocument, item, this.icons),
+        ownIcon: (value, className) => ownIconElement(this.options.element.ownerDocument, value, this.icons, className),
         item: (item, element) => itemLook(item, element, colorBy()),
         get shownProperties() {
           return shownProperties();

@@ -41,6 +41,8 @@ export type BarHandlers = {
   readonly state: (action: Action) => { readonly active: boolean; readonly enabled: boolean };
   // Docked (a phone): an action's choices in the popup instead of a list under its button; again: the popup closed
   readonly choices: (action: Action) => void;
+  // An item's own icon as markup (an emoji, `lucide:house`: Silverware Icons draws it)
+  readonly ownIcon: (value: string) => string;
 };
 
 export class Bar {
@@ -294,8 +296,7 @@ export class Bar {
     const look = this.look(action, enabled);
     // Its own label in place of the action's (one offering choices: the choice on still shown, its own label its name)
     const label = action.choices ? look.label : (ownLabel ?? look.label);
-    button.innerHTML = (ownIcon ? '<span class="swb-own-icon"></span>' : look.icon) + (labeled ? '<span class="swb-label"></span>' : "") + (action.choices ? ICONS.chevronDown : "");
-    if (ownIcon) button.querySelector(".swb-own-icon")!.textContent = ownIcon;
+    button.innerHTML = (ownIcon ? this.handlers.ownIcon(ownIcon) : look.icon) + (labeled ? '<span class="swb-label"></span>' : "") + (action.choices ? ICONS.chevronDown : "");
     if (labeled) {
       button.classList.add("swb-labeled");
       button.querySelector(".swb-label")!.textContent = label;

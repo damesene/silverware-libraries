@@ -24,11 +24,12 @@ export const SHARED_STYLES = [
     ],
   },
   {
-    template: "shared/emoji.css",
-    mark: "shared-emoji",
+    // (The pages of the plugins drawing their own icons through shared/icons.ts, as each moves onto it)
+    template: "shared/icons.css",
+    mark: "shared-icons",
     pages: [
-      { page: "silverware-toolbar/silverware-toolbar-style.md", base: "swb" },
-      { page: "silverware-database/silverware-database-style.md", base: "swd" },
+      { page: "silverware-toolbar/silverware-toolbar-style.md", base: "swb-own" },
+      { page: "silverware-database/silverware-database-style.md", base: "swd-own" },
     ],
   },
 ];

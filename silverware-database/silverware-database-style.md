@@ -657,109 +657,31 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   }
 }
 /* </shared-menu> */
-/* <shared-emoji> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
-/* The emoji picker (shared/emoji.ts): its groups as tabs, its search, the emoji, the current one's name. Its search field,
-   group titles and "none" in the picker's own classes, which a plugin with a look of its own for them (the toolbar)
-   replaces by its own */
-.swd-emoji-search {
-  display: flex;
+/* <shared-icons> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* An icon of the plugin's own (shared/icons.ts; Silverware Icons draws it as markup in this box): text (an emoji,
+   "H1") or an SVG, on the line and of the text's size, in its color; an icon of a set while Silverware Icons is not
+   installed a dotted box, its title saying so */
+.swd-own-icon {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
-}
-.swd-emoji-field {
-  flex: 1;
-  min-width: 0;
-  padding: 2px 0;
-  font: inherit;
-  font-size: 14px;
-  color: inherit;
-  background: none;
-  border: 0;
-  outline: none;
-}
-.swd-emoji-group {
-  padding: 8px 2px 4px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  opacity: 0.55;
-}
-.swd-emoji-none {
-  padding: 12px 8px;
-  opacity: 0.6;
-}
-/* Its groups as filters, over the search: All, then each by its first emoji */
-.swd-emoji-tabs {
-  display: flex;
-  padding: 6px 6px 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.swd-emoji-tabs::-webkit-scrollbar {
-  display: none;
-}
-.swd-emoji-tab {
-  /* All ten in the panel's width, sharing what is left */
-  flex: 1 0 auto;
-  min-width: 28px;
-  height: 30px;
-  padding: 0 3px;
-  font: inherit;
-  font-size: 16px;
+  justify-content: center;
+  min-width: 1em;
+  height: 1em;
   line-height: 1;
-  color: inherit;
-  background: none;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 6px 6px 0 0;
-  cursor: pointer;
+  vertical-align: -0.125em;
 }
-.swd-emoji-tab:first-child {
-  font-size: 12px;
-  font-weight: 600;
+.swd-own-icon > svg {
+  width: 1em;
+  height: 1em;
 }
-.swd-emoji-tab:hover {
-  background: color-mix(in srgb, currentColor 8%, transparent);
+.swd-own-icon-missing {
+  box-sizing: border-box;
+  width: 1em;
+  border: 1px dashed currentColor;
+  border-radius: 3px;
+  opacity: 0.5;
 }
-.swd-emoji-tab[aria-checked="true"] {
-  border-bottom-color: var(--ui-accent-color, #464cfc);
-  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 10%, transparent);
-}
-.swd-emoji-list {
-  overflow-y: auto;
-  max-height: 280px;
-  padding: 4px 6px 6px;
-}
-.swd-emoji-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
-}
-.swd-emoji {
-  height: 36px;
-  padding: 0;
-  font-size: 22px;
-  line-height: 1;
-  background: none;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.swd-emoji.swd-emoji-current {
-  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 16%, transparent);
-}
-.swd-emoji-name {
-  min-height: 1.3em;
-  padding: 6px 10px;
-  border-top: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
-  opacity: 0.75;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-/* </shared-emoji> */
+/* </shared-icons> */
 /* A view drawn once per group (Group by in ⋯, core/groups.ts): each group's head, folded or not, then the view */
 .swd-group + .swd-group {
   margin-top: 12px;
@@ -3778,7 +3700,7 @@ button.swd-editor-document-folder:hover,
   color: inherit;
   background: var(--swd-hover);
 }
-.swd-pop-emoji {
+.swd-pop-icons {
   display: flex;
   flex-direction: column;
 }

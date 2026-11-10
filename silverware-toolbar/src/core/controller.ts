@@ -9,6 +9,7 @@
 // its buttons show the formats around the caret; it goes as the caret moves
 // or text is typed. The modules (modules.ts) give the actions; the core knows
 // none of them. The popup ends with the core's own item, the settings dialog.
+import { type Icons, iconsOf } from "../../../shared/icons.ts";
 import type { Bridge, Settings } from "../bridge.ts";
 import { CONTENT_SELECTOR, inEditor, pageContentOf, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
@@ -16,7 +17,7 @@ import { type Action, type ActionEditor, type Change, type Context, NO_ARGS, wit
 import { Bar, type Dock, type Shown } from "./bar.ts";
 import { contextOf } from "./context.ts";
 import { Docking } from "./dock.ts";
-import { isActionItem, isSeparator, type Look, orderedByPins, ownIconHtml, type Pin, type SlotRef, slotItemOf, slotOf } from "./favorites.ts";
+import { isActionItem, isSeparator, type Look, orderedByPins, OWN_ICON, type Pin, type SlotRef, slotItemOf, slotOf } from "./favorites.ts";
 import type { ItemKind } from "./items.ts";
 import { hideKeyboard } from "./keyboard.ts";
 import { switchToolbarAction } from "./switch.ts";
@@ -98,6 +99,8 @@ export class Controller {
     private readonly openSettings?: () => void,
     // The toolbars after a switch, to be kept (written to the configuration; none: the switch for this visit)
     private readonly switched?: (toolbars: readonly Toolbar[]) => void,
+    // What draws the favourites' own icons (Silverware Icons, or its stand-in: shared/icons.ts)
+    private readonly icons: Icons = iconsOf(undefined),
   ) {
     this.watcher = new SelectionWatcher(
       doc,
@@ -109,6 +112,7 @@ export class Controller {
       run: (action) => void this.run(action),
       state: (action) => (this.context ? this.state(action, this.context) : { active: false, enabled: false }),
       choices: (action) => (this.popup.isOpen ? this.popup.close() : void this.showActions(action)),
+      ownIcon: (value) => this.icons.markup(value, OWN_ICON),
     });
     this.popup = new Popup(doc);
     this.panel = new Panel(doc);
@@ -306,7 +310,7 @@ export class Controller {
             }
             const ref = slotOf(item[key]);
             const found = ref && all.find((a) => a.id === ref.id);
-            return { key, optional, action: found && ref ? withOwnLook(withArgs(found, ref.args), ref) : found };
+            return { key, optional, action: found && ref ? withOwnLook(withArgs(found, ref.args), ref, this.icons) : found };
           });
           if (slots.some(({ optional, action }) => !optional && !action)) return [];
           const found = Object.fromEntries(slots.flatMap(({ key, action }) => (action ? [[key, action]] : [])));
@@ -673,7 +677,7 @@ function lookOf(item: Look): { labeled: boolean; width?: number; pin?: Pin } {
 }
 
 /** An action as a slot shows it: its own icon (a character, an emoji) and label in place of the action's, the rest the action's */
-function withOwnLook(action: Action, ref: SlotRef): Action {
+function withOwnLook(action: Action, ref: SlotRef, icons: Icons): Action {
   if (!ref.icon && !ref.label) return action;
-  return { ...action, ...(ref.icon ? { icon: ownIconHtml(ref.icon) } : {}), ...(ref.label ? { label: ref.label } : {}) };
+  return { ...action, ...(ref.icon ? { icon: icons.markup(ref.icon, OWN_ICON) } : {}), ...(ref.label ? { label: ref.label } : {}) };
 }

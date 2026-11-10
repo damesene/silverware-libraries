@@ -46,7 +46,7 @@ function formatOf(definition: unknown): Format | string {
   if (typeof name !== "string" || !NAME_RE.test(name)) return `its name ${JSON.stringify(name)} is not letters, digits and _ starting with a letter`;
   if (scope !== "block" && scope !== "inline") return `its scope is not "block" or "inline"`;
   if (label !== undefined && typeof label !== "string") return "its label is not text";
-  if (icon !== undefined && typeof icon !== "string") return "its icon is not text (an SVG)";
+  if (icon !== undefined && typeof icon !== "string") return "its icon is not text (an SVG, or an icon of Silverware Icons: lucide:rocket)";
   if (group !== undefined && typeof group !== "string") return "its group is not text";
   if (keywords !== undefined && !(Array.isArray(keywords) && keywords.every((k) => typeof k === "string"))) return "its keywords are not a list of texts";
   for (const fn of ["read", "write", "afterWrite", "clear"] as const) if (definition[fn] !== undefined && typeof definition[fn] !== "function") return `its ${fn} is not a function`;

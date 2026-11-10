@@ -4,6 +4,7 @@
 // that gives one change of the page's text, so a module knows nothing of what
 // shows it, nor how the change is written (one edit, one undo step).
 
+import type { Icons } from "../../../shared/icons.ts";
 import type { ItemKind } from "./items.ts";
 
 /** A line of the page's text: where it is (its end before the line break) and its text */
@@ -147,6 +148,8 @@ export type ToolbarModule = {
 
 /** What a module may ask of the editor beyond the page's text: SilverBullet's commands (each optional: the init page hands them over) */
 export type ModuleHost = {
+  // What draws and picks icons (Silverware Icons, or its stand-in: shared/icons.ts); none: the stand-in
+  readonly icons?: Icons;
   readonly listCommands?: () => unknown;
   readonly invokeCommand?: (name: string) => unknown;
   // A caret touching a word stands for the word, as if selected (the setting wordAtCaret)

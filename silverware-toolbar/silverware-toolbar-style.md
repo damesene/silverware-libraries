@@ -416,127 +416,37 @@ html[data-theme="dark"] .swb-dock-shade {
   border-bottom: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
   opacity: 0.9;
 }
-/* A text snippet's character, as an icon is shown */
-.swb-glyph {
-  display: inline-block;
-  min-width: 18px;
-  font-size: 16px;
-  line-height: 1;
-  text-align: center;
-}
 /* A panel of an action's own (the emoji picker), where the popup shows */
 .swb-panel.swb-visible {
   flex-direction: column;
   width: 340px;
   max-width: calc(100vw - 16px);
 }
-/* The emoji picker's current one, in the toolbar's own class */
-.swb-emoji.swb-current {
-  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 16%, transparent);
-}
-/* <shared-emoji> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
-/* The emoji picker (shared/emoji.ts): its groups as tabs, its search, the emoji, the current one's name. Its search field,
-   group titles and "none" in the picker's own classes, which a plugin with a look of its own for them (the toolbar)
-   replaces by its own */
-.swb-emoji-search {
-  display: flex;
+/* <shared-icons> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* An icon of the plugin's own (shared/icons.ts; Silverware Icons draws it as markup in this box): text (an emoji,
+   "H1") or an SVG, on the line and of the text's size, in its color; an icon of a set while Silverware Icons is not
+   installed a dotted box, its title saying so */
+.swb-own-icon {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
-}
-.swb-emoji-field {
-  flex: 1;
-  min-width: 0;
-  padding: 2px 0;
-  font: inherit;
-  font-size: 14px;
-  color: inherit;
-  background: none;
-  border: 0;
-  outline: none;
-}
-.swb-emoji-group {
-  padding: 8px 2px 4px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  opacity: 0.55;
-}
-.swb-emoji-none {
-  padding: 12px 8px;
-  opacity: 0.6;
-}
-/* Its groups as filters, over the search: All, then each by its first emoji */
-.swb-emoji-tabs {
-  display: flex;
-  padding: 6px 6px 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.swb-emoji-tabs::-webkit-scrollbar {
-  display: none;
-}
-.swb-emoji-tab {
-  /* All ten in the panel's width, sharing what is left */
-  flex: 1 0 auto;
-  min-width: 28px;
-  height: 30px;
-  padding: 0 3px;
-  font: inherit;
-  font-size: 16px;
+  justify-content: center;
+  min-width: 1em;
+  height: 1em;
   line-height: 1;
-  color: inherit;
-  background: none;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 6px 6px 0 0;
-  cursor: pointer;
+  vertical-align: -0.125em;
 }
-.swb-emoji-tab:first-child {
-  font-size: 12px;
-  font-weight: 600;
+.swb-own-icon > svg {
+  width: 1em;
+  height: 1em;
 }
-.swb-emoji-tab:hover {
-  background: color-mix(in srgb, currentColor 8%, transparent);
+.swb-own-icon-missing {
+  box-sizing: border-box;
+  width: 1em;
+  border: 1px dashed currentColor;
+  border-radius: 3px;
+  opacity: 0.5;
 }
-.swb-emoji-tab[aria-checked="true"] {
-  border-bottom-color: var(--ui-accent-color, #464cfc);
-  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 10%, transparent);
-}
-.swb-emoji-list {
-  overflow-y: auto;
-  max-height: 280px;
-  padding: 4px 6px 6px;
-}
-.swb-emoji-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
-}
-.swb-emoji {
-  height: 36px;
-  padding: 0;
-  font-size: 22px;
-  line-height: 1;
-  background: none;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.swb-emoji.swb-emoji-current {
-  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 16%, transparent);
-}
-.swb-emoji-name {
-  min-height: 1.3em;
-  padding: 6px 10px;
-  border-top: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
-  opacity: 0.75;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-/* </shared-emoji> */
+/* </shared-icons> */
 /* Icons by the search field (the settings) */
 .swb-popup-tools {
   display: flex;
@@ -1228,8 +1138,30 @@ html[data-theme="dark"] .swb-dock-shade {
   border: 1px solid var(--swb-settings-line);
   border-radius: 6px;
 }
+/* An own icon's line: what it shows beside its field (an icon of a set is a name there), Choose… the picker */
+.swb-settings-look-own-shown {
+  display: inline-flex;
+  font-size: 16px;
+}
+.swb-settings-look-choose {
+  padding: 3px 10px;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swb-settings-icon-picker {
+  max-width: 360px;
+  margin: 4px 0;
+  background: var(--root-background-color);
+  border: 1px solid var(--swb-settings-line);
+  border-radius: 8px;
+}
+/* Wide enough for an icon of a set's name (lucide:arrow-big-down), what it shows beside it */
 .swb-settings-look-own-icon {
-  width: 4.5em;
+  width: 11em;
 }
 .swb-settings-look-reset {
   display: inline-flex !important;

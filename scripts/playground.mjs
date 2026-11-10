@@ -2,18 +2,17 @@
 //   npm run playground
 import * as esbuild from "esbuild";
 import { writeFileSync } from "node:fs";
-import { emojiModuleText } from "./emoji.mjs";
+import { iconFiles } from "./icons/index.mjs";
 
-// The emoji data beside the bundles, as SilverBullet has it beside each library's (not committed here)
-writeFileSync("playground/silverware-toolbar-emoji.js", emojiModuleText());
-writeFileSync("playground/silverware-database-emoji.js", emojiModuleText());
+// Silverware Icons' sets beside the icons playground's bundle (the manifest is src/'s, committed)
+for (const { path, text } of iconFiles()) if (!path.endsWith(".ts")) writeFileSync(`playground/${path.split("/").pop()}`, text);
 
 const port = Number(process.env.PORT ?? 8000);
 // HOST=0.0.0.0 serves it to the local network too (e.g. to try it on a phone)
 const host = process.env.HOST ?? "127.0.0.1";
 
 const ctx = await esbuild.context({
-  entryPoints: ["playground/playground.ts", "playground/toolbar.ts", "playground/tags.ts", "playground/database.ts"],
+  entryPoints: ["playground/playground.ts", "playground/toolbar.ts", "playground/tags.ts", "playground/database.ts", "playground/icons.ts"],
   outdir: "playground",
   bundle: true,
   format: "esm",

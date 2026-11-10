@@ -1,0 +1,44 @@
+/* The icons playground: the picker in a panel as a plugin's, and what is picked as the plugins draw it */
+#sb-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.panel {
+  width: min(360px, calc(100vw - 32px));
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+}
+.samples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.sample.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
+  border-radius: 6px;
+}
+.sample.button.on {
+  color: var(--ui-accent-color, #464cfc);
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 12%, transparent);
+}
+.sample.big {
+  font-size: 48px;
+}

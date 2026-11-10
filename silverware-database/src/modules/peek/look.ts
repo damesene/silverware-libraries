@@ -1,13 +1,13 @@
 // The peek's look of an item: its icon and its color, over its name (as
 // Notion's page), each a button opening its picker under it in the panel
-// (views/popover.ts): the emoji choice; the palette's colors, its own color,
+// (views/popover.ts): the icons' choice (Silverware Icons); the palette's colors, its own color,
 // None. What is picked is handed to `write` (the core's `setLook` through the
 // panel), the look as a whole.
 import { el } from "../../../../shared/elements.ts";
 import type { ModuleHost } from "../../core/module.ts";
 import { COLORS, isColor } from "../../domain/colors.ts";
 import type { Item, ItemLook } from "../../model/database.ts";
-import { emojiChoice, popovers } from "../../views/popover.ts";
+import { iconChoice, popovers } from "../../views/popover.ts";
 
 export type LookControls = {
   /** The row of the two buttons, over the name */
@@ -42,11 +42,12 @@ export function lookControls(host: ModuleHost, panel: HTMLElement, item: Item, w
       attrs: { "aria-label": look.icon ? "Change the icon" : "Add an icon", "aria-haspopup": "dialog", "aria-expanded": "false" },
       run: () =>
         pickers.open(icon, holderOf(icon), "Icon", (box) =>
-          emojiChoice(
+          iconChoice(
             doc,
+            host.icons,
             box,
             "Icon",
-            (emoji) => done(withPart(look, "icon", emoji), ".swd-peek-icon"),
+            (icon) => done(withPart(look, "icon", icon), ".swd-peek-icon"),
             look.icon ? () => done(withPart(look, "icon", undefined), ".swd-peek-icon") : undefined,
           ),
         ),

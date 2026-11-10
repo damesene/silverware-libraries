@@ -1,0 +1,23 @@
+/* An icon of the plugin's own (shared/icons.ts; Silverware Icons draws it as markup in this box): text (an emoji,
+   "H1") or an SVG, on the line and of the text's size, in its color; an icon of a set while Silverware Icons is not
+   installed a dotted box, its title saying so */
+.__base__-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1em;
+  height: 1em;
+  line-height: 1;
+  vertical-align: -0.125em;
+}
+.__base__-icon > svg {
+  width: 1em;
+  height: 1em;
+}
+.__base__-icon-missing {
+  box-sizing: border-box;
+  width: 1em;
+  border: 1px dashed currentColor;
+  border-radius: 3px;
+  opacity: 0.5;
+}

@@ -1,4 +1,5 @@
-// The emoji module's picker: opened from the list of every action, its emoji loaded from the file beside the bundle
+// The emoji module's picker: Silverware Icons' (its emoji alone), opened from the list of every action, the emoji loaded
+// from its set's file beside its bundle
 import { bar, barButton, expect, popup, select, test, text } from "./helpers.ts";
 
 test.describe("The emoji picker", () => {
@@ -11,13 +12,13 @@ test.describe("The emoji picker", () => {
     await popup(page).locator(".swb-search-field").fill("emoji");
     await page.keyboard.press("Enter");
     const panel = page.locator(".swb-panel.swb-visible");
-    await expect(panel.locator(".swb-emoji").first()).toBeVisible();
-    await expect(panel.locator(".swb-search-field")).toBeFocused();
+    await expect(panel.locator(".swi-item").first()).toBeVisible();
+    await expect(panel.locator(".swi-field")).toBeFocused();
     // Under the toolbar, which stays
     await expect(bar(page)).toBeVisible();
     await page.keyboard.type("thumb");
-    await expect(panel.locator(".swb-emoji").first()).toHaveText("👍");
-    await expect(panel.locator(".swb-emoji-name")).toHaveText("thumbs up");
+    await expect(panel.locator(".swi-item").first()).toHaveText("👍");
+    await expect(panel.locator(".swi-name")).toHaveText("thumbs up");
     await page.keyboard.press("Enter");
     await expect(panel).toHaveCount(0);
     await expect.poll(() => text(page)).toContain("Select 👍 in this page");
@@ -29,7 +30,7 @@ test.describe("The emoji picker", () => {
     await popup(page).locator(".swb-search-field").fill("emoji");
     await page.keyboard.press("Enter");
     const panel = page.locator(".swb-panel.swb-visible");
-    await expect(panel.locator(".swb-emoji").first()).toBeVisible();
+    await expect(panel.locator(".swi-item").first()).toBeVisible();
     await barButton(page, "actions.more").click();
     await expect(popup(page)).toBeVisible();
     await expect(panel).toHaveCount(0);
@@ -42,16 +43,16 @@ test.describe("The emoji picker", () => {
     await popup(page).locator(".swb-search-field").fill("emoji");
     await page.keyboard.press("Enter");
     const panel = page.locator(".swb-panel.swb-visible");
-    const tabs = panel.locator(".swb-emoji-tab");
+    const tabs = panel.locator(".swi-group");
     await expect(tabs.first()).toHaveText("All");
     await expect(tabs.first()).toHaveAttribute("aria-checked", "true");
     // Over the search
-    expect((await tabs.first().boundingBox())!.y).toBeLessThan((await panel.locator(".swb-search-field").boundingBox())!.y);
-    await panel.locator('.swb-emoji-tab[aria-label="Food & drink"]').click();
-    await expect(panel.locator(".swb-group")).toHaveText(["Food & drink"]);
-    await expect(panel.locator(".swb-search-field")).toBeFocused();
+    expect((await tabs.first().boundingBox())!.y).toBeLessThan((await panel.locator(".swi-field").boundingBox())!.y);
+    await panel.locator('.swi-group[aria-label="Food & drink"]').click();
+    await expect(panel.locator(".swi-section")).toHaveText(["Food & drink"]);
+    await expect(panel.locator(".swi-field")).toBeFocused();
     await tabs.first().click();
-    await expect(panel.locator(".swb-group")).toHaveCount(9);
+    await expect(panel.locator(".swi-section")).toHaveCount(9);
   });
 
   test("Esc closes it, nothing written", async ({ page }) => {
@@ -61,7 +62,7 @@ test.describe("The emoji picker", () => {
     await popup(page).locator(".swb-search-field").fill("emoji");
     await page.keyboard.press("Enter");
     const panel = page.locator(".swb-panel.swb-visible");
-    await expect(panel.locator(".swb-emoji").first()).toBeVisible();
+    await expect(panel.locator(".swi-item").first()).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(panel).toHaveCount(0);
     await expect(bar(page)).toBeVisible();

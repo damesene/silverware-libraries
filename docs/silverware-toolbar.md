@@ -597,5 +597,6 @@ it on typing). So an action of a module of its own (`slash`, off with
 it), a space before it where SilverBullet's `slashCommandRegexp`
 (`([^\w:]|^)\/[\w#-]*`, client/plugos/hooks/slash_command.ts of 2.12.1)
 would not match, and starts the completion (`ActionEditor.startCompletion`,
-`editor.startCompletion`, a syscall of 2.12.1). The selection is kept, "/"
-after it, as replacing the text selected would lose it.
+`editor.startCompletion`, a syscall of 2.12.1; asked first, `completes`, so
+a SilverBullet without it gets no stray "/"). Text selected stays as text,
+"/" after it and the caret after the "/", as replacing it would lose it.

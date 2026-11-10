@@ -9,7 +9,7 @@ describe("The keyboard module", () => {
     expect(hide!.id).toBe("actions.hideKeyboard");
     expect(hide!.touchOnly).toBe(true);
     let hidden = 0;
-    const editor: ActionEditor = { invokeCommand: async () => {}, navigate: async () => {}, flash: () => {}, select: () => {}, hideKeyboard: () => void hidden++, write: async () => {}, startCompletion: async () => {} };
+    const editor: ActionEditor = { invokeCommand: async () => {}, navigate: async () => {}, flash: () => {}, select: () => {}, hideKeyboard: () => void hidden++, write: async () => {}, startCompletion: async () => {}, completes: true };
     hide!.perform!(contextOf("a", 0, 1), editor);
     expect(hidden).toBe(1);
   });

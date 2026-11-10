@@ -19,7 +19,7 @@ describe("The slash module", () => {
     expect(slashText(contextOf("some text", 0, 4))).toBe(" /");
   });
 
-  it("writes it, then starts the editor's completion", async () => {
+  it("writes it, then starts the editor's completion; where it cannot be started, writes nothing", async () => {
     const [action] = slashModule().actions();
     expect(action!.id).toBe("actions.slashCommands");
     const done: string[] = [];
@@ -31,8 +31,13 @@ describe("The slash module", () => {
       hideKeyboard: () => {},
       write: async (from, to, text) => void done.push(`write ${from}-${to} ${text}`),
       startCompletion: async () => void done.push("complete"),
+      completes: true,
     };
     await action!.perform!(contextOf("see it", 0, 3), editor);
     expect(done).toEqual(["write 3-3  /", "complete"]);
+    // The completion not to be started: nothing written, a failure said
+    done.length = 0;
+    await expect(action!.perform!(contextOf("see it", 0, 3), { ...editor, completes: false })).rejects.toThrow("editor.startCompletion");
+    expect(done).toEqual([]);
   });
 });

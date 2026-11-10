@@ -6,7 +6,9 @@
 // SilverBullet completes a slash command where "/" starts the line or follows
 // a character that is no letter, digit, "_" or ":" (its slashCommandRegexp,
 // client/plugos/hooks/slash_command.ts of 2.12.1): a space goes before it
-// where it would not. Text selected stays: "/" goes after it.
+// where it would not. Text selected is kept as text, "/" after it, the caret
+// after the "/". Where the completion cannot be started (a SilverBullet
+// before editor.startCompletion), nothing is written: it says so.
 import type { Context, ToolbarModule } from "../core/action.ts";
 import { ICONS } from "../icons.ts";
 
@@ -28,6 +30,7 @@ export function slashModule(): ToolbarModule {
         group: "Insert",
         keywords: ["/", "insert", "command", "menu", "lomítko"],
         perform: async (context, editor) => {
+          if (!editor.completes) throw new Error("this SilverBullet cannot open its completion (editor.startCompletion, 2.12.1)");
           await editor.write(context.to, context.to, slashText(context));
           await editor.startCompletion();
         },

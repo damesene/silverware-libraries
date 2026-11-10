@@ -448,6 +448,7 @@ export class Controller {
         if (!bridge.startCompletion) throw missing("startCompletion");
         await bridge.startCompletion();
       },
+      completes: !!bridge.startCompletion,
     };
     try {
       await action.perform!(context, editor);

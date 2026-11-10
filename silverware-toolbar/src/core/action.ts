@@ -32,8 +32,10 @@ export type ActionEditor = {
   hideKeyboard(): void;
   // Text written over from..to as one edit, the caret after it
   write(from: number, to: number, text: string): Promise<void>;
-  // The editor's completion started at the caret, as typing starts it (SilverBullet's slash commands after a "/")
+  // The editor's completion started at the caret, as typing starts it (SilverBullet's slash commands after a "/");
+  // `completes`: whether it can be (the init page handed it over), asked before writing what it would complete
   startCompletion(): Promise<void>;
+  readonly completes: boolean;
 };
 
 /**

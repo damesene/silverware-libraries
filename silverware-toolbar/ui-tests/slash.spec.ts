@@ -11,6 +11,9 @@ test.describe("Slash commands", () => {
     const completion = page.locator(".cm-tooltip-autocomplete");
     await expect(completion).toBeVisible();
     await expect(completion.locator("li").first()).toBeVisible();
+    // Still there once the toolbar has shown again after the action (and the caret settled)
+    await page.waitForTimeout(600);
+    await expect(completion).toBeVisible();
     if (!onSilverBullet) {
       // The playground's own: one picked takes the "/" and writes its text
       await completion.locator("li", { hasText: "hr" }).click();

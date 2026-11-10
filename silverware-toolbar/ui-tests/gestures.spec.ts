@@ -39,19 +39,27 @@ test.describe("The gesture button", () => {
     await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
     const dialog = page.locator(".swb-settings");
     await dialog.locator('[data-swb-tab="toolbars"]').click();
+    // Shown as the toolbar shows it: its Click's icon, its swipe's small in a corner; its slots in its panel
     const gesture = dialog.locator(".swb-settings-kind").last();
-    // Its Click: its panel, its action, its own icon and label
-    await gesture.locator('[data-swb-slot="tap"]').click();
+    await expect(gesture.locator(".swb-settings-item-hint-1 svg")).toHaveCount(1);
+    await expect(gesture).toHaveAttribute("title", "Gesture button (Click: Bold, Swipe up: Italic)");
     const look = dialog.locator("[data-swb-look]");
+    const slot = (key: string) => look.locator(`[data-swb-slot="${key}"]`);
+    await gesture.click();
+    // Its Click: its panel, its action, its own icon and label
+    await slot("tap").click();
     await expect(look.locator(".swb-settings-look-action")).toHaveText("Bold");
     await look.locator('[data-swb-own="icon"]').fill("★");
     await look.locator('[data-swb-own="icon"]').press("Enter");
     await look.locator('[data-swb-own="label"]').fill("Tučně");
     await look.locator('[data-swb-own="label"]').press("Enter");
-    await expect(gesture.locator('[data-swb-slot="tap"]')).toContainText("★");
-    await expect(gesture.locator('[data-swb-slot="tap"]')).toContainText("Tučně");
+    // Closed: back to the item's panel, its slot showing them
+    await look.locator(".swb-settings-look-close").click();
+    await expect(slot("tap")).toContainText("★");
+    await expect(slot("tap")).toContainText("Tučně");
+    await expect(gesture.locator(".swb-settings-item-icon")).toHaveText("★");
     // Its Swipe up: a label of its own
-    await gesture.locator('[data-swb-slot="up"]').click();
+    await slot("up").click();
     await look.locator('[data-swb-own="label"]').fill("Kurzíva");
     await look.locator('[data-swb-own="label"]').press("Enter");
     await dialog.locator(".swb-settings-save").click();
@@ -63,12 +71,13 @@ test.describe("The gesture button", () => {
     await popup(page).locator(".swb-search-field").fill("settings");
     await popup(page).locator('.swb-popup-tool[data-swb-action="actions.settings"]').click();
     await dialog.locator('[data-swb-tab="toolbars"]').click();
-    await gesture.locator('[data-swb-slot="tap"]').click();
+    await gesture.click();
+    await slot("tap").click();
     await look.locator(".swb-settings-look-change").click();
     await dialog.locator(".swb-settings-pick-field").fill("code");
     await page.keyboard.press("Enter");
-    await expect(gesture.locator('[data-swb-slot="tap"]')).toContainText("Code");
-    await expect(gesture.locator('[data-swb-slot="tap"]')).not.toContainText("★");
+    await expect(look.locator(".swb-settings-look-action")).toHaveText("Code");
+    await expect(look.locator('[data-swb-own="icon"]')).toHaveValue("");
   });
 
   test("a text snippet on a swipe: picked for the slot in the settings, its text and icon typed in its panel; the swipe writes it", async ({ page }) => {
@@ -79,20 +88,18 @@ test.describe("The gesture button", () => {
     const dialog = page.locator(".swb-settings");
     await dialog.locator('[data-swb-tab="toolbars"]').click();
     const gesture = dialog.locator(".swb-settings-kind").last();
-    await gesture.locator('[data-swb-slot="up"]').click();
     const look = dialog.locator("[data-swb-look]");
+    const slot = (key: string) => look.locator(`[data-swb-slot="${key}"]`);
+    await gesture.click();
+    await slot("up").click();
     await look.locator(".swb-settings-look-change").click();
     // Offered beside the actions
     await dialog.locator(".swb-settings-pick-field").fill("snippet");
     await page.keyboard.press("Enter");
-    // Its panel: its text to type in, focused; without it the toolbar leaves it out, said so
+    // Its panel: its text to type in, focused
     await expect(look.locator(".swb-settings-look-action")).toHaveText("Text snippet");
     await expect(look.locator('[data-swb-field="text"] textarea')).toBeFocused();
-    await expect(gesture.locator('[data-swb-slot="up"]')).toHaveAttribute("title", /No text yet/);
     await page.keyboard.type("%%{s}%%");
-    // Its warning gone as it is typed (the tab not drawn anew)
-    await expect(gesture.locator('[data-swb-slot="up"]')).not.toHaveAttribute("title", /No text yet/);
-    await expect(gesture.locator('[data-swb-slot="up"]')).not.toHaveClass(/swb-settings-unknown/);
     // Picked again: kept, its text too
     await look.locator(".swb-settings-look-change").click();
     await dialog.locator(".swb-settings-pick-field").fill("snippet");
@@ -102,8 +109,12 @@ test.describe("The gesture button", () => {
     await look.locator('[data-swb-own="icon"]').press("Enter");
     await look.locator('[data-swb-own="label"]').fill("Comment");
     await look.locator('[data-swb-own="label"]').press("Enter");
-    await expect(gesture.locator('[data-swb-slot="up"]')).toContainText("💬");
-    await expect(gesture.locator('[data-swb-slot="up"]')).toContainText("Comment");
+    // Back in the item's panel: the slot shows it, nothing wrong with it; the item its 💬 in a corner
+    await look.locator(".swb-settings-look-close").click();
+    await expect(slot("up")).toContainText("💬");
+    await expect(slot("up")).toContainText("Comment");
+    await expect(slot("up")).not.toHaveClass(/swb-settings-unknown/);
+    await expect(gesture.locator(".swb-settings-item-hint-1")).toHaveText("💬");
     await dialog.locator(".swb-settings-save").click();
     await expect(dialog).toHaveCount(0);
     await select(page, "some text");

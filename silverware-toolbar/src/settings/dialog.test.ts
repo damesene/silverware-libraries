@@ -65,18 +65,25 @@ describe("The settings dialog's Favorites tab", () => {
       saved: () => undefined,
     });
     await dialog.open();
-    const item = document.querySelector<HTMLElement>('[data-swb-panel="toolbars"] [data-swb-item="0:0"]')!;
-    const slot = item.querySelector<HTMLElement>('[data-swb-slot="tap"]')!;
-    expect(item.title).toBe("Click: No text yet: the toolbar leaves it out");
+    const panel = () => document.querySelector('[data-swb-panel="toolbars"]')!;
+    const item = () => panel().querySelector<HTMLElement>('[data-swb-item="0:0"]')!;
+    expect(item().title).toBe("Click: No text yet: the toolbar leaves it out");
+    expect(item().classList.contains("swb-settings-unknown")).toBe(true);
+    // Its slots in its panel (Enter on it)
+    item().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    const slot = panel().querySelector<HTMLElement>('[data-swb-look] [data-swb-slot="tap"]')!;
     expect(slot.classList.contains("swb-settings-unknown")).toBe(true);
     expect(slot.textContent).toContain("💬");
     slot.click();
     const field = document.querySelector<HTMLTextAreaElement>('[data-swb-look] [data-swb-field="text"] textarea')!;
     field.value = "%%{s}%%";
     field.dispatchEvent(new Event("input"));
-    const again = document.querySelector<HTMLElement>('[data-swb-panel="toolbars"] [data-swb-item="0:0"]')!;
-    expect(again.title).toBe("");
-    expect(again.querySelector('[data-swb-slot="tap"]')!.classList.contains("swb-settings-unknown")).toBe(false);
+    // As it is typed: the item's warning gone
+    expect(item().title).toBe("");
+    expect(item().classList.contains("swb-settings-unknown")).toBe(false);
+    // Back in its item's panel: the slot's gone too
+    panel().querySelector<HTMLElement>("[data-swb-look] .swb-settings-look-close")!.click();
+    expect(panel().querySelector('[data-swb-look] [data-swb-slot="tap"]')!.classList.contains("swb-settings-unknown")).toBe(false);
     dialog.close();
   });
 });

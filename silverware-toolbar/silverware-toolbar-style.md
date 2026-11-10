@@ -1362,15 +1362,39 @@ html[data-theme="dark"] .swb-dock-shade {
 }
 /* A kind's item (the gesture button): its name, look and × on the first line, its slots under them,
    side by side where they fit, else one under another (a phone) */
-.swb-settings-item.swb-settings-kind {
-  /* As wide as its slots need, side by side where two fit (a desktop), one per line on a phone */
-  flex: 1 1 260px;
-  flex-wrap: wrap;
-  max-width: 100%;
-  box-sizing: border-box;
+/* A kind's item as the toolbar shows it: its first slot's icon, the others' small in its corners (a gesture
+   button's swipes: up top right, down bottom right) */
+.swb-settings-item-face {
+  position: relative;
+  display: inline-flex;
+}
+/* (Room for its corners' icons before what follows: its name, its ×) */
+.swb-settings-item-face:has(.swb-settings-item-hint) {
+  margin-right: 8px;
+}
+.swb-settings-item-hint {
+  position: absolute;
+  right: -9px;
+  display: inline-flex;
+  font-size: 9px;
+  line-height: 1;
+  opacity: 0.75;
+}
+.swb-settings-item-hint svg {
+  width: 9px;
+  height: 9px;
+}
+.swb-settings-item-hint-1 {
+  top: -5px;
+}
+.swb-settings-item-hint-2 {
+  bottom: -5px;
+}
+.swb-settings-kind .swb-settings-item-face + .swb-settings-item-name {
+  margin-left: 4px;
 }
 .swb-settings-kind .swb-settings-item-name {
-  flex: 1 1 0;
+  flex: 0 1 auto;
   /* (Narrow, a pinned box: cut, its × beside it) */
   min-width: 0;
   overflow: hidden;
@@ -1387,6 +1411,10 @@ html[data-theme="dark"] .swb-dock-shade {
   gap: 4px;
   min-width: 0;
   padding-bottom: 2px;
+}
+/* In an item's panel: as wide as the panel */
+.swb-settings-look > .swb-settings-slots {
+  align-self: stretch;
 }
 .swb-settings-slots > .swb-settings-slot,
 .swb-settings-slots > .swb-settings-field {

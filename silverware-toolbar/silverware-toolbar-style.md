@@ -115,7 +115,7 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
   left: 10px;
   right: 10px;
   height: 1px;
-  background: color-mix(in srgb, currentColor 9%, transparent);
+  background: color-mix(in srgb, currentColor 6%, transparent);
   pointer-events: none;
 }
 /* Its items in a box faded out and shaded at each end it scrolls further to (swb-more-left / -right) */

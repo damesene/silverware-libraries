@@ -42,6 +42,26 @@ export function nameOfHashtag(hashtag: string): string {
   return hashtag.startsWith("#<") ? hashtag.slice(2, -1) : hashtag.slice(1);
 }
 
+const WHOLE_TAG_RE = new RegExp(`^${TAG_SOURCE}$`);
+const START_TAG_RE = new RegExp(`^${TAG_SOURCE}`);
+
+/** A name as a hashtag: `#name`, or `#<name>` where `#name` would not read as all of it (spaces, punctuation) */
+export function hashtagOf(name: string): string {
+  const plain = `#${name}`;
+  return WHOLE_TAG_RE.test(plain) ? plain : `#<${name}>`;
+}
+
+/**
+ * A name as a hashtag written before `after` (the text that follows it): in
+ * < > also where `#name` would read on into that text (`#<my tag>foo` renamed
+ * `b` is `#<b>foo`, not `#bfoo`)
+ */
+export function hashtagBefore(name: string, after: string): string {
+  const tag = hashtagOf(name);
+  if (tag.startsWith("#<") || !after) return tag;
+  return START_TAG_RE.exec(tag + after)?.[0].length === tag.length ? tag : `#<${name}>`;
+}
+
 /** Where a run of brackets opened at `at` closes (the index after its `]`), counting brackets inside; -1 where it does not */
 function closingBracket(text: string, at: number): number {
   let depth = 0;

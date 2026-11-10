@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { addPageTags, pageTags, removePageTags, removeTags, renameTags, tagUses } from "./edit.ts";
 import { readFrontmatter, writeTags } from "./frontmatter.ts";
-import { cleanName, hashtagOf, isMetaTag, isWithin, validateName, renamedTag } from "./names.ts";
+import { hashtagOf } from "../../markdown/inline.ts";
+import { cleanName, isMetaTag, isWithin, validateName, renamedTag } from "./names.ts";
 import { scanHashtags } from "./scan.ts";
 
 const names = (text: string) => scanHashtags(text, readFrontmatter(text).bodyStart).map((t) => `${t.name}:${t.context}`);

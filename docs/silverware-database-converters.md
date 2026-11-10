@@ -149,4 +149,16 @@ database to markdown, starts as *Copy as tasks* to the clipboard; a conversion i
    * The command *Silverware Database: Convert selection to database*: the lines selected whole, or the cursor's line
      with those under it (`shared/markdown/lines.ts` `linesUnder`); the block put on the line after them, the lines
      selected again (with their last line break); the text changed meanwhile: the block at the cursor.
-5. *Copy as tasks* from ⋯.
+5. ~~*Copy as tasks* from ⋯~~ (done 2026-11-10). As built: a converter's optional `write(items, properties)`; the place's ⋯
+   offers *Copy as* and its label (slot `data`) for each converter that writes, given `host.items` (filtered, in the view's
+   order) and written onto the clipboard at once (nothing awaited before it: `shared/clipboard.ts` over http). An item's
+   text is not copied: the pages store reads no bodies with the items, and reading them first would await before the
+   copy. The tasks converter writes Done (or Status *Done*) as `[x]`, another Status as the state, People, Links and
+   the page's Tags as marks after the name (`hashtagOf`, moved to `shared/markdown/inline.ts` with `hashtagBefore`),
+   the other properties but the system's as attributes (`writeAttribute`; a person `"@ada"`, a reference its links
+   bare); read back, the values are the same, but for what a task cannot hold as the property had it (after the
+   review, 2026-11-10): a Status no state can be (`:`, `]`, `x`) and a person no mention can name (`Ada Lovelace`)
+   are written as attributes, read back under keys of their own (`status_2`, `people_2`); a tag no hashtag can be
+   (holding `>`) is left out; a reference not written `[[…]]` is made one; the name's characters reading takes as
+   syntax are escaped (`\[`, `` \` ``, `\#`, `\@`…), read back without the backslash. Labels, types and settings come
+   back from the values, not as they were. A view showing no item copies nothing.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Converted } from "../../core/converter.ts";
+import type { Item, ItemKey, Property } from "../../model/database.ts";
 import { TASKS_CONVERTER } from "./tasks.ts";
 
 const read = (lines: readonly string[]): Converted => TASKS_CONVERTER.read(lines.join("\n"))!;
@@ -91,6 +92,59 @@ describe("The tasks converter", () => {
       ["A", "line one  \n```\n- [ ] not a task\n```"],
       ["B", undefined],
     ]);
+  });
+
+  it("writes items back as tasks that read back the same: states, marks, attributes; what the system gives left out", () => {
+    const properties: Property[] = [
+      { key: "done", label: "Done", type: "checkbox", params: {}, readonly: false },
+      { key: "status", label: "Status", type: "select", params: { options: ["IN PROGRESS", "Done"] }, readonly: false },
+      { key: "due", label: "Due", type: "date", params: {}, readonly: false },
+      { key: "owner", label: "Owner", type: "person", params: {}, readonly: false },
+      { key: "ref", label: "Ref", type: "reference", params: {}, readonly: false },
+      { key: "note", label: "Note", type: "text", params: {}, readonly: false },
+      { key: "people", label: "People", type: "person", params: { multiple: true }, readonly: false },
+      { key: "links", label: "Links", type: "reference", params: {}, readonly: false },
+      { key: "page_tags", label: "Tags", type: "tags", params: {}, readonly: true, system: "tags" },
+      { key: "created_at", label: "Created", type: "datetime", params: {}, readonly: true, system: "createdAt" },
+    ];
+    const item = (name: string, values: Item["values"]): Item => ({ key: name as ItemKey, name, values, rank: undefined, revision: "1" });
+    const items = [
+      item("Call the client", { done: false, status: "IN PROGRESS", due: "2026-11-12", owner: "ada", ref: ["[[Web]]"], note: "a ] b", people: ["jana"], links: ["[[Acme]]"], page_tags: ["sales", "two words"], created_at: "2026-11-10T10:00" }),
+      item("Send offer", { done: true, status: "Done" }),
+      item("Plain", {}),
+    ];
+    const written = TASKS_CONVERTER.write!(items, properties);
+    expect(written).toBe(
+      [
+        '- [IN PROGRESS] Call the client [due: "2026-11-12"] [owner: "@ada"] [ref: [[Web]]] [note: "a \\u005d b"] @jana [[Acme]] #sales #<two words>',
+        "- [x] Send offer",
+        "- [ ] Plain",
+        "",
+      ].join("\n"),
+    );
+    const back = TASKS_CONVERTER.read(written)!;
+    expect(back.items[0]).toMatchObject({ name: "Call the client", tags: ["sales", "two words"], values: { status: "IN PROGRESS", due: "2026-11-12", owner: "ada", ref: ["[[Web]]"], note: "a ] b", people: ["jana"], links: ["[[Acme]]"] } });
+    expect(back.items.map((one) => one.values?.done)).toEqual([false, true, false]);
+    expect(TASKS_CONVERTER.write!([], properties)).toBe("");
+  });
+
+  it("writes what a task cannot hold so it still reads back: a status no state can be, a person no mention can name, a name of syntax", () => {
+    const prop = (key: string, type: string, params = {}): Property => ({ key, label: key, type, params, readonly: false });
+    const properties = [prop("status", "select"), prop("people", "person", { multiple: true }), prop("ref", "reference"), prop("page_tags", "tags")].map((one) => (one.key === "page_tags" ? { ...one, system: "tags" } : one));
+    const item = (name: string, values: Item["values"]): Item => ({ key: name as ItemKey, name, values, rank: undefined, revision: "1" });
+    const written = TASKS_CONVERTER.write!(
+      [
+        item("[x: y] Use `a` #not @not", { status: "Waiting: for x", people: ["Ada Lovelace", "bob"], ref: ["Plain", "[[Web]]"], page_tags: ["ok", "a>b"] }),
+        item("B", { status: "x" }),
+      ],
+      properties,
+    );
+    expect(written).toBe(String.raw`- [ ] \[x: y\] Use \`a\` \#not \@not [status: "Waiting: for x"] @bob [people: ["@Ada Lovelace"]] [ref: [[Plain]], [[Web]]] #ok
+- [ ] B [status: x]
+`);
+    const back = TASKS_CONVERTER.read(written)!;
+    expect(back.items[0]).toMatchObject({ name: "[x: y] Use `a` #not @not", tags: ["ok"], values: { people: ["bob"], ref: ["[[Plain]]", "[[Web]]"], status_2: "Waiting: for x", people_2: "Ada Lovelace" } });
+    expect(back.items[1]!.values).toMatchObject({ done: false, status_2: "x" });
   });
 
   it("keeps a value YAML does not read as written, as text", () => {

@@ -549,6 +549,24 @@ test("Convert selection to database makes a database of the tasks selected, its 
   await expect.poll(() => editorText(page)).toBe("# Page\n\n\n```silverware-database\nid: calls\n```\n\nAfter\n");
 });
 
+test("Copy as tasks in ⋯ puts the items shown on the clipboard as tasks", async ({ page, space }) => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await space.open(
+    {
+      Page: "# Page\n\n```silverware-database\nid: tasks\n```\n",
+      "Page/db-tasks": "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    done: { type: checkbox, label: Done }\n    due: { type: date, label: Due }\n---\n",
+      "Page/db-tasks/Call": "---\ntags: [db]\ndone: false\ndue: \"2026-11-12\"\n_database:\n  rank: a0\n---\n",
+      "Page/db-tasks/Send": "---\ntags: [db]\ndone: true\n_database:\n  rank: a1\n---\n",
+    },
+    "Page",
+  );
+  await expect(page.locator(".swd-place")).toHaveCount(1);
+  await page.locator(".swd-more").click();
+  await page.locator(".swd-menu .swd-menu-item", { hasText: "Copy as tasks" }).click();
+  // (Read back as the system keeps it: Windows' line breaks CRLF)
+  await expect.poll(async () => (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, "\n")).toBe('- [ ] Call [due: "2026-11-12"]\n- [x] Send\n');
+});
+
 test("a block in a list item is not written, said why, the page as it was", async ({ page, space }) => {
   const listed = "# Page\n\n- item\n  ```silverware-database\n  id: tasks\n  view: names\n  ```\n- next\n";
   await space.open({ Page: listed, ...TASKS }, "Page");

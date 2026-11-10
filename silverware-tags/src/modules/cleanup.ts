@@ -8,7 +8,8 @@ import { pageCounts } from "../core/catalog.ts";
 import type { ModuleHost, TagsModule, WorkspaceHost } from "../core/module.ts";
 import { counted } from "../core/operation.ts";
 import { RENAME_OFFER, type RenameOffer } from "../core/offers.ts";
-import { hashtagOf, isMetaTag } from "../../../shared/pages/tags/names.ts";
+import { hashtagOf } from "../../../shared/markdown/inline.ts";
+import { isMetaTag } from "../../../shared/pages/tags/names.ts";
 import { type SimilarReason, similarTags } from "../tags/similar.ts";
 import { el } from "../../../shared/elements.ts";
 

@@ -4,7 +4,7 @@
 // (frontmatter.ts); a page's tag lines are read as its tags too, as
 // SilverBullet reads them.
 import { type FrontmatterForm, readFrontmatter, writeTags } from "./frontmatter.ts";
-import { hashtagBefore } from "./names.ts";
+import { hashtagBefore } from "../../markdown/inline.ts";
 import { type Hashtag, scanHashtags, type TagContext, type TagScanner } from "./scan.ts";
 
 export type TextEdit = { readonly from: number; readonly to: number; readonly insert: string };

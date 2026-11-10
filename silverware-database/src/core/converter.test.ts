@@ -10,6 +10,7 @@ describe("Converters", () => {
     expect(validateConverter(converter("tasks", " "))).toBe('the converter "tasks" has no label');
     expect(validateConverter({ name: "tasks", label: "Tasks" } as ConverterDefinition)).toBe('the converter "tasks" has no read');
     expect(validateConverter({ ...converter("tasks"), description: 1 } as unknown as ConverterDefinition)).toContain("its description is no text");
+    expect(validateConverter({ ...converter("tasks"), write: "x" } as unknown as ConverterDefinition)).toBe('the converter "tasks": its write is no function');
   });
 
   it("are offered built-in first, one of a built-in name in its place, the others after", () => {

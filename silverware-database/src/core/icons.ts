@@ -15,6 +15,7 @@ export const ICONS = {
   close: svg('<path d="M4 4l8 8M12 4l-8 8"/>'),
   color: svg('<path d="M8 2.5s-4 4.25-4 7a4 4 0 0 0 8 0c0-2.75-4-7-4-7z"/>'),
   group: svg('<path d="M2.5 3.5h11M2.5 7h11M2.5 10.5h7M2.5 13h7"/>'),
+  copy: svg('<rect x="5.5" y="5.5" width="8" height="8" rx="1"/><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"/>'),
   source: svg('<path d="m5.5 4.5-3 3.5 3 3.5M10.5 4.5l3 3.5-3 3.5"/>'),
   remove: VIEW_ICONS.remove,
   up: svg('<path d="M8 13V3M4 7l4-4 4 4"/>'),

@@ -377,7 +377,7 @@ function start(element: HTMLElement, shown: Shown): void {
   // (The place before it for this block over the window: this one so from its first drawing, no frame in the page between)
   const before = handovers.get(JSON.stringify([shown.page, shown.current]));
   const overWindow = !!before && before.until > Date.now() && before.from !== shown.place && before.from.isOverWindow;
-  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, overWindow, settings: platform.settings, ui: platform.ui, editor: platform.editor, documents: platformDocuments(app!.platform), moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), moduleTools: (place) => app!.modules.placeTools(place), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database, from) => app!.modules.openItem(item, database, from), editSource: () => void editSource(element, shown), deleteDatabase: (one, name) => deleteDatabase(core, one, name), takeOver });
+  shown.place = new DatabasePlace({ element, database: id, state, store, core, types, views, converters: () => converters.all(), overWindow, settings: platform.settings, ui: platform.ui, editor: platform.editor, documents: platformDocuments(app!.platform), moduleMenu: (place, menu) => app!.modules.placeMenu(place, menu), moduleTools: (place) => app!.modules.placeTools(place), placeDrawn: (place) => app!.modules.placeDrawn(place), openItem: (item, database, from) => app!.modules.openItem(item, database, from), editSource: () => void editSource(element, shown), deleteDatabase: (one, name) => deleteDatabase(core, one, name), takeOver });
   void shown.place.render();
 }
 

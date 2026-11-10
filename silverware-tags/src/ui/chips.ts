@@ -7,7 +7,8 @@
 import { el } from "../../../shared/elements.ts";
 import { suggestionList } from "../../../shared/suggest.ts";
 import { ICONS } from "./icons.ts";
-import { cleanName, hashtagOf, validateName } from "../../../shared/pages/tags/names.ts";
+import { hashtagOf } from "../../../shared/markdown/inline.ts";
+import { cleanName, validateName } from "../../../shared/pages/tags/names.ts";
 import { tagAtCaret } from "../tags/query.ts";
 
 // At most this many offered

@@ -5,7 +5,7 @@
 // are written against this alike, importing only types from the core. A
 // converter reads; what is made of what it read (a new database now, items
 // added to one later) is the core's, so a converter knows no database.
-import type { Params, Value } from "../model/database.ts";
+import type { Item, Params, Property, Value } from "../model/database.ts";
 import { DefinitionRegistry } from "./registry.ts";
 
 /** A property the items read need: its key (what their values are under), label, type and the type's settings */
@@ -27,6 +27,8 @@ export type ConverterDefinition = {
   readonly description?: string;
   /** The items of a text (the lines selected, whole); none where it holds none this converter reads */
   read(text: string): Converted | undefined;
+  /** Optional: items written back as such a text (*Copy as …* in a place's menu: the items a view shows, as it orders them), as much as the text holds of them */
+  write?(items: readonly Item[], properties: readonly Property[]): string;
 };
 
 const CONVERTER_NAME_RE = /^[a-z][a-z0-9-]*$/;
@@ -37,6 +39,7 @@ export function validateConverter(converter: ConverterDefinition): string | unde
   if (typeof converter.label !== "string" || !converter.label.trim()) return `the converter "${converter.name}" has no label`;
   if (converter.description !== undefined && typeof converter.description !== "string") return `the converter "${converter.name}": its description is no text`;
   if (typeof converter.read !== "function") return `the converter "${converter.name}" has no read`;
+  if (converter.write !== undefined && typeof converter.write !== "function") return `the converter "${converter.name}": its write is no function`;
   return undefined;
 }
 

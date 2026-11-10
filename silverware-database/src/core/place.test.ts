@@ -4,6 +4,7 @@ import { TypeRegistry } from "../domain/types/registry.ts";
 import type { Database } from "../model/database.ts";
 import { MemoryStore } from "../store/memory.ts";
 import { MemoryViewState } from "../store/viewstate.ts";
+import type { ConverterDefinition } from "./converter.ts";
 import { DatabaseCore } from "./core.ts";
 import type { OpenedFrom } from "./module.ts";
 import { DatabasePlace, type PlaceKept, VIEW_KEY, viewSettingPath } from "./place.ts";
@@ -56,7 +57,7 @@ function listView(name: string, options: { update?: boolean; fail?: boolean } = 
   return { view, seen };
 }
 
-function setup(views: readonly ViewDefinition[], state: Record<string, unknown> = {}, settings: Record<string, unknown> = {}, slowSettings = 0, editSource?: () => void) {
+function setup(views: readonly ViewDefinition[], state: Record<string, unknown> = {}, settings: Record<string, unknown> = {}, slowSettings = 0, editSource?: () => void, converters?: readonly ConverterDefinition[]) {
   const store = new MemoryStore([{ database: TASKS, items: [{ name: "Fix login", values: { status: "Todo" }, rank: "a0" }, { name: "Write docs", values: { status: "Done" }, rank: "a1" }] }]);
   const types = new TypeRegistry();
   const core = new DatabaseCore(store, types, { notify: () => {}, ask: () => true });
@@ -81,6 +82,7 @@ function setup(views: readonly ViewDefinition[], state: Record<string, unknown> 
     ui: { notify: (message) => void told.push(message) },
     editor: { open: (ref) => void opened.push(ref) },
     ...(editSource ? { editSource } : {}),
+    ...(converters ? { converters: () => converters } : {}),
   });
   const listed = () => [...element.querySelectorAll("li")].map((one) => one.textContent);
   // The views on, as the picker's menu lists them (opened for it): each item's view (a test view's label is its name in capitals)
@@ -371,6 +373,27 @@ describe("a place", () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(element.querySelector(".swd-group-label")!.textContent).toBe("No Status");
     element.remove();
+  });
+
+  it("offers Copy as … in ⋯ for each converter that writes, the items shown copied in the view's order", async () => {
+    const written: string[] = [];
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (text: string) => void written.push(text) } });
+    const lines: ConverterDefinition = { name: "lines", label: "Lines", read: () => undefined, write: (items) => items.map((one) => one.name).join("\n") };
+    const reader: ConverterDefinition = { name: "reader", label: "Reader", read: () => undefined };
+    const broken: ConverterDefinition = { name: "broken", label: "Broken", read: () => undefined, write: () => { throw new Error("no"); } };
+    const { place, element, told } = setup([listView("table").view], { "table.sort": [{ key: "name", direction: "desc" }] }, {}, 0, undefined, [lines, reader, broken]);
+    await place.render();
+    element.querySelector<HTMLButtonElement>(".swd-more")!.click();
+    expect(menuShown(element).map(([label]) => label)).toContain("Copy as lines");
+    expect(menuShown(element).map(([label]) => label)).not.toContain("Copy as reader");
+    choose(element, "Copy as lines");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(written).toEqual(["Write docs\nFix login"]);
+    expect(told.at(-1)).toBe("2 items copied as lines");
+    element.querySelector<HTMLButtonElement>(".swd-more")!.click();
+    choose(element, "Copy as broken");
+    expect(told.at(-1)).toBe('The converter "broken" did not write: no');
+    delete (navigator as { clipboard?: unknown }).clipboard;
   });
 
   it("offers Edit source last in ⋯ where the place is a block, none where it is not; a view's own entries in its slot", async () => {

@@ -354,7 +354,7 @@ describe("Block formats", () => {
     expect(turn("- [x] a\n- b", "task")).toBe("- [x] a\n- [ ] b");
   });
 
-  it("read a task of a state of its own as a task, as SilverBullet does (shared/markdown/blocks.ts `readLine`)", () => {
+  it("read a task of a state of its own as a task, as SilverBullet does (shared/markdown/blockline.ts `readLine`)", () => {
     const of = (line: string) => blockFormatOf(contextOf(line, 0, line.length))?.name;
     expect(of("- [IN PROGRESS] work")).toBe("task");
     expect(of("1. [x] done")).toBe("task");

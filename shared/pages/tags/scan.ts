@@ -10,10 +10,10 @@
 // a table, a heading.
 //
 // A line-by-line reading, not a markdown parser: a line's block is what
-// shared/markdown/blocks.ts `readLine` reads, its fences lines.ts', and what
+// shared/markdown/blockline.ts `readLine` reads, its fences lines.ts', and what
 // holds over lines (a list, a paragraph, code) is kept here. Behind
 // `TagScanner`, so another (SilverBullet's own parser) could take its place.
-import { readLine } from "../../markdown/blocks.ts";
+import { readLine } from "../../markdown/blockline.ts";
 import { inlineMarks } from "../../markdown/inline.ts";
 import { closesFence, fenceOf, indentWidth, type Line, linesOf } from "../../markdown/lines.ts";
 

@@ -22,6 +22,8 @@ function shape(text: string, from = 0): unknown[] {
           return [`task [${node.state}]${node.done ? " done" : ""}`, node.lines.map((line) => text.slice(line.from, line.to))];
         case "code":
           return [`code ${node.language ?? "indented"}`, node.lines.map((line) => text.slice(line.from, line.to))];
+        case "html":
+          return [node.inline ? "html" : "html raw", node.lines.map((line) => text.slice(line.from, line.to))];
         default:
           return [node.kind, node.lines.map((line) => text.slice(line.from, line.to))];
       }
@@ -87,6 +89,18 @@ describe("parseBlocks", () => {
       ["html", ["<div>", "#h", "</div>"]],
       ["comment", " a #c\n- [ ] t\n", [["paragraph", ["a #c"]], ["item bullet", [["task [ ]", ["t"]]]]]],
     ]);
+  });
+
+  it("tells block-level HTML from raw, a link's definition from a paragraph, and gives a paragraph's elements", () => {
+    expect(shape("<pre>\n#x\n</pre>\n\n<span>\na\n</span>\n\n[top]: #a\n\n[^1]: note")).toEqual([
+      ["html raw", ["<pre>", "#x", "</pre>"]],
+      ["html raw", ["<span>", "a", "</span>"]],
+      ["definition", ["[top]: #a"]],
+      ["paragraph", ["[^1]: note"]],
+    ]);
+    const text = "#a *x* `c`  \nb";
+    const [paragraph] = parseBlocks(text);
+    expect(paragraph?.kind === "paragraph" ? paragraph.inline.map((span) => text.slice(span.from, span.to)) : undefined).toEqual(["*x*", "`c`", "  \n"]);
   });
 
   it("reads no markdown in a marker comment (a baked section's), as SilverBullet does", () => {

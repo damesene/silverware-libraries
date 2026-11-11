@@ -123,8 +123,9 @@ class BlockReader {
         const [line, ...more] = node.lines;
         return { kind: "paragraph", text: this.texts([{ from: node.from, to: line!.to }, ...more]).join("\n"), lines };
       }
+      // (A link's definition a paragraph: what it says is its text)
       default:
-        return { kind: node.kind, text: this.texts(node.lines).join("\n"), lines };
+        return { kind: node.kind === "html" ? "html" : "paragraph", text: this.texts(node.lines).join("\n"), lines };
     }
   }
 

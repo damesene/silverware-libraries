@@ -33,8 +33,14 @@ type Container = Span & { readonly children: readonly MarkdownNode[] };
 
 /** A block of a text, as markdown's parser reads it */
 export type MarkdownNode =
-  // A paragraph's lines without their indentation; HTML's with the indentation it has of its own
-  | (Leaf & { readonly kind: "paragraph" | "html" })
+  // A paragraph's lines without their indentation; `inline` where the elements of its own text are (emphasis, code,
+  // links, HTML, entities, escapes, hard line breaks; no hashtag, lezer knows none), in order
+  | (Leaf & { readonly kind: "paragraph"; readonly inline: readonly Span[] })
+  // HTML's lines with the indentation it has of its own; `inline` where its text is read inline as SilverBullet reads
+  // block-level HTML's (a div's), not a raw block's (pre, script, style, a comment's of its own, a tag alone)
+  | (Leaf & { readonly kind: "html"; readonly inline: boolean })
+  // A link's definition (`[label]: url "title"`), no text read inline
+  | (Leaf & { readonly kind: "definition" })
   // Its text: an ATX heading's without its #s, a setext heading's lines without its underline
   | (Leaf & { readonly kind: "heading"; readonly level: number })
   // A paragraph directly in a list's item starting with a state in brackets (`[ ]`, `[x]`, one of its own): its
@@ -94,6 +100,10 @@ type Prefix = { readonly kind: "quote" } | { readonly kind: "item"; readonly ind
 const QUOTE_MARKER_RE = /^ {0,3}>[ \t]?/;
 // A marker comment, which SilverBullet reads no markdown in (a baked section's `<!--#lua …-->`, `<!--/lua-->`)
 const MARKER_COMMENT_RE = /^\s*<!--[ \t]*[#/]/;
+// Block-level HTML (CommonMark's sixth kind of HTML block: its tags), whose text SilverBullet reads inline; the other
+// kinds (pre, script, style, a tag alone on its line) it keeps raw
+const BLOCK_HTML_RE =
+  /^\s*<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:\s|\/?>|$)/i;
 
 const isSpace = (c: string | undefined) => c === " " || c === "\t";
 
@@ -139,16 +149,24 @@ class Reader {
       case "HorizontalRule":
         return { kind: "rule", from, to };
       case "HTMLBlock":
-      case "ProcessingInstructionBlock":
-        return { kind: "html", from, to, lines: this.lines(node.from, node.to, prefixes, 0) };
+      case "ProcessingInstructionBlock": {
+        const inline = node.name === "HTMLBlock" && BLOCK_HTML_RE.test(this.text.slice(node.from, this.lineEnd(node.from)));
+        return { kind: "html", inline, from, to, lines: this.lines(node.from, node.to, prefixes, 0) };
+      }
       case "CommentBlock":
         return this.comment(node);
+      // (A footnote's definition, `[^1]: …`, SilverBullet's own: a paragraph, its text read inline)
+      case "LinkReference":
+        if (!this.text.startsWith("[^", node.from)) return { kind: "definition", from, to, lines: this.lines(node.from, node.to, prefixes, Infinity) };
+      // falls through
       default: {
-        // A paragraph (a link's or a footnote's definition too; a block of no kind known here, its text as one's), a task
-        // where it is directly in a list's item and starts with a state
+        // A paragraph (a footnote's definition too; a block of no kind known here, its text as one's), a task where it is
+        // directly in a list's item and starts with a state
         const task = node.parent?.name === "ListItem" ? readTaskState(this.text.slice(node.from, node.to)) : undefined;
         if (task) return { kind: "task", state: task.state, done: task.done, from, to, lines: this.lines(node.from, node.to, prefixes, Infinity, node.from + task.textFrom) };
-        return { kind: "paragraph", from, to, lines: this.lines(node.from, node.to, prefixes, Infinity) };
+        const inline: Span[] = [];
+        for (let child = node.firstChild; child; child = child.nextSibling) if (child.name !== "QuoteMark") inline.push(this.span(child.from, child.to));
+        return { kind: "paragraph", inline, from, to, lines: this.lines(node.from, node.to, prefixes, Infinity) };
       }
     }
   }

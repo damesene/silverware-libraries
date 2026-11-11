@@ -81,7 +81,14 @@ describe("scanning", () => {
   it("takes the page's tags as SilverBullet does: hashtags alone before a line break with more after it", () => {
     expect(names("#a #b\n#c\n  #d")).toEqual(["a:page", "b:page", "c:page", "d:paragraph"]);
     expect(names("#a #b text")).toEqual(["a:paragraph", "b:paragraph"]);
+    // An element where text would be is none of a tag line: emphasis, code, a link, a wiki link, a hard line break
+    for (const page of ["#a\n*x*", "#a\n`c`", "#a\n[x](y)", "#a\n[[P]]", "#a  \n#b"]) expect(names(page).every((one) => !one.endsWith(":page"))).toBe(true);
+    expect(names("#a\n  *x*")).toEqual(["a:page"]);
     expect(names("> #q\n\n- #i")).toEqual(["q:paragraph", "i:item"]);
+  });
+  it("finds none in raw HTML nor in a link's definition, as SilverBullet reads them", () => {
+    expect(names("<pre>\n#include\n</pre>\n\n<style>\n#id {}\n</style>\n\n<span>\n#a\n</span>\n\n[top]: #b")).toEqual([]);
+    expect(names("<div>\n#c\n</div>")).toEqual(["c:paragraph"]);
   });
   it("reads a task of a state of its own as a task, as SilverBullet does", () => {
     expect(names("- [IN PROGRESS] task #a")).toEqual(["a:task"]);

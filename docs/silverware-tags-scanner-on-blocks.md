@@ -92,3 +92,10 @@ at the end.
   line of dashes, a heading ends a task's text, HTML runs to its blank line, a setext heading is a heading, a page's
   tag line is a paragraph's hashtags before any other text (frontmatter.ts). The new scanner gives the same on a page
   with LF and with CRLF.
+* **The scanner's review**: a page's tag line is read element by element as frontmatter.ts does, an element where
+  text would be (emphasis, code, a link, a wiki link, an attribute, a hard line break; lezer's inline elements and
+  `inline.ts`' marks) ending it with no page tags (`#a\n*x*`); raw HTML (pre, script, style, a tag alone) and a link's
+  definition (`[top]: #a`) hold no hashtags, as SilverBullet keeps them raw; block-level HTML's (a div's) do.
+* **Known, kept**: a line's marks are read one line at a time, so a span of inline code over two lines is not one (the
+  old scanner read so too); a URL without brackets is no element to the tag line (lezer has none: SilverBullet's
+  NakedURL is its own).

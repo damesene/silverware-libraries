@@ -16,15 +16,21 @@ type LineCommon = {
   // The text after the marker, and where it starts in the line
   readonly content: string;
   readonly contentFrom: number;
+  // The line as a list's item, where it starts with a list's marker whatever its kind (a task's, a bullet's, a rule's
+  // `- - -` too): what reads a list's items by their marker alone, as markdown's lists are, is given it
+  readonly item?: LineItem;
 };
+
+/** A line's list marker: its kind, the marker (`- `, `1. `), the text after it (a task's `[x] …` included) */
+export type LineItem = { readonly kind: "bullet" | "numbered"; readonly marker: string; readonly content: string };
 
 /** A line read as a block's: its kind, and what the kind has of its own */
 export type BlockLine =
   | (LineCommon & { readonly kind: "blank" | "paragraph" | "bullet" | "quote" | "table" | "rule" })
   | (LineCommon & { readonly kind: "heading"; readonly level: number })
   | (LineCommon & { readonly kind: "numbered"; readonly number: number })
-  // A list's item with a state in brackets (`[ ]`, `[x]`, one of its own); `list` its marker's kind
-  | (LineCommon & { readonly kind: "task"; readonly state: string; readonly done: boolean; readonly list: "bullet" | "numbered" });
+  // A list's item with a state in brackets (`[ ]`, `[x]`, one of its own); its `item` the list's marker
+  | (LineCommon & { readonly kind: "task"; readonly state: string; readonly done: boolean; readonly item: LineItem });
 
 export type LineKind = BlockLine["kind"];
 
@@ -43,21 +49,24 @@ const QUOTE_RE = /^>[ \t]?/;
 export function readLine(line: string): BlockLine {
   const indent = /^[ \t]*/.exec(line)![0];
   const rest = line.slice(indent.length);
-  const at = (kind: "blank" | "paragraph" | "table" | "rule", marker = ""): BlockLine => ({ kind, indent, marker, content: rest.slice(marker.length), contentFrom: indent.length + marker.length });
-  if (!rest.trim()) return at("blank");
-  const heading = HEADING_RE.exec(rest);
-  if (heading) return { kind: "heading", level: heading[1]!.length, indent, marker: heading[0], content: rest.slice(heading[0].length), contentFrom: indent.length + heading[0].length };
-  if (RULE_RE.test(rest)) return at("rule");
-  const task = readTaskLine(line);
-  if (task) return { kind: "task", state: task.state, done: task.done, list: /^\d/.test(task.marker) ? "numbered" : "bullet", indent, marker: line.slice(indent.length, task.textFrom), content: task.text, contentFrom: task.textFrom };
   const bullet = BULLET_RE.exec(rest);
-  if (bullet) return { kind: "bullet", indent, marker: bullet[0], content: rest.slice(bullet[0].length), contentFrom: indent.length + bullet[0].length };
-  const numbered = NUMBERED_RE.exec(rest);
-  if (numbered) return { kind: "numbered", number: Number(numbered[1]), indent, marker: numbered[0], content: rest.slice(numbered[0].length), contentFrom: indent.length + numbered[0].length };
+  const numbered = bullet ? null : NUMBERED_RE.exec(rest);
+  const listMarker = bullet ?? numbered;
+  const item: LineItem | undefined = listMarker ? { kind: bullet ? "bullet" : "numbered", marker: listMarker[0], content: rest.slice(listMarker[0].length) } : undefined;
+  // What every kind has: the indentation, its marker and the text after it, the line as a list's item where it is one
+  const common = (marker: string) => ({ indent, marker, content: rest.slice(marker.length), contentFrom: indent.length + marker.length, ...(item ? { item } : {}) });
+  if (!rest.trim()) return { kind: "blank", ...common("") };
+  const heading = HEADING_RE.exec(rest);
+  if (heading) return { kind: "heading", level: heading[1]!.length, ...common(heading[0]) };
+  if (RULE_RE.test(rest)) return { kind: "rule", ...common("") };
+  const task = readTaskLine(line);
+  if (task && item) return { kind: "task", state: task.state, done: task.done, ...common(line.slice(indent.length, task.textFrom)), item };
+  if (bullet) return { kind: "bullet", ...common(bullet[0]) };
+  if (numbered) return { kind: "numbered", number: Number(numbered[1]), ...common(numbered[0]) };
   const quote = QUOTE_RE.exec(rest);
-  if (quote) return { kind: "quote", indent, marker: quote[0], content: rest.slice(quote[0].length), contentFrom: indent.length + quote[0].length };
-  if (rest.startsWith("|")) return at("table");
-  return at("paragraph");
+  if (quote) return { kind: "quote", ...common(quote[0]) };
+  if (rest.startsWith("|")) return { kind: "table", ...common("") };
+  return { kind: "paragraph", ...common("") };
 }
 
 /** The lines a block was read from: their indexes in the text given, `to` past the last */
@@ -188,7 +197,7 @@ function blocksOf(lines: readonly string[], base: number): Block[] {
       }
       const under = dedentedLines(lines.slice(i + 1, last + 1));
       const first = lines.slice(i + 1, last + 1).findIndex((one) => !blank(one));
-      const list = read.kind === "task" ? read.list : read.kind;
+      const list = read.kind === "task" ? read.item.kind : read.kind;
       blocks.push({
         kind: "item",
         list,

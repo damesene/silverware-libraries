@@ -206,9 +206,10 @@ reads: the same per line (a line's block kind, its indentation, its text after t
 tree (it rewrites lines in place; its only blocks of several lines are fenced code and numbering by indentation), and
 kinds of its user's own (its format registry). So two layers in `shared/markdown/`:
 
-* **`readLine(line)`**, for *Turn into* and converters alike: `{ kind, indent, marker, content, contentFrom }` with
+* **`readLine(line)`**, for *Turn into* and converters alike: `{ kind, indent, marker, content, contentFrom, item }` with
   `kind` one of `blank`, `paragraph`, `heading` (`level`), `bullet`, `numbered` (`number`), `task` (`state`, `done`;
-  a list item's), `quote`, `table`, `rule`; standard markdown only (a user's own formats stay the toolbar's registry).
+  a list item's), `quote`, `table`, `rule`; `item`, a line's list marker whatever its kind (a task's, a rule's `- - -`),
+  what the toolbar's bullet and numbered list read by; standard markdown only (a user's own formats stay the toolbar's registry).
   Fenced code is `lines.ts`'.
 * **`readBlocks(text)`**, for converters: a tree made of `readLine` (items with the items and lines under them,
   headings with their section, a table's header and cells, paragraphs, quotes, fenced code), each block with the lines

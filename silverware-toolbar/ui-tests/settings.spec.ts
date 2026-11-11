@@ -406,6 +406,33 @@ test.describe("The settings dialog", () => {
     expect(Math.abs(parseFloat(room) - height)).toBeLessThan(1);
   });
 
+  test("shown always, docked: none while another plugin shows something over the whole window (its room given back, a selection and the key show nothing); back once it ends", async ({ page }) => {
+    await openSettings(page);
+    await tab(page, "toolbars").click();
+    await dialog(page).locator(".swb-settings-toolbar-show").selectOption("always");
+    await dialog(page).locator(".swb-settings-toolbar-placement").selectOption("bottom");
+    await save(page).click();
+    await expect(bar(page)).toBeVisible();
+    // A full screen of another plugin, as any of them marks it (shared/overwindow.ts)
+    await page.evaluate(() => {
+      const view = document.createElement("div");
+      view.id = "test-over-window";
+      view.setAttribute("data-silverware-over-window", "");
+      document.body.append(view);
+    });
+    await expect(bar(page)).toBeHidden();
+    const room = await page.evaluate(() => document.documentElement.style.getPropertyValue("--swb-docked-bottom"));
+    expect(parseFloat(room || "0")).toBe(0);
+    await select(page, "some text");
+    await page.keyboard.press("Control+Shift+Q");
+    await page.waitForTimeout(200);
+    await expect(bar(page)).toBeHidden();
+    await expect(popup(page)).toHaveCount(0);
+    // Ended (its mark taken off): the toolbar as set, at once
+    await page.evaluate(() => document.getElementById("test-over-window")!.removeAttribute("data-silverware-over-window"));
+    await expect(bar(page)).toBeVisible();
+  });
+
   test("a module turned off: Save and reload, its actions gone; closing with changes asks first", async ({ page }) => {
     // (On, its action found by the word)
     await select(page, "some text");

@@ -32,6 +32,7 @@ import { oncePerFrame } from "../../frame.ts";
 import { claimWindow, releaseWindow } from "../../overwindow.ts";
 import { DRAWN_CLASS, STAND_IN_CLASS, UI_CLASS } from "../../../dom.ts";
 import { el } from "../../../../../shared/elements.ts";
+import { markOverWindow } from "../../../../../shared/overwindow.ts";
 import { columnLetters, isFormulaInput } from "../../../formulas/index.ts";
 import { ICONS } from "../../../icons.ts";
 import { escapeCell, findTables, parseTable, type Table, type TableRange } from "../../../markdown.ts";
@@ -250,6 +251,8 @@ export class Sheet implements AdapterFeature {
     const doc = this.host.doc;
     const box = doc.createElement("div");
     box.className = "swt-sheet-board";
+    // Over the whole window: the mark every plugin knows (it goes with the board as it ends)
+    markOverWindow(box, true);
     // The focus the board's (keys typed with nothing selected reach no page under it)
     box.tabIndex = -1;
     const content = doc.createElement("div");

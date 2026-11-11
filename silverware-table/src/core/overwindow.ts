@@ -20,6 +20,7 @@
 // past the table where its module shows rows there (`past`). A module may keep
 // the same room right of the table (`numbersRight`: full screen), numbered too,
 // so the + of a new column and its line are in view, clear of the toolbar.
+import { markOverWindow } from "../../../shared/overwindow.ts";
 import { OUT_OF_LINE_CLASS, UI_CLASS, WIDGET_SELECTOR } from "../dom.ts";
 import { columnLetters } from "../formulas/index.ts";
 import type { TableHost, TableKey, WidgetInfo } from "./feature.ts";
@@ -162,10 +163,14 @@ export class OverWindow {
     this.watching?.disconnect();
     this.watching = undefined;
     const widget = this.shownWidget;
+    const guessed = this.guessed;
     this.shownKey = undefined;
     this.shownWidget = undefined;
+    this.guessed = undefined;
     releaseWindow(this.host, this);
     if (widget) this.unmark(widget);
+    // (A table rendered anew taken for it and not enhanced yet: no enhancement may come to take its mark off)
+    if (guessed && guessed !== widget) this.unmark(guessed);
     for (const layer of this.numbers) layer.classList.remove("swt-visible");
     this.options.changed();
     const info = widget && this.host.infoOf(widget);
@@ -189,7 +194,7 @@ export class OverWindow {
     this.place = this.widgets().indexOf(widget);
     clearTimeout(this.goneTimer);
     this.goneTimer = undefined;
-    widget.classList.add(OVER_WINDOW_CLASS, this.options.className);
+    this.markWidget(widget, true);
     for (const layer of this.numbers) layer.classList.add("swt-visible");
     this.queueNumbers();
     if (this.options.shows && !this.watching) {
@@ -224,7 +229,14 @@ export class OverWindow {
   }
 
   private unmark(widget: HTMLElement): void {
-    widget.classList.remove(OVER_WINDOW_CLASS, this.options.className);
+    this.markWidget(widget, false);
+  }
+
+  /** Its classes, and the mark every plugin knows (shared/overwindow.ts: the others stand back while it shows) */
+  private markWidget(widget: HTMLElement, on: boolean): void {
+    widget.classList.toggle(OVER_WINDOW_CLASS, on);
+    widget.classList.toggle(this.options.className, on);
+    markOverWindow(widget, on);
   }
 
   private widgets(): HTMLElement[] {
@@ -240,7 +252,7 @@ export class OverWindow {
     if (this.shownKey === undefined || !old || old.isConnected || this.guessed?.isConnected) return;
     if (table.dataset.pos !== old.querySelector("table")?.dataset.pos && this.widgets().indexOf(widget) !== this.place) return;
     this.guessed = widget;
-    widget.classList.add(OVER_WINDOW_CLASS, this.options.className);
+    this.markWidget(widget, true);
   }
 
   // Enhanced: shown over the window if it is that table, else not (tableAdded may have guessed wrong)

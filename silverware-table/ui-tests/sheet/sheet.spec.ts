@@ -491,15 +491,19 @@ test.describe("Sheet view", () => {
     expect(await page.evaluate(() => (window as unknown as { stillHere?: boolean }).stillHere)).toBe(true);
   });
 
-  test("ends once the page's table is gone from the markdown (undone, removed)", async ({ page }) => {
+  test("ends once the page's table is gone from the markdown (undone, removed), no mark of it left", async ({ page }) => {
     // The page's only table: no other table of the page takes its key (a table's key is its place among them)
     await setPage(page, "# Test\n\n| Item | Qty |\n|---|---|\n| Pear | 3 |\n");
     await expect(table(page).locator("tr[data-swt-row]")).toHaveCount(1);
     await openSheet(page);
+    // Marked as over the window for the other plugins (shared/overwindow.ts): the board alone
+    await expect(page.locator("[data-silverware-over-window]")).toHaveCount(1);
+    await expect(page.locator(".swt-sheet-board")).toHaveAttribute("data-silverware-over-window", "");
     await setPage(page, "# Test\n\nNo table now.\n");
-    // The page's text read again: the board ends
+    // The page's text read again: the board ends, no mark left
     await expect(sheetTable(page)).toHaveCount(0);
     await expect(page.locator(".swt-sheet-board")).toHaveCount(0);
+    await expect(page.locator("[data-silverware-over-window]")).toHaveCount(0);
   });
 
   test("drawn anew with the table moved in the page: its place follows", async ({ page }) => {

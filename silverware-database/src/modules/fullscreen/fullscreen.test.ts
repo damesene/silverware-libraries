@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { iconsOf } from "../../../../shared/icons.ts";
+import { OVER_WINDOW_ATTRIBUTE } from "../../../../shared/overwindow.ts";
 import { afterEach, describe, expect, it } from "vitest";
 import { DatabaseCore } from "../../core/core.ts";
 import { documentsHost } from "../../core/documents.ts";
@@ -54,15 +55,16 @@ async function setup(on = true) {
 afterEach(() => document.body.replaceChildren());
 
 describe("full screen", () => {
-  it("shows a place over the window by its icon among the tools, the same icon or Esc putting it back", async () => {
+  it("shows a place over the window by its icon among the tools (marked so for the other plugins), the same icon or Esc putting it back", async () => {
     const { element, tool } = await setup();
     expect([tool()!.getAttribute("aria-pressed"), element.classList.contains("swd-over-window")]).toEqual(["false", false]);
     tool()!.click();
     await new Promise((resolve) => setTimeout(resolve));
     expect([tool()!.getAttribute("aria-pressed"), tool()!.title, element.classList.contains("swd-over-window"), document.activeElement === tool()]).toEqual(["true", "Exit full screen (Esc)", true, true]);
+    expect(element.hasAttribute(OVER_WINDOW_ATTRIBUTE)).toBe(true);
     tool()!.click();
     await new Promise((resolve) => setTimeout(resolve));
-    expect(element.classList.contains("swd-over-window")).toBe(false);
+    expect([element.classList.contains("swd-over-window"), element.hasAttribute(OVER_WINDOW_ATTRIBUTE)]).toEqual([false, false]);
     tool()!.click();
     await new Promise((resolve) => setTimeout(resolve));
     tool()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
@@ -81,7 +83,7 @@ describe("full screen", () => {
     tool()!.click();
     await new Promise((resolve) => setTimeout(resolve));
     place.destroy();
-    expect(element.classList.contains("swd-over-window")).toBe(false);
+    expect([element.classList.contains("swd-over-window"), element.hasAttribute(OVER_WINDOW_ATTRIBUTE)]).toEqual([false, false]);
     // (Made over the window from its start: the place before it for the same block was)
     const store = new MemoryStore([{ database: TASKS, items: [] }]);
     const again = document.createElement("div");

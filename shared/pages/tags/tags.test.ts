@@ -52,6 +52,17 @@ describe("scanning", () => {
   it("leaves out an attribute's value, as SilverBullet does", () => {
     expect(names("- [ ] task [x: #no] #yes")).toEqual(["yes:task"]);
   });
+  it("reads fences as shared/markdown does: one in a quote too, ```a``` b inline code and no fence", () => {
+    expect(names("> ```\n> #no\n> ```\n#yes")).toEqual(["yes:page"]);
+    expect(names("```a``` #yes\ntext")).toEqual(["yes:paragraph"]);
+    expect(names("- - - #rule\n* item #i")).toEqual(["rule:item", "i:item"]);
+  });
+  it("reads a CRLF's marker alone as a marker, a tab-indented line a paragraph's, a heading indented four spaces none", () => {
+    expect(names("-\r\n#a")).toEqual(["a:item"]);
+    expect(names("#\r\n#a")).toEqual(["a:page"]);
+    expect(names("text\n\tcont #a\n#d")).toEqual(["a:paragraph", "d:paragraph"]);
+    expect(names("text\n    # H #a")).toEqual(["a:paragraph"]);
+  });
   it("reads a task of a state of its own as a task, as SilverBullet does", () => {
     expect(names("- [IN PROGRESS] task #a")).toEqual(["a:task"]);
   });

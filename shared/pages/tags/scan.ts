@@ -9,12 +9,13 @@
 // first holding anything else), a paragraph (a quote's too), an item, a task,
 // a table, a heading.
 //
-// A line-by-line reading, not a markdown parser: lists, quotes and code are
-// told by their lines' starts. Behind `TagScanner`, so another (SilverBullet's
-// own parser) could take its place.
+// A line-by-line reading, not a markdown parser: a line's block is what
+// shared/markdown/blocks.ts `readLine` reads, its fences lines.ts', and what
+// holds over lines (a list, a paragraph, code) is kept here. Behind
+// `TagScanner`, so another (SilverBullet's own parser) could take its place.
+import { readLine } from "../../markdown/blocks.ts";
 import { inlineMarks } from "../../markdown/inline.ts";
-import type { Line } from "../../markdown/lines.ts";
-import { readTaskLine } from "../../markdown/task.ts";
+import { closesFence, fenceOf, indentWidth, type Line, linesOf } from "../../markdown/lines.ts";
 
 export type TagContext = "page" | "paragraph" | "item" | "task" | "table" | "heading";
 
@@ -30,83 +31,64 @@ export type Hashtag = {
 
 export type TagScanner = (text: string, bodyStart: number) => readonly Hashtag[];
 
-// A fence read over a whole page, in a quote too (`> ````), which shared/markdown/lines.ts' fences, read over the
-// lines a selection touches, leave to the caller
-const FENCE_RE = /^ {0,3}(?:>\s?)*\s*(`{3,}|~{3,})/;
-const LIST_RE = /^(\s*)(?:[-*+]|\d{1,9}[.)])(?:\s+|$)/;
-const HEADING_RE = /^ {0,3}#{1,6}(?=\s|$)/;
-const QUOTE_RE = /^ {0,3}>/;
-const TABLE_RE = /^\s*\|/;
-
-/** Every line of the text from `start` (a line's start), the last one after a final line break too */
-function linesOf(text: string, start: number): Line[] {
-  const lines: Line[] = [];
-  let from = start;
-  while (from <= text.length) {
-    const end = text.indexOf("\n", from);
-    const to = end < 0 ? text.length : end;
-    lines.push({ from, to, text: text.slice(from, to) });
-    if (end < 0) break;
-    from = end + 1;
-  }
-  return lines;
-}
+/** A line without the quote's markers it starts with: a fence in a quote (`> ````) is one */
+const unquoted = (text: string) => text.replace(/^ {0,3}(?:>[ \t]?)*/, "");
 
 /** The hashtags of the body (the text from `bodyStart`, after the frontmatter) */
 export const scanHashtags: TagScanner = (text, bodyStart) => {
   const found: Hashtag[] = [];
-  let fence: { readonly char: string; readonly length: number } | undefined;
+  let fence: string | undefined;
   // Within a list (its items' lines and what is indented under them), until a line of the document's own
   let inList: TagContext | undefined;
   // Within a paragraph directly under the document, and whether its lines so far hold hashtags alone
   let paragraph: { tagsOnly: boolean } | undefined;
   let blankBefore = true;
   let indentedCode = false;
-  for (const line of linesOf(text, bodyStart)) {
-    const { text: t } = line;
+  for (const line of linesOf(text, bodyStart, text.length)) {
+    // (A CRLF's `\r` none of the line's text: a marker alone, `-\r`, is a marker)
+    const t = line.text.endsWith("\r") ? line.text.slice(0, -1) : line.text;
     if (fence) {
-      const close = FENCE_RE.exec(t);
-      if (close && close[1]![0] === fence.char && close[1]!.length >= fence.length && !t.slice(close[0].length).trim()) fence = undefined;
+      if (closesFence(unquoted(t), fence)) fence = undefined;
       continue;
     }
-    const open = FENCE_RE.exec(t);
+    const open = fenceOf(unquoted(t));
     if (open) {
-      fence = { char: open[1]![0]!, length: open[1]!.length };
+      fence = open;
       paragraph = undefined;
       continue;
     }
-    const blank = !t.trim();
-    if (blank) {
+    const read = readLine(t);
+    if (read.kind === "blank") {
       paragraph = undefined;
       blankBefore = true;
       indentedCode = false;
       continue;
     }
-    const indent = /^\s*/.exec(t)![0];
-    const indented = indent.replace(/\t/g, "    ").length >= 4;
+    // (Code: indented four or more, a tab four; a line's own indentation, whether there is any and a heading's: as written)
+    const indent = read.indent.length;
     // An indented block after a blank line, outside a list, is code
-    if (!inList && indented && (blankBefore || indentedCode) && !paragraph) {
+    if (!inList && indentWidth(t) >= 4 && (blankBefore || indentedCode) && !paragraph) {
       indentedCode = true;
       blankBefore = false;
       continue;
     }
     indentedCode = false;
     let context: TagContext;
-    if (readTaskLine(t)) context = inList = "task";
-    else if (LIST_RE.test(t)) context = inList = "item";
-    else if (inList && (indent.length > 0 || !blankBefore)) context = inList;
+    if (read.kind === "task") context = inList = "task";
+    else if (read.item) context = inList = "item";
+    else if (inList && (indent > 0 || !blankBefore)) context = inList;
     else {
       inList = undefined;
-      if (HEADING_RE.test(t)) context = "heading";
-      else if (TABLE_RE.test(t)) context = "table";
-      else if (QUOTE_RE.test(t)) context = "paragraph";
+      // (A heading indented by three spaces at most: more is a paragraph's text going on, or code)
+      if (read.kind === "heading" && /^ {0,3}$/.test(read.indent)) context = "heading";
+      else if (read.kind === "table") context = "table";
       else context = "paragraph";
     }
     const own: Hashtag[] = [];
-    const start = context === "heading" ? HEADING_RE.exec(t)![0].length : 0;
-    const rest = inline(line, start, own);
+    // (A heading's hashtags after its #s: those are its marker)
+    const rest = inline(line, context === "heading" ? read.contentFrom : 0, own);
     // A paragraph directly under the document: its leading lines of hashtags alone are the page's tags
-    if (context === "paragraph" && !QUOTE_RE.test(t) && indent.length < 4) {
+    if (context === "paragraph" && read.kind !== "quote" && indent < 4) {
       paragraph ??= { tagsOnly: true };
       if (paragraph.tagsOnly && own.length > 0 && !rest.trim()) context = "page";
       else paragraph.tagsOnly = false;

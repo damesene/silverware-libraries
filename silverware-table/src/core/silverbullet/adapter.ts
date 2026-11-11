@@ -8,10 +8,11 @@ import { Overlays } from "./overlays.ts";
 import type { TableMeta } from "../../markdown.ts";
 import { TABLE_MARKER } from "../../metanames.ts";
 import type { TableAdapter } from "../adapter.ts";
-import type { CellRef, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "../feature.ts";
+import type { CellRef, ColumnsMeasure, ColumnWidths, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "../feature.ts";
 import { type MergedLooks, refKey } from "../looks.ts";
 import type { TableRows } from "../rows.ts";
 import { applyCellLook, applyHeaderLook, renderedText } from "./looks.ts";
+import { ColumnLayouts, headerNeed, horizontalPadding } from "./columns.ts";
 
 // The attributes of a table's look put on each widget (data-swt-<name>), to take back
 const lookKeys = new WeakMap<HTMLElement, readonly string[]>();
@@ -51,10 +52,14 @@ export type AdapterContext = {
   holdInDocument(info: WidgetInfo, row: HTMLTableRowElement | undefined): void;
   floating(className: string): HTMLElement;
   place(element: HTMLElement, left: number, top: number): void;
+  // A table's columns took other widths after layout (ColumnLayouts): what is placed by them follows
+  columnsResized(info: WidgetInfo): void;
 };
 
 export class SilverBulletAdapter implements TableAdapter {
   private readonly overlays: Overlays;
+  // How tables laid out by their columns' widths show, and the titles of headers cut
+  private readonly columns: ColumnLayouts;
   // The styles hiding hashtags in headers, by who asked
   private readonly tagStyles = new Map<string, HTMLStyleElement>();
   // The cells each mark is on, by table as rendered
@@ -69,6 +74,11 @@ export class SilverBulletAdapter implements TableAdapter {
     private readonly context: AdapterContext,
   ) {
     this.overlays = new Overlays(doc, rows);
+    this.columns = new ColumnLayouts(doc, (table) => {
+      const widget = table.closest<HTMLElement>(WIDGET_SELECTOR);
+      const info = widget && context.infoOf(widget);
+      if (info && info.table === table) context.columnsResized(info);
+    });
   }
 
   applyLooks(info: WidgetInfo, looks: MergedLooks, editing: CellRef | undefined, only?: readonly CellRef[]): void {
@@ -134,6 +144,7 @@ export class SilverBulletAdapter implements TableAdapter {
     for (const style of this.tagStyles.values()) style.remove();
     this.tagStyles.clear();
     this.overlays.stop();
+    this.columns.stop();
   }
 
   showOutline(name: string, info: WidgetInfo, rows: readonly number[], columns: readonly [number, number], pieces: (sides: readonly Side[]) => readonly string[]): void {
@@ -265,21 +276,64 @@ export class SilverBulletAdapter implements TableAdapter {
   // The columns given a width in each table as rendered (a write renders it anew): those to make automatic again
   private readonly sized = new WeakMap<HTMLTableElement, Set<number>>();
 
-  // Only the columns with a width, or that had one: touching every cell's
-  // style (or reading styles between writes) would make the browser compute
-  // the whole table's styles and layout again, for every table shown
-  applyColumnWidths(info: WidgetInfo, widths: ReadonlyMap<number, number>): void {
+  // Every column with a width: the table laid out by its columns alone (a
+  // colgroup, `table-layout: fixed`), so no cell is styled and a frame of a
+  // drag changes only the columns. Some: only those columns' cells, or those
+  // that had one: touching every cell's style (or reading styles between
+  // writes) would make the browser compute the whole table's styles and
+  // layout again, for every table shown
+  applyColumnWidths(info: WidgetInfo, { widths, box }: ColumnWidths): void {
     const sized = this.sized.get(info.table);
-    const columns = Array.from({ length: info.columns }, (_, column) => column).filter((column) => widths.has(column) || sized?.has(column));
-    if (!columns.length) return;
-    // Read before writing: one style computation
-    const paddings = columns.map((column) => (widths.has(column) ? this.paddingOf(info, column) : 0));
-    const rows = [info.table.rows[0]!, ...this.rows.bodyRows(info)];
-    columns.forEach((column, i) => this.applyWidth(info, column, widths.get(column), paddings[i]!, rows));
+    const fixed = info.columns > 0 && Array.from({ length: info.columns }, (_, column) => widths.has(column)).every(Boolean);
+    const columns = Array.from({ length: info.columns }, (_, column) => column).filter((column) => sized?.has(column) || (!fixed && widths.has(column)));
+    if (columns.length) {
+      // Read before writing: one style computation
+      const paddings = columns.map((column) => (!fixed && widths.has(column) ? this.paddingOf(info, column) : 0));
+      const rows = [info.table.rows[0]!, ...this.rows.bodyRows(info)];
+      columns.forEach((column, i) => this.applyWidth(info, column, fixed ? undefined : widths.get(column), paddings[i]!, rows));
+    }
+    this.columns.fix(info.table, fixed ? Array.from({ length: info.columns }, (_, column) => widths.get(column)!) : undefined, box);
   }
 
-  applyColumnWidth(info: WidgetInfo, column: number, width: number | undefined): void {
-    this.applyWidth(info, column, width, width === undefined ? 0 : this.paddingOf(info, column), [info.table.rows[0]!, ...this.rows.bodyRows(info)]);
+  measureColumns(info: WidgetInfo): ColumnsMeasure {
+    const header = info.table.rows[0];
+    // The box's content: the table's width in percent is of it
+    const widget = info.table.closest<HTMLElement>(WIDGET_SELECTOR);
+    const box = widget ? widget.clientWidth - horizontalPadding(this.doc, widget) : 0;
+    if (!header) return { columns: [], box };
+    const cells = Array.from(header.cells);
+    const widths = cells.map((cell) => cell.getBoundingClientRect().width);
+    // The headers' lines as wide as they would be: a sized column's is held to its width (applyWidth), let go
+    // for the reads (all of them together: one layout), held again after
+    const heads = cells.map((cell) => cell.querySelector<HTMLElement>(":scope > .swt-head"));
+    const held = heads.map((head) => head && { width: head.style.width, maxWidth: head.style.maxWidth });
+    for (const head of heads) if (head) Object.assign(head.style, { width: "", maxWidth: "" });
+    const needs = cells.map((cell) => headerNeed(this.doc, cell));
+    heads.forEach((head, column) => {
+      if (head) Object.assign(head.style, held[column]);
+    });
+    return { columns: cells.map((_, column) => ({ width: widths[column]!, header: needs[column]! })), box };
+  }
+
+  columnContentWidth(info: WidgetInfo, column: number): number {
+    const cells = this.rows
+      .bodyRows(info)
+      .filter((tr) => tr.isConnected)
+      .map((tr) => tr.cells[column])
+      .filter((cell): cell is HTMLTableCellElement => !!cell && !cell.classList.contains("swt-editing"));
+    const boxes = cells.map((cell) => cell.querySelector<HTMLElement>(":scope > .swt-cell-content"));
+    // Each box as wide as its text on one line, for the reads (all of them together: one layout), as it was after
+    const held = boxes.map((box) => box && { width: box.style.width, maxWidth: box.style.maxWidth });
+    for (const box of boxes) if (box) Object.assign(box.style, { width: "max-content", maxWidth: "none" });
+    const widest = Math.max(0, ...boxes.map((box) => box?.getBoundingClientRect().width ?? 0));
+    boxes.forEach((box, i) => {
+      if (box) Object.assign(box.style, held[i]);
+    });
+    if (!cells[0]) return 0;
+    // At most a cell's maximum width (the longText module's), where there is one
+    const widget = info.table.closest<HTMLElement>(WIDGET_SELECTOR);
+    const limit = (widget && parseFloat(this.doc.defaultView!.getComputedStyle(widget).getPropertyValue("--swt-cell-max-width"))) || Infinity;
+    return Math.min(widest, limit) + horizontalPadding(this.doc, cells[0]);
   }
 
   /**
@@ -312,9 +366,7 @@ export class SilverBulletAdapter implements TableAdapter {
   /** A cell's padding left and right (the same in the column's header and body cells) */
   private paddingOf(info: WidgetInfo, column: number): number {
     const header = info.table.rows[0]!.cells[column];
-    if (!header) return 0;
-    const style = this.doc.defaultView!.getComputedStyle(header);
-    return (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+    return header ? horizontalPadding(this.doc, header) : 0;
   }
 
   pageView(info: WidgetInfo | undefined): Rect {

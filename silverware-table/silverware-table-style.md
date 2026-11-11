@@ -885,8 +885,8 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
   width: 12px;
   height: 12px;
 }
-/* The widths module: a handle on a header cell's right edge sets the column's
-   width (a line shows on it while hovered or dragged) */
+/* The widths module: a handle on a header cell's right edge moves the edge
+   between two columns (a line shows on it while hovered or dragged) */
 .sb-table-widget.swt-table thead tr:first-child > td:not(.swt-pin-left):not(.swt-pin-right) {
   position: relative;
 }
@@ -938,6 +938,22 @@ body.swt-resizing * {
    ellipsis by the longText module) */
 .sb-table-widget.swt-table td.swt-sized > .swt-cell-content {
   overflow: hidden;
+}
+/* Every column with a width (or being dragged): the table laid out by its
+   columns (a colgroup) alone, whatever its cells hold; text too long cut, and
+   a header's line no wider than its cell */
+.sb-table-widget.swt-table table.swt-fixed-columns {
+  table-layout: fixed;
+}
+.sb-table-widget.swt-table table.swt-fixed-columns td > .swt-cell-content {
+  max-width: 100%;
+  overflow: hidden;
+}
+.sb-table-widget.swt-table table.swt-fixed-columns .swt-head {
+  max-width: 100%;
+}
+.sb-table-widget.swt-long-text table.swt-fixed-columns td > .swt-cell-content {
+  text-overflow: ellipsis;
 }
 
 /* The settings dialog (Silverware Table settings… in a table's ⋯ menu, "Silverware Table:

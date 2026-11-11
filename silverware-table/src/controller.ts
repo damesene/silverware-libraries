@@ -2,7 +2,7 @@
 // inline cell editing and row/column editing. Every change to the markdown is
 // one `editor.replaceRange`, so undo works as for any other edit.
 import { type Bridge, type FeatureName, formatRule, moduleOnByDefault, SETTINGS, type SettingValue } from "./bridge.ts";
-import { type AdapterFeature, type AddressFrame, type AlsoChanged, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type TextPosition, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget } from "./core/feature.ts";
+import { type AdapterFeature, type AddressFrame, type AlsoChanged, CELL_MENU_CHANGES, type Feature, type CellEditor, type RenderedEditor, type TableInfo, type CellHit, type CellRef, type ColumnsMeasure, type ColumnWidths, editorRect, type ClipboardData, type LineDrag, type DragOptions, type HandleLayer, type HandlePlace, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type MarkLayer, type OutlineLayer, type Panel, type PanelAnchor, type PointerTarget, type Side, type RowHold, type PageCommand, type TableBadge, type TableHost, type TextPosition, type TableLook, type TablePreview, type TableTarget, type WidgetInfo, type WriteOptions, type WritePage, type WriteResult, type WriteStep, type NamingTarget } from "./core/feature.ts";
 import { type Dialog, type DialogOptions, Dialogs } from "./core/dialog.ts";
 import { ViewAnchor } from "./core/anchor.ts";
 import { mapPosition, type TextEdit, withWriteListeners } from "./core/writelisteners.ts";
@@ -250,6 +250,10 @@ export class Controller implements TableHost {
       holdInDocument: (info, row) => this.holdInDocument(info, row),
       floating: (className) => this.floating("div", className),
       place: (element, left, top) => this.place(element, left, top),
+      columnsResized: (info) => {
+        this.tableResized(info);
+        for (const feature of this.features) feature.columnsResized?.(info);
+      },
     });
     this.dragContext = {
       doc,
@@ -1659,18 +1663,26 @@ export class Controller implements TableHost {
   }
 
   /** The widths of a table's columns: the first feature's that has them */
-  private columnWidths(info: WidgetInfo): ReadonlyMap<number, number> {
+  private columnWidths(info: WidgetInfo): ColumnWidths {
     for (const feature of this.features) {
       const widths = feature.columnWidths?.(info);
       if (widths) return widths;
     }
-    return new Map();
+    return { widths: new Map() };
   }
 
-  showColumnWidth(info: WidgetInfo, column: number, width: number | undefined): void {
+  showColumnWidths(info: WidgetInfo, widths: ColumnWidths | undefined): void {
     const now = this.tableFor(info.key) ?? info;
-    this.adapter.applyColumnWidth(now, column, width ?? this.columnWidths(now).get(column));
+    this.adapter.applyColumnWidths(now, widths ?? this.columnWidths(now));
     this.tableResized(now);
+  }
+
+  measureColumns(info: WidgetInfo): ColumnsMeasure {
+    return this.adapter.measureColumns(this.tableFor(info.key) ?? info);
+  }
+
+  columnContentWidth(info: WidgetInfo, column: number): number {
+    return this.adapter.columnContentWidth(this.tableFor(info.key) ?? info, column);
   }
 
   get metadataEnabled(): boolean {

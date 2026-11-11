@@ -461,6 +461,21 @@ export type RowHold = { readonly after?: number; readonly before?: number };
  */
 export type WriteStep = (before: Table, after: Table, options: WriteOptions) => Table;
 
+/** A column as shown: its width, and the width its header needs to show its name and icons whole (0: no header line, one being edited), in pixels */
+export type ColumnMeasure = { readonly width: number; readonly header: number };
+
+/** A table's columns as shown, and the width its box gives it now (where it is in the page, or laid over the window), in pixels */
+export type ColumnsMeasure = { readonly columns: readonly ColumnMeasure[]; readonly box: number };
+
+/**
+ * Columns' widths, in pixels, by column. With a width for every column the
+ * table is laid out by them alone, each its share of their sum, and `box` is
+ * the width of the table's box they were set in: the table is their sum over
+ * `box` of the box it has now (undefined: as wide as its box), so it widens
+ * and narrows with its box as it was then
+ */
+export type ColumnWidths = { readonly widths: ReadonlyMap<number, number>; readonly box?: number };
+
 /** The page a write edits: its text as read for it, its tables, and where the edited table is */
 export type WritePage = { readonly text: string; readonly tables: readonly PageTable[]; readonly from: number };
 
@@ -677,8 +692,16 @@ export interface ModelHost {
   areaRect(info: TableInfo, first: CellRef, last: CellRef): Rect | undefined;
   /** The cell of a table at a point of the window, by where its rows and columns are (whatever is over them); undefined: not on it */
   cellAtPoint(info: TableInfo, x: number, y: number): CellRef | undefined;
-  /** A column shown `width` pixels wide for now (undefined: as Feature.columnWidths has it), a width being dragged */
-  showColumnWidth(info: TableInfo, column: number, width: number | undefined): void;
+  /** The columns shown these widths for now (undefined: as Feature.columnWidths has them), widths being dragged */
+  showColumnWidths(info: TableInfo, widths: ColumnWidths | undefined): void;
+  /** A table's columns as shown (read once, before anything is changed: it lays the page out) */
+  measureColumns(info: TableInfo): ColumnsMeasure;
+  /**
+   * The width a column needs to show its body cells' text whole, in pixels, at
+   * most a cell's maximum width where the table has one; only rows in the
+   * document are measured. It lays the column out: asked on an action, not on viewing
+   */
+  columnContentWidth(info: TableInfo, column: number): number;
   /**
    * Hashtags in headers not shown, by name (a column type's): hidden from the
    * moment a table is rendered (before its looks apply); given again, they replace those of `owner`
@@ -1128,8 +1151,8 @@ export interface Feature {
   hidesRows?(info: TableInfo): boolean;
   /** The table's view was applied: rows sorted and hidden, the header marked */
   viewApplied?(info: TableInfo): void;
-  /** The widths of a table's columns, in pixels (the widths module's); asked each time its view is applied */
-  columnWidths?(info: TableInfo): ReadonlyMap<number, number> | undefined;
+  /** The widths of a table's columns (the widths module's); asked each time its view is applied */
+  columnWidths?(info: TableInfo): ColumnWidths | undefined;
   /**
    * A row of the feature's own UI under the table's header, asked each time
    * the view is applied (undefined: none): the same elements given again stay
@@ -1276,4 +1299,10 @@ export interface AdapterFeature extends Feature {
   rowNeeded?(info: WidgetInfo, row: HTMLTableRowElement): void;
   /** Body rows were put back into the document (rowsAttached): laid out now, they can be measured */
   rowsAttached?(info: WidgetInfo, rows: readonly HTMLTableRowElement[]): void;
+  /**
+   * A table's columns took other widths once it was laid out, its box the
+   * same (the rendering held columns at their headers' need): what was
+   * measured on its cells is measured again
+   */
+  columnsResized?(info: WidgetInfo): void;
 }

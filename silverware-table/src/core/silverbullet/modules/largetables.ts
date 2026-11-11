@@ -245,7 +245,8 @@ export class LargeTables implements AdapterFeature {
           if (kept) kept.rowHeight = height;
         }
       }
-      if (!state.widthsKept) {
+      // (A table laid out by its columns' widths needs none, and they would hold its columns once it is not)
+      if (!state.widthsKept && this.host.doc.defaultView!.getComputedStyle(state.table).tableLayout !== "fixed") {
         state.widthsKept = true;
         const header = state.table.rows[0];
         const widths = Array.from(header?.cells ?? [], (cell) => cell.getBoundingClientRect().width);

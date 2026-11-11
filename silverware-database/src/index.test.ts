@@ -186,7 +186,7 @@ describe("Silverware Database in SilverBullet", () => {
   });
 
   it("converts the cursor's line with those under it, and says where nothing is to convert", async () => {
-    const text = "- [ ] One\n  more\n- [ ] Two";
+    const text = "- [ ] One\n\n  more\n- [ ] Two";
     const { memory, bridge, told } = bridgeOf({ Page: text, Other: "plain text" }, "Page");
     init({ ...bridge, prompt: async () => "One", getSelection: async () => ({ from: 3, to: 3 }), setSelection: async () => {} });
     await runCommand("Silverware Database: Convert selection to database");

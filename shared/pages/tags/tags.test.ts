@@ -58,10 +58,37 @@ describe("scanning", () => {
     expect(names("- - - #rule\n* item #i")).toEqual(["rule:item", "i:item"]);
   });
   it("reads a CRLF's marker alone as a marker, a tab-indented line a paragraph's, a heading indented four spaces none", () => {
-    expect(names("-\r\n#a")).toEqual(["a:item"]);
+    // (An item starting with a blank line holds only what is indented under it)
+    expect(names("-\r\n  #a")).toEqual(["a:item"]);
+    expect(names("-\r\n#a")).toEqual(["a:page"]);
     expect(names("#\r\n#a")).toEqual(["a:page"]);
     expect(names("text\n\tcont #a\n#d")).toEqual(["a:paragraph", "d:paragraph"]);
     expect(names("text\n    # H #a")).toEqual(["a:paragraph"]);
+  });
+  it("reads markdown's blocks as SilverBullet's parser does: containers, lines going on lazily, what interrupts what", () => {
+    // A task's own text is the task's (a line going on it lazily too), what else is in its item the item's
+    expect(names("- [ ] t #a\nlazy #b\n\n  para #c\n  - sub #d\n# H #e")).toEqual(["a:task", "b:task", "c:item", "d:item", "e:heading"]);
+    // A list in a quote; a quote not indented under an item none of its
+    expect(names("> - #q\n\n- i\n> #r")).toEqual(["q:item", "r:paragraph"]);
+    // A table only with its line of dashes; a numbered list starting at 2 goes on the paragraph above it
+    expect(names("| #a |\n| b |\n\ntext\n2) two #n")).toEqual(["a:paragraph", "n:paragraph"]);
+    // Indented code after a heading or a rule, a fence indented four spaces code; a quote's fence ends with the quote
+    expect(names("# H\n    #c\n\n---\n    ```\n#a\n\n> ```\n#b")).toEqual(["a:page", "b:page"]);
+    // A setext heading's, HTML's (to its blank line), a comment's (its body read as markdown); a marker comment none
+    // (`<!--` and `#` or `/`: a baked section's, `<!-- #c` too, as SilverBullet reads it)
+    expect(names("#a\n---\n\n<div>\n#h\n# H #i\n</div>\n\n<!-- note #c\n- [ ] #t -->\n\n<!-- #m -->")).toEqual(["a:heading", "h:paragraph", "i:paragraph", "c:paragraph", "t:task"]);
+  });
+  it("takes the page's tags as SilverBullet does: hashtags alone before a line break with more after it", () => {
+    expect(names("#a #b\n#c\n  #d")).toEqual(["a:page", "b:page", "c:page", "d:paragraph"]);
+    expect(names("#a #b text")).toEqual(["a:paragraph", "b:paragraph"]);
+    // An element where text would be is none of a tag line: emphasis, code, a link, a wiki link, a hard line break
+    for (const page of ["#a\n*x*", "#a\n`c`", "#a\n[x](y)", "#a\n[[P]]", "#a  \n#b"]) expect(names(page).every((one) => !one.endsWith(":page"))).toBe(true);
+    expect(names("#a\n  *x*")).toEqual(["a:page"]);
+    expect(names("> #q\n\n- #i")).toEqual(["q:paragraph", "i:item"]);
+  });
+  it("finds none in raw HTML nor in a link's definition, as SilverBullet reads them", () => {
+    expect(names("<pre>\n#include\n</pre>\n\n<style>\n#id {}\n</style>\n\n<span>\n#a\n</span>\n\n[top]: #b")).toEqual([]);
+    expect(names("<div>\n#c\n</div>")).toEqual(["c:paragraph"]);
   });
   it("reads a task of a state of its own as a task, as SilverBullet does", () => {
     expect(names("- [IN PROGRESS] task #a")).toEqual(["a:task"]);

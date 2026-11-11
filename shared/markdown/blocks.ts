@@ -1,73 +1,10 @@
-// Markdown's blocks as SilverBullet's parser reads them: a line's block (its
-// kind, indentation, marker and text: `readLine`, what Silverware Toolbar's
-// Turn into reads, line by line) and a text's blocks as a tree (`readBlocks`:
-// a list's items with what is under them, a heading with its section, a
-// table's cells: what a converter of Silverware Database reads). Standard
-// markdown only: kinds of a plugin's own (the toolbar's formats of its user)
-// are the plugin's. Pure, on the text.
-import { closesFence, fenceOf, indentWidth } from "./lines.ts";
-import { readTaskLine } from "./task.ts";
-
-type LineCommon = {
-  // What the line is indented by
-  readonly indent: string;
-  // What stands between the indentation and the text (`## `, `- `, `1. `, `- [x] `, `> `; none for a paragraph)
-  readonly marker: string;
-  // The text after the marker, and where it starts in the line
-  readonly content: string;
-  readonly contentFrom: number;
-  // The line as a list's item, where it starts with a list's marker whatever its kind (a task's, a bullet's, a rule's
-  // `- - -` too): what reads a list's items by their marker alone, as markdown's lists are, is given it
-  readonly item?: LineItem;
-};
-
-/** A line's list marker: its kind, the marker (`- `, `1. `), the text after it (a task's `[x] …` included) */
-export type LineItem = { readonly kind: "bullet" | "numbered"; readonly marker: string; readonly content: string };
-
-/** A line read as a block's: its kind, and what the kind has of its own */
-export type BlockLine =
-  | (LineCommon & { readonly kind: "blank" | "paragraph" | "bullet" | "quote" | "table" | "rule" })
-  | (LineCommon & { readonly kind: "heading"; readonly level: number })
-  | (LineCommon & { readonly kind: "numbered"; readonly number: number })
-  // A list's item with a state in brackets (`[ ]`, `[x]`, one of its own); its `item` the list's marker
-  | (LineCommon & { readonly kind: "task"; readonly state: string; readonly done: boolean; readonly item: LineItem });
-
-export type LineKind = BlockLine["kind"];
-
-const HEADING_RE = /^(#{1,6})(?:[ \t]+|$)/;
-// A horizontal rule (`---`, `***`, `- - -`): read before a bullet, which `- - -` would otherwise be
-const RULE_RE = /^([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
-const BULLET_RE = /^[-*+](?:[ \t]+|$)/;
-const NUMBERED_RE = /^(\d{1,9})[.)](?:[ \t]+|$)/;
-const QUOTE_RE = /^>[ \t]?/;
-
-/**
- * A line as a block's, read as SilverBullet reads it (a fenced code block's lines are `lines.ts`' to tell). The line
- * as given, its text kept whole: a caller rewriting it finds its content in it (Silverware Toolbar), so a line break
- * (`\r` of a CRLF) is the caller's to take off, as `readBlocks` does
- */
-export function readLine(line: string): BlockLine {
-  const indent = /^[ \t]*/.exec(line)![0];
-  const rest = line.slice(indent.length);
-  const bullet = BULLET_RE.exec(rest);
-  const numbered = bullet ? null : NUMBERED_RE.exec(rest);
-  const listMarker = bullet ?? numbered;
-  const item: LineItem | undefined = listMarker ? { kind: bullet ? "bullet" : "numbered", marker: listMarker[0], content: rest.slice(listMarker[0].length) } : undefined;
-  // What every kind has: the indentation, its marker and the text after it, the line as a list's item where it is one
-  const common = (marker: string) => ({ indent, marker, content: rest.slice(marker.length), contentFrom: indent.length + marker.length, ...(item ? { item } : {}) });
-  if (!rest.trim()) return { kind: "blank", ...common("") };
-  const heading = HEADING_RE.exec(rest);
-  if (heading) return { kind: "heading", level: heading[1]!.length, ...common(heading[0]) };
-  if (RULE_RE.test(rest)) return { kind: "rule", ...common("") };
-  const task = readTaskLine(line);
-  if (task && item) return { kind: "task", state: task.state, done: task.done, ...common(line.slice(indent.length, task.textFrom)), item };
-  if (bullet) return { kind: "bullet", ...common(bullet[0]) };
-  if (numbered) return { kind: "numbered", number: Number(numbered[1]), ...common(numbered[0]) };
-  const quote = QUOTE_RE.exec(rest);
-  if (quote) return { kind: "quote", ...common(quote[0]) };
-  if (rest.startsWith("|")) return { kind: "table", ...common("") };
-  return { kind: "paragraph", ...common("") };
-}
+// A text's blocks as a tree, as SilverBullet's parser reads them (`readBlocks`:
+// a list's items with what is under them, a quote's blocks, a heading with its
+// section, a table's cells: what a converter of Silverware Database reads).
+// Read by parse.ts (lezer's parser), here made what a converter works with:
+// texts, lines, sections. A line's block alone is blockline.ts'. Pure, on the
+// text.
+import { type MarkdownNode, parseBlocks, type Span } from "./parse.ts";
 
 /** The lines a block was read from: their indexes in the text given, `to` past the last */
 export type BlockLines = { readonly from: number; readonly to: number };
@@ -77,7 +14,9 @@ export type Block =
   // A heading and its section: the blocks after it up to a heading of its level or above; `title` the heading's own
   // lines (a setext heading's two or more), `lines` with its section
   | { readonly kind: "heading"; readonly level: number; readonly text: string; readonly children: readonly Block[]; readonly title: BlockLines; readonly lines: BlockLines }
-  // A list's item: its text, the blocks under it (items nested, paragraphs…) and those lines as written, dedented
+  // A list's item: its text (the paragraph it starts with, a line going on lazily too; a task's after its state; none
+  // where it starts with another block), `title` that text's lines (none then); the blocks after it (items nested,
+  // paragraphs…) and those lines as written, dedented
   | {
       readonly kind: "item";
       readonly list: "bullet" | "numbered";
@@ -86,10 +25,13 @@ export type Block =
       readonly text: string;
       readonly children: readonly Block[];
       readonly body: string;
+      readonly title: BlockLines;
       readonly lines: BlockLines;
     }
-  // Lines one after another: their texts joined by line breaks
-  | { readonly kind: "paragraph" | "quote"; readonly text: string; readonly lines: BlockLines }
+  | { readonly kind: "quote"; readonly children: readonly Block[]; readonly lines: BlockLines }
+  // Lines one after another, their texts joined by line breaks: a paragraph's, HTML's, a comment's body (as written)
+  | { readonly kind: "paragraph" | "html" | "comment"; readonly text: string; readonly lines: BlockLines }
+  // Code as written, fenced (its language, "" where it names none) or indented ("")
   | { readonly kind: "code"; readonly language: string; readonly text: string; readonly lines: BlockLines }
   // A table: its header's cells and each row's (the line of dashes under the header left out)
   | { readonly kind: "table"; readonly header: readonly string[]; readonly rows: readonly (readonly string[])[]; readonly lines: BlockLines }
@@ -107,43 +49,18 @@ export function dedentedLines(lines: readonly string[]): string[] {
   return out;
 }
 
-// A table's line of dashes under its header (`|---|:--:|`)
-const TABLE_RULE_RE = /^\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
-
-/** A table's row as its cells: split at each `|` not escaped, the outer ones left out, each trimmed */
-function cellsOf(row: string): string[] {
-  const cells: string[] = [];
-  let cell = "";
-  const text = row.trim().replace(/^\|/, "").replace(/(?<!\\)\|$/, "");
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === "\\" && text[i + 1] === "|") {
-      cell += "|";
-      i++;
-    } else if (text[i] === "|") {
-      cells.push(cell.trim());
-      cell = "";
-    } else cell += text[i];
-  }
-  cells.push(cell.trim());
-  return cells;
-}
-
 /**
- * The text's blocks, in its order: a heading holding its section, an item what is under it. A text starting with a
- * frontmatter (`---`, keys, `---`) gives no block of it. Read as SilverBullet reads markdown, but simpler where a
- * selection is not likely to differ: an item holds the lines indented more than its marker (as `lines.ts`
- * `linesUnder`, not CommonMark's content offset), a table starts with `|` and has its line of dashes, a `|` in a cell
- * ends the cell even in inline code (write `\|`: GFM's rule), no line goes on a paragraph lazily
+ * The text's blocks, in its order: a heading holding its section, an item and a quote what is in them. A text starting
+ * with a frontmatter (`---`, keys, `---`) gives no block of it. A table's row is split at every `|` not escaped (write
+ * `\|` in a cell: GFM's rule), a wiki link's too
  */
 export function readBlocks(text: string): Block[] {
-  const lines = text.split(/\r?\n/);
-  const start = frontmatterEnd(lines);
-  return sections(blocksOf(lines.slice(start), start));
+  return new BlockReader(text).blocks();
 }
 
-/** Every block of a tree, depth first in the text's order: a table under a heading, a paragraph under an item too */
+/** Every block of a tree, depth first in the text's order: a table under a heading, a paragraph in an item or a quote too */
 export function allBlocks(blocks: readonly Block[]): Block[] {
-  return blocks.flatMap((block) => [block, ...(block.kind === "heading" || block.kind === "item" ? allBlocks(block.children) : [])]);
+  return blocks.flatMap((block) => [block, ...("children" in block ? allBlocks(block.children) : [])]);
 }
 
 // A frontmatter's first key: what tells it from a rule above a paragraph
@@ -156,95 +73,106 @@ function frontmatterEnd(lines: readonly string[]): number {
   return close < 0 ? 0 : close + 1;
 }
 
-// A setext heading's underline (the line under a paragraph's): `===` level 1, `---` level 2
-const SETEXT_RE = /^ {0,3}(=+|-+)[ \t]*$/;
+class BlockReader {
+  private readonly lines: readonly string[];
+  // Where each line starts in the text
+  private readonly starts: readonly number[];
 
-/** A heading's text without the `#`s closing it (`## Title ##`) */
-const headingText = (content: string) => content.replace(/(^|[ \t]+)#+[ \t]*$/, "").trim();
-
-/** The blocks of lines (their first one the text's `base`-th), flat but for what a list's item holds */
-function blocksOf(lines: readonly string[], base: number): Block[] {
-  const blocks: Block[] = [];
-  const span = (from: number, to: number): BlockLines => ({ from: base + from, to: base + to });
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i]!;
-    if (blank(line)) {
-      i++;
-      continue;
-    }
-    const fence = fenceOf(line);
-    if (fence) {
-      let end = i + 1;
-      while (end < lines.length && !closesFence(lines[end]!, fence)) end++;
-      const language = line.trim().slice(fence.length).trim();
-      // (Its lines as written: only the fence's own indentation taken off, blank lines kept)
-      const indent = /^[ \t]*/.exec(line)![0].length;
-      const code = lines.slice(i + 1, end).map((one) => one.slice(Math.min(indent, /^[ \t]*/.exec(one)![0].length)));
-      blocks.push({ kind: "code", language, text: code.join("\n"), lines: span(i, Math.min(end + 1, lines.length)) });
-      i = end + 1;
-      continue;
-    }
-    const read = readLine(line);
-    if (read.kind === "bullet" || read.kind === "numbered" || read.kind === "task") {
-      // What is under it: the lines indented more, blank lines among them
-      const width = indentWidth(line);
-      let last = i;
-      for (let j = i + 1; j < lines.length; j++) {
-        if (blank(lines[j]!)) continue;
-        if (indentWidth(lines[j]!) <= width) break;
-        last = j;
-      }
-      const under = dedentedLines(lines.slice(i + 1, last + 1));
-      const first = lines.slice(i + 1, last + 1).findIndex((one) => !blank(one));
-      const list = read.kind === "task" ? read.item.kind : read.kind;
-      blocks.push({
-        kind: "item",
-        list,
-        ...(read.kind === "numbered" ? { number: read.number } : {}),
-        ...(read.kind === "task" ? { task: { state: read.state, done: read.done } } : {}),
-        text: read.content,
-        children: under.length ? sections(blocksOf(under, base + i + 1 + first)) : [],
-        body: under.join("\n"),
-        lines: span(i, last + 1),
-      });
-      i = last + 1;
-      continue;
-    }
-    if (read.kind === "heading") {
-      blocks.push({ kind: "heading", level: read.level, text: headingText(read.content), children: [], title: span(i, i + 1), lines: span(i, i + 1) });
-      i++;
-      continue;
-    }
-    if (read.kind === "rule") {
-      blocks.push({ kind: "rule", lines: span(i, i + 1) });
-      i++;
-      continue;
-    }
-    // Lines of one kind one after another: a quote's, a table's, a paragraph's
-    let end = i + 1;
-    while (end < lines.length && !blank(lines[end]!) && !fenceOf(lines[end]!) && readLine(lines[end]!).kind === read.kind) end++;
-    const run = lines.slice(i, end).map(readLine);
-    if (read.kind === "paragraph") {
-      // A setext heading: the paragraph's lines up to an underline (`===`, a line of the paragraph's run; `---`, read as
-      // a rule, the line after it), its text theirs
-      const equals = run.findIndex((one, at) => at > 0 && SETEXT_RE.exec(lines[i + at]!)?.[1]![0] === "=");
-      const dashes = equals < 0 && end < lines.length && SETEXT_RE.exec(lines[end]!)?.[1]![0] === "-";
-      if (equals > 0 || dashes) {
-        const texts = run.slice(0, equals > 0 ? equals : run.length).map((one) => one.content.trim());
-        const to = equals > 0 ? i + equals + 1 : end + 1;
-        blocks.push({ kind: "heading", level: equals > 0 ? 1 : 2, text: texts.join(" "), children: [], title: span(i, to), lines: span(i, to) });
-        i = to;
-        continue;
-      }
-    }
-    if (read.kind === "table" && run.length > 1 && TABLE_RULE_RE.test(run[1]!.content)) {
-      const rows = run.map((one) => cellsOf(one.content)).filter((_, at) => at !== 1);
-      blocks.push({ kind: "table", header: rows[0]!, rows: rows.slice(1), lines: span(i, end) });
-    } else blocks.push({ kind: read.kind === "quote" ? "quote" : "paragraph", text: run.map((one) => one.content).join("\n"), lines: span(i, end) });
-    i = end;
+  constructor(private readonly text: string) {
+    this.lines = text.split("\n");
+    let at = 0;
+    this.starts = this.lines.map((line) => {
+      const start = at;
+      at += line.length + 1;
+      return start;
+    });
   }
-  return blocks;
+
+  blocks(): Block[] {
+    const start = frontmatterEnd(this.lines.map((line) => line.replace(/\r$/, "")));
+    return this.made(parseBlocks(this.text, this.starts[start] ?? this.text.length));
+  }
+
+  /** Blocks made of the parser's, headings holding their sections */
+  private made(nodes: readonly MarkdownNode[]): Block[] {
+    return sections(nodes.map((node) => this.block(node)));
+  }
+
+  private block(node: MarkdownNode): Block {
+    const lines = this.lineSpan(node);
+    switch (node.kind) {
+      case "heading":
+        return { kind: "heading", level: node.level, text: this.texts(node.lines).join(" "), children: [], title: lines, lines };
+      case "item":
+        return this.item(node, lines);
+      case "quote":
+        return { kind: "quote", children: this.made(node.children), lines };
+      case "comment":
+        return { kind: "comment", text: this.text.slice(node.body.from, node.body.to), lines };
+      case "code":
+        return { kind: "code", language: node.language ?? "", text: node.lines.map((line) => this.of(line)).join("\n"), lines };
+      case "table": {
+        const [header = [], ...rows] = node.rows.map((row) => row.map((cell) => this.of(cell).replace(/\\\|/g, "|")));
+        return { kind: "table", header, rows, lines };
+      }
+      case "rule":
+        return { kind: "rule", lines };
+      // A task not the first block of its item is a paragraph, its state in its text (SilverBullet reads it as a task,
+      // but an item's state is its first's)
+      case "task": {
+        const [line, ...more] = node.lines;
+        return { kind: "paragraph", text: this.texts([{ from: node.from, to: line!.to }, ...more]).join("\n"), lines };
+      }
+      // (A link's definition a paragraph: what it says is its text)
+      default:
+        return { kind: node.kind === "html" ? "html" : "paragraph", text: this.texts(node.lines).join("\n"), lines };
+    }
+  }
+
+  /** An item: its text the paragraph (or task) it starts with, what follows its body */
+  private item(node: Extract<MarkdownNode, { kind: "item" }>, lines: BlockLines): Block {
+    const [first, ...rest] = node.children;
+    const text = first?.kind === "paragraph" || first?.kind === "task" ? first : undefined;
+    const title = text ? this.lineSpan(text) : { from: lines.from, to: lines.from };
+    // (Its lines as the parser gives them: its marker, its containers' and its content's indentation off)
+    const body = dedentedLines(node.lines.filter((line) => this.lineAt(line.from) >= title.to).map((line) => this.of(line)));
+    return {
+      kind: "item",
+      list: node.list,
+      ...(node.number !== undefined ? { number: node.number } : {}),
+      ...(text?.kind === "task" ? { task: { state: text.state, done: text.done } } : {}),
+      text: text ? this.texts(text.lines).join("\n") : "",
+      children: this.made(text ? rest : node.children),
+      body: body.join("\n"),
+      title,
+      lines,
+    };
+  }
+
+  private of(span: Span): string {
+    return this.text.slice(span.from, span.to);
+  }
+
+  /** A leaf's lines' texts, each trimmed */
+  private texts(lines: readonly Span[]): string[] {
+    return lines.map((line) => this.of(line).trim());
+  }
+
+  /** The lines a node spans */
+  private lineSpan(span: Span): BlockLines {
+    return { from: this.lineAt(span.from), to: this.lineAt(Math.max(span.from, span.to - 1)) + 1 };
+  }
+
+  private lineAt(at: number): number {
+    let low = 0;
+    let high = this.starts.length - 1;
+    while (low < high) {
+      const mid = (low + high + 1) >> 1;
+      if (this.starts[mid]! <= at) low = mid;
+      else high = mid - 1;
+    }
+    return low;
+  }
 }
 
 /** Headings made to hold their sections: the blocks after each up to a heading of its level or above */

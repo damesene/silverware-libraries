@@ -24,6 +24,7 @@ A manager of the space's tags (prefix `swg-`, settings and API under `silverware
 ## Gotchas
 
 - **Table rows' and headings' hashtags are in no `tag` object** (`plugs/index/tags.ts` takes paragraphs, items and tasks only): the init page also reads `index.tag "table"` and `index.tag "header"` and their `tags`, else a rename missed them.
+- **Hashtags are found in the blocks lezer's parser reads** (shared/pages/tags/scan.ts on shared/markdown/parse.ts, since 2026-11-11), so the bundle carries lezer (about 60 kB). A difference from what SilverBullet finds is a bug of `parse.ts` (its blocks) or `inline.ts` (a line's marks), not of the scanner: fix it there, with a test.
 - Page tags are written into the frontmatter in the page's own form (a list of dash lines stays one, `a, b` a string); a page whose tags cannot be read safely is left alone and said in the review.
 - F2 in the panel: the navigator focuses its own filter field after the key is handled, so the window takes the focus back for a moment (`keepFocus` in ui/workspace.ts).
 - Hundreds of pages: the writer reads and writes six at a time (shared/pages/batch.ts), a progress dialog while a plan is read or undone, preview lines made as a page is opened, ten changes kept for Undo (`KEPT` in shared/pages/history.ts: each holds every page's text before and after).

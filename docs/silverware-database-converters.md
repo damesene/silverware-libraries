@@ -213,7 +213,10 @@ kinds of its user's own (its format registry). So two layers in `shared/markdown
   Fenced code is `lines.ts`'.
 * **`readBlocks(text)`**, for converters: a tree made of `readLine` (items with the items and lines under them,
   headings with their section, a table's header and cells, paragraphs, quotes, fenced code), each block with the lines
-  it was read from.
+  it was read from. Since 2026-11-11 read by lezer's parser (`shared/markdown/parse.ts`,
+  docs/silverware-tags-scanner-on-blocks.md), `readLine` in a file of its own: an item's text its first paragraph
+  (lines going on lazily too, as SilverBullet names a task), a quote's blocks its own, HTML, comments and indented code
+  blocks of their own.
 
 Converters are given, as `HELPERS` (a module's function form, as views and types are): `readLine`, `readBlocks`,
 `inlineMarks`, `plainText` (a text without its marks, as a task's name is made), `readValue` (YAML, people, links),

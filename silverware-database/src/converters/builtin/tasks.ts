@@ -1,6 +1,7 @@
 // Tasks to a database (docs/silverware-database-converters.md, *Decided*): each
 // task at the selection's top level an item; what is under it (subtasks of any
-// depth, other lines) its body. Its name the task's text, its marks in a
+// depth, other lines) its body. Its name the task's text (its lines going on
+// without a blank line too, as SilverBullet names a task), its marks in a
 // sentence kept as words, those at its end and its attributes left out;
 // Status (always Todo, In progress, Done) from an attribute `state`/`status`,
 // else its checkbox (`[ ]` Todo, `[x]` Done) or its state of its own, whatever
@@ -62,7 +63,7 @@ function topTasks(text: string): Read[] {
     }
   };
   visit(readBlocks(text));
-  return found.map(({ task, to }) => ({ task, body: dedentedLines(lines.slice(task.lines.from + 1, to)).join("\n") }));
+  return found.map(({ task, to }) => ({ task, body: dedentedLines(lines.slice(task.title.to, to)).join("\n") }));
 }
 
 /** A task's name: its text made plain (`plainText`), cut at a word */

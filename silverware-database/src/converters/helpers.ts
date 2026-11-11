@@ -5,7 +5,8 @@
 // a key made of a label, attributes written; and the tasks converter, to build
 // on. Of no kind of block: a converter of a table, a list or sections uses the
 // same as the tasks converter does.
-import { allBlocks, readBlocks, readLine } from "../../../shared/markdown/blocks.ts";
+import { readLine } from "../../../shared/markdown/blockline.ts";
+import { allBlocks, readBlocks } from "../../../shared/markdown/blocks.ts";
 import { escapedAttributes, inlineMarks } from "../../../shared/markdown/inline.ts";
 import { writeAttribute, writeTaskLine } from "../../../shared/markdown/task.ts";
 import { keyFromLabel } from "../domain/keys.ts";

@@ -1,6 +1,6 @@
 // What formats and actions get to write themselves with: the built-in ones
 // and the user's alike (a definition is a function given HELPERS).
-import { readLine } from "../../../shared/markdown/blocks.ts";
+import { readLine } from "../../../shared/markdown/blockline.ts";
 import { cursor } from "../core/cursor.ts";
 import { ICONS } from "../icons.ts";
 import type { BlockInfo } from "./format.ts";
@@ -30,7 +30,7 @@ function numberByIndent(items: readonly Pick<BlockInfo, "indent">[]): number[] {
 export const HELPERS = {
   cursor,
   isUrl,
-  // A line's block as SilverBullet reads it (shared/markdown/blocks.ts): what the block formats read by
+  // A line's block as SilverBullet reads it (shared/markdown/blockline.ts): what the block formats read by
   readLine,
   numberByIndent,
   icons: ICONS,

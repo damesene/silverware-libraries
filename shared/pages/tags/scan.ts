@@ -1,21 +1,25 @@
 // The hashtags of a page's body, found as SilverBullet's parser finds them
-// (`Hashtag`, an inline element wherever a `#` starts one): not in the
-// frontmatter (frontmatter.ts reads it), fenced or indented code, nor where a
-// line's marks leave none (shared/markdown/inline.ts: inline code, wiki links,
-// attributes' values, a link's target, URLs, HTML, a `#` escaped). Each with
-// its place in the text and its context, as SilverBullet's index tells them
-// apart (plugs/index/tags.ts and frontmatter.ts): a page's tag line (a
-// paragraph directly under the document of hashtags alone: its lines up to the
-// first holding anything else), a paragraph (a quote's too), an item, a task,
-// a table, a heading.
+// (`Hashtag`, an inline element wherever text is read inline): not in the
+// frontmatter (frontmatter.ts reads it), code, raw HTML, a link's definition,
+// a marker comment, nor where a line's marks leave none
+// (shared/markdown/inline.ts: inline code, wiki links, attributes' values, a
+// link's target, URLs, HTML, a `#` escaped). Each with its place in the text
+// and its context, as SilverBullet's index tells them apart
+// (plugs/index/tags.ts `hashtagParent`, its main at 01d6b0e7, 2026-11-06): a
+// task's own text a task, anything else within a list's item an item, then a
+// table, a heading, else a paragraph (a quote's, block-level HTML's, a
+// comment's too); and the page's tag line (frontmatter.ts), a paragraph
+// directly under the document as it reads one. A hashtag SilverBullet's index
+// gives no context (in block-level HTML, a setext heading, a footnote) is
+// still one its user sees: found, renamed and removed as the others.
 //
-// A line-by-line reading, not a markdown parser: a line's block is what
-// shared/markdown/blocks.ts `readLine` reads, its fences lines.ts', and what
-// holds over lines (a list, a paragraph, code) is kept here. Behind
-// `TagScanner`, so another (SilverBullet's own parser) could take its place.
-import { readLine } from "../../markdown/blocks.ts";
-import { inlineMarks } from "../../markdown/inline.ts";
-import { closesFence, fenceOf, indentWidth, type Line, linesOf } from "../../markdown/lines.ts";
+// Its blocks are shared/markdown/parse.ts' (lezer's parser, as SilverBullet's),
+// each block's lines read here for their marks, one line at a time (a span of
+// inline code over two lines is not read as one). Behind `TagScanner`, so
+// another could take its place.
+import { type InlineMark, inlineMarks } from "../../markdown/inline.ts";
+import { type Line, linesOf } from "../../markdown/lines.ts";
+import { type MarkdownNode, parseBlocks, type Span } from "../../markdown/parse.ts";
 
 export type TagContext = "page" | "paragraph" | "item" | "task" | "table" | "heading";
 
@@ -31,86 +35,85 @@ export type Hashtag = {
 
 export type TagScanner = (text: string, bodyStart: number) => readonly Hashtag[];
 
-/** A line without the quote's markers it starts with: a fence in a quote (`> ````) is one */
-const unquoted = (text: string) => text.replace(/^ {0,3}(?:>[ \t]?)*/, "");
+/** A line's mark, its place the text's */
+type Mark = InlineMark & { readonly line: Line };
 
 /** The hashtags of the body (the text from `bodyStart`, after the frontmatter) */
 export const scanHashtags: TagScanner = (text, bodyStart) => {
   const found: Hashtag[] = [];
-  let fence: string | undefined;
-  // Within a list (its items' lines and what is indented under them), until a line of the document's own
-  let inList: TagContext | undefined;
-  // Within a paragraph directly under the document, and whether its lines so far hold hashtags alone
-  let paragraph: { tagsOnly: boolean } | undefined;
-  let blankBefore = true;
-  let indentedCode = false;
-  for (const line of linesOf(text, bodyStart, text.length)) {
-    // (A CRLF's `\r` none of the line's text: a marker alone, `-\r`, is a marker)
-    const t = line.text.endsWith("\r") ? line.text.slice(0, -1) : line.text;
-    if (fence) {
-      if (closesFence(unquoted(t), fence)) fence = undefined;
-      continue;
+  // `inItem`: within a list's item, where anything but a task's own text is the item's
+  const visit = (nodes: readonly MarkdownNode[], inItem: boolean, top: boolean) => {
+    for (const node of nodes) {
+      switch (node.kind) {
+        case "item":
+          visit(node.children, true, false);
+          break;
+        case "quote":
+        case "comment":
+          visit(node.children, inItem, false);
+          break;
+        case "code":
+        case "rule":
+        case "definition":
+          break;
+        default: {
+          if (node.kind === "html" && !node.inline) break;
+          const marks = marksOf(text, node.lines);
+          const tags = marks.filter((mark) => mark.kind === "tag");
+          const onTagLine = top && node.kind === "paragraph" ? tagLineCount(text, node, marks) : 0;
+          const context = contextOf(node, inItem);
+          tags.forEach((tag, at) => found.push({ name: tag.name, from: tag.from, to: tag.to, context: at < onTagLine ? "page" : context, line: { from: tag.line.from, to: tag.line.to } }));
+        }
+      }
     }
-    const open = fenceOf(unquoted(t));
-    if (open) {
-      fence = open;
-      paragraph = undefined;
-      continue;
-    }
-    const read = readLine(t);
-    if (read.kind === "blank") {
-      paragraph = undefined;
-      blankBefore = true;
-      indentedCode = false;
-      continue;
-    }
-    // (Code: indented four or more, a tab four; a line's own indentation, whether there is any and a heading's: as written)
-    const indent = read.indent.length;
-    // An indented block after a blank line, outside a list, is code
-    if (!inList && indentWidth(t) >= 4 && (blankBefore || indentedCode) && !paragraph) {
-      indentedCode = true;
-      blankBefore = false;
-      continue;
-    }
-    indentedCode = false;
-    let context: TagContext;
-    if (read.kind === "task") context = inList = "task";
-    else if (read.item) context = inList = "item";
-    else if (inList && (indent > 0 || !blankBefore)) context = inList;
-    else {
-      inList = undefined;
-      // (A heading indented by three spaces at most: more is a paragraph's text going on, or code)
-      if (read.kind === "heading" && /^ {0,3}$/.test(read.indent)) context = "heading";
-      else if (read.kind === "table") context = "table";
-      else context = "paragraph";
-    }
-    const own: Hashtag[] = [];
-    // (A heading's hashtags after its #s: those are its marker)
-    const rest = inline(line, context === "heading" ? read.contentFrom : 0, own);
-    // A paragraph directly under the document: its leading lines of hashtags alone are the page's tags
-    if (context === "paragraph" && read.kind !== "quote" && indent < 4) {
-      paragraph ??= { tagsOnly: true };
-      if (paragraph.tagsOnly && own.length > 0 && !rest.trim()) context = "page";
-      else paragraph.tagsOnly = false;
-    } else paragraph = undefined;
-    for (const tag of own) found.push({ ...tag, context });
-    blankBefore = false;
-  }
+  };
+  visit(parseBlocks(text, bodyStart), false, true);
   return found;
 };
 
+/** A hashtag's context by its block, as SilverBullet's `hashtagParent` ranks them: a task, an item, a table, a heading */
+function contextOf(node: MarkdownNode, inItem: boolean): TagContext {
+  if (node.kind === "task") return "task";
+  if (inItem) return "item";
+  if (node.kind === "table" || node.kind === "heading") return node.kind;
+  return "paragraph";
+}
+
+/** The marks of a block's lines, in order, their places the text's */
+function marksOf(text: string, lines: readonly Span[]): Mark[] {
+  return lines.flatMap((span) => {
+    const [line] = linesOf(text, span.from, span.from);
+    return inlineMarks(text.slice(span.from, span.to)).map((mark) => ({ ...mark, from: span.from + mark.from, to: span.from + mark.to, line: line! }));
+  });
+}
+
 /**
- * The hashtags of a line from `start` (in its own text) into `found`, their
- * context to be set; gives the line's text without them (what else it holds)
+ * How many of a paragraph's first hashtags are the page's, as SilverBullet's frontmatter.ts reads a paragraph directly
+ * under the document, element by element: its hashtags up to a text starting with a line break and more after it
+ * (`#a\ntext`: `a`); none where any other text or element comes first (`#a text`, `#a\n*x*`, a hard line break)
  */
-function inline(line: Line, start: number, found: Hashtag[]): string {
-  let rest = "";
-  let at = 0;
-  for (const mark of inlineMarks(line.text, start)) {
-    if (mark.kind !== "tag") continue;
-    found.push({ name: mark.name, from: line.from + mark.from, to: line.from + mark.to, context: "paragraph", line: { from: line.from, to: line.to } });
-    rest += line.text.slice(at, mark.from);
-    at = mark.to;
+function tagLineCount(text: string, paragraph: Extract<MarkdownNode, { kind: "paragraph" }>, marks: readonly Mark[]): number {
+  // Its elements in order: lezer's (emphasis, code, links…; none starting in a hashtag, which SilverBullet reads from
+  // its #: `#<two words>` no HTML), and the marks SilverBullet reads as elements; a hashtag in another element (a
+  // link's text) none of its own
+  const tags = marks.filter((mark) => mark.kind === "tag");
+  const inTag = (span: Span) => tags.some((tag) => tag.from < span.from && span.from < tag.to);
+  const others: Span[] = [...paragraph.inline.filter((span) => !inTag(span)), ...marks.filter((mark) => mark.kind !== "tag")];
+  const within = (mark: Span) => others.some((other) => other.from <= mark.from && mark.to <= other.to);
+  const elements = [...others.map((span) => ({ span, tag: false })), ...tags.filter((tag) => !within(tag)).map((span) => ({ span, tag: true }))];
+  elements.sort((a, b) => a.span.from - b.span.from);
+  // (A CRLF's `\r` none of the text, as SilverBullet reads it)
+  const textTo = (from: number, to: number) => text.slice(from, to).replace(/\r/g, "");
+  let count = 0;
+  let at = paragraph.from;
+  for (const { span, tag } of [...elements, { span: { from: paragraph.to, to: paragraph.to }, tag: false }]) {
+    const between = textTo(at, span.from);
+    if (between.startsWith("\n") && between !== "\n") return count;
+    if (between.trim()) return 0;
+    if (span.from === paragraph.to) return count;
+    if (!tag) return 0;
+    count++;
+    at = span.to;
   }
-  return rest + line.text.slice(at);
+  return count;
 }

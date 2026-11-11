@@ -65,10 +65,13 @@ abstraction of its own, room for more operations.
    keeps its comments and formatting. A form it does not edit (a list over
    several lines in brackets) is left alone, and the preview says so.
 5. **Hashtags found by our own scanner** (pure, synchronous, tested), as
-   SilverBullet's parser finds them: not in the frontmatter (read apart), fenced
-   code, inline code, wiki links, a link's target, URLs, HTML tags, entities,
-   `${…}`, `\#`. Behind an interface (`TagScanner`), so SilverBullet's parser
-   (`markdown.parseMarkdown`) could take its place.
+   SilverBullet's parser finds them: not in the frontmatter (read apart), code,
+   inline code, wiki links, a link's target, URLs, HTML tags, entities,
+   `${…}`, `\#`. Since 2026-11-11 its blocks are lezer's parser's, the one
+   SilverBullet builds on (shared/markdown/parse.ts;
+   docs/silverware-tags-scanner-on-blocks.md), a hashtag's context SilverBullet's
+   index's (task, item, table, heading, the page's tag line). Behind an interface
+   (`TagScanner`).
 6. **Every change across pages is previewed**: what changes on each page
    (lines before and after), what is skipped and why; nothing is written until
    *Apply*. One page edited in its own dialog (the page's tags) is written at

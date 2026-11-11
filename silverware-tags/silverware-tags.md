@@ -1,6 +1,7 @@
 ---
 name: Library/damesene/silverware-tags
 tags: meta/library
+version: 1.0.0
 description: "Silverware Tags: manage the tags of your space in one window: rename and merge them everywhere (pages, items, tasks), delete them, give tags to many pages at once or to every page under a folder, edit a page's tags; every change reviewed first, and undone with one command."
 files:
 - silverware-tags.js

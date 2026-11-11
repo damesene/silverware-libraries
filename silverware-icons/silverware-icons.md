@@ -1,6 +1,7 @@
 ---
 name: Library/damesene/silverware-icons
 tags: meta/library
+version: 1.0.0
 description: "Silverware Icons: monochrome icons (Lucide) and emoji for the other Silverware plugins, drawn in the colors of your theme, and sets of icons of your own."
 files:
 - silverware-icons.js

@@ -1,10 +1,11 @@
 // Bundles each library's src/index.ts into the .js file next to its library page.
 // --check builds in memory and fails when a committed bundle differs from its sources, or a style page's shared block
-// from its template (scripts/sharedstyles.mjs).
+// from its template (scripts/sharedstyles.mjs). Both fail where a plugin's version has no changelog entry (scripts/versions.mjs).
 import * as esbuild from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
 import { iconFiles } from "./icons/index.mjs";
 import { sharedStyles } from "./sharedstyles.mjs";
+import { checkVersions } from "./versions.mjs";
 
 const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart", "silverware-database", "silverware-icons"];
 // Files bundled beside a library's, loaded by it when needed: Chart.js beside the chart's (src/chartjs.ts)
@@ -53,4 +54,6 @@ for (const { path, text } of iconFiles()) {
 }
 // The CSS of what shared/ draws, in each plugin's style page (scripts/sharedstyles.mjs)
 stale += await sharedStyles(check);
+// Each plugin's version and its changelog's entry (scripts/versions.mjs)
+if (!watch) stale += await checkVersions(libraries);
 if (stale) process.exit(1);

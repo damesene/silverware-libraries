@@ -1,6 +1,7 @@
 ---
 name: Library/damesene/silverware-chart
 tags: meta/library
+version: 1.0.0
 description: "Silverware Chart: charts written as Mermaid, which other tools can draw too, drawn in SilverBullet with Chart.js; their data from your blocks or from a markdown table, followed as you edit it."
 files:
 - silverware-chart.js

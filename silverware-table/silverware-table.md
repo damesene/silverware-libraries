@@ -1,6 +1,7 @@
 ---
 name: Library/damesene/silverware-table
 tags: meta/library
+version: 1.0.0
 description: "Silverware Table: sort, filter and edit markdown tables in place, and move, add or delete rows and columns."
 files:
 - silverware-table.js

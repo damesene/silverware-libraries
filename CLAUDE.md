@@ -18,7 +18,7 @@ docs/ holds each plugin's plan and decision log; a plugin's library page (`silve
 ```sh
 npm install
 npm run build        # every plugin's bundle (silverware-<name>/silverware-<name>.js), the icon sets' data, the shared CSS blocks
-npm run verify       # before a commit: tsc --noUnusedLocals, vitest, check-build (bundles and generated files match their sources)
+npm run verify       # before a commit: tsc --noUnusedLocals, vitest, check-build (bundles and generated files match their sources, each plugin's version has its changelog entry)
 npm test             # vitest
 npm run test:ui:install  # once: Playwright's Chromium
 npm run test:ui      # Playwright against the playground (port 8010)
@@ -31,7 +31,7 @@ npm run deploy -- <space folder>   # copy every plugin into a local space's Libr
 
 ## A plugin's shape
 
-- `silverware-<name>/`: `silverware-<name>.md` (library page: user docs only; its `files:` install the rest beside it), `-init.md` (settings `config.define`, the JS loaded and its bridge, commands, events), `-api.md` (the `-- priority: 50` Space Lua API, before the user's scripts), `-style.md` (the CSS), the built `silverware-<name>.js` (committed: SilverBullet runs no build), `src/`, `ui-tests/` (`helpers.ts` of its own).
+- `silverware-<name>/`: `silverware-<name>.md` (library page: user docs only, `version:` in its frontmatter; its `files:` install the rest beside it), `CHANGELOG.md` (the repository's, not installed), `-init.md` (settings `config.define`, the JS loaded and its bridge, commands, events), `-api.md` (the `-- priority: 50` Space Lua API, before the user's scripts), `-style.md` (the CSS), the built `silverware-<name>.js` (committed: SilverBullet runs no build), `src/`, `ui-tests/` (`helpers.ts` of its own).
 - Named `Silverware <Name>`, commands `Silverware <Name>: …`, settings and Space Lua API under `silverware.<name>` (one global `silverware`, `silverware = silverware or {}`); what a plugin's Lua blocks share that is not API under `silverware_internal.<name>`, so `silverware.<name>.` completes to the API alone. `config.define("silverware.<name>", …)`: SilverBullet splits a dotted key into nested objects (its `client/config.ts`).
 - CSS classes, data attributes and CSS variables under the plugin's prefix.
 - A plugin needs no other installed. One plugin uses another only through its public API handed over by its init page's Lua (Silverware Chart takes Silverware Table's `silverware.table.tables`; the toolbar and the database take `silverware.icons.api`), never through its code: each plugin's isolation test checks imports.
@@ -55,6 +55,18 @@ npm run deploy -- <space folder>   # copy every plugin into a local space's Libr
 - **Do not write a SilverBullet space's pages on disk while SilverBullet has it open**: it keeps its copy and writes a sync conflict into the page (it did, in CONFIG.md). Change pages through SilverBullet. Deploying library files (`npm run deploy`) is fine; reload the page twice after it (Space Lua sees the change on the second).
 - Line endings are LF (`.gitattributes`); git normalizes CRLF from Windows editors on commit.
 - On this machine a shell heredoc mangles backslashes: write scripts to a file, or use an editor tool, when the text has `\`.
+
+## Versions and changelogs
+
+- Each plugin has a version, `version: X.Y.Z` in its library page's frontmatter ([semantic versioning](https://semver.org), three numbers, from 1.0.0), and a `CHANGELOG.md` in its folder, the newest entry first. `check-build` (scripts/versions.mjs) fails where the version is not `X.Y.Z` or the changelog's newest entry is not that version.
+- Why it matters: SilverBullet updates an installed library only when its library page's text changed (`share.install` compares a hash of that text), and only then downloads its `files:`. A change of a bundle or of another page alone reaches no space that has the library already; a release changes the version line, so the update takes every file. A merged change may still reach users before its release, whenever its library page's text changed for another reason.
+- **Never bump a version or write a changelog entry without the user's confirmation.** Propose a release when the user asks, or when one is due: a coherent change finished (its fixes done, `verify` and the UI tests passing) that users should get, such as a bug they see fixed or a feature done. Propose it once, with the new version and the entry drafted, and wait.
+- Which number: MAJOR for a change that breaks what a space has (the commits marked `!`: settings, the Space Lua API, a theme's selectors or variables, stored markdown); MINOR for a new feature; PATCH for fixes and small improvements only. A change in `shared/` releases each plugin it reaches, each by its own number.
+- The entry is drafted from the commits since the plugin's last release: `git log <scope>-v<last>..HEAD -- silverware-<name>/ shared/`.
+- **An entry** is `## X.Y.Z (YYYY-MM-DD)` and a short list, clear to a reader without context: breaking changes first (`**Breaking:**`, what breaks and what to do), then the main features, a line each; fixes and small improvements summed up in a line or two where they are many and minor. Written for users: no internals, no commit hashes, no `@` mentions.
+- **A release is the last commit of a feature branch**, `chore(<scope>): release X.Y.Z`: the version line and the changelog entry, nothing else. A commit added to the branch after it means the release is redone, so it stays last and covers it.
+- **Tags**: once the branch's PR is merged (a merge commit keeps the release commit in `main`), the release commit is tagged `<scope>-vX.Y.Z` (`table-v1.2.0`) and the tag pushed, both with the user's confirmation. Tags are never deleted or moved.
+- A plugin's version is not a version of its settings' model (`silverware.toolbar.version`, its migrations): those change on their own.
 
 ## shared/
 

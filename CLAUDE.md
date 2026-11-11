@@ -67,6 +67,7 @@ Bundled into each plugin (nothing is shared at run time); its classes by a base 
 - `clipboard.ts`: text (and HTML) onto the clipboard from a menu or a button, by the copy command where a page over http has no Clipboard API.
 - `configpage.ts`: settings in the CONFIG page. Tables (the toolbar's favourites) go in a plugin's own block, not the Configuration Manager's: it reads no table back (`parseLuaLiteral`) and rewrites its block from what it read on any save, so a table there would be lost (its source, 2026-10-26: `ui/use_config_editor.ts`, `configuration.ts`).
 - `icons.ts` / `iconref.ts`: how a plugin draws and picks its user's icons (Silverware Icons' API or a stand-in) and how a value is written (`<set>:<name>` or text); see silverware-icons/CLAUDE.md.
+- `overwindow.ts`: what a plugin shows over the whole window (a full screen, a sheet) is marked `data-silverware-over-window` on its element, so the others stand back without knowing whose it is (Silverware Toolbar shows none then); `watchOverWindow` tells when one shows and when the last ends.
 - `elements.ts` `el(...)`: a plugin's own elements in one synchronous expression; no reactive library (weighed, docs/ui-without-framework.md).
 
 ## Verified in SilverBullet (applies to every plugin)

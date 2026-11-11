@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
+import { OVER_WINDOW_ATTRIBUTE, overWindowShown } from "../../../../../shared/overwindow.ts";
 import { cell, clickOn, controller, editor, flush, key, PAGE, setup, text, useTablePage } from "../../../testing/page.ts";
 
 describe("Full screen", () => {
@@ -13,13 +14,13 @@ describe("Full screen", () => {
     return Array.from(document.querySelectorAll<HTMLButtonElement>(".swt-menu .swt-menu-item")).find((b) => b.textContent === label);
   };
 
-  it("shows the table over the whole window from its toolbar icon, the same icon closes it", async () => {
+  it("shows the table over the whole window from its toolbar icon (marked so for the other plugins), the same icon closes it", async () => {
     await setup(PAGE);
     icon("Full screen")!.click();
-    expect(widget().classList.contains("swt-fullscreen")).toBe(true);
+    expect([widget().classList.contains("swt-fullscreen"), overWindowShown(document)]).toEqual([true, true]);
     const exit = icon("Exit full screen")!;
     exit.click();
-    expect(widget().classList.contains("swt-fullscreen")).toBe(false);
+    expect([widget().classList.contains("swt-fullscreen"), overWindowShown(document)]).toEqual([false, false]);
     expect(icon("Full screen")).toBeDefined();
   });
 
@@ -38,8 +39,24 @@ describe("Full screen", () => {
     await controller.scan();
     expect(text).toContain("| Pear | 7 |");
     expect(widget().classList.contains("swt-fullscreen")).toBe(true);
+    // (The mark on the table rendered anew, none left on the one it replaced)
+    expect([...document.querySelectorAll(`[${OVER_WINDOW_ATTRIBUTE}]`)]).toEqual([widget()]);
     key(editor.querySelector(".swt-cell-editor")!, "Escape");
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
     expect(widget().classList.contains("swt-fullscreen")).toBe(false);
+  });
+
+  it("leaves no mark as it ends while the table rendered anew is not enhanced yet", async () => {
+    await setup(PAGE);
+    icon("Full screen")!.click();
+    clickOn(cell(1, 1));
+    editor.querySelector<HTMLInputElement>(".swt-cell-editor")!.value = "7";
+    key(editor.querySelector(".swt-cell-editor")!, "Enter");
+    await flush();
+    // (Taken for it at once, as it was put into the page)
+    expect(text).toContain("| Pear | 7 |");
+    expect(overWindowShown(document)).toBe(true);
+    controller.stop();
+    expect(overWindowShown(document)).toBe(false);
   });
 });

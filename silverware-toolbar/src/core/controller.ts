@@ -9,7 +9,13 @@
 // its buttons show the formats around the caret; it goes as the caret moves
 // or text is typed. The modules (modules.ts) give the actions; the core knows
 // none of them. The popup ends with the core's own item, the settings dialog.
+// While another plugin shows something over the whole window (a table or a
+// database in full screen: shared/overwindow.ts), no toolbar, popup or panel
+// shows, docked or not, and the page is not read for one; once it ends, a
+// toolbar shown always or while writing shows again (one by a selection, as
+// the next selection is made).
 import { type Icons, iconsOf } from "../../../shared/icons.ts";
+import { overWindowShown, watchOverWindow } from "../../../shared/overwindow.ts";
 import type { Bridge, Settings } from "../bridge.ts";
 import { CONTENT_SELECTOR, inEditor, pageContentOf, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
@@ -82,6 +88,8 @@ export class Controller {
   // commands after the toolbar starts, `reloaded`), or after a read that failed, not before `retryAt`
   private stale = true;
   private retryAt = 0;
+  // Watching for something shown over the whole window (shared/overwindow.ts), while started
+  private stopWatchingWindow: (() => void) | undefined;
 
   constructor(
     readonly doc: Document,
@@ -129,6 +137,7 @@ export class Controller {
     this.doc.addEventListener("focusin", this.onFocus);
     this.doc.addEventListener("focusout", this.onBlur);
     this.docking.start();
+    this.stopWatchingWindow = watchOverWindow(this.doc, this.windowChanged);
     // Shown always: from the start
     void this.showStaying();
   }
@@ -144,6 +153,8 @@ export class Controller {
     this.doc.removeEventListener("focusin", this.onFocus);
     this.doc.removeEventListener("focusout", this.onBlur);
     this.docking.stop();
+    this.stopWatchingWindow?.();
+    this.stopWatchingWindow = undefined;
     this.bar.remove();
     this.popup.remove();
     this.panel.remove();
@@ -158,10 +169,13 @@ export class Controller {
   async showActions(choices?: Action): Promise<void> {
     // The popup in a panel's place (the toolbar's … or a list's button while it is open): the panel done
     this.panel.close(true);
+    // (Not over what another plugin shows over the whole window)
+    if (overWindowShown(this.doc)) return;
     // (Also where no toolbar shows: no selection, no caret)
     this.refreshIfStale();
     const context = await this.read();
-    if (!context || this.stopped) return;
+    // (Shown over the window while it was read: nothing)
+    if (!context || this.stopped || overWindowShown(this.doc)) return;
     const range = this.watcher.current() ?? this.watcher.caret();
     this.shows++;
     this.atCaret = context.from === context.to;
@@ -242,12 +256,31 @@ export class Controller {
     this.panel.close(true);
     this.bar.hide();
     this.switched?.(toolbars);
+    this.showAsSet();
+  }
+
+  /**
+   * The toolbar shown as its settings say, not waiting for the caret to move:
+   * shown always, at once; shown while writing, the caret in the text, at the
+   * caret (a selection: `perform`'s `again` shows it by the selection)
+   */
+  private showAsSet(): void {
     void this.showStaying();
-    // (Shown while writing, the caret in the text: at the caret now, not as it next moves; a selection: `perform`'s
-    // `again` shows it by the selection)
     const caret = this.watcher.caret();
     if (caret && !this.watcher.current() && this.persistent() && this.writing()) void this.caretMoved(caret);
   }
+
+  // Something shown over the whole window by another plugin (a table, a database in full screen): the toolbar, its
+  // popup and panel go, the room kept for it docked given back; once it ends, the toolbar shows as set
+  private windowChanged = (shown: boolean): void => {
+    if (!shown) {
+      this.showAsSet();
+      return;
+    }
+    this.shows++;
+    this.popup.close(true);
+    this.hideBar();
+  };
 
   private owns(node: Node): boolean {
     return this.bar.owns(node) || this.popup.owns(node) || this.panel.owns(node);
@@ -323,6 +356,8 @@ export class Controller {
 
   /** The toolbar shown for a context, by the selection or the caret */
   private showBar(context: Context, range: Range | undefined): void {
+    // (None over what another plugin shows over the whole window)
+    if (overWindowShown(this.doc)) range = undefined;
     this.range = range;
     if (!range) {
       this.bar.hide();
@@ -358,7 +393,7 @@ export class Controller {
       return;
     }
     this.atCaret = false;
-    if (this.popup.isOpen) return;
+    if (this.popup.isOpen || overWindowShown(this.doc)) return;
     const context = await this.read();
     if (!context || show !== this.shows || this.stopped) return;
     // The editor's selection is a caret (the page's selection is not its own, or was just changed): no toolbar
@@ -566,7 +601,7 @@ export class Controller {
 
   /** Shown always: the toolbar at once, as the caret is (docked, also where the page's text has no focus) */
   private async showStaying(): Promise<void> {
-    if (!this.stays() || this.bar.shown) return;
+    if (!this.stays() || this.bar.shown || overWindowShown(this.doc)) return;
     const show = ++this.shows;
     const context = await this.read();
     if (!context || show !== this.shows || this.stopped || this.bar.shown) return;
@@ -588,7 +623,7 @@ export class Controller {
 
   /** The caret moved (or came into the page's text): shown always, the toolbar goes with it, its buttons the formats around it */
   private async caretMoved(range: Range): Promise<void> {
-    if (!this.persistent() || !(this.writing() || this.stays()) || this.popup.isOpen) return;
+    if (!this.persistent() || !(this.writing() || this.stays()) || this.popup.isOpen || overWindowShown(this.doc)) return;
     const show = ++this.shows;
     const context = await this.read();
     if (!context || show !== this.shows || this.stopped || context.from !== context.to) return;

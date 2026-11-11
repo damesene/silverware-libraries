@@ -703,3 +703,17 @@ the settings takes those values along: `withArgRenamed`). Custom actions
 declare them too. Values are texts (a number or true/false written in CONFIG
 read as text), so a parameter's type is the action's to read.
 
+
+### None over a full screen (2026-11-11)
+
+Asked by the user: docked, the toolbar lay over a table or a database shown
+over the whole window, where it has no use yet. While another plugin shows
+something over the whole window (Silverware Table's full screen and sheet,
+Silverware Database's full screen), no toolbar shows, floating or docked, nor
+its popup or panel, and the room kept for a docked one is given back; once it
+ends, a toolbar shown always or while writing shows again (one by a selection,
+with the next selection). The plugins know nothing of each other: the one
+showing marks its element with `data-silverware-over-window`
+(`shared/overwindow.ts`), and the toolbar watches the document for the mark
+(told at once as one shows, 100 ms after the last goes, so a view rendered
+anew does not flicker) and checks it before it reads the page for a show.

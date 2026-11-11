@@ -7,6 +7,7 @@
 import { type Icons, iconsOf, isReference } from "../../../shared/icons.ts";
 import { writeClipboard } from "../../../shared/clipboard.ts";
 import { el } from "../../../shared/elements.ts";
+import { markOverWindow } from "../../../shared/overwindow.ts";
 import type { Editor, Settings, UserInterface } from "../../../shared/platform.ts";
 import { type Filter, listItems, type SortKey, textOf, typeOf, validateCondition } from "../domain/listing.ts";
 import type { TypeRegistry } from "../domain/types/registry.ts";
@@ -279,6 +280,8 @@ export class DatabasePlace {
     const { element } = this.options;
     this.overWindow = on;
     element.classList.toggle("swd-over-window", on);
+    // (And the mark every plugin knows: shared/overwindow.ts, the others stand back while it shows)
+    markOverWindow(element, on);
     this.stopOverWindow?.();
     this.stopOverWindow = undefined;
     if (!on) return;

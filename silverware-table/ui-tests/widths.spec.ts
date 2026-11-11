@@ -54,18 +54,42 @@ test.describe("Column widths", () => {
     await expect(header(page, 0).locator(".swt-col-resize.swt-active")).toHaveCount(0);
   });
 
-  test("a column at what its header needs stops giving: the next column gives, the header's name stays whole", async ({ page }) => {
+  test("a column dragged past what its header needs cuts it, its name its title; at 80px the next column gives", async ({ page }) => {
     const before = await widths(page);
     await dragHandle(page, 1, [-2000]);
-    await expect.poll(() => markdown(page)).toContain("widths.-c-quantity.size=");
+    await expect.poll(() => markdown(page)).toContain("widths.-c-quantity.size='80'");
     const after = await widths(page);
-    // Name and Quantity gave all they could, Note took it all
-    expect(after.columns[0]!).toBeLessThan(before.columns[0]!);
-    expect(after.columns[1]!).toBeLessThan(before.columns[1]!);
+    // Quantity and then Name gave all they could, Note took it all
+    near(after.columns[0]!, 80);
+    near(after.columns[1]!, 80);
     near(after.columns[2]!, before.columns[2]! + (before.columns[0]! - after.columns[0]!) + (before.columns[1]! - after.columns[1]!));
     near(after.table, before.table);
     const name = header(page, 1).locator(".swt-head-name");
-    expect(await name.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(0);
+    expect(await name.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeGreaterThan(0);
+    await expect(name).toHaveAttribute("title", "Quantity");
+    // Whole again (Reset column widths): no title
+    await hoverCell(page, cell(page, 1, 0));
+    await (await tableIcon(page, "Reset column widths")).click();
+    await expect.poll(() => markdown(page)).not.toContain("widths.");
+    await expect(name).not.toHaveAttribute("title");
+  });
+
+  test("a header fitted in full screen shows whole back in the page, the other columns giving the room", async ({ page }) => {
+    await hoverCell(page, cell(page, 1, 0));
+    await (await tableIcon(page, "Full screen")).click();
+    await expect(table(page)).toHaveClass(/swt-over-window/);
+    // Quantity as wide as its header (its cells are shorter)
+    await hoverCell(page, header(page, 1));
+    const handle = (await header(page, 1).locator(".swt-col-resize").boundingBox())!;
+    await page.mouse.dblclick(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await expect.poll(() => markdown(page)).toContain("widths.box=");
+    await page.keyboard.press("Escape");
+    await expect(table(page)).not.toHaveClass(/swt-over-window/);
+    const name = header(page, 1).locator(".swt-head-name");
+    await expect.poll(() => name.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(0);
+    await expect(name).not.toHaveAttribute("title");
+    const box = await table(page).evaluate((widget) => widget.scrollWidth - widget.clientWidth);
+    expect(box).toBeLessThanOrEqual(0);
   });
 
   test("a column with a width in a table whose other columns are automatic shrinks as dragged", async ({ page }) => {
@@ -122,6 +146,15 @@ test.describe("Column widths", () => {
     const now = await box();
     expect(now.scroll).toBeLessThanOrEqual(now.client);
     for (const column of [0, 1, 2]) expect(Math.abs(inPage.columns[column]! / inPage.table - full.columns[column]! / full.table)).toBeLessThan(0.01);
+  });
+
+  test("columns held at their headers' need in a narrower box: the pinned columns' offsets follow", async ({ page }) => {
+    // Set in a box three times as wide: Name and Quantity would be under their headers' need, held there
+    await rendersAnew(page, () => setPage(page, `${PAGE}| <meta core.table core.pin-left='2' widths.-c-name.size='300' widths.-c-quantity.size='300' widths.-c-note.size='2400' widths.box='3000'> |\n`));
+    const name = header(page, 1).locator(".swt-head-name");
+    await expect.poll(() => name.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(0);
+    // Quantity's sticky offset is Name's width as shown now
+    await expect.poll(async () => Math.abs(parseFloat(await header(page, 1).evaluate((e) => (e as HTMLElement).style.left)) - (await header(page, 0).boundingBox())!.width)).toBeLessThan(1);
   });
 
   test("the last column has no handle: its right edge is the table's", async ({ page }) => {

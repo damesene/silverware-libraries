@@ -8,10 +8,12 @@
 // automatic again.
 //
 // A drag moves only that edge: what one side gains the other loses, from the
-// nearest column on, none below what its header needs (movedEdge). On release
-// every column's width is kept, and the width of the box the table had then
-// (widths.box): the table is shown as that share of whatever box it has, so
-// it widens and narrows with it (full screen, another window). A column added
+// nearest column on, none below MIN_WIDTH (movedEdge; a header cut shows its
+// name as its title). On release every column's width is kept, and the width
+// of the box the table had then (widths.box): the table is shown as that
+// share of whatever box it has, so it widens and narrows with it (full
+// screen, another window; narrower, the rendering holds columns at their
+// headers' need, core/silverbullet/columns.ts). A column added
 // or deleted keeps the table so (widthsAfterEdit, in the write). A table of
 // its own width (narrower or wider than its box) is a sum other than the box:
 // the same data (docs/silverware-table-column-resize.md).
@@ -32,7 +34,7 @@ import { ICONS } from "../icons.ts";
 import { parseTable, type Table } from "../markdown.ts";
 
 // The narrowest a column can be dragged to, in pixels
-const MIN_WIDTH = 40;
+const MIN_WIDTH = 80;
 // The table's attribute: the width of its box when its columns' widths were set
 const BOX_KEY = "box";
 
@@ -112,8 +114,8 @@ export function widthsAfterEdit(old: readonly number[], map: (column: number) =>
 
 const byColumn = (widths: readonly number[]) => new Map(widths.map((width, column) => [column, width]));
 
-/** The columns as measured, each with the narrowest a drag may make it: what its header needs, at least MIN_WIDTH */
-const draggedColumns = (measured: ColumnsMeasure): DraggedColumn[] => measured.columns.map(({ width, header }) => ({ width, min: Math.max(MIN_WIDTH, Math.ceil(header)) }));
+/** The columns as measured, each with the narrowest a drag may make it (MIN_WIDTH: a header too long is cut, its name its title) */
+const draggedColumns = (measured: ColumnsMeasure): DraggedColumn[] => measured.columns.map(({ width }) => ({ width, min: MIN_WIDTH }));
 
 /** One table's widths (the module's part for it, core/parts.ts): those set for the view, those stored, its handles */
 class TableWidths {
@@ -434,12 +436,14 @@ function tableDrag(host: ModelHost, info: TableInfo, column: number): EdgeDrag |
   };
 }
 
-/** A column as wide as its text and header need (TableWidths.fit); undefined: a table of one column, or not measured */
+/** A column as wide as its text and its header need (TableWidths.fit); undefined: a table of one column, or not measured */
 function fittedWidths(host: ModelHost, info: TableInfo, column: number): { readonly widths: Map<number, number>; readonly box: number | undefined } | undefined {
   const measured = host.measureColumns(info);
   if (info.columns < 2 || measured.columns.length !== info.columns || column >= info.columns) return undefined;
   const columns = draggedColumns(measured);
-  const by = Math.max(columns[column]!.min, Math.ceil(host.columnContentWidth(info, column))) - columns[column]!.width;
+  // Its header whole too
+  const need = Math.max(MIN_WIDTH, Math.ceil(measured.columns[column]!.header), Math.ceil(host.columnContentWidth(info, column)));
+  const by = need - columns[column]!.width;
   // The edge after it, the last column's the edge before it (moved the other way)
   const moved = column < columns.length - 1 ? movedEdge(columns, column, by) : movedEdge(columns, column - 1, -by);
   return { widths: byColumn(wholePixels(moved)), box: boxOf(measured) };

@@ -12,17 +12,7 @@ import type { CellRef, ColumnsMeasure, ColumnWidths, HandlePlace, HeaderRow, Lin
 import { type MergedLooks, refKey } from "../looks.ts";
 import type { TableRows } from "../rows.ts";
 import { applyCellLook, applyHeaderLook, renderedText } from "./looks.ts";
-
-// A table laid out by its columns' widths: its colgroup and the table both have the class
-const FIXED_COLUMNS_CLASS = "swt-fixed-columns";
-// How narrow a column of such a table may get as its box narrows (one set narrower: its width), in pixels
-const SHRINK_FLOOR = 80;
-
-/** An element's padding left and right */
-function horizontalPadding(doc: Document, element: Element): number {
-  const style = doc.defaultView!.getComputedStyle(element);
-  return (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
-}
+import { ColumnLayouts, headerNeed, horizontalPadding } from "./columns.ts";
 
 // The attributes of a table's look put on each widget (data-swt-<name>), to take back
 const lookKeys = new WeakMap<HTMLElement, readonly string[]>();
@@ -62,10 +52,14 @@ export type AdapterContext = {
   holdInDocument(info: WidgetInfo, row: HTMLTableRowElement | undefined): void;
   floating(className: string): HTMLElement;
   place(element: HTMLElement, left: number, top: number): void;
+  // A table's columns took other widths after layout (ColumnLayouts): what is placed by them follows
+  columnsResized(info: WidgetInfo): void;
 };
 
 export class SilverBulletAdapter implements TableAdapter {
   private readonly overlays: Overlays;
+  // How tables laid out by their columns' widths show, and the titles of headers cut
+  private readonly columns: ColumnLayouts;
   // The styles hiding hashtags in headers, by who asked
   private readonly tagStyles = new Map<string, HTMLStyleElement>();
   // The cells each mark is on, by table as rendered
@@ -80,6 +74,11 @@ export class SilverBulletAdapter implements TableAdapter {
     private readonly context: AdapterContext,
   ) {
     this.overlays = new Overlays(doc, rows);
+    this.columns = new ColumnLayouts(doc, (table) => {
+      const widget = table.closest<HTMLElement>(WIDGET_SELECTOR);
+      const info = widget && context.infoOf(widget);
+      if (info && info.table === table) context.columnsResized(info);
+    });
   }
 
   applyLooks(info: WidgetInfo, looks: MergedLooks, editing: CellRef | undefined, only?: readonly CellRef[]): void {
@@ -145,6 +144,7 @@ export class SilverBulletAdapter implements TableAdapter {
     for (const style of this.tagStyles.values()) style.remove();
     this.tagStyles.clear();
     this.overlays.stop();
+    this.columns.stop();
   }
 
   showOutline(name: string, info: WidgetInfo, rows: readonly number[], columns: readonly [number, number], pieces: (sides: readonly Side[]) => readonly string[]): void {
@@ -292,41 +292,7 @@ export class SilverBulletAdapter implements TableAdapter {
       const rows = [info.table.rows[0]!, ...this.rows.bodyRows(info)];
       columns.forEach((column, i) => this.applyWidth(info, column, fixed ? undefined : widths.get(column), paddings[i]!, rows));
     }
-    this.fixColumns(info, fixed ? Array.from({ length: info.columns }, (_, column) => widths.get(column)!) : undefined, box);
-  }
-
-  /**
-   * The table laid out by its columns' widths (undefined: by its cells): each
-   * column its share of their sum, the table their sum over `box` of its box
-   * (none: as wide as its box), so it widens and narrows with its box; it
-   * narrows only until a column would be narrower than SHRINK_FLOOR (or than
-   * its width, if less), then the table scrolls sideways, as a wide table does
-   */
-  private fixColumns(info: WidgetInfo, widths: readonly number[] | undefined, box: number | undefined): void {
-    const { table } = info;
-    let colgroup = table.querySelector<HTMLTableColElement>(`:scope > colgroup.${FIXED_COLUMNS_CLASS}`);
-    if (!widths) {
-      if (!colgroup) return;
-      colgroup.remove();
-      table.classList.remove(FIXED_COLUMNS_CLASS);
-      Object.assign(table.style, { width: "", minWidth: "" });
-      return;
-    }
-    if (!colgroup) {
-      colgroup = this.doc.createElement("colgroup");
-      colgroup.className = FIXED_COLUMNS_CLASS;
-      table.prepend(colgroup);
-    }
-    while (colgroup.children.length < widths.length) colgroup.append(this.doc.createElement("col"));
-    while (colgroup.children.length > widths.length) colgroup.lastElementChild!.remove();
-    const sum = widths.reduce((a, b) => a + b, 0);
-    widths.forEach((width, column) => {
-      (colgroup.children[column] as HTMLElement).style.width = `${(width / sum) * 100}%`;
-    });
-    table.classList.add(FIXED_COLUMNS_CLASS);
-    // The narrowest column reaches its floor first: the table is never narrower than where it does
-    const narrowest = Math.min(...widths);
-    Object.assign(table.style, { width: box && box > 0 ? `${(sum / box) * 100}%` : "", minWidth: `${sum * Math.min(1, SHRINK_FLOOR / narrowest)}px` });
+    this.columns.fix(info.table, fixed ? Array.from({ length: info.columns }, (_, column) => widths.get(column)!) : undefined, box);
   }
 
   measureColumns(info: WidgetInfo): ColumnsMeasure {
@@ -342,13 +308,7 @@ export class SilverBulletAdapter implements TableAdapter {
     const heads = cells.map((cell) => cell.querySelector<HTMLElement>(":scope > .swt-head"));
     const held = heads.map((head) => head && { width: head.style.width, maxWidth: head.style.maxWidth });
     for (const head of heads) if (head) Object.assign(head.style, { width: "", maxWidth: "" });
-    const needs = cells.map((cell, column) => {
-      const head = heads[column];
-      if (!head) return 0;
-      // The name's box cut to what the cell leaves it, its text wider
-      const name = head.querySelector<HTMLElement>(":scope > .swt-head-name");
-      return head.offsetWidth + (name ? name.scrollWidth - name.clientWidth : 0) + horizontalPadding(this.doc, cell);
-    });
+    const needs = cells.map((cell) => headerNeed(this.doc, cell));
     heads.forEach((head, column) => {
       if (head) Object.assign(head.style, held[column]);
     });

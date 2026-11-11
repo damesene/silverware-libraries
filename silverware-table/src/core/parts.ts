@@ -54,6 +54,7 @@ export const TABLE_HOOKS = {
   placeRows: 1,
   rowNeeded: 0,
   rowsAttached: 0,
+  columnsResized: 0,
 } as const satisfies Partial<Record<keyof AdapterFeature, number>>;
 
 export type TableHook = keyof typeof TABLE_HOOKS;

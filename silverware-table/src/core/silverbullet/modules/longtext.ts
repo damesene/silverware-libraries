@@ -58,6 +58,11 @@ export class LongText implements AdapterFeature {
     this.queueCheck();
   }
 
+  // Columns narrower or wider in a box of the same size (its observer sees nothing): cells cut may change
+  columnsResized(): void {
+    this.queueCheck();
+  }
+
   enhanced(): void {
     // The settings may have changed since they were read
     void this.readSettings();

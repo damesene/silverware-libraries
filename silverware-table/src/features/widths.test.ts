@@ -93,9 +93,9 @@ describe("Column widths", () => {
     await controller.scan();
     // Laid out by its columns, each its share of their sum; no cell styled
     expect(cols()).toEqual([`${(100 / 300) * 100}%`, `${(110 / 300) * 100}%`, `${(90 / 300) * 100}%`]);
-    // As wide as its box (none measured: jsdom), narrowing until the narrowest column is at 80px
+    // As wide as its box (none measured: jsdom, which lays nothing out, so no column is held at its header's need)
     expect(editor.querySelector("table")!.style.width).toBe("");
-    expect(editor.querySelector("table")!.style.minWidth).toBe(`${300 * Math.min(1, 80 / 90)}px`);
+    expect(editor.querySelector("table")!.style.minWidth).toBe("");
     expect(cell(1, 0).style.width).toBe("");
     expect(cell(1, 0).classList.contains("swt-sized")).toBe(false);
   });
@@ -106,7 +106,7 @@ describe("Column widths", () => {
     handle(0)!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0, clientX: 100, detail: 1 }));
     window.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, cancelable: true, buttons: 1, clientX: 200 }));
     await new Promise((resolve) => requestAnimationFrame(resolve));
-    expect(cols()).toEqual([`${(200 / 300) * 100}%`, `${(40 / 300) * 100}%`, `${(60 / 300) * 100}%`]);
+    expect(cols()).toEqual([`${(140 / 300) * 100}%`, `${(80 / 300) * 100}%`, `${(80 / 300) * 100}%`]);
     window.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, cancelable: true, buttons: 1, clientX: 100 }));
     window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: 100, detail: 1 }));
     await flush();
@@ -142,8 +142,8 @@ describe("Column widths", () => {
     cell(1, 0).style.padding = "0 5px";
     doubleClick(0);
     await flush();
-    // The text's width and the cells' padding
-    expect(text).toBe(`${PAGE}| ${stored(140, 60, 100)} |\n`);
+    // The text's width and the cells' padding: Qty gives down to 80, then Note
+    expect(text).toBe(`${PAGE}| ${stored(140, 80, 80)} |\n`);
   });
 
   it("fits a column narrower, never below what its header needs, and the last column by the edge before it", async () => {
@@ -153,15 +153,15 @@ describe("Column widths", () => {
     cell(1, 0).style.padding = "0";
     doubleClick(0);
     await flush();
-    expect(text).toBe(`${PAGE}| ${stored(40, 160, 100)} |\n`);
+    expect(text).toBe(`${PAGE}| ${stored(80, 120, 100)} |\n`);
     await controller.scan();
-    // The last column has no handle: its menu fits it
-    measured([40, 160, 100]);
+    // The last column has no handle: its menu fits it, Qty giving down to 80 (Name is there already)
+    measured([80, 120, 100]);
     contentOf(2, [150, 20]);
     cell(1, 2).style.padding = "0";
     columnMenuItem(2, /^Fit to content$/)!.click();
     await flush();
-    expect(text).toBe(`${PAGE}| ${stored(40, 110, 150)} |\n`);
+    expect(text).toBe(`${PAGE}| ${stored(80, 80, 140)} |\n`);
   });
 
   it("keeps the box the widths were set in, and shows the table as that share of the box it has", async () => {
@@ -173,6 +173,26 @@ describe("Column widths", () => {
     expect(text).toBe(`${PAGE}| <meta core.table widths.-c-name.size='120' widths.-c-qty.size='80' widths.-c-note.size='100' widths.box='400'> |\n`);
     await controller.scan();
     expect(editor.querySelector("table")!.style.width).toBe("75%");
+  });
+
+  it("holds each column at its header's need (at most 160px, at most its width) as its table narrows, and titles a header cut", async () => {
+    await setup(`${PAGE}| <meta core.table widths.-c-name.size='100' widths.-c-qty.size='250' widths.-c-note.size='250' widths.box='600'> |\n`, { "silverware.table.metadata": true });
+    const widget = editor.querySelector<HTMLElement>(".sb-table-widget")!;
+    // Two thirds of the box it had: the table 400px wide
+    Object.defineProperty(widget, "clientWidth", { configurable: true, value: 400 });
+    [90, 200, 0].forEach((need, column) => {
+      cell(0, column).style.padding = "0";
+      Object.defineProperty(cell(0, column).querySelector(".swt-head")!, "offsetWidth", { configurable: true, value: need });
+    });
+    // Shown again (jsdom has no ResizeObserver to tell the box changed), looked at in the next frame
+    controller.showColumnWidths(controller.infoOf(widget)!, undefined);
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    // Name held at 90 (its need), Qty at 160 (its need, cut there), Note the rest (at least 80)
+    expect(cols()).toEqual([`${(90 / 400) * 100}%`, `${(160 / 400) * 100}%`, `${(150 / 400) * 100}%`]);
+    expect(editor.querySelector("table")!.style.minWidth).toBe("");
+    const name = (column: number) => cell(0, column).querySelector<HTMLElement>(".swt-head-name")!;
+    expect(name(1).title).toBe("Qty");
+    expect(name(0).hasAttribute("title")).toBe(false);
   });
 
   it("gives a column inserted into a table with a width for every column its share, the others narrower, the box kept", async () => {
@@ -259,15 +279,15 @@ describe("Column widths", () => {
     window.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, cancelable: true, buttons: 1, clientX: 150 }));
     window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: 150, detail: 2 }));
     await flush();
-    expect(text).toBe(`${PAGE}| ${stored(150, 50, 100)} |\n`);
+    expect(text).toBe(`${PAGE}| ${stored(140, 80, 80)} |\n`);
     await controller.scan();
     // Released outside the window (no mouseup): the next move, without the button, ends it there
-    measured([150, 50, 100]);
+    measured([140, 80, 80]);
     handle(0)!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0, clientX: 100, detail: 1 }));
     window.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, cancelable: true, buttons: 1, clientX: 80 }));
     window.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, cancelable: true, buttons: 0, clientX: 300 }));
     await flush();
-    expect(text).toBe(`${PAGE}| ${stored(130, 70, 100)} |\n`);
+    expect(text).toBe(`${PAGE}| ${stored(120, 100, 80)} |\n`);
     expect(document.body.classList.contains("swt-resizing")).toBe(false);
   });
 
@@ -345,10 +365,10 @@ describe("Column widths", () => {
     drag(1, [100, 80, 100], [40]);
     await flush();
     expect(text).toBe(PAGE);
-    expect(cols()).toEqual([`${(100 / 280) * 100}%`, `${(120 / 280) * 100}%`, `${(60 / 280) * 100}%`]);
+    expect(cols()).toEqual([`${(100 / 280) * 100}%`, `${(100 / 280) * 100}%`, `${(80 / 280) * 100}%`]);
     // Rendered anew (an edit elsewhere): still so
     await controller.scan();
-    expect(cols()).toEqual([`${(100 / 280) * 100}%`, `${(120 / 280) * 100}%`, `${(60 / 280) * 100}%`]);
+    expect(cols()).toEqual([`${(100 / 280) * 100}%`, `${(100 / 280) * 100}%`, `${(80 / 280) * 100}%`]);
   });
 
   it("keeps a press on the edge from selecting or editing the header, and a stored width with its column when it moves", async () => {

@@ -250,6 +250,10 @@ export class Controller implements TableHost {
       holdInDocument: (info, row) => this.holdInDocument(info, row),
       floating: (className) => this.floating("div", className),
       place: (element, left, top) => this.place(element, left, top),
+      columnsResized: (info) => {
+        this.tableResized(info);
+        for (const feature of this.features) feature.columnsResized?.(info);
+      },
     });
     this.dragContext = {
       doc,

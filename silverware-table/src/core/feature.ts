@@ -1299,4 +1299,10 @@ export interface AdapterFeature extends Feature {
   rowNeeded?(info: WidgetInfo, row: HTMLTableRowElement): void;
   /** Body rows were put back into the document (rowsAttached): laid out now, they can be measured */
   rowsAttached?(info: WidgetInfo, rows: readonly HTMLTableRowElement[]): void;
+  /**
+   * A table's columns took other widths once it was laid out, its box the
+   * same (the rendering held columns at their headers' need): what was
+   * measured on its cells is measured again
+   */
+  columnsResized?(info: WidgetInfo): void;
 }

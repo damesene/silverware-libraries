@@ -1,7 +1,8 @@
 # Markdown's blocks read by lezer, the tag scanner on them (plan)
 
 Talked through with the user on 2026-11-11; this replaces the first version of the plan (a parser of our own grown
-by probes), the same day.
+by probes), the same day. **Done on 2026-11-11** (branch `refactor/tag-scanner-on-blocks`); what was found on the way
+is under *Found while building* at the end.
 
 ## Why
 
@@ -68,3 +69,26 @@ that holds no tag or misses one.
 
 A commit a step, each reviewed and deployed to the local SilverBullet; unit tests after each, every test (UI too)
 at the end.
+
+## Found while building (2026-11-11)
+
+* **A CRLF is read as LF**, the places mapped back to the text given: lezer took a `\r` for text, so a marker alone
+  (`-\r`) was none, and a table's line of dashes with `\r` after it none (SilverBullet's own table reads it the same
+  way: its regex is lezer's). Read as a space first, which broke tables.
+* **A line's text** is taken off its containers' markers as CommonMark does, outermost first (a quote's `>`, an item's
+  marker on its first line and its content's indentation after), tabs to the next multiple of four. Reading the
+  quote markers lezer marks (the first way) kept a list item's indentation on a lazy line in a quote and could not
+  give an item's own lines, which `readBlocks`' `body` is made of.
+* **A marker comment** (`<!--` with `#` or `/` after it, a baked section's `<!--#lua …-->`, `<!-- #c` too) holds no
+  markdown, as SilverBullet's html_block.ts reads it; another comment's body is read as markdown (its hashtags tags).
+* **An item's text** is the paragraph it starts with, lines going on it lazily included, as SilverBullet names an item
+  (plugs/index/item.ts); none where it starts with another block, its body then all it holds. A paragraph of an item
+  starting with a state that is not its first block is a task to SilverBullet; to `readBlocks` a paragraph, its state
+  in its text.
+* **The scanner against the old one** (some 110,000 generated pages): every kind of difference is lezer reading as
+  SilverBullet does where the old scanner read otherwise: a fence indented four spaces is code, a fence in a quote
+  ends with the quote, a line indented four after a heading or a rule is code, an item starting with a blank line
+  holds only what is indented under it, a numbered list starting at 2 goes on the paragraph above, a table needs its
+  line of dashes, a heading ends a task's text, HTML runs to its blank line, a setext heading is a heading, a page's
+  tag line is a paragraph's hashtags before any other text (frontmatter.ts). The new scanner gives the same on a page
+  with LF and with CRLF.

@@ -79,18 +79,49 @@ test.describe("Column widths", () => {
     near(after.table, before.table);
   });
 
-  test("a double click makes a column automatic again, the others keep their widths", async ({ page }) => {
-    await dragHandle(page, 0, [40]);
-    await expect.poll(() => markdown(page)).toContain("widths.-c-name.size=");
-    const sized = await widths(page);
+  test("a double click fits a column to its text, the next column giving the room, the table keeping its width", async ({ page }) => {
+    await rendersAnew(page, () => setPage(page, "# Test\n\n| Name | Quantity | Note |\n|---|---|---|\n| A rather long name of a pear | 3 | ripe |\n| Fig | 2 | dried |\n| <meta core.table widths.-c-name.size='80' widths.-c-quantity.size='300' widths.-c-note.size='200'> |\n"));
+    const before = await widths(page);
+    // How much wider the text is on one line than its box (cut or wrapped there)
+    const missing = () =>
+      cell(page, 1, 0)
+        .locator(".swt-cell-content")
+        .evaluate((e: HTMLElement) => {
+          const shown = e.clientWidth;
+          const { width, maxWidth } = e.style;
+          Object.assign(e.style, { width: "max-content", maxWidth: "none" });
+          const whole = e.getBoundingClientRect().width;
+          Object.assign(e.style, { width, maxWidth });
+          return whole - shown;
+        });
+    expect(await missing()).toBeGreaterThan(10);
     await hoverCell(page, header(page, 0));
     const handle = (await header(page, 0).locator(".swt-col-resize").boundingBox())!;
     await page.mouse.dblclick(handle.x + handle.width / 2, handle.y + handle.height / 2);
-    await expect.poll(() => markdown(page)).not.toContain("widths.-c-name.size=");
-    await expect(table(page).locator("table > colgroup.swt-fixed-columns")).toHaveCount(0);
+    await expect.poll(() => markdown(page)).not.toContain("widths.-c-name.size='80'");
+    await expect.poll(missing).toBeLessThanOrEqual(1);
     const after = await widths(page);
-    near(after.columns[1]!, sized.columns[1]!);
-    near(after.columns[2]!, sized.columns[2]!);
+    near(after.columns[0]! - before.columns[0]!, before.columns[1]! - after.columns[1]!);
+    near(after.columns[2]!, before.columns[2]!);
+    near(after.table, before.table);
+  });
+
+  test("widths set in full screen: back in the page the table fits its box, its columns as shared as there", async ({ page }) => {
+    const box = () => table(page).evaluate((widget) => ({ scroll: widget.scrollWidth, client: widget.clientWidth }));
+    await hoverCell(page, cell(page, 1, 0));
+    await (await tableIcon(page, "Full screen")).click();
+    await expect(table(page)).toHaveClass(/swt-over-window/);
+    await dragHandle(page, 0, [200]);
+    await expect.poll(() => markdown(page)).toContain("widths.box=");
+    const full = await widths(page);
+    await page.keyboard.press("Escape");
+    await expect(table(page)).not.toHaveClass(/swt-over-window/);
+    const inPage = await widths(page);
+    expect(inPage.table).toBeLessThan(full.table);
+    // No sideways scroll: as wide as its box
+    const now = await box();
+    expect(now.scroll).toBeLessThanOrEqual(now.client);
+    for (const column of [0, 1, 2]) expect(Math.abs(inPage.columns[column]! / inPage.table - full.columns[column]! / full.table)).toBeLessThan(0.01);
   });
 
   test("the last column has no handle: its right edge is the table's", async ({ page }) => {

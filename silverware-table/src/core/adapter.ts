@@ -8,7 +8,7 @@
 //
 // Being moved here step by step from the controller (docs/silverware-table-isolation.md):
 // what is not here yet is still the controller's own DOM code.
-import type { CellRef, ColumnMeasure, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "./feature.ts";
+import type { CellRef, ColumnsMeasure, ColumnWidths, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "./feature.ts";
 import type { MergedLooks } from "./looks.ts";
 
 export interface TableAdapter {
@@ -58,10 +58,12 @@ export interface TableAdapter {
   areaRect(info: WidgetInfo, first: CellRef, last: CellRef): Rect | undefined;
   /** The cell at a point, by where the rows and columns are (TableHost.cellAtPoint) */
   cellAtPoint(info: WidgetInfo, x: number, y: number): CellRef | undefined;
-  /** The widths of a table's columns applied (those not among them: automatic again; all of them: the table laid out by them alone) */
-  applyColumnWidths(info: WidgetInfo, widths: ReadonlyMap<number, number>): void;
-  /** Each column's width as shown and what its header needs (TableHost.measureColumns) */
-  measureColumns(info: WidgetInfo): ColumnMeasure[];
+  /** The widths of a table's columns applied (those not among them: automatic again; all of them: the table laid out by them alone, ColumnWidths) */
+  applyColumnWidths(info: WidgetInfo, widths: ColumnWidths): void;
+  /** Each column's width as shown and what its header needs, and the table's box (TableHost.measureColumns) */
+  measureColumns(info: WidgetInfo): ColumnsMeasure;
+  /** What a column's body cells need (TableHost.columnContentWidth) */
+  columnContentWidth(info: WidgetInfo, column: number): number;
   /** Where the page is in view (a table's, else the page's): its scroller, cut to what an on-screen keyboard leaves */
   pageView(info: WidgetInfo | undefined): Rect;
   /** Whether a node is one of the adapter's own elements over the cells (a piece of an outline, a handle) */

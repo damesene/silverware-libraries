@@ -18,11 +18,15 @@ test.describe("Conditional formatting", () => {
   test("a quick rule of a column's menu: the table as it was while its value is typed, written on Save", async ({ page }) => {
     await load(page);
     await header(page, 1).click({ button: "right" });
-    // Right under the column's alignment: how its cells look
+    // Under the column's alignment, in its section: how its cells look
     const after = await menu(page)
       .locator(".swt-menu-segmented", { has: page.locator(".swt-label", { hasText: /^Align$/ }) })
-      .evaluate((row) => row.nextElementSibling?.textContent ?? "");
-    expect(after).toMatch(/^Conditional formatting/);
+      .evaluate((row) => {
+        const texts: string[] = [];
+        for (let next = row.nextElementSibling; next && !next.matches(".swt-menu-separator"); next = next.nextElementSibling) texts.push(next.textContent ?? "");
+        return texts;
+      });
+    expect(after.some((text) => /^Conditional formatting/.test(text))).toBe(true);
     await menu(page).locator(".swt-menu-item", { hasText: /^Conditional formatting/ }).click();
     await menu(page).locator(".swt-menu-item", { hasText: "Greater than…" }).click();
     await expect(dialog(page)).toBeVisible();

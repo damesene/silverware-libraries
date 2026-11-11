@@ -8,13 +8,21 @@ import { Overlays } from "./overlays.ts";
 import type { TableMeta } from "../../markdown.ts";
 import { TABLE_MARKER } from "../../metanames.ts";
 import type { TableAdapter } from "../adapter.ts";
-import type { CellRef, ColumnMeasure, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "../feature.ts";
+import type { CellRef, ColumnsMeasure, ColumnWidths, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "../feature.ts";
 import { type MergedLooks, refKey } from "../looks.ts";
 import type { TableRows } from "../rows.ts";
 import { applyCellLook, applyHeaderLook, renderedText } from "./looks.ts";
 
 // A table laid out by its columns' widths: its colgroup and the table both have the class
 const FIXED_COLUMNS_CLASS = "swt-fixed-columns";
+// How narrow a column of such a table may get as its box narrows (one set narrower: its width), in pixels
+const SHRINK_FLOOR = 80;
+
+/** An element's padding left and right */
+function horizontalPadding(doc: Document, element: Element): number {
+  const style = doc.defaultView!.getComputedStyle(element);
+  return (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+}
 
 // The attributes of a table's look put on each widget (data-swt-<name>), to take back
 const lookKeys = new WeakMap<HTMLElement, readonly string[]>();
@@ -274,7 +282,7 @@ export class SilverBulletAdapter implements TableAdapter {
   // that had one: touching every cell's style (or reading styles between
   // writes) would make the browser compute the whole table's styles and
   // layout again, for every table shown
-  applyColumnWidths(info: WidgetInfo, widths: ReadonlyMap<number, number>): void {
+  applyColumnWidths(info: WidgetInfo, { widths, box }: ColumnWidths): void {
     const sized = this.sized.get(info.table);
     const fixed = info.columns > 0 && Array.from({ length: info.columns }, (_, column) => widths.has(column)).every(Boolean);
     const columns = Array.from({ length: info.columns }, (_, column) => column).filter((column) => sized?.has(column) || (!fixed && widths.has(column)));
@@ -284,23 +292,24 @@ export class SilverBulletAdapter implements TableAdapter {
       const rows = [info.table.rows[0]!, ...this.rows.bodyRows(info)];
       columns.forEach((column, i) => this.applyWidth(info, column, fixed ? undefined : widths.get(column), paddings[i]!, rows));
     }
-    this.fixColumns(info, fixed ? Array.from({ length: info.columns }, (_, column) => widths.get(column)!) : undefined);
+    this.fixColumns(info, fixed ? Array.from({ length: info.columns }, (_, column) => widths.get(column)!) : undefined, box);
   }
 
   /**
    * The table laid out by its columns' widths (undefined: by its cells): each
-   * column its share of their sum, the table as wide as its box and never
-   * narrower than the sum (a wider box widens the columns alike; a narrower
-   * one scrolls the table sideways, as a wide table does)
+   * column its share of their sum, the table their sum over `box` of its box
+   * (none: as wide as its box), so it widens and narrows with its box; it
+   * narrows only until a column would be narrower than SHRINK_FLOOR (or than
+   * its width, if less), then the table scrolls sideways, as a wide table does
    */
-  private fixColumns(info: WidgetInfo, widths: readonly number[] | undefined): void {
+  private fixColumns(info: WidgetInfo, widths: readonly number[] | undefined, box: number | undefined): void {
     const { table } = info;
     let colgroup = table.querySelector<HTMLTableColElement>(`:scope > colgroup.${FIXED_COLUMNS_CLASS}`);
     if (!widths) {
       if (!colgroup) return;
       colgroup.remove();
       table.classList.remove(FIXED_COLUMNS_CLASS);
-      table.style.minWidth = "";
+      Object.assign(table.style, { width: "", minWidth: "" });
       return;
     }
     if (!colgroup) {
@@ -315,13 +324,17 @@ export class SilverBulletAdapter implements TableAdapter {
       (colgroup.children[column] as HTMLElement).style.width = `${(width / sum) * 100}%`;
     });
     table.classList.add(FIXED_COLUMNS_CLASS);
-    table.style.minWidth = `${sum}px`;
+    // The narrowest column reaches its floor first: the table is never narrower than where it does
+    const narrowest = Math.min(...widths);
+    Object.assign(table.style, { width: box && box > 0 ? `${(sum / box) * 100}%` : "", minWidth: `${sum * Math.min(1, SHRINK_FLOOR / narrowest)}px` });
   }
 
-  measureColumns(info: WidgetInfo): ColumnMeasure[] {
+  measureColumns(info: WidgetInfo): ColumnsMeasure {
     const header = info.table.rows[0];
-    if (!header) return [];
-    const win = this.doc.defaultView!;
+    // The box's content: the table's width in percent is of it
+    const widget = info.table.closest<HTMLElement>(WIDGET_SELECTOR);
+    const box = widget ? widget.clientWidth - horizontalPadding(this.doc, widget) : 0;
+    if (!header) return { columns: [], box };
     const cells = Array.from(header.cells);
     const widths = cells.map((cell) => cell.getBoundingClientRect().width);
     // The headers' lines as wide as they would be: a sized column's is held to its width (applyWidth), let go
@@ -334,14 +347,33 @@ export class SilverBulletAdapter implements TableAdapter {
       if (!head) return 0;
       // The name's box cut to what the cell leaves it, its text wider
       const name = head.querySelector<HTMLElement>(":scope > .swt-head-name");
-      const style = win.getComputedStyle(cell);
-      const padding = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
-      return head.offsetWidth + (name ? name.scrollWidth - name.clientWidth : 0) + padding;
+      return head.offsetWidth + (name ? name.scrollWidth - name.clientWidth : 0) + horizontalPadding(this.doc, cell);
     });
     heads.forEach((head, column) => {
       if (head) Object.assign(head.style, held[column]);
     });
-    return cells.map((_, column) => ({ width: widths[column]!, header: needs[column]! }));
+    return { columns: cells.map((_, column) => ({ width: widths[column]!, header: needs[column]! })), box };
+  }
+
+  columnContentWidth(info: WidgetInfo, column: number): number {
+    const cells = this.rows
+      .bodyRows(info)
+      .filter((tr) => tr.isConnected)
+      .map((tr) => tr.cells[column])
+      .filter((cell): cell is HTMLTableCellElement => !!cell && !cell.classList.contains("swt-editing"));
+    const boxes = cells.map((cell) => cell.querySelector<HTMLElement>(":scope > .swt-cell-content"));
+    // Each box as wide as its text on one line, for the reads (all of them together: one layout), as it was after
+    const held = boxes.map((box) => box && { width: box.style.width, maxWidth: box.style.maxWidth });
+    for (const box of boxes) if (box) Object.assign(box.style, { width: "max-content", maxWidth: "none" });
+    const widest = Math.max(0, ...boxes.map((box) => box?.getBoundingClientRect().width ?? 0));
+    boxes.forEach((box, i) => {
+      if (box) Object.assign(box.style, held[i]);
+    });
+    if (!cells[0]) return 0;
+    // At most a cell's maximum width (the longText module's), where there is one
+    const widget = info.table.closest<HTMLElement>(WIDGET_SELECTOR);
+    const limit = (widget && parseFloat(this.doc.defaultView!.getComputedStyle(widget).getPropertyValue("--swt-cell-max-width"))) || Infinity;
+    return Math.min(widest, limit) + horizontalPadding(this.doc, cells[0]);
   }
 
   /**
@@ -374,9 +406,7 @@ export class SilverBulletAdapter implements TableAdapter {
   /** A cell's padding left and right (the same in the column's header and body cells) */
   private paddingOf(info: WidgetInfo, column: number): number {
     const header = info.table.rows[0]!.cells[column];
-    if (!header) return 0;
-    const style = this.doc.defaultView!.getComputedStyle(header);
-    return (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+    return header ? horizontalPadding(this.doc, header) : 0;
   }
 
   pageView(info: WidgetInfo | undefined): Rect {

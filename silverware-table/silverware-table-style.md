@@ -946,6 +946,7 @@ body.swt-resizing * {
   table-layout: fixed;
 }
 .sb-table-widget.swt-table table.swt-fixed-columns td > .swt-cell-content {
+  max-width: 100%;
   overflow: hidden;
 }
 .sb-table-widget.swt-table table.swt-fixed-columns .swt-head {

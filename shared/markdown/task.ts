@@ -5,7 +5,8 @@
 // values are YAML on one line, read and written by shared/yaml/tree.ts.
 import { quoted, readYamlInline, writeYamlInline, type YamlRead, type YamlValue } from "../yaml/tree.ts";
 
-const TASK_RE = /^([ \t]*)([-*+]|\d{1,9}[.)])[ \t]+\[([^\]:\n]+)\](?:[ \t]+|$)/;
+const LIST_MARKER_RE = /^([ \t]*)([-*+]|\d{1,9}[.)])[ \t]+/;
+const STATE_RE = /^\[([^\]:\n]+)\](?:[ \t]+|$)/;
 const ATTRIBUTE_NAME_RE = /^[\w$]+$/;
 
 /** A task's line read */
@@ -25,12 +26,22 @@ export type TaskLine = {
 /** Whether a task's state is done (`x`, as SilverBullet's `[x]` and `[X]`) */
 export const isDoneState = (state: string) => state === "x" || state === "X";
 
+/** A task's state: what is in its brackets, whether it is done, and where the text after them starts */
+export type TaskState = { readonly state: string; readonly done: boolean; readonly textFrom: number };
+
+/** A list item's text (after its marker) as a task's: its state in brackets at its start, if it has one */
+export function readTaskState(text: string): TaskState | undefined {
+  const m = STATE_RE.exec(text);
+  return m ? { state: m[1]!, done: isDoneState(m[1]!), textFrom: m[0].length } : undefined;
+}
+
 /** A line as a task, if it is one */
 export function readTaskLine(line: string): TaskLine | undefined {
-  const m = TASK_RE.exec(line);
-  if (!m) return undefined;
-  const state = m[3]!;
-  return { indent: m[1]!, marker: m[2]!, state, done: isDoneState(state), text: line.slice(m[0].length), textFrom: m[0].length };
+  const marker = LIST_MARKER_RE.exec(line);
+  const task = marker && readTaskState(line.slice(marker[0].length));
+  if (!marker || !task) return undefined;
+  const textFrom = marker[0].length + task.textFrom;
+  return { indent: marker[1]!, marker: marker[2]!, state: task.state, done: task.done, text: line.slice(textFrom), textFrom };
 }
 
 /** Why a task cannot have a state (empty, a `]`, a `:` or a line break), undefined where it can */

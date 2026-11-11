@@ -9,6 +9,8 @@ const shape = (blocks: readonly Block[]): unknown[] =>
         return [`h${block.level} ${block.text}`, shape(block.children)];
       case "item":
         return [`${block.task ? `[${block.task.state}] ` : ""}${block.text}`, shape(block.children)];
+      case "quote":
+        return ["quote", shape(block.children)];
       case "table":
         return ["table", block.header, block.rows];
       case "code":
@@ -22,16 +24,32 @@ const shape = (blocks: readonly Block[]): unknown[] =>
 
 describe("readBlocks", () => {
   it("nests a list's items, what is under an item its own, its lines as written dedented", () => {
-    const blocks = readBlocks(["- [ ] A", "  - [x] A1", "    more", "", "  > a quote", "- B", "1. C"].join("\n"));
+    const blocks = readBlocks(["- [ ] A", "  - [x] A1", "", "    more", "", "  > a quote", "- B", "1. C"].join("\n"));
     expect(shape(blocks)).toEqual([
-      ["[ ] A", [["[x] A1", [["paragraph", "more"]]], ["quote", "a quote"]]],
+      ["[ ] A", [["[x] A1", [["paragraph", "more"]]], ["quote", [["paragraph", "a quote"]]]]],
       ["B", []],
       ["C", []],
     ]);
-    expect(blocks[0]).toMatchObject({ kind: "item", list: "bullet", body: "- [x] A1\n  more\n\n> a quote", lines: { from: 0, to: 5 } });
+    expect(blocks[0]).toMatchObject({ kind: "item", list: "bullet", body: "- [x] A1\n\n  more\n\n> a quote", title: { from: 0, to: 1 }, lines: { from: 0, to: 6 } });
     expect(blocks[2]).toMatchObject({ list: "numbered", number: 1 });
     // A nested block's lines are the text's
-    expect((blocks[0] as { children: readonly Block[] }).children[1]!.lines).toEqual({ from: 4, to: 5 });
+    expect((blocks[0] as { children: readonly Block[] }).children[1]!.lines).toEqual({ from: 5, to: 6 });
+  });
+
+  it("gives an item its first paragraph's text, a line going on it lazily too, as SilverBullet does", () => {
+    const blocks = readBlocks("- [ ] A\n  goes on\nlazily\n\n  para");
+    expect(shape(blocks)).toEqual([["[ ] A\ngoes on\nlazily", [["paragraph", "para"]]]]);
+    expect(blocks[0]).toMatchObject({ title: { from: 0, to: 3 }, body: "para" });
+    // An item starting with no paragraph has no text
+    expect(shape(readBlocks("- ```\n  code\n  ```"))).toEqual([["", [["code ", "code"]]]]);
+  });
+
+  it("reads a quote's blocks, HTML and a comment as blocks of their own", () => {
+    expect(shape(readBlocks("> # T\n> - item\n\n<div>\n  x\n</div>\n\n<!-- hidden\n- [ ] no -->"))).toEqual([
+      ["quote", [["h1 T", [["item", []]]]]],
+      ["html", "<div>\nx\n</div>"],
+      ["comment", " hidden\n- [ ] no "],
+    ]);
   });
 
   it("takes an item indented less than the one before as one of the same level", () => {
@@ -78,8 +96,8 @@ describe("readBlocks", () => {
   });
 
   it("gives every block of a tree in the text's order", () => {
-    const kinds = allBlocks(readBlocks("# H\n| a |\n|---|\n| 1 |\n- item\n  text")).map((block) => block.kind);
-    expect(kinds).toEqual(["heading", "table", "item", "paragraph"]);
+    const kinds = allBlocks(readBlocks("# H\n| a |\n|---|\n| 1 |\n- item\n\n  text\n> quoted")).map((block) => block.kind);
+    expect(kinds).toEqual(["heading", "table", "item", "paragraph", "quote", "paragraph"]);
   });
 
   it("reads lines starting with | as a table only with its line of dashes", () => {

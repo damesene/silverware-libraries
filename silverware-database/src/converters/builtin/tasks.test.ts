@@ -13,10 +13,17 @@ describe("The tasks converter", () => {
   });
 
   it("makes each task of the top level an item, what is under it its body, dedented", () => {
-    const converted = read(["Before", "- [ ] Parent", "  - [x] Child", "    more text", "", "  > a quote", "- [x] Second", "Text after"]);
+    const converted = read(["Before", "- [ ] Parent", "  - [x] Child", "    more text", "", "  > a quote", "- [x] Second", "", "Text after"]);
     expect(converted.items.map((item) => [item.name, item.values?.status, item.body])).toEqual([
       ["Parent", "Todo", "- [x] Child\n  more text\n\n> a quote"],
       ["Second", "Done", "Text after"],
+    ]);
+  });
+
+  it("names a task by its text's lines, one going on without a blank line too, as SilverBullet does", () => {
+    expect(read(["- [ ] First", "line", "  - [ ] Sub", "- [x] Second", "  goes on"]).items.map((item) => [item.name, item.body])).toEqual([
+      ["First line", "- [ ] Sub"],
+      ["Second goes on", undefined],
     ]);
   });
 
@@ -31,15 +38,16 @@ describe("The tasks converter", () => {
 
   it("keeps a setext heading's underline and a rule in the body, and a task indented under the text after a task that task's", () => {
     const bodies = (lines: readonly string[]) => read(lines).items.map((item) => [item.name, item.body]);
-    expect(bodies(["- [ ] A", "Title", "===", "- [ ] B"])).toEqual([
+    expect(bodies(["- [ ] A", "", "Title", "===", "- [ ] B"])).toEqual([
       ["A", "Title\n==="],
       ["B", undefined],
     ]);
+    // (A line going on the task's text lazily is its name's; a rule is none)
     expect(bodies(["- [ ] A", "text", "---", "- [ ] B"])).toEqual([
-      ["A", "text\n---"],
+      ["A text", "---"],
       ["B", undefined],
     ]);
-    expect(bodies(["- [ ] A", "text", "  - [ ] B"])).toEqual([["A", "text\n  - [ ] B"]]);
+    expect(bodies(["- [ ] A", "", "text", "  - [ ] B"])).toEqual([["A", "text\n  - [ ] B"]]);
   });
 
   it("takes a task indented less than the first as one of the top level too", () => {
@@ -130,7 +138,7 @@ describe("The tasks converter", () => {
   });
 
   it("keeps a body's code and hard line breaks as written, and tabs and CRLF read", () => {
-    const converted = TASKS_CONVERTER.read("- [ ] A\r\n\tline one  \r\n\t```\r\n\t- [ ] not a task\r\n\t```\r\n- [ ] B")!;
+    const converted = TASKS_CONVERTER.read("- [ ] A\r\n\r\n\tline one  \r\n\t```\r\n\t- [ ] not a task\r\n\t```\r\n- [ ] B")!;
     expect(converted.items.map((item) => [item.name, item.body])).toEqual([
       ["A", "line one  \n```\n- [ ] not a task\n```"],
       ["B", undefined],

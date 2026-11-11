@@ -157,10 +157,23 @@ test.describe("Column widths", () => {
     await expect.poll(async () => Math.abs(parseFloat(await header(page, 1).evaluate((e) => (e as HTMLElement).style.left)) - (await header(page, 0).boundingBox())!.width)).toBeLessThan(1);
   });
 
-  test("the last column has no handle: its right edge is the table's", async ({ page }) => {
-    await hoverCell(page, header(page, 2));
-    await expect(header(page, 2).locator(".swt-col-resize")).toHaveCount(0);
-    await expect(table(page).locator("thead .swt-col-resize")).toHaveCount(2);
+  test("the last column's edge is the table's: dragged right the table is wider and scrolls, dragged back it is never narrower than its box", async ({ page }) => {
+    const before = await widths(page);
+    const scrolls = () => table(page).evaluate((widget) => widget.scrollWidth - widget.clientWidth);
+    await dragHandle(page, 2, [300]);
+    await expect.poll(() => markdown(page)).toContain("widths.box=");
+    const wider = await widths(page);
+    near(wider.columns[2]!, before.columns[2]! + 300);
+    near(wider.columns[0]!, before.columns[0]!);
+    near(wider.columns[1]!, before.columns[1]!);
+    expect(await scrolls()).toBeGreaterThan(250);
+    // Back past where it was: the table stops at its box
+    await page.evaluate(() => document.querySelector(".sb-table-widget.swt-table")!.scrollTo({ left: 100000 }));
+    await dragHandle(page, 2, [-2000]);
+    await expect.poll(scrolls).toBeLessThanOrEqual(0);
+    const back = await widths(page);
+    near(back.table, before.table);
+    near(back.columns[0]!, before.columns[0]!);
   });
 
   test("the table the sheet view was opened from has its handles again once the view is closed, its header as it was", async ({ page }) => {
@@ -172,7 +185,7 @@ test.describe("Column widths", () => {
     await page.keyboard.press("Escape");
     await expect(page.locator(".swt-sheet-board")).toHaveCount(0);
     await expect(header(page, 0).locator(".swt-col-resize")).toHaveCount(1);
-    expect(await table(page).locator("thead .swt-col-resize").count()).toBe((await table(page).locator("thead tr").first().locator("> *").count()) - 1);
+    expect(await table(page).locator("thead .swt-col-resize").count()).toBe(await table(page).locator("thead tr").first().locator("> *").count());
     // Shown again, not decorated twice
     expect(await heads()).toEqual(before);
   });

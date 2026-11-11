@@ -1,7 +1,8 @@
 // The widths module: columns' widths are set by dragging the edge between two
-// columns (a handle on a header's right edge, none on the last: the table
-// keeps its width), a column fitted to its text by double-clicking its edge
-// or with "Fit to content" in its menu. With the metadata setting they are
+// columns (a handle on a header's right edge: the table keeps its width) or
+// the last column's, the table's (movedTableEdge: the table wider, scrolling
+// sideways, or narrower down to its box), a column fitted to its text by
+// double-clicking its edge or with "Fit to content" in its menu. With the metadata setting they are
 // stored in the table (widths.-c-price.size='180'), which follows the column
 // through renames and moves (metadataAfterEdit); without it, they hold for
 // the view only. "Reset column widths" in the table's menu makes every column
@@ -42,6 +43,7 @@ const BOX_KEY = "box";
 const LAYER = "width:";
 const HANDLE_CLASS = "swt-col-resize";
 const HANDLE_TITLE = "Drag to move the edge between the columns; double-click to fit the column to its content";
+const LAST_HANDLE_TITLE = "Drag to set the last column's width, and so the table's; double-click to fit the column to its content";
 const GRID_HANDLE_TITLE = "Drag to set the column's width; double-click for automatic";
 
 /** A column at the press of a drag: its width, and the narrowest the drag may make it */
@@ -66,6 +68,25 @@ export function movedEdge(columns: readonly DraggedColumn[], column: number, by:
   }
   widths[by > 0 ? column : column + 1]! += Math.abs(by) - left;
   return widths;
+}
+
+/**
+ * The columns' widths with the table's right edge (the last column's) moved
+ * `by` pixels: the last column alone changes, and the table with it, never
+ * narrower than `least` (its box) nor the column under its minimum
+ */
+export function movedTableEdge(columns: readonly DraggedColumn[], by: number, least: number): number[] {
+  const widths = columns.map((c) => c.width);
+  const last = columns.length - 1;
+  if (last < 0) return widths;
+  const others = widths.slice(0, last).reduce((a, b) => a + b, 0);
+  widths[last] = Math.max(columns[last]!.min, widths[last]! + by, least - others);
+  return widths;
+}
+
+/** The edge after `column` moved `by` pixels: between two columns (movedEdge), or the table's (movedTableEdge) */
+export function movedColumnEdge(columns: readonly DraggedColumn[], column: number, by: number, least: number): number[] {
+  return column === columns.length - 1 ? movedTableEdge(columns, by, least) : movedEdge(columns, column, by);
 }
 
 /**
@@ -170,18 +191,17 @@ class TableWidths {
   }
 
   placeHandles(info: TableInfo, active: number | undefined): void {
-    // The last column's right edge is the table's, which keeps its width; a grid's columns have no such edge
+    // The last column's right edge is the table's: it sets the table's width too
     const grid = !!this.host.addressFrame(info);
-    const count = grid ? info.columns : info.columns - 1;
     this.handles.place(
       info.key,
-      Array.from({ length: Math.max(0, count) }, (_, column) => ({
+      Array.from({ length: info.columns }, (_, column) => ({
         // One handle per column (a layer's handles are told apart by their classes), the one dragged lit
         className: `${HANDLE_CLASS} ${HANDLE_CLASS}-${column}`,
         active: column === active,
         row: 0,
         column,
-        title: grid ? GRID_HANDLE_TITLE : HANDLE_TITLE,
+        title: grid ? GRID_HANDLE_TITLE : column === info.columns - 1 ? LAST_HANDLE_TITLE : HANDLE_TITLE,
       })),
     );
   }
@@ -191,7 +211,7 @@ class TableWidths {
     await this.host.addressFrame(info)?.setColumnWidth(column, width);
   }
 
-  /** A column fitted to its text: the edge after it moved (the last column's: the edge before it), the table's width kept */
+  /** A column fitted to its text: the edge after it moved, as a drag of it would (the last column's: the table's) */
   fit(info: TableInfo, column: number): void {
     const fitted = fittedWidths(this.host, info, column);
     if (fitted) void this.keepMeasured(info, fitted.widths, fitted.box);
@@ -289,14 +309,15 @@ class TableWidths {
         ]),
       ];
     }
-    // A table of one column: it is the table's width
-    if (info.columns < 2) return [];
     return [
       menu.slot.look([
         menu.item({
           label: "Fit to content",
           icon: ICONS.columnWidth,
-          hint: "Make the column as wide as its text; the column beside it gives or takes the difference, the table keeps its width",
+          hint:
+            column === info.columns - 1
+              ? "Make the column as wide as its text, and the table with it (never narrower than its room)"
+              : "Make the column as wide as its text; the column beside it gives or takes the difference, the table keeps its width",
           run: () => this.fit(this.table.current() ?? info, column),
         }),
       ]),
@@ -331,7 +352,7 @@ export class Widths implements Feature {
     if (old.some((width) => !Number.isFinite(width) || width <= 0)) return after;
     const changed = widthsAfterEdit(old, edit.columnMap ?? ((column) => column), columns);
     if (!changed) return after;
-    // One column left: it is the table, without a handle or Fit to content; automatic again
+    // One column left: its width is the table's, which a share of the box kept from the columns gone means nothing to; automatic again
     if (columns === 1) return this.host.setMeta(this.host.setColumnsMeta(after, "size", new Map()), BOX_KEY, undefined);
     // Only columns deleted: the others keep theirs, which the core's write step carries (written here, a width equal
     // to the one a column of the same name had would be taken for that column's), the box shrinks with them
@@ -426,27 +447,32 @@ function gridDrag(host: ModelHost, info: TableInfo, column: number): EdgeDrag | 
 /** In a table: the edge between two of its columns, the table's width kept (movedEdge), every column's width and the box kept on release */
 function tableDrag(host: ModelHost, info: TableInfo, column: number): EdgeDrag | undefined {
   const measured = host.measureColumns(info);
-  if (measured.columns.length !== info.columns || column >= measured.columns.length - 1) return undefined;
+  if (measured.columns.length !== info.columns || column >= measured.columns.length) return undefined;
   const columns = draggedColumns(measured);
+  const least = leastWidth(measured);
   return {
-    widths: (by) => ({ widths: byColumn(wholePixels(movedEdge(columns, column, by))), box: boxOf(measured) }),
+    widths: (by) => ({ widths: byColumn(wholePixels(movedColumnEdge(columns, column, by, least))), box: boxOf(measured) }),
     show: (now, widths) => host.showColumnWidths(now, widths),
     store: (now, part, { widths, box }) => part.keepMeasured(now, widths, box),
     fit: (now, part) => part.fit(now, column),
   };
 }
 
-/** A column as wide as its text and its header need (TableWidths.fit); undefined: a table of one column, or not measured */
+/** A column as wide as its text and its header need, by the edge after it (TableWidths.fit); undefined: not measured */
 function fittedWidths(host: ModelHost, info: TableInfo, column: number): { readonly widths: Map<number, number>; readonly box: number | undefined } | undefined {
   const measured = host.measureColumns(info);
-  if (info.columns < 2 || measured.columns.length !== info.columns || column >= info.columns) return undefined;
+  if (measured.columns.length !== info.columns || column >= info.columns) return undefined;
   const columns = draggedColumns(measured);
   // Its header whole too
   const need = Math.max(MIN_WIDTH, Math.ceil(measured.columns[column]!.header), Math.ceil(host.columnContentWidth(info, column)));
-  const by = need - columns[column]!.width;
-  // The edge after it, the last column's the edge before it (moved the other way)
-  const moved = column < columns.length - 1 ? movedEdge(columns, column, by) : movedEdge(columns, column - 1, -by);
+  const moved = movedColumnEdge(columns, column, need - columns[column]!.width, leastWidth(measured));
   return { widths: byColumn(wholePixels(moved)), box: boxOf(measured) };
+}
+
+/** The narrowest the table's edge may make it: its box (a table already narrower: as it is) */
+function leastWidth(measured: ColumnsMeasure): number {
+  const sum = measured.columns.reduce((total, c) => total + c.width, 0);
+  return measured.box > 0 ? Math.min(measured.box, sum) : sum;
 }
 
 /** The table's box as measured, in whole pixels (up: the widths' sum, rounded down, never passes it); undefined: none measured (not laid out) */

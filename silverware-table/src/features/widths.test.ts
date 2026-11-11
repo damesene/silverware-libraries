@@ -1,7 +1,20 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { cell, controller, editor, flush, setup, tableMenuItem, text, useTablePage } from "../testing/page.ts";
-import { movedEdge, wholePixels, widthsAfterEdit } from "./widths.ts";
+import { movedEdge, movedTableEdge, wholePixels, widthsAfterEdit } from "./widths.ts";
+
+describe("movedTableEdge", () => {
+  const columns = (...widths: number[]) => widths.map((width) => ({ width, min: 80 }));
+
+  it("widens the last column and the table with it", () => {
+    expect(movedTableEdge(columns(100, 100), 50, 200)).toEqual([100, 150]);
+  });
+
+  it("narrows them down to the least the table may be, the column not under its minimum", () => {
+    expect(movedTableEdge(columns(100, 400), -1000, 300)).toEqual([100, 200]);
+    expect(movedTableEdge(columns(300, 100), -1000, 300)).toEqual([300, 80]);
+  });
+});
 
 describe("wholePixels", () => {
   it("rounds each edge down, so the sum never passes the widths' own", () => {
@@ -65,7 +78,7 @@ describe("Column widths", () => {
   const cols = () => Array.from(editor.querySelectorAll<HTMLElement>("table > colgroup.swt-fixed-columns > col"), (col) => col.style.width);
   const stored = (name: number, qty: number, note: number) => `<meta core.table widths.-c-name.size='${name}' widths.-c-qty.size='${qty}' widths.-c-note.size='${note}'>`;
 
-  it("lights the handle pressed while it is dragged, the same element as the one pressed, one per column but the last", async () => {
+  it("lights the handle pressed while it is dragged, the same element as the one pressed, one per column", async () => {
     await setup(PAGE);
     const pressed = handle(0)!;
     measured([120, 100, 100]);
@@ -76,9 +89,9 @@ describe("Column widths", () => {
     expect(pressed.isConnected).toBe(true);
     expect(pressed.classList.contains("swt-active")).toBe(false);
     expect(cell(0, 0).querySelectorAll(".swt-col-resize")).toHaveLength(1);
-    // The last column's right edge is the table's, which keeps its width
+    // The last column's too: its right edge is the table's
     expect(handle(1)).not.toBeNull();
-    expect(handle(2)).toBeNull();
+    expect(handle(2)!.title).toMatch(/table's/);
   });
 
   it("moves the edge between two columns from the widths at the press, the next column giving once one is at its minimum, every width stored", async () => {
@@ -155,13 +168,22 @@ describe("Column widths", () => {
     await flush();
     expect(text).toBe(`${PAGE}| ${stored(80, 120, 100)} |\n`);
     await controller.scan();
-    // The last column has no handle: its menu fits it, Qty giving down to 80 (Name is there already)
+    // The last column by its menu, the same: by the table's edge, the table wider
     measured([80, 120, 100]);
     contentOf(2, [150, 20]);
     cell(1, 2).style.padding = "0";
     columnMenuItem(2, /^Fit to content$/)!.click();
     await flush();
-    expect(text).toBe(`${PAGE}| ${stored(80, 80, 140)} |\n`);
+    expect(text).toBe(`${PAGE}| ${stored(80, 120, 150)} |\n`);
+  });
+
+  it("narrows a table wider than its box by its last column's edge, down to the box, the other columns as they were", async () => {
+    await setup(PAGE, { "silverware.table.metadata": true });
+    const widget = editor.querySelector<HTMLElement>(".sb-table-widget")!;
+    Object.defineProperty(widget, "clientWidth", { configurable: true, value: 300 });
+    drag(2, [100, 100, 400], [-1000]);
+    await flush();
+    expect(text).toBe(`${PAGE}| <meta core.table widths.-c-name.size='100' widths.-c-qty.size='100' widths.-c-note.size='100' widths.box='300'> |\n`);
   });
 
   it("keeps the box the widths were set in, and shows the table as that share of the box it has", async () => {

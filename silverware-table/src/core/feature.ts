@@ -461,6 +461,9 @@ export type RowHold = { readonly after?: number; readonly before?: number };
  */
 export type WriteStep = (before: Table, after: Table, options: WriteOptions) => Table;
 
+/** A column as shown: its width, and the width its header needs to show its name and icons whole (0: no header line, one being edited), in pixels */
+export type ColumnMeasure = { readonly width: number; readonly header: number };
+
 /** The page a write edits: its text as read for it, its tables, and where the edited table is */
 export type WritePage = { readonly text: string; readonly tables: readonly PageTable[]; readonly from: number };
 
@@ -677,8 +680,14 @@ export interface ModelHost {
   areaRect(info: TableInfo, first: CellRef, last: CellRef): Rect | undefined;
   /** The cell of a table at a point of the window, by where its rows and columns are (whatever is over them); undefined: not on it */
   cellAtPoint(info: TableInfo, x: number, y: number): CellRef | undefined;
-  /** A column shown `width` pixels wide for now (undefined: as Feature.columnWidths has it), a width being dragged */
-  showColumnWidth(info: TableInfo, column: number, width: number | undefined): void;
+  /**
+   * The columns shown these widths for now, in pixels (undefined: as
+   * Feature.columnWidths has them), widths being dragged. A width for every
+   * column lays the table out by them alone: each its share of their sum
+   */
+  showColumnWidths(info: TableInfo, widths: ReadonlyMap<number, number> | undefined): void;
+  /** Each column of a table as shown (read once, before anything is changed: it lays the page out) */
+  measureColumns(info: TableInfo): ColumnMeasure[];
   /**
    * Hashtags in headers not shown, by name (a column type's): hidden from the
    * moment a table is rendered (before its looks apply); given again, they replace those of `owner`

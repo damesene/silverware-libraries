@@ -1,19 +1,25 @@
-// The widths module: a column's width is set by dragging the right edge of its
-// header (a handle there), reset to automatic by double-clicking it or with
-// "Auto width" in its menu. With the metadata setting it is stored in the
-// table (width.price="180", meta.ts), which follows the column through renames
-// and moves (metadataAfterEdit); without it, it holds for the view only.
+// The widths module: columns' widths are set by dragging the edge between two
+// columns (a handle on a header's right edge, none on the last: the table
+// keeps its width), reset to automatic by double-clicking it or with "Auto
+// width" in a column's menu. With the metadata setting they are stored in the
+// table (widths.-c-price.size='180'), which follows the column through renames
+// and moves (metadataAfterEdit); without it, they hold for the view only.
 // "Reset column widths" in the table's menu makes every column automatic.
+//
+// A drag moves only that edge: what one side gains the other loses, from the
+// nearest column on, none below what its header needs (movedEdge), and on
+// release every column's width is stored, so nothing moves after it
+// (docs/silverware-table-column-resize.md).
 //
 // Where a feature lays the table out on a grid of its own (TableHost.addressFrame:
 // the sheet view), the columns are the grid's: a handle sets the grid's column
-// (for every table in it), the table's own widths give way.
+// (for every table in it, the last one too), the table's own widths give way.
 //
-// While dragging, the width is the width at the press plus how far the pointer
-// moved since, never measured again: a scrollbar showing or going, or the
-// table moving as it gets narrower, cannot feed back into it. The widths are
-// the module's (columnWidths); the core shows them, and the handles (a handle
-// layer per table, as every table's headers have them).
+// While dragging, the widths are those at the press changed by how far the
+// pointer moved since, never measured again: a scrollbar showing or going, or
+// the table moving as it gets narrower, cannot feed back into them. The widths
+// are the module's (columnWidths); the core shows them, and the handles (a
+// handle layer per table, as every table's headers have them).
 import { type Feature, type HandleLayer, type LineMenuBuilder, type LineMenuGroup, type LineMenuTarget, type ModelHost, type PartTable, type TableInfo, type TableKey, tablePartsOf, type ToolbarButton } from "../core/feature.ts";
 import { ICONS } from "../icons.ts";
 import { parseTable } from "../markdown.ts";
@@ -24,7 +30,31 @@ const MIN_WIDTH = 40;
 // The handles' layers, one per table
 const LAYER = "width:";
 const HANDLE_CLASS = "swt-col-resize";
-const HANDLE_TITLE = "Drag to set the column's width; double-click for automatic";
+const HANDLE_TITLE = "Drag to move the edge between the columns; double-click for the column's automatic width";
+
+/** A column at the press of a drag: its width, and the narrowest the drag may make it */
+type DraggedColumn = { readonly width: number; readonly min: number };
+
+/**
+ * The columns' widths with the edge after `column` moved `by` pixels, the
+ * table's width kept: the side the edge moves into gives, its nearest column
+ * first, none below its minimum (one already narrower gives nothing); the
+ * column on the other side of the edge takes what they gave
+ */
+export function movedEdge(columns: readonly DraggedColumn[], column: number, by: number): number[] {
+  const widths = columns.map((c) => c.width);
+  if (column < 0 || column >= columns.length - 1) return widths;
+  const giving = by > 0 ? Array.from({ length: columns.length - column - 1 }, (_, i) => column + 1 + i) : Array.from({ length: column + 1 }, (_, i) => column - i);
+  let left = Math.abs(by);
+  for (const j of giving) {
+    if (!left) break;
+    const given = Math.min(left, Math.max(0, widths[j]! - columns[j]!.min));
+    widths[j]! -= given;
+    left -= given;
+  }
+  widths[by > 0 ? column : column + 1]! += Math.abs(by) - left;
+  return widths;
+}
 
 /** One table's widths (the module's part for it, core/parts.ts): those set for the view, those stored, its handles */
 class TableWidths {
@@ -75,9 +105,11 @@ class TableWidths {
   }
 
   placeHandles(info: TableInfo, active: number | undefined): void {
+    // The last column's right edge is the table's, which keeps its width; a grid's columns have no such edge
+    const count = this.host.addressFrame(info) ? info.columns : info.columns - 1;
     this.handles.place(
       info.key,
-      Array.from({ length: info.columns }, (_, column) => ({
+      Array.from({ length: Math.max(0, count) }, (_, column) => ({
         // One handle per column (a layer's handles are told apart by their classes), the one dragged lit
         className: `${HANDLE_CLASS} ${HANDLE_CLASS}-${column}`,
         active: column === active,
@@ -95,9 +127,9 @@ class TableWidths {
   }
 
   /** Columns' widths set (undefined: automatic): stored in the table where they can be, else for the view */
-  private async setAll(info: TableInfo, set: ReadonlyMap<number, number | undefined>): Promise<void> {
+  async setAll(info: TableInfo, set: ReadonlyMap<number, number | undefined>): Promise<void> {
     for (const [column, width] of set) this.viewed.set(column, width);
-    for (const column of set.keys()) this.host.showColumnWidth(info, column, undefined);
+    this.host.showColumnWidths(info, undefined);
     // Reset column widths offered or not
     this.host.toolbarChanged();
     // Those the table can take (the metadata setting off: only where it has a width stored); the others are the view's
@@ -194,24 +226,23 @@ export class Widths implements Feature {
     // A cell being edited is saved first, as a press elsewhere would (the press here keeps the focus)
     if (this.host.editing) void this.host.saveEditing();
     const { column } = target;
-    const header = this.host.rectOf(info, { column });
-    if (!header) return true;
-    const startWidth = Math.round(header.right - header.left);
+    const drag = this.host.addressFrame(info) ? gridDrag(this.host, info, column) : tableDrag(this.host, info, column);
+    if (!drag) return true;
     const startX = e.clientX;
     // The second press of a double click: the column automatic again (unless it moves)
     const double = e.detail >= 2;
-    let width = startWidth;
+    const start = drag.widths(0);
+    let shown = start;
+    const moved = () => Array.from(shown).some(([c, width]) => width !== start.get(c));
     this.drag = { key: info.key, column };
     widths.placeHandles(info, column);
     const win = this.host.doc.defaultView!;
-    // The width shown once per frame, however many moves came
+    // The widths shown once per frame, however many moves came
     let frame = 0;
     const show = () => {
       frame = 0;
       const now = this.host.tableFor(info.key);
-      const grid = now && this.host.addressFrame(now);
-      if (this.drag && grid) grid.previewColumnWidth(column, width);
-      else if (this.drag && now) this.host.showColumnWidth(now, column, width);
+      if (this.drag && now) drag.show(now, shown);
     };
     const stop = this.host.drag(e, {
       key: info.key,
@@ -219,7 +250,7 @@ export class Widths implements Feature {
       pageMark: "resizing",
       onMove: (at) => {
         // From the press, never from what is measured now
-        width = Math.max(MIN_WIDTH, Math.round(startWidth + at.x - startX));
+        shown = drag.widths(at.x - startX);
         if (!frame) frame = win.requestAnimationFrame ? win.requestAnimationFrame(show) : (show(), 0);
       },
       onEnd: () => {
@@ -227,14 +258,10 @@ export class Widths implements Feature {
         this.stopDrag?.();
         const now = this.host.tableFor(info.key);
         if (!now) return;
-        if (width !== startWidth) {
-          void widths.set(now, column, width);
-          return;
-        }
+        if (moved()) void drag.store(now, widths, shown);
         // Not moved: a double-click makes the column automatic again; a click shows it as it was
-        if (double) void widths.set(now, column, undefined);
-        else if (this.host.addressFrame(now)) this.host.addressFrame(now)!.previewColumnWidth(column, undefined);
-        else this.host.showColumnWidth(now, column, undefined);
+        else if (double) void widths.set(now, column, undefined);
+        else drag.show(now, undefined);
       },
     });
     this.stopDrag = () => {
@@ -246,4 +273,52 @@ export class Widths implements Feature {
     };
     return true;
   }
+}
+
+/**
+ * Widths in whole pixels whose sum is never more than theirs: each edge
+ * rounded down, not each width (rounded alone, their sum could pass the
+ * table's box, which would then scroll sideways)
+ */
+export function wholePixels(widths: readonly number[]): number[] {
+  let edge = 0;
+  let whole = 0;
+  return widths.map((width) => {
+    edge += width;
+    const next = Math.floor(edge);
+    const result = next - whole;
+    whole = next;
+    return result;
+  });
+}
+
+/** A drag of a column's edge: the widths a move gives, those shown for now (undefined: as they are kept), those kept on release */
+type EdgeDrag = {
+  widths(by: number): ReadonlyMap<number, number>;
+  show(info: TableInfo, widths: ReadonlyMap<number, number> | undefined): void;
+  store(info: TableInfo, part: TableWidths, widths: ReadonlyMap<number, number>): Promise<void>;
+};
+
+/** On a feature's grid (the sheet): the grid's column alone, as wide as the pointer makes it (the tables beside it move) */
+function gridDrag(host: ModelHost, info: TableInfo, column: number): EdgeDrag | undefined {
+  const header = host.rectOf(info, { column });
+  if (!header) return undefined;
+  const start = Math.round(header.right - header.left);
+  return {
+    widths: (by) => new Map([[column, Math.max(MIN_WIDTH, Math.round(start + by))]]),
+    show: (now, widths) => host.addressFrame(now)?.previewColumnWidth(column, widths?.get(column)),
+    store: (now, part, widths) => part.set(now, column, widths.get(column)),
+  };
+}
+
+/** In a table: the edge between two of its columns, the table's width kept (movedEdge), every column's width kept on release */
+function tableDrag(host: ModelHost, info: TableInfo, column: number): EdgeDrag | undefined {
+  const measured = host.measureColumns(info);
+  if (measured.length !== info.columns || column >= measured.length - 1) return undefined;
+  const columns = measured.map(({ width, header }) => ({ width, min: Math.max(MIN_WIDTH, Math.ceil(header)) }));
+  return {
+    widths: (by) => new Map(wholePixels(movedEdge(columns, column, by)).map((width, c) => [c, width])),
+    show: (now, widths) => host.showColumnWidths(now, widths),
+    store: (now, part, widths) => part.setAll(now, widths),
+  };
 }

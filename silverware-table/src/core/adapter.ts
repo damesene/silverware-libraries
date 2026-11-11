@@ -8,7 +8,7 @@
 //
 // Being moved here step by step from the controller (docs/silverware-table-isolation.md):
 // what is not here yet is still the controller's own DOM code.
-import type { CellRef, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "./feature.ts";
+import type { CellRef, ColumnMeasure, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "./feature.ts";
 import type { MergedLooks } from "./looks.ts";
 
 export interface TableAdapter {
@@ -58,10 +58,10 @@ export interface TableAdapter {
   areaRect(info: WidgetInfo, first: CellRef, last: CellRef): Rect | undefined;
   /** The cell at a point, by where the rows and columns are (TableHost.cellAtPoint) */
   cellAtPoint(info: WidgetInfo, x: number, y: number): CellRef | undefined;
-  /** The widths of a table's columns applied (those not among them: automatic again) */
+  /** The widths of a table's columns applied (those not among them: automatic again; all of them: the table laid out by them alone) */
   applyColumnWidths(info: WidgetInfo, widths: ReadonlyMap<number, number>): void;
-  /** One column's width applied (undefined: automatic) */
-  applyColumnWidth(info: WidgetInfo, column: number, width: number | undefined): void;
+  /** Each column's width as shown and what its header needs (TableHost.measureColumns) */
+  measureColumns(info: WidgetInfo): ColumnMeasure[];
   /** Where the page is in view (a table's, else the page's): its scroller, cut to what an on-screen keyboard leaves */
   pageView(info: WidgetInfo | undefined): Rect;
   /** Whether a node is one of the adapter's own elements over the cells (a piece of an outline, a handle) */

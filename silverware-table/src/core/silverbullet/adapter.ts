@@ -8,10 +8,13 @@ import { Overlays } from "./overlays.ts";
 import type { TableMeta } from "../../markdown.ts";
 import { TABLE_MARKER } from "../../metanames.ts";
 import type { TableAdapter } from "../adapter.ts";
-import type { CellRef, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "../feature.ts";
+import type { CellRef, ColumnMeasure, HandlePlace, HeaderRow, LineDrag, PointerTarget, Rect, Side, TableLook, TablePreview, WidgetInfo } from "../feature.ts";
 import { type MergedLooks, refKey } from "../looks.ts";
 import type { TableRows } from "../rows.ts";
 import { applyCellLook, applyHeaderLook, renderedText } from "./looks.ts";
+
+// A table laid out by its columns' widths: its colgroup and the table both have the class
+const FIXED_COLUMNS_CLASS = "swt-fixed-columns";
 
 // The attributes of a table's look put on each widget (data-swt-<name>), to take back
 const lookKeys = new WeakMap<HTMLElement, readonly string[]>();
@@ -265,21 +268,80 @@ export class SilverBulletAdapter implements TableAdapter {
   // The columns given a width in each table as rendered (a write renders it anew): those to make automatic again
   private readonly sized = new WeakMap<HTMLTableElement, Set<number>>();
 
-  // Only the columns with a width, or that had one: touching every cell's
-  // style (or reading styles between writes) would make the browser compute
-  // the whole table's styles and layout again, for every table shown
+  // Every column with a width: the table laid out by its columns alone (a
+  // colgroup, `table-layout: fixed`), so no cell is styled and a frame of a
+  // drag changes only the columns. Some: only those columns' cells, or those
+  // that had one: touching every cell's style (or reading styles between
+  // writes) would make the browser compute the whole table's styles and
+  // layout again, for every table shown
   applyColumnWidths(info: WidgetInfo, widths: ReadonlyMap<number, number>): void {
     const sized = this.sized.get(info.table);
-    const columns = Array.from({ length: info.columns }, (_, column) => column).filter((column) => widths.has(column) || sized?.has(column));
-    if (!columns.length) return;
-    // Read before writing: one style computation
-    const paddings = columns.map((column) => (widths.has(column) ? this.paddingOf(info, column) : 0));
-    const rows = [info.table.rows[0]!, ...this.rows.bodyRows(info)];
-    columns.forEach((column, i) => this.applyWidth(info, column, widths.get(column), paddings[i]!, rows));
+    const fixed = info.columns > 0 && Array.from({ length: info.columns }, (_, column) => widths.has(column)).every(Boolean);
+    const columns = Array.from({ length: info.columns }, (_, column) => column).filter((column) => sized?.has(column) || (!fixed && widths.has(column)));
+    if (columns.length) {
+      // Read before writing: one style computation
+      const paddings = columns.map((column) => (!fixed && widths.has(column) ? this.paddingOf(info, column) : 0));
+      const rows = [info.table.rows[0]!, ...this.rows.bodyRows(info)];
+      columns.forEach((column, i) => this.applyWidth(info, column, fixed ? undefined : widths.get(column), paddings[i]!, rows));
+    }
+    this.fixColumns(info, fixed ? Array.from({ length: info.columns }, (_, column) => widths.get(column)!) : undefined);
   }
 
-  applyColumnWidth(info: WidgetInfo, column: number, width: number | undefined): void {
-    this.applyWidth(info, column, width, width === undefined ? 0 : this.paddingOf(info, column), [info.table.rows[0]!, ...this.rows.bodyRows(info)]);
+  /**
+   * The table laid out by its columns' widths (undefined: by its cells): each
+   * column its share of their sum, the table as wide as its box and never
+   * narrower than the sum (a wider box widens the columns alike; a narrower
+   * one scrolls the table sideways, as a wide table does)
+   */
+  private fixColumns(info: WidgetInfo, widths: readonly number[] | undefined): void {
+    const { table } = info;
+    let colgroup = table.querySelector<HTMLTableColElement>(`:scope > colgroup.${FIXED_COLUMNS_CLASS}`);
+    if (!widths) {
+      if (!colgroup) return;
+      colgroup.remove();
+      table.classList.remove(FIXED_COLUMNS_CLASS);
+      table.style.minWidth = "";
+      return;
+    }
+    if (!colgroup) {
+      colgroup = this.doc.createElement("colgroup");
+      colgroup.className = FIXED_COLUMNS_CLASS;
+      table.prepend(colgroup);
+    }
+    while (colgroup.children.length < widths.length) colgroup.append(this.doc.createElement("col"));
+    while (colgroup.children.length > widths.length) colgroup.lastElementChild!.remove();
+    const sum = widths.reduce((a, b) => a + b, 0);
+    widths.forEach((width, column) => {
+      (colgroup.children[column] as HTMLElement).style.width = `${(width / sum) * 100}%`;
+    });
+    table.classList.add(FIXED_COLUMNS_CLASS);
+    table.style.minWidth = `${sum}px`;
+  }
+
+  measureColumns(info: WidgetInfo): ColumnMeasure[] {
+    const header = info.table.rows[0];
+    if (!header) return [];
+    const win = this.doc.defaultView!;
+    const cells = Array.from(header.cells);
+    const widths = cells.map((cell) => cell.getBoundingClientRect().width);
+    // The headers' lines as wide as they would be: a sized column's is held to its width (applyWidth), let go
+    // for the reads (all of them together: one layout), held again after
+    const heads = cells.map((cell) => cell.querySelector<HTMLElement>(":scope > .swt-head"));
+    const held = heads.map((head) => head && { width: head.style.width, maxWidth: head.style.maxWidth });
+    for (const head of heads) if (head) Object.assign(head.style, { width: "", maxWidth: "" });
+    const needs = cells.map((cell, column) => {
+      const head = heads[column];
+      if (!head) return 0;
+      // The name's box cut to what the cell leaves it, its text wider
+      const name = head.querySelector<HTMLElement>(":scope > .swt-head-name");
+      const style = win.getComputedStyle(cell);
+      const padding = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+      return head.offsetWidth + (name ? name.scrollWidth - name.clientWidth : 0) + padding;
+    });
+    heads.forEach((head, column) => {
+      if (head) Object.assign(head.style, held[column]);
+    });
+    return cells.map((_, column) => ({ width: widths[column]!, header: needs[column]! }));
   }
 
   /**

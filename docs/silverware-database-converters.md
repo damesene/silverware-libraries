@@ -211,9 +211,9 @@ kinds of its user's own (its format registry). So two layers in `shared/markdown
   a list item's), `quote`, `table`, `rule`; `item`, a line's list marker whatever its kind (a task's, a rule's `- - -`),
   what the toolbar's bullet and numbered list read by; standard markdown only (a user's own formats stay the toolbar's registry).
   Fenced code is `lines.ts`'.
-* **`readBlocks(text)`**, for converters: a tree made of `readLine` (items with the items and lines under them,
-  headings with their section, a table's header and cells, paragraphs, quotes, fenced code), each block with the lines
-  it was read from. Since 2026-11-11 read by lezer's parser (`shared/markdown/parse.ts`,
+* **`readBlocks(text)`**, for converters: a tree (items with the items and lines under them, headings with their
+  section, a table's header and cells, paragraphs, quotes, fenced code), each block with the lines it was read from;
+  first made of `readLine`, since 2026-11-11 read by lezer's parser (`shared/markdown/parse.ts`,
   docs/silverware-tags-scanner-on-blocks.md), `readLine` in a file of its own: an item's text its first paragraph
   (lines going on lazily too, as SilverBullet names a task), a quote's blocks its own, HTML, comments and indented code
   blocks of their own.

@@ -30,7 +30,7 @@ Everything is in one window, **Silverware Tags: Manager**, with two views (tabs 
 
 ## Where tags are written
 
-A page's own tags are its frontmatter's `tags` and its **tag lines** (a paragraph of nothing but hashtags, as SilverBullet reads them). Silverware Tags adds a page's tags into its frontmatter. A page that has no `tags` yet gets them on one line by default (a page without a frontmatter gets one too); *How new tags are written* (Settings) writes them as `- ` lines or as `tags: a, b` instead:
+A page's own tags are its frontmatter's `tags` and its **tag lines** (a paragraph starting with hashtags alone, up to a line holding anything else, as SilverBullet reads them). Silverware Tags adds a page's tags into its frontmatter. A page that has no `tags` yet gets them on one line by default (a page without a frontmatter gets one too); *How new tags are written* (Settings) writes them as `- ` lines or as `tags: a, b` instead:
 
 ```yaml
 ---
@@ -40,7 +40,7 @@ tags: [project/alpha, meeting]
 
 A page that has its tags already keeps their form: a list of `- ` lines stays one, `tags: a, b` stays a string (a tag with a space in it makes it `[…]`). The rest of the frontmatter stays as you wrote it, its comments too. A page whose tags it cannot read safely (a list in brackets over several lines) is left alone, and the review says so.
 
-Hashtags are found as SilverBullet finds them: not in code (blocks and `inline`), links, URLs or HTML. Those in headings and tables count too.
+Hashtags are found as SilverBullet finds them: not in code (blocks and `inline`), links, URLs, HTML tags, HTML it keeps as written (`<pre>`, `<style>`, `<script>`) or a link's definition (`[label]: url`). Those in headings, tables, quotes and comments count too.
 
 **Which pages use a tag** comes from SilverBullet's index, so a page it has not indexed yet is not found: wait a moment after a large edit (or run *Space: Reindex*).
 

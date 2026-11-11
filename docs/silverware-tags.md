@@ -246,7 +246,9 @@ the API the user's operations use.
 - Rules by folder (pages under `Projects/Alpha` get `#project/alpha` as they are
   made): writing pages in the background, as SilverBullet's templates do better.
 - A tag's own page and color, aliases.
-- SilverBullet's parser instead of the scanner (`markdown.parseMarkdown`, async).
+- ~~SilverBullet's parser instead of the scanner (`markdown.parseMarkdown`, async)~~: set aside on 2026-11-11 (a
+  plugin depends on no place it runs in); the scanner reads the blocks of lezer's parser, the one SilverBullet builds
+  on (docs/silverware-tags-scanner-on-blocks.md).
 - Tags of a selection of the page's objects (a task's tags in the manager).
 - **A page dragged from the space tree onto a tag of the panel tags it**
   (weighed 2026-10-31, set aside). The space tree's drag carries the page

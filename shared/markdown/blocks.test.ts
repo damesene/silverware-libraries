@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Block, readBlocks, readLine } from "./blocks.ts";
+import { allBlocks, type Block, readBlocks, readLine } from "./blocks.ts";
 
 describe("readLine", () => {
   it("reads each kind of block line with its marker, text and where the text starts", () => {
@@ -97,6 +97,11 @@ describe("readBlocks", () => {
     expect(page[0]!.lines).toEqual({ from: 5, to: 6 });
     // A rule over a paragraph (no key under it) is no frontmatter
     expect(shape(readBlocks("---\ntext\n---"))).toEqual([["rule"], ["h2 text", []]]);
+  });
+
+  it("gives every block of a tree in the text's order", () => {
+    const kinds = allBlocks(readBlocks("# H\n| a |\n|---|\n| 1 |\n- item\n  text")).map((block) => block.kind);
+    expect(kinds).toEqual(["heading", "table", "item", "paragraph"]);
   });
 
   it("reads lines starting with | as a table only with its line of dashes", () => {

@@ -18,6 +18,7 @@ import { keyFromLabel } from "../../domain/keys.ts";
 import { labelOfKey } from "../../domain/loose.ts";
 import type { Item, Property, Value } from "../../model/database.ts";
 import { inferProperty, type ReadValue } from "../infer.ts";
+import { joinedValues, plainText, readValue } from "../values.ts";
 
 // An item's name: about this long at most, cut at a word
 const NAME_LENGTH = 100;
@@ -64,73 +65,13 @@ function topTasks(text: string): Read[] {
   return found.map(({ task, to }) => ({ task, body: dedentedLines(lines.slice(task.lines.from + 1, to)).join("\n") }));
 }
 
-/** A mark as a word in a sentence: a tag's or a person's name, a link's alias or target */
-function wordOf(mark: InlineMark): string {
-  if (mark.kind === "link") return mark.alias ?? mark.name;
-  return mark.name;
-}
-
-/** A task's name: its text without its attributes and the marks at its end, the others as words; cut at a word */
-function nameOf(text: string, marks: readonly InlineMark[]): string {
-  // Whether plain text (no mark) follows each mark: the marks with none after them are the text's end
-  const plainAfter: boolean[] = [];
-  let after = /\S/.test(text.slice(marks.at(-1)?.to ?? 0));
-  for (let at = marks.length - 1; at >= 0; at--) {
-    plainAfter[at] = after;
-    if (/\S/.test(text.slice(marks[at - 1]?.to ?? 0, marks[at]!.from))) after = true;
-  }
-  let name = "";
-  let at = 0;
-  marks.forEach((mark, i) => {
-    name += text.slice(at, mark.from);
-    at = mark.to;
-    if (mark.kind !== "attribute" && plainAfter[i]) name += wordOf(mark);
-    else name += " ";
-  });
-  // (A character escaped, as `write` escapes what would read as syntax, is the character)
-  name = (name + text.slice(at)).replace(/\\([\\[\]#@`$<])/g, "$1").replace(/\s+/g, " ").trim();
-  // Marks alone (`[[Project X]]`, `@ada`): named by their words
-  if (!name) name = marks.flatMap((mark) => (mark.kind === "attribute" ? [] : [wordOf(mark)])).join(" ");
+/** A task's name: its text made plain (`plainText`), cut at a word */
+function nameOf(text: string): string {
+  const name = plainText(text);
   if (name.length <= NAME_LENGTH) return name;
   const cut = name.slice(0, NAME_LENGTH + 1);
   const space = cut.lastIndexOf(" ");
   return (space > NAME_LENGTH / 2 ? cut.slice(0, space) : name.slice(0, NAME_LENGTH)).trim();
-}
-
-/** An attribute's value read: people where it is mentions alone, links where wiki links alone, else YAML (a text where it is none) */
-function readValue(written: string): ReadValue | undefined {
-  const marks = inlineMarks(written);
-  const rest = marks.reduceRight((text, mark) => text.slice(0, mark.from) + text.slice(mark.to), written);
-  if (marks.length && !/[^\s,]/.test(rest)) {
-    if (marks.every((mark) => mark.kind === "mention")) return { kind: "people", names: marks.map((mark) => mark.name) };
-    if (marks.every((mark) => mark.kind === "link")) return { kind: "links", targets: marks.map((mark) => mark.name) };
-  }
-  const yaml = readAttributeValue(written);
-  if ("problem" in yaml) return { kind: "plain", value: written.trim() };
-  const value = yaml.value;
-  if (value === null || value === "") return undefined;
-  if (Array.isArray(value)) {
-    const texts = value.flatMap((one) => (one === null ? [] : [typeof one === "object" ? JSON.stringify(one) : String(one)]));
-    // A list of `@name`s: people
-    if (texts.length && texts.every((one) => /^@\S/.test(one))) return { kind: "people", names: texts.map((one) => one.slice(1).trim()) };
-    return { kind: "plain", value: texts };
-  }
-  if (typeof value === "object") return { kind: "plain", value: written.trim() };
-  // A person quoted, as one is written back (`[owner: "@ada"]`, `"@Ada Lovelace"`)
-  if (typeof value === "string" && /^@\S/.test(value)) return { kind: "people", names: [value.slice(1).trim()] };
-  return { kind: "plain", value };
-}
-
-/** Two values of one key in one task: one list of both */
-function joined(a: ReadValue, b: ReadValue): ReadValue {
-  if (a.kind === "people" && b.kind === "people") return { kind: "people", names: [...new Set([...a.names, ...b.names])] };
-  if (a.kind === "links" && b.kind === "links") return { kind: "links", targets: [...new Set([...a.targets, ...b.targets])] };
-  const texts = (one: ReadValue): string[] => {
-    if (one.kind === "people") return one.names.map((name) => `@${name}`);
-    if (one.kind === "links") return one.targets.map((target) => `[[${target}]]`);
-    return Array.isArray(one.value) ? [...one.value] : one.value === null ? [] : [String(one.value)];
-  };
-  return { kind: "plain", value: [...new Set([...texts(a), ...texts(b)])] };
 }
 
 /** The key of an attribute's property: from its name, none of the task's own nor another name's */
@@ -177,9 +118,9 @@ function read(text: string): Converted | undefined {
       const byItem = attributes.get(key) ?? new Map<number, ReadValue>();
       attributes.set(key, byItem);
       const was = byItem.get(at);
-      byItem.set(at, was ? joined(was, value) : value);
+      byItem.set(at, was ? joinedValues(was, value) : value);
     }
-    items.push({ name: nameOf(task.text, marks), values, ...(body ? { body } : {}), ...(tags.length ? { tags } : {}), source: escapedAttributes(task.text.trim()) });
+    items.push({ name: nameOf(task.text), values, ...(body ? { body } : {}), ...(tags.length ? { tags } : {}), source: escapedAttributes(task.text.trim()) });
   });
   // (Done last: the states of its own met between In progress and it)
   const options = [...states.filter((one) => one !== DONE_STATE), DONE_STATE];
@@ -282,10 +223,11 @@ function write(items: readonly Item[], properties: readonly Property[]): string 
   return lines.length ? `${lines.join("\n")}\n` : "";
 }
 
-export const TASKS_CONVERTER: ConverterDefinition = {
+// (Frozen: a user's converter is given it, HELPERS.tasks, to build on, never to change for every converter)
+export const TASKS_CONVERTER: ConverterDefinition = Object.freeze({
   name: "tasks",
   label: "Tasks",
   description: "A list of tasks: each task an item, its attributes, mentions, links and tags its properties",
   read,
   write,
-};
+});

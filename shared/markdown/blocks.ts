@@ -132,6 +132,11 @@ export function readBlocks(text: string): Block[] {
   return sections(blocksOf(lines.slice(start), start));
 }
 
+/** Every block of a tree, depth first in the text's order: a table under a heading, a paragraph under an item too */
+export function allBlocks(blocks: readonly Block[]): Block[] {
+  return blocks.flatMap((block) => [block, ...(block.kind === "heading" || block.kind === "item" ? allBlocks(block.children) : [])]);
+}
+
 // A frontmatter's first key: what tells it from a rule above a paragraph
 const KEY_RE = /^[A-Za-z_][\w-]*[ \t]*:/;
 

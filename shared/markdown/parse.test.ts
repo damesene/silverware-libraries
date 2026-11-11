@@ -83,10 +83,29 @@ describe("parseBlocks", () => {
   });
 
   it("reads HTML as a block of its own, a comment's body as markdown", () => {
-    expect(shape("<div>\n#h\n</div>\n\n<!-- #c\n- [ ] t\n-->")).toEqual([
+    expect(shape("<div>\n#h\n</div>\n\n<!-- a #c\n- [ ] t\n-->")).toEqual([
       ["html", ["<div>", "#h", "</div>"]],
-      ["comment", " #c\n- [ ] t\n", [["paragraph", ["#c"]], ["item bullet", [["task [ ]", ["t"]]]]]],
+      ["comment", " a #c\n- [ ] t\n", [["paragraph", ["a #c"]], ["item bullet", [["task [ ]", ["t"]]]]]],
     ]);
+  });
+
+  it("reads no markdown in a marker comment (a baked section's), as SilverBullet does", () => {
+    expect(shape("<!--#lua x-->\nbody\n<!--/lua-->")).toEqual([["comment", "#lua x", []], ["paragraph", ["body"]], ["comment", "/lua", []]]);
+  });
+
+  it("takes containers' markers off each line as CommonMark does: tab stops, lazy lines, an unclosed fence's end", () => {
+    expect(shape("  \tcode\n      more")).toEqual([["code indented", ["code", "  more"]]]);
+    expect(shape("- a\n  > b\n  c")).toEqual([["item bullet", [["paragraph", ["a"]], ["quote", [["paragraph", ["b", "c"]]]]]]]);
+    expect(shape("- ```\n  a\n\nb")).toEqual([["item bullet", [["code ", ["a"]]]], ["paragraph", ["b"]]]);
+    expect(shape("| a | b | \n|---|---|\n| 1 | 2 |  ")).toEqual([["table", [["a", "b"], ["1", "2"]]]]);
+  });
+
+  it("gives an item its lines from its content, its containers' markers and its content's indentation off", () => {
+    const text = "> - [ ] q\n>   more\n>\n>     code";
+    const [quote] = parseBlocks(text);
+    const item = quote?.kind === "quote" ? quote.children[0] : undefined;
+    expect(item?.kind === "item" ? item.lines.map((line) => text.slice(line.from, line.to)) : undefined).toEqual(["[ ] q", "more", "", "  code"]);
+    expect(shape("-\n  a\n- b")).toEqual([["item bullet", [["paragraph", ["a"]]]], ["item bullet", [["paragraph", ["b"]]]]]);
   });
 
   it("reads rules, and from a place given on (after a frontmatter), the places the text's", () => {

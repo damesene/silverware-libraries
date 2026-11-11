@@ -40,8 +40,14 @@ describe("readBlocks", () => {
     const blocks = readBlocks("- [ ] A\n  goes on\nlazily\n\n  para");
     expect(shape(blocks)).toEqual([["[ ] A\ngoes on\nlazily", [["paragraph", "para"]]]]);
     expect(blocks[0]).toMatchObject({ title: { from: 0, to: 3 }, body: "para" });
-    // An item starting with no paragraph has no text
-    expect(shape(readBlocks("- ```\n  code\n  ```"))).toEqual([["", [["code ", "code"]]]]);
+    // An item starting with no paragraph has no text, all it holds its body
+    const code = readBlocks("- ```\n  code\n  ```\n  after");
+    expect(shape(code)).toEqual([["", [["code ", "code"], ["paragraph", "after"]]]]);
+    expect(code[0]).toMatchObject({ title: { from: 0, to: 0 }, body: "```\ncode\n```\nafter" });
+    // A body in a quote without the quote's markers; a task not an item's first block a paragraph, its state kept
+    const quoted = readBlocks("> - [ ] q\n>   more\n>\n>   para\n>\n>   [x] later");
+    expect(shape(quoted)).toEqual([["quote", [["[ ] q\nmore", [["paragraph", "para"], ["paragraph", "[x] later"]]]]]]);
+    expect(allBlocks(quoted)[1]).toMatchObject({ body: "para\n\n[x] later" });
   });
 
   it("reads a quote's blocks, HTML and a comment as blocks of their own", () => {

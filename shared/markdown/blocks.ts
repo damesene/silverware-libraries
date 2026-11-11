@@ -14,8 +14,9 @@ export type Block =
   // A heading and its section: the blocks after it up to a heading of its level or above; `title` the heading's own
   // lines (a setext heading's two or more), `lines` with its section
   | { readonly kind: "heading"; readonly level: number; readonly text: string; readonly children: readonly Block[]; readonly title: BlockLines; readonly lines: BlockLines }
-  // A list's item: its text (its first paragraph's, a line going on lazily too; a task's after its state), `title` that
-  // text's lines; the blocks after it (items nested, paragraphs…) and those lines as written, dedented
+  // A list's item: its text (the paragraph it starts with, a line going on lazily too; a task's after its state; none
+  // where it starts with another block), `title` that text's lines (none then); the blocks after it (items nested,
+  // paragraphs…) and those lines as written, dedented
   | {
       readonly kind: "item";
       readonly list: "bullet" | "numbered";
@@ -116,18 +117,24 @@ class BlockReader {
       }
       case "rule":
         return { kind: "rule", lines };
-      // A task outside an item the parser never gives: its text a paragraph's
+      // A task not the first block of its item is a paragraph, its state in its text (SilverBullet reads it as a task,
+      // but an item's state is its first's)
+      case "task": {
+        const [line, ...more] = node.lines;
+        return { kind: "paragraph", text: this.texts([{ from: node.from, to: line!.to }, ...more]).join("\n"), lines };
+      }
       default:
-        return { kind: node.kind === "html" ? "html" : "paragraph", text: this.texts(node.lines).join("\n"), lines };
+        return { kind: node.kind, text: this.texts(node.lines).join("\n"), lines };
     }
   }
 
-  /** An item: its text its first block's where that is a paragraph or a task, what follows its body */
+  /** An item: its text the paragraph (or task) it starts with, what follows its body */
   private item(node: Extract<MarkdownNode, { kind: "item" }>, lines: BlockLines): Block {
     const [first, ...rest] = node.children;
     const text = first?.kind === "paragraph" || first?.kind === "task" ? first : undefined;
-    const title = text ? this.lineSpan(text) : { from: lines.from, to: lines.from + 1 };
-    const body = dedentedLines(this.lines.slice(title.to, lines.to).map((line) => line.replace(/\r$/, "")));
+    const title = text ? this.lineSpan(text) : { from: lines.from, to: lines.from };
+    // (Its lines as the parser gives them: its marker, its containers' and its content's indentation off)
+    const body = dedentedLines(node.lines.filter((line) => this.lineAt(line.from) >= title.to).map((line) => this.of(line)));
     return {
       kind: "item",
       list: node.list,

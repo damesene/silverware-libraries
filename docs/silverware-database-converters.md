@@ -227,5 +227,6 @@ Steps (a commit each, reviewed; unit tests, the UI tests not run, at the user's 
 3. ~~`CONVERTER_HELPERS` given to `defineConverters`; the library page's *Converters* with them, its example using them~~
    (done 2026-11-11: `converters/helpers.ts`; what is of no kind of block moved out of the tasks converter into
    `converters/values.ts`, `plainText`, `readValue`, `joinedValues`; the example a markdown table's converter).
-4. Silverware Toolbar's built-in block formats read through `readLine` (*Turn into* then knows a task of a state of its
-   own, `[IN PROGRESS]`); its user's formats unchanged.
+4. ~~Silverware Toolbar's built-in block formats read through `readLine` (*Turn into* then knows a task of a state of
+   its own, `[IN PROGRESS]`); its user's formats unchanged~~ (done 2026-11-11: `readLine` among the toolbar's HELPERS,
+   which the built-in formats read by, a user's format may too).

@@ -354,6 +354,20 @@ describe("Block formats", () => {
     expect(turn("- [x] a\n- b", "task")).toBe("- [x] a\n- [ ] b");
   });
 
+  it("read a task of a state of its own as a task, as SilverBullet does (shared/markdown/blocks.ts `readLine`)", () => {
+    const of = (line: string) => blockFormatOf(contextOf(line, 0, line.length))?.name;
+    expect(of("- [IN PROGRESS] work")).toBe("task");
+    expect(of("1. [x] done")).toBe("task");
+    expect(of("- [due: x] text")).toBe("bullet");
+    expect(turn("- [IN PROGRESS] work", "bullet")).toBe("- work");
+  });
+
+  it("leave a list's line to the bullet or numbered list where a format of the user's in the task's place reads it not", () => {
+    defineCustomFormats(formatsOf([{ name: "task", scope: "block", label: "Task", read: (text: string) => (text.startsWith("- [ ] ") ? text.slice(6) : undefined), write: (text: string) => `- [ ] ${text}` }]).formats);
+    const of = (line: string) => blockFormatOf(contextOf(line, 0, line.length))?.name;
+    expect([of("- [ ] a"), of("- [x] a"), of("1. [x] a")]).toEqual(["task", "bullet", "numbered"]);
+  });
+
   it("leave fences and code alone; ```code``` in a line is no fence", () => {
     expect(canTurn(contextOf("```js\nx\n```", 3, 3))).toBe(false);
     expect(turn("```a``` b\nc", "bullet")).toBe("- ```a``` b\n- c");

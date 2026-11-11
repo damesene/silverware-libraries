@@ -1,5 +1,7 @@
 // A numbered list's item: `1. `, its indentation kept; numbered from 1 at
-// each depth, so it writes every line at once.
+// each depth, so it writes every line at once. Its marker read by itself, as a
+// bullet's is: a numbered task's line is a numbered item's where a format of
+// the user's took the task's place and leaves it.
 import type { MultilineBlockDefinition } from "../format.ts";
 import type { Helpers } from "../helpers.ts";
 

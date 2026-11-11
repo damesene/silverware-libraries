@@ -1,4 +1,7 @@
 // A bullet list's item: `- `, its indentation kept (a nested item stays nested).
+// Its marker read by itself, not as a line's block: a task's line (`- [x] a`)
+// or a rule's (`- - -`) is a bullet's too where a format of the user's took
+// the task's or the rule's place and leaves it (read in their order first).
 import type { LineBlockDefinition } from "../format.ts";
 import type { Helpers } from "../helpers.ts";
 

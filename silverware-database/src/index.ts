@@ -36,6 +36,7 @@ import { PagesStore } from "./store/pages/store.ts";
 import { BUILT_IN_MODULES } from "./modules/builtin.ts";
 import { BUILT_IN_VIEWS } from "./views/builtin/index.ts";
 import { BUILT_IN_CONVERTERS } from "./converters/builtin/index.ts";
+import { CONVERTER_HELPERS } from "./converters/helpers.ts";
 
 export type { Bridge } from "./host/silverbullet/platform.ts";
 
@@ -292,7 +293,7 @@ export function defineViews(definitions: unknown): string | undefined {
 
 /** The user's converters (a JS module's: a list, or a function giving one); what cannot be a converter said, the others defined */
 export function defineConverters(definitions: unknown): string | undefined {
-  const list = listOf(definitions, {});
+  const list = listOf(definitions, CONVERTER_HELPERS);
   if (typeof list === "string") return list;
   const problems = keepDefined(list as ConverterDefinition[], customConverters, validateConverter, "converter");
   converters.define([...customConverters.values()]);

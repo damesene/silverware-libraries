@@ -6,16 +6,19 @@
 // else its checkbox (`[ ]` Todo, `[x]` Done) or its state of its own, whatever
 // the case; each other attribute a property of its key (its type from its
 // values), mentions People, wiki links Links, hashtags the page's tags; shown
-// first on a board by Status. Read as SilverBullet reads markdown
-// (shared/markdown/); tasks in fenced code are none.
+// first on a board by Status. Read as SilverBullet reads markdown, through
+// the blocks every converter is given (shared/markdown/blocks.ts `readBlocks`);
+// tasks in fenced code are none.
 import { escapedAttributes, hashtagOf, type InlineMark, inlineMarks } from "../../../../shared/markdown/inline.ts";
-import { indentWidth, nextFence } from "../../../../shared/markdown/lines.ts";
-import { readAttributeValue, readTaskLine, type TaskLine, writeAttribute, writeTaskLine } from "../../../../shared/markdown/task.ts";
+import { type Block, dedentedLines, readBlocks } from "../../../../shared/markdown/blocks.ts";
+import { indentWidth } from "../../../../shared/markdown/lines.ts";
+import { readAttributeValue, writeAttribute, writeTaskLine } from "../../../../shared/markdown/task.ts";
 import type { Converted, ConvertedItem, ConvertedProperty, ConverterDefinition } from "../../core/converter.ts";
 import { keyFromLabel } from "../../domain/keys.ts";
 import { labelOfKey } from "../../domain/loose.ts";
 import type { Item, Property, Value } from "../../model/database.ts";
 import { inferProperty, type ReadValue } from "../infer.ts";
+import { joinedValues, plainText, readValue } from "../values.ts";
 
 // An item's name: about this long at most, cut at a word
 const NAME_LENGTH = 100;
@@ -30,101 +33,45 @@ const LINKS = "links";
 // The system property showing a page's tags (domain/system.ts)
 const TAGS = { key: "page_tags", label: "Tags", type: "tags", system: "tags" } as const;
 
-/** A task of the text's top level, and the lines under it */
-type Read = { readonly task: TaskLine; readonly under: string[] };
+type TaskItem = Extract<Block, { kind: "item" }> & { readonly task: { readonly state: string; readonly done: boolean } };
 
-/** The tasks at the top level of a text, each with the lines under it (a line before the first task is no task's) */
+/** A task of the text's top level, and its body: the lines under it and those after it up to the next task, dedented */
+type Read = { readonly task: TaskItem; readonly body: string };
+
+/**
+ * The tasks at the top level of a text (`readBlocks`), each with what is under it and what follows it up to the next
+ * task (any markdown, a heading's lines too): a task inside another is the other's, and so is one indented more than
+ * the task before it (`- [ ] A`, `text`, `  - [ ] B`: B is A's, as the line between is A's text going on); one under
+ * a heading or a list's item that is no task (nothing before it) one of the top level; what is before the first task is
+ * none's; a task under a list's item that is no task, after a task, the task's body as the item is
+ */
 function topTasks(text: string): Read[] {
-  const read: Read[] = [];
-  let fence: string | undefined;
-  for (const line of text.split(/\r?\n/)) {
-    const before = fence;
-    fence = nextFence(line, fence);
-    const task = before === undefined && fence === undefined ? readTaskLine(line) : undefined;
-    const current = read.at(-1);
-    if (task && (!current || indentWidth(task.indent) <= indentWidth(current.task.indent))) read.push({ task, under: [] });
-    else current?.under.push(line);
-  }
-  return read;
+  const lines = text.split(/\r?\n/);
+  const found: { task: TaskItem; to: number }[] = [];
+  const indentOf = (block: Block) => indentWidth(lines[block.lines.from]!);
+  const visit = (blocks: readonly Block[]) => {
+    for (const block of blocks) {
+      const current = found.at(-1);
+      if (block.kind === "item" && block.task && !(current && indentOf(block) > indentOf(current.task))) found.push({ task: block as TaskItem, to: block.lines.to });
+      else if (block.kind === "heading") {
+        // (Its own lines the task's before it, a setext heading's underline too; its section read on, a task in it one of its own)
+        if (current) current.to = block.title.to;
+        visit(block.children);
+      } else if (current) current.to = block.lines.to;
+      else if (block.kind === "item") visit(block.children);
+    }
+  };
+  visit(readBlocks(text));
+  return found.map(({ task, to }) => ({ task, body: dedentedLines(lines.slice(task.lines.from + 1, to)).join("\n") }));
 }
 
-/** Lines without their common indentation (a blank line empty, others' ends as written: a hard line break), blank lines at the ends taken off */
-function dedented(lines: readonly string[]): string {
-  const given = lines.filter((line) => line.trim());
-  const common = given.length ? Math.min(...given.map((line) => /^[ \t]*/.exec(line)![0].length)) : 0;
-  const out = lines.map((line) => (line.trim() ? line.slice(common) : ""));
-  while (out.length && !out[0]) out.shift();
-  while (out.length && !out.at(-1)) out.pop();
-  return out.join("\n");
-}
-
-/** A mark as a word in a sentence: a tag's or a person's name, a link's alias or target */
-function wordOf(mark: InlineMark): string {
-  if (mark.kind === "link") return mark.alias ?? mark.name;
-  return mark.name;
-}
-
-/** A task's name: its text without its attributes and the marks at its end, the others as words; cut at a word */
-function nameOf(text: string, marks: readonly InlineMark[]): string {
-  // Whether plain text (no mark) follows each mark: the marks with none after them are the text's end
-  const plainAfter: boolean[] = [];
-  let after = /\S/.test(text.slice(marks.at(-1)?.to ?? 0));
-  for (let at = marks.length - 1; at >= 0; at--) {
-    plainAfter[at] = after;
-    if (/\S/.test(text.slice(marks[at - 1]?.to ?? 0, marks[at]!.from))) after = true;
-  }
-  let name = "";
-  let at = 0;
-  marks.forEach((mark, i) => {
-    name += text.slice(at, mark.from);
-    at = mark.to;
-    if (mark.kind !== "attribute" && plainAfter[i]) name += wordOf(mark);
-    else name += " ";
-  });
-  // (A character escaped, as `write` escapes what would read as syntax, is the character)
-  name = (name + text.slice(at)).replace(/\\([\\[\]#@`$<])/g, "$1").replace(/\s+/g, " ").trim();
-  // Marks alone (`[[Project X]]`, `@ada`): named by their words
-  if (!name) name = marks.flatMap((mark) => (mark.kind === "attribute" ? [] : [wordOf(mark)])).join(" ");
+/** A task's name: its text made plain (`plainText`), cut at a word */
+function nameOf(text: string): string {
+  const name = plainText(text);
   if (name.length <= NAME_LENGTH) return name;
   const cut = name.slice(0, NAME_LENGTH + 1);
   const space = cut.lastIndexOf(" ");
   return (space > NAME_LENGTH / 2 ? cut.slice(0, space) : name.slice(0, NAME_LENGTH)).trim();
-}
-
-/** An attribute's value read: people where it is mentions alone, links where wiki links alone, else YAML (a text where it is none) */
-function readValue(written: string): ReadValue | undefined {
-  const marks = inlineMarks(written);
-  const rest = marks.reduceRight((text, mark) => text.slice(0, mark.from) + text.slice(mark.to), written);
-  if (marks.length && !/[^\s,]/.test(rest)) {
-    if (marks.every((mark) => mark.kind === "mention")) return { kind: "people", names: marks.map((mark) => mark.name) };
-    if (marks.every((mark) => mark.kind === "link")) return { kind: "links", targets: marks.map((mark) => mark.name) };
-  }
-  const yaml = readAttributeValue(written);
-  if ("problem" in yaml) return { kind: "plain", value: written.trim() };
-  const value = yaml.value;
-  if (value === null || value === "") return undefined;
-  if (Array.isArray(value)) {
-    const texts = value.flatMap((one) => (one === null ? [] : [typeof one === "object" ? JSON.stringify(one) : String(one)]));
-    // A list of `@name`s: people
-    if (texts.length && texts.every((one) => /^@\S/.test(one))) return { kind: "people", names: texts.map((one) => one.slice(1).trim()) };
-    return { kind: "plain", value: texts };
-  }
-  if (typeof value === "object") return { kind: "plain", value: written.trim() };
-  // A person quoted, as one is written back (`[owner: "@ada"]`, `"@Ada Lovelace"`)
-  if (typeof value === "string" && /^@\S/.test(value)) return { kind: "people", names: [value.slice(1).trim()] };
-  return { kind: "plain", value };
-}
-
-/** Two values of one key in one task: one list of both */
-function joined(a: ReadValue, b: ReadValue): ReadValue {
-  if (a.kind === "people" && b.kind === "people") return { kind: "people", names: [...new Set([...a.names, ...b.names])] };
-  if (a.kind === "links" && b.kind === "links") return { kind: "links", targets: [...new Set([...a.targets, ...b.targets])] };
-  const texts = (one: ReadValue): string[] => {
-    if (one.kind === "people") return one.names.map((name) => `@${name}`);
-    if (one.kind === "links") return one.targets.map((target) => `[[${target}]]`);
-    return Array.isArray(one.value) ? [...one.value] : one.value === null ? [] : [String(one.value)];
-  };
-  return { kind: "plain", value: [...new Set([...texts(a), ...texts(b)])] };
 }
 
 /** The key of an attribute's property: from its name, none of the task's own nor another name's */
@@ -151,9 +98,9 @@ function read(text: string): Converted | undefined {
   let anyPeople = false;
   let anyLinks = false;
   let anyTags = false;
-  tasks.forEach(({ task, under }, at) => {
+  tasks.forEach(({ task, body }, at) => {
     const marks = inlineMarks(task.text);
-    const values: Record<string, Value> = { [STATUS]: stateOf(task, marks, states) };
+    const values: Record<string, Value> = { [STATUS]: stateOf(task.task, marks, states) };
     const people = [...new Set(marks.flatMap((mark) => (mark.kind === "mention" ? [mark.name] : [])))];
     const links = [...new Set(marks.flatMap((mark) => (mark.kind === "link" ? [mark.name] : [])))];
     const tags = [...new Set(marks.flatMap((mark) => (mark.kind === "tag" ? [mark.name] : [])))];
@@ -171,10 +118,9 @@ function read(text: string): Converted | undefined {
       const byItem = attributes.get(key) ?? new Map<number, ReadValue>();
       attributes.set(key, byItem);
       const was = byItem.get(at);
-      byItem.set(at, was ? joined(was, value) : value);
+      byItem.set(at, was ? joinedValues(was, value) : value);
     }
-    const body = dedented(under);
-    items.push({ name: nameOf(task.text, marks), values, ...(body ? { body } : {}), ...(tags.length ? { tags } : {}), source: escapedAttributes(task.text.trim()) });
+    items.push({ name: nameOf(task.text), values, ...(body ? { body } : {}), ...(tags.length ? { tags } : {}), source: escapedAttributes(task.text.trim()) });
   });
   // (Done last: the states of its own met between In progress and it)
   const options = [...states.filter((one) => one !== DONE_STATE), DONE_STATE];
@@ -203,7 +149,7 @@ const isStateAttribute = (mark: InlineMark) => mark.kind === "attribute" && /^(s
  * A task's status: its attribute `state` or `status` where it has one (the last), else its checkbox (`[ ]` Todo, `[x]`
  * Done) or the state of its own; one of `states` whatever its case, else added to them as first written
  */
-function stateOf(task: TaskLine, marks: readonly InlineMark[], states: string[]): string {
+function stateOf(task: { readonly state: string; readonly done: boolean }, marks: readonly InlineMark[], states: string[]): string {
   const attribute = marks.filter(isStateAttribute).at(-1);
   const given = attribute?.kind === "attribute" ? readAttributeValue(attribute.value) : undefined;
   // (A value YAML reads as a scalar that; another, a list or a map or none it reads, as written; none: the checkbox)
@@ -277,10 +223,11 @@ function write(items: readonly Item[], properties: readonly Property[]): string 
   return lines.length ? `${lines.join("\n")}\n` : "";
 }
 
-export const TASKS_CONVERTER: ConverterDefinition = {
+// (Frozen: a user's converter is given it, HELPERS.tasks, to build on, never to change for every converter)
+export const TASKS_CONVERTER: ConverterDefinition = Object.freeze({
   name: "tasks",
   label: "Tasks",
   description: "A list of tasks: each task an item, its attributes, mentions, links and tags its properties",
   read,
   write,
-};
+});

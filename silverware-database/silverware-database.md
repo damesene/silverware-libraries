@@ -225,19 +225,55 @@ A type that throws or gives back the wrong kind of answer breaks nothing: the va
 A converter reads the lines selected for **Silverware Database: Convert selection to database**; where more than one reads anything, you pick which.
 
 ```js
-// Library/me/converters.js: each line an item, named by it
-export default [
+// Library/me/converters.js: a markdown table, each row an item named by its first cell, the other columns its properties
+export default (HELPERS) => [
   {
-    name: "lines",
-    label: "Lines",
-    description: "Each line an item",
+    name: "table",
+    label: "Table",
+    description: "A markdown table: each row an item",
     read: (text) => {
-      const names = text.split("\n").map((line) => line.replace(/^[-*+] +/, "").trim()).filter(Boolean);
-      return names.length ? { properties: [], items: names.map((name) => ({ name })) } : undefined;
+      // (The first table of the selection, under a heading or in a list too)
+      const table = HELPERS.allBlocks(HELPERS.readBlocks(text)).find((block) => block.kind === "table");
+      if (!table || !table.rows.length) return undefined;
+      const keys = new Set();
+      const columns = table.header.slice(1).map((label, at) => {
+        // (A key of each column's own: two columns of one label, or none, apart)
+        let key = HELPERS.keyFromLabel(label);
+        for (let n = 2; keys.has(key); n++) key = `${HELPERS.keyFromLabel(label)}_${n}`;
+        keys.add(key);
+        const values = new Map(table.rows.flatMap((row, i) => {
+          const value = HELPERS.readValue(row[at + 1] ?? "");
+          return value ? [[i, value]] : [];
+        }));
+        return HELPERS.inferProperty(key, label || key, values);
+      });
+      return {
+        properties: columns.map((column) => column.property),
+        items: table.rows.map((row, i) => ({
+          name: HELPERS.plainText(row[0] ?? ""),
+          values: Object.fromEntries(columns.flatMap((column) => (column.values.has(i) ? [[column.property.key, column.values.get(i)]] : []))),
+        })),
+      };
     },
   },
 ];
 ```
+
+A module of converters may be a function: it is given `HELPERS`, what the built-in converters read with, of no kind of block:
+
+| Helper | What it gives |
+|---|---|
+| `readBlocks(text)` | The text's blocks as a tree, as SilverBullet reads markdown (a frontmatter at its start left out; a bar within a table's cell escaped by a backslash): `heading` (`level`, `text`, `children`: its section, `title`: its own lines), `item` (`list`, `number`, `task` `{ state, done }`, `text`, `children`, `body`: what is under it as written), `paragraph` and `quote` (`text`), `code` (`language`, `text`), `table` (`header`, `rows`: cells), `rule`; each with `lines` `{ from, to }`, the lines it was read from |
+| `allBlocks(blocks)` | Every block of a tree, depth first in the text's order (a table under a heading, in a list) |
+| `readLine(line)` | One line's block: `kind` (as above, or `bullet`, `numbered`, `task`, `blank`), `indent`, `marker`, `content` and where it starts, `contentFrom`; a heading's `level`, a numbered item's `number`, a task's `state` and `done`; `item` where the line starts with a list's marker, whatever its kind (`{ kind, marker, content }`) |
+| `inlineMarks(line)` | A line's hashtags, mentions, wiki links and attributes, each with its name (an attribute's value as written) and where it is |
+| `plainText(text)` | A text without its attributes, its hashtags, mentions and links within a sentence as words, those at its end left out (a task's name is made so) |
+| `readValue(text)` | A value as written (an attribute's, a cell's): `{ kind: "people", names }`, `{ kind: "links", targets }` or `{ kind: "plain", value }` (YAML: a number, `true`, a list…); `undefined` where it is empty |
+| `joinedValues(a, b)` | Two values of one key as one list |
+| `inferProperty(key, label, values)` | A property for a key's values (a `Map` of an item's index to its `readValue`), its type from them (number, date, date and time, checkbox, person, reference, select of several options, text), and each value as that type keeps it: `{ property, values }` |
+| `keyFromLabel(label)`, `labelOfKey(key)` | A property's key from a label (`Due date` → `due_date`), and back |
+| `writeAttribute(name, value)`, `writeTaskLine(state, text)`, `escapedAttributes(line)` | For `write`: an attribute SilverBullet reads back, a task's line, a line whose attributes read as none |
+| `tasks` | The built-in tasks converter, to build on (its `read`, its `write`) |
 
 | Field | What it is |
 |---|---|

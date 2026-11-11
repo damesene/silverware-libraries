@@ -128,7 +128,7 @@ src/formats/
   format.ts     the Format type, Helpers
   registry.ts   built-in and custom, their order, formatsOf(scope)
   custom.ts     the user's definitions checked; a throwing read/write caught
-  helpers.ts    HELPERS (indentOf, numberByIndent, isFence, isUrl, cursor…)
+  helpers.ts    HELPERS (numberByIndent, isUrl, readLine, cursor…)
   block.ts      the Turn into engine
   inline.ts     the toggle and clear engine
   builtin/      one format per file, index.ts their list

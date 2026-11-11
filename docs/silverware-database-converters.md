@@ -197,3 +197,37 @@ written (a paragraph's attribute there still gives the page its value, as in any
    (holding `>`) is left out; a reference not written `[[…]]` is made one; the name's characters reading takes as
    syntax are escaped (`\[`, `` \` ``, `\#`, `\@`…), read back without the backslash. Labels, types and settings come
    back from the values, not as they were. A view showing no item copies nothing.
+
+## Helpers for converters (2026-11-11, agreed with the user)
+
+Converters to come need not be about tasks (a markdown table, a list, sections under headings, CSV), so what a
+converter is given is markdown's structure and values, not tasks. Checked against what Silverware Toolbar's *Turn into*
+reads: the same per line (a line's block kind, its indentation, its text after the marker and where that starts), no
+tree (it rewrites lines in place; its only blocks of several lines are fenced code and numbering by indentation), and
+kinds of its user's own (its format registry). So two layers in `shared/markdown/`:
+
+* **`readLine(line)`**, for *Turn into* and converters alike: `{ kind, indent, marker, content, contentFrom, item }` with
+  `kind` one of `blank`, `paragraph`, `heading` (`level`), `bullet`, `numbered` (`number`), `task` (`state`, `done`;
+  a list item's), `quote`, `table`, `rule`; `item`, a line's list marker whatever its kind (a task's, a rule's `- - -`),
+  what the toolbar's bullet and numbered list read by; standard markdown only (a user's own formats stay the toolbar's registry).
+  Fenced code is `lines.ts`'.
+* **`readBlocks(text)`**, for converters: a tree made of `readLine` (items with the items and lines under them,
+  headings with their section, a table's header and cells, paragraphs, quotes, fenced code), each block with the lines
+  it was read from.
+
+Converters are given, as `HELPERS` (a module's function form, as views and types are): `readLine`, `readBlocks`,
+`inlineMarks`, `plainText` (a text without its marks, as a task's name is made), `readValue` (YAML, people, links),
+`inferProperty`, `keyFromLabel`, `writeAttribute`, `escapedAttributes`; and the tasks converter, to build on.
+
+Steps (a commit each, reviewed; unit tests, the UI tests not run, at the user's word):
+
+1. ~~`readLine` and `readBlocks` in `shared/markdown/blocks.ts`, tested~~ (done 2026-11-11).
+2. ~~The tasks converter on `readBlocks` (its behaviour unchanged: its tests pass as they are)~~ (done 2026-11-11: a
+   task under a heading, or under a list's item that is no task, is one of the top level; a heading's line goes into
+   the body of the task before it, as any line between two tasks).
+3. ~~`CONVERTER_HELPERS` given to `defineConverters`; the library page's *Converters* with them, its example using them~~
+   (done 2026-11-11: `converters/helpers.ts`; what is of no kind of block moved out of the tasks converter into
+   `converters/values.ts`, `plainText`, `readValue`, `joinedValues`; the example a markdown table's converter).
+4. ~~Silverware Toolbar's built-in block formats read through `readLine` (*Turn into* then knows a task of a state of
+   its own, `[IN PROGRESS]`); its user's formats unchanged~~ (done 2026-11-11: `readLine` among the toolbar's HELPERS,
+   which the built-in formats read by, a user's format may too).

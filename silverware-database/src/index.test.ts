@@ -109,6 +109,13 @@ describe("Silverware Database in SilverBullet", () => {
     const tasks = { name: "tasks", label: "Tasks", read: () => undefined };
     expect(defineConverters([tasks, { name: "Bad" }])).toContain(`"Bad" is no converter's name`);
     expect(defineConverters(() => [tasks])).toBeUndefined();
+    // A function is given HELPERS: the built-in converters' own parts
+    let given: Record<string, unknown> = {};
+    defineConverters((helpers: Record<string, unknown>) => ((given = helpers), [tasks]));
+    const names = ["readBlocks", "allBlocks", "readLine", "inlineMarks", "plainText", "readValue", "joinedValues", "inferProperty", "keyFromLabel", "labelOfKey", "writeAttribute", "writeTaskLine", "escapedAttributes", "tasks"];
+    expect(names.filter((name) => given[name] === undefined)).toEqual([]);
+    // Given frozen, the tasks converter too: no converter changes them for the others, the built-in one included
+    expect([Object.isFrozen(given), Object.isFrozen(given.tasks)]).toEqual([true, true]);
     expect(defineConverters("nope")).toBe("Silverware Database: definitions are a list, or a function giving one");
   });
 

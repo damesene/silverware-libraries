@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { type ConverterDefinition, validateConverted, validateConverter } from "./core/converter.ts";
+import { CONVERTER_HELPERS } from "./converters/helpers.ts";
 import { DatabaseCore } from "./core/core.ts";
 import { DatabasePlace, VIEW_KEY } from "./core/place.ts";
 import type { ViewDefinition } from "./core/view.ts";
@@ -39,16 +40,31 @@ describe("the library page's examples", () => {
     expect([type.text(3, {}), type.parse("4", {}), type.parse("9", {}), type.validate(7, {}), type.validate(null, {})]).toEqual(["★★★", { value: 4 }, { problem: "1 to 5" }, "1 to 5", undefined]);
   });
 
-  it("define a converter whose items make a database", async () => {
-    const [lines] = example("Library/me/converters.js", {}) as ConverterDefinition[];
-    expect(validateConverter(lines!)).toBeUndefined();
-    const converted = lines!.read("- First\n- Second\n");
+  it("define a converter, given HELPERS, whose items make a database", async () => {
+    const [table] = example("Library/me/converters.js", CONVERTER_HELPERS) as ConverterDefinition[];
+    expect(validateConverter(table!)).toBeUndefined();
+    const converted = table!.read("| Name | Due | Estimate |\n|---|---|---|\n| Call the client | 2026-11-12 | 3 |\n| Send the offer | | 5 |\n");
     expect(validateConverted(converted)).toBeUndefined();
+    expect(converted!.properties.map((one) => [one.key, one.type])).toEqual([
+      ["due", "date"],
+      ["estimate", "number"],
+    ]);
     const store = new MemoryStore();
     const core = new DatabaseCore(store, new TypeRegistry(), { notify: () => {}, ask: () => true });
     await core.createDatabaseOf("Ideas", converted!);
-    expect((await store.items("ideas")).value.map((item) => item.name)).toEqual(["First", "Second"]);
-    expect(lines!.read("\n")).toBeUndefined();
+    expect((await store.items("ideas")).value.map((item) => [item.name, item.values.due, item.values.estimate])).toEqual([
+      ["Call the client", "2026-11-12", 3],
+      ["Send the offer", undefined, 5],
+    ]);
+    expect(table!.read("No table here")).toBeUndefined();
+    // A table under a heading; two columns of one label, one of none, each a key of its own; an empty name Untitled as made
+    const under = table!.read("# Plan\n\n| Name | Due | due | |\n|---|---|---|---|\n| | 2026-11-12 | x | 3 |\n")!;
+    expect(under.properties.map((one) => [one.key, one.label])).toEqual([
+      ["due", "Due"],
+      ["due_2", "due"],
+      ["property", "property"],
+    ]);
+    expect(under.items[0]).toEqual({ name: "", values: { due: "2026-11-12", due_2: "x", property: 3 } });
   });
 
   it("define a view that lists the items and edits a value in place", async () => {

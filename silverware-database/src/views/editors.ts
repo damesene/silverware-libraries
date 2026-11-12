@@ -99,9 +99,10 @@ function offered(options: readonly string[], typed: string): readonly string[] {
  */
 export function editValue(host: EditorHost, cell: HTMLElement, item: Item, key: string, show: (written?: Item) => void): void {
   const doc = host.document;
-  // (An editor open in the cell already: a click in it, or the cell's own handler again, opens no second one over what is typed)
+  // (An editor open in the cell already: a click in it, or the cell's own handler again, opens no second one over what is
+  // typed; its panel is in the body while it is open, and goes with the cell's content)
   const open = editing.get(cell);
-  if (open && cell.contains(open)) return;
+  if (open?.isConnected) return;
   const property = host.database.properties.find((one) => one.key === key);
   if (key !== NAME && (!property || property.readonly)) return;
   let ended = false;

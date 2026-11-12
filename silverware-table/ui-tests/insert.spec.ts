@@ -2,10 +2,12 @@ import { bodyRows, cell, cursorLine, expect, header, hoverCell, markdown, markTa
 
 test.describe("Another plugin's over the window", () => {
   test("a table under what another plugin shows over the window (a database's peek) shows no + and no toolbar there", async ({ page }) => {
+    // A cell selected: the table has the focus
+    await cell(page, 1, 0).click();
     await hoverCell(page, cell(page, 1, 0));
     const first = (await cell(page, 1, 0).boundingBox())!;
-    await page.mouse.move(first.x - 20, first.y + first.height - 1, { steps: 4 });
-    await expect(page.locator(".swt-insert:not(.swt-quiet).swt-visible")).toHaveCount(1);
+    await page.mouse.move(first.x - 13, first.y + first.height - 1, { steps: 4 });
+    await expect(page.locator(".swt-insert.swt-visible")).toHaveCount(1);
     // Laid over the whole window, marked as the plugins mark what they show over it (shared/overwindow.ts)
     await page.evaluate(() => {
       const over = document.createElement("div");
@@ -14,19 +16,21 @@ test.describe("Another plugin's over the window", () => {
       document.body.append(over);
     });
     await page.mouse.move(first.x - 25, first.y + first.height - 1, { steps: 4 });
-    await expect(page.locator(".swt-insert:not(.swt-quiet).swt-visible")).toHaveCount(0);
+    await expect(page.locator(".swt-insert.swt-visible")).toHaveCount(0);
     await page.mouse.move(first.x + 10, first.y + 5, { steps: 4 });
     await expect(page.locator(".swt-bar.swt-visible")).toHaveCount(0);
   });
 });
 
 test.describe("Inserting rows with a +", () => {
-  test("the + left of the table inserts a row at the border nearest the pointer", async ({ page }) => {
+  test("the + near a dot left of the table inserts a row at that border", async ({ page }) => {
+    // A cell selected: the table has the focus
+    await cell(page, 1, 0).click();
     await hoverCell(page, cell(page, 1, 0));
     const first = (await cell(page, 1, 0).boundingBox())!;
-    // Left of the row grips, on the border under the first row
-    await page.mouse.move(first.x - 20, first.y + first.height - 1, { steps: 4 });
-    const plus = page.locator(".swt-insert:not(.swt-quiet).swt-visible");
+    // Left of the row grips, by the dot on the border under the first row
+    await page.mouse.move(first.x - 13, first.y + first.height - 1, { steps: 4 });
+    const plus = page.locator(".swt-insert.swt-visible");
     await expect(plus).toHaveCount(1);
     await rendersAnew(page, () => plus.click());
     await expect(bodyRows(page)).toHaveCount(7);
@@ -35,20 +39,28 @@ test.describe("Inserting rows with a +", () => {
     expect(await markdown(page)).toMatch(/\| Pear[^\n]*\n\| +\| +\| +\| +\|\n\| apple/);
   });
 
-  test("the + shows quiet until the pointer is on it, and a press near it inserts nothing", async ({ page }) => {
-    await hoverCell(page, cell(page, 1, 0));
-    const first = (await cell(page, 1, 0).boundingBox())!;
-    // In the band left of the row grips, on the border under the first row, left of the + there
-    await page.mouse.move(first.x - 30, first.y + first.height - 1, { steps: 4 });
-    const plus = page.locator(".swt-insert:not(.swt-quiet).swt-visible");
-    await expect(plus).toHaveCount(1);
-    const box = (await plus.boundingBox())!;
-    // Not on the + itself
-    expect(first.x - 30).toBeLessThan(box.x);
-    const look = () => plus.evaluate((el) => getComputedStyle(el).borderStyle);
+  test("dots show only while the table has the focus, a + only near one with its line, and a press beside it inserts nothing", async ({ page }) => {
+    const dots = page.locator(".swt-insert-dots.swt-visible > span:not([hidden])");
+    const plus = page.locator(".swt-insert.swt-visible");
     const line = page.locator(".swt-insert-line.swt-visible");
-    expect(await look()).toBe("dashed");
-    await expect(line).not.toHaveClass(/swt-lit/);
+    const first = (await cell(page, 1, 0).boundingBox())!;
+    const border = first.y + first.height - 1;
+    // Hovered only: no dots, and no + where the dot would be
+    await hoverCell(page, cell(page, 1, 0));
+    await page.mouse.move(first.x - 13, border, { steps: 4 });
+    await expect(dots).toHaveCount(0);
+    await expect(plus).toHaveCount(0);
+    // A cell selected: a dot on each border, left of the table and above it
+    await cell(page, 1, 0).click();
+    await expect(dots.first()).toBeVisible();
+    // Near the dot: the +, its line with it
+    await page.mouse.move(first.x - 13, border, { steps: 4 });
+    await expect(plus).toHaveCount(1);
+    await expect(line).toHaveCount(1);
+    // Out in the band past the dot: neither, and a press there writes nothing
+    await page.mouse.move(first.x - 28, border, { steps: 2 });
+    await expect(plus).toHaveCount(0);
+    await expect(line).toHaveCount(0);
     const before = await markdown(page);
     await markTable(page);
     await page.mouse.down();
@@ -56,17 +68,25 @@ test.describe("Inserting rows with a +", () => {
     await settled(page);
     await expect(page.locator("table[data-test-old]")).toHaveCount(1);
     expect(await markdown(page)).toBe(before);
-    // On the +: lit, its line too
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 2 });
-    await expect.poll(look).not.toBe("dashed");
-    await expect(line).toHaveClass(/swt-lit/);
+    // Away from the table (its controls gone), then straight to a dot from outside it: the + there
+    await page.mouse.move(Math.max(2, first.x - 200), border, { steps: 4 });
+    await expect(page.locator(".swt-grip.swt-visible")).toHaveCount(0);
+    await page.mouse.move(first.x - 13, border, { steps: 8 });
+    await expect(plus).toHaveCount(1);
+    // Esc ends the selection: the table has the focus no more, its dots go
+    await page.keyboard.press("Escape");
+    await expect(dots).toHaveCount(0);
   });
 
-  test("the quiet + under the last row adds a row at the end", async ({ page }) => {
-    await hoverCell(page, bodyRows(page).last().locator("td").first());
-    const quiet = page.locator(".swt-insert.swt-quiet.swt-visible");
-    await expect(quiet.first()).toBeVisible();
-    await rendersAnew(page, () => quiet.first().click());
+  test("the dot under the last row brings up a + adding a row at the end", async ({ page }) => {
+    const last = bodyRows(page).last().locator("td").first();
+    await last.click();
+    await hoverCell(page, last);
+    const box = (await last.boundingBox())!;
+    await page.mouse.move(box.x - 13, box.y + box.height + 1, { steps: 4 });
+    const plus = page.locator(".swt-insert.swt-visible");
+    await expect(plus).toHaveCount(1);
+    await rendersAnew(page, () => plus.click());
     await expect(bodyRows(page)).toHaveCount(7);
     expect(await markdown(page)).toMatch(/\| Šípek[^\n]*\n\| +\| +\| +\| +\|\n/);
   });

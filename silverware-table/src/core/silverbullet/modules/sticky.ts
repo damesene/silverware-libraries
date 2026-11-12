@@ -79,6 +79,7 @@ export class Sticky implements AdapterFeature {
       const box = this.host.innerBox(widget);
       const pageTop = scroller.top + gap;
       const boxTop = inside ? box.top : -Infinity;
+      const boxBottom = inside ? box.bottom : Infinity;
       const table = info.table.getBoundingClientRect();
       // Rows pinned to the bottom first: held at the bottom of the view (the
       // page, or the table's box), never above the header's own place
@@ -86,7 +87,6 @@ export class Sticky implements AdapterFeature {
       let footTop = table.bottom - footHeight;
       if (foot && footHeight > 0) {
         const pageBottom = scroller.bottom;
-        const boxBottom = inside ? box.bottom : Infinity;
         const lift = Math.min(
           0,
           Math.max(Math.min(pageBottom, boxBottom) - table.bottom, -(table.height - head.offsetHeight - footHeight)),
@@ -95,8 +95,9 @@ export class Sticky implements AdapterFeature {
         foot.classList.toggle("swt-stuck", lift < 0);
         footTop += lift;
       }
-      // The header (with the rows pinned to the top): never past the bottom rows
-      const offset = Math.max(0, Math.min(Math.max(pageTop, boxTop), footTop - head.offsetHeight) - table.top);
+      // The header (with the rows pinned to the top): never past the bottom rows, nor out of the table's box (a box
+      // scrolling its table up and down ends before the table: held past it, the header still measured in view, cut)
+      const offset = Math.max(0, Math.min(Math.max(pageTop, boxTop), footTop - head.offsetHeight, boxBottom - head.offsetHeight) - table.top);
       head.style.transform = offset > 0 ? `translateY(${offset}px)` : "";
       head.classList.toggle("swt-stuck", offset > 0);
       widget.classList.toggle(HELD_BY_PAGE, inside && offset > 0 && pageTop > boxTop + 0.5);

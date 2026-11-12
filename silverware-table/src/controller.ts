@@ -290,7 +290,11 @@ export class Controller implements TableHost {
       holdRow: (widget, info, row) => this.holdRow(widget, info, row),
       releaseRow: () => this.releaseRow(),
       editingEnded: (widget) => this.editingEnded(widget),
-      editingStarted: () => this.touchKeyboard.editorOpened(),
+      editingStarted: () => {
+        this.touchKeyboard.editorOpened();
+        // Its table has the focus: the dots of the +
+        this.queueDots();
+      },
       fieldClosing: (field) => this.touchKeyboard.keepKeyboard(field),
       navigating: (on) => {
         this.navigating = on;
@@ -324,7 +328,11 @@ export class Controller implements TableHost {
       host: this,
       hovered: () => ({ widget: this.hoverWidget, cell: this.hoverCell }),
       hoverTable: (widget) => {
+        if (this.hoverWidget === widget) return;
         this.hoverWidget = widget;
+        // Hovered as the pointer came over it: its toolbar shows
+        const info = this.infos.get(widget);
+        if (info) this.toolbar.show(widget, info);
       },
       hoverAt: (widget, info, cell) => this.hoverAt(widget, info, cell),
       pointer: () => this.lastPointer,
@@ -339,6 +347,9 @@ export class Controller implements TableHost {
       this.queueSettingsRefresh();
     });
     this.queueStickyUpdate = oncePerFrame(doc, () => this.followLayout());
+    this.queueDots = oncePerFrame(doc, () => {
+      if (!this.stopped) this.insert.showDots();
+    });
     this.queueFeaturesLayout = oncePerFrame(doc, () => {
       if (!this.stopped) for (const feature of this.features) feature.layoutChanged?.();
     });
@@ -957,7 +968,11 @@ export class Controller implements TableHost {
     }
     await Promise.all(pending);
     const shown = new Set(this.enhancedWidgets());
-    if ([...this.scanned].some((widget) => !shown.has(widget))) this.queueFeaturesLayout();
+    if ([...this.scanned].some((widget) => !shown.has(widget))) {
+      this.queueFeaturesLayout();
+      // The table with the focus may be among them: its dots go
+      this.queueDots();
+    }
     this.scanned = shown;
   }
 
@@ -1340,8 +1355,9 @@ export class Controller implements TableHost {
     );
   }
 
-  /** The cell editor closed: a sorting waiting for it is stored */
+  /** The cell editor closed: a sorting waiting for it is stored; the dots of the + go where nothing else keeps the focus */
   private editingEnded(widget: HTMLElement): void {
+    this.queueDots();
     const key = this.infos.get(widget)?.key;
     if (key && this.sortsWaiting.delete(key)) this.scheduleSortStore(key);
   }
@@ -2238,7 +2254,7 @@ export class Controller implements TableHost {
     // The features' panels follow what they are anchored to (a formula's help: the popup placed first)
     this.panels.placeAll();
     for (const feature of this.features) feature.layoutChanged?.();
-    this.insert.showQuiet();
+    this.insert.showDots();
     // After the header has moved: controls that point at it follow
     this.followScroll();
   }
@@ -2316,6 +2332,8 @@ export class Controller implements TableHost {
   // width handle, was in the drawn one)
   private readonly drawnKeys = new Set<TableKey>();
   private readonly queueUncover: () => void;
+  // The dots of the + placed anew in the next frame (InsertControls.showDots)
+  private readonly queueDots: () => void;
 
   // A write of each table going on: the next of the table waits for it
   private readonly writing = new Map<TableKey, Promise<void>>();
@@ -2783,18 +2801,18 @@ export class Controller implements TableHost {
     this.cellHovered(widget, info, cell);
   }
 
-  /** A cell is hovered or edited (or the page moved under it): the features follow it; the quiet + of a last row or column */
+  /** A cell is hovered or edited (or the page moved under it): the features follow it */
   private cellHovered(widget: HTMLElement, info: WidgetInfo, cell: HTMLTableCellElement): void {
     const ref = this.cellRef(info, cell);
     for (const feature of this.features) {
       feature.cellHovered?.(widget, info, cell);
       if (ref) feature.hovered?.(info, ref);
     }
-    this.insert.showQuiet();
   }
 
   selectionChanged(): void {
-    this.insert.showQuiet();
+    // In the next frame: a selection shown again as its table is enhanced would measure it amid the features' writes
+    this.queueDots();
     for (const feature of this.features) feature.selectionChanged?.();
   }
 
@@ -2912,7 +2930,6 @@ export class Controller implements TableHost {
   /** No cell is hovered: the grips go, and with `closeMenus` an open menu */
   private endHover(closeMenus: boolean): void {
     this.hoverCell = undefined;
-    this.insert.showQuiet();
     for (const feature of this.features) feature.hoverEnded?.(closeMenus);
   }
 
@@ -2922,8 +2939,6 @@ export class Controller implements TableHost {
     this.toolbar.hide();
     this.insert.hidePointers();
     this.hoverWidget = undefined;
-    // A selected cell's quiet + stays
-    this.insert.showQuiet();
   }
 
   // ---- the cell menu: right click, a long press, the Menu key ------------------

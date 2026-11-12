@@ -19,10 +19,12 @@ const TASKS: Database = {
 
 
 /** The items of the place's menu shown now: each its label (with its value) and whether it is checked */
-const menuShown = (root: ParentNode) => [...root.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].map((one) => [one.querySelector(".swd-label")!.textContent, one.getAttribute("aria-checked")]);
+/** The open menu's items (in the body while it shows) */
+const menuShown = () => [...document.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].map((one) => [one.querySelector(".swd-label")!.textContent, one.getAttribute("aria-checked")]);
 /** An item of the place's menu chosen by its label (its value after it left out) */
-const choose = (root: ParentNode, label: string) => {
-  const item = [...root.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].find((one) => one.querySelector(".swd-label")!.textContent!.split(": ")[0] === label);
+/** An item of the open menu (in the body while it shows) pressed, by its label */
+const choose = (label: string) => {
+  const item = [...document.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].find((one) => one.querySelector(".swd-label")!.textContent!.split(": ")[0] === label);
   if (!item) throw new Error(`No item "${label}" in the menu`);
   item.click();
 };
@@ -89,7 +91,7 @@ function setup(views: readonly ViewDefinition[], state: Record<string, unknown> 
   const switches = () => {
     const picker = element.querySelector<HTMLButtonElement>(".swd-view-picker")!;
     if (picker.getAttribute("aria-expanded") !== "true") picker.click();
-    return [...element.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].map((item) => Object.assign(item, { view: item.querySelector(".swd-label")!.textContent!.toLowerCase() }));
+    return [...document.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].map((item) => Object.assign(item, { view: item.querySelector(".swd-label")!.textContent!.toLowerCase() }));
   };
   return { store, element, viewState, place, listed, switches, opened, core, told };
 }
@@ -122,15 +124,38 @@ describe("a place", () => {
 
   it("closes the picker's menu as the place is drawn anew, and offers none where no view is on", async () => {
     const [table, board] = [listView("table"), listView("board")];
-    const { place, switches, element } = setup([table.view, board.view]);
+    const { place, switches } = setup([table.view, board.view]);
     await place.render();
     expect(switches()).toHaveLength(2);
     await place.render();
-    expect(element.querySelectorAll(".swd-menu .swd-menu-item")).toHaveLength(0);
+    expect(document.querySelectorAll(".swd-menu .swd-menu-item")).toHaveLength(0);
     const none = setup([]);
     await none.place.render();
     const picker = none.element.querySelector<HTMLButtonElement>(".swd-view-picker")!;
     expect([picker.disabled, picker.title]).toEqual([true, "No view is on: turn one on in the settings"]);
+  });
+
+  it("shows ⋯'s menu in the body, over the other plugins' controls, back in its tool's box as it closes; gone with the place", async () => {
+    const { place, element } = setup([listView("table").view]);
+    document.body.append(element);
+    await place.render();
+    const more = element.querySelector<HTMLButtonElement>(".swd-more")!;
+    more.click();
+    const menu = document.querySelector<HTMLElement>(".swd-menu:not([hidden])")!;
+    expect([menu.parentElement, menu.classList.contains("swd-lifted")]).toEqual([document.body, true]);
+    more.click();
+    expect([menu.hidden, menu.parentElement, menu.classList.contains("swd-lifted")]).toEqual([true, more.parentElement, false]);
+    // Tab past its last control: closed, the focus back on ⋯
+    more.click();
+    const controls = [...menu.querySelectorAll<HTMLElement>("button, [tabindex]:not([tabindex='-1'])")];
+    controls[controls.length - 1]!.focus();
+    controls[controls.length - 1]!.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
+    expect([menu.hidden, document.activeElement]).toEqual([true, more]);
+    // Open as the place leaves the page: closed, nothing of it left in the body
+    more.click();
+    element.remove();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(document.body.contains(menu)).toBe(false);
   });
 
   it("switches views, writing the place's state, the view left told", async () => {
@@ -300,18 +325,18 @@ describe("a place", () => {
     const { place, element, viewState, store } = setup([table.view]);
     await place.render();
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    expect(menuShown(element)).toEqual([["Visible properties: All shown", null], ["Group: None", null], ["Color by: None", null]]);
+    expect(menuShown()).toEqual([["Visible properties: All shown", null], ["Group: None", null], ["Color by: None", null]]);
     // Group, then Group by in its place: every property offered, and None, checked: nothing grouped yet
-    choose(element, "Group");
-    expect(menuShown(element)).toEqual([["Group by: None", null]]);
-    choose(element, "Group by");
-    expect(menuShown(element)).toEqual([
+    choose("Group");
+    expect(menuShown()).toEqual([["Group by: None", null]]);
+    choose("Group by");
+    expect(menuShown()).toEqual([
       ["None", "true"],
       ["Status", "false"],
     ]);
-    choose(element, "Status");
+    choose("Status");
     // (Chosen, the menu closed)
-    expect(element.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(true);
+    expect((element.querySelector(".swd-more")!.getAttribute("aria-expanded") !== "true")).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(viewState.get("table.groupBy")).toBe("status");
     const sections = () => [...element.querySelectorAll(".swd-group")].map((one) => [one.querySelector(".swd-group-label")!.textContent, [...one.querySelectorAll("li")].map((li) => li.textContent)]);
@@ -335,9 +360,9 @@ describe("a place", () => {
     ]);
     // None: one view again
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    choose(element, "Group");
-    choose(element, "Group by");
-    choose(element, "None");
+    choose("Group");
+    choose("Group by");
+    choose("None");
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(element.querySelectorAll(".swd-group")).toHaveLength(0);
     expect(element.querySelectorAll("li")).toHaveLength(3);
@@ -384,14 +409,14 @@ describe("a place", () => {
     const { place, element, told } = setup([listView("table").view], { "table.sort": [{ key: "name", direction: "desc" }] }, {}, 0, undefined, [lines, reader, broken]);
     await place.render();
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    expect(menuShown(element).map(([label]) => label)).toContain("Copy as lines");
-    expect(menuShown(element).map(([label]) => label)).not.toContain("Copy as reader");
-    choose(element, "Copy as lines");
+    expect(menuShown().map(([label]) => label)).toContain("Copy as lines");
+    expect(menuShown().map(([label]) => label)).not.toContain("Copy as reader");
+    choose("Copy as lines");
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(written).toEqual(["Write docs\nFix login"]);
     expect(told.at(-1)).toBe("2 items copied as lines");
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    choose(element, "Copy as broken");
+    choose("Copy as broken");
     expect(told.at(-1)).toBe('The converter "broken" did not write: no');
     delete (navigator as { clipboard?: unknown }).clipboard;
   });
@@ -408,18 +433,18 @@ describe("a place", () => {
     const { place, element } = setup([view], {}, {}, 0, () => void asked++);
     await place.render();
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    expect(menuShown(element).map(([label]) => label)).toEqual(["Mine", "Visible properties: All shown", "Group: None", "Color by: None", "Density", "Edit source"]);
-    choose(element, "Density");
+    expect(menuShown().map(([label]) => label)).toEqual(["Mine", "Visible properties: All shown", "Group: None", "Color by: None", "Density", "Edit source"]);
+    choose("Density");
     expect(ran).toEqual(["density"]);
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    choose(element, "Edit source");
+    choose("Edit source");
     expect(asked).toBe(1);
     // A view never grouped nor colored, showing no property, without a block: ⋯ still, its title the database's name to rename, no entry
     const without = setup([{ ...table.view, groupBy: false, colors: false, properties: false }]);
     await without.place.render();
     without.element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    expect(menuShown(without.element)).toEqual([]);
-    expect(without.element.querySelector(".swd-menu-title-text")!.textContent).toBe("Tasks");
+    expect(menuShown()).toEqual([]);
+    expect(document.querySelector(".swd-menu-title-text")!.textContent).toBe("Tasks");
   });
 
   it("renames the database by the pencil in ⋯'s title, its id kept; an empty name refused under the field", async () => {
@@ -429,24 +454,24 @@ describe("a place", () => {
     await place.render();
     const rename = async (name: string) => {
       element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-      element.querySelector<HTMLButtonElement>(".swd-menu-rename")!.click();
-      const field = element.querySelector<HTMLInputElement>(".swd-menu-name")!;
+      document.querySelector<HTMLButtonElement>(".swd-menu-rename")!.click();
+      const field = document.querySelector<HTMLInputElement>(".swd-menu-name")!;
       expect(field.value).toBe((await store.database("tasks"))!.value.name);
       field.value = name;
       field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
       await new Promise((resolve) => setTimeout(resolve, 10));
     };
     await rename("   ");
-    expect(element.querySelector(".swd-menu-name-problem")!.textContent).toContain("needs a name");
+    expect(document.querySelector(".swd-menu-name-problem")!.textContent).toContain("needs a name");
     expect((await store.database("tasks"))!.value.name).toBe("Tasks");
     // Esc in the field leaves it, the menu staying
-    element.querySelector(".swd-menu-name")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
-    expect(element.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(false);
-    element.querySelector<HTMLButtonElement>(".swd-menu-close")!.click();
+    document.querySelector(".swd-menu-name")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    expect((element.querySelector(".swd-more")!.getAttribute("aria-expanded") !== "true")).toBe(false);
+    document.querySelector<HTMLButtonElement>(".swd-menu-close")!.click();
     await rename("Jobs");
     expect((await store.database("tasks"))!.value).toMatchObject({ id: "tasks", name: "Jobs" });
     expect(element.querySelector(".swd-place-name")!.textContent).toBe("Jobs");
-    expect(element.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(true);
+    expect((element.querySelector(".swd-more")!.getAttribute("aria-expanded") !== "true")).toBe(true);
     element.remove();
   });
 
@@ -505,21 +530,21 @@ describe("a place", () => {
       return box;
     };
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    choose(element, "Group");
+    choose("Group");
     document.querySelector<HTMLButtonElement>(".swd-group-eye")!.click();
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(viewState.get("table.groupHidden")).toEqual(['value:"Todo"']);
     expect([...element.querySelectorAll(".swd-group-label")].map((one) => one.textContent)).toEqual(["Done"]);
     // Another block of the database drawn meanwhile: nothing of it
     const other = await next(false);
-    expect(other.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(true);
+    expect((other.querySelector(".swd-more")!.getAttribute("aria-expanded") !== "true")).toBe(true);
     other.remove();
     element.remove();
     const second = await next();
-    expect(second.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(false);
-    expect(document.activeElement).toBe([...second.querySelectorAll<HTMLElement>(".swd-group-row")].find((row) => row.dataset.group === 'value:"Todo"')!.querySelector(".swd-group-eye"));
+    expect((second.querySelector(".swd-more")!.getAttribute("aria-expanded") !== "true")).toBe(false);
+    expect(document.activeElement).toBe([...document.querySelectorAll<HTMLElement>(".swd-group-row")].find((row) => row.dataset.group === 'value:"Todo"')!.querySelector(".swd-group-eye"));
     // Closed by the user: the place after it opens nothing
-    second.querySelector(".swd-menu [role=menu]")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    document.querySelector(".swd-menu [role=menu]")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
     // A filter typed (shown, nothing written while it is typed in), the block drawn anew meanwhile (a write of another
     // part of it): the next place has it all, the panel open, the focus and the caret in the field, shown as typed, and
     // keeps it once the field is left; the place before writes nothing
@@ -533,7 +558,7 @@ describe("a place", () => {
     expect(viewState.get("table.filter")).toBeUndefined();
     second.remove();
     const third = await next();
-    expect(third.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(true);
+    expect((third.querySelector(".swd-more")!.getAttribute("aria-expanded") !== "true")).toBe(true);
     expect(third.querySelector<HTMLElement>(".swd-filter")!.hidden).toBe(false);
     const typed = third.querySelector<HTMLInputElement>('.swd-filter input[data-key="name"]')!;
     expect([typed.value, document.activeElement === typed, typed.selectionStart]).toEqual(["Fi", true, 1]);
@@ -555,11 +580,11 @@ describe("a place", () => {
     const more = element.querySelector<HTMLButtonElement>(".swd-more")!;
     more.click();
     expect(told.at(-1)).toContain("its menu gave no list of groups");
-    expect(menuShown(element).map(([label]) => label)).toEqual(["Visible properties: All shown", "Group: None", "Color by: None"]);
-    choose(element, "Group");
-    choose(element, "Group by");
-    element.querySelector(".swd-menu [role=menu]")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
-    expect(element.querySelector<HTMLElement>(".swd-more + .swd-menu")!.hidden).toBe(true);
+    expect(menuShown().map(([label]) => label)).toEqual(["Visible properties: All shown", "Group: None", "Color by: None"]);
+    choose("Group");
+    choose("Group by");
+    document.querySelector(".swd-menu [role=menu]")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    expect((element.querySelector(".swd-more")!.getAttribute("aria-expanded") !== "true")).toBe(true);
     expect(document.activeElement).toBe(more);
     element.remove();
   });

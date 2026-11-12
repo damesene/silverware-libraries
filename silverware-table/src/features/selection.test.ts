@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { PAGE, cell, clickOn, controller, editor, flashes, flush, key, press, setup, text, useTablePage } from "../testing/page.ts";
+import { PAGE, cell, clickOn, controller, editor, flashes, flush, key, pointInsert, press, setup, tableKey, text, useTablePage } from "../testing/page.ts";
 
 describe("Selecting cells", () => {
   useTablePage();
@@ -25,8 +25,10 @@ describe("Selecting cells", () => {
     cell(3, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
     clickOn(cell(3, 0));
     expect(cell(3, 0).classList.contains("swt-selected")).toBe(true);
-    // The quiet + under the last row (a floating control: the press leaves the selection)
-    press(document.querySelector('.swt-insert.swt-quiet[aria-label="Add a row"]')!, "mousedown");
+    // The + under the last row (a floating control: the press leaves the selection; jsdom has no layout to hover
+    // it: set as the pointer would)
+    pointInsert({ key: tableKey(), axis: "row", at: 4, beside: { after: 3 } }, true);
+    press(document.querySelector(".swt-insert")!, "mousedown");
     for (let i = 0; i < 5 && !editor.querySelector(".swt-cell-editor"); i++) {
       await flush();
       await controller.scan();

@@ -13,6 +13,7 @@ import { el } from "../../../../shared/elements.ts";
 import type { ViewDefinition, ViewHost } from "../../core/view.ts";
 import type { Item, Property } from "../../model/database.ts";
 import { editValue, NAME, toggle } from "../editors.ts";
+import { FLOAT_HOME_SELECTOR } from "../float.ts";
 import { createInGroup, foldedOf, groupHead, setFolded } from "../groups.ts";
 import { ownIcon, VIEW_ICONS } from "../icons.ts";
 import { rowGrip } from "../order.ts";
@@ -136,7 +137,7 @@ function cell(host: ViewHost, item: Item, column: Column, editing: Editing): HTM
       td.classList.add("swd-editing");
       editValue(host, td, item, column.key, show);
       // (Only where an editor took the cell: else what it shows stays as it is)
-      if (editing.cell === td && td.querySelector(":scope > .swd-editor") && !shown.some((node) => td.contains(node))) td.append(el(host.document, "span", { class: "swd-editing-held", attrs: { "aria-hidden": "true" } }, ...shown));
+      if (editing.cell === td && td.querySelector(`:scope > :is(.swd-editor, ${FLOAT_HOME_SELECTOR})`) && !shown.some((node) => td.contains(node))) td.append(el(host.document, "span", { class: "swd-editing-held", attrs: { "aria-hidden": "true" } }, ...shown));
     };
     // Reached by Tab, edited by Enter or F2, as a click edits it
     td.tabIndex = 0;

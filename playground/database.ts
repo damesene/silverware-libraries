@@ -3,6 +3,7 @@
 // its own, as a code block would show it, with the playground's views
 // (database-views.ts) until the built-in ones come (step 5). Kept for the
 // visit: a reload starts from the sample.
+import { applyLayers } from "../shared/layers.ts";
 import { DatabaseCore } from "../silverware-database/src/core/core.ts";
 import { Modules } from "../silverware-database/src/core/module.ts";
 import { BUILT_IN_MODULES } from "../silverware-database/src/modules/builtin.ts";
@@ -70,6 +71,8 @@ const EDITOR = { open: (ref: string) => flash(`Open ${ref}`), openMention: (name
 let places: DatabasePlace[] = [];
 
 function start(): void {
+  // The layers its style page lays its elements in, as Silverware Database's init sets them
+  applyLayers(document);
   for (const place of places) place.destroy();
   store = new MemoryStore(SAMPLE_DATABASES);
   const types = new TypeRegistry();

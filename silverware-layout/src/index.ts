@@ -2,20 +2,24 @@
 // widgets laid out and the handle of their width (widgetlayout.ts), the page's text width (its own, the default
 // setting's, none in a narrow pane) set as pages open and change, and the Page layout dialog. Its init page hands over
 // SilverBullet's API (bridge.ts) and calls `pageLoaded`, `pageOpened` and `pageEdited`.
+import { applyLayers } from "../../shared/layers.ts";
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { type PageWriter, pageWriter } from "../../shared/pages/writer.ts";
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { Registry } from "./core/registry.ts";
 import { textWidthShown } from "./core/textwidth.ts";
-import { markNarrow, paneWidth, showTextWidth, watchPaneWidth } from "./host/silverbullet/dom.ts";
+import { markNarrow, paneWidth, showTextWidth, themeTextWidth, watchPaneWidth } from "./host/silverbullet/dom.ts";
 import { pageLayoutOf, writePageWidth } from "./host/silverbullet/page.ts";
 import { silverBulletPlatform } from "./host/silverbullet/platform.ts";
-import { DEFAULT_MIN_PANE_WIDTH, DEFAULT_PRESETS, PATHS, readSettings, type Settings } from "./model/settings.ts";
+import { DEFAULT_GUIDES, DEFAULT_MIN_PANE_WIDTH, keptGuides, PATHS, readSettings, type Settings } from "./model/settings.ts";
 import { cssWidth, readWidth, type Width } from "./model/width.ts";
 import { PageDialog } from "./ui/pagedialog.ts";
 import { layOutWidgets, type WidgetLayout } from "./widgetlayout.ts";
 
 const PAGE_LAYOUT = "Silverware Layout: Page layout";
+// Silverware Layout's own block of CONFIG: the guides, a list, which the Configuration Manager's block would lose
+// (shared/configpage.ts)
+const OWN_MARKER = "-- managed-by: silverware-layout";
 // How long the page is still before its frontmatter is read again after an edit
 const EDITED_MS = 300;
 
@@ -46,6 +50,8 @@ export const api = registry.api();
 
 /** Started by the init page (again as Space Lua loads again): SilverBullet's API handed over, the settings read */
 export async function init(bridge: Bridge): Promise<void> {
+  // The layers its style page lays its elements in (shared/layers.ts)
+  applyLayers(document);
   const missing = missingBridgeFunctions(bridge);
   if (missing.length) {
     console.error(`Silverware Layout: the init page did not hand over ${missing.join(", ")}`);
@@ -58,7 +64,7 @@ export async function init(bridge: Bridge): Promise<void> {
     if (!dialog?.isOpen) show();
   });
   widgetLayout ??= layOutWidgets(document, registry, {
-    presets: () => app?.settings.presets ?? DEFAULT_PRESETS,
+    guides: () => app?.settings.guides ?? DEFAULT_GUIDES,
     enabled: () => !!app && paneWidth(document) >= app.settings.minPaneWidth,
     problem: (message) => void app?.bridge.flash(message, "error"),
   });
@@ -68,7 +74,7 @@ export async function init(bridge: Bridge): Promise<void> {
 
 /** The settings as configured (none read: the defaults) */
 async function settingsOf(bridge: Bridge): Promise<Settings> {
-  if (!bridge.getConfig) return { textWidth: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, presets: DEFAULT_PRESETS };
+  if (!bridge.getConfig) return { textWidth: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, guides: DEFAULT_GUIDES };
   const values = new Map<string, unknown>();
   for (const path of Object.values(PATHS)) values.set(path, await bridge.getConfig(path, undefined));
   return readSettings((path) => values.get(path));
@@ -143,8 +149,10 @@ async function openPageDialog(): Promise<void> {
     page: now.page,
     pageWidth: now.pageWidth,
     defaultWidth: now.settings.textWidth,
-    presets: now.settings.presets,
-    canSaveDefault: !!bridge.saveConfigPage,
+    guides: now.settings.guides,
+    canSaveSettings: !!bridge.saveConfigPage,
+    paneWidth: () => paneWidth(document),
+    themeWidth: () => themeTextWidth(document),
     preview: (pageWidth, fallback) => showWith(pageWidth, fallback),
     restore: () => show(),
     savePage: async (width) => {
@@ -158,6 +166,13 @@ async function openPageDialog(): Promise<void> {
         withConfigSettings(text, { [PATHS.textWidth]: width ? cssWidth(width) : undefined }),
       );
       now.settings = { ...now.settings, textWidth: width };
+      return undefined;
+    },
+    saveGuides: async (guides) => {
+      await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
+        withConfigSettings(text, { [PATHS.guides]: keptGuides(guides) }, OWN_MARKER),
+      );
+      now.settings = { ...now.settings, guides };
       return undefined;
     },
     confirm: async (question) => (bridge.confirm ? !!(await bridge.confirm(question)) : globalThis.confirm(question)),

@@ -4,6 +4,7 @@
 // the commands; the API page defines the user's own views, types and
 // converters (`defineViews`, `defineTypes`, `defineConverters`), before
 // `init`, as Space Lua loads.
+import { applyLayers } from "../../shared/layers.ts";
 import { iconsOf } from "../../shared/icons.ts";
 import { layoutOf } from "../../shared/layout.ts";
 import { linesOf, linesUnder } from "../../shared/markdown/lines.ts";
@@ -121,6 +122,8 @@ const COMMANDS: Readonly<Record<string, () => Promise<void>>> = {
 };
 
 export function init(bridge: Bridge): void {
+  // The layers its style page lays its elements in (shared/layers.ts)
+  applyLayers(document);
   // Space Lua loaded again: the places of before let go (their listeners with them), one tidying; the blocks shown are
   // taken over and drawn anew below (SilverBullet may keep their elements)
   const before = app?.shown ?? new Map<HTMLElement, Shown>();

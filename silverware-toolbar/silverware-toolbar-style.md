@@ -13,7 +13,7 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
    !important (Tiniri does) */
 .swb-floating {
   position: fixed;
-  z-index: 60;
+  z-index: var(--sw-layer-menu);
   display: none !important;
   box-sizing: border-box;
   font: 13px/1.3 var(--ui-font, system-ui, sans-serif);
@@ -530,7 +530,7 @@ html[data-theme="dark"] .swb-dock-shade {
   top: var(--sw-view-top, 0);
   bottom: auto;
   height: var(--sw-view-height, 100%);
-  z-index: 100;
+  z-index: var(--sw-layer-dialog);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -914,7 +914,7 @@ html[data-theme="dark"] .swb-dock-shade {
 }
 .swb-settings-ghost {
   position: fixed;
-  z-index: 101;
+  z-index: var(--sw-layer-dragged);
   margin: 0;
   pointer-events: none;
   box-sizing: border-box;

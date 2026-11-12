@@ -80,7 +80,7 @@ The look of [Silverware Chart](silverware-chart.md): a chart's box, its toolbar,
 /* The toolbar of the chart hovered and its menu, floating in the page (Silverware Table's look) */
 .swc-floating {
   position: fixed;
-  z-index: 50;
+  z-index: var(--sw-layer-control);
   display: none !important;
   font-family: var(--ui-font, system-ui, sans-serif);
 }
@@ -119,7 +119,7 @@ The look of [Silverware Chart](silverware-chart.md): a chart's box, its toolbar,
 }
 
 .swc-menu {
-  z-index: 60;
+  z-index: var(--sw-layer-menu);
   flex-direction: column;
   min-width: 220px;
   max-width: 340px;
@@ -607,7 +607,7 @@ The look of [Silverware Chart](silverware-chart.md): a chart's box, its toolbar,
   top: var(--sw-view-top, 0);
   bottom: auto;
   height: var(--sw-view-height, 100%);
-  z-index: 100;
+  z-index: var(--sw-layer-dialog);
   display: flex;
   align-items: center;
   justify-content: center;

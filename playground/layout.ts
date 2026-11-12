@@ -3,16 +3,19 @@
 // code widget). The provider keeps each widget's entries in memory and, written, draws the widget anew (a new element,
 // as SilverBullet does after an edit); "Refuse writes" makes it refuse them, as a table with its metadata setting off.
 // Its style page's CSS applied as SilverBullet would.
+import { applyLayers } from "../shared/layers.ts";
 import stylePage from "../silverware-layout/silverware-layout-style.md";
 import type { LayoutChanges, LayoutEntries, LayoutProvider } from "../shared/layout.ts";
 import { layoutOf } from "../shared/layout.ts";
 import { Registry } from "../silverware-layout/src/core/registry.ts";
 import { markNarrow, paneWidth } from "../silverware-layout/src/host/silverbullet/dom.ts";
-import { DEFAULT_MIN_PANE_WIDTH, DEFAULT_PRESETS } from "../silverware-layout/src/model/settings.ts";
+import { DEFAULT_MIN_PANE_WIDTH, DEFAULT_GUIDES, type Guide } from "../silverware-layout/src/model/settings.ts";
 import { layOutWidgets } from "../silverware-layout/src/widgetlayout.ts";
 import { flash, setUpTheme } from "./common.ts";
 
 setUpTheme();
+// The layers its style page lays its elements in, as Silverware Layout's init sets them
+applyLayers(document);
 const style = document.createElement("style");
 style.textContent = /```space-style\r?\n([\s\S]*?)```/.exec(stylePage)?.[1] ?? "";
 document.head.append(style);
@@ -72,7 +75,10 @@ const enabled = () => paneWidth(document) >= DEFAULT_MIN_PANE_WIDTH;
 const narrow = () => markNarrow(document, !enabled());
 narrow();
 window.addEventListener("resize", narrow);
-layOutWidgets(document, registry, { presets: () => DEFAULT_PRESETS, enabled, problem: (message) => flash(message, "error") });
+// The guides: the default, or the page's ?guides=780,800,full (guides near each other, their names in rows)
+const asked = new URLSearchParams(location.search).get("guides");
+const guides: readonly Guide[] = asked ? asked.split(",").map((guide) => (guide === "full" ? "full" : Number(guide))) : DEFAULT_GUIDES;
+layOutWidgets(document, registry, { guides: () => guides, enabled, problem: (message) => flash(message, "error") });
 // Registered as a widget plugin does, through the API its init page hands over
 layoutOf(registry.api()).register(provider);
 showKept();

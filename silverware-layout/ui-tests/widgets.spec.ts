@@ -161,3 +161,38 @@ test("@playground the bar is 120 px at most, centred on the part of the widget i
   bar = (await page.locator(".swl-handle-bar").boundingBox())!;
   expect(Math.round(bar.height)).toBe(Math.round(Math.min(120, inView.height)));
 });
+
+test("@playground while the bar is dragged, a quiet guide each side for the text's width and each guide; the one snapped to a little stronger; none after", async ({ page }) => {
+  await drag(page, "table-1", 40);
+  const guides = page.locator(".swl-handle-guide");
+  // The text's width, the guides 900 px and 1200 px, Full width: two lines each
+  await expect(guides).toHaveCount(8);
+  await expect(page.locator(".swl-handle-guide-label")).toHaveText(["Text width", "900 px", "1200 px", "Full width"]);
+  await expect(page.locator(".swl-handle-guide-near")).toHaveCount(0);
+  // Each guide where a widget of its width has its edges, centred on the text
+  const middle = await contentMiddle(page);
+  const wide = (await page.locator('[data-swl-guide="1200 px"]').boundingBox())!;
+  expect(Math.round(wide.x)).toBe(Math.round(middle + 600));
+  // Near 1200 px: its two lines lit, the others not
+  const at = (await page.locator(".swl-handle-bar").boundingBox())!;
+  await page.mouse.move(at.x + at.width / 2 + (1196 - TEXT - 80) / 2, at.y + at.height / 2, { steps: 5 });
+  await expect(page.locator(".swl-handle-guide-near")).toHaveCount(2);
+  await expect(page.locator('[data-swl-guide="1200 px"]')).toHaveClass(/swl-handle-guide-near/);
+  await page.mouse.up();
+  await expect(guides).toHaveCount(0);
+});
+
+test("@playground guides near each other: their names in rows, none over another", async ({ page }) => {
+  // The text's width (760 px), 780 and 800 px: three lines 10 px apart each side
+  await page.goto("layout.html?guides=780,800,full");
+  await drag(page, "table-1", 40);
+  const labels = page.locator(".swl-handle-guide-label");
+  await expect(labels).toHaveText(["Text width", "780 px", "800 px", "Full width"]);
+  const boxes = await labels.evaluateAll((all) => all.map((label) => label.getBoundingClientRect()).map(({ left, right, top, bottom }) => ({ left, right, top, bottom })));
+  for (const [i, a] of boxes.entries()) {
+    for (const b of boxes.slice(i + 1)) expect(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top).toBe(true);
+  }
+  // Rows only where needed: Full width, far from them, at the top
+  expect(boxes[3]!.top).toBe(boxes[0]!.top);
+  await page.mouse.up();
+});

@@ -79,11 +79,11 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   border-bottom: 1px solid var(--swd-line);
 }
 /* A place over the whole window (the full screen module): its box laid over the page and SilverBullet's top bar, under the
-   peek (z-index 50) and the dialogs, its views scrolling in it; the page's look kept */
+   peek (z-index 70) and the dialogs, its views scrolling in it; the page's look kept */
 .swd-place.swd-over-window {
   position: fixed;
   inset: 0;
-  z-index: 45;
+  z-index: var(--sw-layer-over-window);
   box-sizing: border-box;
   width: 100vw;
   height: 100vh;
@@ -97,7 +97,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 /* SilverBullet's editor scrolls in a box that is a stacking context under its top bar: lifted over it while it holds a place
    shown so (as Silverware Table lifts it for a table over the window) */
 .cm-scroller:has(.swd-place.swd-over-window) {
-  z-index: 30 !important;
+  z-index: var(--sw-layer-lifted) !important;
 }
 /* The view shown: one button (its icon, its label, a mark of its list) opening the views in a menu; the tools at the bar's end */
 .swd-view-picker-box {
@@ -1052,10 +1052,10 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   align-items: center;
   white-space: nowrap;
 }
-/* An editor's panel laid over the page by its cell or field (views/float.ts): over everything around it, scrolled where
-   it is cut to the room in the window */
+/* An editor's panel laid over the page by its cell or field (views/float.ts): over everything around it, the peek too
+   (an editor of the peek's), scrolled where it is cut to the room in the window */
 .swd-floated {
-  z-index: 50;
+  z-index: var(--sw-layer-sheet-panel);
   overflow-y: auto;
 }
 /* A field offering names as typed (a person's with Anyone: shared/suggest.ts): the list under the field, over what is
@@ -1357,7 +1357,7 @@ li:hover .swd-row-grip,
 }
 .swd-rows-ghost {
   position: fixed;
-  z-index: 101;
+  z-index: var(--sw-layer-dragged);
   margin: 0;
   pointer-events: none;
   box-sizing: border-box;
@@ -2417,7 +2417,7 @@ tr:focus-within .swd-open {
   top: var(--sw-view-top, 0);
   bottom: auto;
   height: var(--sw-view-height, 100%);
-  z-index: 100;
+  z-index: var(--sw-layer-dialog);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3279,7 +3279,7 @@ button.swd-editor-document-folder:hover,
 }
 .swd-props-ghost {
   position: fixed;
-  z-index: 101;
+  z-index: var(--sw-layer-dragged);
   margin: 0;
   pointer-events: none;
   box-sizing: border-box;
@@ -3562,10 +3562,12 @@ button.swd-editor-document-folder:hover,
   justify-content: flex-end;
 }
 
-/* The peek: an item beside the page, over the right of the editor's area; a page of its own where the area is narrow */
+/* The peek: an item beside the page, over the right of the editor's area; a page of its own where the area is narrow.
+   Over the other plugins' floating controls (60 at most: a table's +, a chart's toolbar, placed by their widget under
+   it), under the database's own panels (.swd-floated) and every dialog (100 and over) */
 .swd-peek {
   position: fixed;
-  z-index: 50;
+  z-index: var(--sw-layer-sheet);
   /* The editor's font where SilverBullet does not tell its look (the panel sets it from the editor's text as it opens) */
   font-family: var(--editor-font, inherit);
   box-sizing: border-box;

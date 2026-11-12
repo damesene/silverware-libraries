@@ -18,11 +18,16 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   margin-right: calc((100% - var(--swl-shown)) / 2) !important;
   box-sizing: border-box;
 }
+/* The boxes a widget laid out is in, within its line, let it out: SilverBullet scrolls a Lua block's output in a box of
+   the text's width (overflow: auto), which cut a wider database off and showed a scrollbar */
+:root:not([data-swl-narrow]) .cm-content .cm-line :has([data-swl-width]:not([data-silverware-over-window])) {
+  overflow: visible !important;
+}
 /* The handle of a widget's width: a bar beside its right edge, quiet (grey, a dashed outline, as Silverware Table's +)
    until the pointer is on it or it is dragged */
 .swl-handle {
   position: fixed;
-  z-index: 20;
+  z-index: var(--sw-layer-control);
   width: 12px;
   display: flex;
   justify-content: center;
@@ -41,6 +46,47 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   cursor: ew-resize;
   touch-action: none;
 }
+/* A finger's target: wider than the bar looks, the room beside it taken (a touch screen, a tablet with a mouse too) */
+@media (any-pointer: coarse) {
+  .swl-handle-bar {
+    position: relative;
+  }
+  .swl-handle-bar::before {
+    content: "";
+    position: absolute;
+    inset: -6px -12px;
+  }
+}
+/* The guides of a drag: a quiet dashed line each side for the text's width and each guide, over the whole height the
+   page is seen in and under its widgets (in CodeMirror's scroller, z-index -1, as Confluence's), named at its top; the
+   one the width snaps to a little stronger, nothing loud. Where the page has no scroller, over the window */
+.swl-handle-guide {
+  position: absolute;
+  z-index: -1;
+  width: 0;
+  border-left: 1px dashed color-mix(in srgb, var(--root-color) 22%, transparent);
+  pointer-events: none;
+}
+.swl-handle-guide.swl-handle-guide-fixed {
+  position: fixed;
+  z-index: calc(var(--sw-layer-control) - 1);
+}
+.swl-handle-guide.swl-handle-guide-near {
+  border-left: 1px solid color-mix(in srgb, var(--root-color) 45%, transparent);
+}
+/* At the top of the page's view, its end at its line; a row lower where it would touch the name left of it (the
+   handle sets its top) */
+.swl-handle-guide-label {
+  position: absolute;
+  top: 4px;
+  right: 3px;
+  font: 11px var(--ui-font, system-ui, sans-serif);
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--root-color) 45%, transparent);
+}
+.swl-handle-guide-near .swl-handle-guide-label {
+  color: color-mix(in srgb, var(--root-color) 75%, transparent);
+}
 .swl-handle-bar:hover,
 .swl-handle-bar:focus-visible,
 .swl-handle-dragging .swl-handle-bar {
@@ -57,7 +103,7 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   top: var(--sw-view-top, 0);
   bottom: auto;
   height: var(--sw-view-height, 100%);
-  z-index: 100;
+  z-index: var(--sw-layer-dialog);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -137,70 +183,121 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   overflow-y: auto;
   padding: 4px 16px 12px;
 }
-.swl-dialog-content {
+/* Held at the window's top right, the page under it not darkened: a width set shows on the page at once, the text's
+   left edge in view */
+.swl-dialog-backdrop.swl-dialog-backdrop-top {
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 12px 16px 0 0;
+  background: transparent;
+}
+.swl-dialog-backdrop-top .swl-dialog {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+/* The tabs (Page, Guides) under the head */
+.swl-dialog-tabs {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--swl-dialog-line);
+}
+.swl-dialog-tab {
+  padding: 7px 10px;
+  margin-bottom: -1px;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  opacity: 0.7;
+}
+.swl-dialog-tab:hover {
+  opacity: 1;
+}
+.swl-dialog-tab[aria-selected="true"] {
+  opacity: 1;
+  font-weight: 600;
+  border-bottom-color: var(--ui-accent-color);
+}
+.swl-dialog-panel[hidden] {
+  display: none;
+}
+/* Page: a row for this page's width and one for all pages', each its name and what it follows or Own, then a slider
+   marked with the guides and the width typed */
+.swl-dialog-widths {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 8px;
+  gap: 18px;
+  padding: 14px 2px 6px;
 }
-.swl-dialog-card {
-  background: var(--swl-dialog-card);
-  border: 1px solid var(--swl-dialog-line);
-  border-radius: 8px;
-}
-.swl-dialog-row {
+.swl-dialog-width-head {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  justify-content: space-between;
   gap: 12px;
-  padding: 9px 12px;
+  margin-bottom: 8px;
 }
-.swl-dialog-row + .swl-dialog-row {
-  padding-top: 0;
-}
-.swl-dialog-label {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-.swl-dialog-name {
-  font-weight: 500;
-}
-.swl-dialog-hint {
-  font-size: 12px;
-  line-height: 1.35;
-  opacity: 0.62;
-}
-/* The default and the presets: a row of buttons, the one set pressed */
-.swl-dialog-presets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.swl-dialog-preset {
-  padding: 4px 10px;
-  background: var(--root-background-color);
-  border: 1px solid var(--swl-dialog-line);
-  border-radius: 6px;
-}
-.swl-dialog-preset:hover {
-  border-color: var(--ui-accent-color);
-}
-.swl-dialog-preset[aria-pressed="true"] {
-  color: var(--ui-accent-color);
-  border-color: var(--ui-accent-color);
+.swl-dialog-width-name {
   font-weight: 600;
 }
-/* A width: its number and its unit (px or %), side by side */
-.swl-dialog-width {
+.swl-dialog-width-controls {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.swl-dialog-slider-box {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  padding-bottom: 19px;
+}
+.swl-dialog-slider {
+  width: 100%;
+  margin: 6px 0 0;
+  accent-color: var(--ui-accent-color);
+}
+/* A row following another: its slider and number quiet, showing the width it follows, its own once moved */
+.swl-dialog-follows .swl-dialog-slider {
+  opacity: 0.45;
+}
+.swl-dialog-follows .swl-dialog-amount {
+  color: color-mix(in srgb, var(--root-color) 55%, transparent);
+}
+/* The guides under the slider, at their values: a tick and their width */
+.swl-dialog-ticks {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 17px;
+  pointer-events: none;
+}
+.swl-dialog-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  padding-top: 7px;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0.6;
+}
+.swl-dialog-tick::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 3px;
+  border-left: 1px solid currentColor;
+}
+.swl-dialog-width-value {
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
-.swl-dialog-amount {
-  width: 8em;
+.swl-dialog-amount,
+.swl-dialog-guide-amount {
+  width: 6.5em;
   font: inherit;
   color: inherit;
   background: var(--root-background-color);
@@ -208,11 +305,65 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   border-radius: 6px;
   padding: 4px 8px;
 }
-.swl-dialog-amount:disabled {
+.swl-dialog-amount:disabled,
+.swl-dialog-slider:disabled {
   opacity: 0.5;
 }
-.swl-dialog-amount.swl-dialog-invalid {
-  border-color: var(--danger-color, #c62828);
+.swl-dialog-invalid {
+  border-color: var(--danger-color, #c62828) !important;
+}
+/* Guides: a row a width, typed straight in, a × out; added under them; Full width a box */
+.swl-dialog-guides {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 2px 6px;
+}
+.swl-dialog-guide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.swl-dialog-guide-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.swl-dialog-unit {
+  opacity: 0.7;
+}
+.swl-dialog-remove {
+  display: inline-flex;
+  padding: 5px;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  opacity: 0.6;
+}
+.swl-dialog-remove:hover {
+  opacity: 1;
+  background: var(--swl-dialog-card);
+}
+.swl-dialog-remove svg {
+  width: 14px;
+  height: 14px;
+}
+.swl-dialog-add {
+  padding: 5px 10px;
+  background: none;
+  border: 1px dashed var(--swl-dialog-line);
+  border-radius: 6px;
+}
+.swl-dialog-add:hover {
+  border-color: var(--ui-accent-color);
+}
+.swl-dialog-full {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  cursor: pointer;
 }
 .swl-dialog-foot {
   display: flex;
@@ -246,8 +397,20 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   opacity: 0.45;
   cursor: default;
 }
-/* A phone: the whole screen */
+/* A phone: the whole screen, the slider over the width typed, bigger targets for a finger */
 @media (max-width: 480px) {
+  .swl-dialog-backdrop.swl-dialog-backdrop-top {
+    padding: 0;
+  }
+  .swl-dialog-width-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .swl-dialog-amount,
+  .swl-dialog-guide-amount {
+    width: 8em;
+    padding: 8px 10px;
+  }
   .swl-dialog {
     width: 100vw;
     max-height: none;

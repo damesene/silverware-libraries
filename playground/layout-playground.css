@@ -12,6 +12,11 @@
   container-name: sb-editor-col;
   width: 100%;
 }
+/* CodeMirror's scroller: a stacking context of its own, its widgets over a drag's guides */
+.cm-scroller {
+  position: relative;
+  z-index: 0;
+}
 .cm-content {
   width: 100%;
   max-width: var(--editor-width);

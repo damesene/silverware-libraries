@@ -42,7 +42,11 @@ export class Widgets {
     if (!watched) return;
     this.observer = new win.MutationObserver((records) => {
       if (!this.content?.isConnected) return this.watch();
-      for (const record of records) for (const node of record.addedNodes) if (node.nodeType === 1) this.layOutIn(node as Element);
+      // Each widget once a batch: a view drawn a row at a time adds hundreds of nodes to one widget, and reading what it
+      // keeps may parse its block (a database's)
+      const found = new Map<HTMLElement, LayoutProvider>();
+      for (const record of records) for (const node of record.addedNodes) if (node.nodeType === 1) this.widgetsIn(node as Element, found);
+      for (const [element, provider] of found) this.layOut({ element, provider });
     });
     this.observer.observe(watched, { childList: true, subtree: true });
     if (this.content) this.layOutAll();
@@ -54,12 +58,19 @@ export class Widgets {
   }
 
   private layOutIn(root: Element): void {
+    const found = new Map<HTMLElement, LayoutProvider>();
+    this.widgetsIn(root, found);
+    for (const [element, provider] of found) this.layOut({ element, provider });
+  }
+
+  /** The widgets a node is in or holds, added to `found` (a widget once, however many of its nodes came) */
+  private widgetsIn(root: Element, found: Map<HTMLElement, LayoutProvider>): void {
     for (const provider of this.registry.providers) {
       // The widget it is in, or is: SilverBullet puts a widget's element in first and its content after (a table into
       // its widget), so what the widget keeps is read again as its content comes
       const around = root.closest<HTMLElement>(provider.selector);
-      if (around && (!this.content || this.content.contains(around))) this.layOut({ element: around, provider });
-      for (const element of root.querySelectorAll<HTMLElement>(provider.selector)) this.layOut({ element, provider });
+      if (around && !found.has(around) && (!this.content || this.content.contains(around))) found.set(around, provider);
+      for (const element of root.querySelectorAll<HTMLElement>(provider.selector)) if (!found.has(element)) found.set(element, provider);
     }
   }
 

@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { Preset } from "../model/settings.ts";
-import { cssWidgetWidth, draggedWidth, keptWidgetWidth, namedWidths, readWidgetWidth, shownWidgetWidth, snapped, snapTargets } from "./widgetwidth.ts";
+import type { Guide } from "../model/settings.ts";
+import { cssWidgetWidth, draggedWidth, keptWidgetWidth, readWidgetWidth, shownWidgetWidth, snapped, snapTargets, widthName } from "./widgetwidth.ts";
 
-const presets: Preset[] = [
-  { name: "Wide", width: { amount: 1200, unit: "px" } },
-  { name: "Half", width: { amount: 50, unit: "%" } },
-  { name: "Full width", width: "full" },
-];
+const guides: Guide[] = [1200, "full"];
 
 describe("A widget's width", () => {
   it("read from its entries: pixels, or full; nothing else", () => {
@@ -36,28 +32,24 @@ describe("A widget's width", () => {
     expect(draggedWidth(760, 900, 1600)).toBe(1560);
   });
 
-  it("snapped to the text's width (kept: none), a preset of pixels or full (a preset in % left out), within 8 px", () => {
-    const targets = snapTargets(760, presets, 1600);
+  it("snapped to the text's width (kept: none), a guide of pixels or full, within 8 px", () => {
+    const targets = snapTargets(760, guides, 1600);
     expect(targets.map((t) => [t.name, t.width, t.kept])).toEqual([
       ["Text width", 760, undefined],
-      ["Wide", 1200, 1200],
+      ["1200 px", 1200, 1200],
       ["Full width", 1560, "full"],
     ]);
     expect(snapped(765, targets)).toEqual({ width: 760, kept: undefined, name: "Text width" });
-    expect(snapped(1193, targets)).toEqual({ width: 1200, kept: 1200, name: "Wide" });
+    expect(snapped(1193, targets)).toEqual({ width: 1200, kept: 1200, name: "1200 px" });
     expect(snapped(1555, targets)).toEqual({ width: 1560, kept: "full", name: "Full width" });
     expect(snapped(900.4, targets)).toEqual({ width: 900, kept: 900 });
   });
 
-  it("a preset wider than the pane snaps where it is shown", () => {
-    expect(snapTargets(760, presets, 1000).find((t) => t.name === "Wide")).toEqual({ width: 960, kept: 1200, name: "Wide" });
+  it("a guide wider than the pane snaps where it is shown", () => {
+    expect(snapTargets(760, guides, 1000).find((t) => t.name === "1200 px")).toEqual({ width: 960, kept: 1200, name: "1200 px" });
   });
 
-  it("named: the text's width, then each preset of pixels or full (one in % is no widget's width)", () => {
-    expect(namedWidths(presets)).toEqual([
-      { kept: undefined, name: "Text width" },
-      { kept: 1200, name: "Wide" },
-      { kept: "full", name: "Full width" },
-    ]);
+  it("named: the text's width, a guide's pixels, Full width", () => {
+    expect([undefined, 1200, "full" as const].map(widthName)).toEqual(["Text width", "1200 px", "Full width"]);
   });
 });

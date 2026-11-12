@@ -44,8 +44,14 @@ test("a database's place widened by its handle: the width a line of its block, d
   expect(width).toBeGreaterThan(TEXT + 250);
   expect(await space.saved("Page")).toContain("```silverware-database\nid: uilayout\nlayout.width: ");
   await expect.poll(async () => Math.round((await page.locator(".swd-place").boundingBox())!.width)).toBe(width);
+  // Not cut by the box SilverBullet shows a Lua block's output in (the text's width, scrolling): its right end seen
+  const shown = await page.locator(".swd-place").evaluate((place) => {
+    const r = place.querySelector(".swd-table")!.getBoundingClientRect();
+    return !!document.elementFromPoint(r.right - 8, r.top + 8)?.closest(".swd-place");
+  });
+  expect(shown).toBe(true);
   await page.waitForTimeout(300);
-  const after = await page.evaluate((i) => (window as unknown as { swlWidths: number[] }).swlWidths.slice(i), from);
+  const after =await page.evaluate((i) => (window as unknown as { swlWidths: number[] }).swlWidths.slice(i), from);
   expect(after.filter((w) => w === TEXT)).toEqual([]);
 
   const again = (await page.locator(".swd-place").boundingBox())!;

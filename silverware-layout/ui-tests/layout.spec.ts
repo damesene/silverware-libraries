@@ -37,14 +37,19 @@ test("a page's own width in its frontmatter: its text and the top bar at it, a p
   expect((await framesSince(from)).filter((f) => f.page === "wide" && f.width !== 1100).length).toBeLessThanOrEqual(LATE_FRAMES);
 });
 
-test("the dialog: a width in % shown at once and saved into the frontmatter, Default takes _layout off", async ({ page, space }) => {
+// The dialog's rows of the Page tab: this page's width, all pages'
+const rows = (page: import("@playwright/test").Page) => page.locator(".swl-dialog .swl-dialog-width-row");
+
+test("the dialog: a width typed in % shown at once and saved into the frontmatter (typing makes it the page's own); Default takes _layout off", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
   await runCommand(page, PAGE_LAYOUT);
   const dialog = page.locator(".swl-dialog");
   await expect(dialog).toBeVisible();
-  const own = dialog.locator(".swl-dialog-card").first();
+  const own = rows(page).first();
+  await expect(own.getByRole("radio", { name: "The width of all pages" })).toHaveAttribute("aria-checked", "true");
+  await own.getByRole("radio", { name: "Percent of the editor's width" }).click();
   await own.locator(".swl-dialog-amount").fill("90");
-  await own.getByRole("radio", { name: "Percent of the editor's pane" }).click();
+  await expect(own.getByRole("radio", { name: "A width of its own" })).toHaveAttribute("aria-checked", "true");
   await expect.poll(() => widthSet(page)).toBe("90%");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
@@ -53,11 +58,25 @@ test("the dialog: a width in % shown at once and saved into the frontmatter, Def
 
   await runCommand(page, PAGE_LAYOUT);
   await expect(own.locator(".swl-dialog-amount")).toHaveValue("90");
-  await expect(own.getByRole("radio", { name: "Percent of the editor's pane" })).toHaveAttribute("aria-checked", "true");
-  await own.getByRole("button", { name: "Default" }).click();
+  await expect(own.getByRole("radio", { name: "Percent of the editor's width" })).toHaveAttribute("aria-checked", "true");
+  await own.getByRole("radio", { name: "The width of all pages" }).click();
   await expect.poll(() => widthSet(page)).toBe("");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect.poll(() => space.saved("Page")).toBe("# Page\n\nSome text.\n");
+});
+
+test("the dialog's slider, moved near a guide, takes the guide's width and makes it the page's own", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
+  await runCommand(page, PAGE_LAYOUT);
+  const own = rows(page).first();
+  await expect(own.locator(".swl-dialog-tick")).toHaveText(["900", "1200", "Full"]);
+  await own.locator(".swl-dialog-slider").evaluate((slider: HTMLInputElement) => {
+    slider.value = "894";
+    slider.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect(own.locator(".swl-dialog-amount")).toHaveValue("900");
+  await expect(own.getByRole("radio", { name: "A width of its own" })).toHaveAttribute("aria-checked", "true");
+  await expect.poll(() => widthSet(page)).toBe("900px");
 });
 
 test("Cancel puts the page back as it was, writing nothing", async ({ page, space }) => {
@@ -65,7 +84,7 @@ test("Cancel puts the page back as it was, writing nothing", async ({ page, spac
   await expect.poll(() => widthSet(page)).toBe("1100px");
   await runCommand(page, PAGE_LAYOUT);
   const dialog = page.locator(".swl-dialog");
-  await dialog.locator(".swl-dialog-card").first().locator(".swl-dialog-amount").fill("700");
+  await rows(page).first().locator(".swl-dialog-amount").fill("700");
   await expect.poll(() => widthSet(page)).toBe("700px");
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toBeHidden();
@@ -77,7 +96,7 @@ test("the default text width saved into CONFIG, applying to a page without its o
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
   await runCommand(page, PAGE_LAYOUT);
   const dialog = page.locator(".swl-dialog");
-  await dialog.locator(".swl-dialog-card").nth(1).locator(".swl-dialog-amount").fill("1000");
+  await rows(page).nth(1).locator(".swl-dialog-amount").fill("1000");
   await expect.poll(() => widthSet(page)).toBe("1000px");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
@@ -85,6 +104,36 @@ test("the default text width saved into CONFIG, applying to a page without its o
   expect(await space.config()).toContain('"1000px"');
   expect(await widthSet(page)).toBe("1000px");
   expect(await space.saved("Page")).toBe("# Page\n\nSome text.\n");
+});
+
+test("the guides typed straight in their rows, saved into Silverware Layout's own block of CONFIG, ascending as the tab shows again", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
+  await runCommand(page, PAGE_LAYOUT);
+  const dialog = page.locator(".swl-dialog");
+  await dialog.getByRole("tab", { name: "Guides" }).click();
+  const amounts = dialog.locator(".swl-dialog-guide-amount");
+  await expect(amounts).toHaveCount(2);
+  expect(await amounts.evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value))).toEqual(["900", "1200"]);
+  // 1200 made 600 stays where it is while the tab shows; one added; Full width off
+  await amounts.nth(1).fill("600");
+  await dialog.getByRole("button", { name: "+ Add guide" }).click();
+  await expect(amounts.nth(2)).toBeFocused();
+  await page.keyboard.type("1500");
+  await dialog.getByRole("checkbox", { name: "Full width" }).uncheck();
+  expect(await amounts.evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value))).toEqual(["900", "600", "1500"]);
+  // A guide no width says why, Save off
+  await amounts.nth(2).fill("50");
+  await expect(dialog.locator(".swl-dialog-note")).toHaveText("A guide is a whole number of 200 to 10000 px");
+  await expect(dialog.getByRole("button", { name: "Save" })).toBeDisabled();
+  await amounts.nth(2).fill("1500");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(async () => (await space.config()) ?? "").toContain('config.set("silverware.layout.guides", { "900px", "600px", "1500px" })');
+  expect(await space.config()).toContain("-- managed-by: silverware-layout");
+  await runCommand(page, PAGE_LAYOUT);
+  await dialog.getByRole("tab", { name: "Guides" }).click();
+  expect(await amounts.evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value))).toEqual(["600", "900", "1500"]);
+  await expect(dialog.getByRole("checkbox", { name: "Full width" })).not.toBeChecked();
 });
 
 test("a pane narrower than the setting's least gets no width, and gets it back wider", async ({ page, space }) => {

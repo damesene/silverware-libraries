@@ -15,7 +15,7 @@ The look of [Silverware Tags](silverware-tags.md): its window, the review of a c
   top: var(--sw-view-top, 0);
   bottom: auto;
   height: var(--sw-view-height, 100%);
-  z-index: 100;
+  z-index: var(--sw-layer-dialog);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -810,7 +810,7 @@ The look of [Silverware Tags](silverware-tags.md): its window, the review of a c
   top: var(--sw-view-top, 0);
   bottom: auto;
   height: var(--sw-view-height, 100%);
-  z-index: 100;
+  z-index: var(--sw-layer-dialog);
   display: flex;
   align-items: center;
   justify-content: center;

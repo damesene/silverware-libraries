@@ -6,26 +6,35 @@ import { readWidth, type Width } from "./width.ts";
 export const PATHS = {
   textWidth: "silverware.layout.textWidth",
   minPaneWidth: "silverware.layout.minPaneWidth",
-  presets: "silverware.layout.presets",
+  guides: "silverware.layout.guides",
 } as const;
 
-/** A preset: a width a widget is set to in one click, named; `full` the editor's pane */
-export type Preset = { readonly name: string; readonly width: Width | "full" };
+/** A guide: a width a drag snaps to and shows a line at, in pixels, or `full` (the editor's pane) */
+export type Guide = number | "full";
 
 export type Settings = {
   // The text's width on a page without its own; none: the theme's
   readonly textWidth: Width | undefined;
   // Narrower than this (px), the pane gets no layout of Silverware Layout's
   readonly minPaneWidth: number;
-  readonly presets: readonly Preset[];
+  readonly guides: readonly Guide[];
 };
 
 export const DEFAULT_MIN_PANE_WIDTH = 600;
 
-export const DEFAULT_PRESETS: readonly Preset[] = [
-  { name: "Wide", width: { amount: 1200, unit: "px" } },
-  { name: "Full width", width: "full" },
-];
+export const DEFAULT_GUIDES: readonly Guide[] = [900, 1200, "full"];
+
+/** The widths a guide may have (px): narrower is no widget, wider no screen */
+export const GUIDE_LIMITS = { min: 200, max: 10000 } as const;
+
+/** A guide as it is named where it shows (`1200 px`, `Full width`) */
+export const guideName = (guide: Guide): string => (guide === "full" ? "Full width" : `${guide} px`);
+
+/** Why a number cannot be a guide, as text, undefined where it can */
+export function validateGuide(width: number): string | undefined {
+  if (!Number.isInteger(width) || width < GUIDE_LIMITS.min || width > GUIDE_LIMITS.max) return `A guide is a whole number of ${GUIDE_LIMITS.min} to ${GUIDE_LIMITS.max} px`;
+  return undefined;
+}
 
 /** The settings as configured (each value as SilverBullet's config.get gives it), a value not read taking its default */
 export function readSettings(get: (path: string) => unknown): Settings {
@@ -33,24 +42,29 @@ export function readSettings(get: (path: string) => unknown): Settings {
   return {
     textWidth: readWidth(get(PATHS.textWidth)),
     minPaneWidth: typeof pane === "number" && Number.isFinite(pane) && pane >= 0 ? pane : DEFAULT_MIN_PANE_WIDTH,
-    presets: readPresets(get(PATHS.presets)) ?? DEFAULT_PRESETS,
+    guides: readGuides(get(PATHS.guides)) ?? DEFAULT_GUIDES,
   };
 }
 
 /**
- * The presets as configured: a list of `{ name, width }`, a width as a text's (`1200px`, `90%`) or `full`; a preset
- * not read left out. Undefined where nothing is configured (the defaults then). A list from Lua may arrive as an object
- * of 1, 2, …
+ * The guides as configured: a list of widths in px (`1200`, `"1200px"`) or `full`, each once; one not read left out.
+ * Undefined where nothing is configured (the defaults then). A list from Lua may arrive as an object of 1, 2, …
  */
-function readPresets(value: unknown): readonly Preset[] | undefined {
+function readGuides(value: unknown): readonly Guide[] | undefined {
   if (value === undefined || value === null) return undefined;
   const list = Array.isArray(value) ? value : typeof value === "object" ? Object.values(value) : [];
-  return list.flatMap((item): Preset[] => {
-    if (!item || typeof item !== "object") return [];
-    const { name, width } = item as { name?: unknown; width?: unknown };
-    if (typeof name !== "string" || !name.trim()) return [];
-    if (width === "full") return [{ name: name.trim(), width: "full" }];
-    const read = readWidth(width);
-    return read ? [{ name: name.trim(), width: read }] : [];
-  });
+  const guides: Guide[] = [];
+  for (const item of list) {
+    const guide: Guide | undefined = item === "full" ? "full" : pixelsOf(item);
+    if (guide !== undefined && !guides.includes(guide)) guides.push(guide);
+  }
+  return guides;
 }
+
+const pixelsOf = (value: unknown): number | undefined => {
+  const width = readWidth(value);
+  return width?.unit === "px" && !validateGuide(width.amount) ? width.amount : undefined;
+};
+
+/** The guides as the configuration keeps them (`{ "900px", "1200px", "full" }`) */
+export const keptGuides = (guides: readonly Guide[]): string[] => guides.map((guide) => (guide === "full" ? "full" : `${guide}px`));

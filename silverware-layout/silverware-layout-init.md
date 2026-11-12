@@ -29,16 +29,10 @@ config.define("silverware.layout", {
       description = "Where the editor is narrower than this (px), as on a phone, Silverware Layout sets no width: the text is as wide as the screen.",
       ui = { category = "Silverware Layout", label = "Narrowest editor laid out (px)", priority = 0.9 },
     },
-    presets = {
+    guides = {
       type = "array",
-      description = "Widths picked in one click, each a name and a width in px or %, or full (the editor's width). Set in your own space-lua block, as a list of { name = \"Wide\", width = \"1200px\" }.",
-      items = {
-        type = "object",
-        properties = {
-          name = { type = "string" },
-          width = { type = "string" },
-        },
-      },
+      description = "The widths a drag snaps to and shows a guide at, in px (\"1200px\"), or full (the editor's width). Set in the Page layout dialog (Guides), kept in Silverware Layout's own block of CONFIG.",
+      items = { type = "string" },
     },
   },
 })

@@ -15,10 +15,12 @@ The layout of your pages: how wide a page's text is, and how wide each of its ta
 
 ## A page's text width
 
-Run **Silverware Layout: Page layout** from the command palette. The dialog shows:
+Run **Silverware Layout: Page layout** from the command palette. Its **Page** tab has two widths:
 
-- **This page**: *Default* (the default below), one of the presets, or a width of its own: a number in **px**, or in **%** of the editor's width (the px / % switch beside the number).
-- **Every page**: the default width of pages without their own. Empty: your theme's.
+- **This page**: *Default* (the width of all pages) or *Own*.
+- **All pages**: the width of pages without their own, *Theme* (your theme's) or *Own*.
+
+Set a width with its slider, marked with your guides (it snaps to them), or type it, in **px** or in **%** of the editor's width (the px / % switch beside the number). Moving the slider or typing makes the width *Own*.
 
 The page shows each change at once. **Save** keeps it, **Cancel** (or Esc) puts the page back.
 
@@ -33,10 +35,10 @@ or `width: "90%"`. You can type it there too: the page follows as you type. Taki
 
 ## A widget's width
 
-A table of Silverware Table, a database of Silverware Database and a chart of Silverware Chart can each be wider than the page's text, or narrower, as tables in Confluence: point at one, and a bar shows beside its right edge.
+A table of Silverware Table, a database of Silverware Database and a chart of Silverware Chart can each be wider than the page's text, or narrower, as tables in Confluence: point at one (on a tablet, tap it), and a bar shows beside its right edge.
 
-- **Drag the bar**: it grows (or shrinks) on both sides, staying centred on the text. It snaps to the text's width and to the presets as you come near them (Wide, 1200 px, and Full width, or your own: see the settings). Let go, and the width is saved. Esc while dragging puts it back.
-- **Double-click the bar**: it is as wide as the text again.
+- **Drag the bar**: it grows (or shrinks) on both sides, staying centred on the text. While you drag, a faint line each side shows the text's width and each of your guides (900 px, 1200 px and Full width, unless you change them); the bar snaps to one as you come near it, and its lines darken a little. Let go, and the width is saved. Esc while dragging puts it back.
+- **Double-click the bar** (double-tap it): it is as wide as the text again.
 
 A width is never wider than the editor: in a narrower window, or on a phone, it is as wide as there is room (a table's columns in proportion, a chart drawn smaller). Each keeps its width itself:
 
@@ -46,6 +48,10 @@ A width is never wider than the editor: in a narrower window, or on a phone, it 
 
 Without Silverware Layout, each is as wide as the text, its width still kept.
 
+## Guides
+
+The widths a widget snaps to, and the page's sliders are marked with. Change them in the dialog's **Guides** tab: type a width in its row, × takes one away, **+ Add guide** adds one, **Full width** is the editor's whole width. They show from the narrowest. Saved into your CONFIG, in a block of Silverware Layout's own.
+
 ## Settings
 
 In the Configuration Manager (Configuration: Open), under Silverware Layout, or in your CONFIG:
@@ -53,15 +59,12 @@ In the Configuration Manager (Configuration: Open), under Silverware Layout, or 
 ```lua
 config.set("silverware.layout.textWidth", "1100px")
 config.set("silverware.layout.minPaneWidth", 600)
-config.set("silverware.layout.presets", {
-  { name = "Wide", width = "1200px" },
-  { name = "Full width", width = "full" },
-})
+config.set("silverware.layout.guides", { "900px", "1200px", "full" })
 ```
 
 - `textWidth`: the default text width, in px or % (empty: your theme's).
 - `minPaneWidth`: where the editor is narrower than this (px), as on a phone, Silverware Layout sets no width: the text is as wide as the screen. Wider again (a phone turned), the widths come back.
-- `presets`: the widths offered in one click; `full` is the editor's whole width.
+- `guides`: the guides (see above), each a width in px, or `full` for the editor's whole width.
 
 ## Good to know
 

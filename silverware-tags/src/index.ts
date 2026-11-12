@@ -1,6 +1,7 @@
 // Silverware Tags entry point, loaded by the init page's Space Lua:
 //   js.importFromSpace("Library/damesene/silverware-tags.js").init({ ... the bridge ... })
 // then its commands defined by `commandNames()`, each running `runCommand(name)`.
+import { applyLayers } from "../../shared/layers.ts";
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { type Bridge, missingBridgeFunctions, readSettings, type Settings } from "./bridge.ts";
 import { Controller } from "./core/controller.ts";
@@ -42,6 +43,8 @@ export async function init(bridge: Bridge): Promise<void> {
 
 /** The core and the modules on, over a space (SilverBullet's, or the playground's); the settings dialog where a store is given */
 export async function start(space: Space, platform: WritingPlatform, notifier: Notifier, settings: Settings, store?: SettingsStore): Promise<Controller> {
+  // The layers its style page lays its elements in (shared/layers.ts)
+  applyLayers(document);
   const dialog = store ? new SettingsDialog(document, store) : undefined;
   const controller = new Controller(document, space, platform, notifier, { protectMeta: settings.protectMeta, newTagsForm: settings.newTagsForm, settings: dialog ? () => dialog.open() : undefined });
   setNewTagsForm(settings.newTagsForm);

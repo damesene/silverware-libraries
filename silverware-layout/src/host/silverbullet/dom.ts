@@ -23,6 +23,24 @@ export function markNarrow(doc: Document, narrow: boolean): void {
   doc.documentElement.toggleAttribute("data-swl-narrow", narrow);
 }
 
+/**
+ * The text's width the theme gives (px), Silverware Layout's own set aside a moment: what a page follows where neither
+ * it nor the default has a width. Read once, as the dialog opens
+ */
+export function themeTextWidth(doc: Document): number {
+  const content = doc.querySelector<HTMLElement>(".cm-content");
+  const win = doc.defaultView;
+  if (!content || !win) return 0;
+  const style = doc.documentElement.style;
+  const value = style.getPropertyValue(TEXT_WIDTH);
+  const priority = style.getPropertyPriority(TEXT_WIDTH);
+  if (value) style.removeProperty(TEXT_WIDTH);
+  const padding = win.getComputedStyle(content);
+  const width = content.clientWidth - parseFloat(padding.paddingLeft || "0") - parseFloat(padding.paddingRight || "0");
+  if (value) style.setProperty(TEXT_WIDTH, value, priority);
+  return Math.round(width);
+}
+
 /** The text width shown now by Silverware Layout (an inline value on the root), as CSS has it; empty: none */
 export const textWidthNow = (doc: Document): string => doc.documentElement.style.getPropertyValue(TEXT_WIDTH);
 
@@ -35,6 +53,13 @@ export function pageView(doc: Document): { readonly top: number; readonly bottom
   const scroller = doc.querySelector(".cm-scroller")?.getBoundingClientRect();
   return scroller ? { top: Math.max(0, scroller.top), bottom: Math.min(height, scroller.bottom) } : { top: 0, bottom: height };
 }
+
+/**
+ * Where a widget's guides go while it is dragged: CodeMirror's scroller, a stacking context of its own (position
+ * relative, z-index 0) the page's lines and widgets are in, so a guide at z-index -1 lies under the widgets and over
+ * the editor's background (verified in SilverBullet 2.12.1)
+ */
+export const guideLayer = (doc: Document): HTMLElement | undefined => doc.querySelector<HTMLElement>(".cm-scroller") ?? undefined;
 
 /** The editor's pane, or the window where it is not there */
 const paneOf = (doc: Document): Element => doc.querySelector(PANE_SELECTOR) ?? doc.documentElement;

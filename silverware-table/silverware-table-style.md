@@ -354,7 +354,7 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
 .sb-table-widget.swt-over-window {
   position: fixed !important;
   inset: 0;
-  z-index: 45;
+  z-index: var(--sw-layer-over-window);
   box-sizing: border-box;
   width: 100vw;
   height: 100vh;
@@ -446,7 +446,7 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
   pointer-events: none;
 }
 .swt-floating.swt-over-window-rows {
-  z-index: 46;
+  z-index: calc(var(--sw-layer-over-window) + 1);
   left: 0;
   width: 28px;
   overflow: hidden;
@@ -492,7 +492,7 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
   --swt-sheet-line: var(--swt-border, color-mix(in srgb, currentColor 14%, transparent));
   position: fixed;
   inset: 0;
-  z-index: 45;
+  z-index: var(--sw-layer-over-window);
   box-sizing: border-box;
   border-left: 28px solid var(--root-background-color, #fff);
   border-top: 66px solid var(--root-background-color, #fff);
@@ -616,7 +616,7 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
   box-shadow: inset 0 0 0 2px var(--ui-accent-color, #3b82f6);
 }
 .swt-floating.swt-sheet-letters {
-  z-index: 46;
+  z-index: calc(var(--sw-layer-over-window) + 1);
   overflow: hidden;
   background: var(--root-background-color, #fff);
   pointer-events: none;
@@ -667,7 +667,7 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
 }
 /* The page's sheets, one tab each, at the board's bottom (as a spreadsheet's): the one shown marked, + a new one */
 .swt-floating.swt-sheet-tabs {
-  z-index: 46;
+  z-index: calc(var(--sw-layer-over-window) + 1);
   display: flex !important;
   align-items: stretch;
   gap: 2px;
@@ -732,7 +732,7 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
 /* CodeMirror's scroller is a stacking context (z-index 0) under SilverBullet's
    top bar (z-index 20): lifted over it while it holds a table shown so */
 .cm-scroller:has(.sb-table-widget.swt-over-window) {
-  z-index: 30 !important;
+  z-index: var(--sw-layer-lifted) !important;
 }
 /* The largeTables module: a large table scrolls in its own box, at most the
    window's height (the Maximum table height setting, set inline, wins); the
@@ -814,7 +814,7 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
    its header's corner where the view leaves no room above (swt-inside); over the sheet's board, under the controls;
    it takes no presses */
 .swt-floating.swt-table-label {
-  z-index: 47;
+  z-index: calc(var(--sw-layer-over-window) + 2);
   box-sizing: border-box;
   height: 18px;
   padding: 1px 7px;
@@ -864,7 +864,7 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
 
 /* The expand button of a cell whose text does not fit: opens its popup */
 .swt-expand {
-  z-index: 52;
+  z-index: calc(var(--sw-layer-control) + 2);
   width: 18px;
   height: 18px;
   padding: 0;
@@ -962,7 +962,7 @@ body.swt-resizing * {
 .swt-settings-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: var(--sw-layer-dialog);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1227,7 +1227,7 @@ body.swt-resizing * {
   bottom: auto;
   height: 100vh;
   height: var(--sw-view-height, 100dvh);
-  z-index: 100;
+  z-index: var(--sw-layer-dialog);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1539,7 +1539,7 @@ body.swt-resizing * {
 }
 /* The ⤢ icon at the corner of a cell showing #SPILL! (hovered or selected): Show result */
 .swt-floating.swt-result-holder {
-  z-index: 49;
+  z-index: calc(var(--sw-layer-control) - 1);
 }
 .swt-result-button {
   display: inline-flex;
@@ -2121,7 +2121,7 @@ body.swt-resizing * {
 }
 .swt-choices-ghost {
   position: fixed;
-  z-index: 101;
+  z-index: var(--sw-layer-dragged);
   margin: 0;
   pointer-events: none;
   box-sizing: border-box;
@@ -2323,7 +2323,7 @@ html[data-theme="dark"] .swt-excel-error {
   display: block !important;
 }
 .swt-cell-popup {
-  z-index: 55;
+  z-index: calc(var(--sw-layer-control) + 5);
   box-sizing: border-box;
   /* The font is the cell's (set by the script) */
   padding: 6px 8px;
@@ -2568,7 +2568,7 @@ html[data-theme="dark"] .swt-excel-error {
    leave them in view where they no longer act */
 .swt-floating {
   position: fixed;
-  z-index: 50;
+  z-index: var(--sw-layer-control);
   display: none !important;
   font-family: var(--ui-font, system-ui, sans-serif);
 }
@@ -2779,7 +2779,7 @@ html[data-theme="dark"] .swt-excel-error {
 }
 .swt-insert {
   /* Over its line */
-  z-index: 51;
+  z-index: calc(var(--sw-layer-control) + 1);
   width: 18px;
   height: 18px;
   padding: 0;
@@ -2817,7 +2817,7 @@ html[data-theme="dark"] .swt-excel-error {
 
 /* Row and column menus */
 .swt-menu {
-  z-index: 60;
+  z-index: var(--sw-layer-menu);
   flex-direction: column;
   min-width: 200px;
   padding: 4px;
@@ -3263,7 +3263,7 @@ html[data-theme="dark"] .swt-excel-error {
 }
 /* The values a typed cell offers, under its editor */
 .swt-choices {
-  z-index: 57;
+  z-index: calc(var(--sw-layer-control) + 7);
   flex-direction: column;
   max-height: 260px;
   overflow-y: auto;
@@ -3295,7 +3295,7 @@ html[data-theme="dark"] .swt-excel-error {
 
 /* Middle-button autoscroll over a wide table: the start point */
 .swt-autoscroll {
-  z-index: 70;
+  z-index: calc(var(--sw-layer-menu) + 5);
   width: 24px;
   height: 24px;
   box-sizing: border-box;
@@ -3522,7 +3522,7 @@ html[data-swt-pointer="touch"] .swt-select-edge {
   border-right-width: 2px;
 }
 .swt-move-tip {
-  z-index: 57;
+  z-index: calc(var(--sw-layer-control) + 7);
   padding: 2px 6px;
   font-size: 12px;
   color: var(--root-color);
@@ -3626,7 +3626,7 @@ body.swt-select-dragging .swt-select-handle {
   color: var(--danger-color);
 }
 .swt-formula-hint {
-  z-index: 56;
+  z-index: calc(var(--sw-layer-control) + 6);
   /* fx beside the formula and its help, at the edge by the cell (the top, or the bottom above the cell) */
   flex-direction: row;
   align-items: flex-start;
@@ -3785,7 +3785,7 @@ html[data-swt-pointer="touch"] .swt-fill-handle {
   border-right-width: 2px;
 }
 .swt-fill-tip {
-  z-index: 57;
+  z-index: calc(var(--sw-layer-control) + 7);
   padding: 2px 6px;
   font-size: 12px;
   color: var(--root-color);
@@ -3817,7 +3817,7 @@ body.swt-filling * {
   }
 }
 .swt-floating.swt-ref-mark {
-  z-index: 49;
+  z-index: calc(var(--sw-layer-control) - 1);
   box-sizing: border-box;
   pointer-events: none;
   border: 2px solid var(--swt-ref-color);
@@ -3877,7 +3877,7 @@ body.swt-ref-dragging * {
 /* Dragging */
 /* A row (column) dragged: its copy follows the pointer, the others move aside */
 .swt-drag-ghost {
-  z-index: 55;
+  z-index: calc(var(--sw-layer-control) + 5);
   pointer-events: none;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
 }

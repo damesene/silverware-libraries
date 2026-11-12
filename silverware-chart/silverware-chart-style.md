@@ -290,9 +290,7 @@ The look of [Silverware Chart](silverware-chart.md): a chart's box, its toolbar,
   cursor: pointer;
 }
 .swc-menu-item:hover,
-.swc-menu-item:focus-visible,
-.swc-segment:not([aria-disabled="true"]):hover,
-.swc-segment:focus-visible {
+.swc-menu-item:focus-visible {
   background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
   outline: none;
 }
@@ -415,28 +413,7 @@ The look of [Silverware Chart](silverware-chart.md): a chart's box, its toolbar,
   color: var(--danger-color, #c62828);
   opacity: 1;
 }
-.swc-segments {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--root-color) 6%, transparent);
-}
-.swc-segment {
-  display: inline-flex;
-  padding: 4px 6px;
-  color: inherit;
-  background: none;
-  border: 0;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.swc-segment[aria-checked="true"] {
-  color: var(--ui-accent-color);
-  background: var(--root-background-color);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-}
-.swc-segment[aria-disabled="true"],
+/* (Its buttons, swc-segments and swc-segment, are shared/segments.css's) */
 .swc-action[aria-disabled="true"] {
   opacity: 0.35;
   cursor: default;
@@ -517,13 +494,52 @@ The look of [Silverware Chart](silverware-chart.md): a chart's box, its toolbar,
   width: 22px;
   height: 22px;
 }
+/* </shared-menu> */
+/* <shared-segments> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* Joined buttons side by side, one of them pressed: a choice (a menu's Align,
+   a width's unit px or %) or a pair of actions (Move up, Move down). Drawn
+   by a menu's segmented entry (shared/menu.ts) and by segmentedControl
+   (shared/controls.ts) */
+.swc-segments {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--root-color) 6%, transparent);
+}
+.swc-segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swc-segment:not([aria-disabled="true"]):hover,
+.swc-segment:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.swc-segment[aria-checked="true"] {
+  color: var(--ui-accent-color);
+  background: var(--root-background-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.swc-segment[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: default;
+}
 /* A finger's targets: bigger buttons in a row */
 @media (pointer: coarse) {
   .swc-segment {
     padding: 8px 10px;
   }
 }
-/* </shared-menu> */
+/* </shared-segments> */
 /* What a view says without items (Reading the page…, No table on this page) */
 .swc-menu-line {
   padding: 5px 8px;

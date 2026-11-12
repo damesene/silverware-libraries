@@ -423,9 +423,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   cursor: pointer;
 }
 .swd-menu-item:hover,
-.swd-menu-item:focus-visible,
-.swd-segment:not([aria-disabled="true"]):hover,
-.swd-segment:focus-visible {
+.swd-menu-item:focus-visible {
   background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
   outline: none;
 }
@@ -548,28 +546,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   color: var(--danger-color, #c62828);
   opacity: 1;
 }
-.swd-segments {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--root-color) 6%, transparent);
-}
-.swd-segment {
-  display: inline-flex;
-  padding: 4px 6px;
-  color: inherit;
-  background: none;
-  border: 0;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.swd-segment[aria-checked="true"] {
-  color: var(--ui-accent-color);
-  background: var(--root-background-color);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-}
-.swd-segment[aria-disabled="true"],
+/* (Its buttons, swd-segments and swd-segment, are shared/segments.css's) */
 .swd-action[aria-disabled="true"] {
   opacity: 0.35;
   cursor: default;
@@ -650,13 +627,52 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   width: 22px;
   height: 22px;
 }
+/* </shared-menu> */
+/* <shared-segments> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* Joined buttons side by side, one of them pressed: a choice (a menu's Align,
+   a width's unit px or %) or a pair of actions (Move up, Move down). Drawn
+   by a menu's segmented entry (shared/menu.ts) and by segmentedControl
+   (shared/controls.ts) */
+.swd-segments {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--root-color) 6%, transparent);
+}
+.swd-segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swd-segment:not([aria-disabled="true"]):hover,
+.swd-segment:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.swd-segment[aria-checked="true"] {
+  color: var(--ui-accent-color);
+  background: var(--root-background-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.swd-segment[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: default;
+}
 /* A finger's targets: bigger buttons in a row */
 @media (pointer: coarse) {
   .swd-segment {
     padding: 8px 10px;
   }
 }
-/* </shared-menu> */
+/* </shared-segments> */
 /* <shared-icons> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
 /* An icon of the plugin's own (shared/icons.ts; Silverware Icons draws it as markup in this box): text (an emoji,
    "H1") or an SVG, on the line and of the text's size, in its color; an icon of a set while Silverware Icons is not

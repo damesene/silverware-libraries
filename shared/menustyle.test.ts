@@ -13,9 +13,16 @@ describe("the shared menu's style", () => {
     const drawn = new Set([...read("shared/menu.ts").matchAll(/\$\{p\}-([a-z-]*[a-z])(?![a-z-]*\})/g)].map((m) => m[1]!));
     for (const prefix of ["list", "menu-row", "menu-name-problem-"]) drawn.delete(prefix);
     expect(drawn.size).toBeGreaterThan(25);
-    const template = read("shared/menu.css");
+    // (Its segmented entry's buttons are styled by shared/segments.css, which goes wherever the menu's style goes)
+    const template = read("shared/menu.css") + read("shared/segments.css");
     const missing = [...drawn].filter((name) => !template.includes(`.__base__-${name}`));
     expect(missing).toEqual([]);
+  });
+
+  it("has its segmented entry's buttons styled wherever the menu is", () => {
+    const pagesOf = (mark: string) => (SHARED_STYLES.find((style: { mark: string }) => style.mark === mark).pages as { page: string; base: string }[]).map((one) => `${one.page} ${one.base}`);
+    const segments = pagesOf("shared-segments");
+    for (const page of pagesOf("shared-menu")) expect(segments, page).toContain(page);
   });
 
   it("is written into every plugin drawing the menu, as its template makes it", () => {

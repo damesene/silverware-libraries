@@ -1,0 +1,43 @@
+/* Joined buttons side by side, one of them pressed: a choice (a menu's Align,
+   a width's unit px or %) or a pair of actions (Move up, Move down). Drawn
+   by a menu's segmented entry (shared/menu.ts) and by segmentedControl
+   (shared/controls.ts) */
+.__base__-segments {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--root-color) 6%, transparent);
+}
+.__base__-segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.__base__-segment:not([aria-disabled="true"]):hover,
+.__base__-segment:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.__base__-segment[aria-checked="true"] {
+  color: var(--ui-accent-color);
+  background: var(--root-background-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.__base__-segment[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: default;
+}
+/* A finger's targets: bigger buttons in a row */
+@media (pointer: coarse) {
+  .__base__-segment {
+    padding: 8px 10px;
+  }
+}

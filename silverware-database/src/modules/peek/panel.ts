@@ -14,6 +14,7 @@
 // is now. A change made elsewhere draws the panel anew once nothing in it is
 // being edited.
 import { el, openedHere } from "../../../../shared/elements.ts";
+import { markOverWindow } from "../../../../shared/overwindow.ts";
 import type { Result } from "../../core/core.ts";
 import type { ModuleHost, OpenedFrom } from "../../core/module.ts";
 import { samePart } from "../../domain/itempart.ts";
@@ -231,6 +232,9 @@ export class PeekPanel {
   private open(): void {
     const doc = this.host.document;
     const element = el(doc, "aside", { class: "swd-peek", attrs: { role: "dialog", "aria-modal": "false", "aria-labelledby": "swd-peek-name", tabindex: "-1" } });
+    // Over the window as a full screen is (shared/overwindow.ts): the other plugins' controls placed by the pointer
+    // (a table's +, a chart's toolbar under it) stand back from it
+    markOverWindow(element, true);
     // Its keys its own: none goes on to the page (SilverBullet would act on them); Esc closes it where no field takes it
     const keep = (event: KeyboardEvent) => event.stopPropagation();
     element.addEventListener("keydown", (event) => {

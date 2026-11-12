@@ -18,6 +18,8 @@ The database knows neither SilverBullet nor pages. `src/isolation.test.ts` check
 
 ## Invariants
 
+- **Silverware Layout's provider** (`registerLayout` in index.ts, `host/silverbullet/layout.ts`): where the init page hands over `silverware.layout.api` (`bridge.layout`), the places (`.swd-place`) are registered with it; its entries are lines of the block under the name `layout` (`layout.width: 1200`), read from the text the place was drawn for (`shown.current`, synchronously) and written as the place writes its block (`writeBlock`). A place over the window is marked `data-silverware-over-window`: Silverware Layout stands back. Set no width on `.swd-place`.
+
 - **The page writer (`shared/pages/`) is the one place that writes a page's text**, a block's state too (its `codeBlocks` part). The pages store reads the index and writes only through the writer, each page only where it is still as read.
 - **Writes are transactions** (`DatabaseStore.plan` then `apply`, core/changes.ts), applied document by document (SilverBullet writes no pages together; a rename is a page written and another deleted) and reported: what was written, what was left and why (`cause`: changed, refused, missing, version). Undo is the core's (core/history.ts), not the editor's.
 - A revision is of the content read (hashes), not a time, so the index catching up with a write never makes a change stale.

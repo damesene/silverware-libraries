@@ -503,6 +503,9 @@ if js and js.window then
       return markdown.markdownToHtml(text, { expand = true })
     end,
     navigate = editor.navigate,
+    -- Silverware Layout, where it is installed (its API page, priority 50, has run by now): the tables laid out at the
+    -- width their metadata keeps
+    layout = silverware.layout and silverware.layout.api,
     -- The settings dialog: saved as SilverBullet's Configuration Manager saves
     -- (the CONFIG page, indexed, the configuration loaded again)
     saveConfigPage = function(text)

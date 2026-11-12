@@ -16,6 +16,17 @@ export const SHARED_STYLES = [
     ],
   },
   {
+    // Joined buttons, one pressed: a menu's segmented entry (where shared/menu.css is) and segmentedControl
+    template: "shared/segments.css",
+    mark: "shared-segments",
+    pages: [
+      { page: "silverware-table/silverware-table-style.md", base: "swt" },
+      { page: "silverware-chart/silverware-chart-style.md", base: "swc" },
+      { page: "silverware-database/silverware-database-style.md", base: "swd" },
+      { page: "silverware-layout/silverware-layout-style.md", base: "swl" },
+    ],
+  },
+  {
     template: "shared/diffview.css",
     mark: "shared-diff",
     pages: [

@@ -79,11 +79,11 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   border-bottom: 1px solid var(--swd-line);
 }
 /* A place over the whole window (the full screen module): its box laid over the page and SilverBullet's top bar, under the
-   peek (z-index 50) and the dialogs, its views scrolling in it; the page's look kept */
+   peek (z-index 70) and the dialogs, its views scrolling in it; the page's look kept */
 .swd-place.swd-over-window {
   position: fixed;
   inset: 0;
-  z-index: 45;
+  z-index: var(--sw-layer-over-window);
   box-sizing: border-box;
   width: 100vw;
   height: 100vh;
@@ -97,7 +97,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 /* SilverBullet's editor scrolls in a box that is a stacking context under its top bar: lifted over it while it holds a place
    shown so (as Silverware Table lifts it for a table over the window) */
 .cm-scroller:has(.swd-place.swd-over-window) {
-  z-index: 30 !important;
+  z-index: var(--sw-layer-lifted) !important;
 }
 /* The view shown: one button (its icon, its label, a mark of its list) opening the views in a menu; the tools at the bar's end */
 .swd-view-picker-box {
@@ -423,9 +423,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   cursor: pointer;
 }
 .swd-menu-item:hover,
-.swd-menu-item:focus-visible,
-.swd-segment:not([aria-disabled="true"]):hover,
-.swd-segment:focus-visible {
+.swd-menu-item:focus-visible {
   background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
   outline: none;
 }
@@ -548,28 +546,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   color: var(--danger-color, #c62828);
   opacity: 1;
 }
-.swd-segments {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--root-color) 6%, transparent);
-}
-.swd-segment {
-  display: inline-flex;
-  padding: 4px 6px;
-  color: inherit;
-  background: none;
-  border: 0;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.swd-segment[aria-checked="true"] {
-  color: var(--ui-accent-color);
-  background: var(--root-background-color);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-}
-.swd-segment[aria-disabled="true"],
+/* (Its buttons, swd-segments and swd-segment, are shared/segments.css's) */
 .swd-action[aria-disabled="true"] {
   opacity: 0.35;
   cursor: default;
@@ -650,13 +627,52 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   width: 22px;
   height: 22px;
 }
+/* </shared-menu> */
+/* <shared-segments> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* Joined buttons side by side, one of them pressed: a choice (a menu's Align,
+   a width's unit px or %) or a pair of actions (Move up, Move down). Drawn
+   by a menu's segmented entry (shared/menu.ts) and by segmentedControl
+   (shared/controls.ts) */
+.swd-segments {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--root-color) 6%, transparent);
+}
+.swd-segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swd-segment:not([aria-disabled="true"]):hover,
+.swd-segment:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.swd-segment[aria-checked="true"] {
+  color: var(--ui-accent-color);
+  background: var(--root-background-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.swd-segment[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: default;
+}
 /* A finger's targets: bigger buttons in a row */
 @media (pointer: coarse) {
   .swd-segment {
     padding: 8px 10px;
   }
 }
-/* </shared-menu> */
+/* </shared-segments> */
 /* <shared-icons> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
 /* An icon of the plugin's own (shared/icons.ts; Silverware Icons draws it as markup in this box): text (an emoji,
    "H1") or an SVG, on the line and of the text's size, in its color; an icon of a set while Silverware Icons is not
@@ -1036,10 +1052,10 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   align-items: center;
   white-space: nowrap;
 }
-/* An editor's panel laid over the page by its cell or field (views/float.ts): over everything around it, scrolled where
-   it is cut to the room in the window */
+/* An editor's panel laid over the page by its cell or field (views/float.ts): over everything around it, the peek too
+   (an editor of the peek's), scrolled where it is cut to the room in the window */
 .swd-floated {
-  z-index: 50;
+  z-index: var(--sw-layer-sheet-panel);
   overflow-y: auto;
 }
 /* A field offering names as typed (a person's with Anyone: shared/suggest.ts): the list under the field, over what is
@@ -1112,8 +1128,9 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   overflow-x: auto;
 }
 .swd-table {
-  /* A body cell's room above and below its text (SilverBullet's own for its tables' cells, said here so what is laid over a
-     cell, a row's Open, knows where its first line is) */
+  /* A body cell's room above and below its text (SilverBullet's own for its tables' cells, said here so what is laid
+     over a cell, a row's Open, knows where its first line is). In px as SilverBullet's, whatever the font's size
+     (Silverware Layout's font zoom): a row as high as a table's of Silverware Table, its line and this room */
   --swd-cell-pad-y: 8px;
   border-collapse: collapse;
   width: 100%;
@@ -1169,6 +1186,17 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 :is(#sb-main, html) .swd-place .swd-table td {
   padding-top: var(--swd-cell-pad-y);
   padding-bottom: var(--swd-cell-pad-y);
+}
+/* The grip's own cell no higher than the others' (their first line and its room), the grip in the middle of that: a
+   row as high as its text makes it, as a table's of Silverware Table whose handle adds nothing, however small the font
+   (a block, not on the line's baseline, which put it lower in a large font) */
+:is(#sb-main, html) .swd-place .swd-table td.swd-table-grip {
+  --swd-grip-pad-y: max(0px, (1lh + 2 * var(--swd-cell-pad-y) - 22px) / 2);
+  padding-top: var(--swd-grip-pad-y);
+  padding-bottom: var(--swd-grip-pad-y);
+}
+.swd-table td.swd-table-grip .swd-row-grip {
+  display: flex;
 }
 .swd-table th:not(.swd-table-gripcol):not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]),
 .swd-table td:not(.swd-table-grip):not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]) {
@@ -1233,8 +1261,8 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   vertical-align: -0.15em;
 }
 .swd-table .swd-open svg {
-  width: 14px;
-  height: 14px;
+  width: 0.972em;
+  height: 0.972em;
 }
 @media (hover: hover) {
   /* (As high as the cell's first line and its room above and below: the button in its middle, by the name's first line
@@ -1258,7 +1286,8 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
     right: 6px;
     transform: translateY(-50%);
     margin: 0;
-    padding: 4px 8px;
+    /* (4 px and 8 px of its 14.4 px: as the text's size) */
+    padding: 0.278em 0.556em;
     border: 1px solid var(--swd-line);
     border-radius: 6px;
     color: var(--swd-quiet);
@@ -1299,6 +1328,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   width: 18px;
   padding: 4px 0 4px 2px;
 }
+/* (Its size whatever the font's, as Silverware Table's handle) */
 .swd-row-grip {
   display: inline-flex;
   align-items: center;
@@ -1341,7 +1371,7 @@ li:hover .swd-row-grip,
 }
 .swd-rows-ghost {
   position: fixed;
-  z-index: 101;
+  z-index: var(--sw-layer-dragged);
   margin: 0;
   pointer-events: none;
   box-sizing: border-box;
@@ -1448,8 +1478,8 @@ tr:focus-within .swd-open {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 6px 12px;
-  padding: 4px 0;
+  gap: 0.333em 0.667em;
+  padding: 0.222em 0;
   border-bottom: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.3));
   overflow-wrap: anywhere;
 }
@@ -2401,7 +2431,7 @@ tr:focus-within .swd-open {
   top: var(--sw-view-top, 0);
   bottom: auto;
   height: var(--sw-view-height, 100%);
-  z-index: 100;
+  z-index: var(--sw-layer-dialog);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3263,7 +3293,7 @@ button.swd-editor-document-folder:hover,
 }
 .swd-props-ghost {
   position: fixed;
-  z-index: 101;
+  z-index: var(--sw-layer-dragged);
   margin: 0;
   pointer-events: none;
   box-sizing: border-box;
@@ -3546,10 +3576,12 @@ button.swd-editor-document-folder:hover,
   justify-content: flex-end;
 }
 
-/* The peek: an item beside the page, over the right of the editor's area; a page of its own where the area is narrow */
+/* The peek: an item beside the page, over the right of the editor's area; a page of its own where the area is narrow.
+   Over the other plugins' floating controls (60 at most: a table's +, a chart's toolbar, placed by their widget under
+   it), under the database's own panels (.swd-floated) and every dialog (100 and over) */
 .swd-peek {
   position: fixed;
-  z-index: 50;
+  z-index: var(--sw-layer-sheet);
   /* The editor's font where SilverBullet does not tell its look (the panel sets it from the editor's text as it opens) */
   font-family: var(--editor-font, inherit);
   box-sizing: border-box;

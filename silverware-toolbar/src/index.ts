@@ -1,5 +1,6 @@
 // Silverware Toolbar entry point, loaded by the init page's Space Lua:
 //   js.importFromSpace("Library/damesene/silverware-toolbar.js").init({ ... editor functions ... })
+import { applyLayers } from "../../shared/layers.ts";
 import { iconsOf } from "../../shared/icons.ts";
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { actionsOf, customActionsAnew, defineCustomActions } from "./actions.ts";
@@ -25,6 +26,8 @@ let current: { readonly bridge: Bridge; readonly actions: () => readonly Action[
 let settingsDialog: SettingsDialog | undefined;
 
 export async function init(bridge: Bridge): Promise<void> {
+  // The layers its style page lays its elements in (shared/layers.ts)
+  applyLayers(document);
   const missing = missingBridgeFunctions(bridge);
   if (missing.length) {
     console.error(`Silverware Toolbar: the init page did not hand over ${missing.join(", ")}`);

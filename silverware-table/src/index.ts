@@ -1,5 +1,6 @@
 // Silverware Table entry point, loaded by the init page's Space Lua:
 //   js.importFromSpace("Library/damesene/silverware-table.js").init({ ... editor functions ... })
+import { applyLayers } from "../../shared/layers.ts";
 import { customSeries, customSeriesAnew, defineCustomSeries } from "./autofill/index.ts";
 import { type Bridge, listOf, missingBridgeFunctions } from "./bridge.ts";
 import { Controller } from "./controller.ts";
@@ -386,6 +387,8 @@ function definitionsChanged(): void {
 
 /** Silverware Table started on the bridge the host hands over; `sources` the space's (SilverBullet's: those Space Lua defines) */
 export function init(bridge: Bridge, sources: SourceProvider = spaceSources): void {
+  // The layers its style page lays its elements in (shared/layers.ts)
+  applyLayers(document);
   const missing = missingBridgeFunctions(bridge);
   if (missing.length) {
     console.error(`Silverware Table: missing editor functions: ${missing.join(", ")}`);

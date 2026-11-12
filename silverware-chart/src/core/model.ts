@@ -68,6 +68,9 @@ export type ChartModel = {
   readonly source?: Source;
   // What the format read that the model has no field for, kept so it is written back as it was (by key)
   readonly extra?: Readonly<Record<string, string>>;
+  // Silverware Layout's entries (shared/layout.ts: `width`), kept by the format as it can (Mermaid: `%% layout.<key>`),
+  // never read here: a format without a place for them drops them, and a write of them says so
+  readonly layout?: Readonly<Record<string, string>>;
 };
 
 /**

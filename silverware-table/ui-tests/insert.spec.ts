@@ -1,5 +1,25 @@
 import { bodyRows, cell, cursorLine, expect, header, hoverCell, markdown, markTable, rendersAnew, setPage, settled, table, test } from "./helpers.ts";
 
+test.describe("Another plugin's over the window", () => {
+  test("a table under what another plugin shows over the window (a database's peek) shows no + and no toolbar there", async ({ page }) => {
+    await hoverCell(page, cell(page, 1, 0));
+    const first = (await cell(page, 1, 0).boundingBox())!;
+    await page.mouse.move(first.x - 20, first.y + first.height - 1, { steps: 4 });
+    await expect(page.locator(".swt-insert:not(.swt-quiet).swt-visible")).toHaveCount(1);
+    // Laid over the whole window, marked as the plugins mark what they show over it (shared/overwindow.ts)
+    await page.evaluate(() => {
+      const over = document.createElement("div");
+      over.setAttribute("data-silverware-over-window", "");
+      over.style.cssText = "position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, 0.05)";
+      document.body.append(over);
+    });
+    await page.mouse.move(first.x - 25, first.y + first.height - 1, { steps: 4 });
+    await expect(page.locator(".swt-insert:not(.swt-quiet).swt-visible")).toHaveCount(0);
+    await page.mouse.move(first.x + 10, first.y + 5, { steps: 4 });
+    await expect(page.locator(".swt-bar.swt-visible")).toHaveCount(0);
+  });
+});
+
 test.describe("Inserting rows with a +", () => {
   test("the + left of the table inserts a row at the border nearest the pointer", async ({ page }) => {
     await hoverCell(page, cell(page, 1, 0));

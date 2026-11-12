@@ -2,6 +2,8 @@
 //   js.importFromSpace("Library/damesene/silverware-chart.js").init({ ... the bridge ... })
 // then a code widget defined for each of `languages()`, rendering `render(…)`,
 // and the page's edits told to `pageModified(…)`.
+import { applyLayers } from "../../shared/layers.ts";
+import { layoutOf } from "../../shared/layout.ts";
 import { type Bridge, listOf, missingBridgeFunctions, readSettings, type Settings } from "./bridge.ts";
 import { Controller } from "./core/controller.ts";
 import type { ChartConstructor } from "./core/drawn.ts";
@@ -42,6 +44,7 @@ export async function init(bridge: Bridge): Promise<void> {
       : undefined,
     loadChart,
     table: tableApi(bridge),
+    layout: layoutOf(bridge.layout),
   });
 }
 
@@ -61,6 +64,8 @@ function tableApi(bridge: Bridge): TableApi | undefined {
 
 /** The core and the modules on, over a host's API (SilverBullet's, or the playground's) */
 export function start(doc: Document, settings: Settings, env: Omit<ConstructorParameters<typeof Controller>[1], "height">): Controller {
+  // The layers its style page lays its elements in (shared/layers.ts)
+  applyLayers(doc);
   // (The one before it, of a load of Space Lua before, let go)
   slot[GLOBAL_KEY]?.stop();
   const controller = new Controller(doc, { ...env, height: settings.height });

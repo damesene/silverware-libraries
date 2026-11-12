@@ -95,6 +95,14 @@ function pressOn(target: Element): void {
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
 
+describe("the peek over the window", () => {
+  it("is marked as shown over the window, so the other plugins' controls placed by the pointer stand back from it", async () => {
+    const { q, peek } = await setup();
+    await peek("Fix login");
+    expect(q(".swd-peek").hasAttribute("data-silverware-over-window")).toBe(true);
+  });
+});
+
 describe("the peek's width", () => {
   const pointer = (target: Element, type: string, clientX: number) => target.dispatchEvent(new MouseEvent(type, { clientX, button: 0, bubbles: true, cancelable: true }) as PointerEvent);
   it("is 600px by default, the setting's where set, its left edge dragged saving it for every database, a double click its default", async () => {

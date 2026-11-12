@@ -63,6 +63,9 @@ if js and js.window then
     bridge.tables = silverware.table.tables
     bridge.onWrite = silverware.table.onWrite
   end
+  -- Silverware Layout, where it is installed (its API page has priority 50): the charts laid out at the width their
+  -- blocks keep
+  bridge.layout = silverware.layout and silverware.layout.api
   silverwareChartJs.init(bridge)
   -- The commands and slash commands of the modules turned on
   for _, name in ipairs(silverwareChartJs.commandNames()) do

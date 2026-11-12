@@ -7,8 +7,8 @@ import { colorAt, icon, plugins, translucent, values } from "./common.ts";
 
 function axis(theme: Theme, model: ChartModel, own: Axis | undefined, stacked: boolean): Record<string, unknown> {
   return {
-    title: { display: !!own?.title, text: own?.title, color: theme.text, font: { family: theme.font } },
-    ticks: { color: theme.text, font: { family: theme.font } },
+    title: { display: !!own?.title, text: own?.title, color: theme.text, font: { family: theme.font, size: theme.fontSize } },
+    ticks: { color: theme.text, font: { family: theme.font, size: theme.fontSize } },
     grid: { color: theme.grid },
     border: { color: theme.grid },
     stacked,

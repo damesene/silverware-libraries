@@ -20,6 +20,8 @@ export type Bridge = {
   // Optional, Silverware Table's (silverware.table.tables and onWrite), where it is installed
   readonly tables?: (text: string) => unknown;
   readonly onWrite?: (listener: (text: string, context: never) => unknown) => unknown;
+  // Optional: Silverware Layout's API (silverware.layout.api), where it is installed: the charts laid out at the width their blocks keep
+  readonly layout?: unknown;
 };
 
 /** The bridge's functions it cannot work without, missing from what the init page gave */

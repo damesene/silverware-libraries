@@ -14,9 +14,17 @@
 // whose box is laid over the window (position: fixed: full screen) scrolls in
 // that box only, the page never moves it: its header and footer are sticky
 // against the box (`swt-sticky-box`), moved by the browser too.
+//
+// A table in a box of its own whose header the page holds (the page scrolled into the table: the header below the view's
+// top, the box's top above it, under SilverBullet's top bar) is marked `swt-held-by-page`: its box's scrollbar runs up
+// past the header there, beside the room covered for the toolbar, and the CSS makes it clear until the box's top is
+// in view again (its width kept: the table does not move).
 import type { AdapterFeature, TableHost } from "../../feature.ts";
 import { STICKY_GAP } from "../../layout.ts";
 import { renderedTable, WIDGET_SELECTOR } from "../../../dom.ts";
+
+// A box's table whose header the page holds, above the box's top: its scrollbar hidden (the CSS)
+const HELD_BY_PAGE = "swt-held-by-page";
 
 export class Sticky implements AdapterFeature {
   constructor(private readonly host: TableHost) {}
@@ -38,6 +46,7 @@ export class Sticky implements AdapterFeature {
       const native = !overWindow && !inside && widget.clientWidth > 0 && info.table.offsetWidth <= widget.clientWidth + 1;
       widget.classList.toggle("swt-sticky-native", native);
       widget.classList.toggle("swt-sticky-box", overWindow);
+      if (native || overWindow) widget.classList.remove(HELD_BY_PAGE);
       // Held below the view's top by the room for the toolbar (STICKY_GAP), but never lower than the table lies in the
       // page: a table nearer the page's top had its header pushed down over its first rows, the page not even scrolled
       const gap = overWindow ? STICKY_GAP : this.gapFor(widget, info.table, scroller.top);
@@ -90,6 +99,7 @@ export class Sticky implements AdapterFeature {
       const offset = Math.max(0, Math.min(Math.max(pageTop, boxTop), footTop - head.offsetHeight) - table.top);
       head.style.transform = offset > 0 ? `translateY(${offset}px)` : "";
       head.classList.toggle("swt-stuck", offset > 0);
+      widget.classList.toggle(HELD_BY_PAGE, inside && offset > 0 && pageTop > boxTop + 0.5);
     }
   }
 

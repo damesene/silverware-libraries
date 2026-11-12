@@ -1,7 +1,7 @@
 ---
 name: Library/damesene/silverware-toolbar
 tags: meta/library
-version: 1.0.0
+version: 1.0.1
 description: "Silverware Toolbar: select text and a toolbar beside it (over the keyboard on a phone) formats it, turns its lines into a list, a heading, a quote or a code block and back, and runs any action or command; gesture buttons, text snippets, and icons and emoji of your own with Silverware Icons."
 files:
 - silverware-toolbar.js

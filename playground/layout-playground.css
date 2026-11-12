@@ -1,0 +1,65 @@
+/* The layout playground: an editor as SilverBullet's (its pane a size container, its text bounded by --editor-width,
+   5 px 20 px of padding), its widgets of the playground's provider */
+:root {
+  --editor-width: 800px;
+}
+#sb-main {
+  display: flex;
+  flex-direction: column;
+}
+#sb-editor {
+  container-type: inline-size;
+  container-name: sb-editor-col;
+  width: 100%;
+}
+/* CodeMirror's scroller: a stacking context of its own, its widgets over a drag's guides */
+.cm-scroller {
+  position: relative;
+  z-index: 0;
+}
+.cm-content {
+  width: 100%;
+  max-width: var(--editor-width);
+  margin: 0 auto;
+  padding: 5px 20px;
+  box-sizing: border-box;
+  line-height: 1.6;
+}
+.cm-line {
+  padding: 2px 0;
+}
+.pg-widget {
+  display: block;
+  margin: 8px 0;
+  overflow-x: auto;
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.35));
+  border-radius: 6px;
+}
+.pg-widget table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.pg-widget th,
+.pg-widget td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.3));
+}
+.pg-chart {
+  height: 160px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--ui-accent-color, #464cfc) 35%, transparent), color-mix(in srgb, var(--ui-accent-color, #464cfc) 8%, transparent));
+}
+.pg-widget[data-silverware-over-window] {
+  position: fixed;
+  inset: 60px 20px 20px;
+  z-index: 50;
+  margin: 0;
+  background: var(--root-background-color, #fff);
+}
+.entries {
+  max-width: 800px;
+  margin: 24px auto;
+  padding: 0 20px;
+  font-size: 12px;
+  opacity: 0.8;
+}

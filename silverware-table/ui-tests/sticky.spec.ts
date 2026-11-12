@@ -1,6 +1,6 @@
 // The header held at the top of the page's view as a long table scrolls past
 import type { Page } from "@playwright/test";
-import { expect, setPage, settled, table, tableIcon, test } from "./helpers.ts";
+import { expect, setPage, setSettings, settled, table, tableIcon, test } from "./helpers.ts";
 
 test.describe("Rows pinned to the bottom", () => {
   test("a scroller with a bottom padding (as SilverBullet's, to scroll past the end): the row at the table's bottom while it is in view", async ({ page }) => {
@@ -62,6 +62,40 @@ test.describe("The held header", () => {
     const bar = (await page.locator(".swt-bar.swt-visible").boundingBox())!;
     expect(bar.y + bar.height).toBeLessThanOrEqual(at.head.top + 0.5);
     expect(bar.y).toBeGreaterThanOrEqual(at.view - 0.5);
+  });
+
+  test("a table with a maximum height: a thin scrollbar of its own; held by the page, its scrollbar clear (none up past the header), its width kept; back as its top is in view", async ({ page }) => {
+    await setSettings(page, { "silverware.table.maxHeight": 300 });
+    const rows = Array.from({ length: 40 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n");
+    const filler = Array.from({ length: 30 }, (_, i) => `Line ${i + 1}.`).join("\n\n");
+    await setPage(page, `# Test\n\nText above.\n\n| Name | Qty |\n|---|---|\n${rows}\n\n${filler}\n`);
+    await expect(table(page).locator("tr[data-swt-row]").first()).toBeVisible();
+    const look = () =>
+      table(page).evaluate((w) => ({ width: getComputedStyle(w).scrollbarWidth, color: getComputedStyle(w).scrollbarColor, inner: w.clientWidth, held: w.classList.contains("swt-held-by-page") }));
+    const before = await look();
+    expect(before.width).toBe("thin");
+    expect(before.held).toBe(false);
+    expect(before.color).not.toMatch(/^transparent transparent$|rgba\(0, 0, 0, 0\) rgba\(0, 0, 0, 0\)/);
+    // The page scrolled so the box's top is 100 px above the view's top: the header held by the page
+    await page.evaluate(() => {
+      const scroller = document.querySelector(".cm-scroller")!;
+      const box = document.querySelector(".sb-table-widget")!;
+      scroller.scrollTop += box.getBoundingClientRect().top - scroller.getBoundingClientRect().top + 100;
+    });
+    await settled(page);
+    await expect(table(page).locator("thead")).toHaveClass(/swt-stuck/);
+    const held = await look();
+    expect(held.held).toBe(true);
+    expect(held.color).toMatch(/^transparent transparent$|rgba\(0, 0, 0, 0\) rgba\(0, 0, 0, 0\)/);
+    expect(held.inner).toBe(before.inner);
+    // The box's top in view again: its scrollbar back
+    await page.evaluate(() => {
+      const scroller = document.querySelector(".cm-scroller")!;
+      const box = document.querySelector(".sb-table-widget")!;
+      scroller.scrollTop += box.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 150;
+    });
+    await settled(page);
+    expect((await look()).held).toBe(false);
   });
 
   test("the room above it is covered whole in the page's color: no row shows between the view's top and the header", async ({ page }) => {

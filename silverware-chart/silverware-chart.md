@@ -1,7 +1,7 @@
 ---
 name: Library/damesene/silverware-chart
 tags: meta/library
-version: 1.0.0
+version: 1.1.0
 description: "Silverware Chart: charts written as Mermaid, which other tools can draw too, drawn in SilverBullet with Chart.js; their data from your blocks or from a markdown table, followed as you edit it."
 files:
 - silverware-chart.js
@@ -63,6 +63,8 @@ xychart-beta
 | `where`, `rows` | Only some of the table's rows: see below |
 
 A setting it does not know is kept as you wrote it.
+
+With [Silverware Layout](https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md) installed, a chart can be wider (or narrower) than the page's text, centred on it: drag the bar Silverware Layout shows beside its right edge, and the chart is drawn as wide. The width is kept in the block, a comment `%% layout.width: 1200`.
 
 ## Data from a table
 

@@ -23,6 +23,10 @@ Charts written in a format other tools draw (Mermaid's `xychart-beta` and `pie` 
 - An axis' range goes in Mermaid's `y-axis` / `x-axis` only with both ends: one end alone is a syntax error in Mermaid's grammar (`xychart.jison`), so `chart.yFrom` / `yTo` / `xFrom` / `xTo` instead (decided 2026-11-03, so every comment of ours is `chart.*`).
 - Mermaid blocks that are no chart (a flowchart) go to what drew `mermaid` before: the init page (priority -10, after SilverBullet's Mermaid library at 0 and Silverware Table's API at 50) keeps `config.get({"codeWidgets", language})` as the widget's `before`, ours marked `silverwareChart` so a reload of Space Lua does not wrap itself.
 
+## Silverware Layout
+
+- The charts are Silverware Layout's widgets where its API is handed over (`bridge.layout`, `layoutOf`): the controller's `layoutProvider`, selector `.swc-widget` (the widget the init page makes). Its entries are the model's `layout` (`ChartModel.layout`), written by the chart's format as it can: Mermaid `%% layout.<key>: <value>` (formats/mermaid.ts, after the `chart.*` comments, never doubled among the other comments). A format that drops them: the write is refused, said (`the <format> format keeps no layout`), nothing written. Never read their meaning.
+
 ## Gotchas
 
 - Chart.js is a file of its own (`silverware-chart-chartjs.js`, built from src/chartjs.ts, in the library page's `files:`), imported by `new URL(…, import.meta.url)` the first time a chart is drawn.

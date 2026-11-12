@@ -87,7 +87,8 @@ Probe pages: a test table and an inline `${(function() … end)()}` listing `que
 - **Delete twice**: Delete empties cells; on whole rows/columns already empty (hidden rows included for columns) it deletes them; a whole empty table is deleted the same way, asked only where something goes with it.
 - **Paste** is refused while sorted or filtered; cells a feature computes are left (`keepsCell`); new rows get calculated columns' formulas in the write step.
 - **Pinned lines show a tint, not a border**: selected/edited cells draw inset shadows a border would clash with.
-- **Every + inserts only on a press on it** (it shows quiet until hovered): rows were often inserted by presses near it (2026-11-04).
+- **Every + inserts only on a press on it**: rows were often inserted by presses near it (2026-11-04). It shows only with the pointer on it (`INSERT_NEAR` is its radius), so it has no quiet look of its own (2026-11-12).
+- **The + shows only for a table with the focus**, from a dot on its border the pointer comes near (as Confluence does): shown on hover, the + and its line were in the way while writing (2026-11-12).
 - **largeTables is off by default**: it changes the look (a scrolling box) and Ctrl+F sees only rendered rows. Virtualizing against the page's own scroll was rejected: estimated heights would move the page, and CodeMirror keeps its own height map.
 - **No UI framework**: elements made synchronously with `el` (shared/elements.ts), as they are measured and placed at once (docs/ui-without-framework.md).
 
@@ -96,7 +97,7 @@ Probe pages: a test table and an inline `${(function() … end)()}` listing `que
 - One core mechanism for UI state across a table rendered anew, and an explicit interaction mode (idle, editing, menu, picking, dragging) instead of features reacting to each other's events (`pointerBusy` is a start). Not done.
 - Modules loaded apart (weighed 2026-10-24, set aside): most modules are on by default, so little is saved; costs an async start, and whether SilverBullet installs and `js.importFromSpace` resolves chunks is not verified.
 - Recalculating only the formulas an edit affects (every write recalculates the table: the largest cost after layout). Enter without rewriting the table (batching edits). Lua functions in formulas.
-- `editor.downloadFile` for the Excel file (now a link clicked in the page; SilverBullet's mobile app unverified). A parameter picker for column types. The + band found without hovering the table first. Enter after editing in select mode follows `enterKey` (a spreadsheet would only select).
+- `editor.downloadFile` for the Excel file (now a link clicked in the page; SilverBullet's mobile app unverified). A parameter picker for column types. The + band of a table without the focus found without hovering the table first (the focused table's is). Enter after editing in select mode follows `enterKey` (a spreadsheet would only select).
 - `overscroll-behavior: contain` on a table over the window (scroll may hand on to the page, which can unload the table).
 - largeTables limits: Ctrl+F, column widths from the first rows shown, estimated heights of rows out of view.
 - `grips.ts` and `selection.ts` are large and could be split behind their features. Before writing a helper, look in `core/`, `menu.ts` and `shared/`; when two features need the same thing it moves there, generic.

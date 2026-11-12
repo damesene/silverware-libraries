@@ -437,10 +437,13 @@ test.describe("Sheet view", () => {
     await (await tableIcon(page, "Full screen")).click();
     await expect(table(page)).toHaveClass(/swt-fullscreen/);
     const columns = await table(page).locator("table tr").first().locator("th, td").count();
+    // A cell of the last column selected (the table has the focus), the pointer by the dot above the table's right edge
+    await cell(page, 1, columns - 1).click();
     await hoverCell(page, cell(page, 1, columns - 1));
-    const plus = page.locator('.swt-insert.swt-quiet.swt-visible[aria-label="Add a column"]');
-    await expect(plus).toBeVisible();
     const tableBox = (await table(page).locator("table").boundingBox())!;
+    await page.mouse.move(tableBox.x + tableBox.width - 1, tableBox.y - 13, { steps: 4 });
+    const plus = page.locator('.swt-insert.swt-visible[aria-label="Insert a column here"]');
+    await expect(plus).toBeVisible();
     const plusBox = (await plus.boundingBox())!;
     const bar = (await page.locator(".swt-bar.swt-visible").boundingBox())!;
     const width = page.viewportSize()!.width;
@@ -1021,19 +1024,19 @@ test("a cell's text on the sheet sits in the middle of its row, not pushed to it
 });
 
 test("the controls of the table clicked do not stay over the sheet or the full screen, nor after either ends", async ({ page }) => {
-  // Shown and visible: the toolbar, the grips, the + a pointer brought up, a menu (the quiet + of a cell selected: apart)
+  // Shown and visible: the toolbar, the grips, the + a pointer brought up, a menu (the dots of a table with the focus: apart)
   const controls = () =>
     page.evaluate(() =>
       Array.from(document.querySelectorAll<HTMLElement>(".swt-floating.swt-visible"))
-        .filter((e) => e.getBoundingClientRect().width > 0 && /swt-bar|swt-grip|swt-insert|swt-menu/.test(e.className) && !e.classList.contains("swt-quiet"))
+        .filter((e) => e.getBoundingClientRect().width > 0 && /swt-bar|swt-grip|swt-insert|swt-menu/.test(e.className) && !e.classList.contains("swt-insert-dots"))
         .map((e) => e.className),
     );
-  const quiet = page.locator(".swt-insert.swt-quiet.swt-visible");
+  const quiet = page.locator(".swt-insert-dots.swt-visible > span:not([hidden])");
   for (const [open, exit] of [
     ["Sheet view", "Exit sheet view"],
     ["Full screen", "Exit full screen"],
   ] as const) {
-    // The table's last cell selected: its quiet + of the last row and column shows, as long as the table is in sight
+    // The table's last cell selected: the dots of its borders show, as long as the table is in sight
     await cell(page, 2, 1).click();
     await page.keyboard.press("Control+End");
     await hoverCell(page, cell(page, 2, 1));
@@ -1042,9 +1045,8 @@ test("the controls of the table clicked do not stay over the sheet or the full s
     // The pointer stays where the icon was: nothing moved over what is shown now
     await (await tableIcon(page, open)).click();
     await expect.poll(controls).toEqual([]);
-    // Over the sheet the table is out of sight, its cell still selected; in full screen it is the table shown
-    if (open === "Sheet view") await expect(quiet).toHaveCount(0);
-    else await expect(quiet.first()).toBeVisible();
+    // Its cell still selected, shown so in the table drawn on the sheet as in full screen: the dots of that table
+    await expect(quiet.first()).toBeVisible();
     await page.locator(".swt-over-window, .swt-sheet-board").first().locator("td").first().hover();
     await (await tableIcon(page, exit)).click();
     await expect.poll(controls).toEqual([]);
@@ -1146,8 +1148,8 @@ test("the + pressed again and again on a sheet's table adds a row each time, wit
   for (let i = 1; i <= 3; i++) {
     const first = drawn.locator("tr[data-swt-row='1'] > td").first();
     const box = (await first.boundingBox())!;
-    await page.mouse.move(box.x - 20, box.y + 2, { steps: 4 });
-    const plus = page.locator(".swt-insert:not(.swt-quiet).swt-visible");
+    await page.mouse.move(box.x - 13, box.y + 1, { steps: 4 });
+    const plus = page.locator(".swt-insert.swt-visible");
     await expect(plus).toHaveCount(1);
     await plus.click();
     // (Its editor opens in the new row: the next press saves it first)

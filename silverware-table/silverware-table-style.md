@@ -927,7 +927,7 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
   background: var(--ui-accent-color);
 }
 /* While its header cell is hovered, selected or edited: quiet (a grey dashed
-   line) until the pointer is on it, as the quiet + */
+   line) until the pointer is on it */
 @media not (pointer: coarse) {
   .sb-table-widget.swt-table thead tr:first-child > td:is(:hover, .swt-selected, .swt-editing) > .swt-col-resize:not(:hover):not(.swt-active)::after {
     width: 0;
@@ -2792,8 +2792,9 @@ html[data-theme="dark"] .swt-excel-error {
 .swt-insert {
   /* Over its line */
   z-index: calc(var(--sw-layer-control) + 1);
-  width: 18px;
-  height: 18px;
+  /* Its radius is INSERT_NEAR (insert.ts): it shows only with the pointer on it */
+  width: 16px;
+  height: 16px;
   padding: 0;
   align-items: center;
   justify-content: center;
@@ -2805,26 +2806,42 @@ html[data-theme="dark"] .swt-excel-error {
   cursor: pointer;
 }
 .swt-insert svg {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
 }
-/* Every +: quiet (grey, a dashed outline) until the pointer is on it, as only
-   a press on it inserts; opaque, as its line runs under it */
-.swt-insert:not(:hover):not(:focus-visible) {
-  box-sizing: border-box;
-  color: color-mix(in srgb, var(--root-color) 45%, transparent);
-  background: color-mix(in srgb, var(--root-color) 6%, var(--root-background-color));
-  border: 1px dashed color-mix(in srgb, var(--root-color) 40%, transparent);
-  box-shadow: none;
-}
-/* The border a row (column) goes to: over the table, not taking the pointer;
-   faint until the pointer is on its + */
+/* The border a row (column) goes to, shown with its +: over the table, not
+   taking the pointer */
 .swt-insert-line {
-  background: color-mix(in srgb, var(--ui-accent-color) 35%, transparent);
+  background: var(--ui-accent-color);
   pointer-events: none;
 }
-.swt-insert-line.swt-lit {
-  background: var(--ui-accent-color);
+/* A dot on each border a + inserts at, while the table has the focus: one
+   layer at the window's corner, each dot centred on its point. Not after a
+   touch: a finger brings up no + */
+.swt-floating.swt-insert-dots {
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.swt-floating.swt-insert-dots.swt-visible {
+  display: block !important;
+}
+html[data-swt-pointer="touch"] .swt-floating.swt-insert-dots {
+  display: none !important;
+}
+.swt-insert-dots > span {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--root-color) 22%, transparent);
+}
+.swt-insert-dots > span[hidden] {
+  display: none;
 }
 
 /* Row and column menus */

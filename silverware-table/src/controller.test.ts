@@ -302,37 +302,113 @@ describe("Controller", () => {
     });
   };
 
-  it("shows the + inserting a row in a lane of its own left of the row grips, none over a grip", async () => {
+  const move = (x: number, y: number) => document.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerType: "mouse", clientX: x, clientY: y }));
+  // The dots shown, by where they are (placed in the frame after what changed them)
+  const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+  const dots = async () => {
+    await frame();
+    const layer = document.querySelector<HTMLElement>(".swt-insert-dots")!;
+    if (!layer.classList.contains("swt-visible")) return [];
+    return Array.from(layer.querySelectorAll<HTMLElement>("span:not([hidden])")).map((dot) => `${dot.style.left} ${dot.style.top}`);
+  };
+  // A cell selected (select mode), the pointer on it (as layOutTable puts it): the table has the focus
+  const focusOn = async (row: number, column: number) => {
+    move(110 + column * 150, 110 + row * 30);
+    cell(row, column).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+    clickOn(cell(row, column));
+    expect(cell(row, column).classList.contains("swt-selected")).toBe(true);
+    // Its dots placed
+    await frame();
+  };
+
+  it("shows a dot on each border only while the table has the focus, a + only near one, none over a grip", async () => {
+    localStorage.removeItem("silverware.table.editMode");
     await setup(PAGE);
     layOutTable();
     cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
     const mark = document.querySelector<HTMLElement>(".swt-insert")!;
-    const move = (x: number, y: number) => document.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerType: "mouse", clientX: x, clientY: y }));
+    const line = document.querySelector<HTMLElement>(".swt-insert-line")!;
+    const markAt = () => (mark.classList.contains("swt-visible") ? [parseFloat(mark.style.left) + mark.offsetWidth / 2, parseFloat(mark.style.top) + mark.offsetHeight / 2] : undefined);
+    // Hovered, no cell of it selected: neither dots nor a + on the dot's place
+    move(87, 160);
+    expect(await dots()).toEqual([]);
+    expect(markAt()).toBeUndefined();
+    await focusOn(1, 0);
+    // Left of the table (13px out) under the header and each row; above the header (13px up) on each column's edge
+    expect(await dots()).toEqual(["87px 130px", "87px 160px", "87px 190px", "87px 220px", "100px 87px", "250px 87px", "400px 87px"]);
     // On the border under Pear, over the row grip on the table's edge: no +
     move(97, 160);
-    expect(mark.classList.contains("swt-visible")).toBe(false);
+    expect(markAt()).toBeUndefined();
     move(94, 160);
-    expect(mark.classList.contains("swt-visible")).toBe(false);
-    // Left of the grip: the +, its centre 17px left of the edge (the 18px + clear of the grip, 12px wide on the edge)
+    expect(markAt()).toBeUndefined();
+    // On the dot left of the grip (within the +'s radius): the +, its line with it
     move(85, 160);
-    expect(mark.classList.contains("swt-visible")).toBe(true);
-    expect(parseFloat(mark.style.left) + mark.offsetWidth / 2).toBe(83);
-    // Anywhere in the lane: on the border nearest the pointer, no aiming needed
-    move(75, 183);
-    expect(parseFloat(mark.style.top) + mark.offsetHeight / 2).toBe(190);
-    move(75, 172);
-    expect(parseFloat(mark.style.top) + mark.offsetHeight / 2).toBe(160);
+    expect(markAt()).toEqual([87, 160]);
+    expect(line.classList.contains("swt-visible")).toBe(true);
+    move(85, 186);
+    expect(markAt()).toEqual([87, 190]);
+    // Between two dots, out in the band past one, or by a dot but off the + (its corner): no +, no line
+    move(85, 175);
+    expect(markAt()).toBeUndefined();
+    expect(line.classList.contains("swt-visible")).toBe(false);
+    move(70, 160);
+    expect(markAt()).toBeUndefined();
+    move(81, 154);
+    expect(markAt()).toBeUndefined();
+    move(84, 164);
+    expect(markAt()).toEqual([87, 160]);
     mark.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
     await flush();
     expect(text).toBe(PAGE.replace("| Pear | 3 |\n", "| Pear | 3 |\n| | |\n"));
   });
 
+  it("keeps the dots of a cell only selected while the pointer is away from the table; they go with the selection", async () => {
+    localStorage.removeItem("silverware.table.editMode");
+    await setup(PAGE);
+    layOutTable();
+    await focusOn(3, 0);
+    expect(await dots()).toHaveLength(7);
+    // The pointer leaves the table: its controls go, the dots of the selection stay
+    (controller as unknown as { hideFloating(): void }).hideFloating();
+    expect(document.querySelector(".swt-bar")!.classList.contains("swt-visible")).toBe(false);
+    expect(await dots()).toHaveLength(7);
+    // The pointer comes to a dot from outside the table, no table hovered: the + there
+    const mark = document.querySelector<HTMLElement>(".swt-insert")!;
+    move(85, 160);
+    expect(mark.classList.contains("swt-visible")).toBe(true);
+    expect(inInsertBand()).toBe(true);
+    // Hovered from now on, as if the pointer had come over it: its toolbar back
+    expect(document.querySelector(".swt-bar")!.classList.contains("swt-visible")).toBe(true);
+    move(20, 160);
+    expect(mark.classList.contains("swt-visible")).toBe(false);
+    // Esc ends the selection: the table has the focus no more
+    key(document.body, "Escape");
+    expect(editor.querySelectorAll(".swt-selected").length).toBe(0);
+    expect(await dots()).toEqual([]);
+  });
+
+  it("gives a table being edited the dots, kept as Esc leaves its cell selected", async () => {
+    await setup(PAGE);
+    layOutTable();
+    // Edit mode: a click edits
+    clickOn(cell(2, 1));
+    expect(editor.querySelector(".swt-cell-editor")).not.toBeNull();
+    expect(await dots()).toHaveLength(7);
+    key(editor.querySelector(".swt-cell-editor")!, "Escape");
+    await flush();
+    expect(cell(2, 1).classList.contains("swt-selected")).toBe(true);
+    expect(await dots()).toHaveLength(7);
+    key(document.body, "Escape");
+    expect(await dots()).toEqual([]);
+  });
+
   it("shows the + on the borders of the header and of the rows pinned to the top", async () => {
+    localStorage.removeItem("silverware.table.editMode");
     await setup("| Name | Qty |\n|---|---|\n| Pear | 3 |\n| apple | 10 |\n| Fig | 2 |\n| <meta core.table core.pin-top='2'> |\n", { "silverware.table.metadata": true });
     layOutTable();
     expect(cell(2, 0).closest("thead")).not.toBeNull();
-    cell(3, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-    const mark = document.querySelector<HTMLElement>(".swt-insert:not(.swt-quiet)")!;
+    await focusOn(3, 0);
+    const mark = document.querySelector<HTMLElement>(".swt-insert")!;
     const move = (x: number, y: number) => document.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerType: "mouse", clientX: x, clientY: y }));
     const at = () => parseFloat(mark.style.top) + mark.offsetHeight / 2;
     // Under the header (130), between Pear and apple (160), under apple (190)
@@ -342,7 +418,8 @@ describe("Controller", () => {
     }
   });
 
-  it("gives a row scrolled under the header held at the top no grip, its border no +", async () => {
+  it("gives a row scrolled under the header held at the top no grip, its border no dot nor +", async () => {
+    localStorage.removeItem("silverware.table.editMode");
     await setup(PAGE);
     layOutTable();
     // The header held over Pear (130..160) and part of apple (160..190)
@@ -351,36 +428,40 @@ describe("Controller", () => {
       configurable: true,
       value: () => ({ top: 135, bottom: 165, left: 100, right: 400, width: 300, height: 30, x: 100, y: 135, toJSON: () => ({}) }) as DOMRect,
     });
-    cell(2, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-    const mark = document.querySelector<HTMLElement>(".swt-insert:not(.swt-quiet)")!;
+    await focusOn(2, 0);
+    const mark = document.querySelector<HTMLElement>(".swt-insert")!;
     const grip = document.querySelector<HTMLElement>(".swt-grip:not(.swt-grip-column)")!;
-    const move = (x: number, y: number) => document.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerType: "mouse", clientX: x, clientY: y }));
     // Beside Pear, under the header: no grip goes to it
     move(97, 150);
     expect(grip.style.top).not.toBe(`${130 + (30 - 22) / 2}px`);
-    // The nearest border shown: not Pear's (160, under the header)
-    move(80, 158);
-    expect(mark.classList.contains("swt-visible")).toBe(true);
-    expect(parseFloat(mark.style.top) + mark.offsetHeight / 2).not.toBe(160);
-    expect([130, 190]).toContain(parseFloat(mark.style.top) + mark.offsetHeight / 2);
+    // Pear's border (160) is under the header: no dot, no + near it
+    expect((await dots()).filter((dot) => dot.startsWith("87px "))).toEqual(["87px 130px", "87px 190px", "87px 220px"]);
+    move(87, 160);
+    expect(mark.classList.contains("swt-visible")).toBe(false);
+    // apple's (190) shows
+    move(86, 188);
+    expect(parseFloat(mark.style.top) + mark.offsetHeight / 2).toBe(190);
   });
 
   it("shows the + inserting a column in a lane of its own above the column grips, none over a grip; the toolbar keeps clear of it", async () => {
+    localStorage.removeItem("silverware.table.editMode");
     await setup(PAGE);
     layOutTable();
-    cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-    const mark = document.querySelector<HTMLElement>(".swt-insert:not(.swt-quiet)")!;
-    const move = (x: number, y: number) => document.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerType: "mouse", clientX: x, clientY: y }));
+    await focusOn(1, 0);
+    const mark = document.querySelector<HTMLElement>(".swt-insert")!;
     // Over the column grip on the header's top edge: no +
     move(250, 97);
     expect(mark.classList.contains("swt-visible")).toBe(false);
-    // Above it: the + on the border nearest the pointer (between Name and Qty at 250), its centre 17px above the header
-    move(230, 85);
+    // Between two dots: none either
+    move(175, 87);
+    expect(mark.classList.contains("swt-visible")).toBe(false);
+    // On the dot above it (between Name and Qty at 250): the +, its centre 13px above the header
+    move(246, 88);
     expect(mark.classList.contains("swt-visible")).toBe(true);
     expect(parseFloat(mark.style.left) + mark.offsetWidth / 2).toBe(250);
-    expect(parseFloat(mark.style.top) + mark.offsetHeight / 2).toBe(83);
-    // Nearer the table's right edge: there, adding a column at the end
-    move(360, 80);
+    expect(parseFloat(mark.style.top) + mark.offsetHeight / 2).toBe(87);
+    // The dot at the table's right edge: adding a column at the end
+    move(396, 86);
     expect(parseFloat(mark.style.left) + mark.offsetWidth / 2).toBe(400);
     mark.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
     await flush();
@@ -390,100 +471,6 @@ describe("Controller", () => {
     cell(1, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
     const bar = document.querySelector<HTMLElement>(".swt-bar.swt-visible")!;
     expect(parseFloat(bar.style.left) + bar.offsetWidth).toBeLessThanOrEqual(400 - 9 - 4);
-  });
-
-  it("shows a quiet + under the last row and right of the last column while a cell of it is hovered, edited or selected; lit under the pointer, it adds one", async () => {
-    await setup(PAGE);
-    layOutTable();
-    const row = document.querySelector<HTMLElement>('.swt-insert.swt-quiet[aria-label="Add a row"]')!;
-    const column = document.querySelector<HTMLElement>('.swt-insert.swt-quiet[aria-label="Add a column"]')!;
-    const line = document.querySelector<HTMLElement>(".swt-insert-line")!;
-    const shown = () => [row, column].map((mark) => mark.classList.contains("swt-visible"));
-    const hover = (r: number, c: number) => cell(r, c).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-    hover(1, 0);
-    expect(shown()).toEqual([false, false]);
-    // Fig, Qty: the last row and the last column
-    hover(3, 1);
-    expect(shown()).toEqual([true, true]);
-    expect(line.classList.contains("swt-visible")).toBe(false);
-    hover(2, 1);
-    expect(shown()).toEqual([false, true]);
-    hover(3, 0);
-    expect(shown()).toEqual([true, false]);
-    // Edited: shown while the pointer is elsewhere
-    clickOn(cell(3, 0));
-    hover(1, 0);
-    expect(shown()).toEqual([true, false]);
-    key(editor.querySelector(".swt-cell-editor")!, "Escape");
-    await flush();
-    // A press in the band beside the table (no + of the pointer's there) adds nothing
-    hover(3, 0);
-    pointInsert(undefined, true);
-    editor.querySelector(".sb-table-widget")!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
-    await flush();
-    expect(text).toBe(PAGE);
-    pointInsert(undefined);
-    // The pointer on it: the line where it adds; a press adds a row at the end
-    row.dispatchEvent(new PointerEvent("pointerenter"));
-    expect(line.classList.contains("swt-visible")).toBe(true);
-    row.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
-    await flush();
-    expect(text).toBe(`${PAGE}| | |
-`);
-    await controller.scan();
-    key(editor.querySelector(".swt-cell-editor")!, "Escape");
-    await flush();
-    hover(1, 1);
-    column.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
-    await flush();
-    expect(text).toContain("| Name | Qty | Column 3 |");
-  });
-
-  it("draws the line of the + under the pointer, though both quiet + show (the last cell of the last row)", async () => {
-    await setup(PAGE);
-    layOutTable();
-    const row = document.querySelector<HTMLElement>('.swt-insert.swt-quiet[aria-label="Add a row"]')!;
-    const column = document.querySelector<HTMLElement>('.swt-insert.swt-quiet[aria-label="Add a column"]')!;
-    const line = document.querySelector<HTMLElement>(".swt-insert-line")!;
-    const across = () => line.classList.contains("swt-visible") && line.style.height === "2px" && line.style.width !== "2px";
-    const down = () => line.classList.contains("swt-visible") && line.style.width === "2px" && line.style.height !== "2px";
-    const hoverLast = () => cell(3, 1).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-    hoverLast();
-    expect([row, column].map((m) => m.classList.contains("swt-visible"))).toEqual([true, true]);
-    // On the row's +: the line across the table, also once the + are shown again
-    row.dispatchEvent(new PointerEvent("pointerenter"));
-    expect(across()).toBe(true);
-    hoverLast();
-    expect(across()).toBe(true);
-    row.dispatchEvent(new PointerEvent("pointerleave"));
-    expect(line.classList.contains("swt-visible")).toBe(false);
-    // On the column's +: the line down the table
-    column.dispatchEvent(new PointerEvent("pointerenter"));
-    hoverLast();
-    expect(down()).toBe(true);
-    column.dispatchEvent(new PointerEvent("pointerleave"));
-    // The pointer's own + under the last row (in the lane left of the grips): its line, the column's quiet + notwithstanding
-    document.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerType: "mouse", clientX: 80, clientY: 215 }));
-    expect(document.querySelector(".swt-insert:not(.swt-quiet)")!.classList.contains("swt-visible")).toBe(true);
-    expect(across()).toBe(true);
-  });
-
-  it("shows the quiet + of a cell only selected, the pointer away from the table", async () => {
-    // Select mode: a click selects
-    localStorage.removeItem("silverware.table.editMode");
-    await setup(PAGE);
-    const row = document.querySelector<HTMLElement>('.swt-insert.swt-quiet[aria-label="Add a row"]')!;
-    cell(3, 0).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-    clickOn(cell(3, 0));
-    expect(cell(3, 0).classList.contains("swt-selected")).toBe(true);
-    expect(editor.querySelector(".swt-cell-editor")).toBeNull();
-    // The pointer leaves the table: its controls go, the quiet + of the selection stays
-    (controller as unknown as { hideFloating(): void }).hideFloating();
-    expect(document.querySelector(".swt-bar")!.classList.contains("swt-visible")).toBe(false);
-    expect(row.classList.contains("swt-visible")).toBe(true);
-    // Another cell selected: it goes
-    clickOn(cell(1, 0));
-    expect(row.classList.contains("swt-visible")).toBe(false);
   });
 
   it("formats the table's markdown from the toolbar's menu; again, it writes nothing", async () => {

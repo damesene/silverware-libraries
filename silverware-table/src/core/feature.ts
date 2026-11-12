@@ -777,7 +777,7 @@ export interface ModelHost {
   selectsCells(): boolean;
   /** The cells selected in a table, if a feature selects (Feature.selected) */
   selectedCells(info: TableInfo): readonly CellRef[];
-  /** The cells selected changed (the selection module): what follows them (the quiet + of a last row or column) follows */
+  /** The cells selected changed (the selection module): what follows them (the dots of the + of the table with the focus) follows */
   selectionChanged(): void;
   /**
    * An arrow at the table's edge, away from the table, on a cell selected

@@ -6,6 +6,7 @@
 // item does; this file only shows and runs them.
 
 import { el } from "../../../shared/elements.ts";
+import { overWindowOf } from "../../../shared/overwindow.ts";
 import { focusMenu, type MenuEntry, type MenuLook, onMenuClose, renderMenu } from "../../../shared/menu.ts";
 import { IterableWeakSet } from "./weakset.ts";
 
@@ -148,9 +149,12 @@ export class ChartToolbar {
   /** The pointer moved: the chart under it (or under the band above it) shows its toolbar, else the toolbar goes */
   private pointerAt(x: number, y: number): void {
     const band = (this.bar.offsetHeight || 26) + 2 * GAP;
+    // What another plugin shows over the window there (a table in full screen, a database's peek): a chart under it
+    // shows no toolbar (shared/overwindow.ts)
+    const covering = overWindowOf(this.doc.elementFromPoint?.(x, y) ?? null);
     let over: HTMLElement | undefined;
     for (const box of this.watched) {
-      if (!box.isConnected) {
+      if (!box.isConnected || (covering && !covering.contains(box))) {
         // Kept while it may come back (CodeMirror puts a widget's element back), measured only while in the page
         continue;
       }

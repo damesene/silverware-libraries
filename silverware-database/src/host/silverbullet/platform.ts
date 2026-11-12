@@ -12,6 +12,9 @@ import { settledIndex } from "./settledindex.ts";
 export type Bridge = {
   // Silverware Icons' API where it is installed (`silverware.icons.api`; shared/icons.ts `iconsOf` reads it)
   readonly icons?: unknown;
+  // Silverware Layout's API where it is installed (`silverware.layout.api`; shared/layout.ts `layoutOf` reads it): the
+  // places registered with it, laid out at the width their blocks keep
+  readonly layout?: unknown;
   getCurrentPage(): Promise<string>;
   getText(): Promise<string>;
   replaceRange(from: number, to: number, text: string): Promise<void>;

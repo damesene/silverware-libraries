@@ -6,6 +6,7 @@
 // data); a module may have them written with an edit of the source
 // (`dataEdits`). Knows no module, format, type or source by name: the modules
 // give them (and the user's definitions, custom.ts).
+import type { Layout, LayoutProvider } from "../../../shared/layout.ts";
 import { customFormats } from "../custom.ts";
 import { type Block, blockOf, blocksOf } from "./blocks.ts";
 import { type ChartConstructor, chartBox, type Drawn, DrawnCharts } from "./drawn.ts";
@@ -38,6 +39,9 @@ export type ControllerEnv = {
   readonly table?: TableApi;
   // A chart's height where its block says none (CSS)
   readonly height?: string;
+  // Silverware Layout's API where it is installed (else its stand-in): the charts registered with it, laid out at the
+  // width their blocks keep (shared/layout.ts)
+  readonly layout?: Layout;
 };
 
 // The edits of a page come one per key: the charts read their sources once they pause
@@ -136,12 +140,49 @@ export class Controller {
     private readonly env: ControllerEnv,
   ) {
     this.unwatchTheme = watchTheme(doc, () => void this.drawAnew());
+    env.layout?.register(this.layoutProvider());
     if (env.replaceRange) {
       this.toolbar = new ChartToolbar(doc, (box) => {
         const entry = this.boxes.get(box);
         return entry ? chartMenu(this.menuHost(), entry) : undefined;
       });
     }
+  }
+
+  /**
+   * The charts as Silverware Layout's widgets: its entries kept in the chart's model (`layout`), which its format writes
+   * as it can (Mermaid: `%% layout.<key>`); read from the chart drawn in the widget, written into its block as found in
+   * the page now (one edit). A format that keeps no layout drops it: the write says so, nothing written
+   */
+  private layoutProvider(): LayoutProvider {
+    const entryOf = (element: Element) => {
+      const box = element.querySelector<HTMLElement>(".swc-chart");
+      return box ? this.boxes.get(box) : undefined;
+    };
+    return {
+      name: "silverware-chart",
+      selector: ".swc-widget",
+      read: (element) => entryOf(element)?.model.layout ?? {},
+      write: async (element, changes) => {
+        const entry = entryOf(element);
+        if (!entry || !this.env.replaceRange) return "this chart cannot be written here";
+        const text = await this.env.getText();
+        const block = blockOf(text, entry.language, entry.body);
+        const read = block && this.read(block.language, block.body);
+        if (!block || !read || isUnreadable(read.model)) return "the chart's block is not where it was (edited meanwhile)";
+        const layout: Record<string, string> = { ...read.model.layout };
+        for (const [key, value] of Object.entries(changes)) {
+          if (value === null) delete layout[key];
+          else layout[key] = value;
+        }
+        const { layout: _, ...model } = read.model;
+        const written = read.format.write(Object.keys(layout).length ? { ...model, layout } : model, block.body);
+        const back = this.read(block.language, written);
+        if (!back || isUnreadable(back.model) || JSON.stringify(back.model.layout ?? {}) !== JSON.stringify(layout)) return `the ${read.format.label} format keeps no layout of a chart`;
+        if (written !== block.body) await this.env.replaceRange(block.bodyFrom, block.bodyTo, written);
+        return undefined;
+      },
+    };
   }
 
   /** Gone from the page (another started in its place, Space Lua loaded again): its watching ended, its toolbar out */

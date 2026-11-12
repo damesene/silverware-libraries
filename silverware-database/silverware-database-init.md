@@ -30,6 +30,8 @@ if js and js.window then
     -- Silverware Icons, where it is installed (its API page, priority 50, has run by now): items' and properties'
     -- icons drawn and picked
     icons = silverware.icons and silverware.icons.api,
+    -- Silverware Layout, where it is installed: the places laid out at the width their blocks keep
+    layout = silverware.layout and silverware.layout.api,
     getCurrentPage = editor.getCurrentPage,
     getText = editor.getText,
     replaceRange = editor.replaceRange,

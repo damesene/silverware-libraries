@@ -6,6 +6,48 @@ tags: meta
 The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. It is installed with the library.
 
 ```space-style
+/* A widget's width (Silverware Layout writes data-swl-width and --swl-width on the widget's own element): as wide as
+   it keeps, at most the editor's pane less 40 px (100cqw: the pane, SilverBullet's #sb-editor being a size container),
+   centred on the text however wide; in a narrow pane (data-swl-narrow) and out of the page's flow (a widget over the
+   window, or on a sheet) none. Important: SilverBullet's and the widget plugins' own rules size these elements too */
+:root:not([data-swl-narrow]) .cm-content [data-swl-width]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+  --swl-shown: min(var(--swl-width), 100cqw - 40px);
+  width: var(--swl-shown) !important;
+  max-width: none !important;
+  margin-left: calc((100% - var(--swl-shown)) / 2) !important;
+  margin-right: calc((100% - var(--swl-shown)) / 2) !important;
+  box-sizing: border-box;
+}
+/* The handle of a widget's width: a bar beside its right edge, quiet (grey, a dashed outline, as Silverware Table's +)
+   until the pointer is on it or it is dragged */
+.swl-handle {
+  position: fixed;
+  z-index: 20;
+  width: 12px;
+  display: flex;
+  justify-content: center;
+}
+.swl-handle[hidden] {
+  display: none !important;
+}
+.swl-handle-bar {
+  box-sizing: border-box;
+  width: 6px;
+  height: 100%;
+  padding: 0;
+  background: color-mix(in srgb, var(--root-color) 6%, var(--root-background-color));
+  border: 1px dashed color-mix(in srgb, var(--root-color) 40%, transparent);
+  border-radius: 3px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.swl-handle-bar:hover,
+.swl-handle-bar:focus-visible,
+.swl-handle-dragging .swl-handle-bar {
+  outline: none;
+  background: var(--ui-accent-color, #464cfc);
+  border: 1px solid var(--ui-accent-color, #464cfc);
+}
 /* Silverware Layout (prefix swl-): the Page layout dialog ("Silverware Layout: Page layout"), over the page and
    SilverBullet's top bar, in the page's colors; over the part of the window an on-screen keyboard leaves
    (shared/dialog.ts sets where it is) */

@@ -7,6 +7,8 @@ import { type Axis, baseKind, type ChartModel, type Condition, type RowsTaken, L
 
 // Our comments: `%% chart.<key>: <value>`
 const META_RE = /^\s*%%\s*chart\.([A-Za-z][\w.-]*)\s*:\s*(.*?)\s*$/;
+// Silverware Layout's entries (the model's `layout`): `%% layout.<key>: <value>`, as Mermaid has nothing for them either
+const LAYOUT_RE = /^\s*%%\s*layout\.([A-Za-z][\w.-]*)\s*:\s*(.*?)\s*$/;
 // Chart types Mermaid draws as they are: the others are said in `chart.type`
 const ROUND = new Set(["pie", "doughnut", "polar"]);
 
@@ -153,8 +155,19 @@ function metaOf(meta: ReadonlyMap<string, string>, wheres: readonly string[] = [
   return out;
 }
 
-/** A block's text as a chart: undefined where it is another diagram (a flowchart) */
+/** A block's text as a chart: undefined where it is another diagram (a flowchart); Silverware Layout's entries with it */
 export function readMermaid(text: string): ChartModel | Unreadable | undefined {
+  const read = readChart(text);
+  if (!read || "problem" in read) return read;
+  const layout: Record<string, string> = {};
+  for (const line of text.split("\n")) {
+    const m = LAYOUT_RE.exec(line);
+    if (m) layout[group(m, 1)] = group(m, 2);
+  }
+  return Object.keys(layout).length ? { ...read, layout } : read;
+}
+
+function readChart(text: string): ChartModel | Unreadable | undefined {
   const meta = new Map<string, string>();
   const wheres: string[] = [];
   const lines: string[] = [];
@@ -292,9 +305,10 @@ export function writeMermaid(model: ChartModel, previous?: string): string {
   }
   for (const [key, value] of Object.entries(model.extra ?? {})) meta.push([key, value]);
   // Mermaid's directives (`%%{init: …}%%`) before the diagram, the other comments after it, as they were
-  const comments = (previous ?? "").split("\n").filter((line) => /^\s*%%/.test(line) && !META_RE.test(line));
+  const comments = (previous ?? "").split("\n").filter((line) => /^\s*%%/.test(line) && !META_RE.test(line) && !LAYOUT_RE.test(line));
+  const layout = Object.entries(model.layout ?? {}).map(([key, value]) => `%% layout.${key}: ${value}`);
   const directive = (line: string) => /^\s*%%\{/.test(line);
-  return [...comments.filter(directive), ...lines, ...meta.map(([key, value]) => `%% chart.${key}: ${value}`), ...comments.filter((line) => !directive(line))].join("\n");
+  return [...comments.filter(directive), ...lines, ...meta.map(([key, value]) => `%% chart.${key}: ${value}`), ...layout, ...comments.filter((line) => !directive(line))].join("\n");
 }
 
 export const MERMAID_FORMAT: ChartFormat = {

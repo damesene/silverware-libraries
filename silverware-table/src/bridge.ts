@@ -42,6 +42,9 @@ export type Bridge = {
   readonly markdownToHtml?: (markdown: string) => string | Promise<string>;
   // Optional, for links in those tables: SilverBullet's navigation to a ref (a page, a hashtag's page)
   readonly navigate?: (ref: string) => unknown;
+  // Optional: Silverware Layout's API (silverware.layout.api), where it is installed: the tables registered with it, laid
+  // out at the width their metadata keeps (shared/layout.ts)
+  readonly layout?: unknown;
 };
 
 type Setting<T> = {

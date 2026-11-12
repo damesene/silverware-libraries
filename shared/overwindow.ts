@@ -18,6 +18,15 @@ export function markOverWindow(element: Element, on: boolean): void {
   element.toggleAttribute(OVER_WINDOW_ATTRIBUTE, on);
 }
 
+/**
+ * What is shown over the window that a node is in (a table in full screen, a database's peek), if any: a plugin's
+ * controls placed by where the pointer is stand back from another plugin's, as its widget may lie under it
+ */
+export function overWindowOf(node: EventTarget | null): Element | undefined {
+  const element = node instanceof Element ? node : node instanceof Node ? node.parentElement : null;
+  return element?.closest(SELECTOR) ?? undefined;
+}
+
 /** Whether a plugin shows something over the whole window in a document */
 export function overWindowShown(doc: Document): boolean {
   return !!doc.querySelector(SELECTOR);

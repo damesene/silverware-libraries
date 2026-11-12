@@ -44,6 +44,10 @@ export type LayoutProvider = {
   // `undefined` where written, or to why not, as text for the user (a plugin that may store nothing new: Silverware
   // Layout then shows the change for the view only)
   write(element: Element, changes: LayoutChanges): Promise<string | undefined>;
+  // Optional: the part of the widget the user sees (top and bottom in the window), where it is not its whole box: a
+  // table holding its header in view while its rows scroll away, those above the header hidden. Silverware Layout
+  // places the handle of its width by it. None (or undefined): the widget's box
+  seen?(element: Element): { readonly top: number; readonly bottom: number } | undefined;
 };
 
 /** What a widget's plugin registers its providers with: Silverware Layout's API (`silverware.layout.api`), or the stand-in without it */

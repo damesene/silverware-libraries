@@ -84,6 +84,9 @@ import {
 import { type TableKey, TableRegister } from "./core/tables.ts";
 import { Parts } from "./core/parts.ts";
 import { underWindow } from "./core/overwindow.ts";
+import { layoutOf } from "../../shared/layout.ts";
+import { overWindowOf } from "../../shared/overwindow.ts";
+import { tablesLayoutProvider } from "./core/layoutprovider.ts";
 
 // The cell editor as features see it, and what it takes to put the cell back
 
@@ -343,10 +346,27 @@ export class Controller implements TableHost {
 
   setBridge(bridge: Bridge): void {
     this.bridge = bridge;
+    this.registerLayout();
+  }
+
+  /**
+   * The tables registered with Silverware Layout, where its API is handed over (else nothing): it lays them out at the
+   * width their metadata keeps. Again with each bridge (Space Lua loaded again): a provider of the same name replaces it
+   */
+  private registerLayout(): void {
+    layoutOf(this.bridge.layout).register(
+      tablesLayoutProvider({
+        renderedRows: (table) => this.rows.renderedRows(table),
+        enhanced: (widget) => this.infos.has(widget),
+        write: (widget, change) => this.write(widget, change),
+        metadataOn: () => this.metadataOn,
+      }),
+    );
   }
 
   start(): void {
     const win = this.doc.defaultView!;
+    this.registerLayout();
     // Before the controller's own listeners: a press that opens a cell's editor holds it in view after it ends the hold
     this.touchKeyboard.start();
     win.addEventListener("mousedown", this.onMouseDown, true);
@@ -2336,8 +2356,20 @@ export class Controller implements TableHost {
   private onPointerMove = (e: PointerEvent): void => {
     this.lastPointer = { pointerType: e.pointerType, clientX: e.clientX, clientY: e.clientY };
     if (this.navigating) this.markNavigating();
-    this.insert.pointerMoved(e);
+    // Over another plugin's over the window (a database's peek): no + of a table under it
+    if (this.underOthers(e.target)) this.insert.pointerLeft();
+    else this.insert.pointerMoved(e);
   };
+
+  /**
+   * Whether a node is in something another plugin shows over the window (a database's peek, a chart's full screen):
+   * marked so (shared/overwindow.ts), and holding no table (a table in full screen, the sheet's board, are ours). The
+   * controls placed by the pointer stand back there, as a table may lie under it
+   */
+  private underOthers(target: EventTarget | null): boolean {
+    const over = overWindowOf(target);
+    return !!over && !over.matches(WIDGET_SELECTOR) && !over.querySelector(WIDGET_SELECTOR);
+  }
 
   private onMouseMove = (e: MouseEvent): void => {
     // A pressed button: dragging a scrollbar or selecting; the controls stay where they are
@@ -2347,6 +2379,10 @@ export class Controller implements TableHost {
     const target = e.target;
     if ((target instanceof Node && this.isFloating(target)) || this.insert.inBand) {
       this.cancelHide();
+      return;
+    }
+    if (this.underOthers(target)) {
+      if (!busy) this.scheduleHide();
       return;
     }
     // Over the table, or just above its header (where its tab is, and the pointer comes in from above)

@@ -310,3 +310,25 @@ test("a pie of a table of several columns draws one, not stale, the one picked o
   await expect.poll(() => savedText(page)).toContain("%% chart.series: Cost");
   await expect(page.locator(".swc-stale")).toHaveCount(0);
 });
+
+test("a chart under what another plugin shows over the window (a table in full screen) shows no toolbar there", async ({ page, open }) => {
+  await open("# Chart\n\n```mermaid\nxychart-beta\n  x-axis [a, b]\n  bar [1, 2]\n```\n");
+  const canvas = page.locator(".swc-chart canvas");
+  await expect(canvas).toBeVisible();
+  const box = (await canvas.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+  const bar = page.locator(".swc-bar.swc-visible");
+  await expect(bar).toHaveCount(1);
+  await page.mouse.move(10, 10);
+  await expect(bar).toHaveCount(0);
+  // Laid over the whole window, marked as the plugins mark what they show over it (shared/overwindow.ts)
+  await page.evaluate(() => {
+    const over = document.createElement("div");
+    over.setAttribute("data-silverware-over-window", "");
+    over.style.cssText = "position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, 0.05)";
+    document.body.append(over);
+  });
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+  await page.waitForTimeout(300);
+  await expect(bar).toHaveCount(0);
+});

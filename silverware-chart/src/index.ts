@@ -2,6 +2,7 @@
 //   js.importFromSpace("Library/damesene/silverware-chart.js").init({ ... the bridge ... })
 // then a code widget defined for each of `languages()`, rendering `render(…)`,
 // and the page's edits told to `pageModified(…)`.
+import { layoutOf } from "../../shared/layout.ts";
 import { type Bridge, listOf, missingBridgeFunctions, readSettings, type Settings } from "./bridge.ts";
 import { Controller } from "./core/controller.ts";
 import type { ChartConstructor } from "./core/drawn.ts";
@@ -42,6 +43,7 @@ export async function init(bridge: Bridge): Promise<void> {
       : undefined,
     loadChart,
     table: tableApi(bridge),
+    layout: layoutOf(bridge.layout),
   });
 }
 

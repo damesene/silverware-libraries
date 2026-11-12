@@ -5,6 +5,7 @@
 // converters (`defineViews`, `defineTypes`, `defineConverters`), before
 // `init`, as Space Lua loads.
 import { iconsOf } from "../../shared/icons.ts";
+import { layoutOf } from "../../shared/layout.ts";
 import { linesOf, linesUnder } from "../../shared/markdown/lines.ts";
 import { type ConflictHost, openConflict } from "./core/conflictdialog.ts";
 import type { ItemConflict } from "./core/core.ts";
@@ -31,6 +32,7 @@ import { TypeRegistry } from "./domain/types/registry.ts";
 import type { PropertyType } from "./domain/types/type.ts";
 import { BLOCK_LANGUAGE, BlockState, readBlock, writeBlock as blockWithState } from "./host/silverbullet/block.ts";
 import { blockPlaces } from "./host/silverbullet/places.ts";
+import { layoutEntries, withLayout } from "./host/silverbullet/layout.ts";
 import { type Bridge, editorArea, editorLook, silverBulletPlatform, watchEditorArea } from "./host/silverbullet/platform.ts";
 import { PagesStore } from "./store/pages/store.ts";
 import { BUILT_IN_MODULES } from "./modules/builtin.ts";
@@ -137,6 +139,7 @@ export function init(bridge: Bridge): void {
     for (const type of pressed) document.removeEventListener(type, pressBeside, true);
   };
   bridgeCalls = bridge;
+  registerLayout(bridge);
   kept ??= keptParts();
   const { platform, store, writer, core, ui, own } = kept;
   const modules = new Modules(
@@ -226,6 +229,29 @@ function keptParts(): Kept {
     });
   const core = new DatabaseCore(store, types, { ...ui, conflict }, platform.space.noun, { store: blockPlaces(platform.space, writer), propertyMeta: (view) => views.named(view)?.propertyMeta ?? [] });
   return { platform, store, writer, core, ui, own };
+}
+
+/**
+ * The places registered with Silverware Layout, where its API is handed over (else nothing): it lays a place out at the
+ * width its block keeps (`layout.width`), read from the text the place was drawn for and written as the place writes
+ * its block. Again as Space Lua loads again: a provider of the same name replaces it
+ */
+function registerLayout(bridge: Bridge): void {
+  layoutOf(bridge.layout).register({
+    name: "silverware-database",
+    selector: ".swd-place",
+    read: (element) => {
+      const shown = app?.shown.get(element as HTMLElement);
+      return shown ? layoutEntries(shown.current) : {};
+    },
+    write: async (element, changes) => {
+      const shown = app?.shown.get(element as HTMLElement);
+      if (!shown) return "this block was drawn before Silverware Database started again: reload the page";
+      const text = withLayout(shown.current, changes);
+      if (text === shown.current) return undefined;
+      return (await writeBlock(element as HTMLElement, shown, shown.current, text)) ? undefined : "the block could not be written";
+    },
+  });
 }
 
 /** A block drawn: its element, its place made where it names a database */

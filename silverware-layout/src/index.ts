@@ -1,18 +1,19 @@
-// Silverware Layout in SilverBullet: the API the widget plugins register their providers with (shared/layout.ts), the
-// page's text width (its own, the default setting's, none in a narrow pane) set as pages open and change, and the Page
-// layout dialog. Its init page hands over SilverBullet's API (bridge.ts) and calls `pageOpened` and `pageEdited`.
-// Laying widgets out is the next step (docs/silverware-layout.md, *Steps*).
+// Silverware Layout in SilverBullet: the API the widget plugins register their providers with (shared/layout.ts), their
+// widgets laid out and the handle of their width (widgetlayout.ts), the page's text width (its own, the default
+// setting's, none in a narrow pane) set as pages open and change, and the Page layout dialog. Its init page hands over
+// SilverBullet's API (bridge.ts) and calls `pageLoaded`, `pageOpened` and `pageEdited`.
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { type PageWriter, pageWriter } from "../../shared/pages/writer.ts";
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { Registry } from "./core/registry.ts";
 import { textWidthShown } from "./core/textwidth.ts";
-import { paneWidth, showTextWidth, watchPaneWidth } from "./host/silverbullet/dom.ts";
+import { markNarrow, paneWidth, showTextWidth, watchPaneWidth } from "./host/silverbullet/dom.ts";
 import { pageLayoutOf, writePageWidth } from "./host/silverbullet/page.ts";
 import { silverBulletPlatform } from "./host/silverbullet/platform.ts";
 import { DEFAULT_MIN_PANE_WIDTH, DEFAULT_PRESETS, PATHS, readSettings, type Settings } from "./model/settings.ts";
 import { cssWidth, readWidth, type Width } from "./model/width.ts";
 import { PageDialog } from "./ui/pagedialog.ts";
+import { layOutWidgets, type WidgetLayout } from "./widgetlayout.ts";
 
 const PAGE_LAYOUT = "Silverware Layout: Page layout";
 // How long the page is still before its frontmatter is read again after an edit
@@ -33,6 +34,8 @@ let reading = 0;
 let editedTimer: ReturnType<typeof setTimeout> | undefined;
 let stopWatching: (() => void) | undefined;
 let dialog: PageDialog | undefined;
+// Made once per window (its observer and its handle live as long), asking the settings of the last load
+let widgetLayout: WidgetLayout | undefined;
 
 // One registry per window: the module is imported once, so `api` is the same object as Space Lua loads again, and a
 // provider registered again (its plugin's init page run again) replaces its own
@@ -54,6 +57,12 @@ export async function init(bridge: Bridge): Promise<void> {
   stopWatching = watchPaneWidth(document, () => {
     if (!dialog?.isOpen) show();
   });
+  widgetLayout ??= layOutWidgets(document, registry, {
+    presets: () => app?.settings.presets ?? DEFAULT_PRESETS,
+    enabled: () => !!app && paneWidth(document) >= app.settings.minPaneWidth,
+    problem: (message) => void app?.bridge.flash(message, "error"),
+  });
+  widgetLayout.widgets.layOutAll();
   await pageOpened();
 }
 
@@ -109,6 +118,8 @@ function show(): void {
 /** The text shown as it would be with these widths (the page's own, the default; none: none) */
 function showWith(pageWidth: Width | undefined, fallback: Width | undefined): void {
   if (!app) return;
+  // (Widgets laid out where the pane is wide enough: the style page's rule reads it)
+  markNarrow(document, paneWidth(document) < app.settings.minPaneWidth);
   showTextWidth(document, textWidthShown({ page: pageWidth, fallback, paneWidth: paneWidth(document), minPaneWidth: app.settings.minPaneWidth }));
 }
 

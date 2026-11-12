@@ -64,6 +64,8 @@ xychart-beta
 
 A setting it does not know is kept as you wrote it.
 
+With [Silverware Layout](https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md) installed, a chart can be wider (or narrower) than the page's text, centred on it: drag the bar Silverware Layout shows beside its right edge, and the chart is drawn as wide. The width is kept in the block, a comment `%% layout.width: 1200`.
+
 ## Data from a table
 
 A chart may draw a markdown table instead of the numbers in its block: say which table with `source`, the column of the labels with `labels` and the columns of the values with `series` (by their names as they show, or as SilverBullet's index keys them: `Unit price` or `unit_price`).

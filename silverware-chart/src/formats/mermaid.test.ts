@@ -138,3 +138,23 @@ describe("writeMermaid", () => {
     expect(odd.extra).toEqual({ yFrom: "zero" });
   });
 });
+
+describe("Silverware Layout's entries in a Mermaid chart", () => {
+  it("read from `%% layout.<key>` comments into the model's layout, for an xychart and a pie", () => {
+    expect((readMermaid(`${EXAMPLE}\n%% layout.width: 1100`) as ChartModel).layout).toEqual({ width: "1100" });
+    expect((readMermaid('pie\n  "a" : 1\n%% layout.width: full') as ChartModel).layout).toEqual({ width: "full" });
+    expect((readMermaid(EXAMPLE) as ChartModel).layout).toBeUndefined();
+  });
+
+  it("written after the chart's own comments, once, the other comments kept; none written where the layout has none", () => {
+    const previous = `${EXAMPLE}\n%% layout.width: 900\n%% a note of the user's`;
+    const model = readMermaid(previous) as ChartModel;
+    const written = writeMermaid({ ...model, layout: { width: "1100" } }, previous);
+    expect(written.match(/%% layout\./g)).toHaveLength(1);
+    expect(written).toContain("%% layout.width: 1100");
+    expect(written).toContain("%% a note of the user's");
+    expect((readMermaid(written) as ChartModel).layout).toEqual({ width: "1100" });
+    const { layout: _, ...without } = model;
+    expect(writeMermaid(without, previous)).not.toContain("layout.");
+  });
+});

@@ -2,7 +2,8 @@
 // - the text's width is the variable `--editor-width` its theme declares on the root, read by the text, the top bar
 //   and the notifications alike: set inline on the root, important, it wins over a theme's or a Space Style's
 //   `!important` (probe 2);
-// - the editor's pane is `#sb-editor` (a size container since 2.11, which CSS measures as `100cqw`).
+// - the editor's pane is `#sb-editor` (a size container since 2.11, which CSS measures as `100cqw`);
+// - the page is seen in CodeMirror's scroller (`.cm-scroller`), below SilverBullet's top bar.
 import { cssWidth, type Width } from "../../model/width.ts";
 
 const TEXT_WIDTH = "--editor-width";
@@ -17,8 +18,23 @@ export function showTextWidth(doc: Document, width: Width | undefined): void {
   } else if (style.getPropertyValue(TEXT_WIDTH)) style.removeProperty(TEXT_WIDTH);
 }
 
+/** Whether the pane is too narrow for any layout of Silverware Layout's (the style page's rule for widgets reads it) */
+export function markNarrow(doc: Document, narrow: boolean): void {
+  doc.documentElement.toggleAttribute("data-swl-narrow", narrow);
+}
+
 /** The text width shown now by Silverware Layout (an inline value on the root), as CSS has it; empty: none */
 export const textWidthNow = (doc: Document): string => doc.documentElement.style.getPropertyValue(TEXT_WIDTH);
+
+/**
+ * The part of the window the page is seen in: CodeMirror's scroller (below SilverBullet's top bar), cut to the window;
+ * the window where there is none (the playground)
+ */
+export function pageView(doc: Document): { readonly top: number; readonly bottom: number } {
+  const height = doc.defaultView?.innerHeight ?? 0;
+  const scroller = doc.querySelector(".cm-scroller")?.getBoundingClientRect();
+  return scroller ? { top: Math.max(0, scroller.top), bottom: Math.min(height, scroller.bottom) } : { top: 0, bottom: height };
+}
 
 /** The editor's pane, or the window where it is not there */
 const paneOf = (doc: Document): Element => doc.querySelector(PANE_SELECTOR) ?? doc.documentElement;

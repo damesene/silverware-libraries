@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Silverware Layout playground</title>
+    <link rel="stylesheet" href="common.css" />
+    <link rel="stylesheet" href="layout-playground.css" />
+  </head>
+  <body>
+    <header>
+      <strong>Silverware Layout<span class="long"> playground</span></strong>
+      <nav class="playgrounds" aria-label="Playgrounds">
+        <a href="./">Table</a>
+        <a href="toolbar.html">Toolbar</a>
+        <a href="tags.html">Tags</a>
+        <a href="database.html">Database</a>
+        <a href="icons.html">Icons</a>
+        <a href="layout.html" aria-current="page">Layout</a>
+      </nav>
+      <span class="hint">Widgets of a provider of the playground's, laid out as SilverBullet's: hover one, drag the bar by its right edge</span>
+      <span class="spacer"></span>
+      <label class="choice"><input id="refuse" type="checkbox" /> Refuse writes</label>
+      <button id="over-window" type="button">Table over the window</button>
+      <button id="theme" type="button" title="Dark / light"><span class="icon">◐</span><span class="label">Dark / light</span></button>
+    </header>
+    <div id="flash" aria-live="polite"></div>
+    <main id="sb-main">
+      <div id="sb-editor">
+        <div class="cm-content"></div>
+      </div>
+      <aside class="entries">What the provider keeps: <pre id="entries"></pre></aside>
+    </main>
+    <script type="module" src="layout.js"></script>
+  </body>
+</html>

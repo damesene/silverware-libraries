@@ -158,8 +158,8 @@ describe("the calendar", () => {
     expect(element.querySelector(".swd-cal-by")!.textContent).toBe("by Made");
     expect([all(".swd-cal-add").length, all('.swd-cal-item[draggable="true"]').length]).toEqual([0, 0]);
     element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    [...element.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].find((one) => one.textContent!.startsWith("Start"))!.click();
-    expect([...element.querySelectorAll(".swd-menu .swd-menu-item .swd-label")].map((one) => one.textContent)).toEqual(["Due", "Until", "Made"]);
+    [...document.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].find((one) => one.textContent!.startsWith("Start"))!.click();
+    expect([...document.querySelectorAll(".swd-menu .swd-menu-item .swd-label")].map((one) => one.textContent)).toEqual(["Due", "Until", "Made"]);
   });
 });
 
@@ -237,8 +237,8 @@ describe("the calendar's spans", () => {
     const ro = await setup([{ name: "Notes", due: "2026-11-03" }], { "calendar.endBy": "made" });
     expect(ro.element.querySelector(".swd-cal-by")!.textContent).toBe("by Due");
     ro.element.querySelector<HTMLButtonElement>(".swd-more")!.click();
-    [...ro.element.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].find((one) => one.textContent!.startsWith("End"))!.click();
-    expect([...ro.element.querySelectorAll(".swd-menu .swd-menu-item .swd-label")].map((one) => one.textContent)).toEqual(["None (a day each)", "Until"]);
+    [...document.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].find((one) => one.textContent!.startsWith("End"))!.click();
+    expect([...document.querySelectorAll(".swd-menu .swd-menu-item .swd-label")].map((one) => one.textContent)).toEqual(["None (a day each)", "Until"]);
   });
 
   it("lasts a day alone from an earlier day by its start's handle; refuses a start after an end kept, a start given or not", async () => {

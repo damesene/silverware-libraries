@@ -34,9 +34,11 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   outline: none;
 }
 
-/* The look's own values, from SilverBullet's: a line, a quiet text, a surface a little apart from the page */
+/* The look's own values, from SilverBullet's: a line, a quiet text, a surface a little apart from the page; what a place lays
+   over the page from the body has them too (views/float.ts: an editor's panel, a menu) */
 .swd-place,
-.swd-peek {
+.swd-peek,
+.swd-lifted {
   --swd-line: var(--button-border-color, rgba(128, 128, 128, 0.3));
   --swd-quiet: color-mix(in srgb, var(--root-color, currentColor) 68%, transparent);
   --swd-hover: color-mix(in srgb, var(--root-color, currentColor) 7%, transparent);
@@ -255,6 +257,10 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 }
 .swd-menu[hidden] {
   display: none;
+}
+/* Shown, in the body (views/float.ts): over the other plugins' controls, as their menus are */
+.swd-menu.swd-lifted {
+  z-index: var(--sw-layer-menu);
 }
 /* ⋯'s menu (core/placemenu.ts): the shared menu (shared/menu.ts) in Silverware Database's look, its classes swd-menu-…:
    its title (a way back in a submenu, its ×), then its entries one under another */
@@ -1052,8 +1058,8 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   align-items: center;
   white-space: nowrap;
 }
-/* An editor's panel laid over the page by its cell or field (views/float.ts): over everything around it, the peek too
-   (an editor of the peek's), scrolled where it is cut to the room in the window */
+/* An editor's panel laid over the page by its cell or field, in the body (views/float.ts): over everything around it, the
+   other plugins' controls and the peek too (an editor of the peek's), scrolled where it is cut to the room in the window */
 .swd-floated {
   z-index: var(--sw-layer-sheet-panel);
   overflow-y: auto;

@@ -36,7 +36,7 @@ function bridgeOf(pages: Record<string, string>, open: string) {
 /** A view picked in a place: its picker's menu opened, the item of that label pressed */
 function pickView(root: ParentNode, label: string): void {
   root.querySelector<HTMLButtonElement>(".swd-view-picker")!.click();
-  [...root.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].find((item) => item.querySelector(".swd-label")?.textContent === label)!.click();
+  [...document.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].find((item) => item.querySelector(".swd-label")?.textContent === label)!.click();
 }
 /** Two views, "a" and "b": the place's picker picks one */
 const VIEWS: ViewDefinition[] = ["a", "b"].map((name) => ({ name, label: name, icon: name, render: (_host, element) => void element.replaceChildren(name) }));

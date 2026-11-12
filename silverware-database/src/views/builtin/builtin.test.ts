@@ -51,10 +51,12 @@ afterEach(() => document.body.replaceChildren());
 
 
 /** The items of the place's menu shown now: each its label (with its value) and whether it is checked */
-const menuShown = (root: ParentNode) => [...root.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].map((one) => [one.querySelector(".swd-label")!.textContent, one.getAttribute("aria-checked")]);
+/** The open menu's items (in the body while it shows) */
+const menuShown = () => [...document.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].map((one) => [one.querySelector(".swd-label")!.textContent, one.getAttribute("aria-checked")]);
 /** An item of the place's menu chosen by its label (its value after it left out) */
-const choose = (root: ParentNode, label: string) => {
-  const item = [...root.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].find((one) => one.querySelector(".swd-label")!.textContent!.split(": ")[0] === label);
+/** An item of the open menu (in the body while it shows) pressed, by its label */
+const choose = (label: string) => {
+  const item = [...document.querySelectorAll<HTMLElement>(".swd-menu .swd-menu-item")].find((one) => one.querySelector(".swd-label")!.textContent!.split(": ")[0] === label);
   if (!item) throw new Error(`No item "${label}" in the menu`);
   item.click();
 };
@@ -270,16 +272,16 @@ describe("the board", () => {
     const both: Database = { ...TASKS, properties: [...TASKS.properties, { key: "area", label: "Area", type: "select", params: { options: ["Web"] }, readonly: false }] };
     const { q, viewState, all } = await setup("board", {}, both);
     q<HTMLButtonElement>(".swd-more").click();
-    choose(document, "Group");
-    choose(document, "Group by");
+    choose("Group");
+    choose("Group by");
     // Every property, the first select grouped by where none is picked, no None: a board always groups
-    expect(menuShown(document)).toEqual([
+    expect(menuShown()).toEqual([
       ["Status", "true"],
       ["Estimate", "false"],
       ["Done", "false"],
       ["Area", "false"],
     ]);
-    choose(document, "Area");
+    choose("Area");
     await settle();
     expect(viewState.get("board.groupBy")).toBe("area");
     expect(all(".swd-board-column").map((column) => column.getAttribute("aria-label"))).toEqual(["No Area", "Web"]);
@@ -288,9 +290,9 @@ describe("the board", () => {
     // A table is grouped by the place: any property, or None
     const table = await setup("table");
     table.q<HTMLButtonElement>(".swd-more").click();
-    choose(document, "Group");
-    choose(document, "Group by");
-    expect(menuShown(document)[0]).toEqual(["None", "true"]);
+    choose("Group");
+    choose("Group by");
+    expect(menuShown()[0]).toEqual(["None", "true"]);
   });
 
   it("groups by any property: a column per value, a card dragged setting that column's value, a multi-select's one value replaced", async () => {
@@ -338,7 +340,7 @@ describe("the board", () => {
     const { q, all, viewState } = await setup("board");
     const labels = () => all(".swd-board-column").map((column) => column.getAttribute("aria-label"));
     q<HTMLButtonElement>(".swd-more").click();
-    choose(document, "Group");
+    choose("Group");
     const rows = () => [...document.querySelectorAll<HTMLElement>(".swd-group-row")];
     expect(rows().map((row) => row.querySelector(".swd-group-row-label")!.textContent)).toEqual(["Todo", "Done", "Later (none of its options)"]);
     // Alt+↓ on Todo's grip: after Done, the menu still open
@@ -368,8 +370,8 @@ describe("the board", () => {
     expect(viewState.get("board.groupHideEmpty")).toBe(true);
     expect(document.querySelector(".swd-group-switch")!.getAttribute("aria-checked")).toBe("true");
     // Another property picked: the order and the hiding go with the one they were for
-    choose(document, "Group by");
-    choose(document, "Done");
+    choose("Group by");
+    choose("Done");
     await settle();
     expect([viewState.get("board.groupOrder"), viewState.get("board.groupHidden"), viewState.get("board.groupHideEmpty")]).toEqual([undefined, undefined, true]);
   });
@@ -425,7 +427,7 @@ describe("a property hidden in the views", () => {
     expect(all("th").map((th) => th.textContent)).not.toContain("Estimate");
     expect(q('.swd-filter input[data-key="estimate"]')).not.toBeNull();
     q<HTMLButtonElement>(".swd-sort-button").click();
-    choose(document, "Estimate");
+    choose("Estimate");
     await settle();
     expect(viewState.get("table.sort")).toEqual([{ key: "estimate", direction: "asc" }]);
     // (Another view of the same block shows it: what is hidden is each view's own)
@@ -446,8 +448,8 @@ describe("a property hidden in the views", () => {
   it("hidden in one view, given to every other view of the block by Apply to all views, each keeping it its way", async () => {
     const { q, viewState } = await setup("table", { "table.hiddenProperties": ["estimate"] });
     q<HTMLButtonElement>(".swd-more").click();
-    choose(document, "Visible properties");
-    choose(document, "Apply to all views");
+    choose("Visible properties");
+    choose("Apply to all views");
     await settle();
     expect(viewState.get("list.hiddenProperties")).toEqual(["estimate"]);
     expect(viewState.get("board.hiddenProperties")).toEqual(["estimate"]);
@@ -459,18 +461,18 @@ describe("a property hidden in the views", () => {
   it("is hidden and shown again by its eye under Visible properties in ⋯, the menu staying open; Hide all and Show all", async () => {
     const { all, q, viewState } = await setup("table");
     q<HTMLButtonElement>(".swd-more").click();
-    choose(document, "Visible properties");
-    const eye = () => q<HTMLButtonElement>('.swd-shown-row[data-property="estimate"] .swd-shown-eye');
+    choose("Visible properties");
+    const eye = () => document.querySelector<HTMLButtonElement>('.swd-shown-row[data-property="estimate"] .swd-shown-eye')!;
     expect(eye().getAttribute("aria-pressed")).toBe("true");
     eye().click();
     await settle();
     expect(viewState.get("table.hiddenProperties")).toEqual(["estimate"]);
     expect(all("th").map((th) => th.textContent)).not.toContain("Estimate");
     expect(eye().getAttribute("aria-pressed")).toBe("false");
-    q<HTMLButtonElement>(".swd-shown-all").click();
+    document.querySelector<HTMLButtonElement>(".swd-shown-all")!.click();
     await settle();
     expect(viewState.get("table.hiddenProperties")).toEqual(TASKS.properties.map((one) => one.key));
-    q<HTMLButtonElement>(".swd-shown-all").click();
+    document.querySelector<HTMLButtonElement>(".swd-shown-all")!.click();
     await settle();
     expect(viewState.get("table.hiddenProperties")).toBeUndefined();
   });
@@ -523,18 +525,18 @@ describe("the place's tools", () => {
     expect(q(".swd-place-count").textContent).toBe("1 of 3");
     // The sort's menu (the shared menu): the order by hand checked, the way of none to pick yet; a property, then the other way
     q<HTMLButtonElement>(".swd-sort-button").click();
-    expect(menuShown(document)[0]).toEqual(["Order by hand", "true"]);
-    expect(all<HTMLButtonElement>(".swd-menu-row-direction .swd-segment").map((one) => one.getAttribute("aria-disabled"))).toEqual(["true", "true"]);
-    choose(document, "Name");
+    expect(menuShown()[0]).toEqual(["Order by hand", "true"]);
+    expect([...document.querySelectorAll<HTMLButtonElement>(".swd-menu-row-direction .swd-segment")].map((one) => one.getAttribute("aria-disabled"))).toEqual(["true", "true"]);
+    choose("Name");
     await settle();
     expect(viewState.get("table.sort")).toEqual([{ key: "name", direction: "asc" }]);
     expect(document.querySelector<HTMLElement>(".swd-menu")?.hidden ?? true).toBe(true);
     q<HTMLButtonElement>(".swd-sort-button").click();
-    all<HTMLButtonElement>(".swd-menu-row-direction .swd-segment")[1]!.click();
+    [...document.querySelectorAll<HTMLButtonElement>(".swd-menu-row-direction .swd-segment")][1]!.click();
     await settle();
     expect(viewState.get("table.sort")).toEqual([{ key: "name", direction: "desc" }]);
     q<HTMLButtonElement>(".swd-sort-button").click();
-    choose(document, "Order by hand");
+    choose("Order by hand");
     await settle();
     expect(viewState.get("table.sort")).toBeUndefined();
     q('tbody tr:first-child [data-key="estimate"]').click();

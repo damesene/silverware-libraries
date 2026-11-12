@@ -4,10 +4,10 @@ import { editorText, expect, item, root, runCommand, test, waitForIndex } from "
 const BLOCK = "```silverware-database\nid: tasks\nview: names\n```\n";
 const TASKS = { "Page/db-tasks": root("tasks", "Tasks"), "Page/db-tasks/Fix login": item("Todo", "a0"), "Page/db-tasks/Write docs": item("Done", "a1") };
 
-/** A view picked in a place (the first, else the one given): its picker's menu opened, the view's item pressed */
+/** A view picked in a place (the first, else the one given): its picker's menu opened (in the body while open), the view's item pressed */
 async function pickView(page: import("@playwright/test").Page, label: string, place = page.locator(".swd-place").first()): Promise<void> {
   await place.locator(".swd-view-picker").click();
-  await place.locator(".swd-menu .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: new RegExp(`^${label}$`) }) }).click();
+  await page.locator(".swd-menu:not([hidden]) .swd-menu-item").filter({ has: page.locator(".swd-label", { hasText: new RegExp(`^${label}$`) }) }).click();
 }
 
 /** An entry of a place's menu (⋯) chosen by its label (its value after it left out); the menu open first, or a submenu of it */
@@ -167,6 +167,41 @@ test("a tool's menu shows whole over a short block, not cut by it, scrolled in i
   expect(await menu.evaluate((one) => one.scrollTop)).toBe(scrolled);
   await menu.locator(".swd-menu-item", { hasText: "Count" }).click();
   await expect(page.locator(".test-count")).toHaveText("2 of 2");
+});
+
+test("a block's menu and an editor's panel show over what another plugin lays over the page (a table's tab, a width's handle), its keys their own", async ({ page, space }) => {
+  const rootPage = "---\ntags: [db-root]\n_database:\n  id: tasks\n  name: Tasks\n  version: 1\n  properties:\n    status: { type: select, label: Status, options: [Todo, Done] }\n    labels: { type: select, label: Labels, options: [red, blue], multiple: true }\n---\n";
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: table\n```\n", ...TASKS, "Page/db-tasks": rootPage }, "Page");
+  // Another plugin's control laid over the whole page from the body, at its layer (shared/layers.ts), taking presses
+  const cover = () =>
+    page.evaluate(() => {
+      const one = document.createElement("div");
+      one.className = "test-control";
+      one.style.cssText = "position: fixed; inset: 0; z-index: var(--sw-layer-control); background: rgba(0, 0, 0, 0.05)";
+      document.body.append(one);
+    });
+  const onTop = (selector: string) =>
+    page.locator(selector).evaluate((one) => {
+      const box = one.getBoundingClientRect();
+      return !!document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)?.closest(".swd-lifted");
+    });
+  await page.locator(".swd-more").click();
+  await cover();
+  expect(await onTop(".swd-menu:not([hidden])")).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swd-menu:not([hidden])")).toHaveCount(0);
+  await page.locator(".test-control").evaluate((one) => one.remove());
+  const cell = page.locator('.swd-table tbody tr:first-child td[data-key="labels"]');
+  const text = await editorText(page);
+  await cell.click();
+  await cover();
+  expect(await onTop(".swd-editor-choices.swd-floated")).toBe(true);
+  // Its boxes ticked by the keys, nothing typed reaching the page; saved by Enter
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("labels:");
+  await expect(page.locator(".swd-editor-choices")).toHaveCount(0);
+  expect(await editorText(page)).toBe(text);
 });
 
 test("a view picked is written into the block it was picked in, the place drawn anew from it", async ({ page, space }) => {
@@ -673,9 +708,10 @@ test("a time, a date and time and a link: edited in their own fields, written an
   await expect(cell("when")).not.toHaveClass(/swd-invalid/);
   // A link: its address, then a text of its own
   await cell("web").click();
-  // (Typed without its scheme: kept as a web address)
-  await cell("web").locator(".swd-link-address").fill("example.com/docs/");
-  await cell("web").locator(".swd-link-address").press("Enter");
+  // (Typed without its scheme: kept as a web address; its panel laid over the page from the body)
+  const linkEditor = page.locator(".swd-editor-link.swd-floated");
+  await linkEditor.locator(".swd-link-address").fill("example.com/docs/");
+  await linkEditor.locator(".swd-link-address").press("Enter");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toMatch(/web: "?https:\/\/example\.com\/docs\/"?/);
   await expect(cell("web").locator("a.swd-link")).toHaveText("example.com/docs");
   await expect(cell("web").locator(".swd-link-rest")).toHaveText("/docs");
@@ -684,12 +720,12 @@ test("a time, a date and time and a link: edited in their own fields, written an
   await cell("web").locator("a.swd-link").click();
   expect((await opened).url()).toBe("https://example.com/docs/");
   await expect(page.locator(".cm-line", { hasText: "```silverware-database" })).toHaveCount(0);
-  await expect(cell("web").locator(".swd-editor-link")).toHaveCount(0);
+  await expect(linkEditor).toHaveCount(0);
   // Its text, pressed beside the link
   const box = (await cell("web").boundingBox())!;
   await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2);
-  await cell("web").locator(".swd-link-text").fill("Docs");
-  await cell("web").locator(".swd-link-text").press("Enter");
+  await linkEditor.locator(".swd-link-text").fill("Docs");
+  await linkEditor.locator(".swd-link-text").press("Enter");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("[Docs](https://example.com/docs/)");
   await expect(cell("web").locator("a.swd-link")).toHaveText("Docs");
   // A select in the peek: its list open at once
@@ -724,19 +760,20 @@ test("a reference: pages picked, kept as wiki links, opened by a press, renamed 
   const target = `${space.folder}/Refs target one`;
   const cell = page.locator(".swd-table tbody tr", { hasText: "Fix login" }).locator('td[data-key="refs"]');
   await cell.click();
-  // Found by words of its name, ticked by Enter, saved by Enter again
-  const search = cell.locator(".swd-editor-search");
+  // Found by words of its name, ticked by Enter, saved by Enter again (its panel laid over the page from the body)
+  const editor = page.locator(".swd-editor-documents.swd-floated");
+  const search = editor.locator(".swd-editor-search");
   // A page's folder pressed: its path in the search, its page not ticked, the editor still open
   await search.fill(`${space.folder} target two`);
-  await cell.locator(".swd-editor-choice").first().locator("button.swd-editor-document-folder").click();
+  await editor.locator(".swd-editor-choice").first().locator("button.swd-editor-document-folder").click();
   await expect(search).toHaveValue(`${space.folder}/`);
   await expect(search).toBeFocused();
-  await expect(cell.locator("input[type=checkbox]:checked")).toHaveCount(0);
-  await expect(cell.locator(`.swd-editor-choice[title="${space.folder}/Refs target one"]`)).toBeVisible();
+  await expect(editor.locator("input[type=checkbox]:checked")).toHaveCount(0);
+  await expect(editor.locator(`.swd-editor-choice[title="${space.folder}/Refs target one"]`)).toBeVisible();
   await search.fill(`${space.folder} target one`);
   // (Each document its name, its folder under it)
-  await expect(cell.locator(".swd-editor-choice").first()).toHaveAttribute("title", target);
-  await expect(cell.locator(".swd-editor-choice").first().locator(".swd-editor-document-folder")).toHaveText(space.folder);
+  await expect(editor.locator(".swd-editor-choice").first()).toHaveAttribute("title", target);
+  await expect(editor.locator(".swd-editor-choice").first().locator(".swd-editor-document-folder")).toHaveText(space.folder);
   await search.press("Enter");
   await search.press("Enter");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain(`refs: ["[[${target}]]"]`);
@@ -1381,7 +1418,7 @@ test("a select's Multiple turned on in Properties writes it into the root page a
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("status: [Todo]");
   // Edited by its boxes now, one ticked more written as a list of both
   await page.locator('tbody tr:first-child td[data-key="status"]').click();
-  await page.locator('tbody tr:first-child td[data-key="status"] input[type=checkbox][value="Done"]').check();
+  await page.locator('.swd-editor-choices.swd-floated input[type=checkbox][value="Done"]').check();
   await page.keyboard.press("Enter");
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("status: [Todo, Done]");
 });
@@ -1431,7 +1468,7 @@ test("a person shows as a mention, kept by the name alone, picked from its peopl
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("owner: zoe\n");
   // A name clicked in the list: written, the editor closed, not opened anew by the click
   await cell(1).click();
-  await cell(1).locator(".swd-suggest-item", { hasText: "ada" }).click();
+  await page.locator(".swd-suggest.swd-floated .swd-suggest-item", { hasText: "ada" }).click();
   await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("owner: ada\n");
   await expect(cell(1).locator(".swd-editor")).toHaveCount(0);
   await expect(cell(1).locator(".swd-pill")).toHaveText("@ada");
@@ -1449,7 +1486,9 @@ test("a person pressed opens SilverBullet's Mention Inbox on that name, editing 
   await cell("owner").locator(".swd-mention").click();
   await expect(page.getByText("Mention Inbox")).toBeVisible();
   await expect(cell("owner").locator(".swd-editor")).toHaveCount(0);
-  // The boxes fixed to the window by their cell: no box of the page clips them
+  // The boxes fixed to the window by their cell, in the body: no box of the page clips them
   await cell("team").click();
-  await expect(cell("team").locator(".swd-editor-choices")).toHaveCSS("position", "fixed");
+  const boxes = page.locator(".swd-editor-choices.swd-floated");
+  await expect(boxes).toHaveCSS("position", "fixed");
+  expect(await boxes.evaluate((one) => one.parentElement === document.body)).toBe(true);
 });

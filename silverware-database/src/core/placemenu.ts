@@ -8,6 +8,7 @@
 import { el } from "../../../shared/elements.ts";
 import { focusMenu, keepFocus, type MenuBack, type MenuEntry, type MenuLook, type MenuNaming, namingThatCloses, onMenuClose, renderMenu, wrapRuns } from "../../../shared/menu.ts";
 import { customSections, type MenuBuilder, type MenuGroup, menuBuilder, slotEntries } from "../../../shared/menuslots.ts";
+import { liftOut } from "../views/float.ts";
 import { ICONS } from "./icons.ts";
 
 /**
@@ -101,6 +102,10 @@ export function toolMenu(
   // window (position fixed), so no box around the place clips it (SilverBullet's widget scrolls and cuts what leaves it)
   // (By the edge the style page aligns it by, the tool's left or right: a submenu of another width keeps that edge)
   let anchor: { readonly right: boolean; readonly x: number; readonly y: number } | undefined;
+  // Once measured in its box, taken into the body while it shows (views/float.ts: over the other plugins' controls, out of
+  // the page's stacking contexts), put back as it closes; closed where its tool leaves the page meanwhile
+  let lifted: (() => void) | undefined;
+  const inMenu = (node: Node | null) => !!node && (box.contains(node) || holder.contains(node));
   const view = doc.defaultView;
   const place = () => {
     if (holder.hidden || !view) return;
@@ -110,6 +115,8 @@ export function toolMenu(
       const right = Math.abs(was.right - at.right) < Math.abs(was.left - at.left);
       anchor = { right, x: right ? at.right - was.right : was.left - at.left, y: was.top - at.top };
     }
+    // (Its look the place's; its font its own)
+    lifted ??= liftOut(holder, button, () => close(false, false), box);
     // (Where it was scrolled kept: placed again as the page scrolls, it does not jump back to its top)
     const scrolled = holder.scrollTop;
     // Measured at the window's corner, as wide and tall as its content (where it was, near the window's edge, it was squeezed)
@@ -143,8 +150,7 @@ export function toolMenu(
     queued = true;
     view?.requestAnimationFrame(() => {
       queued = false;
-      // (Its tool gone from the page without the menu closed, its place drawn anew: closed, nothing left listening)
-      if (!button.isConnected) return close(false, false);
+      // (Its tool gone from the page: closed by liftOut's watch)
       place();
     });
   };
@@ -153,6 +159,9 @@ export function toolMenu(
     if (byUser) closed?.();
     holder.hidden = true;
     anchor = undefined;
+    lifted?.();
+    lifted = undefined;
+    box.append(holder);
     for (const property of ["position", "left", "top", "right", "bottom", "max-height"]) holder.style.removeProperty(property);
     holder.replaceChildren();
     shown = undefined;
@@ -200,7 +209,7 @@ export function toolMenu(
     top();
     button.setAttribute("aria-expanded", "true");
     const beside = (event: Event) => {
-      if (!box.contains(event.target as Node)) close();
+      if (!inMenu(event.target as Node)) close();
     };
     doc.addEventListener("pointerdown", beside, true);
     doc.addEventListener("scroll", follow, true);
@@ -212,17 +221,33 @@ export function toolMenu(
     };
   };
   button.addEventListener("click", () => (holder.hidden ? open() : close()));
-  box.addEventListener("focusout", (event) => {
-    if (!box.contains(event.relatedTarget as Node | null) && event.relatedTarget) close();
-  });
+  // (The menu in the body while it shows: what leaves the tool for it, or it for the tool, stays)
+  const left = (event: FocusEvent) => {
+    if (!inMenu(event.relatedTarget as Node | null) && event.relatedTarget) close();
+  };
+  box.addEventListener("focusout", left);
+  holder.addEventListener("focusout", left);
   // (Caught on its way down: the menu keeps its keys from going on, Esc too)
-  box.addEventListener(
+  const escape = (event: KeyboardEvent) => {
+    // (Not in the title's field: Esc there leaves the name as it was, the menu staying)
+    if (event.key !== "Escape" || holder.hidden || (event.target instanceof Element && event.target.closest(".swd-menu-name"))) return;
+    event.preventDefault();
+    event.stopPropagation();
+    close(true);
+  };
+  box.addEventListener("keydown", escape, true);
+  holder.addEventListener("keydown", escape, true);
+  // Tab past the menu's first or last control: the menu closed, the focus back on its tool (in the body the next
+  // control would be none, or anything of SilverBullet's, and the menu stayed open). On its way down: the shared menu
+  // keeps its keys from going up
+  holder.addEventListener(
     "keydown",
     (event) => {
-      // (Not in the title's field: Esc there leaves the name as it was, the menu staying)
-      if (event.key !== "Escape" || holder.hidden || (event.target instanceof Element && event.target.closest(".swd-menu-name"))) return;
+      if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) return;
+      const controls = [...holder.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])')].filter((one) => !one.matches(":disabled") && !one.closest("[hidden]"));
+      const edge = event.shiftKey ? controls[0] : controls[controls.length - 1];
+      if (edge && doc.activeElement !== edge) return;
       event.preventDefault();
-      event.stopPropagation();
       close(true);
     },
     true,

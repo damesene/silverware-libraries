@@ -422,14 +422,44 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 .swl-dialog-hint {
   opacity: 0.6;
 }
+/* This device's zoom: its name over a slider, its size (or "default") and Reset */
 .swl-dialog-device {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 8px;
+  margin-top: 12px;
+}
+.swl-dialog-device > .swl-dialog-width-name {
+  display: block;
+  margin-bottom: 6px;
 }
 .swl-dialog-device[hidden] {
   display: none;
+}
+/* (As wide for 5 px as for 40 px: the slider beside it never moves) */
+.swl-dialog-device-value {
+  width: 3.5em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.swl-dialog-reset:disabled {
+  opacity: 0.4;
+}
+/* A slider held: the dialog all but gone, the controls held alone shown on a quiet ground of their own, so what the
+   slider changes is seen on the page under the dialog (on a phone it takes the whole screen) */
+.swl-dialog.swl-dialog-sliding {
+  visibility: hidden;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.swl-dialog-sliding .swl-dialog-held {
+  visibility: visible;
+  /* (Its ground round it without moving it: moved as it was pressed, a press near the slider's edge was off it by the
+     time the browser started dragging, and nothing moved) */
+  padding: 6px 8px;
+  margin: -6px -8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--root-background-color) 88%, transparent);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 .swl-dialog-reset {
   padding: 3px 10px;

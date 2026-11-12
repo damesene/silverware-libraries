@@ -3,7 +3,9 @@
 //   own). Each set by a slider marked with the guides, snapping to them, or typed, in px or % of the pane; a row
 //   following another shows the width it follows, and is its own as soon as either is moved or typed in.
 //   Under them the editor's font size for every page (the theme's, or its own), Font zoom (Ctrl + scroll) and this
-//   device's zoom, taken off by Reset (docs/silverware-layout-font-size.md).
+//   device's zoom, set by a slider of its own or taken off by Reset (docs/silverware-layout-font-size.md).
+//   While a slider is held, the dialog all but goes, its slider alone shown: the page under it seen as it changes
+//   (on a phone the dialog takes the screen).
 //   What is set shows on the page at once (the dialog held at the window's top, the page seen under it).
 // - Guides: the widths a drag snaps to (a widget's bar, these sliders), each typed in its own row, in px or % of the
 //   pane (the same switch as a width's); Full width a box.
@@ -57,8 +59,8 @@ export type PageDialogStore = {
   saveDefault(width: Width | undefined): Promise<string | undefined>;
   saveGuides(guides: readonly Guide[]): Promise<string | undefined>;
   saveFont(fontSize: number | undefined, fontZoom: boolean): Promise<string | undefined>;
-  // This device's zoom taken off
-  resetZoom(): void;
+  // This device's zoom kept (none: taken off)
+  saveZoom(size: number | undefined): void;
   confirm(question: string): Promise<boolean>;
   flash(message: string, type: "info" | "error"): void;
 };
@@ -144,7 +146,10 @@ export class PageDialog {
   // The font: its size, Font zoom, and whether this device's zoom is kept (Reset pressed: not)
   private font: FontField = { own: false, amount: "" };
   private fontZoom: HTMLInputElement | undefined;
-  private zoomKept = false;
+  // This device's zoom as set here (none: the default's size): kept on Save
+  private zoom: number | undefined;
+  // This device's row drawn again (its slider follows the font's size while it has no zoom of its own)
+  private drawDevice: (() => void) | undefined;
 
   constructor(private readonly doc: Document) {
     this.dialogs = new Dialogs(doc, { base: BASE, closeIcon: ICONS.close });
@@ -316,6 +321,7 @@ export class PageDialog {
       row.classList.toggle(`${BASE}-follows`, !field.own);
       drawTicks();
     };
+    this.slides(slider);
     slider.addEventListener("input", () => {
       field.own = true;
       mode.set("own");
@@ -354,14 +360,14 @@ export class PageDialog {
   }
 
   /**
-   * The font size's row: the theme's or its own, a slider (5 to 40 px) and its number; Font zoom a box; this device's
-   * zoom, while there is one, with Reset
+   * The font size's row: the theme's or its own, a slider (5 to 40 px) and its number; Font zoom a box; while it is on,
+   * this device's zoom by a slider of its own (at the default's size: none), Reset taking it off
    */
   private fontRow(): HTMLElement {
     const { doc } = this;
     const store = this.store!;
     const field: FontField = (this.font = { own: store.fontSize !== undefined, amount: store.fontSize === undefined ? "" : String(store.fontSize) });
-    this.zoomKept = store.zoom !== undefined;
+    this.zoom = store.zoom;
     const mode = segmentedControl(
       doc,
       SEGMENTS_BASE,
@@ -396,8 +402,10 @@ export class PageDialog {
       field.own = true;
       field.amount = slider.value;
       show();
+      drawDevice();
       this.update();
     });
+    this.slides(slider);
     amount.addEventListener("input", () => {
       field.own = !!amount.value.trim();
       field.amount = amount.value;
@@ -410,7 +418,10 @@ export class PageDialog {
     // Font zoom: a box, how it is used said quietly beside it
     this.fontZoom = el(doc, "input", { attrs: { type: "checkbox" } });
     this.fontZoom.checked = store.fontZoom;
-    this.fontZoom.addEventListener("change", () => this.update());
+    this.fontZoom.addEventListener("change", () => {
+      drawDevice();
+      this.update();
+    });
     const zoomBox = el(
       doc,
       "label",
@@ -418,25 +429,44 @@ export class PageDialog {
       this.fontZoom,
       el(doc, "span", `${BASE}-zoom-text`, el(doc, "span", { text: "Font zoom" }), el(doc, "span", { class: `${BASE}-hint`, text: "Ctrl + scroll over the page, Ctrl+0 resets" })),
     );
-    // This device's zoom, while there is one: what it is, Reset taking it off (on Save)
-    const device = el(doc, "div", `${BASE}-device`);
-    const drawDevice = () => {
-      device.hidden = !this.zoomKept;
-      if (!this.zoomKept) return;
-      device.replaceChildren(
-        el(doc, "span", { text: `This device: ${store.zoom} px` }),
-        el(doc, "button", {
-          class: `${BASE}-reset`,
-          text: "Reset",
-          run: () => {
-            this.zoomKept = false;
-            drawDevice();
-            this.update();
-          },
-        }),
-      );
-    };
-    drawDevice();
+    // This device's zoom (as Ctrl + scroll sets it, on this device alone): a slider from the size the font has without
+    // it, its size, Reset; shown while Font zoom is on
+    const fallback = () => fontSizeOf(this.font).size ?? store.themeFontSize();
+    const zoomSlider = el(doc, "input", {
+      class: `${BASE}-slider`,
+      attrs: { type: "range", step: "1", min: String(FONT_SIZE_LIMITS.min), max: String(FONT_SIZE_LIMITS.max), "aria-label": "This device's font size" },
+    });
+    const zoomValue = el(doc, "span", `${BASE}-device-value`);
+    const reset = el(doc, "button", {
+      class: `${BASE}-reset`,
+      text: "Reset",
+      run: () => {
+        this.zoom = undefined;
+        drawDevice();
+        this.update();
+      },
+    });
+    zoomSlider.addEventListener("input", () => {
+      const size = Number(zoomSlider.value);
+      this.zoom = size === fallback() ? undefined : size;
+      drawDevice();
+      this.update();
+    });
+    this.slides(zoomSlider);
+    const device = el(
+      doc,
+      "div",
+      `${BASE}-device`,
+      el(doc, "span", { class: `${BASE}-width-name`, text: "This device" }),
+      el(doc, "div", `${BASE}-width-controls`, el(doc, "div", `${BASE}-slider-box ${BASE}-slider-plain`, zoomSlider), el(doc, "div", `${BASE}-width-value`, zoomValue, reset)),
+    );
+    const drawDevice = (this.drawDevice = () => {
+      device.hidden = !this.fontZoom?.checked;
+      zoomSlider.value = String(this.zoom ?? fallback());
+      // (Its size alone: the row above says the default, and a text of changing length moved the slider beside it)
+      zoomValue.textContent = `${this.zoom ?? fallback()} px`;
+      reset.disabled = this.zoom === undefined;
+    });
     const row = el(
       doc,
       "div",
@@ -447,7 +477,32 @@ export class PageDialog {
       device,
     );
     show();
+    drawDevice();
     return row;
+  }
+
+  /**
+   * While a slider is held (by a finger or a mouse), the dialog all but goes, the slider and its value alone shown
+   * (`${BASE}-sliding` on the dialog, `${BASE}-held` on the controls held): what it changes is seen on the page under
+   * the dialog, which on a phone takes the whole screen. Back as it is let go
+   */
+  private slides(slider: HTMLInputElement): void {
+    slider.addEventListener("pointerdown", () => {
+      const box = slider.closest<HTMLElement>(`.${BASE}`);
+      const held = slider.closest<HTMLElement>(`.${BASE}-width-controls`);
+      if (!box || !held) return;
+      box.classList.add(`${BASE}-sliding`);
+      held.classList.add(`${BASE}-held`);
+      const view = this.doc.defaultView;
+      const end = () => {
+        box.classList.remove(`${BASE}-sliding`);
+        held.classList.remove(`${BASE}-held`);
+        view?.removeEventListener("pointerup", end, true);
+        view?.removeEventListener("pointercancel", end, true);
+      };
+      view?.addEventListener("pointerup", end, true);
+      view?.addEventListener("pointercancel", end, true);
+    });
   }
 
   /** Whether a row can be changed here (all pages' width only where settings can be saved) */
@@ -504,10 +559,14 @@ export class PageDialog {
     const fallback = widthOf(this.fallback.field);
     const badGuide = this.guideRows.find((row) => !!rowProblem(row));
     for (const row of this.guideRows) row.input.classList.toggle(`${BASE}-invalid`, !!rowProblem(row));
+    // The rows following another shown as what they follow now (This page the width of all pages, This device the
+    // font's size), as that one changes
+    if (!this.page.field.own) this.page.show();
+    this.drawDevice?.();
     const font = fontSizeOf(this.font);
     const problem = page.problem ?? fallback.problem ?? font.problem ?? (badGuide ? rowProblem(badGuide) : undefined);
     if (!page.problem && !fallback.problem && !font.problem) {
-      store.preview({ pageWidth: page.width, defaultWidth: fallback.width, fontSize: font.size, fontZoom: !!this.fontZoom?.checked, zoom: this.zoomKept ? store.zoom : undefined });
+      store.preview({ pageWidth: page.width, defaultWidth: fallback.width, fontSize: font.size, fontZoom: !!this.fontZoom?.checked, zoom: this.zoom });
     }
     if (this.saveButton) {
       this.saveButton.textContent = this.saving ? "Saving…" : "Save";
@@ -524,7 +583,7 @@ export class PageDialog {
     if (!store || !this.page || !this.fallback) return false;
     const guides = this.currentGuides();
     const sameGuides = guides.length === store.guides.length && guides.every((guide) => store.guides.includes(guide));
-    return !sameWidth(widthOf(this.page.field).width, store.pageWidth) || !sameWidth(widthOf(this.fallback.field).width, store.defaultWidth) || !sameGuides || this.fontChanged() || this.zoomReset();
+    return !sameWidth(widthOf(this.page.field).width, store.pageWidth) || !sameWidth(widthOf(this.fallback.field).width, store.defaultWidth) || !sameGuides || this.fontChanged() || this.zoomChanged();
   }
 
   /** Whether the font size or Font zoom differ from what is saved */
@@ -533,9 +592,9 @@ export class PageDialog {
     return fontSizeOf(this.font).size !== store.fontSize || !!this.fontZoom?.checked !== store.fontZoom;
   }
 
-  /** Whether this device's zoom is to be taken off (Reset) */
-  private zoomReset(): boolean {
-    return this.store!.zoom !== undefined && !this.zoomKept;
+  /** Whether this device's zoom is set otherwise than it is kept (its slider moved, Reset) */
+  private zoomChanged(): boolean {
+    return this.zoom !== this.store!.zoom;
   }
 
   /** Esc, × or a press beside it: whether it closes, after asking where changes would be lost */
@@ -575,7 +634,7 @@ export class PageDialog {
       const problem = await store.saveFont(font.size, !!this.fontZoom?.checked).catch((e: unknown) => String(e));
       if (problem) problems.push(`the font size: ${problem}`);
     }
-    if (this.zoomReset()) store.resetZoom();
+    if (this.zoomChanged()) store.saveZoom(this.zoom);
     if (!sameWidth(page.width, store.pageWidth)) {
       const problem = await store.savePage(page.width).catch((e: unknown) => String(e));
       if (problem) problems.push(`this page: ${problem}`);

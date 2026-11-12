@@ -154,6 +154,67 @@ describe("Silverware Layout's app over a page of no host's", () => {
     expect(document.querySelector<HTMLButtonElement>(".swl-dialog-save")!.disabled).toBe(true);
   });
 
+  it("this device's zoom set by its slider, kept for the device on Save; back at the default's size, none kept", async () => {
+    const { page } = plainPage();
+    const { api, store } = memoryStore({ Page: undefined }, { fontSize: 18 });
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    await app.start(api);
+    await app.openDialog();
+    const slider = document.querySelector<HTMLInputElement>('[aria-label="This device\'s font size"]')!;
+    const value = document.querySelector(".swl-dialog-device-value")!;
+    expect(value.textContent).toBe("18 px");
+    slider.value = "22";
+    slider.dispatchEvent(new Event("input"));
+    expect(value.textContent).toBe("22 px");
+    expect(document.documentElement.getAttribute("data-swl-font-size")).toBe("22");
+    document.querySelector<HTMLButtonElement>(".swl-dialog-save")!.click();
+    await expect.poll(() => store.zoom).toBe(22);
+    // At the default's size again: no zoom kept
+    await app.openDialog();
+    const again = document.querySelector<HTMLInputElement>('[aria-label="This device\'s font size"]')!;
+    again.value = "18";
+    again.dispatchEvent(new Event("input"));
+    expect(document.querySelector(".swl-dialog-device-value")!.textContent).toBe("18 px");
+    document.querySelector<HTMLButtonElement>(".swl-dialog-save")!.click();
+    await expect.poll(() => store.zoom).toBeUndefined();
+  });
+
+  it("a row following another moves with it: This page (Default) with All pages, This device (no zoom) with the font size", async () => {
+    const { page } = plainPage();
+    const { api } = memoryStore({ Page: undefined });
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    await app.start(api);
+    await app.openDialog();
+    const [thisPage, allPages] = [...document.querySelectorAll<HTMLElement>(".swl-dialog-width-row")];
+    const all = allPages!.querySelector<HTMLInputElement>(".swl-dialog-slider")!;
+    all.value = "1000";
+    all.dispatchEvent(new Event("input"));
+    expect(thisPage!.querySelector<HTMLInputElement>(".swl-dialog-slider")!.value).toBe("1000");
+    expect(thisPage!.querySelector<HTMLInputElement>(".swl-dialog-amount")!.placeholder).toBe("1000");
+    // The font's size typed: This device's slider and size with it
+    const font = document.querySelector<HTMLInputElement>(".swl-dialog-font-row .swl-dialog-amount")!;
+    font.value = "22";
+    font.dispatchEvent(new Event("input"));
+    expect(document.querySelector<HTMLInputElement>('[aria-label="This device\'s font size"]')!.value).toBe("22");
+    expect(document.querySelector(".swl-dialog-device-value")!.textContent).toBe("22 px");
+  });
+
+  it("a slider held: the dialog marked sliding, the controls held marked; let go, neither", async () => {
+    const { page } = plainPage();
+    const { api } = memoryStore({ Page: undefined });
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    await app.start(api);
+    await app.openDialog();
+    const dialog = document.querySelector(".swl-dialog")!;
+    const slider = document.querySelector<HTMLInputElement>(".swl-dialog-width-row .swl-dialog-slider")!;
+    slider.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(dialog.classList.contains("swl-dialog-sliding")).toBe(true);
+    expect(slider.closest(".swl-dialog-width-controls")!.classList.contains("swl-dialog-held")).toBe(true);
+    window.dispatchEvent(new Event("pointerup"));
+    expect(dialog.classList.contains("swl-dialog-sliding")).toBe(false);
+    expect(document.querySelectorAll(".swl-dialog-held")).toHaveLength(0);
+  });
+
   it("saves from its dialog through the store: the page's own width, the default", async () => {
     const { page, shown } = plainPage();
     const { api, store } = memoryStore({ Page: undefined });

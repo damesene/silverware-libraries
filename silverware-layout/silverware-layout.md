@@ -22,7 +22,7 @@ Run **Silverware Layout: Page layout** from the command palette. Its **Page** ta
 
 Set a width with its slider, marked with your guides (it snaps to them), or type it, in **px** or in **%** of the editor's width (the px / % switch beside the number). Moving the slider or typing makes the width *Own*.
 
-The page shows each change at once. **Save** keeps it, **Cancel** (or Esc) puts the page back.
+The page shows each change at once; while you hold a slider, the dialog all but disappears, its slider alone left, so you see the page under it as it changes (on a phone too, where the dialog takes the screen). **Save** keeps it, **Cancel** (or Esc) puts the page back.
 
 A page's own width is kept in its frontmatter:
 
@@ -52,7 +52,7 @@ Without Silverware Layout, each is as wide as the text, its width still kept.
 
 The **Font size** row of the dialog's Page tab sets the editor's font size on every page: *Theme* (your theme's) or *Own*, by its slider or typed in px. Headings, code and tables grow with it. (A chart's labels keep their size.)
 
-**Font zoom**: hold Ctrl and scroll over the page, and its font grows or shrinks a pixel a step, as the browser zooms. A label at the bottom left says the size for a moment, and says *default* where it is back at your default. **Ctrl+0** puts the default back. The size you zoom to is this device's alone, kept as the browser keeps its zoom, and never written into your space; the dialog shows it (*This device: 20 px*), and **Reset** takes it off. Turn Font zoom off in the dialog, and Ctrl + scroll zooms the browser again.
+**Font zoom**: hold Ctrl and scroll over the page, and its font grows or shrinks a pixel a step, as the browser zooms. A label at the bottom left says the size for a moment, and says *default* where it is back at your default. **Ctrl+0** puts the default back. The size you zoom to is this device's alone, kept as the browser keeps its zoom, and never written into your space. In the dialog, **This device** sets it by a slider (on a phone, which has no Ctrl + scroll, that is how you zoom), and **Reset** takes it off. Turn Font zoom off in the dialog, and Ctrl + scroll zooms the browser again.
 
 ## Guides
 

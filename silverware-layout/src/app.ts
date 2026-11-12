@@ -211,9 +211,9 @@ export class LayoutApp {
         state.settings = { ...state.settings, fontSize, fontZoom };
         return undefined;
       },
-      resetZoom: () => {
-        state.zoom = undefined;
-        store.keepZoom(undefined);
+      saveZoom: (size) => {
+        state.zoom = size;
+        store.keepZoom(size);
       },
       confirm: (question) => store.confirm(question),
       flash: (message, type) => store.flash(message, type),

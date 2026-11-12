@@ -79,6 +79,24 @@ test("the dialog's slider, moved near a guide, takes the guide's width and makes
   await expect.poll(() => widthSet(page)).toBe("900px");
 });
 
+test("a slider held stays where it was pressed (the dialog all but gone round it): a press near its edge still on it, and it drags", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
+  await runCommand(page, PAGE_LAYOUT);
+  const slider = page.locator(".swl-dialog").getByRole("slider", { name: "Font size", exact: true });
+  const box = (await slider.boundingBox())!;
+  const before = Number(await slider.inputValue());
+  // Pressed by its top edge: moved by as little as a few pixels, the press was off it as the browser began to drag
+  await page.mouse.move(box.x + box.width * 0.3, box.y + 1);
+  await page.mouse.down();
+  await expect(page.locator(".swl-dialog")).toHaveClass(/swl-dialog-sliding/);
+  const held = (await slider.boundingBox())!;
+  expect([held.x, held.y, held.width]).toEqual([box.x, box.y, box.width]);
+  expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains("swl-dialog-slider"), { x: box.x + box.width * 0.3, y: box.y + 1 })).toBe(true);
+  await page.mouse.move(box.x + box.width * 0.6, box.y + 1, { steps: 6 });
+  await page.mouse.up();
+  expect(Number(await slider.inputValue())).not.toBe(before);
+});
+
 test("Cancel puts the page back as it was, writing nothing", async ({ page, space }) => {
   await space.open({ Page: wide("Some text.") }, "Page");
   await expect.poll(() => widthSet(page)).toBe("1100px");

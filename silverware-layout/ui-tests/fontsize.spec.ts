@@ -52,13 +52,42 @@ test("this device's zoom kept across a reload, shown in the dialog, taken off by
   await runCommand(page, PAGE_LAYOUT);
   await expect.poll(() => fontSize(page)).toBe(THEME + 2);
   const dialog = page.locator(".swl-dialog");
-  await expect(dialog.locator(".swl-dialog-device")).toContainText(`This device: ${THEME + 2} px`);
+  await expect(dialog.locator(".swl-dialog-device-value")).toHaveText(`${THEME + 2} px`);
   await dialog.getByRole("button", { name: "Reset" }).click();
   await expect.poll(() => fontSize(page)).toBe(THEME);
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
   expect(await fontSize(page)).toBe(THEME);
   expect(await page.evaluate(() => localStorage.getItem("silverware.layout.fontZoom"))).toBeNull();
+});
+
+test("this device's zoom set by its slider in the dialog (as on a phone, which has no Ctrl + scroll); a slider held, the dialog all but gone, the slider alone shown", async ({ page, space }) => {
+  await space.open({ Page: PAGE }, "Page");
+  await runCommand(page, PAGE_LAYOUT);
+  const dialog = page.locator(".swl-dialog");
+  const value = dialog.locator(".swl-dialog-device-value");
+  await expect(value).toHaveText(`${THEME} px`);
+  const slider = dialog.getByRole("slider", { name: "This device's font size" });
+  // Pressed: the dialog clear but for the slider held
+  const box = (await slider.boundingBox())!;
+  await page.mouse.move(box.x + 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await expect(dialog).toHaveClass(/swl-dialog-sliding/);
+  expect(await dialog.evaluate((d) => getComputedStyle(d).visibility)).toBe("hidden");
+  expect(await slider.evaluate((s) => getComputedStyle(s).visibility)).toBe("visible");
+  await page.mouse.up();
+  await expect(dialog).not.toHaveClass(/swl-dialog-sliding/);
+  // Moved to 24: shown at once, kept for this device on Save
+  await slider.evaluate((s: HTMLInputElement) => {
+    s.value = "24";
+    s.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect(value).toHaveText("24 px");
+  await expect.poll(() => fontSize(page)).toBe(24);
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  expect(await page.evaluate(() => localStorage.getItem("silverware.layout.fontZoom"))).toBe("24");
+  expect(await space.config()).not.toContain("fontSize");
 });
 
 test("the font size for every page set in the dialog, shown at once, saved into CONFIG; the zoom's default then", async ({ page, space }) => {

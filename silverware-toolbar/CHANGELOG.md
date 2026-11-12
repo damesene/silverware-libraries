@@ -1,5 +1,9 @@
 # Silverware Toolbar: changelog
 
+## 1.0.1 (2026-11-12)
+
+- Its menus and dialogs layered in one order with the other Silverware plugins', so none shows under another's.
+
 ## 1.0.0 (2026-11-11)
 
 First versioned release.

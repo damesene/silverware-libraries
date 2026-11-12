@@ -85,6 +85,8 @@ Bundled into each plugin (nothing is shared at run time); its classes by a base 
 
 ## Verified in SilverBullet (applies to every plugin)
 
+- **SilverBullet after 2.12.1 (edge, 2026-11-09) runs `space-lua` / `space-style` only on pages under `Library/` and moves CONFIG to `Library/Config`**: what that breaks here, the fix for both versions, and a cleanup to remind the user of once the old versions are dropped, in docs/silverware-library-prefix.md. Read it before touching `shared/configpage.ts`, an init page's `saveConfigPage`, or how a plugin tells SilverBullet's own pages (`isMetaTag`).
+
 - A new `space-lua` block is not active until Space Lua is reloaded; an inline `${(function() … end)()}` needs none (how the probes were run).
 - **Space Lua blocks are in the index** (`plugs/index/space_lua.ts`, 2026-10-22): `index.tag "space-lua"` gives each block with `ref` `Page@position` and `script`, no `page`; queried from an API page while Space Lua loads it has every block, so a refused definition can name the pages calling the API. `editor.flashNotification(message, type, { timeout = 0, actions = { { name, run } } })` stays until closed, a button per action (`client/plugos/syscalls/editor.ts` of main).
 - **`_CTX` is a `${…}`'s own** (2.12.1, 2026-11-05): `_CTX.currentPage` is set in the expression, `nil` in a function defined on another page that it calls. As a page is opened from another, the editor's page is the new one while its text is still the old page's.

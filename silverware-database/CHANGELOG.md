@@ -1,5 +1,9 @@
 # Silverware Database: changelog
 
+## 1.1.1 (2026-11-12)
+
+- Fixed: a database's menus, value editors and suggestions show over a table's header and over other plugins' controls (a table's tab, the width handle of Silverware Layout).
+
 ## 1.1.0 (2026-11-12)
 
 - With Silverware Layout: a database wider or narrower than the text, by the bar beside it; its width a line of its block.

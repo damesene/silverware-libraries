@@ -1,9 +1,11 @@
-// The Page layout dialog (the command "Silverware Layout: Page layout"), two tabs:
-// - Page: the width of this page's text (the default, or its own) and the default of every page (the theme's, or its
-//   own). Each set by a slider marked with the guides, snapping to them, or typed, in px or % of the pane; a row
-//   following another shows the width it follows, and is its own as soon as either is moved or typed in.
-//   Under them the editor's font size for every page (the theme's, or its own), Font zoom (Ctrl + scroll) and this
-//   device's zoom, set by a slider of its own or taken off by Reset (docs/silverware-layout-font-size.md).
+// The Page layout dialog (the command "Silverware Layout: Page layout"), three tabs, each row named by where it holds
+// (this page, all pages, this device), the same in each: a slider, the value typed and ↺, and under them what it
+// follows while it has no value of its own (the field empty, that value its placeholder); moved or typed in, it is its
+// own, ↺ takes it back:
+// - Page width: this page's (or all pages') and all pages' (or the theme's), in px or % of the pane, the sliders
+//   marked with the guides and snapping to them.
+// - Font: the editor's font size for all pages (or the theme's) and this device's zoom (or the size of all pages), as
+//   Ctrl + scroll sets it, with whether Ctrl + scroll zooms at all (docs/silverware-layout-font-size.md).
 //   While a slider is held, the dialog all but goes, its slider alone shown: the page under it seen as it changes
 //   (on a phone the dialog takes the screen).
 //   What is set shows on the page at once (the dialog held at the window's top, the page seen under it).
@@ -41,6 +43,8 @@ export type PageDialogStore = {
   readonly guides: readonly Guide[];
   // Whether settings can be saved here (else only this page's width)
   readonly canSaveSettings: boolean;
+  // Narrower than this (px), the pane gets no width of Silverware Layout's (a phone): said on the Page width tab
+  readonly minPaneWidth: number;
   // The editor's pane now (px): a slider's room, and what % are of
   paneWidth(): number;
   // The text's width the theme gives (px), Silverware Layout's own set aside
@@ -81,7 +85,7 @@ type FontField = { own: boolean; amount: string };
 function fontSizeOf(field: FontField): { readonly size?: number; readonly problem?: string } {
   if (!field.own) return {};
   const text = field.amount.trim();
-  if (!text) return { problem: "Type a font size, or pick Theme" };
+  if (!text) return {};
   const size = Number(text);
   const problem = validateFontSize(size);
   return problem ? { problem } : { size };
@@ -96,7 +100,7 @@ const fieldOf = (width: Width | undefined): Field => ({ own: !!width, amount: wi
 function widthOf(field: Field): { readonly width?: Width; readonly problem?: string } {
   if (!field.own) return {};
   const text = field.amount.trim();
-  if (!text) return { problem: "Type a width, or pick the one it follows" };
+  if (!text) return {};
   const amount = Number(text);
   const width = { amount, unit: field.unit };
   const problem = Number.isFinite(amount) ? validateTextWidth(width) : "A width is a number";
@@ -143,11 +147,10 @@ export class PageDialog {
   private full: HTMLInputElement | undefined;
   private saveButton: HTMLButtonElement | undefined;
   private note: HTMLElement | undefined;
-  // The font: its size, Font zoom, and whether this device's zoom is kept (Reset pressed: not)
+  // The font size of all pages, this device's zoom (none: the size of all pages), whether Ctrl + scroll zooms
   private font: FontField = { own: false, amount: "" };
+  private device: FontField = { own: false, amount: "" };
   private fontZoom: HTMLInputElement | undefined;
-  // This device's zoom as set here (none: the default's size): kept on Save
-  private zoom: number | undefined;
   // This device's row drawn again (its slider follows the font's size while it has no zoom of its own)
   private drawDevice: (() => void) | undefined;
 
@@ -169,12 +172,28 @@ export class PageDialog {
   private render(): void {
     const { doc } = this;
     const store = this.store!;
-    this.page = this.widthRow("This page", "Default", fieldOf(store.pageWidth), () => this.inherited("page"));
-    this.fallback = this.widthRow("All pages", "Theme", fieldOf(store.defaultWidth), () => this.inherited("fallback"));
+    this.page = this.widthRow("This page", "all pages' width", fieldOf(store.pageWidth), () => this.inherited("page"));
+    this.fallback = this.widthRow("All pages", "your theme's width", fieldOf(store.defaultWidth), () => this.inherited("fallback"));
     if (!store.canSaveSettings) this.fallback.element.classList.add(`${BASE}-readonly`);
-    const fontRow = this.fontRow();
-    if (!store.canSaveSettings) fontRow.classList.add(`${BASE}-readonly`);
-    const pagePanel = el(doc, "div", `${BASE}-widths`, this.page.element, this.fallback.element, fontRow);
+    // (All pages first, as on the Font tab: what holds everywhere, then what holds here alone)
+    this.fallback.element.dataset.swlRow = "all";
+    this.page.element.dataset.swlRow = "page";
+    const pagePanel = el(doc, "div", `${BASE}-widths`, this.fallback.element, this.page.element);
+    // On a screen too narrow for widths (a phone): said first, that what is set here shows on a wider one
+    if (store.paneWidth() < store.minPaneWidth) {
+      pagePanel.prepend(
+        el(
+          doc,
+          "p",
+          { class: `${BASE}-notice`, attrs: { role: "note" } },
+          el(doc, "span", { class: `${BASE}-notice-icon`, html: ICONS.info }),
+          el(doc, "span", { text: `Widths apply on screens wider than ${store.minPaneWidth} px. On this one, the text fills the screen.` }),
+        ),
+      );
+    }
+    const [fontRow, deviceRow] = this.fontRows();
+    if (!store.canSaveSettings) fontRow!.classList.add(`${BASE}-readonly`);
+    const fontPanel = el(doc, "div", `${BASE}-widths`, fontRow!, deviceRow!);
 
     // The guides: each its row, ascending as drawn; Full width a box of its own
     this.guideList = el(doc, "div", { class: `${BASE}-guide-list`, attrs: { role: "list" } });
@@ -195,7 +214,8 @@ export class PageDialog {
     this.fallback.show();
 
     const { bar, panels, select } = tabs(doc, BASE, "swl", [
-      { id: "page", title: "Page", panel: pagePanel },
+      { id: "page", title: "Page width", panel: pagePanel },
+      { id: "font", title: "Font", panel: fontPanel },
       { id: "guides", title: "Guides", panel: guidesPanel },
     ]);
     // (The sliders marked with the guides as typed, as the Page tab shows again)
@@ -255,37 +275,42 @@ export class PageDialog {
     return guides;
   }
 
+  /**
+   * A row of a value: its name (what it is for: this page, all pages, this device) beside a slider, the value typed and
+   * ↺; under them what it follows while it has no value of its own (the field empty, the followed value its
+   * placeholder). Moved or typed in, it is its own; ↺ (shown while it is) takes it back
+   */
+  private rowOf(name: string, controls: HTMLElement, note: HTMLElement, ...more: HTMLElement[]): HTMLElement {
+    return el(this.doc, "div", `${BASE}-row`, el(this.doc, "span", { class: `${BASE}-row-name`, text: name }), controls, note, ...more);
+  }
+
+  /** ↺: the value of its own taken back, what the row follows again */
+  private resetButton(title: string, run: () => void): HTMLButtonElement {
+    return el(this.doc, "button", { class: `${BASE}-reset`, html: ICONS.reset, attrs: { "aria-label": title, title }, run });
+  }
+
   private widthRow(name: string, follows: string, field: Field, inherited: () => number): WidthRow {
     const { doc } = this;
     const store = this.store!;
-    const mode = segmentedControl(
-      doc,
-      SEGMENTS_BASE,
-      `${name}: width`,
-      [
-        { value: "follows", label: follows, title: follows === "Theme" ? "Your theme's width" : "The width of all pages" },
-        { value: "own", label: "Own", title: "A width of its own" },
-      ] as const,
-      field.own ? "own" : "follows",
-      (value) => {
-        field.own = value === "own";
-        // Its own from what it follows, the slider starting where the text is now
-        if (field.own && !field.amount.trim()) field.amount = String(field.unit === "px" ? Math.round(inherited()) : converted(inherited(), "%", store.paneWidth()));
-        show();
-        this.update();
-      },
-    );
     const slider = el(doc, "input", { class: `${BASE}-slider`, attrs: { type: "range", step: "1", "aria-label": `${name}: width` } });
     const ticks = el(doc, "div", { class: `${BASE}-ticks`, attrs: { "aria-hidden": "true" } });
     const amount = el(doc, "input", { class: `${BASE}-amount`, attrs: { type: "number", inputmode: "numeric", step: "1", "aria-label": `${name}: width in ${field.unit}` } });
     let unit: SegmentedControl<WidthUnit> | undefined;
     unit = segmentedControl(doc, SEGMENTS_BASE, `${name}: unit`, UNITS, field.unit, (value) => {
-      const now = Number(field.amount);
-      if (field.amount.trim() && Number.isFinite(now)) field.amount = String(converted(now, value, store.paneWidth()));
+      // (The width it follows converted too: the field shows it, the slider starts from it)
+      const now = field.own ? Number(field.amount) : NaN;
+      if (Number.isFinite(now)) field.amount = String(converted(now, value, store.paneWidth()));
       field.unit = value;
       show();
       this.update();
     });
+    const reset = this.resetButton(`Use ${follows}`, () => {
+      field.own = false;
+      field.amount = "";
+      show();
+      this.update();
+    });
+    const note = el(doc, "div", `${BASE}-row-note`);
     const range = () => {
       const pane = store.paneWidth();
       if (field.unit === "%") return { min: TEXT_WIDTH_LIMITS["%"].min, max: 100 };
@@ -304,28 +329,25 @@ export class PageDialog {
         }),
       );
     };
+    const followed = () => Math.round(field.unit === "px" ? inherited() : converted(inherited(), "%", store.paneWidth()));
     const show = () => {
       const { min, max } = range();
       slider.min = String(min);
       slider.max = String(max);
-      const shown = field.own ? Number(field.amount) : field.unit === "px" ? inherited() : converted(inherited(), "%", store.paneWidth());
+      const shown = field.own ? Number(field.amount) : followed();
       if (Number.isFinite(shown)) slider.value = String(Math.round(shown));
       if (amount.value !== field.amount || !field.own) amount.value = field.own ? field.amount : "";
-      amount.placeholder = String(Math.round(field.unit === "px" ? inherited() : converted(inherited(), "%", store.paneWidth())));
+      amount.placeholder = String(followed());
       amount.setAttribute("aria-label", `${name}: width in ${field.unit}`);
-      // (Never off: moved or typed in, a row following another takes a width of its own)
-      slider.disabled = !this.editable(row);
-      amount.disabled = !this.editable(row);
-      mode.set(field.own ? "own" : "follows");
+      slider.disabled = amount.disabled = reset.disabled = !this.editable(row);
       unit!.set(field.unit);
       row.classList.toggle(`${BASE}-follows`, !field.own);
+      note.textContent = field.own ? "" : `Uses ${follows}`;
       drawTicks();
     };
     this.slides(slider);
     slider.addEventListener("input", () => {
       field.own = true;
-      mode.set("own");
-      row.classList.remove(`${BASE}-follows`);
       // Near a guide: on it, as a widget's bar snaps
       let value = Number(slider.value);
       const pane = store.paneWidth();
@@ -334,151 +356,126 @@ export class PageDialog {
         if (Math.abs(at - value) <= SNAP[field.unit]) value = at;
       }
       field.amount = String(value);
-      amount.value = field.amount;
-      slider.value = field.amount;
+      show();
       this.update();
     });
     amount.addEventListener("input", () => {
       // Typed in: its own width; emptied: the one it follows again
       field.own = !!amount.value.trim();
-      mode.set(field.own ? "own" : "follows");
-      row.classList.toggle(`${BASE}-follows`, !field.own);
       field.amount = amount.value;
       const value = Number(amount.value);
-      if (amount.value.trim() && Number.isFinite(value)) slider.value = String(value);
+      if (field.own && Number.isFinite(value)) slider.value = String(value);
+      row.classList.toggle(`${BASE}-follows`, !field.own);
+      note.textContent = field.own ? "" : `Uses ${follows}`;
       this.update();
     });
-    const row = el(
-      doc,
-      "div",
-      `${BASE}-width-row`,
-      el(doc, "div", `${BASE}-width-head`, el(doc, "span", { class: `${BASE}-width-name`, text: name }), mode.element),
-      el(doc, "div", `${BASE}-width-controls`, el(doc, "div", `${BASE}-slider-box`, slider, ticks), el(doc, "div", `${BASE}-width-value`, amount, unit.element)),
+    const row = this.rowOf(
+      name,
+      el(doc, "div", `${BASE}-width-controls`, el(doc, "div", `${BASE}-slider-box`, slider, ticks), el(doc, "div", `${BASE}-width-value`, amount, unit.element, reset)),
+      note,
     );
+    row.classList.add(`${BASE}-width-row`);
     show();
     return { element: row, field, show };
   }
 
   /**
-   * The font size's row: the theme's or its own, a slider (5 to 40 px) and its number; Font zoom a box; while it is on,
-   * this device's zoom by a slider of its own (at the default's size: none), Reset taking it off
+   * The Font tab: the editor's font size for all pages (the theme's, or its own), and this device's zoom (the size of
+   * all pages, or its own, as Ctrl + scroll sets it), with whether Ctrl + scroll zooms at all; each a slider (5 to 40
+   * px), the size typed and ↺
    */
-  private fontRow(): HTMLElement {
+  private fontRows(): HTMLElement[] {
     const { doc } = this;
     const store = this.store!;
     const field: FontField = (this.font = { own: store.fontSize !== undefined, amount: store.fontSize === undefined ? "" : String(store.fontSize) });
-    this.zoom = store.zoom;
-    const mode = segmentedControl(
-      doc,
-      SEGMENTS_BASE,
-      "Font size",
-      [
-        { value: "follows", label: "Theme", title: "Your theme's font size" },
-        { value: "own", label: "Own", title: "A font size of its own" },
-      ] as const,
-      field.own ? "own" : "follows",
-      (value) => {
-        field.own = value === "own";
-        if (field.own && !field.amount.trim()) field.amount = String(store.themeFontSize());
-        show();
-        this.update();
-      },
-    );
-    const slider = el(doc, "input", {
-      class: `${BASE}-slider`,
-      attrs: { type: "range", step: "1", min: String(FONT_SIZE_LIMITS.min), max: String(FONT_SIZE_LIMITS.max), "aria-label": "Font size" },
+    const sizeSlider = (label: string) =>
+      el(doc, "input", { class: `${BASE}-slider`, attrs: { type: "range", step: "1", min: String(FONT_SIZE_LIMITS.min), max: String(FONT_SIZE_LIMITS.max), "aria-label": label } });
+    const sizeField = (label: string) => el(doc, "input", { class: `${BASE}-amount`, attrs: { type: "number", inputmode: "numeric", step: "1", "aria-label": label } });
+    const controls = (slider: HTMLInputElement, amount: HTMLInputElement, reset: HTMLButtonElement) =>
+      el(doc, "div", `${BASE}-width-controls`, el(doc, "div", `${BASE}-slider-box ${BASE}-slider-plain`, slider), el(doc, "div", `${BASE}-width-value`, amount, el(doc, "span", `${BASE}-unit`, "px"), reset));
+
+    // All pages: the theme's size, or its own
+    const slider = sizeSlider("Font size");
+    const amount = sizeField("Font size in px");
+    const note = el(doc, "div", `${BASE}-row-note`);
+    const reset = this.resetButton("Use your theme's size", () => {
+      field.own = false;
+      field.amount = "";
+      show();
+      this.update();
     });
-    const amount = el(doc, "input", { class: `${BASE}-amount`, attrs: { type: "number", inputmode: "numeric", step: "1", "aria-label": "Font size in px" } });
     const show = () => {
       const shown = field.own ? Number(field.amount) : store.themeFontSize();
       if (Number.isFinite(shown)) slider.value = String(Math.round(shown));
       if (amount.value !== field.amount || !field.own) amount.value = field.own ? field.amount : "";
       amount.placeholder = String(store.themeFontSize());
-      slider.disabled = amount.disabled = !this.editable(row);
-      mode.set(field.own ? "own" : "follows");
+      slider.disabled = amount.disabled = reset.disabled = !this.editable(row);
       row.classList.toggle(`${BASE}-follows`, !field.own);
+      note.textContent = field.own ? "" : "Uses your theme's size";
     };
+    this.slides(slider);
     slider.addEventListener("input", () => {
       field.own = true;
       field.amount = slider.value;
       show();
-      drawDevice();
       this.update();
     });
-    this.slides(slider);
     amount.addEventListener("input", () => {
       field.own = !!amount.value.trim();
       field.amount = amount.value;
       const value = Number(amount.value);
       if (field.own && Number.isFinite(value)) slider.value = String(value);
-      mode.set(field.own ? "own" : "follows");
       row.classList.toggle(`${BASE}-follows`, !field.own);
+      note.textContent = field.own ? "" : "Uses your theme's size";
       this.update();
     });
-    // Font zoom: a box, how it is used said quietly beside it
+    const row = this.rowOf("All pages", controls(slider, amount, reset), note);
+    row.classList.add(`${BASE}-font-row`);
+    show();
+
+    // This device: the size of all pages, or its own (as Ctrl + scroll sets it); Ctrl + scroll on or off, its row there
+    // either way (off: quiet, kept as it is)
+    const device: FontField = (this.device = { own: store.zoom !== undefined, amount: store.zoom === undefined ? "" : String(store.zoom) });
+    const fallback = () => fontSizeOf(this.font).size ?? store.themeFontSize();
+    const zoomSlider = sizeSlider("This device's font size");
+    const zoomAmount = sizeField("This device's font size in px");
+    const zoomNote = el(doc, "div", `${BASE}-row-note`);
+    const zoomReset = this.resetButton("Use the size of all pages", () => {
+      device.own = false;
+      device.amount = "";
+      this.update();
+    });
     this.fontZoom = el(doc, "input", { attrs: { type: "checkbox" } });
     this.fontZoom.checked = store.fontZoom;
-    this.fontZoom.addEventListener("change", () => {
-      drawDevice();
-      this.update();
-    });
-    const zoomBox = el(
-      doc,
-      "label",
-      `${BASE}-zoom`,
-      this.fontZoom,
-      el(doc, "span", `${BASE}-zoom-text`, el(doc, "span", { text: "Font zoom" }), el(doc, "span", { class: `${BASE}-hint`, text: "Ctrl + scroll over the page, Ctrl+0 resets" })),
-    );
-    // This device's zoom (as Ctrl + scroll sets it, on this device alone): a slider from the size the font has without
-    // it, its size, Reset; shown while Font zoom is on
-    const fallback = () => fontSizeOf(this.font).size ?? store.themeFontSize();
-    const zoomSlider = el(doc, "input", {
-      class: `${BASE}-slider`,
-      attrs: { type: "range", step: "1", min: String(FONT_SIZE_LIMITS.min), max: String(FONT_SIZE_LIMITS.max), "aria-label": "This device's font size" },
-    });
-    const zoomValue = el(doc, "span", `${BASE}-device-value`);
-    const reset = el(doc, "button", {
-      class: `${BASE}-reset`,
-      text: "Reset",
-      run: () => {
-        this.zoom = undefined;
-        drawDevice();
-        this.update();
-      },
-    });
-    zoomSlider.addEventListener("input", () => {
-      const size = Number(zoomSlider.value);
-      this.zoom = size === fallback() ? undefined : size;
-      drawDevice();
-      this.update();
-    });
+    this.fontZoom.addEventListener("change", () => this.update());
+    const zoomBox = el(doc, "label", { class: `${BASE}-zoom`, attrs: { title: "Ctrl+0 puts the size of all pages back" } }, this.fontZoom, "Ctrl + scroll zooms here");
     this.slides(zoomSlider);
-    const device = el(
-      doc,
-      "div",
-      `${BASE}-device`,
-      el(doc, "span", { class: `${BASE}-width-name`, text: "This device" }),
-      el(doc, "div", `${BASE}-width-controls`, el(doc, "div", `${BASE}-slider-box ${BASE}-slider-plain`, zoomSlider), el(doc, "div", `${BASE}-width-value`, zoomValue, reset)),
-    );
-    const drawDevice = (this.drawDevice = () => {
-      device.hidden = !this.fontZoom?.checked;
-      zoomSlider.value = String(this.zoom ?? fallback());
-      // (Its size alone: the row above says the default, and a text of changing length moved the slider beside it)
-      zoomValue.textContent = `${this.zoom ?? fallback()} px`;
-      reset.disabled = this.zoom === undefined;
+    zoomSlider.addEventListener("input", () => {
+      device.own = true;
+      device.amount = zoomSlider.value;
+      this.update();
     });
-    const row = el(
-      doc,
-      "div",
-      `${BASE}-width-row ${BASE}-font-row`,
-      el(doc, "div", `${BASE}-width-head`, el(doc, "span", { class: `${BASE}-width-name`, text: "Font size" }), mode.element),
-      el(doc, "div", `${BASE}-width-controls`, el(doc, "div", `${BASE}-slider-box ${BASE}-slider-plain`, slider), el(doc, "div", `${BASE}-width-value`, amount, el(doc, "span", `${BASE}-unit`, "px"))),
-      zoomBox,
-      device,
-    );
-    show();
-    drawDevice();
-    return row;
+    zoomAmount.addEventListener("input", () => {
+      device.own = !!zoomAmount.value.trim();
+      device.amount = zoomAmount.value;
+      this.update();
+    });
+    const deviceRow = this.rowOf("This device", controls(zoomSlider, zoomAmount, zoomReset), zoomNote, zoomBox);
+    deviceRow.classList.add(`${BASE}-device`);
+    // (Drawn again with every change: it follows the size of all pages while it has none of its own)
+    this.drawDevice = () => {
+      const on = !!this.fontZoom?.checked;
+      const shown = device.own ? Number(device.amount) : fallback();
+      if (Number.isFinite(shown)) zoomSlider.value = String(Math.round(shown));
+      if (zoomAmount.value !== device.amount || !device.own) zoomAmount.value = device.own ? device.amount : "";
+      zoomAmount.placeholder = String(fallback());
+      zoomSlider.disabled = zoomAmount.disabled = zoomReset.disabled = !on;
+      deviceRow.classList.toggle(`${BASE}-follows`, !device.own);
+      deviceRow.classList.toggle(`${BASE}-off`, !on);
+      zoomNote.textContent = device.own ? "" : "Uses the size of all pages";
+    };
+    this.drawDevice();
+    return [row, deviceRow];
   }
 
   /**
@@ -564,9 +561,10 @@ export class PageDialog {
     if (!this.page.field.own) this.page.show();
     this.drawDevice?.();
     const font = fontSizeOf(this.font);
-    const problem = page.problem ?? fallback.problem ?? font.problem ?? (badGuide ? rowProblem(badGuide) : undefined);
-    if (!page.problem && !fallback.problem && !font.problem) {
-      store.preview({ pageWidth: page.width, defaultWidth: fallback.width, fontSize: font.size, fontZoom: !!this.fontZoom?.checked, zoom: this.zoom });
+    const zoom = fontSizeOf(this.device);
+    const problem = page.problem ?? fallback.problem ?? font.problem ?? zoom.problem ?? (badGuide ? rowProblem(badGuide) : undefined);
+    if (!page.problem && !fallback.problem && !font.problem && !zoom.problem) {
+      store.preview({ pageWidth: page.width, defaultWidth: fallback.width, fontSize: font.size, fontZoom: !!this.fontZoom?.checked, zoom: zoom.size });
     }
     if (this.saveButton) {
       this.saveButton.textContent = this.saving ? "Saving…" : "Save";
@@ -592,9 +590,9 @@ export class PageDialog {
     return fontSizeOf(this.font).size !== store.fontSize || !!this.fontZoom?.checked !== store.fontZoom;
   }
 
-  /** Whether this device's zoom is set otherwise than it is kept (its slider moved, Reset) */
+  /** Whether this device's zoom is set otherwise than it is kept (its slider moved, typed, ↺) */
   private zoomChanged(): boolean {
-    return this.zoom !== this.store!.zoom;
+    return fontSizeOf(this.device).size !== this.store!.zoom;
   }
 
   /** Esc, × or a press beside it: whether it closes, after asking where changes would be lost */
@@ -616,7 +614,7 @@ export class PageDialog {
     const page = widthOf(this.page.field);
     const fallback = widthOf(this.fallback.field);
     const font = fontSizeOf(this.font);
-    if (page.problem || fallback.problem || font.problem) return;
+    if (page.problem || fallback.problem || font.problem || fontSizeOf(this.device).problem) return;
     this.saving = true;
     this.update();
     const problems: string[] = [];
@@ -634,7 +632,7 @@ export class PageDialog {
       const problem = await store.saveFont(font.size, !!this.fontZoom?.checked).catch((e: unknown) => String(e));
       if (problem) problems.push(`the font size: ${problem}`);
     }
-    if (this.zoomChanged()) store.saveZoom(this.zoom);
+    if (this.zoomChanged()) store.saveZoom(fontSizeOf(this.device).size);
     if (!sameWidth(page.width, store.pageWidth)) {
       const problem = await store.savePage(page.width).catch((e: unknown) => String(e));
       if (problem) problems.push(`this page: ${problem}`);

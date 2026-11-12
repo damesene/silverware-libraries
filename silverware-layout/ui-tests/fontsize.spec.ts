@@ -52,8 +52,9 @@ test("this device's zoom kept across a reload, shown in the dialog, taken off by
   await runCommand(page, PAGE_LAYOUT);
   await expect.poll(() => fontSize(page)).toBe(THEME + 2);
   const dialog = page.locator(".swl-dialog");
-  await expect(dialog.locator(".swl-dialog-device-value")).toHaveText(`${THEME + 2} px`);
-  await dialog.getByRole("button", { name: "Reset" }).click();
+  await dialog.getByRole("tab", { name: "Font" }).click();
+  await expect(dialog.getByRole("spinbutton", { name: "This device's font size in px" })).toHaveValue(`${THEME + 2}`);
+  await dialog.getByRole("button", { name: "Use the size of all pages" }).click();
   await expect.poll(() => fontSize(page)).toBe(THEME);
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
@@ -65,9 +66,12 @@ test("this device's zoom set by its slider in the dialog (as on a phone, which h
   await space.open({ Page: PAGE }, "Page");
   await runCommand(page, PAGE_LAYOUT);
   const dialog = page.locator(".swl-dialog");
-  const value = dialog.locator(".swl-dialog-device-value");
-  await expect(value).toHaveText(`${THEME} px`);
-  const slider = dialog.getByRole("slider", { name: "This device's font size" });
+  await dialog.getByRole("tab", { name: "Font" }).click();
+  const value = dialog.getByRole("spinbutton", { name: "This device's font size in px" });
+  // The size of all pages followed: the field empty, that size its placeholder
+  await expect(value).toHaveValue("");
+  await expect(value).toHaveAttribute("placeholder", `${THEME}`);
+  const slider = dialog.getByRole("slider", { name: "This device's font size", exact: true });
   // Pressed: the dialog clear but for the slider held
   const box = (await slider.boundingBox())!;
   await page.mouse.move(box.x + 2, box.y + box.height / 2);
@@ -82,7 +86,7 @@ test("this device's zoom set by its slider in the dialog (as on a phone, which h
     s.value = "24";
     s.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  await expect(value).toHaveText("24 px");
+  await expect(value).toHaveValue("24");
   await expect.poll(() => fontSize(page)).toBe(24);
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
@@ -94,10 +98,12 @@ test("the font size for every page set in the dialog, shown at once, saved into 
   await space.open({ Page: PAGE }, "Page");
   await runCommand(page, PAGE_LAYOUT);
   const dialog = page.locator(".swl-dialog");
+  await dialog.getByRole("tab", { name: "Font" }).click();
   const row = dialog.locator(".swl-dialog-font-row");
-  await expect(row.getByRole("radio", { name: "Your theme's font size" })).toHaveAttribute("aria-checked", "true");
+  await expect(row).toHaveClass(/swl-dialog-follows/);
+  await expect(row.locator(".swl-dialog-row-note")).toHaveText("Uses your theme's size");
   await row.locator(".swl-dialog-amount").fill("22");
-  await expect(row.getByRole("radio", { name: "A font size of its own" })).toHaveAttribute("aria-checked", "true");
+  await expect(row).not.toHaveClass(/swl-dialog-follows/);
   await expect.poll(() => fontSize(page)).toBe(22);
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
@@ -114,7 +120,8 @@ test("Font zoom off: Ctrl + scroll leaves the font, and the browser's zoom, alon
   await space.open({ Page: PAGE }, "Page");
   await runCommand(page, PAGE_LAYOUT);
   const dialog = page.locator(".swl-dialog");
-  await dialog.getByRole("checkbox", { name: /Font zoom/ }).uncheck();
+  await dialog.getByRole("tab", { name: "Font" }).click();
+  await dialog.getByRole("checkbox", { name: "Ctrl + scroll zooms here" }).uncheck();
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
   await expect.poll(async () => (await space.config()) ?? "").toContain('config.set("silverware.layout.fontZoom.enabled", false)');

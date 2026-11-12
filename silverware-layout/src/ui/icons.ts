@@ -7,4 +7,8 @@ const svg = (body: string) =>
 
 export const ICONS = {
   close: svg('<path d="M6 6l12 12M18 6 6 18"/>'),
+  // Something said, not asked
+  info: svg('<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'),
+  // A value of its own taken back: what it follows again
+  reset: svg('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>'),
 } as const;

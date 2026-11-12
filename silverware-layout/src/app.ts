@@ -183,6 +183,7 @@ export class LayoutApp {
       defaultWidth: state.settings.textWidth,
       guides: state.settings.guides,
       canSaveSettings: store.canSaveSettings,
+      minPaneWidth: state.settings.minPaneWidth,
       paneWidth: () => paneWidth(this.page),
       themeWidth: () => this.page.themeTextWidth(),
       fontSize: state.settings.fontSize,

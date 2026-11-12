@@ -149,7 +149,7 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   flex-direction: column;
   /* (Its border within the height: SilverBullet sets no box-sizing) */
   box-sizing: border-box;
-  width: min(520px, calc(100vw - 24px));
+  width: min(560px, calc(100vw - 24px));
   /* (As high on either tab: it does not jump as they are switched, the footer where it was) */
   min-height: min(560px, calc(var(--sw-view-height, 100dvh) - 32px));
   max-height: min(600px, calc(var(--sw-view-height, 100dvh) - 32px));
@@ -255,23 +255,36 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 .swl-dialog-panel[hidden] {
   display: none;
 }
-/* Page: a row for this page's width and one for all pages', each its name and what it follows or Own, then a slider
-   marked with the guides and the width typed */
+/* Page width and Font: a row a value, its name (where it holds: this page, all pages, this device) at the left, a
+   slider (marked with the guides for a width), the value typed and ↺ at the right, under them what it follows while
+   it has no value of its own */
 .swl-dialog-widths {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   padding: 14px 2px 6px;
 }
-.swl-dialog-width-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
+.swl-dialog-row {
+  display: grid;
+  grid-template-columns: 7em minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: start;
 }
-.swl-dialog-width-name {
+.swl-dialog-row > :not(.swl-dialog-row-name) {
+  grid-column: 2;
+}
+.swl-dialog-row-name {
+  grid-column: 1;
+  grid-row: 1;
+  /* (Level with the slider's track) */
+  padding-top: 5px;
   font-weight: 600;
+}
+.swl-dialog-row-note {
+  min-height: 1.3em;
+  margin-top: 2px;
+  font-size: 12px;
+  opacity: 0.6;
 }
 .swl-dialog-width-controls {
   display: flex;
@@ -289,12 +302,17 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   margin: 6px 0 0;
   accent-color: var(--ui-accent-color);
 }
-/* A row following another: its slider and number quiet, showing the width it follows, its own once moved */
+/* A row following another: its slider quiet, at the value it follows (its field empty, that value its placeholder), no
+   ↺; its own once moved or typed in. A row off (this device's while Ctrl + scroll does not zoom): all of it quiet */
 .swl-dialog-follows .swl-dialog-slider {
   opacity: 0.45;
 }
-.swl-dialog-follows .swl-dialog-amount {
-  color: color-mix(in srgb, var(--root-color) 55%, transparent);
+.swl-dialog-follows .swl-dialog-reset {
+  visibility: hidden;
+}
+.swl-dialog-off .swl-dialog-width-controls,
+.swl-dialog-off .swl-dialog-row-note {
+  opacity: 0.5;
 }
 /* The guides under the slider, at their values: a tick and their width */
 .swl-dialog-ticks {
@@ -399,49 +417,61 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   margin-top: 4px;
   cursor: pointer;
 }
-/* The font size: its slider has no guides under it; Font zoom a box, how it is used said quietly beside it; this
-   device's zoom with Reset */
-.swl-dialog-slider-box.swl-dialog-slider-plain {
-  padding-bottom: 0;
-}
-.swl-dialog-zoom {
+/* What the Page width tab says on a screen too narrow for widths (a phone): quiet, an icon and a line */
+.swl-dialog-notice {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin-top: 12px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--swl-dialog-card);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.swl-dialog-notice-icon {
+  display: inline-flex;
+  flex: none;
+  margin-top: 1px;
+  color: var(--ui-accent-color);
+}
+.swl-dialog-notice-icon svg {
+  width: 16px;
+  height: 16px;
+}
+/* The font size's sliders have no guides under them */
+.swl-dialog-slider-box.swl-dialog-slider-plain {
+  padding-bottom: 0;
+}
+/* Ctrl + scroll on or off, in this device's row, under its note */
+.swl-dialog-zoom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
 }
-.swl-dialog-zoom input {
-  margin-top: 3px;
+/* ↺: an icon button, quiet until pointed at */
+.swl-dialog-reset {
+  display: inline-flex;
+  flex: none;
+  padding: 5px;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  color: inherit;
+  opacity: 0.7;
 }
-.swl-dialog-zoom-text {
-  display: flex;
-  flex-wrap: wrap;
-  column-gap: 8px;
+.swl-dialog-reset:hover,
+.swl-dialog-reset:focus-visible {
+  opacity: 1;
+  background: var(--swl-dialog-card);
 }
-.swl-dialog-hint {
-  opacity: 0.6;
-}
-/* This device's zoom: its name over a slider, its size (or "default") and Reset */
-.swl-dialog-device {
-  margin-top: 12px;
-}
-.swl-dialog-device > .swl-dialog-width-name {
-  display: block;
-  margin-bottom: 6px;
-}
-.swl-dialog-device[hidden] {
-  display: none;
-}
-/* (As wide for 5 px as for 40 px: the slider beside it never moves) */
-.swl-dialog-device-value {
-  width: 3.5em;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
+.swl-dialog-reset svg {
+  width: 16px;
+  height: 16px;
 }
 .swl-dialog-reset:disabled {
-  opacity: 0.4;
+  opacity: 0.3;
 }
 /* A slider held: the dialog all but gone, the controls held alone shown on a quiet ground of their own, so what the
    slider changes is seen on the page under the dialog (on a phone it takes the whole screen) */
@@ -460,15 +490,6 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   border-radius: 8px;
   background: color-mix(in srgb, var(--root-background-color) 88%, transparent);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-}
-.swl-dialog-reset {
-  padding: 3px 10px;
-  background: none;
-  border: 1px solid var(--swl-dialog-line);
-  border-radius: 6px;
-}
-.swl-dialog-reset:hover {
-  border-color: var(--ui-accent-color);
 }
 .swl-dialog-foot {
   display: flex;
@@ -510,6 +531,17 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   .swl-dialog-width-controls {
     flex-direction: column;
     align-items: stretch;
+  }
+  /* (Its name over its slider) */
+  .swl-dialog-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .swl-dialog-row > :not(.swl-dialog-row-name) {
+    grid-column: 1;
+  }
+  .swl-dialog-row-name {
+    grid-row: auto;
+    padding: 0 0 6px;
   }
   .swl-dialog-amount,
   .swl-dialog-guide-amount {

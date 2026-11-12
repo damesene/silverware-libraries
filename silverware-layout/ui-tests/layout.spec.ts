@@ -38,18 +38,21 @@ test("a page's own width in its frontmatter: its text and the top bar at it, a p
 });
 
 // The dialog's rows of the Page tab: this page's width, all pages'
-const rows = (page: import("@playwright/test").Page) => page.locator(".swl-dialog .swl-dialog-width-row");
+// (By what each holds, not by its place: All pages is over This page)
+const row = (page: import("@playwright/test").Page, name: "page" | "all") => page.locator(`.swl-dialog [data-swl-row="${name}"]`);
 
-test("the dialog: a width typed in % shown at once and saved into the frontmatter (typing makes it the page's own); Default takes _layout off", async ({ page, space }) => {
+test("the dialog: a width typed in % shown at once and saved into the frontmatter (typing makes it the page's own); ↺ takes _layout off", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
   await runCommand(page, PAGE_LAYOUT);
   const dialog = page.locator(".swl-dialog");
   await expect(dialog).toBeVisible();
-  const own = rows(page).first();
-  await expect(own.getByRole("radio", { name: "The width of all pages" })).toHaveAttribute("aria-checked", "true");
+  const own = row(page, "page");
+  // All pages' width followed: said under it, no ↺
+  await expect(own).toHaveClass(/swl-dialog-follows/);
+  await expect(own.locator(".swl-dialog-row-note")).toHaveText("Uses all pages' width");
   await own.getByRole("radio", { name: "Percent of the editor's width" }).click();
   await own.locator(".swl-dialog-amount").fill("90");
-  await expect(own.getByRole("radio", { name: "A width of its own" })).toHaveAttribute("aria-checked", "true");
+  await expect(own).not.toHaveClass(/swl-dialog-follows/);
   await expect.poll(() => widthSet(page)).toBe("90%");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
@@ -59,7 +62,7 @@ test("the dialog: a width typed in % shown at once and saved into the frontmatte
   await runCommand(page, PAGE_LAYOUT);
   await expect(own.locator(".swl-dialog-amount")).toHaveValue("90");
   await expect(own.getByRole("radio", { name: "Percent of the editor's width" })).toHaveAttribute("aria-checked", "true");
-  await own.getByRole("radio", { name: "The width of all pages" }).click();
+  await own.getByRole("button", { name: "Use all pages' width" }).click();
   await expect.poll(() => widthSet(page)).toBe("");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect.poll(() => space.saved("Page")).toBe("# Page\n\nSome text.\n");
@@ -68,20 +71,21 @@ test("the dialog: a width typed in % shown at once and saved into the frontmatte
 test("the dialog's slider, moved near a guide, takes the guide's width and makes it the page's own", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
   await runCommand(page, PAGE_LAYOUT);
-  const own = rows(page).first();
+  const own = row(page, "page");
   await expect(own.locator(".swl-dialog-tick")).toHaveText(["900", "1200", "Full"]);
   await own.locator(".swl-dialog-slider").evaluate((slider: HTMLInputElement) => {
     slider.value = "894";
     slider.dispatchEvent(new Event("input", { bubbles: true }));
   });
   await expect(own.locator(".swl-dialog-amount")).toHaveValue("900");
-  await expect(own.getByRole("radio", { name: "A width of its own" })).toHaveAttribute("aria-checked", "true");
+  await expect(own).not.toHaveClass(/swl-dialog-follows/);
   await expect.poll(() => widthSet(page)).toBe("900px");
 });
 
 test("a slider held stays where it was pressed (the dialog all but gone round it): a press near its edge still on it, and it drags", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
   await runCommand(page, PAGE_LAYOUT);
+  await page.locator(".swl-dialog").getByRole("tab", { name: "Font" }).click();
   const slider = page.locator(".swl-dialog").getByRole("slider", { name: "Font size", exact: true });
   const box = (await slider.boundingBox())!;
   const before = Number(await slider.inputValue());
@@ -102,7 +106,7 @@ test("Cancel puts the page back as it was, writing nothing", async ({ page, spac
   await expect.poll(() => widthSet(page)).toBe("1100px");
   await runCommand(page, PAGE_LAYOUT);
   const dialog = page.locator(".swl-dialog");
-  await rows(page).first().locator(".swl-dialog-amount").fill("700");
+  await row(page, "page").locator(".swl-dialog-amount").fill("700");
   await expect.poll(() => widthSet(page)).toBe("700px");
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toBeHidden();
@@ -114,7 +118,7 @@ test("the default text width saved into CONFIG, applying to a page without its o
   await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
   await runCommand(page, PAGE_LAYOUT);
   const dialog = page.locator(".swl-dialog");
-  await rows(page).nth(1).locator(".swl-dialog-amount").fill("1000");
+  await row(page, "all").locator(".swl-dialog-amount").fill("1000");
   await expect.poll(() => widthSet(page)).toBe("1000px");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
@@ -159,8 +163,16 @@ test("a pane narrower than the setting's least gets no width, and gets it back w
   await expect.poll(() => widthSet(page)).toBe("1100px");
   await page.setViewportSize({ width: 500, height: 800 });
   await expect.poll(() => widthSet(page)).toBe("");
+  // The Page width tab says why: the widths show on a wider screen
+  await runCommand(page, PAGE_LAYOUT);
+  const dialog = page.locator(".swl-dialog");
+  await expect(dialog.getByRole("note")).toHaveText("Widths apply on screens wider than 600 px. On this one, the text fills the screen.");
+  await page.screenshot({ path: test.info().outputPath("narrow-dialog.png") });
+  await dialog.getByRole("button", { name: "Cancel" }).click();
   await page.setViewportSize({ width: 1400, height: 800 });
   await expect.poll(() => widthSet(page)).toBe("1100px");
+  await runCommand(page, PAGE_LAYOUT);
+  await expect(dialog.getByRole("note")).toHaveCount(0);
 });
 
 test("a width typed into the frontmatter applies as the page is edited", async ({ page, space }) => {

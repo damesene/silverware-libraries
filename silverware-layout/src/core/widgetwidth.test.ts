@@ -41,34 +41,34 @@ describe("A widget's width", () => {
   it("snapped to the text's width (kept: none), a guide of pixels, of a percent (kept so: the same share in any pane) or full, within 8 px", () => {
     const targets = snapTargets(760, guides, 1600);
     expect(targets.map((t) => [t.name, t.width, t.kept])).toEqual([
-      ["Text width", 760, undefined],
+      ["Page width", 760, undefined],
       ["1200 px", 1200, 1200],
       ["80 %", 1280, "80%"],
       ["Full width", 1560, "full"],
     ]);
     expect(snapped(1285, targets)).toEqual({ width: 1280, kept: "80%", name: "80 %" });
     expect(snapTargets(760, guides, 1000).find((t) => t.kept === "80%")?.width).toBe(800);
-    expect(snapped(765, targets)).toEqual({ width: 760, kept: undefined, name: "Text width" });
+    expect(snapped(765, targets)).toEqual({ width: 760, kept: undefined, name: "Page width" });
     expect(snapped(1193, targets)).toEqual({ width: 1200, kept: 1200, name: "1200 px" });
     expect(snapped(1555, targets)).toEqual({ width: 1560, kept: "full", name: "Full width" });
     expect(snapped(900.4, targets)).toEqual({ width: 900, kept: 900 });
   });
 
   it("only the guides a drag reaches: none of pixels wider than the pane, none under the narrowest a drag makes", () => {
-    expect(snapTargets(760, guides, 1000).map((t) => t.name)).toEqual(["Text width", "80 %", "Full width"]);
-    expect(snapTargets(760, ["10%", 300], 1600).map((t) => t.name)).toEqual(["Text width", "300 px"]);
+    expect(snapTargets(760, guides, 1000).map((t) => t.name)).toEqual(["Page width", "80 %", "Full width"]);
+    expect(snapTargets(760, ["10%", 300], 1600).map((t) => t.name)).toEqual(["Page width", "300 px"]);
   });
 
   it("one target of a width (to the pixel), the first: the line shown, the name said and the width kept are one guide's", () => {
     // 80 % of 1500 px is 1200 px, as a guide of 1200 px: the first given is the one
     const targets = snapTargets(760, [1200, "80%", "full"], 1500);
-    expect(targets.map((t) => t.name)).toEqual(["Text width", "1200 px", "Full width"]);
+    expect(targets.map((t) => t.name)).toEqual(["Page width", "1200 px", "Full width"]);
     expect(snapped(1199, targets)).toEqual({ width: 1200, kept: 1200, name: "1200 px" });
     // A guide as wide as the text: the text's
-    expect(snapTargets(760, [760, 1200], 1600).map((t) => t.name)).toEqual(["Text width", "1200 px"]);
+    expect(snapTargets(760, [760, 1200], 1600).map((t) => t.name)).toEqual(["Page width", "1200 px"]);
   });
 
   it("named: the text's width, a guide's pixels or percent, Full width", () => {
-    expect([undefined, 1200, "80%" as const, "full" as const].map(widthName)).toEqual(["Text width", "1200 px", "80 %", "Full width"]);
+    expect([undefined, 1200, "80%" as const, "full" as const].map(widthName)).toEqual(["Page width", "1200 px", "80 %", "Full width"]);
   });
 });

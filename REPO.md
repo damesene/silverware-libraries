@@ -44,6 +44,14 @@ uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-datab
 ```
 
 ```#meta/library/remote
+name: Silverware Layout
+description: "The width of a page's text (its own or a default for every page) and of its tables, databases and charts, wider or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll."
+author: damesene
+website: https://github.com/damesene/silverware-libraries/tree/main/silverware-layout
+uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md
+```
+
+```#meta/library/remote
 name: Silverware Icons
 description: "Monochrome icons (Lucide) and emoji for the other Silverware plugins, drawn in the colors of your theme, and sets of icons of your own."
 author: damesene

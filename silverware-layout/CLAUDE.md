@@ -1,6 +1,6 @@
 # Silverware Layout
 
-The layout of a page: its text's width (the page's own, a default for every page) and widgets' widths (laid out and changed by their handle; Silverware Table registers its tables, Database and Chart are next) (prefix `swl-`, settings and API under `silverware.layout`). The plan, the probes' results and every decision: [docs/silverware-layout.md](../docs/silverware-layout.md) (*Steps* says what is done). User docs: `silverware-layout.md`; the code pages `-init.md` (settings, the bridge, the command, the events), `-api.md` (priority 50: `silverware.layout.api`), `-style.md`. Version 0.1.0, not listed in REPO.md until it is usable.
+The layout of a page: its text's width (the page's own, a default for every page), widgets' widths (laid out and changed by their handle; Silverware Table, Database and Chart register theirs) and the editor's font size with font zoom (prefix `swl-`, settings and API under `silverware.layout`). The plan, the probes' results and every decision: [docs/silverware-layout.md](../docs/silverware-layout.md) (*Steps* says what is done). User docs: `silverware-layout.md`; the code pages `-init.md` (settings, the bridge, the command, the events), `-api.md` (priority 50: `silverware.layout.api`), `-style.md`. Listed in REPO.md since 1.0.0.
 
 ## Mental model
 

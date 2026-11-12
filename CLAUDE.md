@@ -10,7 +10,7 @@
 | Silverware Chart | `silverware-chart/` | `swc-` | `silverware-chart/CLAUDE.md`, docs/silverware-chart.md |
 | Silverware Database | `silverware-database/` | `swd-` | `silverware-database/CLAUDE.md`, docs/silverware-database.md |
 | Silverware Icons | `silverware-icons/` | `swi-` | `silverware-icons/CLAUDE.md`, docs/silverware-icons.md (a library for the other plugins, nothing on its own) |
-| Silverware Layout | `silverware-layout/` | `swl-` | `silverware-layout/CLAUDE.md`, docs/silverware-layout.md (in development: the text's width, widgets' widths, the font size) |
+| Silverware Layout | `silverware-layout/` | `swl-` | `silverware-layout/CLAUDE.md`, docs/silverware-layout.md, docs/silverware-layout-font-size.md |
 
 docs/ holds each plugin's plan and decision log; a plugin's library page (`silverware-<name>.md`) is its user documentation.
 

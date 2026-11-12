@@ -98,6 +98,28 @@ test.describe("The held header", () => {
     expect((await look()).held).toBe(false);
   });
 
+  test("a table with a maximum height, its box taken up past the view's top: its header held no further than the box, gone with it, no dot of the + left", async ({ page }) => {
+    await setSettings(page, { "silverware.table.maxHeight": 300 });
+    const rows = Array.from({ length: 40 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n");
+    const filler = Array.from({ length: 40 }, (_, i) => `Line ${i + 1}.`).join("\n\n");
+    await setPage(page, `# Test\n\nText above.\n\n| Name | Qty |\n|---|---|\n${rows}\n\n${filler}\n`);
+    // A cell selected: the table has the focus, its dots show
+    await table(page).locator("tr[data-swt-row]").first().locator("td").first().click();
+    const dots = page.locator(".swt-insert-dots.swt-visible > span:not([hidden])");
+    await expect(dots.first()).toBeVisible();
+    // The page scrolled so the box's bottom is 20 px above the view's top (its table, longer, still below it)
+    await page.evaluate(() => {
+      const scroller = document.querySelector(".cm-scroller")!;
+      const box = document.querySelector(".sb-table-widget")!;
+      scroller.scrollTop += box.getBoundingClientRect().bottom - scroller.getBoundingClientRect().top + 20;
+    });
+    await settled(page);
+    const at = await table(page).evaluate((w) => ({ head: w.querySelector("thead")!.getBoundingClientRect().bottom, box: w.getBoundingClientRect().bottom, view: document.querySelector(".cm-scroller")!.getBoundingClientRect().top }));
+    expect(at.box).toBeLessThan(at.view);
+    expect(at.head).toBeLessThanOrEqual(at.box + 0.5);
+    await expect(dots).toHaveCount(0);
+  });
+
   test("the room above it is covered whole in the page's color: no row shows between the view's top and the header", async ({ page }) => {
     const rows = Array.from({ length: 60 }, (_, i) => `| Row ${i + 1} | ${i * 3} |`).join("\n");
     await setPage(page, `# Test\n\nText above.\n\n| Name | Qty |\n|---|---|\n${rows}\n\nText below.\n`);

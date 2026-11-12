@@ -19,7 +19,7 @@ import { inTextLine, renderedTable, WIDGET_SELECTOR } from "../dom.ts";
 import { coveredAt, underWindow } from "./overwindow.ts";
 import { appendColumnAt, appendRowAt } from "../pins.ts";
 import type { RowHold, TableHost, WidgetInfo } from "./feature.ts";
-import { heldBounds, type Rect } from "./geometry.ts";
+import { heldBounds, intersect, isEmpty, type Rect } from "./geometry.ts";
 import { insertColumnWith, insertRowWith } from "./structure.ts";
 import type { TableKey } from "./tables.ts";
 
@@ -201,10 +201,10 @@ export class InsertControls {
     const hovered = this.context.hovered();
     // No table hovered: the band of the table with the focus (its dots show), so the pointer may come to a dot from
     // outside the table; only that one table is measured, no table of the page is looked for
-    const fromFocus = !hovered.widget && this.focusedWidget?.isConnected ? this.focusedWidget : undefined;
-    // (Away from that band: nothing is measured on a move over the page)
-    const band = this.focusedBand;
-    if (fromFocus && band && !(e.clientX >= band.left && e.clientX <= band.right && e.clientY >= band.top && e.clientY <= band.bottom)) return this.hide();
+    // (No band while that table is out of view; away from the band nothing is measured on a move over the page)
+    const band = !hovered.widget && this.focusedWidget?.isConnected ? this.focusedBand : undefined;
+    if (band && !(e.clientX >= band.left && e.clientX <= band.right && e.clientY >= band.top && e.clientY <= band.bottom)) return this.hide();
+    const fromFocus = band && this.focusedWidget;
     const widget = hovered.widget ?? fromFocus;
     const hoverCell = fromFocus ? undefined : hovered.cell;
     const info = widget && host.infoOf(widget);
@@ -338,15 +338,16 @@ export class InsertControls {
     this.focusedWidget = focus?.widget;
     this.focusedBand = undefined;
     const points: (readonly [number, number])[] = [];
-    if (focus) {
-      const { widget, info } = focus;
-      const shown = host.shownRect(widget, info);
-      const view = host.viewBounds(widget);
-      const headerTop = info.table.rows[0]!.getBoundingClientRect().top;
-      this.focusedBand = { left: shown.left - INSERT_LANE_BAND, right: shown.right + INSERT_LANE_PAST, top: headerTop - INSERT_LANE_BAND, bottom: shown.bottom + INSERT_LANE_PAST };
+    const shown = focus && host.shownRect(focus.widget, focus.info);
+    const view = focus && host.viewBounds(focus.widget);
+    // A table scrolled out of view has none
+    if (focus && shown && view && !isEmpty(intersect(shown, view))) {
+      const { info } = focus;
+      const header = info.table.rows[0]!.getBoundingClientRect();
+      this.focusedBand = { left: shown.left - INSERT_LANE_BAND, right: shown.right + INSERT_LANE_PAST, top: header.top - INSERT_LANE_BAND, bottom: shown.bottom + INSERT_LANE_PAST };
       const rowX = shown.left - INSERT_LANE_AT;
       for (const { edge } of rowLines(host, info, shown, view.top, view.bottom).edges) points.push([rowX, edge]);
-      const columnY = headerTop - INSERT_LANE_AT;
+      const columnY = header.top - INSERT_LANE_AT;
       if (columnY >= view.top && columnY <= view.bottom) {
         // A border between columns is both columns' edge: one dot
         const seen = new Set<number>();
@@ -417,7 +418,7 @@ function rowLines(host: TableHost, info: WidgetInfo, shown: Rect, from: number, 
     .filter((row) => row.bottom > row.top + 1);
   const edges = rows
     .map((row, i) => ({ edge: row.edge, i }))
-    .filter(({ edge, i }) => edge >= from && edge <= to && (!body(rows[i]!.tr) || (edge >= held.top - 1 && edge <= held.bottom + 1)));
+    .filter(({ edge, i }) => edge >= from && edge <= to && edge >= shown.top - 1 && edge <= shown.bottom + 1 && (!body(rows[i]!.tr) || (edge >= held.top - 1 && edge <= held.bottom + 1)));
   return { rows, edges };
 }
 

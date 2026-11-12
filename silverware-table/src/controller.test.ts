@@ -387,6 +387,31 @@ describe("Controller", () => {
     expect(await dots()).toEqual([]);
   });
 
+  it("takes the dots away once the table scrolled out of view, its held header cut by its box still measuring where it was held", async () => {
+    localStorage.removeItem("silverware.table.editMode");
+    await setup(PAGE);
+    layOutTable();
+    await focusOn(1, 0);
+    expect(await dots()).toHaveLength(7);
+    // Scrolled up out of view: the table and its rows above the window, the header still held at 120..150
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      const tr = this.closest("tr");
+      if (tr && this.closest(".sb-table-widget")) {
+        const index = (tr as HTMLTableRowElement).rowIndex;
+        const top = index === 0 ? 120 : -400 + index * 30;
+        return this instanceof HTMLTableCellElement ? new DOMRect(100 + this.cellIndex * 150, top, 150, 30) : new DOMRect(100, top, 300, 30);
+      }
+      if (this.matches(".sb-table-widget, table")) return new DOMRect(100, -400, 300, 120);
+      return new DOMRect(0, 0, 0, 0);
+    });
+    window.dispatchEvent(new Event("scroll"));
+    expect(await dots()).toEqual([]);
+    // Nor a + where its dots were
+    (controller as unknown as { hideFloating(): void }).hideFloating();
+    move(87, 107);
+    expect(document.querySelector(".swt-insert")!.classList.contains("swt-visible")).toBe(false);
+  });
+
   it("gives a table being edited the dots, kept as Esc leaves its cell selected", async () => {
     await setup(PAGE);
     layOutTable();
@@ -888,6 +913,23 @@ describe("Controller", () => {
       await settle();
       expect(widget.classList.contains("swt-sticky-native")).toBe(false);
       expect(document.querySelector<HTMLElement>("thead")!.style.transform).toMatch(/^translateY\(/);
+    });
+
+    it("holds the header of a table scrolling in a box of its own no further than the box's bottom, as the page takes the box up past the view", async () => {
+      await setup(PAGE);
+      layOut(5000);
+      const widget = editor.querySelector<HTMLElement>(".sb-table-widget")!;
+      // A box 100 high its 300 high table scrolls in (a maximum height)
+      Object.defineProperty(widget, "clientHeight", { configurable: true, value: 100 });
+      Object.defineProperty(widget, "scrollHeight", { configurable: true, value: 300 });
+      Object.defineProperty(widget, "clientWidth", { configurable: true, value: 800 });
+      Object.defineProperty(document.querySelector("thead")!, "offsetHeight", { configurable: true, value: 30 });
+      // The page scrolled 150 past the box's top: the box ends 50 above the view's top, the table 150 below it
+      scroller.scrollTop = 1150;
+      scroller.dispatchEvent(new Event("scroll"));
+      for (let i = 0; i < 3; i++) await new Promise((resolve) => requestAnimationFrame(resolve));
+      // Held at the box's bottom (100 less the header's 30), not at the view's top (150 + STICKY_GAP): out of view with its box
+      expect(document.querySelector<HTMLElement>("thead")!.style.transform).toBe("translateY(70px)");
     });
 
     it("keeps the toolbar above a header held at the top while the page scrolls, not over a column's name", async () => {

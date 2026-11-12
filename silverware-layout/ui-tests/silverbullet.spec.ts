@@ -1,6 +1,6 @@
-// What Silverware Layout takes of SilverBullet's page, checked against SilverBullet itself: where a new version changes
-// one, the test names it (the other tests would fail somewhere further on, or not at all where the playground stands in
-// for SilverBullet). docs/silverware-layout.md, probes 1 to 3 and *Steps*.
+// What Silverware Layout takes of SilverBullet's page (its host, src/host/silverbullet/dom.ts), checked against
+// SilverBullet itself: where a new version changes one, the test names it (the other tests would fail somewhere further
+// on, or not at all where the playground stands in for SilverBullet). docs/silverware-layout.md, probes 1 to 3.
 import type { Page } from "@playwright/test";
 import { expect, test } from "./helpers.ts";
 
@@ -25,7 +25,7 @@ async function dragTable(page: Page, dx: number): Promise<void> {
   await page.mouse.move(at.x + dx, at.y + at.height / 2, { steps: 5 });
 }
 
-test("SilverBullet's page as Silverware Layout takes it: the editor's text, its pane a size container, the scroller a stacking context the guides lie in", async ({ page, space }) => {
+test("SilverBullet's page as Silverware Layout takes it: its content and editor found and marked, its pane's width given, the scroller a stacking context the guides lie in", async ({ page, space }) => {
   await space.open({ Page: PAGE }, "Page");
   const found = await page.evaluate(() => {
     const editor = document.querySelector("#sb-editor");
@@ -42,17 +42,23 @@ test("SilverBullet's page as Silverware Layout takes it: the editor's text, its 
         /paint|layout|strict|content/.test(style.contain));
     return {
       editor: !!editor,
-      // The pane's width a widget is held to (100cqw in the style page)
-      container: editor ? getComputedStyle(editor).containerType : "",
+      // The pane's width a widget is held to, as Silverware Layout gives it to its style page
+      paneWidth: Math.round(editor?.getBoundingClientRect().width ?? 0),
+      paneGiven: Math.round(parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--swl-pane-width")) || 0),
       content: !!content,
+      // Silverware Layout's marks, which its style page reads (no rule of it names SilverBullet's elements)
+      contentMarked: !!content?.hasAttribute("data-swl-content"),
+      editorMarked: !!document.querySelector("#sb-main .cm-editor")?.hasAttribute("data-swl-editor"),
       stacking,
       // The text's width, SilverBullet's own variable on the root
       editorWidth: getComputedStyle(document.documentElement).getPropertyValue("--editor-width").trim(),
     };
   });
   expect(found.editor, "#sb-editor, the editor's pane").toBe(true);
-  expect(found.container, "#sb-editor a size container (container-type)").toMatch(/size/);
+  expect(found.paneGiven, "--swl-pane-width, the pane's width").toBe(found.paneWidth);
   expect(found.content, ".cm-content in .cm-scroller").toBe(true);
+  expect(found.contentMarked, ".cm-content marked data-swl-content").toBe(true);
+  expect(found.editorMarked, "#sb-main .cm-editor marked data-swl-editor").toBe(true);
   expect(found.stacking, ".cm-scroller a stacking context (the guides at z-index -1 in it lie under the widgets)").toBe(true);
   expect(found.editorWidth, "--editor-width on the root").not.toBe("");
 

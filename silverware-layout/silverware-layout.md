@@ -56,7 +56,7 @@ The **Font size** row of the dialog's Page tab sets the editor's font size on ev
 
 ## Guides
 
-The widths a widget snaps to, and the page's sliders are marked with. Change them in the dialog's **Guides** tab: type a width in its row, × takes one away, **+ Add guide** adds one, **Full width** is the editor's whole width. They show from the narrowest. Saved into your CONFIG, in a block of Silverware Layout's own.
+The widths a widget snaps to, and the page's sliders are marked with. Change them in the dialog's **Guides** tab: type a width in its row, in **px** or in **%** of the editor's width (the px / % switch beside it), × takes one away, **+ Add guide** adds one, **Full width** is the editor's whole width. They show from the narrowest. A widget snapped to a guide in % keeps that share of the editor (`layout.width: 80%`): in a wider or narrower window it is still at the guide. Saved into your CONFIG, in a block of Silverware Layout's own.
 
 ## Settings
 
@@ -72,7 +72,7 @@ config.set("silverware.layout.fontZoom.enabled", true)
 
 - `textWidth`: the default text width, in px or % (empty: your theme's).
 - `minPaneWidth`: where the editor is narrower than this (px), as on a phone, Silverware Layout sets no width: the text is as wide as the screen. Wider again (a phone turned), the widths come back.
-- `guides`: the guides (see above), each a width in px, or `full` for the editor's whole width.
+- `guides`: the guides (see above), each a width in px (`"1200px"`), in % of the editor's width (`"80%"`), or `full` for the editor's whole width.
 - `fontSize`: the editor's font size on every page, in px (empty: your theme's).
 - `fontZoom.enabled`: whether Ctrl + scroll and Ctrl+0 zoom the font (see above).
 

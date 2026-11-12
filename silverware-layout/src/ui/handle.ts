@@ -220,13 +220,9 @@ export class WidthHandle<W> {
   private showGuides(): void {
     this.clearGuides();
     const pane = this.host.paneWidth();
-    const widths = new Set<number>();
+    // (The targets a drag can reach, one of a width: the lines are what it snaps to)
     for (const target of snapTargets(this.host.textWidth(), this.host.guides(), pane)) {
-      // (A guide wider than the pane is not reached: no line; one of the same width as another, one line)
-      if (typeof target.kept === "number" && target.kept > pane - PANE_GUTTER) continue;
       const width = Math.round(target.width);
-      if (widths.has(width)) continue;
-      widths.add(width);
       const left = el(this.doc, "div", `${BASE}-guide`);
       const right = el(this.doc, "div", { class: `${BASE}-guide`, attrs: { "data-swl-guide": target.name } }, el(this.doc, "span", { class: `${BASE}-guide-label`, text: target.name }));
       (this.host.guideLayer() ?? this.doc.body).append(left, right);

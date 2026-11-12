@@ -8,7 +8,8 @@ import stylePage from "../silverware-layout/silverware-layout-style.md";
 import type { LayoutChanges, LayoutEntries, LayoutProvider } from "../shared/layout.ts";
 import { layoutOf } from "../shared/layout.ts";
 import { Registry } from "../silverware-layout/src/core/registry.ts";
-import { markNarrow, paneWidth } from "../silverware-layout/src/host/silverbullet/dom.ts";
+import { markNarrow, paneWidth, showPaneWidth } from "../silverware-layout/src/host/marks.ts";
+import { silverBulletPage } from "../silverware-layout/src/host/silverbullet/dom.ts";
 import { DEFAULT_MIN_PANE_WIDTH, DEFAULT_GUIDES, type Guide } from "../silverware-layout/src/model/settings.ts";
 import { layOutWidgets } from "../silverware-layout/src/widgetlayout.ts";
 import { flash, setUpTheme } from "./common.ts";
@@ -71,14 +72,20 @@ const provider: LayoutProvider = {
 };
 
 const registry = new Registry((message) => flash(message, "error"));
-const enabled = () => paneWidth(document) >= DEFAULT_MIN_PANE_WIDTH;
-const narrow = () => markNarrow(document, !enabled());
-narrow();
-window.addEventListener("resize", narrow);
-// The guides: the default, or the page's ?guides=780,800,full (guides near each other, their names in rows)
+// The page as SilverBullet's (the playground's editor imitates it)
+const page = silverBulletPage(document);
+const enabled = () => paneWidth(page) >= DEFAULT_MIN_PANE_WIDTH;
+// The pane's width and whether it is narrow, as the app gives them to the style page
+const paneShown = () => {
+  showPaneWidth(document, paneWidth(page));
+  markNarrow(document, !enabled());
+};
+paneShown();
+window.addEventListener("resize", paneShown);
+// The guides: the default, or the page's ?guides=780,800,50%,full (guides near each other, their names in rows)
 const asked = new URLSearchParams(location.search).get("guides");
-const guides: readonly Guide[] = asked ? asked.split(",").map((guide) => (guide === "full" ? "full" : Number(guide))) : DEFAULT_GUIDES;
-layOutWidgets(document, registry, { guides: () => guides, enabled, problem: (message) => flash(message, "error") });
+const guides: readonly Guide[] = asked ? asked.split(",").map((guide): Guide => (guide === "full" ? "full" : guide.endsWith("%") ? (guide as Guide) : Number(guide))) : DEFAULT_GUIDES;
+layOutWidgets(document, page, registry, { guides: () => guides, enabled, problem: (message) => flash(message, "error") });
 // Registered as a widget plugin does, through the API its init page hands over
 layoutOf(registry.api()).register(provider);
 showKept();

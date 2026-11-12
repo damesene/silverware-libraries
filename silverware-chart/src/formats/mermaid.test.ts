@@ -143,6 +143,7 @@ describe("Silverware Layout's entries in a Mermaid chart", () => {
   it("read from `%% layout.<key>` comments into the model's layout, for an xychart and a pie", () => {
     expect((readMermaid(`${EXAMPLE}\n%% layout.width: 1100`) as ChartModel).layout).toEqual({ width: "1100" });
     expect((readMermaid('pie\n  "a" : 1\n%% layout.width: full') as ChartModel).layout).toEqual({ width: "full" });
+    expect((readMermaid(`${EXAMPLE}\n%% layout.width: 80%`) as ChartModel).layout).toEqual({ width: "80%" });
     expect((readMermaid(EXAMPLE) as ChartModel).layout).toBeUndefined();
   });
 

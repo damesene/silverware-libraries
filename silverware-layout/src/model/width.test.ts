@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cssWidth, readWidth, sameWidth, storedWidth, validateTextWidth } from "./width.ts";
+import { cssWidth, readTextWidth, readWidth, sameWidth, storedWidth, validateTextWidth } from "./width.ts";
 
 describe("A width", () => {
   it("read from what a page or a setting holds: a number is pixels, text a number with px or %", () => {
@@ -26,6 +26,12 @@ describe("A width", () => {
     expect(cssWidth({ amount: 90, unit: "%" })).toBe("90%");
     expect(storedWidth({ amount: 1100, unit: "px" })).toBe(1100);
     expect(storedWidth({ amount: 90, unit: "%" })).toBe("90%");
+  });
+
+  it("a text's width typed by hand read only within its limits: 0, 5 or 5 % would collapse the text", () => {
+    expect(readTextWidth(1100)).toEqual({ amount: 1100, unit: "px" });
+    expect(readTextWidth("90%")).toEqual({ amount: 90, unit: "%" });
+    expect([0, 5, -100, "5%", "200%", 20000].map(readTextWidth)).toEqual(Array(6).fill(undefined));
   });
 
   it("compared by amount and unit", () => {

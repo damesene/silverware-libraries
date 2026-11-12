@@ -1,13 +1,25 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { Registry } from "../../core/registry.ts";
+import { Registry } from "../core/registry.ts";
+import type { PageHost } from "./page.ts";
 import { Widgets } from "./widgets.ts";
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+/** A page of no host's: its content the element of class `content` */
+const page: PageHost = {
+  content: () => document.querySelector<HTMLElement>(".content") ?? undefined,
+  editor: () => undefined,
+  pane: () => document.body,
+  view: () => ({ top: 0, bottom: 800 }),
+  guideLayer: () => undefined,
+  showTextWidth: () => undefined,
+  themeTextWidth: () => 0,
+};
+
 describe("Widgets", () => {
   it("reads what a widget keeps once for a batch of changes, however many of its nodes came in it", async () => {
-    document.body.innerHTML = `<div class="cm-content"><div class="cm-line"><div class="w" data-key="a"></div></div></div>`;
+    document.body.innerHTML = `<div class="content"><div class="line"><div class="w" data-key="a"></div></div></div>`;
     const reads: string[] = [];
     const registry = new Registry(() => undefined);
     registry.register({
@@ -19,7 +31,7 @@ describe("Widgets", () => {
       },
       write: async () => undefined,
     });
-    new Widgets(document, registry, () => undefined).start();
+    new Widgets(document, page, registry, () => undefined).start();
     expect(reads).toEqual(["a"]);
     reads.length = 0;
 
@@ -29,7 +41,7 @@ describe("Widgets", () => {
     const other = document.createElement("div");
     other.className = "w";
     other.dataset.key = "b";
-    document.querySelector(".cm-line")!.append(other);
+    document.querySelector(".line")!.append(other);
     await flush();
     expect(reads.sort()).toEqual(["a", "b"]);
     expect(other.getAttribute("data-swl-width")).toBe("1000");

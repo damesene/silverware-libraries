@@ -49,7 +49,7 @@ config.define("silverware.layout", {
     },
     guides = {
       type = "array",
-      description = "The widths a drag snaps to and shows a guide at, in px (\"1200px\"), or full (the editor's width). Set in the Page layout dialog (Guides), kept in Silverware Layout's own block of CONFIG.",
+      description = "The widths a drag snaps to and shows a guide at, in px (\"1200px\"), in % of the editor's width (\"80%\"), or full (the editor's width). Set in the Page layout dialog (Guides), kept in Silverware Layout's own block of CONFIG.",
       items = { type = "string" },
     },
   },

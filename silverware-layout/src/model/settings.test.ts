@@ -18,7 +18,7 @@ describe("Silverware Layout's settings", () => {
   });
 
   it("guides from Lua (an object of 1, 2, …), each once, one not read left out, an empty list kept empty", () => {
-    expect(readSettings(configured({ [PATHS.guides]: { 1: "900px", 2: "900", 3: "wide", 4: "90%", 5: 50, 6: "full" } })).guides).toEqual([900, "full"]);
+    expect(readSettings(configured({ [PATHS.guides]: { 1: "900px", 2: "900", 3: "wide", 4: "90%", 5: 50, 6: "full", 7: "5%", 8: "120%", 9: "90 %" } })).guides).toEqual([900, "90%", "full"]);
     expect(readSettings(configured({ [PATHS.guides]: {} })).guides).toEqual([]);
   });
 
@@ -26,13 +26,17 @@ describe("Silverware Layout's settings", () => {
     expect(readSettings(configured({ [PATHS.textWidth]: "wide", [PATHS.minPaneWidth]: "600" }))).toMatchObject({ textWidth: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH });
   });
 
-  it("a guide named by its width, checked, kept as the configuration writes it", () => {
+  it("a guide named by its width, checked, kept as the configuration writes it: pixels, a percent of the pane, full", () => {
     expect(guideName(1200)).toBe("1200 px");
+    expect(guideName("80%")).toBe("80 %");
     expect(guideName("full")).toBe("Full width");
     expect(validateGuide(900)).toBeUndefined();
     expect(validateGuide(150)).toBe("A guide is a whole number of 200 to 10000 px");
     expect(validateGuide(900.5)).toBe("A guide is a whole number of 200 to 10000 px");
-    expect(keptGuides([900, "full"])).toEqual(["900px", "full"]);
+    expect(validateGuide(80, "%")).toBeUndefined();
+    expect(validateGuide(5, "%")).toBe("A guide is a whole number of 10 to 100 %");
+    expect(validateGuide(101, "%")).toBe("A guide is a whole number of 10 to 100 %");
+    expect(keptGuides([900, "80%", "full"])).toEqual(["900px", "80%", "full"]);
   });
 
   it("a font size read from a number or px, checked: 5 to 40 px, whole; anything else none", () => {

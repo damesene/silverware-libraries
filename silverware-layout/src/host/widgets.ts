@@ -1,15 +1,17 @@
 // Widgets laid out (docs/silverware-layout.md, *How a width is shown*, probes 1 and 3): each element a provider's
-// selector matches in the editor's content is given the width its entries keep, as SilverBullet renders it (anew after
-// every edit of it). A MutationObserver on `.cm-content` sees it before the browser paints, so it is never shown at the
-// text's width first. What is set is the widget's own element (`data-swl-width`, `--swl-width`), never CodeMirror's line
-// around it, whose attributes CodeMirror takes back; the style page's rule sizes it. A widget out of the page's flow
-// (marked `data-silverware-over-window`, or in an element marked so) is left to its plugin.
-import type { LayoutProvider } from "../../../../shared/layout.ts";
-import { OVER_WINDOW_ATTRIBUTE } from "../../../../shared/overwindow.ts";
-import type { Registry } from "../../core/registry.ts";
-import { cssWidgetWidth, keptWidgetWidth, readWidgetWidth, type WidgetWidth } from "../../core/widgetwidth.ts";
+// selector matches in the page's content (its host's, host/page.ts) is given the width its entries keep, as the host
+// renders it (SilverBullet: anew after every edit of it). A MutationObserver on the content sees it before the browser
+// paints, so it is never shown at the text's width first. What is set is the widget's own element (`data-swl-width`,
+// `--swl-width`), never the host's element around it (CodeMirror takes its lines' attributes back); the style page's
+// rule sizes it, in the content marked `data-swl-content`. A widget out of the page's flow (marked
+// `data-silverware-over-window`, or in an element marked so) is left to its plugin.
+import type { LayoutProvider } from "../../../shared/layout.ts";
+import { OVER_WINDOW_ATTRIBUTE } from "../../../shared/overwindow.ts";
+import type { Registry } from "../core/registry.ts";
+import { cssWidgetWidth, keptWidgetWidth, readWidgetWidth, type WidgetWidth } from "../core/widgetwidth.ts";
+import { markContent, textWidthOf } from "./marks.ts";
+import type { PageHost } from "./page.ts";
 
-const CONTENT_SELECTOR = ".cm-content";
 const WIDTH_ATTRIBUTE = "data-swl-width";
 const WIDTH_VARIABLE = "--swl-width";
 
@@ -22,11 +24,12 @@ export class Widgets {
 
   constructor(
     private readonly doc: Document,
+    private readonly page: PageHost,
     private readonly registry: Registry,
     private readonly problem: (message: string) => void,
   ) {}
 
-  /** Laying out from now on: the editor's content watched (once it is there), every widget laid out again as providers change */
+  /** Laying out from now on: the page's content watched (once it is there), every widget laid out again as providers change */
   start(): void {
     this.registry.onChanged(() => this.layOutAll());
     this.watch();
@@ -36,8 +39,9 @@ export class Widgets {
     const win = this.doc.defaultView;
     if (!win) return;
     this.observer?.disconnect();
-    this.content = this.doc.querySelector(CONTENT_SELECTOR) ?? undefined;
-    // (No editor yet: the document watched until one is there)
+    this.content = this.page.content();
+    if (this.content) markContent(this.content);
+    // (No content yet: the document watched until it is there)
     const watched = this.content ?? this.doc.body;
     if (!watched) return;
     this.observer = new win.MutationObserver((records) => {
@@ -52,7 +56,13 @@ export class Widgets {
     if (this.content) this.layOutAll();
   }
 
-  /** Every widget in the editor's content laid out as its entries keep it */
+  /** The page's content followed where the host made a new one since (watched, marked, its widgets laid out) */
+  followContent(): void {
+    const content = this.page.content();
+    if (content && content !== this.content) this.watch();
+  }
+
+  /** Every widget in the page's content laid out as its entries keep it */
   layOutAll(): void {
     if (this.content) this.layOutIn(this.content);
   }
@@ -132,12 +142,8 @@ export class Widgets {
     return undefined;
   }
 
-  /** The text's width now (the editor's content less its padding): a widget without a width of its own is as wide */
+  /** The text's width now (the page's content less its padding): a widget without a width of its own is as wide */
   textWidth(): number {
-    const content = this.content;
-    const win = this.doc.defaultView;
-    if (!content || !win) return 0;
-    const style = win.getComputedStyle(content);
-    return content.clientWidth - parseFloat(style.paddingLeft || "0") - parseFloat(style.paddingRight || "0");
+    return this.content instanceof HTMLElement ? textWidthOf(this.content) : 0;
   }
 }

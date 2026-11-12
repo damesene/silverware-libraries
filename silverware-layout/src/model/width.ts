@@ -26,6 +26,15 @@ export function readWidth(value: unknown): Width | undefined {
   return { amount: Number(match[1]), unit: (match[2] as WidthUnit | undefined) ?? "px" };
 }
 
+/**
+ * A text's width as a page or a setting holds it: as `readWidth` reads it, and within TEXT_WIDTH_LIMITS (a width typed
+ * by hand into a frontmatter, `0` or `5`, would collapse the text: none then, the default's or the theme's)
+ */
+export function readTextWidth(value: unknown): Width | undefined {
+  const width = readWidth(value);
+  return width && !validateTextWidth(width) ? width : undefined;
+}
+
 /** Why a width cannot be a text's, as text, undefined where it can */
 export function validateTextWidth(width: Width): string | undefined {
   const { min, max } = TEXT_WIDTH_LIMITS[width.unit];

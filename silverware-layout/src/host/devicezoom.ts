@@ -1,7 +1,7 @@
 // This device's font zoom (docs/silverware-layout-font-size.md): kept in the browser's local storage, as the browser
 // keeps its own zoom, never in the space. Storage may be refused (a private window, blocked site data): then the zoom
 // lasts until the page is reloaded.
-import { readFontSize } from "../../model/settings.ts";
+import { readFontSize } from "../model/settings.ts";
 
 const KEY = "silverware.layout.fontZoom";
 

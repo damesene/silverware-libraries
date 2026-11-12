@@ -5,7 +5,7 @@ import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import { pageChanges } from "../../../../shared/pages/changes.ts";
 import { readFrontmatter } from "../../../../shared/pages/frontmatter.ts";
 import { isYamlMap, readYamlMap } from "../../../../shared/yaml/tree.ts";
-import { readWidth, storedWidth, type Width } from "../../model/width.ts";
+import { readTextWidth, storedWidth, type Width } from "../../model/width.ts";
 
 /** The frontmatter's key holding a page's layout */
 export const LAYOUT_KEY = "_layout";
@@ -21,7 +21,7 @@ export function pageLayoutOf(text: string): PageLayout {
   if ("problem" in read || !isYamlMap(read.value)) return { width: undefined, more: false };
   const layout = read.value[LAYOUT_KEY];
   if (!isYamlMap(layout)) return { width: undefined, more: false };
-  return { width: readWidth(layout.width), more: Object.keys(layout).some((key) => key !== "width") };
+  return { width: readTextWidth(layout.width), more: Object.keys(layout).some((key) => key !== "width") };
 }
 
 /**

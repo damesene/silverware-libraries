@@ -6,32 +6,35 @@ tags: meta
 The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. It is installed with the library.
 
 ```space-style
+/* The page as Silverware Layout marks it (src/host/marks.ts), never by a host's elements: the content its widgets
+   are in (data-swl-content), the editor whose font it sizes (data-swl-editor), the pane's width (--swl-pane-width) and
+   a pane too narrow to lay out (data-swl-narrow), on the root. */
 /* A widget's width (Silverware Layout writes data-swl-width and --swl-width on the widget's own element): as wide as
-   it keeps, at most the editor's pane less 40 px (100cqw: the pane, SilverBullet's #sb-editor being a size container),
-   centred on the text however wide; in a narrow pane (data-swl-narrow) and out of the page's flow (a widget over the
-   window, or on a sheet) none. Important: SilverBullet's and the widget plugins' own rules size these elements too */
-:root:not([data-swl-narrow]) .cm-content [data-swl-width]:not([data-silverware-over-window], [data-silverware-over-window] *) {
-  --swl-shown: min(var(--swl-width), 100cqw - 40px);
+   it keeps, at most the pane less 40 px, centred on the text however wide; in a narrow pane and out of the page's flow
+   (a widget over the window, or on a sheet) none. Important: SilverBullet's and the widget plugins' own rules size
+   these elements too */
+:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+  --swl-shown: min(var(--swl-width), var(--swl-pane-width, 100vw) - 40px);
   width: var(--swl-shown) !important;
   max-width: none !important;
   margin-left: calc((100% - var(--swl-shown)) / 2) !important;
   margin-right: calc((100% - var(--swl-shown)) / 2) !important;
   box-sizing: border-box;
 }
-/* The boxes a widget laid out is in, within its line, let it out: SilverBullet scrolls a Lua block's output in a box of
-   the text's width (overflow: auto), which cut a wider database off and showed a scrollbar */
-:root:not([data-swl-narrow]) .cm-content .cm-line :has([data-swl-width]:not([data-silverware-over-window])) {
+/* The boxes a widget laid out is in, within the content, let it out: SilverBullet scrolls a Lua block's output in a
+   box of the text's width (overflow: auto), which cut a wider database off and showed a scrollbar */
+:root:not([data-swl-narrow]) [data-swl-content] > * :has([data-swl-width]:not([data-silverware-over-window])) {
   overflow: visible !important;
 }
-/* The editor's font size (the setting, or this device's zoom): SilverBullet sizes the editor in px (2.12.1) or by
-   --editor-font-size (since); the text, headings, code and widgets in em of it */
-:root[data-swl-font-size] #sb-main .cm-editor {
+/* The editor's font size (the setting, or this device's zoom), over the host's own: SilverBullet sizes its editor in
+   px (2.12.1) or by --editor-font-size (since); the text, headings, code and widgets in em of it */
+:root[data-swl-font-size] [data-swl-editor] {
   font-size: var(--swl-font-size) !important;
 }
 /* A task's box: SilverBullet sizes it 1.3em of its own font, which is the browser's for a control (13.33 px), not the
    text's, so it kept its size as the font changed; given the text's in the proportion it has in SilverBullet's
    18 px (13.33 / 18), it is as SilverBullet draws it there and grows with the font */
-:root[data-swl-font-size] #sb-main .cm-editor input[type="checkbox"] {
+:root[data-swl-font-size] [data-swl-editor] input[type="checkbox"] {
   font-size: 0.7407em;
 }
 /* Font zoom's label at the window's bottom left, a moment after each step, as the browser's own zoom shows its */

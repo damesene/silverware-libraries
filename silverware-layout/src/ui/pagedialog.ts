@@ -5,7 +5,8 @@
 //   Under them the editor's font size for every page (the theme's, or its own), Font zoom (Ctrl + scroll) and this
 //   device's zoom, taken off by Reset (docs/silverware-layout-font-size.md).
 //   What is set shows on the page at once (the dialog held at the window's top, the page seen under it).
-// - Guides: the widths a drag snaps to (a widget's bar, these sliders), each typed in its own row; Full width a box.
+// - Guides: the widths a drag snaps to (a widget's bar, these sliders), each typed in its own row, in px or % of the
+//   pane (the same switch as a width's); Full width a box.
 //   Ascending as the tab is drawn, left in the order typed until it is drawn again.
 // Save writes what changed (the page's into its frontmatter, the default and the guides into CONFIG), Cancel or Esc
 // puts the page back. Font zoom and the font size are saved into CONFIG as well. The shared dialog, tabs and controls (shared/), classes `swl-dialog-*`.
@@ -13,8 +14,9 @@ import { type SegmentedControl, segmentedControl } from "../../../shared/control
 import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { el } from "../../../shared/elements.ts";
 import { tabs } from "../../../shared/tabs.ts";
-import { FONT_SIZE_LIMITS, type Guide, validateFontSize, validateGuide } from "../model/settings.ts";
+import { FONT_SIZE_LIMITS, GUIDE_LIMITS, type Guide, guideOf, percentOf, validateFontSize, validateGuide } from "../model/settings.ts";
 import { sameWidth, TEXT_WIDTH_LIMITS, validateTextWidth, type Width, type WidthUnit } from "../model/width.ts";
+import { widthInPane } from "../core/widgetwidth.ts";
 import { ICONS } from "./icons.ts";
 
 const BASE = "swl-dialog";
@@ -100,20 +102,32 @@ function widthOf(field: Field): { readonly width?: Width; readonly problem?: str
 }
 
 /** A width in the other unit, of a pane: px as % of it and back, whole */
-const converted = (amount: number, to: WidthUnit, pane: number): number => {
+const converted = (amount: number, to: WidthUnit, pane: number, limits = TEXT_WIDTH_LIMITS): number => {
   const value = to === "%" ? Math.round((amount / pane) * 100) : Math.round((amount * pane) / 100);
-  const { min, max } = TEXT_WIDTH_LIMITS[to];
+  const { min, max } = limits[to];
   return Math.min(max, Math.max(min, value));
 };
 
+/** A guide in a pane (px): its pixels, its share of the pane, the pane (as a widget's width is) */
+const guidePixels = widthInPane;
+
 /** A guide as a slider in `unit` has it, in a pane */
-const guideAt = (guide: Guide, unit: WidthUnit, pane: number): number => (guide === "full" ? (unit === "%" ? 100 : Math.round(pane)) : unit === "%" ? Math.round((guide / pane) * 100) : guide);
+const guideAt = (guide: Guide, unit: WidthUnit, pane: number): number => {
+  if (unit === "px") return Math.round(guidePixels(guide, pane));
+  return guide === "full" ? 100 : typeof guide === "string" ? percentOf(guide)! : Math.round((guide / pane) * 100);
+};
+
+/** A guide as a tick under a slider names it */
+const tickName = (guide: Guide): string => (guide === "full" ? "Full" : typeof guide === "string" ? `${percentOf(guide)}%` : String(guide));
 
 /** One width's row of the Page tab: what it follows or its own, a slider marked with the guides, a number and unit */
 type WidthRow = { readonly element: HTMLElement; readonly field: Field; show(): void };
 
-/** A guide's row of the Guides tab: its number as typed */
-type GuideRow = { readonly element: HTMLElement; readonly input: HTMLInputElement };
+/** A guide's row of the Guides tab: its number as typed, its unit */
+type GuideRow = { readonly element: HTMLElement; readonly input: HTMLInputElement; unit: WidthUnit };
+
+/** Why a guide's row holds no guide (empty: none, nothing to say) */
+const rowProblem = (row: GuideRow): string | undefined => (row.input.value.trim() ? validateGuide(Number(row.input.value), row.unit) : undefined);
 
 export class PageDialog {
   private readonly dialogs: Dialogs;
@@ -160,8 +174,11 @@ export class PageDialog {
     // The guides: each its row, ascending as drawn; Full width a box of its own
     this.guideList = el(doc, "div", { class: `${BASE}-guide-list`, attrs: { role: "list" } });
     this.guideRows = [];
-    for (const guide of [...store.guides].filter((g): g is number => g !== "full").sort((a, b) => a - b)) this.addGuide(String(guide), false);
-    const add = el(doc, "button", { class: `${BASE}-add`, text: "+ Add guide", run: () => this.addGuide("", true) });
+    // (Ascending as shown in the pane now: pixels and percents among each other)
+    const pane = store.paneWidth();
+    const rows = store.guides.filter((guide) => guide !== "full").sort((a, b) => guidePixels(a, pane) - guidePixels(b, pane));
+    for (const guide of rows) this.addGuide(typeof guide === "string" ? String(percentOf(guide)) : String(guide), typeof guide === "string" ? "%" : "px", false);
+    const add = el(doc, "button", { class: `${BASE}-add`, text: "+ Add guide", run: () => this.addGuide("", "px", true) });
     this.full = el(doc, "input", { attrs: { type: "checkbox" } });
     this.full.checked = store.guides.includes("full");
     this.full.addEventListener("change", () => this.update());
@@ -221,12 +238,13 @@ export class PageDialog {
     return row === "page" ? px(this.fallback ? widthOf(this.fallback.field).width : store.defaultWidth) : store.themeWidth();
   }
 
-  /** The guides as typed now, in pixels (those that are no guide left out), and Full width */
+  /** The guides as typed now, in pixels or percents (those that are no guide left out), and Full width */
   private currentGuides(): Guide[] {
     const guides: Guide[] = [];
     for (const row of this.guideRows) {
-      const value = Number(row.input.value);
-      if (row.input.value.trim() && !validateGuide(value) && !guides.includes(value)) guides.push(value);
+      if (!row.input.value.trim() || rowProblem(row)) continue;
+      const guide = guideOf(Number(row.input.value), row.unit);
+      if (!guides.includes(guide)) guides.push(guide);
     }
     if (this.full?.checked) guides.push("full");
     return guides;
@@ -266,7 +284,7 @@ export class PageDialog {
     const range = () => {
       const pane = store.paneWidth();
       if (field.unit === "%") return { min: TEXT_WIDTH_LIMITS["%"].min, max: 100 };
-      const widest = Math.max(pane, Number(field.amount) || 0, ...this.currentGuides().map((guide) => (guide === "full" ? pane : guide)));
+      const widest = Math.max(pane, Number(field.amount) || 0, ...this.currentGuides().map((guide) => guidePixels(guide, pane)));
       return { min: TEXT_WIDTH_LIMITS.px.min, max: Math.ceil(widest / 100) * 100 };
     };
     // The guides as marks under the slider, where their values are on it
@@ -277,7 +295,7 @@ export class PageDialog {
         ...this.currentGuides().flatMap((guide) => {
           const at = guideAt(guide, field.unit, pane);
           if (at < min || at > max) return [];
-          return [el(doc, "span", { class: `${BASE}-tick`, text: guide === "full" ? "Full" : String(guide), attrs: { style: `left: ${((at - min) / (max - min)) * 100}%` } })];
+          return [el(doc, "span", { class: `${BASE}-tick`, text: tickName(guide), attrs: { style: `left: ${((at - min) / (max - min)) * 100}%` } })];
         }),
       );
     };
@@ -437,13 +455,30 @@ export class PageDialog {
     return !row.closest(`.${BASE}-readonly`);
   }
 
-  /** A guide's row: its number typed straight in, a × taking it out; `focus`: the new one, to type in */
-  private addGuide(value: string, focus: boolean): void {
+  /**
+   * A guide's row: its number typed straight in, its unit switched (px or % of the pane: the number converted, as a
+   * width's), a × taking it out; `focus`: the new one, to type in
+   */
+  private addGuide(value: string, unit: WidthUnit, focus: boolean): void {
     const { doc } = this;
-    const input = el(doc, "input", { class: `${BASE}-guide-amount`, attrs: { type: "number", inputmode: "numeric", step: "1", min: "200", max: "10000", "aria-label": "Guide width in px" } });
+    const input = el(doc, "input", { class: `${BASE}-guide-amount`, attrs: { type: "number", inputmode: "numeric", step: "1" } });
     input.value = value;
     input.addEventListener("input", () => this.update());
-    const row: GuideRow = { element: el(doc, "div", { class: `${BASE}-guide-row`, attrs: { role: "listitem" } }), input };
+    const row: GuideRow = { element: el(doc, "div", { class: `${BASE}-guide-row`, attrs: { role: "listitem" } }), input, unit };
+    const limits = () => {
+      input.min = String(GUIDE_LIMITS[row.unit].min);
+      input.max = String(GUIDE_LIMITS[row.unit].max);
+      input.setAttribute("aria-label", `Guide width in ${row.unit}`);
+    };
+    limits();
+    const units = segmentedControl(doc, SEGMENTS_BASE, "Guide's unit", UNITS, unit, (to) => {
+      const now = Number(input.value);
+      const pane = this.store!.paneWidth();
+      if (input.value.trim() && Number.isFinite(now) && pane > 0) input.value = String(converted(now, to, pane, GUIDE_LIMITS));
+      row.unit = to;
+      limits();
+      this.update();
+    });
     const remove = el(doc, "button", {
       class: `${BASE}-remove`,
       html: ICONS.close,
@@ -454,7 +489,7 @@ export class PageDialog {
         this.update();
       },
     });
-    row.element.append(input, el(doc, "span", `${BASE}-unit`, "px"), remove);
+    row.element.append(input, units.element, remove);
     this.guideRows.push(row);
     this.guideList?.append(row.element);
     if (focus) input.focus();
@@ -467,10 +502,10 @@ export class PageDialog {
     if (!store || !this.page || !this.fallback) return;
     const page = widthOf(this.page.field);
     const fallback = widthOf(this.fallback.field);
-    const badGuide = this.guideRows.find((row) => row.input.value.trim() && validateGuide(Number(row.input.value)));
-    for (const row of this.guideRows) row.input.classList.toggle(`${BASE}-invalid`, row === badGuide || (!!row.input.value.trim() && !!validateGuide(Number(row.input.value))));
+    const badGuide = this.guideRows.find((row) => !!rowProblem(row));
+    for (const row of this.guideRows) row.input.classList.toggle(`${BASE}-invalid`, !!rowProblem(row));
     const font = fontSizeOf(this.font);
-    const problem = page.problem ?? fallback.problem ?? font.problem ?? (badGuide ? validateGuide(Number(badGuide.input.value)) : undefined);
+    const problem = page.problem ?? fallback.problem ?? font.problem ?? (badGuide ? rowProblem(badGuide) : undefined);
     if (!page.problem && !fallback.problem && !font.problem) {
       store.preview({ pageWidth: page.width, defaultWidth: fallback.width, fontSize: font.size, fontZoom: !!this.fontZoom?.checked, zoom: this.zoomKept ? store.zoom : undefined });
     }

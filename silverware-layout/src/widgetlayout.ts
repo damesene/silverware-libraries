@@ -1,8 +1,10 @@
-// The widgets laid out and their handle, put together over a document: what SilverBullet's index.ts starts once per
-// window, and the playground over its own page. The settings are asked each time (a setting saved applies at once).
+// The widgets laid out and their handle, put together over a host's page (host/page.ts): what the app (app.ts) starts
+// once per window, and the playground over its own page. The settings are asked each time (a setting saved applies at
+// once).
 import type { Registry } from "./core/registry.ts";
-import { guideLayer, pageView, paneWidth } from "./host/silverbullet/dom.ts";
-import { type Widget, Widgets } from "./host/silverbullet/widgets.ts";
+import { paneWidth } from "./host/marks.ts";
+import type { PageHost } from "./host/page.ts";
+import { type Widget, Widgets } from "./host/widgets.ts";
 import type { Guide } from "./model/settings.ts";
 import { WidthHandle } from "./ui/handle.ts";
 
@@ -16,9 +18,9 @@ export type WidgetLayoutOptions = {
 
 export type WidgetLayout = { readonly widgets: Widgets; readonly handle: WidthHandle<Widget> };
 
-/** The document's widgets laid out from now on, as the registry's providers find them, and their handle */
-export function layOutWidgets(doc: Document, registry: Registry, options: WidgetLayoutOptions): WidgetLayout {
-  const widgets = new Widgets(doc, registry, options.problem);
+/** The page's widgets laid out from now on, as the registry's providers find them, and their handle */
+export function layOutWidgets(doc: Document, page: PageHost, registry: Registry, options: WidgetLayoutOptions): WidgetLayout {
+  const widgets = new Widgets(doc, page, registry, options.problem);
   widgets.start();
   const handle = new WidthHandle<Widget>(doc, {
     widgetAt: (node) => widgets.widgetAt(node),
@@ -27,10 +29,10 @@ export function layOutWidgets(doc: Document, registry: Registry, options: Widget
     show: (element, width) => widgets.show(element, width),
     write: (widget, width) => widgets.write(widget, width),
     textWidth: () => widgets.textWidth(),
-    paneWidth: () => paneWidth(doc),
+    paneWidth: () => paneWidth(page),
     guides: options.guides,
-    view: () => pageView(doc),
-    guideLayer: () => guideLayer(doc),
+    view: () => page.view(),
+    guideLayer: () => page.guideLayer(),
     seen: (widget) => widgets.seen(widget),
     enabled: options.enabled,
   });

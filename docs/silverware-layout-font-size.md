@@ -29,6 +29,6 @@ A page with headings, a paragraph with code, a list, a table (Silverware Table),
 
 1. ~~The probe~~: done (above).
 2. ~~The model~~ (settings `fontSize`, `fontZoom.enabled`; which size applies; a wheel's turns as steps), unit tests: done.
-3. ~~The font size shown~~ (host/silverbullet/dom.ts), the zoom (ui/fontzoom.ts: Ctrl + wheel, Ctrl+0, the label; host/silverbullet/devicezoom.ts: local storage), the dialog's row, Font zoom box and *This device* with Reset: done. Reset is the dialog's, applied on Save (Cancel keeps the zoom), as everything in it. Font zoom off leaves this device's zoom kept but not shown.
+3. ~~The font size shown~~ (host/marks.ts, the editor the host's), the zoom (ui/fontzoom.ts: Ctrl + wheel, Ctrl+0, the label; host/devicezoom.ts: local storage), the dialog's row, Font zoom box and *This device* with Reset: done. Reset is the dialog's, applied on Save (Cancel keeps the zoom), as everything in it. Font zoom off leaves this device's zoom kept but not shown.
 4. ~~UI tests~~ (silverware-layout/ui-tests/fontsize.spec.ts, against SilverBullet): done.
 5. ~~Docs~~: done (2026-11-12).

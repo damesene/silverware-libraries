@@ -1,63 +1,36 @@
-// Silverware Layout in SilverBullet: the API the widget plugins register their providers with (shared/layout.ts), their
-// widgets laid out and the handle of their width (widgetlayout.ts), the page's text width (its own, the default
-// setting's, none in a narrow pane) set as pages open and change, and the Page layout dialog. Its init page hands over
-// SilverBullet's API (bridge.ts) and calls `pageLoaded`, `pageOpened` and `pageEdited`.
+// Silverware Layout in SilverBullet: the API the widget plugins register their providers with (shared/layout.ts), and
+// the app (app.ts) over SilverBullet's page (host/silverbullet/dom.ts), its store SilverBullet's: the settings in its
+// configuration (saved into CONFIG), a page's own width in its frontmatter (through the page writer), this device's
+// zoom in the browser. Its init page hands over SilverBullet's API (bridge.ts) and calls `pageLoaded`, `pageOpened`
+// and `pageEdited`.
 import { applyLayers } from "../../shared/layers.ts";
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { type PageWriter, pageWriter } from "../../shared/pages/writer.ts";
+import { LayoutApp, type LayoutStore } from "./app.ts";
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { Registry } from "./core/registry.ts";
-import { fontSizeShown } from "./core/fontsize.ts";
-import { textWidthShown } from "./core/textwidth.ts";
-import { keepDeviceZoom, readDeviceZoom } from "./host/silverbullet/devicezoom.ts";
-import { inEditor, markNarrow, paneWidth, showFontSize, showTextWidth, themeFontSize, themeTextWidth, watchPaneWidth } from "./host/silverbullet/dom.ts";
+import { keepDeviceZoom, readDeviceZoom } from "./host/devicezoom.ts";
+import { silverBulletPage } from "./host/silverbullet/dom.ts";
 import { pageLayoutOf, writePageWidth } from "./host/silverbullet/page.ts";
 import { silverBulletPlatform } from "./host/silverbullet/platform.ts";
 import { DEFAULT_GUIDES, DEFAULT_MIN_PANE_WIDTH, keptGuides, PATHS, readSettings, type Settings } from "./model/settings.ts";
-import { cssWidth, readWidth, type Width } from "./model/width.ts";
-import { FontZoom } from "./ui/fontzoom.ts";
-import { PageDialog, type Preview } from "./ui/pagedialog.ts";
-import { layOutWidgets, type WidgetLayout } from "./widgetlayout.ts";
+import { cssWidth, readTextWidth } from "./model/width.ts";
 
 const PAGE_LAYOUT = "Silverware Layout: Page layout";
 // Silverware Layout's own block of CONFIG: the guides, a list, which the Configuration Manager's block would lose
 // (shared/configpage.ts)
 const OWN_MARKER = "-- managed-by: silverware-layout";
-// How long the page is still before its frontmatter is read again after an edit
-const EDITED_MS = 300;
-// The editor's font size where no theme says one (SilverBullet's own)
-const SILVERBULLET_FONT_SIZE = 18;
-
-type App = {
-  readonly bridge: Bridge;
-  readonly writer: PageWriter;
-  settings: Settings;
-  // The page open and its own text width, as last read
-  page: string;
-  pageWidth: Width | undefined;
-  // This device's font zoom (px), as kept in the browser; none: none
-  zoom: number | undefined;
-};
-
-let app: App | undefined;
-// Each reading of the page numbered: one answered after a later one is dropped (a page opened while another was read)
-let reading = 0;
-let editedTimer: ReturnType<typeof setTimeout> | undefined;
-let stopWatching: (() => void) | undefined;
-let dialog: PageDialog | undefined;
-// Made once per window (its observer and its handle live as long), asking the settings of the last load
-let widgetLayout: WidgetLayout | undefined;
-// Made once per window (its listeners live as long), asking the app of the last load
-let fontZoom: FontZoom | undefined;
 
 // One registry per window: the module is imported once, so `api` is the same object as Space Lua loads again, and a
-// provider registered again (its plugin's init page run again) replaces its own
-const registry = new Registry((message) => (app ? void app.bridge.flash(message, "error") : console.error(message)));
+// provider registered again (its plugin's init page run again) replaces its own. One app per window as well (its
+// observers and listeners live as long), started again with each load of Space Lua
+const registry = new Registry((message) => app.problem(message));
+const app = new LayoutApp(document, silverBulletPage(document), registry);
 
 /** Silverware Layout's API, as its API page hands it to the widget plugins (`silverware.layout.api`) */
 export const api = registry.api();
 
-/** Started by the init page (again as Space Lua loads again): SilverBullet's API handed over, the settings read */
+/** Started by the init page (again as Space Lua loads again): SilverBullet's API handed over */
 export async function init(bridge: Bridge): Promise<void> {
   // The layers its style page lays its elements in (shared/layers.ts)
   applyLayers(document);
@@ -66,40 +39,7 @@ export async function init(bridge: Bridge): Promise<void> {
     console.error(`Silverware Layout: the init page did not hand over ${missing.join(", ")}`);
     return;
   }
-  app = { bridge, writer: pageWriter(silverBulletPlatform(bridge)), settings: await settingsOf(bridge), page: "", pageWidth: undefined, zoom: readDeviceZoom(window) };
-  stopWatching?.();
-  // (Not while the dialog shows a width it is setting)
-  stopWatching = watchPaneWidth(document, () => {
-    if (!dialog?.isOpen) show();
-  });
-  widgetLayout ??= layOutWidgets(document, registry, {
-    guides: () => app?.settings.guides ?? DEFAULT_GUIDES,
-    enabled: () => !!app && paneWidth(document) >= app.settings.minPaneWidth,
-    problem: (message) => void app?.bridge.flash(message, "error"),
-  });
-  widgetLayout.widgets.layOutAll();
-  fontZoom ??= new FontZoom(document, {
-    enabled: () => !!app?.settings.fontZoom,
-    inEditor,
-    size: () => fontShown() ?? defaultFontSize(),
-    defaultSize: defaultFontSize,
-    zoom: (size) => {
-      if (!app) return;
-      app.zoom = size;
-      keepDeviceZoom(window, size);
-      if (!dialog?.isOpen) show();
-    },
-  });
-  show();
-  await pageOpened();
-}
-
-/** The settings as configured (none read: the defaults) */
-async function settingsOf(bridge: Bridge): Promise<Settings> {
-  if (!bridge.getConfig) return { textWidth: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true };
-  const values = new Map<string, unknown>();
-  for (const path of Object.values(PATHS)) values.set(path, await bridge.getConfig(path, undefined));
-  return readSettings((path) => values.get(path));
+  await app.start(silverBulletStore(bridge, pageWriter(silverBulletPlatform(bridge))));
 }
 
 /**
@@ -108,56 +48,18 @@ async function settingsOf(bridge: Bridge): Promise<Settings> {
  * bridge from here is a promise answered later: reading the text took frames)
  */
 export function pageLoaded(page: unknown, width: unknown): void {
-  const now = app;
-  if (!now) return;
-  ++reading;
-  now.page = String(page);
-  now.pageWidth = readWidth(width);
-  show();
-  // (The meta is the index's, which may lag behind a write a moment ago: the text read too, a moment later)
-  void pageOpened();
+  app.pageLoaded(String(page), readTextWidth(width));
 }
 
-/** The page open read again from its text (as Silverware Layout starts, after an edit): its own width, the text shown at it */
-export async function pageOpened(): Promise<void> {
-  const now = app;
-  if (!now) return;
-  const mine = ++reading;
-  const [page, text] = await Promise.all([now.bridge.getCurrentPage(), now.bridge.getText()]);
-  if (mine !== reading || now !== app) return;
-  now.page = String(page);
-  now.pageWidth = pageLayoutOf(String(text)).width;
-  show();
+/** The page open read again from its text (as Silverware Layout starts, after an edit) */
+export function pageOpened(): Promise<void> {
+  return app.pageOpened();
 }
 
-/** The page edited (editor:pageModified): its width read again once it is still a moment (a width typed in its frontmatter) */
+/** The page edited (editor:pageModified): its width read again once it is still a moment */
 export function pageEdited(): void {
-  clearTimeout(editedTimer);
-  editedTimer = setTimeout(() => {
-    if (!dialog?.isOpen) void pageOpened();
-  }, EDITED_MS);
+  app.pageEdited();
 }
-
-/** The text shown at the width and the font size that apply now */
-function show(): void {
-  if (app) showWith({ pageWidth: app.pageWidth, defaultWidth: app.settings.textWidth, fontSize: app.settings.fontSize, fontZoom: app.settings.fontZoom, zoom: app.zoom });
-}
-
-/** The text shown as it would be with these (the page's own width, the default; the font size, the zoom; none: none) */
-function showWith(shown: Preview): void {
-  if (!app) return;
-  // (Widgets laid out where the pane is wide enough: the style page's rule reads it)
-  markNarrow(document, paneWidth(document) < app.settings.minPaneWidth);
-  showTextWidth(document, textWidthShown({ page: shown.pageWidth, fallback: shown.defaultWidth, paneWidth: paneWidth(document), minPaneWidth: app.settings.minPaneWidth }));
-  // (Font zoom off: this device's zoom not shown, still kept)
-  showFontSize(document, fontSizeShown(shown.fontZoom ? shown.zoom : undefined, shown.fontSize));
-}
-
-/** The font size Silverware Layout shows now (none: the theme's) */
-const fontShown = (): number | undefined => (app ? fontSizeShown(app.settings.fontZoom ? app.zoom : undefined, app.settings.fontSize) : undefined);
-
-/** The default font size: the setting's, else the theme's */
-const defaultFontSize = (): number => app?.settings.fontSize ?? themeFontSize(document) ?? SILVERBULLET_FONT_SIZE;
 
 /** The commands, as the init page defines them */
 export function commandNames(): string[] {
@@ -165,63 +67,38 @@ export function commandNames(): string[] {
 }
 
 export async function runCommand(name: string): Promise<void> {
-  if (name === PAGE_LAYOUT) await openPageDialog();
+  if (name === PAGE_LAYOUT) await app.openDialog();
 }
 
-/** The Page layout dialog over the page open */
-async function openPageDialog(): Promise<void> {
-  const now = app;
-  if (!now) return;
-  await pageOpened();
-  const { bridge } = now;
-  dialog ??= new PageDialog(document);
-  dialog.open({
-    page: now.page,
-    pageWidth: now.pageWidth,
-    defaultWidth: now.settings.textWidth,
-    guides: now.settings.guides,
+/** What Silverware Layout reads and saves, SilverBullet's way */
+function silverBulletStore(bridge: Bridge, writer: PageWriter): LayoutStore {
+  // A setting saved into CONFIG as SilverBullet's Configuration Manager saves it (indexed, the configuration loaded again)
+  const saveConfig = (values: Readonly<Record<string, unknown>>, marker?: string) =>
+    saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values, marker));
+  return {
     canSaveSettings: !!bridge.saveConfigPage,
-    paneWidth: () => paneWidth(document),
-    themeWidth: () => themeTextWidth(document),
-    fontSize: now.settings.fontSize,
-    fontZoom: now.settings.fontZoom,
-    zoom: now.zoom,
-    themeFontSize: () => themeFontSize(document) ?? SILVERBULLET_FONT_SIZE,
-    preview: (shown) => showWith(shown),
-    restore: () => show(),
-    savePage: async (width) => {
-      const problem = await writePageWidth(now.writer, now.page, String(await bridge.getText()), width);
-      if (!problem) now.pageWidth = width;
-      return problem;
+    readSettings: () => settingsOf(bridge),
+    readPage: async () => {
+      const [page, text] = await Promise.all([bridge.getCurrentPage(), bridge.getText()]);
+      return { page: String(page), width: pageLayoutOf(String(text)).width };
     },
-    saveDefault: async (width) => {
-      // In the Configuration Manager's block of CONFIG (it shows it, Ctrl-,), as the other plugins save theirs
-      await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
-        withConfigSettings(text, { [PATHS.textWidth]: width ? cssWidth(width) : undefined }),
-      );
-      now.settings = { ...now.settings, textWidth: width };
-      return undefined;
-    },
-    saveGuides: async (guides) => {
-      await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
-        withConfigSettings(text, { [PATHS.guides]: keptGuides(guides) }, OWN_MARKER),
-      );
-      now.settings = { ...now.settings, guides };
-      return undefined;
-    },
-    saveFont: async (fontSize, zoomOn) => {
-      // In the Configuration Manager's block, as the default text width
-      await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
-        withConfigSettings(text, { [PATHS.fontSize]: fontSize === undefined ? undefined : `${fontSize}px`, [PATHS.fontZoom]: zoomOn ? undefined : false }),
-      );
-      now.settings = { ...now.settings, fontSize, fontZoom: zoomOn };
-      return undefined;
-    },
-    resetZoom: () => {
-      now.zoom = undefined;
-      keepDeviceZoom(window, undefined);
-    },
+    savePageWidth: async (page, width) => writePageWidth(writer, page, String(await bridge.getText()), width),
+    // In the Configuration Manager's block of CONFIG (it shows it, Ctrl-,), as the other plugins save theirs
+    saveTextWidth: (width) => saveConfig({ [PATHS.textWidth]: width ? cssWidth(width) : undefined }),
+    // In Silverware Layout's own block: a list, which the Configuration Manager would lose
+    saveGuides: (guides) => saveConfig({ [PATHS.guides]: keptGuides(guides) }, OWN_MARKER),
+    saveFont: (fontSize, fontZoom) => saveConfig({ [PATHS.fontSize]: fontSize === undefined ? undefined : `${fontSize}px`, [PATHS.fontZoom]: fontZoom ? undefined : false }),
+    readZoom: () => readDeviceZoom(window),
+    keepZoom: (size) => keepDeviceZoom(window, size),
     confirm: async (question) => (bridge.confirm ? !!(await bridge.confirm(question)) : globalThis.confirm(question)),
     flash: (message, type) => void bridge.flash(message, type),
-  });
+  };
+}
+
+/** The settings as configured (none read: the defaults) */
+async function settingsOf(bridge: Bridge): Promise<Settings> {
+  if (!bridge.getConfig) return { textWidth: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true };
+  const values = new Map<string, unknown>();
+  for (const path of Object.values(PATHS)) values.set(path, await bridge.getConfig(path, undefined));
+  return readSettings((path) => values.get(path));
 }

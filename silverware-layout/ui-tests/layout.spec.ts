@@ -243,7 +243,6 @@ test("a pane narrower than the setting's least gets no width, and gets it back w
   await runCommand(page, PAGE_LAYOUT);
   const dialog = page.locator(".swl-dialog");
   await expect(dialog.getByRole("note")).toHaveText("Widths apply on screens wider than 600 px. On this one, the text fills the screen.");
-  await page.screenshot({ path: test.info().outputPath("narrow-dialog.png") });
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await page.setViewportSize({ width: 1400, height: 800 });
   await expect.poll(() => widthSet(page)).toBe("1100px");

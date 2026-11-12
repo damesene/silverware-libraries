@@ -580,7 +580,9 @@ export class PageDialog {
       held.classList.remove(`${BASE}-held`);
       for (const type of types) view?.removeEventListener(type, end, true);
       ended?.();
-      this.update();
+      // (The guides' sliders fitted to what was set meanwhile; not where the dialog closed while it was held: the page
+      // would show again what it put back)
+      if (this.isOpen) this.update();
     };
     for (const type of types) view?.addEventListener(type, end, true);
   }

@@ -278,6 +278,23 @@ describe("Silverware Layout's app over a page of no host's", () => {
     expect(document.querySelector<HTMLInputElement>(".swl-dialog-zoom input")!.disabled).toBe(true);
   });
 
+  it("a slider held as the dialog closes (Esc meanwhile): let go, the page stays as it was put back", async () => {
+    const { page, shown } = plainPage();
+    const { api } = memoryStore({ Page: undefined });
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    await app.start(api);
+    await app.openDialog();
+    const slider = document.querySelector<HTMLInputElement>('[data-swl-row="page"] .swl-dialog-slider')!;
+    slider.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    slider.value = "1000";
+    slider.dispatchEvent(new Event("input"));
+    expect(shown.at(-1)).toEqual({ amount: 1000, unit: "px" });
+    document.querySelector<HTMLButtonElement>(".swl-dialog-cancel")!.click();
+    expect(shown.at(-1)).toBeUndefined();
+    window.dispatchEvent(new Event("pointerup"));
+    expect(shown.at(-1)).toBeUndefined();
+  });
+
   it("the guides' sliders share the room of the guides as typed: a wider one typed widens it, taken out narrows it", async () => {
     const { page } = plainPage();
     const { api } = memoryStore({ Page: undefined }, { guides: [900, 3000, "full"] });

@@ -70,6 +70,10 @@ export const test = base.extend<{ favorites: Favorites | null }>({
     await use(target === "silverbullet" ? `http://127.0.0.1:${server().port}/` : baseURL);
   },
   page: async ({ page, favorites }, use, testInfo) => {
+    // A mouse's tests on a machine without touch, whatever this one has: a touchscreen or a pen makes Chromium report
+    // touch points (navigator.maxTouchPoints 10 on a Windows machine with a digitizer), and the toolbar then offers
+    // what a finger needs (src/index.ts) as on a phone
+    if (testInfo.project.name !== "touch") await page.addInitScript(() => Object.defineProperty(Navigator.prototype, "maxTouchPoints", { get: () => 0 }));
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => {

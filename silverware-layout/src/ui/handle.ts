@@ -9,6 +9,7 @@
 import { el } from "../../../shared/elements.ts";
 import type { Guide } from "../model/settings.ts";
 import { draggedWidth, MIN_WIDGET_WIDTH, PANE_GUTTER, snapped, snapTargets, type WidgetWidth, widthName } from "../core/widgetwidth.ts";
+import { GuideLines } from "./guidelines.ts";
 
 const BASE = "swl-handle";
 // The bar's height at most and at least (px): centred on the part of the widget in view, so a tall table's is in view
@@ -20,9 +21,6 @@ const LEAVE_MS = 400;
 const KEYS_MS = 400;
 // The most between two taps of a finger on the bar for a double tap (ms)
 const DOUBLE_TAP_MS = 400;
-// A guide's name: at its line's top, a row lower where it would touch the name left of it (px)
-const LABEL_TOP = 4;
-const LABEL_GAP = 4;
 
 /** What the handle asks of whoever lays the widgets out */
 export type HandleHost<W> = {
@@ -59,7 +57,7 @@ export class WidthHandle<W> {
   private keysTimer: ReturnType<typeof setTimeout> | undefined;
   private keyed: { readonly widget: W; width: number } | undefined;
   // While a drag goes on: a guide for each width it snaps to, a quiet line each side of the text's middle
-  private guides: { readonly name: string; readonly width: number; readonly lines: readonly HTMLElement[] }[] = [];
+  private readonly lines: GuideLines;
   // The guide the drag snapped to last, lit as the page scrolls meanwhile
   private near: string | undefined;
   // Where the widget's middle was last: a widget drawn anew (after a write) is found there again
@@ -75,6 +73,7 @@ export class WidthHandle<W> {
   ) {
     this.bar = el(doc, "button", { class: `${BASE}-bar`, attrs: { "aria-label": "Widget width: drag, or the arrow keys; a double click for the text's width" } });
     this.box = el(doc, "div", { class: BASE, attrs: { hidden: "" } }, this.bar);
+    this.lines = new GuideLines(doc, host);
     doc.body.append(this.box);
     doc.addEventListener("pointermove", (e) => this.pointed(e), { passive: true });
     doc.addEventListener("pointerdown", (e) => this.touched(e), { capture: true, passive: true });
@@ -213,77 +212,25 @@ export class WidthHandle<W> {
     this.showGuides();
   }
 
-  /**
-   * The guides of a drag: for the text's width and each guide the pane can hold, a quiet line each side (a widget is
-   * centred on the text, so its edges meet both), the right one named. A width snapped to lights its guide a little
-   */
+  /** The guides of a drag: the targets it can snap to, placed by its widget's middle */
   private showGuides(): void {
-    this.clearGuides();
-    const pane = this.host.paneWidth();
-    // (The targets a drag can reach, one of a width: the lines are what it snaps to)
-    for (const target of snapTargets(this.host.textWidth(), this.host.guides(), pane)) {
-      const width = Math.round(target.width);
-      const left = el(this.doc, "div", `${BASE}-guide`);
-      const right = el(this.doc, "div", { class: `${BASE}-guide`, attrs: { "data-swl-guide": target.name } }, el(this.doc, "span", { class: `${BASE}-guide-label`, text: target.name }));
-      (this.host.guideLayer() ?? this.doc.body).append(left, right);
-      this.guides.push({ name: target.name, width, lines: [left, right] });
-    }
-    this.placeGuides(undefined);
-    this.rowLabels();
+    const middle = this.middleOf();
+    if (middle === undefined) return;
+    this.lines.show(snapTargets(this.host.textWidth(), this.host.guides(), this.host.paneWidth()), middle);
   }
 
-  /**
-   * The guides' names in rows: each, from the left, in the first row where it keeps clear of the name before it (two
-   * guides near each other, as the text's width and 900 px, had their names over each other). Once a drag: the
-   * guides keep their distances while it goes on
-   */
-  private rowLabels(): void {
-    const labels = this.guides
-      .map((guide) => guide.lines[1]!.firstElementChild as HTMLElement | null)
-      .filter((label): label is HTMLElement => !!label)
-      .map((label) => ({ label, box: label.getBoundingClientRect() }))
-      .sort((a, b) => a.box.left - b.box.left);
-    const ends: number[] = [];
-    for (const { label, box } of labels) {
-      let row = ends.findIndex((end) => end + LABEL_GAP <= box.left);
-      if (row < 0) row = ends.length;
-      ends[row] = box.right;
-      label.style.top = `${LABEL_TOP + row * (Math.ceil(box.height) + 1)}px`;
-    }
-  }
-
-  /**
-   * The guides placed by the text's middle, over the whole height the page is seen in: in the box it scrolls in, by
-   * its scroll (under its widgets, as Confluence's); else over the window. The one of `near` lit
-   */
+  /** The guides placed again by the widget's middle (the page scrolled, the widget wider), the one of `near` lit */
   private placeGuides(near: string | undefined): void {
-    const element = this.widget && this.host.element(this.widget);
-    if (!element?.isConnected || !this.guides.length) return;
-    const rect = element.getBoundingClientRect();
-    const middle = rect.left + rect.width / 2;
-    const layer = this.host.guideLayer();
-    const box = layer?.getBoundingClientRect();
-    const view = this.host.view();
-    // In the scrolling box its own coordinates (what it scrolled by added), else the window's
-    const dx = layer && box ? layer.scrollLeft - box.left : 0;
-    const top = layer ? layer.scrollTop : view.top;
-    const height = `${Math.round(layer ? layer.clientHeight : view.bottom - view.top)}px`;
-    for (const guide of this.guides) {
-      const [left, right] = guide.lines;
-      for (const [line, x] of [
-        [left!, middle - guide.width / 2],
-        [right!, middle + guide.width / 2],
-      ] as const) {
-        line.classList.toggle(`${BASE}-guide-fixed`, !layer);
-        Object.assign(line.style, { left: `${Math.round(x + dx)}px`, top: `${Math.round(top)}px`, height });
-        line.classList.toggle(`${BASE}-guide-near`, guide.name === near);
-      }
-    }
+    const middle = this.middleOf();
+    if (middle !== undefined) this.lines.place(middle, near);
   }
 
-  private clearGuides(): void {
-    for (const guide of this.guides) for (const line of guide.lines) line.remove();
-    this.guides = [];
+  /** The middle of the widget dragged (x in the window); none where it is not in the page */
+  private middleOf(): number | undefined {
+    const element = this.widget && this.host.element(this.widget);
+    if (!element?.isConnected) return undefined;
+    const rect = element.getBoundingClientRect();
+    return rect.left + rect.width / 2;
   }
 
   private dragged(e: PointerEvent): void {
@@ -335,7 +282,7 @@ export class WidthHandle<W> {
     if (this.drag && this.bar.hasPointerCapture(this.drag.pointer)) this.bar.releasePointerCapture(this.drag.pointer);
     this.drag = undefined;
     this.box.classList.remove(`${BASE}-dragging`);
-    this.clearGuides();
+    this.lines.clear();
   }
 
   private key(e: KeyboardEvent): void {

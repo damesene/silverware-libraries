@@ -377,10 +377,22 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   flex-direction: column;
   gap: 6px;
 }
+.swl-dialog-guide-list {
+  align-self: stretch;
+}
 .swl-dialog-guide-row {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+/* A guide's slider: the room the row leaves its number, unit and × */
+.swl-dialog-guide-slider-box {
+  flex: 1;
+  min-width: 0;
+}
+.swl-dialog-guide-slider-box .swl-dialog-slider {
+  display: block;
+  margin: 0;
 }
 .swl-dialog-unit {
   opacity: 0.7;
@@ -436,6 +448,61 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   color: var(--ui-accent-color);
 }
 .swl-dialog-notice-icon svg {
+  width: 16px;
+  height: 16px;
+}
+/* Preview on the Guides tab (held, the guides on the page) and Default guides beside it, over the list: an icon and its name each */
+.swl-dialog-guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.swl-dialog-preview-box {
+  display: flex;
+}
+.swl-dialog-guides-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  opacity: 0.8;
+}
+.swl-dialog-guides-reset:hover:not(:disabled),
+.swl-dialog-guides-reset:focus-visible {
+  opacity: 1;
+  background: var(--swl-dialog-card);
+}
+.swl-dialog-guides-reset:disabled {
+  opacity: 0.35;
+}
+.swl-dialog-guides-reset svg {
+  width: 16px;
+  height: 16px;
+}
+.swl-dialog-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: none;
+  border: 1px solid var(--swl-dialog-line);
+  border-radius: 6px;
+  /* (Held by a finger: no text selected, no menu of the browser's) */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+.swl-dialog-preview:hover,
+.swl-dialog-preview:focus-visible {
+  border-color: var(--ui-accent-color);
+}
+.swl-dialog-preview svg {
   width: 16px;
   height: 16px;
 }

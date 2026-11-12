@@ -35,6 +35,8 @@ function memoryStore(pages: Record<string, Width | undefined>, settings: Partial
     settings: { ...SETTINGS, ...settings },
     zoom: undefined as number | undefined,
     saved: [] as string[],
+    // What a confirmation is answered
+    answer: true,
   };
   const api: LayoutStore = {
     canSaveSettings: true,
@@ -50,7 +52,7 @@ function memoryStore(pages: Record<string, Width | undefined>, settings: Partial
     saveFont: async (size, zoom) => void store.saved.push(`font ${size} ${zoom}`),
     readZoom: () => store.zoom,
     keepZoom: (size) => void (store.zoom = size),
-    confirm: async () => true,
+    confirm: async () => store.answer,
     flash: () => undefined,
   };
   return { store, api };
@@ -220,6 +222,120 @@ describe("Silverware Layout's app over a page of no host's", () => {
     font.dispatchEvent(new Event("input"));
     expect(document.querySelector<HTMLInputElement>('[aria-label="This device\'s font size"]')!.value).toBe("22");
     expect(document.querySelector<HTMLInputElement>('[aria-label="This device\'s font size in px"]')!.placeholder).toBe("22");
+  });
+
+  it("Preview held: the guides as typed drawn on the page, the dialog all but gone; let go, both back", async () => {
+    const { page } = plainPage();
+    const { api } = memoryStore({ Page: undefined });
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    await app.start(api);
+    await app.openDialog();
+    const dialog = document.querySelector(".swl-dialog")!;
+    const preview = document.querySelector<HTMLButtonElement>(".swl-dialog-preview")!;
+    preview.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+    expect(dialog.classList.contains("swl-dialog-sliding")).toBe(true);
+    // The page's width and the guides, a line each side (jsdom lays nothing out: every guide is "reached")
+    expect([...document.querySelectorAll(".swl-handle-guide-label")].map((label) => label.textContent)).toContain("Page width");
+    expect(document.querySelectorAll(".swl-handle-guide").length).toBeGreaterThan(2);
+    window.dispatchEvent(new Event("pointerup"));
+    expect(dialog.classList.contains("swl-dialog-sliding")).toBe(false);
+    expect(document.querySelectorAll(".swl-handle-guide")).toHaveLength(0);
+  });
+
+  it("Default guides: asked; declined, the guides as they were; confirmed, the default ones in the rows, saved on Save; off while they are the default", async () => {
+    const { page } = plainPage();
+    const { api, store } = memoryStore({ Page: undefined }, { guides: [600, "75%"] });
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    await app.start(api);
+    await app.openDialog();
+    const values = () => [...document.querySelectorAll<HTMLInputElement>(".swl-dialog-guide-amount")].map((input) => input.value);
+    const reset = document.querySelector<HTMLButtonElement>(".swl-dialog-guides-reset")!;
+    expect(values()).toEqual(["600", "75"]);
+    store.answer = false;
+    reset.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(values()).toEqual(["600", "75"]);
+    store.answer = true;
+    reset.click();
+    await expect.poll(values).toEqual(["900", "1200"]);
+    expect(document.querySelector<HTMLInputElement>(".swl-dialog-full input")!.checked).toBe(true);
+    expect(reset.disabled).toBe(true);
+    document.querySelector<HTMLButtonElement>(".swl-dialog-save")!.click();
+    await expect.poll(() => store.saved).toEqual(["guides 900 1200 full"]);
+  });
+
+  it("where settings cannot be saved, the guides, all pages' width and the Ctrl + scroll box cannot be changed; Preview still shows", async () => {
+    const { page } = plainPage();
+    const { api } = memoryStore({ Page: undefined });
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    await app.start({ ...api, canSaveSettings: false });
+    await app.openDialog();
+    const guides = document.querySelector(".swl-dialog-guides")!;
+    const enabled = [...guides.querySelectorAll<HTMLInputElement | HTMLButtonElement>("input, button")].filter((control) => !control.disabled);
+    expect(enabled.map((control) => control.className)).toEqual(["swl-dialog-preview"]);
+    const all = document.querySelector('[data-swl-row="all"]')!;
+    expect([...all.querySelectorAll<HTMLInputElement | HTMLButtonElement>("input, button")].every((control) => control.disabled)).toBe(true);
+    expect(document.querySelector<HTMLInputElement>(".swl-dialog-zoom input")!.disabled).toBe(true);
+  });
+
+  it("the guides' sliders share the room of the guides as typed: a wider one typed widens it, taken out narrows it", async () => {
+    const { page } = plainPage();
+    const { api } = memoryStore({ Page: undefined }, { guides: [900, 3000, "full"] });
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    await app.start(api);
+    await app.openDialog();
+    const sliders = () => [...document.querySelectorAll<HTMLInputElement>(".swl-dialog-guide-slider")].map((slider) => slider.max);
+    expect(sliders()).toEqual(["3000", "3000"]);
+    const rows = document.querySelectorAll<HTMLElement>(".swl-dialog-guide-row");
+    rows[1]!.querySelector<HTMLButtonElement>(".swl-dialog-remove")!.click();
+    expect(sliders()).toEqual(["1200"]);
+    const input = rows[0]!.querySelector<HTMLInputElement>(".swl-dialog-guide-amount")!;
+    input.value = "2500";
+    input.dispatchEvent(new Event("input"));
+    expect(sliders()).toEqual(["2500"]);
+    expect(rows[0]!.querySelector<HTMLInputElement>(".swl-dialog-guide-slider")!.value).toBe("2500");
+  });
+
+  it("a guide's slider: its number follows it; held, the guides on the page, drawn again as it moves; let go, none", async () => {
+    const { page } = plainPage();
+    const { api } = memoryStore({ Page: undefined });
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    await app.start(api);
+    await app.openDialog();
+    const row = document.querySelectorAll<HTMLElement>(".swl-dialog-guide-row")[0]!;
+    const slider = row.querySelector<HTMLInputElement>(".swl-dialog-guide-slider")!;
+    expect(slider.value).toBe("900");
+    slider.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(document.querySelector(".swl-dialog")!.classList.contains("swl-dialog-sliding")).toBe(true);
+    const labels = () => [...document.querySelectorAll(".swl-handle-guide-label")].map((label) => label.textContent);
+    expect(labels()).toContain("900 px");
+    slider.value = "700";
+    slider.dispatchEvent(new Event("input"));
+    expect(row.querySelector<HTMLInputElement>(".swl-dialog-guide-amount")!.value).toBe("700");
+    expect(labels()).toContain("700 px");
+    expect(labels()).not.toContain("900 px");
+    window.dispatchEvent(new Event("pointerup"));
+    expect(document.querySelectorAll(".swl-handle-guide")).toHaveLength(0);
+  });
+
+  it("with the dialog open, Ctrl + scroll and Ctrl+0 set its This device (anywhere: its ground lies over the page), kept on Save", async () => {
+    const { page } = plainPage();
+    const { api, store } = memoryStore({ Page: undefined }, { fontSize: 18 });
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    await app.start(api);
+    await app.openDialog();
+    const zoomed = document.querySelector<HTMLInputElement>('[aria-label="This device\'s font size in px"]')!;
+    const wheel = (deltaY: number) => document.querySelector(".swl-dialog-backdrop")!.dispatchEvent(new WheelEvent("wheel", { deltaY, ctrlKey: true, bubbles: true, cancelable: true }));
+    wheel(-100);
+    wheel(-100);
+    expect(zoomed.value).toBe("20");
+    expect(document.documentElement.getAttribute("data-swl-font-size")).toBe("20");
+    // Ctrl+0: the size of all pages again
+    document.querySelector(".swl-dialog")!.dispatchEvent(new KeyboardEvent("keydown", { key: "0", ctrlKey: true, bubbles: true, cancelable: true }));
+    expect(zoomed.value).toBe("");
+    wheel(-100);
+    document.querySelector<HTMLButtonElement>(".swl-dialog-save")!.click();
+    await expect.poll(() => store.zoom).toBe(19);
   });
 
   it("a slider held: the dialog marked sliding, the controls held marked; let go, neither", async () => {

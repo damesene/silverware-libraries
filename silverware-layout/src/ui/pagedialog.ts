@@ -10,15 +10,17 @@
 //   (on a phone the dialog takes the screen).
 //   What is set shows on the page at once (the dialog held at the window's top, the page seen under it).
 // - Guides: the widths a drag snaps to (a widget's bar, these sliders), each typed in its own row, in px or % of the
-//   pane (the same switch as a width's); Full width a box.
-//   Ascending as the tab is drawn, left in the order typed until it is drawn again.
-// Save writes what changed (the page's into its frontmatter, the default and the guides into CONFIG), Cancel or Esc
-// puts the page back. Font zoom and the font size are saved into CONFIG as well. The shared dialog, tabs and controls (shared/), classes `swl-dialog-*`.
+//   pane (the same switch as a width's), or by its slider, which held shows them on the page as it moves; Full width a
+//   box. Preview, held, shows them on the page as typed, the dialog all but gone meanwhile; Default guides puts the
+//   default ones back, once confirmed (saved, as all, on Save). Ascending as the tab is drawn, left in the order typed
+//   until it is drawn again.
+// Save writes what changed (the page's into its frontmatter, the default, the guides and the font into CONFIG), Cancel
+// or Esc puts the page back. The shared dialog, tabs and controls (shared/), classes `swl-dialog-*`.
 import { type SegmentedControl, segmentedControl } from "../../../shared/controls.ts";
 import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { el } from "../../../shared/elements.ts";
 import { tabs } from "../../../shared/tabs.ts";
-import { FONT_SIZE_LIMITS, GUIDE_LIMITS, type Guide, guideOf, percentOf, validateFontSize, validateGuide } from "../model/settings.ts";
+import { DEFAULT_GUIDES, FONT_SIZE_LIMITS, GUIDE_LIMITS, type Guide, guideName, guideOf, percentOf, validateFontSize, validateGuide } from "../model/settings.ts";
 import { sameWidth, TEXT_WIDTH_LIMITS, validateTextWidth, type Width, type WidthUnit } from "../model/width.ts";
 import { widthInPane } from "../core/widgetwidth.ts";
 import { ICONS } from "./icons.ts";
@@ -65,6 +67,8 @@ export type PageDialogStore = {
   saveFont(fontSize: number | undefined, fontZoom: boolean): Promise<string | undefined>;
   // This device's zoom kept (none: taken off)
   saveZoom(size: number | undefined): void;
+  // The guides shown on the page as a drag shows them (the page's width with them), until the function given back
+  previewGuides(guides: readonly Guide[]): () => void;
   confirm(question: string): Promise<boolean>;
   flash(message: string, type: "info" | "error"): void;
 };
@@ -130,7 +134,7 @@ const tickName = (guide: Guide): string => (guide === "full" ? "Full" : typeof g
 type WidthRow = { readonly element: HTMLElement; readonly field: Field; show(): void };
 
 /** A guide's row of the Guides tab: its number as typed, its unit */
-type GuideRow = { readonly element: HTMLElement; readonly input: HTMLInputElement; unit: WidthUnit };
+type GuideRow = { readonly element: HTMLElement; readonly input: HTMLInputElement; readonly slider: HTMLInputElement; unit: WidthUnit };
 
 /** Why a guide's row holds no guide (empty: none, nothing to say) */
 const rowProblem = (row: GuideRow): string | undefined => (row.input.value.trim() ? validateGuide(Number(row.input.value), row.unit) : undefined);
@@ -145,14 +149,17 @@ export class PageDialog {
   private guideRows: GuideRow[] = [];
   private guideList: HTMLElement | undefined;
   private full: HTMLInputElement | undefined;
+  private resetGuides: HTMLButtonElement | undefined;
   private saveButton: HTMLButtonElement | undefined;
   private note: HTMLElement | undefined;
   // The font size of all pages, this device's zoom (none: the size of all pages), whether Ctrl + scroll zooms
-  private font: FontField = { own: false, amount: "" };
+  private fontField: FontField = { own: false, amount: "" };
   private device: FontField = { own: false, amount: "" };
   private fontZoom: HTMLInputElement | undefined;
   // This device's row drawn again (its slider follows the font's size while it has no zoom of its own)
   private drawDevice: (() => void) | undefined;
+  // How many of its controls are held now (a slider, Preview): the guides' sliders keep their room meanwhile
+  private holds = 0;
 
   constructor(private readonly doc: Document) {
     this.dialogs = new Dialogs(doc, { base: BASE, closeIcon: ICONS.close });
@@ -160,6 +167,22 @@ export class PageDialog {
 
   get isOpen(): boolean {
     return this.dialogs.isOpen;
+  }
+
+  /**
+   * The font as set in the dialog now, for the font zoom while it is open (Ctrl + scroll and Ctrl+0 then set This
+   * device's row, as its slider does, kept on Save): whether Ctrl + scroll zooms, the size of all pages (none: the
+   * theme's), this device's zoom (none: none)
+   */
+  get font(): { readonly zooms: boolean; readonly size: number | undefined; readonly zoom: number | undefined } {
+    return { zooms: !!this.fontZoom?.checked, size: fontSizeOf(this.fontField).size, zoom: fontSizeOf(this.device).size };
+  }
+
+  /** This device's zoom set (none: the size of all pages again), as its row's slider sets it */
+  setZoom(size: number | undefined): void {
+    this.device.own = size !== undefined;
+    this.device.amount = size === undefined ? "" : String(size);
+    this.update();
   }
 
   open(store: PageDialogStore): void {
@@ -197,18 +220,45 @@ export class PageDialog {
 
     // The guides: each its row, ascending as drawn; Full width a box of its own
     this.guideList = el(doc, "div", { class: `${BASE}-guide-list`, attrs: { role: "list" } });
-    this.guideRows = [];
-    // (Ascending as shown in the pane now: pixels and percents among each other)
-    const pane = store.paneWidth();
-    const rows = store.guides.filter((guide) => guide !== "full").sort((a, b) => guidePixels(a, pane) - guidePixels(b, pane));
-    for (const guide of rows) this.addGuide(typeof guide === "string" ? String(percentOf(guide)) : String(guide), typeof guide === "string" ? "%" : "px", false);
     const add = el(doc, "button", { class: `${BASE}-add`, text: "+ Add guide", run: () => this.addGuide("", "px", true) });
     this.full = el(doc, "input", { attrs: { type: "checkbox" } });
-    this.full.checked = store.guides.includes("full");
     this.full.addEventListener("change", () => this.update());
+    this.showGuides(store.guides);
+    // Default guides: the default ones back in the rows, once confirmed (the user's own would go); saved on Save
+    this.resetGuides = el(doc, "button", {
+      class: `${BASE}-guides-reset`,
+      html: ICONS.reset,
+      attrs: { title: `Put the default guides back: ${DEFAULT_GUIDES.map(guideName).join(", ")}` },
+      run: () => void this.defaultGuides(),
+    });
+    this.resetGuides.append("Default guides");
     const fullRow = el(doc, "label", `${BASE}-full`, this.full, "Full width");
-    const guidesPanel = el(doc, "div", `${BASE}-guides`, this.guideList, add, fullRow);
-    if (!store.canSaveSettings) guidesPanel.classList.add(`${BASE}-readonly`);
+    // Preview: held (a press, a finger, Space or Enter), the guides as typed on the page, the dialog all but gone
+    const preview = el(doc, "button", { class: `${BASE}-preview`, html: ICONS.eye, attrs: { title: "Hold to see the guides on the page" } });
+    preview.append("Preview");
+    const previewBox = el(doc, "div", `${BASE}-preview-box`, preview);
+    const startPreview = (byKey: boolean) => this.hold(previewBox, store.previewGuides(this.currentGuides()), byKey);
+    preview.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      startPreview(false);
+    });
+    preview.addEventListener("keydown", (e) => {
+      if ((e.key !== " " && e.key !== "Enter") || e.repeat) return;
+      e.preventDefault();
+      startPreview(true);
+    });
+    // (Preview held shows its own box alone: Default guides beside it, not in it)
+    const actions = el(doc, "div", `${BASE}-guide-actions`, previewBox, this.resetGuides);
+    // (Preview and Default guides first, over the list: found at once, not under a list of any length)
+    const guidesPanel = el(doc, "div", `${BASE}-guides`, actions, this.guideList, add, fullRow);
+    // Settings that cannot be saved here cannot be changed either (Save would leave them as they are); Preview still shows
+    if (!store.canSaveSettings) {
+      guidesPanel.classList.add(`${BASE}-readonly`);
+      for (const part of [this.fallback.element, guidesPanel, this.fontZoom!]) {
+        const controls = part instanceof HTMLInputElement ? [part] : part.querySelectorAll<HTMLInputElement | HTMLButtonElement>("input, button");
+        for (const control of controls) if (control !== preview) control.disabled = true;
+      }
+    }
     // (The sliders made before the guides' rows: marked with them now)
     this.page.show();
     this.fallback.show();
@@ -261,6 +311,28 @@ export class PageDialog {
     const px = (width: Width | undefined) => (width ? (width.unit === "px" ? width.amount : (width.amount * pane) / 100) : store.themeWidth());
     // (All pages' row as set now; while it is being made, its width as saved)
     return row === "page" ? px(this.fallback ? widthOf(this.fallback.field).width : store.defaultWidth) : store.themeWidth();
+  }
+
+  /** Rows of these guides (those typed before gone), ascending in the pane now; Full width ticked where full is one */
+  private showGuides(guides: readonly Guide[]): void {
+    const pane = this.store!.paneWidth();
+    this.guideRows = [];
+    this.guideList?.replaceChildren();
+    // (Ascending as shown in the pane now: pixels and percents among each other)
+    const rows = guides.filter((guide) => guide !== "full").sort((a, b) => guidePixels(a, pane) - guidePixels(b, pane));
+    for (const guide of rows) this.addGuide(typeof guide === "string" ? String(percentOf(guide)) : String(guide), typeof guide === "string" ? "%" : "px", false);
+    if (this.full) this.full.checked = guides.includes("full");
+  }
+
+  /** Default guides pressed: asked, then the default guides in the rows (the sliders marked with them), Save to keep */
+  private async defaultGuides(): Promise<void> {
+    const store = this.store!;
+    const names = DEFAULT_GUIDES.map(guideName).join(", ");
+    if (!(await store.confirm(`Put the default guides back (${names})? The guides you set here go; Save keeps the change.`))) return;
+    this.showGuides(DEFAULT_GUIDES);
+    this.page?.show();
+    this.fallback?.show();
+    this.update();
   }
 
   /** The guides as typed now, in pixels or percents (those that are no guide left out), and Full width */
@@ -387,7 +459,7 @@ export class PageDialog {
   private fontRows(): HTMLElement[] {
     const { doc } = this;
     const store = this.store!;
-    const field: FontField = (this.font = { own: store.fontSize !== undefined, amount: store.fontSize === undefined ? "" : String(store.fontSize) });
+    const field: FontField = (this.fontField = { own: store.fontSize !== undefined, amount: store.fontSize === undefined ? "" : String(store.fontSize) });
     const sizeSlider = (label: string) =>
       el(doc, "input", { class: `${BASE}-slider`, attrs: { type: "range", step: "1", min: String(FONT_SIZE_LIMITS.min), max: String(FONT_SIZE_LIMITS.max), "aria-label": label } });
     const sizeField = (label: string) => el(doc, "input", { class: `${BASE}-amount`, attrs: { type: "number", inputmode: "numeric", step: "1", "aria-label": label } });
@@ -436,7 +508,7 @@ export class PageDialog {
     // This device: the size of all pages, or its own (as Ctrl + scroll sets it); Ctrl + scroll on or off, its row there
     // either way (off: quiet, kept as it is)
     const device: FontField = (this.device = { own: store.zoom !== undefined, amount: store.zoom === undefined ? "" : String(store.zoom) });
-    const fallback = () => fontSizeOf(this.font).size ?? store.themeFontSize();
+    const fallback = () => fontSizeOf(this.fontField).size ?? store.themeFontSize();
     const zoomSlider = sizeSlider("This device's font size");
     const zoomAmount = sizeField("This device's font size in px");
     const zoomNote = el(doc, "div", `${BASE}-row-note`);
@@ -485,21 +557,53 @@ export class PageDialog {
    */
   private slides(slider: HTMLInputElement): void {
     slider.addEventListener("pointerdown", () => {
-      const box = slider.closest<HTMLElement>(`.${BASE}`);
       const held = slider.closest<HTMLElement>(`.${BASE}-width-controls`);
-      if (!box || !held) return;
-      box.classList.add(`${BASE}-sliding`);
-      held.classList.add(`${BASE}-held`);
-      const view = this.doc.defaultView;
-      const end = () => {
-        box.classList.remove(`${BASE}-sliding`);
-        held.classList.remove(`${BASE}-held`);
-        view?.removeEventListener("pointerup", end, true);
-        view?.removeEventListener("pointercancel", end, true);
-      };
-      view?.addEventListener("pointerup", end, true);
-      view?.addEventListener("pointercancel", end, true);
+      if (held) this.hold(held);
     });
+  }
+
+  /**
+   * The dialog all but gone while something of it is held (`held` alone shown), back as it is let go: the pointer up
+   * or taken away, or, held by a key (Preview by Space or Enter), the key up; `ended` then
+   */
+  private hold(held: HTMLElement, ended?: () => void, byKey = false): void {
+    const box = held.closest<HTMLElement>(`.${BASE}`);
+    if (!box) return;
+    box.classList.add(`${BASE}-sliding`);
+    held.classList.add(`${BASE}-held`);
+    this.holds++;
+    const view = this.doc.defaultView;
+    const types = byKey ? ["keyup", "pointercancel"] : ["pointerup", "pointercancel"];
+    const end = () => {
+      this.holds--;
+      box.classList.remove(`${BASE}-sliding`);
+      held.classList.remove(`${BASE}-held`);
+      for (const type of types) view?.removeEventListener(type, end, true);
+      ended?.();
+      this.update();
+    };
+    for (const type of types) view?.addEventListener(type, end, true);
+  }
+
+  /**
+   * The room of the guides' sliders in px: one for all, so their places compare (on a phone too), to the pane's width or
+   * the widest guide typed now (or `more`), whichever is wider, in whole hundreds
+   */
+  private guideRoom(more = 0): number {
+    const pane = this.store!.paneWidth();
+    const widest = Math.max(pane, more, ...this.currentGuides().map((guide) => guidePixels(guide, pane)));
+    return Math.min(GUIDE_LIMITS.px.max, Math.ceil(widest / 100) * 100);
+  }
+
+  /** The guides' sliders in px given the room of the guides as typed now (not while one is held: it would jump) */
+  private fitGuideSliders(): void {
+    if (this.holds) return;
+    const room = String(this.guideRoom());
+    for (const row of this.guideRows) {
+      if (row.unit !== "px" || row.slider.max === room) continue;
+      row.slider.max = room;
+      if (row.input.value.trim() && Number.isFinite(Number(row.input.value))) row.slider.value = row.input.value;
+    }
   }
 
   /** Whether a row can be changed here (all pages' width only where settings can be saved) */
@@ -508,24 +612,56 @@ export class PageDialog {
   }
 
   /**
-   * A guide's row: its number typed straight in, its unit switched (px or % of the pane: the number converted, as a
-   * width's), a × taking it out; `focus`: the new one, to type in
+   * A guide's row: a slider (held: the guides on the page as it moves, the dialog all but gone), its number typed
+   * straight in, its unit switched (px or % of the pane: the number converted, as a width's), a × taking it out;
+   * `focus`: the new one, to type in
    */
   private addGuide(value: string, unit: WidthUnit, focus: boolean): void {
     const { doc } = this;
+    const store = this.store!;
     const input = el(doc, "input", { class: `${BASE}-guide-amount`, attrs: { type: "number", inputmode: "numeric", step: "1" } });
     input.value = value;
-    input.addEventListener("input", () => this.update());
-    const row: GuideRow = { element: el(doc, "div", { class: `${BASE}-guide-row`, attrs: { role: "listitem" } }), input, unit };
+    const slider = el(doc, "input", { class: `${BASE}-slider ${BASE}-guide-slider`, attrs: { type: "range", step: "1" } });
+    const row: GuideRow = { element: el(doc, "div", { class: `${BASE}-guide-row`, attrs: { role: "listitem" } }), input, slider, unit };
+    // The slider's room: % of the pane to its whole; px from the least to the pane's width (or the value, wider)
     const limits = () => {
-      input.min = String(GUIDE_LIMITS[row.unit].min);
-      input.max = String(GUIDE_LIMITS[row.unit].max);
+      const { min, max } = GUIDE_LIMITS[row.unit];
+      input.min = String(min);
+      input.max = String(max);
       input.setAttribute("aria-label", `Guide width in ${row.unit}`);
+      slider.setAttribute("aria-label", `Guide width (${row.unit})`);
+      slider.min = String(min);
+      slider.max = String(row.unit === "%" ? max : this.guideRoom(Number(input.value) || 0));
+      if (input.value.trim() && Number.isFinite(Number(input.value))) slider.value = input.value;
+      else slider.value = String(row.unit === "%" ? 80 : Math.round(store.paneWidth() * 0.8));
     };
     limits();
+    // While the slider is held: the guides on the page, drawn again as it moves
+    let stopPreview: (() => void) | undefined;
+    const previewAgain = () => {
+      if (!stopPreview) return;
+      stopPreview();
+      stopPreview = store.previewGuides(this.currentGuides());
+    };
+    slider.addEventListener("pointerdown", () => {
+      stopPreview = store.previewGuides(this.currentGuides());
+      this.hold(row.element, () => {
+        stopPreview?.();
+        stopPreview = undefined;
+      });
+    });
+    slider.addEventListener("input", () => {
+      input.value = slider.value;
+      this.update();
+      previewAgain();
+    });
+    input.addEventListener("input", () => {
+      if (input.value.trim() && Number.isFinite(Number(input.value))) slider.value = input.value;
+      this.update();
+    });
     const units = segmentedControl(doc, SEGMENTS_BASE, "Guide's unit", UNITS, unit, (to) => {
       const now = Number(input.value);
-      const pane = this.store!.paneWidth();
+      const pane = store.paneWidth();
       if (input.value.trim() && Number.isFinite(now) && pane > 0) input.value = String(converted(now, to, pane, GUIDE_LIMITS));
       row.unit = to;
       limits();
@@ -541,7 +677,7 @@ export class PageDialog {
         this.update();
       },
     });
-    row.element.append(input, units.element, remove);
+    row.element.append(el(doc, "div", `${BASE}-guide-slider-box`, slider), input, units.element, remove);
     this.guideRows.push(row);
     this.guideList?.append(row.element);
     if (focus) input.focus();
@@ -554,13 +690,16 @@ export class PageDialog {
     if (!store || !this.page || !this.fallback) return;
     const page = widthOf(this.page.field);
     const fallback = widthOf(this.fallback.field);
+    const guides = this.currentGuides();
+    if (this.resetGuides) this.resetGuides.disabled = !this.editable(this.resetGuides) || (guides.length === DEFAULT_GUIDES.length && DEFAULT_GUIDES.every((guide) => guides.includes(guide)));
     const badGuide = this.guideRows.find((row) => !!rowProblem(row));
     for (const row of this.guideRows) row.input.classList.toggle(`${BASE}-invalid`, !!rowProblem(row));
+    this.fitGuideSliders();
     // The rows following another shown as what they follow now (This page the width of all pages, This device the
     // font's size), as that one changes
     if (!this.page.field.own) this.page.show();
     this.drawDevice?.();
-    const font = fontSizeOf(this.font);
+    const font = fontSizeOf(this.fontField);
     const zoom = fontSizeOf(this.device);
     const problem = page.problem ?? fallback.problem ?? font.problem ?? zoom.problem ?? (badGuide ? rowProblem(badGuide) : undefined);
     if (!page.problem && !fallback.problem && !font.problem && !zoom.problem) {
@@ -587,7 +726,7 @@ export class PageDialog {
   /** Whether the font size or Font zoom differ from what is saved */
   private fontChanged(): boolean {
     const store = this.store!;
-    return fontSizeOf(this.font).size !== store.fontSize || !!this.fontZoom?.checked !== store.fontZoom;
+    return fontSizeOf(this.fontField).size !== store.fontSize || !!this.fontZoom?.checked !== store.fontZoom;
   }
 
   /** Whether this device's zoom is set otherwise than it is kept (its slider moved, typed, ↺) */
@@ -613,7 +752,7 @@ export class PageDialog {
     if (!store || this.saving || !this.page || !this.fallback) return;
     const page = widthOf(this.page.field);
     const fallback = widthOf(this.fallback.field);
-    const font = fontSizeOf(this.font);
+    const font = fontSizeOf(this.fontField);
     if (page.problem || fallback.problem || font.problem || fontSizeOf(this.device).problem) return;
     this.saving = true;
     this.update();

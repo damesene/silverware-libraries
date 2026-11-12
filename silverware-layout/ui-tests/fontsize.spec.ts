@@ -94,6 +94,21 @@ test("this device's zoom set by its slider in the dialog (as on a phone, which h
   expect(await space.config()).not.toContain("fontSize");
 });
 
+test("with the Page layout dialog open, Ctrl + scroll over the page zooms as its This device row: shown at once, kept on Save", async ({ page, space }) => {
+  await space.open({ Page: PAGE }, "Page");
+  await runCommand(page, PAGE_LAYOUT);
+  const dialog = page.locator(".swl-dialog");
+  await dialog.getByRole("tab", { name: "Font" }).click();
+  await zoom(page, 2);
+  await expect.poll(() => fontSize(page)).toBe(THEME + 2);
+  await expect(dialog.getByRole("spinbutton", { name: "This device's font size in px" })).toHaveValue(`${THEME + 2}`);
+  await expect(label(page)).toHaveText(`Font size ${THEME + 2} px`);
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  expect(await page.evaluate(() => localStorage.getItem("silverware.layout.fontZoom"))).toBe(`${THEME + 2}`);
+  expect(await fontSize(page)).toBe(THEME + 2);
+});
+
 test("the font size for every page set in the dialog, shown at once, saved into CONFIG; the zoom's default then", async ({ page, space }) => {
   await space.open({ Page: PAGE }, "Page");
   await runCommand(page, PAGE_LAYOUT);

@@ -158,6 +158,82 @@ test("the guides typed straight in their rows, saved into Silverware Layout's ow
   await expect(dialog.getByRole("checkbox", { name: "Full width" })).not.toBeChecked();
 });
 
+test("Preview held on the Guides tab: the guides as typed on the page (one added, unsaved), the dialog all but gone; let go, the dialog back and no guide", async ({ page, space }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
+  await runCommand(page, PAGE_LAYOUT);
+  const dialog = page.locator(".swl-dialog");
+  await dialog.getByRole("tab", { name: "Guides" }).click();
+  await dialog.getByRole("button", { name: "+ Add guide" }).click();
+  await page.keyboard.type("1000");
+  const preview = dialog.getByRole("button", { name: "Preview" });
+  const box = (await preview.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await expect(dialog).toHaveClass(/swl-dialog-sliding/);
+  // (In the order typed: the one added last; sorted only as the tab is shown again)
+  await expect(page.locator(".swl-handle-guide-label")).toHaveText(["Page width", "900 px", "1200 px", "1000 px", "Full width"]);
+  // Under the page's widgets, in its scroller, as a drag's
+  expect(await page.locator(".cm-scroller .swl-handle-guide").count()).toBe(10);
+  await page.mouse.up();
+  await expect(dialog).not.toHaveClass(/swl-dialog-sliding/);
+  await expect(page.locator(".swl-handle-guide")).toHaveCount(0);
+  // Held by Space as well
+  await preview.focus();
+  await page.keyboard.down(" ");
+  await expect(page.locator(".swl-handle-guide-label").first()).toHaveText("Page width");
+  await page.keyboard.up(" ");
+  await expect(page.locator(".swl-handle-guide")).toHaveCount(0);
+});
+
+test("a guide's slider dragged: its number follows, the guides shown on the page as it moves, the dialog all but gone; let go, both back", async ({ page, space }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
+  await runCommand(page, PAGE_LAYOUT);
+  const dialog = page.locator(".swl-dialog");
+  await dialog.getByRole("tab", { name: "Guides" }).click();
+  const row = dialog.locator(".swl-dialog-guide-row").first();
+  const slider = row.locator(".swl-dialog-guide-slider");
+  const box = (await slider.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2);
+  await page.mouse.down();
+  await expect(dialog).toHaveClass(/swl-dialog-sliding/);
+  const amount = Number(await row.locator(".swl-dialog-guide-amount").inputValue());
+  await expect(page.locator(".swl-handle-guide-label", { hasText: `${amount} px` })).toHaveCount(1);
+  await page.mouse.move(box.x + box.width * 0.3, box.y + box.height / 2, { steps: 5 });
+  const moved = Number(await row.locator(".swl-dialog-guide-amount").inputValue());
+  expect(moved).toBeLessThan(amount);
+  await expect(page.locator(".swl-handle-guide-label", { hasText: `${moved} px` })).toHaveCount(1);
+  await page.mouse.up();
+  await expect(dialog).not.toHaveClass(/swl-dialog-sliding/);
+  await expect(page.locator(".swl-handle-guide")).toHaveCount(0);
+});
+
+test("Default guides on the Guides tab: asked in SilverBullet's dialog; Cancel keeps the guides, Ok puts the default ones back", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\nSome text.\n" }, "Page");
+  await runCommand(page, PAGE_LAYOUT);
+  const dialog = page.locator(".swl-dialog");
+  await dialog.getByRole("tab", { name: "Guides" }).click();
+  const amounts = dialog.locator(".swl-dialog-guide-amount");
+  const reset = dialog.getByRole("button", { name: "Default guides" });
+  // The default ones already: nothing to put back
+  await expect(reset).toBeDisabled();
+  await amounts.first().fill("600");
+  await expect(reset).toBeEnabled();
+  const prompt = page.locator("dialog.sb-modal-box .sb-prompt");
+  await reset.click();
+  await expect(prompt).toContainText("Put the default guides back (900 px, 1200 px, Full width)?");
+  await prompt.locator(".sb-prompt-buttons button", { hasText: "Cancel" }).click();
+  await expect(prompt).toHaveCount(0);
+  expect(await amounts.evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value))).toEqual(["600", "1200"]);
+  await reset.click();
+  await prompt.locator(".sb-prompt-buttons button", { hasText: "Ok" }).click();
+  await expect.poll(() => amounts.evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value))).toEqual(["900", "1200"]);
+  await expect(reset).toBeDisabled();
+  // The Page layout dialog still open, nothing saved yet
+  await expect(dialog).toBeVisible();
+});
+
 test("a pane narrower than the setting's least gets no width, and gets it back wider", async ({ page, space }) => {
   await space.open({ Page: wide("Some text.") }, "Page");
   await expect.poll(() => widthSet(page)).toBe("1100px");

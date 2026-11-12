@@ -52,11 +52,13 @@ Without Silverware Layout, each is as wide as the text, its width still kept.
 
 The dialog's **Font** tab sets the editor's font size: **All pages** for every page (your theme's size until you set one), by its slider or typed in px. Headings, code, tables and charts grow with it.
 
-**Font zoom**: hold Ctrl and scroll over the page, and its font grows or shrinks a pixel a step, as the browser zooms. A label at the bottom left says the size for a moment, and says *default* where it is back at your default. **Ctrl+0** puts the default back. The size you zoom to is this device's alone, kept as the browser keeps its zoom, and never written into your space. On the Font tab, **This device** sets it too, by its slider or typed (on a phone, which has no Ctrl + scroll, that is how you zoom), and **↺** takes it off. Untick *Ctrl + scroll zooms here*, and Ctrl + scroll zooms the browser again.
+**Font zoom**: hold Ctrl and scroll over the page, and its font grows or shrinks a pixel a step, as the browser zooms. A label at the bottom left says the size for a moment, and says *default* where it is back at your default. **Ctrl+0** puts the default back. The size you zoom to is this device's alone, kept as the browser keeps its zoom, and never written into your space. On the Font tab, **This device** sets it too, by its slider or typed (on a phone, which has no Ctrl + scroll, that is how you zoom), and **↺** takes it off. Untick *Ctrl + scroll zooms here*, and Ctrl + scroll zooms the browser again. With the dialog open, Ctrl + scroll and Ctrl+0 set its **This device** row, as its slider does: **Save** keeps it, **Cancel** puts it back.
 
 ## Guides
 
-The widths a widget snaps to, and the page's sliders are marked with. Change them in the dialog's **Guides** tab: type a width in its row, in **px** or in **%** of the editor's width (the px / % switch beside it), × takes one away, **+ Add guide** adds one, **Full width** is the editor's whole width. They show from the narrowest. A widget snapped to a guide in % keeps that share of the editor (`layout.width: 80%`): in a wider or narrower window it is still at the guide. Saved into your CONFIG, in a block of Silverware Layout's own.
+The widths a widget snaps to, and the page's sliders are marked with. Change them in the dialog's **Guides** tab: set a width in its row by its slider (held, it shows the guides on the page as it moves) or type it, in **px** or in **%** of the editor's width (the px / % switch beside it), × takes one away, **+ Add guide** adds one, **Full width** is the editor's whole width. They show from the narrowest. A widget snapped to a guide in % keeps that share of the editor (`layout.width: 80%`): in a wider or narrower window it is still at the guide. Saved into your CONFIG, in a block of Silverware Layout's own.
+
+Hold **Preview** (press it, or hold Space or Enter on it) to see the guides on the page as you typed them, the dialog out of the way meanwhile. **Default guides** puts the default ones back (900 px, 1200 px and Full width) once you confirm; **Save** keeps them, as everything in the dialog.
 
 ## Settings
 

@@ -167,7 +167,7 @@ test("@playground while the bar is dragged, a quiet guide each side for the text
   const guides = page.locator(".swl-handle-guide");
   // The text's width, the guides 900 px and 1200 px, Full width: two lines each
   await expect(guides).toHaveCount(8);
-  await expect(page.locator(".swl-handle-guide-label")).toHaveText(["Text width", "900 px", "1200 px", "Full width"]);
+  await expect(page.locator(".swl-handle-guide-label")).toHaveText(["Page width", "900 px", "1200 px", "Full width"]);
   await expect(page.locator(".swl-handle-guide-near")).toHaveCount(0);
   // Each guide where a widget of its width has its edges, centred on the text
   const middle = await contentMiddle(page);
@@ -187,7 +187,7 @@ test("@playground guides near each other: their names in rows, none over another
   await page.goto("layout.html?guides=780,800,full");
   await drag(page, "table-1", 40);
   const labels = page.locator(".swl-handle-guide-label");
-  await expect(labels).toHaveText(["Text width", "780 px", "800 px", "Full width"]);
+  await expect(labels).toHaveText(["Page width", "780 px", "800 px", "Full width"]);
   const boxes = await labels.evaluateAll((all) => all.map((label) => label.getBoundingClientRect()).map(({ left, right, top, bottom }) => ({ left, right, top, bottom })));
   for (const [i, a] of boxes.entries()) {
     for (const b of boxes.slice(i + 1)) expect(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top).toBe(true);

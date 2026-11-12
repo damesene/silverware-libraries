@@ -6,11 +6,13 @@
 import { fontSizeShown } from "./core/fontsize.ts";
 import type { Registry } from "./core/registry.ts";
 import { textWidthShown } from "./core/textwidth.ts";
-import { inEditor, markNarrow, paneWidth, showFontSize, showPaneWidth, themeFontSize, watchPaneWidth } from "./host/marks.ts";
+import { snapTargets } from "./core/widgetwidth.ts";
+import { inEditor, markNarrow, paneWidth, showFontSize, showPaneWidth, textWidthOf, themeFontSize, watchPaneWidth } from "./host/marks.ts";
 import type { PageHost } from "./host/page.ts";
 import { DEFAULT_GUIDES, type Guide, type Settings } from "./model/settings.ts";
 import type { Width } from "./model/width.ts";
 import { FontZoom } from "./ui/fontzoom.ts";
+import { GuideLines } from "./ui/guidelines.ts";
 import { PageDialog, type Preview } from "./ui/pagedialog.ts";
 import { layOutWidgets, type WidgetLayout } from "./widgetlayout.ts";
 
@@ -86,17 +88,28 @@ export class LayoutApp {
       problem: (message) => this.problem(message),
     });
     this.widgetLayout.widgets.layOutAll();
+    // While the Page layout dialog is open, the zoom is its This device's (set as its slider sets it, kept on Save, its
+    // Ctrl + scroll box as ticked there), anywhere in the window: the dialog's ground lies over the editor
+    const open = () => (this.dialog?.isOpen ? this.dialog : undefined);
     this.fontZoom ??= new FontZoom(this.doc, {
-      enabled: () => !!this.state?.settings.fontZoom,
-      inEditor: (node) => inEditor(this.page, node),
-      size: () => this.fontShown() ?? this.defaultFontSize(),
-      defaultSize: () => this.defaultFontSize(),
+      enabled: () => open()?.font.zooms ?? !!this.state?.settings.fontZoom,
+      inEditor: (node) => !!open() || inEditor(this.page, node),
+      size: () => {
+        const dialog = open();
+        return dialog ? (dialog.font.zoom ?? dialog.font.size ?? this.themeSize()) : (this.fontShown() ?? this.defaultFontSize());
+      },
+      defaultSize: () => {
+        const dialog = open();
+        return dialog ? (dialog.font.size ?? this.themeSize()) : this.defaultFontSize();
+      },
       zoom: (size) => {
+        const dialog = open();
+        if (dialog) return dialog.setZoom(size);
         const state = this.state;
         if (!state) return;
         state.zoom = size;
         state.store.keepZoom(size);
-        if (!this.dialog?.isOpen) this.show();
+        this.show();
       },
     });
     this.show();
@@ -167,7 +180,12 @@ export class LayoutApp {
 
   /** The default font size: the setting's, else the host's */
   private defaultFontSize(): number {
-    return this.state?.settings.fontSize ?? themeFontSize(this.doc, this.page) ?? FALLBACK_FONT_SIZE;
+    return this.state?.settings.fontSize ?? this.themeSize();
+  }
+
+  /** The font size the host's theme gives (px) */
+  private themeSize(): number {
+    return themeFontSize(this.doc, this.page) ?? FALLBACK_FONT_SIZE;
   }
 
   /** The Page layout dialog over the page open */
@@ -183,12 +201,22 @@ export class LayoutApp {
       defaultWidth: state.settings.textWidth,
       guides: state.settings.guides,
       canSaveSettings: store.canSaveSettings,
+      minPaneWidth: state.settings.minPaneWidth,
       paneWidth: () => paneWidth(this.page),
       themeWidth: () => this.page.themeTextWidth(),
       fontSize: state.settings.fontSize,
       fontZoom: state.settings.fontZoom,
       zoom: state.zoom,
       themeFontSize: () => themeFontSize(this.doc, this.page) ?? FALLBACK_FONT_SIZE,
+      // The guides as a drag shows them: the page's width and each guide the pane can hold, by the text's middle
+      previewGuides: (guides) => {
+        const content = this.page.content();
+        if (!content) return () => undefined;
+        const box = content.getBoundingClientRect();
+        const lines = new GuideLines(this.doc, this.page);
+        lines.show(snapTargets(textWidthOf(content), guides, paneWidth(this.page)), box.left + box.width / 2);
+        return () => lines.clear();
+      },
       preview: (shown) => this.showWith(shown),
       restore: () => this.show(),
       savePage: async (width) => {
@@ -211,9 +239,9 @@ export class LayoutApp {
         state.settings = { ...state.settings, fontSize, fontZoom };
         return undefined;
       },
-      resetZoom: () => {
-        state.zoom = undefined;
-        store.keepZoom(undefined);
+      saveZoom: (size) => {
+        state.zoom = size;
+        store.keepZoom(size);
       },
       confirm: (question) => store.confirm(question),
       flash: (message, type) => store.flash(message, type),

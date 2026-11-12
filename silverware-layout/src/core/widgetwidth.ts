@@ -57,7 +57,7 @@ export type SnapTarget = { readonly width: number; readonly kept: WidgetWidth | 
  * one of a width (to the pixel): the first, so the line shown, the name said and the width kept are one guide's
  */
 export function snapTargets(textWidth: number, guides: readonly Guide[], pane: number): SnapTarget[] {
-  const targets: SnapTarget[] = [{ width: textWidth, kept: undefined, name: "Text width" }];
+  const targets: SnapTarget[] = [{ width: textWidth, kept: undefined, name: "Page width" }];
   const widths = new Set([Math.round(textWidth)]);
   for (const guide of guides) {
     if (typeof guide === "number" && guide > pane - PANE_GUTTER) continue;
@@ -77,4 +77,4 @@ export function snapped(width: number, targets: readonly SnapTarget[]): { readon
 }
 
 /** A width kept, as it is named where it shows: the text's, Full width, else its pixels or percent */
-export const widthName = (kept: WidgetWidth | undefined): string => (kept === undefined ? "Text width" : guideName(kept));
+export const widthName = (kept: WidgetWidth | undefined): string => (kept === undefined ? "Page width" : guideName(kept));

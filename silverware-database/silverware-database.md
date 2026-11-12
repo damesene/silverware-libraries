@@ -1,7 +1,7 @@
 ---
 name: Library/damesene/silverware-database
 tags: meta/library
-version: 1.0.0
+version: 1.1.0
 description: "Silverware Database: databases of pages, in the spirit of Notion's: one item a page, its properties the page's frontmatter, shown in your pages as a table, a list, a board, a calendar or a timeline. In development."
 files:
 - silverware-database.js

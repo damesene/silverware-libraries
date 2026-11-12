@@ -1,7 +1,7 @@
 ---
 name: Library/damesene/silverware-layout
 tags: meta/library
-version: 0.1.0
+version: 1.0.0
 description: "Silverware Layout: The width of a page's text (its own or a default for every page) and of its tables, databases and charts, wider or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll."
 files:
 - silverware-layout.js

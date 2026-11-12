@@ -76,7 +76,7 @@ export const RADAR: ChartType = {
     options: {
       maintainAspectRatio: false,
       plugins: plugins(model, theme, model.series.length),
-      scales: { r: { grid: { color: theme.grid }, angleLines: { color: theme.grid }, pointLabels: { color: theme.text }, ticks: { color: theme.text, backdropColor: "transparent" } } },
+      scales: { r: { grid: { color: theme.grid }, angleLines: { color: theme.grid }, pointLabels: { color: theme.text, font: { size: theme.fontSize } }, ticks: { color: theme.text, backdropColor: "transparent", font: { size: theme.fontSize } } } },
     },
   }),
 };

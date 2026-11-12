@@ -8,6 +8,9 @@ export type Theme = {
   readonly text: string;
   readonly grid: string;
   readonly font: string;
+  // The size of a chart's text (px): its labels, ticks and legend; a title a little larger. In proportion to the
+  // page's text, so a chart follows its font as it is set larger or smaller (Chart.js's 12 px by SilverBullet's 18)
+  readonly fontSize: number;
   // A series' (or a slice's) color by its place, where the model gives none
   readonly palette: readonly string[];
 };

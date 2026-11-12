@@ -57,3 +57,26 @@ test("a chart widened by its handle: the width a comment of its block, drawn ane
   expect(await space.saved("Page")).toContain('xychart-beta\n  x-axis ["a", "b", "c"]\n  bar [3, 5, 2]\n```');
   await expect.poll(async () => Math.round((await page.locator(".swc-widget").boundingBox())!.width)).toBe(TEXT);
 });
+
+/** The size of a chart's tick labels, as Chart.js draws them (its own registry) */
+const tickSize = (page: import("@playwright/test").Page) =>
+  page.evaluate(async () => {
+    const url = "/.fs/Library/damesene/silverware-chart-chartjs.js";
+    const { Chart } = (await import(url)) as {
+      Chart: { getChart(canvas: HTMLCanvasElement): { options: { scales: { x: { ticks: { font: { size: number } } } } } } | undefined };
+    };
+    return Chart.getChart(document.querySelector<HTMLCanvasElement>(".swc-chart canvas")!)?.options.scales.x.ticks.font.size;
+  });
+
+test("a chart's text in proportion to the page's: Chart.js's 12 px at SilverBullet's 18, larger with the font zoomed", async ({ page, space }) => {
+  await space.open({ Page: PAGE }, "Page");
+  await expect(page.locator(".swc-widget canvas")).toBeVisible();
+  await expect.poll(() => tickSize(page)).toBe(12);
+  // Font zoom: Ctrl + scroll over the page's text, 9 steps up (27 px)
+  const text = (await page.locator(".cm-line", { hasText: "Quisque placerat" }).first().boundingBox())!;
+  await page.mouse.move(text.x + 20, text.y + text.height / 2);
+  await page.keyboard.down("Control");
+  for (let i = 0; i < 9; i++) await page.mouse.wheel(0, -100);
+  await page.keyboard.up("Control");
+  await expect.poll(() => tickSize(page)).toBe(18);
+});

@@ -29,6 +29,16 @@ The look of [Silverware Chart](silverware-chart.md): a chart's box, its toolbar,
   width: 100%;
   box-sizing: border-box;
 }
+/* A mark one em wide, unseen, taking no room: watched, it tells the chart its text's size changed (core/theme.ts) */
+.swc-chart > .swc-em {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1em;
+  height: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
 
 .swc-problem {
   height: auto !important;

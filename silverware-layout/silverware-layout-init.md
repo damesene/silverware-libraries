@@ -9,7 +9,7 @@ What starts [Silverware Layout](silverware-layout.md) in SilverBullet: its setti
 -- Settings, shown in the Configuration Manager (Configuration: Open)
 config.defineCategory({
   name = "Silverware Layout",
-  description = "The layout of a page: the width of its text.",
+  description = "The layout of a page: the width of its text, its widgets' widths and the editor's font size.",
   priority = 3,
 })
 
@@ -28,6 +28,24 @@ config.define("silverware.layout", {
       default = 600,
       description = "Where the editor is narrower than this (px), as on a phone, Silverware Layout sets no width: the text is as wide as the screen.",
       ui = { category = "Silverware Layout", label = "Narrowest editor laid out (px)", priority = 0.9 },
+    },
+    fontSize = {
+      type = "string",
+      default = "",
+      description = "The editor's font size on every page, in px (18px). Empty: your theme's.",
+      ui = { category = "Silverware Layout", label = "Font size", priority = 0.8 },
+    },
+    fontZoom = {
+      type = "object",
+      additionalProperties = false,
+      properties = {
+        enabled = {
+          type = "boolean",
+          default = true,
+          description = "Ctrl + scroll over the page makes its font larger or smaller on this device, as the browser zooms; Ctrl+0 puts it back.",
+          ui = { category = "Silverware Layout", label = "Font zoom", priority = 0.7 },
+        },
+      },
     },
     guides = {
       type = "array",

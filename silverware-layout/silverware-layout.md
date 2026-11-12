@@ -11,7 +11,7 @@ files:
 ---
 # Silverware Layout
 
-The layout of your pages: how wide a page's text is, and how wide each of its tables, databases and charts is. Give one page a wider text (a page of tables), all of them a width of your own without touching your theme, or one table or chart more room than the text has.
+The layout of your pages: how wide a page's text is, how wide each of its tables, databases and charts is, and how large the editor's font is. Give one page a wider text (a page of tables), all of them a width of your own without touching your theme, one table or chart more room than the text has, or zoom the text with Ctrl + scroll.
 
 ## A page's text width
 
@@ -48,6 +48,12 @@ A width is never wider than the editor: in a narrower window, or on a phone, it 
 
 Without Silverware Layout, each is as wide as the text, its width still kept.
 
+## Font size
+
+The **Font size** row of the dialog's Page tab sets the editor's font size on every page: *Theme* (your theme's) or *Own*, by its slider or typed in px. Headings, code and tables grow with it. (A chart's labels keep their size.)
+
+**Font zoom**: hold Ctrl and scroll over the page, and its font grows or shrinks a pixel a step, as the browser zooms. A label at the bottom left says the size for a moment, and says *default* where it is back at your default. **Ctrl+0** puts the default back. The size you zoom to is this device's alone, kept as the browser keeps its zoom, and never written into your space; the dialog shows it (*This device: 20 px*), and **Reset** takes it off. Turn Font zoom off in the dialog, and Ctrl + scroll zooms the browser again.
+
 ## Guides
 
 The widths a widget snaps to, and the page's sliders are marked with. Change them in the dialog's **Guides** tab: type a width in its row, × takes one away, **+ Add guide** adds one, **Full width** is the editor's whole width. They show from the narrowest. Saved into your CONFIG, in a block of Silverware Layout's own.
@@ -60,11 +66,15 @@ In the Configuration Manager (Configuration: Open), under Silverware Layout, or 
 config.set("silverware.layout.textWidth", "1100px")
 config.set("silverware.layout.minPaneWidth", 600)
 config.set("silverware.layout.guides", { "900px", "1200px", "full" })
+config.set("silverware.layout.fontSize", "18px")
+config.set("silverware.layout.fontZoom.enabled", true)
 ```
 
 - `textWidth`: the default text width, in px or % (empty: your theme's).
 - `minPaneWidth`: where the editor is narrower than this (px), as on a phone, Silverware Layout sets no width: the text is as wide as the screen. Wider again (a phone turned), the widths come back.
 - `guides`: the guides (see above), each a width in px, or `full` for the editor's whole width.
+- `fontSize`: the editor's font size on every page, in px (empty: your theme's).
+- `fontZoom.enabled`: whether Ctrl + scroll and Ctrl+0 zoom the font (see above).
 
 ## Good to know
 

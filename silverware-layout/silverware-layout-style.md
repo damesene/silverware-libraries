@@ -23,6 +23,35 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 :root:not([data-swl-narrow]) .cm-content .cm-line :has([data-swl-width]:not([data-silverware-over-window])) {
   overflow: visible !important;
 }
+/* The editor's font size (the setting, or this device's zoom): SilverBullet sizes the editor in px (2.12.1) or by
+   --editor-font-size (since); the text, headings, code and widgets in em of it */
+:root[data-swl-font-size] #sb-main .cm-editor {
+  font-size: var(--swl-font-size) !important;
+}
+/* A task's box: SilverBullet sizes it 1.3em of its own font, which is the browser's for a control (13.33 px), not the
+   text's, so it kept its size as the font changed; given the text's in the proportion it has in SilverBullet's
+   18 px (13.33 / 18), it is as SilverBullet draws it there and grows with the font */
+:root[data-swl-font-size] #sb-main .cm-editor input[type="checkbox"] {
+  font-size: 0.7407em;
+}
+/* Font zoom's label at the window's bottom left, a moment after each step, as the browser's own zoom shows its */
+.swl-zoom-label {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: var(--sw-layer-dialog);
+  padding: 6px 10px;
+  font: 13px var(--ui-font, system-ui, sans-serif);
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.3));
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+.swl-zoom-label[hidden] {
+  display: none;
+}
 /* The handle of a widget's width: a bar beside its right edge, quiet (grey, a dashed outline, as Silverware Table's +)
    until the pointer is on it or it is dragged */
 .swl-handle {
@@ -118,6 +147,8 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   /* (Its border within the height: SilverBullet sets no box-sizing) */
   box-sizing: border-box;
   width: min(520px, calc(100vw - 24px));
+  /* (As high on either tab: it does not jump as they are switched, the footer where it was) */
+  min-height: min(560px, calc(var(--sw-view-height, 100dvh) - 32px));
   max-height: min(600px, calc(var(--sw-view-height, 100dvh) - 32px));
   color: var(--root-color);
   background: var(--root-background-color);
@@ -364,6 +395,47 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   gap: 8px;
   margin-top: 4px;
   cursor: pointer;
+}
+/* The font size: its slider has no guides under it; Font zoom a box, how it is used said quietly beside it; this
+   device's zoom with Reset */
+.swl-dialog-slider-box.swl-dialog-slider-plain {
+  padding-bottom: 0;
+}
+.swl-dialog-zoom {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  cursor: pointer;
+}
+.swl-dialog-zoom input {
+  margin-top: 3px;
+}
+.swl-dialog-zoom-text {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 8px;
+}
+.swl-dialog-hint {
+  opacity: 0.6;
+}
+.swl-dialog-device {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.swl-dialog-device[hidden] {
+  display: none;
+}
+.swl-dialog-reset {
+  padding: 3px 10px;
+  background: none;
+  border: 1px solid var(--swl-dialog-line);
+  border-radius: 6px;
+}
+.swl-dialog-reset:hover {
+  border-color: var(--ui-accent-color);
 }
 .swl-dialog-foot {
   display: flex;

@@ -18,8 +18,8 @@ import type { Setting } from "./setting.ts";
 import { openSettings } from "./settingsdialog.ts";
 import { ChartToolbar } from "./toolbar.ts";
 import { IterableWeakSet } from "./weakset.ts";
-import { themeOf, watchTheme } from "./theme.ts";
-import type { ChartType } from "./type.ts";
+import { themeOf, watchFontSize, watchTheme } from "./theme.ts";
+import type { ChartType, Theme } from "./type.ts";
 
 /** What the core needs of its host (SilverBullet through the bridge, or a test's) */
 export type ControllerEnv = {
@@ -129,6 +129,8 @@ export class Controller {
   private chart: Promise<ChartConstructor> | undefined;
   private following: ReturnType<typeof setTimeout> | undefined;
   private readonly unwatchTheme: () => void;
+  // The size of each chart's text as it was last drawn (a change of the page's font draws it anew)
+  private readonly fontDrawn = new WeakMap<Drawn, number>();
   // Each run of following the page's edits: a run that a later one started meanwhile writes nothing it read
   private followRun = 0;
   // What shows where a chart's source could not be read, with its block: drawn in its place once it can be
@@ -323,14 +325,26 @@ export class Controller {
     const canvas = this.doc.createElement("canvas");
     box.append(canvas);
     const entry: Drawn = { box, page, model, language, body: text, format: read.format, data };
+    let unwatchFont: (() => void) | undefined;
     this.boxes.set(box, entry);
     this.toolbar?.watch(box);
     try {
       // Made now, and again where the box comes back after its chart was let go: with the data as last drawn
       box.setUp(
-        () => new Chart(canvas, type.config(entry.data ? withData(model, entry.data) : model, themeOf(this.doc))),
-        () => this.drawn.add(entry),
-        () => this.drawn.remove(entry),
+        () => new Chart(canvas, type.config(entry.data ? withData(model, entry.data) : model, this.themeFor(entry))),
+        () => {
+          this.drawn.add(entry);
+          // Its text's size followed (known as it is put in the page, the page's font set larger or smaller): drawn
+          // anew where it is not the size it was drawn at (made before it was in the page: Chart.js's own)
+          unwatchFont ??= watchFontSize(box, () => {
+            if (themeOf(this.doc, box).fontSize !== this.fontDrawn.get(entry)) this.redraw(entry, entry.data ? withData(entry.model, entry.data) : entry.model);
+          });
+        },
+        () => {
+          this.drawn.remove(entry);
+          unwatchFont?.();
+          unwatchFont = undefined;
+        },
       );
     } catch (e) {
       return this.problem(`the chart could not be drawn: ${e instanceof Error ? e.message : String(e)}`);
@@ -391,7 +405,14 @@ export class Controller {
 
   private redraw(entry: Drawn, model: ChartModel): void {
     const type = this.types().find((t) => t.name === model.type);
-    if (type) DrawnCharts.redraw(entry, type.config(model, themeOf(this.doc)));
+    if (type) DrawnCharts.redraw(entry, type.config(model, this.themeFor(entry)));
+  }
+
+  /** The theme a chart is drawn in now, its text's size kept as drawn */
+  private themeFor(entry: Drawn): Theme {
+    const theme = themeOf(this.doc, entry.box);
+    this.fontDrawn.set(entry, theme.fontSize);
+    return theme;
   }
 
   /** The chart marked Stale where its block's data are not its source's, with Update data; unmarked where they are */

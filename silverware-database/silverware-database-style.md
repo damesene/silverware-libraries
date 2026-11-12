@@ -1128,8 +1128,9 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   overflow-x: auto;
 }
 .swd-table {
-  /* A body cell's room above and below its text (SilverBullet's own for its tables' cells, said here so what is laid over a
-     cell, a row's Open, knows where its first line is) */
+  /* A body cell's room above and below its text (SilverBullet's own for its tables' cells, said here so what is laid
+     over a cell, a row's Open, knows where its first line is). In px as SilverBullet's, whatever the font's size
+     (Silverware Layout's font zoom): a row as high as a table's of Silverware Table, its line and this room */
   --swd-cell-pad-y: 8px;
   border-collapse: collapse;
   width: 100%;
@@ -1185,6 +1186,17 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
 :is(#sb-main, html) .swd-place .swd-table td {
   padding-top: var(--swd-cell-pad-y);
   padding-bottom: var(--swd-cell-pad-y);
+}
+/* The grip's own cell no higher than the others' (their first line and its room), the grip in the middle of that: a
+   row as high as its text makes it, as a table's of Silverware Table whose handle adds nothing, however small the font
+   (a block, not on the line's baseline, which put it lower in a large font) */
+:is(#sb-main, html) .swd-place .swd-table td.swd-table-grip {
+  --swd-grip-pad-y: max(0px, (1lh + 2 * var(--swd-cell-pad-y) - 22px) / 2);
+  padding-top: var(--swd-grip-pad-y);
+  padding-bottom: var(--swd-grip-pad-y);
+}
+.swd-table td.swd-table-grip .swd-row-grip {
+  display: flex;
 }
 .swd-table th:not(.swd-table-gripcol):not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]),
 .swd-table td:not(.swd-table-grip):not(.swd-table-actions):not([data-type="checkbox"]):not([colspan]) {
@@ -1249,8 +1261,8 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   vertical-align: -0.15em;
 }
 .swd-table .swd-open svg {
-  width: 14px;
-  height: 14px;
+  width: 0.972em;
+  height: 0.972em;
 }
 @media (hover: hover) {
   /* (As high as the cell's first line and its room above and below: the button in its middle, by the name's first line
@@ -1274,7 +1286,8 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
     right: 6px;
     transform: translateY(-50%);
     margin: 0;
-    padding: 4px 8px;
+    /* (4 px and 8 px of its 14.4 px: as the text's size) */
+    padding: 0.278em 0.556em;
     border: 1px solid var(--swd-line);
     border-radius: 6px;
     color: var(--swd-quiet);
@@ -1315,6 +1328,7 @@ html[data-theme="dark"] :is(.swd-widget, .swd-peek, .swd-settings-backdrop) {
   width: 18px;
   padding: 4px 0 4px 2px;
 }
+/* (Its size whatever the font's, as Silverware Table's handle) */
 .swd-row-grip {
   display: inline-flex;
   align-items: center;
@@ -1464,8 +1478,8 @@ tr:focus-within .swd-open {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 6px 12px;
-  padding: 4px 0;
+  gap: 0.333em 0.667em;
+  padding: 0.222em 0;
   border-bottom: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.3));
   overflow-wrap: anywhere;
 }

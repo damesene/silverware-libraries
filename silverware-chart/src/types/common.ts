@@ -24,9 +24,11 @@ export function translucent(color: string, alpha = 0.33): string {
 export function plugins(model: ChartModel, theme: Theme, items: number, place: "top" | "right" = "top"): Record<string, unknown> {
   const legend = model.legend ?? place;
   return {
-    title: { display: !!model.title, text: model.title, color: theme.text, font: { family: theme.font, size: 14 } },
+    // (14 px by Chart.js's 12)
+    title: { display: !!model.title, text: model.title, color: theme.text, font: { family: theme.font, size: Math.round(theme.fontSize * (14 / 12) * 10) / 10 } },
     // In the series' order (Chart.js sorts it by their drawing order: lines over bars)
-    legend: { display: legend !== "none" && items > 1, position: legend === "none" ? place : legend, labels: { color: theme.text, font: { family: theme.font }, sort: (a: { datasetIndex: number }, b: { datasetIndex: number }) => a.datasetIndex - b.datasetIndex } },
+    legend: { display: legend !== "none" && items > 1, position: legend === "none" ? place : legend, labels: { color: theme.text, font: { family: theme.font, size: theme.fontSize }, sort: (a: { datasetIndex: number }, b: { datasetIndex: number }) => a.datasetIndex - b.datasetIndex } },
+    tooltip: { titleFont: { size: theme.fontSize }, bodyFont: { size: theme.fontSize } },
   };
 }
 

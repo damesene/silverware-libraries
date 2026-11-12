@@ -7,13 +7,16 @@ import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { type PageWriter, pageWriter } from "../../shared/pages/writer.ts";
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { Registry } from "./core/registry.ts";
+import { fontSizeShown } from "./core/fontsize.ts";
 import { textWidthShown } from "./core/textwidth.ts";
-import { markNarrow, paneWidth, showTextWidth, themeTextWidth, watchPaneWidth } from "./host/silverbullet/dom.ts";
+import { keepDeviceZoom, readDeviceZoom } from "./host/silverbullet/devicezoom.ts";
+import { inEditor, markNarrow, paneWidth, showFontSize, showTextWidth, themeFontSize, themeTextWidth, watchPaneWidth } from "./host/silverbullet/dom.ts";
 import { pageLayoutOf, writePageWidth } from "./host/silverbullet/page.ts";
 import { silverBulletPlatform } from "./host/silverbullet/platform.ts";
 import { DEFAULT_GUIDES, DEFAULT_MIN_PANE_WIDTH, keptGuides, PATHS, readSettings, type Settings } from "./model/settings.ts";
 import { cssWidth, readWidth, type Width } from "./model/width.ts";
-import { PageDialog } from "./ui/pagedialog.ts";
+import { FontZoom } from "./ui/fontzoom.ts";
+import { PageDialog, type Preview } from "./ui/pagedialog.ts";
 import { layOutWidgets, type WidgetLayout } from "./widgetlayout.ts";
 
 const PAGE_LAYOUT = "Silverware Layout: Page layout";
@@ -22,6 +25,8 @@ const PAGE_LAYOUT = "Silverware Layout: Page layout";
 const OWN_MARKER = "-- managed-by: silverware-layout";
 // How long the page is still before its frontmatter is read again after an edit
 const EDITED_MS = 300;
+// The editor's font size where no theme says one (SilverBullet's own)
+const SILVERBULLET_FONT_SIZE = 18;
 
 type App = {
   readonly bridge: Bridge;
@@ -30,6 +35,8 @@ type App = {
   // The page open and its own text width, as last read
   page: string;
   pageWidth: Width | undefined;
+  // This device's font zoom (px), as kept in the browser; none: none
+  zoom: number | undefined;
 };
 
 let app: App | undefined;
@@ -40,6 +47,8 @@ let stopWatching: (() => void) | undefined;
 let dialog: PageDialog | undefined;
 // Made once per window (its observer and its handle live as long), asking the settings of the last load
 let widgetLayout: WidgetLayout | undefined;
+// Made once per window (its listeners live as long), asking the app of the last load
+let fontZoom: FontZoom | undefined;
 
 // One registry per window: the module is imported once, so `api` is the same object as Space Lua loads again, and a
 // provider registered again (its plugin's init page run again) replaces its own
@@ -57,7 +66,7 @@ export async function init(bridge: Bridge): Promise<void> {
     console.error(`Silverware Layout: the init page did not hand over ${missing.join(", ")}`);
     return;
   }
-  app = { bridge, writer: pageWriter(silverBulletPlatform(bridge)), settings: await settingsOf(bridge), page: "", pageWidth: undefined };
+  app = { bridge, writer: pageWriter(silverBulletPlatform(bridge)), settings: await settingsOf(bridge), page: "", pageWidth: undefined, zoom: readDeviceZoom(window) };
   stopWatching?.();
   // (Not while the dialog shows a width it is setting)
   stopWatching = watchPaneWidth(document, () => {
@@ -69,12 +78,25 @@ export async function init(bridge: Bridge): Promise<void> {
     problem: (message) => void app?.bridge.flash(message, "error"),
   });
   widgetLayout.widgets.layOutAll();
+  fontZoom ??= new FontZoom(document, {
+    enabled: () => !!app?.settings.fontZoom,
+    inEditor,
+    size: () => fontShown() ?? defaultFontSize(),
+    defaultSize: defaultFontSize,
+    zoom: (size) => {
+      if (!app) return;
+      app.zoom = size;
+      keepDeviceZoom(window, size);
+      if (!dialog?.isOpen) show();
+    },
+  });
+  show();
   await pageOpened();
 }
 
 /** The settings as configured (none read: the defaults) */
 async function settingsOf(bridge: Bridge): Promise<Settings> {
-  if (!bridge.getConfig) return { textWidth: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, guides: DEFAULT_GUIDES };
+  if (!bridge.getConfig) return { textWidth: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true };
   const values = new Map<string, unknown>();
   for (const path of Object.values(PATHS)) values.set(path, await bridge.getConfig(path, undefined));
   return readSettings((path) => values.get(path));
@@ -116,18 +138,26 @@ export function pageEdited(): void {
   }, EDITED_MS);
 }
 
-/** The text shown at the width that applies now */
+/** The text shown at the width and the font size that apply now */
 function show(): void {
-  if (app) showWith(app.pageWidth, app.settings.textWidth);
+  if (app) showWith({ pageWidth: app.pageWidth, defaultWidth: app.settings.textWidth, fontSize: app.settings.fontSize, fontZoom: app.settings.fontZoom, zoom: app.zoom });
 }
 
-/** The text shown as it would be with these widths (the page's own, the default; none: none) */
-function showWith(pageWidth: Width | undefined, fallback: Width | undefined): void {
+/** The text shown as it would be with these (the page's own width, the default; the font size, the zoom; none: none) */
+function showWith(shown: Preview): void {
   if (!app) return;
   // (Widgets laid out where the pane is wide enough: the style page's rule reads it)
   markNarrow(document, paneWidth(document) < app.settings.minPaneWidth);
-  showTextWidth(document, textWidthShown({ page: pageWidth, fallback, paneWidth: paneWidth(document), minPaneWidth: app.settings.minPaneWidth }));
+  showTextWidth(document, textWidthShown({ page: shown.pageWidth, fallback: shown.defaultWidth, paneWidth: paneWidth(document), minPaneWidth: app.settings.minPaneWidth }));
+  // (Font zoom off: this device's zoom not shown, still kept)
+  showFontSize(document, fontSizeShown(shown.fontZoom ? shown.zoom : undefined, shown.fontSize));
 }
+
+/** The font size Silverware Layout shows now (none: the theme's) */
+const fontShown = (): number | undefined => (app ? fontSizeShown(app.settings.fontZoom ? app.zoom : undefined, app.settings.fontSize) : undefined);
+
+/** The default font size: the setting's, else the theme's */
+const defaultFontSize = (): number => app?.settings.fontSize ?? themeFontSize(document) ?? SILVERBULLET_FONT_SIZE;
 
 /** The commands, as the init page defines them */
 export function commandNames(): string[] {
@@ -153,7 +183,11 @@ async function openPageDialog(): Promise<void> {
     canSaveSettings: !!bridge.saveConfigPage,
     paneWidth: () => paneWidth(document),
     themeWidth: () => themeTextWidth(document),
-    preview: (pageWidth, fallback) => showWith(pageWidth, fallback),
+    fontSize: now.settings.fontSize,
+    fontZoom: now.settings.fontZoom,
+    zoom: now.zoom,
+    themeFontSize: () => themeFontSize(document) ?? SILVERBULLET_FONT_SIZE,
+    preview: (shown) => showWith(shown),
     restore: () => show(),
     savePage: async (width) => {
       const problem = await writePageWidth(now.writer, now.page, String(await bridge.getText()), width);
@@ -174,6 +208,18 @@ async function openPageDialog(): Promise<void> {
       );
       now.settings = { ...now.settings, guides };
       return undefined;
+    },
+    saveFont: async (fontSize, zoomOn) => {
+      // In the Configuration Manager's block, as the default text width
+      await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
+        withConfigSettings(text, { [PATHS.fontSize]: fontSize === undefined ? undefined : `${fontSize}px`, [PATHS.fontZoom]: zoomOn ? undefined : false }),
+      );
+      now.settings = { ...now.settings, fontSize, fontZoom: zoomOn };
+      return undefined;
+    },
+    resetZoom: () => {
+      now.zoom = undefined;
+      keepDeviceZoom(window, undefined);
     },
     confirm: async (question) => (bridge.confirm ? !!(await bridge.confirm(question)) : globalThis.confirm(question)),
     flash: (message, type) => void bridge.flash(message, type),

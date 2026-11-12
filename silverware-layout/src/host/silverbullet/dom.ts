@@ -78,3 +78,38 @@ export function watchPaneWidth(doc: Document, changed: (width: number) => void):
   observer.observe(paneOf(doc));
   return () => observer.disconnect();
 }
+
+// The editor's font size: SilverBullet 2.12.1 sizes `#sb-main .cm-editor` in px, its main by `--editor-font-size`; the
+// style page's rule wins over either where the root has the attribute (docs/silverware-layout-font-size.md, probe)
+const FONT_SIZE_ATTRIBUTE = "data-swl-font-size";
+const FONT_SIZE = "--swl-font-size";
+const EDITOR_SELECTOR = "#sb-main .cm-editor";
+
+/** The editor's text shown at a font size (px; none: the theme's, nothing of ours left) */
+export function showFontSize(doc: Document, size: number | undefined): void {
+  const root = doc.documentElement;
+  if (size === undefined) {
+    if (root.hasAttribute(FONT_SIZE_ATTRIBUTE)) root.removeAttribute(FONT_SIZE_ATTRIBUTE);
+    if (root.style.getPropertyValue(FONT_SIZE)) root.style.removeProperty(FONT_SIZE);
+    return;
+  }
+  const value = `${size}px`;
+  if (root.getAttribute(FONT_SIZE_ATTRIBUTE) !== String(size)) root.setAttribute(FONT_SIZE_ATTRIBUTE, String(size));
+  if (root.style.getPropertyValue(FONT_SIZE) !== value) root.style.setProperty(FONT_SIZE, value);
+}
+
+/** The font size the theme gives the editor (px), Silverware Layout's own set aside a moment; none without an editor */
+export function themeFontSize(doc: Document): number | undefined {
+  const editor = doc.querySelector(EDITOR_SELECTOR);
+  const win = doc.defaultView;
+  if (!editor || !win) return undefined;
+  const root = doc.documentElement;
+  const shown = root.getAttribute(FONT_SIZE_ATTRIBUTE);
+  if (shown !== null) root.removeAttribute(FONT_SIZE_ATTRIBUTE);
+  const size = parseFloat(win.getComputedStyle(editor).fontSize);
+  if (shown !== null) root.setAttribute(FONT_SIZE_ATTRIBUTE, shown);
+  return Number.isFinite(size) ? Math.round(size) : undefined;
+}
+
+/** Whether a node is in the editor (its text, its widgets): where Ctrl + scroll zooms its font */
+export const inEditor = (node: unknown): boolean => node instanceof Element && !!node.closest(EDITOR_SELECTOR);

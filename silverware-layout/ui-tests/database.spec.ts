@@ -62,3 +62,30 @@ test("a database's place widened by its handle: the width a line of its block, d
   await expect.poll(async () => (await space.saved("Page")) ?? "").not.toContain("layout.width");
   await expect.poll(async () => Math.round((await page.locator(".swd-place").boundingBox())!.width)).toBe(TEXT);
 });
+
+test("a database's rows lower at a smaller font (Silverware Layout's font zoom), as high as a table's, their grip keeping its size; the name and Open in the row's middle", async ({ page, space }) => {
+  await space.open({ "db-uilayout": root, "db-uilayout/First task": item, Page: PAGE }, "Page");
+  const row = page.locator(".swd-table tbody tr", { hasText: "First task" });
+  await expect(row).toBeVisible();
+  const height = async () => Math.round((await row.boundingBox())!.height);
+  const theme = await height();
+  // Font zoom down to half SilverBullet's 18 px, over the page's text
+  const text = (await page.locator(".cm-line", { hasText: "Quisque placerat" }).first().boundingBox())!;
+  await page.mouse.move(text.x + 20, text.y + text.height / 2);
+  await page.keyboard.down("Control");
+  for (let i = 0; i < 9; i++) await page.mouse.wheel(0, 100);
+  await page.keyboard.up("Control");
+  await expect.poll(height).toBeLessThan(theme - 6);
+  await row.hover();
+  const grip = (await row.locator(".swd-row-grip").boundingBox())!;
+  expect(Math.round(grip.height)).toBe(22);
+  // As high as a table's row of Silverware Table: the line and SilverBullet's 8 px above and below (and its line under it)
+  const line = await row.locator("td[data-key=name]").evaluate((td) => parseFloat(getComputedStyle(td).lineHeight));
+  expect(await height()).toBeLessThanOrEqual(Math.round(line + 16) + 2);
+  const r = (await row.boundingBox())!;
+  const middle = r.y + r.height / 2;
+  for (const part of [".swd-open", ".swd-table-name", ".swd-row-grip"]) {
+    const b = (await row.locator(part).boundingBox())!;
+    expect(Math.abs(b.y + b.height / 2 - middle), part).toBeLessThanOrEqual(2);
+  }
+});

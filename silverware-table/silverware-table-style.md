@@ -742,6 +742,18 @@ body.swt-select-mode .sb-table-widget.swt-table td.swt-selected-alone {
   max-height: calc(100dvh - 120px);
   overflow: auto;
 }
+/* A table scrolling in a box of its own (Maximum table height, a large table, sideways): a thin scrollbar, its thumb
+   quiet and its track clear, so it reads as the table's, not a strip beside it. While the page holds its header
+   (swt-held-by-page, the sticky module: the page scrolled into the table, the box's top under SilverBullet's top bar)
+   the box's scrollbar would run up past the header, beside the room covered for the toolbar: clear then, its width
+   kept (the table does not move), back as the box's top is in view; the wheel and a finger scroll it as ever */
+.sb-table-widget.swt-table:not(.swt-over-window) {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--root-color, #333) 30%, transparent) transparent;
+}
+.sb-table-widget.swt-table.swt-held-by-page:not(.swt-over-window) {
+  scrollbar-color: transparent transparent;
+}
 .sb-table-widget tr.swt-large-spacer > td {
   padding: 0 !important;
   border: 0 !important;

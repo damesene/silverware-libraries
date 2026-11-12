@@ -2,16 +2,18 @@
 // - Page: the width of this page's text (the default, or its own) and the default of every page (the theme's, or its
 //   own). Each set by a slider marked with the guides, snapping to them, or typed, in px or % of the pane; a row
 //   following another shows the width it follows, and is its own as soon as either is moved or typed in.
+//   Under them the editor's font size for every page (the theme's, or its own), Font zoom (Ctrl + scroll) and this
+//   device's zoom, taken off by Reset (docs/silverware-layout-font-size.md).
 //   What is set shows on the page at once (the dialog held at the window's top, the page seen under it).
 // - Guides: the widths a drag snaps to (a widget's bar, these sliders), each typed in its own row; Full width a box.
 //   Ascending as the tab is drawn, left in the order typed until it is drawn again.
 // Save writes what changed (the page's into its frontmatter, the default and the guides into CONFIG), Cancel or Esc
-// puts the page back. The shared dialog, tabs and controls (shared/), classes `swl-dialog-*`.
+// puts the page back. Font zoom and the font size are saved into CONFIG as well. The shared dialog, tabs and controls (shared/), classes `swl-dialog-*`.
 import { type SegmentedControl, segmentedControl } from "../../../shared/controls.ts";
 import { type Dialog, Dialogs } from "../../../shared/dialog.ts";
 import { el } from "../../../shared/elements.ts";
 import { tabs } from "../../../shared/tabs.ts";
-import { type Guide, validateGuide } from "../model/settings.ts";
+import { FONT_SIZE_LIMITS, type Guide, validateFontSize, validateGuide } from "../model/settings.ts";
 import { sameWidth, TEXT_WIDTH_LIMITS, validateTextWidth, type Width, type WidthUnit } from "../model/width.ts";
 import { ICONS } from "./icons.ts";
 
@@ -39,16 +41,47 @@ export type PageDialogStore = {
   paneWidth(): number;
   // The text's width the theme gives (px), Silverware Layout's own set aside
   themeWidth(): number;
-  // The page shown as it would be with these (the page's own, the default), until `restore`
-  preview(pageWidth: Width | undefined, defaultWidth: Width | undefined): void;
+  // The editor's font size for every page (none: the theme's), whether Font zoom is on, this device's zoom (none: none)
+  readonly fontSize: number | undefined;
+  readonly fontZoom: boolean;
+  readonly zoom: number | undefined;
+  // The font size the theme gives (px)
+  themeFontSize(): number;
+  // The page shown as it would be with these, until `restore`
+  preview(shown: Preview): void;
   restore(): void;
   // Each saved; why not, as text
   savePage(width: Width | undefined): Promise<string | undefined>;
   saveDefault(width: Width | undefined): Promise<string | undefined>;
   saveGuides(guides: readonly Guide[]): Promise<string | undefined>;
+  saveFont(fontSize: number | undefined, fontZoom: boolean): Promise<string | undefined>;
+  // This device's zoom taken off
+  resetZoom(): void;
   confirm(question: string): Promise<boolean>;
   flash(message: string, type: "info" | "error"): void;
 };
+
+/** What the page is shown with while the dialog is open */
+export type Preview = {
+  readonly pageWidth: Width | undefined;
+  readonly defaultWidth: Width | undefined;
+  readonly fontSize: number | undefined;
+  readonly fontZoom: boolean;
+  readonly zoom: number | undefined;
+};
+
+/** The font size being set: its own (or the theme's), its number as typed */
+type FontField = { own: boolean; amount: string };
+
+/** The font size of a field: none where it follows the theme, else its number, or why it is none */
+function fontSizeOf(field: FontField): { readonly size?: number; readonly problem?: string } {
+  if (!field.own) return {};
+  const text = field.amount.trim();
+  if (!text) return { problem: "Type a font size, or pick Theme" };
+  const size = Number(text);
+  const problem = validateFontSize(size);
+  return problem ? { problem } : { size };
+}
 
 /** A width being set: its own (or what it follows), its number as typed and its unit */
 type Field = { own: boolean; amount: string; unit: WidthUnit };
@@ -94,6 +127,10 @@ export class PageDialog {
   private full: HTMLInputElement | undefined;
   private saveButton: HTMLButtonElement | undefined;
   private note: HTMLElement | undefined;
+  // The font: its size, Font zoom, and whether this device's zoom is kept (Reset pressed: not)
+  private font: FontField = { own: false, amount: "" };
+  private fontZoom: HTMLInputElement | undefined;
+  private zoomKept = false;
 
   constructor(private readonly doc: Document) {
     this.dialogs = new Dialogs(doc, { base: BASE, closeIcon: ICONS.close });
@@ -116,7 +153,9 @@ export class PageDialog {
     this.page = this.widthRow("This page", "Default", fieldOf(store.pageWidth), () => this.inherited("page"));
     this.fallback = this.widthRow("All pages", "Theme", fieldOf(store.defaultWidth), () => this.inherited("fallback"));
     if (!store.canSaveSettings) this.fallback.element.classList.add(`${BASE}-readonly`);
-    const pagePanel = el(doc, "div", `${BASE}-widths`, this.page.element, this.fallback.element);
+    const fontRow = this.fontRow();
+    if (!store.canSaveSettings) fontRow.classList.add(`${BASE}-readonly`);
+    const pagePanel = el(doc, "div", `${BASE}-widths`, this.page.element, this.fallback.element, fontRow);
 
     // The guides: each its row, ascending as drawn; Full width a box of its own
     this.guideList = el(doc, "div", { class: `${BASE}-guide-list`, attrs: { role: "list" } });
@@ -296,6 +335,103 @@ export class PageDialog {
     return { element: row, field, show };
   }
 
+  /**
+   * The font size's row: the theme's or its own, a slider (5 to 40 px) and its number; Font zoom a box; this device's
+   * zoom, while there is one, with Reset
+   */
+  private fontRow(): HTMLElement {
+    const { doc } = this;
+    const store = this.store!;
+    const field: FontField = (this.font = { own: store.fontSize !== undefined, amount: store.fontSize === undefined ? "" : String(store.fontSize) });
+    this.zoomKept = store.zoom !== undefined;
+    const mode = segmentedControl(
+      doc,
+      SEGMENTS_BASE,
+      "Font size",
+      [
+        { value: "follows", label: "Theme", title: "Your theme's font size" },
+        { value: "own", label: "Own", title: "A font size of its own" },
+      ] as const,
+      field.own ? "own" : "follows",
+      (value) => {
+        field.own = value === "own";
+        if (field.own && !field.amount.trim()) field.amount = String(store.themeFontSize());
+        show();
+        this.update();
+      },
+    );
+    const slider = el(doc, "input", {
+      class: `${BASE}-slider`,
+      attrs: { type: "range", step: "1", min: String(FONT_SIZE_LIMITS.min), max: String(FONT_SIZE_LIMITS.max), "aria-label": "Font size" },
+    });
+    const amount = el(doc, "input", { class: `${BASE}-amount`, attrs: { type: "number", inputmode: "numeric", step: "1", "aria-label": "Font size in px" } });
+    const show = () => {
+      const shown = field.own ? Number(field.amount) : store.themeFontSize();
+      if (Number.isFinite(shown)) slider.value = String(Math.round(shown));
+      if (amount.value !== field.amount || !field.own) amount.value = field.own ? field.amount : "";
+      amount.placeholder = String(store.themeFontSize());
+      slider.disabled = amount.disabled = !this.editable(row);
+      mode.set(field.own ? "own" : "follows");
+      row.classList.toggle(`${BASE}-follows`, !field.own);
+    };
+    slider.addEventListener("input", () => {
+      field.own = true;
+      field.amount = slider.value;
+      show();
+      this.update();
+    });
+    amount.addEventListener("input", () => {
+      field.own = !!amount.value.trim();
+      field.amount = amount.value;
+      const value = Number(amount.value);
+      if (field.own && Number.isFinite(value)) slider.value = String(value);
+      mode.set(field.own ? "own" : "follows");
+      row.classList.toggle(`${BASE}-follows`, !field.own);
+      this.update();
+    });
+    // Font zoom: a box, how it is used said quietly beside it
+    this.fontZoom = el(doc, "input", { attrs: { type: "checkbox" } });
+    this.fontZoom.checked = store.fontZoom;
+    this.fontZoom.addEventListener("change", () => this.update());
+    const zoomBox = el(
+      doc,
+      "label",
+      `${BASE}-zoom`,
+      this.fontZoom,
+      el(doc, "span", `${BASE}-zoom-text`, el(doc, "span", { text: "Font zoom" }), el(doc, "span", { class: `${BASE}-hint`, text: "Ctrl + scroll over the page, Ctrl+0 resets" })),
+    );
+    // This device's zoom, while there is one: what it is, Reset taking it off (on Save)
+    const device = el(doc, "div", `${BASE}-device`);
+    const drawDevice = () => {
+      device.hidden = !this.zoomKept;
+      if (!this.zoomKept) return;
+      device.replaceChildren(
+        el(doc, "span", { text: `This device: ${store.zoom} px` }),
+        el(doc, "button", {
+          class: `${BASE}-reset`,
+          text: "Reset",
+          run: () => {
+            this.zoomKept = false;
+            drawDevice();
+            this.update();
+          },
+        }),
+      );
+    };
+    drawDevice();
+    const row = el(
+      doc,
+      "div",
+      `${BASE}-width-row ${BASE}-font-row`,
+      el(doc, "div", `${BASE}-width-head`, el(doc, "span", { class: `${BASE}-width-name`, text: "Font size" }), mode.element),
+      el(doc, "div", `${BASE}-width-controls`, el(doc, "div", `${BASE}-slider-box ${BASE}-slider-plain`, slider), el(doc, "div", `${BASE}-width-value`, amount, el(doc, "span", `${BASE}-unit`, "px"))),
+      zoomBox,
+      device,
+    );
+    show();
+    return row;
+  }
+
   /** Whether a row can be changed here (all pages' width only where settings can be saved) */
   private editable(row: HTMLElement): boolean {
     return !row.closest(`.${BASE}-readonly`);
@@ -333,8 +469,11 @@ export class PageDialog {
     const fallback = widthOf(this.fallback.field);
     const badGuide = this.guideRows.find((row) => row.input.value.trim() && validateGuide(Number(row.input.value)));
     for (const row of this.guideRows) row.input.classList.toggle(`${BASE}-invalid`, row === badGuide || (!!row.input.value.trim() && !!validateGuide(Number(row.input.value))));
-    const problem = page.problem ?? fallback.problem ?? (badGuide ? validateGuide(Number(badGuide.input.value)) : undefined);
-    if (!page.problem && !fallback.problem) store.preview(page.width, fallback.width);
+    const font = fontSizeOf(this.font);
+    const problem = page.problem ?? fallback.problem ?? font.problem ?? (badGuide ? validateGuide(Number(badGuide.input.value)) : undefined);
+    if (!page.problem && !fallback.problem && !font.problem) {
+      store.preview({ pageWidth: page.width, defaultWidth: fallback.width, fontSize: font.size, fontZoom: !!this.fontZoom?.checked, zoom: this.zoomKept ? store.zoom : undefined });
+    }
     if (this.saveButton) {
       this.saveButton.textContent = this.saving ? "Saving…" : "Save";
       this.saveButton.disabled = this.saving || !!problem || !this.changed();
@@ -350,7 +489,18 @@ export class PageDialog {
     if (!store || !this.page || !this.fallback) return false;
     const guides = this.currentGuides();
     const sameGuides = guides.length === store.guides.length && guides.every((guide) => store.guides.includes(guide));
-    return !sameWidth(widthOf(this.page.field).width, store.pageWidth) || !sameWidth(widthOf(this.fallback.field).width, store.defaultWidth) || !sameGuides;
+    return !sameWidth(widthOf(this.page.field).width, store.pageWidth) || !sameWidth(widthOf(this.fallback.field).width, store.defaultWidth) || !sameGuides || this.fontChanged() || this.zoomReset();
+  }
+
+  /** Whether the font size or Font zoom differ from what is saved */
+  private fontChanged(): boolean {
+    const store = this.store!;
+    return fontSizeOf(this.font).size !== store.fontSize || !!this.fontZoom?.checked !== store.fontZoom;
+  }
+
+  /** Whether this device's zoom is to be taken off (Reset) */
+  private zoomReset(): boolean {
+    return this.store!.zoom !== undefined && !this.zoomKept;
   }
 
   /** Esc, × or a press beside it: whether it closes, after asking where changes would be lost */
@@ -371,7 +521,8 @@ export class PageDialog {
     if (!store || this.saving || !this.page || !this.fallback) return;
     const page = widthOf(this.page.field);
     const fallback = widthOf(this.fallback.field);
-    if (page.problem || fallback.problem) return;
+    const font = fontSizeOf(this.font);
+    if (page.problem || fallback.problem || font.problem) return;
     this.saving = true;
     this.update();
     const problems: string[] = [];
@@ -385,6 +536,11 @@ export class PageDialog {
       const problem = await store.saveDefault(fallback.width).catch((e: unknown) => String(e));
       if (problem) problems.push(`the default: ${problem}`);
     }
+    if (this.fontChanged() && store.canSaveSettings) {
+      const problem = await store.saveFont(font.size, !!this.fontZoom?.checked).catch((e: unknown) => String(e));
+      if (problem) problems.push(`the font size: ${problem}`);
+    }
+    if (this.zoomReset()) store.resetZoom();
     if (!sameWidth(page.width, store.pageWidth)) {
       const problem = await store.savePage(page.width).catch((e: unknown) => String(e));
       if (problem) problems.push(`this page: ${problem}`);

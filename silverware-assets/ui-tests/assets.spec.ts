@@ -1,10 +1,9 @@
-// Embedded media (docs/silverware-assets.md) as a user works with them in SilverBullet: the "…" menu writing a
+// Embedded files (docs/silverware-assets.md) as a user works with them in SilverBullet, in a page and in Silverware
+// Layout's grid (shared/rendered.ts, where the two meet): the "…" menu writing a
 // view into the embed it is on (the same file in a grid and outside it apart), a file SilverBullet cannot draw as a card,
 // a width dragged (in the page, and within a grid's cell), a PDF and a zip in a cell, a link's icon, the settings'
 // card fields and a click shown in the side panel.
-import { expect, gridsDrawn, PAGE_LAYOUT, PIXEL_PNG, runCommand, test } from "./helpers.ts";
-
-const ASSETS_SETTINGS = "Silverware Assets: Settings";
+import { ASSETS_SETTINGS, expect, gridsDrawn, PAGE_LAYOUT, PIXEL_PNG, runCommand, test } from "./helpers.ts";
 
 const cell = (text: string) => `<column>\n\n${text}\n\n</column>`;
 const grid = (...cells: string[]) => `<grid>\n${cells.map(cell).join("\n")}\n</grid>\n`;

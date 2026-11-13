@@ -9,4 +9,5 @@ The files a page embeds and links (prefix `swa-`, settings and Space Lua API und
 
 ## Tests
 
-- `src/isolation.test.ts`: no other plugin's code (Silverware Layout only through its API, `shared/layout.ts` and `shared/rendered.ts`).
+- `src/isolation.test.ts`: the layers (model, core, builtin, ui; SilverBullet only in `host/silverbullet/` and `index.ts`), no other plugin's code (Silverware Layout only through its API, `shared/layout.ts` and `shared/rendered.ts`), of Layout's marks only `data-swl-width` in the style page.
+- `ui-tests/` against SilverBullet only (`helpers.ts`: a test's pages and files under `UiAssets/<test>/`, CONFIG put back): `assets.spec.ts` (files in a page and in Layout's grid, the settings window, the markdown-as-written mode), `link-touch.spec.ts` (the touch project).

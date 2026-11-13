@@ -132,7 +132,7 @@ test("a cell's menu: the cell moved right, then the grid removed, its content ke
     const target = page.locator("#sb-main .swl-grid-cell").nth(cell);
     await target.hover();
     await target.locator(".swl-grid-cell-more").click();
-    await page.locator(".swl-asset-menu-holder .swl-menu-item", { hasText: label }).click();
+    await page.locator(".swl-popup .swl-menu-item", { hasText: label }).click();
   };
   await pick(0, "Move right");
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${GRID.replace("Left text", "@@").replace("Right text", "Left text").replace("@@", "Right text")}\nAfter\n`);
@@ -234,6 +234,8 @@ test("a cell left by Esc, then a drag in a cell: the grid stays drawn, the field
   await expect(field).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(field).toHaveCount(0);
+  // (SilverBullet may draw the page anew as another test's CONFIG is put back: the grid drawn again first)
+  await gridsDrawn(page);
   const words = page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Right text");
   const box = (await words.boundingBox())!;
   await page.mouse.move(box.x + 2, box.y + box.height / 2);

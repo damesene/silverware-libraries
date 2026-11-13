@@ -1,11 +1,13 @@
-// A menu Silverware Layout opens from an element of its own (a medium's "…", a link's icon, a grid's cell's "…"): its
-// sections of items, a separator between; placed under what opened it, over the page. The shared menu
-// (shared/menu.ts), its classes by Silverware Layout's base. What opens it takes the press as its own: what it is in
-// (a link SilverBullet follows as a touch on it ends, an editor moving its cursor) does not get it.
-import { el } from "../../../shared/elements.ts";
-import { focusMenu, type MenuEntry, menuItem, menuSeparator, onMenuClose, renderMenu } from "../../../shared/menu.ts";
+// A menu a plugin opens from an element of its own (a medium's "…", a link's icon, a grid's cell's "…"): its sections
+// of items, a separator between; placed under what opened it, over the page. The shared menu (menu.ts), its classes by
+// the plugin's base (`<base>-menu-item`…), in a box of the plugin's own (`<base>-popup <base>-menu`: its style page
+// places and draws it). What opens it takes the press as its own: what it is in (a link SilverBullet follows as a touch
+// on it ends, an editor moving its cursor) does not get it.
+import { el } from "./elements.ts";
+import { focusMenu, type MenuEntry, menuItem, menuSeparator, onMenuClose, renderMenu } from "./menu.ts";
 
-const LOOK = { base: "swl" } as const;
+/** The plugin's base of classes (`swl`) */
+export type PopupLook = { readonly base: string };
 
 /** One item: its label, what it does; checked (a choice shown as on), disabled (why, as text) */
 export type PopupItem = { readonly label: string; readonly run: () => void; readonly checked?: boolean; readonly disabled?: string };
@@ -13,7 +15,8 @@ export type PopupItem = { readonly label: string; readonly run: () => void; read
 export type PopupMenu = { readonly title: string; readonly sections: readonly (readonly PopupItem[])[] };
 
 /** An element that opens a menu as it is pressed, the menu made then; closed by a press beside it, Esc, or a second press; all of it gone as `signal` aborts */
-export function opensMenu(doc: Document, trigger: HTMLElement, menu: () => PopupMenu, signal?: AbortSignal): void {
+export function opensMenu(doc: Document, look: PopupLook, trigger: HTMLElement, menu: () => PopupMenu, signal?: AbortSignal): void {
+  const LOOK = { base: look.base };
   trigger.setAttribute("aria-haspopup", "menu");
   trigger.setAttribute("aria-expanded", "false");
   let holder: HTMLElement | undefined;
@@ -43,7 +46,7 @@ export function opensMenu(doc: Document, trigger: HTMLElement, menu: () => Popup
     const rendered = renderMenu(doc, LOOK, shown.title, entries);
     onMenuClose(rendered, LOOK, close);
     // (The box is the plugin's own, `.swl-menu`: the shared look's rules are of the menu in it)
-    holder = el(doc, "div", { class: "swl-asset-menu-holder swl-menu" }, rendered);
+    holder = el(doc, "div", { class: `${look.base}-popup ${look.base}-menu` }, rendered);
     const box = trigger.getBoundingClientRect();
     holder.style.top = `${box.bottom + 4}px`;
     holder.style.left = `${Math.max(8, Math.min(box.right - 220, (doc.defaultView?.innerWidth ?? Infinity) - 228))}px`;

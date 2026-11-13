@@ -11,9 +11,12 @@ import { metadataOf } from "./core/metadata.ts";
 import type { AssetRegistry } from "./core/registry.ts";
 import { type AssetSettings, type Gesture, type View, VIEWS } from "./model/settings.ts";
 import { addCardFields, dateText, drawCard, iconElement, markFailed, sizeText } from "./ui/card.ts";
-import { opensMenu } from "../ui/popupmenu.ts";
+import { opensMenu } from "../../../shared/popupmenu.ts";
 import { addMoreButton, type MoreMenu, popupOf } from "./ui/moremenu.ts";
 import { plainMedium } from "./ui/plainmedium.ts";
+
+// The popup menu's classes: Silverware Layout's
+const POPUP = { base: "swl" } as const;
 
 /** An embed as the host drew it: its frame, its target as drawn (a path of the space or a URL), its own media element */
 export type DrawnEmbed = {
@@ -137,6 +140,7 @@ export class AssetDecorator {
       const capabilities: Capabilities = { views: ["icon", ...(type.views?.preview ? (["preview"] as const) : []), ...(drawn ? (["embed"] as const) : [])] };
       opensMenu(
         this.doc,
+        POPUP,
         icon,
         () =>
           popupOf({
@@ -342,7 +346,7 @@ export class AssetDecorator {
         icon.classList.add("swl-asset-menu-icon");
         icon.title = "Show…";
         icon.setAttribute("role", "button");
-        opensMenu(this.doc, icon, () => popupOf(menu()), control.signal);
+        opensMenu(this.doc, POPUP, icon, () => popupOf(menu()), control.signal);
       } else addMoreButton(this.doc, frame, menu, control.signal);
       return;
     }

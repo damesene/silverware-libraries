@@ -145,7 +145,7 @@ describe("an asset's menu", () => {
     await decorator.decorate([one]);
     const more = one.frame.querySelector<HTMLButtonElement>(".swl-asset-more")!;
     more.click();
-    const items = [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")];
+    const items = [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")];
     expect(items.map((item) => [item.textContent?.trim(), item.getAttribute("aria-checked")])).toEqual([
       ["Show as a card", "false"],
       ["Show as a preview", "false"],
@@ -158,14 +158,14 @@ describe("an asset's menu", () => {
     items[0]!.click();
     await vi.waitFor(() => expect(state.writes).toHaveLength(1));
     expect(state.writes[0]!.changes).toEqual({ metadata: { view: "icon" } });
-    expect(document.querySelector(".swl-asset-menu-holder")).toBeNull();
+    expect(document.querySelector(".swl-popup")).toBeNull();
     more.click();
-    [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")][2]!.click();
+    [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")][2]!.click();
     await vi.waitFor(() => expect(state.writes).toHaveLength(2));
     expect(state.writes[1]!.changes).toEqual({ metadata: { view: null } });
     // Shown as a link: the embed written as one
     more.click();
-    [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")].at(-1)!.click();
+    [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")].at(-1)!.click();
     await vi.waitFor(() => expect(state.forms).toEqual(["link ![[cat.png|A cat|200]] 0/1"]));
   });
 });
@@ -181,13 +181,13 @@ describe("a link's menu", () => {
     const icon = element.querySelector<HTMLElement>(".swl-asset-link-icon")!;
     icon.click();
     expect(followed).toBe(0);
-    const items = [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")];
+    const items = [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")];
     expect(items.map((item) => item.textContent?.trim())).toEqual(["Open in a new tab", "Show in a side panel", "Show enlarged", "Show as embedded"]);
     items[0]!.click();
     expect(state.opened).toEqual([".fs/report.pdf"]);
     // Shown in the side panel: the file's viewer, as the browser draws a PDF
     icon.click();
-    [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")][1]!.click();
+    [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")][1]!.click();
     await vi.waitFor(() => expect(document.querySelector(".swl-asset-peek object")?.getAttribute("data")).toBe(".fs/report.pdf"));
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   });
@@ -237,7 +237,7 @@ describe("the same file outside a grid and in it", () => {
     // A view chosen on each writes its own embed
     for (const [one, view] of [[gridFrame, 0], [widget, 1]] as const) {
       one.frame.querySelector<HTMLButtonElement>(".swl-asset-more")!.click();
-      [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")][view]!.click();
+      [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")][view]!.click();
     }
     await vi.waitFor(() => expect(state.writes).toHaveLength(2));
     expect(state.writes.map((write) => [write.occurrence, write.changes])).toEqual([
@@ -282,7 +282,7 @@ describe("links to files decorated", () => {
 describe("a link shown as embedded", () => {
   const menuItem = (icon: HTMLElement, label: string) => {
     icon.click();
-    [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")].find((item) => item.textContent?.trim() === label)!.click();
+    [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")].find((item) => item.textContent?.trim() === label)!.click();
   };
 
   it("writes the link it is: one in the editor by its order among those drawn of its target, outside what is rendered outside the editor", async () => {
@@ -320,7 +320,7 @@ describe("a card's menu", () => {
     expect(one.frame.querySelector(".swl-asset-more")).toBeNull();
     const icon = one.frame.querySelector<HTMLElement>(".swl-asset-card .swl-asset-icon")!;
     icon.click();
-    const items = [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")].map((item) => item.textContent?.trim());
+    const items = [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")].map((item) => item.textContent?.trim());
     expect(items.slice(0, 3)).toEqual(["Show as a card", "Show as a preview", "Show as the original"]);
     expect(items).toContain("Open in a new tab");
     // (The icon's click the menu's alone: no file opened by it)

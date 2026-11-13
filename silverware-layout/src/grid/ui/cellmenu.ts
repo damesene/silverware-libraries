@@ -3,7 +3,10 @@
 // after it, moved out of the grid) and with the grid (its number of columns, a column added, the grid taken apart).
 // One button a cell, not one for the grid besides: the two would lie at the same corner.
 import { el } from "../../../../shared/elements.ts";
-import { opensMenu, type PopupItem } from "../../ui/popupmenu.ts";
+import { opensMenu, type PopupItem } from "../../../../shared/popupmenu.ts";
+
+// The popup menu's classes: Silverware Layout's
+const POPUP = { base: "swl" } as const;
 
 /** What a cell's menu does */
 export type CellAction =
@@ -25,7 +28,7 @@ const COLUMN_CHOICES: readonly (readonly [string | null, string])[] = [
 export function addCellMenus(doc: Document, grid: HTMLElement, state: () => { readonly columns: string | undefined; readonly cells: number }, act: (cell: number, action: CellAction) => void): void {
   grid.querySelectorAll<HTMLElement>(":scope > .swl-grid-cell").forEach((cell, index) => {
     const button = el(doc, "button", { class: "swl-grid-cell-more", title: "Column…", text: "…", attrs: { type: "button" } });
-    opensMenu(doc, button, () => {
+    opensMenu(doc, POPUP, button, () => {
       const now = state();
       const item = (label: string, action: CellAction, disabled?: string): PopupItem => ({ label, run: () => act(index, action), ...(disabled ? { disabled } : {}) });
       return {

@@ -1,8 +1,11 @@
 // An asset's "…" button (docs/silverware-layout-assets.md, *Views*): on its frame, at its top right, opening the
-// asset's menu (Silverware Layout's popup menu, ui/popupmenu.ts): how it is shown (icon, preview, embed: the one it is
+// asset's menu (the shared popup menu, shared/popupmenu.ts): how it is shown (icon, preview, embed: the one it is
 // shown as checked, one that cannot be drawn disabled), then what can be done with it.
 import { el } from "../../../../shared/elements.ts";
-import { opensMenu, type PopupMenu } from "../../ui/popupmenu.ts";
+import { opensMenu, type PopupMenu } from "../../../../shared/popupmenu.ts";
+
+// The popup menu's classes: Silverware Layout's
+const POPUP = { base: "swl" } as const;
 
 type Item = { readonly label: string; readonly run: () => void };
 
@@ -19,7 +22,7 @@ export const popupOf = (menu: MoreMenu): PopupMenu => ({ title: menu.title, sect
 /** The "…" button on an asset's frame, its menu made as it is pressed; gone as `signal` aborts */
 export function addMoreButton(doc: Document, frame: HTMLElement, menu: () => MoreMenu, signal: AbortSignal): HTMLButtonElement {
   const button = el(doc, "button", { class: "swl-asset-more", title: "Show as…", text: "…" });
-  opensMenu(doc, button, () => popupOf(menu()), signal);
+  opensMenu(doc, POPUP, button, () => popupOf(menu()), signal);
   signal.addEventListener("abort", () => button.remove());
   frame.append(button);
   return button;

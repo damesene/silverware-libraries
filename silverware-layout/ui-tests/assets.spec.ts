@@ -11,7 +11,7 @@ const grid = (...cells: string[]) => `<grid>\n${cells.map(cell).join("\n")}\n</g
 async function choose(page: import("@playwright/test").Page, frame: import("@playwright/test").Locator, item: string): Promise<void> {
   await frame.hover();
   await frame.locator(".swl-asset-more").click();
-  await page.locator(".swl-asset-menu-holder .swl-menu-item", { hasText: item }).click();
+  await page.locator(".swl-popup .swl-menu-item", { hasText: item }).click();
 }
 
 test("the same image outside a grid and in it: a view chosen in the grid written to the grid's embed alone, shown at once", async ({ page, space }) => {
@@ -93,7 +93,7 @@ test("a link to a file shows its type's icon, in a grid too; a link to a page no
   // Its icon's menu: the link not followed, the file shown enlarged
   const url = page.url();
   await page.locator("#sb-main .swl-grid [data-swl-asset-link='pdf'] .swl-asset-link-icon").click();
-  await page.locator(".swl-asset-menu-holder .swl-menu-item", { hasText: "Show enlarged" }).click();
+  await page.locator(".swl-popup .swl-menu-item", { hasText: "Show enlarged" }).click();
   await expect(page.locator(".swl-asset-popover object")).toHaveAttribute("data", `.fs/${encodeURI(`${space.folder}/doc.pdf`)}`);
   expect(page.url()).toBe(url);
   await page.keyboard.press("Escape");
@@ -126,7 +126,7 @@ test("a link shown as embedded by its icon's menu, and the embed shown as a link
   await gridsDrawn(page);
   const pick = async (trigger: import("@playwright/test").Locator, label: string) => {
     await trigger.click();
-    await page.locator(".swl-asset-menu-holder .swl-menu-item", { hasText: label }).click();
+    await page.locator(".swl-popup .swl-menu-item", { hasText: label }).click();
   };
   await pick(page.locator("#sb-main .swl-grid [data-swl-asset-link] .swl-asset-link-icon"), "Show as embedded");
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\nA ${link} here.\n\n${grid(`Cell !${link}`, "Right")}`);
@@ -223,6 +223,6 @@ test("a card opens its menu from its icon, no button over it; what is chosen the
   await card.hover();
   await expect(page.locator("#sb-main [data-swl-asset] .swl-asset-more")).toHaveCount(0);
   await card.locator(".swl-asset-icon").click();
-  await page.locator(".swl-asset-menu-holder .swl-menu-item", { hasText: "Show as a link" }).click();
+  await page.locator(".swl-popup .swl-menu-item", { hasText: "Show as a link" }).click();
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n[[${space.folder}/archive.zip]]\n`);
 });

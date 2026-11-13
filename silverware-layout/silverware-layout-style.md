@@ -1193,7 +1193,8 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
     opacity: 0.8;
   }
 }
-.swl-asset-menu-holder {
+/* The box of a popup menu (shared/popupmenu.ts), over the page */
+.swl-popup {
   position: fixed;
   z-index: var(--sw-layer-menu);
 }

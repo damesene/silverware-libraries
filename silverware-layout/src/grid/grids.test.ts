@@ -255,7 +255,7 @@ describe("a cell's menu", () => {
     document.body.append(grid);
     const menuOf = (cell: number) => {
       grid.querySelectorAll<HTMLElement>(".swl-grid-cell-more")[cell]!.click();
-      return [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")];
+      return [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")];
     };
     const pick = async (cell: number, label: string) => {
       menuOf(cell).find((item) => item.textContent?.trim() === label)!.click();

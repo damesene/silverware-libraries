@@ -26,6 +26,8 @@ export type Bridge = {
   readonly moveCursor?: (at: number, center?: boolean) => unknown;
   // Optional, for `/grid`: where the cursor is, an offset of the page's text (`editor.getCursor`)
   readonly getCursor?: () => unknown;
+  // Optional, for a file's card: a document's meta (`space.getDocumentMeta`: its `size` in bytes, `lastModified`)
+  readonly documentMeta?: (path: string) => unknown;
   // Optional, for a link written new: SilverBullet's setting `defaultLinkStyle` ("wikilink" or "markdown")
   readonly linkStyle?: () => unknown;
 };

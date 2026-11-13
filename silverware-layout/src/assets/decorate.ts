@@ -10,7 +10,7 @@ import { embedAt, embedOf, outside, type Range, sameTarget } from "./core/locate
 import { metadataOf } from "./core/metadata.ts";
 import type { AssetRegistry } from "./core/registry.ts";
 import { type AssetSettings, type Gesture, type View, VIEWS } from "./model/settings.ts";
-import { drawCard, markFailed } from "./ui/card.ts";
+import { addCardFields, dateText, drawCard, markFailed, sizeText } from "./ui/card.ts";
 import { addMoreButton } from "./ui/moremenu.ts";
 
 /** An embed as the host drew it: its frame, its target as drawn (a path of the space or a URL), its own media element */
@@ -21,6 +21,9 @@ export type DrawnEmbed = {
   // Where it is in the page, where the host knows (a medium in markdown rendered outside the editor: its block's place and its own offset in it)
   readonly position?: () => number | undefined;
 };
+
+/** A file's size in bytes and when it was last changed (a time the host gives: an ISO text or milliseconds) */
+export type FileInfo = { readonly size?: number; readonly modified?: string | number };
 
 /** An embed to write: found by its text as read and its place among those alike */
 export type EmbedWrite = { readonly text: string; readonly occurrence: number; readonly of: number; readonly changes: EmbedChanges };
@@ -38,6 +41,8 @@ export type AssetHost = {
   /** An embed's asset */
   assetOf(embed: Embed, page: string): Asset;
   settings(): Promise<AssetSettings>;
+  /** A file's size (bytes) and when it was last changed, where the host knows them (its card shows them) */
+  fileInfo?(asset: Asset): Promise<FileInfo | undefined>;
   writeEmbed(write: EmbedWrite): Promise<string | undefined>;
   open(url: string): void;
   problem(message: string): void;
@@ -231,11 +236,26 @@ export class AssetDecorator {
       });
   }
 
-  /** The card of an asset: its type's icon and the fields the user shows */
+  /** The card of an asset: its type's icon and the fields the user shows (a file's size and date as the host tells them, a moment later) */
   private card(type: AssetType, asset: Asset, settings: AssetSettings): HTMLElement {
     const name = asset.alt || (asset.kind === "file" ? asset.path.split("/").pop()! : asset.kind === "web" ? asset.url.split(/[?#]/, 1)[0]!.split("/").pop()! : asset.page);
     const fields = settings.card.filter((field) => field === "name").map((field) => ({ name: field, text: name }));
-    return drawCard(this.doc, settings.card.includes("icon") ? type.icon : undefined, fields, name);
+    const card = drawCard(this.doc, settings.card.includes("icon") ? type.icon : undefined, fields, name);
+    const wanted = settings.card.filter((field) => field === "size" || field === "modified");
+    if (wanted.length && this.host.fileInfo) {
+      void this.host
+        .fileInfo(asset)
+        .then((info) => {
+          if (!info) return;
+          const shown = wanted.flatMap((field) => {
+            const text = field === "size" ? (info.size === undefined ? undefined : sizeText(info.size)) : info.modified === undefined ? undefined : dateText(info.modified);
+            return text ? [{ name: field, text }] : [];
+          });
+          addCardFields(this.doc, card, shown);
+        })
+        .catch(() => undefined);
+    }
+    return card;
   }
 }
 

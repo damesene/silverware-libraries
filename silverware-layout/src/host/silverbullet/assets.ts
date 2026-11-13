@@ -108,6 +108,15 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
       return WEB.test(target) ? { kind: "web", url: target, ...alt } : { kind: "file", path: target, url: documentUrl(target), ...alt };
     },
     settings: async () => (bridge.getConfig ? await bridge.getConfig("silverware.layout.assets", undefined) : undefined),
+    // A file of the space: its document's meta (its size in bytes, `lastModified`); a URL, or a file not there: none
+    fileInfo: async (asset: Asset): Promise<{ readonly size?: number; readonly modified?: string | number } | undefined> => {
+      if (asset.kind !== "file" || !bridge.documentMeta) return undefined;
+      const meta = (await bridge.documentMeta(asset.path)) as { size?: unknown; lastModified?: unknown } | undefined;
+      if (!meta) return undefined;
+      const size = typeof meta.size === "number" ? meta.size : undefined;
+      const modified = typeof meta.lastModified === "string" || typeof meta.lastModified === "number" ? meta.lastModified : undefined;
+      return { ...(size === undefined ? {} : { size }), ...(modified === undefined ? {} : { modified }) };
+    },
     writeEmbed: async (write: Write): Promise<string | undefined> => {
       const page = String(await bridge.getCurrentPage());
       const report = await writer.write(pageChanges().page(page, (p) => p.embeds.set(write.text, write.changes, { occurrence: write.occurrence, of: write.of })).build());

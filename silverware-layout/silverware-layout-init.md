@@ -82,6 +82,8 @@ if js and js.window then
     -- A grid's Alt+click: the cursor where the click was in its markdown; /grid: where the cursor is
     moveCursor = editor.moveCursor,
     getCursor = editor.getCursor,
+    -- A file's card: its size and date (an error where it is not in the space: the card shows its name alone)
+    documentMeta = space.getDocumentMeta,
     -- How a link written new is written: SilverBullet's own setting, the one place naming it
     linkStyle = function()
       return config.get("defaultLinkStyle", "wikilink")

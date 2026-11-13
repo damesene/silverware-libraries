@@ -43,6 +43,13 @@ describe("the Media tab", () => {
       actions: { default: { click: "open-tab", "shift+click": "" }, types: {} },
       anchor: "start",
     });
+    // What a card shows: its icon, its size and its date, each a box
+    const boxes = [...tab.panel.querySelectorAll<HTMLInputElement>(".swl-media-checks input")];
+    expect(boxes.map((box) => [box.parentElement!.textContent, box.checked])).toEqual([["Its icon", true], ["Its size", false], ["Its date", false]]);
+    boxes[0]!.checked = false;
+    boxes[2]!.checked = true;
+    await tab.save();
+    expect((saved as { card: unknown }).card).toEqual(["name", "modified"]);
     // As kept and read back: the Shift+click to nothing
     const back = readAssetSettings(storedAssetSettings(saved as never)).settings;
     expect(back.actions.default).toEqual({ click: "open-tab" });

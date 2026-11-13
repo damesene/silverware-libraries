@@ -3,7 +3,7 @@
 // what its card shows, where it stays as its width is dragged. The dialog shows it among its tabs, saves it on Save.
 import { el } from "../../../../shared/elements.ts";
 import type { DialogTabPart } from "../../ui/pagedialog.ts";
-import { type AssetSettings, type Gesture, type View, VIEWS } from "../model/settings.ts";
+import { type AssetSettings, type CardField, type Gesture, type View, VIEWS } from "../model/settings.ts";
 import { iconElement } from "./card.ts";
 
 const VIEW_LABELS: Readonly<Record<View, string>> = { icon: "Card", preview: "Preview", embed: "Original" };
@@ -35,8 +35,15 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
   const allClick = select(doc, "All files: a click", actions, settings.actions.default.click ?? NONE);
   const allShift = select(doc, "All files: a Shift+click", actions, settings.actions.default["shift+click"] ?? NONE);
   const anchor = select(doc, "Width dragged", [["start", "Stays at the start"], ["center", "Centred"]], settings.anchor);
-  const cardIcon = el(doc, "input", { attrs: { type: "checkbox" } });
-  cardIcon.checked = settings.card.includes("icon");
+  // What a card shows besides the file's name, each a box
+  const cardField = (field: CardField) => {
+    const box = el(doc, "input", { attrs: { type: "checkbox" } });
+    box.checked = settings.card.includes(field);
+    return box;
+  };
+  const cardIcon = cardField("icon");
+  const cardSize = cardField("size");
+  const cardDate = cardField("modified");
   const all = el(
     doc,
     "div",
@@ -46,7 +53,7 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
     el(doc, "label", "swl-media-field", "A click", allClick),
     el(doc, "label", "swl-media-field", "A Shift+click", allShift),
     el(doc, "label", "swl-media-field", "Width dragged", anchor),
-    el(doc, "label", "swl-media-check", cardIcon, "Cards show the file's icon"),
+    el(doc, "div", "swl-media-checks", el(doc, "span", { text: "Cards show" }), el(doc, "label", "swl-media-check", cardIcon, "Its icon"), el(doc, "label", "swl-media-check", cardSize, "Its size"), el(doc, "label", "swl-media-check", cardDate, "Its date")),
   );
 
   // Per type: "Default" follows All files
@@ -84,7 +91,7 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
       ...settings,
       views: { default: allView.value as View, types: viewTypes },
       actions: { default: defaults, types: actionTypes },
-      card: cardIcon.checked ? ["icon", "name"] : ["name"],
+      card: [...(cardIcon.checked ? (["icon"] as const) : []), "name", ...(cardSize.checked ? (["size"] as const) : []), ...(cardDate.checked ? (["modified"] as const) : [])],
       anchor: anchor.value === "center" ? "center" : "start",
     };
   };

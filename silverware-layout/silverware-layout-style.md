@@ -1175,8 +1175,14 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 .swl-media-field {
   display: contents;
 }
-.swl-media-check {
+.swl-media-checks {
   grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+.swl-media-check {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1299,6 +1305,18 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* A file's size and date, under its name: quieter, apart by a dot */
+.swl-asset-card-meta {
+  display: inline-flex;
+  gap: 6px;
+  font-size: 0.8em;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+.swl-asset-card-meta > * + *::before {
+  content: "·";
+  margin-right: 6px;
 }
 .swl-asset-pdf {
   display: block;

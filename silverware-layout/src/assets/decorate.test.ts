@@ -21,6 +21,7 @@ function setUp(text: string, settings: unknown = {}) {
     assetOf: (embed) => ({ kind: "file", path: embed.target, url: `.fs/${embed.target}`, ...(embed.alt ? { alt: embed.alt } : {}) }),
     settings: async (): Promise<AssetSettings> => readAssetSettings(settings).settings,
     writeEmbed: async (write) => void state.writes.push(write),
+    fileInfo: async (asset) => (asset.kind === "file" && asset.path.endsWith(".zip") ? { size: 2_621_440, modified: "2026-11-13T10:00:00Z" } : undefined),
     open: (url) => void state.opened.push(url),
     problem: (message) => void state.problems.push(message),
   };
@@ -67,6 +68,21 @@ describe("embedded media decorated", () => {
     expect(one.frame.querySelector(".p")!.classList.contains("swl-asset-native-hidden")).toBe(true);
     card.click();
     expect(state.opened).toEqual([".fs/Docs/archive.zip"]);
+  });
+
+  it("shows a file's size and date on its card where the user shows them, as the host tells them", async () => {
+    const { decorator } = setUp("![[archive.zip]]", { card: ["icon", "name", "size", "modified"] });
+    const one = frame("archive.zip", false);
+    await decorator.decorate([one]);
+    await vi.waitFor(() => expect(one.frame.querySelector(".swl-asset-card-meta")).not.toBeNull());
+    expect(one.frame.querySelector(".swl-asset-card-size")!.textContent).toBe("2.5 MB");
+    expect(one.frame.querySelector(".swl-asset-card-modified")!.textContent).toMatch(/2026/);
+    // Not shown where the user shows them not
+    const { decorator: plain } = setUp("![[archive.zip]]");
+    const other = frame("archive.zip", false);
+    await plain.decorate([other]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(other.frame.querySelector(".swl-asset-card-meta")).toBeNull();
   });
 
   it("takes the embed's own view, then the user's per type, the second of two alike by its order", async () => {

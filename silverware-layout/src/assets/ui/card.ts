@@ -28,6 +28,32 @@ export function drawCard(doc: Document, icon: string | undefined, fields: readon
   return card;
 }
 
+/** Fields added to a card a moment after it was drawn (a file's size and date), on a line of their own under its name */
+export function addCardFields(doc: Document, card: HTMLElement, fields: readonly CardField[]): void {
+  if (!fields.length) return;
+  const line = el(doc, "span", { class: "swl-asset-card-meta" });
+  for (const field of fields) line.append(el(doc, "span", { class: `swl-asset-card-${field.name}`, text: field.text }));
+  (card.querySelector(".swl-asset-card-text") ?? card).append(line);
+}
+
+/** A size in bytes as read: B, KB, MB, GB (1024 a step), one decimal under 10 */
+export function sizeText(bytes: number): string {
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let size = bytes;
+  let unit = 0;
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024;
+    unit++;
+  }
+  return `${unit === 0 || size >= 10 ? Math.round(size) : Math.round(size * 10) / 10} ${units[unit]}`;
+}
+
+/** A time (an ISO text or milliseconds) as a date in the browser's language; none where it is no time */
+export function dateText(time: string | number, locale?: string): string | undefined {
+  const date = new Date(time);
+  return Number.isNaN(date.getTime()) ? undefined : date.toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric" });
+}
+
 /** An asset marked as failed to render: an icon over it, the message its tooltip */
 export function markFailed(doc: Document, element: HTMLElement, message: string): void {
   element.querySelector(":scope > .swl-asset-failed")?.remove();

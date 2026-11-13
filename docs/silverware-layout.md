@@ -21,7 +21,7 @@ Proposed 2026-11-11, nothing built. A new plugin for a page's layout, starting w
   - Silverware Table: its table metadata, owner `layout` (`layout.width`, the core's metadata names as for any owner);
   - Silverware Chart: a comment, `%% layout.width: 1100`;
   - Silverware Database: a line of its block, `layout.width: 1100`;
-  - images later: decided then (SilverBullet's own image syntax may hold a width).
+  - images: decided 2026-11-13 in [silverware-layout-assets.md](silverware-layout-assets.md): SilverBullet's own size in an embed (`|300`), the plugin's metadata in a third segment; no `layout.*` entries, no provider of this contract.
 - Silverware Layout never reads or writes a widget's text.
 - **A page's layout is in its frontmatter**, one key holding a map, written through the page writer (`shared/pages/`):
 
@@ -70,7 +70,7 @@ function layoutOf(given: unknown): Layout;
 - The keys and their values are Silverware Layout's vocabulary alone (`width` now; `aspect` of a chart or an image later), so a new key needs no change in any widget plugin.
 - **`read` is synchronous**: the plugin has the widget's source parsed as it renders it (Silverware Table's cached `parseTable`, a code widget's block text), so Silverware Layout can lay the widget out before the browser paints it.
 - **The provider writes through its own pipeline**: Silverware Table's `write` (one `replaceRange`; with the metadata setting off it writes nothing and says why, and the width holds for the view only), Silverware Database's place state, Silverware Chart's format.
-- Built-in providers of Silverware Layout itself (images, later) implement the same interface.
+- Built-in providers of Silverware Layout itself (the grid, [silverware-layout-grid.md](silverware-layout-grid.md)) implement the same interface. Images are not one (superseded 2026-11-13): embedded media are decorated by registered asset types, their size in SilverBullet's own syntax ([silverware-layout-assets.md](silverware-layout-assets.md)).
 
 ## How a width is shown
 
@@ -83,7 +83,7 @@ function layoutOf(given: unknown): Layout;
 
 ## Later: a widget's height
 
-A chart's or an image's height is kept as an **aspect ratio** (`layout.aspect`), never in pixels: on a phone the widget is narrower and its height follows, so nothing is cut or stretched. A table's or a database's height is its content's.
+A chart's height is kept as an **aspect ratio** (`layout.aspect`), never in pixels: on a phone the widget is narrower and its height follows, so nothing is cut or stretched. A table's or a database's height is its content's. An image's is not a widget's (superseded 2026-11-13): SilverBullet's `|300x200`, or its ratio by the host ([silverware-layout-assets.md](silverware-layout-assets.md), *Size and the viewport*).
 
 ## Layers (silverware-layout/src/)
 
@@ -209,7 +209,7 @@ Two pages, `Wide` (`_layout: { width: 1100 }` in its frontmatter) and `Plain` (n
 7. ~~**Guides in %**~~ (2026-11-12, the user: the same px / % switch as a page's width): a guide is px (200 to 10000), a percent of the editor's pane (10 to 100, `"80%"`) or `full`, typed in its row of the Guides tab with the unit switch (the number converted as it is switched). A widget snapped to a % guide keeps the percent (`layout.width: 80%`, the plugins keep it as any value of theirs, unread), so in another window it is still at the guide; its CSS is that share of `--swl-pane-width`, at most the pane less its gutter (weighed with the user: kept in px it would leave the guide in another window). Guides in px and in % at the same width show one line, as two of the same width did.
 8. ~~**The dialog in tabs**~~ (2026-11-13, the user: the Page tab of four sliders had grown unclear): tabs *Page width* (This page, All pages), *Font* (All pages, This device with *Ctrl + scroll zooms here*), *Guides*. Each row its name where it holds (this page, all pages, this device), a slider, the value typed and ↺; without a value of its own the field is empty, the value it follows its placeholder, and a note says which (*Uses all pages' width*). The switches Default/Own and Theme/Own went: moving a slider or typing already made a row its own. *Text width* is called *Page width* everywhere it shows (the tab, the guide of a drag): *editor width*, SilverBullet's own word, would read as the editor's pane, which % and Full width are of.
 9. ~~**Preview and Default guides**~~ (2026-11-13, the user): on the Guides tab, *Preview* (an eye), held, draws the guides as typed on the page (the page's width with them, as a drag does), the dialog all but gone as for a slider; let go, both back. *Default guides* (↺) puts the default ones back once confirmed (the user's own would go), saved on Save as all of the dialog. The lines' drawing moved out of the handle into `ui/guidelines.ts`, the handle's drag and the Preview one code. Each guide's row has a slider too (one room for all, so their places compare), the guides shown on the page while it is held. With the dialog open, Ctrl + scroll and Ctrl+0 set its *This device* row (kept on Save, put back on Cancel): before, they did nothing there.
-10. Later: aspect ratios (charts, images), images, more page layout.
+10. Later: aspect ratios (charts), more page layout. Columns and media have plans of their own: [silverware-layout-grid.md](silverware-layout-grid.md), [silverware-layout-assets.md](silverware-layout-assets.md).
 
 ## Decided (2026-11-11)
 

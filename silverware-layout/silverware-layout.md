@@ -2,7 +2,7 @@
 name: Library/damesene/silverware-layout
 tags: meta/library
 version: 1.0.0
-description: "Silverware Layout: The width of a page's text (its own or a default for every page) and of its tables, databases and charts, wider or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll."
+description: "Silverware Layout: Columns in a page (/grid), embedded files shown as the original, as a preview or as a card, the width of a page's text (its own or a default for every page) and of its tables, databases, charts and grids, wider or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll."
 files:
 - silverware-layout.js
 - silverware-layout-init.md
@@ -11,7 +11,7 @@ files:
 ---
 # Silverware Layout
 
-The layout of your pages: how wide a page's text is, how wide each of its tables, databases and charts is, and how large the editor's font is. Give one page a wider text (a page of tables), all of them a width of your own without touching your theme, one table or chart more room than the text has, or zoom the text with Ctrl + scroll.
+The layout of your pages: columns side by side, how wide a page's text is, how wide each of its tables, databases and charts is, and how large the editor's font is. Give one page a wider text (a page of tables), all of them a width of your own without touching your theme, one table or chart more room than the text has, or zoom the text with Ctrl + scroll.
 
 ## Page width
 
@@ -47,6 +47,76 @@ A width is never wider than the editor: in a narrower window, or on a phone, it 
 - a chart in its block, a comment `%% layout.width: 1200` (in the Mermaid format; a format of your own that keeps no such line says so, and the width holds until the chart is drawn again).
 
 Without Silverware Layout, each is as wide as the text, its width still kept.
+
+## Columns
+
+Put part of a page side by side: type **/grid** where it should go. A grid of two columns comes in, the cursor in the first:
+
+```markdown
+<grid>
+<column>
+
+The first column: any markdown, lists, links, images.
+
+</column>
+<column>
+
+The second column.
+
+</column>
+</grid>
+```
+
+- **Put what you have into a grid**: select paragraphs, list items, tasks, images (or put the cursor in one), and run **Silverware Layout: Put into grid**. Pick how:
+  - **Gallery**: each block a cell of its own, as many to a row as the columns you pick (2, 3 or 4): a row of images, a board of notes.
+  - **Split**: the blocks in their order, cut into the columns you pick by their number (ten tasks in three columns: 4, 3, 3), a list staying a list in each column.
+
+  With Silverware Toolbar, add **Put into grid** to a toolbar and set its *Mode*: the button then asks the number of columns alone.
+- **Change a grid by its menu**: point at a column (on a phone it shows always), and its **…** at the top right lets you move the column left or right, add a column after it, or move it out of the grid (its content goes under the grid); set the grid's number of columns (automatic, 2, 3, 4), add a column at the end, or **remove the grid**: its content stays, the columns one under another in their order (row by row), as it was before you put it into a grid.
+- **Edit a column where it is**: click into it, and its markdown shows in a field of its own, the cursor where you clicked (or the text you selected in it by a drag, selected there too), the rest of the grid as it was. Click elsewhere, or press Esc (or Ctrl+Enter), and it is saved. A click on a link or a tag in it still follows it.
+- **See the raw text**: Alt+click a column, and the page shows its markdown, the cursor where you clicked.
+- **More columns, or other widths**: give the grid a `columns` attribute: `<grid columns="3">` for three of the same width, or their widths, `<grid columns="1fr 2fr">` (the second twice as wide), `30% 70%`, `200px 1fr`. More columns than you give make more rows: nine columns in `<grid columns="3">` are three rows of three, a gallery of images. Without it, each `<column>` is a column of its own, four at most in a row.
+- **The grid's width**: point at it, and the bar beside its right edge makes it wider or narrower, as a table's (see *A widget's width* above); it is kept on its line, `<grid width="1100">`.
+- **On a phone** (an editor narrower than the setting *Narrowest editor laid out*), the columns are shown one under another.
+
+Keep the blank lines round a column's text, as /grid writes them: without them other markdown renderers show its markdown as plain text. Without Silverware Layout, and in other renderers (GitHub, VS Code), the columns are shown one under another and the `<grid>` and `<column>` lines as text: nothing is lost.
+
+What you should know:
+
+- A grid in a page you embed in another (`![[Other page]]`) is shown with its columns there too; edit it on its own page.
+- A grid ends at the first line `</grid>`, wherever it is: a code block in a column that holds such a line ends the grid there. Grids in grids are not supported yet.
+- Links and images in a grid show in their pages' backlinks, and a renamed page or image is renamed in a grid too. Its hashtags are known to SilverBullet (completed, listed, and a paragraph holding one found by a query of its tag); its tasks and list items are not indexed yet.
+- A task in a column is toggled by its box there, as in the page.
+- A grid starts on a line of its own, not straight after a paragraph's line: leave a blank line before it (/grid does).
+
+## Media
+
+Images, videos, audio, PDFs and other files you embed (`![[photo.png]]`, `![Photo](photo.png)`) can each be shown three ways:
+
+- **Original**: the file itself, as SilverBullet shows it (the image, a player, a viewer).
+- **Preview**: smaller (a PDF in a small viewer).
+- **Card**: a small card with the file's icon and name, the file itself not shown. A file SilverBullet cannot show (a zip, a document) is a card instead of an error.
+
+Point at a medium, and a **…** button shows at its top right: choose how it is shown there, or open it in a new tab, in a side panel or enlarged. On a card, its icon is that button (as a link's icon). A click on a card or a preview opens the file in a new tab; Shift+click does the same, unless you set otherwise: either can instead show the file in a panel at the window's right (**Show in a side panel**, the page still beside it) or enlarged over the page (**Show enlarged**). Esc or × closes them, and a click beside the enlarged file.
+
+**Its width**: point at an image (or a video, a PDF as the original or as a preview), and the bar beside its right edge makes it wider or narrower, as a table's; it stays where it is and grows to the right (*Width dragged* below sets it centred instead). Let go, and the width is saved as SilverBullet's own size: `![[photo.png|Photo|300]]`.
+
+**Links to files** (`[[report.pdf]]`) show the file's icon before their text, in a grid too (a markdown link, `[report](report.pdf)`, only in a grid). Click the icon for what you can do with the file: open it in a new tab, show it in a side panel or enlarged, or **Show as embedded** (`[[report.pdf]]` becomes `![[report.pdf]]`); a click on the link's text opens it as SilverBullet does. An embedded file's **…** menu has **Show as a link** the other way (its alt text kept as the link's, its size and view left out). The Media tab turns the icons off.
+
+What you choose is kept in the embed itself, after SilverBullet's own size:
+
+```markdown
+![[report.pdf|Report||{ view: icon }]]
+![Photo|300|{ view: preview }](photo.png)
+```
+
+SilverBullet reads only the alt text and the size, so without Silverware Layout every file shows as SilverBullet shows it, at its size: nothing is lost. Keep the three parts, even an empty one (`||`): with two, SilverBullet would take the size for the alt text.
+
+**For all files, or for one kind of file**: run **Silverware Layout: Page layout** and open its **Media** tab. Set how files are shown, what a click and a Shift+click do, whether a width dragged stays at the start or is centred, a preview's height (one with a height of its own, `|200x120`, keeps it), and what a card shows besides the file's name (its icon, its size, its date), for all files; then, per kind (image, video, audio, PDF, file), anything other than that ("Default" follows all files). What a file's own `view` says wins over both.
+
+Media in a grid's columns are shown the same way, and their bar makes them wider or narrower within their column: it snaps to a quarter, a half, three quarters and the whole of the column's width.
+
+**SilverBullet's markdown as written** (*Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws embedded files and grids in that mode; Silverware Layout hides them there, so you see their markdown alone. In that mode a click on a link only puts the cursor there (before an embed's `![[` too), the pointer a text one over it; Ctrl+click (Cmd+click) still follows it. Each can be turned off in the **Markdown** tab of **Silverware Layout: Page layout** (or `silverware.layout.syntaxMode.hideWidgets`, `silverware.layout.syntaxMode.clickPlacesCursor` in your CONFIG).
 
 ## Font size
 

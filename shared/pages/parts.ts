@@ -6,6 +6,10 @@
 // else. Built in only for now (decided 2026-11-07); another plugin's part
 // would be registered the same way, its types added to `PageChange` and
 // `PageSections` (TypeScript's interface merging for the latter).
+import { validateAttributeName, writeAttributes } from "../markdown/attributes.ts";
+import { embedAsLink, type EmbedChanges, linkAsEmbed, readEmbeds, readLinks, writeEmbed } from "../markdown/embed.ts";
+import { readGrids } from "../markdown/grid.ts";
+import { blocksIn, type GridMode, gridOfBlocks, gridText, ungridded } from "../markdown/gridbuild.ts";
 import { codeBlocksOf, sameBody } from "./blocks.ts";
 import type { PageBuilder } from "./changes.ts";
 import { type FrontmatterValue, readFrontmatter, readKey, validateFrontmatterKey, writeKey } from "./frontmatter.ts";
@@ -47,7 +51,19 @@ export type PageChange =
   // A fenced code block of a language and body (the `occurrence`-th of those alike, counted from 0) written anew
   | { readonly kind: "replaceCodeBlock"; readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number; readonly text: string }
   // Such a block taken out of the page whole, its fences with it
-  | { readonly kind: "removeCodeBlock"; readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number };
+  | { readonly kind: "removeCodeBlock"; readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number }
+  // A cell of a grid (Silverware Layout's columns, shared/markdown/grid.ts) given new content: the grid of that body
+  // (the `occurrence`-th of those alike), its `cell`-th cell counted from 0
+  | { readonly kind: "replaceGridCell"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly cell: number; readonly content: string }
+  // A grid's `<grid>` line given attributes (a value set, or null: taken off), the others on it kept
+  | { readonly kind: "setGridAttributes"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly attributes: Readonly<Record<string, string | null>> }
+  | { readonly kind: "changeGridCells"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly cells: GridCellsChange }
+  | { readonly kind: "putIntoGrid"; readonly from: number; readonly to: number; readonly was: string; readonly mode: GridMode; readonly columns: number }
+  // An embed (shared/markdown/embed.ts) given an alt text, a size or metadata: the embed of that text (the
+  // `occurrence`-th of those alike), written in its own style
+  | { readonly kind: "setEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number; readonly changes: EmbedChanges }
+  | { readonly kind: "embedToLink"; readonly text: string; readonly occurrence: number; readonly of?: number }
+  | { readonly kind: "linkToEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number };
 
 /** The builder's sections, one per part of a page's content (their parts below make them); every method gives the page's builder back */
 export interface PageSections {
@@ -83,7 +99,55 @@ export interface PageSections {
      */
     remove(language: string, body: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
   };
+  readonly grids: {
+    /**
+     * A grid's cell given new content (its markdown, written with a blank
+     * line before and after it, so other renderers read it as markdown): the
+     * grid whose body is `body` (as the plugin read it, shared/markdown/grid.ts),
+     * the `occurrence`-th of those alike, its `cell`-th cell; none so (the grid
+     * or the cell changed since it was read): the page left alone
+     */
+    replaceCell(body: string, cell: number, content: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /**
+     * A grid's attributes set on its `<grid>` line (a value, or null: taken off; the others on it kept, the line
+     * written in HTML's form), the grid found as `replaceCell` finds it
+     */
+    setAttributes(body: string, attributes: Readonly<Record<string, string | null>>, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /**
+     * A grid's cells changed (found as `replaceCell` finds it): one moved by a step, an empty one added after one (none:
+     * at the end), one taken out (its content put under the grid), or all taken apart (`ungrid`: the cells one under
+     * another in their order, the grid gone); the cells written again in the form a cell is written, its attributes kept
+     */
+    changeCells(body: string, cells: GridCellsChange, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /**
+     * The blocks of a range put into a grid by a mode (shared/markdown/gridbuild.ts): `gallery` a cell each, `columns`
+     * to a row; `split` in order, cut into `columns` cells by their number. The range as the plugin read it (`was`):
+     * one changed since is left alone
+     */
+    put(from: number, to: number, was: string, mode: GridMode, columns: number): PageBuilder;
+  };
+  readonly embeds: {
+    /**
+     * An embed given an alt text, a size or metadata (each a value, or null: taken off), written in its own style
+     * with SilverBullet's size in its alias and the metadata in a third segment (shared/markdown/embed.ts): the embed
+     * whose text is `text` (as the plugin read it), the `occurrence`-th of those alike; none so: the page left alone
+     */
+    set(text: string, changes: EmbedChanges, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /** An embed written as a link to its target (its alt text the link's, its size and metadata left out), found as `set` finds it */
+    toLink(text: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+  };
+  readonly links: {
+    /** A link written as an embed of its target (`[[a.pdf]]`: `![[a.pdf]]`): the link whose text is `text`, the `occurrence`-th of those alike */
+    toEmbed(text: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+  };
 }
+
+/** What a grid's cells get (`changeCells`) */
+export type GridCellsChange =
+  | { readonly kind: "move"; readonly cell: number; readonly by: -1 | 1 }
+  | { readonly kind: "add"; readonly after?: number }
+  | { readonly kind: "takeOut"; readonly cell: number }
+  | { readonly kind: "ungrid" };
 
 export type WriterOptions = {
   // How a page's tags are written where it has none yet
@@ -318,6 +382,111 @@ export const PARTS: readonly Part[] = [
       const insert = block.bodyTo > block.bodyFrom ? body + (region.endsWith("\r") ? "\r" : "") : body ? (atEnd ? nl : "") + body + nl : "";
       if (region === insert) return { text, changes: 0 };
       return { text: text.slice(0, block.bodyFrom) + insert + text.slice(block.bodyTo), changes: 1 };
+    },
+  }),
+  part({
+    kinds: ["replaceGridCell", "setGridAttributes", "changeGridCells", "putIntoGrid"],
+    section: {
+      name: "grids",
+      make: (add) => ({
+        replaceCell: (body, cell, content, where = {}) =>
+          add({ kind: "replaceGridCell", body, cell, content, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        setAttributes: (body, attributes, where = {}) =>
+          add({ kind: "setGridAttributes", body, attributes: { ...attributes }, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        changeCells: (body, cells, where = {}) => add({ kind: "changeGridCells", body, cells: { ...cells }, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        put: (from, to, was, mode, columns) => add({ kind: "putIntoGrid", from, to, was, mode, columns }),
+      }),
+    },
+    write: (text, change) => {
+      if (change.kind === "putIntoGrid") {
+        if (text.slice(change.from, change.to) !== change.was) return { text, changes: 0, problem: "the text changed since it was read: left alone" };
+        const edit = gridOfBlocks(text, blocksIn(text, change.from, change.to, readGrids(text)), change.mode, change.columns);
+        if (!edit) return { text, changes: 0, problem: "no block to put into a grid there" };
+        return { text: text.slice(0, edit.from) + edit.insert + text.slice(edit.to), changes: 1 };
+      }
+      const alike = readGrids(text).filter((grid) => sameBody(grid.body) === sameBody(change.body));
+      const grid = alike[change.occurrence];
+      const changed = { text, changes: 0, problem: "its grid changed since it was read: left alone" };
+      if (!grid || (change.of !== undefined && alike.length !== change.of)) return changed;
+      if (change.kind === "changeGridCells") {
+        const how = change.cells;
+        if (how.kind === "ungrid") return { text: text.slice(0, grid.from) + ungridded(grid) + text.slice(grid.to), changes: 1 };
+        const cells = grid.cells.map((cell) => cell.content.replace(/\r\n/g, "\n"));
+        let after = "";
+        if (how.kind === "move") {
+          const to = how.cell + how.by;
+          if (how.cell < 0 || how.cell >= cells.length || to < 0 || to >= cells.length) return { text, changes: 0 };
+          [cells[how.cell], cells[to]] = [cells[to]!, cells[how.cell]!];
+        } else if (how.kind === "add") {
+          cells.splice(how.after === undefined ? cells.length : how.after + 1, 0, "");
+        } else {
+          if (how.cell < 0 || how.cell >= cells.length) return { text, changes: 0 };
+          const [out] = cells.splice(how.cell, 1);
+          // Its content under the grid, never lost; the grid gone where it was its last cell
+          after = out!.trim() ? out! : "";
+          if (!cells.length) return { text: text.slice(0, grid.from) + after + text.slice(grid.to), changes: 1 };
+        }
+        const nl = lineBreakOf(text);
+        const written = (gridText(cells, grid.attributes) + (after ? `\n\n${after}` : "")).replace(/\n/g, nl);
+        return { text: text.slice(0, grid.from) + written + text.slice(grid.to), changes: 1 };
+      }
+      if (change.kind === "setGridAttributes") {
+        const problem = Object.keys(change.attributes).map(validateAttributeName).find(Boolean);
+        if (problem) return { text, changes: 0, problem };
+        const attributes: Record<string, string> = { ...grid.attributes };
+        for (const [name, value] of Object.entries(change.attributes)) {
+          if (value === null) delete attributes[name.toLowerCase()];
+          else attributes[name.toLowerCase()] = value;
+        }
+        // The `<grid>` line, to its line break (a CR before it kept)
+        const lineEnd = text.indexOf("\n", grid.from);
+        const end = lineEnd < 0 ? text.length : text[lineEnd - 1] === "\r" ? lineEnd - 1 : lineEnd;
+        const line = `<grid${writeAttributes(attributes)}>`;
+        if (text.slice(grid.from, end) === line) return { text, changes: 0 };
+        return { text: text.slice(0, grid.from) + line + text.slice(end), changes: 1 };
+      }
+      const cell = grid.cells[change.cell];
+      if (!cell) return changed;
+      const nl = lineBreakOf(text);
+      const content = sameBody(change.content).replace(/^(\s*\n)+/, "");
+      // A blank line before and after the content (none for no content): what other renderers need to read it as markdown
+      const inner = (content ? nl + content.replace(/\n/g, nl) + nl + nl : nl) + (cell.closed ? "" : `</column>${nl}`);
+      if (text.slice(cell.innerFrom, cell.innerTo) === inner) return { text, changes: 0 };
+      return { text: text.slice(0, cell.innerFrom) + inner + text.slice(cell.innerTo), changes: 1 };
+    },
+  }),
+  part({
+    kinds: ["setEmbed", "embedToLink"],
+    section: {
+      name: "embeds",
+      make: (add) => ({
+        set: (text, changes, where = {}) =>
+          add({ kind: "setEmbed", text, changes: structuredClone(changes), occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        toLink: (text, where = {}) => add({ kind: "embedToLink", text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+      }),
+    },
+    write: (text, change) => {
+      const alike = readEmbeds(text).filter((embed) => embed.text === change.text);
+      const embed = alike[change.occurrence];
+      if (!embed || (change.of !== undefined && alike.length !== change.of)) return { text, changes: 0, problem: "its embed changed since it was read: left alone" };
+      const written = change.kind === "embedToLink" ? embedAsLink(embed) : writeEmbed(embed, change.changes);
+      if (written === embed.text) return { text, changes: 0 };
+      return { text: text.slice(0, embed.from) + written + text.slice(embed.to), changes: 1 };
+    },
+  }),
+  part({
+    kinds: ["linkToEmbed"],
+    section: {
+      name: "links",
+      make: (add) => ({
+        toEmbed: (text, where = {}) => add({ kind: "linkToEmbed", text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+      }),
+    },
+    write: (text, change) => {
+      const alike = readLinks(text).filter((link) => link.text === change.text);
+      const link = alike[change.occurrence];
+      if (!link || (change.of !== undefined && alike.length !== change.of)) return { text, changes: 0, problem: "its link changed since it was read: left alone" };
+      return { text: text.slice(0, link.from) + linkAsEmbed(link) + text.slice(link.to), changes: 1 };
     },
   }),
   // The body: the page builder's own `body`, no section

@@ -5,7 +5,7 @@
 // `--swl-width`), never the host's element around it (CodeMirror takes its lines' attributes back); the style page's
 // rule sizes it, in the content marked `data-swl-content`. A widget out of the page's flow (marked
 // `data-silverware-over-window`, or in an element marked so) is left to its plugin.
-import type { LayoutProvider } from "../../../shared/layout.ts";
+import type { LayoutAnchor, LayoutProvider } from "../../../shared/layout.ts";
 import { OVER_WINDOW_ATTRIBUTE } from "../../../shared/overwindow.ts";
 import type { Registry } from "../core/registry.ts";
 import { cssWidgetWidth, keptWidgetWidth, readWidgetWidth, type WidgetWidth } from "../core/widgetwidth.ts";
@@ -14,6 +14,10 @@ import type { PageHost } from "./page.ts";
 
 const WIDTH_ATTRIBUTE = "data-swl-width";
 const WIDTH_VARIABLE = "--swl-width";
+// A widget staying at the text's start as its width changes (the style page lays it out so)
+const ANCHOR_ATTRIBUTE = "data-swl-anchor-start";
+// A widget laid out in a room of its own, not the page's text (a cell): the style page holds it within that room
+const ROOM_ATTRIBUTE = "data-swl-in-room";
 
 /** A widget of a provider's, as rendered */
 export type Widget = { readonly element: HTMLElement; readonly provider: LayoutProvider };
@@ -85,7 +89,30 @@ export class Widgets {
   }
 
   private layOut(widget: Widget): void {
+    // Where it stays as its width changes, its provider's say (none: centred), marked for the style page's rule
+    const start = this.anchor(widget) === "start";
+    if (widget.element.hasAttribute(ANCHOR_ATTRIBUTE) !== start) widget.element.toggleAttribute(ANCHOR_ATTRIBUTE, start);
+    const inRoom = this.room(widget) !== undefined;
+    if (widget.element.hasAttribute(ROOM_ATTRIBUTE) !== inRoom) widget.element.toggleAttribute(ROOM_ATTRIBUTE, inRoom);
     this.show(widget.element, this.kept(widget));
+  }
+
+  /** Where a widget stays as its width changes: its provider's say, centred where it says none */
+  anchor(widget: Widget): LayoutAnchor {
+    try {
+      return widget.provider.anchor?.(widget.element) === "start" ? "start" : "center";
+    } catch {
+      return "center";
+    }
+  }
+
+  /** The box a widget is laid out in, where its provider says it is not the page's text (a cell) */
+  room(widget: Widget): Element | undefined {
+    try {
+      return widget.provider.room?.(widget.element) ?? undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   /** The part of a widget the user sees, where its plugin says it is not its box */
@@ -132,14 +159,16 @@ export class Widgets {
     if (problem) this.problem(`Silverware Layout: the width could not be saved (${problem}); it holds until the widget is drawn again`);
   }
 
-  /** The widget a node is in (its own outer element, a provider's), where it is in the page's flow */
+  /** The widget a node is in (its own outer element, a provider's), where it is in the page's flow: the innermost, where one is in another (a medium in a grid) */
   widgetAt(node: Element): Widget | undefined {
     if (!this.content?.contains(node)) return undefined;
+    let found: Widget | undefined;
     for (const provider of this.registry.providers) {
       const element = node.closest<HTMLElement>(provider.selector);
-      if (element && this.content.contains(element) && !element.closest(`[${OVER_WINDOW_ATTRIBUTE}]`)) return { element, provider };
+      if (!element || !this.content.contains(element) || element.closest(`[${OVER_WINDOW_ATTRIBUTE}]`)) continue;
+      if (!found || found.element.contains(element)) found = { element, provider };
     }
-    return undefined;
+    return found;
   }
 
   /** The text's width now (the page's content less its padding): a widget without a width of its own is as wide */

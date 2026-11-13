@@ -37,6 +37,19 @@ const UNITS = [
 ] as const;
 
 /** What the dialog shows and saves, and how it shows a width on the page meanwhile */
+/**
+ * A tab of the dialog of another part of Silverware Layout's (the media's): the dialog knows none by name; it shows
+ * its panel, asks whether it changed, and saves it with the rest on Save
+ */
+export type DialogTabPart = {
+  readonly id: string;
+  readonly title: string;
+  readonly panel: HTMLElement;
+  changed(): boolean;
+  // Saved; why not, as text
+  save(): Promise<string | undefined>;
+};
+
 export type PageDialogStore = {
   readonly page: string;
   // As saved now: the page's own width, the default, the guides
@@ -71,6 +84,8 @@ export type PageDialogStore = {
   previewGuides(guides: readonly Guide[]): () => void;
   confirm(question: string): Promise<boolean>;
   flash(message: string, type: "info" | "error"): void;
+  // Tabs of other parts, after its own (saved only where settings can be)
+  readonly tabs?: readonly DialogTabPart[];
 };
 
 /** What the page is shown with while the dialog is open */
@@ -267,7 +282,10 @@ export class PageDialog {
       { id: "page", title: "Page width", panel: pagePanel },
       { id: "font", title: "Font", panel: fontPanel },
       { id: "guides", title: "Guides", panel: guidesPanel },
+      ...(store.tabs ?? []).map(({ id, title, panel }) => ({ id, title, panel })),
     ]);
+    // (A tab of another part changed: Save and the note as for the dialog's own)
+    for (const tab of store.tabs ?? []) for (const type of ["change", "input"]) tab.panel.addEventListener(type, () => this.update());
     // (The sliders marked with the guides as typed, as the Page tab shows again)
     bar.addEventListener("click", () => {
       this.page?.show();
@@ -722,7 +740,14 @@ export class PageDialog {
     if (!store || !this.page || !this.fallback) return false;
     const guides = this.currentGuides();
     const sameGuides = guides.length === store.guides.length && guides.every((guide) => store.guides.includes(guide));
-    return !sameWidth(widthOf(this.page.field).width, store.pageWidth) || !sameWidth(widthOf(this.fallback.field).width, store.defaultWidth) || !sameGuides || this.fontChanged() || this.zoomChanged();
+    return (
+      !sameWidth(widthOf(this.page.field).width, store.pageWidth) ||
+      !sameWidth(widthOf(this.fallback.field).width, store.defaultWidth) ||
+      !sameGuides ||
+      this.fontChanged() ||
+      this.zoomChanged() ||
+      (store.tabs ?? []).some((tab) => tab.changed())
+    );
   }
 
   /** Whether the font size or Font zoom differ from what is saved */
@@ -774,6 +799,11 @@ export class PageDialog {
       if (problem) problems.push(`the font size: ${problem}`);
     }
     if (this.zoomChanged()) store.saveZoom(fontSizeOf(this.device).size);
+    for (const tab of store.tabs ?? []) {
+      if (!tab.changed() || !store.canSaveSettings) continue;
+      const problem = await tab.save().catch((e: unknown) => String(e));
+      if (problem) problems.push(`${tab.title}: ${problem}`);
+    }
     if (!sameWidth(page.width, store.pageWidth)) {
       const problem = await store.savePage(page.width).catch((e: unknown) => String(e));
       if (problem) problems.push(`this page: ${problem}`);

@@ -22,6 +22,12 @@ export type LayoutEntries = Readonly<Record<string, string>>;
 export type LayoutChanges = Readonly<Record<string, string | null>>;
 
 /**
+ * Where a widget stays as its width changes: centred on the text (a drag of its right edge widens it on both sides),
+ * or at the text's start (it grows to the right alone, as an image in a text)
+ */
+export type LayoutAnchor = "center" | "start";
+
+/**
  * A widget plugin's part that Silverware Layout talks to, one per kind of widget a plugin draws.
  *
  * The element its selector matches is the widget's box. While the widget is in the page's flow, the box's width is
@@ -48,6 +54,13 @@ export type LayoutProvider = {
   // table holding its header in view while its rows scroll away, those above the header hidden. Silverware Layout
   // places the handle of its width by it. None (or undefined): the widget's box
   seen?(element: Element): { readonly top: number; readonly bottom: number } | undefined;
+  // Optional: where the widget whose element this is stays as its width changes (none: centred). A widget's own (a
+  // setting may choose it), asked as it is laid out
+  anchor?(element: Element): LayoutAnchor;
+  // Optional: the box the widget is laid out in, where it is not the page's text (a medium in markdown rendered outside
+  // the editor, a grid's cell): its width then a share of that box's, snapped to its quarters, never wider; neither the
+  // text's width nor the guides apply. None (or undefined): the page's text
+  room?(element: Element): Element | undefined;
 };
 
 /** What a widget's plugin registers its providers with: Silverware Layout's API (`silverware.layout.api`), or the stand-in without it */

@@ -47,6 +47,28 @@ config.define("silverware.layout", {
         },
       },
     },
+    syntaxMode = {
+      type = "object",
+      additionalProperties = false,
+      properties = {
+        hideWidgets = {
+          type = "boolean",
+          default = true,
+          description = "While SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax Rendering), embedded files and grids are hidden: their markdown alone.",
+          ui = { category = "Silverware Layout", label = "Markdown as written: hide files and grids", priority = 0.6 },
+        },
+        clickPlacesCursor = {
+          type = "boolean",
+          default = true,
+          description = "While SilverBullet shows the markdown as written, a click on a link only places the cursor; Ctrl+click follows it.",
+          ui = { category = "Silverware Layout", label = "Markdown as written: a click places the cursor", priority = 0.59 },
+        },
+      },
+    },
+    assets = {
+      type = "object",
+      description = "Embedded media: how each type is shown (views), what a click and a Shift+click do (actions), what a card shows (card), a view's default height (heights), where a medium stays as its width is dragged (anchor). Set in the Page layout dialog (Media), kept in Silverware Layout's own block of CONFIG.",
+    },
     guides = {
       type = "array",
       description = "The widths a drag snaps to and shows a guide at, in px (\"1200px\"), in % of the editor's width (\"80%\"), or full (the editor's width). Set in the Page layout dialog (Guides), kept in Silverware Layout's own block of CONFIG.",
@@ -70,6 +92,27 @@ if js and js.window then
     end,
     getConfig = config.get,
     confirm = editor.confirm,
+    -- A grid's cell: its markdown rendered as SilverBullet renders a page, its embeds expanded, each element marked with
+    -- its offset in the text
+    renderMarkdown = function(text)
+      return markdown.markdownToHtml(text, { expand = true, annotationPositions = true })
+    end,
+    -- A grid's Alt+click: the cursor where the click was in its markdown; /grid: where the cursor is
+    moveCursor = editor.moveCursor,
+    getCursor = editor.getCursor,
+    -- Put into grid: the selection, and a pick (its mode, its number of columns)
+    getSelection = editor.getSelection,
+    filterBox = function(label, options)
+      return editor.filterBox(label, options, "", "Type to filter")
+    end,
+    -- Whether SilverBullet shows the markdown's syntax (Editor: Toggle Markdown Syntax Rendering): media and grids hidden then
+    getUiOption = editor.getUiOption,
+    -- A file's card: its size and date (an error where it is not in the space: the card shows its name alone)
+    documentMeta = space.getDocumentMeta,
+    -- How a link written new is written: SilverBullet's own setting, the one place naming it
+    linkStyle = function()
+      return config.get("defaultLinkStyle", "wikilink")
+    end,
     -- The dialog's default text width: saved as SilverBullet's Configuration Manager saves
     -- (the CONFIG page, indexed, the configuration loaded again)
     saveConfigPage = function(text)
@@ -94,6 +137,45 @@ if js and js.window then
       end,
     })
   end
+  -- Put into grid as a button of Silverware Toolbar, its mode a parameter (through its public API, where it is installed)
+  if silverware.toolbar and silverware.toolbar.defineActions then
+    silverware.toolbar.defineActions(silverwareLayoutJs.toolbarActions)
+  end
+  for _, slash in ipairs(silverwareLayoutJs.slashCommands()) do
+    local name = slash.name
+    slashCommand.define({
+      name = name,
+      description = slash.description,
+      run = function()
+        silverwareLayoutJs.runSlashCommand(name)
+      end,
+    })
+  end
+  -- Columns: a grid's lines, from <grid …> alone on its line to the first </grid>, drawn as its cells side by side
+  -- (SilverBullet's custom syntax: active once the page is loaded again after it is first defined)
+  syntax.define({
+    name = "SilverwareLayoutGrid",
+    startMarker = "^<grid(\\s[^>]*)?>\\s*$",
+    endMarker = "^</grid>\\s*$",
+    mode = "block",
+    renderClass = "swl-grid-widget",
+    renderWidget = function(body, pageName)
+      return widget.new({ html = silverwareLayoutJs.renderGrid(body), display = "block" })
+    end,
+  })
+  -- A page indexed: the links in its grids indexed too (SilverBullet's index sees nothing in a grid), so backlinks and
+  -- a rename of a page or an attachment find them. SilverBullet clears a page's objects before this event: these
+  -- replace, never pile up
+  event.listen({
+    name = "page:index",
+    run = function(event)
+      local page = event.data
+      local objects = silverwareLayoutJs.gridIndexObjects(page.name, page.text, page.meta and page.meta.lastModified)
+      if objects then
+        index.indexObjects(page.name, objects)
+      end
+    end,
+  })
   -- Another page opened: its own text width read here from its meta (one call) and handed over, so it is set before
   -- the page is painted (verified: a few ms ahead; read from JS, each call of the bridge a promise, it took frames)
   event.listen({

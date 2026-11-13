@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Guide } from "../model/settings.ts";
-import { cssWidgetWidth, draggedWidth, keptWidgetWidth, readWidgetWidth, shownWidgetWidth, snapped, snapTargets, widthName } from "./widgetwidth.ts";
+import { cssWidgetWidth, draggedRoomWidth, draggedWidth, keptWidgetWidth, readWidgetWidth, roomTargets, shownWidgetWidth, snapped, snapTargets, widthName } from "./widgetwidth.ts";
 
 const guides: Guide[] = [1200, "80%", "full"];
 
@@ -70,5 +70,20 @@ describe("A widget's width", () => {
 
   it("named: the text's width, a guide's pixels or percent, Full width", () => {
     expect([undefined, 1200, "80%" as const, "full" as const].map(widthName)).toEqual(["Page width", "1200 px", "80 %", "Full width"]);
+  });
+
+  it("in a room of its own (a cell): snapped to its quarters as pixels, dragged within it, not under the least", () => {
+    expect(roomTargets(400)).toEqual([
+      { width: 100, kept: 100, name: "25 %" },
+      { width: 200, kept: 200, name: "50 %" },
+      { width: 300, kept: 300, name: "75 %" },
+      { width: 400, kept: 400, name: "100 %" },
+    ]);
+    expect(roomTargets(120).map((t) => t.name)).toEqual(["50 %", "75 %", "100 %"]);
+    expect(snapped(296, roomTargets(400))).toEqual({ width: 300, kept: 300, name: "75 %" });
+    expect(draggedRoomWidth(120, 500, 400, "start")).toBe(400);
+    expect(draggedRoomWidth(120, -500, 400, "start")).toBe(40);
+    expect(draggedRoomWidth(120, 30, 400, "center")).toBe(180);
+    expect(draggedRoomWidth(30, -10, 30, "start")).toBe(30);
   });
 });

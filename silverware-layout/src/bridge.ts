@@ -19,6 +19,23 @@ export type Bridge = {
   // Optional, for the dialog's default text width: the CONFIG page saved as SilverBullet's Configuration Manager saves
   // it, the configuration loaded again (readPage reads it)
   readonly saveConfigPage?: (text: string) => unknown;
+  // Optional, for the grids: markdown rendered to HTML as SilverBullet renders a page, its embeds expanded, each
+  // element marked with its offset in the text (`markdown.markdownToHtml(text, { expand = true, annotationPositions = true })`)
+  readonly renderMarkdown?: (text: string) => string | Promise<string>;
+  // Optional, for a grid's Alt+click: the cursor put at an offset of the page's text, centred in view (`editor.moveCursor`)
+  readonly moveCursor?: (at: number, center?: boolean) => unknown;
+  // Optional, for `/grid`: where the cursor is, an offset of the page's text (`editor.getCursor`)
+  readonly getCursor?: () => unknown;
+  // Optional, for Put into grid: the selection (`editor.getSelection`: `{ from, to }`) and a pick of one of options
+  // (`editor.filterBox`, the option picked given back, its `index` as given)
+  readonly getSelection?: () => unknown;
+  readonly filterBox?: (label: string, options: readonly { readonly name: string; readonly description: string; readonly index: number }[]) => unknown;
+  // Optional: one of SilverBullet's UI options (`editor.getUiOption`: `markdownSyntaxRendering`, the markdown shown as written)
+  readonly getUiOption?: (name: string) => unknown;
+  // Optional, for a file's card: a document's meta (`space.getDocumentMeta`: its `size` in bytes, `lastModified`)
+  readonly documentMeta?: (path: string) => unknown;
+  // Optional, for a link written new: SilverBullet's setting `defaultLinkStyle` ("wikilink" or "markdown")
+  readonly linkStyle?: () => unknown;
 };
 
 /** The bridge's functions Silverware Layout cannot work without, missing from what the init page gave */

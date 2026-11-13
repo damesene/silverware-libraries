@@ -46,4 +46,20 @@ describe("Widgets", () => {
     expect(reads.sort()).toEqual(["a", "b"]);
     expect(other.getAttribute("data-swl-width")).toBe("1000");
   });
+
+  it("finds the innermost widget a node is in, and marks one its provider lays out in a room of its own", async () => {
+    document.body.innerHTML = `<div class="content"><div class="outer"><div class="room"><span class="inner"><img></span></div></div></div>`;
+    const registry = new Registry(() => undefined);
+    registry.register({ name: "outer", selector: ".outer", read: () => ({}), write: async () => undefined });
+    registry.register({ name: "inner", selector: ".inner", read: () => ({ width: "120" }), write: async () => undefined, room: (element) => element.closest(".room") ?? undefined });
+    const widgets = new Widgets(document, page, registry, () => undefined);
+    widgets.start();
+    const found = widgets.widgetAt(document.querySelector("img")!);
+    expect(found?.provider.name).toBe("inner");
+    expect(widgets.room(found!)).toBe(document.querySelector(".room"));
+    expect(document.querySelector(".inner")!.hasAttribute("data-swl-in-room")).toBe(true);
+    expect(document.querySelector(".outer")!.hasAttribute("data-swl-in-room")).toBe(false);
+    expect(widgets.widgetAt(document.querySelector(".room")!)?.provider.name).toBe("outer");
+  });
 });
+

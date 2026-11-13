@@ -19,6 +19,9 @@ export type Bridge = {
   // Optional, for the dialog's default text width: the CONFIG page saved as SilverBullet's Configuration Manager saves
   // it, the configuration loaded again (readPage reads it)
   readonly saveConfigPage?: (text: string) => unknown;
+  // Optional, for the grids: markdown rendered to HTML as SilverBullet renders a page, its embeds expanded, each
+  // element marked with its offset in the text (`markdown.markdownToHtml(text, { expand = true, annotationPositions = true })`)
+  readonly renderMarkdown?: (text: string) => string | Promise<string>;
 };
 
 /** The bridge's functions Silverware Layout cannot work without, missing from what the init page gave */

@@ -9,6 +9,8 @@ import { type PageWriter, pageWriter } from "../../shared/pages/writer.ts";
 import { LayoutApp, type LayoutStore } from "./app.ts";
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { Registry } from "./core/registry.ts";
+import { Grids } from "./grid/grids.ts";
+import { silverBulletGridHost } from "./host/silverbullet/grid.ts";
 import { keepDeviceZoom, readDeviceZoom } from "./host/devicezoom.ts";
 import { silverBulletPage } from "./host/silverbullet/dom.ts";
 import { pageLayoutOf, writePageWidth } from "./host/silverbullet/page.ts";
@@ -30,6 +32,9 @@ const app = new LayoutApp(document, silverBulletPage(document), registry);
 /** Silverware Layout's API, as its API page hands it to the widget plugins (`silverware.layout.api`) */
 export const api = registry.api();
 
+// The page's grids (docs/silverware-layout-grid.md), made as the init page hands SilverBullet's API over
+let grids: Grids | undefined;
+
 /** Started by the init page (again as Space Lua loads again): SilverBullet's API handed over */
 export async function init(bridge: Bridge): Promise<void> {
   // The layers its style page lays its elements in (shared/layers.ts)
@@ -39,7 +44,20 @@ export async function init(bridge: Bridge): Promise<void> {
     console.error(`Silverware Layout: the init page did not hand over ${missing.join(", ")}`);
     return;
   }
+  grids = new Grids(document, silverBulletGridHost(bridge));
   await app.start(silverBulletStore(bridge, pageWriter(silverBulletPlatform(bridge))));
+}
+
+/**
+ * A grid drawn, as SilverBullet's custom syntax (the init page's `syntax.define`) asks with its body; before Silverware
+ * Layout is started (no API handed over yet), its cells' markdown shown as text
+ */
+export function renderGrid(body: unknown): Promise<HTMLElement> | HTMLElement {
+  if (grids) return grids.render(String(body));
+  const plain = document.createElement("pre");
+  plain.className = "swl-grid-plain";
+  plain.textContent = String(body);
+  return plain;
 }
 
 /**
@@ -59,6 +77,8 @@ export function pageOpened(): Promise<void> {
 /** The page edited (editor:pageModified): its width read again once it is still a moment */
 export function pageEdited(): void {
   app.pageEdited();
+  // A grid's `<grid>` line edited changes no body SilverBullet draws a grid anew for: its columns set again
+  grids?.refreshSoon();
 }
 
 /** The commands, as the init page defines them */

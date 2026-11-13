@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readGrids } from "./grid.ts";
+import { readGridBody, readGrids } from "./grid.ts";
 
 const page = [
   "# Page",
@@ -82,6 +82,15 @@ describe("readGrids", () => {
     const [grid] = readGrids(text);
     expect(grid!.cells[0]!.content).toBe("A\nB");
     expect(grid!.body).toBe("<column>\r\n\r\nA\r\nB\r\n\r\n</column>");
+  });
+
+  it("reads a body alone (what SilverBullet hands a renderer), its cells' places counted from the body's start", () => {
+    const body = "<column>\n\nA [[x]]\n\n</column>\n<column>\nB\n</column>";
+    const cells = readGridBody(body);
+    expect(cells.map((cell) => cell.content)).toEqual(["A [[x]]", "B"]);
+    expect(cells.map((cell) => body.slice(cell.contentFrom, cell.contentTo))).toEqual(["A [[x]]", "B"]);
+    expect(body.slice(cells[1]!.from, cells[1]!.to)).toBe("<column>\nB\n</column>");
+    expect(readGridBody("")).toEqual([]);
   });
 
   it("reads an empty grid, and lines between cells as no cell's", () => {

@@ -70,6 +70,11 @@ if js and js.window then
     end,
     getConfig = config.get,
     confirm = editor.confirm,
+    -- A grid's cell: its markdown rendered as SilverBullet renders a page, its embeds expanded, each element marked with
+    -- its offset in the text
+    renderMarkdown = function(text)
+      return markdown.markdownToHtml(text, { expand = true, annotationPositions = true })
+    end,
     -- The dialog's default text width: saved as SilverBullet's Configuration Manager saves
     -- (the CONFIG page, indexed, the configuration loaded again)
     saveConfigPage = function(text)
@@ -94,6 +99,18 @@ if js and js.window then
       end,
     })
   end
+  -- Columns: a grid's lines, from <grid …> alone on its line to the first </grid>, drawn as its cells side by side
+  -- (SilverBullet's custom syntax: active once the page is loaded again after it is first defined)
+  syntax.define({
+    name = "SilverwareLayoutGrid",
+    startMarker = "^<grid(\\s[^>]*)?>\\s*$",
+    endMarker = "^</grid>\\s*$",
+    mode = "block",
+    renderClass = "swl-grid-widget",
+    renderWidget = function(body, pageName)
+      return widget.new({ html = silverwareLayoutJs.renderGrid(body), display = "block" })
+    end,
+  })
   -- Another page opened: its own text width read here from its meta (one call) and handed over, so it is set before
   -- the page is painted (verified: a few ms ahead; read from JS, each call of the bridge a promise, it took frames)
   event.listen({

@@ -103,6 +103,27 @@ export function readGrids(text: string): Grid[] {
   return grids;
 }
 
+const OPEN_LINE = "<grid>\n";
+
+/**
+ * A grid's cells as its body alone holds them (what SilverBullet hands a custom syntax's renderer: the lines between
+ * `<grid …>` and `</grid>`, so no attributes), their places counted from the body's start
+ */
+export function readGridBody(body: string): readonly GridCell[] {
+  const grid = readGrids(`${OPEN_LINE}${body}\n</grid>`)[0];
+  if (!grid) return [];
+  const shift = OPEN_LINE.length;
+  return grid.cells.map((cell) => ({
+    ...cell,
+    from: cell.from - shift,
+    to: Math.min(cell.to - shift, body.length),
+    innerFrom: cell.innerFrom - shift,
+    innerTo: Math.min(cell.innerTo - shift, body.length),
+    contentFrom: cell.contentFrom - shift,
+    contentTo: cell.contentTo - shift,
+  }));
+}
+
 /** The grid from the line `open` to the line `close` */
 function grid(text: string, all: readonly TextLine[], open: number, close: number, attributes: string): Grid {
   const first = all[open]!;

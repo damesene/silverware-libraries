@@ -8,6 +8,7 @@ import stylePage from "../silverware-layout/silverware-layout-style.md";
 import type { LayoutChanges, LayoutEntries, LayoutProvider } from "../shared/layout.ts";
 import { layoutOf } from "../shared/layout.ts";
 import { Registry } from "../silverware-layout/src/core/registry.ts";
+import { Grids } from "../silverware-layout/src/grid/grids.ts";
 import { markNarrow, paneWidth, showPaneWidth } from "../silverware-layout/src/host/marks.ts";
 import { silverBulletPage } from "../silverware-layout/src/host/silverbullet/dom.ts";
 import { DEFAULT_MIN_PANE_WIDTH, DEFAULT_GUIDES, type Guide } from "../silverware-layout/src/model/settings.ts";
@@ -89,6 +90,35 @@ layOutWidgets(document, page, registry, { guides: () => guides, enabled, problem
 // Registered as a widget plugin does, through the API its init page hands over
 layoutOf(registry.api()).register(provider);
 showKept();
+
+// A grid (docs/silverware-layout-grid.md) as SilverBullet draws one: its body handed to the renderer, its cells'
+// markdown rendered by the host (here a few of markdown's forms, each element marked with its offset as SilverBullet's
+// renderer marks it), its columns read from the page's text
+const GRID_BODY = "<column>\n\n**Left** column, with a [[Link]].\n\nA second paragraph.\n\n</column>\n<column>\n\nThe **right** column.\n\n</column>";
+const gridPage = `${LOREM}\n\n<grid columns="1fr 2fr">\n${GRID_BODY}\n</grid>\n`;
+const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const grids = new Grids(document, {
+  renderMarkdown: async (markdown) => {
+    let at = 0;
+    return markdown
+      .split(/\n{2,}/)
+      .map((paragraph) => {
+        const pos = markdown.indexOf(paragraph, at);
+        at = pos + paragraph.length;
+        const inline = escape(paragraph)
+          .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+          .replace(/\[\[(.+?)\]\]/g, '<a class="wiki-link" href="#">$1</a>');
+        return `<span class="p" data-pos="${pos}">${inline}</span>`;
+      })
+      .join("");
+  },
+  pageText: async () => gridPage,
+});
+void grids.render(GRID_BODY).then((grid) => {
+  const frame = Object.assign(document.createElement("div"), { className: "pg-grid-frame" });
+  frame.append(grid);
+  content.append(frame, line(LOREM));
+});
 
 // The first table shown over the window (as Silverware Table's full screen marks it): Silverware Layout stands back
 document.querySelector("#over-window")!.addEventListener("click", () => {

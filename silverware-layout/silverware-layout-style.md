@@ -668,4 +668,40 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   }
 }
 /* </shared-segments> */
+/* A grid (docs/silverware-layout-grid.md): its cells side by side as its columns attribute says (--swl-grid-columns,
+   set by Silverware Layout), one under another in a pane too narrow to lay out. A cell's markdown is the host's own
+   rendering: its first and last block take no margin outside the cell */
+/* (The frame SilverBullet draws a custom syntax's widget in, given the class swl-grid-widget by the init page: no
+   border round a grid, which is the page's own layout, not a box in it. Its rule names #sb-main, but sets no
+   !important, so this one outweighs it) */
+.swl-grid-widget {
+  border: none !important;
+}
+.swl-grid {
+  display: grid;
+  grid-template-columns: var(--swl-grid-columns, repeat(2, minmax(0, 1fr)));
+  gap: 0.5em 1.5em;
+  align-items: start;
+}
+:root[data-swl-narrow] .swl-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.swl-grid-cell {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.swl-grid-cell > :first-child {
+  margin-top: 0;
+}
+.swl-grid-cell > :last-child {
+  margin-bottom: 0;
+}
+.swl-grid-cell img {
+  max-width: 100%;
+}
+/* A cell's markdown that could not be rendered, and a grid drawn before Silverware Layout started: as typed */
+.swl-grid-plain {
+  white-space: pre-wrap;
+  font-family: inherit;
+}
 ```

@@ -7,6 +7,7 @@
 // would be registered the same way, its types added to `PageChange` and
 // `PageSections` (TypeScript's interface merging for the latter).
 import { validateAttributeName, writeAttributes } from "../markdown/attributes.ts";
+import { type EmbedChanges, readEmbeds, writeEmbed } from "../markdown/embed.ts";
 import { readGrids } from "../markdown/grid.ts";
 import { codeBlocksOf, sameBody } from "./blocks.ts";
 import type { PageBuilder } from "./changes.ts";
@@ -54,7 +55,10 @@ export type PageChange =
   // (the `occurrence`-th of those alike), its `cell`-th cell counted from 0
   | { readonly kind: "replaceGridCell"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly cell: number; readonly content: string }
   // A grid's `<grid>` line given attributes (a value set, or null: taken off), the others on it kept
-  | { readonly kind: "setGridAttributes"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly attributes: Readonly<Record<string, string | null>> };
+  | { readonly kind: "setGridAttributes"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly attributes: Readonly<Record<string, string | null>> }
+  // An embed (shared/markdown/embed.ts) given an alt text, a size or metadata: the embed of that text (the
+  // `occurrence`-th of those alike), written in its own style
+  | { readonly kind: "setEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number; readonly changes: EmbedChanges };
 
 /** The builder's sections, one per part of a page's content (their parts below make them); every method gives the page's builder back */
 export interface PageSections {
@@ -104,6 +108,14 @@ export interface PageSections {
      * written in HTML's form), the grid found as `replaceCell` finds it
      */
     setAttributes(body: string, attributes: Readonly<Record<string, string | null>>, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+  };
+  readonly embeds: {
+    /**
+     * An embed given an alt text, a size or metadata (each a value, or null: taken off), written in its own style
+     * with SilverBullet's size in its alias and the metadata in a third segment (shared/markdown/embed.ts): the embed
+     * whose text is `text` (as the plugin read it), the `occurrence`-th of those alike; none so: the page left alone
+     */
+    set(text: string, changes: EmbedChanges, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
   };
 }
 
@@ -381,6 +393,24 @@ export const PARTS: readonly Part[] = [
       const inner = (content ? nl + content.replace(/\n/g, nl) + nl + nl : nl) + (cell.closed ? "" : `</column>${nl}`);
       if (text.slice(cell.innerFrom, cell.innerTo) === inner) return { text, changes: 0 };
       return { text: text.slice(0, cell.innerFrom) + inner + text.slice(cell.innerTo), changes: 1 };
+    },
+  }),
+  part({
+    kinds: ["setEmbed"],
+    section: {
+      name: "embeds",
+      make: (add) => ({
+        set: (text, changes, where = {}) =>
+          add({ kind: "setEmbed", text, changes: structuredClone(changes), occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+      }),
+    },
+    write: (text, change) => {
+      const alike = readEmbeds(text).filter((embed) => embed.text === change.text);
+      const embed = alike[change.occurrence];
+      if (!embed || (change.of !== undefined && alike.length !== change.of)) return { text, changes: 0, problem: "its embed changed since it was read: left alone" };
+      const written = writeEmbed(embed, change.changes);
+      if (written === embed.text) return { text, changes: 0 };
+      return { text: text.slice(0, embed.from) + written + text.slice(embed.to), changes: 1 };
     },
   }),
   // The body: the page builder's own `body`, no section

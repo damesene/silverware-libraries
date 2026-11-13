@@ -363,6 +363,16 @@ describe("the page writer", () => {
     expect(bad.skipped.map((one) => one.reason)).toEqual(['"a b" is no attribute\'s name (letters, digits, -, _, : and . only, not first a digit)']);
   });
 
+  it("writes an embed's size and metadata, the one of those alike asked, and leaves one changed", async () => {
+    const { map, writer } = memory({ A: "x ![[cat.png]] y ![[cat.png]]\n" });
+    await writer.write(pageChanges().page("A", (p) => p.embeds.set("![[cat.png]]", { width: "300", metadata: { view: "preview" } }, { occurrence: 1, of: 2 })).build());
+    expect(map.get("A")).toBe("x ![[cat.png]] y ![[cat.png||300|{ view: preview }]]\n");
+    const gone = await writer.plan(pageChanges().page("A", (p) => p.embeds.set("![[dog.png]]", { width: "1" })).build());
+    expect(gone.skipped.map((one) => one.reason)).toEqual(["its embed changed since it was read: left alone"]);
+    const same = await writer.plan(pageChanges().page("A", (p) => p.embeds.set("![[cat.png]]", {})).build());
+    expect(same.pages).toEqual([]);
+  });
+
   it("closes a grid's cell left open as it writes it", async () => {
     const { map, writer } = memory({ A: "<grid>\n<column>\nOpen\n</grid>" });
     await writer.write(pageChanges().page("A", (p) => p.grids.replaceCell("<column>\nOpen", 0, "Shut")).build());
@@ -373,7 +383,7 @@ describe("the page writer", () => {
 describe("the builder", () => {
   it("has every section the parts make, each a part of its own", () => {
     const sections = PARTS.flatMap((one) => (one.section ? [one.section.name] : []));
-    expect(sections).toEqual(["properties", "tags", "codeBlocks", "grids"]);
+    expect(sections).toEqual(["properties", "tags", "codeBlocks", "grids", "embeds"]);
     pageChanges().page("A", (p) => {
       for (const name of sections) expect(Object.values(p[name]).every((method) => typeof method === "function"), name).toBe(true);
     });

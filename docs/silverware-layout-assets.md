@@ -326,7 +326,7 @@ The assets' codec is pure and could be built beside the grid by a second agent.
 ## Steps
 
 1. The probes (1 to 5).
-2. The codec (read and write, wiki and markdown, embeds and links, the three segments, typographic quotes, an embed untouched without changes); tests.
+2. The codec (read and write, wiki and markdown, embeds and links, the three segments, typographic quotes, an embed untouched without changes); tests. **Done 2026-11-13** for embeds: `shared/markdown/embed.ts` (`readEmbeds`, `writeEmbed`, a size and metadata read and written), the page writer's `embeds.set`. Links (`[[report.pdf]]`) are read when they come (*Later*): the occurrence's `form` then.
 3. `linkStyle` in `Platform`, the SilverBullet binding's `defaultLinkStyle`.
 4. The contract (`shared/assets.ts`), the registries of types and actions, the built-in types and `open-tab` registered through it, which view and action apply, the error state; the isolation test's rules for the area; tests.
 5. The host: embeds found in SilverBullet's widgets, decorated or replaced by view; the icon card; `preview` of image and PDF; a click running its action; UI tests (SilverBullet and the playground).

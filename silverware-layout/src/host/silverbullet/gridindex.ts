@@ -23,3 +23,28 @@ export function gridRelations(page: string, links: readonly Link[], lastModified
     ...(link.alias ? { alias: link.alias } : {}),
   }));
 }
+
+/** A hashtag found in a grid and a paragraph holding some (src/grid/core/tags.ts' `GridTag`, `GridParagraph`) */
+type Tag = { readonly name: string; readonly context: "page" | "paragraph" | "item" | "task" | "table" | "heading" };
+type Paragraph = { readonly from: number; readonly to: number; readonly text: string; readonly tags: readonly string[] };
+
+// A hashtag's parent as SilverBullet's index names it (2.12.1: a task's, an item's, else the page's; its main a table's
+// and a heading's of their own)
+const PARENT: Readonly<Record<Tag["context"], string>> = { page: "page", paragraph: "page", item: "item", task: "task", table: "table", heading: "header" };
+
+/**
+ * The index's objects for a page's grid hashtags, as SilverBullet's index makes them (`plugs/index/tags.ts`,
+ * `paragraph.ts`, 2.12.1): a tag each of a name and a parent (`<name>:<parent>`, the same object SilverBullet makes of
+ * one outside a grid), and a paragraph each holding some, its tags its own
+ */
+export function gridTagObjects(page: string, tags: readonly Tag[], paragraphs: readonly Paragraph[]): Record<string, unknown>[] {
+  const named = new Map<string, Record<string, unknown>>();
+  for (const tag of tags) {
+    const parent = PARENT[tag.context];
+    named.set(`${tag.name}:${parent}`, { ref: `${tag.name}:${parent}`, tag: "tag", name: tag.name, page, parent });
+  }
+  return [
+    ...named.values(),
+    ...paragraphs.map((paragraph) => ({ ref: `${page}@${paragraph.from}`, tag: "paragraph", text: paragraph.text, page, pos: paragraph.from, range: [paragraph.from, paragraph.to], tags: [...paragraph.tags], itags: [...paragraph.tags] })),
+  ];
+}

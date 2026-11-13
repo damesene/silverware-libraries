@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gridRelations } from "./gridindex.ts";
+import { gridRelations, gridTagObjects } from "./gridindex.ts";
 
 describe("a grid's links as SilverBullet's index keeps them", () => {
   it("makes a relation of each, as SilverBullet's index makes one of a link (2.12.1)", () => {
@@ -13,5 +13,24 @@ describe("a grid's links as SilverBullet's index keeps them", () => {
     ]);
     expect(gridRelations("P", [])).toEqual([]);
     expect(gridRelations("P", [links[0]!])[0]).not.toHaveProperty("pageLastModified");
+  });
+});
+
+describe("a grid's hashtags as SilverBullet's index keeps them", () => {
+  it("makes a tag of each name and parent, and a paragraph of each holding some", () => {
+    const tags = [
+      { name: "idea", context: "paragraph" as const },
+      { name: "idea", context: "page" as const },
+      { name: "todo", context: "item" as const },
+      { name: "urgent", context: "task" as const },
+      { name: "h", context: "heading" as const },
+    ];
+    expect(gridTagObjects("P", tags, [{ from: 30, to: 45, text: "A note #idea", tags: ["idea"] }])).toEqual([
+      { ref: "idea:page", tag: "tag", name: "idea", page: "P", parent: "page" },
+      { ref: "todo:item", tag: "tag", name: "todo", page: "P", parent: "item" },
+      { ref: "urgent:task", tag: "tag", name: "urgent", page: "P", parent: "task" },
+      { ref: "h:header", tag: "tag", name: "h", page: "P", parent: "header" },
+      { ref: "P@30", tag: "paragraph", text: "A note #idea", page: "P", pos: 30, range: [30, 45], tags: ["idea"], itags: ["idea"] },
+    ]);
   });
 });

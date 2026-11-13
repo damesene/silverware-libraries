@@ -18,7 +18,8 @@ import { ASSETS_PATH, readAssetSettings, storedAssetSettings } from "./assets/mo
 import { silverBulletAssetHost } from "./host/silverbullet/assets.ts";
 import { gridInsertion } from "./grid/core/insert.ts";
 import { gridLinks } from "./grid/core/links.ts";
-import { gridRelations } from "./host/silverbullet/gridindex.ts";
+import { gridTags } from "./grid/core/tags.ts";
+import { gridRelations, gridTagObjects } from "./host/silverbullet/gridindex.ts";
 import { Grids } from "./grid/grids.ts";
 import { gridProvider } from "./grid/provider.ts";
 import { silverBulletGridHost } from "./host/silverbullet/grid.ts";
@@ -136,14 +137,15 @@ export function pageEdited(): void {
 let current: Bridge | undefined;
 
 /**
- * A page being indexed (the init page's page:index listener): the relations of the links in its grids, for the index
- * (SilverBullet's own sees nothing in a grid); none where it has no grid
+ * A page being indexed (the init page's page:index listener): the relations of the links in its grids, its hashtags
+ * there and their paragraphs, for the index (SilverBullet's own sees nothing in a grid); none where it has no grid
  */
 export function gridIndexObjects(page: unknown, text: unknown, lastModified?: unknown): Record<string, unknown>[] | undefined {
   const source = String(text ?? "");
   if (!source.includes("<grid")) return undefined;
-  const links = gridLinks(String(page), source);
-  return links.length ? gridRelations(String(page), links, lastModified) : undefined;
+  const { tags, paragraphs } = gridTags(source);
+  const objects = [...gridRelations(String(page), gridLinks(String(page), source), lastModified), ...gridTagObjects(String(page), tags, paragraphs)];
+  return objects.length ? objects : undefined;
 }
 
 /** The slash commands, as the init page defines them */

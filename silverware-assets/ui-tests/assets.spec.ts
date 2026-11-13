@@ -26,6 +26,9 @@ test("the same image outside a grid and in it: a view chosen in the grid written
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${image}\n\n${grid(written, "Right")}`);
   await expect(page.locator("#sb-main .swl-grid [data-swa-asset]").first()).toHaveAttribute("data-swa-view", "icon");
   await expect(page.locator("#sb-main [data-swa-asset]:not(.swl-grid *)").first()).toHaveAttribute("data-swa-view", "embed");
+  // Then the one outside the grid: written to its own embed, as the page is now (its text no longer the grid's)
+  await choose(page, page.locator("#sb-main [data-swa-asset]:not(.swl-grid *)").first(), "Show as a preview");
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n![[${space.folder}/photo.png|Photo|120|{ view: preview }]]\n\n${grid(written, "Right")}`);
 });
 
 test("a file SilverBullet cannot draw is a card, its click opening the file in a new tab", async ({ page, space }) => {

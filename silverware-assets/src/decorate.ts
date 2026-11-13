@@ -217,25 +217,14 @@ export class AssetDecorator {
   async decorate(drawn: readonly DrawnEmbed[]): Promise<void> {
     if (!drawn.length) return;
     const [text, page, settings] = await Promise.all([this.host.pageText(), this.host.pageName(), this.host.settings()]);
-    const embeds = readEmbeds(text);
-    // The host's own widgets are the files embedded outside what is rendered outside the editor (an embedded page is
-    // drawn as no medium): each found by the run of them the widgets drawn now are, the editor drawing what is in view
-    const widgetsEmbeds = outside(embeds, this.host.renderedRanges(text)).filter((embed) => isFileTarget(embed.target));
-    const inText = widgetsEmbeds.map((embed): Placed => ({ target: sameTarget(this.host.resolved(embed, page)), at: embed.from / Math.max(text.length, 1) }));
     // (Each marked first: a widget's run is of all those drawn, this batch's too)
     for (const one of drawn) {
       this.drawn.set(one.frame, one);
       one.frame.setAttribute("data-swa-target", sameTarget(one.target));
       if (!one.position) one.frame.setAttribute("data-swa-widget", "");
     }
-    const widgets = [...this.doc.querySelectorAll<HTMLElement>("[data-swa-widget]")];
-    const widgetsDrawn = widgets.map((frame): Placed => ({ target: frame.getAttribute("data-swa-target") ?? "", at: this.host.placeOf?.(frame) ?? 0 }));
     for (const one of drawn) {
-      const at = one.position?.();
-      // (A medium rendered outside the editor whose place is not known yet: left, never taken for another)
-      if (one.position && at === undefined) continue;
-      const index = at === undefined ? placeAmong(widgetsDrawn, widgets.indexOf(one.frame), inText) : undefined;
-      const found = at !== undefined ? embedAt(embeds, at) : index !== undefined ? occurrenceIn(embeds, widgetsEmbeds[index]!) : undefined;
+      const found = this.locate(one, text, page);
       if (!found) continue;
       const asset = this.host.assetOf(found.embed, page);
       const type = typeFor(this.registry.types.all, asset);
@@ -243,6 +232,30 @@ export class AssetDecorator {
       this.render(one, found, asset, type, settings);
     }
     this.onDecorated?.();
+  }
+
+  /**
+   * The embed a frame drawn is, in a page's text: one rendered outside the editor by its place as told; the host's own
+   * widget (the files embedded outside what is rendered outside the editor, an embedded page drawn as no medium) by the
+   * run of them the widgets drawn now are, the editor drawing what is in view. None: not found (a medium rendered
+   * outside the editor whose place is not known yet, never taken for another)
+   */
+  private locate(one: DrawnEmbed, text: string, page: string): Found | undefined {
+    const embeds = readEmbeds(text);
+    const at = one.position?.();
+    if (one.position) return at === undefined ? undefined : embedAt(embeds, at);
+    const widgetsEmbeds = outside(embeds, this.host.renderedRanges(text)).filter((embed) => isFileTarget(embed.target));
+    const inText = widgetsEmbeds.map((embed): Placed => ({ target: sameTarget(this.host.resolved(embed, page)), at: embed.from / Math.max(text.length, 1) }));
+    const widgets = [...this.doc.querySelectorAll<HTMLElement>("[data-swa-widget]")];
+    const widgetsDrawn = widgets.map((frame): Placed => ({ target: frame.getAttribute("data-swa-target") ?? "", at: this.host.placeOf?.(frame) ?? 0 }));
+    const index = placeAmong(widgetsDrawn, widgets.indexOf(one.frame), inText);
+    return index === undefined ? undefined : occurrenceIn(embeds, widgetsEmbeds[index]!);
+  }
+
+  /** The embed a frame is, found again in the page as it is now: another embed may have changed since it was decorated (the same file's in a grid, written) */
+  private async locateNow(one: DrawnEmbed): Promise<Found | undefined> {
+    const [text, page] = await Promise.all([this.host.pageText(), this.host.pageName()]);
+    return this.locate(one, text, page);
   }
 
   /** Every embed decorated in the page decorated again (the settings saved) */
@@ -269,7 +282,7 @@ export class AssetDecorator {
   }
 
   /** One embed drawn as its view says */
-  private render(drawn: DrawnEmbed, found: { readonly embed: Embed; readonly occurrence: number; readonly of: number }, asset: Asset, type: AssetType, settings: AssetSettings): void {
+  private render(drawn: DrawnEmbed, found: Found, asset: Asset, type: AssetType, settings: AssetSettings): void {
     this.renders.get(drawn.frame)?.abort();
     const control = new AbortController();
     this.renders.set(drawn.frame, control);
@@ -286,7 +299,11 @@ export class AssetDecorator {
     frame.setAttribute("data-swa-view", view);
     // A preview's height, the setting's (the style page's rules read it)
     frame.style.setProperty("--swa-height", `${Number(found.embed.height) || settings.heights.preview}px`);
-    const write = (changes: EmbedChanges) => this.host.writeEmbed({ text: found.embed.text, occurrence: found.occurrence, of: found.of, changes });
+    // (Written to the embed as the page has it now: its place among those of its text may have changed since)
+    const write = async (changes: EmbedChanges) => {
+      const now = await this.locateNow(drawn);
+      return now ? this.host.writeEmbed({ text: now.embed.text, occurrence: now.occurrence, of: now.of, changes }) : NOT_FOUND;
+    };
     // Its width laid out by Silverware Layout's handle (not a card's): written as SilverBullet's size, the height taken off so the ratio holds
     this.sizes.set(frame, { width: found.embed.width, anchor: settings.anchor, write: (width) => write({ width: width ?? null, height: null }) });
     const context: RenderContext = {
@@ -330,7 +347,9 @@ export class AssetDecorator {
                   {
                     label: "Show as a link",
                     run: () =>
-                      void this.host.embedToLink!({ text: found.embed.text, occurrence: found.occurrence, of: found.of }).then((problem) => problem && this.host.problem(`Silverware Assets: not written: ${problem}`)),
+                      void this.locateNow(drawn)
+                        .then((now) => (now ? this.host.embedToLink!({ text: now.embed.text, occurrence: now.occurrence, of: now.of }) : NOT_FOUND))
+                        .then((problem) => problem && this.host.problem(`Silverware Assets: not written: ${problem}`)),
                   },
                 ]
               : []),
@@ -451,8 +470,14 @@ function viewportOf(element: HTMLElement, embed: Embed, view: View, settings: As
   };
 }
 
+/** An embed of the page and its place among those of its text, which the page writer finds it by */
+type Found = { readonly embed: Embed; readonly occurrence: number; readonly of: number };
+
+// Why a frame's embed was not written: not found in the page as it is now
+const NOT_FOUND = "this file was not found in the page";
+
 /** An embed of the text with its place among those of its text, which the page writer finds it by */
-function occurrenceIn(embeds: readonly Embed[], embed: Embed): { readonly embed: Embed; readonly occurrence: number; readonly of: number } {
+function occurrenceIn(embeds: readonly Embed[], embed: Embed): Found {
   const sameText = embeds.filter((one) => one.text === embed.text);
   return { embed, occurrence: sameText.indexOf(embed), of: sameText.length };
 }

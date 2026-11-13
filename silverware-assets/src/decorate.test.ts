@@ -260,6 +260,24 @@ describe("the same file outside a grid and in it", () => {
     expect(state.writes[0]!.occurrence).toBe(1);
   });
 
+  it("writes the editor's widget to its embed as the page is now, after the same file's in a grid was written", async () => {
+    // Both read alike at first (one text twice); then the grid's written its view, the page's not drawn again
+    const before = "![[cat.png]]\n\n<grid>\n<column>\n\n![[cat.png]]\n\n</column>\n</grid>";
+    const { state, decorator } = setUp(before);
+    const inGrid = before.lastIndexOf("![[cat.png");
+    state.ranges = [{ from: before.indexOf("<grid>"), to: before.length }];
+    const gridFrame = { ...frame("cat.png"), position: () => inGrid };
+    const widget = frame("cat.png");
+    await decorator.decorate([gridFrame, widget]);
+    state.text = before.replace("\n\n![[cat.png]]\n\n</column>", "\n\n![[cat.png|||{ view: icon }]]\n\n</column>");
+    widget.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
+    [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")][1]!.click();
+    await vi.waitFor(() => expect(state.writes).toHaveLength(1));
+    // Its text now once in the page: the first of one, not of two (which the page writer would refuse as changed)
+    expect(state.writes.map((write) => [write.text, write.occurrence, write.of])).toEqual([["![[cat.png]]", 0, 1]]);
+    expect(state.problems).toEqual([]);
+  });
+
   it("leaves a medium rendered outside the editor whose place is not known yet", async () => {
     const { decorator } = setUp("![[cat.png]]");
     const unplaced = { ...frame("cat.png"), position: () => undefined };

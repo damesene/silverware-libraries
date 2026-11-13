@@ -22,6 +22,9 @@ describe("SilverBullet's embeds found", () => {
     expect(drawnTarget(widget)?.target).toBe("Pics/my cat.png");
     widget.innerHTML = '<span class="p"><b>Error:</b> Unsupported content: archive.zip</span>';
     expect(drawnTarget(widget)).toEqual({ target: "archive.zip", native: undefined });
+    // A run of spaces in its words kept by a no-break one (2.12.1): read as the target's spaces
+    widget.innerHTML = '<span class="p"><b>Error:</b> Unsupported content: Two\u00a0 spaces/archive.zip</span>';
+    expect(drawnTarget(widget)?.target).toBe("Two  spaces/archive.zip");
     widget.innerHTML = "<p>An embedded page</p>";
     expect(drawnTarget(widget)).toBeUndefined();
   });

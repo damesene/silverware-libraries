@@ -62,7 +62,8 @@ export function drawnTarget(frame: HTMLElement): { readonly target: string; read
     }
     return { target, native };
   }
-  const unsupported = UNSUPPORTED.exec(frame.textContent?.trim() ?? "");
+  // (Its words keep a run of spaces by no-break ones, `a\u00a0 b` for `a  b`, 2.12.1: the target's spaces again)
+  const unsupported = UNSUPPORTED.exec(frame.textContent?.replace(/\u00a0/g, " ").trim() ?? "");
   return unsupported ? { target: unsupported[1]!.trim(), native: undefined } : undefined;
 }
 

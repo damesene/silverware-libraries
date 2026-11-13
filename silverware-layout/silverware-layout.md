@@ -2,7 +2,7 @@
 name: Library/damesene/silverware-layout
 tags: meta/library
 version: 1.0.0
-description: "Silverware Layout: Columns in a page (/grid), the width of a page's text (its own or a default for every page) and of its tables, databases, charts and grids, wider or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll."
+description: "Silverware Layout: Columns in a page (/grid), embedded files shown in full, as a preview or as a card, the width of a page's text (its own or a default for every page) and of its tables, databases, charts and grids, wider or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll."
 files:
 - silverware-layout.js
 - silverware-layout-init.md
@@ -80,6 +80,31 @@ What you should know:
 - A grid ends at the first line `</grid>`, wherever it is: a code block in a column that holds such a line ends the grid there. Grids in grids are not supported yet.
 - Links and images in a grid show in their pages' backlinks, and a renamed page or image is renamed in a grid too (its hashtags are not found yet).
 - A grid starts on a line of its own, not straight after a paragraph's line: leave a blank line before it (/grid does).
+
+## Media
+
+Images, videos, audio, PDFs and other files you embed (`![[photo.png]]`, `![Photo](photo.png)`) can each be shown three ways:
+
+- **In full**: as SilverBullet shows it (the image, a player, a viewer).
+- **Preview**: smaller (a PDF in a small viewer).
+- **Card**: a small card with the file's icon and name, the file itself not shown. A file SilverBullet cannot show (a zip, a document) is a card instead of an error.
+
+Point at a medium, and a **…** button shows at its top right: choose how it is shown there, or **Open** it. A click on a card or a preview opens the file in a new tab; Shift+click does the same, unless you set otherwise.
+
+**Its width**: point at an image (or a video, a PDF in full or in preview), and the bar beside its right edge makes it wider or narrower, as a table's; it stays where it is and grows to the right (*Width dragged* below sets it centred instead). Let go, and the width is saved as SilverBullet's own size: `![[photo.png|Photo|300]]`.
+
+What you choose is kept in the embed itself, after SilverBullet's own size:
+
+```markdown
+![[report.pdf|Report||{ view: icon }]]
+![Photo|300|{ view: preview }](photo.png)
+```
+
+SilverBullet reads only the alt text and the size, so without Silverware Layout every file shows as SilverBullet shows it, at its size: nothing is lost. Keep the three parts, even an empty one (`||`): with two, SilverBullet would take the size for the alt text.
+
+**For all files, or for one kind of file**: run **Silverware Layout: Page layout** and open its **Media** tab. Set how files are shown, what a click and a Shift+click do, and whether a width dragged stays at the start or is centred, for all files; then, per kind (image, video, audio, PDF, file), anything other than that ("Default" follows all files). What a file's own `view` says wins over both.
+
+Media in a grid's columns are shown the same way (their width is not dragged there yet).
 
 ## Font size
 

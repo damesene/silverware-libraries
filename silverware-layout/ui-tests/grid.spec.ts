@@ -244,3 +244,23 @@ test("a cell left by Esc, then a drag in a cell: the grid stays drawn, the field
   await expect(page.locator("#sb-main .swl-grid")).toHaveCount(1);
   await page.keyboard.press("Escape");
 });
+
+test("Ctrl+Z and Ctrl+Y in a cell's field undo and redo its typing, the page's text left alone", async ({ page, space }) => {
+  const text = `# Page\n\n${GRID}`;
+  await space.open({ Page: text }, "Page");
+  await gridsDrawn(page);
+  await page.locator("#sb-main .swl-grid-cell").first().click();
+  const field = page.locator("#sb-main textarea.swl-grid-editor");
+  await expect(field).toBeFocused();
+  await field.press("End");
+  await page.keyboard.type(" typed");
+  await expect(field).toHaveValue("Left text typed");
+  await page.keyboard.press("Control+z");
+  await expect(field).toHaveValue("Left text");
+  await page.keyboard.press("Control+y");
+  await expect(field).toHaveValue("Left text typed");
+  await page.keyboard.press("Control+z");
+  await expect(field).toHaveValue("Left text");
+  expect(await editorText(page)).toBe(text);
+  await page.keyboard.press("Escape");
+});

@@ -14,9 +14,24 @@ export function editCell(cell: HTMLElement, markdown: string, at: number | { rea
     field.style.height = "auto";
     field.style.height = `${field.scrollHeight}px`;
   };
+  // Undo and redo the field's own: the page's editor takes Ctrl+Z (Ctrl+Y, Ctrl+Shift+Z) for its own as the window
+  // gets it, before the field (SilverBullet 2.12.1: held back, the field's typing not undone). Taken after it, at the
+  // window too, and done in the field by the browser's undo of what was typed there
+  const win = doc.defaultView;
+  const history = (event: KeyboardEvent) => {
+    if (event.target !== field || !(event.ctrlKey || event.metaKey) || event.altKey) return;
+    const key = event.key.toLowerCase();
+    const redo = key === "y" || (key === "z" && event.shiftKey);
+    if (key !== "z" && !redo) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    doc.execCommand(redo ? "redo" : "undo");
+  };
+  win?.addEventListener("keydown", history, true);
   const leave = () => {
     if (left) return;
     left = true;
+    win?.removeEventListener("keydown", history, true);
     const text = field.value;
     // The page's editor the cell is in focused again, as it was before (unfocused, the next press in a grid focused
     // it and it took the drag's selection for its own, its cursor in the grid's text: the grid shown as its raw text)

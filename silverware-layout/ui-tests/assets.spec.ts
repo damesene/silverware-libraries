@@ -90,6 +90,14 @@ test("a link to a file shows its type's icon, in a grid too; a link to a page no
   await gridsDrawn(page);
   await expect(page.locator("#sb-main [data-swl-asset-link='pdf'] .swl-asset-link-icon")).toHaveCount(2);
   await expect(page.locator("#sb-main a", { hasText: "Other" }).locator(".swl-asset-link-icon")).toHaveCount(0);
+  // Its icon's menu: the link not followed, the file shown enlarged
+  const url = page.url();
+  await page.locator("#sb-main .swl-grid [data-swl-asset-link='pdf'] .swl-asset-link-icon").click();
+  await page.locator(".swl-asset-menu-holder .swl-menu-item", { hasText: "Show enlarged" }).click();
+  await expect(page.locator(".swl-asset-popover object")).toHaveAttribute("data", `.fs/${encodeURI(`${space.folder}/doc.pdf`)}`);
+  expect(page.url()).toBe(url);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swl-asset-popover")).toHaveCount(0);
 });
 
 test("the Media tab: a card's size shown, a click set to the side panel; the panel shows the file and Esc closes it", async ({ page, space }) => {

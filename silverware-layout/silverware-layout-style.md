@@ -1439,6 +1439,13 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   height: 1em;
   margin-right: 0.2em;
   vertical-align: -0.125em;
+  border-radius: 3px;
+  cursor: pointer;
+}
+/* Its menu opened by it: pointed at, it shows it is a button */
+.swl-asset-link-icon:hover,
+.swl-asset-link-icon[aria-expanded="true"] {
+  background: color-mix(in srgb, currentColor 15%, transparent);
 }
 .swl-asset-pdf {
   display: block;

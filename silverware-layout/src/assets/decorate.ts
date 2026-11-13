@@ -3,15 +3,16 @@
 // order among those of the same target), its type matched, its view chosen, and it is left as the host drew it (a view
 // the type renders none of), replaced by the type's rendering, or by the card. A click on a card or a preview runs the
 // action the user set for it. A render that fails shows the host's drawing (else the card) with an error mark.
-import type { ActionContext, Asset, AssetType, RenderContext, Viewport } from "../../../shared/assets.ts";
+import type { ActionContext, Asset, AssetType, Capabilities, RenderContext, Viewport } from "../../../shared/assets.ts";
 import { type Embed, type EmbedChanges, readEmbeds } from "../../../shared/markdown/embed.ts";
-import { actionFor, typeFor, viewFor } from "./core/choose.ts";
+import { actionFor, mimeOf, typeFor, viewFor } from "./core/choose.ts";
 import { embedAt, embedOf, outside, type Range, sameTarget } from "./core/locate.ts";
 import { metadataOf } from "./core/metadata.ts";
 import type { AssetRegistry } from "./core/registry.ts";
 import { type AssetSettings, type Gesture, type View, VIEWS } from "./model/settings.ts";
 import { addCardFields, dateText, drawCard, iconElement, markFailed, sizeText } from "./ui/card.ts";
-import { addMoreButton } from "./ui/moremenu.ts";
+import { addMoreButton, opensMenu } from "./ui/moremenu.ts";
+import { plainMedium } from "./ui/plainmedium.ts";
 
 /** An embed as the host drew it: its frame, its target as drawn (a path of the space or a URL), its own media element */
 export type DrawnEmbed = {
@@ -67,6 +68,8 @@ export class AssetDecorator {
   private readonly drawn = new WeakMap<HTMLElement, DrawnEmbed>();
   // The links decorated (decorated again as the settings change; those gone from the page left out then)
   private readonly links = new Set<DrawnLink>();
+  // Each link's menu: what ends it (its icon drawn again, or the link gone)
+  private readonly linkMenus = new WeakMap<HTMLElement, AbortController>();
   /** Told as a frame is decorated (its width laid out again) */
   onDecorated: (() => void) | undefined;
   private started = false;
@@ -93,19 +96,65 @@ export class AssetDecorator {
   async decorateLinks(links: readonly DrawnLink[]): Promise<void> {
     if (!links.length || !this.host.linkAsset) return;
     const [page, settings] = await Promise.all([this.host.pageName(), this.host.settings()]);
-    for (const old of this.links) if (!old.element.isConnected) this.links.delete(old);
+    for (const old of this.links) {
+      if (old.element.isConnected) continue;
+      this.links.delete(old);
+      this.linkMenus.get(old.element)?.abort();
+    }
     for (const link of links) {
       this.links.add(link);
       link.element.querySelector(`:scope > .${LINK_ICON}`)?.remove();
+      this.linkMenus.get(link.element)?.abort();
       if (!settings.linkIcons) continue;
       const asset = this.host.linkAsset(link, page);
       const type = asset && typeFor(this.registry.types.all, asset);
       if (!type) continue;
       const icon = iconElement(this.doc, type.icon);
       icon.classList.add(LINK_ICON);
+      icon.title = "Show…";
+      icon.setAttribute("role", "button");
       link.element.setAttribute("data-swl-asset-link", type.name);
       link.element.prepend(icon);
+      // Its menu: what can be done with the file (a press on the icon the menu's, the link's text still the host's)
+      const control = new AbortController();
+      this.linkMenus.set(link.element, control);
+      const drawn = !!type.views?.embed || !!plainMedium(this.doc, asset, mimeOf(asset));
+      const capabilities: Capabilities = { views: ["icon", ...(type.views?.preview ? (["preview"] as const) : []), ...(drawn ? (["embed"] as const) : [])] };
+      opensMenu(
+        this.doc,
+        icon,
+        () => ({ title: assetName(asset), views: [], actions: this.actionItems(asset, capabilities, (container, as) => this.drawInto(container, as, type, asset, settings, control.signal)) }),
+        control.signal,
+      );
     }
+  }
+
+  /** What can be done with an asset: each fitting action registered (its menu's), run with how it is drawn elsewhere */
+  private actionItems(asset: Asset, can: Capabilities, render: (container: HTMLElement, as: "preview" | "embed") => Promise<void>): { readonly label: string; readonly run: () => void }[] {
+    return this.registry.actions.all
+      .filter((action) => action.fits(asset, can))
+      .map((action) => ({
+        label: action.label ?? action.name,
+        run: () => {
+          const context: ActionContext = { asset, open: (url) => this.host.open(url), render: (as, container) => render(container, as) };
+          void Promise.resolve(action.run(context)).catch((error: unknown) => this.host.problem(`Silverware Layout: ${action.name}: ${message(error)}`));
+        },
+      }));
+  }
+
+  /** A link's asset drawn into a container of an action's: its type's view, else the plain medium of its kind, else its card */
+  private async drawInto(container: HTMLElement, as: "preview" | "embed", type: AssetType, asset: Asset, settings: AssetSettings, signal: AbortSignal): Promise<void> {
+    const viewport: Viewport = {
+      get width() {
+        return container.clientWidth;
+      },
+      get height() {
+        return settings.heights[as];
+      },
+      onChange: () => undefined,
+    };
+    const element = await type.views?.[as]?.({ asset, viewport, metadata: metadataOf({}, async () => "a link keeps no metadata"), signal, placement: "inline" });
+    container.replaceChildren(element ?? plainMedium(this.doc, asset, mimeOf(asset)) ?? this.card(type, asset, settings));
   }
 
   /** Embeds drawn, decorated */
@@ -181,17 +230,15 @@ export class AssetDecorator {
       placement: "block",
     };
     const capabilities = { views: (["icon", "preview", "embed"] as const).filter(can) };
+    // The asset drawn into a container of an action's (a panel): its type's view, else a copy of the host's drawing, else its card
+    const renderInto = async (as: "preview" | "embed", container: HTMLElement) => {
+      const element = await type.views?.[as]?.({ ...context, viewport: viewportOf(container, found.embed, as, settings, control.signal) });
+      container.replaceChildren(element ?? shownCopy(native) ?? this.card(type, asset, settings));
+    };
     const runAction = (gesture: Gesture) => {
       const action = actionFor(gesture, type.name, settings, (name) => this.registry.actions.get(name), asset, capabilities);
       if (!action) return;
-      const actionContext: ActionContext = {
-        asset,
-        open: (url) => this.host.open(url),
-        render: async (as, container) => {
-          const element = await type.views?.[as]?.({ ...context, viewport: viewportOf(container, found.embed, as, settings, control.signal) });
-          container.replaceChildren(element ?? shownCopy(native) ?? this.card(type, asset, settings));
-        },
-      };
+      const actionContext: ActionContext = { asset, open: (url) => this.host.open(url), render: renderInto };
       void Promise.resolve(action.run(actionContext)).catch((error: unknown) => this.host.problem(`Silverware Layout: ${action.name}: ${message(error)}`));
     };
     // The "…" menu: how it is shown (the one the settings give left unwritten), the click's action
@@ -201,7 +248,6 @@ export class AssetDecorator {
       this.doc,
       frame,
       () => {
-        const click = actionFor("click", type.name, settings, (name) => this.registry.actions.get(name), asset, capabilities);
         return {
           title: asset.alt || type.name,
           views: VIEWS.map((one) => ({
@@ -212,7 +258,7 @@ export class AssetDecorator {
             run: () =>
               void write({ metadata: { view: one === settled ? null : one } }).then((problem) => problem && this.host.problem(`Silverware Layout: not written: ${problem}`)),
           })),
-          ...(click ? { open: { label: "Open", run: () => runAction("click") } } : {}),
+          actions: this.actionItems(asset, capabilities, (container, as) => renderInto(as, container)),
         };
       },
       control.signal,
@@ -269,7 +315,7 @@ export class AssetDecorator {
 
   /** The card of an asset: its type's icon and the fields the user shows (a file's size and date as the host tells them, a moment later) */
   private card(type: AssetType, asset: Asset, settings: AssetSettings): HTMLElement {
-    const name = asset.alt || (asset.kind === "file" ? asset.path.split("/").pop()! : asset.kind === "web" ? asset.url.split(/[?#]/, 1)[0]!.split("/").pop()! : asset.page);
+    const name = assetName(asset);
     const fields = settings.card.filter((field) => field === "name").map((field) => ({ name: field, text: name }));
     const card = drawCard(this.doc, settings.card.includes("icon") ? type.icon : undefined, fields, name);
     const wanted = settings.card.filter((field) => field === "size" || field === "modified");
@@ -288,6 +334,14 @@ export class AssetDecorator {
     }
     return card;
   }
+}
+
+/** What an asset is called where it is shown: its alt text, else its file's name, its URL's, its page's */
+function assetName(asset: Asset): string {
+  if (asset.alt) return asset.alt;
+  if (asset.kind === "file") return asset.path.split("/").pop() ?? asset.path;
+  if (asset.kind === "web") return asset.url.split(/[?#]/, 1)[0]!.split("/").pop() || asset.url;
+  return asset.page;
 }
 
 /** A copy of the host's drawing to show elsewhere (a panel): shown, though it is hidden where it is (a card shown there) */

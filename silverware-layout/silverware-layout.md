@@ -90,11 +90,11 @@ Images, videos, audio, PDFs and other files you embed (`![[photo.png]]`, `![Phot
 - **Preview**: smaller (a PDF in a small viewer).
 - **Card**: a small card with the file's icon and name, the file itself not shown. A file SilverBullet cannot show (a zip, a document) is a card instead of an error.
 
-Point at a medium, and a **…** button shows at its top right: choose how it is shown there, or **Open** it. A click on a card or a preview opens the file in a new tab; Shift+click does the same, unless you set otherwise: either can instead show the file in a panel at the window's right (**Show in a side panel**, the page still beside it) or enlarged over the page (**Show enlarged**). Esc or × closes them, and a click beside the enlarged file.
+Point at a medium, and a **…** button shows at its top right: choose how it is shown there, or open it in a new tab, in a side panel or enlarged. A click on a card or a preview opens the file in a new tab; Shift+click does the same, unless you set otherwise: either can instead show the file in a panel at the window's right (**Show in a side panel**, the page still beside it) or enlarged over the page (**Show enlarged**). Esc or × closes them, and a click beside the enlarged file.
 
 **Its width**: point at an image (or a video, a PDF as the original or as a preview), and the bar beside its right edge makes it wider or narrower, as a table's; it stays where it is and grows to the right (*Width dragged* below sets it centred instead). Let go, and the width is saved as SilverBullet's own size: `![[photo.png|Photo|300]]`.
 
-**Links to files** (`[[report.pdf]]`) show the file's icon before their text, in a grid too (a markdown link, `[report](report.pdf)`, only in a grid). The Media tab turns this off.
+**Links to files** (`[[report.pdf]]`) show the file's icon before their text, in a grid too (a markdown link, `[report](report.pdf)`, only in a grid). Click the icon for what you can do with the file: open it in a new tab, show it in a side panel or enlarged; a click on the link's text opens it as SilverBullet does. The Media tab turns the icons off.
 
 What you choose is kept in the embed itself, after SilverBullet's own size:
 

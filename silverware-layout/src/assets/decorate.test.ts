@@ -148,7 +148,9 @@ describe("an asset's menu", () => {
       ["Show as a card", "false"],
       ["Show as a preview", "false"],
       ["Show as the original", "true"],
-      ["Open", null],
+      ["Open in a new tab", null],
+      ["Show in a side panel", null],
+      ["Show enlarged", null],
     ]);
     items[0]!.click();
     await vi.waitFor(() => expect(state.writes).toHaveLength(1));
@@ -158,6 +160,29 @@ describe("an asset's menu", () => {
     [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")][2]!.click();
     await vi.waitFor(() => expect(state.writes).toHaveLength(2));
     expect(state.writes[1]!.changes).toEqual({ metadata: { view: null } });
+  });
+});
+
+describe("a link's menu", () => {
+  it("opens from its icon with what can be done with the file, the link's own click not followed", async () => {
+    const { state, decorator } = setUp("");
+    const element = Object.assign(document.createElement("a"), { textContent: "report.pdf", href: "report.pdf" });
+    let followed = 0;
+    element.addEventListener("click", () => followed++);
+    document.body.append(element);
+    await decorator.decorateLinks([{ element, target: "report.pdf", style: "wiki" }]);
+    const icon = element.querySelector<HTMLElement>(".swl-asset-link-icon")!;
+    icon.click();
+    expect(followed).toBe(0);
+    const items = [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")];
+    expect(items.map((item) => item.textContent?.trim())).toEqual(["Open in a new tab", "Show in a side panel", "Show enlarged"]);
+    items[0]!.click();
+    expect(state.opened).toEqual([".fs/report.pdf"]);
+    // Shown in the side panel: the file's viewer, as the browser draws a PDF
+    icon.click();
+    [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")][1]!.click();
+    await vi.waitFor(() => expect(document.querySelector(".swl-asset-peek object")?.getAttribute("data")).toBe(".fs/report.pdf"));
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   });
 });
 

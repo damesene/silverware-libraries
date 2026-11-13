@@ -69,8 +69,8 @@ describe("SilverBullet's embeds found", () => {
     const cell = cellOf('<span class="p"><img src=".fs/b.png"></span>');
     const medium = cell.querySelector("img")!;
     tell([{ kind: "embed", element: medium, target: "b.png", style: "wiki", position: 40, room: cell }]);
-    expect(found[1]).toEqual(["swl-asset-frame:b.png:40"]);
-    expect(cell.querySelector(".swl-asset-frame > img")).toBe(medium);
+    expect(found[1]).toEqual(["swa-frame:b.png:40"]);
+    expect(cell.querySelector(".swa-frame > img")).toBe(medium);
   });
 
   it("frames the place of an embed SilverBullet's HTML draws none of, no medium of the host's in it", () => {
@@ -94,7 +94,7 @@ describe("what is drawn outside the editor, told again", () => {
     tell([{ kind: "embed", element: medium, target: "b.png", style: "wiki", position: 61, room: cell }]);
     tell([{ kind: "embed", element: medium, target: "b.png", style: "wiki", position: 70, room: cell }]);
     expect(found).toEqual([[61], [70]]);
-    expect(cell.querySelectorAll(".swl-asset-frame")).toHaveLength(1);
+    expect(cell.querySelectorAll(".swa-frame")).toHaveLength(1);
     expect(host.renderedRanges()).toEqual([{ from: 61, to: 85 }]);
   });
 });

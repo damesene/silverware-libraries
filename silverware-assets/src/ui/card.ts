@@ -8,22 +8,22 @@ export type CardField = { readonly name: string; readonly text: string };
 /** A type's icon: SVG text inlined, else an image of its URL */
 export function iconElement(doc: Document, icon: string): HTMLElement {
   if (icon.trimStart().startsWith("<svg")) {
-    const holder = el(doc, "span", { class: "swl-asset-icon", attrs: { "aria-hidden": "true" } });
+    const holder = el(doc, "span", { class: "swa-icon", attrs: { "aria-hidden": "true" } });
     // The type's own markup (its icon), as registered
     holder.innerHTML = icon;
     return holder;
   }
-  const holder = el(doc, "span", { class: "swl-asset-icon", attrs: { "aria-hidden": "true" } });
+  const holder = el(doc, "span", { class: "swa-icon", attrs: { "aria-hidden": "true" } });
   holder.append(el(doc, "img", { attrs: { src: icon, alt: "" } }));
   return holder;
 }
 
 /** A card: the icon where the user shows it, then each field */
 export function drawCard(doc: Document, icon: string | undefined, fields: readonly CardField[], title: string): HTMLElement {
-  const card = el(doc, "div", { class: "swl-asset-card", title, attrs: { role: "button", tabindex: 0 } });
+  const card = el(doc, "div", { class: "swa-card", title, attrs: { role: "button", tabindex: 0 } });
   if (icon !== undefined) card.append(iconElement(doc, icon));
-  const text = el(doc, "span", { class: "swl-asset-card-text" });
-  for (const field of fields) text.append(el(doc, "span", { class: `swl-asset-card-${field.name}`, text: field.text }));
+  const text = el(doc, "span", { class: "swa-card-text" });
+  for (const field of fields) text.append(el(doc, "span", { class: `swa-card-${field.name}`, text: field.text }));
   card.append(text);
   return card;
 }
@@ -31,9 +31,9 @@ export function drawCard(doc: Document, icon: string | undefined, fields: readon
 /** Fields added to a card a moment after it was drawn (a file's size and date), on a line of their own under its name */
 export function addCardFields(doc: Document, card: HTMLElement, fields: readonly CardField[]): void {
   if (!fields.length) return;
-  const line = el(doc, "span", { class: "swl-asset-card-meta" });
-  for (const field of fields) line.append(el(doc, "span", { class: `swl-asset-card-${field.name}`, text: field.text }));
-  (card.querySelector(".swl-asset-card-text") ?? card).append(line);
+  const line = el(doc, "span", { class: "swa-card-meta" });
+  for (const field of fields) line.append(el(doc, "span", { class: `swa-card-${field.name}`, text: field.text }));
+  (card.querySelector(".swa-card-text") ?? card).append(line);
 }
 
 /** A size in bytes as read: B, KB, MB, GB (1024 a step), one decimal under 10 */
@@ -56,7 +56,7 @@ export function dateText(time: string | number, locale?: string): string | undef
 
 /** An asset marked as failed to render: an icon over it, the message its tooltip */
 export function markFailed(doc: Document, element: HTMLElement, message: string): void {
-  element.querySelector(":scope > .swl-asset-failed")?.remove();
-  element.classList.add("swl-asset-has-error");
-  element.append(el(doc, "span", { class: "swl-asset-failed", text: "!", title: message, attrs: { role: "img", "aria-label": `Not rendered: ${message}` } }));
+  element.querySelector(":scope > .swa-failed")?.remove();
+  element.classList.add("swa-has-error");
+  element.append(el(doc, "span", { class: "swa-failed", text: "!", title: message, attrs: { role: "img", "aria-label": `Not rendered: ${message}` } }));
 }

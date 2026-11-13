@@ -15,8 +15,8 @@ import { opensMenu } from "../../shared/popupmenu.ts";
 import { addMoreButton, type MoreMenu, popupOf } from "./ui/moremenu.ts";
 import { plainMedium } from "./ui/plainmedium.ts";
 
-// The popup menu's classes: Silverware Layout's
-const POPUP = { base: "swl" } as const;
+// The popup menu's classes: Silverware Assets'
+const POPUP = { base: "swa" } as const;
 
 /** An embed as the host drew it: its frame, its target as drawn (a path of the space or a URL), its own media element */
 export type DrawnEmbed = {
@@ -74,8 +74,8 @@ export type AssetHost = {
   problem(message: string): void;
 };
 
-const NATIVE_HIDDEN = "swl-asset-native-hidden";
-const LINK_ICON = "swl-asset-link-icon";
+const NATIVE_HIDDEN = "swa-native-hidden";
+const LINK_ICON = "swa-link-icon";
 
 export class AssetDecorator {
   // Each frame decorated: what ends its render
@@ -128,10 +128,10 @@ export class AssetDecorator {
       const type = asset && typeFor(this.registry.types.all, asset);
       if (!type) continue;
       const icon = iconElement(this.doc, type.icon);
-      icon.classList.add(LINK_ICON, "swl-asset-menu-icon");
+      icon.classList.add(LINK_ICON, "swa-menu-icon");
       icon.title = "Show…";
       icon.setAttribute("role", "button");
-      link.element.setAttribute("data-swl-asset-link", type.name);
+      link.element.setAttribute("data-swa-link", type.name);
       link.element.prepend(icon);
       // Its menu: what can be done with the file (a press on the icon the menu's, the link's text still the host's)
       const control = new AbortController();
@@ -215,12 +215,12 @@ export class AssetDecorator {
     for (const one of drawn) {
       this.drawn.set(one.frame, one);
       // (Laid out once all are decorated)
-      one.frame.setAttribute("data-swl-asset-target", sameTarget(one.target));
+      one.frame.setAttribute("data-swa-target", sameTarget(one.target));
       const at = one.position?.();
       // (A medium rendered outside the editor whose place is not known yet: left, never taken for another)
       if (one.position && at === undefined) continue;
-      if (at === undefined) one.frame.setAttribute("data-swl-asset-widget", "");
-      const nth = [...this.doc.querySelectorAll("[data-swl-asset-widget]")].filter((frame) => frame.getAttribute("data-swl-asset-target") === sameTarget(one.target)).indexOf(one.frame);
+      if (at === undefined) one.frame.setAttribute("data-swa-widget", "");
+      const nth = [...this.doc.querySelectorAll("[data-swa-widget]")].filter((frame) => frame.getAttribute("data-swa-target") === sameTarget(one.target)).indexOf(one.frame);
       const found = at !== undefined ? embedAt(embeds, at) : embedOf(embeds, (embed) => this.host.resolved(embed, page), one.target, nth, widgetsEmbeds);
       if (!found) continue;
       const asset = this.host.assetOf(found.embed, page);
@@ -233,7 +233,7 @@ export class AssetDecorator {
 
   /** Every embed decorated in the page decorated again (the settings saved) */
   async redecorateAll(): Promise<void> {
-    const frames = [...this.doc.querySelectorAll<HTMLElement>("[data-swl-asset-target]")];
+    const frames = [...this.doc.querySelectorAll<HTMLElement>("[data-swa-target]")];
     for (const link of this.links) if (!link.element.isConnected) this.links.delete(link);
     await Promise.all([this.decorate(frames.flatMap((frame) => this.drawn.get(frame) ?? [])), this.decorateLinks([...this.links])]);
   }
@@ -260,18 +260,18 @@ export class AssetDecorator {
     const control = new AbortController();
     this.renders.set(drawn.frame, control);
     const { frame, native } = drawn;
-    frame.querySelectorAll(":scope > .swl-asset-own, :scope > .swl-asset-failed").forEach((own) => own.remove());
-    frame.classList.remove("swl-asset-has-error");
+    frame.querySelectorAll(":scope > .swa-own, :scope > .swa-failed").forEach((own) => own.remove());
+    frame.classList.remove("swa-has-error");
     // The host's own drawing (its medium, or its words that it could not draw one): hidden where ours is drawn instead
-    const hostOwn = [...frame.children].filter((child) => !child.classList.contains("swl-asset-own"));
+    const hostOwn = [...frame.children].filter((child) => !child.classList.contains("swa-own"));
     for (const child of hostOwn) child.classList.remove(NATIVE_HIDDEN);
     const hideHost = () => hostOwn.forEach((child) => child.classList.add(NATIVE_HIDDEN));
     const can = (view: View) => view === "icon" || !!type.views?.[view as "preview" | "embed"] || !!native;
     const view = viewFor(found.embed.metadata.view, type.name, settings, can);
-    frame.setAttribute("data-swl-asset", type.name);
-    frame.setAttribute("data-swl-asset-view", view);
+    frame.setAttribute("data-swa-asset", type.name);
+    frame.setAttribute("data-swa-view", view);
     // A preview's height, the setting's (the style page's rules read it)
-    frame.style.setProperty("--swl-asset-height", `${Number(found.embed.height) || settings.heights.preview}px`);
+    frame.style.setProperty("--swa-height", `${Number(found.embed.height) || settings.heights.preview}px`);
     const write = (changes: EmbedChanges) => this.host.writeEmbed({ text: found.embed.text, occurrence: found.occurrence, of: found.of, changes });
     // Its width laid out by Silverware Layout's handle (not a card's): written as SilverBullet's size, the height taken off so the ratio holds
     this.sizes.set(frame, { width: found.embed.width, anchor: settings.anchor, write: (width) => write({ width: width ?? null, height: null }) });
@@ -336,14 +336,14 @@ export class AssetDecorator {
 
     if (view === "icon") {
       const card = this.card(type, asset, settings);
-      card.classList.add("swl-asset-own");
+      card.classList.add("swa-own");
       clicked(card);
       hideHost();
       frame.append(card);
       // (A card without its icon, as the user shows cards: the "…" then)
-      const icon = card.querySelector<HTMLElement>(".swl-asset-icon");
+      const icon = card.querySelector<HTMLElement>(".swa-icon");
       if (icon) {
-        icon.classList.add("swl-asset-menu-icon");
+        icon.classList.add("swa-menu-icon");
         icon.title = "Show…";
         icon.setAttribute("role", "button");
         opensMenu(this.doc, POPUP, icon, () => popupOf(menu()), control.signal);
@@ -365,7 +365,7 @@ export class AssetDecorator {
           if (view === "preview") clicked(frame);
           return;
         }
-        element.classList.add("swl-asset-own");
+        element.classList.add("swa-own");
         if (view === "preview") clicked(element);
         hideHost();
         frame.append(element);
@@ -374,7 +374,7 @@ export class AssetDecorator {
         if (control.signal.aborted) return;
         if (!native) {
           const card = this.card(type, asset, settings);
-          card.classList.add("swl-asset-own");
+          card.classList.add("swa-own");
           clicked(card);
           frame.append(card);
         }

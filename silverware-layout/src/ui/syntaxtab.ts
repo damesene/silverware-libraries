@@ -19,8 +19,8 @@ export function syntaxTab(doc: Document, settings: SyntaxModeSettings, save: (se
     "div",
     "swl-syntax",
     el(doc, "p", "swl-syntax-note", "While SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax Rendering):"),
-    el(doc, "label", "swl-media-check", hide, "Hide embedded files and grids: their markdown alone"),
-    el(doc, "label", "swl-media-check", click, "A click on a link only places the cursor (Ctrl+click follows it)"),
+    el(doc, "label", "swl-syntax-check", hide, "Hide embedded files and grids: their markdown alone"),
+    el(doc, "label", "swl-syntax-check", click, "A click on a link only places the cursor (Ctrl+click follows it)"),
   );
   return {
     id: "markdown",

@@ -11,7 +11,7 @@ export function assetProvider(assets: AssetDecorator): LayoutProvider {
   return {
     name: "silverware-assets",
     // (Not a card, which has no size, nor a preview of an image or a video, which its height sizes: a PDF's preview is as wide as its frame)
-    selector: '[data-swl-asset]:not([data-swl-asset-view="icon"], [data-swl-asset-view="preview"]:not(:has(object, .swl-asset-pdf)))',
+    selector: '[data-swa-asset]:not([data-swa-view="icon"], [data-swa-view="preview"]:not(:has(object, .swa-pdf)))',
     read: (element): LayoutEntries => {
       const width = assets.sizeOf(element as HTMLElement)?.width;
       return width && /^\d+(\.\d+)?$/.test(width) ? { width } : {};

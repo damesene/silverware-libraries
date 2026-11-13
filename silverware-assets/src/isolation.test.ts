@@ -56,6 +56,16 @@ describe("isolation", () => {
     const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     const sbNames = /\.cm-[a-z]|#sb-|\.sb-[a-z]|--editor-(width|font-size)/;
     for (const [file] of of(".").filter(([file]) => !file.startsWith("host/silverbullet/"))) expect(code(readFileSync(join(SRC, file), "utf8")).match(sbNames)?.[0], file).toBeUndefined();
+    const style = readFileSync(join(SRC, "..", "silverware-assets-style.md"), "utf8");
+    const rules = /```space-style\r?\n([\s\S]*?)```/.exec(style)?.[1] ?? "";
+    expect(code(rules).match(sbNames)?.[0], "silverware-assets-style.md").toBeUndefined();
+  });
+
+  it("reads of Silverware Layout's marks only the width it lays a frame out at (shared/layout.ts), none of its classes", () => {
+    const style = readFileSync(join(SRC, "..", "silverware-assets-style.md"), "utf8");
+    const rules = (/```space-style\r?\n([\s\S]*?)```/.exec(style)?.[1] ?? "").replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(rules.match(/\.swl-[a-z-]+|data-swl-(?!width\b)[a-z-]+|--swl-[a-z-]+/g) ?? []).toEqual([]);
+    for (const [file] of of(".")) expect(readFileSync(join(SRC, file), "utf8").replace(/^\s*\/\/.*$/gm, "").match(/swl-(?!embed\b)[a-z-]+/g) ?? [], file).toEqual([]);
   });
 
   it("imports no other plugin's code", () => {

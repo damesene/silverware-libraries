@@ -47,6 +47,23 @@ describe("Widgets", () => {
     expect(other.getAttribute("data-swl-width")).toBe("1000");
   });
 
+  it("takes the width off an element its provider no longer takes, as everything is laid out again", () => {
+    document.body.innerHTML = `<div class="content"><div class="w" data-view="embed"></div></div>`;
+    const registry = new Registry(() => undefined);
+    registry.register({ name: "test", selector: '.w:not([data-view="card"])', read: () => ({ width: "300" }), write: async () => undefined, anchor: () => "start" });
+    const widgets = new Widgets(document, page, registry, () => undefined);
+    widgets.start();
+    const element = document.querySelector<HTMLElement>(".w")!;
+    expect(element.getAttribute("data-swl-width")).toBe("300");
+    expect(element.hasAttribute("data-swl-anchor-start")).toBe(true);
+    // (Shown another way by its plugin, which its selector leaves out, then laid out again on its word)
+    element.dataset.view = "card";
+    widgets.layOutAll();
+    expect(element.hasAttribute("data-swl-width")).toBe(false);
+    expect(element.style.getPropertyValue("--swl-width")).toBe("");
+    expect(element.hasAttribute("data-swl-anchor-start")).toBe(false);
+  });
+
   it("finds the innermost widget a node is in, and marks one its provider lays out in a room of its own", async () => {
     document.body.innerHTML = `<div class="content"><div class="outer"><div class="room"><span class="inner"><img></span></div></div></div>`;
     const registry = new Registry(() => undefined);

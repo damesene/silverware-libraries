@@ -54,21 +54,21 @@ describe("embedded media decorated", () => {
     const { decorator } = setUp("![[cat.png|A cat|200]]");
     const one = frame("cat.png");
     await decorator.decorate([one]);
-    expect(one.frame.getAttribute("data-swl-asset")).toBe("image");
-    expect(one.frame.getAttribute("data-swl-asset-view")).toBe("embed");
-    expect(one.native!.classList.contains("swl-asset-native-hidden")).toBe(false);
+    expect(one.frame.getAttribute("data-swa-asset")).toBe("image");
+    expect(one.frame.getAttribute("data-swa-view")).toBe("embed");
+    expect(one.native!.classList.contains("swa-native-hidden")).toBe(false);
   });
 
   it("shows a file the host cannot draw as a card, its click opening it in a tab", async () => {
     const { state, decorator } = setUp("![[Docs/archive.zip]]");
     const one = frame("Docs/archive.zip", false);
     await decorator.decorate([one]);
-    expect(one.frame.getAttribute("data-swl-asset-view")).toBe("icon");
-    const card = one.frame.querySelector<HTMLElement>(".swl-asset-card")!;
+    expect(one.frame.getAttribute("data-swa-view")).toBe("icon");
+    const card = one.frame.querySelector<HTMLElement>(".swa-card")!;
     expect(card.textContent).toBe("archive.zip");
     expect(card.querySelector("svg")).not.toBeNull();
     // The host's words that it could not draw it: hidden behind the card
-    expect(one.frame.querySelector(".p")!.classList.contains("swl-asset-native-hidden")).toBe(true);
+    expect(one.frame.querySelector(".p")!.classList.contains("swa-native-hidden")).toBe(true);
     card.click();
     expect(state.opened).toEqual([".fs/Docs/archive.zip"]);
   });
@@ -77,24 +77,24 @@ describe("embedded media decorated", () => {
     const { decorator } = setUp("![[archive.zip]]", { card: ["icon", "name", "size", "modified"] });
     const one = frame("archive.zip", false);
     await decorator.decorate([one]);
-    await vi.waitFor(() => expect(one.frame.querySelector(".swl-asset-card-meta")).not.toBeNull());
-    expect(one.frame.querySelector(".swl-asset-card-size")!.textContent).toBe("2.5 MB");
-    expect(one.frame.querySelector(".swl-asset-card-modified")!.textContent).toMatch(/2026/);
+    await vi.waitFor(() => expect(one.frame.querySelector(".swa-card-meta")).not.toBeNull());
+    expect(one.frame.querySelector(".swa-card-size")!.textContent).toBe("2.5 MB");
+    expect(one.frame.querySelector(".swa-card-modified")!.textContent).toMatch(/2026/);
     // Not shown where the user shows them not
     const { decorator: plain } = setUp("![[archive.zip]]");
     const other = frame("archive.zip", false);
     await plain.decorate([other]);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(other.frame.querySelector(".swl-asset-card-meta")).toBeNull();
+    expect(other.frame.querySelector(".swa-card-meta")).toBeNull();
   });
 
   it("takes the embed's own view, then the user's per type, the second of two alike by its order", async () => {
     const { decorator } = setUp("![[cat.png]] ![[cat.png|||{ view: icon }]]", { views: { types: { image: "preview" } } });
     const [first, second] = [frame("cat.png"), frame("cat.png")];
     await decorator.decorate([first!, second!]);
-    expect(first!.frame.getAttribute("data-swl-asset-view")).toBe("preview");
-    expect(second!.frame.getAttribute("data-swl-asset-view")).toBe("icon");
-    expect(second!.native!.classList.contains("swl-asset-native-hidden")).toBe(true);
+    expect(first!.frame.getAttribute("data-swa-view")).toBe("preview");
+    expect(second!.frame.getAttribute("data-swa-view")).toBe("icon");
+    expect(second!.native!.classList.contains("swa-native-hidden")).toBe(true);
   });
 
   it("draws a type's own preview, and where it fails the host's drawing with an error mark", async () => {
@@ -105,11 +105,11 @@ describe("embedded media decorated", () => {
     // (jsdom lays nothing out: the frame's width as a browser would give it)
     Object.defineProperty(pdf.frame, "clientWidth", { value: 600 });
     await decorator.decorate([pdf, png]);
-    await vi.waitFor(() => expect(pdf.frame.querySelector(".swl-asset-pdf")).not.toBeNull());
-    expect(pdf.native!.classList.contains("swl-asset-native-hidden")).toBe(true);
-    await vi.waitFor(() => expect(png.frame.querySelector(".swl-asset-failed")).not.toBeNull());
-    expect(png.frame.querySelector(".swl-asset-failed")!.getAttribute("title")).toBe("no thumbnail");
-    expect(png.native!.classList.contains("swl-asset-native-hidden")).toBe(false);
+    await vi.waitFor(() => expect(pdf.frame.querySelector(".swa-pdf")).not.toBeNull());
+    expect(pdf.native!.classList.contains("swa-native-hidden")).toBe(true);
+    await vi.waitFor(() => expect(png.frame.querySelector(".swa-failed")).not.toBeNull());
+    expect(png.frame.querySelector(".swa-failed")!.getAttribute("title")).toBe("no thumbnail");
+    expect(png.native!.classList.contains("swa-native-hidden")).toBe(false);
   });
 
   it("writes a type's metadata through the host, the reserved keys refused", async () => {
@@ -143,9 +143,9 @@ describe("an asset's menu", () => {
     const { state, decorator } = setUp("![[cat.png|A cat|200]]", { views: { types: { image: "embed" } } });
     const one = frame("cat.png");
     await decorator.decorate([one]);
-    const more = one.frame.querySelector<HTMLButtonElement>(".swl-asset-more")!;
+    const more = one.frame.querySelector<HTMLButtonElement>(".swa-more")!;
     more.click();
-    const items = [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")];
+    const items = [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")];
     expect(items.map((item) => [item.textContent?.trim(), item.getAttribute("aria-checked")])).toEqual([
       ["Show as a card", "false"],
       ["Show as a preview", "false"],
@@ -158,14 +158,14 @@ describe("an asset's menu", () => {
     items[0]!.click();
     await vi.waitFor(() => expect(state.writes).toHaveLength(1));
     expect(state.writes[0]!.changes).toEqual({ metadata: { view: "icon" } });
-    expect(document.querySelector(".swl-popup")).toBeNull();
+    expect(document.querySelector(".swa-popup")).toBeNull();
     more.click();
-    [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")][2]!.click();
+    [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")][2]!.click();
     await vi.waitFor(() => expect(state.writes).toHaveLength(2));
     expect(state.writes[1]!.changes).toEqual({ metadata: { view: null } });
     // Shown as a link: the embed written as one
     more.click();
-    [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")].at(-1)!.click();
+    [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].at(-1)!.click();
     await vi.waitFor(() => expect(state.forms).toEqual(["link ![[cat.png|A cat|200]] 0/1"]));
   });
 });
@@ -178,17 +178,17 @@ describe("a link's menu", () => {
     element.addEventListener("click", () => followed++);
     document.body.append(element);
     await decorator.decorateLinks([{ element, target: "report.pdf", style: "wiki" }]);
-    const icon = element.querySelector<HTMLElement>(".swl-asset-link-icon")!;
+    const icon = element.querySelector<HTMLElement>(".swa-link-icon")!;
     icon.click();
     expect(followed).toBe(0);
-    const items = [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")];
+    const items = [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")];
     expect(items.map((item) => item.textContent?.trim())).toEqual(["Open in a new tab", "Show in a side panel", "Show enlarged", "Show as embedded"]);
     items[0]!.click();
     expect(state.opened).toEqual([".fs/report.pdf"]);
     // Shown in the side panel: the file's viewer, as the browser draws a PDF
     icon.click();
-    [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")][1]!.click();
-    await vi.waitFor(() => expect(document.querySelector(".swl-asset-peek object")?.getAttribute("data")).toBe(".fs/report.pdf"));
+    [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")][1]!.click();
+    await vi.waitFor(() => expect(document.querySelector(".swa-peek object")?.getAttribute("data")).toBe(".fs/report.pdf"));
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   });
 });
@@ -236,8 +236,8 @@ describe("the same file outside a grid and in it", () => {
     await decorator.decorate([widget]);
     // A view chosen on each writes its own embed
     for (const [one, view] of [[gridFrame, 0], [widget, 1]] as const) {
-      one.frame.querySelector<HTMLButtonElement>(".swl-asset-more")!.click();
-      [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")][view]!.click();
+      one.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
+      [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")][view]!.click();
     }
     await vi.waitFor(() => expect(state.writes).toHaveLength(2));
     expect(state.writes.map((write) => [write.occurrence, write.changes])).toEqual([
@@ -250,7 +250,7 @@ describe("the same file outside a grid and in it", () => {
     const { decorator } = setUp("![[cat.png]]");
     const unplaced = { ...frame("cat.png"), position: () => undefined };
     await decorator.decorate([unplaced]);
-    expect(unplaced.frame.hasAttribute("data-swl-asset")).toBe(false);
+    expect(unplaced.frame.hasAttribute("data-swa-asset")).toBe(false);
   });
 });
 
@@ -266,23 +266,23 @@ describe("links to files decorated", () => {
     const pdf = link("report.pdf");
     const page = link("Notes");
     await decorator.decorateLinks([pdf, page]);
-    expect(pdf.element.getAttribute("data-swl-asset-link")).toBe("pdf");
-    expect(pdf.element.firstElementChild?.classList.contains("swl-asset-link-icon")).toBe(true);
+    expect(pdf.element.getAttribute("data-swa-link")).toBe("pdf");
+    expect(pdf.element.firstElementChild?.classList.contains("swa-link-icon")).toBe(true);
     expect(pdf.element.textContent).toBe("report.pdf");
-    expect(page.element.querySelector(".swl-asset-link-icon")).toBeNull();
+    expect(page.element.querySelector(".swa-link-icon")).toBeNull();
     await decorator.decorateLinks([pdf]);
-    expect(pdf.element.querySelectorAll(".swl-asset-link-icon")).toHaveLength(1);
+    expect(pdf.element.querySelectorAll(".swa-link-icon")).toHaveLength(1);
     const { decorator: off } = setUp("", { linkIcons: false });
     const plain = link("report.pdf");
     await off.decorateLinks([plain]);
-    expect(plain.element.querySelector(".swl-asset-link-icon")).toBeNull();
+    expect(plain.element.querySelector(".swa-link-icon")).toBeNull();
   });
 });
 
 describe("a link shown as embedded", () => {
   const menuItem = (icon: HTMLElement, label: string) => {
     icon.click();
-    [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")].find((item) => item.textContent?.trim() === label)!.click();
+    [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].find((item) => item.textContent?.trim() === label)!.click();
   };
 
   it("writes the link it is: one in the editor by its order among those drawn of its target, outside what is rendered outside the editor", async () => {
@@ -295,7 +295,7 @@ describe("a link shown as embedded", () => {
       return { element, target: "a.pdf", style: "wiki" as const };
     });
     await decorator.decorateLinks(drawn);
-    menuItem(drawn[1]!.element.querySelector(".swl-asset-link-icon")!, "Show as embedded");
+    menuItem(drawn[1]!.element.querySelector(".swa-link-icon")!, "Show as embedded");
     // The second drawn in the editor: the page's third link (the grid's is none of the editor's)
     await vi.waitFor(() => expect(state.forms).toEqual(["embed [[a.pdf]] 2/3"]));
   });
@@ -306,7 +306,7 @@ describe("a link shown as embedded", () => {
     const element = Object.assign(document.createElement("a"), { textContent: "a.pdf" });
     document.body.append(element);
     await decorator.decorateLinks([{ element, target: "a.pdf", style: "wiki", position: () => text.lastIndexOf("[[") }]);
-    menuItem(element.querySelector(".swl-asset-link-icon")!, "Show as embedded");
+    menuItem(element.querySelector(".swa-link-icon")!, "Show as embedded");
     await vi.waitFor(() => expect(state.forms).toEqual(["embed [[a.pdf]] 1/2"]));
   });
 });
@@ -317,16 +317,16 @@ describe("a card's menu", () => {
     const { state, decorator } = setUp("![[archive.zip]]");
     const one = frame("archive.zip", false);
     await decorator.decorate([one]);
-    expect(one.frame.querySelector(".swl-asset-more")).toBeNull();
-    const icon = one.frame.querySelector<HTMLElement>(".swl-asset-card .swl-asset-icon")!;
+    expect(one.frame.querySelector(".swa-more")).toBeNull();
+    const icon = one.frame.querySelector<HTMLElement>(".swa-card .swa-icon")!;
     icon.click();
-    const items = [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")].map((item) => item.textContent?.trim());
+    const items = [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].map((item) => item.textContent?.trim());
     expect(items.slice(0, 3)).toEqual(["Show as a card", "Show as a preview", "Show as the original"]);
     expect(items).toContain("Open in a new tab");
     // (The icon's click the menu's alone: no file opened by it)
     expect(state.opened).toEqual([]);
     icon.click();
-    one.frame.querySelector<HTMLElement>(".swl-asset-card-name")!.click();
+    one.frame.querySelector<HTMLElement>(".swa-card-name")!.click();
     expect(state.opened).toEqual([".fs/archive.zip"]);
   });
 
@@ -334,6 +334,6 @@ describe("a card's menu", () => {
     const { decorator } = setUp("![[archive.zip]]", { card: ["name"] });
     const one = frame("archive.zip", false);
     await decorator.decorate([one]);
-    expect(one.frame.querySelector(".swl-asset-more")).not.toBeNull();
+    expect(one.frame.querySelector(".swa-more")).not.toBeNull();
   });
 });

@@ -10,26 +10,26 @@ const grid = (...cells: string[]) => `<grid>\n${cells.map(cell).join("\n")}\n</g
 /** A view chosen in a medium's "…" menu */
 async function choose(page: import("@playwright/test").Page, frame: import("@playwright/test").Locator, item: string): Promise<void> {
   await frame.hover();
-  await frame.locator(".swl-asset-more").click();
-  await page.locator(".swl-popup .swl-menu-item", { hasText: item }).click();
+  await frame.locator(".swa-more").click();
+  await page.locator(".swa-popup .swa-menu-item", { hasText: item }).click();
 }
 
 test("the same image outside a grid and in it: a view chosen in the grid written to the grid's embed alone, shown at once", async ({ page, space }) => {
   const image = `![[${space.folder}/photo.png|Photo|120]]`;
   await space.open({ Page: `# Page\n\n${image}\n\n${grid(image, "Right")}` }, "Page", { "photo.png": PIXEL_PNG });
   await gridsDrawn(page);
-  const inGrid = page.locator("#sb-main .swl-grid [data-swl-asset]").first();
-  await expect(inGrid).toHaveAttribute("data-swl-asset-view", "embed");
+  const inGrid = page.locator("#sb-main .swl-grid [data-swa-asset]").first();
+  await expect(inGrid).toHaveAttribute("data-swa-view", "embed");
   await choose(page, inGrid, "Show as a card");
   const written = `![[${space.folder}/photo.png|Photo|120|{ view: icon }]]`;
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${image}\n\n${grid(written, "Right")}`);
-  await expect(page.locator("#sb-main .swl-grid [data-swl-asset]").first()).toHaveAttribute("data-swl-asset-view", "icon");
-  await expect(page.locator("#sb-main [data-swl-asset]:not(.swl-grid *)").first()).toHaveAttribute("data-swl-asset-view", "embed");
+  await expect(page.locator("#sb-main .swl-grid [data-swa-asset]").first()).toHaveAttribute("data-swa-view", "icon");
+  await expect(page.locator("#sb-main [data-swa-asset]:not(.swl-grid *)").first()).toHaveAttribute("data-swa-view", "embed");
 });
 
 test("a file SilverBullet cannot draw is a card, its click opening the file in a new tab", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/archive.zip]]\n` }, "Page", { "archive.zip": "not really a zip" });
-  const card = page.locator("#sb-main .swl-asset-card");
+  const card = page.locator("#sb-main .swa-card");
   await expect(card).toHaveText("archive.zip");
   // (What the click opens taken instead of opened: a tab opened with noopener tells its page nothing)
   await page.evaluate(() => {
@@ -42,7 +42,7 @@ test("a file SilverBullet cannot draw is a card, its click opening the file in a
 
 test("an image's width dragged by its handle, staying at its place, written as SilverBullet's size", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/photo.png|Photo|200]]\n\nAfter\n` }, "Page", { "photo.png": PIXEL_PNG });
-  const frame = page.locator("#sb-main [data-swl-asset]").first();
+  const frame = page.locator("#sb-main [data-swa-asset]").first();
   await expect(frame).toHaveAttribute("data-swl-width", "200");
   const left = (await frame.boundingBox())!.x;
   await frame.hover();
@@ -54,13 +54,13 @@ test("an image's width dragged by its handle, staying at its place, written as S
   await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2, { steps: 6 });
   await page.mouse.up();
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n![[${space.folder}/photo.png|Photo|260]]\n\nAfter\n`);
-  await expect.poll(async () => Math.round((await page.locator("#sb-main [data-swl-asset]").first().boundingBox())!.x)).toBe(Math.round(left));
+  await expect.poll(async () => Math.round((await page.locator("#sb-main [data-swa-asset]").first().boundingBox())!.x)).toBe(Math.round(left));
 });
 
 test("an image in a grid's cell dragged within the cell: no wider than it, its quarters its guides", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${grid(`![[${space.folder}/photo.png|Photo|100]]`, "Right")}` }, "Page", { "photo.png": PIXEL_PNG });
   await gridsDrawn(page);
-  const frame = page.locator("#sb-main .swl-grid [data-swl-asset]").first();
+  const frame = page.locator("#sb-main .swl-grid [data-swa-asset]").first();
   await expect(frame).toHaveAttribute("data-swl-in-room", "");
   const cellWidth = (await page.locator("#sb-main .swl-grid-cell").first().boundingBox())!.width;
   await frame.hover();
@@ -79,30 +79,30 @@ test("a PDF and a zip in a grid's cells: the PDF's viewer as wide as its cell, t
   await space.open({ Page: `# Page\n\n${grid(`![[${space.folder}/doc.pdf]]`, `![[${space.folder}/archive.zip]]`)}` }, "Page", { "doc.pdf": "%PDF-1.4\n", "archive.zip": "zip" });
   await gridsDrawn(page);
   const cells = page.locator("#sb-main .swl-grid-cell");
-  const pdf = cells.nth(0).locator("[data-swl-asset='pdf']");
+  const pdf = cells.nth(0).locator("[data-swa-asset='pdf']");
   await expect(pdf.locator("object")).toHaveAttribute("data", `.fs/${encodeURI(`${space.folder}/doc.pdf`)}`);
   expect(Math.round((await pdf.boundingBox())!.width)).toBe(Math.round((await cells.nth(0).boundingBox())!.width));
-  await expect(cells.nth(1).locator(".swl-asset-card")).toHaveText("archive.zip");
+  await expect(cells.nth(1).locator(".swa-card")).toHaveText("archive.zip");
 });
 
 test("a link to a file shows its type's icon, in a grid too; a link to a page none", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\nSee [[${space.folder}/doc.pdf]] and [[${space.folder}/Other]].\n\n${grid(`In a cell [[${space.folder}/doc.pdf]]`, "Right")}`, Other: "# Other\n" }, "Page", { "doc.pdf": "%PDF-1.4\n" });
   await gridsDrawn(page);
-  await expect(page.locator("#sb-main [data-swl-asset-link='pdf'] .swl-asset-link-icon")).toHaveCount(2);
-  await expect(page.locator("#sb-main a", { hasText: "Other" }).locator(".swl-asset-link-icon")).toHaveCount(0);
+  await expect(page.locator("#sb-main [data-swa-link='pdf'] .swa-link-icon")).toHaveCount(2);
+  await expect(page.locator("#sb-main a", { hasText: "Other" }).locator(".swa-link-icon")).toHaveCount(0);
   // Its icon's menu: the link not followed, the file shown enlarged
   const url = page.url();
-  await page.locator("#sb-main .swl-grid [data-swl-asset-link='pdf'] .swl-asset-link-icon").click();
-  await page.locator(".swl-popup .swl-menu-item", { hasText: "Show enlarged" }).click();
-  await expect(page.locator(".swl-asset-popover object")).toHaveAttribute("data", `.fs/${encodeURI(`${space.folder}/doc.pdf`)}`);
+  await page.locator("#sb-main .swl-grid [data-swa-link='pdf'] .swa-link-icon").click();
+  await page.locator(".swa-popup .swa-menu-item", { hasText: "Show enlarged" }).click();
+  await expect(page.locator(".swa-popover object")).toHaveAttribute("data", `.fs/${encodeURI(`${space.folder}/doc.pdf`)}`);
   expect(page.url()).toBe(url);
   await page.keyboard.press("Escape");
-  await expect(page.locator(".swl-asset-popover")).toHaveCount(0);
+  await expect(page.locator(".swa-popover")).toHaveCount(0);
 });
 
 test("the Media tab: a card's size shown, a click set to the side panel; the panel shows the file and Esc closes it", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/archive.zip]]\n\n![[${space.folder}/photo.png|Photo||{ view: preview }]]\n` }, "Page", { "archive.zip": "zip", "photo.png": PIXEL_PNG });
-  await expect(page.locator("#sb-main .swl-asset-card")).toHaveText("archive.zip");
+  await expect(page.locator("#sb-main .swa-card")).toHaveText("archive.zip");
   await runCommand(page, PAGE_LAYOUT);
   const dialog = page.locator(".swl-dialog");
   await dialog.getByRole("tab", { name: "Media" }).click();
@@ -111,11 +111,11 @@ test("the Media tab: a card's size shown, a click set to the side panel; the pan
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
   await expect.poll(() => space.config()).toContain('click = "peek"');
-  await expect(page.locator("#sb-main .swl-asset-card-size")).toHaveText("3 B");
-  await page.locator("#sb-main [data-swl-asset='image'] img").click();
-  const peek = page.locator(".swl-asset-peek");
-  await expect(peek.locator(".swl-asset-panel-title")).toHaveText("Photo");
-  await expect(peek.locator(".swl-asset-panel-body img")).toBeVisible();
+  await expect(page.locator("#sb-main .swa-card-size")).toHaveText("3 B");
+  await page.locator("#sb-main [data-swa-asset='image'] img").click();
+  const peek = page.locator(".swa-peek");
+  await expect(peek.locator(".swa-panel-title")).toHaveText("Photo");
+  await expect(peek.locator(".swa-panel-body img")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(peek).toHaveCount(0);
 });
@@ -126,13 +126,13 @@ test("a link shown as embedded by its icon's menu, and the embed shown as a link
   await gridsDrawn(page);
   const pick = async (trigger: import("@playwright/test").Locator, label: string) => {
     await trigger.click();
-    await page.locator(".swl-popup .swl-menu-item", { hasText: label }).click();
+    await page.locator(".swa-popup .swa-menu-item", { hasText: label }).click();
   };
-  await pick(page.locator("#sb-main .swl-grid [data-swl-asset-link] .swl-asset-link-icon"), "Show as embedded");
+  await pick(page.locator("#sb-main .swl-grid [data-swa-link] .swa-link-icon"), "Show as embedded");
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\nA ${link} here.\n\n${grid(`Cell !${link}`, "Right")}`);
-  const embedded = page.locator("#sb-main .swl-grid [data-swl-asset='pdf']");
+  const embedded = page.locator("#sb-main .swl-grid [data-swa-asset='pdf']");
   await embedded.hover();
-  await pick(embedded.locator(".swl-asset-more"), "Show as a link");
+  await pick(embedded.locator(".swa-more"), "Show as a link");
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\nA ${link} here.\n\n${grid(`Cell ${link}`, "Right")}`);
 });
 
@@ -140,7 +140,7 @@ test("SilverBullet's markdown shown as written: media and grids hidden, their ma
   const image = `![[${space.folder}/photo.png|Photo|120]]`;
   await space.open({ Page: `# Page\n\n${image}\n\n${grid("Left", "Right")}` }, "Page", { "photo.png": PIXEL_PNG });
   await gridsDrawn(page);
-  const medium = page.locator("#sb-main [data-swl-asset]:not(.swl-asset-frame)").first();
+  const medium = page.locator("#sb-main [data-swa-asset]:not(.swa-frame)").first();
   const shownGrid = page.locator("#sb-main .swl-grid");
   await expect(medium).toBeVisible();
   await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
@@ -148,7 +148,7 @@ test("SilverBullet's markdown shown as written: media and grids hidden, their ma
   await expect(medium).toBeHidden();
   await expect(shownGrid).toBeHidden();
   await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
-  await expect(page.locator("#sb-main [data-swl-asset]:not(.swl-asset-frame)").first()).toBeVisible();
+  await expect(page.locator("#sb-main [data-swa-asset]:not(.swa-frame)").first()).toBeVisible();
   await expect(page.locator("#sb-main .swl-grid")).toBeVisible();
 });
 
@@ -211,18 +211,18 @@ test("SilverBullet's markdown shown as written, the Markdown tab's box for media
   await expect.poll(() => space.config()).toContain('config.set("silverware.layout.syntaxMode.hideWidgets", false)');
   await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
   await expect(page.locator("#sb-main .cm-content")).toContainText(image);
-  await expect(page.locator("#sb-main [data-swl-asset]:not(.swl-asset-frame)").first()).toBeVisible();
+  await expect(page.locator("#sb-main [data-swa-asset]:not(.swa-frame)").first()).toBeVisible();
   await expect(page.locator("#sb-main .swl-grid")).toBeVisible();
   await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
 });
 
 test("a card opens its menu from its icon, no button over it; what is chosen there is written", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/archive.zip]]\n` }, "Page", { "archive.zip": "zip" });
-  const card = page.locator("#sb-main .swl-asset-card");
+  const card = page.locator("#sb-main .swa-card");
   await expect(card).toHaveText("archive.zip");
   await card.hover();
-  await expect(page.locator("#sb-main [data-swl-asset] .swl-asset-more")).toHaveCount(0);
-  await card.locator(".swl-asset-icon").click();
-  await page.locator(".swl-popup .swl-menu-item", { hasText: "Show as a link" }).click();
+  await expect(page.locator("#sb-main [data-swa-asset] .swa-more")).toHaveCount(0);
+  await card.locator(".swa-icon").click();
+  await page.locator(".swa-popup .swa-menu-item", { hasText: "Show as a link" }).click();
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n[[${space.folder}/archive.zip]]\n`);
 });

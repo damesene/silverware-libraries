@@ -16,7 +16,7 @@ import { documentUrl } from "./platform.ts";
 const FRAME = ".sb-inline-content";
 // A medium drawn outside the editor (a grid's cell) is a plain element: put in a frame of Silverware Layout's own, to
 // be decorated as SilverBullet's widget is
-const OWN_FRAME = "swl-asset-frame";
+const OWN_FRAME = "swa-frame";
 const MEDIA = "img, video, audio, object";
 const BARS = ".button-bar, .sb-widget-menu-bar";
 const UNSUPPORTED = /Unsupported content:\s*(.+)$/;
@@ -35,7 +35,7 @@ type FormWrite = { readonly text: string; readonly occurrence: number; readonly 
 
 /** A link's target and form as SilverBullet drew it; none for an element of Silverware Layout's own */
 export function drawnLink(element: HTMLElement): Link | undefined {
-  if (element.closest(".swl-asset-own, .swl-asset-card")) return undefined;
+  if (element.closest(".swa-own, .swa-card")) return undefined;
   if (element.matches("a.sb-wiki-link")) return { element, target: element.getAttribute("href") ?? "", style: "wiki" };
   if (element.matches("a.wiki-link[data-ref]")) return { element, target: element.getAttribute("data-ref") ?? "", style: "wiki" };
   const href = element.getAttribute("href");

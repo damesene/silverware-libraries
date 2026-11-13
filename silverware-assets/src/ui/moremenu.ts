@@ -4,8 +4,8 @@
 import { el } from "../../../shared/elements.ts";
 import { opensMenu, type PopupMenu } from "../../../shared/popupmenu.ts";
 
-// The popup menu's classes: Silverware Layout's
-const POPUP = { base: "swl" } as const;
+// The popup menu's classes: Silverware Assets'
+const POPUP = { base: "swa" } as const;
 
 type Item = { readonly label: string; readonly run: () => void };
 
@@ -16,12 +16,12 @@ export type MoreMenu = {
   readonly actions?: readonly Item[];
 };
 
-/** An asset's menu as Silverware Layout's popup menu shows it: its views, then its actions */
+/** An asset's menu as the shared popup menu shows it: its views, then its actions */
 export const popupOf = (menu: MoreMenu): PopupMenu => ({ title: menu.title, sections: [menu.views, menu.actions ?? []] });
 
 /** The "…" button on an asset's frame, its menu made as it is pressed; gone as `signal` aborts */
 export function addMoreButton(doc: Document, frame: HTMLElement, menu: () => MoreMenu, signal: AbortSignal): HTMLButtonElement {
-  const button = el(doc, "button", { class: "swl-asset-more", title: "Show as…", text: "…" });
+  const button = el(doc, "button", { class: "swa-more", title: "Show as…", text: "…" });
   opensMenu(doc, POPUP, button, () => popupOf(menu()), signal);
   signal.addEventListener("abort", () => button.remove());
   frame.append(button);

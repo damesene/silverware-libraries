@@ -32,7 +32,8 @@ export type LayoutAnchor = "center" | "start";
  *
  * The element its selector matches is the widget's box. While the widget is in the page's flow, the box's width is
  * Silverware Layout's: the plugin sets no `width`, `max-width` or margin on it and never replaces its `style`
- * attribute whole (Silverware Layout's variables are in it). What the widget lays out inside the box stays its own. A
+ * attribute whole (Silverware Layout's variables are in it). What the widget lays out inside the box stays its own;
+ * its style page may tell a box laid out at a width by `data-swl-width` on it (a medium then filling its frame). A
  * plugin taking the widget out of the page's flow (over the window, onto a sheet) marks it, or an element around it,
  * with `data-silverware-over-window` (shared/overwindow.ts): Silverware Layout stands back there.
  */

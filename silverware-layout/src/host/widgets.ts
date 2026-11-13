@@ -75,6 +75,14 @@ export class Widgets {
     const found = new Map<HTMLElement, LayoutProvider>();
     this.widgetsIn(root, found);
     for (const [element, provider] of found) this.layOut({ element, provider });
+    // An element laid out before that no provider takes any more (a medium shown another way by its plugin, which its
+    // provider's selector leaves out): its width taken off, it is no widget now
+    for (const element of root.querySelectorAll<HTMLElement>(`[${WIDTH_ATTRIBUTE}], [${ANCHOR_ATTRIBUTE}], [${ROOM_ATTRIBUTE}]`)) {
+      if (found.has(element)) continue;
+      this.show(element, undefined);
+      element.removeAttribute(ANCHOR_ATTRIBUTE);
+      element.removeAttribute(ROOM_ATTRIBUTE);
+    }
   }
 
   /** The widgets a node is in or holds, added to `found` (a widget once, however many of its nodes came) */

@@ -34,16 +34,10 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   margin-left: 0 !important;
   margin-right: 0 !important;
 }
-/* A preview of an image or a video: its height sizes it, a width its embed keeps (for the original) not its frame's */
-:root [data-swl-content] [data-swl-asset-view="preview"][data-swl-width]:not(:has(object, .swl-asset-pdf)):not([data-swl-narrow] *) {
-  width: fit-content !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-}
 /* SilverBullet showing the markdown as written (Editor: Toggle Markdown Syntax Rendering): the media and grids it still
    draws there hidden, their markdown alone shown; the host's box round each too (an empty one is a line's height) */
-:root[data-swl-syntax-shown] :is([data-swl-asset]:not(.swl-asset-frame), .swl-grid-widget),
-:root[data-swl-syntax-shown] :has(> :is([data-swl-asset]:not(.swl-asset-frame), .swl-grid-widget)) {
+:root[data-swl-syntax-shown] :is([data-swa-asset]:not(.swa-frame), .swl-grid-widget),
+:root[data-swl-syntax-shown] :has(> :is([data-swa-asset]:not(.swa-frame), .swl-grid-widget)) {
   display: none !important;
 }
 /* There, a click on a link placing the cursor alone: the text's pointer over it, not a hand (a widget's own, its
@@ -1123,29 +1117,7 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   height: 22px;
 }
 /* </shared-menu> */
-/* An asset's "…" button, at its frame's top right as the pointer is over it (always on a touch screen), its menu
-   under it */
-.swl-asset-more {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  z-index: var(--sw-layer-control);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 22px;
-  padding: 0;
-  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-  border-radius: 4px;
-  font: inherit;
-  line-height: 1;
-  color: inherit;
-  background: var(--root-background-color);
-  opacity: 0;
-  cursor: pointer;
-}
-/* A grid's cell's "…", as a medium's, at the cell's top right as the pointer is over the cell */
+/* A grid's cell's "…", at the cell's top right as the pointer is over the cell */
 .swl-grid-cell {
   position: relative;
 }
@@ -1179,20 +1151,6 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
     opacity: 0.8;
   }
 }
-/* (A medium's "…" in a cell over the cell's, a step up: the one pointed at is the medium's) */
-.swl-grid-cell .swl-asset-more {
-  z-index: calc(var(--sw-layer-control) + 1);
-}
-[data-swl-asset]:hover > .swl-asset-more,
-.swl-asset-more:focus-visible,
-.swl-asset-more[aria-expanded="true"] {
-  opacity: 1;
-}
-@media (hover: none) {
-  .swl-asset-more {
-    opacity: 0.8;
-  }
-}
 /* The box of a popup menu (shared/popupmenu.ts), over the page */
 .swl-popup {
   position: fixed;
@@ -1211,26 +1169,6 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   border-radius: 8px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
 }
-/* The Media tab of the Page layout dialog: All files' fields in rows, then a row per type (its icon and name, how
-   it is shown, its click, its Shift+click) */
-.swl-media {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.swl-media-all {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 6px 12px;
-  align-items: center;
-}
-.swl-media-heading {
-  grid-column: 1 / -1;
-  font-weight: 600;
-}
-.swl-media-field {
-  display: contents;
-}
 /* The Markdown tab: its boxes one under another */
 .swl-syntax {
   display: flex;
@@ -1241,317 +1179,10 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   margin: 0 0 4px;
   opacity: 0.8;
 }
-.swl-media-checks {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 14px;
-}
-.swl-media-check {
+.swl-syntax-check {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-.swl-media-types {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.swl-media-type {
-  display: grid;
-  grid-template-columns: minmax(90px, 1fr) repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  align-items: center;
-}
-.swl-media-type-head {
-  font-size: 0.85em;
-  opacity: 0.7;
-}
-.swl-media-type-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.swl-media-type-name .swl-asset-icon {
-  width: 16px;
-  height: 16px;
-}
-.swl-media-select {
-  min-width: 0;
-  font: inherit;
-}
-.swl-media-unit {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.swl-media-number {
-  width: 6em;
-  font: inherit;
-}
-/* Embedded media (docs/silverware-layout-assets.md), marked by Silverware Layout on the host's frame of each
-   (data-swl-asset: its type, data-swl-asset-view: icon, preview or embed): the host's own drawing hidden where Silverware
-   Layout draws instead; a preview of the host's drawing kept small; a card; the mark of a render that failed */
-.swl-asset-native-hidden {
-  display: none !important;
-}
-[data-swl-asset-view="preview"] :is(img, video, object):not(.swl-asset-icon img, .swl-asset-pdf) {
-  max-height: var(--swl-asset-height, 160px);
-  max-width: 100%;
-  width: auto !important;
-  object-fit: contain;
-  cursor: pointer;
-}
-/* The frame as wide as what is shown in it, without the host's border round a widget: its "…" at the medium's corner,
-   not the page's (a card's at the text's right). A PDF's viewer, as wide as its room, keeps the text's width */
-[data-swl-asset] {
-  position: relative;
-  width: fit-content;
-  max-width: 100%;
-  border: none !important;
-}
-[data-swl-asset]:has(object, .swl-asset-pdf) {
-  display: block;
-  width: auto;
-}
-/* A card: its "…" beside it, not over its name */
-[data-swl-asset-view="icon"] {
-  display: flex !important;
-  align-items: center;
-  gap: 4px;
-}
-.swl-asset-frame[data-swl-asset-view="icon"] {
-  display: inline-flex !important;
-}
-[data-swl-asset-view="icon"] > .swl-asset-more {
-  position: static;
-  order: 1;
-  flex: none;
-}
-/* A medium in markdown rendered outside the editor (a grid's cell) in a frame of Silverware Layout's own */
-.swl-asset-frame {
-  display: inline-block;
-  max-width: 100%;
-  vertical-align: top;
-}
-/* Laid out by the handle (its width on the frame, data-swl-width): the host's medium fills the frame, its height by
-   its ratio, so a drag shows at once what the width written will draw */
-[data-swl-asset][data-swl-width]:not([data-swl-asset-view="preview"]) :is(img, video, object):not(.swl-asset-icon img) {
-  width: 100% !important;
-  max-width: 100% !important;
-  height: auto;
-}
-.swl-asset-card {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  max-width: 100%;
-  padding: 6px 12px 6px 8px;
-  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-  border-radius: 6px;
-  cursor: pointer;
-  user-select: none;
-}
-.swl-asset-card:hover {
-  background: color-mix(in srgb, currentColor 6%, transparent);
-}
-.swl-asset-card:focus-visible {
-  outline: 2px solid color-mix(in srgb, currentColor 40%, transparent);
-}
-.swl-asset-icon {
-  display: inline-flex;
-  width: 22px;
-  height: 22px;
-  flex: none;
-}
-.swl-asset-icon > svg,
-.swl-asset-icon > img {
-  width: 100%;
-  height: 100%;
-}
-.swl-asset-card-text {
-  display: inline-flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.swl-asset-card-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* A file's size and date, under its name: quieter, apart by a dot */
-.swl-asset-card-meta {
-  display: inline-flex;
-  gap: 6px;
-  font-size: 0.8em;
-  opacity: 0.7;
-  white-space: nowrap;
-}
-.swl-asset-card-meta > * + *::before {
-  content: "·";
-  margin-right: 6px;
-}
-/* An asset shown by an action: in a panel at the window's right (peek, over part of the window: the sheet's layer), or
-   enlarged over the dimmed page (popover, a dialog's layer); its head its name, Open in a new tab and ×, its body the
-   asset as large as the panel lets it be */
-.swl-asset-peek {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: var(--sw-layer-sheet);
-  display: flex;
-  flex-direction: column;
-  width: min(560px, 100vw);
-  color: var(--root-color);
-  background: var(--root-background-color);
-  border-left: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
-  box-shadow: -6px 0 24px rgba(0, 0, 0, 0.18);
-}
-.swl-asset-popover {
-  position: fixed;
-  inset: 0;
-  z-index: var(--sw-layer-dialog);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
-}
-.swl-asset-popover-box {
-  display: flex;
-  flex-direction: column;
-  max-width: 92vw;
-  max-height: 92vh;
-  min-width: min(320px, 92vw);
-  color: var(--root-color);
-  background: var(--root-background-color);
-  border-radius: 8px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
-  overflow: hidden;
-}
-.swl-asset-panel-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px 8px 14px;
-  font-family: var(--ui-font, system-ui, sans-serif);
-  font-size: 13px;
-  border-bottom: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.25));
-}
-.swl-asset-panel-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.swl-asset-panel-button,
-.swl-asset-panel-close {
-  padding: 3px 10px;
-  font: inherit;
-  color: inherit;
-  background: transparent;
-  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
-  border-radius: 4px;
-  cursor: pointer;
-}
-.swl-asset-panel-close {
-  padding: 0 8px;
-  font-size: 18px;
-  line-height: 24px;
-  border-color: transparent;
-}
-.swl-asset-panel-body {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-  padding: 12px;
-  overflow: auto;
-}
-.swl-asset-panel-body > :is(img, video) {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto !important;
-  height: auto !important;
-  object-fit: contain;
-}
-.swl-asset-popover .swl-asset-panel-body > :is(img, video) {
-  max-height: calc(92vh - 70px);
-}
-.swl-asset-panel-body > object {
-  width: 100% !important;
-  height: 100% !important;
-  min-height: 60vh;
-}
-.swl-asset-popover .swl-asset-panel-body > object {
-  width: 85vw !important;
-  height: calc(92vh - 70px) !important;
-}
-/* A link to a file of the space: its type's icon before its text, as large as the text */
-.swl-asset-link-icon {
-  display: inline-flex;
-  width: 1em;
-  height: 1em;
-  margin-right: 0.2em;
-  vertical-align: -0.125em;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.12s, transform 0.12s;
-}
-/* On a touch screen it takes a finger: its box larger than the icon, not the text's */
-@media (pointer: coarse) {
-  .swl-asset-link-icon {
-    position: relative;
-  }
-  .swl-asset-link-icon::after {
-    content: "";
-    position: absolute;
-    inset: -10px -6px;
-  }
-}
-/* An icon opening its asset's menu (a link's, a card's): pointed at (or its menu open), it shows plainly it is a
-   button of its own, apart from the text beside it: filled, a little larger */
-.swl-asset-menu-icon {
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.12s, transform 0.12s;
-}
-.swl-asset-menu-icon:hover,
-.swl-asset-menu-icon[aria-expanded="true"] {
-  background: color-mix(in srgb, currentColor 22%, transparent);
-  transform: scale(1.2);
-}
-@media (prefers-reduced-motion: reduce) {
-  .swl-asset-menu-icon {
-    transition: none;
-  }
-}
-.swl-asset-pdf {
-  display: block;
-  width: 100%;
-  height: var(--swl-asset-height, 160px);
-  border: none;
-}
-.swl-asset-failed {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  font-size: 12px;
-  font-weight: bold;
-  color: #fff;
-  background: #c0392b;
-  cursor: help;
 }
 /* A cell's markdown that could not be rendered, and a grid drawn before Silverware Layout started: as typed */
 .swl-grid-plain {

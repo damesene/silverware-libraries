@@ -34,7 +34,7 @@ export const pdfType: AssetType = {
   views: {
     // A smaller viewer, cheap (a preview of the first page later); no room for one, or no URL: the host's own
     preview: (context) =>
-      "url" in context.asset && context.viewport.width >= 160 ? el(document, "object", { class: "swl-asset-pdf", attrs: { type: "application/pdf", data: context.asset.url } }) : null,
+      "url" in context.asset && context.viewport.width >= 160 ? el(document, "object", { class: "swa-pdf", attrs: { type: "application/pdf", data: context.asset.url } }) : null,
   },
 };
 

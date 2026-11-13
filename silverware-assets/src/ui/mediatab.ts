@@ -36,7 +36,7 @@ function heightOf(typed: string, had: number): number {
 
 /** A select of options, value first */
 function select(doc: Document, label: string, options: readonly (readonly [string, string])[], value: string): HTMLSelectElement {
-  const field = el(doc, "select", { class: "swl-media-select", attrs: { "aria-label": label } });
+  const field = el(doc, "select", { class: "swa-settings-select", attrs: { "aria-label": label } });
   for (const [v, text] of options) field.append(el(doc, "option", { text, attrs: { value: v } }));
   field.value = value;
   return field;
@@ -53,7 +53,7 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
   const allShift = select(doc, "All files: a Shift+click", actions, settings.actions.default["shift+click"] ?? NONE);
   const anchor = select(doc, "Width dragged", [["start", "Stays at the start"], ["center", "Centred"]], settings.anchor);
   // A preview's height where its embed gives none (px): a number typed, one that is none kept as it was
-  const previewHeight = el(doc, "input", { class: "swl-media-number", attrs: { type: "number", min: MIN_HEIGHT, max: MAX_HEIGHT, step: 10, "aria-label": "A preview's height (px)" } });
+  const previewHeight = el(doc, "input", { class: "swa-settings-number", attrs: { type: "number", min: MIN_HEIGHT, max: MAX_HEIGHT, step: 10, "aria-label": "A preview's height (px)" } });
   previewHeight.value = String(settings.heights.preview);
   // What a card shows besides the file's name, each a box
   const cardField = (field: CardField) => {
@@ -69,15 +69,15 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
   const all = el(
     doc,
     "div",
-    "swl-media-all",
-    el(doc, "div", "swl-media-heading", "All files"),
-    el(doc, "label", "swl-media-field", "Shown as", allView),
-    el(doc, "label", "swl-media-field", "A click", allClick),
-    el(doc, "label", "swl-media-field", "A Shift+click", allShift),
-    el(doc, "label", "swl-media-field", "Width dragged", anchor),
-    el(doc, "label", "swl-media-field", "A preview's height", el(doc, "span", "swl-media-unit", previewHeight, "px")),
-    el(doc, "div", "swl-media-checks", el(doc, "span", { text: "Cards show" }), el(doc, "label", "swl-media-check", cardIcon, "Its icon"), el(doc, "label", "swl-media-check", cardSize, "Its size"), el(doc, "label", "swl-media-check", cardDate, "Its date")),
-    el(doc, "div", "swl-media-checks", el(doc, "label", "swl-media-check", linkIcons, "Links to files show the file's icon")),
+    "swa-settings-all",
+    el(doc, "div", "swa-settings-heading", "All files"),
+    el(doc, "label", "swa-settings-field", "Shown as", allView),
+    el(doc, "label", "swa-settings-field", "A click", allClick),
+    el(doc, "label", "swa-settings-field", "A Shift+click", allShift),
+    el(doc, "label", "swa-settings-field", "Width dragged", anchor),
+    el(doc, "label", "swa-settings-field", "A preview's height", el(doc, "span", "swa-settings-unit", previewHeight, "px")),
+    el(doc, "div", "swa-settings-checks", el(doc, "span", { text: "Cards show" }), el(doc, "label", "swa-settings-check", cardIcon, "Its icon"), el(doc, "label", "swa-settings-check", cardSize, "Its size"), el(doc, "label", "swa-settings-check", cardDate, "Its date")),
+    el(doc, "div", "swa-settings-checks", el(doc, "label", "swa-settings-check", linkIcons, "Links to files show the file's icon")),
   );
 
   // Per type: "Default" follows All files
@@ -86,14 +86,14 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
     const view = select(doc, `${type.name}: shown as`, [[DEFAULT, "Default"], ...views], settings.views.types[type.name] ?? DEFAULT);
     const click = select(doc, `${type.name}: a click`, [[DEFAULT, "Default"], ...actions], own("click") ?? DEFAULT);
     const shift = select(doc, `${type.name}: a Shift+click`, [[DEFAULT, "Default"], ...actions], own("shift+click") ?? DEFAULT);
-    const row = el(doc, "div", "swl-media-type", el(doc, "span", "swl-media-type-name", iconElement(doc, type.icon), type.name), view, click, shift);
+    const row = el(doc, "div", "swa-settings-type", el(doc, "span", "swa-settings-type-name", iconElement(doc, type.icon), type.name), view, click, shift);
     return { name: type.name, view, click, shift, row };
   });
   const table = el(
     doc,
     "div",
-    "swl-media-types",
-    el(doc, "div", "swl-media-type swl-media-type-head", el(doc, "span", { text: "Type" }), el(doc, "span", { text: "Shown as" }), el(doc, "span", { text: "Click" }), el(doc, "span", { text: "Shift+click" })),
+    "swa-settings-types",
+    el(doc, "div", "swa-settings-type swa-settings-type-head", el(doc, "span", { text: "Type" }), el(doc, "span", { text: "Shown as" }), el(doc, "span", { text: "Click" }), el(doc, "span", { text: "Shift+click" })),
     ...rows.map((one) => one.row),
   );
 
@@ -126,7 +126,7 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
   return {
     id: "media",
     title: "Media",
-    panel: el(doc, "div", "swl-media", all, table),
+    panel: el(doc, "div", "swa-settings", all, table),
     changed: () => JSON.stringify(current()) !== was,
     save: () => save(current()),
   };

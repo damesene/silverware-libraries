@@ -46,7 +46,7 @@ function show(kind: "peek" | "popover", context: ActionContext, build: (close: (
   doc.body.append(root);
   doc.addEventListener("keydown", key, true);
   open.set(kind, close);
-  void context.render("embed", body).catch(() => body.replaceChildren(el(doc, "div", { class: "swl-asset-panel-failed", text: "This file cannot be shown here" })));
+  void context.render("embed", body).catch(() => body.replaceChildren(el(doc, "div", { class: "swa-panel-failed", text: "This file cannot be shown here" })));
   return close;
 }
 
@@ -54,12 +54,12 @@ function show(kind: "peek" | "popover", context: ActionContext, build: (close: (
 function head(context: ActionContext, close: () => void): HTMLElement {
   const doc = document;
   const name = assetName(context.asset);
-  const closeButton = el(doc, "button", { class: "swl-asset-panel-close", title: "Close (Esc)", text: "×", attrs: { "aria-label": "Close" } });
+  const closeButton = el(doc, "button", { class: "swa-panel-close", title: "Close (Esc)", text: "×", attrs: { "aria-label": "Close" } });
   closeButton.addEventListener("click", () => close());
-  const tab = "url" in context.asset ? el(doc, "button", { class: "swl-asset-panel-button", text: "Open in a new tab" }) : null;
+  const tab = "url" in context.asset ? el(doc, "button", { class: "swa-panel-button", text: "Open in a new tab" }) : null;
   const url = "url" in context.asset ? context.asset.url : undefined;
   tab?.addEventListener("click", () => url && context.open(url));
-  return el(doc, "div", { class: "swl-asset-panel-head" }, el(doc, "span", { class: "swl-asset-panel-title", text: name, title: name }), tab, closeButton);
+  return el(doc, "div", { class: "swa-panel-head" }, el(doc, "span", { class: "swa-panel-title", text: name, title: name }), tab, closeButton);
 }
 
 export const peek: AssetAction = {
@@ -68,8 +68,8 @@ export const peek: AssetAction = {
   fits: shows,
   run: (context) =>
     void show("peek", context, (close) => {
-      const body = el(document, "div", { class: "swl-asset-panel-body" });
-      const root = el(document, "aside", { class: "swl-asset-peek", attrs: { role: "dialog", "aria-label": assetName(context.asset) } }, head(context, close), body);
+      const body = el(document, "div", { class: "swa-panel-body" });
+      const root = el(document, "aside", { class: "swa-peek", attrs: { role: "dialog", "aria-label": assetName(context.asset) } }, head(context, close), body);
       return { root, body };
     }),
 };
@@ -80,9 +80,9 @@ export const popover: AssetAction = {
   fits: shows,
   run: (context) =>
     void show("popover", context, (close) => {
-      const body = el(document, "div", { class: "swl-asset-panel-body" });
-      const box = el(document, "div", { class: "swl-asset-popover-box", attrs: { role: "dialog", "aria-modal": "true", "aria-label": assetName(context.asset) } }, head(context, close), body);
-      const root = el(document, "div", { class: "swl-asset-popover" }, box);
+      const body = el(document, "div", { class: "swa-panel-body" });
+      const box = el(document, "div", { class: "swa-popover-box", attrs: { role: "dialog", "aria-modal": "true", "aria-label": assetName(context.asset) } }, head(context, close), body);
+      const root = el(document, "div", { class: "swa-popover" }, box);
       // A click beside the box (on the dimmed page) closes it
       root.addEventListener("click", (event) => {
         if (event.target === root) close();

@@ -75,6 +75,8 @@ if js and js.window then
     renderMarkdown = function(text)
       return markdown.markdownToHtml(text, { expand = true, annotationPositions = true })
     end,
+    -- A grid's Alt+click: the cursor where the click was in its markdown
+    moveCursor = editor.moveCursor,
     -- The dialog's default text width: saved as SilverBullet's Configuration Manager saves
     -- (the CONFIG page, indexed, the configuration loaded again)
     saveConfigPage = function(text)

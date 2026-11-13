@@ -699,6 +699,37 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 .swl-grid-cell img {
   max-width: 100%;
 }
+/* A cell is edited by a click in it: a quiet hint of that as the pointer is over it, its markdown in a field as tall
+   as its text while edited, the grid keeping its shape */
+@media (hover: hover) {
+  .swl-grid-cell:not(.swl-grid-editing):hover {
+    outline: 1px dashed color-mix(in srgb, currentColor 25%, transparent);
+    outline-offset: 4px;
+    cursor: text;
+  }
+}
+.swl-grid-editor {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.5em;
+  margin: 0;
+  padding: 4px 6px;
+  resize: none;
+  overflow: hidden;
+  font: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  line-height: 1.5;
+  color: inherit;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 4px;
+}
+.swl-grid-editor:focus {
+  outline: 2px solid color-mix(in srgb, currentColor 40%, transparent);
+  outline-offset: 1px;
+}
 /* A cell's markdown that could not be rendered, and a grid drawn before Silverware Layout started: as typed */
 .swl-grid-plain {
   white-space: pre-wrap;

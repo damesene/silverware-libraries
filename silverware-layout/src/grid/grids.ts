@@ -3,10 +3,19 @@
 // `<grid>` line's attributes say. The host hands the renderer no attributes and draws a grid anew only as its body
 // changes, so the attributes are read from the page's text, and set again on the grids drawn as the page changes
 // (`refresh`): a `columns` edited shows without a new drawing.
-import { readGridBody } from "../../../shared/markdown/grid.ts";
-import { gridOf } from "./core/match.ts";
+//
+// A click in a cell edits its markdown in place, written when the cell is left (one edit); an Alt+click shows the raw
+// text with the cursor where the click was. Which of the page's grids a grid drawn is: the one of its body, by its
+// order among the grids of that body drawn (core/match.ts).
+import { type Grid, readGridBody } from "../../../shared/markdown/grid.ts";
+import { gridsOfBody } from "./core/match.ts";
+import { positionInCell, wordAt } from "./core/position.ts";
 import { columnTemplate } from "./model/columns.ts";
+import { caretWord, editCell } from "./ui/celleditor.ts";
 import { drawGrid, plainCell, showColumns } from "./ui/view.ts";
+
+/** A cell to write: the grid by its body as read and its place among those alike, the cell, its new markdown */
+export type CellWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly cell: number; readonly content: string };
 
 /** What the grids ask of the host whose page they are in */
 export type GridHost = {
@@ -14,22 +23,55 @@ export type GridHost = {
   renderMarkdown(text: string): Promise<string>;
   /** The page's text now */
   pageText(): Promise<string>;
-  /** A grid's element handed to the host, which draws it in a frame of its own: the frame made bare once it is in the page (its menu, its border) */
+  /** A cell's markdown written into the page (one edit); why not, as text */
+  writeCell(write: CellWrite): Promise<string | undefined>;
+  /** The page's cursor put at an offset in its text, the raw text shown there */
+  moveCursor(at: number): void;
+  /** A problem said to the user */
+  problem(message: string): void;
+  /** A grid's element handed to the host, which draws it in a frame of its own: the frame made bare once it is in the page (its menu) */
   settle?(element: HTMLElement): void;
 };
 
 // How long after a grid is drawn its attributes are read again (it is in the page by then, its order among its alike known)
 const SETTLE_MS = 50;
+// What a click in a cell leaves to the cell's rendering: a link, a tag, a button, a field, an editor open
+const OWN_CLICKS = "a, button, input, textarea, select, label, [data-ref]";
+
+/** A body or a cell's markdown as compared: its line breaks LF, no blank lines at its end */
+const same = (text: string) => text.replace(/\r\n/g, "\n").replace(/\s+$/, "");
 
 export class Grids {
   // Each grid drawn, its body (what it is found in the page by)
   private readonly bodies = new WeakMap<HTMLElement, string>();
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  private started = false;
 
   constructor(
     private readonly doc: Document,
-    private readonly host: GridHost,
+    private host: GridHost,
   ) {}
+
+  /** The host's API handed over anew (the host's scripts loaded again): asked from now on */
+  useHost(host: GridHost): void {
+    this.host = host;
+  }
+
+  /** The clicks in the grids followed from now on (once per document: Space Lua loaded again starts nothing twice) */
+  start(): void {
+    if (this.started) return;
+    this.started = true;
+    // An Alt+click is the grid's before the host's (SilverBullet's puts the cursor at the grid's start): taken as the
+    // press comes, its click after it held back too
+    this.doc.addEventListener("mousedown", (event) => this.altPress(event), true);
+    this.doc.addEventListener("click", (event) => {
+      if (event.altKey && this.gridOf(event.target)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    }, true);
+    this.doc.addEventListener("click", (event) => void this.click(event));
+  }
 
   /** A grid drawn of its body: its cells rendered by the host, its columns as the first grid of that body in the page has them */
   async render(body: string): Promise<HTMLElement> {
@@ -38,7 +80,7 @@ export class Grids {
       Promise.all(cells.map((cell) => this.host.renderMarkdown(cell.content).catch(() => plainCell(this.doc, cell.content)))),
       this.host.pageText().catch(() => ""),
     ]);
-    const element = drawGrid(this.doc, columnTemplate(gridOf(text, body, 0)?.attributes.columns, cells.length), html);
+    const element = drawGrid(this.doc, columnTemplate(gridsOfBody(text, body)[0]?.attributes.columns, cells.length), html);
     this.bodies.set(element, body);
     this.host.settle?.(element);
     // In the page, its order among the grids of its body is known: its own attributes then
@@ -48,17 +90,13 @@ export class Grids {
 
   /** The grids drawn given their attributes again, as the page's text has them now (a `<grid>` line edited) */
   async refresh(): Promise<void> {
-    const drawn = [...this.doc.querySelectorAll<HTMLElement>(".swl-grid")].filter((element) => this.bodies.has(element));
+    const drawn = this.drawn();
     if (!drawn.length) return;
     const text = await this.host.pageText().catch(() => undefined);
     if (text === undefined) return;
-    const seen = new Map<string, number>();
     for (const element of drawn) {
-      const body = this.bodies.get(element)!;
-      const nth = seen.get(body) ?? 0;
-      seen.set(body, nth + 1);
-      const grid = gridOf(text, body, nth);
-      if (grid) showColumns(element, columnTemplate(grid.attributes.columns, element.querySelectorAll(":scope > .swl-grid-cell").length));
+      const found = this.found(text, element);
+      if (found) showColumns(element, columnTemplate(found.grid.attributes.columns, element.querySelectorAll(":scope > .swl-grid-cell").length));
     }
   }
 
@@ -69,5 +107,84 @@ export class Grids {
       this.refreshTimer = undefined;
       void this.refresh();
     }, SETTLE_MS);
+  }
+
+  /** The grids drawn in the page, in its order */
+  private drawn(): HTMLElement[] {
+    return [...this.doc.querySelectorAll<HTMLElement>(".swl-grid")].filter((element) => this.bodies.has(element));
+  }
+
+  /** A grid drawn as the page's text has it: the grid, its place among those of its body, how many those are */
+  private found(text: string, element: HTMLElement): { readonly grid: Grid; readonly occurrence: number; readonly of: number } | undefined {
+    const body = this.bodies.get(element);
+    if (body === undefined) return undefined;
+    const nth = this.drawn().filter((one) => this.bodies.get(one) === body).indexOf(element);
+    const alike = gridsOfBody(text, body);
+    if (!alike.length) return undefined;
+    const occurrence = Math.min(Math.max(nth, 0), alike.length - 1);
+    return { grid: alike[occurrence]!, occurrence, of: alike.length };
+  }
+
+  /** The grid drawn and its cell a node is in (none: not in a grid of these) */
+  private gridOf(target: EventTarget | null): { readonly element: HTMLElement; readonly cell: HTMLElement | undefined } | undefined {
+    if (!(target instanceof Element)) return undefined;
+    const element = target.closest<HTMLElement>(".swl-grid");
+    if (!element || !this.bodies.has(element)) return undefined;
+    return { element, cell: target.closest<HTMLElement>(".swl-grid-cell") ?? undefined };
+  }
+
+  /** A click in a cell, not on what its rendering handles itself: the cell edited */
+  private async click(event: MouseEvent): Promise<void> {
+    if (event.altKey || event.button !== 0 || event.defaultPrevented) return;
+    const at = this.gridOf(event.target);
+    if (!at?.cell || at.cell.classList.contains("swl-grid-editing")) return;
+    if ((event.target as Element).closest(OWN_CLICKS)) return;
+    await this.edit(at.element, at.cell);
+  }
+
+  /** A cell's markdown edited in place, written as it is left where it changed */
+  async edit(element: HTMLElement, cellElement: HTMLElement): Promise<void> {
+    const index = Number(cellElement.getAttribute("data-swl-cell"));
+    const text = await this.host.pageText().catch(() => undefined);
+    const found = text === undefined ? undefined : this.found(text, element);
+    const cell = found?.grid.cells[index];
+    if (!found || !cell) {
+      this.host.problem("Silverware Layout: this grid changed in the page since it was drawn; edit it there");
+      return;
+    }
+    editCell(cellElement, cell.content, (content) => {
+      if (same(content) === same(cell.content)) return;
+      void this.host
+        .writeCell({ body: found.grid.body, occurrence: found.occurrence, of: found.of, cell: index, content })
+        .then((problem) => problem && this.host.problem(`Silverware Layout: the cell was not written: ${problem}`))
+        .catch((error: unknown) => this.host.problem(`Silverware Layout: the cell was not written: ${error instanceof Error ? error.message : String(error)}`));
+    });
+  }
+
+  /** An Alt+press in a cell: the raw text shown, the cursor where it was in the cell's markdown */
+  private altPress(event: MouseEvent): void {
+    if (!event.altKey || event.button !== 0) return;
+    const at = this.gridOf(event.target);
+    if (!at) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const caret = caretWord(this.doc, event.clientX, event.clientY);
+    void this.showSource(at.element, at.cell, event.target as Element, caret);
+  }
+
+  /** The cursor put where a point of a cell's rendering is in the page's text (no cell: at the grid's start) */
+  async showSource(element: HTMLElement, cellElement: HTMLElement | undefined, target: Element, caret: { readonly node: Node; readonly offset: number } | undefined): Promise<void> {
+    const text = await this.host.pageText().catch(() => undefined);
+    const found = text === undefined ? undefined : this.found(text, element);
+    if (!found) return;
+    const cell = cellElement ? found.grid.cells[Number(cellElement.getAttribute("data-swl-cell"))] : undefined;
+    if (!cell) return this.host.moveCursor(found.grid.from);
+    // The element clicked's place in the cell's markdown (SilverBullet leaves 0 out: none is 0)
+    const marked = target.closest("[data-pos]");
+    const elementPos = marked && cellElement!.contains(marked) ? Number(marked.getAttribute("data-pos")) || 0 : 0;
+    const nodeText = caret?.node.textContent ?? "";
+    const word = caret ? wordAt(nodeText, caret.offset) : "";
+    const wordStart = caret ? nodeText.lastIndexOf(word, caret.offset) : 0;
+    this.host.moveCursor(cell.contentFrom + positionInCell(cell.content, elementPos, word, caret ? caret.offset - Math.max(wordStart, 0) : 0));
   }
 }

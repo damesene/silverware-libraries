@@ -44,8 +44,15 @@ export async function init(bridge: Bridge): Promise<void> {
     console.error(`Silverware Layout: the init page did not hand over ${missing.join(", ")}`);
     return;
   }
-  grids = new Grids(document, silverBulletGridHost(bridge));
-  await app.start(silverBulletStore(bridge, pageWriter(silverBulletPlatform(bridge))));
+  const writer = pageWriter(silverBulletPlatform(bridge));
+  // One per window (its listeners live as long); its host the bridge handed over now, again with each start
+  const host = silverBulletGridHost(bridge, writer);
+  if (grids) grids.useHost(host);
+  else {
+    grids = new Grids(document, host);
+    grids.start();
+  }
+  await app.start(silverBulletStore(bridge, writer));
 }
 
 /**

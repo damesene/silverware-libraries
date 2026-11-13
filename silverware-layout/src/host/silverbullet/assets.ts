@@ -11,6 +11,10 @@ import type { Bridge } from "../../bridge.ts";
 import { documentUrl } from "./platform.ts";
 
 const FRAME = ".sb-inline-content";
+// Markdown rendered outside the editor (a grid's cells: Silverware Layout's convention), its media plain elements:
+// each put in a frame of Silverware Layout's own to be decorated as SilverBullet's widget is
+const RENDERED_MEDIA = "[data-swl-rendered] :is(img, video, audio, object):not(.swl-asset-frame > *, .swl-asset-icon *, .swl-asset-own, .swl-asset-own *)";
+const OWN_FRAME = "swl-asset-frame";
 const MEDIA = "img, video, audio, object";
 const BARS = ".button-bar, .sb-widget-menu-bar";
 const UNSUPPORTED = /Unsupported content:\s*(.+)$/;
@@ -51,13 +55,21 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
           if (around) frames.add(around);
         }
         root.querySelectorAll<HTMLElement>(FRAME).forEach((frame) => frames.add(frame));
+        const rendered = root instanceof HTMLElement && root.matches(RENDERED_MEDIA) ? [root] : [];
+        for (const medium of [...rendered, ...root.querySelectorAll<HTMLElement>(RENDERED_MEDIA)]) {
+          const frame = doc.createElement("span");
+          frame.className = OWN_FRAME;
+          medium.replaceWith(frame);
+          frame.append(medium);
+          frames.add(frame);
+        }
         for (const frame of frames) {
           if (seen.has(frame)) continue;
           const target = drawnTarget(frame);
           // (Its content comes after the frame: looked at again as it does)
           if (!target) continue;
           seen.add(frame);
-          for (const bar of frame.parentElement?.querySelectorAll<HTMLElement>(BARS) ?? []) bar.style.setProperty("display", "none", "important");
+          if (!frame.classList.contains(OWN_FRAME)) for (const bar of frame.parentElement?.querySelectorAll<HTMLElement>(BARS) ?? []) bar.style.setProperty("display", "none", "important");
           found.push({ frame, ...target });
         }
         if (found.length) drawn(found);

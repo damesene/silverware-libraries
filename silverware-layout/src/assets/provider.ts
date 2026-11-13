@@ -9,7 +9,8 @@ import type { AssetDecorator } from "./decorate.ts";
 export function assetProvider(assets: AssetDecorator): LayoutProvider {
   return {
     name: "silverware-layout-assets",
-    selector: '[data-swl-asset]:not([data-swl-asset-view="icon"])',
+    // (Not in markdown rendered outside the editor, a grid's cell: its snaps to the cell's shares come later)
+    selector: '[data-swl-asset]:not([data-swl-asset-view="icon"], [data-swl-rendered] *)',
     read: (element): LayoutEntries => {
       const width = assets.sizeOf(element as HTMLElement)?.width;
       return width && /^\d+(\.\d+)?$/.test(width) ? { width } : {};

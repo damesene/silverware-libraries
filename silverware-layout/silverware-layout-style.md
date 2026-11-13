@@ -1218,6 +1218,12 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 [data-swl-asset] {
   position: relative;
 }
+/* A medium in markdown rendered outside the editor (a grid's cell) in a frame of Silverware Layout's own */
+.swl-asset-frame {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: top;
+}
 /* Laid out by the handle (its width on the frame, data-swl-width): the host's medium fills the frame, its height by
    its ratio, so a drag shows at once what the width written will draw */
 [data-swl-asset][data-swl-width] :is(img, video, object):not(.swl-asset-icon img) {

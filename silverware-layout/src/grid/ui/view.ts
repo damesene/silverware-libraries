@@ -9,7 +9,8 @@ export function drawGrid(doc: Document, template: string, cells: readonly string
   const grid = el(doc, "div", { class: "swl-grid" });
   showColumns(grid, template);
   cells.forEach((html, index) => {
-    const cell = el(doc, "div", { class: "swl-grid-cell", attrs: { "data-swl-cell": index } });
+    // (Marked as markdown rendered outside the editor: what decorates media there finds them so, knowing no grid)
+    const cell = el(doc, "div", { class: "swl-grid-cell", attrs: { "data-swl-cell": index, "data-swl-rendered": "" } });
     // The host's rendering of the page's markdown (SilverBullet's renderer, which leaves out what would run), not
     // markup of Silverware Layout's own: set as the host gave it
     cell.innerHTML = html;

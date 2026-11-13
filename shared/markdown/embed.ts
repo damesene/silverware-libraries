@@ -1,5 +1,5 @@
 // A page's embeds (`![[cat.png|A cat|200|{ view: preview }]]`, `![A cat|200|{ view: preview }](cat.png)`) as Silverware
-// Layout's assets read them (docs/silverware-layout-assets.md, *How an embed is written*): the one place that knows how
+// Assets reads them (docs/silverware-assets.md, *How an embed is written*): the one place that knows how
 // an embed's text holds its size and its metadata. Pure.
 //
 // SilverBullet reads an embed's alias by its first two `|` segments only (`[alias, dimPart] = text.split("|")`,

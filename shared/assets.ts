@@ -1,8 +1,8 @@
-// What Silverware Layout's assets (docs/silverware-layout-assets.md) and whoever registers a type of asset or an action
+// What Silverware Assets (docs/silverware-assets.md) and whoever registers a type of asset or an action
 // agree on: an embed's asset as a union by kind, a type's match, icon and renderers, a renderer's context, an action.
-// A type provides renderers; Silverware Layout decides what is rendered (the view, the size, the host's own drawing,
-// the card). A type and an action use only what they are handed, and import nothing of Silverware Layout. As
-// shared/layout.ts: Silverware Layout's API as a plugin's init page hands it over, or a stand-in without it (`assetsOf`).
+// A type provides renderers; Silverware Assets decides what is rendered (the view, the size, the host's own drawing,
+// the card). A type and an action use only what they are handed, and import nothing of Silverware Assets. As
+// shared/layout.ts: Silverware Assets' API as a plugin's init page hands it over, or a stand-in without it (`assetsOf`).
 
 /** The version of the assets' API this file is written for: another is taken as none (updated apart) */
 export const ASSETS_VERSION = 1;
@@ -27,7 +27,7 @@ export type Viewport = {
   onChange(changed: () => void, options?: { readonly signal?: AbortSignal }): void;
 };
 
-/** A type's own metadata keys of an embed: their values as written, read by the helpers, written through Silverware Layout */
+/** A type's own metadata keys of an embed: their values as written, read by the helpers, written through Silverware Assets */
 export type AssetMetadata = {
   readonly values: Readonly<Record<string, string>>;
   number(key: string): number | undefined;
@@ -64,7 +64,7 @@ export type AssetType = {
   readonly match: AssetMatch;
   // A plain image: a URL (drawn as <img>) or SVG text (inlined: currentColor follows the theme)
   readonly icon: string;
-  // A view left out is drawn by the host where it can (Silverware Layout draws the card, `icon`, for every type)
+  // A view left out is drawn by the host where it can (Silverware Assets draws the card, `icon`, for every type)
   readonly views?: { readonly preview?: Renderer; readonly embed?: Renderer };
   // Where its renderers draw (none: in place of an embed alone)
   readonly placements?: readonly Placement[];
@@ -77,7 +77,7 @@ export type AssetType = {
 /** What an action is handed */
 export type ActionContext = {
   readonly asset: Asset;
-  /** The asset rendered in a container of the action's (a panel, a popover), as Silverware Layout renders it */
+  /** The asset rendered in a container of the action's (a panel, a popover), as Silverware Assets renders it */
   render(view: Exclude<AssetView, "icon">, container: HTMLElement): Promise<void>;
   /** A URL opened in a new tab of the browser */
   open(url: string): void;
@@ -102,7 +102,7 @@ export type Assets = {
   readonly actions: { register(action: AssetAction): () => void };
 };
 
-/** Silverware Layout's assets API as handed over, where it is of this version; else the stand-in, registering nothing */
+/** Silverware Assets' API as handed over, where it is of this version; else the stand-in, registering nothing */
 export function assetsOf(given: unknown): Assets {
   if (given && typeof given === "object") {
     const api = given as Partial<Assets>;

@@ -10,8 +10,8 @@
 | Silverware Chart | `silverware-chart/` | `swc-` | `silverware-chart/CLAUDE.md`, docs/silverware-chart.md |
 | Silverware Database | `silverware-database/` | `swd-` | `silverware-database/CLAUDE.md`, docs/silverware-database.md |
 | Silverware Icons | `silverware-icons/` | `swi-` | `silverware-icons/CLAUDE.md`, docs/silverware-icons.md (a library for the other plugins, nothing on its own) |
-| Silverware Assets | `silverware-assets/` | `swa-` | `silverware-assets/CLAUDE.md`, docs/silverware-assets-split.md (being split out of Layout) |
-| Silverware Layout | `silverware-layout/` | `swl-` | `silverware-layout/CLAUDE.md`, docs/silverware-layout.md, docs/silverware-layout-font-size.md, docs/silverware-layout-grid.md, docs/silverware-layout-assets.md, docs/silverware-assets-split.md (the assets to a plugin of their own: next) |
+| Silverware Assets | `silverware-assets/` | `swa-` | `silverware-assets/CLAUDE.md`, docs/silverware-assets.md, docs/silverware-assets-split.md (split out of Layout) |
+| Silverware Layout | `silverware-layout/` | `swl-` | `silverware-layout/CLAUDE.md`, docs/silverware-layout.md, docs/silverware-layout-font-size.md, docs/silverware-layout-grid.md |
 
 docs/ holds each plugin's plan and decision log; a plugin's library page (`silverware-<name>.md`) is its user documentation.
 

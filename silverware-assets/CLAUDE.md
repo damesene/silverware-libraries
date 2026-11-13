@@ -1,11 +1,14 @@
 # Silverware Assets
 
-The files a page embeds and links (prefix `swa-`, settings and Space Lua API under `silverware.assets`): being split out of Silverware Layout, where its code still is (`silverware-layout/src/assets/`), by [docs/silverware-assets-split.md](../docs/silverware-assets-split.md) (its steps, what goes where, the renames). Its design and decisions: [docs/silverware-layout-assets.md](../docs/silverware-layout-assets.md), to become docs/silverware-assets.md. User docs: `silverware-assets.md`; the code pages `-init.md` (the bridge), `-api.md` (priority 50: `silverware.assets.api`), `-style.md`.
+The files a page embeds and links (prefix `swa-`, settings and Space Lua API under `silverware.assets`): each shown as the original, a preview or a card, its menu (the "…", a card's or a link's icon), a link turned into an embed and back, a file shown in a side panel or enlarged; the settings window (`Silverware Assets: Settings`: tabs Assets, Markdown). Split out of Silverware Layout 2026-11-14 ([docs/silverware-assets-split.md](../docs/silverware-assets-split.md)); its design and decisions: [docs/silverware-assets.md](../docs/silverware-assets.md). User docs: `silverware-assets.md`; the code pages `-init.md` (settings, the bridge, the command), `-api.md` (priority 50: `silverware.assets.api`, types and actions registered, `shared/assets.ts`), `-style.md`.
 
 ## Mental model
 
 - **Silverware Layout is optional**: its API (`silverware.layout.api`, handed over by the init page) gives a medium's width by its handle (a `LayoutProvider`, as Silverware Table registers) and what its grids draw outside the editor (`shared/rendered.ts`: each file and link drawn, its place in the page). Without it, files are decorated where SilverBullet draws them, without the handle; there are no grids then.
 - The code keeps the word "asset" (`shared/assets.ts`: `Asset`, `AssetType`, `AssetAction`), the plugin's name.
+- **Layers** (src/isolation.test.ts): `model/` (settings, pure), `core/` (the registry, which type, view and action apply, an embed found in the text), `builtin/` (its own types and actions, through the contract alone), `ui/` (card, menus, the settings window's tabs), `decorate.ts` (`AssetDecorator` over an `AssetHost`), `host/silverbullet/` (SilverBullet's embeds and links, its platform, its markdown-as-written elements) used by `index.ts` alone.
+- **Settings**: `silverware.assets.<key>` (views, actions, card, heights, anchor, linkIcons), each key its own line of Assets' own block of CONFIG (marker `-- managed-by: silverware-assets`: tables the Configuration Manager would lose); `silverware.assets.syntaxMode.*` in the Configuration Manager's.
+- **Markdown as written** (`shared/syntaxmode.ts`): files hidden, a click on a link the cursor's (`data-swa-syntax-shown`, `data-swa-syntax-clicks`, `data-swa-text` on the editor's text).
 
 ## Tests
 

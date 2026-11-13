@@ -1,10 +1,10 @@
 // The registered types of asset and actions (docs/silverware-assets.md, *Types*, *Actions*): one per name, a
-// name registered again replacing the one before; Silverware Layout's own registered only where their name is free
+// name registered again replacing the one before; Silverware Assets' own registered only where their name is free
 // (Space Lua loaded again runs Layout's init again: a user's or another plugin's override survives). The core knows no
 // type or action by name.
 import { ASSETS_VERSION, type AssetAction, type Assets, type AssetType } from "../../../shared/assets.ts";
 
-/** Metadata keys Silverware Layout's own: a type declaring one in its validation is told so */
+/** Metadata keys Silverware Assets' own: a type declaring one in its validation is told so */
 export const RESERVED_KEYS: readonly string[] = ["view"];
 
 /** Why a type cannot be registered, as text; undefined where it can */
@@ -58,7 +58,7 @@ class Named<T extends { readonly name: string }> {
     };
   }
 
-  /** Registered where its name is free (Silverware Layout's own) */
+  /** Registered where its name is free (Silverware Assets' own) */
   registerDefault(one: T): void {
     if (!this.byName.has(one.name)) this.register(one);
   }
@@ -73,7 +73,7 @@ export class AssetRegistry {
     this.actions = new Named<AssetAction>(validateAssetAction, problem);
   }
 
-  /** The API a plugin registers with (`silverware.layout.api.assets`) */
+  /** The API a plugin registers with (`silverware.assets.api`) */
   api(): Assets {
     return {
       version: ASSETS_VERSION,

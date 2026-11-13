@@ -1,4 +1,4 @@
-// Two of Silverware Layout's own actions (docs/silverware-assets.md, *Actions*), registered as anyone's: the
+// Two of Silverware Assets' own actions (docs/silverware-assets.md, *Actions*), registered as anyone's: the
 // asset shown in a panel at the window's right (`peek`: the page beside it still used) or enlarged over the page
 // (`popover`), each rendered as the core renders it (`render`: the type's own view, else the host's drawing, else its
 // card). One of each at a time: another shown takes its place. Esc, ×, or (the popover) a click beside it closes it.

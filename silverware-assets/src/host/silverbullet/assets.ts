@@ -14,7 +14,7 @@ import { ASSETS_PATH } from "../../model/settings.ts";
 import { documentUrl } from "./platform.ts";
 
 const FRAME = ".sb-inline-content";
-// A medium drawn outside the editor (a grid's cell) is a plain element: put in a frame of Silverware Layout's own, to
+// A medium drawn outside the editor (a grid's cell) is a plain element: put in a frame of Silverware Assets' own, to
 // be decorated as SilverBullet's widget is
 const OWN_FRAME = "swa-frame";
 const MEDIA = "img, video, audio, object";
@@ -33,7 +33,7 @@ const WEB = /^[a-z][a-z0-9+.-]*:/i;
 type Link = { readonly element: HTMLElement; readonly target: string; readonly style: "wiki" | "markdown"; readonly position?: () => number | undefined };
 type FormWrite = { readonly text: string; readonly occurrence: number; readonly of: number };
 
-/** A link's target and form as SilverBullet drew it; none for an element of Silverware Layout's own */
+/** A link's target and form as SilverBullet drew it; none for an element of Silverware Assets' own */
 export function drawnLink(element: HTMLElement): Link | undefined {
   if (element.closest(".swa-own, .swa-card")) return undefined;
   if (element.matches("a.sb-wiki-link")) return { element, target: element.getAttribute("href") ?? "", style: "wiki" };
@@ -132,7 +132,7 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
         stopTold();
       };
     },
-    // (Each link element offered once: Silverware Layout's icon put into it is no new link; the function given back stops it)
+    // (Each link element offered once: Silverware Assets' icon put into it is no new link; the function given back stops it)
     watchLinks: (drawn: (links: readonly Link[]) => void): (() => void) => {
       const seen = new WeakSet<HTMLElement>();
       const look = (root: ParentNode) => {

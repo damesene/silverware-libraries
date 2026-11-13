@@ -111,7 +111,7 @@ A part of Silverware Layout (decided 2026-11-12): it is the page's layout, it us
 - `/grid` (`slashCommand.define`) inserts two columns in the form with blank lines, the cursor in the first column's content (in the raw text: the widget shows once the cursor leaves).
 - Later a "…" menu on the grid (shared/menu): add or remove a cell, the column count and widths, move a cell. Planned in detail: *Building a grid from the page* below.
 
-## Building a grid from the page (planned 2026-11-13, not built)
+## Building a grid from the page (planned 2026-11-13; built 2026-11-13)
 
 Agreed with the user: a grid is made and taken apart without typing its tags, with the mouse or a finger, for any markdown, not only images. The grid gets the effort (a row of images by CSS alone was weighed and dropped: SilverBullet draws each embed as a block, and the grid is the more general tool).
 
@@ -132,6 +132,14 @@ Agreed with the user: a grid is made and taken apart without typing its tags, wi
 - **Shown** at the grid's top right as the pointer is over it (always on a touch screen), as a medium's; a cell's at the cell's top right.
 - **The grid**: the number of columns (Auto, 2, 3, 4: its `columns`), add a column, **Remove grid**: its content without the grid, the cells one under another in their order (row by row: cell 1, 2, 3 of the first row, then the next row's), each cell's markdown as written, a blank line between. The inverse of both modes: Gallery's cells and Split's columns are in the blocks' order.
 - **A cell**: move left, move right, add a column after it, remove the column (its content put under the grid, never lost), move out of the grid (the same, the cell gone).
+
+### Built (2026-11-13)
+
+- `shared/markdown/gridbuild.ts`: the blocks a range touches (`blocksIn`, by parse.ts: a list's items each), a grid of them by mode (`gridOfBlocks`, `splitCounts`, items of one list one list in a column, a blank line kept round the grid), a grid's text (`gridText`), a grid taken apart (`ungridded`: items split into two cells one list again; the inverse of both modes, tested). The page writer's `grids.put` (the range as read, else left alone) and `grids.changeCells` (move, add, takeOut: its content under the grid, ungrid).
+- `src/grid/build.ts`: Put into grid over a `PutHost` (the selection, a pick, the writer); SilverBullet's (`silverBulletPutHost`: `editor.getSelection`, `editor.filterBox`); the command `Silverware Layout: Put into grid`; Silverware Toolbar's action `layoutPutIntoGrid` (its parameter *Mode*: Ask, Gallery, Split), defined by the init page through `silverware.toolbar.defineActions` where Silverware Toolbar is installed.
+- `src/grid/ui/cellmenu.ts`: one "…" a cell (not one for the grid besides: they would lie at one corner), its sections the cell's (move left, move right, add a column after it, move out of the grid), the columns (automatic, 2, 3, 4: the attribute), the grid's (a column at the end, remove the grid). Silverware Layout's popup menu moved to `src/ui/popupmenu.ts`, the media's, the links' and the cells' alike.
+- Fixed with it: SilverBullet's button bar of a grid's frame showed as the pointer was over the grid (2.12.1 puts it in a div of the frame, and draws the frame anew with a bar of its own): hidden now by one watcher of the document for every grid's frame (`hideGridBars`).
+- Seen in SilverBullet 2.12.1: five tasks selected, Split into 2 columns (3 and 2, one list each, their states kept), Gallery into 2 (`columns="2"`, a cell each); a cell moved right, 3 columns set, a cell moved out under the grid, the grid removed (its cells in order); Silverware Toolbar knew the action.
 
 ### Open
 

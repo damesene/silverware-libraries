@@ -245,3 +245,41 @@ describe("a grid's width, as Silverware Layout's widget", () => {
     expect(await gridProvider(grids).write(document.createElement("div"), { width: "900" })).toBe("the grid is not drawn");
   });
 });
+
+describe("a cell's menu", () => {
+  it("moves the cell, sets the grid's columns, takes the grid apart, each through the host", async () => {
+    const { state, gridHost } = host(`<grid>\n${body}\n</grid>\n`);
+    const changes: unknown[] = [];
+    const grids = new Grids(document, { ...gridHost, changeCells: async (write) => void changes.push(write.cells) });
+    const grid = await grids.render(body);
+    document.body.append(grid);
+    const menuOf = (cell: number) => {
+      grid.querySelectorAll<HTMLElement>(".swl-grid-cell-more")[cell]!.click();
+      return [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")];
+    };
+    const pick = async (cell: number, label: string) => {
+      menuOf(cell).find((item) => item.textContent?.trim() === label)!.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    expect(menuOf(0).map((item) => item.textContent?.trim())).toEqual([
+      "Move left",
+      "Move right",
+      "Add a column after it",
+      "Move out of the grid",
+      "Columns: automatic",
+      "2 columns",
+      "3 columns",
+      "4 columns",
+      "Add a column at the end",
+      "Remove the grid, its content kept",
+    ]);
+    // (Closed again by its button)
+    grid.querySelector<HTMLElement>(".swl-grid-cell-more")!.click();
+    await pick(0, "Move right");
+    await pick(1, "Move out of the grid");
+    await pick(0, "Remove the grid, its content kept");
+    expect(changes).toEqual([{ kind: "move", cell: 0, by: 1 }, { kind: "takeOut", cell: 1 }, { kind: "ungrid" }]);
+    await pick(0, "3 columns");
+    expect(state.attributeWrites.map((write) => write.attributes)).toEqual([{ columns: "3" }]);
+  });
+});

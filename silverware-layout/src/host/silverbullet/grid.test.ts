@@ -53,8 +53,13 @@ describe("SilverBullet's grid host", () => {
     const bar = Object.assign(document.createElement("div"), { className: "button-bar" });
     const grid = document.createElement("div");
     bridgeOf("").host.settle(grid);
-    // In the page a frame later, as SilverBullet puts a widget's content in after its renderer returns
-    frame.append(bar, grid);
+    // In the page a frame later, as SilverBullet puts a widget's content in after its renderer returns: its bar in a
+    // div of the frame, beside the content (2.12.1)
+    const inner = document.createElement("div");
+    const content = Object.assign(document.createElement("div"), { className: "content" });
+    content.append(grid);
+    inner.append(bar, content);
+    frame.append(inner);
     document.body.append(frame);
     await vi.waitFor(() => expect(bar.style.getPropertyValue("display")).toBe("none"));
     expect(bar.style.getPropertyPriority("display")).toBe("important");

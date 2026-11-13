@@ -12,14 +12,20 @@ import { resolvedTarget } from "./assets.ts";
 import { documentUrl } from "./platform.ts";
 import { keepUndrawn } from "./undrawn.ts";
 
-// SilverBullet's frame of a widget, and its button bar in it (2.12.1: .button-bar; its main: .sb-widget-menu-bar)
-const FRAME = ".sb-lua-directive-block";
-const BARS = ":scope > .button-bar, :scope > .sb-widget-menu-bar";
-// How many frames a grid drawn is waited for to be in the page
-const SETTLE_FRAMES = 60;
+// SilverBullet's frame of a grid (its custom syntax's, the class the init page gives it), and its button bar in it
+// (2.12.1: .button-bar, in a div of the frame beside the widget's content, probed 2026-11-13; its main: .sb-widget-menu-bar)
+const GRID_FRAME = ".swl-grid-widget";
+const GRID_BARS = ".swl-grid-widget .button-bar, .swl-grid-widget .sb-widget-menu-bar";
 
 /** A cell to write (src/grid/grids.ts' `CellWrite`, named here apart: the host knows no area) */
 type CellWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly cell: number; readonly content: string };
+/** A grid's cells to change (src/grid/grids.ts' `CellsWrite`) */
+type CellsWrite = {
+  readonly body: string;
+  readonly occurrence: number;
+  readonly of: number;
+  readonly cells: { readonly kind: "move"; readonly cell: number; readonly by: -1 | 1 } | { readonly kind: "add"; readonly after?: number } | { readonly kind: "takeOut"; readonly cell: number } | { readonly kind: "ungrid" };
+};
 /** A grid's attributes to write (src/grid/grids.ts' `AttributesWrite`) */
 type AttributesWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly attributes: Readonly<Record<string, string | null>> };
 
@@ -44,29 +50,48 @@ export function silverBulletGridHost(bridge: Bridge, writer: PageWriter) {
       const report = await writer.write(pageChanges().page(page, (p) => p.grids.setAttributes(write.body, write.attributes, { occurrence: write.occurrence, of: write.of })).build());
       return report.skipped[0]?.reason;
     },
+    changeCells: async (write: CellsWrite): Promise<string | undefined> => {
+      const page = String(await bridge.getCurrentPage());
+      const report = await writer.write(pageChanges().page(page, (p) => p.grids.changeCells(write.body, write.cells, { occurrence: write.occurrence, of: write.of })).build());
+      return report.skipped[0]?.reason;
+    },
     moveCursor: (at: number): void => {
       if (bridge.moveCursor) void bridge.moveCursor(at, true);
     },
     problem: (message: string): void => void bridge.flash(message, "error"),
-    settle: (element: HTMLElement): void => whenInPage(element, () => bare(element)),
+    settle: (element: HTMLElement): void => hideGridBars(element.ownerDocument),
   };
 }
 
-/** `then` once the element is in the page (SilverBullet puts a widget's content into its frame after the renderer returns) */
-function whenInPage(element: HTMLElement, then: () => void, frames = SETTLE_FRAMES): void {
-  if (element.isConnected) return then();
-  if (frames <= 0) return;
-  const win = element.ownerDocument.defaultView;
+/**
+ * The button bars of SilverBullet's frames round grids hidden, those there now and each put in after (once per
+ * document): SilverBullet puts its bar in after the grid, and draws a frame anew (CodeMirror's widget made again, the
+ * grid's element moved into it) with a bar of its own, so a frame watched alone was left with one shown. A frame of a
+ * grid is SilverBullet's custom syntax's, given the class `swl-grid-widget` by the init page
+ */
+function hideGridBars(doc: Document): void {
+  if (watched.has(doc)) return;
+  watched.add(doc);
+  const win = doc.defaultView;
   if (!win) return;
-  win.requestAnimationFrame(() => whenInPage(element, then, frames - 1));
+  const hide = (root: ParentNode) => {
+    // (Not one in a grid's own content: a cell's markdown may hold a widget of its own)
+    for (const bar of root.querySelectorAll<HTMLElement>(GRID_BARS)) {
+      if (!bar.closest(".swl-grid") && bar.style.getPropertyValue("display") !== "none") bar.style.setProperty("display", "none", "important");
+    }
+  };
+  hide(doc);
+  new win.MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (!(node instanceof win.Element)) continue;
+        const frame = node.closest(GRID_FRAME);
+        hide(frame ?? node);
+      }
+    }
+  }).observe(doc.body, { childList: true, subtree: true });
 }
-
-/** SilverBullet's frame round a grid: its bar of buttons hidden */
-function bare(element: HTMLElement): void {
-  const frame = element.closest<HTMLElement>(FRAME);
-  if (!frame) return;
-  for (const bar of frame.querySelectorAll<HTMLElement>(BARS)) bar.style.setProperty("display", "none", "important");
-}
+const watched = new WeakSet<Document>();
 
 /** What Put into grid asks of SilverBullet (src/grid/build.ts' `PutHost`): its selection, its filter box, the page writer */
 export function silverBulletPutHost(bridge: Bridge, writer: PageWriter) {

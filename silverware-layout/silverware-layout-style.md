@@ -1140,6 +1140,44 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   opacity: 0;
   cursor: pointer;
 }
+/* A grid's cell's "…", as a medium's, at the cell's top right as the pointer is over the cell */
+.swl-grid-cell {
+  position: relative;
+}
+.swl-grid-cell-more {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: var(--sw-layer-control);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 4px;
+  font: inherit;
+  line-height: 1;
+  color: inherit;
+  background: var(--root-background-color);
+  opacity: 0;
+  cursor: pointer;
+}
+.swl-grid-cell:hover > .swl-grid-cell-more,
+.swl-grid-cell-more:focus-visible,
+.swl-grid-cell-more[aria-expanded="true"] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .swl-grid-cell-more {
+    opacity: 0.8;
+  }
+}
+/* (A medium's "…" in a cell over the cell's, a step up: the one pointed at is the medium's) */
+.swl-grid-cell .swl-asset-more {
+  z-index: calc(var(--sw-layer-control) + 1);
+}
 [data-swl-asset]:hover > .swl-asset-more,
 .swl-asset-more:focus-visible,
 .swl-asset-more[aria-expanded="true"] {

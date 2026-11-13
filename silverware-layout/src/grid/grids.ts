@@ -12,6 +12,7 @@ import { type Grid, readGridBody, readGrids } from "../../../shared/markdown/gri
 import { gridsOfBody } from "./core/match.ts";
 import { positionInCell, wordAt } from "./core/position.ts";
 import { columnTemplate } from "./model/columns.ts";
+import { addCellMenus, type CellAction } from "./ui/cellmenu.ts";
 import { caretWord, editCell } from "./ui/celleditor.ts";
 import { drawGrid, plainCell, showColumns } from "./ui/view.ts";
 
@@ -20,6 +21,14 @@ export type CellWrite = { readonly body: string; readonly occurrence: number; re
 
 /** A grid's attributes to write (a value, or null: taken off), the grid found as a cell's is */
 export type AttributesWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly attributes: Readonly<Record<string, string | null>> };
+
+/** A grid's cells to change (shared/pages' `GridCellsChange`, named here apart), the grid found as a cell's is */
+export type CellsChange =
+  | { readonly kind: "move"; readonly cell: number; readonly by: -1 | 1 }
+  | { readonly kind: "add"; readonly after?: number }
+  | { readonly kind: "takeOut"; readonly cell: number }
+  | { readonly kind: "ungrid" };
+export type CellsWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly cells: CellsChange };
 
 /** What the grids ask of the host whose page they are in */
 export type GridHost = {
@@ -31,6 +40,8 @@ export type GridHost = {
   writeCell(write: CellWrite): Promise<string | undefined>;
   /** A grid's attributes written on its `<grid>` line (one edit); why not, as text */
   writeAttributes(write: AttributesWrite): Promise<string | undefined>;
+  /** A grid's cells changed (one edit): moved, added, taken out, all taken apart; why not, as text */
+  changeCells?(write: CellsWrite): Promise<string | undefined>;
   /** The page's cursor put at an offset in its text, the raw text shown there */
   moveCursor(at: number): void;
   /** A problem said to the user */
@@ -118,6 +129,8 @@ export class Grids {
     this.attributes.set(element, attributes);
     // Where its cells are in the page (the first grid of its body; set again as it is found among its alike)
     if (first) markPlaces(element, first);
+    // Each cell's "…": what can be done with it and with the grid
+    if (this.host.changeCells) addCellMenus(this.doc, element, () => ({ columns: this.attributesOf(element).columns, cells: cells.length }), (cell, action) => void this.cellAction(element, cell, action));
     this.host.settle?.(element);
     // In the page, its order among the grids of its body is known: its own attributes then
     this.refreshSoon();
@@ -176,6 +189,18 @@ export class Grids {
     }
     this.attributes.set(element, kept);
     return undefined;
+  }
+
+  /** What a cell's menu chose, written: the grid's columns as an attribute, a change of its cells by the host */
+  async cellAction(element: HTMLElement, cell: number, action: CellAction): Promise<void> {
+    const said = (problem: string | undefined) => problem && this.host.problem(`Silverware Layout: the grid was not changed: ${problem}`);
+    if (action.kind === "columns") return void said(await this.writeAttributes(element, { columns: action.columns }));
+    const text = await this.host.pageText().catch(() => undefined);
+    const found = text === undefined ? undefined : this.found(text, element);
+    if (!found || !this.host.changeCells) return void said("this grid changed in the page since it was drawn");
+    const cells: CellsChange =
+      action.kind === "move" ? { kind: "move", cell, by: action.by } : action.kind === "addAfter" ? { kind: "add", after: cell } : action.kind === "takeOut" ? { kind: "takeOut", cell } : action.kind === "addColumn" ? { kind: "add" } : { kind: "ungrid" };
+    said(await this.host.changeCells({ body: found.grid.body, occurrence: found.occurrence, of: found.of, cells }).catch((error: unknown) => (error instanceof Error ? error.message : String(error))));
   }
 
   /** `refresh` a moment later, once (several asked at once: one) */

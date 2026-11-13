@@ -11,7 +11,8 @@ import { metadataOf } from "./core/metadata.ts";
 import type { AssetRegistry } from "./core/registry.ts";
 import { type AssetSettings, type Gesture, type View, VIEWS } from "./model/settings.ts";
 import { addCardFields, dateText, drawCard, iconElement, markFailed, sizeText } from "./ui/card.ts";
-import { addMoreButton, opensMenu } from "./ui/moremenu.ts";
+import { opensMenu } from "../ui/popupmenu.ts";
+import { addMoreButton, popupOf } from "./ui/moremenu.ts";
 import { plainMedium } from "./ui/plainmedium.ts";
 
 /** An embed as the host drew it: its frame, its target as drawn (a path of the space or a URL), its own media element */
@@ -135,14 +136,15 @@ export class AssetDecorator {
       opensMenu(
         this.doc,
         icon,
-        () => ({
-          title: assetName(asset),
-          views: [],
-          actions: [
-            ...this.actionItems(asset, capabilities, (container, as) => this.drawInto(container, as, type, asset, settings, control.signal)),
-            ...(this.host.linkToEmbed ? [{ label: "Show as embedded", run: () => void this.toEmbed(link) }] : []),
-          ],
-        }),
+        () =>
+          popupOf({
+            title: assetName(asset),
+            views: [],
+            actions: [
+              ...this.actionItems(asset, capabilities, (container, as) => this.drawInto(container, as, type, asset, settings, control.signal)),
+              ...(this.host.linkToEmbed ? [{ label: "Show as embedded", run: () => void this.toEmbed(link) }] : []),
+            ],
+          }),
         control.signal,
       );
     }

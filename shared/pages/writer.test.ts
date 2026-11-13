@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Editor, Space } from "../platform.ts";
-import { pageChanges } from "./changes.ts";
+import { type PageBuilder, pageChanges } from "./changes.ts";
 import { diffLines, minimalEdit } from "./diff.ts";
 import { PageHistory } from "./history.ts";
 import { PARTS } from "./parts.ts";
+import { readGrids } from "../markdown/grid.ts";
 import { pageWriter } from "./writer.ts";
 
 /** A space of pages in memory, `open` the page in its editor; `edits` what the editor was asked */
@@ -381,6 +382,36 @@ describe("the page writer", () => {
     expect(map.get("A")).toBe("[[cat.png|Cat]] and [[doc.pdf]] ![[doc.pdf]]\n");
     const gone = await writer.plan(pageChanges().page("A", (p) => p.links.toEmbed("[[nope.pdf]]")).build());
     expect(gone.skipped.map((one) => one.reason)).toEqual(["its link changed since it was read: left alone"]);
+  });
+
+  it("puts a selection's blocks into a grid, the text as read alone", async () => {
+    const text = "Top\n\nOne\n\nTwo\n\nThree\n";
+    const { map, writer } = memory({ A: text });
+    const from = text.indexOf("One");
+    const to = text.indexOf("Three") + 5;
+    await writer.write(pageChanges().page("A", (p) => p.grids.put(from, to, text.slice(from, to), "split", 2)).build());
+    expect(map.get("A")).toBe("Top\n\n<grid>\n<column>\n\nOne\n\nTwo\n\n</column>\n<column>\n\nThree\n\n</column>\n</grid>\n");
+    const stale = await writer.plan(pageChanges().page("A", (p) => p.grids.put(from, to, "something else", "gallery", 3)).build());
+    expect(stale.skipped.map((one) => one.reason)).toEqual(["the text changed since it was read: left alone"]);
+  });
+
+  it("changes a grid's cells: one moved, one added, one taken out under it, all taken apart", async () => {
+    const grid = '<grid columns="3">\n<column>\n\nA\n\n</column>\n<column>\n\nB\n\n</column>\n</grid>';
+    const body = readGrids(grid)[0]!.body;
+    const { map, writer } = memory({ A: `${grid}\n\nAfter\n` });
+    const change = async (cells: Parameters<PageBuilder["grids"]["changeCells"]>[1]) => {
+      const now = readGrids(map.get("A")!)[0]!.body;
+      await writer.write(pageChanges().page("A", (p) => p.grids.changeCells(now, cells)).build());
+    };
+    await change({ kind: "move", cell: 0, by: 1 });
+    expect(map.get("A")).toBe('<grid columns="3">\n<column>\n\nB\n\n</column>\n<column>\n\nA\n\n</column>\n</grid>\n\nAfter\n');
+    await change({ kind: "add", after: 0 });
+    expect(readGrids(map.get("A")!)[0]!.cells.map((cell) => cell.content)).toEqual(["B", "", "A"]);
+    await change({ kind: "takeOut", cell: 2 });
+    expect(map.get("A")).toBe('<grid columns="3">\n<column>\n\nB\n\n</column>\n<column>\n\n\n</column>\n</grid>\n\nA\n\nAfter\n');
+    await change({ kind: "ungrid" });
+    expect(map.get("A")).toBe("B\n\nA\n\nAfter\n");
+    expect(body).toContain("<column>");
   });
 
   it("closes a grid's cell left open as it writes it", async () => {

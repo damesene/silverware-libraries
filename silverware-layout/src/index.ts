@@ -22,6 +22,7 @@ import { gridTags } from "./grid/core/tags.ts";
 import { gridRelations, gridTagObjects } from "./host/silverbullet/gridindex.ts";
 import { Grids } from "./grid/grids.ts";
 import { gridProvider } from "./grid/provider.ts";
+import { watchEmbeddedGrids } from "./host/silverbullet/embeddedgrids.ts";
 import { silverBulletGridHost } from "./host/silverbullet/grid.ts";
 import { keepDeviceZoom, readDeviceZoom } from "./host/devicezoom.ts";
 import { silverBulletPage } from "./host/silverbullet/dom.ts";
@@ -73,6 +74,9 @@ export async function init(bridge: Bridge): Promise<void> {
     // A grid's width laid out as any widget's, registered as a widget plugin registers
     registry.register(gridProvider(grids));
     grids.onAttributes = () => app.layOutWidgets();
+    // A grid in a page embedded in this one, which SilverBullet shows as its text: drawn as the grid it is
+    const drawing = grids;
+    watchEmbeddedGrids(document, (text) => drawing.drawText(text));
   }
   const raw = silverBulletAssetHost(bridge, writer, document);
   const assetHost: AssetHost = { ...raw, settings: async () => readAssetSettings(await raw.settings()).settings };

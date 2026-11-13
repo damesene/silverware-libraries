@@ -2,9 +2,9 @@
 // or audio as its element; a PDF it leaves out (its <object> lost), any other file it leaves as its text (`![[a.zip]]`).
 // In the page, its widget draws them (a PDF viewer, its words that it cannot): in a cell rendered outside the editor a
 // PDF is drawn as the widget draws it (an <object> of its URL), any other kept as a place, `<span data-swl-embed=
-// "<target>" data-pos="<offset>">`, which the assets' host frames as it frames a medium (./assets.ts). Done by
-// rendering a stand-in of each, an image SilverBullet does draw, swapped for the place in its HTML; the offsets after
-// it set back by the difference in length, so `data-pos` is the text's. Pure.
+// "<target>" data-pos="<offset>">` (its text in it), which the assets' host frames as it frames a medium
+// (./assets.ts). Done by rendering a stand-in of each, an image SilverBullet does draw, swapped for the place in its
+// HTML; the offsets after it set back by the difference in length, so `data-pos` is the text's. Pure.
 import { type Embed, readEmbeds } from "../../../../shared/markdown/embed.ts";
 
 // What SilverBullet draws by an embed's extension: its media's (an image, audio, video; `createMediaElement`)
@@ -62,7 +62,8 @@ export function keepUndrawn(text: string, urlOf?: (embed: Embed) => string): { r
           if (!one) return all;
           if (urlOf && /\.pdf$/i.test(one.embed.target.split(/[?#@$]/, 1)[0]!))
             return `<object type="application/pdf" data="${escaped(urlOf(one.embed))}" data-pos="${one.original}" style="width: 100%; max-width: 100%;"></object>`;
-          return `<span class="swl-embed" data-swl-embed="${escaped(one.embed.target)}" data-pos="${one.original}"></span>`;
+          // (Its text in it, as SilverBullet's HTML had it: what shows where nothing decorates it)
+          return `<span class="swl-embed" data-swl-embed="${escaped(one.embed.target)}" data-pos="${one.original}">${escaped(one.embed.text)}</span>`;
         }),
   };
 }

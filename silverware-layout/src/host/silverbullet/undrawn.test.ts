@@ -32,7 +32,7 @@ describe("embeds SilverBullet's HTML draws none of", () => {
     const kept = keepUndrawn(text, (embed) => `.fs/${embed.target}`);
     expect(kept.text).toBe("Top\n\n![swl-embed-0](data:,.png)\n\n![swl-embed-1](data:,.png)\n\nEnd");
     const html = kept.restore(render(kept.text));
-    expect(html).toContain(`<span class="swl-embed" data-swl-embed="archive.zip" data-pos="${text.indexOf("![[archive")}"></span>`);
+    expect(html).toContain(`<span class="swl-embed" data-swl-embed="archive.zip" data-pos="${text.indexOf("![[archive")}">![[archive.zip]]</span>`);
     expect(html).toContain(`<object type="application/pdf" data=".fs/sample.pdf" data-pos="${text.indexOf("![[sample")}"`);
     expect(html).toContain(`<span class="p" data-pos="${text.indexOf("End")}">End</span>`);
     expect(html).not.toContain("swl-embed-");

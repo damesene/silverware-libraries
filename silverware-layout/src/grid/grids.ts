@@ -8,7 +8,7 @@
 // text with the cursor where the click was. Which of the page's grids a grid drawn is: the one of its body, by its
 // order among the grids of that body drawn (core/match.ts).
 import type { Attributes } from "../../../shared/markdown/attributes.ts";
-import { type Grid, readGridBody } from "../../../shared/markdown/grid.ts";
+import { type Grid, readGridBody, readGrids } from "../../../shared/markdown/grid.ts";
 import { gridsOfBody } from "./core/match.ts";
 import { positionInCell, wordAt } from "./core/position.ts";
 import { columnTemplate } from "./model/columns.ts";
@@ -121,6 +121,20 @@ export class Grids {
     this.host.settle?.(element);
     // In the page, its order among the grids of its body is known: its own attributes then
     this.refreshSoon();
+    return element;
+  }
+
+  /**
+   * A grid of another page's text drawn, as its own `<grid>` line says (a page embedded in this one, which the host
+   * shows as text): its cells rendered, not edited here (it is no grid of this page: no click nor Alt+click is its)
+   */
+  async drawText(gridText: string): Promise<HTMLElement | undefined> {
+    const grid = readGrids(gridText)[0];
+    if (!grid) return undefined;
+    const cells = readGridBody(grid.body);
+    const html = await Promise.all(cells.map((cell) => this.host.renderMarkdown(cell.content).catch(() => plainCell(this.doc, cell.content))));
+    const element = drawGrid(this.doc, columnTemplate(grid.attributes.columns, cells.length), html);
+    element.classList.add("swl-grid-shown");
     return element;
   }
 

@@ -4,12 +4,12 @@
 // Pixels only: SilverBullet's `%` is of the medium's box, Silverware Layout's of the editor's pane, so a width in % is
 // left to SilverBullet, and one Layout gives in % or `full` is written as the pixels it shows. Drawn outside the editor
 // (a grid's cell) its room is that box: its quarters its snaps, no wider.
-import type { LayoutChanges, LayoutEntries, LayoutProvider } from "../../../shared/layout.ts";
+import type { LayoutChanges, LayoutEntries, LayoutProvider } from "../../shared/layout.ts";
 import type { AssetDecorator } from "./decorate.ts";
 
 export function assetProvider(assets: AssetDecorator): LayoutProvider {
   return {
-    name: "silverware-layout-assets",
+    name: "silverware-assets",
     // (Not a card, which has no size, nor a preview of an image or a video, which its height sizes: a PDF's preview is as wide as its frame)
     selector: '[data-swl-asset]:not([data-swl-asset-view="icon"], [data-swl-asset-view="preview"]:not(:has(object, .swl-asset-pdf)))',
     read: (element): LayoutEntries => {

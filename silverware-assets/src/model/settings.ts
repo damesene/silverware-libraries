@@ -1,4 +1,4 @@
-// The assets' settings (docs/silverware-layout-assets.md, *Settings and the Media tab*): how an asset is shown and
+// The assets' settings (docs/silverware-assets.md, *Settings and the Media tab*): how an asset is shown and
 // what a click on it does, a default and an override per type, what the card shows, a view's default height. Types and
 // actions are named here as data, never as code. Pure.
 
@@ -24,8 +24,13 @@ export type AssetSettings = {
   readonly linkIcons: boolean;
 };
 
-/** Where the settings are kept: Silverware Layout's own block of CONFIG (a table the Configuration Manager would lose) */
-export const ASSETS_PATH = "silverware.layout.assets";
+/** Where the settings are kept (read whole): Silverware Assets' own block of CONFIG (tables the Configuration Manager would lose) */
+export const ASSETS_PATH = "silverware.assets";
+
+/** The settings as kept, each key its own path (`silverware.assets.views`…): other settings under `silverware.assets` left as they are */
+export function storedAssetPaths(settings: AssetSettings): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(storedAssetSettings(settings)).map(([key, value]) => [`${ASSETS_PATH}.${key}`, value]));
+}
 
 /** The settings as kept: plain data, as Lua writes a table */
 export function storedAssetSettings(settings: AssetSettings): Record<string, unknown> {

@@ -1,8 +1,8 @@
-// An asset's "…" button (docs/silverware-layout-assets.md, *Views*): on its frame, at its top right, opening the
+// An asset's "…" button (docs/silverware-assets.md, *Views*): on its frame, at its top right, opening the
 // asset's menu (the shared popup menu, shared/popupmenu.ts): how it is shown (icon, preview, embed: the one it is
 // shown as checked, one that cannot be drawn disabled), then what can be done with it.
-import { el } from "../../../../shared/elements.ts";
-import { opensMenu, type PopupMenu } from "../../../../shared/popupmenu.ts";
+import { el } from "../../../shared/elements.ts";
+import { opensMenu, type PopupMenu } from "../../../shared/popupmenu.ts";
 
 // The popup menu's classes: Silverware Layout's
 const POPUP = { base: "swl" } as const;

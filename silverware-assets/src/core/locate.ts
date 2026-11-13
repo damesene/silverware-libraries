@@ -1,8 +1,8 @@
-// Which of a page's embeds an embed drawn by the host is (docs/silverware-layout-assets.md, probe 1: SilverBullet's
+// Which of a page's embeds an embed drawn by the host is (docs/silverware-assets.md, probe 1: SilverBullet's
 // widget of an embed carries no position): the embeds of its target in the page's order, the one by its order among
 // the widgets of that target drawn. A widget scrolled out of view is not drawn, so the order may be short: the last
 // of them then. Pure.
-import type { Embed } from "../../../../shared/markdown/embed.ts";
+import type { Embed } from "../../../shared/markdown/embed.ts";
 
 /** A target as compared: no leading `/`, no `.md`, decoded, lower case */
 export function sameTarget(target: string): string {

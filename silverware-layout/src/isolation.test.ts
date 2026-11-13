@@ -64,21 +64,15 @@ describe("isolation", () => {
     expect(code(rules).match(sbNames)?.[0], "silverware-layout-style.md").toBeUndefined();
   });
 
-  // Areas (docs/silverware-layout-grid.md, docs/silverware-layout-assets.md): a part of Silverware Layout with
-  // Layout's layers inside, under the same rules; Layout's own layers know no area, and no area knows another
-  const AREAS = ["grid", "assets"];
+  // Areas (docs/silverware-layout-grid.md): a part of Silverware Layout with Layout's layers inside, under the same
+  // rules; Layout's own layers know no area, and no area knows another
+  const AREAS = ["grid"];
   it("keeps an area's model to itself, and Layout's layers off every area", () => {
     for (const area of AREAS) {
       for (const [file, list] of of(`${area}/model`)) expect(list.filter((path) => !path.startsWith(`${area}/model/`)), file).toEqual([]);
     }
     for (const [file, list] of [...of("model"), ...of("core"), ...of("ui"), ...of("host")]) {
       expect(list.filter((path) => AREAS.some((area) => path.startsWith(`${area}/`))), file).toEqual([]);
-    }
-  });
-
-  it("registers the assets' built-in types and actions through the contract alone, as anyone's", () => {
-    for (const [file, list] of of("assets/builtin")) {
-      expect(list.filter((path) => !path.startsWith("assets/builtin/") && path !== "shared/assets.ts" && path !== "shared/elements.ts"), file).toEqual([]);
     }
   });
 

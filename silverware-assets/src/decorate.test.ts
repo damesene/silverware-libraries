@@ -3,8 +3,8 @@
 // "Unsupported content"), the page's text kept here. No SilverBullet is needed to find an embed drawn in the page,
 // choose its view and run a click's action.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AssetType } from "../../../shared/assets.ts";
-import { readEmbeds } from "../../../shared/markdown/embed.ts";
+import type { AssetType } from "../../shared/assets.ts";
+import { readEmbeds } from "../../shared/markdown/embed.ts";
 import { registerBuiltins } from "./builtin/index.ts";
 import { AssetRegistry } from "./core/registry.ts";
 import { AssetDecorator, type AssetHost, type DrawnEmbed, type EmbedWrite } from "./decorate.ts";
@@ -133,7 +133,7 @@ describe("embedded media decorated", () => {
     await decorator.decorate([one]);
     await vi.waitFor(() => expect(one.frame.querySelector("canvas")).not.toBeNull());
     await written;
-    expect(await refused).toBe('"view" is Silverware Layout\'s own key');
+    expect(await refused).toBe('"view" is Silverware Assets\' own key');
     expect(state.writes).toEqual([{ text: readEmbeds(state.text)[0]!.text, occurrence: 0, of: 1, changes: { metadata: { zoom: "3" } } }]);
   });
 });

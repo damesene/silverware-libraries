@@ -65,10 +65,6 @@ config.define("silverware.layout", {
         },
       },
     },
-    assets = {
-      type = "object",
-      description = "Embedded media: how each type is shown (views), what a click and a Shift+click do (actions), what a card shows (card), a view's default height (heights), where a medium stays as its width is dragged (anchor). Set in the Page layout dialog (Media), kept in Silverware Layout's own block of CONFIG.",
-    },
     guides = {
       type = "array",
       description = "The widths a drag snaps to and shows a guide at, in px (\"1200px\"), in % of the editor's width (\"80%\"), or full (the editor's width). Set in the Page layout dialog (Guides), kept in Silverware Layout's own block of CONFIG.",
@@ -107,8 +103,6 @@ if js and js.window then
     end,
     -- Whether SilverBullet shows the markdown's syntax (Editor: Toggle Markdown Syntax Rendering): media and grids hidden then
     getUiOption = editor.getUiOption,
-    -- A file's card: its size and date (an error where it is not in the space: the card shows its name alone)
-    documentMeta = space.getDocumentMeta,
     -- How a link written new is written: SilverBullet's own setting, the one place naming it
     linkStyle = function()
       return config.get("defaultLinkStyle", "wikilink")

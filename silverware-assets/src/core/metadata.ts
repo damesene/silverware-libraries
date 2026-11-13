@@ -1,7 +1,7 @@
 // A type's own metadata of an embed, as a renderer is handed them (shared/assets.ts, `AssetMetadata`): Silverware
 // Layout's reserved keys left out, read by helpers so that no type converts values itself, written through Silverware
 // Layout. Pure.
-import type { AssetMetadata } from "../../../../shared/assets.ts";
+import type { AssetMetadata } from "../../../shared/assets.ts";
 import { RESERVED_KEYS } from "./registry.ts";
 
 export function metadataOf(all: Readonly<Record<string, string>>, write: (changes: Readonly<Record<string, string | null>>) => Promise<string | undefined>): AssetMetadata {
@@ -19,7 +19,7 @@ export function metadataOf(all: Readonly<Record<string, string>>, write: (change
     text: (key) => values[key],
     write: (changes) => {
       const reserved = Object.keys(changes).find((key) => RESERVED_KEYS.includes(key));
-      if (reserved) return Promise.resolve(`"${reserved}" is Silverware Layout's own key`);
+      if (reserved) return Promise.resolve(`"${reserved}" is Silverware Assets' own key`);
       return write(Object.fromEntries(Object.entries(changes).map(([key, value]) => [key, value === null ? null : String(value)])));
     },
   };

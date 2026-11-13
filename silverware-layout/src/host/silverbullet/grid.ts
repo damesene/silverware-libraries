@@ -5,10 +5,10 @@
 // a rule naming `#sb-main`, also important, whose specificity no rule of a style page naming no SilverBullet element
 // outweighs. (The frame's border is the style page's, by the class the init page gives the frame: SilverBullet sets it
 // unimportant. An inline border set here did not hold in 2.12.1, 2026-11-13: the frame's style is SilverBullet's.)
+import { resolvedTarget } from "../../../../shared/markdown/embed.ts";
 import { pageChanges } from "../../../../shared/pages/changes.ts";
 import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
-import { resolvedTarget } from "./assets.ts";
 import { documentUrl } from "./platform.ts";
 import { ownTasks } from "./tasks.ts";
 import { keepUndrawn } from "./undrawn.ts";

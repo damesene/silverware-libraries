@@ -9,14 +9,7 @@ import { type PageWriter, pageWriter } from "../../shared/pages/writer.ts";
 import { LayoutApp, type LayoutStore } from "./app.ts";
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { Registry } from "./core/registry.ts";
-import { registerBuiltins } from "./assets/builtin/index.ts";
-import { AssetRegistry } from "./assets/core/registry.ts";
-import { AssetDecorator, type AssetHost } from "./assets/decorate.ts";
-import { assetProvider } from "./assets/provider.ts";
-import { mediaTab } from "./assets/ui/mediatab.ts";
-import { ASSETS_PATH, readAssetSettings, storedAssetSettings } from "./assets/model/settings.ts";
 import { RENDERED_VERSION, type Rendered, type RenderedItem } from "../../shared/rendered.ts";
-import { silverBulletAssetHost } from "./host/silverbullet/assets.ts";
 import { gridInsertion } from "./grid/core/insert.ts";
 import { gridLinks } from "./grid/core/links.ts";
 import { GRID_MODES, isGridMode, putIntoGrid } from "./grid/build.ts";
@@ -47,12 +40,11 @@ const OWN_MARKER = "-- managed-by: silverware-layout";
 const registry = new Registry((message) => app.problem(message));
 const app = new LayoutApp(document, silverBulletPage(document), registry);
 
-// The types of asset and actions (docs/silverware-layout-assets.md), one registry per window as the providers'
-const assetRegistry = new AssetRegistry((message) => app.problem(message));
-registerBuiltins(assetRegistry);
-
-/** Silverware Layout's API, as its API page hands it to the widget plugins (`silverware.layout.api`): the widgets' providers, and `assets` (shared/assets.ts) */
-export const api = Object.assign(registry.api(), { assets: assetRegistry.api(), rendered: renderedApi() });
+/**
+ * Silverware Layout's API, as its API page hands it to the widget plugins (`silverware.layout.api`): the widgets'
+ * providers (shared/layout.ts), and what its grids draw outside the editor (`rendered`, shared/rendered.ts)
+ */
+export const api = Object.assign(registry.api(), { rendered: renderedApi(), layOutAgain: () => app.layOutWidgets() });
 
 // The page's grids (docs/silverware-layout-grid.md), made as the init page hands SilverBullet's API over
 let grids: Grids | undefined;
@@ -71,8 +63,6 @@ function renderedApi(): Rendered {
     },
   };
 }
-// The embedded media decorated, made as the API is handed over
-let assets: AssetDecorator | undefined;
 
 /** Started by the init page (again as Space Lua loads again): SilverBullet's API handed over */
 export async function init(bridge: Bridge): Promise<void> {
@@ -108,36 +98,16 @@ export async function init(bridge: Bridge): Promise<void> {
       () => (current ? readSyntaxSettings(current) : { hideWidgets: true, clickPlacesCursor: true }),
     );
   }
-  const raw = silverBulletAssetHost(bridge, writer, document, api.rendered);
-  const assetHost: AssetHost = { ...raw, settings: async () => readAssetSettings(await raw.settings()).settings };
-  if (assets) assets.useHost(assetHost);
-  else {
-    assets = new AssetDecorator(document, assetHost, assetRegistry);
-    // A medium's width laid out as a widget's, registered as a widget plugin registers
-    registry.register(assetProvider(assets));
-    assets.onDecorated = () => app.layOutWidgets();
-    assets.start();
-  }
-  // The Media tab of the Page layout dialog, made as it opens: the settings as configured, the types and actions registered
-  const decorator = assets;
-  app.dialogTabs = async () => {
-    const settings = await assetHost.settings();
-    const input = { settings, types: assetRegistry.types.all.map(({ name, icon }) => ({ name, icon })), actions: assetRegistry.actions.all.map(({ name, label }) => ({ name, ...(label ? { label } : {}) })) };
-    return [
-      mediaTab(document, input, async (saved) => {
-        await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, { [ASSETS_PATH]: storedAssetSettings(saved) }, OWN_MARKER));
-        await decorator.redecorateAll();
-        return undefined;
-      }),
-      syntaxTab(document, await readSyntaxSettings(bridge), async (saved) => {
-        await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
-          withConfigSettings(text, { [PATHS.syntaxHides]: saved.hideWidgets ? undefined : false, [PATHS.syntaxClicks]: saved.clickPlacesCursor ? undefined : false }),
-        );
-        syntaxWatcher?.settingsChanged(saved);
-        return undefined;
-      }),
-    ];
-  };
+  // The Markdown tab of the Page layout dialog, made as it opens
+  app.dialogTabs = async () => [
+    syntaxTab(document, await readSyntaxSettings(bridge), async (saved) => {
+      await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
+        withConfigSettings(text, { [PATHS.syntaxHides]: saved.hideWidgets ? undefined : false, [PATHS.syntaxClicks]: saved.clickPlacesCursor ? undefined : false }),
+      );
+      syntaxWatcher?.settingsChanged(saved);
+      return undefined;
+    }),
+  ];
   await app.start(silverBulletStore(bridge, writer));
 }
 

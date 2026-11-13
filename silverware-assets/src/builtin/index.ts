@@ -1,6 +1,6 @@
 // Silverware Layout's own types and actions registered, each only where its name is free: a user's or another
 // plugin's of the same name, registered before a reload of Space Lua, is kept.
-import type { AssetAction, AssetType } from "../../../../shared/assets.ts";
+import type { AssetAction, AssetType } from "../../../shared/assets.ts";
 import { BUILTIN_ACTIONS } from "./actions.ts";
 import { BUILTIN_TYPES } from "./types.ts";
 

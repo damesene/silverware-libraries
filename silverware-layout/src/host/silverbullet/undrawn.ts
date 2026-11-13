@@ -2,8 +2,8 @@
 // or audio as its element; a PDF it leaves out (its <object> lost), any other file it leaves as its text (`![[a.zip]]`).
 // In the page, its widget draws them (a PDF viewer, its words that it cannot): in a cell rendered outside the editor a
 // PDF is drawn as the widget draws it (an <object> of its URL), any other kept as a place, `<span data-swl-embed=
-// "<target>" data-pos="<offset>">` (its text in it), which the assets' host frames as it frames a medium
-// (./assets.ts). Done by rendering a stand-in of each, an image SilverBullet does draw, swapped for the place in its
+// "<target>" data-pos="<offset>">` (its text in it), which the grid tells of as it tells of a medium (src/grid/drawn.ts,
+// shared/rendered.ts: Silverware Assets frames it). Done by rendering a stand-in of each, an image SilverBullet does draw, swapped for the place in its
 // HTML; the offsets after it set back by the difference in length, so `data-pos` is the text's. Pure.
 import { type Embed, readEmbeds } from "../../../../shared/markdown/embed.ts";
 

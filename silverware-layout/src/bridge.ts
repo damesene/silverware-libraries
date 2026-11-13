@@ -32,8 +32,6 @@ export type Bridge = {
   readonly filterBox?: (label: string, options: readonly { readonly name: string; readonly description: string; readonly index: number }[]) => unknown;
   // Optional: one of SilverBullet's UI options (`editor.getUiOption`: `markdownSyntaxRendering`, the markdown shown as written)
   readonly getUiOption?: (name: string) => unknown;
-  // Optional, for a file's card: a document's meta (`space.getDocumentMeta`: its `size` in bytes, `lastModified`)
-  readonly documentMeta?: (path: string) => unknown;
   // Optional, for a link written new: SilverBullet's setting `defaultLinkStyle` ("wikilink" or "markdown")
   readonly linkStyle?: () => unknown;
 };

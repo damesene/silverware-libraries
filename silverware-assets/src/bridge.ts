@@ -1,0 +1,37 @@
+// The SilverBullet API Silverware Assets uses, handed over by the init page's Space Lua (`editor.*`, `space.*`,
+// `config.get`), so no SilverBullet internals are needed; and Silverware Layout's API, where it is installed. Only
+// index.ts and host/silverbullet/ read it.
+
+export type Bridge = {
+  // The page open in the editor, its text and one edit of it (one undo step)
+  readonly getCurrentPage: () => string | Promise<string>;
+  readonly getText: () => string | Promise<string>;
+  readonly replaceRange: (from: number, to: number, text: string) => unknown;
+  readonly readPage: (name: string) => string | Promise<string>;
+  readonly writePage: (name: string, text: string) => unknown;
+  // Every page (space.listPages: page objects with their name, or names)
+  readonly listPages: () => unknown;
+  // A notification
+  readonly flash: (message: string, type?: "info" | "error") => unknown;
+  // Optional: without it, settings keep their defaults
+  readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
+  // Optional, for the settings window: asks before closing it with changes (else the browser's confirm)
+  readonly confirm?: (message: string) => boolean | Promise<boolean>;
+  // Optional, for the settings window: the CONFIG page saved as SilverBullet's Configuration Manager saves it, the
+  // configuration loaded again (readPage reads it)
+  readonly saveConfigPage?: (text: string) => unknown;
+  // Optional: one of SilverBullet's UI options (`editor.getUiOption`: `markdownSyntaxRendering`, the markdown shown as written)
+  readonly getUiOption?: (name: string) => unknown;
+  // Optional, for a file's card: a document's meta (`space.getDocumentMeta`: its `size` in bytes, `lastModified`)
+  readonly documentMeta?: (path: string) => unknown;
+  // Optional, for a link written new: SilverBullet's setting `defaultLinkStyle` ("wikilink" or "markdown")
+  readonly linkStyle?: () => unknown;
+  // Optional: Silverware Layout's API (`silverware.layout.api`), where it is installed: a medium's width by its handle
+  // (shared/layout.ts), what its grids draw outside the editor (its `rendered`, shared/rendered.ts)
+  readonly layout?: unknown;
+};
+
+/** The bridge's functions Silverware Assets cannot work without, missing from what the init page gave */
+export function missingBridgeFunctions(bridge: Partial<Bridge>): string[] {
+  return (["getCurrentPage", "getText", "replaceRange", "readPage", "writePage", "listPages", "flash"] as const).filter((name) => typeof bridge[name] !== "function");
+}

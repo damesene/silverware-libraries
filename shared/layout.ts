@@ -69,6 +69,9 @@ export type Layout = {
   // A provider registered, its widgets laid out from now on (one of the same name replaced); the function given back
   // unregisters it
   register(provider: LayoutProvider): () => void;
+  // Optional: every widget laid out again, where a plugin changed what its provider reads of a widget already in the
+  // page without putting a node into it (a medium's view changed by its menu). The stand-in's does nothing
+  layOutAgain?(): void;
 };
 
 /**
@@ -87,4 +90,5 @@ export function layoutOf(given: unknown): Layout {
 const STAND_IN: Layout = {
   version: LAYOUT_VERSION,
   register: () => () => undefined,
+  layOutAgain: () => undefined,
 };

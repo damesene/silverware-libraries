@@ -1,8 +1,8 @@
-// Silverware Layout's own types of asset (docs/silverware-layout-assets.md, *Types*), registered as anyone's: through
+// Silverware Layout's own types of asset (docs/silverware-assets.md, *Types*), registered as anyone's: through
 // the contract alone. Images, video and audio leave both views to the host (SilverBullet draws them); a PDF draws a
 // smaller viewer as its preview; any other file has the card alone. Icons: SVG text, so they follow the theme's colour.
-import type { AssetType } from "../../../../shared/assets.ts";
-import { el } from "../../../../shared/elements.ts";
+import type { AssetType } from "../../../shared/assets.ts";
+import { el } from "../../../shared/elements.ts";
 
 const svg = (paths: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;

@@ -1,7 +1,7 @@
-// Which type an asset is, which view it is shown in, which action a gesture runs (docs/silverware-layout-assets.md,
+// Which type an asset is, which view it is shown in, which action a gesture runs (docs/silverware-assets.md,
 // *Matching*, *Views*, *Actions*): the declarations of the types and the user's settings evaluated, no type or action
 // known by name. Pure.
-import type { Asset, AssetAction, AssetMatch, AssetType, Capabilities } from "../../../../shared/assets.ts";
+import type { Asset, AssetAction, AssetMatch, AssetType, Capabilities } from "../../../shared/assets.ts";
 import type { AssetSettings, Gesture, View } from "../model/settings.ts";
 
 // A file's MIME type where the host gives none, by its extension (the common ones a type is likely to match)

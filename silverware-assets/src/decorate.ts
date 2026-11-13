@@ -1,17 +1,17 @@
-// Embedded media decorated (docs/silverware-layout-assets.md): the host draws an embed (SilverBullet its widget, its
+// Embedded media decorated (docs/silverware-assets.md): the host draws an embed (SilverBullet its widget, its
 // own <img>, <video>, <object>, or "Unsupported content"); each drawn is found in the page's text (its target, its
 // order among those of the same target), its type matched, its view chosen, and it is left as the host drew it (a view
 // the type renders none of), replaced by the type's rendering, or by the card. A click on a card or a preview runs the
 // action the user set for it. A render that fails shows the host's drawing (else the card) with an error mark.
-import type { ActionContext, Asset, AssetType, Capabilities, RenderContext, Viewport } from "../../../shared/assets.ts";
-import { type Embed, type EmbedChanges, readEmbeds, readLinks } from "../../../shared/markdown/embed.ts";
+import type { ActionContext, Asset, AssetType, Capabilities, RenderContext, Viewport } from "../../shared/assets.ts";
+import { type Embed, type EmbedChanges, readEmbeds, readLinks } from "../../shared/markdown/embed.ts";
 import { actionFor, mimeOf, typeFor, viewFor } from "./core/choose.ts";
 import { embedAt, embedOf, linkAt, outside, type Range, sameTarget } from "./core/locate.ts";
 import { metadataOf } from "./core/metadata.ts";
 import type { AssetRegistry } from "./core/registry.ts";
 import { type AssetSettings, type Gesture, type View, VIEWS } from "./model/settings.ts";
 import { addCardFields, dateText, drawCard, iconElement, markFailed, sizeText } from "./ui/card.ts";
-import { opensMenu } from "../../../shared/popupmenu.ts";
+import { opensMenu } from "../../shared/popupmenu.ts";
 import { addMoreButton, type MoreMenu, popupOf } from "./ui/moremenu.ts";
 import { plainMedium } from "./ui/plainmedium.ts";
 
@@ -172,9 +172,9 @@ export class AssetDecorator {
         found = { link: one, occurrence: sameText.indexOf(one), of: sameText.length };
       }
     }
-    if (!found) return this.host.problem("Silverware Layout: this link was not found in the page");
+    if (!found) return this.host.problem("Silverware Assets: this link was not found in the page");
     const problem = await this.host.linkToEmbed!({ text: found.link.text, occurrence: found.occurrence, of: found.of });
-    if (problem) this.host.problem(`Silverware Layout: not written: ${problem}`);
+    if (problem) this.host.problem(`Silverware Assets: not written: ${problem}`);
   }
 
   /** What can be done with an asset: each fitting action registered (its menu's), run with how it is drawn elsewhere */
@@ -185,7 +185,7 @@ export class AssetDecorator {
         label: action.label ?? action.name,
         run: () => {
           const context: ActionContext = { asset, open: (url) => this.host.open(url), render: (as, container) => render(container, as) };
-          void Promise.resolve(action.run(context)).catch((error: unknown) => this.host.problem(`Silverware Layout: ${action.name}: ${message(error)}`));
+          void Promise.resolve(action.run(context)).catch((error: unknown) => this.host.problem(`Silverware Assets: ${action.name}: ${message(error)}`));
         },
       }));
   }
@@ -292,7 +292,7 @@ export class AssetDecorator {
       const action = actionFor(gesture, type.name, settings, (name) => this.registry.actions.get(name), asset, capabilities);
       if (!action) return;
       const actionContext: ActionContext = { asset, open: (url) => this.host.open(url), render: renderInto };
-      void Promise.resolve(action.run(actionContext)).catch((error: unknown) => this.host.problem(`Silverware Layout: ${action.name}: ${message(error)}`));
+      void Promise.resolve(action.run(actionContext)).catch((error: unknown) => this.host.problem(`Silverware Assets: ${action.name}: ${message(error)}`));
     };
     // Its menu: how it is shown (the one the settings give left unwritten), what can be done with it. Opened by the "…"
     // at its top right; a card's by its icon, as a link's (no "…" over a card's name)
@@ -307,7 +307,7 @@ export class AssetDecorator {
             checked: one === view,
             ...(can(one) ? {} : { disabled: "This file cannot be shown so" }),
             run: () =>
-              void write({ metadata: { view: one === settled ? null : one } }).then((problem) => problem && this.host.problem(`Silverware Layout: not written: ${problem}`)),
+              void write({ metadata: { view: one === settled ? null : one } }).then((problem) => problem && this.host.problem(`Silverware Assets: not written: ${problem}`)),
           })),
           actions: [
             ...this.actionItems(asset, capabilities, (container, as) => renderInto(as, container)),
@@ -316,7 +316,7 @@ export class AssetDecorator {
                   {
                     label: "Show as a link",
                     run: () =>
-                      void this.host.embedToLink!({ text: found.embed.text, occurrence: found.occurrence, of: found.of }).then((problem) => problem && this.host.problem(`Silverware Layout: not written: ${problem}`)),
+                      void this.host.embedToLink!({ text: found.embed.text, occurrence: found.occurrence, of: found.of }).then((problem) => problem && this.host.problem(`Silverware Assets: not written: ${problem}`)),
                   },
                 ]
               : []),

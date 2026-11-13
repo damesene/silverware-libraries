@@ -5,11 +5,12 @@
 // settings, an embed written through the page writer. What is drawn outside the editor (a grid's cells) is told by
 // the one drawing it (shared/rendered.ts: its media, its links, their places), never read from its HTML.
 import type { Asset } from "../../../../shared/assets.ts";
-import { type Embed, type EmbedChanges, resolveLinkPath } from "../../../../shared/markdown/embed.ts";
+import { type Embed, type EmbedChanges, resolvedTarget } from "../../../../shared/markdown/embed.ts";
 import { pageChanges } from "../../../../shared/pages/changes.ts";
 import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
 import type { Rendered, RenderedItem } from "../../../../shared/rendered.ts";
+import { ASSETS_PATH } from "../../model/settings.ts";
 import { documentUrl } from "./platform.ts";
 
 const FRAME = ".sb-inline-content";
@@ -185,7 +186,7 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
       const alt = embed.alt ? { alt: embed.alt } : {};
       return WEB.test(target) ? { kind: "web", url: target, ...alt } : { kind: "file", path: target, url: documentUrl(target), ...alt };
     },
-    settings: async () => (bridge.getConfig ? await bridge.getConfig("silverware.layout.assets", undefined) : undefined),
+    settings: async () => (bridge.getConfig ? await bridge.getConfig(ASSETS_PATH, undefined) : undefined),
     // A file of the space: its document's meta (its size in bytes, `lastModified`); a URL, or a file not there: none
     fileInfo: async (asset: Asset): Promise<{ readonly size?: number; readonly modified?: string | number } | undefined> => {
       if (asset.kind !== "file" || !bridge.documentMeta) return undefined;
@@ -213,18 +214,4 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
     open: (url: string): void => void (doc.defaultView ?? window).open(url, "_blank", "noopener"),
     problem: (message: string): void => void bridge.flash(message, "error"),
   };
-}
-
-/** An embed's (or a link's) target as SilverBullet resolves it: a wiki link's from the space's root, a markdown link's from the page's folder */
-export function resolvedTarget(embed: Pick<Embed, "target" | "style">, page: string): string {
-  const target = embed.target.split(/[#@$]/, 1)[0]!;
-  if (WEB.test(target)) return target;
-  if (embed.style === "wiki") return target.replace(/^\//, "");
-  let decoded = target;
-  try {
-    decoded = decodeURI(target);
-  } catch {
-    // (As written)
-  }
-  return resolveLinkPath(page, decoded);
 }

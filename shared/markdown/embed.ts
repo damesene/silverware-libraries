@@ -45,6 +45,20 @@ export function resolveLinkPath(page: string, url: string): string {
   return parts.join("/");
 }
 
+/** An embed's (or a link's) target as SilverBullet resolves it: a wiki link's from the space's root, a markdown link's from the page's folder */
+export function resolvedTarget(embed: Pick<Embed, "target" | "style">, page: string): string {
+  const target = embed.target.split(/[#@$]/, 1)[0]!;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(target)) return target;
+  if (embed.style === "wiki") return target.replace(/^\//, "");
+  let decoded = target;
+  try {
+    decoded = decodeURI(target);
+  } catch {
+    // (As written)
+  }
+  return resolveLinkPath(page, decoded);
+}
+
 const WIKI = /!\[\[([^\]\n]+?)\]\]/g;
 // A link: no `!` before it (that is an embed's)
 const WIKI_LINK = /(?<!!)\[\[([^\]\n]+?)\]\]/g;

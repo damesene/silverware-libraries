@@ -1,7 +1,7 @@
-// An asset's card (docs/silverware-layout-assets.md, *The icon card*): drawn here for every type, its icon the type's
+// An asset's card (docs/silverware-assets.md, *The icon card*): drawn here for every type, its icon the type's
 // (a URL drawn as <img>, SVG text inlined so it takes the theme's colour), its fields as the user chose them. And the
 // mark of an asset that failed to render: an icon over it, the error as its tooltip.
-import { el } from "../../../../shared/elements.ts";
+import { el } from "../../../shared/elements.ts";
 
 export type CardField = { readonly name: string; readonly text: string };
 

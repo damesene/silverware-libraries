@@ -1,8 +1,7 @@
-// The Media tab of the Page layout dialog (docs/silverware-layout-assets.md, *Settings and the Media tab*): how a
+// The Media tab of the Page layout dialog (docs/silverware-assets.md, *Settings and the Media tab*): how a
 // medium is shown and what a click and a Shift+click on it do, for all types and per type ("Default": as for all),
 // what its card shows, where it stays as its width is dragged. The dialog shows it among its tabs, saves it on Save.
-import { el } from "../../../../shared/elements.ts";
-import type { DialogTabPart } from "../../ui/pagedialog.ts";
+import { el } from "../../../shared/elements.ts";
 import { type AssetSettings, type CardField, type Gesture, type View, VIEWS } from "../model/settings.ts";
 import { iconElement } from "./card.ts";
 
@@ -12,6 +11,15 @@ const NONE = "";
 const MIN_HEIGHT = 40;
 const MAX_HEIGHT = 2000;
 const DEFAULT = "*";
+
+/** A tab of a settings window: its panel, whether it changed, its save (why not, as text) */
+export type SettingsTab = {
+  readonly id: string;
+  readonly title: string;
+  readonly panel: HTMLElement;
+  changed(): boolean;
+  save(): Promise<string | undefined>;
+};
 
 export type MediaTabInput = {
   readonly settings: AssetSettings;
@@ -34,7 +42,7 @@ function select(doc: Document, label: string, options: readonly (readonly [strin
   return field;
 }
 
-export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: AssetSettings) => Promise<string | undefined>): DialogTabPart {
+export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: AssetSettings) => Promise<string | undefined>): SettingsTab {
   const { settings } = input;
   const views = VIEWS.map((view) => [view, VIEW_LABELS[view]] as const);
   const actions = [...input.actions.map(({ name, label }) => [name, label ?? name] as const), [NONE, "Nothing"] as const];

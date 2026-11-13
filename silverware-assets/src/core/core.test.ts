@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Asset, type AssetAction, type AssetType, assetsOf, ASSETS_VERSION } from "../../../../shared/assets.ts";
+import { type Asset, type AssetAction, type AssetType, assetsOf, ASSETS_VERSION } from "../../../shared/assets.ts";
 import { registerBuiltins } from "../builtin/index.ts";
 import { BUILTIN_TYPES } from "../builtin/types.ts";
 import { DEFAULT_ASSET_SETTINGS, readAssetSettings } from "../model/settings.ts";
@@ -76,7 +76,7 @@ describe("the registry", () => {
     off();
     expect(registry.types.get("image")).toBeUndefined();
     registry.api().types.register({ name: "", match: { kind: ["file"] }, icon: "" } as AssetType);
-    expect(problems).toEqual(["Silverware Layout: a type has no name; not registered"]);
+    expect(problems).toEqual(["Silverware Assets: a type has no name; not registered"]);
   });
 
   it("says why a type is wrong", () => {

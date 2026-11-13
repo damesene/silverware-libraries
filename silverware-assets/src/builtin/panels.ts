@@ -1,11 +1,11 @@
-// Two of Silverware Layout's own actions (docs/silverware-layout-assets.md, *Actions*), registered as anyone's: the
+// Two of Silverware Layout's own actions (docs/silverware-assets.md, *Actions*), registered as anyone's: the
 // asset shown in a panel at the window's right (`peek`: the page beside it still used) or enlarged over the page
 // (`popover`), each rendered as the core renders it (`render`: the type's own view, else the host's drawing, else its
 // card). One of each at a time: another shown takes its place. Esc, ×, or (the popover) a click beside it closes it.
 // Over the window, so marked `data-silverware-over-window` (the other plugins stand back: shared/overwindow.ts, its
 // attribute named here as the contract leaves this part to know no more than the contract and the elements).
-import type { ActionContext, Asset, AssetAction, Capabilities } from "../../../../shared/assets.ts";
-import { el } from "../../../../shared/elements.ts";
+import type { ActionContext, Asset, AssetAction, Capabilities } from "../../../shared/assets.ts";
+import { el } from "../../../shared/elements.ts";
 
 const OVER_WINDOW = "data-silverware-over-window";
 

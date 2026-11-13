@@ -4,7 +4,7 @@
 // follow its `<grid>` line, edit a cell and find where a click was in its markdown.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readGrids } from "../../../shared/markdown/grid.ts";
-import { type AttributesWrite, type CellWrite, type GridHost, Grids } from "./grids.ts";
+import { type AttributesWrite, type CellWrite, type GridHost, Grids, toggledTask } from "./grids.ts";
 import { gridProvider } from "./provider.ts";
 
 const body = "<column>\n\nLeft\n\n</column>\n<column>\nRight\n</column>";
@@ -316,5 +316,26 @@ describe("a cell edited from a selection in it", () => {
     await grids.edit(grid, cell, { target: cell.querySelector("span")!, caret: undefined, selected: { anchor: { node: text, offset: 10 }, focus: { node: text, offset: 5 } } });
     const field = await fieldOf(cell);
     expect([field.selectionStart, field.selectionEnd, field.selectionDirection]).toEqual([5, 10, "backward"]);
+  });
+});
+
+describe("a task in a cell", () => {
+  it("is toggled in the cell's markdown at its box's place, done and undone", () => {
+    const content = "- [ ] one\n- [x] two";
+    expect(toggledTask(content, 2)).toBe("- [x] one\n- [x] two");
+    expect(toggledTask(content, content.indexOf("[x]"))).toBe("- [ ] one\n- [ ] two");
+    expect(toggledTask(content, 0)).toBeUndefined();
+  });
+
+  it("is toggled by its box's click, written as the cell", async () => {
+    const tasks = "<column>\n\n- [ ] one\n\n</column>";
+    const { state, gridHost } = host(`<grid>\n${tasks}\n</grid>\n`);
+    const grids = new Grids(document, { ...gridHost, renderMarkdown: async () => '<ul><li><span class="sb-task"><input type="checkbox" data-pos="2"> one</span></li></ul>' });
+    grids.start();
+    const grid = await grids.render(tasks);
+    document.body.append(grid);
+    grid.querySelector<HTMLInputElement>("input")!.click();
+    await vi.waitFor(() => expect(state.writes.map((write) => write.content)).toEqual(["- [x] one"]));
+    expect(grid.querySelector("textarea")).toBeNull();
   });
 });

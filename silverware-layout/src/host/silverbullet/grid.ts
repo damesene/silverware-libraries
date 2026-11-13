@@ -10,12 +10,15 @@ import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
 import { resolvedTarget } from "./assets.ts";
 import { documentUrl } from "./platform.ts";
+import { ownTasks } from "./tasks.ts";
 import { keepUndrawn } from "./undrawn.ts";
 
 // SilverBullet's frame of a grid (its custom syntax's, the class the init page gives it), and its button bar in it
 // (2.12.1: .button-bar, in a div of the frame beside the widget's content, probed 2026-11-13; its main: .sb-widget-menu-bar)
 const GRID_FRAME = ".swl-grid-widget";
 const GRID_BARS = ".swl-grid-widget .button-bar, .swl-grid-widget .sb-widget-menu-bar";
+// A task's box in a grid's cell
+const TASK_BOXES = '.swl-grid-cell .sb-task > input[type="checkbox"]';
 
 /** A cell to write (src/grid/grids.ts' `CellWrite`, named here apart: the host knows no area) */
 type CellWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly cell: number; readonly content: string };
@@ -36,7 +39,8 @@ export function silverBulletGridHost(bridge: Bridge, writer: PageWriter) {
       // (An embed SilverBullet's HTML draws none of, a PDF, a zip, kept as a place: the page's widget draws it)
       const page = String(await bridge.getCurrentPage());
       const kept = keepUndrawn(text, (embed) => documentUrl(resolvedTarget(embed, page)));
-      return kept.restore(String(await bridge.renderMarkdown(kept.text)));
+      // (Its tasks the page's own, not a query's: no link to their ref)
+      return ownTasks(kept.restore(String(await bridge.renderMarkdown(kept.text))));
     },
     pageText: async (): Promise<string> => String(await bridge.getText()),
     // Through the page writer (the page open: one replaceRange, one undo step)
@@ -59,37 +63,48 @@ export function silverBulletGridHost(bridge: Bridge, writer: PageWriter) {
       if (bridge.moveCursor) void bridge.moveCursor(at, true);
     },
     problem: (message: string): void => void bridge.flash(message, "error"),
-    settle: (element: HTMLElement): void => hideGridBars(element.ownerDocument),
+    settle: (element: HTMLElement): void => settleGridFrames(element.ownerDocument),
   };
 }
 
 /**
- * The button bars of SilverBullet's frames round grids hidden, those there now and each put in after (once per
- * document): SilverBullet puts its bar in after the grid, and draws a frame anew (CodeMirror's widget made again, the
- * grid's element moved into it) with a bar of its own, so a frame watched alone was left with one shown. A frame of a
- * grid is SilverBullet's custom syntax's, given the class `swl-grid-widget` by the init page
+ * SilverBullet's frames round grids settled, those there now and each put in after (once per document):
+ *
+ * - their button bars hidden: SilverBullet puts its bar in after the grid, and draws a frame anew (CodeMirror's widget
+ *   made again, the grid's element moved into it) with a bar of its own, so a frame watched alone was left with one
+ *   shown;
+ * - a task's box in a cell enabled: SilverBullet disables one it cannot toggle itself as it attaches its handlers to
+ *   the widget (2.12.1), the grid toggles it (src/grid/grids.ts).
+ *
+ * A frame of a grid is SilverBullet's custom syntax's, given the class `swl-grid-widget` by the init page
  */
-function hideGridBars(doc: Document): void {
+function settleGridFrames(doc: Document): void {
   if (watched.has(doc)) return;
   watched.add(doc);
   const win = doc.defaultView;
   if (!win) return;
-  const hide = (root: ParentNode) => {
+  const settle = (root: ParentNode) => {
     // (Not one in a grid's own content: a cell's markdown may hold a widget of its own)
     for (const bar of root.querySelectorAll<HTMLElement>(GRID_BARS)) {
       if (!bar.closest(".swl-grid") && bar.style.getPropertyValue("display") !== "none") bar.style.setProperty("display", "none", "important");
     }
+    for (const box of root.querySelectorAll<HTMLInputElement>(TASK_BOXES)) if (box.disabled) box.disabled = false;
   };
-  hide(doc);
+  settle(doc);
   new win.MutationObserver((records) => {
     for (const record of records) {
+      if (record.type === "attributes") {
+        const box = record.target;
+        if (box instanceof win.HTMLInputElement && box.disabled && box.matches(TASK_BOXES)) box.disabled = false;
+        continue;
+      }
       for (const node of record.addedNodes) {
         if (!(node instanceof win.Element)) continue;
         const frame = node.closest(GRID_FRAME);
-        hide(frame ?? node);
+        settle(frame ?? node);
       }
     }
-  }).observe(doc.body, { childList: true, subtree: true });
+  }).observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled"] });
 }
 const watched = new WeakSet<Document>();
 

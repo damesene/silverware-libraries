@@ -129,6 +129,19 @@ export class Grids {
       }
     }, true);
     this.doc.addEventListener("click", (event) => void this.click(event));
+    // A task's box in a cell: the grid's to toggle in the cell's markdown (the host would toggle it elsewhere, or not)
+    this.doc.addEventListener(
+      "click",
+      (event) => {
+        const box = event.target instanceof Element ? event.target.closest<HTMLInputElement>('input[type="checkbox"]') : null;
+        const at = box ? this.gridOf(box) : undefined;
+        if (!box || !at?.cell || at.cell.classList.contains("swl-grid-editing")) return;
+        event.preventDefault();
+        event.stopPropagation();
+        void this.toggleTask(at.element, at.cell, box);
+      },
+      true,
+    );
   }
 
   /** A grid drawn of its body: its cells rendered by the host, its columns as the first grid of that body in the page has them */
@@ -276,6 +289,19 @@ export class Grids {
     await this.edit(at.element, at.cell, point);
   }
 
+  /** A task's box in a cell clicked: its state in the cell's markdown toggled (`[ ]` done `[x]`, any other undone), written */
+  async toggleTask(element: HTMLElement, cellElement: HTMLElement, box: HTMLElement): Promise<void> {
+    const index = Number(cellElement.getAttribute("data-swl-cell"));
+    const text = await this.host.pageText().catch(() => undefined);
+    const found = text === undefined ? undefined : this.found(text, element);
+    const cell = found?.grid.cells[index];
+    if (!found || !cell) return this.host.problem("Silverware Layout: this grid changed in the page since it was drawn; toggle the task there");
+    const content = toggledTask(cell.content, Number(box.getAttribute("data-pos")) || 0);
+    if (content === undefined) return this.host.problem("Silverware Layout: the task was not found in the column's markdown");
+    const problem = await this.host.writeCell({ body: found.grid.body, occurrence: found.occurrence, of: found.of, cell: index, content }).catch((error: unknown) => (error instanceof Error ? error.message : String(error)));
+    if (problem) this.host.problem(`Silverware Layout: the task was not toggled: ${problem}`);
+  }
+
   /** A cell's markdown edited in place, the cursor where a click was in its rendering (none: at its end), written as it is left where it changed */
   async edit(element: HTMLElement, cellElement: HTMLElement, point?: CellPoint): Promise<void> {
     const index = Number(cellElement.getAttribute("data-swl-cell"));
@@ -316,6 +342,13 @@ export class Grids {
     if (!cell) return this.host.moveCursor(found.grid.from);
     this.host.moveCursor(cell.contentFrom + offsetInCell(cell.content, cellElement!, target, caret));
   }
+}
+
+/** A cell's markdown with the task whose state is at `at` (its `[`, the box's `data-pos`) toggled; none where no state is there */
+export function toggledTask(content: string, at: number): string | undefined {
+  const state = /^\[(.)\]/.exec(content.slice(at));
+  if (!state) return undefined;
+  return content.slice(0, at + 1) + (state[1] === " " ? "x" : " ") + content.slice(at + 2);
 }
 
 /** Where a click was in a cell's rendering: the element, the caret there, and the text selected in the cell, where some was */

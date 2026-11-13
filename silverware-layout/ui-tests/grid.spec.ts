@@ -264,3 +264,18 @@ test("Ctrl+Z and Ctrl+Y in a cell's field undo and redo its typing, the page's t
   expect(await editorText(page)).toBe(text);
   await page.keyboard.press("Escape");
 });
+
+test("a task in a cell: drawn as the page's own (no link to its place), its box toggling it in the cell, the page's other task alone", async ({ page, space }) => {
+  const text = (state: string) => `# Page\n\n- [ ] outside\n\n<grid>\n<column>\n\nThis is my note!\n- [${state}] inside\n\n</column>\n<column>\n\nRight\n\n</column>\n</grid>\n`;
+  await space.open({ Page: text(" ") }, "Page");
+  await gridsDrawn(page);
+  const task = page.locator("#sb-main .swl-grid-cell .sb-task").first();
+  await expect(task).toHaveText("inside");
+  await expect(task.locator("a")).toHaveCount(0);
+  await task.locator('input[type="checkbox"]').click();
+  await expect.poll(() => space.saved("Page")).toBe(text("x"));
+  await expect(page.locator("#sb-main textarea.swl-grid-editor")).toHaveCount(0);
+  await gridsDrawn(page);
+  await page.locator('#sb-main .swl-grid-cell .sb-task input[type="checkbox"]').first().click();
+  await expect.poll(() => space.saved("Page")).toBe(text(" "));
+});

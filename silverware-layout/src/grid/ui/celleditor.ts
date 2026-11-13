@@ -18,8 +18,13 @@ export function editCell(cell: HTMLElement, markdown: string, at: number | { rea
     if (left) return;
     left = true;
     const text = field.value;
+    // The page's editor the cell is in focused again, as it was before (unfocused, the next press in a grid focused
+    // it and it took the drag's selection for its own, its cursor in the grid's text: the grid shown as its raw text)
+    const editor = cell.closest<HTMLElement>('[contenteditable="true"]');
+    const refocus = field === doc.activeElement || doc.activeElement === doc.body;
     cell.replaceChildren(...shown);
     cell.classList.remove("swl-grid-editing");
+    if (editor && refocus && doc.activeElement !== editor) editor.focus({ preventScroll: true });
     done(text);
   };
   field.addEventListener("input", grow);

@@ -184,3 +184,63 @@ test("text selected in a cell by a drag is selected in its field as it is edited
   expect(to).toBeLessThanOrEqual("Right side".length + 1);
   await page.keyboard.press("Escape");
 });
+
+test("a selection by a drag carried into the field to the character: the user's cases", async ({ page, space }) => {
+  const cell = "# test\n\nThis is my note!";
+  await space.open({ Page: `# Page\n\n<grid>\n<column>\n\n${cell}\n\n</column>\n<column>\n\nRight\n\n</column>\n</grid>\n` }, "Page");
+  await gridsDrawn(page);
+  const text = "This is my note!";
+  const start = cell.indexOf(text);
+  /** Where a character of the paragraph's text is drawn, its left edge (x) and its middle (y) */
+  const at = (index: number) =>
+    page.evaluate(
+      ({ wanted, index }) => {
+        const span = [...document.querySelectorAll("#sb-main .swl-grid-cell span")].find((one) => one.textContent === wanted)!;
+        const node = span.firstChild!;
+        const range = document.createRange();
+        range.setStart(node, Math.min(index, wanted.length - 1));
+        range.setEnd(node, Math.min(index, wanted.length - 1) + 1);
+        const box = range.getBoundingClientRect();
+        return { x: index >= wanted.length ? box.right : box.left, y: box.top + box.height / 2 };
+      },
+      { wanted: text, index },
+    );
+  const field = page.locator("#sb-main textarea.swl-grid-editor");
+  for (const [from, to] of [
+    [4, text.length], // " is my note!"
+    [5, 7], // "is"
+    [8, text.length], // "my note!"
+  ] as const) {
+    // (SilverBullet may draw the page anew as another test's CONFIG is put back: the grid drawn again first)
+    await gridsDrawn(page);
+    const a = await at(from);
+    const b = await at(to);
+    await page.mouse.move(a.x + 1, a.y);
+    await page.mouse.down();
+    await page.mouse.move(b.x - 1, b.y, { steps: 6 });
+    await page.mouse.up();
+    await expect(field).toBeFocused();
+    expect(await field.evaluate((input: HTMLTextAreaElement) => [input.selectionStart, input.selectionEnd]), text.slice(from, to)).toEqual([start + from, start + to]);
+    await page.keyboard.press("Escape");
+    await expect(field).toHaveCount(0);
+  }
+});
+
+test("a cell left by Esc, then a drag in a cell: the grid stays drawn, the field opens", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${GRID}` }, "Page");
+  await gridsDrawn(page);
+  const field = page.locator("#sb-main textarea.swl-grid-editor");
+  await page.locator("#sb-main .swl-grid-cell").first().click();
+  await expect(field).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(field).toHaveCount(0);
+  const words = page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Right text");
+  const box = (await words.boundingBox())!;
+  await page.mouse.move(box.x + 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect(field).toBeFocused();
+  await expect(page.locator("#sb-main .swl-grid")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+});

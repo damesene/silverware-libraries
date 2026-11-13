@@ -10,7 +10,7 @@
 import type { Attributes } from "../../../shared/markdown/attributes.ts";
 import { type Grid, readGridBody, readGrids } from "../../../shared/markdown/grid.ts";
 import { gridsOfBody } from "./core/match.ts";
-import { positionInCell, wordAt } from "./core/position.ts";
+import { positionInCell } from "./core/position.ts";
 import { columnTemplate } from "./model/columns.ts";
 import { addCellMenus, type CellAction } from "./ui/cellmenu.ts";
 import { caretWord, editCell } from "./ui/celleditor.ts";
@@ -116,6 +116,9 @@ export class Grids {
       (event) => {
         const at = event.button === 0 && !event.altKey ? this.gridOf(event.target) : undefined;
         this.pressed = at?.cell ? { cell: at.cell, x: event.clientX, y: event.clientY, caret: caretWord(this.doc, event.clientX, event.clientY) } : undefined;
+        // The press the grid's, not the page editor's (its click handler not told of it: a click in a grid is the
+        // grid's). (A field being edited, a link, a button: their own, as the click's)
+        if (at?.cell && !at.cell.classList.contains("swl-grid-editing") && !(event.target as Element).closest(OWN_CLICKS)) event.stopPropagation();
       },
       true,
     );
@@ -328,14 +331,19 @@ function selectionInCell(content: string, cellElement: HTMLElement, selected: { 
 }
 
 /**
- * Where a point of a cell's rendering is in its markdown: the element clicked's place (`data-pos`; SilverBullet leaves
- * 0 out: none is 0), then the word under the caret found from there (core/position.ts)
+ * Where a point of a cell's rendering is in its markdown: the element it is in that is marked with its place
+ * (`data-pos`; SilverBullet leaves 0 out: the cell's first block, unmarked, is at 0), and how far into that element's
+ * text the point is, followed through the markdown from there (core/position.ts)
  */
 function offsetInCell(content: string, cellElement: HTMLElement, target: Element, caret: Caret | undefined): number {
-  const marked = target.closest("[data-pos]");
-  const elementPos = marked && cellElement.contains(marked) ? Number(marked.getAttribute("data-pos")) || 0 : 0;
-  const nodeText = caret?.node.textContent ?? "";
-  const word = caret ? wordAt(nodeText, caret.offset) : "";
-  const wordStart = caret ? nodeText.lastIndexOf(word, caret.offset) : 0;
-  return positionInCell(content, elementPos, word, caret ? caret.offset - Math.max(wordStart, 0) : 0);
+  const from = caret ? (caret.node instanceof Element ? caret.node : caret.node.parentElement) ?? target : target;
+  const marked = from.closest("[data-pos]");
+  const element = marked && cellElement.contains(marked) ? marked : ([...cellElement.children].find((child) => child.contains(from)) ?? cellElement);
+  const elementPos = element === marked ? Number(marked.getAttribute("data-pos")) || 0 : 0;
+  if (!caret || !element.contains(caret.node)) return positionInCell(content, elementPos, "", 0);
+  // The element's text before the point
+  const range = cellElement.ownerDocument.createRange();
+  range.setStart(element, 0);
+  range.setEnd(caret.node, caret.offset);
+  return positionInCell(content, elementPos, element.textContent ?? "", range.toString().length);
 }

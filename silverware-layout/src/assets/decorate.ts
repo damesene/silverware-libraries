@@ -42,6 +42,8 @@ export class AssetDecorator {
   private readonly renders = new WeakMap<HTMLElement, AbortController>();
   // Each frame decorated: its width as its embed keeps it, where it stays as it changes, how a new one is written
   private readonly sizes = new WeakMap<HTMLElement, { readonly width: string | undefined; readonly anchor: "start" | "center"; readonly write: (width: string | undefined) => Promise<string | undefined> }>();
+  // Each frame decorated, as the host drew it (decorated again as the settings change)
+  private readonly drawn = new WeakMap<HTMLElement, DrawnEmbed>();
   /** Told as a frame is decorated (its width laid out again) */
   onDecorated: (() => void) | undefined;
   private started = false;
@@ -69,6 +71,7 @@ export class AssetDecorator {
     const [text, page, settings] = await Promise.all([this.host.pageText(), this.host.pageName(), this.host.settings()]);
     const embeds = readEmbeds(text);
     for (const one of drawn) {
+      this.drawn.set(one.frame, one);
       // (Laid out once all are decorated)
       one.frame.setAttribute("data-swl-asset-target", sameTarget(one.target));
       const nth = [...this.doc.querySelectorAll(`[data-swl-asset-target]`)].filter((frame) => frame.getAttribute("data-swl-asset-target") === sameTarget(one.target)).indexOf(one.frame);
@@ -80,6 +83,12 @@ export class AssetDecorator {
       this.render(one, found, asset, type, settings);
     }
     this.onDecorated?.();
+  }
+
+  /** Every embed decorated in the page decorated again (the settings saved) */
+  redecorateAll(): Promise<void> {
+    const frames = [...this.doc.querySelectorAll<HTMLElement>("[data-swl-asset-target]")];
+    return this.decorate(frames.flatMap((frame) => this.drawn.get(frame) ?? []));
   }
 
   /** A frame decorated: its width as its embed keeps it (none: none), where it stays */

@@ -13,7 +13,7 @@ import { DEFAULT_GUIDES, type Guide, type Settings } from "./model/settings.ts";
 import type { Width } from "./model/width.ts";
 import { FontZoom } from "./ui/fontzoom.ts";
 import { GuideLines } from "./ui/guidelines.ts";
-import { PageDialog, type Preview } from "./ui/pagedialog.ts";
+import { type DialogTabPart, PageDialog, type Preview } from "./ui/pagedialog.ts";
 import { layOutWidgets, type WidgetLayout } from "./widgetlayout.ts";
 
 // How long the page is still before its own width is read again after an edit
@@ -66,6 +66,9 @@ export class LayoutApp {
     private readonly page: PageHost,
     private readonly registry: Registry,
   ) {}
+
+  /** Tabs of other parts of Silverware Layout's for the Page layout dialog, made as it opens (the media's) */
+  dialogTabs: (() => Promise<readonly DialogTabPart[]>) | undefined;
 
   /** Every widget laid out again as its entries keep it (a provider's entries changed outside a drag: typed by hand) */
   layOutWidgets(): void {
@@ -200,7 +203,9 @@ export class LayoutApp {
     await this.pageOpened();
     const { store } = state;
     this.dialog ??= new PageDialog(this.doc);
+    const tabs = (await this.dialogTabs?.().catch(() => [])) ?? [];
     this.dialog.open({
+      tabs,
       page: state.page,
       pageWidth: state.pageWidth,
       defaultWidth: state.settings.textWidth,

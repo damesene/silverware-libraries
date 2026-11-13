@@ -89,6 +89,8 @@ export type Capabilities = { readonly views: readonly AssetView[] };
 /** An action of a gesture on an asset (a click on its card or its preview) */
 export type AssetAction = {
   readonly name: string;
+  // What the user is shown (none: its name)
+  readonly label?: string;
   fits(asset: Asset, can: Capabilities): boolean;
   run(context: ActionContext): unknown;
 };

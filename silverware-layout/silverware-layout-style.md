@@ -1147,6 +1147,61 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   border-radius: 8px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
 }
+/* The Media tab of the Page layout dialog: All files' fields in rows, then a row per type (its icon and name, how
+   it is shown, its click, its Shift+click) */
+.swl-media {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.swl-media-all {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 12px;
+  align-items: center;
+}
+.swl-media-heading {
+  grid-column: 1 / -1;
+  font-weight: 600;
+}
+.swl-media-field {
+  display: contents;
+}
+.swl-media-check {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.swl-media-types {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.swl-media-type {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  align-items: center;
+}
+.swl-media-type-head {
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+.swl-media-type-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.swl-media-type-name .swl-asset-icon {
+  width: 16px;
+  height: 16px;
+}
+.swl-media-select {
+  min-width: 0;
+  font: inherit;
+}
 /* Embedded media (docs/silverware-layout-assets.md), marked by Silverware Layout on the host's frame of each
    (data-swl-asset: its type, data-swl-asset-view: icon, preview or embed): the host's own drawing hidden where Silverware
    Layout draws instead; a preview of the host's drawing kept small; a card; the mark of a render that failed */

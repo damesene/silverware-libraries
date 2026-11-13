@@ -13,7 +13,8 @@ import { registerBuiltins } from "./assets/builtin/index.ts";
 import { AssetRegistry } from "./assets/core/registry.ts";
 import { AssetDecorator, type AssetHost } from "./assets/decorate.ts";
 import { assetProvider } from "./assets/provider.ts";
-import { readAssetSettings } from "./assets/model/settings.ts";
+import { mediaTab } from "./assets/ui/mediatab.ts";
+import { ASSETS_PATH, readAssetSettings, storedAssetSettings } from "./assets/model/settings.ts";
 import { silverBulletAssetHost } from "./host/silverbullet/assets.ts";
 import { gridInsertion } from "./grid/core/insert.ts";
 import { gridLinks } from "./grid/core/links.ts";
@@ -82,6 +83,19 @@ export async function init(bridge: Bridge): Promise<void> {
     assets.onDecorated = () => app.layOutWidgets();
     assets.start();
   }
+  // The Media tab of the Page layout dialog, made as it opens: the settings as configured, the types and actions registered
+  const decorator = assets;
+  app.dialogTabs = async () => {
+    const settings = await assetHost.settings();
+    const input = { settings, types: assetRegistry.types.all.map(({ name, icon }) => ({ name, icon })), actions: assetRegistry.actions.all.map(({ name, label }) => ({ name, ...(label ? { label } : {}) })) };
+    return [
+      mediaTab(document, input, async (saved) => {
+        await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, { [ASSETS_PATH]: storedAssetSettings(saved) }, OWN_MARKER));
+        await decorator.redecorateAll();
+        return undefined;
+      }),
+    ];
+  };
   await app.start(silverBulletStore(bridge, writer));
 }
 

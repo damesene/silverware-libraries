@@ -47,6 +47,10 @@ config.define("silverware.layout", {
         },
       },
     },
+    assets = {
+      type = "object",
+      description = "Embedded media: how each type is shown (views), what a click and a Shift+click do (actions), what a card shows (card), a view's default height (heights), where a medium stays as its width is dragged (anchor). Set in the Page layout dialog (Media), kept in Silverware Layout's own block of CONFIG.",
+    },
     guides = {
       type = "array",
       description = "The widths a drag snaps to and shows a guide at, in px (\"1200px\"), in % of the editor's width (\"80%\"), or full (the editor's width). Set in the Page layout dialog (Guides), kept in Silverware Layout's own block of CONFIG.",

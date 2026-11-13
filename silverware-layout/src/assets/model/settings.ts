@@ -22,6 +22,20 @@ export type AssetSettings = {
   readonly anchor: "start" | "center";
 };
 
+/** Where the settings are kept: Silverware Layout's own block of CONFIG (a table the Configuration Manager would lose) */
+export const ASSETS_PATH = "silverware.layout.assets";
+
+/** The settings as kept: plain data, as Lua writes a table */
+export function storedAssetSettings(settings: AssetSettings): Record<string, unknown> {
+  return {
+    views: { default: settings.views.default, types: { ...settings.views.types } },
+    actions: { default: { ...settings.actions.default }, types: Object.fromEntries(Object.entries(settings.actions.types).map(([k, v]) => [k, { ...v }])) },
+    card: [...settings.card],
+    heights: { ...settings.heights },
+    anchor: settings.anchor,
+  };
+}
+
 export const DEFAULT_ASSET_SETTINGS: AssetSettings = {
   views: { default: "embed", types: {} },
   actions: { default: { click: "open-tab", "shift+click": "open-tab" }, types: {} },

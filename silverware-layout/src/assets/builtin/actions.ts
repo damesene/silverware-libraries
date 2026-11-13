@@ -4,6 +4,7 @@ import type { AssetAction } from "../../../../shared/assets.ts";
 
 export const openTab: AssetAction = {
   name: "open-tab",
+  label: "Open in a new tab",
   fits: (asset) => "url" in asset,
   run: (context) => {
     if ("url" in context.asset) context.open(context.asset.url);

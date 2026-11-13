@@ -1,6 +1,6 @@
 # Silverware Assets: split out of Silverware Layout
 
-Plan of 2026-11-13, agreed with the user; steps 1 to 9 done 2026-11-14 (step 10, the user's SilverBullet, and the releases are left). Branch: `docs/layout-assets` (all of Layout's grid and assets work lives there, not on `main`; nothing of it is released).
+Plan of 2026-11-13, agreed with the user; all steps done 2026-11-14 (the releases are left). Branch: `docs/layout-assets` (all of Layout's grid and assets work lives there, not on `main`; nothing of it is released).
 
 ## Why
 
@@ -120,6 +120,7 @@ Each step: `npm run build`, `npm run verify` (run from `D:\` in PowerShell: vite
 9. **Docs.** docs/silverware-layout-assets.md → docs/silverware-assets.md (*Renames*); docs/silverware-layout-grid.md's mentions of the assets read "Silverware Assets"; Layout's library page loses *Media* (a line pointing to Silverware Assets), Assets' library page gets it (with the settings window, the Markdown boxes, links' icons and menu, cards, the side panel); both plugins' `CLAUDE.md`; this plan marked done. The memory's note of the grid and assets work updated.
    **Done 2026-11-14**.
 10. **The user's SilverBullet.** Deploy both (`npm run deploy -- <space>`; the deploy script copies every plugin listed), so the space gets `Library/damesene/silverware-assets*`. Reload twice. Then the user tries it.
+   **Done 2026-11-14**: deployed; the user's `silverware.layout.assets` (Layout's own block of CONFIG) moved into Assets' own block by hand while SilverBullet was stopped (its copy kept as `CONFIG.md.before-assets-split`).
 
 Then, before the branch is merged and on the user's word only: the releases (*Versions*).
 

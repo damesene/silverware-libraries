@@ -20,6 +20,8 @@ export type AssetSettings = {
   readonly heights: Readonly<Record<"preview" | "embed", number>>;
   // Where an asset stays as its width is dragged: at the text's start (it grows to the right), or centred
   readonly anchor: "start" | "center";
+  // Whether a link to a file of the space (`[[report.pdf]]`) shows its type's icon before its text
+  readonly linkIcons: boolean;
 };
 
 /** Where the settings are kept: Silverware Layout's own block of CONFIG (a table the Configuration Manager would lose) */
@@ -33,6 +35,7 @@ export function storedAssetSettings(settings: AssetSettings): Record<string, unk
     card: [...settings.card],
     heights: { ...settings.heights },
     anchor: settings.anchor,
+    linkIcons: settings.linkIcons,
   };
 }
 
@@ -42,6 +45,7 @@ export const DEFAULT_ASSET_SETTINGS: AssetSettings = {
   card: ["icon", "name"],
   heights: { preview: 160, embed: 480 },
   anchor: "start",
+  linkIcons: true,
 };
 
 const isView = (value: unknown): value is View => typeof value === "string" && (VIEWS as readonly string[]).includes(value);
@@ -78,6 +82,7 @@ export function readAssetSettings(value: unknown): { readonly settings: AssetSet
       card,
       heights: { preview: height("preview"), embed: height("embed") },
       anchor: given.anchor === "center" ? "center" : "start",
+      linkIcons: given.linkIcons !== false,
     },
     problems,
   };

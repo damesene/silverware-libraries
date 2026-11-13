@@ -1327,6 +1327,14 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   content: "·";
   margin-right: 6px;
 }
+/* A link to a file of the space: its type's icon before its text, as large as the text */
+.swl-asset-link-icon {
+  display: inline-flex;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.2em;
+  vertical-align: -0.125em;
+}
 .swl-asset-pdf {
   display: block;
   width: 100%;

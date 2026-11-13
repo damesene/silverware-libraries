@@ -10,7 +10,7 @@ import { embedAt, embedOf, outside, type Range, sameTarget } from "./core/locate
 import { metadataOf } from "./core/metadata.ts";
 import type { AssetRegistry } from "./core/registry.ts";
 import { type AssetSettings, type Gesture, type View, VIEWS } from "./model/settings.ts";
-import { addCardFields, dateText, drawCard, markFailed, sizeText } from "./ui/card.ts";
+import { addCardFields, dateText, drawCard, iconElement, markFailed, sizeText } from "./ui/card.ts";
 import { addMoreButton } from "./ui/moremenu.ts";
 
 /** An embed as the host drew it: its frame, its target as drawn (a path of the space or a URL), its own media element */
@@ -22,6 +22,9 @@ export type DrawnEmbed = {
   readonly position?: () => number | undefined;
 };
 
+/** A link drawn by the host (`[[report.pdf]]`, `[the report](report.pdf)`): its element, its target as written, its form */
+export type DrawnLink = { readonly element: HTMLElement; readonly target: string; readonly style: "wiki" | "markdown" };
+
 /** A file's size in bytes and when it was last changed (a time the host gives: an ISO text or milliseconds) */
 export type FileInfo = { readonly size?: number; readonly modified?: string | number };
 
@@ -32,6 +35,10 @@ export type EmbedWrite = { readonly text: string; readonly occurrence: number; r
 export type AssetHost = {
   /** Told of the embeds drawn, those there now and each drawn after */
   watch(drawn: (embeds: readonly DrawnEmbed[]) => void): unknown;
+  /** Told of the links drawn, those there now and each drawn after (none: links are not decorated) */
+  watchLinks?(drawn: (links: readonly DrawnLink[]) => void): unknown;
+  /** A link's asset, where it links a file of the space (a page, a site: none) */
+  linkAsset?(link: DrawnLink, page: string): Asset | undefined;
   /** The ranges of the page rendered outside the editor now (a grid's cells): their embeds are no widget of the host's */
   renderedRanges(): readonly Range[];
   pageText(): Promise<string>;
@@ -49,6 +56,7 @@ export type AssetHost = {
 };
 
 const NATIVE_HIDDEN = "swl-asset-native-hidden";
+const LINK_ICON = "swl-asset-link-icon";
 
 export class AssetDecorator {
   // Each frame decorated: what ends its render
@@ -57,6 +65,8 @@ export class AssetDecorator {
   private readonly sizes = new WeakMap<HTMLElement, { readonly width: string | undefined; readonly anchor: "start" | "center"; readonly write: (width: string | undefined) => Promise<string | undefined> }>();
   // Each frame decorated, as the host drew it (decorated again as the settings change)
   private readonly drawn = new WeakMap<HTMLElement, DrawnEmbed>();
+  // The links decorated (decorated again as the settings change; those gone from the page left out then)
+  private readonly links = new Set<DrawnLink>();
   /** Told as a frame is decorated (its width laid out again) */
   onDecorated: (() => void) | undefined;
   private started = false;
@@ -76,6 +86,26 @@ export class AssetDecorator {
     if (this.started) return;
     this.started = true;
     this.host.watch((drawn) => void this.decorate(drawn));
+    this.host.watchLinks?.((links) => void this.decorateLinks(links));
+  }
+
+  /** Links drawn: each to a file of the space given its type's icon before its text (the setting off: none) */
+  async decorateLinks(links: readonly DrawnLink[]): Promise<void> {
+    if (!links.length || !this.host.linkAsset) return;
+    const [page, settings] = await Promise.all([this.host.pageName(), this.host.settings()]);
+    for (const old of this.links) if (!old.element.isConnected) this.links.delete(old);
+    for (const link of links) {
+      this.links.add(link);
+      link.element.querySelector(`:scope > .${LINK_ICON}`)?.remove();
+      if (!settings.linkIcons) continue;
+      const asset = this.host.linkAsset(link, page);
+      const type = asset && typeFor(this.registry.types.all, asset);
+      if (!type) continue;
+      const icon = iconElement(this.doc, type.icon);
+      icon.classList.add(LINK_ICON);
+      link.element.setAttribute("data-swl-asset-link", type.name);
+      link.element.prepend(icon);
+    }
   }
 
   /** Embeds drawn, decorated */
@@ -105,9 +135,10 @@ export class AssetDecorator {
   }
 
   /** Every embed decorated in the page decorated again (the settings saved) */
-  redecorateAll(): Promise<void> {
+  async redecorateAll(): Promise<void> {
     const frames = [...this.doc.querySelectorAll<HTMLElement>("[data-swl-asset-target]")];
-    return this.decorate(frames.flatMap((frame) => this.drawn.get(frame) ?? []));
+    for (const link of this.links) if (!link.element.isConnected) this.links.delete(link);
+    await Promise.all([this.decorate(frames.flatMap((frame) => this.drawn.get(frame) ?? [])), this.decorateLinks([...this.links])]);
   }
 
   /** A frame decorated: its width as its embed keeps it (none: none), where it stays */

@@ -22,6 +22,7 @@ function setUp(text: string, settings: unknown = {}) {
     settings: async (): Promise<AssetSettings> => readAssetSettings(settings).settings,
     writeEmbed: async (write) => void state.writes.push(write),
     fileInfo: async (asset) => (asset.kind === "file" && asset.path.endsWith(".zip") ? { size: 2_621_440, modified: "2026-11-13T10:00:00Z" } : undefined),
+    linkAsset: (link) => (/\.[a-z]+$/.test(link.target) ? { kind: "file", path: link.target, url: `.fs/${link.target}` } : undefined),
     open: (url) => void state.opened.push(url),
     problem: (message) => void state.problems.push(message),
   };
@@ -218,5 +219,30 @@ describe("the same file outside a grid and in it", () => {
     const unplaced = { ...frame("cat.png"), position: () => undefined };
     await decorator.decorate([unplaced]);
     expect(unplaced.frame.hasAttribute("data-swl-asset")).toBe(false);
+  });
+});
+
+describe("links to files decorated", () => {
+  const link = (target: string) => {
+    const element = Object.assign(document.createElement("a"), { textContent: target });
+    document.body.append(element);
+    return { element, target, style: "wiki" as const };
+  };
+
+  it("give a link to a file its type's icon before its text, once, none to a page; none where the user shows none", async () => {
+    const { decorator } = setUp("");
+    const pdf = link("report.pdf");
+    const page = link("Notes");
+    await decorator.decorateLinks([pdf, page]);
+    expect(pdf.element.getAttribute("data-swl-asset-link")).toBe("pdf");
+    expect(pdf.element.firstElementChild?.classList.contains("swl-asset-link-icon")).toBe(true);
+    expect(pdf.element.textContent).toBe("report.pdf");
+    expect(page.element.querySelector(".swl-asset-link-icon")).toBeNull();
+    await decorator.decorateLinks([pdf]);
+    expect(pdf.element.querySelectorAll(".swl-asset-link-icon")).toHaveLength(1);
+    const { decorator: off } = setUp("", { linkIcons: false });
+    const plain = link("report.pdf");
+    await off.decorateLinks([plain]);
+    expect(plain.element.querySelector(".swl-asset-link-icon")).toBeNull();
   });
 });

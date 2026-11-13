@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { pageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
-import { drawnTarget, silverBulletAssetHost } from "./assets.ts";
+import { drawnLink, drawnTarget, silverBulletAssetHost } from "./assets.ts";
 import { silverBulletPlatform } from "./platform.ts";
 
 const bridge = { getText: () => "", getCurrentPage: () => "P", replaceRange: () => undefined, readPage: () => "", writePage: () => undefined, listPages: () => [], flash: () => undefined } as unknown as Bridge;
@@ -68,3 +68,37 @@ describe("a block rendered outside the editor given its place later", () => {
     expect(host.renderedRanges()).toEqual([{ from: 61, to: 85 }]);
   });
 });
+
+describe("SilverBullet's links found", () => {
+  it("reads a link's target and form as SilverBullet draws it, in the editor and in a cell", () => {
+    const of = (html: string) => drawnLink(Object.assign(document.createElement("div"), { innerHTML: html }).firstElementChild as HTMLElement);
+    expect(of('<a class="sb-wiki-link" href="Docs/a.pdf">a</a>')).toMatchObject({ target: "Docs/a.pdf", style: "wiki" });
+    expect(of('<a class="sb-link" href="../a.pdf">a</a>')).toMatchObject({ target: "../a.pdf", style: "markdown" });
+    expect(of('<a class="wiki-link" href="/a.pdf" data-ref="a.pdf">a</a>')).toMatchObject({ target: "a.pdf", style: "wiki" });
+  });
+
+  it("makes a file of the space of a link to one, resolved as SilverBullet resolves it; a page or a site none", () => {
+    const host = silverBulletAssetHost(bridge, pageWriter(silverBulletPlatform(bridge)), document);
+    const a = (target: string, style: "wiki" | "markdown" = "wiki") => host.linkAsset({ element: document.createElement("a"), target, style }, "Notes/Page");
+    expect(a("Docs/report.pdf")).toMatchObject({ kind: "file", path: "Docs/report.pdf" });
+    expect(a("report.pdf", "markdown")).toMatchObject({ kind: "file", path: "Notes/report.pdf" });
+    expect(a("report.pdf#page=2")).toMatchObject({ path: "report.pdf" });
+    expect(a("Other page")).toBeUndefined();
+    expect(a("Other.md", "markdown")).toBeUndefined();
+    expect(a("https://example.com/a.pdf", "markdown")).toBeUndefined();
+  });
+
+  it("offers each link once, the icon put into it no new one", async () => {
+    const host = silverBulletAssetHost(bridge, pageWriter(silverBulletPlatform(bridge)), document);
+    const found: string[][] = [];
+    stops.push(host.watchLinks((links) => found.push(links.map((one) => one.target))));
+    const cell = Object.assign(document.createElement("div"), { innerHTML: '<span class="p"><a class="wiki-link" data-ref="a.pdf" href="/a.pdf">a.pdf</a></span>' });
+    cell.setAttribute("data-swl-rendered", "");
+    document.body.append(cell);
+    await vi.waitFor(() => expect(found).toEqual([["a.pdf"]]));
+    cell.querySelector("a")!.prepend(document.createElement("span"));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(found).toEqual([["a.pdf"]]);
+  });
+});
+

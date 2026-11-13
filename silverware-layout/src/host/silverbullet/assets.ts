@@ -19,7 +19,27 @@ const OWN_FRAME = "swl-asset-frame";
 const MEDIA = "img, video, audio, object";
 const BARS = ".button-bar, .sb-widget-menu-bar";
 const UNSUPPORTED = /Unsupported content:\s*(.+)$/;
+// Links as SilverBullet draws them (2.12.1, probed 2026-11-13): in the editor a wiki link's widget `a.sb-wiki-link`
+// (its href the target as written; a widget, so an element put in it is no edit of the text); in markdown rendered
+// outside the editor (a grid's cell) a wiki link's `a.wiki-link` (its `data-ref` the target) and a markdown link's plain
+// `a`. A markdown link in the editor (`a.sb-link`) is the editor's own text, marked: left alone, as CodeMirror would take
+// an element put in it for an edit
+const LINKS = ".cm-content a.sb-wiki-link, [data-swl-rendered] a[href]";
+// A file of the space's name: an extension of its own, not a page's (`.md`)
+const FILE_NAME = /\.(?!md$)[a-z0-9]{1,8}$/i;
 const WEB = /^[a-z][a-z0-9+.-]*:/i;
+
+/** A link drawn (src/assets/decorate.ts' `DrawnLink`) */
+type Link = { readonly element: HTMLElement; readonly target: string; readonly style: "wiki" | "markdown" };
+
+/** A link's target and form as SilverBullet drew it; none for an element of Silverware Layout's own */
+export function drawnLink(element: HTMLElement): Link | undefined {
+  if (element.closest(".swl-asset-own, .swl-asset-card")) return undefined;
+  if (element.matches("a.sb-wiki-link")) return { element, target: element.getAttribute("href") ?? "", style: "wiki" };
+  if (element.matches("a.wiki-link[data-ref]")) return { element, target: element.getAttribute("data-ref") ?? "", style: "wiki" };
+  const href = element.getAttribute("href");
+  return href ? { element, target: href, style: "markdown" } : undefined;
+}
 
 /** An embed drawn (src/assets/decorate.ts' `DrawnEmbed`, named apart: the host knows no area) */
 type Drawn = { readonly frame: HTMLElement; readonly target: string; readonly native: HTMLElement | undefined; readonly position?: () => number | undefined };
@@ -97,6 +117,34 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
       observer.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-swl-pos"] });
       return () => observer.disconnect();
     },
+    // (Each link element offered once: Silverware Layout's icon put into it is no new link; the function given back stops it)
+    watchLinks: (drawn: (links: readonly Link[]) => void): (() => void) => {
+      const seen = new WeakSet<HTMLElement>();
+      const look = (root: ParentNode) => {
+        const found: Link[] = [];
+        const elements = [...(root instanceof HTMLElement && root.matches(LINKS) ? [root] : []), ...root.querySelectorAll<HTMLElement>(LINKS)];
+        for (const element of elements) {
+          if (seen.has(element)) continue;
+          seen.add(element);
+          const link = drawnLink(element);
+          if (link?.target) found.push(link);
+        }
+        if (found.length) drawn(found);
+      };
+      look(doc);
+      const observer = new (doc.defaultView ?? window).MutationObserver((records) => {
+        for (const record of records) for (const node of record.addedNodes) if (node instanceof HTMLElement) look(node);
+      });
+      observer.observe(doc.body, { childList: true, subtree: true });
+      return () => observer.disconnect();
+    },
+    // A file of the space a link points to (a wiki link's from the space's root, a markdown link's from the page's folder); a page or a site: none
+    linkAsset: (link: Link, page: string): Asset | undefined => {
+      if (WEB.test(link.target)) return undefined;
+      const target = resolvedTarget(link, page);
+      if (!FILE_NAME.test(target)) return undefined;
+      return { kind: "file", path: target, url: documentUrl(target) };
+    },
     renderedRanges: () =>
       [...doc.querySelectorAll<HTMLElement>("[data-swl-rendered][data-swl-pos][data-swl-end]")].map((block) => ({ from: Number(block.getAttribute("data-swl-pos")), to: Number(block.getAttribute("data-swl-end")) })),
     pageText: async () => String(await bridge.getText()),
@@ -141,8 +189,8 @@ function renderedPosition(frame: HTMLElement): number | undefined {
   return Number(base) + own;
 }
 
-/** An embed's target as SilverBullet resolves it: a wiki link's from the space's root, a markdown link's from the page's folder */
-export function resolvedTarget(embed: Embed, page: string): string {
+/** An embed's (or a link's) target as SilverBullet resolves it: a wiki link's from the space's root, a markdown link's from the page's folder */
+export function resolvedTarget(embed: Pick<Embed, "target" | "style">, page: string): string {
   const target = embed.target.split(/[#@$]/, 1)[0]!;
   if (WEB.test(target)) return target;
   if (embed.style === "wiki") return target.replace(/^\//, "");

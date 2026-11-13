@@ -45,7 +45,7 @@ describe("the Media tab", () => {
     });
     // What a card shows: its icon, its size and its date, each a box
     const boxes = [...tab.panel.querySelectorAll<HTMLInputElement>(".swl-media-checks input")];
-    expect(boxes.map((box) => [box.parentElement!.textContent, box.checked])).toEqual([["Its icon", true], ["Its size", false], ["Its date", false]]);
+    expect(boxes.map((box) => [box.parentElement!.textContent, box.checked])).toEqual([["Its icon", true], ["Its size", false], ["Its date", false], ["Links to files show the file's icon", true]]);
     boxes[0]!.checked = false;
     boxes[2]!.checked = true;
     await tab.save();

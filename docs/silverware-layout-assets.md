@@ -285,7 +285,7 @@ SilverBullet's paste and drop are CodeMirror's `domEventHandlers` (`editor_paste
 
 ## Later
 
-- **Links** (`[[report.pdf]]`): the same types rendered `inline` (an icon by the link, a preview on hover); a second source of occurrences in the host; the codec reads links from the start.
+- **Links** (`[[report.pdf]]`): the same types rendered `inline` (an icon by the link, a preview on hover); a second source of occurrences in the host; the codec reads links from the start. **The icon done 2026-11-13**: the asset host's optional `watchLinks` and `linkAsset` (SilverBullet's: a wiki link's widget `a.sb-wiki-link` in the editor, `a.wiki-link[data-ref]` and a plain `a` in a block rendered outside the editor; a file of the space alone, by an extension not `.md`: no page, no site), the decorator puts its type's icon first in the link (`swl-asset-link-icon`, marked `data-swl-asset-link`), the setting `linkIcons` (on; a box in the Media tab). A markdown link in the editor (`a.sb-link`) is CodeMirror's text, marked, not a widget: an element put there would be taken for an edit, so it gets none. Seen in SilverBullet 2.12.1: `[[sample.pdf]]` and `[[archive.zip|the archive]]` with their icons, in a cell too, a page's and a site's link none.
 - **Embedded pages** (`![[Page]]`): drawn by SilverBullet for now, untouched; later a type as the others (matched as a page, not a file), with the links.
 - Actions beyond `open-tab` (`peek`, `popover`, `open`, `embed`), a long press on touch.
 - A real PDF preview (pdf.js, loaded on first use), a video's first frame.

@@ -94,6 +94,8 @@ Point at a medium, and a **…** button shows at its top right: choose how it is
 
 **Its width**: point at an image (or a video, a PDF as the original or as a preview), and the bar beside its right edge makes it wider or narrower, as a table's; it stays where it is and grows to the right (*Width dragged* below sets it centred instead). Let go, and the width is saved as SilverBullet's own size: `![[photo.png|Photo|300]]`.
 
+**Links to files** (`[[report.pdf]]`) show the file's icon before their text, in a grid too (a markdown link, `[report](report.pdf)`, only in a grid). The Media tab turns this off.
+
 What you choose is kept in the embed itself, after SilverBullet's own size:
 
 ```markdown

@@ -56,6 +56,8 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
   const cardIcon = cardField("icon");
   const cardSize = cardField("size");
   const cardDate = cardField("modified");
+  const linkIcons = el(doc, "input", { attrs: { type: "checkbox" } });
+  linkIcons.checked = settings.linkIcons;
   const all = el(
     doc,
     "div",
@@ -67,6 +69,7 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
     el(doc, "label", "swl-media-field", "Width dragged", anchor),
     el(doc, "label", "swl-media-field", "A preview's height", el(doc, "span", "swl-media-unit", previewHeight, "px")),
     el(doc, "div", "swl-media-checks", el(doc, "span", { text: "Cards show" }), el(doc, "label", "swl-media-check", cardIcon, "Its icon"), el(doc, "label", "swl-media-check", cardSize, "Its size"), el(doc, "label", "swl-media-check", cardDate, "Its date")),
+    el(doc, "div", "swl-media-checks", el(doc, "label", "swl-media-check", linkIcons, "Links to files show the file's icon")),
   );
 
   // Per type: "Default" follows All files
@@ -107,6 +110,7 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
       card: [...(cardIcon.checked ? (["icon"] as const) : []), "name", ...(cardSize.checked ? (["size"] as const) : []), ...(cardDate.checked ? (["modified"] as const) : [])],
       anchor: anchor.value === "center" ? "center" : "start",
       heights: { ...settings.heights, preview: heightOf(previewHeight.value, settings.heights.preview) },
+      linkIcons: linkIcons.checked,
     };
   };
   const was = JSON.stringify(current());

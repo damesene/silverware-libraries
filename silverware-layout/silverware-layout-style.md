@@ -1498,8 +1498,9 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   height: 1em;
   margin-right: 0.2em;
   vertical-align: -0.125em;
-  border-radius: 3px;
+  border-radius: 4px;
   cursor: pointer;
+  transition: background-color 0.12s, box-shadow 0.12s, transform 0.12s;
 }
 /* On a touch screen it takes a finger: its box larger than the icon, not the text's */
 @media (pointer: coarse) {
@@ -1512,10 +1513,18 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
     inset: -10px -6px;
   }
 }
-/* Its menu opened by it: pointed at, it shows it is a button */
+/* Its menu opened by it: pointed at (or its menu open), it shows plainly it is a button of its own, apart from the
+   link's text: filled, ringed, a little larger */
 .swl-asset-link-icon:hover,
 .swl-asset-link-icon[aria-expanded="true"] {
-  background: color-mix(in srgb, currentColor 15%, transparent);
+  background: color-mix(in srgb, currentColor 22%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 40%, transparent);
+  transform: scale(1.2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .swl-asset-link-icon {
+    transition: none;
+  }
 }
 .swl-asset-pdf {
   display: block;

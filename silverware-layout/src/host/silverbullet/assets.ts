@@ -12,8 +12,9 @@ import { documentUrl } from "./platform.ts";
 
 const FRAME = ".sb-inline-content";
 // Markdown rendered outside the editor (a grid's cells: Silverware Layout's convention), its media plain elements:
-// each put in a frame of Silverware Layout's own to be decorated as SilverBullet's widget is
-const RENDERED_MEDIA = "[data-swl-rendered] :is(img, video, audio, object):not(.swl-asset-frame > *, .swl-asset-icon *, .swl-asset-own, .swl-asset-own *)";
+// each put in a frame of Silverware Layout's own to be decorated as SilverBullet's widget is; an embed SilverBullet's
+// HTML draws none of is a place there (./undrawn.ts), its target its `data-swl-embed`
+const RENDERED_MEDIA = "[data-swl-rendered] :is(img, video, audio, object, [data-swl-embed]):not(.swl-asset-frame > *, .swl-asset-icon *, .swl-asset-own, .swl-asset-own *)";
 const OWN_FRAME = "swl-asset-frame";
 const MEDIA = "img, video, audio, object";
 const BARS = ".button-bar, .sb-widget-menu-bar";
@@ -26,6 +27,8 @@ type Write = { readonly text: string; readonly occurrence: number; readonly of: 
 
 /** The target an embed's frame was drawn of: its medium's path in the space (or its URL), or the name it could not draw */
 export function drawnTarget(frame: HTMLElement): { readonly target: string; readonly native: HTMLElement | undefined } | undefined {
+  const place = frame.querySelector("[data-swl-embed]")?.getAttribute("data-swl-embed");
+  if (place) return { target: place, native: undefined };
   const native = frame.querySelector<HTMLElement>(MEDIA) ?? undefined;
   const source = native?.getAttribute("src") ?? native?.getAttribute("data");
   if (source) {
@@ -130,7 +133,7 @@ function renderedPosition(frame: HTMLElement): number | undefined {
 }
 
 /** An embed's target as SilverBullet resolves it: a wiki link's from the space's root, a markdown link's from the page's folder */
-function resolvedTarget(embed: Embed, page: string): string {
+export function resolvedTarget(embed: Embed, page: string): string {
   const target = embed.target.split(/[#@$]/, 1)[0]!;
   if (WEB.test(target)) return target;
   if (embed.style === "wiki") return target.replace(/^\//, "");

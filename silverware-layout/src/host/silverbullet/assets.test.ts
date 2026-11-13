@@ -40,6 +40,17 @@ describe("SilverBullet's embeds found", () => {
     expect(found[1]).toEqual(["swl-asset-frame:b.png"]);
     expect(cell.querySelector(".swl-asset-frame > img")).not.toBeNull();
   });
+
+  it("frames the place of an embed SilverBullet's HTML draws none of, its target its own", async () => {
+    const host = silverBulletAssetHost(bridge, pageWriter(silverBulletPlatform(bridge)), document);
+    const found: string[][] = [];
+    stops.push(host.watch((drawn) => found.push(drawn.map((one) => `${one.target}:${one.native ? "native" : "none"}:${one.position?.()}`))));
+    const cell = Object.assign(document.createElement("div"), { innerHTML: '<span class="p"><span class="swl-embed" data-swl-embed="archive.zip" data-pos="7"></span></span>' });
+    cell.setAttribute("data-swl-rendered", "");
+    cell.setAttribute("data-swl-pos", "40");
+    document.body.append(cell);
+    await vi.waitFor(() => expect(found).toEqual([["archive.zip:none:47"]]));
+  });
 });
 
 describe("a block rendered outside the editor given its place later", () => {

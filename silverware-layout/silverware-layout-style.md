@@ -1224,6 +1224,7 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   border: none !important;
 }
 [data-swl-asset]:has(object, .swl-asset-pdf) {
+  display: block;
   width: auto;
 }
 /* A card: its "…" beside it, not over its name */

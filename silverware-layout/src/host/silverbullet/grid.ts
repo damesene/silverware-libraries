@@ -8,6 +8,9 @@
 import { pageChanges } from "../../../../shared/pages/changes.ts";
 import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
+import { resolvedTarget } from "./assets.ts";
+import { documentUrl } from "./platform.ts";
+import { keepUndrawn } from "./undrawn.ts";
 
 // SilverBullet's frame of a widget, and its button bar in it (2.12.1: .button-bar; its main: .sb-widget-menu-bar)
 const FRAME = ".sb-lua-directive-block";
@@ -24,7 +27,10 @@ export function silverBulletGridHost(bridge: Bridge, writer: PageWriter) {
   return {
     renderMarkdown: async (text: string): Promise<string> => {
       if (!bridge.renderMarkdown) throw new Error("the init page hands over no renderMarkdown");
-      return String(await bridge.renderMarkdown(text));
+      // (An embed SilverBullet's HTML draws none of, a PDF, a zip, kept as a place: the page's widget draws it)
+      const page = String(await bridge.getCurrentPage());
+      const kept = keepUndrawn(text, (embed) => documentUrl(resolvedTarget(embed, page)));
+      return kept.restore(String(await bridge.renderMarkdown(kept.text)));
     },
     pageText: async (): Promise<string> => String(await bridge.getText()),
     // Through the page writer (the page open: one replaceRange, one undo step)

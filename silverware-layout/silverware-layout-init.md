@@ -124,6 +124,19 @@ if js and js.window then
       return widget.new({ html = silverwareLayoutJs.renderGrid(body), display = "block" })
     end,
   })
+  -- A page indexed: the links in its grids indexed too (SilverBullet's index sees nothing in a grid), so backlinks and
+  -- a rename of a page or an attachment find them. SilverBullet clears a page's objects before this event: these
+  -- replace, never pile up
+  event.listen({
+    name = "page:index",
+    run = function(event)
+      local page = event.data
+      local objects = silverwareLayoutJs.gridIndexObjects(page.name, page.text, page.meta and page.meta.lastModified)
+      if objects then
+        index.indexObjects(page.name, objects)
+      end
+    end,
+  })
   -- Another page opened: its own text width read here from its meta (one call) and handed over, so it is set before
   -- the page is painted (verified: a few ms ahead; read from JS, each call of the bridge a promise, it took frames)
   event.listen({

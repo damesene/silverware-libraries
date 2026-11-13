@@ -10,6 +10,8 @@ import { LayoutApp, type LayoutStore } from "./app.ts";
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { Registry } from "./core/registry.ts";
 import { gridInsertion } from "./grid/core/insert.ts";
+import { gridLinks } from "./grid/core/links.ts";
+import { gridRelations } from "./host/silverbullet/gridindex.ts";
 import { Grids } from "./grid/grids.ts";
 import { gridProvider } from "./grid/provider.ts";
 import { silverBulletGridHost } from "./host/silverbullet/grid.ts";
@@ -96,6 +98,17 @@ export function pageEdited(): void {
 
 // The bridge handed over last (for the slash commands)
 let current: Bridge | undefined;
+
+/**
+ * A page being indexed (the init page's page:index listener): the relations of the links in its grids, for the index
+ * (SilverBullet's own sees nothing in a grid); none where it has no grid
+ */
+export function gridIndexObjects(page: unknown, text: unknown, lastModified?: unknown): Record<string, unknown>[] | undefined {
+  const source = String(text ?? "");
+  if (!source.includes("<grid")) return undefined;
+  const links = gridLinks(String(page), source);
+  return links.length ? gridRelations(String(page), links, lastModified) : undefined;
+}
 
 /** The slash commands, as the init page defines them */
 export function slashCommands(): { name: string; description: string }[] {

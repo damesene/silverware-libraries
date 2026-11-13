@@ -2,7 +2,7 @@
 name: Library/damesene/silverware-layout
 tags: meta/library
 version: 1.0.0
-description: "Silverware Layout: Columns in a page (/grid), embedded files shown in full, as a preview or as a card, the width of a page's text (its own or a default for every page) and of its tables, databases, charts and grids, wider or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll."
+description: "Silverware Layout: Columns in a page (/grid), embedded files shown as the original, as a preview or as a card, the width of a page's text (its own or a default for every page) and of its tables, databases, charts and grids, wider or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll."
 files:
 - silverware-layout.js
 - silverware-layout-init.md
@@ -85,13 +85,13 @@ What you should know:
 
 Images, videos, audio, PDFs and other files you embed (`![[photo.png]]`, `![Photo](photo.png)`) can each be shown three ways:
 
-- **In full**: as SilverBullet shows it (the image, a player, a viewer).
+- **Original**: the file itself, as SilverBullet shows it (the image, a player, a viewer).
 - **Preview**: smaller (a PDF in a small viewer).
 - **Card**: a small card with the file's icon and name, the file itself not shown. A file SilverBullet cannot show (a zip, a document) is a card instead of an error.
 
 Point at a medium, and a **…** button shows at its top right: choose how it is shown there, or **Open** it. A click on a card or a preview opens the file in a new tab; Shift+click does the same, unless you set otherwise.
 
-**Its width**: point at an image (or a video, a PDF in full or in preview), and the bar beside its right edge makes it wider or narrower, as a table's; it stays where it is and grows to the right (*Width dragged* below sets it centred instead). Let go, and the width is saved as SilverBullet's own size: `![[photo.png|Photo|300]]`.
+**Its width**: point at an image (or a video, a PDF as the original or as a preview), and the bar beside its right edge makes it wider or narrower, as a table's; it stays where it is and grows to the right (*Width dragged* below sets it centred instead). Let go, and the width is saved as SilverBullet's own size: `![[photo.png|Photo|300]]`.
 
 What you choose is kept in the embed itself, after SilverBullet's own size:
 

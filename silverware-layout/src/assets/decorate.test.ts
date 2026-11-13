@@ -130,7 +130,7 @@ describe("an asset's menu", () => {
     expect(items.map((item) => [item.textContent?.trim(), item.getAttribute("aria-checked")])).toEqual([
       ["Show as a card", "false"],
       ["Show as a preview", "false"],
-      ["Show in full", "true"],
+      ["Show as the original", "true"],
       ["Open", null],
     ]);
     items[0]!.click();

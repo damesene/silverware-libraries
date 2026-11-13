@@ -6,7 +6,7 @@ import type { DialogTabPart } from "../../ui/pagedialog.ts";
 import { type AssetSettings, type Gesture, type View, VIEWS } from "../model/settings.ts";
 import { iconElement } from "./card.ts";
 
-const VIEW_LABELS: Readonly<Record<View, string>> = { icon: "Card", preview: "Preview", embed: "In full" };
+const VIEW_LABELS: Readonly<Record<View, string>> = { icon: "Card", preview: "Preview", embed: "Original" };
 const NONE = "";
 const DEFAULT = "*";
 

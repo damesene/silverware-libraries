@@ -160,7 +160,7 @@ export class AssetDecorator {
     };
     // The "…" menu: how it is shown (the one the settings give left unwritten), the click's action
     const settled = settings.views.types[type.name] ?? settings.views.default;
-    const LABELS: Readonly<Record<View, string>> = { icon: "Show as a card", preview: "Show as a preview", embed: "Show in full" };
+    const LABELS: Readonly<Record<View, string>> = { icon: "Show as a card", preview: "Show as a preview", embed: "Show as the original" };
     addMoreButton(
       this.doc,
       frame,

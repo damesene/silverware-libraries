@@ -9,7 +9,7 @@
 import { validateAttributeName, writeAttributes } from "../markdown/attributes.ts";
 import { embedAsLink, type EmbedChanges, linkAsEmbed, readEmbeds, readLinks, writeEmbed } from "../markdown/embed.ts";
 import { readGrids } from "../markdown/grid.ts";
-import { blocksIn, type GridMode, gridOfBlocks, gridText, ungridded } from "../markdown/gridbuild.ts";
+import { blocksIn, type GridMode, gridOfBlocks, ungridded } from "../markdown/gridbuild.ts";
 import { codeBlocksOf, sameBody } from "./blocks.ts";
 import type { PageBuilder } from "./changes.ts";
 import { type FrontmatterValue, readFrontmatter, readKey, validateFrontmatterKey, writeKey } from "./frontmatter.ts";
@@ -411,24 +411,42 @@ export const PARTS: readonly Part[] = [
       if (change.kind === "changeGridCells") {
         const how = change.cells;
         if (how.kind === "ungrid") return { text: text.slice(0, grid.from) + ungridded(grid) + text.slice(grid.to), changes: 1 };
-        const cells = grid.cells.map((cell) => cell.content.replace(/\r\n/g, "\n"));
-        let after = "";
+        // Only the cells' own lines change: each cell moved whole (its `<column …>` line's attributes with it), what
+        // lies between them where it was
+        const nl = lineBreakOf(text);
+        const cells = grid.cells;
+        // A cell's text whole, its `</column>` written where it was left open
+        const whole = (cell: (typeof cells)[number]) => {
+          const own = text.slice(cell.from, cell.to);
+          return cell.closed ? own : `${own.replace(/\s+$/, "")}${nl}</column>`;
+        };
+        // The end of a cell's last line, its line break after it included (where it has one)
+        const lineEnd = (at: number) => (text.startsWith("\r\n", at) ? at + 2 : text.startsWith("\n", at) ? at + 1 : at);
         if (how.kind === "move") {
           const to = how.cell + how.by;
           if (how.cell < 0 || how.cell >= cells.length || to < 0 || to >= cells.length) return { text, changes: 0 };
-          [cells[how.cell], cells[to]] = [cells[to]!, cells[how.cell]!];
-        } else if (how.kind === "add") {
-          cells.splice(how.after === undefined ? cells.length : how.after + 1, 0, "");
-        } else {
-          if (how.cell < 0 || how.cell >= cells.length) return { text, changes: 0 };
-          const [out] = cells.splice(how.cell, 1);
-          // Its content under the grid, never lost; the grid gone where it was its last cell
-          after = out!.trim() ? out! : "";
-          if (!cells.length) return { text: text.slice(0, grid.from) + after + text.slice(grid.to), changes: 1 };
+          const [first, second] = how.cell < to ? [cells[how.cell]!, cells[to]!] : [cells[to]!, cells[how.cell]!];
+          return { text: text.slice(0, first.from) + whole(second) + text.slice(first.to, second.from) + whole(first) + text.slice(second.to), changes: 1 };
         }
-        const nl = lineBreakOf(text);
-        const written = (gridText(cells, grid.attributes) + (after ? `\n\n${after}` : "")).replace(/\n/g, nl);
-        return { text: text.slice(0, grid.from) + written + text.slice(grid.to), changes: 1 };
+        if (how.kind === "add") {
+          const empty = `<column>${nl}${nl}${nl}</column>`;
+          const before = how.after === undefined ? cells.at(-1) : cells[how.after];
+          if (!before) {
+            // (No cell yet: the first, at the body's start)
+            return { text: text.slice(0, grid.bodyFrom) + empty + nl + text.slice(grid.bodyFrom), changes: 1 };
+          }
+          // (After the cell's `</column>` line; one left open closed first)
+          return { text: text.slice(0, before.from) + whole(before) + nl + empty + text.slice(before.to), changes: 1 };
+        }
+        if (how.cell < 0 || how.cell >= cells.length) return { text, changes: 0 };
+        const out = cells[how.cell]!;
+        // Its content under the grid, never lost; the grid gone where it was its last cell
+        const after = out.content.replace(/\r\n/g, "\n").trim() ? out.content.replace(/\r\n/g, "\n") : "";
+        if (cells.length === 1) return { text: text.slice(0, grid.from) + after.replace(/\n/g, nl) + text.slice(grid.to), changes: 1 };
+        const kept = text.slice(0, out.from) + text.slice(out.closed ? lineEnd(out.to) : out.to);
+        const shift = kept.length - text.length;
+        const end = grid.to + shift;
+        return { text: kept.slice(0, end) + (after ? `${nl}${nl}${after.replace(/\n/g, nl)}` : "") + kept.slice(end), changes: 1 };
       }
       if (change.kind === "setGridAttributes") {
         const problem = Object.keys(change.attributes).map(validateAttributeName).find(Boolean);

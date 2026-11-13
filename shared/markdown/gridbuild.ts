@@ -86,8 +86,16 @@ function spaced(text: string, from: number, to: number, insert: string): string 
 
 /** A grid's cells one under another, in their order (row by row), each cell's markdown as written: the grid taken apart */
 export function ungridded(grid: Grid): string {
-  const parts: { readonly text: string; readonly items: readonly MarkdownNode[] }[] = grid.cells
-    .map((cell) => cell.content.replace(/\r\n/g, "\n"))
+  // Each cell's content, and what lies between the cells in the grid's body (a line written there by hand), in order
+  const texts: string[] = [];
+  let at = grid.bodyFrom;
+  for (const cell of grid.cells) {
+    texts.push(grid.body.slice(at - grid.bodyFrom, cell.from - grid.bodyFrom).trim(), cell.content);
+    at = cell.to;
+  }
+  texts.push(grid.body.slice(at - grid.bodyFrom).trim());
+  const parts: { readonly text: string; readonly items: readonly MarkdownNode[] }[] = texts
+    .map((content) => content.replace(/\r\n/g, "\n"))
     .filter((content) => content.trim())
     .map((content) => ({ text: content, items: parseBlocks(content) }));
   let out = "";

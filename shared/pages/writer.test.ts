@@ -414,6 +414,33 @@ describe("the page writer", () => {
     expect(body).toContain("<column>");
   });
 
+  it("moves, adds and takes out a cell whole: its column's attributes and what lies between the cells kept", async () => {
+    const page = '<grid>\n<column span="2">\n\nA\n\n</column>\nA note\n<column>\n\nB\n\n</column>\n</grid>\n';
+    const { map, writer } = memory({ A: page });
+    const change = async (cells: Parameters<PageBuilder["grids"]["changeCells"]>[1]) => {
+      const now = readGrids(map.get("A")!)[0]!.body;
+      await writer.write(pageChanges().page("A", (p) => p.grids.changeCells(now, cells)).build());
+    };
+    await change({ kind: "move", cell: 1, by: -1 });
+    expect(map.get("A")).toBe('<grid>\n<column>\n\nB\n\n</column>\nA note\n<column span="2">\n\nA\n\n</column>\n</grid>\n');
+    await change({ kind: "add", after: 1 });
+    expect(map.get("A")).toBe('<grid>\n<column>\n\nB\n\n</column>\nA note\n<column span="2">\n\nA\n\n</column>\n<column>\n\n\n</column>\n</grid>\n');
+    await change({ kind: "takeOut", cell: 0 });
+    expect(map.get("A")).toBe('<grid>\nA note\n<column span="2">\n\nA\n\n</column>\n<column>\n\n\n</column>\n</grid>\n\nB\n');
+    await change({ kind: "ungrid" });
+    expect(map.get("A")).toBe("A note\n\nA\n\nB\n");
+  });
+
+  it("moves a cell left open, closing it", async () => {
+    const { map, writer } = memory({ A: "<grid>\n<column>\nA\n</column>\n<column>\nB\n</grid>" });
+    const now = readGrids(map.get("A")!)[0]!.body;
+    await writer.write(pageChanges().page("A", (p) => p.grids.changeCells(now, { kind: "move", cell: 1, by: -1 })).build());
+    expect(readGrids(map.get("A")!)[0]!.cells.map((cell) => [cell.content, cell.closed])).toEqual([
+      ["B", true],
+      ["A", true],
+    ]);
+  });
+
   it("closes a grid's cell left open as it writes it", async () => {
     const { map, writer } = memory({ A: "<grid>\n<column>\nOpen\n</grid>" });
     await writer.write(pageChanges().page("A", (p) => p.grids.replaceCell("<column>\nOpen", 0, "Shut")).build());

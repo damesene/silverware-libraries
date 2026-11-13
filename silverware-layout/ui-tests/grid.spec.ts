@@ -1,6 +1,6 @@
 // Columns (docs/silverware-layout-grid.md) as a user works with them in SilverBullet: /grid, a cell edited in place,
 // Alt+click to the raw text, columns set by the grid's line, a grid in an embedded page, its hashtags indexed.
-import { cursorAt, editorText, expect, gridsDrawn, test } from "./helpers.ts";
+import { cursorAt, editorText, expect, gridsDrawn, runCommand, test } from "./helpers.ts";
 
 const GRID = "<grid>\n<column>\n\nLeft text\n\n</column>\n<column>\n\nRight text\n\n</column>\n</grid>\n";
 
@@ -98,4 +98,49 @@ test("a grid's hashtags in the index: a tag of the page, a paragraph holding it"
     .toEqual([`${space.folder}/Page:page`]);
   const paragraphs = (await query("paragraph")) as { page: string; text: string; tags?: string[] }[];
   expect(paragraphs.filter((one) => one.page === `${space.folder}/Page`).map((one) => [one.text, one.tags])).toEqual([["Left #uigridtag text", ["uigridtag"]]]);
+});
+
+test("Put into grid: the tasks selected split into 2 columns, a list in each, by the command's two picks", async ({ page, space }) => {
+  const tasks = "- [ ] one\n- [ ] two\n- [x] three\n- [ ] four\n- [ ] five";
+  await space.open({ Page: `# Page\n\n${tasks}\n\nAfter\n` }, "Page");
+  await page.evaluate((list) => {
+    const view = (window as unknown as { client: { editorView: { state: { doc: { toString(): string } }; dispatch(spec: unknown): void } } }).client.editorView;
+    const text = view.state.doc.toString();
+    view.dispatch({ selection: { anchor: text.indexOf(list), head: text.indexOf(list) + list.length } });
+  }, tasks);
+  // (Not awaited: the command waits for the picks)
+  void runCommand(page, "Silverware Layout: Put into grid");
+  const box = page.locator(".sb-modal-box, .sb-modal").first();
+  await expect(box).toContainText("Put 5 blocks into a grid");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(box).toContainText("How many columns");
+  await page.keyboard.press("Enter");
+  await expect
+    .poll(() => space.saved("Page"))
+    .toBe("# Page\n\n<grid>\n<column>\n\n- [ ] one\n- [ ] two\n- [x] three\n\n</column>\n<column>\n\n- [ ] four\n- [ ] five\n\n</column>\n</grid>\n\nAfter\n");
+});
+
+test("a cell's menu: the cell moved right, then the grid removed, its content kept in its order", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${GRID}\nAfter\n` }, "Page");
+  await gridsDrawn(page);
+  const pick = async (cell: number, label: string) => {
+    const target = page.locator("#sb-main .swl-grid-cell").nth(cell);
+    await target.hover();
+    await target.locator(".swl-grid-cell-more").click();
+    await page.locator(".swl-asset-menu-holder .swl-menu-item", { hasText: label }).click();
+  };
+  await pick(0, "Move right");
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${GRID.replace("Left text", "@@").replace("Right text", "Left text").replace("@@", "Right text")}\nAfter\n`);
+  await gridsDrawn(page);
+  await expect(page.locator("#sb-main .swl-grid-cell").first()).toContainText("Right text");
+  await pick(0, "Remove the grid");
+  await expect.poll(() => space.saved("Page")).toBe("# Page\n\nRight text\n\nLeft text\n\nAfter\n");
+});
+
+test("SilverBullet's button bar of a grid's frame stays hidden as the pointer is over the grid", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${GRID}` }, "Page");
+  await gridsDrawn(page);
+  await page.locator("#sb-main .swl-grid-cell").first().hover();
+  await expect(page.locator("#sb-main .swl-grid-widget :is(.button-bar, .sb-widget-menu-bar)")).toBeHidden();
 });

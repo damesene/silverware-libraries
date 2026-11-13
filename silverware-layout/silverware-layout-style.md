@@ -1442,6 +1442,17 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   border-radius: 3px;
   cursor: pointer;
 }
+/* On a touch screen it takes a finger: its box larger than the icon, not the text's */
+@media (pointer: coarse) {
+  .swl-asset-link-icon {
+    position: relative;
+  }
+  .swl-asset-link-icon::after {
+    content: "";
+    position: absolute;
+    inset: -10px -6px;
+  }
+}
 /* Its menu opened by it: pointed at, it shows it is a button */
 .swl-asset-link-icon:hover,
 .swl-asset-link-icon[aria-expanded="true"] {

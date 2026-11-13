@@ -48,31 +48,38 @@ export function opensMenu(doc: Document, trigger: HTMLElement, menu: () => MoreM
   };
   trigger.addEventListener("mousedown", hold, { signal });
   trigger.addEventListener("pointerdown", (event) => event.stopPropagation(), { signal });
-  trigger.addEventListener(
-    "click",
-    (event) => {
-      hold(event);
-      if (holder) return close();
-      const shown = menu();
-      const entries: MenuEntry[] = shown.views.map((one) =>
-        menuItem({ label: one.label, checked: one.checked, ...(one.disabled ? { disabled: one.disabled } : {}), run: () => (close(), one.run()) }),
-      );
-      const actions = shown.actions ?? [];
-      if (entries.length && actions.length) entries.push(menuSeparator());
-      for (const action of actions) entries.push(menuItem({ label: action.label, run: () => (close(), action.run()) }));
-      const rendered = renderMenu(doc, LOOK, shown.title, entries);
-      onMenuClose(rendered, LOOK, close);
-      // (The box is the plugin's own, `.swl-menu`: the shared look's rules are of the menu in it)
-      holder = el(doc, "div", { class: "swl-asset-menu-holder swl-menu" }, rendered);
-      const box = trigger.getBoundingClientRect();
-      holder.style.top = `${box.bottom + 4}px`;
-      holder.style.left = `${Math.max(8, Math.min(box.right - 220, (doc.defaultView?.innerWidth ?? Infinity) - 228))}px`;
-      doc.body.append(holder);
-      trigger.setAttribute("aria-expanded", "true");
-      focusMenu(rendered, LOOK);
-    },
-    { signal },
-  );
+  const pressed = (event: Event) => {
+    hold(event);
+    toggle();
+  };
+  trigger.addEventListener("click", pressed, { signal });
+  // A finger: SilverBullet follows a link as a touch on it ends (2.12.1, its LinkWidget's touchend), before any click:
+  // the touch ending on the trigger is the trigger's (held back, the click after it none). One that moved is a scroll,
+  // left to what it is in (SilverBullet's link counts it, and follows nothing)
+  let moved = false;
+  trigger.addEventListener("touchstart", () => void (moved = false), { signal, passive: true });
+  trigger.addEventListener("touchmove", () => void (moved = true), { signal, passive: true });
+  trigger.addEventListener("touchend", (event) => void (moved || pressed(event)), { signal });
+  const toggle = () => {
+    if (holder) return close();
+    const shown = menu();
+    const entries: MenuEntry[] = shown.views.map((one) =>
+      menuItem({ label: one.label, checked: one.checked, ...(one.disabled ? { disabled: one.disabled } : {}), run: () => (close(), one.run()) }),
+    );
+    const actions = shown.actions ?? [];
+    if (entries.length && actions.length) entries.push(menuSeparator());
+    for (const action of actions) entries.push(menuItem({ label: action.label, run: () => (close(), action.run()) }));
+    const rendered = renderMenu(doc, LOOK, shown.title, entries);
+    onMenuClose(rendered, LOOK, close);
+    // (The box is the plugin's own, `.swl-menu`: the shared look's rules are of the menu in it)
+    holder = el(doc, "div", { class: "swl-asset-menu-holder swl-menu" }, rendered);
+    const box = trigger.getBoundingClientRect();
+    holder.style.top = `${box.bottom + 4}px`;
+    holder.style.left = `${Math.max(8, Math.min(box.right - 220, (doc.defaultView?.innerWidth ?? Infinity) - 228))}px`;
+    doc.body.append(holder);
+    trigger.setAttribute("aria-expanded", "true");
+    focusMenu(rendered, LOOK);
+  };
   doc.addEventListener("pointerdown", outside, { capture: true, ...(signal ? { signal } : {}) });
   signal?.addEventListener("abort", close);
 }

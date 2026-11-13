@@ -1498,35 +1498,14 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   height: 1em;
   margin-right: 0.2em;
   vertical-align: -0.125em;
-  position: relative;
   border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.12s, transform 0.12s;
 }
-/* A small arrow down at its top right, as the pointer is over it (always on a touch screen): it opens a menu */
-.swl-asset-link-icon::before {
-  content: "";
-  position: absolute;
-  top: -0.3em;
-  right: -0.35em;
-  width: 0.55em;
-  height: 0.55em;
-  background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 9 7 7 7-7'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 9 7 7 7-7'/%3E%3C/svg%3E") center / contain no-repeat;
-  opacity: 0;
-  transition: opacity 0.12s;
-  pointer-events: none;
-}
-.swl-asset-link-icon:hover::before,
-.swl-asset-link-icon[aria-expanded="true"]::before {
-  opacity: 1;
-}
-/* On a touch screen (no pointer over it) its arrow shown always, and it takes a finger: its box larger than the
-   icon */
+/* On a touch screen it takes a finger: its box larger than the icon, not the text's */
 @media (pointer: coarse) {
-  .swl-asset-link-icon::before {
-    opacity: 0.8;
+  .swl-asset-link-icon {
+    position: relative;
   }
   .swl-asset-link-icon::after {
     content: "";
@@ -1542,8 +1521,7 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   transform: scale(1.2);
 }
 @media (prefers-reduced-motion: reduce) {
-  .swl-asset-link-icon,
-  .swl-asset-link-icon::before {
+  .swl-asset-link-icon {
     transition: none;
   }
 }

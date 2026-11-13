@@ -9,7 +9,11 @@ import { silverBulletPlatform } from "./platform.ts";
 
 const bridge = { getText: () => "", getCurrentPage: () => "P", replaceRange: () => undefined, readPage: () => "", writePage: () => undefined, listPages: () => [], flash: () => undefined } as unknown as Bridge;
 
-afterEach(() => document.body.replaceChildren());
+const stops: (() => void)[] = [];
+afterEach(() => {
+  for (const stop of stops.splice(0)) stop();
+  document.body.replaceChildren();
+});
 
 describe("SilverBullet's embeds found", () => {
   it("reads a widget's target from its medium or from what it could not draw", () => {
@@ -27,7 +31,7 @@ describe("SilverBullet's embeds found", () => {
     const found: string[][] = [];
     const widget = Object.assign(document.createElement("div"), { className: "sb-inline-content", innerHTML: '<img src=".fs/a.png">' });
     document.body.append(widget);
-    host.watch((drawn) => found.push(drawn.map((one) => `${one.frame.className}:${one.target}`)));
+    stops.push(host.watch((drawn) => found.push(drawn.map((one) => `${one.frame.className}:${one.target}`))));
     expect(found).toEqual([["sb-inline-content:a.png"]]);
     const cell = Object.assign(document.createElement("div"), { innerHTML: '<span class="p"><img src=".fs/b.png" data-pos="0"></span>' });
     cell.setAttribute("data-swl-rendered", "");
@@ -35,5 +39,21 @@ describe("SilverBullet's embeds found", () => {
     await vi.waitFor(() => expect(found).toHaveLength(2));
     expect(found[1]).toEqual(["swl-asset-frame:b.png"]);
     expect(cell.querySelector(".swl-asset-frame > img")).not.toBeNull();
+  });
+});
+
+describe("a block rendered outside the editor given its place later", () => {
+  it("offers its media again, their places known now", async () => {
+    const host = silverBulletAssetHost(bridge, pageWriter(silverBulletPlatform(bridge)), document);
+    const found: (number | undefined)[][] = [];
+    stops.push(host.watch((drawn) => found.push(drawn.map((one) => one.position?.()))));
+    const cell = Object.assign(document.createElement("div"), { innerHTML: '<span class="p"><img src=".fs/b.png"></span>' });
+    cell.setAttribute("data-swl-rendered", "");
+    document.body.append(cell);
+    await vi.waitFor(() => expect(found).toEqual([[undefined]]));
+    cell.setAttribute("data-swl-pos", "61");
+    cell.setAttribute("data-swl-end", "85");
+    await vi.waitFor(() => expect(found).toEqual([[undefined], [61]]));
+    expect(host.renderedRanges()).toEqual([{ from: 61, to: 85 }]);
   });
 });

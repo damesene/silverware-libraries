@@ -47,6 +47,20 @@ const OWN_CLICKS = "a, button, input, textarea, select, label, [data-ref]";
 /** A body or a cell's markdown as compared: its line breaks LF, no blank lines at its end */
 const same = (text: string) => text.replace(/\r\n/g, "\n").replace(/\s+$/, "");
 
+/**
+ * Each cell marked with where its markdown is in the page (`data-swl-pos`, `data-swl-end`): Silverware Layout's
+ * convention for markdown rendered outside the editor, by which what is in it (an embed, its `data-pos` its offset in
+ * the cell) is found in the page's text, knowing no grid
+ */
+function markPlaces(element: HTMLElement, grid: Grid): void {
+  element.querySelectorAll<HTMLElement>(":scope > .swl-grid-cell").forEach((cellElement, index) => {
+    const cell = grid.cells[index];
+    if (!cell) return;
+    if (cellElement.getAttribute("data-swl-pos") !== String(cell.contentFrom)) cellElement.setAttribute("data-swl-pos", String(cell.contentFrom));
+    if (cellElement.getAttribute("data-swl-end") !== String(cell.contentTo)) cellElement.setAttribute("data-swl-end", String(cell.contentTo));
+  });
+}
+
 /** Whether two sets of attributes are the same */
 function sameAttributes(a: Attributes | undefined, b: Attributes): boolean {
   if (!a) return false;
@@ -97,10 +111,13 @@ export class Grids {
       Promise.all(cells.map((cell) => this.host.renderMarkdown(cell.content).catch(() => plainCell(this.doc, cell.content)))),
       this.host.pageText().catch(() => ""),
     ]);
-    const attributes = gridsOfBody(text, body)[0]?.attributes ?? {};
+    const first = gridsOfBody(text, body)[0];
+    const attributes = first?.attributes ?? {};
     const element = drawGrid(this.doc, columnTemplate(attributes.columns, cells.length), html);
     this.bodies.set(element, body);
     this.attributes.set(element, attributes);
+    // Where its cells are in the page (the first grid of its body; set again as it is found among its alike)
+    if (first) markPlaces(element, first);
     this.host.settle?.(element);
     // In the page, its order among the grids of its body is known: its own attributes then
     this.refreshSoon();
@@ -118,6 +135,7 @@ export class Grids {
       const found = this.found(text, element);
       if (!found) continue;
       showColumns(element, columnTemplate(found.grid.attributes.columns, element.querySelectorAll(":scope > .swl-grid-cell").length));
+      markPlaces(element, found.grid);
       if (!sameAttributes(this.attributes.get(element), found.grid.attributes)) changed = true;
       this.attributes.set(element, found.grid.attributes);
     }

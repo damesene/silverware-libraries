@@ -11,9 +11,10 @@ import { AssetDecorator, type AssetHost, type DrawnEmbed, type EmbedWrite } from
 import { type AssetSettings, readAssetSettings } from "./model/settings.ts";
 
 function setUp(text: string, settings: unknown = {}) {
-  const state = { text, opened: [] as string[], writes: [] as EmbedWrite[], problems: [] as string[] };
+  const state = { text, opened: [] as string[], writes: [] as EmbedWrite[], problems: [] as string[], ranges: [] as { from: number; to: number }[] };
   const host: AssetHost = {
     watch: () => undefined,
+    renderedRanges: () => state.ranges,
     pageText: async () => state.text,
     pageName: async () => "Notes/Page",
     resolved: (embed) => embed.target,
@@ -170,5 +171,36 @@ describe("an asset's width, as Silverware Layout's widget", () => {
     const cat = frame("cat.png");
     await decorator.decorate([cat]);
     expect(assetProvider(decorator).anchor!(cat.frame)).toBe("center");
+  });
+});
+
+describe("the same file outside a grid and in it", () => {
+  it("finds a medium rendered outside the editor by its place, the host's widget among the embeds outside such a block", async () => {
+    // The grid's embed after the one outside: the grid drawn (and decorated) first
+    const text = "![[cat.png|A]]\n\n<grid>\n<column>\n\n![[cat.png|A]]\n\n</column>\n</grid>";
+    const { state, decorator } = setUp(text);
+    const inGrid = text.lastIndexOf("![[cat.png");
+    state.ranges = [{ from: inGrid, to: inGrid + 14 }];
+    const gridFrame = { ...frame("cat.png"), position: () => inGrid };
+    await decorator.decorate([gridFrame]);
+    const widget = frame("cat.png");
+    await decorator.decorate([widget]);
+    // A view chosen on each writes its own embed
+    for (const [one, view] of [[gridFrame, 0], [widget, 1]] as const) {
+      one.frame.querySelector<HTMLButtonElement>(".swl-asset-more")!.click();
+      [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")][view]!.click();
+    }
+    await vi.waitFor(() => expect(state.writes).toHaveLength(2));
+    expect(state.writes.map((write) => [write.occurrence, write.changes])).toEqual([
+      [1, { metadata: { view: "icon" } }],
+      [0, { metadata: { view: "preview" } }],
+    ]);
+  });
+
+  it("leaves a medium rendered outside the editor whose place is not known yet", async () => {
+    const { decorator } = setUp("![[cat.png]]");
+    const unplaced = { ...frame("cat.png"), position: () => undefined };
+    await decorator.decorate([unplaced]);
+    expect(unplaced.frame.hasAttribute("data-swl-asset")).toBe(false);
   });
 });

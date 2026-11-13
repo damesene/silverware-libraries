@@ -21,7 +21,7 @@ const UNSUPPORTED = /Unsupported content:\s*(.+)$/;
 const WEB = /^[a-z][a-z0-9+.-]*:/i;
 
 /** An embed drawn (src/assets/decorate.ts' `DrawnEmbed`, named apart: the host knows no area) */
-type Drawn = { readonly frame: HTMLElement; readonly target: string; readonly native: HTMLElement | undefined };
+type Drawn = { readonly frame: HTMLElement; readonly target: string; readonly native: HTMLElement | undefined; readonly position?: () => number | undefined };
 type Write = { readonly text: string; readonly occurrence: number; readonly of: number; readonly changes: EmbedChanges };
 
 /** The target an embed's frame was drawn of: its medium's path in the space (or its URL), or the name it could not draw */
@@ -44,7 +44,8 @@ export function drawnTarget(frame: HTMLElement): { readonly target: string; read
 
 export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: Document) {
   return {
-    watch: (drawn: (embeds: readonly Drawn[]) => void): void => {
+    // (The function given back stops it)
+    watch: (drawn: (embeds: readonly Drawn[]) => void): (() => void) => {
       const seen = new WeakSet<HTMLElement>();
       const look = (root: ParentNode) => {
         const found: Drawn[] = [];
@@ -70,16 +71,31 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
           if (!target) continue;
           seen.add(frame);
           if (!frame.classList.contains(OWN_FRAME)) for (const bar of frame.parentElement?.querySelectorAll<HTMLElement>(BARS) ?? []) bar.style.setProperty("display", "none", "important");
-          found.push({ frame, ...target });
+          found.push({ frame, ...target, ...(frame.classList.contains(OWN_FRAME) ? { position: () => renderedPosition(frame) } : {}) });
         }
         if (found.length) drawn(found);
       };
       look(doc);
       const observer = new (doc.defaultView ?? window).MutationObserver((records) => {
-        for (const record of records) for (const node of record.addedNodes) if (node instanceof HTMLElement) look(node);
+        const placed: Drawn[] = [];
+        for (const record of records) {
+          for (const node of record.addedNodes) if (node instanceof HTMLElement) look(node);
+          // A block rendered outside the editor given its place (later than its media came: its host read the page's
+          // text while it was still the page before): its media offered again, their places known now
+          if (record.type === "attributes" && record.target instanceof HTMLElement && record.target.matches("[data-swl-rendered]")) {
+            for (const frame of record.target.querySelectorAll<HTMLElement>(`.${OWN_FRAME}`)) {
+              const target = drawnTarget(frame);
+              if (target) placed.push({ frame, ...target, position: () => renderedPosition(frame) });
+            }
+          }
+        }
+        if (placed.length) drawn(placed);
       });
-      observer.observe(doc.body, { childList: true, subtree: true });
+      observer.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-swl-pos"] });
+      return () => observer.disconnect();
     },
+    renderedRanges: () =>
+      [...doc.querySelectorAll<HTMLElement>("[data-swl-rendered][data-swl-pos][data-swl-end]")].map((block) => ({ from: Number(block.getAttribute("data-swl-pos")), to: Number(block.getAttribute("data-swl-end")) })),
     pageText: async () => String(await bridge.getText()),
     pageName: async () => String(await bridge.getCurrentPage()),
     resolved: (embed: Embed, page: string): string => resolvedTarget(embed, page),
@@ -97,6 +113,20 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
     open: (url: string): void => void (doc.defaultView ?? window).open(url, "_blank", "noopener"),
     problem: (message: string): void => void bridge.flash(message, "error"),
   };
+}
+
+/**
+ * Where a medium in markdown rendered outside the editor is in the page: its block's place (`data-swl-pos`, the
+ * convention) and its own offset in the block's markdown (SilverBullet's `data-pos`, which it leaves out at 0); its
+ * block's place not known yet: none
+ */
+function renderedPosition(frame: HTMLElement): number | undefined {
+  const block = frame.closest<HTMLElement>("[data-swl-rendered]");
+  const base = block?.getAttribute("data-swl-pos");
+  if (!block || base === null || base === undefined) return undefined;
+  const marked = frame.querySelector("[data-pos]") ?? frame.closest("[data-pos]");
+  const own = marked && block.contains(marked) ? Number(marked.getAttribute("data-pos")) || 0 : 0;
+  return Number(base) + own;
 }
 
 /** An embed's target as SilverBullet resolves it: a wiki link's from the space's root, a markdown link's from the page's folder */

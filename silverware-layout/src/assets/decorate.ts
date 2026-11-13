@@ -6,7 +6,7 @@
 import type { ActionContext, Asset, AssetType, RenderContext, Viewport } from "../../../shared/assets.ts";
 import { type Embed, type EmbedChanges, readEmbeds } from "../../../shared/markdown/embed.ts";
 import { actionFor, typeFor, viewFor } from "./core/choose.ts";
-import { embedOf, sameTarget } from "./core/locate.ts";
+import { embedAt, embedOf, outside, type Range, sameTarget } from "./core/locate.ts";
 import { metadataOf } from "./core/metadata.ts";
 import type { AssetRegistry } from "./core/registry.ts";
 import { type AssetSettings, type Gesture, type View, VIEWS } from "./model/settings.ts";
@@ -14,7 +14,13 @@ import { drawCard, markFailed } from "./ui/card.ts";
 import { addMoreButton } from "./ui/moremenu.ts";
 
 /** An embed as the host drew it: its frame, its target as drawn (a path of the space or a URL), its own media element */
-export type DrawnEmbed = { readonly frame: HTMLElement; readonly target: string; readonly native: HTMLElement | undefined };
+export type DrawnEmbed = {
+  readonly frame: HTMLElement;
+  readonly target: string;
+  readonly native: HTMLElement | undefined;
+  // Where it is in the page, where the host knows (a medium in markdown rendered outside the editor: its block's place and its own offset in it)
+  readonly position?: () => number | undefined;
+};
 
 /** An embed to write: found by its text as read and its place among those alike */
 export type EmbedWrite = { readonly text: string; readonly occurrence: number; readonly of: number; readonly changes: EmbedChanges };
@@ -22,7 +28,9 @@ export type EmbedWrite = { readonly text: string; readonly occurrence: number; r
 /** What the assets ask of the host whose page they are in */
 export type AssetHost = {
   /** Told of the embeds drawn, those there now and each drawn after */
-  watch(drawn: (embeds: readonly DrawnEmbed[]) => void): void;
+  watch(drawn: (embeds: readonly DrawnEmbed[]) => void): unknown;
+  /** The ranges of the page rendered outside the editor now (a grid's cells): their embeds are no widget of the host's */
+  renderedRanges(): readonly Range[];
   pageText(): Promise<string>;
   pageName(): Promise<string>;
   /** An embed's target as the host draws it (resolved from the page), to find a drawn one by */
@@ -70,12 +78,18 @@ export class AssetDecorator {
     if (!drawn.length) return;
     const [text, page, settings] = await Promise.all([this.host.pageText(), this.host.pageName(), this.host.settings()]);
     const embeds = readEmbeds(text);
+    // The host's own widgets are the embeds outside what is rendered outside the editor: counted among those alone
+    const widgetsEmbeds = outside(embeds, this.host.renderedRanges());
     for (const one of drawn) {
       this.drawn.set(one.frame, one);
       // (Laid out once all are decorated)
       one.frame.setAttribute("data-swl-asset-target", sameTarget(one.target));
-      const nth = [...this.doc.querySelectorAll(`[data-swl-asset-target]`)].filter((frame) => frame.getAttribute("data-swl-asset-target") === sameTarget(one.target)).indexOf(one.frame);
-      const found = embedOf(embeds, (embed) => this.host.resolved(embed, page), one.target, nth);
+      const at = one.position?.();
+      // (A medium rendered outside the editor whose place is not known yet: left, never taken for another)
+      if (one.position && at === undefined) continue;
+      if (at === undefined) one.frame.setAttribute("data-swl-asset-widget", "");
+      const nth = [...this.doc.querySelectorAll("[data-swl-asset-widget]")].filter((frame) => frame.getAttribute("data-swl-asset-target") === sameTarget(one.target)).indexOf(one.frame);
+      const found = at !== undefined ? embedAt(embeds, at) : embedOf(embeds, (embed) => this.host.resolved(embed, page), one.target, nth, widgetsEmbeds);
       if (!found) continue;
       const asset = this.host.assetOf(found.embed, page);
       const type = typeFor(this.registry.types.all, asset);

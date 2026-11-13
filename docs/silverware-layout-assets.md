@@ -16,17 +16,17 @@ Proposed 2026-11-13, nothing built. Every medium a page embeds (an image, a vide
 - SilverBullet draws an image, audio, video (`<img>`, `<audio>`, `<video>`) and a PDF (`<object>`) (`createMediaElement`, `client/media.ts`), each capped at its box (`max-width: 100%`); any other file is `**Error:** Unsupported content`.
 - The size (`parseDimensionFromAlias`, `plug-api/lib/transclusion.ts`): `|200`, `|50%`, `|200x100` after the alias, for every embed, not images alone. `alt` and `title` of the element are the alias.
 - The index indexes an `Image` node as a link to its document (`plugs/index/relation.ts`).
-- `markdown.renderToDom(text)` (`client/plugos/syscalls/markdown.ts`) renders markdown into live DOM as the editor's widgets do, embeds expanded (`expandTransclusions`, `client/markdown_renderer/inline.ts`).
+- `markdown.markdownToHtml(text, { expand = true, annotationPositions = true })` renders markdown to HTML, embeds expanded, each element with its offset (`data-pos`); `markdown.renderToDom` (live DOM) is in SilverBullet's main only, not 2.12.1 (*Probe results*).
 
 ## SilverBullet draws, the plugin decorates
 
 - The text stays SilverBullet's: its parser reads the `Image` node, so the index and everything above work as they do.
 - **Outside a grid** SilverBullet draws an embed as its widget. Silverware Layout finds it (a `MutationObserver` on the content, as it finds widgets) and, by the asset's view, leaves SilverBullet's content as it is (a view the type renders none of, or a renderer's `null`) or replaces it by a render (the card, a type's own renderer); the handle and the "…" menu are added in each.
-- **In a grid** the cells' markdown is rendered by SilverBullet too, `markdown.renderToDom` per block (the blocks marked with their source offsets for Alt+click: the grid's plan), so a cell looks as the rest of the page and its media are SilverBullet's; the same decoration applies to them.
+- **In a grid** the cells' markdown is rendered by SilverBullet too (`markdown.markdownToHtml` on 2.12.1, its elements marked with their offsets: the grid's plan), so a cell looks as the rest of the page and its media are SilverBullet's (an image a plain `<img>` there, not a widget); the same decoration applies to them.
 - The rule: **markdown and media are always drawn by SilverBullet; Silverware Layout decorates or replaces what it drew.** A render of its own only for the card and a type's own renderers.
 - **Not taken over by `syntax.define`** (weighed 2026-11-13, dropped): a custom inline syntax runs before lezer's `Link` and `Image` and could take every `![`, but the index parses with the user's syntax extensions, so embeds would leave the index (no backlinks, no rename of attachments); `![[Page]]` is the same node; navigation looks for `Image`; a regex is no parser (`[![badge](a.svg)](url)`, a `)` in a URL); every embed in the space through an experimental API.
 - What SilverBullet's DOM is (`.sb-inline-content`, the media inside) is known in `host/silverbullet/` alone, as all of Silverware Layout's; `ui-tests/silverbullet.spec.ts` checks it by name.
-- **Where an embed is in the source**: in the editor, by SilverBullet's widget (a probe); in markdown rendered outside the editor (a grid's cell), by a convention of Silverware Layout's host, not of the grid: **a block rendered outside the editor carries its offset in the page's text** (`data-swl-pos`, as SilverBullet's `data-pos`). Whoever renders such a block sets it (the grid does, for Alt+click anyway); the asset host reads it and finds the embed's text from there. An agreement on an attribute: no area knows another.
+- **Where an embed is in the source**: in the editor, by its target and its order among the page's embeds (SilverBullet's widget carries no position: *Probe results*); in markdown rendered outside the editor (a grid's cell), by a convention of Silverware Layout's host, not of the grid: **a block rendered outside the editor carries its offset in the page's text** (`data-swl-pos`, as SilverBullet's `data-pos`). Whoever renders such a block sets it (the grid does, for Alt+click anyway); the asset host reads it and finds the embed's text from there. An agreement on an attribute: no area knows another.
 
 ### SilverBullet's widget menu
 
@@ -299,14 +299,24 @@ SilverBullet's paste and drop are CodeMirror's `domEventHandlers` (`editor_paste
 2. A markdown embed with three segments (`![a|200|{…}](cat.jpg)`): `mdLinkRegex` (`client/markdown_parser/constants.ts`) takes `{`, `:`, `,` and quotes in the alt; the same for a wiki link.
 3. The index and renaming an attachment with such a link (they read the URL, not the alias: expected to work).
 4. Replacing a widget's content: no flicker of SilverBullet's own drawing first; what survives SilverBullet drawing the widget anew; what SilverBullet's own widget menu offers on an embed (so that nothing the user needs is lost as it is hidden, *SilverBullet's widget menu*).
-5. `markdown.renderToDom` of a cell: embeds drawn as media, the DOM it makes (the same as the editor's widget or not), its speed per block over the bridge, and a whole grid drawn anew after one embed in it is written (its widget's cache key is its body's text): how long, whether it flickers (the grid's plan).
+5. The rendering of a cell (`markdown.markdownToHtml` on 2.12.1): embeds drawn as media, the DOM it makes (the same as the editor's widget or not), its speed per block over the bridge, and a whole grid drawn anew after one embed in it is written (its widget's cache key is its body's text): how long, whether it flickers (the grid's plan).
 6. A type's renderer in Lua called from JS (for later).
+
+### Probe results (2026-11-13, SilverBullet 2.12.1, Chromium)
+
+1. **No position on an embed's widget**: `div.sb-inline-content.sb-lua-directive-block` in a `span.sb-lua-wrapper` in `.cm-content`, no `data-pos` on it or around it. SilverBullet's own Edit button knows it, but nothing in the DOM says it: an embed is found in the page's text by its target and its order among the embeds (as Silverware Table finds tables), by the host.
+2. **Three segments hold in both forms**: `![[cat.png|Wiki cat|150|{ view: preview, zoom: 2 }]]` and `![Md cat|150|{ view: preview }](cat.png)` both drew the image 150 px wide (`style="max-width: 100%; width: 150px;"`), alt and title the first segment, the metadata nowhere; typographic quotes in the metadata too. A plain `![[cat.png]]`: no alt, no width.
+3. Not probed apart: a rename of an attachment linked with three segments (the index's relation covers the whole node; the grid's rename was probed, *the grid's plan*). Checked by `silverbullet.spec.ts` when built.
+4. Partly: **SilverBullet's widget menu on an embed** is a bar of buttons (`.button-bar`), not a menu: **Reload, Copy, Edit, Open** (`data-button` `reload`, `copy`, `edit`, `open`). Hidden, as decided; what the "…" menu takes over: *Open* (the document's own page in SilverBullet, an action `open`), *Edit* is Alt+click. Flicker on replacing a widget's content: probed when built (it needs the decoration).
+5. **In a grid's cell an embed is not SilverBullet's widget**: `markdownToHtml` draws an image as a plain `<img>` with SilverBullet's size and alt, and `data-pos` (its offset in the cell), no `.sb-inline-content` round it. The host knows both: SilverBullet's widget in the editor, an element with `data-swl-pos` rendered outside it; what the host draws "natively" in a cell is what `markdownToHtml` drew. Only an image was probed in a cell; a PDF or a video there is checked when built.
+
+**A zip** embedded: `Error: Unsupported content: archive.zip` in the widget, as read from the code.
 
 ## Order
 
 The grid and the assets together, from nothing built (2026-11-13):
 
-1. **The probes of both plans**, one batch: the grid's step 1 (`syntax.define`, `renderToDom`, a rename and the index) and this plan's 1 to 5. Their results written into the plans; a probe that fails changes a design, not a detail, so nothing is built before.
+1. **The probes of both plans**, one batch: the grid's step 1 (`syntax.define`, a cell's rendering, a rename and the index; done 2026-11-13, the results in both plans) and this plan's 1 to 5. Their results written into the plans; a probe that fails changes a design, not a detail, so nothing is built before.
 2. **The grid's first version** (its plan's steps 2 to 8): the first aim, and needs no assets.
 3. **The assets** (the steps below, 2 to 7, and 9).
 4. **The assets in a grid** (step 8): where the two meet, by `data-swl-pos` alone.

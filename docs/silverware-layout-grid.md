@@ -68,7 +68,7 @@ Column 2
 Found in the review of 2026-11-13: what the index misses inside a grid is more than backlinks. SilverBullet updates links on a rename by its index (to be confirmed by the probe), so a page or an attachment renamed would leave the links and embeds in a grid pointing at the old name: an image in a cell broken, silently.
 
 - **Decided (2026-11-13): the grid's first release indexes its content's links and embeds itself**, unless the probe shows a rename finds them anyway. A grid that silently breaks on a rename is not released.
-- How: the body parsed (`shared/markdown/`), its links and embeds added to SilverBullet's index as the objects SilverBullet itself makes for them (`plugs/index/relation.ts`), so its backlinks and its rename see them. Whether a library can add such objects (an index event, `index.indexObjects`) is a probe, step 1.
+- How (probed, it works: *Probe results*): a listener of `page:index` reads the page's grids (`shared/markdown/`) and adds their links and embeds by `index.indexObjects` as the relations SilverBullet itself makes (`plugs/index/relation.ts`), so its backlinks and its rename see them. The relations' shape is SilverBullet's, so it is known in the host alone and checked by `silverbullet.spec.ts` (a rename updating a grid's link).
 - Hashtags inside a grid the same way, if the probe shows it is as cheap; else later.
 
 ## Editing
@@ -86,10 +86,10 @@ Found in the review of 2026-11-13: what the index misses inside a grid is more t
 
 ## Rendering a cell
 
-A cell's markdown is rendered by SilverBullet, `markdown.renderToDom` (`client/plugos/syscalls/markdown.ts`) per block: a cell looks as the rest of the page (links, tags, tasks, embeds drawn by SilverBullet), and the grid writes no markdown renderer of its own.
+A cell's markdown is rendered by SilverBullet: on 2.12.1 `markdown.markdownToHtml(cell, { expand = true, annotationPositions = true })` (`renderToDom` is in SilverBullet's main only; *Probe results*), behind the host's interface so that `renderToDom` can take over where it is. A cell looks as the rest of the page (links, tags, embeds drawn by SilverBullet), and the grid writes no markdown renderer of its own.
 
-- Each block carries its offset in the page's text as `data-swl-pos`: the convention of Silverware Layout's host for a block rendered outside the editor ([silverware-layout-assets.md](silverware-layout-assets.md), *SilverBullet draws, the plugin decorates*). The grid uses it for Alt+click, the assets to find an embed's text in a cell; neither knows the other.
-- Writing anything in a grid (a cell, an embed's size in it) changes its body, so SilverBullet draws the whole widget anew (its cache key is the body's text) and every cell is rendered again. Its speed, and whether it flickers, are part of the probe of `renderToDom`.
+- SilverBullet marks each rendered element with `data-pos`, its offset in the cell's text; the grid adds the cell's offset in the page and sets it as `data-swl-pos` on the cell's elements: the convention of Silverware Layout's host for a block rendered outside the editor ([silverware-layout-assets.md](silverware-layout-assets.md), *SilverBullet draws, the plugin decorates*). The grid uses it for Alt+click, the assets to find an embed's text in a cell; neither knows the other.
+- Writing anything in a grid (a cell, an embed's size in it) changes its body, so SilverBullet draws the whole widget anew (its cache key is the body's text) and every cell is rendered again. Its speed, and whether it flickers, are checked as the widget is built (step 3).
 
 ## Media in a grid
 
@@ -104,18 +104,30 @@ What a grid looks like in a page (the tags, their attributes, the cells and thei
 A part of Silverware Layout (decided 2026-11-12): it is the page's layout, it uses the widget widths, the narrow-pane rule, the page writer and the markdown parser already in Layout's bundle. Its own area, `src/grid/`, with Silverware Layout's layers inside (`grid/model`, `grid/core`, `grid/ui`) under the same rules (`src/isolation.test.ts` gets them); it registers its width by the same `LayoutProvider` contract as Silverware Table or Chart, so Layout's core knows no grid by name; `app.ts` puts it together, `index.ts` binds it to SilverBullet (its `syntax.define`, the bridge). Its CSS classes `swl-grid-…`.
 
 - **The grid and the assets know nothing of each other** ([silverware-layout-assets.md](silverware-layout-assets.md), *Layers*): the assets decorate the embeds SilverBullet draws in a cell as anywhere else, and size them by shares of their own box, which in a cell is the cell. No area imports another.
-- What SilverBullet is (`syntax.define`, `markdown.renderToDom`, moving its cursor) is the host's (`host/silverbullet/`), behind an interface of the grid's own, so the grid runs in the playground and its tests over plain elements, as the rest of Layout does.
+- What SilverBullet is (`syntax.define`, `markdown.markdownToHtml`, moving its cursor, the index's relations) is the host's (`host/silverbullet/`), behind an interface of the grid's own, so the grid runs in the playground and its tests over plain elements, as the rest of Layout does.
 
 ## The slash command and the menu
 
 - `/grid` (`slashCommand.define`) inserts two columns in the form with blank lines, the cursor in the first column's content (in the raw text: the widget shows once the cursor leaves).
 - Later a "…" menu on the grid (shared/menu): add or remove a cell, the column count and widths, move a cell.
 
+## Probe results (2026-11-13, SilverBullet 2.12.1, Chromium)
+
+A scratch space, a `space-lua` block defining `<grid>` by `syntax.define`, Playwright driving the page.
+
+- **`syntax.define` with `<grid>` works**: the region is a widget, classes `<renderClass> sb-lua-directive-block`; the raw text is not shown while the cursor is outside. A definition is active after the page is loaded again (twice in a fresh browser: the first load indexes before Space Lua runs).
+- **`markdown.renderToDom` is not in 2.12.1** (SilverBullet's main only). **`markdown.markdownToHtml(cell, { expand = true, annotationPositions = true })`** is, and does what the plan needs: a cell's links (`a.wiki-link[data-ref]`), hashtags (`a.sb-hashtag`), bold, an image embed as `<img>` with SilverBullet's size (`|120` → `width: 120px`) and alt; every element carries **`data-pos`, its 0-based offset in the cell's text** (the text from the line after `<column>`). The widget's handlers are attached by SilverBullet (`data-handlers-attached`), so its links are SilverBullet's. So a cell is rendered by `markdownToHtml` on 2.12.1, behind the host's interface; `renderToDom` where SilverBullet has it, later.
+- **A plain click in the widget** leaves the widget and SilverBullet's cursor where they are: a click is the grid's. **An Alt+click** is SilverBullet's: the cursor goes to the region's start (the raw text shows), not to the place clicked; the grid's Alt+click is its own (a capture listener, the position by `data-pos` plus the cell's offset).
+- **SilverBullet's widget menu** on the grid: Reload, Copy, Edit (`.button-bar`): hidden, as decided.
+- **The index**: what a fresh browser indexes before Space Lua runs is parsed without the syntax extension, so a grid's links are indexed then; after a reindex with Space Lua loaded they are not (the body has no children). A rename (`Page: Rename`) updated a link outside a grid and **left the grid's link as it was**: the index decides what a rename sees.
+- **The grid's own indexing works**: a Space Lua listener of `page:index` (the page in `event.data`: `name`, `text`; `event.name` is the event's) adding objects by `index.indexObjects(page, objects)` (SilverBullet clears a page's objects before the event, so they replace rather than accumulate); a relation as SilverBullet makes one (`ref` `Page@from`, `tag = "relation"`, `kind = "mention"`, `from`, `fromTag = "page"`, `to`, `toTag = "page"`, `page`, `range = { from, to }`, 0-based, end exclusive). With it the rename **updated the grid's link**. A Lua table and `js.tojs(…)` both arrive as an array.
+- Not probed: SilverBullet's edge (after 2.12.1, `space-lua` only under `Library/`); how SilverBullet and GitHub show a grid without the plugin (as the plan reads them from the code); a page or a PDF embedded in a cell through `markdownToHtml` (only an image was).
+
 ## Steps
 
-1. **Probe** (SilverBullet 2.12.1 and edge, Chromium): `syntax.define` with `<grid>` in a page's `space-lua` (edge runs it only under `Library/`: docs/silverware-library-prefix.md); the widget shown, the cursor's entry, a plain click and an Alt+click on the widget, the reload needed; how SilverBullet and GitHub show a grid without the plugin (both forms); `renderToDom` of a cell and a grid drawn anew; **a rename of a page and of an attachment linked from a grid, and whether a library can add link objects to the index** (*Indexing*).
+1. **Probe** (done 2026-11-13 on 2.12.1, *Probe results*; edge not yet) (SilverBullet 2.12.1 and edge, Chromium): `syntax.define` with `<grid>` in a page's `space-lua` (edge runs it only under `Library/`: docs/silverware-library-prefix.md); the widget shown, the cursor's entry, a plain click and an Alt+click on the widget, the reload needed; how SilverBullet and GitHub show a grid without the plugin (both forms); `renderToDom` of a cell and a grid drawn anew; **a rename of a page and of an attachment linked from a grid, and whether a library can add link objects to the index** (*Indexing*).
 2. The grid's model and codec: read a body into attributes and cells with their source ranges (`shared/markdown/`), write a cell back through the page writer (blank lines kept); the isolation test's rules for the area; tests.
-3. The widget: render the cells by `markdown.renderToDom` (each block marked with its offset), CSS grid, the narrow pane; the playground.
+3. The widget: render the cells by `markdown.markdownToHtml` (each element's `data-pos` turned into `data-swl-pos` in the page), CSS grid, the narrow pane, SilverBullet's widget menu hidden; the playground.
 4. Editing a cell in place; Alt+click to the source position; UI tests.
 5. `/grid`.
 6. The width by Silverware Layout's handle.

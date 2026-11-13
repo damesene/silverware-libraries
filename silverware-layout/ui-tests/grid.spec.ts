@@ -148,3 +148,18 @@ test("SilverBullet's button bar of a grid's frame stays hidden as the pointer is
   await page.locator("#sb-main .swl-grid-cell").first().hover();
   await expect(page.locator("#sb-main .swl-grid-widget :is(.button-bar, .sb-widget-menu-bar)")).toBeHidden();
 });
+
+test("a click on a word of a cell edits it with the cursor in that word", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${GRID}` }, "Page");
+  await gridsDrawn(page);
+  const words = page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Right text");
+  const box = (await words.boundingBox())!;
+  // Into "text", the second word
+  await words.click({ position: { x: box.width - 6, y: box.height / 2 } });
+  const field = page.locator("#sb-main textarea.swl-grid-editor");
+  await expect(field).toBeFocused();
+  const at = await field.evaluate((input: HTMLTextAreaElement) => input.selectionStart);
+  expect(at).toBeGreaterThanOrEqual("Right ".length);
+  expect(at).toBeLessThanOrEqual("Right text".length);
+  await page.keyboard.press("Escape");
+});

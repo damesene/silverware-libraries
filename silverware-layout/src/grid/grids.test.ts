@@ -283,3 +283,22 @@ describe("a cell's menu", () => {
     expect(state.attributeWrites.map((write) => write.attributes)).toEqual([{ columns: "3" }]);
   });
 });
+
+describe("a cell edited from a click", () => {
+  it("puts the field's cursor where the click was in the cell's markdown, at its end without a point", async () => {
+    const words = "<column>\n\nLeft words here\n\n</column>";
+    const { gridHost } = host(`<grid>\n${words}\n</grid>\n`);
+    const grids = new Grids(document, gridHost);
+    const grid = await grids.render(words);
+    document.body.append(grid);
+    const cell = grid.querySelector<HTMLElement>(".swl-grid-cell")!;
+    const text = cell.querySelector("span")!.firstChild!;
+    // On "words", two characters into it
+    await grids.edit(grid, cell, { target: cell.querySelector("span")!, caret: { node: text, offset: "Left wo".length } });
+    const field = await fieldOf(cell);
+    expect(field.selectionStart).toBe("Left wo".length);
+    field.blur();
+    await grids.edit(grid, cell);
+    expect((await fieldOf(cell)).selectionStart).toBe("Left words here".length);
+  });
+});

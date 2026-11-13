@@ -242,11 +242,13 @@ export class Grids {
     const at = this.gridOf(event.target);
     if (!at?.cell || at.cell.classList.contains("swl-grid-editing")) return;
     if ((event.target as Element).closest(OWN_CLICKS)) return;
-    await this.edit(at.element, at.cell);
+    // Where the click was, read before the cell's rendering gives way to its field
+    const point = { target: event.target as Element, caret: caretWord(this.doc, event.clientX, event.clientY) };
+    await this.edit(at.element, at.cell, point);
   }
 
-  /** A cell's markdown edited in place, written as it is left where it changed */
-  async edit(element: HTMLElement, cellElement: HTMLElement): Promise<void> {
+  /** A cell's markdown edited in place, the cursor where a click was in its rendering (none: at its end), written as it is left where it changed */
+  async edit(element: HTMLElement, cellElement: HTMLElement, point?: { readonly target: Element; readonly caret: { readonly node: Node; readonly offset: number } | undefined }): Promise<void> {
     const index = Number(cellElement.getAttribute("data-swl-cell"));
     const text = await this.host.pageText().catch(() => undefined);
     const found = text === undefined ? undefined : this.found(text, element);
@@ -255,7 +257,8 @@ export class Grids {
       this.host.problem("Silverware Layout: this grid changed in the page since it was drawn; edit it there");
       return;
     }
-    editCell(cellElement, cell.content, (content) => {
+    const at = point ? offsetInCell(cell.content, cellElement, point.target, point.caret) : undefined;
+    editCell(cellElement, cell.content, at, (content) => {
       if (same(content) === same(cell.content)) return;
       void this.host
         .writeCell({ body: found.grid.body, occurrence: found.occurrence, of: found.of, cell: index, content })
@@ -282,12 +285,19 @@ export class Grids {
     if (!found) return;
     const cell = cellElement ? found.grid.cells[Number(cellElement.getAttribute("data-swl-cell"))] : undefined;
     if (!cell) return this.host.moveCursor(found.grid.from);
-    // The element clicked's place in the cell's markdown (SilverBullet leaves 0 out: none is 0)
-    const marked = target.closest("[data-pos]");
-    const elementPos = marked && cellElement!.contains(marked) ? Number(marked.getAttribute("data-pos")) || 0 : 0;
-    const nodeText = caret?.node.textContent ?? "";
-    const word = caret ? wordAt(nodeText, caret.offset) : "";
-    const wordStart = caret ? nodeText.lastIndexOf(word, caret.offset) : 0;
-    this.host.moveCursor(cell.contentFrom + positionInCell(cell.content, elementPos, word, caret ? caret.offset - Math.max(wordStart, 0) : 0));
+    this.host.moveCursor(cell.contentFrom + offsetInCell(cell.content, cellElement!, target, caret));
   }
+}
+
+/**
+ * Where a point of a cell's rendering is in its markdown: the element clicked's place (`data-pos`; SilverBullet leaves
+ * 0 out: none is 0), then the word under the caret found from there (core/position.ts)
+ */
+function offsetInCell(content: string, cellElement: HTMLElement, target: Element, caret: { readonly node: Node; readonly offset: number } | undefined): number {
+  const marked = target.closest("[data-pos]");
+  const elementPos = marked && cellElement.contains(marked) ? Number(marked.getAttribute("data-pos")) || 0 : 0;
+  const nodeText = caret?.node.textContent ?? "";
+  const word = caret ? wordAt(nodeText, caret.offset) : "";
+  const wordStart = caret ? nodeText.lastIndexOf(word, caret.offset) : 0;
+  return positionInCell(content, elementPos, word, caret ? caret.offset - Math.max(wordStart, 0) : 0);
 }

@@ -125,6 +125,10 @@ export async function gridsDrawn(page: Page, count = 1): Promise<void> {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       await expect(page.locator("#sb-main .swl-grid:not(.swl-grid-shown)")).toHaveCount(count, { timeout: 5000 });
+      // (Still there a moment later: SilverBullet may draw the page anew once more as it loads its scripts, a grid
+      // drawn before its custom syntax is active gone again)
+      await page.waitForTimeout(700);
+      await expect(page.locator("#sb-main .swl-grid:not(.swl-grid-shown)")).toHaveCount(count, { timeout: 1000 });
       return;
     } catch {
       await page.reload();

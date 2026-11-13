@@ -52,6 +52,8 @@ export type GridHost = {
 
 // How long after a grid is drawn its attributes are read again (it is in the page by then, its order among its alike known)
 const SETTLE_MS = 50;
+// How far a press and its release are apart to be a drag that selects (px)
+const DRAG_PX = 4;
 // What a click in a cell leaves to the cell's rendering: a link, a tag, a button, a field, an editor open
 const OWN_CLICKS = "a, button, input, textarea, select, label, [data-ref]";
 
@@ -85,6 +87,8 @@ export class Grids {
   // Each grid drawn, its attributes as the page's text had them when last read (asked synchronously: its width)
   private readonly attributes = new WeakMap<HTMLElement, Attributes>();
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  // The last press in a cell: its cell, where it was, the caret there
+  private pressed: { readonly cell: HTMLElement; readonly x: number; readonly y: number; readonly caret: Caret | undefined } | undefined;
   private started = false;
   /** Told as a grid drawn gets other attributes than it had (its width typed by hand: laid out again) */
   onAttributes: (() => void) | undefined;
@@ -106,6 +110,15 @@ export class Grids {
     // An Alt+click is the grid's before the host's (SilverBullet's puts the cursor at the grid's start): taken as the
     // press comes, its click after it held back too
     this.doc.addEventListener("mousedown", (event) => this.altPress(event), true);
+    // Where a press in a cell was (a drag from there to where it is let go selects: its click follows the release)
+    this.doc.addEventListener(
+      "mousedown",
+      (event) => {
+        const at = event.button === 0 && !event.altKey ? this.gridOf(event.target) : undefined;
+        this.pressed = at?.cell ? { cell: at.cell, x: event.clientX, y: event.clientY, caret: caretWord(this.doc, event.clientX, event.clientY) } : undefined;
+      },
+      true,
+    );
     this.doc.addEventListener("click", (event) => {
       if (event.altKey && this.gridOf(event.target)) {
         event.preventDefault();
@@ -242,13 +255,26 @@ export class Grids {
     const at = this.gridOf(event.target);
     if (!at?.cell || at.cell.classList.contains("swl-grid-editing")) return;
     if ((event.target as Element).closest(OWN_CLICKS)) return;
-    // Where the click was, read before the cell's rendering gives way to its field
-    const point = { target: event.target as Element, caret: caretWord(this.doc, event.clientX, event.clientY) };
+    // Where the click was, read before the cell's rendering gives way to its field; text selected in the cell by a
+    // drag (its click comes as the button is let go) taken over as the field's selection
+    // (The browser's selection where it kept one: in a page's editor it may not, CodeMirror's own taking its place; else
+    // the press and the release, where they were apart)
+    const caret = caretWord(this.doc, event.clientX, event.clientY);
+    const selection = this.doc.getSelection();
+    const pressed = this.pressed;
+    this.pressed = undefined;
+    const selected =
+      selection && !selection.isCollapsed && selection.anchorNode && selection.focusNode && at.cell.contains(selection.anchorNode) && at.cell.contains(selection.focusNode)
+        ? { anchor: { node: selection.anchorNode, offset: selection.anchorOffset }, focus: { node: selection.focusNode, offset: selection.focusOffset } }
+        : pressed && pressed.cell === at.cell && pressed.caret && caret && Math.hypot(event.clientX - pressed.x, event.clientY - pressed.y) > DRAG_PX
+          ? { anchor: pressed.caret, focus: caret }
+          : undefined;
+    const point = { target: event.target as Element, caret, ...(selected ? { selected } : {}) };
     await this.edit(at.element, at.cell, point);
   }
 
   /** A cell's markdown edited in place, the cursor where a click was in its rendering (none: at its end), written as it is left where it changed */
-  async edit(element: HTMLElement, cellElement: HTMLElement, point?: { readonly target: Element; readonly caret: { readonly node: Node; readonly offset: number } | undefined }): Promise<void> {
+  async edit(element: HTMLElement, cellElement: HTMLElement, point?: CellPoint): Promise<void> {
     const index = Number(cellElement.getAttribute("data-swl-cell"));
     const text = await this.host.pageText().catch(() => undefined);
     const found = text === undefined ? undefined : this.found(text, element);
@@ -257,7 +283,7 @@ export class Grids {
       this.host.problem("Silverware Layout: this grid changed in the page since it was drawn; edit it there");
       return;
     }
-    const at = point ? offsetInCell(cell.content, cellElement, point.target, point.caret) : undefined;
+    const at = !point ? undefined : point.selected ? selectionInCell(cell.content, cellElement, point.selected) : offsetInCell(cell.content, cellElement, point.target, point.caret);
     editCell(cellElement, cell.content, at, (content) => {
       if (same(content) === same(cell.content)) return;
       void this.host
@@ -289,11 +315,23 @@ export class Grids {
   }
 }
 
+/** Where a click was in a cell's rendering: the element, the caret there, and the text selected in the cell, where some was */
+type Caret = { readonly node: Node; readonly offset: number };
+export type CellPoint = { readonly target: Element; readonly caret: Caret | undefined; readonly selected?: { readonly anchor: Caret; readonly focus: Caret } };
+
+/** A selection in a cell's rendering as one of its markdown: each end where it is there, its direction kept */
+function selectionInCell(content: string, cellElement: HTMLElement, selected: { readonly anchor: Caret; readonly focus: Caret }): { readonly from: number; readonly to: number; readonly backward: boolean } {
+  const end = (caret: Caret) => offsetInCell(content, cellElement, caret.node instanceof Element ? caret.node : (caret.node.parentElement ?? cellElement), caret);
+  const anchor = end(selected.anchor);
+  const focus = end(selected.focus);
+  return { from: Math.min(anchor, focus), to: Math.max(anchor, focus), backward: focus < anchor };
+}
+
 /**
  * Where a point of a cell's rendering is in its markdown: the element clicked's place (`data-pos`; SilverBullet leaves
  * 0 out: none is 0), then the word under the caret found from there (core/position.ts)
  */
-function offsetInCell(content: string, cellElement: HTMLElement, target: Element, caret: { readonly node: Node; readonly offset: number } | undefined): number {
+function offsetInCell(content: string, cellElement: HTMLElement, target: Element, caret: Caret | undefined): number {
   const marked = target.closest("[data-pos]");
   const elementPos = marked && cellElement.contains(marked) ? Number(marked.getAttribute("data-pos")) || 0 : 0;
   const nodeText = caret?.node.textContent ?? "";

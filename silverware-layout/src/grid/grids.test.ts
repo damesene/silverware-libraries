@@ -302,3 +302,19 @@ describe("a cell edited from a click", () => {
     expect((await fieldOf(cell)).selectionStart).toBe("Left words here".length);
   });
 });
+
+describe("a cell edited from a selection in it", () => {
+  it("selects in the field what was selected in the cell's rendering, its direction kept", async () => {
+    const words = "<column>\n\nLeft words here\n\n</column>";
+    const { gridHost } = host(`<grid>\n${words}\n</grid>\n`);
+    const grids = new Grids(document, gridHost);
+    const grid = await grids.render(words);
+    document.body.append(grid);
+    const cell = grid.querySelector<HTMLElement>(".swl-grid-cell")!;
+    const text = cell.querySelector("span")!.firstChild!;
+    // "words" selected from its end back to its start
+    await grids.edit(grid, cell, { target: cell.querySelector("span")!, caret: undefined, selected: { anchor: { node: text, offset: 10 }, focus: { node: text, offset: 5 } } });
+    const field = await fieldOf(cell);
+    expect([field.selectionStart, field.selectionEnd, field.selectionDirection]).toEqual([5, 10, "backward"]);
+  });
+});

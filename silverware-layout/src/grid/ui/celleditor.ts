@@ -3,8 +3,8 @@
 // text is handed back once; the cell shows its rendering again until the host draws the grid anew.
 import { el } from "../../../../shared/elements.ts";
 
-/** The cell's markdown edited in place, the cursor at `at` in it (none: at its end); `done` gets the text as left (once) */
-export function editCell(cell: HTMLElement, markdown: string, at: number | undefined, done: (text: string) => void): HTMLTextAreaElement {
+/** The cell's markdown edited in place, the cursor at `at` in it or a selection (none: at its end); `done` gets the text as left (once) */
+export function editCell(cell: HTMLElement, markdown: string, at: number | { readonly from: number; readonly to: number; readonly backward: boolean } | undefined, done: (text: string) => void): HTMLTextAreaElement {
   const doc = cell.ownerDocument;
   const shown = [...cell.childNodes];
   const field = el(doc, "textarea", { class: "swl-grid-editor", attrs: { "aria-label": "The cell's markdown", spellcheck: "true" } });
@@ -36,8 +36,11 @@ export function editCell(cell: HTMLElement, markdown: string, at: number | undef
   cell.replaceChildren(field);
   grow();
   field.focus();
-  const caret = at === undefined ? markdown.length : Math.max(0, Math.min(markdown.length, at));
-  field.setSelectionRange(caret, caret);
+  const within = (offset: number) => Math.max(0, Math.min(markdown.length, offset));
+  if (at === undefined || typeof at === "number") {
+    const caret = within(at ?? markdown.length);
+    field.setSelectionRange(caret, caret);
+  } else field.setSelectionRange(within(at.from), within(at.to), at.backward ? "backward" : "forward");
   return field;
 }
 

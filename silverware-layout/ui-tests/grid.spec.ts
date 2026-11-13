@@ -163,3 +163,24 @@ test("a click on a word of a cell edits it with the cursor in that word", async 
   expect(at).toBeLessThanOrEqual("Right text".length);
   await page.keyboard.press("Escape");
 });
+
+test("text selected in a cell by a drag is selected in its field as it is edited", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${GRID.replace("Right text", "Right side text")}` }, "Page");
+  await gridsDrawn(page);
+  const words = page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Right side text");
+  const box = (await words.boundingBox())!;
+  const char = box.width / "Right side text".length;
+  // From the start of "side" to its end
+  await page.mouse.move(box.x + char * 6 + 1, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + char * 10 - 1, box.y + box.height / 2, { steps: 5 });
+  await page.mouse.up();
+  const field = page.locator("#sb-main textarea.swl-grid-editor");
+  await expect(field).toBeFocused();
+  const [from, to] = await field.evaluate((input: HTMLTextAreaElement) => [input.selectionStart, input.selectionEnd]);
+  expect(from).toBeGreaterThanOrEqual("Right ".length - 1);
+  expect(from).toBeLessThanOrEqual("Right s".length);
+  expect(to).toBeGreaterThanOrEqual("Right sid".length);
+  expect(to).toBeLessThanOrEqual("Right side".length + 1);
+  await page.keyboard.press("Escape");
+});

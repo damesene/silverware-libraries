@@ -4,18 +4,10 @@
 // card). One of each at a time: another shown takes its place. Esc, ×, or (the popover) a click beside it closes it.
 // Over the window, so marked `data-silverware-over-window` (the other plugins stand back: shared/overwindow.ts, its
 // attribute named here as the contract leaves this part to know no more than the contract and the elements).
-import type { ActionContext, Asset, AssetAction, Capabilities } from "../../../shared/assets.ts";
+import { type ActionContext, type Asset, type AssetAction, assetName, type Capabilities } from "../../../shared/assets.ts";
 import { el } from "../../../shared/elements.ts";
 
 const OVER_WINDOW = "data-silverware-over-window";
-
-/** What an asset is called where it is shown: its alt text, else its file's name, its URL's, its page's */
-export function assetName(asset: Asset): string {
-  if (asset.alt) return asset.alt;
-  if (asset.kind === "file") return asset.path.split("/").pop() ?? asset.path;
-  if (asset.kind === "web") return asset.url.split(/[?#]/, 1)[0]!.split("/").pop() || asset.url;
-  return asset.page;
-}
 
 // What a panel shows: an asset drawn larger than its card (a card alone is no more than the card in the page)
 const shows = (_asset: Asset, can: Capabilities) => can.views.includes("embed") || can.views.includes("preview");

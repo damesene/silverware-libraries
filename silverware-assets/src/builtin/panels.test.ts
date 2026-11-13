@@ -2,8 +2,8 @@
 // The asset in a side panel or enlarged: rendered as the core renders it, one of a kind at a time, closed by Esc, ×,
 // or (the popover) a click beside it; over the window, so the other plugins stand back.
 import { afterEach, describe, expect, it } from "vitest";
-import type { ActionContext } from "../../../shared/assets.ts";
-import { assetName, peek, popover } from "./panels.ts";
+import { type ActionContext, assetName } from "../../../shared/assets.ts";
+import { peek, popover } from "./panels.ts";
 
 const context = (opened: string[] = []): ActionContext => ({
   asset: { kind: "file", path: "Docs/report.pdf", url: ".fs/Docs/report.pdf" },

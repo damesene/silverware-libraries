@@ -14,7 +14,7 @@ import { registerBuiltins } from "./builtin/index.ts";
 import { AssetRegistry } from "./core/registry.ts";
 import { AssetDecorator, type AssetHost } from "./decorate.ts";
 import { silverBulletAssetHost } from "./host/silverbullet/assets.ts";
-import { silverBulletPlatform } from "./host/silverbullet/platform.ts";
+import { silverBulletPlatform } from "../../shared/silverbullet/platform.ts";
 import { ASSETS_PATH, readAssetSettings, readSyntaxModeSettings, storedAssetPaths, SYNTAX_PATHS, type SyntaxModeSettings } from "./model/settings.ts";
 import { SILVERBULLET_SYNTAX_PAGE, SYNTAX_OPTION } from "./host/silverbullet/syntaxmode.ts";
 import { assetProvider } from "./provider.ts";

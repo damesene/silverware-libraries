@@ -9,7 +9,7 @@ import { resolvedTarget } from "../../../../shared/markdown/embed.ts";
 import { pageChanges } from "../../../../shared/pages/changes.ts";
 import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
-import { documentUrl } from "./platform.ts";
+import { documentUrl } from "../../../../shared/silverbullet/platform.ts";
 import { ownTasks } from "./tasks.ts";
 import { keepUndrawn } from "./undrawn.ts";
 

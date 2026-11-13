@@ -5,7 +5,7 @@
 // "<target>" data-pos="<offset>">` (its text in it), which the grid tells of as it tells of a medium (src/grid/drawn.ts,
 // shared/rendered.ts: Silverware Assets frames it). Done by rendering a stand-in of each, an image SilverBullet does draw, swapped for the place in its
 // HTML; the offsets after it set back by the difference in length, so `data-pos` is the text's. Pure.
-import { type Embed, readEmbeds } from "../../../../shared/markdown/embed.ts";
+import { type Embed, isFileTarget, readEmbeds } from "../../../../shared/markdown/embed.ts";
 
 // What SilverBullet draws by an embed's extension: its media's (an image, audio, video; `createMediaElement`)
 const DRAWN = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif", "apng", "mp4", "webm", "ogv", "mov", "m4v", "mp3", "wav", "ogg", "oga", "m4a", "flac", "aac", "opus"]);
@@ -25,7 +25,8 @@ const escaped = (text: string) => text.replace(/&/g, "&amp;").replace(/"/g, "&qu
 
 /** A text to render with each embed SilverBullet draws none of stood in for, and its HTML given back with their places (a PDF's viewer, where its URL is given) */
 export function keepUndrawn(text: string, urlOf?: (embed: Embed) => string): { readonly text: string; readonly restore: (html: string) => string } {
-  const undrawn = readEmbeds(text).filter((embed) => !drawnInHtml(embed.target));
+  // (A page embedded is expanded by SilverBullet's HTML: left as written)
+  const undrawn = readEmbeds(text).filter((embed) => isFileTarget(embed.target) && !drawnInHtml(embed.target));
   if (!undrawn.length) return { text, restore: (html) => html };
   let shown = "";
   let at = 0;

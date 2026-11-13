@@ -95,6 +95,14 @@ export type AssetAction = {
   run(context: ActionContext): unknown;
 };
 
+/** What an asset is called where it is shown: its alt text, else its file's name, its URL's, its page's */
+export function assetName(asset: Asset): string {
+  if (asset.alt) return asset.alt;
+  if (asset.kind === "file") return asset.path.split("/").pop() ?? asset.path;
+  if (asset.kind === "web") return asset.url.split(/[?#]/, 1)[0]!.split("/").pop() || asset.url;
+  return asset.page;
+}
+
 /** What a plugin registers types and actions with */
 export type Assets = {
   readonly version: number;

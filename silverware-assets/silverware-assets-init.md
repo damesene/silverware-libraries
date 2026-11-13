@@ -65,10 +65,6 @@ if js and js.window then
     getUiOption = editor.getUiOption,
     -- A file's card: its size and date (an error where it is not in the space: the card shows its name alone)
     documentMeta = space.getDocumentMeta,
-    -- How a link written new is written: SilverBullet's own setting, the one place naming it
-    linkStyle = function()
-      return config.get("defaultLinkStyle", "wikilink")
-    end,
     -- The settings window: saved as SilverBullet's Configuration Manager saves (the CONFIG page, indexed, the
     -- configuration loaded again)
     saveConfigPage = function(text)

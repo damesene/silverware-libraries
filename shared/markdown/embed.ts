@@ -6,6 +6,7 @@
 // plug-api/lib/transclusion.ts, 2.12.1): the alt text and the size (`200`, `50%`, `200x100`). A third segment it
 // ignores holds the metadata, `{ key: value, … }`. So an embed with metadata is always written with three segments,
 // empty ones kept (`||200|{…}`): with two, SilverBullet would read the size as the alt text.
+import { nextFence } from "./lines.ts";
 
 /** One embed of a page, as written */
 export type Embed = {
@@ -24,6 +25,8 @@ export type Embed = {
   readonly metadata: Readonly<Record<string, string>>;
   // Its alias's segments as read (a third not in braces is no metadata: an embed written with changes leaves it out)
   readonly segments: readonly string[];
+  // A markdown image's title after its URL, as written with its space before it (` "A title"`): kept as it is written again
+  readonly title?: string;
 };
 
 /** What an embed is given: a value, or null (taken off); a metadata key, null to take it off */
@@ -33,6 +36,19 @@ export type EmbedChanges = {
   readonly height?: string | null;
   readonly metadata?: Readonly<Record<string, string | null>>;
 };
+
+
+// A target that is a URL (a scheme before its colon), not a name of the space
+const WEB_URL = /^[a-z][a-z0-9+.-]*:/i;
+
+/** Whether an embed's target is a file (a URL, or an extension of its own, not a page's `.md`): an embedded page (`![[Notes]]`, `![[Notes#Part]]`) SilverBullet expands itself */
+export function isFileTarget(target: string): boolean {
+  // (A URL is a file of the web, whatever its name)
+  if (WEB_URL.test(target)) return true;
+  const path = target.split(/[?#@$|]/, 1)[0]!;
+  const ext = /\.([a-z0-9]{1,8})$/i.exec(path)?.[1]?.toLowerCase();
+  return !!ext && ext !== "md";
+}
 
 /** A markdown link's local URL resolved from the page's folder, as SilverBullet resolves one (`../x`, `./x`, `/x`) */
 export function resolveLinkPath(page: string, url: string): string {
@@ -47,8 +63,9 @@ export function resolveLinkPath(page: string, url: string): string {
 
 /** An embed's (or a link's) target as SilverBullet resolves it: a wiki link's from the space's root, a markdown link's from the page's folder */
 export function resolvedTarget(embed: Pick<Embed, "target" | "style">, page: string): string {
+  // (A URL as written: its `@` and `$` are its own, `pkg@1.2.0`; a page's or a file's name loses its section or ref)
+  if (WEB_URL.test(embed.target)) return embed.target;
   const target = embed.target.split(/[#@$]/, 1)[0]!;
-  if (/^[a-z][a-z0-9+.-]*:/i.test(target)) return target;
   if (embed.style === "wiki") return target.replace(/^\//, "");
   let decoded = target;
   try {
@@ -62,10 +79,10 @@ export function resolvedTarget(embed: Pick<Embed, "target" | "style">, page: str
 const WIKI = /!\[\[([^\]\n]+?)\]\]/g;
 // A link: no `!` before it (that is an embed's)
 const WIKI_LINK = /(?<!!)\[\[([^\]\n]+?)\]\]/g;
-const MARKDOWN_LINK = /(?<![!\]])\[([^\]\n]*)\]\(([^)\s]+)\)/g;
-const MARKDOWN = /!\[([^\]\n]*)\]\(([^)\s]+)\)/g;
+// (A title after the URL, `[x](a.pdf "Title")`, read with it, as the grid's index reads it)
+const MARKDOWN_LINK = /(?<![!\]])\[([^\]\n]*)\]\(([^)\s]+)(?:\s+"[^"\n]*")?\)/g;
+const MARKDOWN = /!\[([^\]\n]*)\]\(([^)\s]+)(\s+"[^"\n]*")?\)/g;
 const CODE_SPAN = /`+[^`\n]*`+/g;
-const FENCE = /^\s*(`{3,}|~{3,})/;
 
 /** The size a segment is (`200`, `50%`, `200x100`, `x100`), as SilverBullet reads it; none: not a size */
 export function readSize(segment: string): { readonly width?: string; readonly height?: string } | undefined {
@@ -142,14 +159,10 @@ export function readEmbeds(text: string): Embed[] {
   let at = 0;
   for (const raw of text.split("\n")) {
     const line = raw.replace(/\r$/, "");
-    const mark = FENCE.exec(line)?.[1];
-    if (fence !== undefined) {
-      if (mark && mark[0] === fence[0] && mark.length >= fence.length && line.trim() === mark) fence = undefined;
-    } else if (mark) {
-      fence = mark;
-    } else {
-      embeds.push(...embedsOfLine(line, at));
-    }
+    // (Fences as every reader of shared/markdown reads them, lines.ts)
+    const before = fence;
+    fence = nextFence(line, fence);
+    if (before === undefined && fence === undefined) embeds.push(...embedsOfLine(line, at));
     at += raw.length + 1;
   }
   return embeds;
@@ -171,7 +184,7 @@ function embedsOfLine(line: string, at: number): Embed[] {
     // (A wiki embed's `![[x]]` is no markdown image)
     if (line[m.index! + 2] === "[") continue;
     const alias = m[1]!;
-    found.push({ from: at + m.index!, to: at + m.index! + m[0].length, text: m[0], style: "markdown", target: m[2]!, ...fromAlias(alias === "" ? undefined : alias) });
+    found.push({ from: at + m.index!, to: at + m.index! + m[0].length, text: m[0], style: "markdown", target: m[2]!, ...(m[3] ? { title: m[3] } : {}), ...fromAlias(alias === "" ? undefined : alias) });
   }
   return found.sort((a, b) => a.from - b.from);
 }
@@ -194,9 +207,11 @@ export function writeEmbed(embed: Embed, changes: EmbedChanges): string {
   if (same) return embed.text;
   const size = writeSize(width, height);
   const meta = writeMetadata(metadata);
-  const segments = meta ? [alt, size, meta] : size ? [alt, size] : alt ? [alt] : [];
+  // (An alt alone that reads as a size, `2024` or `50%`, followed by an empty size: SilverBullet takes a lone segment
+  // starting with a digit, an `x` or `.5%` for the size, `parseDimensionFromAlias`)
+  const segments = meta ? [alt, size, meta] : size ? [alt, size] : alt ? (/^[x\d]|^\.\d+%/.test(alt) ? [alt, ""] : [alt]) : [];
   const alias = segments.join("|");
-  return embed.style === "wiki" ? `![[${embed.target}${alias ? `|${alias}` : ""}]]` : `![${alias}](${embed.target})`;
+  return embed.style === "wiki" ? `![[${embed.target}${alias ? `|${alias}` : ""}]]` : `![${alias}](${embed.target}${embed.title ?? ""})`;
 }
 
 /** A link of a page, as written (`[[report.pdf|The report]]`, `[The report](report.pdf)`): an embed's form without its `!` */
@@ -217,12 +232,9 @@ export function readLinks(text: string): Link[] {
   let at = 0;
   for (const raw of text.split("\n")) {
     const line = raw.replace(/\r$/, "");
-    const mark = FENCE.exec(line)?.[1];
-    if (fence !== undefined) {
-      if (mark && mark[0] === fence[0] && mark.length >= fence.length && line.trim() === mark) fence = undefined;
-    } else if (mark) {
-      fence = mark;
-    } else {
+    const before = fence;
+    fence = nextFence(line, fence);
+    if (before === undefined && fence === undefined) {
       const code = [...line.matchAll(CODE_SPAN)].map((m) => [m.index!, m.index! + m[0].length] as const);
       const inCode = (i: number) => code.some(([from, to]) => i >= from && i < to);
       const found: Link[] = [];

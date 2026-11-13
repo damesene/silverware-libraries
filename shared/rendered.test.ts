@@ -13,7 +13,7 @@ describe("renderedOf", () => {
     for (const given of [undefined, null, 3, { version: RENDERED_VERSION + 1, items: () => [], ranges: () => [], onChange: () => () => undefined }, { version: RENDERED_VERSION }]) {
       const rendered = renderedOf(given);
       expect(rendered.items()).toEqual([]);
-      expect(rendered.ranges()).toEqual([]);
+      expect(rendered.ranges("text")).toEqual([]);
       expect(typeof rendered.onChange(() => undefined)).toBe("function");
     }
   });

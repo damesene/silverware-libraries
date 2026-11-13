@@ -1,6 +1,7 @@
 // Embeds SilverBullet's HTML draws none of (2.12.1: a PDF left out, a zip left as its text) kept as places in a cell's
 // HTML, the offsets of what follows them the text's.
 import { describe, expect, it } from "vitest";
+import { isFileTarget } from "../../../../shared/markdown/embed.ts";
 import { drawnInHtml, keepUndrawn } from "./undrawn.ts";
 
 /** SilverBullet's HTML as 2.12.1 renders a paragraph (its offset, 0 left out) and an image embed (`data:`: no source; its offset) */
@@ -19,6 +20,12 @@ const render = (text: string) =>
 describe("embeds SilverBullet's HTML draws none of", () => {
   it("are those not an image, a video or audio", () => {
     expect(["a.png", "b.MP4", "c.mp3", "d.pdf", "e.zip", "f", "g.png#x"].map(drawnInHtml)).toEqual([true, true, true, false, false, false, true]);
+  });
+
+  it("leaves an embedded page to SilverBullet's HTML, which expands it", () => {
+    expect(["Notes", "Notes#Part", "Notes.md", "v1/Notes", "a.zip", "b.pdf"].map(isFileTarget)).toEqual([false, false, false, false, true, true]);
+    const kept = keepUndrawn("![[Meeting notes]] and ![[Other#Part]]");
+    expect(kept.text).toBe("![[Meeting notes]] and ![[Other#Part]]");
   });
 
   it("leaves a text without them as it is", () => {

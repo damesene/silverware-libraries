@@ -32,8 +32,6 @@ export type Bridge = {
   readonly filterBox?: (label: string, options: readonly { readonly name: string; readonly description: string; readonly index: number }[]) => unknown;
   // Optional: one of SilverBullet's UI options (`editor.getUiOption`: `markdownSyntaxRendering`, the markdown shown as written)
   readonly getUiOption?: (name: string) => unknown;
-  // Optional, for a link written new: SilverBullet's setting `defaultLinkStyle` ("wikilink" or "markdown")
-  readonly linkStyle?: () => unknown;
 };
 
 /** The bridge's functions Silverware Layout cannot work without, missing from what the init page gave */

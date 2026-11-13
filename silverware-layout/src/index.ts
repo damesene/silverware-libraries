@@ -15,7 +15,7 @@ import { gridLinks } from "./grid/core/links.ts";
 import { GRID_MODES, isGridMode, putIntoGrid } from "./grid/build.ts";
 import { gridTags } from "./grid/core/tags.ts";
 import { gridRelations, gridTagObjects } from "./host/silverbullet/gridindex.ts";
-import { Grids } from "./grid/grids.ts";
+import { gridRanges, Grids } from "./grid/grids.ts";
 import { gridProvider } from "./grid/provider.ts";
 import { watchEmbeddedGrids } from "./host/silverbullet/embeddedgrids.ts";
 import { watchSyntaxMode, type SyntaxModeWatcher } from "../../shared/syntaxmode.ts";
@@ -24,7 +24,7 @@ import { silverBulletGridHost, silverBulletPutHost } from "./host/silverbullet/g
 import { keepDeviceZoom, readDeviceZoom } from "./host/devicezoom.ts";
 import { silverBulletPage } from "./host/silverbullet/dom.ts";
 import { pageLayoutOf, writePageWidth } from "./host/silverbullet/page.ts";
-import { silverBulletPlatform } from "./host/silverbullet/platform.ts";
+import { silverBulletPlatform } from "../../shared/silverbullet/platform.ts";
 import { DEFAULT_GUIDES, DEFAULT_MIN_PANE_WIDTH, keptGuides, PATHS, readSettings, readSyntaxModeSettings, type Settings, type SyntaxModeSettings } from "./model/settings.ts";
 import { syntaxTab } from "./ui/syntaxtab.ts";
 import { cssWidth, readTextWidth } from "./model/width.ts";
@@ -57,7 +57,7 @@ function renderedApi(): Rendered {
   return {
     version: RENDERED_VERSION,
     items: () => grids?.rendered.items() ?? [],
-    ranges: () => grids?.rendered.ranges() ?? [],
+    ranges: (text) => gridRanges(text),
     onChange: (listener) => {
       renderedListeners.add(listener);
       return () => void renderedListeners.delete(listener);

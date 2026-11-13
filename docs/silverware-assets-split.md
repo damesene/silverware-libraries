@@ -60,8 +60,8 @@ export type Rendered = {
   readonly version: number;
   /** What is drawn outside the editor now */
   items(): readonly RenderedItem[];
-  /** The ranges of the page's text drawn outside the editor (their embeds are no widget of SilverBullet's: Assets counts SilverBullet's widgets among the others alone) */
-  ranges(): readonly { readonly from: number; readonly to: number }[];
+  /** The ranges of a page's text (the caller's, as it read it) drawn outside the editor, drawn now or not (their embeds are no widget of SilverBullet's: Assets counts SilverBullet's widgets among the others alone). Changed 2026-11-14 in the branch's review: of the grids drawn alone, an embed in a grid scrolled away was taken for an editor's widget */
+  ranges(text: string): readonly { readonly from: number; readonly to: number }[];
   /** Told as items are drawn, drawn anew, or given their places later (a grid drawn while the editor's text was still the page before); the function given back stops it */
   onChange(listener: (items: readonly RenderedItem[]) => void): () => void;
 };

@@ -10,11 +10,12 @@ import { AssetRegistry } from "./core/registry.ts";
 import { AssetDecorator, type AssetHost, type DrawnEmbed, type EmbedWrite } from "./decorate.ts";
 import { type AssetSettings, readAssetSettings } from "./model/settings.ts";
 
-function setUp(text: string, settings: unknown = {}) {
+function setUp(text: string, settings: unknown = {}, placeOf?: (element: HTMLElement) => number) {
   const state = { text, opened: [] as string[], writes: [] as EmbedWrite[], forms: [] as string[], problems: [] as string[], ranges: [] as { from: number; to: number }[] };
   const host: AssetHost = {
     watch: () => undefined,
     renderedRanges: () => state.ranges,
+    ...(placeOf ? { placeOf } : {}),
     pageText: async () => state.text,
     pageName: async () => "Notes/Page",
     resolved: (embed) => embed.target,
@@ -244,6 +245,19 @@ describe("the same file outside a grid and in it", () => {
       [1, { metadata: { view: "icon" } }],
       [0, { metadata: { view: "preview" } }],
     ]);
+  });
+
+  it("finds the editor's widget by where it is in the page where the one above it is not drawn (scrolled away)", async () => {
+    // The same image at the top and at the end; only the one at the end drawn, far down the page
+    const text = `![[cat.png]]\n\n${"Text.\n\n".repeat(50)}![[cat.png]]\n`;
+    const { state, decorator } = setUp(text, {}, () => 0.95);
+    const bottom = frame("cat.png");
+    await decorator.decorate([bottom]);
+    bottom.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
+    [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")][0]!.click();
+    await vi.waitFor(() => expect(state.writes).toHaveLength(1));
+    // The second of the two
+    expect(state.writes[0]!.occurrence).toBe(1);
   });
 
   it("leaves a medium rendered outside the editor whose place is not known yet", async () => {

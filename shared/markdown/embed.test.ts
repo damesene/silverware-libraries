@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { embedAsLink, linkAsEmbed, readEmbeds, readLinks, readMetadata, readSize, writeEmbed, writeMetadata } from "./embed.ts";
+import { embedAsLink, linkAsEmbed, readEmbeds, readLinks, readMetadata, readSize, resolvedTarget, writeEmbed, writeMetadata } from "./embed.ts";
 
 describe("an embed's size and metadata", () => {
   it("reads a size as SilverBullet does", () => {
@@ -56,6 +56,12 @@ describe("writeEmbed", () => {
     expect(writeEmbed(wiki!, { width: "200" })).toBe(wiki!.text);
   });
 
+  it("keeps an alt alone that reads as a size an alt, an empty size after it", () => {
+    const [year] = readEmbeds("![[photo.png|2024|300]]");
+    expect(writeEmbed(year!, { width: null })).toBe("![[photo.png|2024|]]");
+    expect(writeEmbed(year!, { width: null, alt: "A photo" })).toBe("![[photo.png|A photo]]");
+  });
+
   it("writes three segments where it has metadata, empty ones kept", () => {
     expect(writeEmbed(plain!, { metadata: { view: "icon" } })).toBe("![[cat.png|||{ view: icon }]]");
     expect(writeEmbed(md!, { metadata: { view: "icon" } })).toBe("![Md|150|{ view: icon }](cat.png)");
@@ -92,5 +98,24 @@ describe("links and embeds written as each other", () => {
     expect([linkAsEmbed(wiki!), linkAsEmbed(md!)]).toEqual(["![[a.pdf|Doc]]", "![x](b%20c.zip)"]);
     const embeds = readEmbeds("![[cat.png|Cat|300|{ view: icon }]] ![[dog.png]] ![|200](Pics/my%20cat.png) ![A cat](cat.png)");
     expect(embeds.map(embedAsLink)).toEqual(["[[cat.png|Cat]]", "[[dog.png]]", "[my cat.png](Pics/my%20cat.png)", "[A cat](cat.png)"]);
+  });
+});
+
+describe("what every reader of shared/markdown reads alike", () => {
+  it("reads fences as lines.ts does (one in a list item too), and a markdown link's or image's title with it", () => {
+    const text = '- Item\n  ```\n  ![[in-code.png]]\n  ```\n![[a.png]] [[b.pdf]]\n[x](c.pdf "The report") ![Pic](d.png "A title")';
+    expect(readEmbeds(text).map((one) => one.target)).toEqual(["a.png", "d.png"]);
+    expect(readLinks(text).map((one) => one.target)).toEqual(["b.pdf", "c.pdf"]);
+    const [, image] = readEmbeds(text);
+    expect(image!.title).toBe(' "A title"');
+    expect(writeEmbed(image!, { width: "200" })).toBe('![Pic|200](d.png "A title")');
+  });
+});
+
+describe("resolvedTarget", () => {
+  it("keeps a URL whole, its @ and $ its own; a name loses its section", () => {
+    expect(resolvedTarget({ target: "https://cdn.jsdelivr.net/npm/pkg@1.2.0/logo.png", style: "markdown" }, "P")).toBe("https://cdn.jsdelivr.net/npm/pkg@1.2.0/logo.png");
+    expect(resolvedTarget({ target: "/Docs/report.pdf#page", style: "wiki" }, "P")).toBe("Docs/report.pdf");
+    expect(resolvedTarget({ target: "../a%20b.png", style: "markdown" }, "Notes/Sub/P")).toBe("Notes/a b.png");
   });
 });

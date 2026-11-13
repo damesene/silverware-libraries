@@ -11,7 +11,7 @@ import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
 import type { Rendered, RenderedItem } from "../../../../shared/rendered.ts";
 import { ASSETS_PATH } from "../../model/settings.ts";
-import { documentUrl } from "./platform.ts";
+import { documentUrl } from "../../../../shared/silverbullet/platform.ts";
 
 const FRAME = ".sb-inline-content";
 // A medium drawn outside the editor (a grid's cell) is a plain element: put in a frame of Silverware Assets' own, to
@@ -19,12 +19,15 @@ const FRAME = ".sb-inline-content";
 const OWN_FRAME = "swa-frame";
 const MEDIA = "img, video, audio, object";
 const BARS = ".button-bar, .sb-widget-menu-bar";
-const UNSUPPORTED = /Unsupported content:\s*(.+)$/;
+// (The frame's whole text: a page embedded there whose own embed failed says it deeper, after its words)
+const UNSUPPORTED = /^(?:Error:\s*)?Unsupported content:\s*(.+)$/;
 // Links as SilverBullet draws them in the editor (2.12.1, probed 2026-11-13): a wiki link's widget `a.sb-wiki-link`
 // (its href the target as written; a widget, so an element put in it is no edit of the text). A markdown link there
 // (`a.sb-link`) is the editor's own text, marked: left alone, as CodeMirror would take an element put in it for an
 // edit. Those drawn outside the editor (a grid's cell) are told (`Rendered`)
 const LINKS = ".cm-content a.sb-wiki-link";
+// The editor's content: as tall as the whole page
+const CONTENT = ".cm-content";
 // A file of the space's name: an extension of its own, not a page's (`.md`)
 const FILE_NAME = /\.(?!md$)[a-z0-9]{1,8}$/i;
 const WEB = /^[a-z][a-z0-9+.-]*:/i;
@@ -52,9 +55,21 @@ type Drawn = {
 };
 type Write = { readonly text: string; readonly occurrence: number; readonly of: number; readonly changes: EmbedChanges };
 
+// How deep in its frame SilverBullet puts an embed's medium, at most (its widget's div, its content's)
+const MEDIUM_DEPTH = 2;
+
+/** How many elements lie between a frame and an element in it */
+function depthIn(frame: HTMLElement, element: HTMLElement): number {
+  let depth = 0;
+  for (let at = element.parentElement; at && at !== frame; at = at.parentElement) depth++;
+  return depth;
+}
+
 /** The target an embed's frame was drawn of: its medium's path in the space (or its URL), or the name it could not draw */
 export function drawnTarget(frame: HTMLElement): { readonly target: string; readonly native: HTMLElement | undefined } | undefined {
-  const native = frame.querySelector<HTMLElement>(MEDIA) ?? undefined;
+  // (The frame's own medium, in its content (2.12.1, probed 2026-11-14: `div > div.content > img`); one deeper is in a
+  // page embedded there, the other page's)
+  const native = [...frame.querySelectorAll<HTMLElement>(MEDIA)].find((medium) => depthIn(frame, medium) <= MEDIUM_DEPTH);
   const source = native?.getAttribute("src") ?? native?.getAttribute("data");
   if (source) {
     const path = source.replace(/^\.?\/?\.fs\//, "");
@@ -177,7 +192,13 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
       if (!FILE_NAME.test(target)) return undefined;
       return { kind: "file", path: target, url: documentUrl(target) };
     },
-    renderedRanges: () => rendered.ranges(),
+    renderedRanges: (text: string) => rendered.ranges(text),
+    // (The editor's content is as tall as the whole page, the part not drawn by its estimated height)
+    placeOf: (element: HTMLElement): number | undefined => {
+      const content = element.closest(CONTENT)?.getBoundingClientRect();
+      if (!content?.height) return undefined;
+      return (element.getBoundingClientRect().top - content.top) / content.height;
+    },
     pageText: async () => String(await bridge.getText()),
     pageName: async () => String(await bridge.getCurrentPage()),
     resolved: (embed: Embed, page: string): string => resolvedTarget(embed, page),

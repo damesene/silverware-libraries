@@ -41,15 +41,15 @@ describe("isolation", () => {
     for (const [file, list] of of("core")) expect(list.filter((path) => !path.startsWith("model/") && !path.startsWith("core/") && path !== "shared/layout.ts"), file).toEqual([]);
   });
   it("keeps the dialog off the host and the bridge", () => {
-    for (const [file, list] of of("ui")) expect(list.filter((path) => path.startsWith("host/") || path === "bridge.ts" || path.startsWith("shared/pages/")), file).toEqual([]);
+    for (const [file, list] of of("ui")) expect(list.filter((path) => path.startsWith("host/") || path === "bridge.ts" || path.startsWith("shared/pages/") || path.startsWith("shared/silverbullet/")), file).toEqual([]);
   });
   it("leaves SilverBullet to the host and the root, a page's text to the page writer", () => {
-    for (const [file, list] of [...of("model"), ...of("core"), ...of("ui")]) expect(list.filter((path) => path === "bridge.ts" || path.startsWith("shared/pages/") || path === "shared/platform.ts"), file).toEqual([]);
+    for (const [file, list] of [...of("model"), ...of("core"), ...of("ui")]) expect(list.filter((path) => path === "bridge.ts" || path.startsWith("shared/pages/") || path.startsWith("shared/silverbullet/") || path === "shared/platform.ts"), file).toEqual([]);
   });
   it("keeps SilverBullet to its host and its binding: the host's other parts, the app and the widgets' layout know none", () => {
     const generic = [...of("host").filter(([file]) => !file.startsWith("host/silverbullet/")), ...of(".").filter(([file]) => file === "app.ts" || file === "widgetlayout.ts")];
     expect(generic.length).toBeGreaterThan(3);
-    for (const [file, list] of generic) expect(list.filter((path) => path.startsWith("host/silverbullet/") || path === "bridge.ts" || path.startsWith("shared/pages/") || path === "shared/platform.ts"), file).toEqual([]);
+    for (const [file, list] of generic) expect(list.filter((path) => path.startsWith("host/silverbullet/") || path === "bridge.ts" || path.startsWith("shared/pages/") || path.startsWith("shared/silverbullet/") || path === "shared/platform.ts"), file).toEqual([]);
     // (SilverBullet's host used by its binding alone)
     for (const [file, list] of of(".").filter(([file]) => !file.startsWith("host/silverbullet/") && file !== "index.ts")) expect(list.filter((path) => path.startsWith("host/silverbullet/")), file).toEqual([]);
   });

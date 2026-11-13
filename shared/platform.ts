@@ -86,13 +86,6 @@ export interface Space {
   readonly folderSeparator?: string;
   /** What the space calls its documents, one and several, for what is said to the user (SilverBullet: page, pages); none: document */
   readonly noun?: { readonly one: string; readonly many: string };
-  /**
-   * How the user wants a link written where a plugin writes a new one: a wiki link (`[[…]]`) or a markdown link
-   * (`[…](…)`) (SilverBullet: its setting `defaultLinkStyle`); none: wiki. A link already written keeps its own
-   */
-  linkStyle?(): Awaitable<"wiki" | "markdown">;
-  /** The URL a browser loads a file of the space by (a path from the space's root: `Pics/cat.png`); none: not loaded so */
-  documentUrl?(path: string): string | undefined;
 }
 
 /** A rename asked of the space: `problem` why nothing was renamed (a name taken, one the space cannot hold) */

@@ -24,8 +24,6 @@ export type Bridge = {
   readonly getUiOption?: (name: string) => unknown;
   // Optional, for a file's card: a document's meta (`space.getDocumentMeta`: its `size` in bytes, `lastModified`)
   readonly documentMeta?: (path: string) => unknown;
-  // Optional, for a link written new: SilverBullet's setting `defaultLinkStyle` ("wikilink" or "markdown")
-  readonly linkStyle?: () => unknown;
   // Optional: Silverware Layout's API (`silverware.layout.api`), where it is installed: a medium's width by its handle
   // (shared/layout.ts), what its grids draw outside the editor (its `rendered`, shared/rendered.ts)
   readonly layout?: unknown;

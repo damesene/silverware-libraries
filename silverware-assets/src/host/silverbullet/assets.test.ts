@@ -7,7 +7,7 @@ import { pageWriter } from "../../../../shared/pages/writer.ts";
 import { type Rendered, RENDERED_VERSION, type RenderedItem } from "../../../../shared/rendered.ts";
 import type { Bridge } from "../../bridge.ts";
 import { drawnLink, drawnTarget, silverBulletAssetHost } from "./assets.ts";
-import { silverBulletPlatform } from "./platform.ts";
+import { silverBulletPlatform } from "../../../../shared/silverbullet/platform.ts";
 
 const bridge = { getText: () => "", getCurrentPage: () => "P", replaceRange: () => undefined, readPage: () => "", writePage: () => undefined, listPages: () => [], flash: () => undefined } as unknown as Bridge;
 
@@ -17,7 +17,7 @@ function renderedOf(items: RenderedItem[] = [], ranges: { from: number; to: numb
   const rendered: Rendered = {
     version: RENDERED_VERSION,
     items: () => items,
-    ranges: () => ranges,
+    ranges: (_text: string) => ranges,
     onChange: (listener) => {
       listeners.add(listener);
       return () => void listeners.delete(listener);
@@ -56,6 +56,13 @@ describe("SilverBullet's embeds found", () => {
     expect(drawnTarget(widget)?.target).toBe("Two  spaces/archive.zip");
     widget.innerHTML = "<p>An embedded page</p>";
     expect(drawnTarget(widget)).toBeUndefined();
+    // A page embedded whose own text embeds a medium, or a file it cannot draw: the other page's, no target of this frame
+    widget.innerHTML = '<div><div class="content"><span class="wrapper"><span class="p">See <img src=".fs/cat.png"> here</span></span></div></div>';
+    expect(drawnTarget(widget)).toBeUndefined();
+    widget.innerHTML = '<div><div class="content"><span class="p">Notes</span><span class="p"><b>Error:</b> Unsupported content: a.zip</span></div></div>';
+    expect(drawnTarget(widget)).toBeUndefined();
+    widget.innerHTML = '<div><div class="content"><img src=".fs/cat.png"></div></div>';
+    expect(drawnTarget(widget)?.target).toBe("cat.png");
   });
 
   it("finds SilverBullet's widgets, and puts each medium told of outside the editor in a frame of its own", async () => {
@@ -95,7 +102,7 @@ describe("what is drawn outside the editor, told again", () => {
     tell([{ kind: "embed", element: medium, target: "b.png", style: "wiki", position: 70, room: cell }]);
     expect(found).toEqual([[61], [70]]);
     expect(cell.querySelectorAll(".swa-frame")).toHaveLength(1);
-    expect(host.renderedRanges()).toEqual([{ from: 61, to: 85 }]);
+    expect(host.renderedRanges("")).toEqual([{ from: 61, to: 85 }]);
   });
 });
 

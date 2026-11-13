@@ -3,10 +3,10 @@
 // order among those of the same target), its type matched, its view chosen, and it is left as the host drew it (a view
 // the type renders none of), replaced by the type's rendering, or by the card. A click on a card or a preview runs the
 // action the user set for it. A render that fails shows the host's drawing (else the card) with an error mark.
-import type { ActionContext, Asset, AssetType, Capabilities, RenderContext, Viewport } from "../../shared/assets.ts";
-import { type Embed, type EmbedChanges, readEmbeds, readLinks } from "../../shared/markdown/embed.ts";
+import { type ActionContext, type Asset, assetName, type AssetType, type Capabilities, type RenderContext, type Viewport } from "../../shared/assets.ts";
+import { type Embed, type EmbedChanges, isFileTarget, readEmbeds, readLinks } from "../../shared/markdown/embed.ts";
 import { actionFor, mimeOf, typeFor, viewFor } from "./core/choose.ts";
-import { embedAt, embedOf, linkAt, outside, type Range, sameTarget } from "./core/locate.ts";
+import { embedAt, linkAt, outside, placeAmong, type Placed, type Range, sameTarget } from "./core/locate.ts";
 import { metadataOf } from "./core/metadata.ts";
 import type { AssetRegistry } from "./core/registry.ts";
 import { type AssetSettings, type Gesture, type View, VIEWS } from "./model/settings.ts";
@@ -55,8 +55,10 @@ export type AssetHost = {
   watchLinks?(drawn: (links: readonly DrawnLink[]) => void): unknown;
   /** A link's asset, where it links a file of the space (a page, a site: none) */
   linkAsset?(link: DrawnLink, page: string): Asset | undefined;
-  /** The ranges of the page rendered outside the editor now (a grid's cells): their embeds are no widget of the host's */
-  renderedRanges(): readonly Range[];
+  /** The ranges of the page's text (as read) rendered outside the editor (a grid's), drawn now or not: their embeds are no widget of the host's */
+  renderedRanges(text: string): readonly Range[];
+  /** How far down the page an element of the host's is (0 its top, 1 its end; none: not known), a widget's place where several fit */
+  placeOf?(element: HTMLElement): number | undefined;
   pageText(): Promise<string>;
   pageName(): Promise<string>;
   /** An embed's target as the host draws it (resolved from the page), to find a drawn one by */
@@ -163,10 +165,16 @@ export class AssetDecorator {
     const at = link.position?.();
     let found = at !== undefined ? linkAt(links, at) : undefined;
     if (at === undefined) {
-      const drawn = [...this.links].filter((one) => one.element.isConnected && !one.position && sameTarget(one.target) === sameTarget(link.target));
+      // The editor's links of its form drawn now, in the page's order: a run of those of the text (as a widget's, above)
+      const drawn = [...this.links].filter((one) => one.element.isConnected && !one.position && one.style === link.style);
       drawn.sort((a, b) => (a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
-      const alike = outside(links, this.host.renderedRanges()).filter((one) => one.style === link.style && sameTarget(one.target) === sameTarget(link.target));
-      const one = alike[Math.min(Math.max(drawn.indexOf(link), 0), alike.length - 1)];
+      const editorLinks = outside(links, this.host.renderedRanges(text)).filter((one) => one.style === link.style);
+      const index = placeAmong(
+        drawn.map((one): Placed => ({ target: sameTarget(one.target), at: this.host.placeOf?.(one.element) ?? 0 })),
+        drawn.indexOf(link),
+        editorLinks.map((one): Placed => ({ target: sameTarget(one.target), at: one.from / Math.max(text.length, 1) })),
+      );
+      const one = index === undefined ? undefined : editorLinks[index];
       if (one) {
         const sameText = links.filter((other) => other.text === one.text);
         found = { link: one, occurrence: sameText.indexOf(one), of: sameText.length };
@@ -210,18 +218,24 @@ export class AssetDecorator {
     if (!drawn.length) return;
     const [text, page, settings] = await Promise.all([this.host.pageText(), this.host.pageName(), this.host.settings()]);
     const embeds = readEmbeds(text);
-    // The host's own widgets are the embeds outside what is rendered outside the editor: counted among those alone
-    const widgetsEmbeds = outside(embeds, this.host.renderedRanges());
+    // The host's own widgets are the files embedded outside what is rendered outside the editor (an embedded page is
+    // drawn as no medium): each found by the run of them the widgets drawn now are, the editor drawing what is in view
+    const widgetsEmbeds = outside(embeds, this.host.renderedRanges(text)).filter((embed) => isFileTarget(embed.target));
+    const inText = widgetsEmbeds.map((embed): Placed => ({ target: sameTarget(this.host.resolved(embed, page)), at: embed.from / Math.max(text.length, 1) }));
+    // (Each marked first: a widget's run is of all those drawn, this batch's too)
     for (const one of drawn) {
       this.drawn.set(one.frame, one);
-      // (Laid out once all are decorated)
       one.frame.setAttribute("data-swa-target", sameTarget(one.target));
+      if (!one.position) one.frame.setAttribute("data-swa-widget", "");
+    }
+    const widgets = [...this.doc.querySelectorAll<HTMLElement>("[data-swa-widget]")];
+    const widgetsDrawn = widgets.map((frame): Placed => ({ target: frame.getAttribute("data-swa-target") ?? "", at: this.host.placeOf?.(frame) ?? 0 }));
+    for (const one of drawn) {
       const at = one.position?.();
       // (A medium rendered outside the editor whose place is not known yet: left, never taken for another)
       if (one.position && at === undefined) continue;
-      if (at === undefined) one.frame.setAttribute("data-swa-widget", "");
-      const nth = [...this.doc.querySelectorAll("[data-swa-widget]")].filter((frame) => frame.getAttribute("data-swa-target") === sameTarget(one.target)).indexOf(one.frame);
-      const found = at !== undefined ? embedAt(embeds, at) : embedOf(embeds, (embed) => this.host.resolved(embed, page), one.target, nth, widgetsEmbeds);
+      const index = at === undefined ? placeAmong(widgetsDrawn, widgets.indexOf(one.frame), inText) : undefined;
+      const found = at !== undefined ? embedAt(embeds, at) : index !== undefined ? occurrenceIn(embeds, widgetsEmbeds[index]!) : undefined;
       if (!found) continue;
       const asset = this.host.assetOf(found.embed, page);
       const type = typeFor(this.registry.types.all, asset);
@@ -405,14 +419,6 @@ export class AssetDecorator {
   }
 }
 
-/** What an asset is called where it is shown: its alt text, else its file's name, its URL's, its page's */
-function assetName(asset: Asset): string {
-  if (asset.alt) return asset.alt;
-  if (asset.kind === "file") return asset.path.split("/").pop() ?? asset.path;
-  if (asset.kind === "web") return asset.url.split(/[?#]/, 1)[0]!.split("/").pop() || asset.url;
-  return asset.page;
-}
-
 /** A copy of the host's drawing to show elsewhere (a panel): shown, though it is hidden where it is (a card shown there) */
 function shownCopy(native: HTMLElement | undefined): HTMLElement | undefined {
   if (!native) return undefined;
@@ -443,4 +449,10 @@ function viewportOf(element: HTMLElement, embed: Embed, view: View, settings: As
       options?.signal?.addEventListener("abort", stop);
     },
   };
+}
+
+/** An embed of the text with its place among those of its text, which the page writer finds it by */
+function occurrenceIn(embeds: readonly Embed[], embed: Embed): { readonly embed: Embed; readonly occurrence: number; readonly of: number } {
+  const sameText = embeds.filter((one) => one.text === embed.text);
+  return { embed, occurrence: sameText.indexOf(embed), of: sameText.length };
 }

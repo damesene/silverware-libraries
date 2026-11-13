@@ -31,7 +31,7 @@ function imports(file: string): string[] {
 }
 
 const of = (folder: string) => files(join(SRC, folder)).map((file) => [relative(SRC, file).replace(/\\/g, "/"), imports(file)] as const);
-const SILVERBULLET = (path: string) => path === "bridge.ts" || path.startsWith("host/") || path.startsWith("shared/pages/") || path === "shared/platform.ts";
+const SILVERBULLET = (path: string) => path === "bridge.ts" || path.startsWith("host/") || path.startsWith("shared/pages/") || path.startsWith("shared/silverbullet/") || path === "shared/platform.ts";
 
 describe("isolation", () => {
   it("keeps the model to itself", () => {

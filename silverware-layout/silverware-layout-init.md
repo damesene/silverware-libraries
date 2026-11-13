@@ -97,10 +97,6 @@ if js and js.window then
     end,
     -- Whether SilverBullet shows the markdown's syntax (Editor: Toggle Markdown Syntax Rendering): grids hidden then
     getUiOption = editor.getUiOption,
-    -- How a link written new is written: SilverBullet's own setting, the one place naming it
-    linkStyle = function()
-      return config.get("defaultLinkStyle", "wikilink")
-    end,
     -- The dialog's default text width: saved as SilverBullet's Configuration Manager saves
     -- (the CONFIG page, indexed, the configuration loaded again)
     saveConfigPage = function(text)

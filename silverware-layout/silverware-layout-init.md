@@ -78,6 +78,10 @@ if js and js.window then
     -- A grid's Alt+click: the cursor where the click was in its markdown; /grid: where the cursor is
     moveCursor = editor.moveCursor,
     getCursor = editor.getCursor,
+    -- How a link written new is written: SilverBullet's own setting, the one place naming it
+    linkStyle = function()
+      return config.get("defaultLinkStyle", "wikilink")
+    end,
     -- The dialog's default text width: saved as SilverBullet's Configuration Manager saves
     -- (the CONFIG page, indexed, the configuration loaded again)
     saveConfigPage = function(text)

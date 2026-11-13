@@ -3,7 +3,7 @@
 import type { Platform } from "../../../../shared/platform.ts";
 import type { Bridge } from "../../bridge.ts";
 
-export function silverBulletPlatform(bridge: Bridge): Pick<Platform, "editor" | "space"> {
+export function silverBulletPlatform(bridge: Bridge): Pick<Platform, "editor"> & { readonly space: Required<Pick<Platform["space"], "linkStyle" | "documentUrl">> & Platform["space"] } {
   return {
     editor: {
       documentName: async () => String(await bridge.getCurrentPage()),
@@ -18,8 +18,16 @@ export function silverBulletPlatform(bridge: Bridge): Pick<Platform, "editor" | 
         await bridge.writePage(page, text);
       },
       list: async () => pageNamesOf(await bridge.listPages()),
+      // SilverBullet's setting `defaultLinkStyle` ("wikilink" by default), read by the init page: only it names the key
+      linkStyle: async () => (bridge.linkStyle && String(await bridge.linkStyle()) === "markdown" ? "markdown" : "wiki"),
+      documentUrl: (path) => documentUrl(path),
     },
   };
+}
+
+/** The URL SilverBullet serves a file of its space at (its files under `.fs/`, as its own media elements load them) */
+export function documentUrl(path: string): string {
+  return `.fs/${path.replace(/^\//, "").split("/").map(encodeURIComponent).join("/")}`;
 }
 
 /** Every page's name, as Space Lua hands the list over (a list or a table of 1, 2, …; a page a name or an object with one) */

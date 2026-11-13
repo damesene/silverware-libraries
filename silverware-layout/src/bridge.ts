@@ -26,6 +26,8 @@ export type Bridge = {
   readonly moveCursor?: (at: number, center?: boolean) => unknown;
   // Optional, for `/grid`: where the cursor is, an offset of the page's text (`editor.getCursor`)
   readonly getCursor?: () => unknown;
+  // Optional, for a link written new: SilverBullet's setting `defaultLinkStyle` ("wikilink" or "markdown")
+  readonly linkStyle?: () => unknown;
 };
 
 /** The bridge's functions Silverware Layout cannot work without, missing from what the init page gave */

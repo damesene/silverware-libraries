@@ -67,3 +67,30 @@ function bare(element: HTMLElement): void {
   if (!frame) return;
   for (const bar of frame.querySelectorAll<HTMLElement>(BARS)) bar.style.setProperty("display", "none", "important");
 }
+
+/** What Put into grid asks of SilverBullet (src/grid/build.ts' `PutHost`): its selection, its filter box, the page writer */
+export function silverBulletPutHost(bridge: Bridge, writer: PageWriter) {
+  return {
+    selection: async (): Promise<{ readonly from: number; readonly to: number }> => {
+      const selection = (await bridge.getSelection?.()) as { from?: unknown; to?: unknown } | undefined;
+      const from = Number(selection?.from);
+      const to = Number(selection?.to);
+      if (Number.isFinite(from) && Number.isFinite(to)) return { from, to };
+      const cursor = Number(await bridge.getCursor?.());
+      return { from: cursor, to: cursor };
+    },
+    pageText: async (): Promise<string> => String(await bridge.getText()),
+    pick: async (label: string, options: readonly { readonly name: string; readonly description: string }[]): Promise<number | undefined> => {
+      if (!bridge.filterBox) return undefined;
+      const picked = (await bridge.filterBox(label, options.map((option, index) => ({ ...option, index })))) as { index?: unknown } | undefined;
+      return typeof picked?.index === "number" ? picked.index : undefined;
+    },
+    put: async (from: number, to: number, was: string, mode: "gallery" | "split", columns: number): Promise<string | undefined> => {
+      const page = String(await bridge.getCurrentPage());
+      const report = await writer.write(pageChanges().page(page, (p) => p.grids.put(from, to, was, mode, columns)).build());
+      return report.skipped[0]?.reason;
+    },
+    problem: (message: string): void => void bridge.flash(message, "error"),
+  };
+}
+

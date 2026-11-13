@@ -26,6 +26,10 @@ export type Bridge = {
   readonly moveCursor?: (at: number, center?: boolean) => unknown;
   // Optional, for `/grid`: where the cursor is, an offset of the page's text (`editor.getCursor`)
   readonly getCursor?: () => unknown;
+  // Optional, for Put into grid: the selection (`editor.getSelection`: `{ from, to }`) and a pick of one of options
+  // (`editor.filterBox`, the option picked given back, its `index` as given)
+  readonly getSelection?: () => unknown;
+  readonly filterBox?: (label: string, options: readonly { readonly name: string; readonly description: string; readonly index: number }[]) => unknown;
   // Optional: one of SilverBullet's UI options (`editor.getUiOption`: `markdownSyntaxRendering`, the markdown shown as written)
   readonly getUiOption?: (name: string) => unknown;
   // Optional, for a file's card: a document's meta (`space.getDocumentMeta`: its `size` in bytes, `lastModified`)

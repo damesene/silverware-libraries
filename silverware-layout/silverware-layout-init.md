@@ -82,6 +82,11 @@ if js and js.window then
     -- A grid's Alt+click: the cursor where the click was in its markdown; /grid: where the cursor is
     moveCursor = editor.moveCursor,
     getCursor = editor.getCursor,
+    -- Put into grid: the selection, and a pick (its mode, its number of columns)
+    getSelection = editor.getSelection,
+    filterBox = function(label, options)
+      return editor.filterBox(label, options, "", "Type to filter")
+    end,
     -- Whether SilverBullet shows the markdown's syntax (Editor: Toggle Markdown Syntax Rendering): media and grids hidden then
     getUiOption = editor.getUiOption,
     -- A file's card: its size and date (an error where it is not in the space: the card shows its name alone)
@@ -113,6 +118,10 @@ if js and js.window then
         silverwareLayoutJs.runCommand(name)
       end,
     })
+  end
+  -- Put into grid as a button of Silverware Toolbar, its mode a parameter (through its public API, where it is installed)
+  if silverware.toolbar and silverware.toolbar.defineActions then
+    silverware.toolbar.defineActions(silverwareLayoutJs.toolbarActions)
   end
   for _, slash in ipairs(silverwareLayoutJs.slashCommands()) do
     local name = slash.name

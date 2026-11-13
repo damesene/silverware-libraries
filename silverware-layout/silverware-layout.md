@@ -67,6 +67,11 @@ The second column.
 </grid>
 ```
 
+- **Put what you have into a grid**: select paragraphs, list items, tasks, images (or put the cursor in one), and run **Silverware Layout: Put into grid**. Pick how:
+  - **Gallery**: each block a cell of its own, as many to a row as the columns you pick (2, 3 or 4): a row of images, a board of notes.
+  - **Split**: the blocks in their order, cut into the columns you pick by their number (ten tasks in three columns: 4, 3, 3), a list staying a list in each column.
+
+  With Silverware Toolbar, add **Put into grid** to a toolbar and set its *Mode*: the button then asks the number of columns alone.
 - **Edit a column where it is**: click into it, and its markdown shows in a field of its own, the rest of the grid as it was. Click elsewhere, or press Esc (or Ctrl+Enter), and it is saved. A click on a link or a tag in it still follows it.
 - **See the raw text**: Alt+click a column, and the page shows its markdown, the cursor where you clicked.
 - **More columns, or other widths**: give the grid a `columns` attribute: `<grid columns="3">` for three of the same width, or their widths, `<grid columns="1fr 2fr">` (the second twice as wide), `30% 70%`, `200px 1fr`. More columns than you give make more rows: nine columns in `<grid columns="3">` are three rows of three, a gallery of images. Without it, each `<column>` is a column of its own, four at most in a row.

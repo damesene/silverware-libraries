@@ -18,13 +18,14 @@ import { ASSETS_PATH, readAssetSettings, storedAssetSettings } from "./assets/mo
 import { silverBulletAssetHost } from "./host/silverbullet/assets.ts";
 import { gridInsertion } from "./grid/core/insert.ts";
 import { gridLinks } from "./grid/core/links.ts";
+import { GRID_MODES, isGridMode, putIntoGrid } from "./grid/build.ts";
 import { gridTags } from "./grid/core/tags.ts";
 import { gridRelations, gridTagObjects } from "./host/silverbullet/gridindex.ts";
 import { Grids } from "./grid/grids.ts";
 import { gridProvider } from "./grid/provider.ts";
 import { watchEmbeddedGrids } from "./host/silverbullet/embeddedgrids.ts";
 import { watchSyntaxMode } from "./host/silverbullet/syntaxmode.ts";
-import { silverBulletGridHost } from "./host/silverbullet/grid.ts";
+import { silverBulletGridHost, silverBulletPutHost } from "./host/silverbullet/grid.ts";
 import { keepDeviceZoom, readDeviceZoom } from "./host/devicezoom.ts";
 import { silverBulletPage } from "./host/silverbullet/dom.ts";
 import { pageLayoutOf, writePageWidth } from "./host/silverbullet/page.ts";
@@ -33,6 +34,7 @@ import { DEFAULT_GUIDES, DEFAULT_MIN_PANE_WIDTH, keptGuides, PATHS, readSettings
 import { cssWidth, readTextWidth } from "./model/width.ts";
 
 const PAGE_LAYOUT = "Silverware Layout: Page layout";
+const PUT_INTO_GRID = "Silverware Layout: Put into grid";
 // Silverware Layout's own block of CONFIG: the guides, a list, which the Configuration Manager's block would lose
 // (shared/configpage.ts)
 const OWN_MARKER = "-- managed-by: silverware-layout";
@@ -172,11 +174,38 @@ export async function runSlashCommand(name: string): Promise<void> {
 
 /** The commands, as the init page defines them */
 export function commandNames(): string[] {
-  return [PAGE_LAYOUT];
+  return [PAGE_LAYOUT, PUT_INTO_GRID];
 }
 
 export async function runCommand(name: string): Promise<void> {
   if (name === PAGE_LAYOUT) await app.openDialog();
+  if (name === PUT_INTO_GRID) await putInto();
+}
+
+/** Put into grid: the selection's blocks, the mode given (a toolbar's button) or asked */
+function putInto(given?: Parameters<typeof putIntoGrid>[1]): Promise<void> {
+  if (!current) return Promise.resolve();
+  return putIntoGrid(silverBulletPutHost(current, pageWriter(silverBulletPlatform(current))), given);
+}
+
+/** Silverware Toolbar's actions (its public API's definitions, handed over by the init page): Put into grid, its mode a parameter */
+export function toolbarActions(): unknown[] {
+  return [
+    {
+      name: "layoutPutIntoGrid",
+      label: "Put into grid",
+      icon: "lucide:layout-grid",
+      group: "Layout",
+      keywords: ["grid", "columns", "gallery", "side by side", "split"],
+      params: [{ key: "mode", label: "Mode", choices: [{ value: "", label: "Ask" }, ...GRID_MODES.map(({ mode, name }) => ({ value: mode, label: name }))] }],
+      describe: (args: { readonly mode?: unknown }) => {
+        const mode = GRID_MODES.find((one) => one.mode === args.mode);
+        return mode ? `Put into grid: ${mode.name.toLowerCase()}` : undefined;
+      },
+      perform: (context: { readonly from: number; readonly to: number }, _editor: unknown, args: { readonly mode?: unknown } = {}) =>
+        putInto({ ...(isGridMode(args.mode) ? { mode: args.mode } : {}), from: context.from, to: context.to }),
+    },
+  ];
 }
 
 /** What Silverware Layout reads and saves, SilverBullet's way */

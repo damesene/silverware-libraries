@@ -109,7 +109,34 @@ A part of Silverware Layout (decided 2026-11-12): it is the page's layout, it us
 ## The slash command and the menu
 
 - `/grid` (`slashCommand.define`) inserts two columns in the form with blank lines, the cursor in the first column's content (in the raw text: the widget shows once the cursor leaves).
-- Later a "…" menu on the grid (shared/menu): add or remove a cell, the column count and widths, move a cell.
+- Later a "…" menu on the grid (shared/menu): add or remove a cell, the column count and widths, move a cell. Planned in detail: *Building a grid from the page* below.
+
+## Building a grid from the page (planned 2026-11-13, not built)
+
+Agreed with the user: a grid is made and taken apart without typing its tags, with the mouse or a finger, for any markdown, not only images. The grid gets the effort (a row of images by CSS alone was weighed and dropped: SilverBullet draws each embed as a block, and the grid is the more general tool).
+
+### The command: Put into grid
+
+- **One command, `Silverware Layout: Put into grid`**, over the blocks the selection touches (none selected: the block at the cursor). Not `/grid` over a selection: typing `/` replaces the selection. Named for the grid, not for columns: both modes make a grid, and a later way of filling one is one more mode, not another command.
+- **A block**: a paragraph, each item of a list (a task too), an image's embed, a heading, a table, a fenced code block, a quote; read by `shared/markdown/` (`readBlocks`/`parseBlocks`), never by lines.
+- **It asks** the mode, then the number of columns (2, 3, 4), each a pick list as SilverBullet's palette shows one (`editor.filterBox`), on a phone too.
+- **Modes**:
+  - **Gallery**: each block a cell of its own, in order, the grid `columns="N"`: N to a row, more rows as there are blocks (ten blocks in 3 columns: rows of 3, 3, 3, 1).
+  - **Split**: the blocks kept in order and cut into N columns one after another, as a newspaper's: by the number of blocks (the user's choice: it keeps what belongs together together; by length can come later), the first columns one more where they do not divide (ten blocks in 3: 4, 3, 3).
+- **Lists split**: a list's items in two columns are two lists; a numbered list goes on counting (`5.` in the second, not `1.`), tasks keep their state.
+- **Silverware Toolbar**: Silverware Layout defines an action through Silverware Toolbar's public API (`silverware.toolbar.defineActions`, from its init page, where Silverware Toolbar is installed), *Put into grid* with a parameter *Mode* (Gallery, Split): a button with its mode set asks the number of columns alone. Without Silverware Toolbar, the command alone.
+- Written by the page writer (the blocks' range replaced by the grid's text, one edit, one undo step).
+
+### The grid's and a cell's "…" menu
+
+- **Shown** at the grid's top right as the pointer is over it (always on a touch screen), as a medium's; a cell's at the cell's top right.
+- **The grid**: the number of columns (Auto, 2, 3, 4: its `columns`), add a column, **Remove grid**: its content without the grid, the cells one under another in their order (row by row: cell 1, 2, 3 of the first row, then the next row's), each cell's markdown as written, a blank line between. The inverse of both modes: Gallery's cells and Split's columns are in the blocks' order.
+- **A cell**: move left, move right, add a column after it, remove the column (its content put under the grid, never lost), move out of the grid (the same, the cell gone).
+
+### Open
+
+- **A phone**: a grid's columns stack under each other in a narrow pane (`minPaneWidth`). Whether a gallery (or a grid that asks so, an attribute) keeps its columns there: the user is still thinking it over.
+- **Later, an idea kept**: images uploaded several at once into a grid (a picker of several files, the camera on a phone, `space.writeDocument`, `maximumDocumentSize`; where the files go and how they are named to decide): postponed by the user for what serves any markdown first.
 
 ## Probe results (2026-11-13, SilverBullet 2.12.1, Chromium)
 
@@ -135,7 +162,7 @@ A scratch space, a `space-lua` block defining `<grid>` by `syntax.define`, Playw
    **A grid in an embedded page, done 2026-11-13**: SilverBullet (2.12.1 and its main) draws an embedded page's markdown without its custom syntax, the grid's lines as text with a `<br>` between each (its cells' markdown as written), so it showed as text (not the open page's columns, as feared). `host/silverbullet/embeddedgrids.ts` finds such a grid in `.sb-inline-content` (a text `<grid …>` to a text `</grid>`, siblings) and `Grids.drawText` draws it in its place by its own `<grid>` line, marked `swl-grid-shown`: no grid of the open page, so neither edited nor Alt+clicked there, no handle (the provider's frame is SilverBullet's of a custom syntax), its media not decorated (no place in the open page).
 8. Library page (the syntax, what it looks like without the plugin, what is indexed), release. **Library page done 2026-11-13** (*Columns*); the release is proposed to the user, not made.
 
-Later: attributes (`columns`, `gap`, `span`, `align`), the "…" menu, nesting.
+Later: attributes (`gap`, `span`, `align`), nesting. Next: *Building a grid from the page* (the command Put into grid, the grid's and a cell's "…" menu).
 
 ## Open
 

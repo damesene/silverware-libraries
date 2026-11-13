@@ -1,8 +1,10 @@
-// Embedded media (docs/silverware-layout-assets.md) as a user works with them in SilverBullet: the "…" menu writing a
+// Embedded media (docs/silverware-assets.md) as a user works with them in SilverBullet: the "…" menu writing a
 // view into the embed it is on (the same file in a grid and outside it apart), a file SilverBullet cannot draw as a card,
-// a width dragged (in the page, and within a grid's cell), a PDF and a zip in a cell, a link's icon, the Media tab's
+// a width dragged (in the page, and within a grid's cell), a PDF and a zip in a cell, a link's icon, the settings'
 // card fields and a click shown in the side panel.
 import { expect, gridsDrawn, PAGE_LAYOUT, PIXEL_PNG, runCommand, test } from "./helpers.ts";
+
+const ASSETS_SETTINGS = "Silverware Assets: Settings";
 
 const cell = (text: string) => `<column>\n\n${text}\n\n</column>`;
 const grid = (...cells: string[]) => `<grid>\n${cells.map(cell).join("\n")}\n</grid>\n`;
@@ -100,12 +102,12 @@ test("a link to a file shows its type's icon, in a grid too; a link to a page no
   await expect(page.locator(".swa-popover")).toHaveCount(0);
 });
 
-test("the Media tab: a card's size shown, a click set to the side panel; the panel shows the file and Esc closes it", async ({ page, space }) => {
+test("the settings' Assets tab: a card's size shown, a click set to the side panel; the panel shows the file and Esc closes it", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/archive.zip]]\n\n![[${space.folder}/photo.png|Photo||{ view: preview }]]\n` }, "Page", { "archive.zip": "zip", "photo.png": PIXEL_PNG });
   await expect(page.locator("#sb-main .swa-card")).toHaveText("archive.zip");
-  await runCommand(page, PAGE_LAYOUT);
-  const dialog = page.locator(".swl-dialog");
-  await dialog.getByRole("tab", { name: "Media" }).click();
+  await runCommand(page, ASSETS_SETTINGS);
+  const dialog = page.locator(".swa-dialog");
+  await dialog.getByRole("tab", { name: "Assets" }).click();
   await dialog.getByLabel("Its size").check();
   await dialog.getByLabel("All files: a click").selectOption("peek");
   await dialog.getByRole("button", { name: "Save" }).click();
@@ -184,36 +186,54 @@ test("SilverBullet's markdown shown as written: a click on an embed's `![[` plac
   expect(await told()).toBe(0);
   await page.waitForTimeout(500);
   expect(page.url()).toBe(url);
-  // The box off in the Markdown tab: the click SilverBullet's again (what it does with it, its own)
-  await runCommand(page, PAGE_LAYOUT);
-  const dialog = page.locator(".swl-dialog");
+  // The box off in the settings' Markdown tab: the click SilverBullet's again (what it does with it, its own)
+  await runCommand(page, ASSETS_SETTINGS);
+  const dialog = page.locator(".swa-dialog");
   await dialog.getByRole("tab", { name: "Markdown" }).click();
   await dialog.getByLabel("A click on a link only places the cursor").uncheck();
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect.poll(() => space.config()).toContain('config.set("silverware.assets.syntaxMode.clickPlacesCursor", false)');
   // (Once SilverBullet has loaded its configuration again: the root no longer marked for it)
-  await expect.poll(() => page.evaluate(() => document.documentElement.hasAttribute("data-swl-syntax-clicks")), { timeout: 15_000 }).toBe(false);
+  await expect.poll(() => page.evaluate(() => document.documentElement.hasAttribute("data-swa-syntax-clicks")), { timeout: 15_000 }).toBe(false);
   await clickAtStart();
   await expect.poll(told).toBe(1);
   if (page.url() !== url) await page.goBack();
   await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
 });
 
-test("SilverBullet's markdown shown as written, the Markdown tab's box for media off: media and grids drawn there as SilverBullet draws them", async ({ page, space }) => {
+test("SilverBullet's markdown shown as written, each plugin's box off apart: files kept by Silverware Assets', grids by Silverware Layout's", async ({ page, space }) => {
   const image = `![[${space.folder}/photo.png|Photo|120]]`;
   await space.open({ Page: `# Page\n\n${image}\n\n${grid("Left", "Right")}` }, "Page", { "photo.png": PIXEL_PNG });
   await gridsDrawn(page);
-  await runCommand(page, PAGE_LAYOUT);
-  const dialog = page.locator(".swl-dialog");
-  await dialog.getByRole("tab", { name: "Markdown" }).click();
-  await dialog.getByLabel("Hide embedded files and grids").uncheck();
-  await dialog.getByRole("button", { name: "Save" }).click();
-  await expect.poll(() => space.config()).toContain('config.set("silverware.layout.syntaxMode.hideWidgets", false)');
-  await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
+  const file = page.locator("#sb-main [data-swa-asset]:not(.swa-frame)").first();
+  const shownGrid = page.locator("#sb-main .swl-grid");
+  const toggle = () => runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
+  // Assets' box off: the file drawn there, the grid still hidden
+  await runCommand(page, ASSETS_SETTINGS);
+  const assets = page.locator(".swa-dialog");
+  await assets.getByRole("tab", { name: "Markdown" }).click();
+  await assets.getByLabel("Hide embedded files").uncheck();
+  await assets.getByRole("button", { name: "Save" }).click();
+  await expect.poll(() => space.config()).toContain('config.set("silverware.assets.syntaxMode.hideAssets", false)');
+  await toggle();
   await expect(page.locator("#sb-main .cm-content")).toContainText(image);
-  await expect(page.locator("#sb-main [data-swa-asset]:not(.swa-frame)").first()).toBeVisible();
-  await expect(page.locator("#sb-main .swl-grid")).toBeVisible();
-  await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
+  await expect(file).toBeVisible();
+  await expect(shownGrid).toBeHidden();
+  await toggle();
+  // Layout's box off too: the grid drawn there as well (its dialog opened again where SilverBullet, loading the
+  // configuration Assets saved, started Silverware Layout again under it)
+  const layout = page.locator(".swl-dialog");
+  await expect(async () => {
+    if (!(await layout.isVisible())) await runCommand(page, PAGE_LAYOUT);
+    await layout.getByRole("tab", { name: "Markdown" }).click({ timeout: 2_000 });
+    await layout.getByLabel("Hide grids").uncheck({ timeout: 2_000 });
+    await layout.getByRole("button", { name: "Save" }).click({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
+  await expect.poll(() => space.config()).toContain('config.set("silverware.layout.syntaxMode.hideGrids", false)');
+  await toggle();
+  await expect(file).toBeVisible();
+  await expect(shownGrid).toBeVisible();
+  await toggle();
 });
 
 test("a card opens its menu from its icon, no button over it; what is chosen there is written", async ({ page, space }) => {

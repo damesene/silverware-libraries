@@ -3,7 +3,7 @@ tags: meta
 ---
 # Silverware Assets init
 
-What starts [Silverware Assets](silverware-assets.md) in SilverBullet: the JavaScript loaded and handed SilverBullet's space and editor API. It is installed with the library; its Space Lua API is [silverware-assets-api](silverware-assets-api.md).
+What starts [Silverware Assets](silverware-assets.md) in SilverBullet: its settings, the JavaScript loaded and handed SilverBullet's space and editor API, its command. It is installed with the library; its Space Lua API is [silverware-assets-api](silverware-assets-api.md).
 
 ```space-lua
 -- Settings: how files are shown (tables, kept in Silverware Assets' own block of CONFIG: the Configuration Manager
@@ -86,5 +86,13 @@ if js and js.window then
     end,
     layout = silverware.layout and silverware.layout.api,
   })
+  for _, name in ipairs(silverwareAssetsJs.commandNames()) do
+    command.define({
+      name = name,
+      run = function()
+        silverwareAssetsJs.runCommand(name)
+      end,
+    })
+  end
 end
 ```

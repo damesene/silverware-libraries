@@ -12,11 +12,11 @@ const input = (settings: unknown = {}) => ({
   actions: [{ name: "open-tab", label: "Open in a new tab" }],
 });
 
-describe("the Media tab", () => {
+describe("the Assets tab", () => {
   it("shows the settings, says it changed as a field changes, saves the settings as the tab has them", async () => {
     let saved: unknown;
     const tab = mediaTab(document, input({ views: { types: { pdf: "icon" } } }), async (settings) => void (saved = settings));
-    expect(tab.title).toBe("Media");
+    expect(tab.title).toBe("Assets");
     expect(tab.changed()).toBe(false);
     const selects = [...tab.panel.querySelectorAll<HTMLSelectElement>("select")];
     const label = (select: HTMLSelectElement) => select.getAttribute("aria-label");

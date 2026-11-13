@@ -1,6 +1,6 @@
-// The Media tab of the Page layout dialog (docs/silverware-assets.md, *Settings and the Media tab*): how a
-// medium is shown and what a click and a Shift+click on it do, for all types and per type ("Default": as for all),
-// what its card shows, where it stays as its width is dragged. The dialog shows it among its tabs, saves it on Save.
+// The Assets tab of the settings window (docs/silverware-assets.md, *Settings and the Media tab*): how a file is
+// shown and what a click and a Shift+click on it do, for all types and per type ("Default": as for all), what its card
+// shows, where it stays as its width is dragged. The window shows it among its tabs, saves it on Save.
 import { el } from "../../../shared/elements.ts";
 import { type AssetSettings, type CardField, type Gesture, type View, VIEWS } from "../model/settings.ts";
 import { iconElement } from "./card.ts";
@@ -124,8 +124,8 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
   const was = JSON.stringify(current());
 
   return {
-    id: "media",
-    title: "Media",
+    id: "assets",
+    title: "Assets",
     panel: el(doc, "div", "swa-settings", all, table),
     changed: () => JSON.stringify(current()) !== was,
     save: () => save(current()),

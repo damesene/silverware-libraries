@@ -403,6 +403,169 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   background: #c0392b;
   cursor: help;
 }
+/* The settings window ("Silverware Assets: Settings"): the shared dialog (shared/dialog.ts) over the page, in the
+   page's colors; over the part of the window an on-screen keyboard leaves (shared/dialog.ts sets where it is) */
+.swa-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  top: var(--sw-view-top, 0);
+  bottom: auto;
+  height: var(--sw-view-height, 100%);
+  z-index: var(--sw-layer-dialog);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--modal-backdrop-color, rgba(0, 0, 0, 0.35));
+  font-family: var(--ui-font, system-ui, sans-serif);
+}
+.swa-dialog {
+  --swa-dialog-line: var(--button-border-color, rgba(128, 128, 128, 0.3));
+  --swa-dialog-card: color-mix(in srgb, var(--root-color) 4%, var(--root-background-color));
+  display: flex;
+  flex-direction: column;
+  /* (Its border within the height: SilverBullet sets no box-sizing) */
+  box-sizing: border-box;
+  width: min(640px, calc(100vw - 24px));
+  /* (As high on either tab: it does not jump as they are switched, the footer where it was) */
+  min-height: min(520px, calc(var(--sw-view-height, 100dvh) - 32px));
+  max-height: min(600px, calc(var(--sw-view-height, 100dvh) - 32px));
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border: 1px solid var(--swa-dialog-line);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+  font-size: 14px;
+  overflow: hidden;
+}
+.swa-dialog *,
+.swa-dialog *::before,
+.swa-dialog *::after {
+  box-sizing: border-box;
+}
+.swa-dialog:focus {
+  outline: none;
+}
+.swa-dialog button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.swa-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 16px 8px;
+}
+.swa-dialog-titles {
+  flex: 1;
+  min-width: 0;
+}
+.swa-dialog-title {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.3;
+}
+.swa-dialog-subtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  opacity: 0.65;
+  overflow-wrap: anywhere;
+}
+.swa-dialog-close {
+  display: inline-flex;
+  padding: 5px;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  opacity: 0.65;
+}
+.swa-dialog-close:hover {
+  opacity: 1;
+  background: var(--swa-dialog-card);
+}
+.swa-dialog-close svg {
+  width: 16px;
+  height: 16px;
+}
+.swa-dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 16px 12px;
+}
+/* The tabs (Assets, Markdown) under the head */
+.swa-dialog-tabs {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--swa-dialog-line);
+}
+.swa-dialog-tab {
+  padding: 7px 10px;
+  margin-bottom: -1px;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  opacity: 0.7;
+}
+.swa-dialog-tab:hover {
+  opacity: 1;
+}
+.swa-dialog-tab[aria-selected="true"] {
+  opacity: 1;
+  font-weight: 600;
+  border-bottom-color: var(--ui-accent-color);
+}
+.swa-dialog-panel[hidden] {
+  display: none;
+}
+.swa-dialog-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--swa-dialog-line);
+}
+.swa-dialog-note {
+  flex: 1;
+  font-size: 12px;
+  opacity: 0.75;
+}
+.swa-dialog-note.swa-dialog-problem {
+  color: var(--danger-color, #c62828);
+  opacity: 1;
+}
+.swa-dialog-cancel,
+.swa-dialog-save {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--swa-dialog-line);
+  background: var(--root-background-color);
+}
+.swa-dialog-save {
+  color: #fff !important;
+  background: var(--ui-accent-color);
+  border-color: var(--ui-accent-color);
+}
+.swa-dialog-save:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* The Assets and Markdown tabs' room */
+.swa-dialog-panel {
+  padding: 14px 2px 6px;
+}
+/* The Markdown tab: its boxes one under another */
+.swa-settings-markdown {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.swa-settings-note {
+  margin: 0 0 4px;
+  opacity: 0.8;
+}
 /* <shared-menu> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
 /* The look of shared/menu.ts's menus: one template for every plugin drawing them, its classes those renderMenu gives
    (`<base>-menu-item`…) with a placeholder for the base; scripts/sharedstyles.mjs writes it, the plugin's base (`swt`,

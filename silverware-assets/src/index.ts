@@ -3,6 +3,7 @@
 // others through `api`, shared/assets.ts). Silverware Layout, where it is installed, is used through its API alone
 // (handed over by the init page): a medium's width by its handle (a provider registered, shared/layout.ts), what its
 // grids draw outside the editor (shared/rendered.ts).
+import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { layoutOf } from "../../shared/layout.ts";
 import { applyLayers } from "../../shared/layers.ts";
 import { pageWriter } from "../../shared/pages/writer.ts";
@@ -14,9 +15,15 @@ import { AssetRegistry } from "./core/registry.ts";
 import { AssetDecorator, type AssetHost } from "./decorate.ts";
 import { silverBulletAssetHost } from "./host/silverbullet/assets.ts";
 import { silverBulletPlatform } from "./host/silverbullet/platform.ts";
-import { readAssetSettings, readSyntaxModeSettings, SYNTAX_PATHS, type SyntaxModeSettings } from "./model/settings.ts";
+import { ASSETS_PATH, readAssetSettings, readSyntaxModeSettings, storedAssetPaths, SYNTAX_PATHS, type SyntaxModeSettings } from "./model/settings.ts";
 import { SILVERBULLET_SYNTAX_PAGE, SYNTAX_OPTION } from "./host/silverbullet/syntaxmode.ts";
 import { assetProvider } from "./provider.ts";
+import { mediaTab } from "./ui/mediatab.ts";
+import { markdownTab, SettingsWindow } from "./ui/settingswindow.ts";
+
+const SETTINGS = "Silverware Assets: Settings";
+// Silverware Assets' own block of CONFIG: its tables, which the Configuration Manager's block would lose (shared/configpage.ts)
+const OWN_MARKER = "-- managed-by: silverware-assets";
 
 // The bridge handed over last (a problem told through it)
 let current: Bridge | undefined;
@@ -82,4 +89,47 @@ export function init(bridge: Bridge): void {
     textMark: "data-swa-text",
     initial: { hideAssets: true, clickPlacesCursor: true },
   });
+}
+
+/** The commands, as the init page defines them */
+export function commandNames(): string[] {
+  return [SETTINGS];
+}
+
+export async function runCommand(name: string): Promise<void> {
+  if (name === SETTINGS) await openSettings();
+}
+
+// The settings window, made as it is first opened
+let settingsWindow: SettingsWindow | undefined;
+
+/** The settings window: the settings as configured, the types and actions registered; saved into CONFIG */
+async function openSettings(): Promise<void> {
+  const bridge = current;
+  const shown = decorator;
+  if (!bridge || !shown) return;
+  const save = (values: Readonly<Record<string, unknown>>, marker?: string) =>
+    saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, values, marker));
+  const [settings, syntax] = await Promise.all([readAssetSettings(bridge.getConfig ? await bridge.getConfig(ASSETS_PATH, undefined) : undefined).settings, readSyntaxSettings(bridge)]);
+  const input = {
+    settings,
+    types: registry.types.all.map(({ name, icon }) => ({ name, icon })),
+    actions: registry.actions.all.map(({ name, label }) => ({ name, ...(label ? { label } : {}) })),
+  };
+  settingsWindow ??= new SettingsWindow(document);
+  settingsWindow.open(
+    [
+      mediaTab(document, input, async (saved) => {
+        await save(storedAssetPaths(saved), OWN_MARKER);
+        await shown.redecorateAll();
+        return undefined;
+      }),
+      markdownTab(document, syntax, async (saved) => {
+        await save({ [SYNTAX_PATHS.hides]: saved.hideAssets ? undefined : false, [SYNTAX_PATHS.clicks]: saved.clickPlacesCursor ? undefined : false });
+        syntaxWatcher?.settingsChanged(saved);
+        return undefined;
+      }),
+    ],
+    { canSave: !!bridge.saveConfigPage, confirm: async (question) => (bridge.confirm ? !!(await bridge.confirm(question)) : globalThis.confirm(question)) },
+  );
 }

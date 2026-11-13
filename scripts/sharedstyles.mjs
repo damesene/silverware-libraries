@@ -13,6 +13,7 @@ export const SHARED_STYLES = [
       { page: "silverware-table/silverware-table-style.md", base: "swt" },
       { page: "silverware-chart/silverware-chart-style.md", base: "swc" },
       { page: "silverware-database/silverware-database-style.md", base: "swd" },
+      { page: "silverware-layout/silverware-layout-style.md", base: "swl" },
     ],
   },
   {

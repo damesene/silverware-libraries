@@ -117,3 +117,28 @@ describe("embedded media decorated", () => {
     expect(state.writes).toEqual([{ text: readEmbeds(state.text)[0]!.text, occurrence: 0, of: 1, changes: { metadata: { zoom: "3" } } }]);
   });
 });
+
+describe("an asset's menu", () => {
+  it("shows its views, the one shown checked, writes the one chosen, the settings' own as none", async () => {
+    const { state, decorator } = setUp("![[cat.png|A cat|200]]", { views: { types: { image: "embed" } } });
+    const one = frame("cat.png");
+    await decorator.decorate([one]);
+    const more = one.frame.querySelector<HTMLButtonElement>(".swl-asset-more")!;
+    more.click();
+    const items = [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")];
+    expect(items.map((item) => [item.textContent?.trim(), item.getAttribute("aria-checked")])).toEqual([
+      ["Show as a card", "false"],
+      ["Show as a preview", "false"],
+      ["Show in full", "true"],
+      ["Open", null],
+    ]);
+    items[0]!.click();
+    await vi.waitFor(() => expect(state.writes).toHaveLength(1));
+    expect(state.writes[0]!.changes).toEqual({ metadata: { view: "icon" } });
+    expect(document.querySelector(".swl-asset-menu-holder")).toBeNull();
+    more.click();
+    [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")][2]!.click();
+    await vi.waitFor(() => expect(state.writes).toHaveLength(2));
+    expect(state.writes[1]!.changes).toEqual({ metadata: { view: null } });
+  });
+});

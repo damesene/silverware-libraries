@@ -730,6 +730,418 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   outline: 2px solid color-mix(in srgb, currentColor 40%, transparent);
   outline-offset: 1px;
 }
+/* <shared-menu> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
+/* The look of shared/menu.ts's menus: one template for every plugin drawing them, its classes those renderMenu gives
+   (`<base>-menu-item`…) with a placeholder for the base; scripts/sharedstyles.mjs writes it, the plugin's base (`swt`,
+   `swc`, `swd`) in place, into each plugin's style page (between its marks; npm run build), and check-build fails where
+   one differs.
+   The menu's box (where it shows, its size, its font, its background) is the plugin's own, `.<base>-menu`. */
+
+/* The menu's entries one under another */
+[role="menu"].swl-menu,
+.swl-menu > [role="menu"] {
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+/* The title centered; a submenu's back arrow at the left */
+.swl-menu-title {
+  /* No say in the menu's width: as wide as its items, a long title cut */
+  contain: inline-size;
+  display: grid;
+  /* The back arrow | the title | its pencil | the ×: the sides keep room for the arrow and the ×, the title is cut first */
+  grid-template-columns: minmax(22px, 1fr) minmax(0, max-content) auto minmax(22px, 1fr);
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.swl-menu-title-text {
+  grid-column: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A submenu's way back: an arrow before its title */
+.swl-menu-back {
+  justify-self: start;
+  display: inline-flex;
+  margin: -3px 0 -3px -5px;
+  padding: 3px;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.swl-menu-back:hover,
+.swl-menu-back:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.swl-menu .swl-menu-back svg {
+  width: 14px;
+  height: 14px;
+}
+/* The × closing the menu, at the title's right */
+.swl-menu-close {
+  grid-column: 4;
+  grid-row: 1;
+  justify-self: end;
+  display: inline-flex;
+  margin: -3px -5px -3px 0;
+  padding: 3px;
+  color: inherit;
+  opacity: 0.6;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.swl-menu-close:hover,
+.swl-menu-close:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.swl-menu .swl-menu-close svg {
+  width: 14px;
+  height: 14px;
+}
+/* What the menu is about named in its title: a pencil after the title, the title a field once pressed */
+.swl-menu-rename {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: start;
+  display: inline-flex;
+  margin: -3px 0;
+  padding: 3px;
+  color: inherit;
+  opacity: 0.6;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.swl-menu-rename:hover,
+.swl-menu-rename:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.swl-menu-rename[aria-disabled] {
+  opacity: 0.3;
+  cursor: default;
+  background: none;
+}
+.swl-menu .swl-menu-rename svg {
+  width: 14px;
+  height: 14px;
+}
+.swl-menu-title.swl-naming {
+  display: block;
+  padding: 2px 6px 6px;
+}
+.swl-menu-name {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 3px 6px;
+  font: inherit;
+  font-weight: 400;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--ui-accent-color);
+  border-radius: 5px;
+  outline: none;
+}
+.swl-menu-name-clear {
+  margin: 4px 0 0;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 5px;
+  cursor: pointer;
+}
+.swl-menu-name-problem {
+  max-width: 260px;
+  padding: 0 8px 6px;
+  font-size: 12px;
+  color: var(--danger-color, #c62828);
+}
+/* An item: its icon, its label (and its value), a mark where it opens a submenu or is checked */
+.swl-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.swl-menu-item:hover,
+.swl-menu-item:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+/* A list opened in the menu's place: its choice highlighted (focusMenu), not
+   the item that came under the pointer, until the pointer moves */
+.swl-menu.swl-menu-still .swl-menu-item:hover:not(:focus-visible),
+.swl-menu-still .swl-menu-item:hover:not(:focus-visible) {
+  background: none;
+}
+.swl-menu-item.swl-menu-current {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+}
+.swl-menu-item[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.45;
+}
+.swl-menu-item[aria-disabled="true"]:hover {
+  background: none;
+}
+.swl-menu-item .swl-label {
+  flex: 1;
+}
+.swl-menu-item.swl-menu-sub::after {
+  content: "\203A";
+  opacity: 0.6;
+}
+.swl-menu-item[aria-checked="true"]::after {
+  content: "\2713";
+  color: var(--ui-accent-color);
+}
+.swl-menu-item.swl-danger {
+  color: var(--danger-color, #c62828);
+}
+.swl-icon {
+  display: inline-flex;
+}
+.swl-menu svg {
+  width: 16px;
+  height: 16px;
+}
+/* An item's detail: a bubble beside the menu, at the item's height */
+.swl-menu-detail {
+  position: absolute;
+  left: calc(100% + 8px);
+  width: max-content;
+  max-width: 280px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+.swl-menu-detail.swl-left {
+  left: auto;
+  right: calc(100% + 8px);
+}
+.swl-menu-detail[hidden] {
+  display: none;
+}
+.swl-menu-detail-title {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.swl-menu-detail-code {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.swl-menu-detail-code code {
+  padding: 1px 5px;
+  font-size: 11px;
+  background: color-mix(in srgb, var(--ui-accent-color) 12%, transparent);
+  border-radius: 4px;
+}
+.swl-menu-detail p {
+  margin: 0;
+}
+.swl-menu-detail .swl-menu-detail-note {
+  margin-top: 6px;
+  opacity: 0.7;
+}
+/* The icon of an item's value: Type: ☆ Stars */
+.swl-menu-value-icon {
+  display: inline-flex;
+  margin-right: 3px;
+  vertical-align: -2px;
+}
+.swl-menu .swl-menu-value-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.swl-menu-separator {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--button-border-color, rgba(128, 128, 128, 0.3));
+}
+/* A row of icon buttons after a label: a choice (Align) or a pair of actions (Move up, Move down) */
+.swl-menu-segmented {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 2px 8px;
+}
+/* A long label (a sheet's name) cut, whole in its tooltip: the menu as wide as its items */
+.swl-menu-segmented > .swl-label {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Something missing (a table shown as a sheet on none): its label in the danger color */
+.swl-menu-segmented .swl-label.swl-attention {
+  font-weight: 600;
+  color: var(--danger-color, #c62828);
+  opacity: 1;
+}
+/* (Its buttons, swl-segments and swl-segment, are shared/segments.css's) */
+.swl-action[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: default;
+}
+/* A bar of actions, a caption under each icon (Copy, Cut, Paste): first in a menu */
+.swl-menu-actions {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+}
+.swl-action {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 44px;
+  padding: 6px 2px 4px;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.2;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swl-action .swl-icon {
+  display: inline-flex;
+}
+.swl-action:not([aria-disabled="true"]):hover,
+.swl-action:focus-visible {
+  background: color-mix(in srgb, var(--ui-accent-color) 15%, transparent);
+  outline: none;
+}
+.swl-action-caption {
+  white-space: nowrap;
+  opacity: 0.85;
+}
+/* Choices laid out as tiles, an icon over each label (a gallery: a chart's types) */
+.swl-menu-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+}
+.swl-menu-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  font: inherit;
+  font-size: 11px;
+  color: inherit;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.swl-menu-tile[aria-checked="true"] {
+  border-color: var(--ui-accent-color);
+}
+.swl-menu-tile[aria-checked="true"] .swl-label::after {
+  content: " \2713";
+  color: var(--ui-accent-color);
+}
+.swl-menu-tile[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.45;
+}
+.swl-menu-tile:not([aria-disabled="true"]):hover,
+.swl-menu-tile:focus-visible,
+.swl-menu-tile.swl-menu-current {
+  background: color-mix(in srgb, var(--ui-accent-color) 14%, transparent);
+  outline: none;
+}
+.swl-menu-tile svg {
+  width: 22px;
+  height: 22px;
+}
+/* </shared-menu> */
+/* An asset's "…" button, at its frame's top right as the pointer is over it (always on a touch screen), its menu
+   under it */
+.swl-asset-more {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: var(--sw-layer-control);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 4px;
+  font: inherit;
+  line-height: 1;
+  color: inherit;
+  background: var(--root-background-color);
+  opacity: 0;
+  cursor: pointer;
+}
+[data-swl-asset]:hover > .swl-asset-more,
+.swl-asset-more:focus-visible,
+.swl-asset-more[aria-expanded="true"] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .swl-asset-more {
+    opacity: 0.8;
+  }
+}
+.swl-asset-menu-holder {
+  position: fixed;
+  z-index: var(--sw-layer-menu);
+}
+/* The box of Silverware Layout's menus (the shared menu's look is its template's, above) */
+.swl-menu {
+  min-width: 200px;
+  max-width: 320px;
+  padding: 4px;
+  font-family: var(--ui-font, system-ui, sans-serif);
+  font-size: 13px;
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
 /* Embedded media (docs/silverware-layout-assets.md), marked by Silverware Layout on the host's frame of each
    (data-swl-asset: its type, data-swl-asset-view: icon, preview or embed): the host's own drawing hidden where Silverware
    Layout draws instead; a preview of the host's drawing kept small; a card; the mark of a render that failed */

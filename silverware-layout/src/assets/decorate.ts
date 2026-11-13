@@ -9,8 +9,9 @@ import { actionFor, typeFor, viewFor } from "./core/choose.ts";
 import { embedOf, sameTarget } from "./core/locate.ts";
 import { metadataOf } from "./core/metadata.ts";
 import type { AssetRegistry } from "./core/registry.ts";
-import type { AssetSettings, Gesture, View } from "./model/settings.ts";
+import { type AssetSettings, type Gesture, type View, VIEWS } from "./model/settings.ts";
 import { drawCard, markFailed } from "./ui/card.ts";
+import { addMoreButton } from "./ui/moremenu.ts";
 
 /** An embed as the host drew it: its frame, its target as drawn (a path of the space or a URL), its own media element */
 export type DrawnEmbed = { readonly frame: HTMLElement; readonly target: string; readonly native: HTMLElement | undefined };
@@ -115,6 +116,29 @@ export class AssetDecorator {
       };
       void Promise.resolve(action.run(actionContext)).catch((error: unknown) => this.host.problem(`Silverware Layout: ${action.name}: ${message(error)}`));
     };
+    // The "…" menu: how it is shown (the one the settings give left unwritten), the click's action
+    const settled = settings.views.types[type.name] ?? settings.views.default;
+    const LABELS: Readonly<Record<View, string>> = { icon: "Show as a card", preview: "Show as a preview", embed: "Show in full" };
+    addMoreButton(
+      this.doc,
+      frame,
+      () => {
+        const click = actionFor("click", type.name, settings, (name) => this.registry.actions.get(name), asset, capabilities);
+        return {
+          title: asset.alt || type.name,
+          views: VIEWS.map((one) => ({
+            view: one,
+            label: LABELS[one],
+            checked: one === view,
+            ...(can(one) ? {} : { disabled: "This file cannot be shown so" }),
+            run: () =>
+              void write({ metadata: { view: one === settled ? null : one } }).then((problem) => problem && this.host.problem(`Silverware Layout: not written: ${problem}`)),
+          })),
+          ...(click ? { open: { label: "Open", run: () => runAction("click") } } : {}),
+        };
+      },
+      control.signal,
+    );
     const clicked = (element: HTMLElement) =>
       element.addEventListener(
         "click",

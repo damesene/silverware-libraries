@@ -1513,15 +1513,20 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
     inset: -10px -6px;
   }
 }
-/* Its menu opened by it: pointed at (or its menu open), it shows plainly it is a button of its own, apart from the
-   link's text: filled, a little larger */
-.swl-asset-link-icon:hover,
-.swl-asset-link-icon[aria-expanded="true"] {
+/* An icon opening its asset's menu (a link's, a card's): pointed at (or its menu open), it shows plainly it is a
+   button of its own, apart from the text beside it: filled, a little larger */
+.swl-asset-menu-icon {
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.12s, transform 0.12s;
+}
+.swl-asset-menu-icon:hover,
+.swl-asset-menu-icon[aria-expanded="true"] {
   background: color-mix(in srgb, currentColor 22%, transparent);
   transform: scale(1.2);
 }
 @media (prefers-reduced-motion: reduce) {
-  .swl-asset-link-icon {
+  .swl-asset-menu-icon {
     transition: none;
   }
 }

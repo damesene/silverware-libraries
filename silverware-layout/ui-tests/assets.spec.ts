@@ -215,3 +215,14 @@ test("SilverBullet's markdown shown as written, the Markdown tab's box for media
   await expect(page.locator("#sb-main .swl-grid")).toBeVisible();
   await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
 });
+
+test("a card opens its menu from its icon, no button over it; what is chosen there is written", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/archive.zip]]\n` }, "Page", { "archive.zip": "zip" });
+  const card = page.locator("#sb-main .swl-asset-card");
+  await expect(card).toHaveText("archive.zip");
+  await card.hover();
+  await expect(page.locator("#sb-main [data-swl-asset] .swl-asset-more")).toHaveCount(0);
+  await card.locator(".swl-asset-icon").click();
+  await page.locator(".swl-asset-menu-holder .swl-menu-item", { hasText: "Show as a link" }).click();
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n[[${space.folder}/archive.zip]]\n`);
+});

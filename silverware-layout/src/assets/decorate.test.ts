@@ -311,3 +311,29 @@ describe("a link shown as embedded", () => {
   });
 });
 
+
+describe("a card's menu", () => {
+  it("opens from the card's icon, no \"…\" over it; a click on the card still runs its action", async () => {
+    const { state, decorator } = setUp("![[archive.zip]]");
+    const one = frame("archive.zip", false);
+    await decorator.decorate([one]);
+    expect(one.frame.querySelector(".swl-asset-more")).toBeNull();
+    const icon = one.frame.querySelector<HTMLElement>(".swl-asset-card .swl-asset-icon")!;
+    icon.click();
+    const items = [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")].map((item) => item.textContent?.trim());
+    expect(items.slice(0, 3)).toEqual(["Show as a card", "Show as a preview", "Show as the original"]);
+    expect(items).toContain("Open in a new tab");
+    // (The icon's click the menu's alone: no file opened by it)
+    expect(state.opened).toEqual([]);
+    icon.click();
+    one.frame.querySelector<HTMLElement>(".swl-asset-card-name")!.click();
+    expect(state.opened).toEqual([".fs/archive.zip"]);
+  });
+
+  it("keeps the \"…\" where the card shows no icon", async () => {
+    const { decorator } = setUp("![[archive.zip]]", { card: ["name"] });
+    const one = frame("archive.zip", false);
+    await decorator.decorate([one]);
+    expect(one.frame.querySelector(".swl-asset-more")).not.toBeNull();
+  });
+});

@@ -12,7 +12,7 @@ import type { AssetRegistry } from "./core/registry.ts";
 import { type AssetSettings, type Gesture, type View, VIEWS } from "./model/settings.ts";
 import { addCardFields, dateText, drawCard, iconElement, markFailed, sizeText } from "./ui/card.ts";
 import { opensMenu } from "../ui/popupmenu.ts";
-import { addMoreButton, popupOf } from "./ui/moremenu.ts";
+import { addMoreButton, type MoreMenu, popupOf } from "./ui/moremenu.ts";
 import { plainMedium } from "./ui/plainmedium.ts";
 
 /** An embed as the host drew it: its frame, its target as drawn (a path of the space or a URL), its own media element */
@@ -123,7 +123,7 @@ export class AssetDecorator {
       const type = asset && typeFor(this.registry.types.all, asset);
       if (!type) continue;
       const icon = iconElement(this.doc, type.icon);
-      icon.classList.add(LINK_ICON);
+      icon.classList.add(LINK_ICON, "swl-asset-menu-icon");
       icon.title = "Show…";
       icon.setAttribute("role", "button");
       link.element.setAttribute("data-swl-asset-link", type.name);
@@ -283,13 +283,11 @@ export class AssetDecorator {
       const actionContext: ActionContext = { asset, open: (url) => this.host.open(url), render: renderInto };
       void Promise.resolve(action.run(actionContext)).catch((error: unknown) => this.host.problem(`Silverware Layout: ${action.name}: ${message(error)}`));
     };
-    // The "…" menu: how it is shown (the one the settings give left unwritten), the click's action
+    // Its menu: how it is shown (the one the settings give left unwritten), what can be done with it. Opened by the "…"
+    // at its top right; a card's by its icon, as a link's (no "…" over a card's name)
     const settled = settings.views.types[type.name] ?? settings.views.default;
     const LABELS: Readonly<Record<View, string>> = { icon: "Show as a card", preview: "Show as a preview", embed: "Show as the original" };
-    addMoreButton(
-      this.doc,
-      frame,
-      () => {
+    const menu = (): MoreMenu => {
         return {
           title: asset.alt || type.name,
           views: VIEWS.map((one) => ({
@@ -313,9 +311,7 @@ export class AssetDecorator {
               : []),
           ],
         };
-      },
-      control.signal,
-    );
+    };
     const clicked = (element: HTMLElement) =>
       element.addEventListener(
         "click",
@@ -333,8 +329,17 @@ export class AssetDecorator {
       clicked(card);
       hideHost();
       frame.append(card);
+      // (A card without its icon, as the user shows cards: the "…" then)
+      const icon = card.querySelector<HTMLElement>(".swl-asset-icon");
+      if (icon) {
+        icon.classList.add("swl-asset-menu-icon");
+        icon.title = "Show…";
+        icon.setAttribute("role", "button");
+        opensMenu(this.doc, icon, () => popupOf(menu()), control.signal);
+      } else addMoreButton(this.doc, frame, menu, control.signal);
       return;
     }
+    addMoreButton(this.doc, frame, menu, control.signal);
     const renderer = type.views?.[view];
     if (!renderer) {
       // The host's own drawing: a preview of it is the same, smaller (the style page's rule by the view's mark)

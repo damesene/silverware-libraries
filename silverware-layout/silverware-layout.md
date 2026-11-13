@@ -96,7 +96,7 @@ Images, videos, audio, PDFs and other files you embed (`![[photo.png]]`, `![Phot
 - **Preview**: smaller (a PDF in a small viewer).
 - **Card**: a small card with the file's icon and name, the file itself not shown. A file SilverBullet cannot show (a zip, a document) is a card instead of an error.
 
-Point at a medium, and a **…** button shows at its top right: choose how it is shown there, or open it in a new tab, in a side panel or enlarged. A click on a card or a preview opens the file in a new tab; Shift+click does the same, unless you set otherwise: either can instead show the file in a panel at the window's right (**Show in a side panel**, the page still beside it) or enlarged over the page (**Show enlarged**). Esc or × closes them, and a click beside the enlarged file.
+Point at a medium, and a **…** button shows at its top right: choose how it is shown there, or open it in a new tab, in a side panel or enlarged. On a card, its icon is that button (as a link's icon). A click on a card or a preview opens the file in a new tab; Shift+click does the same, unless you set otherwise: either can instead show the file in a panel at the window's right (**Show in a side panel**, the page still beside it) or enlarged over the page (**Show enlarged**). Esc or × closes them, and a click beside the enlarged file.
 
 **Its width**: point at an image (or a video, a PDF as the original or as a preview), and the bar beside its right edge makes it wider or narrower, as a table's; it stays where it is and grows to the right (*Width dragged* below sets it centred instead). Let go, and the width is saved as SilverBullet's own size: `![[photo.png|Photo|300]]`.
 

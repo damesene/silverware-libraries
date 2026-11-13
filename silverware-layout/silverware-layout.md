@@ -2,7 +2,7 @@
 name: Library/damesene/silverware-layout
 tags: meta/library
 version: 1.0.0
-description: "Silverware Layout: The width of a page's text (its own or a default for every page) and of its tables, databases and charts, wider or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll."
+description: "Silverware Layout: Columns in a page (/grid), the width of a page's text (its own or a default for every page) and of its tables, databases, charts and grids, wider or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll."
 files:
 - silverware-layout.js
 - silverware-layout-init.md
@@ -11,7 +11,7 @@ files:
 ---
 # Silverware Layout
 
-The layout of your pages: how wide a page's text is, how wide each of its tables, databases and charts is, and how large the editor's font is. Give one page a wider text (a page of tables), all of them a width of your own without touching your theme, one table or chart more room than the text has, or zoom the text with Ctrl + scroll.
+The layout of your pages: columns side by side, how wide a page's text is, how wide each of its tables, databases and charts is, and how large the editor's font is. Give one page a wider text (a page of tables), all of them a width of your own without touching your theme, one table or chart more room than the text has, or zoom the text with Ctrl + scroll.
 
 ## Page width
 
@@ -47,6 +47,39 @@ A width is never wider than the editor: in a narrower window, or on a phone, it 
 - a chart in its block, a comment `%% layout.width: 1200` (in the Mermaid format; a format of your own that keeps no such line says so, and the width holds until the chart is drawn again).
 
 Without Silverware Layout, each is as wide as the text, its width still kept.
+
+## Columns
+
+Put part of a page side by side: type **/grid** where it should go. A grid of two columns comes in, the cursor in the first:
+
+```markdown
+<grid>
+<column>
+
+The first column: any markdown, lists, links, images.
+
+</column>
+<column>
+
+The second column.
+
+</column>
+</grid>
+```
+
+- **Edit a column where it is**: click into it, and its markdown shows in a field of its own, the rest of the grid as it was. Click elsewhere, or press Esc (or Ctrl+Enter), and it is saved. A click on a link or a tag in it still follows it.
+- **See the raw text**: Alt+click a column, and the page shows its markdown, the cursor where you clicked.
+- **More columns, or other widths**: give the grid a `columns` attribute: `<grid columns="3">` for three of the same width, or their widths, `<grid columns="1fr 2fr">` (the second twice as wide), `30% 70%`, `200px 1fr`. More columns than you give make more rows: nine columns in `<grid columns="3">` are three rows of three, a gallery of images. Without it, each `<column>` is a column of its own, four at most in a row.
+- **The grid's width**: point at it, and the bar beside its right edge makes it wider or narrower, as a table's (see *A widget's width* above); it is kept on its line, `<grid width="1100">`.
+- **On a phone** (an editor narrower than the setting *Narrowest editor laid out*), the columns are shown one under another.
+
+Keep the blank lines round a column's text, as /grid writes them: without them other markdown renderers show its markdown as plain text. Without Silverware Layout, and in other renderers (GitHub, VS Code), the columns are shown one under another and the `<grid>` and `<column>` lines as text: nothing is lost.
+
+What you should know:
+
+- A grid ends at the first line `</grid>`, wherever it is: a code block in a column that holds such a line ends the grid there. Grids in grids are not supported yet.
+- Links and images in a grid show in their pages' backlinks, and a renamed page or image is renamed in a grid too (its hashtags are not found yet).
+- A grid starts on a line of its own, not straight after a paragraph's line: leave a blank line before it (/grid does).
 
 ## Font size
 

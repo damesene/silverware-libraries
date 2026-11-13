@@ -1,13 +1,42 @@
 // @vitest-environment jsdom
 // SilverBullet's embeds as the assets find them (2.12.1, probed 2026-11-13): its widget's medium or its words that it
-// could not draw one; and media in markdown rendered outside the editor (a grid's cell), framed to be decorated alike.
+// could not draw one; and media and links drawn outside the editor (a grid's cell) as the one drawing them tells
+// (shared/rendered.ts), each medium framed to be decorated alike.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { pageWriter } from "../../../../shared/pages/writer.ts";
+import { type Rendered, RENDERED_VERSION, type RenderedItem } from "../../../../shared/rendered.ts";
 import type { Bridge } from "../../bridge.ts";
 import { drawnLink, drawnTarget, silverBulletAssetHost } from "./assets.ts";
 import { silverBulletPlatform } from "./platform.ts";
 
 const bridge = { getText: () => "", getCurrentPage: () => "P", replaceRange: () => undefined, readPage: () => "", writePage: () => undefined, listPages: () => [], flash: () => undefined } as unknown as Bridge;
+
+/** What is drawn outside the editor, told as a test says: its items and ranges, told again by `tell` */
+function renderedOf(items: RenderedItem[] = [], ranges: { from: number; to: number }[] = []) {
+  const listeners = new Set<(items: readonly RenderedItem[]) => void>();
+  const rendered: Rendered = {
+    version: RENDERED_VERSION,
+    items: () => items,
+    ranges: () => ranges,
+    onChange: (listener) => {
+      listeners.add(listener);
+      return () => void listeners.delete(listener);
+    },
+  };
+  const tell = (next: RenderedItem[]) => {
+    items = next;
+    for (const listener of listeners) listener(next);
+  };
+  return { rendered, tell };
+}
+const hostOf = (rendered: Rendered = renderedOf().rendered) => silverBulletAssetHost(bridge, pageWriter(silverBulletPlatform(bridge)), document, rendered);
+
+/** A cell as a grid draws it, its elements as the one drawing tells of them */
+function cellOf(html: string) {
+  const cell = Object.assign(document.createElement("div"), { innerHTML: html });
+  document.body.append(cell);
+  return cell;
+}
 
 const stops: (() => void)[] = [];
 afterEach(() => {
@@ -29,45 +58,43 @@ describe("SilverBullet's embeds found", () => {
     expect(drawnTarget(widget)).toBeUndefined();
   });
 
-  it("finds SilverBullet's widgets and, in a block rendered outside the editor, puts each medium in a frame of its own", async () => {
-    const host = silverBulletAssetHost(bridge, pageWriter(silverBulletPlatform(bridge)), document);
+  it("finds SilverBullet's widgets, and puts each medium told of outside the editor in a frame of its own", async () => {
+    const { rendered, tell } = renderedOf();
+    const host = hostOf(rendered);
     const found: string[][] = [];
     const widget = Object.assign(document.createElement("div"), { className: "sb-inline-content", innerHTML: '<img src=".fs/a.png">' });
     document.body.append(widget);
-    stops.push(host.watch((drawn) => found.push(drawn.map((one) => `${one.frame.className}:${one.target}`))));
-    expect(found).toEqual([["sb-inline-content:a.png"]]);
-    const cell = Object.assign(document.createElement("div"), { innerHTML: '<span class="p"><img src=".fs/b.png" data-pos="0"></span>' });
-    cell.setAttribute("data-swl-rendered", "");
-    document.body.append(cell);
-    await vi.waitFor(() => expect(found).toHaveLength(2));
-    expect(found[1]).toEqual(["swl-asset-frame:b.png"]);
-    expect(cell.querySelector(".swl-asset-frame > img")).not.toBeNull();
+    stops.push(host.watch((drawn) => found.push(drawn.map((one) => `${one.frame.className}:${one.target}:${one.position?.() ?? "-"}`))));
+    expect(found).toEqual([["sb-inline-content:a.png:-"]]);
+    const cell = cellOf('<span class="p"><img src=".fs/b.png"></span>');
+    const medium = cell.querySelector("img")!;
+    tell([{ kind: "embed", element: medium, target: "b.png", style: "wiki", position: 40, room: cell }]);
+    expect(found[1]).toEqual(["swl-asset-frame:b.png:40"]);
+    expect(cell.querySelector(".swl-asset-frame > img")).toBe(medium);
   });
 
-  it("frames the place of an embed SilverBullet's HTML draws none of, its target its own", async () => {
-    const host = silverBulletAssetHost(bridge, pageWriter(silverBulletPlatform(bridge)), document);
+  it("frames the place of an embed SilverBullet's HTML draws none of, no medium of the host's in it", () => {
+    const cell = cellOf('<span class="p"><span class="swl-embed" data-swl-embed="archive.zip">![[archive.zip]]</span></span>');
+    const place = cell.querySelector<HTMLElement>(".swl-embed")!;
+    const { rendered } = renderedOf([{ kind: "embed", element: place, target: "archive.zip", style: "wiki", position: 47, room: cell }]);
     const found: string[][] = [];
-    stops.push(host.watch((drawn) => found.push(drawn.map((one) => `${one.target}:${one.native ? "native" : "none"}:${one.position?.()}`))));
-    const cell = Object.assign(document.createElement("div"), { innerHTML: '<span class="p"><span class="swl-embed" data-swl-embed="archive.zip" data-pos="7"></span></span>' });
-    cell.setAttribute("data-swl-rendered", "");
-    cell.setAttribute("data-swl-pos", "40");
-    document.body.append(cell);
-    await vi.waitFor(() => expect(found).toEqual([["archive.zip:none:47"]]));
+    stops.push(hostOf(rendered).watch((drawn) => found.push(drawn.map((one) => `${one.target}:${one.native ? "native" : "none"}:${one.position?.()}:${one.room?.() === cell}`))));
+    expect(found).toEqual([["archive.zip:none:47:true"]]);
   });
 });
 
-describe("a block rendered outside the editor given its place later", () => {
-  it("offers its media again, their places known now", async () => {
-    const host = silverBulletAssetHost(bridge, pageWriter(silverBulletPlatform(bridge)), document);
+describe("what is drawn outside the editor, told again", () => {
+  it("offers its media again with their places as told last, one frame each, and gives its ranges", () => {
+    const cell = cellOf('<span class="p"><img src=".fs/b.png"></span>');
+    const medium = cell.querySelector("img")!;
+    const { rendered, tell } = renderedOf([], [{ from: 61, to: 85 }]);
+    const host = hostOf(rendered);
     const found: (number | undefined)[][] = [];
     stops.push(host.watch((drawn) => found.push(drawn.map((one) => one.position?.()))));
-    const cell = Object.assign(document.createElement("div"), { innerHTML: '<span class="p"><img src=".fs/b.png"></span>' });
-    cell.setAttribute("data-swl-rendered", "");
-    document.body.append(cell);
-    await vi.waitFor(() => expect(found).toEqual([[undefined]]));
-    cell.setAttribute("data-swl-pos", "61");
-    cell.setAttribute("data-swl-end", "85");
-    await vi.waitFor(() => expect(found).toEqual([[undefined], [61]]));
+    tell([{ kind: "embed", element: medium, target: "b.png", style: "wiki", position: 61, room: cell }]);
+    tell([{ kind: "embed", element: medium, target: "b.png", style: "wiki", position: 70, room: cell }]);
+    expect(found).toEqual([[61], [70]]);
+    expect(cell.querySelectorAll(".swl-asset-frame")).toHaveLength(1);
     expect(host.renderedRanges()).toEqual([{ from: 61, to: 85 }]);
   });
 });
@@ -81,7 +108,7 @@ describe("SilverBullet's links found", () => {
   });
 
   it("makes a file of the space of a link to one, resolved as SilverBullet resolves it; a page or a site none", () => {
-    const host = silverBulletAssetHost(bridge, pageWriter(silverBulletPlatform(bridge)), document);
+    const host = hostOf();
     const a = (target: string, style: "wiki" | "markdown" = "wiki") => host.linkAsset({ element: document.createElement("a"), target, style }, "Notes/Page");
     expect(a("Docs/report.pdf")).toMatchObject({ kind: "file", path: "Docs/report.pdf" });
     expect(a("report.pdf", "markdown")).toMatchObject({ kind: "file", path: "Notes/report.pdf" });
@@ -91,17 +118,24 @@ describe("SilverBullet's links found", () => {
     expect(a("https://example.com/a.pdf", "markdown")).toBeUndefined();
   });
 
-  it("offers each link once, the icon put into it no new one", async () => {
-    const host = silverBulletAssetHost(bridge, pageWriter(silverBulletPlatform(bridge)), document);
-    const found: string[][] = [];
-    stops.push(host.watchLinks((links) => found.push(links.map((one) => one.target))));
-    const cell = Object.assign(document.createElement("div"), { innerHTML: '<span class="p"><a class="wiki-link" data-ref="a.pdf" href="/a.pdf">a.pdf</a></span>' });
-    cell.setAttribute("data-swl-rendered", "");
-    document.body.append(cell);
-    await vi.waitFor(() => expect(found).toEqual([["a.pdf"]]));
-    cell.querySelector("a")!.prepend(document.createElement("span"));
+  it("offers each link once, a link in the editor by its widget, one outside it as told with its place", async () => {
+    const cell = cellOf('<span class="p"><a class="wiki-link" data-ref="a.pdf" href="/a.pdf">a.pdf</a></span>');
+    const link = cell.querySelector("a")!;
+    const { rendered, tell } = renderedOf();
+    const offered: { target: string; position?: () => number | undefined }[][] = [];
+    stops.push(hostOf(rendered).watchLinks((links) => offered.push([...links])));
+    const found = () => offered.map((links) => links.map((one) => `${one.target}:${one.position?.() ?? "-"}`));
+    const editor = Object.assign(document.createElement("div"), { className: "cm-content", innerHTML: '<a class="sb-wiki-link" href="b.pdf">b.pdf</a>' });
+    document.body.append(editor);
+    await vi.waitFor(() => expect(found()).toEqual([["b.pdf:-"]]));
+    tell([{ kind: "link", element: link, target: "a.pdf", style: "wiki", position: 12, room: cell }]);
+    tell([{ kind: "link", element: link, target: "a.pdf", style: "wiki", position: 15, room: cell }]);
+    // (Offered once, its place the one told last)
+    expect(found()).toEqual([["b.pdf:-"], ["a.pdf:15"]]);
+    // (Its icon put into the link: no new link)
+    editor.querySelector("a")!.prepend(document.createElement("span"));
     await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(found).toEqual([["a.pdf"]]);
+    expect(offered).toHaveLength(2);
   });
 });
 

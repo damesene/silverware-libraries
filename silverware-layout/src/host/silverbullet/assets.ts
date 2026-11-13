@@ -2,29 +2,28 @@
 // 2026-11-13: `.sb-inline-content` in the editor's content, its <img>, <video>, <audio> or <object> loading `.fs/<path>`,
 // or "Error: Unsupported content: <name>"; an embedded page's markdown is no medium and is left alone), its button bar
 // hidden (as on a grid: inline and important), a target resolved as SilverBullet resolves it, a file's URL, the
-// settings, an embed written through the page writer.
+// settings, an embed written through the page writer. What is drawn outside the editor (a grid's cells) is told by
+// the one drawing it (shared/rendered.ts: its media, its links, their places), never read from its HTML.
 import type { Asset } from "../../../../shared/assets.ts";
 import { type Embed, type EmbedChanges, resolveLinkPath } from "../../../../shared/markdown/embed.ts";
 import { pageChanges } from "../../../../shared/pages/changes.ts";
 import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
+import type { Rendered, RenderedItem } from "../../../../shared/rendered.ts";
 import { documentUrl } from "./platform.ts";
 
 const FRAME = ".sb-inline-content";
-// Markdown rendered outside the editor (a grid's cells: Silverware Layout's convention), its media plain elements:
-// each put in a frame of Silverware Layout's own to be decorated as SilverBullet's widget is; an embed SilverBullet's
-// HTML draws none of is a place there (./undrawn.ts), its target its `data-swl-embed`
-const RENDERED_MEDIA = "[data-swl-rendered] :is(img, video, audio, object, [data-swl-embed]):not(.swl-asset-frame > *, .swl-asset-icon *, .swl-asset-own, .swl-asset-own *)";
+// A medium drawn outside the editor (a grid's cell) is a plain element: put in a frame of Silverware Layout's own, to
+// be decorated as SilverBullet's widget is
 const OWN_FRAME = "swl-asset-frame";
 const MEDIA = "img, video, audio, object";
 const BARS = ".button-bar, .sb-widget-menu-bar";
 const UNSUPPORTED = /Unsupported content:\s*(.+)$/;
-// Links as SilverBullet draws them (2.12.1, probed 2026-11-13): in the editor a wiki link's widget `a.sb-wiki-link`
-// (its href the target as written; a widget, so an element put in it is no edit of the text); in markdown rendered
-// outside the editor (a grid's cell) a wiki link's `a.wiki-link` (its `data-ref` the target) and a markdown link's plain
-// `a`. A markdown link in the editor (`a.sb-link`) is the editor's own text, marked: left alone, as CodeMirror would take
-// an element put in it for an edit
-const LINKS = ".cm-content a.sb-wiki-link, [data-swl-rendered] a[href]";
+// Links as SilverBullet draws them in the editor (2.12.1, probed 2026-11-13): a wiki link's widget `a.sb-wiki-link`
+// (its href the target as written; a widget, so an element put in it is no edit of the text). A markdown link there
+// (`a.sb-link`) is the editor's own text, marked: left alone, as CodeMirror would take an element put in it for an
+// edit. Those drawn outside the editor (a grid's cell) are told (`Rendered`)
+const LINKS = ".cm-content a.sb-wiki-link";
 // A file of the space's name: an extension of its own, not a page's (`.md`)
 const FILE_NAME = /\.(?!md$)[a-z0-9]{1,8}$/i;
 const WEB = /^[a-z][a-z0-9+.-]*:/i;
@@ -43,13 +42,17 @@ export function drawnLink(element: HTMLElement): Link | undefined {
 }
 
 /** An embed drawn (src/assets/decorate.ts' `DrawnEmbed`, named apart: the host knows no area) */
-type Drawn = { readonly frame: HTMLElement; readonly target: string; readonly native: HTMLElement | undefined; readonly position?: () => number | undefined };
+type Drawn = {
+  readonly frame: HTMLElement;
+  readonly target: string;
+  readonly native: HTMLElement | undefined;
+  readonly position?: () => number | undefined;
+  readonly room?: () => HTMLElement | undefined;
+};
 type Write = { readonly text: string; readonly occurrence: number; readonly of: number; readonly changes: EmbedChanges };
 
 /** The target an embed's frame was drawn of: its medium's path in the space (or its URL), or the name it could not draw */
 export function drawnTarget(frame: HTMLElement): { readonly target: string; readonly native: HTMLElement | undefined } | undefined {
-  const place = frame.querySelector("[data-swl-embed]")?.getAttribute("data-swl-embed");
-  if (place) return { target: place, native: undefined };
   const native = frame.querySelector<HTMLElement>(MEDIA) ?? undefined;
   const source = native?.getAttribute("src") ?? native?.getAttribute("data");
   if (source) {
@@ -67,7 +70,12 @@ export function drawnTarget(frame: HTMLElement): { readonly target: string; read
   return unsupported ? { target: unsupported[1]!.trim(), native: undefined } : undefined;
 }
 
-export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: Document) {
+export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: Document, rendered: Rendered) {
+  // What is drawn outside the editor, as last told: each element's item (its place, its room)
+  const told = new WeakMap<HTMLElement, RenderedItem>();
+  const remember = (items: readonly RenderedItem[]) => {
+    for (const item of items) told.set(item.element, item);
+  };
   return {
     // (The function given back stops it)
     watch: (drawn: (embeds: readonly Drawn[]) => void): (() => void) => {
@@ -81,43 +89,47 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
           if (around) frames.add(around);
         }
         root.querySelectorAll<HTMLElement>(FRAME).forEach((frame) => frames.add(frame));
-        const rendered = root instanceof HTMLElement && root.matches(RENDERED_MEDIA) ? [root] : [];
-        for (const medium of [...rendered, ...root.querySelectorAll<HTMLElement>(RENDERED_MEDIA)]) {
-          const frame = doc.createElement("span");
-          frame.className = OWN_FRAME;
-          medium.replaceWith(frame);
-          frame.append(medium);
-          frames.add(frame);
-        }
         for (const frame of frames) {
           if (seen.has(frame)) continue;
           const target = drawnTarget(frame);
           // (Its content comes after the frame: looked at again as it does)
           if (!target) continue;
           seen.add(frame);
-          if (!frame.classList.contains(OWN_FRAME)) for (const bar of frame.parentElement?.querySelectorAll<HTMLElement>(BARS) ?? []) bar.style.setProperty("display", "none", "important");
-          found.push({ frame, ...target, ...(frame.classList.contains(OWN_FRAME) ? { position: () => renderedPosition(frame) } : {}) });
+          for (const bar of frame.parentElement?.querySelectorAll<HTMLElement>(BARS) ?? []) bar.style.setProperty("display", "none", "important");
+          found.push({ frame, ...target });
+        }
+        if (found.length) drawn(found);
+      };
+      // Media drawn outside the editor, as told: each in a frame of its own (once), offered with its place as told last
+      const offer = (items: readonly RenderedItem[]) => {
+        remember(items);
+        const found: Drawn[] = [];
+        for (const item of items) {
+          if (item.kind !== "embed") continue;
+          const medium = item.element;
+          let frame = medium.parentElement;
+          if (!frame?.classList.contains(OWN_FRAME)) {
+            frame = doc.createElement("span");
+            frame.className = OWN_FRAME;
+            medium.replaceWith(frame);
+            frame.append(medium);
+          }
+          const native = medium.matches(MEDIA) ? medium : undefined;
+          found.push({ frame, target: item.target, native, position: () => told.get(medium)?.position, room: () => told.get(medium)?.room });
         }
         if (found.length) drawn(found);
       };
       look(doc);
+      offer(rendered.items());
+      const stopTold = rendered.onChange(offer);
       const observer = new (doc.defaultView ?? window).MutationObserver((records) => {
-        const placed: Drawn[] = [];
-        for (const record of records) {
-          for (const node of record.addedNodes) if (node instanceof HTMLElement) look(node);
-          // A block rendered outside the editor given its place (later than its media came: its host read the page's
-          // text while it was still the page before): its media offered again, their places known now
-          if (record.type === "attributes" && record.target instanceof HTMLElement && record.target.matches("[data-swl-rendered]")) {
-            for (const frame of record.target.querySelectorAll<HTMLElement>(`.${OWN_FRAME}`)) {
-              const target = drawnTarget(frame);
-              if (target) placed.push({ frame, ...target, position: () => renderedPosition(frame) });
-            }
-          }
-        }
-        if (placed.length) drawn(placed);
+        for (const record of records) for (const node of record.addedNodes) if (node instanceof HTMLElement) look(node);
       });
-      observer.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-swl-pos"] });
-      return () => observer.disconnect();
+      observer.observe(doc.body, { childList: true, subtree: true });
+      return () => {
+        observer.disconnect();
+        stopTold();
+      };
     },
     // (Each link element offered once: Silverware Layout's icon put into it is no new link; the function given back stops it)
     watchLinks: (drawn: (links: readonly Link[]) => void): (() => void) => {
@@ -129,17 +141,33 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
           if (seen.has(element)) continue;
           seen.add(element);
           const link = drawnLink(element);
-          // (One in markdown rendered outside the editor found by its place, as a medium there is)
-          if (link?.target) found.push(element.closest("[data-swl-rendered]") ? { ...link, position: () => renderedPosition(element) } : link);
+          if (link?.target) found.push(link);
+        }
+        if (found.length) drawn(found);
+      };
+      // Links drawn outside the editor, as told (each once), their places as told last
+      const offered = new WeakSet<HTMLElement>();
+      const offer = (items: readonly RenderedItem[]) => {
+        remember(items);
+        const found: Link[] = [];
+        for (const item of items) {
+          if (item.kind !== "link" || offered.has(item.element)) continue;
+          offered.add(item.element);
+          found.push({ element: item.element, target: item.target, style: item.style, position: () => told.get(item.element)?.position });
         }
         if (found.length) drawn(found);
       };
       look(doc);
+      offer(rendered.items());
+      const stopTold = rendered.onChange(offer);
       const observer = new (doc.defaultView ?? window).MutationObserver((records) => {
         for (const record of records) for (const node of record.addedNodes) if (node instanceof HTMLElement) look(node);
       });
       observer.observe(doc.body, { childList: true, subtree: true });
-      return () => observer.disconnect();
+      return () => {
+        observer.disconnect();
+        stopTold();
+      };
     },
     // A file of the space a link points to (a wiki link's from the space's root, a markdown link's from the page's folder); a page or a site: none
     linkAsset: (link: Link, page: string): Asset | undefined => {
@@ -148,8 +176,7 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
       if (!FILE_NAME.test(target)) return undefined;
       return { kind: "file", path: target, url: documentUrl(target) };
     },
-    renderedRanges: () =>
-      [...doc.querySelectorAll<HTMLElement>("[data-swl-rendered][data-swl-pos][data-swl-end]")].map((block) => ({ from: Number(block.getAttribute("data-swl-pos")), to: Number(block.getAttribute("data-swl-end")) })),
+    renderedRanges: () => rendered.ranges(),
     pageText: async () => String(await bridge.getText()),
     pageName: async () => String(await bridge.getCurrentPage()),
     resolved: (embed: Embed, page: string): string => resolvedTarget(embed, page),
@@ -186,20 +213,6 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
     open: (url: string): void => void (doc.defaultView ?? window).open(url, "_blank", "noopener"),
     problem: (message: string): void => void bridge.flash(message, "error"),
   };
-}
-
-/**
- * Where a medium in markdown rendered outside the editor is in the page: its block's place (`data-swl-pos`, the
- * convention) and its own offset in the block's markdown (SilverBullet's `data-pos`, which it leaves out at 0); its
- * block's place not known yet: none
- */
-function renderedPosition(frame: HTMLElement): number | undefined {
-  const block = frame.closest<HTMLElement>("[data-swl-rendered]");
-  const base = block?.getAttribute("data-swl-pos");
-  if (!block || base === null || base === undefined) return undefined;
-  const marked = frame.querySelector("[data-pos]") ?? frame.closest("[data-pos]");
-  const own = marked && block.contains(marked) ? Number(marked.getAttribute("data-pos")) || 0 : 0;
-  return Number(base) + own;
 }
 
 /** An embed's (or a link's) target as SilverBullet resolves it: a wiki link's from the space's root, a markdown link's from the page's folder */

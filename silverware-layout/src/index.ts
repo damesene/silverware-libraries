@@ -15,6 +15,7 @@ import { AssetDecorator, type AssetHost } from "./assets/decorate.ts";
 import { assetProvider } from "./assets/provider.ts";
 import { mediaTab } from "./assets/ui/mediatab.ts";
 import { ASSETS_PATH, readAssetSettings, storedAssetSettings } from "./assets/model/settings.ts";
+import { RENDERED_VERSION, type Rendered, type RenderedItem } from "../../shared/rendered.ts";
 import { silverBulletAssetHost } from "./host/silverbullet/assets.ts";
 import { gridInsertion } from "./grid/core/insert.ts";
 import { gridLinks } from "./grid/core/links.ts";
@@ -51,10 +52,25 @@ const assetRegistry = new AssetRegistry((message) => app.problem(message));
 registerBuiltins(assetRegistry);
 
 /** Silverware Layout's API, as its API page hands it to the widget plugins (`silverware.layout.api`): the widgets' providers, and `assets` (shared/assets.ts) */
-export const api = Object.assign(registry.api(), { assets: assetRegistry.api() });
+export const api = Object.assign(registry.api(), { assets: assetRegistry.api(), rendered: renderedApi() });
 
 // The page's grids (docs/silverware-layout-grid.md), made as the init page hands SilverBullet's API over
 let grids: Grids | undefined;
+// Who is told what the grids draw (shared/rendered.ts), the grids made or not yet
+const renderedListeners = new Set<(items: readonly RenderedItem[]) => void>();
+
+/** What the grids draw outside the editor and where it is in the page, for another plugin to decorate (shared/rendered.ts) */
+function renderedApi(): Rendered {
+  return {
+    version: RENDERED_VERSION,
+    items: () => grids?.rendered.items() ?? [],
+    ranges: () => grids?.rendered.ranges() ?? [],
+    onChange: (listener) => {
+      renderedListeners.add(listener);
+      return () => void renderedListeners.delete(listener);
+    },
+  };
+}
 // The embedded media decorated, made as the API is handed over
 let assets: AssetDecorator | undefined;
 
@@ -74,6 +90,9 @@ export async function init(bridge: Bridge): Promise<void> {
   if (grids) grids.useHost(host);
   else {
     grids = new Grids(document, host);
+    grids.rendered.onChange((items) => {
+      for (const listener of renderedListeners) listener(items);
+    });
     grids.start();
     // A grid's width laid out as any widget's, registered as a widget plugin registers
     registry.register(gridProvider(grids));
@@ -89,7 +108,7 @@ export async function init(bridge: Bridge): Promise<void> {
       () => (current ? readSyntaxSettings(current) : { hideWidgets: true, clickPlacesCursor: true }),
     );
   }
-  const raw = silverBulletAssetHost(bridge, writer, document);
+  const raw = silverBulletAssetHost(bridge, writer, document, api.rendered);
   const assetHost: AssetHost = { ...raw, settings: async () => readAssetSettings(await raw.settings()).settings };
   if (assets) assets.useHost(assetHost);
   else {

@@ -2,8 +2,8 @@
 // host draws it in, decorated (not a card: a card has no size), its width kept as SilverBullet's own size in the
 // embed (`|300`), where it stays as it changes the user's setting (`anchor`: at the text's start by default).
 // Pixels only: SilverBullet's `%` is of the medium's box, Silverware Layout's of the editor's pane, so a width in % is
-// left to SilverBullet, and one Layout gives in % or `full` is written as the pixels it shows. In markdown rendered
-// outside the editor (a grid's cell) its room is that block: its quarters its snaps, no wider.
+// left to SilverBullet, and one Layout gives in % or `full` is written as the pixels it shows. Drawn outside the editor
+// (a grid's cell) its room is that box: its quarters its snaps, no wider.
 import type { LayoutChanges, LayoutEntries, LayoutProvider } from "../../../shared/layout.ts";
 import type { AssetDecorator } from "./decorate.ts";
 
@@ -24,7 +24,7 @@ export function assetProvider(assets: AssetDecorator): LayoutProvider {
       return assets.writeWidth(element as HTMLElement, pixels);
     },
     anchor: (element) => assets.sizeOf(element as HTMLElement)?.anchor ?? "start",
-    // In markdown rendered outside the editor (a grid's cell, Silverware Layout's convention): that block its room
-    room: (element) => element.closest("[data-swl-rendered]") ?? undefined,
+    // Drawn outside the editor (a grid's cell): that box its room, as the one drawing it told
+    room: (element) => assets.roomOf(element as HTMLElement),
   };
 }

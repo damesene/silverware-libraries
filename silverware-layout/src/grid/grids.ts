@@ -12,6 +12,8 @@ import { type Grid, readGridBody, readGrids } from "../../../shared/markdown/gri
 import { gridsOfBody } from "./core/match.ts";
 import { positionInCell } from "./core/position.ts";
 import { columnTemplate } from "./model/columns.ts";
+import { RENDERED_VERSION, type Rendered, type RenderedItem, type RenderedRange } from "../../../shared/rendered.ts";
+import { type Drawn, drawnIn, itemsOf } from "./drawn.ts";
 import { addCellMenus, type CellAction } from "./ui/cellmenu.ts";
 import { caretWord, editCell } from "./ui/celleditor.ts";
 import { drawGrid, plainCell, showColumns } from "./ui/view.ts";
@@ -61,17 +63,43 @@ const OWN_CLICKS = "a, button, input, textarea, select, label, [data-ref]";
 const same = (text: string) => text.replace(/\r\n/g, "\n").replace(/\s+$/, "");
 
 /**
- * Each cell marked with where its markdown is in the page (`data-swl-pos`, `data-swl-end`): Silverware Layout's
- * convention for markdown rendered outside the editor, by which what is in it (an embed, its `data-pos` its offset in
- * the cell) is found in the page's text, knowing no grid
+ * Each cell marked with where its markdown is in the page (`data-swl-pos`, `data-swl-end`); whether any changed
+ * (what the grid drew is told again then: shared/rendered.ts). Read by no one else: what is drawn and where is told
  */
-function markPlaces(element: HTMLElement, grid: Grid): void {
+function markPlaces(element: HTMLElement, grid: Grid): boolean {
+  let changed = false;
   element.querySelectorAll<HTMLElement>(":scope > .swl-grid-cell").forEach((cellElement, index) => {
     const cell = grid.cells[index];
     if (!cell) return;
-    if (cellElement.getAttribute("data-swl-pos") !== String(cell.contentFrom)) cellElement.setAttribute("data-swl-pos", String(cell.contentFrom));
-    if (cellElement.getAttribute("data-swl-end") !== String(cell.contentTo)) cellElement.setAttribute("data-swl-end", String(cell.contentTo));
+    if (cellElement.getAttribute("data-swl-pos") !== String(cell.contentFrom)) {
+      cellElement.setAttribute("data-swl-pos", String(cell.contentFrom));
+      changed = true;
+    }
+    if (cellElement.getAttribute("data-swl-end") !== String(cell.contentTo)) {
+      cellElement.setAttribute("data-swl-end", String(cell.contentTo));
+      changed = true;
+    }
   });
+  return changed;
+}
+
+/** `then` once an element is in the page: watched for a while, as a host puts what a renderer gives into the page a while later */
+function whenConnected(element: HTMLElement, then: () => void, within = 30_000): void {
+  if (element.isConnected) return then();
+  const doc = element.ownerDocument;
+  const win = doc.defaultView;
+  if (!win || !doc.body) return;
+  const observer = new win.MutationObserver(() => {
+    if (!element.isConnected) return;
+    stop();
+    then();
+  });
+  const timer = win.setTimeout(() => stop(), within);
+  const stop = () => {
+    observer.disconnect();
+    win.clearTimeout(timer);
+  };
+  observer.observe(doc.body, { childList: true, subtree: true });
 }
 
 /** Whether two sets of attributes are the same */
@@ -86,6 +114,22 @@ export class Grids {
   private readonly bodies = new WeakMap<HTMLElement, string>();
   // Each grid drawn, its attributes as the page's text had them when last read (asked synchronously: its width)
   private readonly attributes = new WeakMap<HTMLElement, Attributes>();
+  // Each grid drawn: what it drew in its cells (taken as drawn), and the grid in the page's text it was last found as
+  private readonly drawnItems = new WeakMap<HTMLElement, readonly Drawn[]>();
+  private readonly placed = new WeakMap<HTMLElement, Grid>();
+  // What is drawn changed since last told (a grid drawn or placed anew), and who is told
+  private changedSinceTold = false;
+  private readonly listeners = new Set<(items: readonly RenderedItem[]) => void>();
+  /** What the grids drew in their cells and where it is in the page, for another to decorate (shared/rendered.ts) */
+  readonly rendered: Rendered = {
+    version: RENDERED_VERSION,
+    items: () => this.items(),
+    ranges: () => this.ranges(),
+    onChange: (listener) => {
+      this.listeners.add(listener);
+      return () => void this.listeners.delete(listener);
+    },
+  };
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
   // The last press in a cell: its cell, where it was, the caret there
   private pressed: { readonly cell: HTMLElement; readonly x: number; readonly y: number; readonly caret: Caret | undefined } | undefined;
@@ -156,13 +200,20 @@ export class Grids {
     const element = drawGrid(this.doc, columnTemplate(attributes.columns, cells.length), html);
     this.bodies.set(element, body);
     this.attributes.set(element, attributes);
+    // What it drew, before anything else touches it (another may frame a medium to decorate it)
+    this.drawnItems.set(element, drawnIn(element));
+    this.changedSinceTold = true;
     // Where its cells are in the page (the first grid of its body; set again as it is found among its alike)
-    if (first) markPlaces(element, first);
+    if (first) {
+      markPlaces(element, first);
+      this.placed.set(element, first);
+    }
     // Each cell's "…": what can be done with it and with the grid
     if (this.host.changeCells) addCellMenus(this.doc, element, () => ({ columns: this.attributesOf(element).columns, cells: cells.length }), (cell, action) => void this.cellAction(element, cell, action));
     this.host.settle?.(element);
-    // In the page, its order among the grids of its body is known: its own attributes then
+    // In the page, its order among the grids of its body is known: its own attributes then (and what it drew told)
     this.refreshSoon();
+    whenConnected(element, () => this.refreshSoon());
     return element;
   }
 
@@ -191,11 +242,42 @@ export class Grids {
       const found = this.found(text, element);
       if (!found) continue;
       showColumns(element, columnTemplate(found.grid.attributes.columns, element.querySelectorAll(":scope > .swl-grid-cell").length));
-      markPlaces(element, found.grid);
+      if (markPlaces(element, found.grid)) this.changedSinceTold = true;
+      this.placed.set(element, found.grid);
       if (!sameAttributes(this.attributes.get(element), found.grid.attributes)) changed = true;
       this.attributes.set(element, found.grid.attributes);
     }
     if (changed) this.onAttributes?.();
+    this.tell();
+  }
+
+  /** What the grids in the page drew, their places known */
+  private items(): RenderedItem[] {
+    return this.drawn().flatMap((element) => {
+      const grid = this.placed.get(element);
+      const drawn = this.drawnItems.get(element);
+      return grid && drawn ? itemsOf(element, drawn, grid) : [];
+    });
+  }
+
+  /** The ranges of the page's text the grids in the page drew, their cells' markdown */
+  private ranges(): RenderedRange[] {
+    return this.drawn().flatMap((element) => this.placed.get(element)?.cells.map((cell) => ({ from: cell.contentFrom, to: cell.contentTo })) ?? []);
+  }
+
+  /** Who listens told of what is drawn, where it changed since last told and some of it is in the page */
+  private tell(): void {
+    if (!this.changedSinceTold || !this.listeners.size) return;
+    const items = this.items();
+    if (!this.drawn().some((element) => this.placed.has(element))) return;
+    this.changedSinceTold = false;
+    for (const listener of this.listeners) {
+      try {
+        listener(items);
+      } catch (error) {
+        console.error("Silverware Layout: a listener of what grids draw failed", error);
+      }
+    }
   }
 
   /** A grid drawn's attributes as last read (none drawn: none) */

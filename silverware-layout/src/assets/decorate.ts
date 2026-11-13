@@ -20,8 +20,10 @@ export type DrawnEmbed = {
   readonly frame: HTMLElement;
   readonly target: string;
   readonly native: HTMLElement | undefined;
-  // Where it is in the page, where the host knows (a medium in markdown rendered outside the editor: its block's place and its own offset in it)
+  // Where it is in the page, where the host knows (a medium in markdown rendered outside the editor: as told by the one drawing it)
   readonly position?: () => number | undefined;
+  // The box it is drawn in, where it is not the page's text (a grid's cell): a width given to it a share of that
+  readonly room?: () => HTMLElement | undefined;
 };
 
 /** A link drawn by the host (`[[report.pdf]]`, `[the report](report.pdf)`): its element, its target as written, its form */
@@ -230,6 +232,11 @@ export class AssetDecorator {
     const frames = [...this.doc.querySelectorAll<HTMLElement>("[data-swl-asset-target]")];
     for (const link of this.links) if (!link.element.isConnected) this.links.delete(link);
     await Promise.all([this.decorate(frames.flatMap((frame) => this.drawn.get(frame) ?? [])), this.decorateLinks([...this.links])]);
+  }
+
+  /** A frame decorated: the box it is drawn in, where it is not the page's text (a grid's cell) */
+  roomOf(frame: HTMLElement): HTMLElement | undefined {
+    return this.drawn.get(frame)?.room?.();
   }
 
   /** A frame decorated: its width as its embed keeps it (none: none), where it stays */

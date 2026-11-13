@@ -339,3 +339,30 @@ describe("a task in a cell", () => {
     expect(grid.querySelector("textarea")).toBeNull();
   });
 });
+
+describe("what a grid draws, told", () => {
+  it("tells its media and links once it is in the page and placed, with their places in the page and their cell", async () => {
+    const cellBody = "<column>\n\nSee [[a.pdf]] and\n![[cat.png]]\n\n</column>\n<column>\n\nRight\n\n</column>";
+    const text = `# Page\n\n<grid>\n${cellBody}\n</grid>\n`;
+    const { gridHost } = host(text);
+    // (The host's rendering of the first cell: a link and an image, each marked with its offset in the cell)
+    const grids = new Grids(document, {
+      ...gridHost,
+      renderMarkdown: async (markdown) =>
+        markdown.startsWith("See") ? `<span class="p">See <a href="/a.pdf" data-pos="4">a.pdf</a> and<br><img src=".fs/cat.png" data-pos="${markdown.indexOf("![[")}"></span>` : `<span class="p">${markdown}</span>`,
+    });
+    const told: string[][] = [];
+    grids.rendered.onChange((items) => told.push(items.map((one) => `${one.kind}:${one.target}:${one.position}:${one.room.getAttribute("data-swl-cell")}`)));
+    const grid = await grids.render(cellBody);
+    // (Not in the page yet: nothing told)
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(told).toEqual([]);
+    document.body.append(grid);
+    await vi.waitFor(() => expect(told).toHaveLength(1));
+    expect(told[0]).toEqual([`embed:cat.png:${text.indexOf("![[cat")}:0`, `link:a.pdf:${text.indexOf("[[a.pdf")}:0`]);
+    expect(grids.rendered.ranges()).toEqual(readGrids(text)[0]!.cells.map((cell) => ({ from: cell.contentFrom, to: cell.contentTo })));
+    // Drawn again as the page is edited, nothing moved: nothing told
+    await grids.refresh();
+    expect(told).toHaveLength(1);
+  });
+});

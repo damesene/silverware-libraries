@@ -39,6 +39,8 @@ describe("SilverBullet's grid host", () => {
     expect(await host.writeCell({ body: "<column>\nA\n</column>", occurrence: 0, of: 1, cell: 0, content: "B" })).toBeUndefined();
     expect(state.text).toBe("<grid>\n<column>\n\nB\n\n</column>\n</grid>\n");
     expect(await host.writeCell({ body: "<column>\nA\n</column>", occurrence: 0, of: 1, cell: 0, content: "C" })).toBe("its grid changed since it was read: left alone");
+    expect(await host.writeAttributes({ body: "<column>\n\nB\n\n</column>", occurrence: 0, of: 1, attributes: { width: "900" } })).toBeUndefined();
+    expect(state.text.startsWith('<grid width="900">\n')).toBe(true);
     host.moveCursor(7);
     expect(state.moved).toEqual([[7, true]]);
     host.problem("no");

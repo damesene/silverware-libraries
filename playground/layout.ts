@@ -7,9 +7,11 @@ import { applyLayers } from "../shared/layers.ts";
 import stylePage from "../silverware-layout/silverware-layout-style.md";
 import type { LayoutChanges, LayoutEntries, LayoutProvider } from "../shared/layout.ts";
 import { layoutOf } from "../shared/layout.ts";
+import { writeAttributes } from "../shared/markdown/attributes.ts";
 import { readGrids } from "../shared/markdown/grid.ts";
 import { Registry } from "../silverware-layout/src/core/registry.ts";
 import { Grids } from "../silverware-layout/src/grid/grids.ts";
+import { gridProvider } from "../silverware-layout/src/grid/provider.ts";
 import { markNarrow, paneWidth, showPaneWidth } from "../silverware-layout/src/host/marks.ts";
 import { silverBulletPage } from "../silverware-layout/src/host/silverbullet/dom.ts";
 import { DEFAULT_MIN_PANE_WIDTH, DEFAULT_GUIDES, type Guide } from "../silverware-layout/src/model/settings.ts";
@@ -97,7 +99,8 @@ showKept();
 // renderer marks it), its columns read from the page's text
 const GRID_BODY = "<column>\n\n**Left** column, with a [[Link]].\n\nA second paragraph.\n\n</column>\n<column>\n\nThe **right** column.\n\n</column>";
 let gridPage = `${LOREM}\n\n<grid columns="1fr 2fr">\n${GRID_BODY}\n</grid>\n`;
-const gridFrame = Object.assign(document.createElement("div"), { className: "pg-grid-frame" });
+// (The frame as SilverBullet's, given the class the init page gives it: the widget Silverware Layout lays out)
+const gridFrame = Object.assign(document.createElement("div"), { className: "pg-grid-frame swl-grid-widget" });
 /** The grid drawn anew of the page's text, as SilverBullet draws it after its body changed */
 const drawGrid = () => void grids.render(readGrids(gridPage)[0]!.body).then((grid) => gridFrame.replaceChildren(grid));
 const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -126,10 +129,23 @@ const grids = new Grids(document, {
     setTimeout(drawGrid, 30);
     return undefined;
   },
+  writeAttributes: async (write) => {
+    const grid = readGrids(gridPage).filter((one) => one.body === write.body)[write.occurrence];
+    if (!grid) return "its grid changed since it was read: left alone";
+    const attributes: Record<string, string> = { ...grid.attributes };
+    for (const [name, value] of Object.entries(write.attributes)) {
+      if (value === null) delete attributes[name];
+      else attributes[name] = value;
+    }
+    const lineEnd = gridPage.indexOf("\n", grid.from);
+    gridPage = gridPage.slice(0, grid.from) + `<grid${writeAttributes(attributes)}>` + gridPage.slice(lineEnd);
+    return undefined;
+  },
   moveCursor: (at) => flash(`The raw text shown, the cursor at ${at}: “${gridPage.slice(at, at + 20)}…”`, "info"),
   problem: (message) => flash(message, "error"),
 });
 grids.start();
+layoutOf(registry.api()).register(gridProvider(grids));
 content.append(gridFrame, line(LOREM));
 drawGrid();
 

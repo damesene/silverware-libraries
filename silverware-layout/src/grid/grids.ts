@@ -7,6 +7,7 @@
 // A click in a cell edits its markdown in place, written when the cell is left (one edit); an Alt+click shows the raw
 // text with the cursor where the click was. Which of the page's grids a grid drawn is: the one of its body, by its
 // order among the grids of that body drawn (core/match.ts).
+import type { Attributes } from "../../../shared/markdown/attributes.ts";
 import { type Grid, readGridBody } from "../../../shared/markdown/grid.ts";
 import { gridsOfBody } from "./core/match.ts";
 import { positionInCell, wordAt } from "./core/position.ts";
@@ -17,6 +18,9 @@ import { drawGrid, plainCell, showColumns } from "./ui/view.ts";
 /** A cell to write: the grid by its body as read and its place among those alike, the cell, its new markdown */
 export type CellWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly cell: number; readonly content: string };
 
+/** A grid's attributes to write (a value, or null: taken off), the grid found as a cell's is */
+export type AttributesWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly attributes: Readonly<Record<string, string | null>> };
+
 /** What the grids ask of the host whose page they are in */
 export type GridHost = {
   /** A cell's markdown rendered as the host renders a page (its elements marked with `data-pos`, their offsets in it) */
@@ -25,6 +29,8 @@ export type GridHost = {
   pageText(): Promise<string>;
   /** A cell's markdown written into the page (one edit); why not, as text */
   writeCell(write: CellWrite): Promise<string | undefined>;
+  /** A grid's attributes written on its `<grid>` line (one edit); why not, as text */
+  writeAttributes(write: AttributesWrite): Promise<string | undefined>;
   /** The page's cursor put at an offset in its text, the raw text shown there */
   moveCursor(at: number): void;
   /** A problem said to the user */
@@ -41,11 +47,22 @@ const OWN_CLICKS = "a, button, input, textarea, select, label, [data-ref]";
 /** A body or a cell's markdown as compared: its line breaks LF, no blank lines at its end */
 const same = (text: string) => text.replace(/\r\n/g, "\n").replace(/\s+$/, "");
 
+/** Whether two sets of attributes are the same */
+function sameAttributes(a: Attributes | undefined, b: Attributes): boolean {
+  if (!a) return false;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key]);
+}
+
 export class Grids {
   // Each grid drawn, its body (what it is found in the page by)
   private readonly bodies = new WeakMap<HTMLElement, string>();
+  // Each grid drawn, its attributes as the page's text had them when last read (asked synchronously: its width)
+  private readonly attributes = new WeakMap<HTMLElement, Attributes>();
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
   private started = false;
+  /** Told as a grid drawn gets other attributes than it had (its width typed by hand: laid out again) */
+  onAttributes: (() => void) | undefined;
 
   constructor(
     private readonly doc: Document,
@@ -80,8 +97,10 @@ export class Grids {
       Promise.all(cells.map((cell) => this.host.renderMarkdown(cell.content).catch(() => plainCell(this.doc, cell.content)))),
       this.host.pageText().catch(() => ""),
     ]);
-    const element = drawGrid(this.doc, columnTemplate(gridsOfBody(text, body)[0]?.attributes.columns, cells.length), html);
+    const attributes = gridsOfBody(text, body)[0]?.attributes ?? {};
+    const element = drawGrid(this.doc, columnTemplate(attributes.columns, cells.length), html);
     this.bodies.set(element, body);
+    this.attributes.set(element, attributes);
     this.host.settle?.(element);
     // In the page, its order among the grids of its body is known: its own attributes then
     this.refreshSoon();
@@ -94,10 +113,37 @@ export class Grids {
     if (!drawn.length) return;
     const text = await this.host.pageText().catch(() => undefined);
     if (text === undefined) return;
+    let changed = false;
     for (const element of drawn) {
       const found = this.found(text, element);
-      if (found) showColumns(element, columnTemplate(found.grid.attributes.columns, element.querySelectorAll(":scope > .swl-grid-cell").length));
+      if (!found) continue;
+      showColumns(element, columnTemplate(found.grid.attributes.columns, element.querySelectorAll(":scope > .swl-grid-cell").length));
+      if (!sameAttributes(this.attributes.get(element), found.grid.attributes)) changed = true;
+      this.attributes.set(element, found.grid.attributes);
     }
+    if (changed) this.onAttributes?.();
+  }
+
+  /** A grid drawn's attributes as last read (none drawn: none) */
+  attributesOf(element: HTMLElement): Attributes {
+    return this.attributes.get(element) ?? {};
+  }
+
+  /** A grid drawn's attributes written (a value, or null: taken off); why not, as text */
+  async writeAttributes(element: HTMLElement, attributes: Readonly<Record<string, string | null>>): Promise<string | undefined> {
+    const text = await this.host.pageText().catch(() => undefined);
+    const found = text === undefined ? undefined : this.found(text, element);
+    if (!found) return "this grid changed in the page since it was drawn";
+    const problem = await this.host.writeAttributes({ body: found.grid.body, occurrence: found.occurrence, of: found.of, attributes });
+    if (problem) return problem;
+    // As written (no new drawing comes: the body is the same)
+    const kept: Record<string, string> = { ...this.attributesOf(element) };
+    for (const [name, value] of Object.entries(attributes)) {
+      if (value === null) delete kept[name];
+      else kept[name] = value;
+    }
+    this.attributes.set(element, kept);
+    return undefined;
   }
 
   /** `refresh` a moment later, once (several asked at once: one) */

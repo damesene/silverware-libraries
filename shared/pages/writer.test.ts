@@ -350,6 +350,19 @@ describe("the page writer", () => {
     expect((await writer.plan(pageChanges().page("Crlf", (p) => p.grids.replaceCell("<column>\r\ny\r\nz\r\n</column>", 3, "x")).build())).skipped).toHaveLength(1);
   });
 
+  it("sets a grid's attributes on its <grid> line, the others kept, one taken off, a name refused", async () => {
+    const body = "<column>\nA\n</column>";
+    const { map, writer } = memory({ A: `<grid columns="1fr 2fr">\r\n${body.replace(/\n/g, "\r\n")}\r\n</grid>\r\n` });
+    await writer.write(pageChanges().page("A", (p) => p.grids.setAttributes(body, { width: "1100" })).build());
+    expect(map.get("A")!.split("\r\n")[0]).toBe('<grid columns="1fr 2fr" width="1100">');
+    await writer.write(pageChanges().page("A", (p) => p.grids.setAttributes(body, { width: null, columns: "3" })).build());
+    expect(map.get("A")).toBe(`<grid columns="3">\r\n<column>\r\nA\r\n</column>\r\n</grid>\r\n`);
+    const same = await writer.plan(pageChanges().page("A", (p) => p.grids.setAttributes(body, { columns: "3" })).build());
+    expect(same.pages).toEqual([]);
+    const bad = await writer.plan(pageChanges().page("A", (p) => p.grids.setAttributes(body, { "a b": "x" })).build());
+    expect(bad.skipped.map((one) => one.reason)).toEqual(['"a b" is no attribute\'s name (letters, digits, -, _, : and . only, not first a digit)']);
+  });
+
   it("closes a grid's cell left open as it writes it", async () => {
     const { map, writer } = memory({ A: "<grid>\n<column>\nOpen\n</grid>" });
     await writer.write(pageChanges().page("A", (p) => p.grids.replaceCell("<column>\nOpen", 0, "Shut")).build());

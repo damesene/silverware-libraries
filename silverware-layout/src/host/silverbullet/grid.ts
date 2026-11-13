@@ -17,6 +17,8 @@ const SETTLE_FRAMES = 60;
 
 /** A cell to write (src/grid/grids.ts' `CellWrite`, named here apart: the host knows no area) */
 type CellWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly cell: number; readonly content: string };
+/** A grid's attributes to write (src/grid/grids.ts' `AttributesWrite`) */
+type AttributesWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly attributes: Readonly<Record<string, string | null>> };
 
 export function silverBulletGridHost(bridge: Bridge, writer: PageWriter) {
   return {
@@ -29,6 +31,11 @@ export function silverBulletGridHost(bridge: Bridge, writer: PageWriter) {
     writeCell: async (write: CellWrite): Promise<string | undefined> => {
       const page = String(await bridge.getCurrentPage());
       const report = await writer.write(pageChanges().page(page, (p) => p.grids.replaceCell(write.body, write.cell, write.content, { occurrence: write.occurrence, of: write.of })).build());
+      return report.skipped[0]?.reason;
+    },
+    writeAttributes: async (write: AttributesWrite): Promise<string | undefined> => {
+      const page = String(await bridge.getCurrentPage());
+      const report = await writer.write(pageChanges().page(page, (p) => p.grids.setAttributes(write.body, write.attributes, { occurrence: write.occurrence, of: write.of })).build());
       return report.skipped[0]?.reason;
     },
     moveCursor: (at: number): void => {

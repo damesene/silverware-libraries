@@ -67,6 +67,11 @@ export class LayoutApp {
     private readonly registry: Registry,
   ) {}
 
+  /** Every widget laid out again as its entries keep it (a provider's entries changed outside a drag: typed by hand) */
+  layOutWidgets(): void {
+    this.widgetLayout?.widgets.layOutAll();
+  }
+
   /** A problem said to the user (the registry's, a widget's), the console's before a start */
   problem(message: string): void {
     if (this.state) this.state.store.flash(message, "error");

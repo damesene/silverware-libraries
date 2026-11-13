@@ -11,6 +11,7 @@ import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { Registry } from "./core/registry.ts";
 import { gridInsertion } from "./grid/core/insert.ts";
 import { Grids } from "./grid/grids.ts";
+import { gridProvider } from "./grid/provider.ts";
 import { silverBulletGridHost } from "./host/silverbullet/grid.ts";
 import { keepDeviceZoom, readDeviceZoom } from "./host/devicezoom.ts";
 import { silverBulletPage } from "./host/silverbullet/dom.ts";
@@ -53,6 +54,9 @@ export async function init(bridge: Bridge): Promise<void> {
   else {
     grids = new Grids(document, host);
     grids.start();
+    // A grid's width laid out as any widget's, registered as a widget plugin registers
+    registry.register(gridProvider(grids));
+    grids.onAttributes = () => app.layOutWidgets();
   }
   await app.start(silverBulletStore(bridge, writer));
 }

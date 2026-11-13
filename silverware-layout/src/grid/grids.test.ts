@@ -4,12 +4,21 @@
 // follow its `<grid>` line, edit a cell and find where a click was in its markdown.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readGrids } from "../../../shared/markdown/grid.ts";
-import { type CellWrite, type GridHost, Grids } from "./grids.ts";
+import { type AttributesWrite, type CellWrite, type GridHost, Grids } from "./grids.ts";
+import { gridProvider } from "./provider.ts";
 
 const body = "<column>\n\nLeft\n\n</column>\n<column>\nRight\n</column>";
 
 function host(text: string, fail?: string) {
-  const state = { text, settled: [] as HTMLElement[], writes: [] as CellWrite[], cursor: undefined as number | undefined, problems: [] as string[], refuse: undefined as string | undefined };
+  const state = {
+    text,
+    settled: [] as HTMLElement[],
+    writes: [] as CellWrite[],
+    attributeWrites: [] as AttributesWrite[],
+    cursor: undefined as number | undefined,
+    problems: [] as string[],
+    refuse: undefined as string | undefined,
+  };
   const gridHost: GridHost = {
     renderMarkdown: async (markdown) => {
       if (markdown === fail) throw new Error("no rendering");
@@ -23,6 +32,10 @@ function host(text: string, fail?: string) {
       const cell = grid.cells[write.cell]!;
       state.text = state.text.slice(0, cell.innerFrom) + `\n${write.content}\n\n` + state.text.slice(cell.innerTo);
       return undefined;
+    },
+    writeAttributes: async (write) => {
+      state.attributeWrites.push(write);
+      return state.refuse;
     },
     moveCursor: (at) => void (state.cursor = at),
     problem: (message) => void state.problems.push(message),
@@ -188,5 +201,47 @@ describe("an Alt+click in a grid", () => {
     grid.querySelector(".swl-grid-cell")!.dispatchEvent(press);
     expect(press.defaultPrevented).toBe(true);
     expect(hostSaw).not.toHaveBeenCalled();
+  });
+});
+
+describe("a grid's width, as Silverware Layout's widget", () => {
+  it("is read from its <grid> line by the provider, written there, and told when typed by hand", async () => {
+    const { state, gridHost } = host(`<grid width="900" columns="2">\n${body}\n</grid>\n`);
+    const grids = new Grids(document, gridHost);
+    const provider = gridProvider(grids);
+    const frame = document.createElement("div");
+    frame.className = "swl-grid-widget";
+    frame.append(await grids.render(body));
+    document.body.append(frame);
+    expect(frame.matches(provider.selector)).toBe(true);
+    expect(provider.read(frame)).toEqual({ width: "900" });
+    expect(await provider.write(frame, { width: "1200" })).toBeUndefined();
+    expect(state.attributeWrites).toEqual([{ body, occurrence: 0, of: 1, attributes: { width: "1200" } }]);
+    expect(provider.read(frame)).toEqual({ width: "1200" });
+    expect(await provider.write(frame, { width: null })).toBeUndefined();
+    expect(provider.read(frame)).toEqual({});
+    // Typed by hand: told once the page is read again
+    const told = vi.fn();
+    grids.onAttributes = told;
+    state.text = `<grid width="50%">\n${body}\n</grid>\n`;
+    await grids.refresh();
+    expect(told).toHaveBeenCalledTimes(1);
+    expect(provider.read(frame)).toEqual({ width: "50%" });
+    await grids.refresh();
+    expect(told).toHaveBeenCalledTimes(1);
+  });
+
+  it("says why a width was not written", async () => {
+    const { state, gridHost } = host(`<grid>\n${body}\n</grid>\n`);
+    const grids = new Grids(document, gridHost);
+    const frame = Object.assign(document.createElement("div"), { className: "swl-grid-widget" });
+    frame.append(await grids.render(body));
+    document.body.append(frame);
+    state.refuse = "its grid changed since it was read: left alone";
+    expect(await gridProvider(grids).write(frame, { width: "900" })).toBe("its grid changed since it was read: left alone");
+    expect(gridProvider(grids).read(frame)).toEqual({});
+    state.text = "";
+    expect(await gridProvider(grids).write(frame, { width: "900" })).toBe("this grid changed in the page since it was drawn");
+    expect(await gridProvider(grids).write(document.createElement("div"), { width: "900" })).toBe("the grid is not drawn");
   });
 });

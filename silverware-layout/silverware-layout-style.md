@@ -1215,8 +1215,30 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   object-fit: contain;
   cursor: pointer;
 }
+/* The frame as wide as what is shown in it, without the host's border round a widget: its "…" at the medium's corner,
+   not the page's (a card's at the text's right). A PDF's viewer, as wide as its room, keeps the text's width */
 [data-swl-asset] {
   position: relative;
+  width: fit-content;
+  max-width: 100%;
+  border: none !important;
+}
+[data-swl-asset]:has(object, .swl-asset-pdf) {
+  width: auto;
+}
+/* A card: its "…" beside it, not over its name */
+[data-swl-asset-view="icon"] {
+  display: flex !important;
+  align-items: center;
+  gap: 4px;
+}
+.swl-asset-frame[data-swl-asset-view="icon"] {
+  display: inline-flex !important;
+}
+[data-swl-asset-view="icon"] > .swl-asset-more {
+  position: static;
+  order: 1;
+  flex: none;
 }
 /* A medium in markdown rendered outside the editor (a grid's cell) in a frame of Silverware Layout's own */
 .swl-asset-frame {

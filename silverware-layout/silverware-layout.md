@@ -85,8 +85,8 @@ What you should know:
 
 - A grid in a page you embed in another (`![[Other page]]`) is shown with its columns there too; edit it on its own page.
 - A grid ends at the first line `</grid>`, wherever it is: a code block in a column that holds such a line ends the grid there. Grids in grids are not supported yet.
-- Links and images in a grid show in their pages' backlinks, and a renamed page or image is renamed in a grid too.
-- A task in a column is toggled by its box there, as in the page. Its hashtags are known to SilverBullet (completed, listed, and a paragraph holding one found by a query of its tag); its tasks and list items are not indexed yet.
+- Links and images in a grid show in their pages' backlinks, and a renamed page or image is renamed in a grid too. Its hashtags are known to SilverBullet (completed, listed, and a paragraph holding one found by a query of its tag); its tasks and list items are not indexed yet.
+- A task in a column is toggled by its box there, as in the page.
 - A grid starts on a line of its own, not straight after a paragraph's line: leave a blank line before it (/grid does).
 
 ## Media

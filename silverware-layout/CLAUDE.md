@@ -2,6 +2,8 @@
 
 The layout of a page: its text's width (the page's own, a default for every page), widgets' widths (laid out and changed by their handle; Silverware Table, Database and Chart register theirs) and the editor's font size with font zoom (prefix `swl-`, settings and API under `silverware.layout`). The plan, the probes' results and every decision: [docs/silverware-layout.md](../docs/silverware-layout.md) (*Steps* says what is done). User docs: `silverware-layout.md`; the code pages `-init.md` (settings, the bridge, the command, the events), `-api.md` (priority 50: `silverware.layout.api`), `-style.md`. Listed in REPO.md since 1.0.0.
 
+Planned, not built (each its own plan, decisions included): columns in a page, [docs/silverware-layout-grid.md](../docs/silverware-layout-grid.md); embedded media decorated by registered types, [docs/silverware-layout-assets.md](../docs/silverware-layout-assets.md). The order of the work is in the assets plan's *Order*.
+
 ## Mental model
 
 - **Responsibilities**: a widget's plugin draws its widget and keeps Silverware Layout's entries for it (`layout.*` in its own markdown) without understanding them; Silverware Layout alone gives them meaning and shows them. The contract is `shared/layout.ts` (`LayoutProvider`, `layoutOf`, `LAYOUT_VERSION`), as `shared/icons.ts` is Silverware Icons'.

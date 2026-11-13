@@ -56,15 +56,24 @@ Column 2
 - `startMarker` a regex for the opening line (`^<grid(\s[^>]*)?>\s*$`), `endMarker` for the closing line (`^</grid>\s*$`); `renderWidget(body, pageName)` gives the widget of the live preview, `renderHtml(body, pageName)` the HTML of an export.
 - Its block parser is placed before `HorizontalRule`, so before lezer's HTML block and SilverBullet's own (`before: "HTMLBlock"`): the whole `<grid>…</grid>` is ours, SilverBullet's HTML preview does not touch it. The cells are read by our own code from the body.
 - The region is replaced by the widget (a `LuaWidget`, the same as a code widget's) while the cursor is outside it; with the cursor inside SilverBullet shows the raw text.
+- **SilverBullet's widget menu is hidden** on the grid (decided 2026-11-13), as Silverware Chart and Database hide it on theirs: the widget gets the grid's class by `renderClass`, and the style page hides `.button-bar` (2.12.1), `.sb-widget-menu-bar` (main) and the touch screen's forced path within it; the grid's own "…" menu is the one menu. `silverbullet.spec.ts` checks it stays hidden.
 - **The end is the first line matching `endMarker`**: the parser counts no nesting, so a grid in a grid would close at the inner `</grid>` (no nesting in the first version), and a `</grid>` line inside a column's fenced code block would end the grid early (documented).
 - A new definition is active after the editor's state is rebuilt (a page reload).
-- **Not in the index**: the region's body node has no children (`markdown.parseMarkdown`, which the index uses, takes the user's syntax extensions), so links and hashtags inside a grid are not indexed: no backlinks from a grid's content. Without the plugin they would be. A later probe may look at indexing them ourselves (the body parsed, links and tags added as objects).
+- **Not in the index**: the region's body node has no children (`markdown.parseMarkdown`, which the index uses, takes the user's syntax extensions), so links, hashtags and embeds inside a grid are not indexed. Without the plugin they would be. See *Indexing*: not only backlinks are lost.
 - **Experimental API**: may change in a SilverBullet release; `ui-tests/silverbullet.spec.ts` gets a check of it, failing by name.
 - `shared/markdown/` (lezer with SilverBullet's configuration) does not know the node: it reads a grid as HTML blocks and paragraphs. What reads blocks (Silverware Toolbar's Turn into, the page writer) must not take a grid apart; checked as each is touched.
 
+## Indexing
+
+Found in the review of 2026-11-13: what the index misses inside a grid is more than backlinks. SilverBullet updates links on a rename by its index (to be confirmed by the probe), so a page or an attachment renamed would leave the links and embeds in a grid pointing at the old name: an image in a cell broken, silently.
+
+- **Decided (2026-11-13): the grid's first release indexes its content's links and embeds itself**, unless the probe shows a rename finds them anyway. A grid that silently breaks on a rename is not released.
+- How: the body parsed (`shared/markdown/`), its links and embeds added to SilverBullet's index as the objects SilverBullet itself makes for them (`plugs/index/relation.ts`), so its backlinks and its rename see them. Whether a library can add such objects (an index event, `index.indexObjects`) is a probe, step 1.
+- Hashtags inside a grid the same way, if the probe shows it is as cheap; else later.
+
 ## Editing
 
-- **A click into a cell** edits that cell alone, in place: the cell shows its markdown in a growing text field in the cell's box, the other cells stay rendered, the grid keeps its shape. Leaving the cell (blur, Esc, a click elsewhere) writes the cell's text by one `replaceRange` over the cell's range only: one edit, one undo step. As Silverware Table's cell editing.
+- **A click into a cell** edits that cell alone, in place: the cell shows its markdown in a growing text field in the cell's box, the other cells stay rendered, the grid keeps its shape. Leaving the cell (blur, Esc, a click elsewhere) writes the cell's text through the page writer, over the cell's range only: one edit, one undo step. As Silverware Table's cell editing.
 - **Alt+click** moves SilverBullet's cursor (`moveCursor`) to the source position under the click, which shows the raw markdown. The position: each block of a cell is rendered on its own and marked with its offset in the source (`shared/markdown/parse.ts` gives the blocks); within a block, found by the text under the click. As Silverware Table's Edit markdown / Alt+click.
 - Whether SilverBullet's widget takes a plain click or an Alt+click itself (moves the cursor in) is a probe.
 - A table in a cell is plain HTML: Silverware Table enhances SilverBullet's table widgets only. Later, if wanted.
@@ -73,11 +82,29 @@ Column 2
 
 - Rendered as CSS grid: `grid-template-columns` from `columns` (a number: equal columns; else track sizes, `1fr 2fr`, `30% 70%`), a gap.
 - **Its width** by Silverware Layout's handle, as any widget: the grid registers as a `LayoutProvider` (shared/layout.ts) and keeps its entries in an attribute of `<grid>` (its name decided when built).
-- **On a narrow pane** (under `minPaneWidth`, as Silverware Layout lays nothing out there) the cells stack.
+- **On a narrow pane** (under `minPaneWidth`, as Silverware Layout lays nothing out there) the cells stack: by the mark Silverware Layout already sets there (`data-swl-narrow`, host/marks.ts), nothing measured anew.
+
+## Rendering a cell
+
+A cell's markdown is rendered by SilverBullet, `markdown.renderToDom` (`client/plugos/syscalls/markdown.ts`) per block: a cell looks as the rest of the page (links, tags, tasks, embeds drawn by SilverBullet), and the grid writes no markdown renderer of its own.
+
+- Each block carries its offset in the page's text as `data-swl-pos`: the convention of Silverware Layout's host for a block rendered outside the editor ([silverware-layout-assets.md](silverware-layout-assets.md), *SilverBullet draws, the plugin decorates*). The grid uses it for Alt+click, the assets to find an embed's text in a cell; neither knows the other.
+- Writing anything in a grid (a cell, an embed's size in it) changes its body, so SilverBullet draws the whole widget anew (its cache key is the body's text) and every cell is rendered again. Its speed, and whether it flickers, are part of the probe of `renderToDom`.
+
+## Media in a grid
+
+A matrix of images (or of PDFs as cards) is a grid of embeds. How an embed is decorated, resized and written (SilverBullet's own size in its text, the plugin's metadata in a third segment, the views, the link form by `defaultLinkStyle`): [silverware-layout-assets.md](silverware-layout-assets.md). The same decoration applies to the media SilverBullet draws in a cell; SilverBullet's `%` is of the medium's box, so `|100%` fills the cell; the grid's CSS keeps media within their cell (`max-width: 100%`).
+
+## The grid's codec
+
+What a grid looks like in a page (the tags, their attributes, the cells and their ranges in the source, the blank lines) is known in one place, as an image's is: read in `shared/markdown/`, written through `shared/pages/`. The widget, the cell editing and the menu work on the grid's model alone, so a change of the syntax is a change of the codec.
 
 ## Where it lives
 
-A part of Silverware Layout (decided 2026-11-12): it is the page's layout, it uses the widget widths, the narrow-pane rule, the page writer and the markdown parser already in Layout's bundle. Its own area, `src/grid/`; it registers its width by the same `LayoutProvider` contract as Silverware Table or Chart, so Layout's core knows no grid by name. Its CSS classes `swl-grid-…`.
+A part of Silverware Layout (decided 2026-11-12): it is the page's layout, it uses the widget widths, the narrow-pane rule, the page writer and the markdown parser already in Layout's bundle. Its own area, `src/grid/`, with Silverware Layout's layers inside (`grid/model`, `grid/core`, `grid/ui`) under the same rules (`src/isolation.test.ts` gets them); it registers its width by the same `LayoutProvider` contract as Silverware Table or Chart, so Layout's core knows no grid by name; `app.ts` puts it together, `index.ts` binds it to SilverBullet (its `syntax.define`, the bridge). Its CSS classes `swl-grid-…`.
+
+- **The grid and the assets know nothing of each other** ([silverware-layout-assets.md](silverware-layout-assets.md), *Layers*): the assets decorate the embeds SilverBullet draws in a cell as anywhere else, and size them by shares of their own box, which in a cell is the cell. No area imports another.
+- What SilverBullet is (`syntax.define`, `markdown.renderToDom`, moving its cursor) is the host's (`host/silverbullet/`), behind an interface of the grid's own, so the grid runs in the playground and its tests over plain elements, as the rest of Layout does.
 
 ## The slash command and the menu
 
@@ -86,18 +113,18 @@ A part of Silverware Layout (decided 2026-11-12): it is the page's layout, it us
 
 ## Steps
 
-1. **Probe** (SilverBullet 2.12.1 and edge, Chromium): `syntax.define` with `<grid>` in a page's `space-lua` (edge runs it only under `Library/`: docs/silverware-library-prefix.md); the widget shown, the cursor's entry, a plain click and an Alt+click on the widget, the reload needed; how SilverBullet and GitHub show a grid without the plugin (both forms).
-2. The grid's model, pure: read a body into attributes and cells with their source ranges, write a cell back (blank lines kept); tests.
-3. The widget: render the cells (each block marked with its offset), CSS grid, the narrow pane; the playground.
+1. **Probe** (SilverBullet 2.12.1 and edge, Chromium): `syntax.define` with `<grid>` in a page's `space-lua` (edge runs it only under `Library/`: docs/silverware-library-prefix.md); the widget shown, the cursor's entry, a plain click and an Alt+click on the widget, the reload needed; how SilverBullet and GitHub show a grid without the plugin (both forms); `renderToDom` of a cell and a grid drawn anew; **a rename of a page and of an attachment linked from a grid, and whether a library can add link objects to the index** (*Indexing*).
+2. The grid's model and codec: read a body into attributes and cells with their source ranges (`shared/markdown/`), write a cell back through the page writer (blank lines kept); the isolation test's rules for the area; tests.
+3. The widget: render the cells by `markdown.renderToDom` (each block marked with its offset), CSS grid, the narrow pane; the playground.
 4. Editing a cell in place; Alt+click to the source position; UI tests.
 5. `/grid`.
 6. The width by Silverware Layout's handle.
-7. Library page (the syntax, what it looks like without the plugin, that a grid's links are not indexed), release.
+7. The grid's content indexed (*Indexing*), unless the probe found it needless.
+8. Library page (the syntax, what it looks like without the plugin, what is indexed), release.
 
-Later: attributes (`columns`, `gap`, `span`, `align`), the "…" menu, nesting, indexing a grid's content.
+Later: attributes (`columns`, `gap`, `span`, `align`), the "…" menu, nesting.
 
 ## Open
 
 - The attribute names (`columns`, `gap`, the width's).
-- Whether indexing a grid's links and tags is worth our own indexing (a probe).
 - The field a cell is edited in: a plain growing `textarea`, or something richer later.

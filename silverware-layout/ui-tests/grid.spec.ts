@@ -112,9 +112,13 @@ test("Put into grid: the tasks selected split into 2 columns, a list in each, by
   void runCommand(page, "Silverware Layout: Put into grid");
   const box = page.locator(".sb-modal-box, .sb-modal").first();
   await expect(box).toContainText("Put 5 blocks into a grid");
+  // (Keys once the filter box has the focus: before, they would be the editor's, the selection typed over)
+  const field = page.locator(".sb-modal-box input, .sb-modal input").first();
+  await expect(field).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
   await expect(box).toContainText("How many columns");
+  await expect(field).toBeFocused();
   await page.keyboard.press("Enter");
   await expect
     .poll(() => space.saved("Page"))

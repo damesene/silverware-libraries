@@ -151,3 +151,15 @@ test("SilverBullet's markdown shown as written: media and grids hidden, their ma
   await expect(page.locator("#sb-main [data-swl-asset]:not(.swl-asset-frame)").first()).toBeVisible();
   await expect(page.locator("#sb-main .swl-grid")).toBeVisible();
 });
+
+test("SilverBullet's markdown shown as written: a click on a link puts the cursor there, follows nothing", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\nSee [[${space.folder}/Other]] here.\n`, Other: "# Other\n" }, "Page");
+  const url = page.url();
+  await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
+  const line = page.locator("#sb-main .cm-line", { hasText: "See" });
+  await expect(line).toContainText(`[[${space.folder}/Other]]`);
+  await line.getByText("Other").click();
+  await page.waitForTimeout(500);
+  expect(page.url()).toBe(url);
+  await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
+});

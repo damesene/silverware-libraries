@@ -26,4 +26,23 @@ describe("SilverBullet's markdown shown as written", () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(document.documentElement.hasAttribute("data-swl-syntax-shown")).toBe(false);
   });
+
+  it("holds a plain click in the text back from what follows links while on; Ctrl held, or a widget's, or off: not", async () => {
+    let on = true;
+    stops.push(watchSyntaxMode(document, async () => on));
+    await vi.waitFor(() => expect(document.documentElement.hasAttribute("data-swl-syntax-shown")).toBe(true));
+    document.body.innerHTML = '<div id="sb-main"><div class="cm-content"><div class="cm-line"><span class="link">![[a.png]]</span></div><div class="sb-lua-directive-block"><button>Run</button></div></div></div>';
+    const followed: string[] = [];
+    document.querySelector(".cm-content")!.addEventListener("click", (event) => void followed.push((event.target as Element).textContent ?? ""));
+    const click = (selector: string, init: MouseEventInit = {}) => document.querySelector(selector)!.dispatchEvent(new MouseEvent("click", { bubbles: true, button: 0, ...init }));
+    click(".link");
+    click(".link", { ctrlKey: true });
+    click("button");
+    expect(followed).toEqual(["![[a.png]]", "Run"]);
+    on = false;
+    document.querySelector(".cm-content")!.append(Object.assign(document.createElement("div"), { className: "sb-inline-content" }));
+    await vi.waitFor(() => expect(document.documentElement.hasAttribute("data-swl-syntax-shown")).toBe(false));
+    click(".link");
+    expect(followed).toHaveLength(3);
+  });
 });

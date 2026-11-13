@@ -6,6 +6,7 @@
 // and markdown links and images to a local target (`[x](Other.md)`, `![](cat.png)`), resolved from the page's folder
 // as SilverBullet resolves them; a link's target named by its page (its `#header`, `@position` or `$anchor` left out)
 // or document (a file of another extension). Not in a fenced code block or a code span.
+import { resolveLinkPath } from "../../../../shared/markdown/embed.ts";
 import { readGrids } from "../../../../shared/markdown/grid.ts";
 import { inlineMarks } from "../../../../shared/markdown/inline.ts";
 import { nextFence } from "../../../../shared/markdown/lines.ts";
@@ -31,17 +32,6 @@ export function targetOf(name: string): { readonly to: string; readonly toTag: "
   const ext = /\.([A-Za-z0-9]+)$/.exec(path)?.[1]?.toLowerCase();
   if (!ext || ext === "md") return { to: ext === "md" ? path.slice(0, -3) : path, toTag: "page" };
   return { to: path, toTag: "document" };
-}
-
-/** A markdown link's local URL resolved from the page's folder, as SilverBullet resolves one (`../x`, `./x`) */
-export function resolveFrom(page: string, url: string): string {
-  if (url.startsWith("/")) return url.slice(1);
-  const parts = page.split("/").slice(0, -1);
-  for (const part of url.split("/")) {
-    if (part === "..") parts.pop();
-    else if (part !== "." && part !== "") parts.push(part);
-  }
-  return parts.join("/");
 }
 
 /** The links of the page's grids, in the page's order */
@@ -82,7 +72,7 @@ function linksOfLine(page: string, line: string, at: number): GridLink[] {
     } catch {
       // (A URL not encoded right: as written)
     }
-    const target = targetOf(resolveFrom(page, decoded));
+    const target = targetOf(resolveLinkPath(page, decoded));
     if (target) found.push({ ...target, from: at + m.index!, end: at + m.index! + m[0].length, ...(m[1] ? { alias: m[1] } : {}), line });
   }
   return found.sort((a, b) => a.from - b.from);

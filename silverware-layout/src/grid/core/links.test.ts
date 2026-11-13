@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { gridLinks, resolveFrom, targetOf } from "./links.ts";
+import { resolveLinkPath as resolveFrom } from "../../../../shared/markdown/embed.ts";
+import { gridLinks, targetOf } from "./links.ts";
 
 describe("a link's target", () => {
   it("names a page without what names a place in it, a document by its path", () => {

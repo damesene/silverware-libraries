@@ -730,6 +730,82 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   outline: 2px solid color-mix(in srgb, currentColor 40%, transparent);
   outline-offset: 1px;
 }
+/* Embedded media (docs/silverware-layout-assets.md), marked by Silverware Layout on the host's frame of each
+   (data-swl-asset: its type, data-swl-asset-view: icon, preview or embed): the host's own drawing hidden where Silverware
+   Layout draws instead; a preview of the host's drawing kept small; a card; the mark of a render that failed */
+.swl-asset-native-hidden {
+  display: none !important;
+}
+[data-swl-asset-view="preview"] > :is(img, video, object) {
+  max-height: var(--swl-asset-height, 160px);
+  max-width: 100%;
+  width: auto !important;
+  object-fit: contain;
+  cursor: pointer;
+}
+[data-swl-asset] {
+  position: relative;
+}
+.swl-asset-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 6px 12px 6px 8px;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.swl-asset-card:hover {
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+.swl-asset-card:focus-visible {
+  outline: 2px solid color-mix(in srgb, currentColor 40%, transparent);
+}
+.swl-asset-icon {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+.swl-asset-icon > svg,
+.swl-asset-icon > img {
+  width: 100%;
+  height: 100%;
+}
+.swl-asset-card-text {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.swl-asset-card-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swl-asset-pdf {
+  display: block;
+  width: 100%;
+  height: var(--swl-asset-height, 160px);
+  border: none;
+}
+.swl-asset-failed {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: bold;
+  color: #fff;
+  background: #c0392b;
+  cursor: help;
+}
 /* A cell's markdown that could not be rendered, and a grid drawn before Silverware Layout started: as typed */
 .swl-grid-plain {
   white-space: pre-wrap;

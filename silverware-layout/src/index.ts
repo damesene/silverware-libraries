@@ -9,6 +9,11 @@ import { type PageWriter, pageWriter } from "../../shared/pages/writer.ts";
 import { LayoutApp, type LayoutStore } from "./app.ts";
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { Registry } from "./core/registry.ts";
+import { registerBuiltins } from "./assets/builtin/index.ts";
+import { AssetRegistry } from "./assets/core/registry.ts";
+import { AssetDecorator, type AssetHost } from "./assets/decorate.ts";
+import { readAssetSettings } from "./assets/model/settings.ts";
+import { silverBulletAssetHost } from "./host/silverbullet/assets.ts";
 import { gridInsertion } from "./grid/core/insert.ts";
 import { gridLinks } from "./grid/core/links.ts";
 import { gridRelations } from "./host/silverbullet/gridindex.ts";
@@ -33,11 +38,17 @@ const OWN_MARKER = "-- managed-by: silverware-layout";
 const registry = new Registry((message) => app.problem(message));
 const app = new LayoutApp(document, silverBulletPage(document), registry);
 
-/** Silverware Layout's API, as its API page hands it to the widget plugins (`silverware.layout.api`) */
-export const api = registry.api();
+// The types of asset and actions (docs/silverware-layout-assets.md), one registry per window as the providers'
+const assetRegistry = new AssetRegistry((message) => app.problem(message));
+registerBuiltins(assetRegistry);
+
+/** Silverware Layout's API, as its API page hands it to the widget plugins (`silverware.layout.api`): the widgets' providers, and `assets` (shared/assets.ts) */
+export const api = Object.assign(registry.api(), { assets: assetRegistry.api() });
 
 // The page's grids (docs/silverware-layout-grid.md), made as the init page hands SilverBullet's API over
 let grids: Grids | undefined;
+// The embedded media decorated, made as the API is handed over
+let assets: AssetDecorator | undefined;
 
 /** Started by the init page (again as Space Lua loads again): SilverBullet's API handed over */
 export async function init(bridge: Bridge): Promise<void> {
@@ -59,6 +70,13 @@ export async function init(bridge: Bridge): Promise<void> {
     // A grid's width laid out as any widget's, registered as a widget plugin registers
     registry.register(gridProvider(grids));
     grids.onAttributes = () => app.layOutWidgets();
+  }
+  const raw = silverBulletAssetHost(bridge, writer, document);
+  const assetHost: AssetHost = { ...raw, settings: async () => readAssetSettings(await raw.settings()).settings };
+  if (assets) assets.useHost(assetHost);
+  else {
+    assets = new AssetDecorator(document, assetHost, assetRegistry);
+    assets.start();
   }
   await app.start(silverBulletStore(bridge, writer));
 }

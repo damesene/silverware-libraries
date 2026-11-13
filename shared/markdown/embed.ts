@@ -34,6 +34,17 @@ export type EmbedChanges = {
   readonly metadata?: Readonly<Record<string, string | null>>;
 };
 
+/** A markdown link's local URL resolved from the page's folder, as SilverBullet resolves one (`../x`, `./x`, `/x`) */
+export function resolveLinkPath(page: string, url: string): string {
+  if (url.startsWith("/")) return url.slice(1);
+  const parts = page.split("/").slice(0, -1);
+  for (const part of url.split("/")) {
+    if (part === "..") parts.pop();
+    else if (part !== "." && part !== "") parts.push(part);
+  }
+  return parts.join("/");
+}
+
 const WIKI = /!\[\[([^\]\n]+?)\]\]/g;
 const MARKDOWN = /!\[([^\]\n]*)\]\(([^)\s]+)\)/g;
 const CODE_SPAN = /`+[^`\n]*`+/g;

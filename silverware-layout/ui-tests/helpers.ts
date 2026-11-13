@@ -18,8 +18,8 @@ const FOLDER = "UiLayout";
 export type Space = {
   /** The folder of this test's pages in the space (`UiLayout/<test>`) */
   readonly folder: string;
-  /** Pages written (by their names under the folder), the page `open` of them opened, Silverware Layout started */
-  open(pages: Readonly<Record<string, string>>, open: string): Promise<void>;
+  /** Pages written (by their names under the folder), and files beside them (an image: its name with its extension), the page `open` of them opened, Silverware Layout started */
+  open(pages: Readonly<Record<string, string>>, open: string, files?: Readonly<Record<string, Uint8Array | string>>): Promise<void>;
   /** A page's text as saved (its name under the folder) */
   saved(name: string): Promise<string | undefined>;
   /** The space's CONFIG page as saved */
@@ -50,10 +50,15 @@ export const test = base.extend<{ space: Space }>({
     const configBefore = existsSync(configPath) ? await readFile(configPath, "utf8") : undefined;
     await use({
       folder,
-      open: async (pages, open) => {
+      open: async (pages, open, files = {}) => {
         for (const [name, text] of Object.entries(pages)) {
           await mkdir(dirname(path(name)), { recursive: true });
           await writeFile(path(name), text);
+        }
+        for (const [name, content] of Object.entries(files)) {
+          const file = join(server().space, folder, name);
+          await mkdir(dirname(file), { recursive: true });
+          await writeFile(file, content);
         }
         await page.goto(`http://127.0.0.1:${server().port}/${folder}/${open}`);
         await page.waitForFunction(() => !!(window as unknown as { client?: { editorView?: unknown } }).client?.editorView);
@@ -107,4 +112,34 @@ export async function waitForIndexedLayout(page: Page, name: string): Promise<vo
       return Array.isArray(pages) && pages.some((one: { name?: string; _layout?: unknown }) => one.name === name && !!one._layout);
     })
     .toBe(true);
+}
+
+/** A PNG of one pixel: an image of the space, drawn as large as its embed says */
+export const PIXEL_PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+
+/**
+ * Waits until the page shows a grid drawn (`count` of them): SilverBullet's custom syntax is active once the page is
+ * loaded again after it is first defined, so a page shown before that has its grid as text: loaded again then
+ */
+export async function gridsDrawn(page: Page, count = 1): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await expect(page.locator("#sb-main .swl-grid:not(.swl-grid-shown)")).toHaveCount(count, { timeout: 5000 });
+      return;
+    } catch {
+      await page.reload();
+      await page.waitForFunction(() => !!(window as unknown as { client?: { editorView?: unknown } }).client?.editorView);
+    }
+  }
+  await expect(page.locator("#sb-main .swl-grid:not(.swl-grid-shown)")).toHaveCount(count);
+}
+
+/** Where SilverBullet's cursor is (an offset of the page's text) */
+export function cursorAt(page: Page): Promise<number> {
+  return page.evaluate(() => (window as unknown as { client: { editorView: { state: { selection: { main: { head: number } } } } } }).client.editorView.state.selection.main.head);
+}
+
+/** The page's text in the editor now */
+export function editorText(page: Page): Promise<string> {
+  return page.evaluate(() => (window as unknown as { client: { editorView: { state: { doc: { toString(): string } } } } }).client.editorView.state.doc.toString());
 }

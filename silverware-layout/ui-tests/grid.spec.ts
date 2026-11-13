@@ -1,0 +1,87 @@
+// Columns (docs/silverware-layout-grid.md) as a user works with them in SilverBullet: /grid, a cell edited in place,
+// Alt+click to the raw text, columns set by the grid's line, a grid in an embedded page, its hashtags indexed.
+import { cursorAt, editorText, expect, gridsDrawn, test } from "./helpers.ts";
+
+const GRID = "<grid>\n<column>\n\nLeft text\n\n</column>\n<column>\n\nRight text\n\n</column>\n</grid>\n";
+
+test("/grid puts a grid of two columns at the cursor, the cursor in its first", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\nAbove\n\n" }, "Page");
+  await page.locator("#sb-main .cm-content").click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type("/grid");
+  await expect(page.locator(".cm-tooltip-autocomplete")).toContainText("grid");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => editorText(page)).toContain("<grid>\n<column>\n\n");
+  const text = await editorText(page);
+  expect(text.match(/<column>/g)).toHaveLength(2);
+  // The cursor on the first column's blank line
+  const first = text.indexOf("<column>\n\n") + "<column>\n\n".length;
+  expect(await cursorAt(page)).toBe(first);
+});
+
+test("a cell edited in place: its markdown in a field, written as it is left, the rest of the grid kept", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${GRID}\nBelow\n` }, "Page");
+  await gridsDrawn(page);
+  const cell = page.locator("#sb-main .swl-grid-cell").first();
+  await cell.click();
+  const field = cell.locator("textarea.swl-grid-editor");
+  await expect(field).toHaveValue("Left text");
+  await field.fill("Left **edited**");
+  await page.keyboard.press("Escape");
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${GRID.replace("Left text", "Left **edited**")}\nBelow\n`);
+  await expect(page.locator("#sb-main .swl-grid-cell").first().locator("strong")).toHaveText("edited");
+});
+
+test("Alt+click in a cell shows the raw text, the cursor where the click was", async ({ page, space }) => {
+  const text = `# Page\n\n${GRID}`;
+  await space.open({ Page: text }, "Page");
+  await gridsDrawn(page);
+  const words = page.locator("#sb-main .swl-grid-cell").nth(1).getByText("Right text");
+  const box = (await words.boundingBox())!;
+  // On "text", the second word
+  await words.click({ modifiers: ["Alt"], position: { x: box.width - 4, y: box.height / 2 } });
+  await expect.poll(() => cursorAt(page)).toBeGreaterThanOrEqual(text.indexOf("Right text") + "Right ".length);
+  expect(await cursorAt(page)).toBeLessThanOrEqual(text.indexOf("Right text") + "Right text".length);
+  // The raw text shown: the grid's lines are the editor's again
+  await expect(page.locator("#sb-main .cm-content")).toContainText("<column>");
+});
+
+test("a grid's columns as its line says, given again as the line is edited", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${GRID.replace("<grid>", '<grid columns="1fr 3fr">')}\nBelow\n` }, "Page");
+  await gridsDrawn(page);
+  const cells = page.locator("#sb-main .swl-grid-cell");
+  const widthsOf = async () => [Math.round((await cells.nth(0).boundingBox())!.width), Math.round((await cells.nth(1).boundingBox())!.width)];
+  await expect.poll(async () => {
+    const [a, b] = await widthsOf();
+    return Math.round(b! / a!);
+  }).toBe(3);
+});
+
+test("a grid in a page embedded in another: drawn with its own columns, not edited there", async ({ page, space }) => {
+  await space.open(
+    {
+      Host: `# Host\n\nAbove\n\n![[${space.folder}/Embedded]]\n\nBelow\n`,
+      Embedded: `# Embedded\n\n${GRID.replace("<grid>", '<grid columns="1fr 3fr">')}`,
+    },
+    "Host",
+  );
+  const shown = page.locator("#sb-main .swl-grid-shown");
+  await expect(shown).toHaveCount(1, { timeout: 15000 });
+  await expect(shown.locator(".swl-grid-cell")).toHaveText(["Left text", "Right text"]);
+  const [a, b] = [(await shown.locator(".swl-grid-cell").nth(0).boundingBox())!.width, (await shown.locator(".swl-grid-cell").nth(1).boundingBox())!.width];
+  expect(Math.round(b / a)).toBe(3);
+  await shown.locator(".swl-grid-cell").first().click();
+  await expect(shown.locator("textarea")).toHaveCount(0);
+});
+
+test("a grid's hashtags in the index: a tag of the page, a paragraph holding it", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${GRID.replace("Left text", "Left #uigridtag text")}` }, "Page");
+  await gridsDrawn(page);
+  type Indexed = { clientSystem: { localSyscall(name: string, args: unknown[]): Promise<unknown> } };
+  const query = (tag: string) => page.evaluate((t) => (window as unknown as { client: Indexed }).client.clientSystem.localSyscall("index.queryLuaObjects", [t, {}]), tag);
+  await expect
+    .poll(async () => ((await query("tag")) as { name: string; page: string; parent: string }[]).filter((one) => one.name === "uigridtag").map((one) => `${one.page}:${one.parent}`))
+    .toEqual([`${space.folder}/Page:page`]);
+  const paragraphs = (await query("paragraph")) as { page: string; text: string; tags?: string[] }[];
+  expect(paragraphs.filter((one) => one.page === `${space.folder}/Page`).map((one) => [one.text, one.tags])).toEqual([["Left #uigridtag text", ["uigridtag"]]]);
+});

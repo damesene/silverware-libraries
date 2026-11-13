@@ -1,0 +1,113 @@
+// Embedded media (docs/silverware-layout-assets.md) as a user works with them in SilverBullet: the "…" menu writing a
+// view into the embed it is on (the same file in a grid and outside it apart), a file SilverBullet cannot draw as a card,
+// a width dragged (in the page, and within a grid's cell), a PDF and a zip in a cell, a link's icon, the Media tab's
+// card fields and a click shown in the side panel.
+import { expect, gridsDrawn, PAGE_LAYOUT, PIXEL_PNG, runCommand, test } from "./helpers.ts";
+
+const cell = (text: string) => `<column>\n\n${text}\n\n</column>`;
+const grid = (...cells: string[]) => `<grid>\n${cells.map(cell).join("\n")}\n</grid>\n`;
+
+/** A view chosen in a medium's "…" menu */
+async function choose(page: import("@playwright/test").Page, frame: import("@playwright/test").Locator, item: string): Promise<void> {
+  await frame.hover();
+  await frame.locator(".swl-asset-more").click();
+  await page.locator(".swl-asset-menu-holder .swl-menu-item", { hasText: item }).click();
+}
+
+test("the same image outside a grid and in it: a view chosen in the grid written to the grid's embed alone, shown at once", async ({ page, space }) => {
+  const image = `![[${space.folder}/photo.png|Photo|120]]`;
+  await space.open({ Page: `# Page\n\n${image}\n\n${grid(image, "Right")}` }, "Page", { "photo.png": PIXEL_PNG });
+  await gridsDrawn(page);
+  const inGrid = page.locator("#sb-main .swl-grid [data-swl-asset]").first();
+  await expect(inGrid).toHaveAttribute("data-swl-asset-view", "embed");
+  await choose(page, inGrid, "Show as a card");
+  const written = `![[${space.folder}/photo.png|Photo|120|{ view: icon }]]`;
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${image}\n\n${grid(written, "Right")}`);
+  await expect(page.locator("#sb-main .swl-grid [data-swl-asset]").first()).toHaveAttribute("data-swl-asset-view", "icon");
+  await expect(page.locator("#sb-main [data-swl-asset]:not(.swl-grid *)").first()).toHaveAttribute("data-swl-asset-view", "embed");
+});
+
+test("a file SilverBullet cannot draw is a card, its click opening the file in a new tab", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/archive.zip]]\n` }, "Page", { "archive.zip": "not really a zip" });
+  const card = page.locator("#sb-main .swl-asset-card");
+  await expect(card).toHaveText("archive.zip");
+  // (What the click opens taken instead of opened: a tab opened with noopener tells its page nothing)
+  await page.evaluate(() => {
+    const opened: string[] = ((window as unknown as { swlOpened: string[] }).swlOpened = []);
+    window.open = (url?: string | URL) => (opened.push(String(url)), null);
+  });
+  await card.click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { swlOpened: string[] }).swlOpened)).toEqual([`.fs/${encodeURI(`${space.folder}/archive.zip`)}`]);
+});
+
+test("an image's width dragged by its handle, staying at its place, written as SilverBullet's size", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/photo.png|Photo|200]]\n\nAfter\n` }, "Page", { "photo.png": PIXEL_PNG });
+  const frame = page.locator("#sb-main [data-swl-asset]").first();
+  await expect(frame).toHaveAttribute("data-swl-width", "200");
+  const left = (await frame.boundingBox())!.x;
+  await frame.hover();
+  const bar = page.locator(".swl-handle-bar");
+  await expect(bar).toBeVisible();
+  const box = (await bar.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n![[${space.folder}/photo.png|Photo|260]]\n\nAfter\n`);
+  await expect.poll(async () => Math.round((await page.locator("#sb-main [data-swl-asset]").first().boundingBox())!.x)).toBe(Math.round(left));
+});
+
+test("an image in a grid's cell dragged within the cell: no wider than it, its quarters its guides", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${grid(`![[${space.folder}/photo.png|Photo|100]]`, "Right")}` }, "Page", { "photo.png": PIXEL_PNG });
+  await gridsDrawn(page);
+  const frame = page.locator("#sb-main .swl-grid [data-swl-asset]").first();
+  await expect(frame).toHaveAttribute("data-swl-in-room", "");
+  const cellWidth = (await page.locator("#sb-main .swl-grid-cell").first().boundingBox())!.width;
+  await frame.hover();
+  const bar = page.locator(".swl-handle-bar");
+  await expect(bar).toBeVisible();
+  const box = (await bar.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 1000, box.y + box.height / 2, { steps: 8 });
+  await expect(page.locator(".swl-handle-guide-label")).toContainText(["25 %", "50 %", "75 %", "100 %"]);
+  await page.mouse.up();
+  await expect.poll(async () => /\|Photo\|(\d+)\]\]/.exec((await space.saved("Page")) ?? "")?.[1]).toBe(String(Math.round(cellWidth)));
+});
+
+test("a PDF and a zip in a grid's cells: the PDF's viewer as wide as its cell, the zip a card", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${grid(`![[${space.folder}/doc.pdf]]`, `![[${space.folder}/archive.zip]]`)}` }, "Page", { "doc.pdf": "%PDF-1.4\n", "archive.zip": "zip" });
+  await gridsDrawn(page);
+  const cells = page.locator("#sb-main .swl-grid-cell");
+  const pdf = cells.nth(0).locator("[data-swl-asset='pdf']");
+  await expect(pdf.locator("object")).toHaveAttribute("data", `.fs/${encodeURI(`${space.folder}/doc.pdf`)}`);
+  expect(Math.round((await pdf.boundingBox())!.width)).toBe(Math.round((await cells.nth(0).boundingBox())!.width));
+  await expect(cells.nth(1).locator(".swl-asset-card")).toHaveText("archive.zip");
+});
+
+test("a link to a file shows its type's icon, in a grid too; a link to a page none", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\nSee [[${space.folder}/doc.pdf]] and [[${space.folder}/Other]].\n\n${grid(`In a cell [[${space.folder}/doc.pdf]]`, "Right")}`, Other: "# Other\n" }, "Page", { "doc.pdf": "%PDF-1.4\n" });
+  await gridsDrawn(page);
+  await expect(page.locator("#sb-main [data-swl-asset-link='pdf'] .swl-asset-link-icon")).toHaveCount(2);
+  await expect(page.locator("#sb-main a", { hasText: "Other" }).locator(".swl-asset-link-icon")).toHaveCount(0);
+});
+
+test("the Media tab: a card's size shown, a click set to the side panel; the panel shows the file and Esc closes it", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/archive.zip]]\n\n![[${space.folder}/photo.png|Photo||{ view: preview }]]\n` }, "Page", { "archive.zip": "zip", "photo.png": PIXEL_PNG });
+  await expect(page.locator("#sb-main .swl-asset-card")).toHaveText("archive.zip");
+  await runCommand(page, PAGE_LAYOUT);
+  const dialog = page.locator(".swl-dialog");
+  await dialog.getByRole("tab", { name: "Media" }).click();
+  await dialog.getByLabel("Its size").check();
+  await dialog.getByLabel("All files: a click").selectOption("peek");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => space.config()).toContain('click = "peek"');
+  await expect(page.locator("#sb-main .swl-asset-card-size")).toHaveText("3 B");
+  await page.locator("#sb-main [data-swl-asset='image'] img").click();
+  const peek = page.locator(".swl-asset-peek");
+  await expect(peek.locator(".swl-asset-panel-title")).toHaveText("Photo");
+  await expect(peek.locator(".swl-asset-panel-body img")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(peek).toHaveCount(0);
+});

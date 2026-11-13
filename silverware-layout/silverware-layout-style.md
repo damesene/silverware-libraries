@@ -34,6 +34,12 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   margin-left: 0 !important;
   margin-right: 0 !important;
 }
+/* A preview of an image or a video: its height sizes it, a width its embed keeps (for the original) not its frame's */
+:root [data-swl-content] [data-swl-asset-view="preview"][data-swl-width]:not(:has(object, .swl-asset-pdf)):not([data-swl-narrow] *) {
+  width: fit-content !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
 /* The boxes a widget laid out is in, within the content, let it out: SilverBullet scrolls a Lua block's output in a
    box of the text's width (overflow: auto), which cut a wider database off and showed a scrollbar */
 :root:not([data-swl-narrow]) [data-swl-content] > * :has([data-swl-width]:not([data-silverware-over-window])) {
@@ -1272,7 +1278,7 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 }
 /* Laid out by the handle (its width on the frame, data-swl-width): the host's medium fills the frame, its height by
    its ratio, so a drag shows at once what the width written will draw */
-[data-swl-asset][data-swl-width] :is(img, video, object):not(.swl-asset-icon img) {
+[data-swl-asset][data-swl-width]:not([data-swl-asset-view="preview"]) :is(img, video, object):not(.swl-asset-icon img) {
   width: 100% !important;
   max-width: 100% !important;
   height: auto;
@@ -1326,6 +1332,105 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 .swl-asset-card-meta > * + *::before {
   content: "·";
   margin-right: 6px;
+}
+/* An asset shown by an action: in a panel at the window's right (peek, over part of the window: the sheet's layer), or
+   enlarged over the dimmed page (popover, a dialog's layer); its head its name, Open in a new tab and ×, its body the
+   asset as large as the panel lets it be */
+.swl-asset-peek {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--sw-layer-sheet);
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100vw);
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border-left: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  box-shadow: -6px 0 24px rgba(0, 0, 0, 0.18);
+}
+.swl-asset-popover {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sw-layer-dialog);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+.swl-asset-popover-box {
+  display: flex;
+  flex-direction: column;
+  max-width: 92vw;
+  max-height: 92vh;
+  min-width: min(320px, 92vw);
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.swl-asset-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 14px;
+  font-family: var(--ui-font, system-ui, sans-serif);
+  font-size: 13px;
+  border-bottom: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.25));
+}
+.swl-asset-panel-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swl-asset-panel-button,
+.swl-asset-panel-close {
+  padding: 3px 10px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
+  border-radius: 4px;
+  cursor: pointer;
+}
+.swl-asset-panel-close {
+  padding: 0 8px;
+  font-size: 18px;
+  line-height: 24px;
+  border-color: transparent;
+}
+.swl-asset-panel-body {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 12px;
+  overflow: auto;
+}
+.swl-asset-panel-body > :is(img, video) {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain;
+}
+.swl-asset-popover .swl-asset-panel-body > :is(img, video) {
+  max-height: calc(92vh - 70px);
+}
+.swl-asset-panel-body > object {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 60vh;
+}
+.swl-asset-popover .swl-asset-panel-body > object {
+  width: 85vw !important;
+  height: calc(92vh - 70px) !important;
 }
 /* A link to a file of the space: its type's icon before its text, as large as the text */
 .swl-asset-link-icon {

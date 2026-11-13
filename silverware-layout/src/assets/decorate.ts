@@ -189,7 +189,7 @@ export class AssetDecorator {
         open: (url) => this.host.open(url),
         render: async (as, container) => {
           const element = await type.views?.[as]?.({ ...context, viewport: viewportOf(container, found.embed, as, settings, control.signal) });
-          container.replaceChildren(element ?? native?.cloneNode(true) ?? this.card(type, asset, settings));
+          container.replaceChildren(element ?? shownCopy(native) ?? this.card(type, asset, settings));
         },
       };
       void Promise.resolve(action.run(actionContext)).catch((error: unknown) => this.host.problem(`Silverware Layout: ${action.name}: ${message(error)}`));
@@ -288,6 +288,14 @@ export class AssetDecorator {
     }
     return card;
   }
+}
+
+/** A copy of the host's drawing to show elsewhere (a panel): shown, though it is hidden where it is (a card shown there) */
+function shownCopy(native: HTMLElement | undefined): HTMLElement | undefined {
+  if (!native) return undefined;
+  const copy = native.cloneNode(true) as HTMLElement;
+  for (const one of [copy, ...copy.querySelectorAll<HTMLElement>(`.${NATIVE_HIDDEN}`)]) one.classList.remove(NATIVE_HIDDEN);
+  return copy;
 }
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));

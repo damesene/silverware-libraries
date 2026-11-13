@@ -1,6 +1,7 @@
-// Silverware Layout's own actions (docs/silverware-layout-assets.md, *Actions*), registered as anyone's. The first
-// version has one: the asset's URL in a new tab of the browser.
+// Silverware Layout's own actions (docs/silverware-layout-assets.md, *Actions*), registered as anyone's: the asset's
+// URL in a new tab of the browser; the asset in a side panel, or enlarged over the page (./panels.ts).
 import type { AssetAction } from "../../../../shared/assets.ts";
+import { peek, popover } from "./panels.ts";
 
 export const openTab: AssetAction = {
   name: "open-tab",
@@ -11,4 +12,4 @@ export const openTab: AssetAction = {
   },
 };
 
-export const BUILTIN_ACTIONS: readonly AssetAction[] = [openTab];
+export const BUILTIN_ACTIONS: readonly AssetAction[] = [openTab, peek, popover];

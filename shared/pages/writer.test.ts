@@ -325,12 +325,42 @@ describe("the page writer", () => {
     const gone = await writer.plan(pageChanges().page("A", (p) => p.codeBlocks.remove("silverware-database", "id: other")).build());
     expect(gone.skipped.map((one) => one.reason)).toEqual(["its silverware-database block changed since it was read: left alone"]);
   });
+
+  it("writes a grid's cell with a blank line before and after its content, the grid of those alike asked, and leaves a grid changed", async () => {
+    const grid = "<grid>\n<column>\nOld\n</column>\n<column>\n\nKeep\n\n</column>\n</grid>";
+    const body = "<column>\nOld\n</column>\n<column>\n\nKeep\n\n</column>";
+    const { map, writer } = memory({ A: `# A\n\n${grid}\n\n${grid}\n`, Crlf: "<grid>\r\n<column>\r\nx\r\n</column>\r\n</grid>\r\n" });
+    const report = await writer.write(
+      pageChanges()
+        .page("A", (p) => p.grids.replaceCell(body, 0, "New\n- a", { occurrence: 1, of: 2 }))
+        .page("Crlf", (p) => p.grids.replaceCell("<column>\r\nx\r\n</column>", 0, "y\nz"))
+        .build(),
+    );
+    expect(report.skipped).toEqual([]);
+    expect(map.get("A")).toBe(`# A\n\n${grid}\n\n<grid>\n<column>\n\nNew\n- a\n\n</column>\n<column>\n\nKeep\n\n</column>\n</grid>\n`);
+    expect(map.get("Crlf")).toBe("<grid>\r\n<column>\r\n\r\ny\r\nz\r\n\r\n</column>\r\n</grid>\r\n");
+    // Its content as written already: nothing to write; emptied: one blank line left
+    const same = await writer.plan(pageChanges().page("A", (p) => p.grids.replaceCell(body, 1, "Keep")).build());
+    expect(same.pages).toEqual([]);
+    await writer.write(pageChanges().page("A", (p) => p.grids.replaceCell(body, 1, "")).build());
+    expect(map.get("A")!.startsWith(`# A\n\n<grid>\n<column>\nOld\n</column>\n<column>\n\n</column>\n</grid>`)).toBe(true);
+    // A grid changed since it was read, a cell not there, two alike counted where one is: left alone
+    const gone = await writer.plan(pageChanges().page("A", (p) => p.grids.replaceCell("<column>\nOther\n</column>", 0, "x")).build());
+    expect(gone.skipped.map((one) => one.reason)).toEqual(["its grid changed since it was read: left alone"]);
+    expect((await writer.plan(pageChanges().page("Crlf", (p) => p.grids.replaceCell("<column>\r\ny\r\nz\r\n</column>", 3, "x")).build())).skipped).toHaveLength(1);
+  });
+
+  it("closes a grid's cell left open as it writes it", async () => {
+    const { map, writer } = memory({ A: "<grid>\n<column>\nOpen\n</grid>" });
+    await writer.write(pageChanges().page("A", (p) => p.grids.replaceCell("<column>\nOpen", 0, "Shut")).build());
+    expect(map.get("A")).toBe("<grid>\n<column>\n\nShut\n\n</column>\n</grid>");
+  });
 });
 
 describe("the builder", () => {
   it("has every section the parts make, each a part of its own", () => {
     const sections = PARTS.flatMap((one) => (one.section ? [one.section.name] : []));
-    expect(sections).toEqual(["properties", "tags", "codeBlocks"]);
+    expect(sections).toEqual(["properties", "tags", "codeBlocks", "grids"]);
     pageChanges().page("A", (p) => {
       for (const name of sections) expect(Object.values(p[name]).every((method) => typeof method === "function"), name).toBe(true);
     });

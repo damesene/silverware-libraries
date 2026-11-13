@@ -6,6 +6,7 @@
 // else. Built in only for now (decided 2026-11-07); another plugin's part
 // would be registered the same way, its types added to `PageChange` and
 // `PageSections` (TypeScript's interface merging for the latter).
+import { readGrids } from "../markdown/grid.ts";
 import { codeBlocksOf, sameBody } from "./blocks.ts";
 import type { PageBuilder } from "./changes.ts";
 import { type FrontmatterValue, readFrontmatter, readKey, validateFrontmatterKey, writeKey } from "./frontmatter.ts";
@@ -47,7 +48,10 @@ export type PageChange =
   // A fenced code block of a language and body (the `occurrence`-th of those alike, counted from 0) written anew
   | { readonly kind: "replaceCodeBlock"; readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number; readonly text: string }
   // Such a block taken out of the page whole, its fences with it
-  | { readonly kind: "removeCodeBlock"; readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number };
+  | { readonly kind: "removeCodeBlock"; readonly language: string; readonly body: string; readonly occurrence: number; readonly of?: number }
+  // A cell of a grid (Silverware Layout's columns, shared/markdown/grid.ts) given new content: the grid of that body
+  // (the `occurrence`-th of those alike), its `cell`-th cell counted from 0
+  | { readonly kind: "replaceGridCell"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly cell: number; readonly content: string };
 
 /** The builder's sections, one per part of a page's content (their parts below make them); every method gives the page's builder back */
 export interface PageSections {
@@ -82,6 +86,16 @@ export interface PageSections {
      * it: none so, the page left alone
      */
     remove(language: string, body: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+  };
+  readonly grids: {
+    /**
+     * A grid's cell given new content (its markdown, written with a blank
+     * line before and after it, so other renderers read it as markdown): the
+     * grid whose body is `body` (as the plugin read it, shared/markdown/grid.ts),
+     * the `occurrence`-th of those alike, its `cell`-th cell; none so (the grid
+     * or the cell changed since it was read): the page left alone
+     */
+    replaceCell(body: string, cell: number, content: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
   };
 }
 
@@ -318,6 +332,28 @@ export const PARTS: readonly Part[] = [
       const insert = block.bodyTo > block.bodyFrom ? body + (region.endsWith("\r") ? "\r" : "") : body ? (atEnd ? nl : "") + body + nl : "";
       if (region === insert) return { text, changes: 0 };
       return { text: text.slice(0, block.bodyFrom) + insert + text.slice(block.bodyTo), changes: 1 };
+    },
+  }),
+  part({
+    kinds: ["replaceGridCell"],
+    section: {
+      name: "grids",
+      make: (add) => ({
+        replaceCell: (body, cell, content, where = {}) =>
+          add({ kind: "replaceGridCell", body, cell, content, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+      }),
+    },
+    write: (text, change) => {
+      const alike = readGrids(text).filter((grid) => sameBody(grid.body) === sameBody(change.body));
+      const grid = alike[change.occurrence];
+      const cell = grid?.cells[change.cell];
+      if (!grid || !cell || (change.of !== undefined && alike.length !== change.of)) return { text, changes: 0, problem: "its grid changed since it was read: left alone" };
+      const nl = lineBreakOf(text);
+      const content = sameBody(change.content).replace(/^(\s*\n)+/, "");
+      // A blank line before and after the content (none for no content): what other renderers need to read it as markdown
+      const inner = (content ? nl + content.replace(/\n/g, nl) + nl + nl : nl) + (cell.closed ? "" : `</column>${nl}`);
+      if (text.slice(cell.innerFrom, cell.innerTo) === inner) return { text, changes: 0 };
+      return { text: text.slice(0, cell.innerFrom) + inner + text.slice(cell.innerTo), changes: 1 };
     },
   }),
   // The body: the page builder's own `body`, no section

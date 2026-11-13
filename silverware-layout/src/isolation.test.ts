@@ -6,13 +6,15 @@
 // index.ts, SilverBullet's binding, uses it and the bridge. No plugin's code but its own (another plugin only through
 // its API, handed over by the init page). And no name of SilverBullet's page (its elements, its theme's variable) in
 // the code or the style page's rules but host/silverbullet/'s: Silverware Layout could be carried to another host.
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const SRC = import.meta.dirname;
 
 function files(dir: string): string[] {
+  // (A folder not made yet, an area planned: no files)
+  if (!existsSync(dir)) return [];
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) return files(path);
@@ -60,6 +62,24 @@ describe("isolation", () => {
     const style = readFileSync(join(SRC, "..", "silverware-layout-style.md"), "utf8");
     const rules = /```space-style\r?\n([\s\S]*?)```/.exec(style)?.[1] ?? "";
     expect(code(rules).match(sbNames)?.[0], "silverware-layout-style.md").toBeUndefined();
+  });
+
+  // Areas (docs/silverware-layout-grid.md, docs/silverware-layout-assets.md): a part of Silverware Layout with
+  // Layout's layers inside, under the same rules; Layout's own layers know no area, and no area knows another
+  const AREAS = ["grid", "assets"];
+  it("keeps an area's model to itself, and Layout's layers off every area", () => {
+    for (const area of AREAS) {
+      for (const [file, list] of of(`${area}/model`)) expect(list.filter((path) => !path.startsWith(`${area}/model/`)), file).toEqual([]);
+    }
+    for (const [file, list] of [...of("model"), ...of("core"), ...of("ui"), ...of("host")]) {
+      expect(list.filter((path) => AREAS.some((area) => path.startsWith(`${area}/`))), file).toEqual([]);
+    }
+  });
+
+  it("keeps the areas apart", () => {
+    for (const area of AREAS) {
+      for (const [file, list] of of(area)) expect(list.filter((path) => AREAS.some((other) => other !== area && path.startsWith(`${other}/`))), file).toEqual([]);
+    }
   });
 
   it("imports no other plugin's code", () => {

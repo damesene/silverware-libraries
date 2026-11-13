@@ -126,7 +126,7 @@ A scratch space, a `space-lua` block defining `<grid>` by `syntax.define`, Playw
 ## Steps
 
 1. **Probe** (done 2026-11-13 on 2.12.1, *Probe results*; edge not yet) (SilverBullet 2.12.1 and edge, Chromium): `syntax.define` with `<grid>` in a page's `space-lua` (edge runs it only under `Library/`: docs/silverware-library-prefix.md); the widget shown, the cursor's entry, a plain click and an Alt+click on the widget, the reload needed; how SilverBullet and GitHub show a grid without the plugin (both forms); `renderToDom` of a cell and a grid drawn anew; **a rename of a page and of an attachment linked from a grid, and whether a library can add link objects to the index** (*Indexing*).
-2. The grid's model and codec: read a body into attributes and cells with their source ranges (`shared/markdown/`), write a cell back through the page writer (blank lines kept); the isolation test's rules for the area; tests.
+2. The grid's model and codec: read a body into attributes and cells with their source ranges (`shared/markdown/`), write a cell back through the page writer (blank lines kept); the isolation test's rules for the area; tests. **Done 2026-11-13**: `shared/markdown/attributes.ts` (HTML's attributes, smart quotes read), `shared/markdown/grid.ts` (`readGrids`), the page writer's `grids.replaceCell`, `src/grid/model/columns.ts` (the `columns` attribute as a CSS column template), the areas' rules in `src/isolation.test.ts`.
 3. The widget: render the cells by `markdown.markdownToHtml` (each element's `data-pos` turned into `data-swl-pos` in the page), CSS grid, the narrow pane, SilverBullet's widget menu hidden; the playground.
 4. Editing a cell in place; Alt+click to the source position; UI tests.
 5. `/grid`.

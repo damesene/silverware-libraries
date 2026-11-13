@@ -76,6 +76,12 @@ describe("isolation", () => {
     }
   });
 
+  it("registers the assets' built-in types and actions through the contract alone, as anyone's", () => {
+    for (const [file, list] of of("assets/builtin")) {
+      expect(list.filter((path) => !path.startsWith("assets/builtin/") && path !== "shared/assets.ts" && path !== "shared/elements.ts"), file).toEqual([]);
+    }
+  });
+
   it("keeps the areas apart", () => {
     for (const area of AREAS) {
       for (const [file, list] of of(area)) expect(list.filter((path) => AREAS.some((other) => other !== area && path.startsWith(`${other}/`))), file).toEqual([]);

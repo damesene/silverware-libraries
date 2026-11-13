@@ -135,3 +135,19 @@ test("a link shown as embedded by its icon's menu, and the embed shown as a link
   await pick(embedded.locator(".swl-asset-more"), "Show as a link");
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\nA ${link} here.\n\n${grid(`Cell ${link}`, "Right")}`);
 });
+
+test("SilverBullet's markdown shown as written: media and grids hidden, their markdown alone; shown again after", async ({ page, space }) => {
+  const image = `![[${space.folder}/photo.png|Photo|120]]`;
+  await space.open({ Page: `# Page\n\n${image}\n\n${grid("Left", "Right")}` }, "Page", { "photo.png": PIXEL_PNG });
+  await gridsDrawn(page);
+  const medium = page.locator("#sb-main [data-swl-asset]:not(.swl-asset-frame)").first();
+  const shownGrid = page.locator("#sb-main .swl-grid");
+  await expect(medium).toBeVisible();
+  await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
+  await expect(page.locator("#sb-main .cm-content")).toContainText(image);
+  await expect(medium).toBeHidden();
+  await expect(shownGrid).toBeHidden();
+  await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
+  await expect(page.locator("#sb-main [data-swl-asset]:not(.swl-asset-frame)").first()).toBeVisible();
+  await expect(page.locator("#sb-main .swl-grid")).toBeVisible();
+});

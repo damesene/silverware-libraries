@@ -23,6 +23,7 @@ import { gridRelations, gridTagObjects } from "./host/silverbullet/gridindex.ts"
 import { Grids } from "./grid/grids.ts";
 import { gridProvider } from "./grid/provider.ts";
 import { watchEmbeddedGrids } from "./host/silverbullet/embeddedgrids.ts";
+import { watchSyntaxMode } from "./host/silverbullet/syntaxmode.ts";
 import { silverBulletGridHost } from "./host/silverbullet/grid.ts";
 import { keepDeviceZoom, readDeviceZoom } from "./host/devicezoom.ts";
 import { silverBulletPage } from "./host/silverbullet/dom.ts";
@@ -77,6 +78,8 @@ export async function init(bridge: Bridge): Promise<void> {
     // A grid in a page embedded in this one, which SilverBullet shows as its text: drawn as the grid it is
     const drawing = grids;
     watchEmbeddedGrids(document, (text) => drawing.drawText(text));
+    // The markdown shown as written (SilverBullet's mode): what Silverware Layout draws or decorates hidden then
+    watchSyntaxMode(document, () => current?.getUiOption?.("markdownSyntaxRendering"));
   }
   const raw = silverBulletAssetHost(bridge, writer, document);
   const assetHost: AssetHost = { ...raw, settings: async () => readAssetSettings(await raw.settings()).settings };

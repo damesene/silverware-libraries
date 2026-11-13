@@ -40,6 +40,12 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   margin-left: 0 !important;
   margin-right: 0 !important;
 }
+/* SilverBullet showing the markdown as written (Editor: Toggle Markdown Syntax Rendering): the media and grids it still
+   draws there hidden, their markdown alone shown; the host's box round each too (an empty one is a line's height) */
+:root[data-swl-syntax-shown] :is([data-swl-asset]:not(.swl-asset-frame), .swl-grid-widget),
+:root[data-swl-syntax-shown] :has(> :is([data-swl-asset]:not(.swl-asset-frame), .swl-grid-widget)) {
+  display: none !important;
+}
 /* The boxes a widget laid out is in, within the content, let it out: SilverBullet scrolls a Lua block's output in a
    box of the text's width (overflow: auto), which cut a wider database off and showed a scrollbar */
 :root:not([data-swl-narrow]) [data-swl-content] > * :has([data-swl-width]:not([data-silverware-over-window])) {

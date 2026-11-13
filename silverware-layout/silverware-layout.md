@@ -109,6 +109,8 @@ SilverBullet reads only the alt text and the size, so without Silverware Layout 
 
 Media in a grid's columns are shown the same way, and their bar makes them wider or narrower within their column: it snaps to a quarter, a half, three quarters and the whole of the column's width.
 
+**SilverBullet's markdown as written** (*Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws embedded files and grids in that mode; Silverware Layout hides them there, so you see their markdown alone.
+
 ## Font size
 
 The dialog's **Font** tab sets the editor's font size: **All pages** for every page (your theme's size until you set one), by its slider or typed in px. Headings, code, tables and charts grow with it.

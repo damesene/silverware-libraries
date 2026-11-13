@@ -24,6 +24,8 @@ export type Bridge = {
   readonly renderMarkdown?: (text: string) => string | Promise<string>;
   // Optional, for a grid's Alt+click: the cursor put at an offset of the page's text, centred in view (`editor.moveCursor`)
   readonly moveCursor?: (at: number, center?: boolean) => unknown;
+  // Optional, for `/grid`: where the cursor is, an offset of the page's text (`editor.getCursor`)
+  readonly getCursor?: () => unknown;
 };
 
 /** The bridge's functions Silverware Layout cannot work without, missing from what the init page gave */

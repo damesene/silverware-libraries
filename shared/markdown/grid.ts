@@ -103,6 +103,17 @@ export function readGrids(text: string): Grid[] {
   return grids;
 }
 
+/**
+ * A new grid's text: `cells` empty cells, each with a blank line before and after its (empty) content, as the page
+ * writer writes a cell; `content`: where the first cell's content line is in it. Here beside the reading, the one
+ * place that knows the grid's syntax (a cell written later is the page writer's)
+ */
+export function newGridText(cells: number): { readonly text: string; readonly content: number } {
+  const cell = "<column>\n\n\n\n</column>\n";
+  const text = `<grid>\n${cell.repeat(Math.max(1, cells))}</grid>`;
+  return { text, content: "<grid>\n<column>\n\n".length };
+}
+
 const OPEN_LINE = "<grid>\n";
 
 /**

@@ -75,8 +75,9 @@ if js and js.window then
     renderMarkdown = function(text)
       return markdown.markdownToHtml(text, { expand = true, annotationPositions = true })
     end,
-    -- A grid's Alt+click: the cursor where the click was in its markdown
+    -- A grid's Alt+click: the cursor where the click was in its markdown; /grid: where the cursor is
     moveCursor = editor.moveCursor,
+    getCursor = editor.getCursor,
     -- The dialog's default text width: saved as SilverBullet's Configuration Manager saves
     -- (the CONFIG page, indexed, the configuration loaded again)
     saveConfigPage = function(text)
@@ -98,6 +99,16 @@ if js and js.window then
       name = name,
       run = function()
         silverwareLayoutJs.runCommand(name)
+      end,
+    })
+  end
+  for _, slash in ipairs(silverwareLayoutJs.slashCommands()) do
+    local name = slash.name
+    slashCommand.define({
+      name = name,
+      description = slash.description,
+      run = function()
+        silverwareLayoutJs.runSlashCommand(name)
       end,
     })
   end

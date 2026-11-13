@@ -9,6 +9,7 @@ import { type PageWriter, pageWriter } from "../../shared/pages/writer.ts";
 import { LayoutApp, type LayoutStore } from "./app.ts";
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { Registry } from "./core/registry.ts";
+import { gridInsertion } from "./grid/core/insert.ts";
 import { Grids } from "./grid/grids.ts";
 import { silverBulletGridHost } from "./host/silverbullet/grid.ts";
 import { keepDeviceZoom, readDeviceZoom } from "./host/devicezoom.ts";
@@ -44,6 +45,7 @@ export async function init(bridge: Bridge): Promise<void> {
     console.error(`Silverware Layout: the init page did not hand over ${missing.join(", ")}`);
     return;
   }
+  current = bridge;
   const writer = pageWriter(silverBulletPlatform(bridge));
   // One per window (its listeners live as long); its host the bridge handed over now, again with each start
   const host = silverBulletGridHost(bridge, writer);
@@ -86,6 +88,24 @@ export function pageEdited(): void {
   app.pageEdited();
   // A grid's `<grid>` line edited changes no body SilverBullet draws a grid anew for: its columns set again
   grids?.refreshSoon();
+}
+
+// The bridge handed over last (for the slash commands)
+let current: Bridge | undefined;
+
+/** The slash commands, as the init page defines them */
+export function slashCommands(): { name: string; description: string }[] {
+  return [{ name: "grid", description: "Columns: a grid of two cells side by side" }];
+}
+
+/** A slash command run: `/grid` puts a new grid at the cursor, the cursor in its first cell */
+export async function runSlashCommand(name: string): Promise<void> {
+  const bridge = current;
+  if (name !== "grid" || !bridge?.getCursor) return;
+  const [text, at] = await Promise.all([bridge.getText(), bridge.getCursor()]);
+  const edit = gridInsertion(String(text), Number(at) || 0);
+  await bridge.replaceRange(edit.from, edit.to, edit.insert);
+  await bridge.moveCursor?.(edit.cursor);
 }
 
 /** The commands, as the init page defines them */

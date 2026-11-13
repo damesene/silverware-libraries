@@ -115,7 +115,7 @@ SilverBullet reads only the alt text and the size, so without Silverware Layout 
 
 Media in a grid's columns are shown the same way, and their bar makes them wider or narrower within their column: it snaps to a quarter, a half, three quarters and the whole of the column's width.
 
-**SilverBullet's markdown as written** (*Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws embedded files and grids in that mode; Silverware Layout hides them there, so you see their markdown alone. In that mode a click on a link only puts the cursor there (before an embed's `![[` too); Ctrl+click (Cmd+click) still follows it.
+**SilverBullet's markdown as written** (*Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws embedded files and grids in that mode; Silverware Layout hides them there, so you see their markdown alone. In that mode a click on a link only puts the cursor there (before an embed's `![[` too), the pointer a text one over it; Ctrl+click (Cmd+click) still follows it. Each can be turned off in the **Markdown** tab of **Silverware Layout: Page layout** (or `silverware.layout.syntaxMode.hideWidgets`, `silverware.layout.syntaxMode.clickPlacesCursor` in your CONFIG).
 
 ## Font size
 

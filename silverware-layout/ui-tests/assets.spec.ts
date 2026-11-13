@@ -152,14 +152,66 @@ test("SilverBullet's markdown shown as written: media and grids hidden, their ma
   await expect(page.locator("#sb-main .swl-grid")).toBeVisible();
 });
 
-test("SilverBullet's markdown shown as written: a click on a link puts the cursor there, follows nothing", async ({ page, space }) => {
-  await space.open({ Page: `# Page\n\nSee [[${space.folder}/Other]] here.\n`, Other: "# Other\n" }, "Page");
+test("SilverBullet's markdown shown as written: a click on an embed's `![[` places the cursor, SilverBullet not told of it, a text pointer over it; the Markdown tab's box off, SilverBullet's click again", async ({ page, space }) => {
+  const image = `![[${space.folder}/photo.png|Photo|120]]`;
+  await space.open({ Page: `# Page\n\n${image}\n\nAfter\n` }, "Page", { "photo.png": PIXEL_PNG });
   const url = page.url();
+  const clickAtStart = async () => {
+    const line = page.locator("#sb-main .cm-line", { hasText: "photo.png" });
+    const box = (await line.boundingBox())!;
+    await page.mouse.click(box.x + 3, box.y + 8);
+  };
+  const cursor = () => page.evaluate(() => (window as unknown as { client: { editorView: { state: { selection: { main: { head: number } } } } } }).client.editorView.state.selection.main.head);
+  // The clicks SilverBullet is told of (its editor's listener is under `#sb-main`): counted there
+  await page.evaluate(() => {
+    const seen = window as unknown as { swlClicks: number };
+    seen.swlClicks = 0;
+    document.querySelector("#sb-main")!.addEventListener("click", () => void seen.swlClicks++);
+  });
+  const told = () => page.evaluate(() => (window as unknown as { swlClicks: number }).swlClicks);
   await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
-  const line = page.locator("#sb-main .cm-line", { hasText: "See" });
-  await expect(line).toContainText(`[[${space.folder}/Other]]`);
-  await line.getByText("Other").click();
+  await expect(page.locator("#sb-main .cm-content")).toContainText(image);
+  // The text's pointer over it, no hand: nothing to follow there
+  await expect
+    .poll(() => page.locator("#sb-main .cm-line", { hasText: "photo.png" }).evaluate((line) => [...line.querySelectorAll("span")].map((span) => getComputedStyle(span).cursor)))
+    .not.toContain("pointer");
+  // (SilverBullet follows an embed's line on a click anywhere on it, its `!` too: held back, the cursor at the click)
+  await clickAtStart();
+  // (The cursor in the embed's line, where the click was; a long path wraps the line, so not asked to the character)
+  const start = "# Page\n\n".length;
+  await expect.poll(cursor).toBeGreaterThanOrEqual(start);
+  expect(await cursor()).toBeLessThanOrEqual(start + image.length);
+  expect(await told()).toBe(0);
   await page.waitForTimeout(500);
   expect(page.url()).toBe(url);
+  // The box off in the Markdown tab: the click SilverBullet's again (what it does with it, its own)
+  await runCommand(page, PAGE_LAYOUT);
+  const dialog = page.locator(".swl-dialog");
+  await dialog.getByRole("tab", { name: "Markdown" }).click();
+  await dialog.getByLabel("A click on a link only places the cursor").uncheck();
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect.poll(() => space.config()).toContain('config.set("silverware.layout.syntaxMode.clickPlacesCursor", false)');
+  // (Once SilverBullet has loaded its configuration again: the root no longer marked for it)
+  await expect.poll(() => page.evaluate(() => document.documentElement.hasAttribute("data-swl-syntax-clicks")), { timeout: 15_000 }).toBe(false);
+  await clickAtStart();
+  await expect.poll(told).toBe(1);
+  if (page.url() !== url) await page.goBack();
+  await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
+});
+
+test("SilverBullet's markdown shown as written, the Markdown tab's box for media off: media and grids drawn there as SilverBullet draws them", async ({ page, space }) => {
+  const image = `![[${space.folder}/photo.png|Photo|120]]`;
+  await space.open({ Page: `# Page\n\n${image}\n\n${grid("Left", "Right")}` }, "Page", { "photo.png": PIXEL_PNG });
+  await gridsDrawn(page);
+  await runCommand(page, PAGE_LAYOUT);
+  const dialog = page.locator(".swl-dialog");
+  await dialog.getByRole("tab", { name: "Markdown" }).click();
+  await dialog.getByLabel("Hide embedded files and grids").uncheck();
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect.poll(() => space.config()).toContain('config.set("silverware.layout.syntaxMode.hideWidgets", false)');
+  await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
+  await expect(page.locator("#sb-main .cm-content")).toContainText(image);
+  await expect(page.locator("#sb-main [data-swl-asset]:not(.swl-asset-frame)").first()).toBeVisible();
+  await expect(page.locator("#sb-main .swl-grid")).toBeVisible();
   await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
 });

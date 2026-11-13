@@ -30,7 +30,8 @@ import { keepDeviceZoom, readDeviceZoom } from "./host/devicezoom.ts";
 import { silverBulletPage } from "./host/silverbullet/dom.ts";
 import { pageLayoutOf, writePageWidth } from "./host/silverbullet/page.ts";
 import { silverBulletPlatform } from "./host/silverbullet/platform.ts";
-import { DEFAULT_GUIDES, DEFAULT_MIN_PANE_WIDTH, keptGuides, PATHS, readSettings, type Settings } from "./model/settings.ts";
+import { DEFAULT_GUIDES, DEFAULT_MIN_PANE_WIDTH, keptGuides, PATHS, readSettings, readSyntaxModeSettings, type Settings, type SyntaxModeSettings } from "./model/settings.ts";
+import { syntaxTab } from "./ui/syntaxtab.ts";
 import { cssWidth, readTextWidth } from "./model/width.ts";
 
 const PAGE_LAYOUT = "Silverware Layout: Page layout";
@@ -80,8 +81,13 @@ export async function init(bridge: Bridge): Promise<void> {
     // A grid in a page embedded in this one, which SilverBullet shows as its text: drawn as the grid it is
     const drawing = grids;
     watchEmbeddedGrids(document, (text) => drawing.drawText(text));
-    // The markdown shown as written (SilverBullet's mode): what Silverware Layout draws or decorates hidden then
-    watchSyntaxMode(document, () => current?.getUiOption?.("markdownSyntaxRendering"));
+    // The markdown shown as written (SilverBullet's mode): what Silverware Layout draws or decorates hidden then, a
+    // link's click the cursor's, as the settings say (read as Silverware Layout starts, again as the tab saves them)
+    syntaxWatcher = watchSyntaxMode(
+      document,
+      () => current?.getUiOption?.("markdownSyntaxRendering"),
+      () => (current ? readSyntaxSettings(current) : { hideWidgets: true, clickPlacesCursor: true }),
+    );
   }
   const raw = silverBulletAssetHost(bridge, writer, document);
   const assetHost: AssetHost = { ...raw, settings: async () => readAssetSettings(await raw.settings()).settings };
@@ -102,6 +108,13 @@ export async function init(bridge: Bridge): Promise<void> {
       mediaTab(document, input, async (saved) => {
         await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, { [ASSETS_PATH]: storedAssetSettings(saved) }, OWN_MARKER));
         await decorator.redecorateAll();
+        return undefined;
+      }),
+      syntaxTab(document, await readSyntaxSettings(bridge), async (saved) => {
+        await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
+          withConfigSettings(text, { [PATHS.syntaxHides]: saved.hideWidgets ? undefined : false, [PATHS.syntaxClicks]: saved.clickPlacesCursor ? undefined : false }),
+        );
+        syntaxWatcher?.settingsChanged(saved);
         return undefined;
       }),
     ];
@@ -144,6 +157,15 @@ export function pageEdited(): void {
 
 // The bridge handed over last (for the slash commands)
 let current: Bridge | undefined;
+// What follows SilverBullet's markdown shown as written (its settings read as it checks the mode)
+let syntaxWatcher: ReturnType<typeof watchSyntaxMode> | undefined;
+
+/** The settings of the markdown shown as written, as SilverBullet's configuration has them */
+async function readSyntaxSettings(bridge: Bridge): Promise<SyntaxModeSettings> {
+  if (!bridge.getConfig) return { hideWidgets: true, clickPlacesCursor: true };
+  const [hides, clicks] = await Promise.all([bridge.getConfig(PATHS.syntaxHides, true), bridge.getConfig(PATHS.syntaxClicks, true)]);
+  return readSyntaxModeSettings((path) => (path === PATHS.syntaxHides ? hides : path === PATHS.syntaxClicks ? clicks : undefined));
+}
 
 /**
  * A page being indexed (the init page's page:index listener): the relations of the links in its grids, its hashtags

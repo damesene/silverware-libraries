@@ -47,6 +47,24 @@ config.define("silverware.layout", {
         },
       },
     },
+    syntaxMode = {
+      type = "object",
+      additionalProperties = false,
+      properties = {
+        hideWidgets = {
+          type = "boolean",
+          default = true,
+          description = "While SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax Rendering), embedded files and grids are hidden: their markdown alone.",
+          ui = { category = "Silverware Layout", label = "Markdown as written: hide files and grids", priority = 0.6 },
+        },
+        clickPlacesCursor = {
+          type = "boolean",
+          default = true,
+          description = "While SilverBullet shows the markdown as written, a click on a link only places the cursor; Ctrl+click follows it.",
+          ui = { category = "Silverware Layout", label = "Markdown as written: a click places the cursor", priority = 0.59 },
+        },
+      },
+    },
     assets = {
       type = "object",
       description = "Embedded media: how each type is shown (views), what a click and a Shift+click do (actions), what a card shows (card), a view's default height (heights), where a medium stays as its width is dragged (anchor). Set in the Page layout dialog (Media), kept in Silverware Layout's own block of CONFIG.",

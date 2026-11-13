@@ -7,7 +7,7 @@ import { iconFiles } from "./icons/index.mjs";
 import { sharedStyles } from "./sharedstyles.mjs";
 import { checkVersions } from "./versions.mjs";
 
-const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart", "silverware-database", "silverware-icons", "silverware-layout"];
+const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart", "silverware-database", "silverware-icons", "silverware-layout", "silverware-assets"];
 // Files bundled beside a library's, loaded by it when needed: Chart.js beside the chart's (src/chartjs.ts)
 const beside = [{ entry: "silverware-chart/src/chartjs.ts", outfile: "silverware-chart/silverware-chart-chartjs.js" }];
 const watch = process.argv.includes("--watch");

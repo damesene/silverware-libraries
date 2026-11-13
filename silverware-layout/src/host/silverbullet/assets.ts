@@ -30,7 +30,8 @@ const FILE_NAME = /\.(?!md$)[a-z0-9]{1,8}$/i;
 const WEB = /^[a-z][a-z0-9+.-]*:/i;
 
 /** A link drawn (src/assets/decorate.ts' `DrawnLink`) */
-type Link = { readonly element: HTMLElement; readonly target: string; readonly style: "wiki" | "markdown" };
+type Link = { readonly element: HTMLElement; readonly target: string; readonly style: "wiki" | "markdown"; readonly position?: () => number | undefined };
+type FormWrite = { readonly text: string; readonly occurrence: number; readonly of: number };
 
 /** A link's target and form as SilverBullet drew it; none for an element of Silverware Layout's own */
 export function drawnLink(element: HTMLElement): Link | undefined {
@@ -127,7 +128,8 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
           if (seen.has(element)) continue;
           seen.add(element);
           const link = drawnLink(element);
-          if (link?.target) found.push(link);
+          // (One in markdown rendered outside the editor found by its place, as a medium there is)
+          if (link?.target) found.push(element.closest("[data-swl-rendered]") ? { ...link, position: () => renderedPosition(element) } : link);
         }
         if (found.length) drawn(found);
       };
@@ -168,6 +170,16 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
     writeEmbed: async (write: Write): Promise<string | undefined> => {
       const page = String(await bridge.getCurrentPage());
       const report = await writer.write(pageChanges().page(page, (p) => p.embeds.set(write.text, write.changes, { occurrence: write.occurrence, of: write.of })).build());
+      return report.skipped[0]?.reason;
+    },
+    embedToLink: async (write: FormWrite): Promise<string | undefined> => {
+      const page = String(await bridge.getCurrentPage());
+      const report = await writer.write(pageChanges().page(page, (p) => p.embeds.toLink(write.text, { occurrence: write.occurrence, of: write.of })).build());
+      return report.skipped[0]?.reason;
+    },
+    linkToEmbed: async (write: FormWrite): Promise<string | undefined> => {
+      const page = String(await bridge.getCurrentPage());
+      const report = await writer.write(pageChanges().page(page, (p) => p.links.toEmbed(write.text, { occurrence: write.occurrence, of: write.of })).build());
       return report.skipped[0]?.reason;
     },
     open: (url: string): void => void (doc.defaultView ?? window).open(url, "_blank", "noopener"),

@@ -46,6 +46,9 @@ export function resolveLinkPath(page: string, url: string): string {
 }
 
 const WIKI = /!\[\[([^\]\n]+?)\]\]/g;
+// A link: no `!` before it (that is an embed's)
+const WIKI_LINK = /(?<!!)\[\[([^\]\n]+?)\]\]/g;
+const MARKDOWN_LINK = /(?<![!\]])\[([^\]\n]*)\]\(([^)\s]+)\)/g;
 const MARKDOWN = /!\[([^\]\n]*)\]\(([^)\s]+)\)/g;
 const CODE_SPAN = /`+[^`\n]*`+/g;
 const FENCE = /^\s*(`{3,}|~{3,})/;
@@ -180,4 +183,70 @@ export function writeEmbed(embed: Embed, changes: EmbedChanges): string {
   const segments = meta ? [alt, size, meta] : size ? [alt, size] : alt ? [alt] : [];
   const alias = segments.join("|");
   return embed.style === "wiki" ? `![[${embed.target}${alias ? `|${alias}` : ""}]]` : `![${alias}](${embed.target})`;
+}
+
+/** A link of a page, as written (`[[report.pdf|The report]]`, `[The report](report.pdf)`): an embed's form without its `!` */
+export type Link = {
+  readonly from: number;
+  readonly to: number;
+  readonly text: string;
+  readonly style: "wiki" | "markdown";
+  readonly target: string;
+  // What it shows (a wiki link's alias, a markdown link's text); none: ""
+  readonly alias: string;
+};
+
+/** The links of a text, in order (embeds not among them): not in a fenced code block or a code span */
+export function readLinks(text: string): Link[] {
+  const links: Link[] = [];
+  let fence: string | undefined;
+  let at = 0;
+  for (const raw of text.split("\n")) {
+    const line = raw.replace(/\r$/, "");
+    const mark = FENCE.exec(line)?.[1];
+    if (fence !== undefined) {
+      if (mark && mark[0] === fence[0] && mark.length >= fence.length && line.trim() === mark) fence = undefined;
+    } else if (mark) {
+      fence = mark;
+    } else {
+      const code = [...line.matchAll(CODE_SPAN)].map((m) => [m.index!, m.index! + m[0].length] as const);
+      const inCode = (i: number) => code.some(([from, to]) => i >= from && i < to);
+      const found: Link[] = [];
+      for (const m of line.matchAll(WIKI_LINK)) {
+        if (inCode(m.index!)) continue;
+        const inner = m[1]!;
+        const bar = inner.indexOf("|");
+        found.push({ from: at + m.index!, to: at + m.index! + m[0].length, text: m[0], style: "wiki", target: bar < 0 ? inner : inner.slice(0, bar), alias: bar < 0 ? "" : inner.slice(bar + 1) });
+      }
+      for (const m of line.matchAll(MARKDOWN_LINK)) {
+        // (A wiki link's `[[x]]` read above; a link in a wiki link's brackets is none of its own)
+        if (inCode(m.index!) || line[m.index! + 1] === "[" || found.some((one) => at + m.index! >= one.from && at + m.index! < one.to)) continue;
+        found.push({ from: at + m.index!, to: at + m.index! + m[0].length, text: m[0], style: "markdown", target: m[2]!, alias: m[1]! });
+      }
+      links.push(...found.sort((a, b) => a.from - b.from));
+    }
+    at += raw.length + 1;
+  }
+  return links;
+}
+
+/** A link written as an embed of its target: its alias the embed's alt text (`[[a.pdf|Doc]]`: `![[a.pdf|Doc]]`) */
+export function linkAsEmbed(link: Link): string {
+  return `!${link.text}`;
+}
+
+/**
+ * An embed written as a link to its target: its alt text the link's alias, its size and metadata left out (a link's
+ * alias is all it shows); a markdown link without a text named by its file
+ */
+export function embedAsLink(embed: Embed): string {
+  if (embed.style === "wiki") return `[[${embed.target}${embed.alt ? `|${embed.alt}` : ""}]]`;
+  const name = embed.target.split(/[?#]/, 1)[0]!.split("/").pop() ?? embed.target;
+  let shown = name;
+  try {
+    shown = decodeURI(name);
+  } catch {
+    // (As written)
+  }
+  return `[${embed.alt || shown}](${embed.target})`;
 }

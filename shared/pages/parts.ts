@@ -7,7 +7,7 @@
 // would be registered the same way, its types added to `PageChange` and
 // `PageSections` (TypeScript's interface merging for the latter).
 import { validateAttributeName, writeAttributes } from "../markdown/attributes.ts";
-import { type EmbedChanges, readEmbeds, writeEmbed } from "../markdown/embed.ts";
+import { embedAsLink, type EmbedChanges, linkAsEmbed, readEmbeds, readLinks, writeEmbed } from "../markdown/embed.ts";
 import { readGrids } from "../markdown/grid.ts";
 import { codeBlocksOf, sameBody } from "./blocks.ts";
 import type { PageBuilder } from "./changes.ts";
@@ -58,7 +58,9 @@ export type PageChange =
   | { readonly kind: "setGridAttributes"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly attributes: Readonly<Record<string, string | null>> }
   // An embed (shared/markdown/embed.ts) given an alt text, a size or metadata: the embed of that text (the
   // `occurrence`-th of those alike), written in its own style
-  | { readonly kind: "setEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number; readonly changes: EmbedChanges };
+  | { readonly kind: "setEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number; readonly changes: EmbedChanges }
+  | { readonly kind: "embedToLink"; readonly text: string; readonly occurrence: number; readonly of?: number }
+  | { readonly kind: "linkToEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number };
 
 /** The builder's sections, one per part of a page's content (their parts below make them); every method gives the page's builder back */
 export interface PageSections {
@@ -116,6 +118,12 @@ export interface PageSections {
      * whose text is `text` (as the plugin read it), the `occurrence`-th of those alike; none so: the page left alone
      */
     set(text: string, changes: EmbedChanges, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /** An embed written as a link to its target (its alt text the link's, its size and metadata left out), found as `set` finds it */
+    toLink(text: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+  };
+  readonly links: {
+    /** A link written as an embed of its target (`[[a.pdf]]`: `![[a.pdf]]`): the link whose text is `text`, the `occurrence`-th of those alike */
+    toEmbed(text: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
   };
 }
 
@@ -396,21 +404,37 @@ export const PARTS: readonly Part[] = [
     },
   }),
   part({
-    kinds: ["setEmbed"],
+    kinds: ["setEmbed", "embedToLink"],
     section: {
       name: "embeds",
       make: (add) => ({
         set: (text, changes, where = {}) =>
           add({ kind: "setEmbed", text, changes: structuredClone(changes), occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        toLink: (text, where = {}) => add({ kind: "embedToLink", text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
       }),
     },
     write: (text, change) => {
       const alike = readEmbeds(text).filter((embed) => embed.text === change.text);
       const embed = alike[change.occurrence];
       if (!embed || (change.of !== undefined && alike.length !== change.of)) return { text, changes: 0, problem: "its embed changed since it was read: left alone" };
-      const written = writeEmbed(embed, change.changes);
+      const written = change.kind === "embedToLink" ? embedAsLink(embed) : writeEmbed(embed, change.changes);
       if (written === embed.text) return { text, changes: 0 };
       return { text: text.slice(0, embed.from) + written + text.slice(embed.to), changes: 1 };
+    },
+  }),
+  part({
+    kinds: ["linkToEmbed"],
+    section: {
+      name: "links",
+      make: (add) => ({
+        toEmbed: (text, where = {}) => add({ kind: "linkToEmbed", text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+      }),
+    },
+    write: (text, change) => {
+      const alike = readLinks(text).filter((link) => link.text === change.text);
+      const link = alike[change.occurrence];
+      if (!link || (change.of !== undefined && alike.length !== change.of)) return { text, changes: 0, problem: "its link changed since it was read: left alone" };
+      return { text: text.slice(0, link.from) + linkAsEmbed(link) + text.slice(link.to), changes: 1 };
     },
   }),
   // The body: the page builder's own `body`, no section

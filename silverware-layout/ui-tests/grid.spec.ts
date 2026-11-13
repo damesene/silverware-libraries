@@ -6,11 +6,25 @@ const GRID = "<grid>\n<column>\n\nLeft text\n\n</column>\n<column>\n\nRight text
 
 test("/grid puts a grid of two columns at the cursor, the cursor in its first", async ({ page, space }) => {
   await space.open({ Page: "# Page\n\nAbove\n\n" }, "Page");
-  await page.locator("#sb-main .cm-content").click();
-  await page.keyboard.press("Control+End");
-  await page.keyboard.type("/grid");
-  await expect(page.locator(".cm-tooltip-autocomplete")).toContainText("grid");
-  await page.keyboard.press("Enter");
+  // (Space Lua's slash command may come after the page: where /grid is not offered yet, typed again once loaded again)
+  for (let attempt = 0; ; attempt++) {
+    await page.locator("#sb-main .cm-content").click();
+    await page.keyboard.press("Control+End");
+    await page.keyboard.type("/grid", { delay: 50 });
+    // (Asked for as well, where typed while the editor was busy it offered none)
+    if (!(await page.locator(".cm-tooltip-autocomplete").isVisible())) await page.keyboard.press("Control+Space");
+    try {
+      // (Ours by its description: the list may offer more holding "grid")
+      await expect(page.locator(".cm-tooltip-autocomplete li", { hasText: "Columns:" })).toBeVisible({ timeout: 5000 });
+      break;
+    } catch (error) {
+      if (attempt >= 2) throw error;
+      for (let i = 0; i < "/grid".length; i++) await page.keyboard.press("Backspace");
+      await page.reload();
+      await page.waitForFunction(() => !!(window as unknown as { client?: { editorView?: unknown } }).client?.editorView);
+    }
+  }
+  await page.locator(".cm-tooltip-autocomplete li", { hasText: "Columns:" }).click();
   await expect.poll(() => editorText(page)).toContain("<grid>\n<column>\n\n");
   const text = await editorText(page);
   expect(text.match(/<column>/g)).toHaveLength(2);

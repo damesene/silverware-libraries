@@ -373,6 +373,16 @@ describe("the page writer", () => {
     expect(same.pages).toEqual([]);
   });
 
+  it("writes an embed as a link and a link as an embed, the one of those alike asked", async () => {
+    const { map, writer } = memory({ A: "![[cat.png|Cat|300|{ view: icon }]] and [[doc.pdf]] [[doc.pdf]]\n" });
+    await writer.write(pageChanges().page("A", (p) => p.embeds.toLink("![[cat.png|Cat|300|{ view: icon }]]")).build());
+    expect(map.get("A")).toBe("[[cat.png|Cat]] and [[doc.pdf]] [[doc.pdf]]\n");
+    await writer.write(pageChanges().page("A", (p) => p.links.toEmbed("[[doc.pdf]]", { occurrence: 1, of: 2 })).build());
+    expect(map.get("A")).toBe("[[cat.png|Cat]] and [[doc.pdf]] ![[doc.pdf]]\n");
+    const gone = await writer.plan(pageChanges().page("A", (p) => p.links.toEmbed("[[nope.pdf]]")).build());
+    expect(gone.skipped.map((one) => one.reason)).toEqual(["its link changed since it was read: left alone"]);
+  });
+
   it("closes a grid's cell left open as it writes it", async () => {
     const { map, writer } = memory({ A: "<grid>\n<column>\nOpen\n</grid>" });
     await writer.write(pageChanges().page("A", (p) => p.grids.replaceCell("<column>\nOpen", 0, "Shut")).build());
@@ -383,7 +393,7 @@ describe("the page writer", () => {
 describe("the builder", () => {
   it("has every section the parts make, each a part of its own", () => {
     const sections = PARTS.flatMap((one) => (one.section ? [one.section.name] : []));
-    expect(sections).toEqual(["properties", "tags", "codeBlocks", "grids", "embeds"]);
+    expect(sections).toEqual(["properties", "tags", "codeBlocks", "grids", "embeds", "links"]);
     pageChanges().page("A", (p) => {
       for (const name of sections) expect(Object.values(p[name]).every((method) => typeof method === "function"), name).toBe(true);
     });

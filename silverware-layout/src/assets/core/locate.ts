@@ -28,7 +28,7 @@ export function embedAt(embeds: readonly Embed[], at: number): { readonly embed:
 }
 
 /** The embeds the host draws as its own widgets: those outside every range rendered outside the editor */
-export const outside = (embeds: readonly Embed[], ranges: readonly Range[]) => embeds.filter((one) => !ranges.some((range) => one.from >= range.from && one.from < range.to));
+export const outside = <E extends { readonly from: number }>(embeds: readonly E[], ranges: readonly Range[]): E[] => embeds.filter((one) => !ranges.some((range) => one.from >= range.from && one.from < range.to));
 
 /** The embed a widget drawn is: of the page's embeds of its target (as resolved), the `nth` (its order among those drawn) */
 export function embedOf(embeds: readonly Embed[], resolved: (embed: Embed) => string, target: string, nth: number, among: readonly Embed[] = embeds): { readonly embed: Embed; readonly occurrence: number; readonly of: number } | undefined {
@@ -39,4 +39,12 @@ export function embedOf(embeds: readonly Embed[], resolved: (embed: Embed) => st
   // Its place among the embeds of the same text, which the page writer finds it by
   const sameText = embeds.filter((one) => one.text === embed.text);
   return { embed, occurrence: sameText.indexOf(embed), of: sameText.length };
+}
+
+/** The link at a place of the page (a link in markdown rendered outside the editor, its place known), with its place among those of its text */
+export function linkAt<L extends { readonly from: number; readonly text: string }>(links: readonly L[], at: number): { readonly link: L; readonly occurrence: number; readonly of: number } | undefined {
+  const link = links.find((one) => one.from === at) ?? links.find((one) => Math.abs(one.from - at) <= 2);
+  if (!link) return undefined;
+  const sameText = links.filter((one) => one.text === link.text);
+  return { link, occurrence: sameText.indexOf(link), of: sameText.length };
 }

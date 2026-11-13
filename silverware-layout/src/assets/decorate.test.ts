@@ -11,7 +11,7 @@ import { AssetDecorator, type AssetHost, type DrawnEmbed, type EmbedWrite } from
 import { type AssetSettings, readAssetSettings } from "./model/settings.ts";
 
 function setUp(text: string, settings: unknown = {}) {
-  const state = { text, opened: [] as string[], writes: [] as EmbedWrite[], problems: [] as string[], ranges: [] as { from: number; to: number }[] };
+  const state = { text, opened: [] as string[], writes: [] as EmbedWrite[], forms: [] as string[], problems: [] as string[], ranges: [] as { from: number; to: number }[] };
   const host: AssetHost = {
     watch: () => undefined,
     renderedRanges: () => state.ranges,
@@ -21,6 +21,8 @@ function setUp(text: string, settings: unknown = {}) {
     assetOf: (embed) => ({ kind: "file", path: embed.target, url: `.fs/${embed.target}`, ...(embed.alt ? { alt: embed.alt } : {}) }),
     settings: async (): Promise<AssetSettings> => readAssetSettings(settings).settings,
     writeEmbed: async (write) => void state.writes.push(write),
+    embedToLink: async (write) => void state.forms.push(`link ${write.text} ${write.occurrence}/${write.of}`),
+    linkToEmbed: async (write) => void state.forms.push(`embed ${write.text} ${write.occurrence}/${write.of}`),
     fileInfo: async (asset) => (asset.kind === "file" && asset.path.endsWith(".zip") ? { size: 2_621_440, modified: "2026-11-13T10:00:00Z" } : undefined),
     linkAsset: (link) => (/\.[a-z]+$/.test(link.target) ? { kind: "file", path: link.target, url: `.fs/${link.target}` } : undefined),
     open: (url) => void state.opened.push(url),
@@ -151,6 +153,7 @@ describe("an asset's menu", () => {
       ["Open in a new tab", null],
       ["Show in a side panel", null],
       ["Show enlarged", null],
+      ["Show as a link", null],
     ]);
     items[0]!.click();
     await vi.waitFor(() => expect(state.writes).toHaveLength(1));
@@ -160,6 +163,10 @@ describe("an asset's menu", () => {
     [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")][2]!.click();
     await vi.waitFor(() => expect(state.writes).toHaveLength(2));
     expect(state.writes[1]!.changes).toEqual({ metadata: { view: null } });
+    // Shown as a link: the embed written as one
+    more.click();
+    [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")].at(-1)!.click();
+    await vi.waitFor(() => expect(state.forms).toEqual(["link ![[cat.png|A cat|200]] 0/1"]));
   });
 });
 
@@ -175,7 +182,7 @@ describe("a link's menu", () => {
     icon.click();
     expect(followed).toBe(0);
     const items = [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")];
-    expect(items.map((item) => item.textContent?.trim())).toEqual(["Open in a new tab", "Show in a side panel", "Show enlarged"]);
+    expect(items.map((item) => item.textContent?.trim())).toEqual(["Open in a new tab", "Show in a side panel", "Show enlarged", "Show as embedded"]);
     items[0]!.click();
     expect(state.opened).toEqual([".fs/report.pdf"]);
     // Shown in the side panel: the file's viewer, as the browser draws a PDF
@@ -271,3 +278,36 @@ describe("links to files decorated", () => {
     expect(plain.element.querySelector(".swl-asset-link-icon")).toBeNull();
   });
 });
+
+describe("a link shown as embedded", () => {
+  const menuItem = (icon: HTMLElement, label: string) => {
+    icon.click();
+    [...document.querySelectorAll<HTMLElement>(".swl-asset-menu-holder .swl-menu-item")].find((item) => item.textContent?.trim() === label)!.click();
+  };
+
+  it("writes the link it is: one in the editor by its order among those drawn of its target, outside what is rendered outside the editor", async () => {
+    const text = "[[a.pdf]] then <grid> [[a.pdf]] </grid> and [[a.pdf]]";
+    const { state, decorator } = setUp(text);
+    state.ranges = [{ from: text.indexOf("<grid>"), to: text.indexOf("</grid>") }];
+    const drawn = [0, 1].map(() => {
+      const element = Object.assign(document.createElement("a"), { textContent: "a.pdf" });
+      document.body.append(element);
+      return { element, target: "a.pdf", style: "wiki" as const };
+    });
+    await decorator.decorateLinks(drawn);
+    menuItem(drawn[1]!.element.querySelector(".swl-asset-link-icon")!, "Show as embedded");
+    // The second drawn in the editor: the page's third link (the grid's is none of the editor's)
+    await vi.waitFor(() => expect(state.forms).toEqual(["embed [[a.pdf]] 2/3"]));
+  });
+
+  it("writes one rendered outside the editor by its place", async () => {
+    const text = "[[a.pdf]] then [[a.pdf]]";
+    const { state, decorator } = setUp(text);
+    const element = Object.assign(document.createElement("a"), { textContent: "a.pdf" });
+    document.body.append(element);
+    await decorator.decorateLinks([{ element, target: "a.pdf", style: "wiki", position: () => text.lastIndexOf("[[") }]);
+    menuItem(element.querySelector(".swl-asset-link-icon")!, "Show as embedded");
+    await vi.waitFor(() => expect(state.forms).toEqual(["embed [[a.pdf]] 1/2"]));
+  });
+});
+

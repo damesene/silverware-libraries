@@ -119,3 +119,19 @@ test("the Media tab: a card's size shown, a click set to the side panel; the pan
   await page.keyboard.press("Escape");
   await expect(peek).toHaveCount(0);
 });
+
+test("a link shown as embedded by its icon's menu, and the embed shown as a link again by its own, each the one it is", async ({ page, space }) => {
+  const link = `[[${space.folder}/doc.pdf]]`;
+  await space.open({ Page: `# Page\n\nA ${link} here.\n\n${grid(`Cell ${link}`, "Right")}` }, "Page", { "doc.pdf": "%PDF-1.4\n" });
+  await gridsDrawn(page);
+  const pick = async (trigger: import("@playwright/test").Locator, label: string) => {
+    await trigger.click();
+    await page.locator(".swl-asset-menu-holder .swl-menu-item", { hasText: label }).click();
+  };
+  await pick(page.locator("#sb-main .swl-grid [data-swl-asset-link] .swl-asset-link-icon"), "Show as embedded");
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\nA ${link} here.\n\n${grid(`Cell !${link}`, "Right")}`);
+  const embedded = page.locator("#sb-main .swl-grid [data-swl-asset='pdf']");
+  await embedded.hover();
+  await pick(embedded.locator(".swl-asset-more"), "Show as a link");
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\nA ${link} here.\n\n${grid(`Cell ${link}`, "Right")}`);
+});

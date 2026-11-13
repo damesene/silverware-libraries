@@ -4,9 +4,9 @@
 // the type renders none of), replaced by the type's rendering, or by the card. A click on a card or a preview runs the
 // action the user set for it. A render that fails shows the host's drawing (else the card) with an error mark.
 import type { ActionContext, Asset, AssetType, Capabilities, RenderContext, Viewport } from "../../../shared/assets.ts";
-import { type Embed, type EmbedChanges, readEmbeds } from "../../../shared/markdown/embed.ts";
+import { type Embed, type EmbedChanges, readEmbeds, readLinks } from "../../../shared/markdown/embed.ts";
 import { actionFor, mimeOf, typeFor, viewFor } from "./core/choose.ts";
-import { embedAt, embedOf, outside, type Range, sameTarget } from "./core/locate.ts";
+import { embedAt, embedOf, linkAt, outside, type Range, sameTarget } from "./core/locate.ts";
 import { metadataOf } from "./core/metadata.ts";
 import type { AssetRegistry } from "./core/registry.ts";
 import { type AssetSettings, type Gesture, type View, VIEWS } from "./model/settings.ts";
@@ -24,7 +24,16 @@ export type DrawnEmbed = {
 };
 
 /** A link drawn by the host (`[[report.pdf]]`, `[the report](report.pdf)`): its element, its target as written, its form */
-export type DrawnLink = { readonly element: HTMLElement; readonly target: string; readonly style: "wiki" | "markdown" };
+export type DrawnLink = {
+  readonly element: HTMLElement;
+  readonly target: string;
+  readonly style: "wiki" | "markdown";
+  // Where it is in the page, where the host knows (a link in markdown rendered outside the editor)
+  readonly position?: () => number | undefined;
+};
+
+/** An embed or a link to write as the other, found by its text as read and its place among those alike */
+export type FormWrite = { readonly text: string; readonly occurrence: number; readonly of: number };
 
 /** A file's size in bytes and when it was last changed (a time the host gives: an ISO text or milliseconds) */
 export type FileInfo = { readonly size?: number; readonly modified?: string | number };
@@ -52,6 +61,9 @@ export type AssetHost = {
   /** A file's size (bytes) and when it was last changed, where the host knows them (its card shows them) */
   fileInfo?(asset: Asset): Promise<FileInfo | undefined>;
   writeEmbed(write: EmbedWrite): Promise<string | undefined>;
+  /** An embed written as a link to its file, a link as an embed of it (none: neither is offered); why not, as text */
+  embedToLink?(write: FormWrite): Promise<string | undefined>;
+  linkToEmbed?(write: FormWrite): Promise<string | undefined>;
   open(url: string): void;
   problem(message: string): void;
 };
@@ -123,10 +135,38 @@ export class AssetDecorator {
       opensMenu(
         this.doc,
         icon,
-        () => ({ title: assetName(asset), views: [], actions: this.actionItems(asset, capabilities, (container, as) => this.drawInto(container, as, type, asset, settings, control.signal)) }),
+        () => ({
+          title: assetName(asset),
+          views: [],
+          actions: [
+            ...this.actionItems(asset, capabilities, (container, as) => this.drawInto(container, as, type, asset, settings, control.signal)),
+            ...(this.host.linkToEmbed ? [{ label: "Show as embedded", run: () => void this.toEmbed(link) }] : []),
+          ],
+        }),
         control.signal,
       );
     }
+  }
+
+  /** A link written as an embed of its file: found in the page by its place, else by its target and its order among the links drawn of it */
+  private async toEmbed(link: DrawnLink): Promise<void> {
+    const text = await this.host.pageText();
+    const links = readLinks(text);
+    const at = link.position?.();
+    let found = at !== undefined ? linkAt(links, at) : undefined;
+    if (at === undefined) {
+      const drawn = [...this.links].filter((one) => one.element.isConnected && !one.position && sameTarget(one.target) === sameTarget(link.target));
+      drawn.sort((a, b) => (a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+      const alike = outside(links, this.host.renderedRanges()).filter((one) => one.style === link.style && sameTarget(one.target) === sameTarget(link.target));
+      const one = alike[Math.min(Math.max(drawn.indexOf(link), 0), alike.length - 1)];
+      if (one) {
+        const sameText = links.filter((other) => other.text === one.text);
+        found = { link: one, occurrence: sameText.indexOf(one), of: sameText.length };
+      }
+    }
+    if (!found) return this.host.problem("Silverware Layout: this link was not found in the page");
+    const problem = await this.host.linkToEmbed!({ text: found.link.text, occurrence: found.occurrence, of: found.of });
+    if (problem) this.host.problem(`Silverware Layout: not written: ${problem}`);
   }
 
   /** What can be done with an asset: each fitting action registered (its menu's), run with how it is drawn elsewhere */
@@ -258,7 +298,18 @@ export class AssetDecorator {
             run: () =>
               void write({ metadata: { view: one === settled ? null : one } }).then((problem) => problem && this.host.problem(`Silverware Layout: not written: ${problem}`)),
           })),
-          actions: this.actionItems(asset, capabilities, (container, as) => renderInto(as, container)),
+          actions: [
+            ...this.actionItems(asset, capabilities, (container, as) => renderInto(as, container)),
+            ...(this.host.embedToLink
+              ? [
+                  {
+                    label: "Show as a link",
+                    run: () =>
+                      void this.host.embedToLink!({ text: found.embed.text, occurrence: found.occurrence, of: found.of }).then((problem) => problem && this.host.problem(`Silverware Layout: not written: ${problem}`)),
+                  },
+                ]
+              : []),
+          ],
         };
       },
       control.signal,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readEmbeds, readMetadata, readSize, writeEmbed, writeMetadata } from "./embed.ts";
+import { embedAsLink, linkAsEmbed, readEmbeds, readLinks, readMetadata, readSize, writeEmbed, writeMetadata } from "./embed.ts";
 
 describe("an embed's size and metadata", () => {
   it("reads a size as SilverBullet does", () => {
@@ -73,5 +73,24 @@ describe("writeEmbed", () => {
     const written = writeEmbed(plain!, { alt: "Cat", width: "50%", metadata: { view: "preview", caption: "a, b" } });
     const [again] = readEmbeds(written);
     expect(again).toMatchObject({ alt: "Cat", width: "50%", metadata: { view: "preview", caption: "a, b" } });
+  });
+});
+
+describe("links and embeds written as each other", () => {
+  it("reads a page's links, not its embeds nor what is in code", () => {
+    const text = "See [[Docs/a.pdf|The doc]] and [b](b.zip), ![[c.png]] and ![d](d.png)\n`[[code]]`\n```\n[[fenced]]\n```\n[[Page]]";
+    expect(readLinks(text).map(({ style, target, alias, text: written }) => [style, target, alias, written])).toEqual([
+      ["wiki", "Docs/a.pdf", "The doc", "[[Docs/a.pdf|The doc]]"],
+      ["markdown", "b.zip", "b", "[b](b.zip)"],
+      ["wiki", "Page", "", "[[Page]]"],
+    ]);
+    expect(readLinks(text)[0]!.from).toBe(text.indexOf("[[Docs"));
+  });
+
+  it("writes a link as an embed, and an embed as a link keeping its alt text, not its size and metadata", () => {
+    const [wiki, md] = readLinks("[[a.pdf|Doc]] [x](b%20c.zip)");
+    expect([linkAsEmbed(wiki!), linkAsEmbed(md!)]).toEqual(["![[a.pdf|Doc]]", "![x](b%20c.zip)"]);
+    const embeds = readEmbeds("![[cat.png|Cat|300|{ view: icon }]] ![[dog.png]] ![|200](Pics/my%20cat.png) ![A cat](cat.png)");
+    expect(embeds.map(embedAsLink)).toEqual(["[[cat.png|Cat]]", "[[dog.png]]", "[my cat.png](Pics/my%20cat.png)", "[A cat](cat.png)"]);
   });
 });

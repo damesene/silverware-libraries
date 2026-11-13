@@ -50,6 +50,15 @@ describe("the Media tab", () => {
     boxes[2]!.checked = true;
     await tab.save();
     expect((saved as { card: unknown }).card).toEqual(["name", "modified"]);
+    // A preview's height: a number typed within its bounds, else as it was
+    const height = tab.panel.querySelector<HTMLInputElement>(`input[aria-label="A preview's height (px)"]`)!;
+    expect(height.value).toBe("160");
+    height.value = "240";
+    await tab.save();
+    expect((saved as { heights: unknown }).heights).toEqual({ preview: 240, embed: 480 });
+    height.value = "5";
+    await tab.save();
+    expect((saved as { heights: { preview: number } }).heights.preview).toBe(160);
     // As kept and read back: the Shift+click to nothing
     const back = readAssetSettings(storedAssetSettings(saved as never)).settings;
     expect(back.actions.default).toEqual({ click: "open-tab" });

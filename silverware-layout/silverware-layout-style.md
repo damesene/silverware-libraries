@@ -1216,6 +1216,15 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   min-width: 0;
   font: inherit;
 }
+.swl-media-unit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.swl-media-number {
+  width: 6em;
+  font: inherit;
+}
 /* Embedded media (docs/silverware-layout-assets.md), marked by Silverware Layout on the host's frame of each
    (data-swl-asset: its type, data-swl-asset-view: icon, preview or embed): the host's own drawing hidden where Silverware
    Layout draws instead; a preview of the host's drawing kept small; a card; the mark of a render that failed */

@@ -8,6 +8,9 @@ import { iconElement } from "./card.ts";
 
 const VIEW_LABELS: Readonly<Record<View, string>> = { icon: "Card", preview: "Preview", embed: "Original" };
 const NONE = "";
+// The heights a preview may be given (px)
+const MIN_HEIGHT = 40;
+const MAX_HEIGHT = 2000;
 const DEFAULT = "*";
 
 export type MediaTabInput = {
@@ -16,6 +19,12 @@ export type MediaTabInput = {
   readonly types: readonly { readonly name: string; readonly icon: string }[];
   readonly actions: readonly { readonly name: string; readonly label?: string }[];
 };
+
+/** A height typed (px, whole, within the bounds); anything else: the one it had */
+function heightOf(typed: string, had: number): number {
+  const value = Math.round(Number(typed));
+  return typed.trim() && Number.isFinite(value) && value >= MIN_HEIGHT && value <= MAX_HEIGHT ? value : had;
+}
 
 /** A select of options, value first */
 function select(doc: Document, label: string, options: readonly (readonly [string, string])[], value: string): HTMLSelectElement {
@@ -35,6 +44,9 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
   const allClick = select(doc, "All files: a click", actions, settings.actions.default.click ?? NONE);
   const allShift = select(doc, "All files: a Shift+click", actions, settings.actions.default["shift+click"] ?? NONE);
   const anchor = select(doc, "Width dragged", [["start", "Stays at the start"], ["center", "Centred"]], settings.anchor);
+  // A preview's height where its embed gives none (px): a number typed, one that is none kept as it was
+  const previewHeight = el(doc, "input", { class: "swl-media-number", attrs: { type: "number", min: MIN_HEIGHT, max: MAX_HEIGHT, step: 10, "aria-label": "A preview's height (px)" } });
+  previewHeight.value = String(settings.heights.preview);
   // What a card shows besides the file's name, each a box
   const cardField = (field: CardField) => {
     const box = el(doc, "input", { attrs: { type: "checkbox" } });
@@ -53,6 +65,7 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
     el(doc, "label", "swl-media-field", "A click", allClick),
     el(doc, "label", "swl-media-field", "A Shift+click", allShift),
     el(doc, "label", "swl-media-field", "Width dragged", anchor),
+    el(doc, "label", "swl-media-field", "A preview's height", el(doc, "span", "swl-media-unit", previewHeight, "px")),
     el(doc, "div", "swl-media-checks", el(doc, "span", { text: "Cards show" }), el(doc, "label", "swl-media-check", cardIcon, "Its icon"), el(doc, "label", "swl-media-check", cardSize, "Its size"), el(doc, "label", "swl-media-check", cardDate, "Its date")),
   );
 
@@ -93,6 +106,7 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
       actions: { default: defaults, types: actionTypes },
       card: [...(cardIcon.checked ? (["icon"] as const) : []), "name", ...(cardSize.checked ? (["size"] as const) : []), ...(cardDate.checked ? (["modified"] as const) : [])],
       anchor: anchor.value === "center" ? "center" : "start",
+      heights: { ...settings.heights, preview: heightOf(previewHeight.value, settings.heights.preview) },
     };
   };
   const was = JSON.stringify(current());

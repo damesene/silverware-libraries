@@ -105,7 +105,7 @@ SilverBullet reads only the alt text and the size, so without Silverware Layout 
 
 **For all files, or for one kind of file**: run **Silverware Layout: Page layout** and open its **Media** tab. Set how files are shown, what a click and a Shift+click do, and whether a width dragged stays at the start or is centred, for all files; then, per kind (image, video, audio, PDF, file), anything other than that ("Default" follows all files). What a file's own `view` says wins over both.
 
-Media in a grid's columns are shown the same way (their width is not dragged there yet).
+Media in a grid's columns are shown the same way, and their bar makes them wider or narrower within their column: it snaps to a quarter, a half, three quarters and the whole of the column's width.
 
 ## Font size
 

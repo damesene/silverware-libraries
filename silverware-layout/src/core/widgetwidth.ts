@@ -74,6 +74,18 @@ export function snapTargets(textWidth: number, guides: readonly Guide[], pane: n
   return targets;
 }
 
+/** The narrowest a widget in a room of its own is made by a drag (px): a small image in a cell */
+export const MIN_ROOM_WIDTH = 40;
+
+/** Where a drag of the right edge by `moved` may take a width in a room (a cell): not narrower than the least, nor wider than the room */
+export const draggedRoomWidth = (start: number, moved: number, room: number, anchor: LayoutAnchor = "center"): number =>
+  Math.max(Math.min(MIN_ROOM_WIDTH, room), Math.min(room, start + (anchor === "start" ? 1 : 2) * moved));
+
+/** The snap targets in a room of a widget's own (a cell): its quarters, each kept as its pixels */
+export function roomTargets(room: number): SnapTarget[] {
+  return [25, 50, 75, 100].map((share) => ({ width: Math.round((room * share) / 100), share })).filter(({ width }) => width >= MIN_ROOM_WIDTH).map(({ width, share }) => ({ width, kept: width, name: `${share} %` }));
+}
+
 /** A width dragged to: the target it came within SNAP_DISTANCE of (the nearest), else its own pixels */
 export function snapped(width: number, targets: readonly SnapTarget[]): { readonly width: number; readonly kept: WidgetWidth | undefined; readonly name?: string } {
   let best: SnapTarget | undefined;

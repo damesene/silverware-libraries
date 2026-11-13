@@ -36,6 +36,10 @@ export function layOutWidgets(doc: Document, page: PageHost, registry: Registry,
     seen: (widget) => widgets.seen(widget),
     enabled: options.enabled,
     anchor: (widget) => widgets.anchor(widget),
+    room: (widget) => {
+      const room = widgets.room(widget);
+      return room ? room.getBoundingClientRect().width : undefined;
+    },
   });
   return { widgets, handle };
 }

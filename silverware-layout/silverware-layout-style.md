@@ -26,6 +26,14 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   margin-left: 0 !important;
   margin-right: auto !important;
 }
+/* A widget laid out in a room of its own, not the page's text (a medium in a grid's cell): within that room, at its
+   start, no wider */
+:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-in-room]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+  width: min(var(--swl-width), 100%) !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
 /* The boxes a widget laid out is in, within the content, let it out: SilverBullet scrolls a Lua block's output in a
    box of the text's width (overflow: auto), which cut a wider database off and showed a scrollbar */
 :root:not([data-swl-narrow]) [data-swl-content] > * :has([data-swl-width]:not([data-silverware-over-window])) {

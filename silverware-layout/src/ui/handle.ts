@@ -9,7 +9,7 @@
 import { el } from "../../../shared/elements.ts";
 import type { LayoutAnchor } from "../../../shared/layout.ts";
 import type { Guide } from "../model/settings.ts";
-import { draggedWidth, MIN_WIDGET_WIDTH, PANE_GUTTER, snapped, snapTargets, type WidgetWidth, widthName } from "../core/widgetwidth.ts";
+import { draggedRoomWidth, draggedWidth, MIN_ROOM_WIDTH, MIN_WIDGET_WIDTH, PANE_GUTTER, roomTargets, type SnapTarget, snapped, snapTargets, type WidgetWidth, widthName } from "../core/widgetwidth.ts";
 import { GuideLines } from "./guidelines.ts";
 
 const BASE = "swl-handle";
@@ -47,6 +47,8 @@ export type HandleHost<W> = {
   enabled(): boolean;
   // Where a widget stays as its width changes (none: centred): a drag widens it on both sides, or to the right alone
   anchor?(widget: W): LayoutAnchor;
+  // The width of the box a widget is laid out in, where it is not the page's text (a cell): its quarters its snaps, no wider
+  room?(widget: W): number | undefined;
 };
 
 type Drag = { readonly pointer: number; readonly x: number; readonly start: number; readonly was: WidgetWidth | undefined; now: WidgetWidth | undefined; moved: boolean };
@@ -219,13 +221,30 @@ export class WidthHandle<W> {
   private showGuides(): void {
     const middle = this.middleOf();
     if (middle === undefined) return;
-    this.lines.show(snapTargets(this.host.textWidth(), this.host.guides(), this.host.paneWidth()), middle, this.anchorOf());
+    this.lines.show(this.targets(), middle, this.anchorOf());
   }
 
   /** The guides placed again by the widget's middle (the page scrolled, the widget wider), the one of `near` lit */
   private placeGuides(near: string | undefined): void {
     const middle = this.middleOf();
     if (middle !== undefined) this.lines.place(middle, near, this.anchorOf());
+  }
+
+  /** The width of the room the widget is in, where it is not the page's text */
+  private roomOf(): number | undefined {
+    return this.widget ? this.host.room?.(this.widget) : undefined;
+  }
+
+  /** What the widget's width snaps to: its room's quarters, else the text's width and the guides */
+  private targets(): SnapTarget[] {
+    const room = this.roomOf();
+    return room !== undefined ? roomTargets(room) : snapTargets(this.host.textWidth(), this.host.guides(), this.host.paneWidth());
+  }
+
+  /** Where a drag by `moved` from `start` takes the width: within its room, else within the pane */
+  private draggedTo(start: number, moved: number): number {
+    const room = this.roomOf();
+    return room !== undefined ? draggedRoomWidth(start, moved, room, this.anchorOf()) : draggedWidth(start, moved, this.host.paneWidth(), this.anchorOf());
   }
 
   /** Where the widget dragged stays as its width changes */
@@ -247,9 +266,7 @@ export class WidthHandle<W> {
     const moved = e.clientX - drag.x;
     if (!drag.moved && Math.abs(moved) < 2) return;
     drag.moved = true;
-    const pane = this.host.paneWidth();
-    const width = draggedWidth(drag.start, moved, pane, this.anchorOf());
-    const snap = snapped(width, snapTargets(this.host.textWidth(), this.host.guides(), pane));
+    const snap = snapped(this.draggedTo(drag.start, moved), this.targets());
     drag.now = snap.kept;
     this.host.show(this.host.element(this.widget), snap.kept);
     this.place();
@@ -298,9 +315,10 @@ export class WidthHandle<W> {
     if (!step || !this.widget) return;
     e.preventDefault();
     const widget = this.widget;
-    const pane = this.host.paneWidth();
     const from = this.keyed?.widget === widget ? this.keyed.width : this.host.element(widget).getBoundingClientRect().width;
-    const width = Math.max(MIN_WIDGET_WIDTH, Math.min(pane - PANE_GUTTER, Math.round(from + step * (e.shiftKey ? 50 : 10))));
+    const to = Math.round(from + step * (e.shiftKey ? 50 : 10));
+    const room = this.roomOf();
+    const width = room !== undefined ? Math.max(Math.min(MIN_ROOM_WIDTH, room), Math.min(room, to)) : Math.max(MIN_WIDGET_WIDTH, Math.min(this.host.paneWidth() - PANE_GUTTER, to));
     this.keyed = { widget, width };
     this.host.show(this.host.element(widget), width);
     this.place();

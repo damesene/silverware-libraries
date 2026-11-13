@@ -12,6 +12,7 @@ import { Registry } from "./core/registry.ts";
 import { registerBuiltins } from "./assets/builtin/index.ts";
 import { AssetRegistry } from "./assets/core/registry.ts";
 import { AssetDecorator, type AssetHost } from "./assets/decorate.ts";
+import { assetProvider } from "./assets/provider.ts";
 import { readAssetSettings } from "./assets/model/settings.ts";
 import { silverBulletAssetHost } from "./host/silverbullet/assets.ts";
 import { gridInsertion } from "./grid/core/insert.ts";
@@ -76,6 +77,9 @@ export async function init(bridge: Bridge): Promise<void> {
   if (assets) assets.useHost(assetHost);
   else {
     assets = new AssetDecorator(document, assetHost, assetRegistry);
+    // A medium's width laid out as a widget's, registered as a widget plugin registers
+    registry.register(assetProvider(assets));
+    assets.onDecorated = () => app.layOutWidgets();
     assets.start();
   }
   await app.start(silverBulletStore(bridge, writer));

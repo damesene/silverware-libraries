@@ -40,6 +40,10 @@ const NATIVE_HIDDEN = "swl-asset-native-hidden";
 export class AssetDecorator {
   // Each frame decorated: what ends its render
   private readonly renders = new WeakMap<HTMLElement, AbortController>();
+  // Each frame decorated: its width as its embed keeps it, where it stays as it changes, how a new one is written
+  private readonly sizes = new WeakMap<HTMLElement, { readonly width: string | undefined; readonly anchor: "start" | "center"; readonly write: (width: string | undefined) => Promise<string | undefined> }>();
+  /** Told as a frame is decorated (its width laid out again) */
+  onDecorated: (() => void) | undefined;
   private started = false;
 
   constructor(
@@ -65,6 +69,7 @@ export class AssetDecorator {
     const [text, page, settings] = await Promise.all([this.host.pageText(), this.host.pageName(), this.host.settings()]);
     const embeds = readEmbeds(text);
     for (const one of drawn) {
+      // (Laid out once all are decorated)
       one.frame.setAttribute("data-swl-asset-target", sameTarget(one.target));
       const nth = [...this.doc.querySelectorAll(`[data-swl-asset-target]`)].filter((frame) => frame.getAttribute("data-swl-asset-target") === sameTarget(one.target)).indexOf(one.frame);
       const found = embedOf(embeds, (embed) => this.host.resolved(embed, page), one.target, nth);
@@ -74,6 +79,18 @@ export class AssetDecorator {
       if (!type) continue;
       this.render(one, found, asset, type, settings);
     }
+    this.onDecorated?.();
+  }
+
+  /** A frame decorated: its width as its embed keeps it (none: none), where it stays */
+  sizeOf(frame: HTMLElement): { readonly width: string | undefined; readonly anchor: "start" | "center" } | undefined {
+    return this.sizes.get(frame);
+  }
+
+  /** A frame's width written (none: taken off); why not, as text */
+  async writeWidth(frame: HTMLElement, width: string | undefined): Promise<string | undefined> {
+    const size = this.sizes.get(frame);
+    return size ? size.write(width) : "this file is not decorated";
   }
 
   /** One embed drawn as its view says */
@@ -95,6 +112,8 @@ export class AssetDecorator {
     // A preview's height, the setting's (the style page's rules read it)
     frame.style.setProperty("--swl-asset-height", `${Number(found.embed.height) || settings.heights.preview}px`);
     const write = (changes: EmbedChanges) => this.host.writeEmbed({ text: found.embed.text, occurrence: found.occurrence, of: found.of, changes });
+    // Its width laid out by Silverware Layout's handle (not a card's): written as SilverBullet's size, the height taken off so the ratio holds
+    this.sizes.set(frame, { width: found.embed.width, anchor: settings.anchor, write: (width) => write({ width: width ?? null, height: null }) });
     const context: RenderContext = {
       asset,
       viewport: viewportOf(frame, found.embed, view, settings, control.signal),

@@ -5,7 +5,7 @@
 // `--swl-width`), never the host's element around it (CodeMirror takes its lines' attributes back); the style page's
 // rule sizes it, in the content marked `data-swl-content`. A widget out of the page's flow (marked
 // `data-silverware-over-window`, or in an element marked so) is left to its plugin.
-import type { LayoutProvider } from "../../../shared/layout.ts";
+import type { LayoutAnchor, LayoutProvider } from "../../../shared/layout.ts";
 import { OVER_WINDOW_ATTRIBUTE } from "../../../shared/overwindow.ts";
 import type { Registry } from "../core/registry.ts";
 import { cssWidgetWidth, keptWidgetWidth, readWidgetWidth, type WidgetWidth } from "../core/widgetwidth.ts";
@@ -14,6 +14,8 @@ import type { PageHost } from "./page.ts";
 
 const WIDTH_ATTRIBUTE = "data-swl-width";
 const WIDTH_VARIABLE = "--swl-width";
+// A widget staying at the text's start as its width changes (the style page lays it out so)
+const ANCHOR_ATTRIBUTE = "data-swl-anchor-start";
 
 /** A widget of a provider's, as rendered */
 export type Widget = { readonly element: HTMLElement; readonly provider: LayoutProvider };
@@ -85,7 +87,19 @@ export class Widgets {
   }
 
   private layOut(widget: Widget): void {
+    // Where it stays as its width changes, its provider's say (none: centred), marked for the style page's rule
+    const start = this.anchor(widget) === "start";
+    if (widget.element.hasAttribute(ANCHOR_ATTRIBUTE) !== start) widget.element.toggleAttribute(ANCHOR_ATTRIBUTE, start);
     this.show(widget.element, this.kept(widget));
+  }
+
+  /** Where a widget stays as its width changes: its provider's say, centred where it says none */
+  anchor(widget: Widget): LayoutAnchor {
+    try {
+      return widget.provider.anchor?.(widget.element) === "start" ? "start" : "center";
+    } catch {
+      return "center";
+    }
   }
 
   /** The part of a widget the user sees, where its plugin says it is not its box */

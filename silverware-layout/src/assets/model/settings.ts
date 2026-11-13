@@ -18,6 +18,8 @@ export type AssetSettings = {
   readonly card: readonly CardField[];
   // A view's height where nothing gives one (px)
   readonly heights: Readonly<Record<"preview" | "embed", number>>;
+  // Where an asset stays as its width is dragged: at the text's start (it grows to the right), or centred
+  readonly anchor: "start" | "center";
 };
 
 export const DEFAULT_ASSET_SETTINGS: AssetSettings = {
@@ -25,6 +27,7 @@ export const DEFAULT_ASSET_SETTINGS: AssetSettings = {
   actions: { default: { click: "open-tab", "shift+click": "open-tab" }, types: {} },
   card: ["icon", "name"],
   heights: { preview: 160, embed: 480 },
+  anchor: "start",
 };
 
 const isView = (value: unknown): value is View => typeof value === "string" && (VIEWS as readonly string[]).includes(value);
@@ -60,6 +63,7 @@ export function readAssetSettings(value: unknown): { readonly settings: AssetSet
       actions: { default: actions.default === undefined ? DEFAULT_ASSET_SETTINGS.actions.default : gestures(actions.default), types: actionTypes },
       card,
       heights: { preview: height("preview"), embed: height("embed") },
+      anchor: given.anchor === "center" ? "center" : "start",
     },
     problems,
   };

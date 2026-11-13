@@ -21,6 +21,11 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   margin-right: calc((100% - var(--swl-shown)) / 2) !important;
   box-sizing: border-box;
 }
+/* A widget staying at the text's start (its provider's say: an embedded medium): it grows to the right alone */
+:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-anchor-start]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
 /* The boxes a widget laid out is in, within the content, let it out: SilverBullet scrolls a Lua block's output in a
    box of the text's width (overflow: auto), which cut a wider database off and showed a scrollbar */
 :root:not([data-swl-narrow]) [data-swl-content] > * :has([data-swl-width]:not([data-silverware-over-window])) {
@@ -1148,7 +1153,7 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 .swl-asset-native-hidden {
   display: none !important;
 }
-[data-swl-asset-view="preview"] > :is(img, video, object) {
+[data-swl-asset-view="preview"] :is(img, video, object):not(.swl-asset-icon img, .swl-asset-pdf) {
   max-height: var(--swl-asset-height, 160px);
   max-width: 100%;
   width: auto !important;
@@ -1157,6 +1162,13 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 }
 [data-swl-asset] {
   position: relative;
+}
+/* Laid out by the handle (its width on the frame, data-swl-width): the host's medium fills the frame, its height by
+   its ratio, so a drag shows at once what the width written will draw */
+[data-swl-asset][data-swl-width] :is(img, video, object):not(.swl-asset-icon img) {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto;
 }
 .swl-asset-card {
   display: inline-flex;

@@ -7,6 +7,7 @@
 // editor, so a press on it moves no cursor. A finger has no hover: a touch on a widget shows its handle, a touch
 // elsewhere hides it, a double tap is the double click.
 import { el } from "../../../shared/elements.ts";
+import type { LayoutAnchor } from "../../../shared/layout.ts";
 import type { Guide } from "../model/settings.ts";
 import { draggedWidth, MIN_WIDGET_WIDTH, PANE_GUTTER, snapped, snapTargets, type WidgetWidth, widthName } from "../core/widgetwidth.ts";
 import { GuideLines } from "./guidelines.ts";
@@ -44,6 +45,8 @@ export type HandleHost<W> = {
   guideLayer(): HTMLElement | undefined;
   // Whether widgets are laid out now (not in a narrow pane)
   enabled(): boolean;
+  // Where a widget stays as its width changes (none: centred): a drag widens it on both sides, or to the right alone
+  anchor?(widget: W): LayoutAnchor;
 };
 
 type Drag = { readonly pointer: number; readonly x: number; readonly start: number; readonly was: WidgetWidth | undefined; now: WidgetWidth | undefined; moved: boolean };
@@ -216,21 +219,26 @@ export class WidthHandle<W> {
   private showGuides(): void {
     const middle = this.middleOf();
     if (middle === undefined) return;
-    this.lines.show(snapTargets(this.host.textWidth(), this.host.guides(), this.host.paneWidth()), middle);
+    this.lines.show(snapTargets(this.host.textWidth(), this.host.guides(), this.host.paneWidth()), middle, this.anchorOf());
   }
 
   /** The guides placed again by the widget's middle (the page scrolled, the widget wider), the one of `near` lit */
   private placeGuides(near: string | undefined): void {
     const middle = this.middleOf();
-    if (middle !== undefined) this.lines.place(middle, near);
+    if (middle !== undefined) this.lines.place(middle, near, this.anchorOf());
   }
 
-  /** The middle of the widget dragged (x in the window); none where it is not in the page */
+  /** Where the widget dragged stays as its width changes */
+  private anchorOf(): LayoutAnchor {
+    return (this.widget && this.host.anchor?.(this.widget)) || "center";
+  }
+
+  /** Where the guides are placed from (x in the window): the widget's middle, or its left edge where it stays at the start; none where it is not in the page */
   private middleOf(): number | undefined {
     const element = this.widget && this.host.element(this.widget);
     if (!element?.isConnected) return undefined;
     const rect = element.getBoundingClientRect();
-    return rect.left + rect.width / 2;
+    return this.anchorOf() === "start" ? rect.left : rect.left + rect.width / 2;
   }
 
   private dragged(e: PointerEvent): void {
@@ -240,7 +248,7 @@ export class WidthHandle<W> {
     if (!drag.moved && Math.abs(moved) < 2) return;
     drag.moved = true;
     const pane = this.host.paneWidth();
-    const width = draggedWidth(drag.start, moved, pane);
+    const width = draggedWidth(drag.start, moved, pane, this.anchorOf());
     const snap = snapped(width, snapTargets(this.host.textWidth(), this.host.guides(), pane));
     drag.now = snap.kept;
     this.host.show(this.host.element(this.widget), snap.kept);

@@ -35,6 +35,7 @@ export function layOutWidgets(doc: Document, page: PageHost, registry: Registry,
     guideLayer: () => page.guideLayer(),
     seen: (widget) => widgets.seen(widget),
     enabled: options.enabled,
+    anchor: (widget) => widgets.anchor(widget),
   });
   return { widgets, handle };
 }

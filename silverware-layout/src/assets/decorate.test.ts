@@ -142,3 +142,33 @@ describe("an asset's menu", () => {
     expect(state.writes[1]!.changes).toEqual({ metadata: { view: null } });
   });
 });
+
+describe("an asset's width, as Silverware Layout's widget", () => {
+  it("is read in pixels from its embed, written there (its height taken off), staying at the start by default", async () => {
+    const { assetProvider } = await import("./provider.ts");
+    const { state, decorator } = setUp("![[cat.png|A cat|200x100]] ![[b.png|B|50%]] ![[c.zip]]");
+    const [cat, half, zip] = [frame("cat.png"), frame("b.png"), frame("c.zip", false)];
+    await decorator.decorate([cat!, half!, zip!]);
+    const provider = assetProvider(decorator);
+    expect(cat!.frame.matches(provider.selector)).toBe(true);
+    expect(zip!.frame.matches(provider.selector)).toBe(false);
+    expect(provider.read(cat!.frame)).toEqual({ width: "200" });
+    expect(provider.read(half!.frame)).toEqual({});
+    expect(provider.anchor!(cat!.frame)).toBe("start");
+    await provider.write(cat!.frame, { width: "320" });
+    expect(state.writes.at(-1)!.changes).toEqual({ width: "320", height: null });
+    Object.defineProperty(cat!.frame, "getBoundingClientRect", { value: () => ({ width: 412.4 }) });
+    await provider.write(cat!.frame, { width: "full" });
+    expect(state.writes.at(-1)!.changes).toEqual({ width: "412", height: null });
+    await provider.write(cat!.frame, { width: null });
+    expect(state.writes.at(-1)!.changes).toEqual({ width: null, height: null });
+  });
+
+  it("is centred where the user sets it so", async () => {
+    const { assetProvider } = await import("./provider.ts");
+    const { decorator } = setUp("![[cat.png]]", { anchor: "center" });
+    const cat = frame("cat.png");
+    await decorator.decorate([cat]);
+    expect(assetProvider(decorator).anchor!(cat.frame)).toBe("center");
+  });
+});

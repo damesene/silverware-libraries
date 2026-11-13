@@ -190,7 +190,7 @@ test("SilverBullet's markdown shown as written: a click on an embed's `![[` plac
   await dialog.getByRole("tab", { name: "Markdown" }).click();
   await dialog.getByLabel("A click on a link only places the cursor").uncheck();
   await dialog.getByRole("button", { name: "Save" }).click();
-  await expect.poll(() => space.config()).toContain('config.set("silverware.layout.syntaxMode.clickPlacesCursor", false)');
+  await expect.poll(() => space.config()).toContain('config.set("silverware.assets.syntaxMode.clickPlacesCursor", false)');
   // (Once SilverBullet has loaded its configuration again: the root no longer marked for it)
   await expect.poll(() => page.evaluate(() => document.documentElement.hasAttribute("data-swl-syntax-clicks")), { timeout: 15_000 }).toBe(false);
   await clickAtStart();

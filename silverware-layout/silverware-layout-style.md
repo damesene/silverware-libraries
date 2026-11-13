@@ -34,16 +34,11 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   margin-left: 0 !important;
   margin-right: 0 !important;
 }
-/* SilverBullet showing the markdown as written (Editor: Toggle Markdown Syntax Rendering): the media and grids it still
-   draws there hidden, their markdown alone shown; the host's box round each too (an empty one is a line's height) */
-:root[data-swl-syntax-shown] :is([data-swa-asset]:not(.swa-frame), .swl-grid-widget),
-:root[data-swl-syntax-shown] :has(> :is([data-swa-asset]:not(.swa-frame), .swl-grid-widget)) {
+/* SilverBullet showing the markdown as written (Editor: Toggle Markdown Syntax Rendering): the grids it still draws
+   there hidden, their markdown alone shown; the host's box round each too (an empty one is a line's height) */
+:root[data-swl-syntax-shown] .swl-grid-widget,
+:root[data-swl-syntax-shown] :has(> .swl-grid-widget) {
   display: none !important;
-}
-/* There, a click on a link placing the cursor alone: the text's pointer over it, not a hand (a widget's own, its
-   buttons, kept) */
-:root[data-swl-syntax-clicks] [data-swl-content] :not([contenteditable="false"], [contenteditable="false"] *) {
-  cursor: text !important;
 }
 /* The boxes a widget laid out is in, within the content, let it out: SilverBullet scrolls a Lua block's output in a
    box of the text's width (overflow: auto), which cut a wider database off and showed a scrollbar */

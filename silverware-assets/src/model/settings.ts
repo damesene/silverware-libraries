@@ -92,3 +92,22 @@ export function readAssetSettings(value: unknown): { readonly settings: AssetSet
     problems,
   };
 }
+
+/** Where the settings of SilverBullet's markdown shown as written are (the Configuration Manager's block: booleans) */
+export const SYNTAX_PATHS = {
+  hides: "silverware.assets.syntaxMode.hideAssets",
+  clicks: "silverware.assets.syntaxMode.clickPlacesCursor",
+} as const;
+
+/**
+ * What Silverware Assets does while SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax
+ * Rendering): embedded files hidden (SilverBullet draws them there still), a click on a link placing the cursor alone
+ * (Ctrl/Cmd+click following it). Both on unless the user turns one off
+ */
+export type SyntaxModeSettings = { readonly hideAssets: boolean; readonly clickPlacesCursor: boolean };
+
+/** The settings of the markdown shown as written, as configured (anything but false: on) */
+export const readSyntaxModeSettings = (get: (path: string) => unknown): SyntaxModeSettings => ({
+  hideAssets: get(SYNTAX_PATHS.hides) !== false,
+  clickPlacesCursor: get(SYNTAX_PATHS.clicks) !== false,
+});

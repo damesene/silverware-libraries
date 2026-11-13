@@ -8,6 +8,18 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 ```space-style
 /* Silverware Assets (prefix swa-): its classes and attributes under swa- (data-swa-…). The width of a file laid out by
    Silverware Layout's handle is Layout's (its marks on the frame, its rules). */
+/* SilverBullet showing the markdown as written (Editor: Toggle Markdown Syntax Rendering): the embedded files it still
+   draws there hidden, their markdown alone shown; the host's box round each too (an empty one is a line's height). A
+   file in markdown rendered outside the editor (a grid's cell, in a frame of Silverware Assets' own) is its drawer's */
+:root[data-swa-syntax-shown] [data-swa-asset]:not(.swa-frame),
+:root[data-swa-syntax-shown] :has(> [data-swa-asset]:not(.swa-frame)) {
+  display: none !important;
+}
+/* There, a click on a link placing the cursor alone: the text's pointer over it, not a hand (a widget's own, its
+   buttons, kept) */
+:root[data-swa-syntax-clicks] [data-swa-text] :not([contenteditable="false"], [contenteditable="false"] *) {
+  cursor: text !important;
+}
 /* A file's "…" button, at its frame's top right as the pointer is over it (always on a touch screen), its menu
    under it */
 .swa-more {

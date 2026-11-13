@@ -7,13 +7,15 @@ import { layoutOf } from "../../shared/layout.ts";
 import { applyLayers } from "../../shared/layers.ts";
 import { pageWriter } from "../../shared/pages/writer.ts";
 import { renderedOf } from "../../shared/rendered.ts";
+import { type SyntaxModeWatcher, watchSyntaxMode } from "../../shared/syntaxmode.ts";
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { registerBuiltins } from "./builtin/index.ts";
 import { AssetRegistry } from "./core/registry.ts";
 import { AssetDecorator, type AssetHost } from "./decorate.ts";
 import { silverBulletAssetHost } from "./host/silverbullet/assets.ts";
 import { silverBulletPlatform } from "./host/silverbullet/platform.ts";
-import { readAssetSettings } from "./model/settings.ts";
+import { readAssetSettings, readSyntaxModeSettings, SYNTAX_PATHS, type SyntaxModeSettings } from "./model/settings.ts";
+import { SILVERBULLET_SYNTAX_PAGE, SYNTAX_OPTION } from "./host/silverbullet/syntaxmode.ts";
 import { assetProvider } from "./provider.ts";
 
 // The bridge handed over last (a problem told through it)
@@ -35,6 +37,15 @@ export const api = registry.api();
 
 // The files decorated, one per window (its observers live as long), its host the bridge handed over last
 let decorator: AssetDecorator | undefined;
+// What follows SilverBullet's markdown shown as written, one per window (its settings read as it checks the mode)
+let syntaxWatcher: SyntaxModeWatcher<SyntaxModeSettings> | undefined;
+
+/** The settings of the markdown shown as written, as SilverBullet's configuration has them */
+async function readSyntaxSettings(bridge: Bridge): Promise<SyntaxModeSettings> {
+  if (!bridge.getConfig) return { hideAssets: true, clickPlacesCursor: true };
+  const [hides, clicks] = await Promise.all([bridge.getConfig(SYNTAX_PATHS.hides, true), bridge.getConfig(SYNTAX_PATHS.clicks, true)]);
+  return readSyntaxModeSettings((path) => (path === SYNTAX_PATHS.hides ? hides : path === SYNTAX_PATHS.clicks ? clicks : undefined));
+}
 
 /** Started by the init page (again as Space Lua loads again): SilverBullet's API handed over, Silverware Layout's where it is installed */
 export function init(bridge: Bridge): void {
@@ -59,4 +70,16 @@ export function init(bridge: Bridge): void {
   layout.register(assetProvider(decorator));
   decorator.onDecorated = () => layout.layOutAgain?.();
   if (fresh) decorator.start();
+  // The markdown shown as written (SilverBullet's mode): the files hidden then, a link's click the cursor's, as the
+  // settings say (read as the mode is asked, again as the settings window saves them)
+  syntaxWatcher ??= watchSyntaxMode<SyntaxModeSettings>(document, {
+    page: SILVERBULLET_SYNTAX_PAGE,
+    shown: () => current?.getUiOption?.(SYNTAX_OPTION),
+    read: () => (current ? readSyntaxSettings(current) : { hideAssets: true, clickPlacesCursor: true }),
+    same: (a, b) => a.hideAssets === b.hideAssets && a.clickPlacesCursor === b.clickPlacesCursor,
+    marks: (settings) => ({ "data-swa-syntax-shown": settings.hideAssets, "data-swa-syntax-clicks": settings.clickPlacesCursor }),
+    placesCursor: (settings) => settings.clickPlacesCursor,
+    textMark: "data-swa-text",
+    initial: { hideAssets: true, clickPlacesCursor: true },
+  });
 }

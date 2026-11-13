@@ -6,7 +6,14 @@ tags: meta
 What starts [Silverware Assets](silverware-assets.md) in SilverBullet: the JavaScript loaded and handed SilverBullet's space and editor API. It is installed with the library; its Space Lua API is [silverware-assets-api](silverware-assets-api.md).
 
 ```space-lua
--- Settings: tables, kept in Silverware Assets' own block of CONFIG (the Configuration Manager would lose them)
+-- Settings: how files are shown (tables, kept in Silverware Assets' own block of CONFIG: the Configuration Manager
+-- would lose them), and the markdown as written (shown in the Configuration Manager)
+config.defineCategory({
+  name = "Silverware Assets",
+  description = "The files your pages embed and link: how they are shown, what a click on them does.",
+  priority = 3,
+})
+
 config.define("silverware.assets", {
   description = "Silverware Assets settings",
   type = "object",
@@ -17,6 +24,24 @@ config.define("silverware.assets", {
     heights = { type = "object", description = "A preview's and an embed's height where nothing gives one (px)." },
     anchor = { type = "string", description = "Where a file stays as its width is dragged: start (it grows to the right) or center." },
     linkIcons = { type = "boolean", description = "A link to a file of the space shows its type's icon before its text." },
+    syntaxMode = {
+      type = "object",
+      additionalProperties = false,
+      properties = {
+        hideAssets = {
+          type = "boolean",
+          default = true,
+          description = "While SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax Rendering), embedded files are hidden: their markdown alone.",
+          ui = { category = "Silverware Assets", label = "Markdown as written: hide embedded files", priority = 0.6 },
+        },
+        clickPlacesCursor = {
+          type = "boolean",
+          default = true,
+          description = "While SilverBullet shows the markdown as written, a click on a link only places the cursor; Ctrl+click follows it.",
+          ui = { category = "Silverware Assets", label = "Markdown as written: a click places the cursor", priority = 0.59 },
+        },
+      },
+    },
   },
 })
 

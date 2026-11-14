@@ -97,9 +97,6 @@ export async function runCommand(page: Page, name: string): Promise<void> {
   await page.evaluate((command) => void (window as unknown as { client: Client }).client.runCommandByName(command), name);
 }
 
-
-
-
 /** A PNG of one pixel: an image of the space, drawn as large as its embed says */
 export const PIXEL_PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
 

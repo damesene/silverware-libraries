@@ -18,7 +18,7 @@ The files your pages embed and link: images, videos, audio, PDFs and any other f
 Images, videos, audio, PDFs and other files you embed (`![[photo.png]]`, `![Photo](photo.png)`) can each be shown three ways:
 
 - **Original**: the file itself, as SilverBullet shows it (the image, a player, a viewer).
-- **Preview**: smaller (a PDF in a small viewer).
+- **Preview**: smaller (a PDF in a small viewer; with Silverware Assets PDF installed, its first page as an image).
 - **Card**: a small card with the file's icon and name, the file itself not shown. A file SilverBullet cannot show (a zip, a document) is a card instead of an error.
 
 Point at a file, and a **…** button shows at its top right: choose how it is shown there, or open it in a new tab, in a side panel or enlarged. On a card, its icon is that button (as a link's icon); with the icon hidden, a small arrow after the card's name. A click on a card or a preview opens the file in a new tab; Shift+click does the same, unless you set otherwise: either can instead show the file in a panel at the window's right (**Show in a side panel**, the page still beside it) or enlarged over the page (**Show enlarged**). Esc or × closes them, and a click beside the enlarged file.
@@ -48,7 +48,7 @@ SilverBullet reads only the alt text and the size, so without Silverware Assets 
 
 **For all files, or for one kind of file**: run **Silverware Assets: Settings**. Its tabs:
 
-- **Files**: how a file is shown (the original, a preview or a card) and what a click and a Shift+click on it do; all files first, then each kind (image, video, audio, PDF, file), "Like all files" following them. What a file's own `view` says wins over both.
+- **Files**: how a file is shown (the original, a preview or a card) and what a click and a Shift+click on it do; all files first, then each kind (image, video, audio, PDF, archive, file), "Like all files" following them. What a file's own `view` says wins over both.
 - **Appearance**: how a file looks where it is shown, picked by **Preview**, **Original**, **Card** or **Link**, each on a sample drawn as your pages draw it. Point at (or tap) a part of a sample for its name and a × that hides it; the parts not shown are in a row over the sample, click one to show it.
   - **Preview**: a row for all files and one for each kind of file; click one to open it. Each holds the label (below), the size (its width and height: an image fits in it, its proportions kept; a PDF's preview is that large) . A kind of file follows all files until you change one of them there: its row is then marked **Own**, and **↺ Reset to all files** inside it takes it back.
   - **Original**: an original PDF's height (one with a height of its own, `|200x120`, keeps it).

@@ -39,6 +39,16 @@ function problem(message: string): void {
 const registry = new AssetRegistry(problem);
 registerBuiltins(registry);
 
+// The files drawn again as another plugin registers a type or an action (its init page may run after the page's files
+// were drawn: a PDF's preview drawn as the browser's viewer before Silverware Assets PDF registered its own), once for a burst
+// of them
+const REDRAW_MS = 50;
+let redraw: ReturnType<typeof setTimeout> | undefined;
+registry.onChange(() => {
+  clearTimeout(redraw);
+  redraw = setTimeout(() => void decorator?.redecorateAll(), REDRAW_MS);
+});
+
 /** Silverware Assets' API, as its API page hands it to other plugins (`silverware.assets.api`): types of file and actions (shared/assets.ts) */
 export const api = registry.api();
 

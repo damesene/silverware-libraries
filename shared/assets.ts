@@ -7,6 +7,12 @@
 /** The version of the assets' API this file is written for: another is taken as none (updated apart) */
 export const ASSETS_VERSION = 1;
 
+/**
+ * The attribute a renderer marks its element with where it is as wide as the line it is in (a document's reader, read
+ * at any width), not as what it draws; in a panel it fills the panel, its height too (`RenderContext.fills`)
+ */
+export const ASSET_WIDE_ATTRIBUTE = "data-asset-wide";
+
 /** What an embed shows: a file of the space, a file of the web; later a page. Each kind its own required properties */
 export type Asset = { readonly alt?: string } & (
   | { readonly kind: "file"; readonly path: string; readonly url: string; readonly mime?: string }
@@ -45,6 +51,8 @@ export type RenderContext = {
   // Aborted when the render ends (drawn anew, another view, the page closed): what the renderer started ends with it
   readonly signal: AbortSignal;
   readonly placement: Placement;
+  // Drawn into a container of its own (a side panel, the enlarged view), not the page: its room's height its own too
+  readonly fills?: boolean;
 };
 
 /** A renderer: an element, or null for the host to draw this asset as it draws it */

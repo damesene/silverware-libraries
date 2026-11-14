@@ -11,6 +11,9 @@
 | Silverware Database | `silverware-database/` | `swd-` | `silverware-database/CLAUDE.md`, docs/silverware-database.md |
 | Silverware Icons | `silverware-icons/` | `swi-` | `silverware-icons/CLAUDE.md`, docs/silverware-icons.md (a library for the other plugins, nothing on its own) |
 | Silverware Assets | `silverware-assets/` | `swa-` | `silverware-assets/CLAUDE.md`, docs/silverware-assets.md, docs/silverware-assets-split.md (split out of Layout), docs/silverware-layout-assets-next.md (what is left before the merge) |
+| Silverware Assets PDF | `silverware-assets-pdf/` | `swa-pdf-` | `silverware-assets-pdf/CLAUDE.md`, docs/silverware-assets-pdf.md (a PDF's preview, its first page, through Silverware Assets' API), docs/silverware-viewers.md (with DOCX and XLSX) |
+| Silverware Assets DOCX | `silverware-assets-docx/` | `swa-docx-` | `silverware-assets-docx/CLAUDE.md`, docs/silverware-viewers.md |
+| Silverware Assets XLSX | `silverware-assets-xlsx/` | `swa-xlsx-` | `silverware-assets-xlsx/CLAUDE.md`, docs/silverware-viewers.md |
 | Silverware Layout | `silverware-layout/` | `swl-` | `silverware-layout/CLAUDE.md`, docs/silverware-layout.md, docs/silverware-layout-font-size.md, docs/silverware-layout-grid.md, docs/silverware-layout-assets-next.md (what is left before the merge) |
 
 docs/ holds each plugin's plan and decision log; a plugin's library page (`silverware-<name>.md`) is its user documentation.
@@ -84,6 +87,7 @@ Bundled into each plugin (nothing is shared at run time); its classes by a base 
 - `icons.ts` / `iconref.ts`: how a plugin draws and picks its user's icons (Silverware Icons' API or a stand-in) and how a value is written (`<set>:<name>` or text); see silverware-icons/CLAUDE.md.
 - `overwindow.ts`: what a plugin shows over the whole window (a full screen, a sheet, a database's peek) is marked `data-silverware-over-window` on its element, so the others stand back without knowing whose it is (Silverware Toolbar shows none then); `watchOverWindow` tells when one shows and when the last ends. **Controls placed by where the pointer is** (a table's +, a chart's toolbar) stand back from another plugin's (`overWindowOf` of the node under the pointer): their widget may lie under it, and coordinates alone found it there. **Layers**: every z-index laying something over the page is one of `shared/layers.ts` (`LAYERS`, the one place they are set; each plugin sets them as CSS variables as it starts, `applyLayers`, its style page's rules taking `var(--sw-layer-control)` or a step `calc(… + 1)` for its own order within a layer); a sheet over part of the window (a database's peek) is over the other plugins' controls, its own panels over it, dialogs over all. `shared/layers.test.ts` fails on a number of a page's own (30 and over).
 - `elements.ts` `el(...)`: a plugin's own elements in one synchronous expression; no reactive library (weighed, docs/ui-without-framework.md).
+- `docreader.ts` (and its CSS template `docreader.css`): the reader's shell Silverware Assets DOCX and XLSX draw a document in (bar, zoom, scroller, as wide as its line); `reads.ts`: a file's version and the turns of reads, theirs and Silverware Assets PDF's.
 
 ## Verified in SilverBullet (applies to every plugin)
 

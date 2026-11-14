@@ -586,13 +586,13 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   max-width: 100%;
   border: none !important;
 }
-[data-swa-asset]:has(object, .swa-pdf) {
+[data-swa-asset]:has(object:not(.swa-native-hidden, .swa-native-hidden *), .swa-pdf) {
   display: block;
   width: auto;
 }
 /* A PDF's preview of a width the settings give: its frame as wide as the preview, its "…" at the preview's corner
    (none given: as wide as the text, the frame too) */
-[data-swa-asset][data-swa-view="preview"][data-swa-preview-width]:has(.swa-pdf) {
+[data-swa-asset][data-swa-view="preview"][data-swa-preview-width]:has(object:not(.swa-native-hidden, .swa-native-hidden *), .swa-pdf) {
   width: fit-content;
   max-width: 100%;
 }
@@ -772,6 +772,18 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 .swa-popover .swa-panel-body > :is(img, video) {
   max-height: calc(92vh - 70px);
+}
+/* A type's reader as wide as its line (shared/assets.ts, ASSET_WIDE_ATTRIBUTE: a document's, read at any width): its
+   frame the line's width, not its content's; in a panel the panel's room, its height too */
+[data-swa-asset]:has(> [data-asset-wide]) {
+  display: block;
+  width: auto;
+}
+.swa-panel-body > [data-asset-wide] {
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
 }
 .swa-panel-body > object {
   width: 100% !important;

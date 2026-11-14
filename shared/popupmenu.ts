@@ -6,6 +6,9 @@
 import { el } from "./elements.ts";
 import { focusMenu, type MenuEntry, menuItem, menuSegmented, menuSeparator, onMenuClose, renderMenu } from "./menu.ts";
 
+// The room a menu keeps from the window's edges where it is held in it (px)
+const POPUP_MARGIN = 8;
+
 /** The plugin's base of classes (`swl`) */
 export type PopupLook = { readonly base: string };
 
@@ -65,6 +68,23 @@ export function showPopup(doc: Document, look: PopupLook, at: HTMLElement, shown
   holder.style.top = `${box.bottom + 4}px`;
   holder.style.left = `${Math.max(8, Math.min(box.right - 220, (doc.defaultView?.innerWidth ?? Infinity) - 228))}px`;
   doc.body.append(holder);
+  // Held in the part of the window seen (an on-screen keyboard's room out): over what opened it where it has no room
+  // under it and has above it (by the window's bottom its last items were cut off), else as low as it fits, and where it
+  // is taller than that part, as tall and scrolled
+  const win = doc.defaultView;
+  const seenTop = win?.visualViewport?.offsetTop ?? 0;
+  const seenHeight = win?.visualViewport?.height ?? win?.innerHeight ?? Infinity;
+  const room = seenHeight - 2 * POPUP_MARGIN;
+  if (holder.getBoundingClientRect().height > room) {
+    holder.style.maxHeight = `${room}px`;
+    holder.style.overflowY = "auto";
+  }
+  const height = holder.getBoundingClientRect().height;
+  const bottom = seenTop + seenHeight;
+  if (box.bottom + 4 + height > bottom) {
+    const above = box.top - 4 - height;
+    holder.style.top = `${above >= seenTop ? above : Math.max(seenTop + POPUP_MARGIN, bottom - height - POPUP_MARGIN)}px`;
+  }
   // (A press beside it watched while it is open alone: an element drawn anew and thrown away leaves no listener)
   doc.addEventListener("pointerdown", outside, true);
   doc.addEventListener("keydown", escape, true);

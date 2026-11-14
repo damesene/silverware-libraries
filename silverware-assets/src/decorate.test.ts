@@ -3,7 +3,7 @@
 // "Unsupported content"), the page's text kept here. No SilverBullet is needed to find an embed drawn in the page,
 // choose its view and run a click's action.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AssetType } from "../../shared/assets.ts";
+import type { AssetType, RenderContext } from "../../shared/assets.ts";
 import { readEmbeds } from "../../shared/markdown/embed.ts";
 import { registerBuiltins } from "./builtin/index.ts";
 import { AssetRegistry } from "./core/registry.ts";
@@ -111,6 +111,28 @@ describe("embedded media decorated", () => {
     await vi.waitFor(() => expect(png.frame.querySelector(".swa-failed")).not.toBeNull());
     expect(png.frame.querySelector(".swa-failed")!.getAttribute("title")).toBe("no thumbnail");
     expect(png.native!.classList.contains("swa-native-hidden")).toBe(false);
+  });
+
+  it("gives a type's preview the height of its type's own preview where it has one, all files' else", async () => {
+    const { registry, decorator } = setUp("![[a.pdf|||{ view: preview }]] ![[b.thing|||{ view: preview }]]", { heights: { preview: 160 }, previews: { types: { pdf: { height: 300 } } } });
+    const heights: Record<string, number> = {};
+    const renderer = (name: string) => (context: RenderContext) => ((heights[name] = context.viewport.height), document.createElement("div"));
+    registry.types.register({ name: "pdf", match: { kind: ["file"], ext: ["pdf"] }, icon: "<svg/>", views: { preview: renderer("pdf") } } as AssetType);
+    registry.types.register({ name: "thing", match: { kind: ["file"], ext: ["thing"] }, icon: "<svg/>", views: { preview: renderer("thing") } } as AssetType);
+    await decorator.decorate([frame("a.pdf"), frame("b.thing")]);
+    await vi.waitFor(() => expect(heights).toEqual({ pdf: 300, thing: 160 }));
+  });
+
+  it("lays its layer over a document's viewer a preview puts in after it was drawn (a page a reader could not draw: the browser's viewer in its place)", async () => {
+    const { registry, decorator } = setUp("![[a.pdf|||{ view: preview }]]");
+    let box: HTMLElement | undefined;
+    registry.types.register({ name: "pdf", match: { kind: ["file"], ext: ["pdf"] }, icon: "<svg/>", views: { preview: () => (box = document.createElement("div")) } } as AssetType);
+    const pdf = frame("a.pdf");
+    await decorator.decorate([pdf]);
+    await vi.waitFor(() => expect(box?.isConnected).toBe(true));
+    expect(pdf.frame.querySelector(":scope > .swa-shield")).toBeNull();
+    box!.append(document.createElement("object"));
+    await vi.waitFor(() => expect(pdf.frame.querySelector(":scope > .swa-shield")).not.toBeNull());
   });
 
   it("writes a type's metadata through the host, the reserved keys refused", async () => {

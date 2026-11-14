@@ -38,6 +38,15 @@ export const SHARED_STYLES = [
     ],
   },
   {
+    // A document's reader (shared/docreader.ts): Silverware Assets DOCX's and XLSX's
+    template: "shared/docreader.css",
+    mark: "shared-reader",
+    pages: [
+      { page: "silverware-assets-docx/silverware-assets-docx-style.md", base: "swa-docx" },
+      { page: "silverware-assets-xlsx/silverware-assets-xlsx-style.md", base: "swa-xlsx" },
+    ],
+  },
+  {
     // (The pages of the plugins drawing their own icons through shared/icons.ts, as each moves onto it)
     template: "shared/icons.css",
     mark: "shared-icons",

@@ -1,6 +1,8 @@
 // Silverware Assets' own types of asset (docs/silverware-assets.md, *Types*), registered as anyone's: through
 // the contract alone. Images, video and audio leave both views to the host (SilverBullet draws them); a PDF draws a
-// smaller viewer as its preview; any other file has the card alone. Icons: SVG text, so they follow the theme's colour.
+// smaller viewer as its preview, its original the browser's viewer (Silverware Assets PDF, where installed, replaces the type:
+// its preview its first page as an image, docs/silverware-viewers.md); an archive and any other file the card alone,
+// each its own icon. Icons: SVG text, so they follow the theme's colour.
 import type { AssetType } from "../../../shared/assets.ts";
 import { el } from "../../../shared/elements.ts";
 
@@ -32,11 +34,20 @@ export const pdfType: AssetType = {
   match: { kind: ["file", "web"], mime: "application/pdf", ext: ["pdf"] },
   icon: svg(`${FILE}<path d="M9 13h6M9 17h4"/>`),
   views: {
-    // A smaller viewer, cheap (a preview of the first page later); no room for one (narrower than a preview may be
-    // set, 40 px), or no URL: the host's own
+    // A smaller viewer; no room for one (narrower than a preview may be set, 40 px), or no URL: the host's own
     preview: (context) =>
       "url" in context.asset && context.viewport.width >= 40 ? el(document, "object", { class: "swa-pdf", attrs: { type: "application/pdf", data: context.asset.url } }) : null,
   },
+};
+
+// The extensions of archives and disk images
+const ARCHIVES = ["zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "tbz2", "xz", "txz", "zst", "lz", "lzma", "cab", "iso", "dmg"];
+
+/** An archive (zip, 7z, rar, tar…): a card as any file, its own icon (a file with a zipper) */
+export const archiveType: AssetType = {
+  name: "archive",
+  match: { kind: ["file", "web"], ext: ARCHIVES },
+  icon: svg(`${FILE}<path d="M10 7h1M10 10h1M10 13h1"/><rect x="9" y="15" width="3" height="4" rx="1"/>`),
 };
 
 export const fileType: AssetType = {
@@ -45,4 +56,4 @@ export const fileType: AssetType = {
   icon: svg(FILE),
 };
 
-export const BUILTIN_TYPES: readonly AssetType[] = [imageType, videoType, audioType, pdfType, fileType];
+export const BUILTIN_TYPES: readonly AssetType[] = [imageType, videoType, audioType, pdfType, archiveType, fileType];

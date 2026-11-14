@@ -23,7 +23,10 @@ describe("an asset's type", () => {
     expect(typeFor(types, file("a.png"))?.name).toBe("image");
     expect(typeFor(types, file("a.jpg"))?.name).toBe("photo");
     expect(typeFor(types, file("a.pdf"))?.name).toBe("pdf");
-    expect(typeFor(types, file("a.zip"))?.name).toBe("file");
+    expect(typeFor(types, file("a.zip"))?.name).toBe("archive");
+    expect(typeFor(types, file("backup.tar.gz"))?.name).toBe("archive");
+    expect(typeFor(types, file("a.7z"))?.name).toBe("archive");
+    expect(typeFor(types, file("a.bin"))?.name).toBe("file");
     expect(typeFor(types, { kind: "page", page: "P" })).toBeUndefined();
     const special: AssetType = { name: "special", match: { kind: ["file"], test: (asset) => asset.kind === "file" && asset.path.startsWith("Special/") }, icon: "" };
     expect(typeFor([...types, special], file("Special/a.jpg"))?.name).toBe("special");
@@ -128,6 +131,37 @@ describe("the registry", () => {
     expect(registry.types.get("image")).toBeUndefined();
     registry.api().types.register({ name: "", match: { kind: ["file"] }, icon: "" } as AssetType);
     expect(problems).toEqual(["Silverware Assets: a type has no name; not registered"]);
+  });
+
+  it("tells who listens as a type or an action is registered, replaced or taken off; not for one refused, nor one not registered any more", () => {
+    const registry = new AssetRegistry(() => undefined);
+    let told = 0;
+    const stop = registry.onChange(() => told++);
+    const pdf: AssetType = { name: "pdf", match: { kind: ["file"], ext: ["pdf"] }, icon: "<svg/>" };
+    const off = registry.api().types.register(pdf);
+    expect(told).toBe(1);
+    registry.api().types.register({ ...pdf });
+    expect(told).toBe(2);
+    // (Replaced by another: its own taking off takes nothing)
+    off();
+    expect(told).toBe(2);
+    registry.api().types.register({ name: "", match: { kind: ["file"] }, icon: "" } as AssetType);
+    expect(told).toBe(2);
+    stop();
+    registry.api().types.register(pdf);
+    expect(told).toBe(2);
+  });
+
+  it("gives the built-in type back as a plugin's of its name is taken off (Silverware Assets PDF's `pdf`: the browser's viewer again)", () => {
+    const registry = new AssetRegistry(() => undefined);
+    registerBuiltins(registry);
+    const builtin = registry.types.get("pdf");
+    expect(builtin?.views?.preview).toBeDefined();
+    const plugin: AssetType = { name: "pdf", match: { kind: ["file"], ext: ["pdf"] }, icon: "<svg/>" };
+    const off = registry.api().types.register(plugin);
+    expect(registry.types.get("pdf")).toBe(plugin);
+    off();
+    expect(registry.types.get("pdf")).toBe(builtin);
   });
 
   it("says why a type is wrong", () => {

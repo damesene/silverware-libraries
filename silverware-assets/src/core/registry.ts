@@ -36,6 +36,7 @@ class Named<T extends { readonly name: string }> {
   constructor(
     private readonly validate: (one: unknown) => string | undefined,
     private readonly problem: (message: string) => void,
+    private readonly changed: () => void,
   ) {}
 
   get all(): readonly T[] {
@@ -52,9 +53,15 @@ class Named<T extends { readonly name: string }> {
       this.problem(`Silverware Assets: ${problem}; not registered`);
       return () => undefined;
     }
+    // (What it replaces comes back as it is taken off: Silverware Assets PDF's `pdf` gone, Silverware Assets' own the browser's again)
+    const replaced = this.byName.get(one.name);
     this.byName.set(one.name, one);
+    this.changed();
     return () => {
-      if (this.byName.get(one.name) === one) this.byName.delete(one.name);
+      if (this.byName.get(one.name) !== one) return;
+      if (replaced) this.byName.set(one.name, replaced);
+      else this.byName.delete(one.name);
+      this.changed();
     };
   }
 
@@ -67,10 +74,18 @@ class Named<T extends { readonly name: string }> {
 export class AssetRegistry {
   readonly types: Named<AssetType>;
   readonly actions: Named<AssetAction>;
+  private readonly listeners = new Set<() => void>();
 
   constructor(problem: (message: string) => void) {
-    this.types = new Named<AssetType>(validateAssetType, problem);
-    this.actions = new Named<AssetAction>(validateAssetAction, problem);
+    const changed = () => this.listeners.forEach((listener) => listener());
+    this.types = new Named<AssetType>(validateAssetType, problem, changed);
+    this.actions = new Named<AssetAction>(validateAssetAction, problem, changed);
+  }
+
+  /** Told as a type or an action is registered, replaced or taken off (another plugin's, its init page run after the page's files were drawn); what stops it given back */
+  onChange(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => void this.listeners.delete(listener);
   }
 
   /** The API a plugin registers with (`silverware.assets.api`) */

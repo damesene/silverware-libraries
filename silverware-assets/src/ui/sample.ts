@@ -13,7 +13,8 @@ const FILES: Readonly<Record<string, { readonly name: string; readonly alt: stri
   video: { name: "trip.mp4", alt: "Our trip", size: "48 MB" },
   audio: { name: "interview.mp3", alt: "Interview", size: "6.1 MB" },
   pdf: { name: "report.pdf", alt: "Quarterly report", size: "860 KB" },
-  file: { name: "project.zip", alt: "Project files", size: "12 MB" },
+  archive: { name: "project.zip", alt: "Project files", size: "12 MB" },
+  file: { name: "minutes.odt", alt: "Meeting minutes", size: "48 KB" },
 };
 
 /** The sample file of a type: its name, alt text and size */

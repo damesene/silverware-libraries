@@ -49,7 +49,7 @@ Written 2026-11-14 so that a new session can start from here. Branch `docs/layou
 ## Later (the plans' backlogs)
 
 - The grid: attributes (`gap`, `span`, `align`), a grid in a grid, a grid exported (`renderHtml`), a grid's tasks and items indexed, several images uploaded into a grid at once (a phone's camera too).
-- The files: paste and drop, an embedded page as a type of its own, a real PDF preview (pdf.js), a video's first frame, types and renderers from Space Lua, actions `open` and `embed`, a long press on a touch screen.
+- The files: paste and drop, an embedded page as a type of its own, a video's first frame, types and renderers from Space Lua, actions `open` and `embed`, a long press on a touch screen.
 
 ## How to work
 

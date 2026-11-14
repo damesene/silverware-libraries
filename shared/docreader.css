@@ -1,0 +1,71 @@
+/* A document's reader (shared/docreader.ts): a box of the embed's height in the page (filling a side panel or the
+   enlarged view), a bar on top (a label at its left, the zoom at its right, clear of a file frame's "…" at its top
+   right, Silverware Assets', which lay over it), the document on a quiet ground under it, scrolled inside it */
+.__base__-reader {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--root-color, #000) 14%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--root-color, #000) 5%, var(--root-background-color, #fff));
+}
+.__base__-reader.__base__-reader-fills {
+  height: 100%;
+}
+.__base__-reader-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 40px 4px 8px;
+  font: 13px var(--ui-font, system-ui, sans-serif);
+  color: var(--root-color);
+  background: var(--root-background-color, #fff);
+  border-bottom: 1px solid color-mix(in srgb, var(--root-color, #000) 12%, transparent);
+}
+.__base__-reader-label {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+.__base__-reader-tools {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+  overflow-x: auto;
+}
+.__base__-reader-zoom {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+}
+.__base__-reader-button {
+  min-width: 28px;
+  padding: 2px 6px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.__base__-reader-button:hover,
+.__base__-reader-button:focus-visible {
+  border-color: color-mix(in srgb, var(--root-color, #000) 25%, transparent);
+}
+.__base__-reader-button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--root-color, #000) 10%, transparent);
+}
+.__base__-reader-fit {
+  min-width: 48px;
+  font-variant-numeric: tabular-nums;
+}
+.__base__-reader-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}

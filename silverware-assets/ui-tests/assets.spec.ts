@@ -6,6 +6,9 @@
 import { ASSETS_SETTINGS, expect, gridsDrawn, PAGE_LAYOUT, PIXEL_PNG, runCommand, test } from "./helpers.ts";
 
 const cell = (text: string) => `<column>\n\n${text}\n\n</column>`;
+// What shows a PDF in its frame, whoever draws it: the browser's viewer (Silverware Assets' own type), or Silverware
+// PDF's preview where that library is installed beside it (the tests' spaces have every plugin)
+const PDF_SHOWN = ":is(object:visible, .swa-pdf, .swa-pdf-preview)";
 const grid = (...cells: string[]) => `<grid>\n${cells.map(cell).join("\n")}\n</grid>\n`;
 
 /** A view chosen in a medium's "…" menu */
@@ -128,10 +131,10 @@ test("a PDF's viewer as wide as its frame, its handle shown from beside its righ
   await expect(frames).toHaveCount(2);
   const width = async (locator: import("@playwright/test").Locator) => Math.round((await locator.boundingBox())!.width);
   // Without a size of its own: the frame's width; with one: its own
-  await expect.poll(async () => (await width(frames.first().locator("object"))) === (await width(frames.first()))).toBe(true);
-  await expect.poll(() => width(frames.nth(1).locator("object"))).toBe(200);
+  await expect.poll(async () => (await width(frames.first().locator(PDF_SHOWN).first())) === (await width(frames.first()))).toBe(true);
+  await expect.poll(() => width(frames.nth(1).locator(PDF_SHOWN).first())).toBe(200);
   // As tall as the original's setting (480 px), not the browser's 150 px of an object: no preview's size
-  await expect.poll(async () => Math.round((await frames.first().locator("object").boundingBox())!.height)).toBe(480);
+  await expect.poll(async () => Math.round((await frames.first().locator(PDF_SHOWN).first().boundingBox())!.height)).toBe(480);
   // From the page right of it to just beside its edge, where the bar is: shown
   const box = (await frames.first().boundingBox())!;
   await page.mouse.move(box.x + box.width + 120, box.y + box.height / 2);
@@ -162,7 +165,7 @@ test("a PDF and a zip in a grid's cells: the PDF's viewer as wide as its cell, t
   await gridsDrawn(page);
   const cells = page.locator("#sb-main .swl-grid-cell");
   const pdf = cells.nth(0).locator("[data-swa-asset='pdf']");
-  await expect(pdf.locator("object")).toHaveAttribute("data", `.fs/${encodeURI(`${space.folder}/doc.pdf`)}`);
+  await expect(pdf.locator("object:visible")).toHaveAttribute("data", `.fs/${encodeURI(`${space.folder}/doc.pdf`)}`);
   expect(Math.round((await pdf.boundingBox())!.width)).toBe(Math.round((await cells.nth(0).boundingBox())!.width));
   await expect(cells.nth(1).locator(".swa-card")).toHaveText("archive.zip");
 });
@@ -189,7 +192,7 @@ test("a preview's size the settings' (all files, a type's own), never widened by
     { "doc.pdf": "%PDF-1.4\n", "photo.png": PIXEL_PNG },
   );
   const pdf = page.locator("#sb-main [data-swa-asset='pdf']");
-  await expect(pdf.locator(".swa-pdf")).toBeVisible();
+  await expect(pdf.locator(PDF_SHOWN).first()).toBeVisible();
   // Beside a preview its grip for its menu alone, no width to drag: its size is the settings'
   const box = (await pdf.boundingBox())!;
   await page.mouse.move(box.x + box.width + 120, box.y + 20);
@@ -212,11 +215,11 @@ test("a preview's size the settings' (all files, a type's own), never widened by
     const one = (await locator.boundingBox())!;
     return [Math.round(one.width), Math.round(one.height)];
   };
-  await expect.poll(() => size(pdf.locator(".swa-pdf"))).toEqual([100, 300]);
+  await expect.poll(() => size(pdf.locator(PDF_SHOWN).first())).toEqual([100, 300]);
   // Its frame as wide as the preview: its "…" at the preview's corner, not at the text's right
   await pdf.hover();
   const more = (await pdf.locator(".swa-more").boundingBox())!;
-  const shown = (await pdf.locator(".swa-pdf").boundingBox())!;
+  const shown = (await pdf.locator(PDF_SHOWN).first().boundingBox())!;
   expect(more.x + more.width).toBeLessThanOrEqual(shown.x + shown.width + 1);
   // The image within 100 × 160 (a pixel drawn as large as it fits, its ratio kept): no wider than 100
   await expect.poll(async () => (await size(page.locator("#sb-main [data-swa-asset='image'] img")))[0]! <= 100).toBe(true);
@@ -395,7 +398,7 @@ test("a card's icon hidden in the settings: a small arrow after its name within 
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
   // No "…" beside the card: the arrow its last part, within it and within its frame on a phone's width (its long name cut instead)
-  const frame = page.locator("#sb-main [data-swa-asset='file']");
+  const frame = page.locator("#sb-main [data-swa-asset='archive']");
   const marker = frame.locator(".swa-card > .swa-menu-marker:last-child");
   await expect(marker).toBeVisible();
   await expect(frame.locator(".swa-more")).toHaveCount(0);
@@ -442,7 +445,7 @@ test("Delete file… in a file's menu: asked in SilverBullet's dialog, the file 
   await space.open({ Page: `# Page\n\n${embed}\n\nSee ${link} here.\n` }, "Page", { "archive.zip": "zip", "doc.pdf": "%PDF-1.4\n" });
   const confirm = page.locator(".sb-modal-box, .sb-modal").filter({ hasText: "Delete the file" });
   // The card's menu (its icon): Delete file…, declined first
-  const card = page.locator("#sb-main [data-swa-asset='file'] .swa-card");
+  const card = page.locator("#sb-main [data-swa-asset='archive'] .swa-card");
   await card.locator(".swa-icon").click();
   await page.locator(".swa-popup .swa-menu-item.swa-danger", { hasText: "Delete file…" }).click();
   await expect(confirm).toContainText("The file itself is deleted, not only this embed: it cannot be brought back.");

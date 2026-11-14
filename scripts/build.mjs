@@ -7,9 +7,20 @@ import { iconFiles } from "./icons/index.mjs";
 import { sharedStyles } from "./sharedstyles.mjs";
 import { checkVersions } from "./versions.mjs";
 
-const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart", "silverware-database", "silverware-icons", "silverware-layout", "silverware-assets"];
-// Files bundled beside a library's, loaded by it when needed: Chart.js beside the chart's (src/chartjs.ts)
-const beside = [{ entry: "silverware-chart/src/chartjs.ts", outfile: "silverware-chart/silverware-chart-chartjs.js" }];
+const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart", "silverware-database", "silverware-icons", "silverware-layout", "silverware-assets", "silverware-assets-pdf", "silverware-assets-docx", "silverware-assets-xlsx"];
+// Files bundled beside a library's, loaded by it when needed: Chart.js beside the chart's (src/chartjs.ts), docx-preview
+// and JSZip beside Silverware Assets DOCX's, ExcelJS beside Silverware Assets XLSX's (each src/vendor.ts)
+const beside = [
+  { entry: "silverware-chart/src/chartjs.ts", outfile: "silverware-chart/silverware-chart-chartjs.js" },
+  { entry: "silverware-assets-docx/src/vendor.ts", outfile: "silverware-assets-docx/silverware-assets-docx-docxpreview.js" },
+  { entry: "silverware-assets-xlsx/src/vendor.ts", outfile: "silverware-assets-xlsx/silverware-assets-xlsx-exceljs.js" },
+];
+// Files copied unchanged beside a library's from a package, loaded by it when needed: pdf.js and its worker beside
+// Silverware Assets PDF's (silverware-assets-pdf/src/pdfjs/load.ts)
+const copied = [
+  { from: "node_modules/pdfjs-dist/build/pdf.min.mjs", to: "silverware-assets-pdf/silverware-assets-pdf-pdfjs.js" },
+  { from: "node_modules/pdfjs-dist/build/pdf.worker.min.mjs", to: "silverware-assets-pdf/silverware-assets-pdf-pdfjs-worker.js" },
+];
 const watch = process.argv.includes("--watch");
 const check = process.argv.includes("--check");
 
@@ -41,6 +52,17 @@ for (const { entry, outfile, name } of [...libraries.map((name) => ({ entry: `${
   } else {
     await esbuild.build(options);
   }
+}
+// The files copied from packages, as the package installed has them
+for (const { from, to } of copied) {
+  const text = (await readFile(from, "utf8")).replaceAll("\r\n", "\n");
+  if (check) {
+    const committed = (await readFile(to, "utf8").catch(() => "")).replaceAll("\r\n", "\n");
+    if (committed !== text) {
+      console.error(`${to} does not match ${from}: run npm run build`);
+      stale++;
+    }
+  } else await writeFile(to, text);
 }
 // Silverware Icons' sets beside its bundle and its manifest (scripts/icons/index.mjs), made from the packages as installed
 for (const { path, text } of iconFiles()) {

@@ -55,4 +55,32 @@ describe("a popup menu", () => {
     expect(heard).not.toHaveBeenCalled();
     expect(removed.mock.calls.filter(([type]) => type === "keydown")).toHaveLength(1);
   });
+
+  it("opens over what opened it where it has no room under it and has above it, under it else", () => {
+    const rect = (top: number, height: number) => ({ top, bottom: top + height, left: 300, right: 330, width: 30, height, x: 300, y: top, toJSON: () => ({}) }) as DOMRect;
+    vi.spyOn(window, "innerHeight", "get").mockReturnValue(800);
+    // (jsdom lays nothing out: the menu 200 px high as a browser would make it)
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains("swa-xlsx-popup") ? rect(0, 200) : rect(Number(this.dataset.top), 20);
+    });
+    const low = document.body.appendChild(document.createElement("button"));
+    low.dataset.top = "700";
+    opensMenu(document, LOOK, low, menu);
+    low.click();
+    expect(document.querySelector<HTMLElement>(".swa-xlsx-popup")!.style.top).toBe(`${700 - 4 - 200}px`);
+    low.click();
+    const high = document.body.appendChild(document.createElement("button"));
+    high.dataset.top = "100";
+    opensMenu(document, LOOK, high, menu);
+    high.click();
+    expect(document.querySelector<HTMLElement>(".swa-xlsx-popup")!.style.top).toBe(`${100 + 20 + 4}px`);
+    high.click();
+    // Room neither under nor over it (a phone held sideways): as low as it fits, in the window
+    vi.spyOn(window, "innerHeight", "get").mockReturnValue(360);
+    const middle = document.body.appendChild(document.createElement("button"));
+    middle.dataset.top = "180";
+    opensMenu(document, LOOK, middle, menu);
+    middle.click();
+    expect(document.querySelector<HTMLElement>(".swa-xlsx-popup")!.style.top).toBe(`${360 - 200 - 8}px`);
+  });
 });

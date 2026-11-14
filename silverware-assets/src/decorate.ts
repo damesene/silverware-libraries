@@ -296,7 +296,7 @@ export class AssetDecorator {
       },
       onChange: () => undefined,
     };
-    const element = await type.views?.[as]?.({ asset, viewport, metadata: metadataOf({}, async () => "a link keeps no metadata"), signal, placement: "inline" });
+    const element = await type.views?.[as]?.({ asset, viewport, metadata: metadataOf({}, async () => "a link keeps no metadata"), signal, placement: "inline", fills: true });
     container.replaceChildren(element ?? plainMedium(this.doc, asset, mimeOf(asset)) ?? this.card(type, asset, settings));
   }
 
@@ -436,7 +436,7 @@ export class AssetDecorator {
     });
     const context: RenderContext = {
       asset,
-      viewport: viewportOf(frame, found.embed, view, settings, control.signal, sized ? preview.width : undefined),
+      viewport: viewportOf(frame, found.embed, view, settings, control.signal, sized ? preview.width : undefined, view === "preview" ? preview.height : undefined),
       metadata: metadataOf(found.embed.metadata, (changes) => write({ metadata: changes })),
       signal: control.signal,
       placement: "block",
@@ -444,7 +444,7 @@ export class AssetDecorator {
     const capabilities = { views: (["icon", "preview", "embed"] as const).filter(can) };
     // The asset drawn into a container of an action's (a panel): its type's view, else a copy of the host's drawing, else its card
     const renderInto = async (as: "preview" | "embed", container: HTMLElement) => {
-      const element = await type.views?.[as]?.({ ...context, viewport: viewportOf(container, found.embed, as, settings, control.signal) });
+      const element = await type.views?.[as]?.({ ...context, viewport: viewportOf(container, found.embed, as, settings, control.signal), fills: true });
       container.replaceChildren(element ?? shownCopy(native) ?? this.card(type, asset, settings));
     };
     const runAction = (gesture: Gesture) => {
@@ -540,10 +540,23 @@ export class AssetDecorator {
     };
 
     // A preview drawn (by its type: `element`; else the host's own, smaller): its click (a layer over a document's
-    // viewer, which takes every click on it) and its label
+    // viewer, which takes every click on it) and its label. A viewer its type puts in later (a PDF's page it could not
+    // draw: the browser's viewer in its place) gets the layer then
     const previewDone = (element?: HTMLElement) => {
       if (!element || element.matches(DOCUMENT_VIEWERS) || element.querySelector(DOCUMENT_VIEWERS)) shielded();
-      else clicked(element);
+      else {
+        clicked(element);
+        const win = this.doc.defaultView;
+        if (win?.MutationObserver) {
+          const watcher = new win.MutationObserver(() => {
+            if (!element.querySelector(DOCUMENT_VIEWERS)) return;
+            watcher.disconnect();
+            shielded();
+          });
+          watcher.observe(element, { childList: true, subtree: true });
+          control.signal.addEventListener("abort", () => watcher.disconnect());
+        }
+      }
       labelled();
     };
 
@@ -633,8 +646,9 @@ function shownCopy(native: HTMLElement | undefined): HTMLElement | undefined {
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /** The room an asset is drawn in: the frame's width; its height the stored one, else the view's default */
-function viewportOf(element: HTMLElement, embed: Embed, view: View, settings: AssetSettings, signal: AbortSignal, width?: number): Viewport {
-  const height = () => Number(embed.height) || (view === "icon" ? 0 : settings.heights[view]);
+function viewportOf(element: HTMLElement, embed: Embed, view: View, settings: AssetSettings, signal: AbortSignal, width?: number, ownHeight?: number): Viewport {
+  // (A preview's: its type's own where it has one, as the frame's --swa-height says, else all files')
+  const height = () => Number(embed.height) || ownHeight || (view === "icon" ? 0 : settings.heights[view]);
   return {
     // (A preview of a width the settings give: that width its room, the frame taking its width from what is drawn)
     get width() {

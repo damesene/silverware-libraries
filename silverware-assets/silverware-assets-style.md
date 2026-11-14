@@ -166,6 +166,13 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   display: block;
   width: auto;
 }
+/* The host's PDF viewer as the original, without a size of its own: as wide as its frame (the text's), so the frame's
+   edge, and Silverware Layout's handle beside it, is the viewer's (SilverBullet 2.12.1 draws it 300 px wide, its
+   style `max-width: 100%;`; one with a size, `width: 200px` after it, keeps it) */
+[data-swa-asset][data-swa-view="embed"] object:not(.swa-icon *, [style*="; width"]) {
+  width: 100% !important;
+  max-width: 100% !important;
+}
 /* A card: its "…" beside it, not over its name */
 [data-swa-view="icon"] {
   display: flex !important;

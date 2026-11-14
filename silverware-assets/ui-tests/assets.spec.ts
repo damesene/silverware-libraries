@@ -95,6 +95,21 @@ test("an image widened to the page's width by its handle: kept at that width as 
   await expect.poll(() => space.saved("Page")).toMatch(new RegExp(`photo\\.png\\|Photo\\|${Math.round(text)}\\]\\]`));
 });
 
+test("a PDF's viewer as wide as its frame, its handle shown from beside its right edge (the viewer tells the page of no move over it)", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/doc.pdf]]\n\n![[${space.folder}/doc.pdf|Doc|200]]\n\nAfter\n` }, "Page", { "doc.pdf": "%PDF-1.4\n" });
+  const frames = page.locator("#sb-main [data-swa-asset='pdf']");
+  await expect(frames).toHaveCount(2);
+  const width = async (locator: import("@playwright/test").Locator) => Math.round((await locator.boundingBox())!.width);
+  // Without a size of its own: the frame's width; with one: its own
+  await expect.poll(async () => (await width(frames.first().locator("object"))) === (await width(frames.first()))).toBe(true);
+  await expect.poll(() => width(frames.nth(1).locator("object"))).toBe(200);
+  // From the page right of it to just beside its edge, where the bar is: shown
+  const box = (await frames.first().boundingBox())!;
+  await page.mouse.move(box.x + box.width + 120, box.y + box.height / 2);
+  await page.mouse.move(box.x + box.width + 6, box.y + box.height / 2, { steps: 8 });
+  await expect(page.locator(".swl-handle-bar")).toBeVisible();
+});
+
 test("an image in a grid's cell dragged within the cell: no wider than it, its quarters its guides", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${grid(`![[${space.folder}/photo.png|Photo|100]]`, "Right")}` }, "Page", { "photo.png": PIXEL_PNG });
   await gridsDrawn(page);

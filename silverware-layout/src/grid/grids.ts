@@ -16,6 +16,7 @@ import { RENDERED_VERSION, type Rendered, type RenderedItem, type RenderedRange 
 import { type Drawn, drawnIn, itemsOf } from "./drawn.ts";
 import { addCellMenus, type CellAction } from "./ui/cellmenu.ts";
 import { caretWord, editCell } from "./ui/celleditor.ts";
+import { blankLinesBefore, blankLineStart } from "./core/blanklines.ts";
 import { addColumnDividers } from "./ui/dividers.ts";
 import { drawGrid, keepBlankLines, plainCell, showColumns } from "./ui/view.ts";
 
@@ -378,7 +379,7 @@ export class Grids {
         : pressed && pressed.cell === at.cell && pressed.caret && caret && Math.hypot(event.clientX - pressed.x, event.clientY - pressed.y) > DRAG_PX
           ? { anchor: pressed.caret, focus: caret }
           : undefined;
-    const point = { target: event.target as Element, caret, ...(selected ? { selected } : {}) };
+    const point = { target: event.target as Element, caret, y: event.clientY, ...(selected ? { selected } : {}) };
     await this.edit(at.element, at.cell, point);
   }
 
@@ -405,7 +406,11 @@ export class Grids {
       this.host.problem("Silverware Layout: this grid changed in the page since it was drawn; edit it there");
       return;
     }
-    const at = !point ? undefined : point.selected ? selectionInCell(cell.content, cellElement, point.selected) : offsetInCell(cell.content, cellElement, point.target, point.caret);
+    const at = !point
+      ? undefined
+      : point.selected
+        ? selectionInCell(cell.content, cellElement, point.selected)
+        : ((point.y === undefined ? undefined : blankLineAt(cell.content, cellElement, point.y)) ?? offsetInCell(cell.content, cellElement, point.target, point.caret));
     editCell(cellElement, cell.content, at, (content) => {
       if (same(content) === same(cell.content)) return;
       void this.host
@@ -446,7 +451,7 @@ export function toggledTask(content: string, at: number): string | undefined {
 
 /** Where a click was in a cell's rendering: the element, the caret there, and the text selected in the cell, where some was */
 type Caret = { readonly node: Node; readonly offset: number };
-export type CellPoint = { readonly target: Element; readonly caret: Caret | undefined; readonly selected?: { readonly anchor: Caret; readonly focus: Caret } };
+export type CellPoint = { readonly target: Element; readonly caret: Caret | undefined; readonly y?: number; readonly selected?: { readonly anchor: Caret; readonly focus: Caret } };
 
 /** A selection in a cell's rendering as one of its markdown: each end where it is there, its direction kept */
 function selectionInCell(content: string, cellElement: HTMLElement, selected: { readonly anchor: Caret; readonly focus: Caret }): { readonly from: number; readonly to: number; readonly backward: boolean } {
@@ -472,6 +477,30 @@ function offsetInCell(content: string, cellElement: HTMLElement, target: Element
   range.setStart(element, 0);
   range.setEnd(caret.node, caret.offset);
   return positionInCell(content, elementPos, element.textContent ?? "", range.toString().length);
+}
+
+/**
+ * Where a click on a blank line of a cell's rendering is in its markdown: the start of that blank line (none where the
+ * click is on no blank line). Blank lines are drawn as space, no element marked with its place in it: found by
+ * height, between the element drawn before (its bottom) and the one after (its top, its `data-pos`), as many lines
+ * there as its markdown has blank lines before it
+ */
+function blankLineAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
+  const marked = [...cellElement.querySelectorAll<HTMLElement>(":scope > [data-pos], :scope li[data-pos]")];
+  const next = marked.find((element) => element.getBoundingClientRect().top > y);
+  if (!next) return undefined;
+  const pos = Number(next.getAttribute("data-pos"));
+  const blanks = blankLinesBefore(content, pos);
+  if (!blanks) return undefined;
+  // The bottom of what is drawn before it (a line break or a put-back blank line is space, not content)
+  let before = next.previousElementSibling;
+  while (before && (before.tagName === "BR" || before.classList.contains("swl-grid-blank"))) before = before.previousElementSibling;
+  const top = next.getBoundingClientRect().top;
+  const bottom = before ? before.getBoundingClientRect().bottom : cellElement.getBoundingClientRect().top;
+  if (y < bottom || top <= bottom) return undefined;
+  const line = (top - bottom) / blanks;
+  const nth = Math.min(blanks, Math.max(1, Math.ceil((top - y) / line)));
+  return blankLineStart(content, pos, nth);
 }
 
 /** The ranges of a page's text its grids draw outside the editor, drawn now or not: each grid's lines whole */

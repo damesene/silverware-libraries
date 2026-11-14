@@ -25,3 +25,11 @@ export function blankLinesDrawn(breaks: number, before: { readonly tagName: stri
   const inline = !!before && !BLOCKS.has(before.tagName.toUpperCase());
   return inline ? Math.max(0, breaks - 1) : breaks;
 }
+
+/** Where the `nth` blank line above the line a place of a text is on starts (1: the nearest); none where there are not as many */
+export function blankLineStart(text: string, at: number, nth: number): number | undefined {
+  if (nth < 1 || nth > blankLinesBefore(text, at)) return undefined;
+  let start = text.lastIndexOf("\n", Math.max(0, at) - 1) + 1;
+  for (let i = 0; i < nth; i++) start = text.lastIndexOf("\n", start - 2) + 1;
+  return start;
+}

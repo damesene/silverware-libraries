@@ -3,7 +3,7 @@
 // loose list's items) put back, those it kept (between paragraphs, as line breaks) left as they are.
 import { describe, expect, it } from "vitest";
 import { keepBlankLines } from "../ui/view.ts";
-import { blankLinesBefore, blankLinesDrawn } from "./blanklines.ts";
+import { blankLinesBefore, blankLinesDrawn, blankLineStart } from "./blanklines.ts";
 
 // SilverBullet 2.12.1's markdownToHtml of this text (probed 2026-11-14)
 const TEXT = "One\n\nTwo\n\n\nThree\n\n\n\nFour\n- item\n\n- item2\n\n# Head\n\nAfter";
@@ -38,5 +38,15 @@ describe("a cell's blank lines", () => {
     // Drawn again over the same: none more
     keepBlankLines(document, cell, TEXT);
     expect(cell.querySelectorAll(".swl-grid-blank")).toHaveLength(2);
+  });
+});
+
+describe("a blank line clicked", () => {
+  it("is where the nth blank line above a place's line starts, the nearest first; none past them", () => {
+    const text = "a\n\n\nb";
+    expect(blankLineStart(text, 4, 1)).toBe(3);
+    expect(blankLineStart(text, 4, 2)).toBe(2);
+    expect(blankLineStart(text, 4, 3)).toBeUndefined();
+    expect(blankLineStart(text, 0, 1)).toBeUndefined();
   });
 });

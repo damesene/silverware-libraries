@@ -116,6 +116,30 @@ test("a cell keeps the blank lines of its markdown as the editor shows them: bet
   expect(Math.round(((await top("h1")) - (await top("li >> nth=1"))) / line)).toBe(2);
 });
 
+test("a click on a blank line of a cell puts the field's caret on that line, not at the cell's start", async ({ page, space }) => {
+  // Two blank lines between the paragraphs (drawn as line breaks), one between the list's items (put back)
+  const cell = "One\n\n\nTwo\n- a\n\n- b";
+  await space.open({ Page: `# Page\n\n<grid>\n<column>\n\n${cell}\n\n</column>\n<column>\n\nRight\n\n</column>\n</grid>\n` }, "Page");
+  await gridsDrawn(page);
+  const first = page.locator("#sb-main .swl-grid-cell").first();
+  const clickAbove = async (selector: string, lines: number) => {
+    const box = (await first.locator(selector).first().boundingBox())!;
+    const line = (await first.locator(".p").first().boundingBox())!.height;
+    await page.mouse.click(box.x + 30, box.y - line * (lines - 0.5));
+  };
+  const caret = () => page.locator("#sb-main .swl-grid-editor").evaluate((field: HTMLTextAreaElement) => field.selectionStart);
+  // The blank line right above "Two": its line's start (the second blank one, at 5)
+  await clickAbove(".p >> nth=1", 1);
+  await expect(page.locator("#sb-main .swl-grid-editor")).toBeVisible();
+  expect(await caret()).toBe(cell.indexOf("\n\nTwo") + 1);
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#sb-main .swl-grid-editor")).toHaveCount(0);
+  // The one between the list's items
+  await clickAbove("li >> nth=1", 1);
+  await expect(page.locator("#sb-main .swl-grid-editor")).toBeVisible();
+  expect(await caret()).toBe(cell.indexOf("\n- b"));
+});
+
 test("a grid's left edge dragged alone: its right edge standing, written as its width and shift; a double click centres it again", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\nAbove\n\n${GRID}\nBelow\n` }, "Page");
   await gridsDrawn(page);

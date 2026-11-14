@@ -5,7 +5,7 @@ const configured = (values: Record<string, unknown>) => (path: string) => values
 
 describe("Silverware Layout's settings", () => {
   it("their defaults where nothing is configured: the theme's text width, 600 px, guides of 900 px, 1200 px and full, the theme's font size, font zoom on", () => {
-    expect(readSettings(configured({}))).toEqual({ textWidth: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true });
+    expect(readSettings(configured({}))).toEqual({ textWidth: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true, alignments: {} });
     expect(DEFAULT_GUIDES).toEqual([900, 1200, "full"]);
   });
 
@@ -13,7 +13,7 @@ describe("Silverware Layout's settings", () => {
     const settings = readSettings(
       configured({ [PATHS.textWidth]: "90%", [PATHS.minPaneWidth]: 700, [PATHS.guides]: ["600px", 1000, "full"], [PATHS.fontSize]: "20px", [PATHS.fontZoom]: false }),
     );
-    expect(settings).toEqual({ textWidth: { amount: 90, unit: "%" }, minPaneWidth: 700, guides: [600, 1000, "full"], fontSize: 20, fontZoom: false });
+    expect(settings).toEqual({ textWidth: { amount: 90, unit: "%" }, minPaneWidth: 700, guides: [600, 1000, "full"], fontSize: 20, fontZoom: false, alignments: {} });
     expect(PATHS.fontZoom).toBe("silverware.layout.fontZoom.enabled");
   });
 

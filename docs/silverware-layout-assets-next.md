@@ -10,7 +10,7 @@ Written 2026-11-14 so that a new session can start from here. Branch `docs/layou
 
 ## Left before the merge
 
-1. **Fix: the Page layout dialog closes when another plugin saves the configuration.** Saving in Silverware Assets' settings makes SilverBullet load the configuration again, Silverware Layout starts again and the dialog open goes. Seen in a UI test (`silverware-assets/ui-tests/assets.spec.ts`, the markdown-as-written test reopens it), worked round there, not fixed. Recommended to the user; not started.
+1. ~~The Page layout dialog closed when another plugin saved the configuration~~: fixed 2026-11-14. Started again, Silverware Layout took the page it had for none (`start` set it `""`), and `pageOpened` closed the dialog as over another page; the page is kept now, and what the open dialog shows is not undone (`app.test.ts`, and Assets' markdown-as-written test with Layout's dialog open as Assets saves).
 2. **SilverBullet after 2.12.1 (edge)**: [silverware-library-prefix.md](silverware-library-prefix.md) plans the change for every plugin (scripts only under `Library/`, CONFIG moved to `Library/Config`). Silverware Assets' init page has its own `saveConfigPage` writing `CONFIG`: add Assets to that plan. The grid and the assets were never tried on edge.
 3. **Releases** (on the user's word only, the last commits of the branch, root `CLAUDE.md` *Versions*):
    - Silverware Assets 1.0.0: its entry (`silverware-assets/CHANGELOG.md`, dated 2026-11-13) predates the settings window, previews' sizes, the PDF's height and the click on a PDF's preview: redraft it and its date, then ask.
@@ -31,7 +31,7 @@ Written 2026-11-14 so that a new session can start from here. Branch `docs/layou
 
 - **A PDF's height by a handle**: left (the user: an image cannot be deformed, so a second handle fits nothing but a PDF); the height is the settings' (`heights.embed`, the settings window) or the embed's own (`|640x900`).
 - **A preview widened by the handle**: never (its size is the settings').
-- **A grid anchored at the text's start**: tried, worse; a grid grows both ways (Alt on an edge line).
+- **A grid anchored at the text's start**: tried, worse; a grid is centred by default, aligned as any widget since (docs/silverware-layout-align.md).
 - **Marks for how a grid's cells were apart** (`<column line>`): dropped; taken apart, a cell ending in a line of text and the next starting with one are a line break apart.
 
 ## Open questions (the user's)

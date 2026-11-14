@@ -93,12 +93,19 @@ const NATIVE_HIDDEN = "swa-native-hidden";
 // What shows a document of its own, taking the clicks on it (a PDF's viewer)
 const DOCUMENT_VIEWERS = "object, iframe, embed";
 const LINK_ICON = "swa-link-icon";
+/** A frame's width and alignment as its embed keeps them, how each is written */
+type FramePlace = {
+  readonly width: string | undefined;
+  readonly align: string | undefined;
+  readonly write: (width: string | undefined) => Promise<string | undefined>;
+  readonly writeAlign: (align: string | undefined) => Promise<string | undefined>;
+};
 
 export class AssetDecorator {
   // Each frame decorated: what ends its render
   private readonly renders = new WeakMap<HTMLElement, AbortController>();
   // Each frame decorated: its width as its embed keeps it, where it stays as it changes, how a new one is written
-  private readonly sizes = new WeakMap<HTMLElement, { readonly width: string | undefined; readonly anchor: "start" | "center"; readonly write: (width: string | undefined) => Promise<string | undefined> }>();
+  private readonly sizes = new WeakMap<HTMLElement, FramePlace>();
   // Each frame decorated, as the host drew it (decorated again as the settings change)
   private readonly drawn = new WeakMap<HTMLElement, DrawnEmbed>();
   // The links decorated (decorated again as the settings change; those gone from the page left out then)
@@ -368,9 +375,15 @@ export class AssetDecorator {
     return this.drawn.get(frame)?.room?.();
   }
 
-  /** A frame decorated: its width as its embed keeps it (none: none), where it stays */
-  sizeOf(frame: HTMLElement): { readonly width: string | undefined; readonly anchor: "start" | "center" } | undefined {
+  /** A frame decorated: its width and its alignment as its embed keeps them (each none: none) */
+  sizeOf(frame: HTMLElement): { readonly width: string | undefined; readonly align: string | undefined } | undefined {
     return this.sizes.get(frame);
+  }
+
+  /** A frame's alignment written (none: taken off), as Silverware Layout gives it; why not, as text */
+  async writeAlign(frame: HTMLElement, align: string | undefined): Promise<string | undefined> {
+    const size = this.sizes.get(frame);
+    return size ? size.writeAlign(align) : "this file is not decorated";
   }
 
   /** A frame's width written (none: taken off); why not, as text */
@@ -411,7 +424,16 @@ export class AssetDecorator {
       return now ? this.host.writeEmbed({ text: now.embed.text, occurrence: now.occurrence, of: now.of, changes }) : NOT_FOUND;
     };
     // Its width laid out by Silverware Layout's handle (not a card's): written as SilverBullet's size, the height taken off so the ratio holds
-    this.sizes.set(frame, { width: found.embed.width, anchor: settings.anchor, write: (width) => write({ width: width ?? null, height: null }) });
+    // Its width (not a card's) and its alignment, Silverware Layout's to give meaning to (docs/silverware-layout-align.md):
+    // kept in its embed, its width as SilverBullet's size (the height taken off so the ratio holds), its alignment in its
+    // metadata (`{ align: right }`)
+    const own = found.embed.metadata.align;
+    this.sizes.set(frame, {
+      width: found.embed.width,
+      align: typeof own === "string" ? own : undefined,
+      write: (width) => write({ width: width ?? null, height: null }),
+      writeAlign: (align) => write({ metadata: { align: align ?? null } }),
+    });
     const context: RenderContext = {
       asset,
       viewport: viewportOf(frame, found.embed, view, settings, control.signal, sized ? preview.width : undefined),

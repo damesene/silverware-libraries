@@ -190,12 +190,12 @@ test("a preview's size the settings' (all files, a type's own), never widened by
   );
   const pdf = page.locator("#sb-main [data-swa-asset='pdf']");
   await expect(pdf.locator(".swa-pdf")).toBeVisible();
-  // No handle beside a preview: its size is the settings'
+  // Beside a preview its grip for its menu alone, no width to drag: its size is the settings'
   const box = (await pdf.boundingBox())!;
   await page.mouse.move(box.x + box.width + 120, box.y + 20);
   await page.mouse.move(box.x + box.width + 6, box.y + 20, { steps: 6 });
   await pdf.hover();
-  await expect(page.locator(".swl-handle-bar")).toBeHidden();
+  await expect(page.locator(".swl-handle.swl-handle-menu-only .swl-handle-bar")).toBeVisible();
   // A preview's width for all files, a PDF's own height
   await runCommand(page, ASSETS_SETTINGS);
   const dialog = page.locator(".swa-dialog");
@@ -294,6 +294,89 @@ test("a preview's label: its alt text above by default (else its name), then the
   await expect(pdf.locator(".swa-label-above > .swa-label-icon")).toBeVisible();
   await expect(pdf.locator(".swa-label-below")).toHaveAttribute("title", "doc.pdf · 9 B");
   await expect.poll(() => space.config()).toContain('field = "name"');
+});
+
+test("a preview in a grid's cell: the pointer on it, its own grip shown, which opens its menu and drags nothing", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${grid(`![[${space.folder}/a.png|A|60x40|{ view: preview }]]`, "Right")}\nAfter\n` }, "Page", { "a.png": PIXEL_PNG });
+  await gridsDrawn(page);
+  const preview = page.locator("#sb-main .swl-grid [data-swa-asset='image']");
+  await expect(preview).toBeVisible();
+  // The grid's menu open first: closed as the handle goes to the preview, so a press there opens the preview's
+  await page.locator("#sb-main .swl-grid-cell").nth(1).hover();
+  await page.locator(".swl-handle-bar").click();
+  await expect(page.locator(".swl-popup")).toBeVisible();
+  await preview.hover();
+  await expect(page.locator(".swl-popup")).toHaveCount(0);
+  const bar = page.locator(".swl-handle-bar");
+  await expect(bar).toBeVisible();
+  const handle = (await bar.boundingBox())!;
+  const box = (await preview.boundingBox())!;
+  // Beside the preview, not the grid
+  expect(Math.abs(handle.x - (box.x + box.width))).toBeLessThan(20);
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  // A press opens its menu at once: Align alone, no width to take off
+  await expect(page.locator(".swl-popup")).toBeVisible();
+  await page.mouse.move(handle.x + handle.width / 2 + 60, handle.y + handle.height / 2, { steps: 6 });
+  await page.mouse.up();
+  expect(Math.round((await preview.boundingBox())!.width)).toBe(Math.round(box.width));
+  await expect(page.locator(".swl-popup .swl-menu-item", { hasText: "Width" })).toHaveCount(0);
+  // Esc closes it; a plain click on the grip opens it again
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swl-popup")).toHaveCount(0);
+  await preview.hover();
+  await page.locator(".swl-handle-bar").click();
+  await expect(page.locator(".swl-popup")).toBeVisible();
+  await page.locator(".swl-popup .swl-segment[title='Center']").click();
+  await expect.poll(() => space.saved("Page")).toMatch(/\|A\|60x40\|\{ [^}]*align: center[^}]*\}\]\]/);
+});
+
+test("a file aligned right: its handle beside its left edge shown as the pointer comes to it from the left", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/a.png|Photo|200|{ align: right }]]\n\nAfter\n` }, "Page", { "a.png": PIXEL_PNG });
+  const image = page.locator("#sb-main [data-swa-asset='image']");
+  await expect(image).toBeVisible();
+  const box = (await image.boundingBox())!;
+  // From the text's left, over the empty line, to just left of the image's left edge: no widget there but its handle's place
+  await page.mouse.move(box.x - 200, box.y + box.height / 2);
+  await page.mouse.move(box.x - 8, box.y + box.height / 2, { steps: 10 });
+  await expect(page.locator(".swl-handle-bar")).toBeVisible();
+  const handle = (await page.locator(".swl-handle-bar").boundingBox())!;
+  expect(handle.x + handle.width).toBeLessThanOrEqual(box.x);
+});
+
+test("a file aligned right from its handle's menu: written in its embed, at the text's right edge; its handle at its left edge widens it to the left", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\nText above.\n\n![[${space.folder}/a.png|Photo|200]]\n\nText under.\n` }, "Page", { "a.png": PIXEL_PNG });
+  const image = page.locator("#sb-main [data-swa-asset='image']");
+  await expect(image).toBeVisible();
+  const content = page.locator("#sb-main .cm-content");
+  const textRight = await content.evaluate((one) => one.getBoundingClientRect().right - parseFloat(getComputedStyle(one).paddingRight));
+  const textLeft = await content.evaluate((one) => one.getBoundingClientRect().left + parseFloat(getComputedStyle(one).paddingLeft));
+  // At the left by default
+  expect(Math.round((await image.boundingBox())!.x)).toBe(Math.round(textLeft));
+  await image.hover();
+  await page.locator(".swl-handle-bar").click();
+  await expect(page.locator(".swl-popup .swl-segment[title='Left (default)']")).toBeVisible();
+  // (Its own menu offers no alignment)
+  await page.locator(".swl-popup .swl-segment[title='Right']").click();
+  await expect.poll(() => space.saved("Page")).toContain(`![[${space.folder}/a.png|Photo|200|{ align: right }]]`);
+  const rightEdge = async () => {
+    const box = (await image.boundingBox())!;
+    return Math.round(box.x + box.width);
+  };
+  await expect.poll(rightEdge).toBe(Math.round(textRight));
+  // Its handle beside its left edge; dragged to the left, wider, its right edge where it was
+  await image.hover();
+  const bar = page.locator(".swl-handle-bar");
+  await expect(bar).toBeVisible();
+  const handle = (await bar.boundingBox())!;
+  expect(handle.x + handle.width).toBeLessThanOrEqual((await image.boundingBox())!.x);
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 - 80, handle.y + handle.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => Math.round((await image.boundingBox())!.width)).toBe(280);
+  expect(await rightEdge()).toBe(Math.round(textRight));
+  await expect.poll(() => space.saved("Page")).toContain("|Photo|280|{ align: right }]]");
 });
 
 test("a card's icon hidden in the settings: a small arrow after its name within the card opens its menu, on a narrow page too", async ({ page, space }) => {
@@ -494,27 +577,32 @@ test("SilverBullet's markdown shown as written, each plugin's box off apart: fil
   const file = page.locator("#sb-main [data-swa-asset]:not(.swa-frame)").first();
   const shownGrid = page.locator("#sb-main .swl-grid");
   const toggle = () => runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
-  // Assets' box off: the file drawn there, the grid still hidden
+  // Assets' box off, saved while Layout's dialog is open: the file drawn there, the grid still hidden. Layout's dialog
+  // stays open as SilverBullet, loading the configuration Assets saved, starts Silverware Layout again under it
+  const layout = page.locator(".swl-dialog");
+  await runCommand(page, PAGE_LAYOUT);
+  await expect(layout).toBeVisible();
   await runCommand(page, ASSETS_SETTINGS);
   const assets = page.locator(".swa-dialog");
   await assets.getByRole("tab", { name: "Markdown" }).click();
   await assets.getByLabel("Hide embedded files").uncheck();
   await assets.getByRole("button", { name: "Save" }).click();
   await expect.poll(() => space.config()).toContain('config.set("silverware.assets.syntaxMode.hideAssets", false)');
+  // (Silverware Layout started again: its init page's settings read anew, a moment after the configuration loads)
+  await page.waitForTimeout(2_000);
+  await expect(layout).toBeVisible();
+  await layout.getByRole("button", { name: "Cancel" }).click();
+  await expect(layout).toBeHidden();
   await toggle();
   await expect(page.locator("#sb-main .cm-content")).toContainText(image);
   await expect(file).toBeVisible();
   await expect(shownGrid).toBeHidden();
   await toggle();
-  // Layout's box off too: the grid drawn there as well (its dialog opened again where SilverBullet, loading the
-  // configuration Assets saved, started Silverware Layout again under it)
-  const layout = page.locator(".swl-dialog");
-  await expect(async () => {
-    if (!(await layout.isVisible())) await runCommand(page, PAGE_LAYOUT);
-    await layout.getByRole("tab", { name: "Markdown" }).click({ timeout: 2_000 });
-    await layout.getByLabel("Hide grids").uncheck({ timeout: 2_000 });
-    await layout.getByRole("button", { name: "Save" }).click({ timeout: 2_000 });
-  }).toPass({ timeout: 20_000 });
+  // Layout's box off too: the grid drawn there as well
+  await runCommand(page, PAGE_LAYOUT);
+  await layout.getByRole("tab", { name: "Markdown" }).click();
+  await layout.getByLabel("Hide grids").uncheck();
+  await layout.getByRole("button", { name: "Save" }).click();
   await expect.poll(() => space.config()).toContain('config.set("silverware.layout.syntaxMode.hideGrids", false)');
   await toggle();
   await expect(file).toBeVisible();

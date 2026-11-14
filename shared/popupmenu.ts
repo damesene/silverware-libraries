@@ -4,7 +4,7 @@
 // places and draws it). What opens it takes the press as its own: what it is in (a link SilverBullet follows as a touch
 // on it ends, an editor moving its cursor) does not get it.
 import { el } from "./elements.ts";
-import { focusMenu, type MenuEntry, menuItem, menuSeparator, onMenuClose, renderMenu } from "./menu.ts";
+import { focusMenu, type MenuEntry, menuItem, menuSegmented, menuSeparator, onMenuClose, renderMenu } from "./menu.ts";
 
 /** The plugin's base of classes (`swl`) */
 export type PopupLook = { readonly base: string };
@@ -12,50 +12,83 @@ export type PopupLook = { readonly base: string };
 /** One item: its label, what it does; checked (a choice shown as on), disabled (why, as text) */
 export type PopupItem = { readonly label: string; readonly run: () => void; readonly checked?: boolean; readonly disabled?: string; readonly danger?: boolean };
 
-export type PopupMenu = { readonly title: string; readonly sections: readonly (readonly PopupItem[])[] };
+/** A row of choices side by side (Align: left, centre, right), each its icon (SVG text) and title, the one set active */
+export type PopupSegmented = {
+  readonly kind: "segmented";
+  readonly label: string;
+  readonly options: readonly { readonly icon: string; readonly title: string; readonly active?: boolean; readonly run: () => void }[];
+};
+
+export type PopupMenu = { readonly title: string; readonly sections: readonly (readonly (PopupItem | PopupSegmented)[])[] };
+
+/**
+ * A menu shown under an element, over the page (placed by the element's box): closed by a press beside it and the
+ * element, Esc, a choice, or the function given back; `closed` told as it closes
+ */
+export function showPopup(doc: Document, look: PopupLook, at: HTMLElement, shown: PopupMenu, closed?: () => void): () => void {
+  const LOOK = { base: look.base };
+  let holder: HTMLElement | undefined;
+  const close = () => {
+    if (!holder) return;
+    holder.remove();
+    holder = undefined;
+    doc.removeEventListener("pointerdown", outside, true);
+    doc.removeEventListener("keydown", escape, true);
+    closed?.();
+  };
+  const outside = (event: Event) => {
+    if (holder && !holder.contains(event.target as Node) && !at.contains(event.target as Node)) close();
+  };
+  // (Esc wherever the focus is: a press on what opened it may have taken the focus from the menu)
+  const escape = (event: KeyboardEvent) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    close();
+  };
+  const entries: MenuEntry[] = [];
+  for (const section of shown.sections.filter((one) => one.length)) {
+    if (entries.length) entries.push(menuSeparator());
+    for (const item of section) {
+      if ("kind" in item) {
+        entries.push(menuSegmented({ label: item.label, options: item.options.map((option) => ({ icon: option.icon, title: option.title, ...(option.active === undefined ? {} : { active: option.active }), run: () => (close(), option.run()) })) }));
+        continue;
+      }
+      entries.push(menuItem({ label: item.label, ...(item.checked === undefined ? {} : { checked: item.checked }), ...(item.disabled ? { disabled: item.disabled } : {}), ...(item.danger ? { danger: true } : {}), run: () => (close(), item.run()) }));
+    }
+  }
+  const rendered = renderMenu(doc, LOOK, shown.title, entries);
+  onMenuClose(rendered, LOOK, close);
+  // (The box is the plugin's own, `.swl-menu`: the shared look's rules are of the menu in it)
+  holder = el(doc, "div", { class: `${look.base}-popup ${look.base}-menu` }, rendered);
+  const box = at.getBoundingClientRect();
+  holder.style.top = `${box.bottom + 4}px`;
+  holder.style.left = `${Math.max(8, Math.min(box.right - 220, (doc.defaultView?.innerWidth ?? Infinity) - 228))}px`;
+  doc.body.append(holder);
+  // (A press beside it watched while it is open alone: an element drawn anew and thrown away leaves no listener)
+  doc.addEventListener("pointerdown", outside, true);
+  doc.addEventListener("keydown", escape, true);
+  focusMenu(rendered, LOOK);
+  return close;
+}
 
 /** An element that opens a menu as it is pressed, the menu made then; closed by a press beside it, Esc, or a second press; all of it gone as `signal` aborts */
 export function opensMenu(doc: Document, look: PopupLook, trigger: HTMLElement, menu: () => PopupMenu, signal?: AbortSignal): void {
-  const LOOK = { base: look.base };
   trigger.setAttribute("aria-haspopup", "menu");
   trigger.setAttribute("aria-expanded", "false");
-  let holder: HTMLElement | undefined;
-  const close = () => {
-    holder?.remove();
-    holder = undefined;
-    trigger.setAttribute("aria-expanded", "false");
-    doc.removeEventListener("pointerdown", outside, true);
-  };
-  const outside = (event: Event) => {
-    if (holder && !holder.contains(event.target as Node) && !trigger.contains(event.target as Node)) close();
-  };
+  let close: (() => void) | undefined;
   // (Held back as it comes: what the trigger is in, a link, would follow it or move the editor's cursor)
   const hold = (event: Event) => {
     event.preventDefault();
     event.stopPropagation();
   };
   const toggle = () => {
-    if (holder) return close();
-    const shown = menu();
-    const entries: MenuEntry[] = [];
-    for (const section of shown.sections.filter((one) => one.length)) {
-      if (entries.length) entries.push(menuSeparator());
-      for (const item of section) {
-        entries.push(menuItem({ label: item.label, ...(item.checked === undefined ? {} : { checked: item.checked }), ...(item.disabled ? { disabled: item.disabled } : {}), ...(item.danger ? { danger: true } : {}), run: () => (close(), item.run()) }));
-      }
-    }
-    const rendered = renderMenu(doc, LOOK, shown.title, entries);
-    onMenuClose(rendered, LOOK, close);
-    // (The box is the plugin's own, `.swl-menu`: the shared look's rules are of the menu in it)
-    holder = el(doc, "div", { class: `${look.base}-popup ${look.base}-menu` }, rendered);
-    const box = trigger.getBoundingClientRect();
-    holder.style.top = `${box.bottom + 4}px`;
-    holder.style.left = `${Math.max(8, Math.min(box.right - 220, (doc.defaultView?.innerWidth ?? Infinity) - 228))}px`;
-    doc.body.append(holder);
+    if (close) return close();
+    close = showPopup(doc, look, trigger, menu(), () => {
+      close = undefined;
+      trigger.setAttribute("aria-expanded", "false");
+    });
     trigger.setAttribute("aria-expanded", "true");
-    // (A press beside it watched while it is open alone: a trigger drawn anew and thrown away leaves no listener)
-    doc.addEventListener("pointerdown", outside, true);
-    focusMenu(rendered, LOOK);
   };
   const pressed = (event: Event) => {
     hold(event);
@@ -71,5 +104,5 @@ export function opensMenu(doc: Document, look: PopupLook, trigger: HTMLElement, 
   trigger.addEventListener("touchstart", () => void (moved = false), { signal, passive: true });
   trigger.addEventListener("touchmove", () => void (moved = true), { signal, passive: true });
   trigger.addEventListener("touchend", (event) => void (moved || pressed(event)), { signal });
-  signal?.addEventListener("abort", close);
+  signal?.addEventListener("abort", () => close?.());
 }

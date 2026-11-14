@@ -28,10 +28,9 @@ export type AssetSettings = {
   // A view's height where nothing gives one (px)
   readonly heights: Readonly<Record<"preview" | "embed", number>>;
   // A preview's size: its width for all files (none: as wide as it fits), and per type its width and height (none:
-  // all files'); the height for all files is `heights.preview`. An image fits in it, its ratio kept; a PDF's is so large
+  // all files'); the height for all files is `heights.preview`. An image fits in it, its ratio kept; a PDF's is so
+  // large
   readonly previews: { readonly width?: number; readonly types: Readonly<Record<string, PreviewSize>> };
-  // Where an asset stays as its width is dragged: at the text's start (it grows to the right), or centred
-  readonly anchor: "start" | "center";
   // Whether a link to a file of the space (`[[report.pdf]]`) shows its type's icon before its text (its menu's way
   // in); off, a small arrow after it is
   readonly linkIcons: boolean;
@@ -50,7 +49,7 @@ export function labelFor(settings: AssetSettings, type: string): PreviewLabel {
   return settings.labels.types[type] ?? settings.labels.default;
 }
 
-/** A preview's size of a type's own: its width, its height (px), each none where all files' holds */
+/** A preview's size of a type's own: its width and height (px), each none where all files' holds */
 export type PreviewSize = { readonly width?: number; readonly height?: number };
 
 /** The least and the most a preview's side may be (px) */
@@ -78,8 +77,13 @@ export function storedAssetSettings(settings: AssetSettings): Record<string, unk
     actions: { default: { ...settings.actions.default }, types: Object.fromEntries(Object.entries(settings.actions.types).map(([k, v]) => [k, { ...v }])) },
     card: [...settings.card],
     heights: { ...settings.heights },
-    previews: { ...(settings.previews.width === undefined ? {} : { width: settings.previews.width }), types: Object.fromEntries(Object.entries(settings.previews.types).map(([k, v]) => [k, { ...v }])) },
-    anchor: settings.anchor,
+    previews: {
+      ...(settings.previews.width === undefined ? {} : { width: settings.previews.width }),
+      types: Object.fromEntries(Object.entries(settings.previews.types).map(([k, v]) => [k, { ...v }])),
+    },
+    // (Former settings, where a file stands: Silverware Layout's now, taken out of CONFIG as the settings are saved)
+    originals: undefined,
+    anchor: undefined,
     linkIcons: settings.linkIcons,
     labels: { default: storedLabel(settings.labels.default), types: Object.fromEntries(Object.entries(settings.labels.types).map(([k, v]) => [k, storedLabel(v)])) },
   };
@@ -110,7 +114,6 @@ export const DEFAULT_ASSET_SETTINGS: AssetSettings = {
   card: ["icon", "name"],
   heights: { preview: 160, embed: 480 },
   previews: { types: {} },
-  anchor: "start",
   linkIcons: true,
   labels: { default: DEFAULT_LABEL, types: {} },
 };
@@ -149,7 +152,6 @@ export function readAssetSettings(value: unknown): { readonly settings: AssetSet
       card,
       heights: { preview: height("preview"), embed: height("embed") },
       previews: readPreviews(given.previews),
-      anchor: given.anchor === "center" ? "center" : "start",
       linkIcons: given.linkIcons !== false,
       labels: readLabels(given.labels),
     },

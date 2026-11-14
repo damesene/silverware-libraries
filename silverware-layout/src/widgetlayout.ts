@@ -1,6 +1,7 @@
 // The widgets laid out and their handle, put together over a host's page (host/page.ts): what the app (app.ts) starts
 // once per window, and the playground over its own page. The settings are asked each time (a setting saved applies at
 // once).
+import type { LayoutAlign } from "../../shared/layout.ts";
 import type { Registry } from "./core/registry.ts";
 import { paneWidth } from "./host/marks.ts";
 import type { PageHost } from "./host/page.ts";
@@ -14,13 +15,15 @@ export type WidgetLayoutOptions = {
   readonly enabled: () => boolean;
   // A problem said to the user (a width that could not be saved)
   readonly problem: (message: string) => void;
+  // The user's default alignment of each kind of widget (by `<provider>/<kind>`; none set: each kind's own)
+  readonly alignments?: () => Readonly<Record<string, LayoutAlign>>;
 };
 
 export type WidgetLayout = { readonly widgets: Widgets; readonly handle: WidthHandle<Widget> };
 
 /** The page's widgets laid out from now on, as the registry's providers find them, and their handle */
 export function layOutWidgets(doc: Document, page: PageHost, registry: Registry, options: WidgetLayoutOptions): WidgetLayout {
-  const widgets = new Widgets(doc, page, registry, options.problem);
+  const widgets = new Widgets(doc, page, registry, options.problem, options.alignments);
   widgets.start();
   const handle = new WidthHandle<Widget>(doc, {
     widgetAt: (node) => widgets.widgetAt(node),
@@ -36,14 +39,10 @@ export function layOutWidgets(doc: Document, page: PageHost, registry: Registry,
     seen: (widget) => widgets.seen(widget),
     enabled: options.enabled,
     anchor: (widget) => widgets.anchor(widget),
+    resizable: (widget) => widgets.resizable(widget),
     unsized: (widget) => widget.provider.unsized ?? "text",
-    edges: (widget) => !!widget.provider.edges,
-    textMiddle: () => widgets.textMiddle(),
-    showPlace: (element, width, shift) => {
-      widgets.show(element, width);
-      widgets.showShift(element, shift);
-    },
-    writePlace: (widget, width, shift) => widgets.writePlace(widget, width, shift),
+    alignOf: (widget) => widgets.alignOf(widget),
+    writeAlign: (widget, align) => widgets.writeAlign(widget, align),
     room: (widget) => {
       const room = widgets.room(widget);
       return room ? room.getBoundingClientRect().width : undefined;

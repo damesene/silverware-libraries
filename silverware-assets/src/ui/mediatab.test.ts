@@ -13,14 +13,14 @@ const input = (settings: unknown = {}) => ({
 });
 
 describe("the assets' settings tabs", () => {
-  it("are Files, Appearance and Original; the first says they changed and saves the settings as all of them have them", async () => {
+  it("are Files and Appearance; the first says they changed and saves the settings as all of them have them", async () => {
     let saved: unknown;
     let saves = 0;
     const tabs = mediaTabs(document, input({ views: { types: { pdf: "icon" } } }), async (settings) => void ((saved = settings), saves++));
-    expect(tabs.map((tab) => tab.title)).toEqual(["Files", "Appearance", "Original"]);
-    const [files, preview, original] = tabs as [(typeof tabs)[number], (typeof tabs)[number], (typeof tabs)[number]];
+    expect(tabs.map((tab) => tab.title)).toEqual(["Files", "Appearance"]);
+    const [files, preview] = tabs as [(typeof tabs)[number], (typeof tabs)[number]];
     const changed = () => tabs.map((tab) => tab.changed());
-    expect(changed()).toEqual([false, false, false]);
+    expect(changed()).toEqual([false, false]);
     // Files: all files' row, then each type's (like all files, or its own)
     const selects = [...files.panel.querySelectorAll<HTMLSelectElement>("select")];
     expect(selects.map((select) => select.getAttribute("aria-label"))).toEqual([
@@ -40,13 +40,12 @@ describe("the assets' settings tabs", () => {
     selects[6]!.value = "*";
     selects[2]!.value = "";
     // (A change in any tab is the first's to tell and to save: one write)
-    expect(changed()).toEqual([true, false, false]);
+    expect(changed()).toEqual([true, false]);
     await files.save();
     expect(saves).toBe(1);
     expect(saved).toMatchObject({
       views: { default: "embed", types: { image: "preview" } },
       actions: { default: { click: "open-tab", "shift+click": "" }, types: {} },
-      anchor: "start",
     });
     // Appearance: a preview first; a card and a link by the switch, one shown at a time
     const look = (name: string) => preview.panel.querySelector<HTMLElement>(`[data-swa-look="${name}"]`)!;
@@ -97,11 +96,11 @@ describe("the assets' settings tabs", () => {
     expect(row("pdf").querySelector(".swa-type-mark")).toBeNull();
     await files.save();
     expect((saved as { previews: unknown }).previews).toEqual({ width: 320, types: {} });
-    // Original: where a file stays as its width is dragged, a PDF's height
-    original.panel.querySelector<HTMLSelectElement>(`select[aria-label="Width dragged"]`)!.value = "center";
-    original.panel.querySelector<HTMLInputElement>(`input[aria-label="An original PDF's height (px)"]`)!.value = "640";
+    // Original, a view of Appearance: a PDF's height (where a file stands is Silverware Layout's: no alignment here)
+    expect(preview.panel.querySelector('select[aria-label*="alignment"]')).toBeNull();
+    preview.panel.querySelector<HTMLInputElement>(`input[aria-label="An original PDF's height (px)"]`)!.value = "640";
     await files.save();
-    expect(saved).toMatchObject({ anchor: "center", heights: { preview: 160, embed: 640 } });
+    expect(saved).toMatchObject({ heights: { preview: 160, embed: 640 } });
     // Its label: all files' (the icon and the alt text above by default), a type's own made from it, changed apart, reset
     // (A property not shown: a chip of the row, shown by Space/Enter; one shown: its value in the sample's line)
     const press = (name: string) => preview.panel.querySelector<HTMLButtonElement>(`.swa-label-edit .swa-sample-chip[data-swa-field="${name}"]`)!.dispatchEvent(new MouseEvent("click", { detail: 0, bubbles: true }));
@@ -158,6 +157,27 @@ describe("the assets' settings tabs", () => {
     [...row().querySelectorAll<HTMLButtonElement>("button")].find((one) => one.textContent === "↺ Reset to all files")!.click();
     expect(mark()).toBeNull();
     expect(document.activeElement).toBe(row().querySelector(".swa-type-head"));
+    panel.remove();
+  });
+
+  it("keep a type Own where a size out of bounds is typed over one of its own: the one it had is kept, as saved", async () => {
+    let saved: unknown;
+    const tabs = mediaTabs(document, input({ previews: { types: { pdf: { width: 300 } } } }), async (settings) => void (saved = settings));
+    const panel = tabs[1]!.panel;
+    document.body.append(panel);
+    const row = () => [...panel.querySelectorAll<HTMLElement>(".swa-type")].find((one) => one.getAttribute("data-swa-type") === "pdf")!;
+    expect(row().querySelector(".swa-type-mark")).not.toBeNull();
+    row().querySelector<HTMLButtonElement>(".swa-type-head")!.click();
+    const width = row().querySelector<HTMLInputElement>('input[aria-label="pdf: a preview\'s width (px)"]')!;
+    width.value = "5";
+    width.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(row().querySelector(".swa-type-mark")).not.toBeNull();
+    width.value = "";
+    width.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(row().querySelector(".swa-type-mark")).toBeNull();
+    width.value = "5";
+    await tabs[0]!.save();
+    expect((saved as { previews: { types: object } }).previews.types).toEqual({ pdf: { width: 300 } });
     panel.remove();
   });
 });

@@ -50,18 +50,32 @@ describe("Widgets", () => {
   it("takes the width off an element its provider no longer takes, as everything is laid out again", () => {
     document.body.innerHTML = `<div class="content"><div class="w" data-view="embed"></div></div>`;
     const registry = new Registry(() => undefined);
-    registry.register({ name: "test", selector: '.w:not([data-view="card"])', read: () => ({ width: "300" }), write: async () => undefined, anchor: () => "start" });
+    registry.register({ name: "test", selector: '.w:not([data-view="card"])', read: () => ({ width: "300", align: "left" }), write: async () => undefined });
     const widgets = new Widgets(document, page, registry, () => undefined);
     widgets.start();
     const element = document.querySelector<HTMLElement>(".w")!;
     expect(element.getAttribute("data-swl-width")).toBe("300");
-    expect(element.hasAttribute("data-swl-anchor-start")).toBe(true);
+    expect(element.getAttribute("data-swl-anchor")).toBe("start");
     // (Shown another way by its plugin, which its selector leaves out, then laid out again on its word)
     element.dataset.view = "card";
     widgets.layOutAll();
     expect(element.hasAttribute("data-swl-width")).toBe(false);
     expect(element.style.getPropertyValue("--swl-width")).toBe("");
-    expect(element.hasAttribute("data-swl-anchor-start")).toBe(false);
+    expect(element.hasAttribute("data-swl-anchor")).toBe(false);
+  });
+
+  it("marks the inline box a widget centred or at the end stands in (a line's width then), never a list's item", () => {
+    document.body.innerHTML = `<div class="content"><span class="box"><div class="w" data-at="right"></div></span><ul><li><div class="w" data-at="center"></div></li></ul><span class="box2"><div class="w" data-at="left"></div></span></div>`;
+    const registry = new Registry(() => undefined);
+    registry.register({ name: "test", selector: ".w", read: (element) => ({ align: (element as HTMLElement).dataset.at! }), write: async () => undefined });
+    const widgets = new Widgets(document, page, registry, () => undefined);
+    widgets.start();
+    const holder = (selector: string) => document.querySelector(selector)!.hasAttribute("data-swl-anchor-holder");
+    expect([holder(".box"), holder("li"), holder(".box2")]).toEqual([true, false, false]);
+    // (Aligned at the start again: its box as it was)
+    document.querySelector<HTMLElement>(".box .w")!.dataset.at = "left";
+    widgets.layOutAll();
+    expect(holder(".box")).toBe(false);
   });
 
   it("finds the innermost widget a node is in, and marks one its provider lays out in a room of its own", async () => {

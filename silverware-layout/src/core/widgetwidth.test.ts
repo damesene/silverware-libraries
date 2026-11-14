@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Guide } from "../model/settings.ts";
-import { cssWidgetWidth, draggedRoomWidth, draggedWidth, keptWidgetWidth, readWidgetWidth, roomTargets, shownWidgetWidth, snapped, snapTargets, widestWidth, widthName, draggedEdge, draggedBoth, edgesOf, readShift } from "./widgetwidth.ts";
+import { cssWidgetWidth, draggedRoomWidth, draggedWidth, keptWidgetWidth, readWidgetWidth, roomTargets, shownWidgetWidth, snapped, snapTargets, widestWidth, widthName, anchorOf, readAlign } from "./widgetwidth.ts";
 
 const guides: Guide[] = [1200, "80%", "full"];
 
@@ -40,6 +40,10 @@ describe("A widget's width", () => {
     expect(draggedWidth(760, 100, 1600, "start", 760)).toBe(860);
     expect(draggedWidth(760, 900, 1600, "start", 760)).toBe(1160);
     expect(widestWidth(1600, "center", 760)).toBe(1560);
+    // (At the text's end: the move outwards from its left edge, one side alone; as far as the pane's left edge)
+    expect(draggedWidth(760, 100, 1600, "end", 760)).toBe(860);
+    expect(widestWidth(1600, "end", 760)).toBe(widestWidth(1600, "start", 760));
+    expect(draggedRoomWidth(200, 50, 400, "end")).toBe(250);
   });
 
   it("snapped to the text's width (kept: none), a guide of pixels, of a percent (kept so: the same share in any pane) or full, within 8 px", () => {
@@ -97,50 +101,9 @@ describe("A widget's width", () => {
   });
 });
 
-describe("a widget's edge dragged alone", () => {
-  const targets = snapTargets(760, [1200, "full"], 1600);
-  const start = edgesOf(760, 0);
-
-  it("moves that edge alone, the other standing: its width and shift off the text's middle", () => {
-    const left = draggedEdge(start, "left", -100, 1600, targets);
-    expect(left.edges).toEqual({ left: -480, right: 380 });
-    expect([left.width, left.shift]).toEqual([860, -50]);
-    const right = draggedEdge(start, "right", 50, 1600, targets);
-    expect([right.width, right.shift]).toEqual([810, 25]);
-  });
-
-  it("snaps an edge to where a target's width puts it about the text's middle, within the pane", () => {
-    // 1200's left edge: 600 left of the middle
-    const snapped = draggedEdge(start, "left", -217, 1600, targets);
-    expect(snapped.edges.left).toBe(-600);
-    expect(snapped.name).toBe("1200 px");
-    // Past the pane less half its gutter: held there (780 from the middle), Full width's edge
-    expect(draggedEdge(start, "left", -900, 1600, targets).edges.left).toBe(-780);
-  });
-
-  it("keeps it centred as a target keeps it where both edges come back to one", () => {
-    const back = draggedEdge({ left: -380, right: 400 }, "right", -20, 1600, targets);
-    expect([back.width, back.shift]).toEqual([undefined, 0]);
-  });
-
-  it("reads a shift kept, anything else none", () => {
-    expect([readShift("-150"), readShift("12.6"), readShift(undefined), readShift("x"), readShift("")]).toEqual([-150, 13, 0, 0, 0]);
-  });
-});
-
-describe("a widget's edge dragged with Alt", () => {
-  const targets = snapTargets(760, [1200, "full"], 1600);
-
-  it("moves both edges, its middle standing: twice the move, its shift kept", () => {
-    const both = draggedBoth(edgesOf(800, -40), "right", 50, 1600, targets);
-    expect(both.edges).toEqual({ left: -490, right: 410 });
-    expect([both.width, both.shift]).toEqual([900, -40]);
-    expect(draggedBoth(edgesOf(800, 0), "left", -50, 1600, targets).width).toBe(900);
-  });
-
-  it("snaps its width as the bar's, within the pane", () => {
-    expect(draggedBoth(edgesOf(760, 0), "right", 218, 1600, targets)).toMatchObject({ width: 1200, name: "1200 px" });
-    expect(draggedBoth(edgesOf(800, 0), "right", -20, 1600, targets)).toMatchObject({ width: undefined, name: "Page width" });
-    expect(draggedBoth(edgesOf(800, 0), "right", 900, 1600, targets).width).toBe("full");
+describe("a widget's alignment", () => {
+  it("is read from its entry (left, center, right; anything else none) and gives the anchor its width is dragged from", () => {
+    expect([readAlign("left"), readAlign("center"), readAlign("right"), readAlign("middle"), readAlign(undefined)]).toEqual(["left", "center", "right", undefined, undefined]);
+    expect([anchorOf("left"), anchorOf("center"), anchorOf("right")]).toEqual(["start", "center", "end"]);
   });
 });

@@ -3,7 +3,7 @@
 // where they would touch. Drawn by a widget's handle while it is dragged (its target snapped to lit) and by the Page
 // layout dialog's Preview while it is held. Class names `swl-handle-guide*` (the style page's).
 import { el } from "../../../shared/elements.ts";
-import type { LayoutAnchor } from "../../../shared/layout.ts";
+import type { LayoutAnchor } from "../core/widgetwidth.ts";
 
 const BASE = "swl-handle";
 // A guide's name: at its line's top, a row lower where it would touch the name left of it (px)
@@ -61,9 +61,9 @@ export class GuideLines {
     for (const guide of this.guides) {
       const [left, right] = guide.lines;
       for (const [line, x] of [
-        // (A widget at the start: `middle` is its left edge, the guides from there)
-        [left!, anchor === "start" ? middle : middle - guide.width / 2],
-        [right!, anchor === "start" ? middle + guide.width : middle + guide.width / 2],
+        // (A widget at the start: `middle` is its left edge, the guides from there; at the end its right edge)
+        [left!, anchor === "start" ? middle : anchor === "end" ? middle - guide.width : middle - guide.width / 2],
+        [right!, anchor === "start" ? middle + guide.width : anchor === "end" ? middle : middle + guide.width / 2],
       ] as const) {
         line.classList.toggle(`${BASE}-guide-fixed`, !layer);
         Object.assign(line.style, { left: `${Math.round(x + dx)}px`, top: `${Math.round(top)}px`, height });

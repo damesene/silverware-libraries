@@ -1,12 +1,13 @@
-// A grid's width laid out by Silverware Layout's handle, as any widget's (shared/layout.ts): the grid registers as a
+// A grid's width and place laid out by Silverware Layout, as any widget's (shared/layout.ts): the grid registers as a
 // provider, its widget the frame the host draws it in (SilverBullet's, given the class `swl-grid-widget` by the init
-// page; the playground's alike), its entries kept as attributes of its `<grid>` line (`width="1100"`), Layout's key
-// as the attribute's name. Layout's core knows no grid: the binding registers this as a widget plugin would.
+// page; the playground's alike), its entries kept as attributes of its `<grid>` line (`width="1100" align="right"`),
+// Layout's key as the attribute's name; its kind *Grid*, centred unless set. Layout's core knows no grid: the binding
+// registers this as a widget plugin would.
 import type { LayoutChanges, LayoutEntries, LayoutProvider } from "../../../shared/layout.ts";
 import type { Grids } from "./grids.ts";
 
 // Layout's keys a grid keeps (its others are the grid's own: columns)
-const LAYOUT_KEYS = ["width", "shift"] as const;
+const LAYOUT_KEYS = ["width", "align"] as const;
 
 export function gridProvider(grids: Grids): LayoutProvider {
   const gridIn = (element: Element) => element.querySelector<HTMLElement>(":scope .swl-grid");
@@ -23,7 +24,6 @@ export function gridProvider(grids: Grids): LayoutProvider {
       if (!grid) return "the grid is not drawn";
       return grids.writeAttributes(grid, changes);
     },
-    // Each edge dragged alone too, its place off the text's middle kept as `shift`
-    edges: true,
+    kinds: [{ id: "grid", name: "Grid", align: "center" }],
   };
 }

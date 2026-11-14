@@ -21,26 +21,53 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   margin-right: calc((100% - var(--swl-shown)) / 2) !important;
   box-sizing: border-box;
 }
-/* A widget off the text's middle (its edges dragged alone: a grid), by --swl-shift (its middle right of the text's):
-   held within the pane less half the gutter on either side */
-:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-shift]:not([data-silverware-over-window], [data-silverware-over-window] *) {
-  margin-left: clamp(calc(20px - (var(--swl-pane-width, 100vw) - 100%) / 2), calc((100% - var(--swl-shown)) / 2 + var(--swl-shift, 0px)), calc(100% + (var(--swl-pane-width, 100vw) - 100%) / 2 - 20px - var(--swl-shown))) !important;
-  margin-right: auto !important;
-}
 /* A widget staying at the text's start (its provider's say: an embedded medium): it grows to the right alone,
    as far as the pane's right edge less half the gutter (the text centred in the pane, 100% its width) */
-:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-anchor-start]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-anchor="start"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
   width: min(var(--swl-shown), calc((var(--swl-pane-width, 100vw) + 100%) / 2 - 20px)) !important;
   margin-left: 0 !important;
   margin-right: auto !important;
 }
-/* A widget laid out in a room of its own, not the page's text (a medium in a grid's cell): within that room, at its
-   start, no wider */
+/* A widget staying at the text's end (its provider's say: a medium aligned right): it grows to the left alone, as far
+   as the pane's left edge less half the gutter */
+:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-anchor="end"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+  width: min(var(--swl-shown), calc((var(--swl-pane-width, 100vw) + 100%) / 2 - 20px)) !important;
+  margin-left: auto !important;
+  margin-right: 0 !important;
+}
+/* A widget laid out in a room of its own, not the page's text (a medium in a grid's cell): within that room, no
+   wider; at its start, centred or at its end as its provider says */
 :root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-in-room]:not([data-silverware-over-window], [data-silverware-over-window] *) {
   width: min(var(--swl-width), 100%) !important;
   max-width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-in-room][data-swl-anchor="start"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
   margin-left: 0 !important;
+}
+:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-in-room][data-swl-anchor="end"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
   margin-right: 0 !important;
+}
+/* Where a widget stands (data-swl-anchor, its provider's say: a medium aligned), with or without a width laid out, a
+   narrow pane too: centred or at the text's end (of its room, a cell). The inline box the host draws such a widget in
+   (marked data-swl-anchor-holder by the code: its parent alone, and only an inline one) the whole line then, so the
+   widget has room to stand in; a widget in a room a block of its own width. Important over the host's own margins (SilverBullet's by an id); the rules of a width laid out, above, more
+   particular, place it as wide as it is */
+[data-swl-content] [data-swl-anchor="center"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+[data-swl-content] [data-swl-anchor="end"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+  margin-left: auto !important;
+  margin-right: 0 !important;
+}
+[data-swl-content] [data-swl-anchor-holder]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+  display: block !important;
+}
+[data-swl-content] [data-swl-in-room]:is([data-swl-anchor="center"], [data-swl-anchor="end"]):not([data-silverware-over-window]) {
+  display: block !important;
+  width: fit-content;
 }
 /* SilverBullet showing the markdown as written (Editor: Toggle Markdown Syntax Rendering): the grids it still draws
    there hidden, their markdown alone shown; the host's box round each too (an empty one is a line's height) */
@@ -83,7 +110,7 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   display: none;
 }
 /* The handle of a widget's width: a short rounded grip beside its right edge, quiet grey, the accent's as the pointer
-   is on it or it is dragged (the user's choice, 2026-11-14: grips, as the grid's edges and column dividers have) */
+   is on it or it is dragged (the user's choice, 2026-11-14: grips, as the grid's column dividers have) */
 .swl-handle {
   position: fixed;
   z-index: var(--sw-layer-control);
@@ -128,84 +155,19 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
     inset: -6px -12px;
   }
 }
-/* A widget's edges dragged alone (src/ui/edges.ts, its provider's say: a grid): a grip on each edge as its handle
-   shows (in the middle of the part of it in view); the pointer on it (or dragging it), the grip lit and a thin line over
-   the widget's height; outside the widget's box (a press near the edge of its content is the content's); a finger's
-   target wider */
-/* (Its bar none: the lines are its handle) */
-.swl-handle.swl-handle-bare {
-  display: none !important;
+/* A widget not widened (a preview; any in a pane too narrow to lay widths out): its bar the grip of its menu alone
+   (where it stands), pressed as a button; the drag's line kept, plainly off (the user's wish, 2026-11-14: seen to be
+   no width's at a glance): faint, neither growing nor taking the accent as it is pointed at, a little stronger alone */
+.swl-handle.swl-handle-menu-only .swl-handle-bar {
+  cursor: pointer;
 }
-.swl-edge {
-  position: fixed;
-  z-index: var(--sw-layer-control);
-  width: 12px;
-  cursor: ew-resize;
-  touch-action: none;
+.swl-handle.swl-handle-menu-only .swl-handle-bar::after,
+.swl-handle.swl-handle-menu-only .swl-handle-bar:is(:hover, :focus-visible)::after {
+  height: min(28px, 100%);
+  background: color-mix(in srgb, var(--root-color) 15%, transparent);
 }
-.swl-edge-left {
-  margin-left: -12px;
-}
-.swl-edge[hidden] {
-  display: none;
-}
-/* The line (shown on the pointer) and the grip, on the widget's edge */
-.swl-edge::before,
-.swl-edge::after {
-  content: "";
-  position: absolute;
-  transition: opacity 0.12s, background-color 0.12s, height 0.12s;
-}
-.swl-edge::before {
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: var(--ui-accent-color, #4a90e2);
-  opacity: 0;
-}
-.swl-edge::after {
-  top: 50%;
-  width: 4px;
-  height: 28px;
-  transform: translateY(-50%);
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--root-color) 35%, transparent);
-}
-/* (The line on the widget's own first and last pixel, the grip centred on it: a grid's borders, drawn within its box,
-   lie there too; what is pressed stays outside the box) */
-.swl-edge-left::before {
-  right: -1px;
-}
-.swl-edge-left::after {
-  right: -2.5px;
-}
-.swl-edge-right::before {
-  left: -1px;
-}
-.swl-edge-right::after {
-  left: -2.5px;
-}
-.swl-edge:hover::before,
-.swl-edge:focus-visible::before,
-.swl-edge.swl-edge-dragging::before {
-  opacity: 1;
-}
-.swl-edge:hover::after,
-.swl-edge:focus-visible::after,
-.swl-edge.swl-edge-dragging::after {
-  height: 40px;
-  background: var(--ui-accent-color, #4a90e2);
-}
-.swl-edge:focus {
-  outline: none;
-}
-@media (pointer: coarse) {
-  .swl-edge {
-    width: 24px;
-  }
-  .swl-edge-left {
-    margin-left: -24px;
-  }
+.swl-handle.swl-handle-menu-only .swl-handle-bar:is(:hover, :focus-visible)::after {
+  background: color-mix(in srgb, var(--root-color) 40%, transparent);
 }
 /* The guides of a drag: a quiet dashed line each side for the text's width and each guide, over the whole height the
    page is seen in and under its widgets (in CodeMirror's scroller, z-index -1, as Confluence's), named at its top; the
@@ -941,7 +903,7 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 /* A grid's borders (its `border` attribute): faint lines round it and between its cells, as a table's. The gap goes
    into each cell's padding, so a line between two columns lies where the gap's middle was, on its divider. All within
    the grid's box (the frame the host draws it in cuts off what lies outside): its ring on its own first and last
-   pixels, where its edge lines are drawn; between cells each cell's right and bottom shadow, on the pixel after the
+   pixels; between cells each cell's right and bottom shadow, on the pixel after the
    cell, where a divider draws its line (each cell closed so, a last row's last cell too, not run into the empty
    place beside it). Opaque, so where two meet the line is no darker. Cells as tall as their row: a line between two
    columns runs its height */
@@ -1405,6 +1367,25 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   border: 1px solid var(--button-border-color, rgba(128, 128, 128, 0.4));
   border-radius: 8px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+/* The Alignment tab (src/ui/aligntab.ts): a row per kind of widget, its name and where it stands */
+.swl-align {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.swl-align-note {
+  margin: 0 0 4px;
+  opacity: 0.8;
+}
+.swl-align-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 12em);
+  gap: 12px;
+  align-items: center;
+}
+.swl-align-select {
+  font: inherit;
 }
 /* The Markdown tab: its boxes one under another */
 .swl-syntax {

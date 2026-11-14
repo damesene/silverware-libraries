@@ -48,6 +48,12 @@ A width is never wider than the editor: in a narrower window, or on a phone, it 
 
 Without Silverware Layout, each is as wide as the text, its width still kept.
 
+## Where a widget stands
+
+Click the bar beside a table, a database, a chart, a grid or an embedded file (a preview's too: its bar has no width to drag), and its menu puts it at the **left**, in the **middle** or at the **right** of the page's text (of its column, in a grid), or makes it as wide as the text again. Where there is no width to drag (a preview, or anything on a phone), the bar is fainter and opens the menu alone; on a phone it shows beside a widget narrower than the screen (an image), not beside one as wide as it. A widget at the left grows to the right as you drag its bar, one at the right to the left (its bar beside its left edge), a centred one both ways. It is kept with its width, as `layout.align` (a file's in its embed, `{ align: right }`; a grid's on its line, `<grid align="right">`).
+
+A widget without its own stands as the **Alignment** tab of **Silverware Layout: Page layout** says for its kind (a table, a chart, a database, a grid, a file's preview, a file's original): tables, charts, databases and grids centred, files at the left, unless you change them there. The one marked *(default)* in a widget's menu is that one; choosing it keeps nothing of the widget's own, so the widget follows the tab as it changes.
+
 ## Columns
 
 Put part of a page side by side: type **/grid** where it should go. A grid of two columns comes in, the cursor in the first:
@@ -75,11 +81,11 @@ The second column.
 - **Change a grid by its menu**: point at a column (on a phone it shows always), and its **…** at the top right lets you move the column left or right, add a column after it, or move it out of the grid (its content goes under the grid); set the grid's number of columns (automatic, 2, 3, 4), turn its **Borders** on or off, add a column at the end, or **remove the grid**: its content stays, the columns one under another in their order (row by row), as it was before you put it into a grid.
 - **Edit a column where it is**: click into it, and its markdown shows in a field of its own, the cursor where you clicked (or the text you selected in it by a drag, selected there too), the rest of the grid as it was. Click elsewhere, or press Esc (or Ctrl+Enter), and it is saved. A click on a link or a tag in it still follows it.
 - **See the raw text**: Alt+click a column, and the page shows its markdown, the cursor where you clicked.
-- **A grid's width**: point at a grid, and a line shows on its left and right edge. Drag one to move that edge alone, the other staying where it is; hold Alt to widen or narrow it on both sides at once. It snaps to the page width and your guides. Double-click a line to centre the grid on the text again (with Alt: back to the page width). A focused line moves with the arrow keys.
+- **A grid's width and place**: point at a grid, and a bar shows beside it, as beside a table: drag it to widen or narrow the grid, double-click it for the page's width, click it to put the grid at the left, in the middle or at the right (see *Where a widget stands*).
 - **Columns' widths by dragging**: point at a grid, and a line shows between its columns. Drag it to make one column wider and its neighbour narrower; it snaps to 1 : 1, 2 : 1, 1 : 2, 3 : 1, 1 : 3, 3 : 2 and 2 : 3, and in a grid wider than the page's text to the text's edges (a column lined up with the text above and below it), showing a guide for each and saying where it snapped as you drag, and is saved as the grid's `columns` (`<grid columns="2fr 1fr">`). Double-click the line to make the two even again.
 - **More columns, or other widths**: give the grid a `columns` attribute: `<grid columns="3">` for three of the same width, or their widths, `<grid columns="1fr 2fr">` (the second twice as wide), `30% 70%`, `200px 1fr`. More columns than you give make more rows: nine columns in `<grid columns="3">` are three rows of three, a gallery of images. Without it, each `<column>` is a column of its own, four at most in a row.
-- **Borders**: faint lines round the grid and between its columns and rows, as a table's, the columns' text a little in from them. Turn them on in the grid's menu; they are kept on its line, `<grid border="1">`. The lines you drag (its edges, between its columns) lie on them.
-- **The grid's width** is kept on its line too, `<grid width="1100" shift="-150">` (`shift`: an edge dragged alone, the grid off the text's middle).
+- **Borders**: faint lines round the grid and between its columns and rows, as a table's, the columns' text a little in from them. Turn them on in the grid's menu; they are kept on its line, `<grid border="1">`. The lines you drag between its columns lie on them.
+- **The grid's width and place** are kept on its line too, `<grid width="1100" align="right">`.
 - **On a phone** (an editor narrower than the setting *Narrowest editor laid out*), the columns are shown one under another.
 
 Keep the blank lines round a column's text, as /grid writes them: without them other markdown renderers show its markdown as plain text. Without Silverware Layout, and in other renderers (GitHub, VS Code), the columns are shown one under another and the `<grid>` and `<column>` lines as text: nothing is lost.

@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 // The app over a page of no host's (a PageHost of plain elements) and a store of memory: Silverware Layout needs no
 // SilverBullet to show a page's width and font size, follow the pages opened and save from its dialog.
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LayoutApp, type LayoutStore } from "./app.ts";
 import { Registry } from "./core/registry.ts";
 import type { PageHost } from "./host/page.ts";
 import { DEFAULT_GUIDES, type Settings } from "./model/settings.ts";
 import { type Width } from "./model/width.ts";
 
-const SETTINGS: Settings = { textWidth: undefined, minPaneWidth: 600, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true };
+const SETTINGS: Settings = { textWidth: undefined, minPaneWidth: 600, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true, alignments: {} };
 
 /** A page of plain elements: its pane 1200 px wide (jsdom lays nothing out), its text width kept as shown */
 function plainPage(paneWidth = 1200) {
@@ -49,6 +49,7 @@ function memoryStore(pages: Record<string, Width | undefined>, settings: Partial
     },
     saveTextWidth: async (width) => void store.saved.push(`textWidth ${width?.amount}`),
     saveGuides: async (guides) => void store.saved.push(`guides ${guides.join(" ")}`),
+    saveAlignments: async (alignments) => void store.saved.push(`alignments ${JSON.stringify(alignments)}`),
     saveFont: async (size, zoom) => void store.saved.push(`font ${size} ${zoom}`),
     readZoom: () => store.zoom,
     keepZoom: (size) => void (store.zoom = size),
@@ -135,6 +136,22 @@ describe("Silverware Layout's app over a page of no host's", () => {
     expect(document.querySelector(".swl-dialog")).toBeNull();
     expect(shown.at(-1)).toEqual({ amount: 700, unit: "px" });
     expect(store.saved).toEqual([]);
+  });
+
+  it("keeps its dialog open, and what it shows, as it is started again on the same page (another plugin's configuration saved)", async () => {
+    const { page, shown } = plainPage();
+    const { api, store } = memoryStore({ First: undefined });
+    const app = new LayoutApp(document, page, new Registry(() => undefined));
+    await app.start(api);
+    await app.openDialog();
+    const amount = document.querySelector<HTMLInputElement>('[data-swl-row="page"] .swl-dialog-amount')!;
+    amount.value = "1000";
+    amount.dispatchEvent(new Event("input"));
+    await app.start(api);
+    expect(document.querySelector(".swl-dialog")).not.toBeNull();
+    expect(shown.at(-1)).toEqual({ amount: 1000, unit: "px" });
+    document.querySelector<HTMLButtonElement>(".swl-dialog-save")!.click();
+    await vi.waitFor(() => expect(store.saved).toContain("page First"));
   });
 
   it("a guide in % of the pane: typed in its row, its unit switched (the number converted), saved as a percent", async () => {

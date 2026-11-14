@@ -243,6 +243,7 @@ function registerLayout(bridge: Bridge): void {
   layoutOf(bridge.layout).register({
     name: "silverware-database",
     selector: ".swd-place",
+    kinds: [{ id: "database", name: "Database", align: "center" }],
     read: (element) => {
       const shown = app?.shown.get(element as HTMLElement);
       return shown ? layoutEntries(shown.current) : {};

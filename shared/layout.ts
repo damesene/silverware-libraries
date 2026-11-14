@@ -11,10 +11,12 @@
 export const LAYOUT_VERSION = 1;
 
 /**
- * Silverware Layout's entries for one widget: its keys (`width`) and their values, as text whose meaning is Silverware
- * Layout's. The widget's plugin keeps every key apart from its own, under the name `layout` in its own form
- * (`layout.width` in a table's metadata, a chart's `%% layout.width: 1100`, a database block's `layout.width: 1100`),
- * and gives back what it kept as it was written: a key it does not know is kept like any other.
+ * Silverware Layout's entries for one widget: its keys and their values, as text whose meaning is Silverware Layout's
+ * (`width`; `align`: where it stands, `left`, `center` or `right`, docs/silverware-layout-align.md). The widget's
+ * plugin keeps every key apart from its own, under the name `layout` in its own form (`layout.width` in a table's
+ * metadata, a chart's `%% layout.width: 1100`, a database block's `layout.width: 1100`), and gives back what it kept
+ * as it was written: a key it does not know is kept like any other. Silverware Layout reads and writes them through
+ * the provider alone, never in the widget's markdown.
  */
 export type LayoutEntries = Readonly<Record<string, string>>;
 
@@ -22,10 +24,13 @@ export type LayoutEntries = Readonly<Record<string, string>>;
 export type LayoutChanges = Readonly<Record<string, string | null>>;
 
 /**
- * Where a widget stays as its width changes: centred on the text (a drag of its right edge widens it on both sides),
- * or at the text's start (it grows to the right alone, as an image in a text)
+ * Where a widget stands (the entry `align`), and so stays as its width changes: at the left (a width grows to the
+ * right, as an image in a text), centred (on both sides) or at the right (to the left, its handle at its left edge)
  */
-export type LayoutAnchor = "center" | "start";
+export type LayoutAlign = "left" | "center" | "right";
+
+/** A kind of widget a provider draws: its id (among the provider's), its name for the user, where it stands unless set (none: centred) */
+export type LayoutKind = { readonly id: string; readonly name: string; readonly align?: LayoutAlign };
 
 /**
  * A widget plugin's part that Silverware Layout talks to, one per kind of widget a plugin draws.
@@ -55,17 +60,20 @@ export type LayoutProvider = {
   // table holding its header in view while its rows scroll away, those above the header hidden. Silverware Layout
   // places the handle of its width by it. None (or undefined): the widget's box
   seen?(element: Element): { readonly top: number; readonly bottom: number } | undefined;
-  // Optional: where the widget whose element this is stays as its width changes (none: centred). A widget's own (a
-  // setting may choose it), asked as it is laid out
-  anchor?(element: Element): LayoutAnchor;
+  // Optional: the kinds of widget it draws (a medium's preview and original, a table), each its default alignment, the
+  // user's own default of each set in Silverware Layout's dialog; and which kind the widget whose element this is (none
+  // said: the first). A widget stands as its entry `align` says, else its kind's default as the user set it, else as
+  // its kind says, else centred. A provider with no kinds: its widgets as they are drawn (a width centred) where no
+  // entry says otherwise
+  readonly kinds?: readonly LayoutKind[];
+  kindOf?(element: Element): string;
+  // Optional: whether the widget whose element this is may be widened by the handle (none: yes). One that may not (a
+  // preview, its size its plugin's settings') has the handle's grip alone: its menu, where it stands
+  resizable?(element: Element): boolean;
   // Optional: what a widget without a width of its own is: as wide as the text ("text", a table: none said) or of its
   // own size ("own", a medium: SilverBullet's size or the file's). Where its own, the text's width a drag snaps to is
   // kept as its pixels: none would give it back its own size
   readonly unsized?: "text" | "own";
-  // Optional: whether each edge of the widget is dragged alone too (a line on each, beside the handle that widens it
-  // on both sides): its place then off the text's middle, kept as the entry `shift` beside `width` (px, its middle
-  // right of the text's, left where negative). None: centred (or as its anchor says) alone
-  readonly edges?: boolean;
   // Optional: the box the widget is laid out in, where it is not the page's text (a medium in markdown rendered outside
   // the editor, a grid's cell): its width then a share of that box's, snapped to its quarters, never wider; neither the
   // text's width nor the guides apply. None (or undefined): the page's text

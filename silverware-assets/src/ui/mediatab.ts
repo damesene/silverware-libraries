@@ -1,11 +1,12 @@
 // The tabs of the assets' settings in the settings window (docs/silverware-assets.md, *Settings and the Media tab*;
-// docs/silverware-assets-label.md, *The settings dialog*), each one thing a user sets, a line on top saying what:
-// Files (how a file is shown and what a click and a Shift+click do, for all files and per type, "Like all files"
-// following them), Appearance (how a file looks as it is shown: a preview's label and size, for all files and per type;
-// a card; a link's icon; each picked by a switch and edited on a sample, ui/labeleditor.ts and ui/cardeditor.ts),
-// Original (where a file stays as its width is dragged, an original PDF's height). One set of settings behind them
-// all, saved once on Save: the first tab answers for the others (the window asks each tab that changed to save, and
-// the settings are written whole).
+// docs/silverware-assets-label.md, *The settings dialog*), each one thing a user sets, a line on top saying
+// what: Files (how a file is shown and what a click and a Shift+click do, for all files and per type, "Like all files"
+// following them), Appearance (how a file looks as it is shown, picked by a switch: a preview's label, size and
+// for all files and per type; an original PDF's height; a card; a link's icon (where a file stands is Silverware
+// Layout's: docs/silverware-layout-align.md); the
+// label, the card and the link edited on a sample, ui/labeleditor.ts and ui/cardeditor.ts). One set of settings behind
+// them all, saved once on Save: the first tab answers for the others (the window asks each tab that changed to save,
+// and the settings are written whole).
 import { el } from "../../../shared/elements.ts";
 import { type AssetSettings, type CardField, type Gesture, type PreviewLabel, type PreviewSize, sameLabel, type View, VIEWS } from "../model/settings.ts";
 import { dateText, iconElement } from "./card.ts";
@@ -148,11 +149,17 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
   );
   // (All files' sample: an image's, the most common preview)
   const sampleType = (name: string) => input.types.find((type) => type.name === name) ?? input.types.find((type) => type.name === "image") ?? input.types[0];
-  /** Whether a type differs from all files: a label of its own, or a size of its own that will be kept (one out of bounds is not) */
-  const isOwn = (type: string) => {
+  /** A type's own preview size as it will be kept (a side typed out of bounds: the one it had); none of either: none */
+  const keptOf = (type: string): PreviewSize | undefined => {
     const size = sizes.get(type);
-    return type in labels.types || (!!size && (sideOf(size.width.value, undefined) !== undefined || sideOf(size.height.value, undefined) !== undefined));
+    const had = settings.previews.types[type] ?? {};
+    const width = size && sideOf(size.width.value, had.width);
+    const height = size && sideOf(size.height.value, had.height);
+    if (width === undefined && height === undefined) return undefined;
+    return { ...(width === undefined ? {} : { width }), ...(height === undefined ? {} : { height }) };
   };
+  /** Whether a type differs from all files: a label of its own, or a size of its own as it will be kept */
+  const isOwn = (type: string) => type in labels.types || keptOf(type) !== undefined;
   const rows = [{ name: DEFAULT, title: "All files", icon: undefined as string | undefined }, ...input.types.map((type) => ({ name: type.name, title: type.name, icon: type.icon as string | undefined }))];
   const list = el(doc, "div", { class: "swa-types", attrs: { role: "list", "aria-label": "A preview, for all files and per type" } });
   /** A row's element, by its type's name (as given: no selector made of it) */
@@ -242,11 +249,11 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
     if (reset) reset.hidden = !own;
   };
   list.addEventListener("input", markOpen);
-  editor.element.addEventListener("change", markOpen);
+  // (The label editor's change, within the open row, bubbles to the list)
+  list.addEventListener("change", markOpen);
   drawList();
 
-  // Original: where a file stays as its width is dragged, an original PDF's height
-  const anchor = select(doc, "Width dragged", [["start", "Stays at the start, grows to the right"], ["center", "Stays centred, grows both ways"]], settings.anchor);
+  // Original: a PDF's height, for all files
   const embedHeight = el(doc, "input", { class: "swa-settings-number", attrs: { type: "number", min: MIN_HEIGHT, max: MAX_HEIGHT, step: 10, "aria-label": "An original PDF's height (px)" } });
   embedHeight.value = String(settings.heights.embed);
 
@@ -267,6 +274,13 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
       list,
     ),
     card: el(doc, "div", { class: "swa-settings-look", attrs: { "data-swa-look": "card" } }, el(doc, "p", "swa-settings-note", "A file shown as its icon and name (“Card” on the Files tab), for all files."), cardSection),
+    original: el(
+      doc,
+      "div",
+      { class: "swa-settings-look", attrs: { "data-swa-look": "original" } },
+      el(doc, "p", "swa-settings-note", "A file shown as SilverBullet draws it (“Original” on the Files tab), for all files."),
+      section(doc, "A PDF's height", el(doc, "p", "swa-settings-note", "An original PDF's viewer, where its embed gives no size."), el(doc, "span", "swa-settings-unit", embedHeight, "px")),
+    ),
     link: el(doc, "div", { class: "swa-settings-look", attrs: { "data-swa-look": "link" } }, el(doc, "p", "swa-settings-note", "A link to a file in your text, [[report.pdf]], for all files."), linkSection),
   };
   type Look = keyof typeof looks;
@@ -279,6 +293,7 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
     "What is shown",
     [
       { value: "preview", label: "Preview" },
+      { value: "original", label: "Original" },
       { value: "card", label: "Card" },
       { value: "link", label: "Link" },
     ],
@@ -299,11 +314,9 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
       if (Object.keys(gestures).length) actionTypes[one.name] = gestures;
     }
     const previewTypes: Record<string, PreviewSize> = {};
-    for (const [name, one] of sizes) {
-      const had = settings.previews.types[name] ?? {};
-      const width = sideOf(one.width.value, had.width);
-      const height = sideOf(one.height.value, had.height);
-      if (width !== undefined || height !== undefined) previewTypes[name] = { ...(width === undefined ? {} : { width }), ...(height === undefined ? {} : { height }) };
+    for (const name of sizes.keys()) {
+      const kept = keptOf(name);
+      if (kept) previewTypes[name] = kept;
     }
     const allWidth = sideOf(previewWidth.value, settings.previews.width);
     return {
@@ -311,9 +324,11 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
       views: { default: allView.value as View, types: viewTypes },
       actions: { default: { click: allClick.value, "shift+click": allShift.value }, types: actionTypes },
       card: [...card],
-      anchor: anchor.value === "center" ? "center" : "start",
       heights: { preview: heightOf(previewHeight.value, settings.heights.preview), embed: heightOf(embedHeight.value, settings.heights.embed) },
-      previews: { ...(allWidth === undefined ? {} : { width: allWidth }), types: previewTypes },
+      previews: {
+        ...(allWidth === undefined ? {} : { width: allWidth }),
+        types: previewTypes,
+      },
       linkIcons,
       labels: { default: labels.default, types: { ...labels.types } },
     };
@@ -330,16 +345,6 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
       panelOf(doc, "files", "How an embedded file is shown where its embed does not say, and what a click on it does. A type set to “Like all files” follows the first row.", filesGrid),
       true,
     ),
-    tab("appearance", "Appearance", panelOf(doc, "appearance", "How a file looks where it is shown: as a preview, as a card, or as a link to it.", el(doc, "div", "swa-settings-looks", lookSwitch.element), ...Object.values(looks))),
-    tab(
-      "original",
-      "Original",
-      panelOf(
-        doc,
-        "original",
-        "A file shown as the original: as SilverBullet draws it.",
-        el(doc, "div", "swa-settings-fields", el(doc, "label", "swa-settings-field", "Width dragged", anchor), el(doc, "label", "swa-settings-field", "A PDF's height", el(doc, "span", "swa-settings-unit", embedHeight, "px"))),
-      ),
-    ),
+    tab("appearance", "Appearance", panelOf(doc, "appearance", "How a file looks where it is shown: as a preview, as the original, as a card, or as a link to it.", el(doc, "div", "swa-settings-looks", lookSwitch.element), ...Object.values(looks))),
   ];
 }

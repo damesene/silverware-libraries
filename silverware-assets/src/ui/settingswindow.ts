@@ -1,5 +1,5 @@
-// Silverware Assets' settings window ("Silverware Assets: Settings"): its tabs (Files, Appearance, Original:
-// ui/mediatab.ts; Markdown: what happens while SilverBullet shows the markdown as written), saved together on Save. Cancel closes without asking; Esc, × or a press beside it ask where changes would be lost. The
+// Silverware Assets' settings window ("Silverware Assets: Settings"): its tabs (Files, Appearance: ui/mediatab.ts;
+// Markdown: what happens while SilverBullet shows the markdown as written), saved together on Save. Cancel closes without asking; Esc, × or a press beside it ask where changes would be lost. The
 // shared dialog and tabs (shared/), classes `swa-dialog-*`.
 import { Dialogs } from "../../../shared/dialog.ts";
 import { el } from "../../../shared/elements.ts";

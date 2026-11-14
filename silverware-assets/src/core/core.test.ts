@@ -64,6 +64,12 @@ describe("the settings", () => {
     expect(readAssetSettings(storedAssetSettings(settings)).settings.previews).toEqual(settings.previews);
   });
 
+  it("write the former settings of where a file stands as none, so a save takes their lines out of CONFIG", () => {
+    const stored = storedAssetSettings(readAssetSettings({}).settings);
+    expect("originals" in stored && stored.originals === undefined).toBe(true);
+    expect("anchor" in stored && stored.anchor === undefined).toBe(true);
+  });
+
   it("give a preview's label: the icon and the alt text above by default, a type's own whole, read leniently, kept and read back", () => {
     const defaults = readAssetSettings({}).settings;
     expect(labelFor(defaults, "pdf")).toEqual(DEFAULT_LABEL);

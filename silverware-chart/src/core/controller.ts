@@ -164,6 +164,7 @@ export class Controller {
     return {
       name: "silverware-chart",
       selector: ".swc-widget",
+      kinds: [{ id: "chart", name: "Chart", align: "center" }],
       read: (element) => entryOf(element)?.model.layout ?? {},
       write: async (element, changes) => {
         const entry = entryOf(element);

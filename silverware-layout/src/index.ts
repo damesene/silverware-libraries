@@ -241,6 +241,8 @@ function silverBulletStore(bridge: Bridge, writer: PageWriter): LayoutStore {
     saveTextWidth: (width) => saveConfig({ [PATHS.textWidth]: width ? cssWidth(width) : undefined }),
     // In Silverware Layout's own block: a list, which the Configuration Manager would lose
     saveGuides: (guides) => saveConfig({ [PATHS.guides]: keptGuides(guides) }, OWN_MARKER),
+    // (A table: in Silverware Layout's own block; none set, taken out)
+    saveAlignments: (alignments) => saveConfig({ [PATHS.alignments]: Object.keys(alignments).length ? alignments : undefined }, OWN_MARKER),
     saveFont: (fontSize, fontZoom) => saveConfig({ [PATHS.fontSize]: fontSize === undefined ? undefined : `${fontSize}px`, [PATHS.fontZoom]: fontZoom ? undefined : false }),
     readZoom: () => readDeviceZoom(window),
     keepZoom: (size) => keepDeviceZoom(window, size),
@@ -251,7 +253,7 @@ function silverBulletStore(bridge: Bridge, writer: PageWriter): LayoutStore {
 
 /** The settings as configured (none read: the defaults) */
 async function settingsOf(bridge: Bridge): Promise<Settings> {
-  if (!bridge.getConfig) return { textWidth: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true };
+  if (!bridge.getConfig) return { textWidth: undefined, minPaneWidth: DEFAULT_MIN_PANE_WIDTH, guides: DEFAULT_GUIDES, fontSize: undefined, fontZoom: true, alignments: {} };
   const values = new Map<string, unknown>();
   for (const path of Object.values(PATHS)) values.set(path, await bridge.getConfig(path, undefined));
   return readSettings((path) => values.get(path));

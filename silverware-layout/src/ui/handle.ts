@@ -1,16 +1,21 @@
-// The handle of a widget's width (docs/silverware-layout.md, *What it does*): a bar beside the right edge of the widget
-// the pointer is over, outside its box (as Confluence's beside a table), quiet until the pointer is on it. Dragging it
-// widens or narrows the widget on both sides (it stays centred on the text), snapping to the text's width and to the
-// guides; every frame only shown, the width written on release (one edit). A double click takes the width off (the
-// text's again), Esc during a drag puts it back. The arrow keys on the focused bar change the width by 10 px (Shift:
-// 50), written once they rest a moment. The handle is the plugin's own element in the body, never in SilverBullet's
-// editor, so a press on it moves no cursor. A finger has no hover: a touch on a widget shows its handle, a touch
-// elsewhere hides it, a double tap is the double click.
+// The handle of a widget's width and place (docs/silverware-layout.md, *What it does*; docs/silverware-layout-align.md):
+// a bar beside the widget the pointer is over (its right edge; its left one where it stands at the right), outside its
+// box (as Confluence's beside a table), quiet until the pointer is on it. Dragging it widens or narrows the widget as
+// it stands (centred: on both sides; at the left or right: on its one side), snapping to the text's width and to the
+// guides; every frame only shown, the width written on release (one edit). A click on it (no drag) opens its menu:
+// where the widget stands (Left, Center, Right, its default marked) and its width taken off; a double click takes the
+// width off at once, Esc during a drag puts it back. A widget not widened (a preview) has the bar for its menu alone.
+// On the focused bar the arrow keys change the width by 10 px (Shift: 50), written once they rest a moment; Enter or
+// Space opens the menu. The handle is the plugin's own element in the body, never in SilverBullet's editor, so a press
+// on it moves no cursor. A finger has no hover: a touch on a widget shows its handle, a touch elsewhere hides it, a
+// double tap is the double click. In a pane too narrow to lay widths out (a phone) the bar is for the menu alone, shown
+// only beside a widget it fits beside in the window (one narrower than the text: a table as wide as the screen has none).
 import { el } from "../../../shared/elements.ts";
-import type { LayoutAnchor } from "../../../shared/layout.ts";
-import type { Guide } from "../model/settings.ts";
-import { draggedRoomWidth, draggedWidth, MIN_ROOM_WIDTH, MIN_WIDGET_WIDTH, PANE_GUTTER, roomTargets, type SnapTarget, snapped, snapTargets, type WidgetWidth, widestWidth, widthName } from "../core/widgetwidth.ts";
-import { EdgeLines } from "./edges.ts";
+import { ALIGN_CENTER, ALIGN_LEFT, ALIGN_RIGHT } from "../../../shared/glyphs.ts";
+import type { LayoutAlign } from "../../../shared/layout.ts";
+import { type PopupMenu, showPopup } from "../../../shared/popupmenu.ts";
+import { ALIGN_NAMES, ALIGNS, type Guide } from "../model/settings.ts";
+import { draggedRoomWidth, draggedWidth, type LayoutAnchor, MIN_ROOM_WIDTH, MIN_WIDGET_WIDTH, PANE_GUTTER, roomTargets, type SnapTarget, snapped, snapTargets, type WidgetWidth, widestWidth, widthName } from "../core/widgetwidth.ts";
 import { GuideLines } from "./guidelines.ts";
 
 const BASE = "swl-handle";
@@ -27,6 +32,9 @@ const EDGE_ZONE = 16;
 const KEYS_MS = 400;
 // The most between two taps of a finger on the bar for a double tap (ms)
 const DOUBLE_TAP_MS = 400;
+// The menu's classes: Silverware Layout's
+const POPUP = { base: "swl" } as const;
+const ALIGN_ICONS: Readonly<Record<LayoutAlign, string>> = { left: ALIGN_LEFT, center: ALIGN_CENTER, right: ALIGN_RIGHT };
 
 /** What the handle asks of whoever lays the widgets out */
 export type HandleHost<W> = {
@@ -50,18 +58,18 @@ export type HandleHost<W> = {
   guideLayer(): HTMLElement | undefined;
   // Whether widgets are laid out now (not in a narrow pane)
   enabled(): boolean;
-  // Where a widget stays as its width changes (none: centred): a drag widens it on both sides, or to the right alone
+  // Where a widget stays as its width changes (none: centred): a drag widens it on both sides, or on its one side alone
   anchor?(widget: W): LayoutAnchor;
+  // Whether a widget's width is dragged at all (none: yes): a widget placed alone (a preview) gets no handle
+  resizable?(widget: W): boolean;
   // The width of the box a widget is laid out in, where it is not the page's text (a cell): its quarters its snaps, no wider
   room?(widget: W): number | undefined;
   // What a widget without a width of its own is (none: as wide as the text): of its own size, the text's width it snaps to kept as pixels
   unsized?(widget: W): "text" | "own";
-  // Whether each edge of a widget is dragged alone too (ui/edges.ts), and what that asks: where the text's middle is
-  // (x in the window), a width and a shift off that middle shown (nothing written), and written in one edit
-  edges?(widget: W): boolean;
-  textMiddle?(): number | undefined;
-  showPlace?(element: HTMLElement, width: WidgetWidth | undefined, shift: number): void;
-  writePlace?(widget: W, width: WidgetWidth | undefined, shift: number): Promise<void>;
+  // Where a widget stands: its own (its entry), its default (none: the widget names no kind, it is placed by nothing
+  // but its own); and its own written (none, or its default: taken off)
+  alignOf?(widget: W): { readonly own: LayoutAlign | undefined; readonly default: LayoutAlign | undefined };
+  writeAlign?(widget: W, align: LayoutAlign | undefined): Promise<void>;
 };
 
 type Drag = { readonly pointer: number; readonly x: number; readonly start: number; readonly was: WidgetWidth | undefined; now: WidgetWidth | undefined; moved: boolean };
@@ -76,8 +84,9 @@ export class WidthHandle<W> {
   private keyed: { readonly widget: W; width: number } | undefined;
   // While a drag goes on: a guide for each width it snaps to, a quiet line each side of the text's middle
   private readonly lines: GuideLines;
-  // A widget's edges dragged alone, where its provider has them (a line on each)
-  private readonly edges: EdgeLines<W>;
+  // The menu shown (a click on the bar): what closes it; and the click waiting for a second (a double click), the menu's after it
+  private closeMenu: (() => void) | undefined;
+  private menuTimer: ReturnType<typeof setTimeout> | undefined;
   // The guide the drag snapped to last, lit as the page scrolls meanwhile
   private near: string | undefined;
   // Where the widget's middle was last: a widget drawn anew (after a write) is found there again
@@ -94,7 +103,6 @@ export class WidthHandle<W> {
     this.bar = el(doc, "button", { class: `${BASE}-bar`, attrs: { "aria-label": "Widget width: drag, or the arrow keys; a double click for the text's width" } });
     this.box = el(doc, "div", { class: BASE, attrs: { hidden: "" } }, this.bar);
     this.lines = new GuideLines(doc, host);
-    this.edges = new EdgeLines(doc, host, this.lines);
     doc.body.append(this.box);
     doc.addEventListener("pointermove", (e) => this.pointed(e), { passive: true });
     doc.addEventListener("pointerdown", (e) => this.touched(e), { capture: true, passive: true });
@@ -106,7 +114,8 @@ export class WidthHandle<W> {
     this.bar.addEventListener("pointercancel", () => this.cancel());
     this.bar.addEventListener("dblclick", (e) => {
       e.preventDefault();
-      if (e.timeStamp - this.tappedTwice > DOUBLE_TAP_MS * 2) this.takeOff();
+      clearTimeout(this.menuTimer);
+      if (e.timeStamp - this.tappedTwice > DOUBLE_TAP_MS * 2 && this.resizable()) this.takeOff();
     });
     this.bar.addEventListener("keydown", (e) => this.key(e));
     doc.addEventListener("keydown", (e) => {
@@ -124,32 +133,55 @@ export class WidthHandle<W> {
   }
 
   private pointed(e: PointerEvent): void {
-    if (this.drag || this.edges.dragging || e.pointerType === "touch") return;
+    if (this.drag || e.pointerType === "touch") return;
     const target = e.target instanceof Element ? e.target : undefined;
     if (!target) return;
-    if (this.box.contains(target) || this.edges.contains(target)) return this.stay();
-    const widget = this.host.enabled() ? (this.host.widgetAt(target) ?? this.besideEdge(e.clientX, e.clientY)) : undefined;
+    // (Its own and its menu's: the pointer on its way to an item, or resting on it, is not off the widget)
+    if (this.box.contains(target) || target.closest(`.${POPUP.base}-popup`)) return this.stay();
+    const widget = this.shown(this.widgetAt(target) ?? this.besideEdge(e.clientX, e.clientY));
     if (widget) {
       this.stay();
       this.showFor(widget);
     } else if (!this.box.hidden && !this.leaveTimer) this.leaveTimer = setTimeout(() => this.hide(), LEAVE_MS);
   }
 
-  /** The widget whose right edge a point is just beside, where its bar is */
+  /**
+   * A widget whose handle may show: any where widths are laid out; in a narrow pane (a phone, the bar for the menu
+   * alone) one the bar fits beside within the window
+   */
+  private shown(widget: W | undefined): W | undefined {
+    if (!widget || this.host.enabled()) return widget;
+    const rect = this.host.element(widget).getBoundingClientRect();
+    const room = (this.box.offsetWidth || 12) + 6;
+    const width = this.doc.documentElement.clientWidth;
+    return (this.anchorOf(widget) === "end" ? rect.left - room >= 0 : rect.right + room <= width) ? widget : undefined;
+  }
+
+  /** The widget a node is in whose handle shows: the innermost (a preview in a grid: its own, its menu's grip) */
+  private widgetAt(node: Element): W | undefined {
+    return this.host.widgetAt(node);
+  }
+
+  /** The widget whose edge a point is just beside, where its bar is: past its right edge, past its left one at the end */
   private besideEdge(x: number, y: number): W | undefined {
-    const near = this.doc.elementFromPoint(x - EDGE_ZONE, y);
-    const widget = near ? this.host.widgetAt(near) : undefined;
-    if (!widget) return undefined;
-    const right = this.host.element(widget).getBoundingClientRect().right;
-    return x >= right && x <= right + EDGE_ZONE ? widget : undefined;
+    return this.besideOne(x, y, "right") ?? this.besideOne(x, y, "left");
+  }
+
+  private besideOne(x: number, y: number, side: "left" | "right"): W | undefined {
+    const near = this.doc.elementFromPoint(side === "right" ? x - EDGE_ZONE : x + EDGE_ZONE, y);
+    const widget = near ? this.widgetAt(near) : undefined;
+    if (!widget || (side === "left") !== (this.host.anchor?.(widget) === "end")) return undefined;
+    const rect = this.host.element(widget).getBoundingClientRect();
+    return side === "right" ? (x >= rect.right && x <= rect.right + EDGE_ZONE ? widget : undefined) : x <= rect.left && x >= rect.left - EDGE_ZONE ? widget : undefined;
   }
 
   /** A finger (or a pen) on the page, which has no hover: on a widget its handle shows, elsewhere it goes */
   private touched(e: PointerEvent): void {
-    if (this.drag || this.edges.dragging || e.pointerType === "mouse") return;
+    if (this.drag || e.pointerType === "mouse") return;
     const target = e.target instanceof Element ? e.target : undefined;
-    if (!target || this.box.contains(target) || this.edges.contains(target)) return;
-    const widget = this.host.enabled() ? this.host.widgetAt(target) : undefined;
+    // (Its own and its menu's: a finger on the menu is no touch beside the widget, which would close the menu first)
+    if (!target || this.box.contains(target) || target.closest(`.${POPUP.base}-popup`)) return;
+    const widget = this.shown(this.widgetAt(target));
     if (widget) {
       this.stay();
       this.showFor(widget);
@@ -168,6 +200,8 @@ export class WidthHandle<W> {
   }
 
   private showFor(widget: W): void {
+    // (Its menu is of the widget it was opened for: another closes it; the same, found again as a new reference, not)
+    if (!this.widget || this.host.element(widget) !== this.host.element(this.widget)) this.closeMenu?.();
     this.widget = widget;
     this.box.hidden = false;
     this.place();
@@ -176,10 +210,10 @@ export class WidthHandle<W> {
 
   private hide(): void {
     this.stay();
-    if (this.drag || this.edges.dragging) return;
+    if (this.drag) return;
     this.box.hidden = true;
     this.widget = undefined;
-    this.edges.hide();
+    this.closeMenu?.();
   }
 
   /** Placed by the widget's right edge, centred on the part of it in view */
@@ -188,7 +222,7 @@ export class WidthHandle<W> {
     if (!element?.isConnected) {
       // Drawn anew (its plugin wrote it): the widget where it was, if one is there
       const at = this.middle && this.doc.elementFromPoint(this.middle.x, this.middle.y);
-      const again = at ? this.host.widgetAt(at) : undefined;
+      const again = at ? this.widgetAt(at) : undefined;
       if (!again) return this.hide();
       this.widget = again;
       element = this.host.element(again);
@@ -204,15 +238,18 @@ export class WidthHandle<W> {
     this.middle = { x: rect.left + rect.width / 2, y: top + Math.min((bottom - top) / 2, 20) };
     // (Held in the view: a sliver of a widget in view gets the least bar, not out over the top bar)
     const at = Math.min(Math.max(top + (bottom - top - height) / 2, view.top), view.bottom - height);
-    Object.assign(this.box.style, { left: `${Math.round(rect.right + 6)}px`, top: `${Math.round(at)}px`, height: `${Math.round(height)}px` });
-    // (A widget whose edges are dragged has its lines in place of the bar: one control a side)
-    this.box.classList.toggle(`${BASE}-bare`, !!this.host.edges?.(this.widget!));
-    this.edges.show(this.widget);
+    // (Beside its right edge; a widget at the end grows to the left: beside its left edge, the bar's width before it)
+    const left = this.anchorOf() === "end" ? rect.left - 6 - (this.box.offsetWidth || 12) : rect.right + 6;
+    Object.assign(this.box.style, { left: `${Math.round(left)}px`, top: `${Math.round(at)}px`, height: `${Math.round(height)}px` });
+    // (A widget not widened: its bar for its menu alone)
+    this.box.classList.toggle(`${BASE}-menu-only`, !this.resizable());
   }
 
   /** Placed again as the page scrolls or the window changes; gone where its widget is (drawn anew, scrolled away) */
   private follow(): void {
     if (this.box.hidden) return;
+    // (A pane become too narrow, a phone turned: no room beside its widget any more, none shown)
+    if (!this.drag && this.widget && !this.shown(this.widget)) return this.hide();
     this.place();
     this.label();
     if (this.drag) this.placeGuides(this.near);
@@ -228,7 +265,9 @@ export class WidthHandle<W> {
     if (!this.widget) return;
     const kept = this.drag ? this.drag.now : this.host.kept(this.widget);
     const named = widthName(kept);
-    this.bar.title = `Width: ${named}. Drag to change it, double-click for the text's width`;
+    const resizable = this.resizable();
+    this.bar.title = resizable ? `Width: ${named}. Drag to change it, click for where it stands, double-click for the text's width` : "Click for where it stands";
+    this.bar.setAttribute("aria-label", resizable ? "Widget width: drag, or the arrow keys; a click for where it stands, a double click for the text's width" : "Where the widget stands: a click for its menu");
   }
 
   private pressed(e: PointerEvent): void {
@@ -238,12 +277,58 @@ export class WidthHandle<W> {
     // (Its widget drawn anew since it was shown, after a write: the one where it was taken)
     this.place();
     if (!this.widget || this.box.hidden) return;
+    // (Not widened: its menu at once, no drag)
+    if (!this.resizable()) return this.openMenu();
     this.bar.setPointerCapture(e.pointerId);
     const element = this.host.element(this.widget);
     const was = this.host.kept(this.widget);
     this.drag = { pointer: e.pointerId, x: e.clientX, start: element.getBoundingClientRect().width, was, now: was, moved: false };
     this.box.classList.add(`${BASE}-dragging`);
     this.showGuides();
+  }
+
+  /** Whether the widget the handle is for may be widened (not a preview, nor any in a pane too narrow to lay widths out) */
+  private resizable(): boolean {
+    return !this.widget || (this.host.enabled() && this.host.resizable?.(this.widget) !== false);
+  }
+
+  /** A click on the bar (no drag): its menu once no second click comes (a double click takes the width off) */
+  private clicked(): void {
+    clearTimeout(this.menuTimer);
+    this.menuTimer = setTimeout(() => this.openMenu(), DOUBLE_TAP_MS);
+  }
+
+  /** The menu of the widget the handle is for: where it stands (its own checked, its default named), its width taken off */
+  private openMenu(): void {
+    clearTimeout(this.menuTimer);
+    const widget = this.widget;
+    if (!widget || this.box.hidden) return;
+    if (this.closeMenu) return this.closeMenu();
+    const align = this.host.alignOf?.(widget);
+    const placed = align ? (align.own ?? align.default ?? "center") : undefined;
+    const sections: PopupMenu["sections"][number][] = [];
+    if (align && this.host.writeAlign) {
+      const name = (to: LayoutAlign) => `${ALIGN_NAMES[to]}${to === align.default ? " (default)" : ""}`;
+      sections.push([
+        {
+          kind: "segmented",
+          label: "Align",
+          options: ALIGNS.map((to) => ({
+            icon: ALIGN_ICONS[to],
+            title: name(to),
+            active: placed === to,
+            run: () => void this.host.writeAlign!(widget, to).then(() => this.settle()),
+          })),
+        },
+      ]);
+    }
+    if (this.resizable() && this.host.kept(widget) !== undefined) sections.push([{ label: "Width: as the page's", run: () => this.takeOff() }]);
+    if (!sections.length) return;
+    this.closeMenu = showPopup(this.doc, POPUP, this.box, { title: "Widget", sections }, () => {
+      this.closeMenu = undefined;
+      this.bar.setAttribute("aria-expanded", "false");
+    });
+    this.bar.setAttribute("aria-expanded", "true");
   }
 
   /** The guides of a drag: the targets it can snap to, placed by its widget's middle */
@@ -280,23 +365,25 @@ export class WidthHandle<W> {
     return room !== undefined ? draggedRoomWidth(start, moved, room, this.anchorOf()) : draggedWidth(start, moved, this.host.paneWidth(), this.anchorOf(), this.host.textWidth());
   }
 
-  /** Where the widget dragged stays as its width changes */
-  private anchorOf(): LayoutAnchor {
-    return (this.widget && this.host.anchor?.(this.widget)) || "center";
+  /** Where the widget dragged (or one given) stays as its width changes */
+  private anchorOf(widget: W | undefined = this.widget): LayoutAnchor {
+    return (widget && this.host.anchor?.(widget)) || "center";
   }
 
-  /** Where the guides are placed from (x in the window): the widget's middle, or its left edge where it stays at the start; none where it is not in the page */
+  /** Where the guides are placed from (x in the window): the widget's middle, or the edge it stays at (its left at the start, its right at the end); none where it is not in the page */
   private middleOf(): number | undefined {
     const element = this.widget && this.host.element(this.widget);
     if (!element?.isConnected) return undefined;
     const rect = element.getBoundingClientRect();
-    return this.anchorOf() === "start" ? rect.left : rect.left + rect.width / 2;
+    const anchor = this.anchorOf();
+    return anchor === "start" ? rect.left : anchor === "end" ? rect.right : rect.left + rect.width / 2;
   }
 
   private dragged(e: PointerEvent): void {
     const drag = this.drag;
     if (!drag || e.pointerId !== drag.pointer || !this.widget) return;
-    const moved = e.clientX - drag.x;
+    // (Outwards: a widget at the end grows to the left, its handle at its left edge)
+    const moved = (e.clientX - drag.x) * (this.anchorOf() === "end" ? -1 : 1);
     if (!drag.moved && Math.abs(moved) < 2) return;
     drag.moved = true;
     const snap = snapped(this.draggedTo(drag.start, moved), this.targets());
@@ -315,12 +402,15 @@ export class WidthHandle<W> {
     // A finger's two taps: the double click it has not
     if (!drag.moved && e.pointerType !== "mouse") {
       if (e.timeStamp - this.tapped <= DOUBLE_TAP_MS) {
+        clearTimeout(this.menuTimer);
         this.tapped = -Infinity;
         this.tappedTwice = e.timeStamp;
         return this.takeOff();
       }
       this.tapped = e.timeStamp;
     }
+    // A press without a drag: a click, its menu (unless a second comes)
+    if (!drag.moved) this.clicked();
     if (drag.moved && this.widget && drag.now !== drag.was) await this.host.write(this.widget, drag.now);
     this.label();
     this.settle();
@@ -344,8 +434,12 @@ export class WidthHandle<W> {
   }
 
   private key(e: KeyboardEvent): void {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      return this.openMenu();
+    }
     const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-    if (!step || !this.widget) return;
+    if (!step || !this.widget || !this.resizable()) return;
     e.preventDefault();
     const widget = this.widget;
     const from = this.keyed?.widget === widget ? this.keyed.width : this.host.element(widget).getBoundingClientRect().width;

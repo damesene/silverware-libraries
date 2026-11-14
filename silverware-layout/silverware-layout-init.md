@@ -64,6 +64,10 @@ config.define("silverware.layout", {
       description = "The widths a drag snaps to and shows a guide at, in px (\"1200px\"), in % of the editor's width (\"80%\"), or full (the editor's width). Set in the Page layout dialog (Guides), kept in Silverware Layout's own block of CONFIG.",
       items = { type = "string" },
     },
+    alignments = {
+      type = "object",
+      description = "Where each kind of widget stands where it says nothing itself, by its plugin and kind (\"silverware-assets/preview\" = \"right\"): left, center or right. Set in the Page layout dialog (Alignment), kept in Silverware Layout's own block of CONFIG.",
+    },
   },
 })
 

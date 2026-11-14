@@ -15,6 +15,8 @@ import { FontZoom } from "./ui/fontzoom.ts";
 import { GuideLines } from "./ui/guidelines.ts";
 import { type DialogTabPart, PageDialog, type Preview } from "./ui/pagedialog.ts";
 import { layOutWidgets, type WidgetLayout } from "./widgetlayout.ts";
+import type { LayoutAlign } from "../../shared/layout.ts";
+import { alignTab } from "./ui/aligntab.ts";
 
 // How long the page is still before its own width is read again after an edit
 const EDITED_MS = 300;
@@ -32,6 +34,7 @@ export type LayoutStore = {
   savePageWidth(page: string, width: Width | undefined): Promise<string | undefined>;
   saveTextWidth(width: Width | undefined): Promise<void>;
   saveGuides(guides: readonly Guide[]): Promise<void>;
+  saveAlignments(alignments: Readonly<Record<string, LayoutAlign>>): Promise<void>;
   saveFont(fontSize: number | undefined, fontZoom: boolean): Promise<void>;
   /** This device's font zoom (px), as kept; none: none */
   readZoom(): number | undefined;
@@ -92,7 +95,10 @@ export class LayoutApp {
 
   /** Started (again, the host's scripts loaded again): the store handed over, the settings read, the page shown */
   async start(store: LayoutStore): Promise<void> {
-    this.state = { store, settings: await store.readSettings(), page: "", pageWidth: undefined, zoom: store.readZoom() };
+    // (Started again on the same page, as another plugin's saved configuration loads the host's scripts again: the page
+    // kept, so the dialog open over it is not taken for one of another page and closed)
+    const was = this.state;
+    this.state = { store, settings: await store.readSettings(), page: was?.page ?? "", pageWidth: was?.pageWidth, zoom: store.readZoom() };
     this.stopWatching?.();
     this.stopWatching = watchPaneWidth(this.page, (width) => {
       showPaneWidth(this.doc, width);
@@ -103,6 +109,7 @@ export class LayoutApp {
       guides: () => this.state?.settings.guides ?? DEFAULT_GUIDES,
       enabled: () => !!this.state && paneWidth(this.page) >= this.state.settings.minPaneWidth,
       problem: (message) => this.problem(message),
+      alignments: () => this.state?.settings.alignments ?? {},
     });
     this.widgetLayout.widgets.layOutAll();
     // While the Page layout dialog is open, the zoom is its This device's (set as its slider sets it, kept on Save, its
@@ -129,7 +136,8 @@ export class LayoutApp {
         this.show();
       },
     });
-    this.show();
+    // (The dialog open shows what it sets: not undone)
+    if (!this.dialog?.isOpen) this.show();
     await this.pageOpened();
   }
 
@@ -154,10 +162,12 @@ export class LayoutApp {
     const mine = ++this.reading;
     const { page, width } = await state.store.readPage();
     if (mine !== this.reading || state !== this.state) return;
-    if (this.dialog?.isOpen && page !== state.page) this.dialog.close();
+    const same = page === state.page;
+    if (this.dialog?.isOpen && !same) this.dialog.close();
     state.page = page;
     state.pageWidth = width;
-    this.show();
+    // (The dialog open over the same page shows what it sets: not undone)
+    if (!(this.dialog?.isOpen && same)) this.show();
   }
 
   /** The page edited: its width read again once it is still a moment (a width typed in its frontmatter) */
@@ -212,7 +222,15 @@ export class LayoutApp {
     await this.pageOpened();
     const { store } = state;
     this.dialog ??= new PageDialog(this.doc);
-    const tabs = (await this.dialogTabs?.().catch(() => [])) ?? [];
+    // (Where each kind of widget stands: a tab of the kinds the providers registered now name)
+    const kinds = this.registry.providers.flatMap((provider) => (provider.kinds ?? []).map((kind) => ({ key: `${provider.name}/${kind.id}`, kind })));
+    const alignment = alignTab(this.doc, kinds, state.settings.alignments, async (alignments) => {
+      await store.saveAlignments(alignments);
+      state.settings = { ...state.settings, alignments };
+      this.widgetLayout?.widgets.layOutAll();
+      return undefined;
+    });
+    const tabs = [alignment, ...((await this.dialogTabs?.().catch(() => [])) ?? [])];
     this.dialog.open({
       tabs,
       page: state.page,

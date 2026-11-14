@@ -40,4 +40,19 @@ describe("a popup menu", () => {
     expect(document.querySelector(".swa-xlsx-popup")).toBeNull();
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
+
+  it("closes on Esc wherever the focus is, the key no one else's, and listens for it only while open", () => {
+    const trigger = document.body.appendChild(document.createElement("button"));
+    const field = document.body.appendChild(document.createElement("input"));
+    const removed = vi.spyOn(document, "removeEventListener");
+    opensMenu(document, LOOK, trigger, menu);
+    trigger.click();
+    field.focus();
+    const heard = vi.fn();
+    field.addEventListener("keydown", heard);
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(document.querySelector(".swa-xlsx-popup")).toBeNull();
+    expect(heard).not.toHaveBeenCalled();
+    expect(removed.mock.calls.filter(([type]) => type === "keydown")).toHaveLength(1);
+  });
 });

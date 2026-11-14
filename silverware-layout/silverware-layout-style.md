@@ -126,9 +126,12 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   position: fixed;
   z-index: var(--sw-layer-control);
   width: 12px;
-  margin-left: -6px;
   cursor: ew-resize;
   touch-action: none;
+}
+/* (Outside the widget's box, its line on the edge: a press near the edge of its content is the content's) */
+.swl-edge-left {
+  margin-left: -12px;
 }
 .swl-edge[hidden] {
   display: none;
@@ -138,12 +141,17 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 5px;
   width: 2px;
   border-radius: 1px;
   background: var(--ui-accent-color, #4a90e2);
   opacity: 0.25;
   transition: opacity 0.12s;
+}
+.swl-edge-left::before {
+  right: 0;
+}
+.swl-edge-right::before {
+  left: 0;
 }
 .swl-edge:hover::before,
 .swl-edge:focus-visible::before,
@@ -156,10 +164,9 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 @media (pointer: coarse) {
   .swl-edge {
     width: 24px;
-    margin-left: -12px;
   }
-  .swl-edge::before {
-    left: 11px;
+  .swl-edge-left {
+    margin-left: -24px;
   }
 }
 /* The guides of a drag: a quiet dashed line each side for the text's width and each guide, over the whole height the
@@ -872,12 +879,11 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 .swl-grid-cell img {
   max-width: 100%;
 }
-/* A cell is edited by a click in it: a quiet hint of that as the pointer is over it, its markdown in a field as tall
-   as its text while edited, the grid keeping its shape */
+/* A cell is edited by a click in it: the text's pointer over it (no outline round it: cut off at the grid's edges, and
+   drawn on every column, the user found it noisy, 2026-11-14), its markdown in a field as tall as its text while
+   edited, the grid keeping its shape */
 @media (hover: hover) {
   .swl-grid-cell:not(.swl-grid-editing):hover {
-    outline: 1px dashed color-mix(in srgb, currentColor 25%, transparent);
-    outline-offset: 4px;
     cursor: text;
   }
 }

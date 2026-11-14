@@ -850,6 +850,11 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   min-width: 0;
   overflow-wrap: anywhere;
 }
+/* A blank line of a cell's markdown its rendering left out (next to a list, a heading, a table): a line of the cell's
+   text, as the editor shows it */
+.swl-grid-blank {
+  height: 1lh;
+}
 .swl-grid-cell > :first-child {
   margin-top: 0;
 }

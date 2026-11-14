@@ -17,7 +17,7 @@ import { type Drawn, drawnIn, itemsOf } from "./drawn.ts";
 import { addCellMenus, type CellAction } from "./ui/cellmenu.ts";
 import { caretWord, editCell } from "./ui/celleditor.ts";
 import { addColumnDividers } from "./ui/dividers.ts";
-import { drawGrid, plainCell, showColumns } from "./ui/view.ts";
+import { drawGrid, keepBlankLines, plainCell, showColumns } from "./ui/view.ts";
 
 /** A cell to write: the grid by its body as read and its place among those alike, the cell, its new markdown */
 export type CellWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly cell: number; readonly content: string };
@@ -199,6 +199,7 @@ export class Grids {
     const first = gridsOfBody(text, body)[0];
     const attributes = first?.attributes ?? {};
     const element = drawGrid(this.doc, columnTemplate(attributes.columns, cells.length), html);
+    this.keepBlankLines(element, cells.map((cell) => cell.content));
     this.bodies.set(element, body);
     this.attributes.set(element, attributes);
     // What it drew, before anything else touches it (another may frame a medium to decorate it)
@@ -236,6 +237,7 @@ export class Grids {
     const cells = readGridBody(grid.body);
     const html = await Promise.all(cells.map((cell) => this.host.renderMarkdown(cell.content).catch(() => plainCell(this.doc, cell.content))));
     const element = drawGrid(this.doc, columnTemplate(grid.attributes.columns, cells.length), html);
+    this.keepBlankLines(element, cells.map((cell) => cell.content));
     element.classList.add("swl-grid-shown");
     return element;
   }
@@ -282,6 +284,11 @@ export class Grids {
         console.error("Silverware Layout: a listener of what grids draw failed", error);
       }
     }
+  }
+
+  /** Each cell of a grid drawn given the blank lines of its markdown the host's rendering left out */
+  private keepBlankLines(element: HTMLElement, contents: readonly string[]): void {
+    element.querySelectorAll<HTMLElement>(":scope > .swl-grid-cell").forEach((cell, i) => keepBlankLines(this.doc, cell, contents[i] ?? ""));
   }
 
   /** A grid drawn's attributes as last read (none drawn: none) */

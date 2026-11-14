@@ -190,3 +190,8 @@ A divider between each two columns (`src/grid/ui/dividers.ts`): a quiet line in 
 ## Its edges (2026-11-14)
 
 The user wanted a grid's left edge moved without its right one; asked how (a line on each edge, a second handle on the left, Alt and the handle), chose a line on each edge. Built in Silverware Layout for any widget whose provider asks (`edges: true` in shared/layout.ts; the grid's): a quiet line on each edge as its handle shows (`src/ui/edges.ts`), dragged, that edge alone moves (the handle's bar still widens it on both sides): the widget's place off the text's middle kept as Layout's entry `shift` beside `width` (px, its middle right of the text's; the grid's attribute `shift="-150"`), shown by `--swl-shift` (the style page's rule, held within the pane less half the gutter on either side), snapping to where the text's width and the guides put an edge (`draggedEdge`), their guides shown as for the bar. A double click on a line centres it again, its width kept; the bar's double click (the text's width) takes the shift off too.
+
+## Blank lines (2026-11-14)
+
+The editor shows each blank line of a page as a line of its own; SilverBullet's `markdownToHtml` (2.12.1, probed) keeps those between paragraphs (as `<br>`) and drops those next to a block (a list, a heading, a table, a code block) and between a loose list's items, so a cell looked tighter than its markdown in the editor (the user's report). Each element of a cell (by its `data-pos`, a list's items too) is given the blank lines before it in the cell's text that the rendering did not draw (`core/blanklines.ts`: the line breaks before it, the first only ending an inline element's line), as a `div.swl-grid-blank` of the cell's line height each (`ui/view.ts` `keepBlankLines`).
+

@@ -93,6 +93,20 @@ test("a grid widened by its handle grows both ways, centred on the text", async 
   await expect.poll(() => space.saved("Page")).toMatch(/<grid width="\d+">/);
 });
 
+test("a cell keeps the blank lines of its markdown as the editor shows them: between a loose list's items, before a heading after a list", async ({ page, space }) => {
+  const cell = "One\n\nTwo\n- item\n\n- item2\n\n# Head\n\nAfter";
+  await space.open({ Page: `# Page\n\n<grid>\n<column>\n\n${cell}\n\n</column>\n<column>\n\nRight\n\n</column>\n</grid>\n` }, "Page");
+  await gridsDrawn(page);
+  const first = page.locator("#sb-main .swl-grid-cell").first();
+  // The two SilverBullet's rendering leaves out, put back; those between paragraphs it keeps
+  await expect(first.locator(".swl-grid-blank")).toHaveCount(2);
+  const top = async (selector: string) => (await first.locator(selector).first().boundingBox())!.y;
+  const line = (await first.locator("li").first().boundingBox())!.height;
+  // item2 two lines under item (a blank line between), the heading a blank line under the list
+  expect(Math.round(((await top("li >> nth=1")) - (await top("li"))) / line)).toBe(2);
+  expect(Math.round(((await top("h1")) - (await top("li >> nth=1"))) / line)).toBe(2);
+});
+
 test("a grid's left edge dragged alone: its right edge standing, written as its width and shift; a double click centres it again", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\nAbove\n\n${GRID}\nBelow\n` }, "Page");
   await gridsDrawn(page);

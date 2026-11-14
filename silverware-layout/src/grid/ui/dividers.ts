@@ -106,18 +106,19 @@ export function addColumnDividers(doc: Document, grid: HTMLElement, write: (colu
         return [{ element, ratio }];
       });
       // The text's edges: the first column's right edge on the text's right one, the second's left edge on its left
-      // one (a column lined up with the text above and below the grid); their guides on the edge itself
+      // one (a column lined up with the text above and below the grid); their guides where the divider will be, as
+      // the ratios' (the gap's middle: a guide on the column's edge itself stood apart from the divider snapped to it)
       const text = textEdges?.();
       const left = grid.getBoundingClientRect().left + start;
       others = text
         ? [
-            { at: text.right - left, name: TEXT_EDGE, line: text.right - left },
-            { at: text.left - left - gap, name: TEXT_EDGE, line: text.left - left },
+            { at: text.right - left, name: TEXT_EDGE },
+            { at: text.left - left - gap, name: TEXT_EDGE },
           ]
             .filter((one) => withinShares(one.at, sum) && !shown.has(Math.round(one.at)))
-            .map(({ at, name, line }) => {
+            .map(({ at, name }) => {
               const element = el(doc, "div", { class: `${GUIDE} ${GUIDE}-text` }, el(doc, "span", { class: `${GUIDE}-label`, text: name }));
-              element.style.setProperty("left", `${start + line}px`);
+              element.style.setProperty("left", `${start + at + gap / 2}px`);
               grid.append(element);
               guides.push({ element, name: `${name}@${Math.round(at)}` });
               return { at, name: `${name}@${Math.round(at)}` };

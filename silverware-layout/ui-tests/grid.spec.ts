@@ -218,6 +218,12 @@ test("a wide grid's divider snaps to the text's edge too: its first column lined
   await expect(page.locator("#sb-main .swl-grid-guide.swl-grid-guide-near")).toHaveText("Page width");
   const right = (await page.locator("#sb-main .swl-grid-cell").first().boundingBox())!;
   expect(Math.round(right.x + right.width)).toBe(Math.round(textRight));
+  // The guide where the divider is, snapped (its line on the divider's, not on the column's edge beside it)
+  const middle = async (selector: string) => {
+    const one = (await page.locator(selector).boundingBox())!;
+    return Math.round(one.x + one.width / 2);
+  };
+  expect(Math.abs((await middle("#sb-main .swl-grid-guide.swl-grid-guide-near")) - (await middle("#sb-main .swl-grid-divider")))).toBeLessThanOrEqual(1);
   await page.mouse.up();
   await expect.poll(() => space.saved("Page")).toMatch(/<grid width="1100" columns="[^"]+">/);
 });

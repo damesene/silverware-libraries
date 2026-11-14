@@ -32,6 +32,8 @@ export type Bridge = {
   readonly filterBox?: (label: string, options: readonly { readonly name: string; readonly description: string; readonly index: number }[]) => unknown;
   // Optional: one of SilverBullet's UI options (`editor.getUiOption`: `markdownSyntaxRendering`, the markdown shown as written)
   readonly getUiOption?: (name: string) => unknown;
+  // Optional: Silverware Editor's API (`silverware.editor.api`), what a grid's cell is edited in (none: a `<textarea>`)
+  readonly editor?: unknown;
 };
 
 /** The bridge's functions Silverware Layout cannot work without, missing from what the init page gave */

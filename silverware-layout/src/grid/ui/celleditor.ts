@@ -1,68 +1,161 @@
 // A grid's cell edited in place (docs/silverware-layout-grid.md, *Editing*): its rendering replaced by its markdown in
-// a field as tall as its text, the grid keeping its shape. Left (the field losing focus, Esc, Ctrl/Cmd+Enter), the
-// text is handed back once; the cell shows its rendering again until the host draws the grid anew.
-import { el } from "../../../../shared/elements.ts";
+// an editor (shared/editor.ts: Silverware Editor's where it is installed, else a `<textarea>`), as tall as its text, the
+// grid keeping its shape. Left (the focus gone, Esc, Ctrl/Cmd+Enter), the text is handed back once, with when to write
+// it; the cell shows its rendering again until the host draws the grid anew. The grid drawn anew while it is edited
+// (another cell written, left by the press that opened this one), the editor goes into the new drawing's cell
+// (`moveTo`), what was typed kept.
+import type { Editors, TextEditor, TextSelection } from "../../../../shared/editor.ts";
 
-/** The cell's markdown edited in place, the cursor at `at` in it or a selection (none: at its end); `done` gets the text as left (once) */
-export function editCell(cell: HTMLElement, markdown: string, at: number | { readonly from: number; readonly to: number; readonly backward: boolean } | undefined, done: (text: string) => void): HTMLTextAreaElement {
+/** What a cell edited asks of the host (src/grid/grids.ts' `GridHost`, its answers there) */
+export type CellHost = {
+  // When a cell left by a press may be written
+  afterPress(doc: Document): Promise<void>;
+  // The page's editor around a cell given the focus back
+  focusPage(cell: HTMLElement): void;
+};
+
+/** A cell edited: its editor, and moving it into the same cell of the grid drawn anew */
+export type CellEditing = {
+  readonly editor: TextEditor;
+  moveTo(cell: HTMLElement): void;
+};
+
+/**
+ * The cell's markdown edited in place, the cursor at `at` in it or a selection (none: at its end), in an editor of
+ * `editors`; `done` gets the text as left (once), and when it may be written (`settled`: at once where left by a key,
+ * once the press is over where left by one)
+ */
+export function editCell(cell: HTMLElement, markdown: string, at: number | TextSelection | undefined, editors: Editors, host: CellHost, done: (text: string, settled: Promise<void>) => void): CellEditing {
   const doc = cell.ownerDocument;
-  const shown = [...cell.childNodes];
-  const field = el(doc, "textarea", { class: "swl-grid-editor", attrs: { "aria-label": "The cell's markdown", spellcheck: "true" } });
-  field.value = markdown;
+  let shown = [...cell.childNodes];
   let left = false;
-  const grow = () => {
-    field.style.height = "auto";
-    field.style.height = `${field.scrollHeight}px`;
-  };
-  // Undo and redo the field's own: the page's editor takes Ctrl+Z (Ctrl+Y, Ctrl+Shift+Z) for its own as the window
-  // gets it, before the field (SilverBullet 2.12.1: held back, the field's typing not undone). Taken after it, at the
-  // window too, and done in the field by the browser's undo of what was typed there
-  const win = doc.defaultView;
-  const history = (event: KeyboardEvent) => {
-    if (event.target !== field || !(event.ctrlKey || event.metaKey) || event.altKey) return;
-    const key = event.key.toLowerCase();
-    const redo = key === "y" || (key === "z" && event.shiftKey);
-    if (key !== "z" && !redo) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    doc.execCommand(redo ? "redo" : "undo");
-  };
-  win?.addEventListener("keydown", history, true);
-  const leave = () => {
-    if (left) return;
+  // Being moved into another cell: the focus lost as it goes is not the cell left
+  let moving = false;
+  // The focus lost to nothing without a press (the host taking it as it draws the grid anew after another cell's
+  // write, the grid taken out of the page): the cell not left, waiting for the new drawing (`moveTo`) or the focus back
+  let lost = false;
+  // A press going on (from its pointerdown to its release): a blur then is the user's, the cell left
+  let pressing = false;
+  const presses = new AbortController();
+  let editor: TextEditor | undefined;
+  // Left by a key (Esc, Ctrl/Cmd+Enter) or by the focus gone (a press elsewhere)
+  const leave = (byKey: boolean) => {
+    if (left || moving || !editor) return;
     left = true;
-    win?.removeEventListener("keydown", history, true);
-    const text = field.value;
-    // The page's editor the cell is in focused again, as it was before (unfocused, the next press in a grid focused
-    // it and it took the drag's selection for its own, its cursor in the grid's text: the grid shown as its raw text)
-    const editor = cell.closest<HTMLElement>('[contenteditable="true"]');
-    const refocus = field === doc.activeElement || doc.activeElement === doc.body;
-    cell.replaceChildren(...shown);
-    cell.classList.remove("swl-grid-editing");
-    if (editor && refocus && doc.activeElement !== editor) editor.focus({ preventScroll: true });
-    done(text);
-  };
-  field.addEventListener("input", grow);
-  field.addEventListener("blur", leave);
-  field.addEventListener("keydown", (event) => {
-    // The page's editor takes no key typed here (its shortcuts, its own handling of the widget's keys)
-    event.stopPropagation();
-    if (event.key === "Escape" || (event.key === "Enter" && (event.ctrlKey || event.metaKey))) {
-      event.preventDefault();
-      field.blur();
+    lost = false;
+    presses.abort();
+    const text = editor.getText();
+    // The page's editor the cell is in given the focus back, as it had it before (the host's `focusPage`). Left by a
+    // press, only once the press is over and nothing took the focus: focused in the middle of a tap on the page's text
+    // (a phone), the page's editor said it had the focus but took no typing, its cursor not placed
+    const refocus = (from: HTMLElement) => {
+      if (doc.activeElement === null || doc.activeElement === doc.body) host.focusPage(from);
+    };
+    const hadFocus = editor.hasFocus() || editor.element.contains(doc.activeElement);
+    const close = (shut: TextEditor, from: HTMLElement, rendering: ChildNode[]) => {
+      shut.destroy();
+      from.replaceChildren(...rendering);
+      from.classList.remove("swl-grid-editing");
+    };
+    if (!byKey) {
+      const [shut, from, rendering] = [editor, cell, shown];
+      setTimeout(() => {
+        close(shut, from, rendering);
+        refocus(from);
+      }, 0);
+      // Written when the host says a write may go after a press (the grid drawn anew after it)
+      done(text, host.afterPress(doc));
+      return;
     }
+    const from = cell;
+    close(editor, cell, shown);
+    if (hadFocus) host.focusPage(from);
+    done(text, Promise.resolve());
+  };
+  editor = editors.create(doc, {
+    text: markdown,
+    className: "swl-grid-editor",
+    label: "The cell's markdown",
+    spellcheck: true,
+    selection: at,
+    keys: { Escape: () => (leave(true), true), "Mod-Enter": () => (leave(true), true) },
+    onBlur: () => {
+      if (left || moving || !editor) return;
+      if (pressing) return leave(false);
+      // (Without a press: lost at once (moved meanwhile, the focus given back there), where the focus went told a task
+      // later. To an element of its own (Tab, a field focused by a script): left. Still the editor's (the window
+      // left): nothing. To nothing: waited for)
+      lost = true;
+      setTimeout(() => {
+        if (!lost || left || !editor) return;
+        const active = doc.activeElement;
+        if (editor.hasFocus() || (active && editor.element.contains(active))) return void (lost = false);
+        if (active && active !== doc.body) {
+          lost = false;
+          return leave(false);
+        }
+        const kept = editor;
+        // (In the page still: its focus given back after a moment, the grid not drawn anew; taken out: left, the
+        // grid drawn anew none came)
+        setTimeout(() => {
+          if (!lost || left) return;
+          lost = false;
+          if (kept.element.isConnected) kept.focus();
+          else leave(false);
+        }, kept.element.isConnected ? LOST_MS : REMOVED_MS);
+      }, 0);
+    },
   });
+  const win = doc.defaultView;
+  if (win) {
+    win.addEventListener(
+      "pointerdown",
+      (event) => {
+        pressing = true;
+        // (Lost, a press elsewhere: the cell left as by that press)
+        if (lost && editor && !(event.target instanceof Node && editor.element.contains(event.target))) {
+          lost = false;
+          leave(false);
+        }
+      },
+      { capture: true, signal: presses.signal },
+    );
+    for (const type of ["pointerup", "pointercancel"]) win.addEventListener(type, () => setTimeout(() => (pressing = false), 0), { capture: true, signal: presses.signal });
+  }
+  // (One showing the markdown as rendered looks as the cell did: only what the caret is at changes, as in the page)
+  if (editor.preview) editor.element.classList.add("swl-grid-editor-preview");
   cell.classList.add("swl-grid-editing");
-  cell.replaceChildren(field);
-  grow();
-  field.focus();
-  const within = (offset: number) => Math.max(0, Math.min(markdown.length, offset));
-  if (at === undefined || typeof at === "number") {
-    const caret = within(at ?? markdown.length);
-    field.setSelectionRange(caret, caret);
-  } else field.setSelectionRange(within(at.from), within(at.to), at.backward ? "backward" : "forward");
-  return field;
+  cell.replaceChildren(editor.element);
+  editor.focus();
+  // (Where the cursor was asked once it is in the page and focused: a field's selection is its own then)
+  if (at === undefined || typeof at === "number") editor.setSelection(at ?? markdown.length);
+  else editor.setSelection(at.from, at.to, at.backward);
+  const shownEditor = editor;
+  return {
+    editor: shownEditor,
+    moveTo: (to) => {
+      if (left || to === cell) return;
+      // (Its selection kept: an element moved loses the focus, given back with the selection it had)
+      const selection = shownEditor.getSelection();
+      const focused = shownEditor.hasFocus() || lost;
+      lost = false;
+      moving = true;
+      shown = [...to.childNodes];
+      cell = to;
+      to.classList.add("swl-grid-editing");
+      to.replaceChildren(shownEditor.element);
+      if (focused) shownEditor.focus();
+      shownEditor.setSelection(selection.from, selection.to, selection.backward);
+      // (A blur the move fires comes before the focus is given back, or a task later)
+      setTimeout(() => (moving = false), 0);
+    },
+  };
 }
+
+// How long an editor that lost the focus to nothing waits before taking it back, in the page still (`moveTo` gives it
+// back as the grid is drawn anew), and taken out of it with its grid (left where no new drawing came)
+const LOST_MS = 300;
+const REMOVED_MS = 3000;
 
 /**
  * The word under a point in the rendering and how far into it the point is, as the browser places a caret there

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { editorsOf } from "../../../../shared/editor.ts";
 import { iconsOf } from "../../../../shared/icons.ts";
 import { OVER_WINDOW_ATTRIBUTE } from "../../../../shared/overwindow.ts";
 import { afterEach, describe, expect, it } from "vitest";
@@ -27,6 +28,7 @@ async function setup(on = true) {
     {
       document,
       icons: iconsOf(undefined),
+      editors: editorsOf(undefined),
       core,
       types,
       ui,

@@ -3,6 +3,7 @@
 // SilverBullet's API is called and what it answers. Everything else asks the
 // platform (shared/platform.ts).
 import { iconsOf } from "../../../../shared/icons.ts";
+import { editorsOf } from "../../../../shared/editor.ts";
 import { saveConfigPage, withConfigSettings } from "../../../../shared/configpage.ts";
 import type { Choice, IndexChange, IndexedObject, Platform } from "../../../../shared/platform.ts";
 import { PAGE_KEYS, pageDates, referablePages, tasksOfPages, validatePageName } from "./pages.ts";
@@ -12,6 +13,9 @@ import { settledIndex } from "./settledindex.ts";
 export type Bridge = {
   // Silverware Icons' API where it is installed (`silverware.icons.api`; shared/icons.ts `iconsOf` reads it)
   readonly icons?: unknown;
+  // Silverware Editor's API where it is installed (`silverware.editor.api`; shared/editor.ts `editorsOf` reads it): an
+  // item's content edited in its editor
+  readonly editor?: unknown;
   // Silverware Layout's API where it is installed (`silverware.layout.api`; shared/layout.ts `layoutOf` reads it): the
   // places registered with it, laid out at the width their blocks keep
   readonly layout?: unknown;
@@ -135,6 +139,8 @@ export function silverBulletPlatform(bridge: Bridge): {
     },
     ui: {
       icons: iconsOf(bridge.icons),
+      // (SilverBullet takes Ctrl+Z at the window and holds it back, 2.12.1: the stand-in's field undoes at the window too)
+      editors: editorsOf(bridge.editor, { historyAtWindow: true }),
       // (Its timeout and buttons where given, nothing else: SilverBullet's defaults for what is not)
       notify: (message, options) => {
         const more = { ...(options?.timeout === undefined ? {} : { timeout: options.timeout }), ...(options?.actions?.length ? { actions: options.actions } : {}) };

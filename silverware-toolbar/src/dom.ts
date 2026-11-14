@@ -11,8 +11,20 @@ export const CONTENT_SELECTOR = ".cm-content";
 // query's result: CodeMirror marks them contenteditable=false)
 const NOT_THE_PAGE = "dialog, .sb-modal-box, .sb-mini-editor, [contenteditable='false']";
 
+/**
+ * The node itself where it is in the document, else the element whose shadow root holds it (an editor drawn in a
+ * shadow root of its own, Silverware Editor's): where it is in SilverBullet's page
+ */
+export function inDocument(node: Node | null): Node | null {
+  let at = node;
+  for (let root = at?.getRootNode(); root instanceof ShadowRoot; root = at?.getRootNode()) at = root.host;
+  return at;
+}
+
 /** The page's editable area a node is in, if it is the page's text (not a widget's, not another editor's) */
 export function pageContentOf(node: Node | null): HTMLElement | undefined {
+  // (In a shadow root: another editor's, never the page's, even where its own `.cm-content` is found there)
+  if (node && node.getRootNode() instanceof ShadowRoot) return undefined;
   const element = node instanceof Element ? node : node?.parentElement;
   const content = element?.closest<HTMLElement>(CONTENT_SELECTOR);
   if (!element || !content || element.closest(NOT_THE_PAGE)) return undefined;
@@ -59,12 +71,15 @@ export function editorBox(doc: Document): DOMRect | undefined {
 
 /** Whether a node is in SilverBullet's editor (its text, or a widget's field there: a table's cell editor) */
 export function inEditor(node: Node | null): boolean {
-  const element = node instanceof Element ? node : node?.parentElement;
+  const at = inDocument(node);
+  const element = at instanceof Element ? at : at?.parentElement;
   return !!element?.closest(EDITOR_SELECTOR);
 }
 
 /** The top of the page's view around a node (the toolbar goes below it there), else the window's */
 export function viewTopOf(node: Node | null): number {
-  const element = node instanceof Element ? node : node?.parentElement;
+  // (SilverBullet's view around an editor in a shadow root, not that editor's own scroller)
+  const at = inDocument(node);
+  const element = at instanceof Element ? at : at?.parentElement;
   return element?.closest(SCROLLER_SELECTOR)?.getBoundingClientRect().top ?? 0;
 }

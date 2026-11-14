@@ -1,6 +1,6 @@
 // Columns (docs/silverware-layout-grid.md) as a user works with them in SilverBullet: /grid, a cell edited in place,
 // Alt+click to the raw text, columns set by the grid's line, a grid in an embedded page, its hashtags indexed.
-import { cursorAt, editorText, expect, gridsDrawn, PAGE_LAYOUT, runCommand, test } from "./helpers.ts";
+import { cellField, cursorAt, editorText, expect, fieldState, fillField, gridsDrawn, PAGE_LAYOUT, runCommand, test } from "./helpers.ts";
 
 const GRID = "<grid>\n<column>\n\nLeft text\n\n</column>\n<column>\n\nRight text\n\n</column>\n</grid>\n";
 
@@ -38,12 +38,28 @@ test("a cell edited in place: its markdown in a field, written as it is left, th
   await gridsDrawn(page);
   const cell = page.locator("#sb-main .swl-grid-cell").first();
   await cell.click();
-  const field = cell.locator("textarea.swl-grid-editor");
-  await expect(field).toHaveValue("Left text");
-  await field.fill("Left **edited**");
+  await expect.poll(async () => (await fieldState(page)).text).toBe("Left text");
+  await fillField(page, "Left **edited**");
   await page.keyboard.press("Escape");
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${GRID.replace("Left text", "Left **edited**")}\nBelow\n`);
   await expect(page.locator("#sb-main .swl-grid-cell").first().locator("strong")).toHaveText("edited");
+});
+
+test("a cell left by a click straight into another of its grid: the first written, the second edited on, what is typed in it kept as the grid is drawn anew", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${GRID}\nBelow\n` }, "Page");
+  await gridsDrawn(page);
+  await page.locator("#sb-main .swl-grid-cell").first().click();
+  await expect.poll(async () => (await fieldState(page)).text).toBe("Left text");
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type(" one");
+  await page.locator("#sb-main .swl-grid-cell").nth(1).click();
+  await page.keyboard.press("Control+End");
+  // (Typed as the first is written and the grid drawn anew: the second's editor taken into the new drawing)
+  await page.keyboard.type(" two", { delay: 60 });
+  await expect.poll(() => space.saved("Page")).toContain("Left text one");
+  await expect.poll(async () => (await fieldState(page)).text).toBe("Right text two");
+  await page.keyboard.press("Escape");
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${GRID.replace("Left text", "Left text one").replace("Right text", "Right text two")}\nBelow\n`);
 });
 
 test("Alt+click in a cell shows the raw text, the cursor where the click was", async ({ page, space }) => {
@@ -123,17 +139,17 @@ test("a click on a blank line of a cell puts the field's caret on that line, not
     const line = (await first.locator(".p").first().boundingBox())!.height;
     await page.mouse.click(box.x + 30, box.y - line * (lines - 0.5));
   };
-  const caret = () => page.locator("#sb-main .swl-grid-editor").evaluate((field: HTMLTextAreaElement) => field.selectionStart);
+  const caret = async () => (await fieldState(page)).from;
   // The blank line right above "Two": its line's start (the second blank one, at 5)
   await clickAbove(".p >> nth=1", 1);
-  await expect(page.locator("#sb-main .swl-grid-editor")).toBeVisible();
-  expect(await caret()).toBe(cell.indexOf("\n\nTwo") + 1);
+  await expect(cellField(page)).toBeVisible();
+  await expect.poll(caret).toBe(cell.indexOf("\n\nTwo") + 1);
   await page.keyboard.press("Escape");
-  await expect(page.locator("#sb-main .swl-grid-editor")).toHaveCount(0);
+  await expect(cellField(page)).toHaveCount(0);
   // The one between the list's items
   await clickAbove("li >> nth=1", 1);
-  await expect(page.locator("#sb-main .swl-grid-editor")).toBeVisible();
-  expect(await caret()).toBe(cell.indexOf("\n- b"));
+  await expect(cellField(page)).toBeVisible();
+  await expect.poll(caret).toBe(cell.indexOf("\n- b"));
 });
 
 test("an empty cell is a line high, clicked into to write in it", async ({ page, space }) => {
@@ -142,9 +158,9 @@ test("an empty cell is a line high, clicked into to write in it", async ({ page,
   const empty = page.locator("#sb-main .swl-grid-cell").nth(1);
   expect((await empty.boundingBox())!.height).toBeGreaterThan(10);
   await empty.click();
-  const field = empty.locator("textarea.swl-grid-editor");
-  await expect(field).toBeVisible();
-  await field.fill("Written");
+  await expect(empty.locator(".swl-grid-editor")).toBeVisible();
+  await expect.poll(async () => (await fieldState(page)).focused).toBe(true);
+  await fillField(page, "Written");
   await page.keyboard.press("Escape");
   await expect.poll(() => space.saved("Page")).toContain("<column>\n\nWritten\n\n</column>");
 });
@@ -189,7 +205,11 @@ test("a grid aligned right from its handle's menu: written as its attribute, at 
   expect(handle.x + handle.width).toBeLessThanOrEqual((await grid.boundingBox())!.x);
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
   await page.mouse.down();
-  await page.mouse.move(handle.x + handle.width / 2 - 60, handle.y + handle.height / 2, { steps: 8 });
+  // (Wider than the text too: still to the left alone, its right edge kept, the guides placed from it with it)
+  await page.mouse.move(handle.x + handle.width / 2 - 600, handle.y + handle.height / 2, { steps: 12 });
+  expect((await grid.boundingBox())!.width).toBeGreaterThan(textRight - (await content.boundingBox())!.x);
+  expect(await rightEdge()).toBe(Math.round(textRight));
+  await page.mouse.move(handle.x + handle.width / 2 - 60, handle.y + handle.height / 2, { steps: 12 });
   await page.mouse.up();
   await expect.poll(() => space.saved("Page")).toContain('<grid width="460" align="right">');
   expect(await rightEdge()).toBe(Math.round(textRight));
@@ -437,9 +457,8 @@ test("a click on a word of a cell edits it with the cursor in that word", async 
   const box = (await words.boundingBox())!;
   // Into "text", the second word
   await words.click({ position: { x: box.width - 6, y: box.height / 2 } });
-  const field = page.locator("#sb-main textarea.swl-grid-editor");
-  await expect(field).toBeFocused();
-  const at = await field.evaluate((input: HTMLTextAreaElement) => input.selectionStart);
+  await expect.poll(async () => (await fieldState(page)).focused).toBe(true);
+  const at = (await fieldState(page)).from;
   expect(at).toBeGreaterThanOrEqual("Right ".length);
   expect(at).toBeLessThanOrEqual("Right text".length);
   await page.keyboard.press("Escape");
@@ -456,9 +475,8 @@ test("text selected in a cell by a drag is selected in its field as it is edited
   await page.mouse.down();
   await page.mouse.move(box.x + char * 10 - 1, box.y + box.height / 2, { steps: 5 });
   await page.mouse.up();
-  const field = page.locator("#sb-main textarea.swl-grid-editor");
-  await expect(field).toBeFocused();
-  const [from, to] = await field.evaluate((input: HTMLTextAreaElement) => [input.selectionStart, input.selectionEnd]);
+  await expect.poll(async () => (await fieldState(page)).focused).toBe(true);
+  const { from, to } = await fieldState(page);
   expect(from).toBeGreaterThanOrEqual("Right ".length - 1);
   expect(from).toBeLessThanOrEqual("Right s".length);
   expect(to).toBeGreaterThanOrEqual("Right sid".length);
@@ -486,7 +504,7 @@ test("a selection by a drag carried into the field to the character: the user's 
       },
       { wanted: text, index },
     );
-  const field = page.locator("#sb-main textarea.swl-grid-editor");
+  const field = cellField(page);
   for (const [from, to] of [
     [4, text.length], // " is my note!"
     [5, 7], // "is"
@@ -500,8 +518,9 @@ test("a selection by a drag carried into the field to the character: the user's 
     await page.mouse.down();
     await page.mouse.move(b.x - 1, b.y, { steps: 6 });
     await page.mouse.up();
-    await expect(field).toBeFocused();
-    expect(await field.evaluate((input: HTMLTextAreaElement) => [input.selectionStart, input.selectionEnd]), text.slice(from, to)).toEqual([start + from, start + to]);
+    await expect.poll(async () => (await fieldState(page)).focused).toBe(true);
+    const state = await fieldState(page);
+    expect([state.from, state.to], text.slice(from, to)).toEqual([start + from, start + to]);
     await page.keyboard.press("Escape");
     await expect(field).toHaveCount(0);
   }
@@ -510,9 +529,9 @@ test("a selection by a drag carried into the field to the character: the user's 
 test("a cell left by Esc, then a drag in a cell: the grid stays drawn, the field opens", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${GRID}` }, "Page");
   await gridsDrawn(page);
-  const field = page.locator("#sb-main textarea.swl-grid-editor");
+  const field = cellField(page);
   await page.locator("#sb-main .swl-grid-cell").first().click();
-  await expect(field).toBeFocused();
+  await expect.poll(async () => (await fieldState(page)).focused).toBe(true);
   await page.keyboard.press("Escape");
   await expect(field).toHaveCount(0);
   // (SilverBullet may draw the page anew as another test's CONFIG is put back: the grid drawn again first)
@@ -523,7 +542,7 @@ test("a cell left by Esc, then a drag in a cell: the grid stays drawn, the field
   await page.mouse.down();
   await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2, { steps: 6 });
   await page.mouse.up();
-  await expect(field).toBeFocused();
+  await expect.poll(async () => (await fieldState(page)).focused).toBe(true);
   await expect(page.locator("#sb-main .swl-grid")).toHaveCount(1);
   await page.keyboard.press("Escape");
 });
@@ -533,19 +552,94 @@ test("Ctrl+Z and Ctrl+Y in a cell's field undo and redo its typing, the page's t
   await space.open({ Page: text }, "Page");
   await gridsDrawn(page);
   await page.locator("#sb-main .swl-grid-cell").first().click();
-  const field = page.locator("#sb-main textarea.swl-grid-editor");
-  await expect(field).toBeFocused();
-  await field.press("End");
+  await expect.poll(async () => (await fieldState(page)).focused).toBe(true);
+  const value = async () => (await fieldState(page)).text;
+  await page.keyboard.press("End");
   await page.keyboard.type(" typed");
-  await expect(field).toHaveValue("Left text typed");
+  await expect.poll(value).toBe("Left text typed");
   await page.keyboard.press("Control+z");
-  await expect(field).toHaveValue("Left text");
+  await expect.poll(value).toBe("Left text");
   await page.keyboard.press("Control+y");
-  await expect(field).toHaveValue("Left text typed");
+  await expect.poll(value).toBe("Left text typed");
   await page.keyboard.press("Control+z");
-  await expect(field).toHaveValue("Left text");
+  await expect.poll(value).toBe("Left text");
   expect(await editorText(page)).toBe(text);
   await page.keyboard.press("Escape");
+});
+
+test("with Silverware Editor installed, a cell is edited in its editor: a list continued on Enter, its own undo, the page's editor left alone", async ({ page, space }) => {
+  const text = `# Page\n\n<grid>\n<column>\n\n- one\n\n</column>\n<column>\n\nRight\n\n</column>\n</grid>\n`;
+  await space.open({ Page: text }, "Page");
+  await gridsDrawn(page);
+  // (The editor is loaded once SilverBullet has started, when the browser is idle: a cell opened before is a plain field)
+  await expect(async () => {
+    if (await cellField(page).count()) await page.keyboard.press("Escape");
+    await page.locator("#sb-main .swl-grid-cell").first().click();
+    await expect(page.locator("#sb-main .swl-grid-editor .cm-content")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  await expect.poll(async () => (await fieldState(page)).focused).toBe(true);
+  const value = async () => (await fieldState(page)).text;
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("two");
+  await expect.poll(value).toBe("- one\n- two");
+  await page.keyboard.press("Control+z");
+  await expect.poll(value).not.toBe("- one\n- two");
+  await page.keyboard.press("Control+y");
+  await expect.poll(value).toBe("- one\n- two");
+  // Nothing of it in the page's editor while it is open; written as it is left
+  expect(await editorText(page)).toBe(text);
+  await page.keyboard.press("Escape");
+  await expect.poll(() => space.saved("Page")).toContain("<column>\n\n- one\n- two\n\n</column>");
+});
+
+test("with Silverware Editor installed, a cell's markdown is shown as SilverBullet shows it: marks hidden away from the caret, a task's box toggling it", async ({ page, space }) => {
+  const text = `# Page\n\n<grid>\n<column>\n\nSome **bold** and [[Other|a link]]\n- [ ] open\n\n</column>\n<column>\n\nRight\n\n</column>\n</grid>\n`;
+  await space.open({ Page: text }, "Page");
+  await gridsDrawn(page);
+  const field = page.locator("#sb-main .swl-grid-editor");
+  await expect(async () => {
+    if (await cellField(page).count()) await page.keyboard.press("Escape");
+    await page.locator("#sb-main .swl-grid-cell").first().click();
+    await expect(field.locator(".cm-content")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  await expect.poll(async () => (await fieldState(page)).focused).toBe(true);
+  // (The caret at the end, on the task's line: the first line's marks hidden)
+  await page.keyboard.press("Control+End");
+  await expect(field.locator(".cm-line").first()).toHaveText("Some bold and a link");
+  await expect(field.locator(".swe-wiki-link")).toHaveText("a link");
+  // (At the first line's end: the link it touches shown as written, the bold it does not still hidden)
+  await page.keyboard.press("Control+Home");
+  await page.keyboard.press("End");
+  await expect(field.locator(".cm-line").first()).toHaveText("Some bold and [[Other|a link]]");
+  await field.locator("input.swe-checkbox").click();
+  await expect.poll(async () => (await fieldState(page)).text).toBe("Some **bold** and [[Other|a link]]\n- [x] open");
+  await expect(field.locator(".swe-task-done")).toHaveText("open");
+  await page.keyboard.press("Escape");
+  await expect.poll(() => space.saved("Page")).toContain("<column>\n\nSome **bold** and [[Other|a link]]\n- [x] open\n\n</column>");
+});
+
+test("a task toggled in a cell of a grid of a width of its own: the grid drawn anew at that width from its first frame, no narrower one between", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n<grid width="900">\n<column>\n\n- [ ] one\n\n</column>\n<column>\n\nRight\n\n</column>\n</grid>\n\nAfter\n` }, "Page");
+  await gridsDrawn(page);
+  const widget = page.locator("#sb-main .swl-grid-widget");
+  await expect(widget).toHaveAttribute("data-swl-width", "900");
+  // (Every frame's width of the grid in the page while it is drawn anew)
+  await page.evaluate(() => {
+    const widths: number[] = ((window as unknown as { swlWidths: number[] }).swlWidths = []);
+    const until = performance.now() + 2000;
+    const tick = () => {
+      const grid = document.querySelector("#sb-main .swl-grid");
+      if (grid) widths.push(Math.round(grid.getBoundingClientRect().width));
+      if (performance.now() < until) requestAnimationFrame(tick);
+    };
+    tick();
+  });
+  await page.locator('#sb-main .swl-grid-cell input[type="checkbox"]').click();
+  await expect.poll(() => space.saved("Page")).toContain("- [x] one");
+  await page.waitForTimeout(2100);
+  const widths = await page.evaluate(() => (window as unknown as { swlWidths: number[] }).swlWidths);
+  expect(new Set(widths).size, `the grid's widths frame by frame: ${[...new Set(widths)].join(", ")}`).toBe(1);
 });
 
 test("a task in a cell: drawn as the page's own (no link to its place), its box toggling it in the cell, the page's other task alone", async ({ page, space }) => {
@@ -557,7 +651,7 @@ test("a task in a cell: drawn as the page's own (no link to its place), its box 
   await expect(task.locator("a")).toHaveCount(0);
   await task.locator('input[type="checkbox"]').click();
   await expect.poll(() => space.saved("Page")).toBe(text("x"));
-  await expect(page.locator("#sb-main textarea.swl-grid-editor")).toHaveCount(0);
+  await expect(cellField(page)).toHaveCount(0);
   await gridsDrawn(page);
   await page.locator('#sb-main .swl-grid-cell .sb-task input[type="checkbox"]').first().click();
   await expect.poll(() => space.saved("Page")).toBe(text(" "));

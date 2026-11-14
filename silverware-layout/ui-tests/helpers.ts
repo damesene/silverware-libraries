@@ -147,3 +147,29 @@ export function cursorAt(page: Page): Promise<number> {
 export function editorText(page: Page): Promise<string> {
   return page.evaluate(() => (window as unknown as { client: { editorView: { state: { doc: { toString(): string } } } } }).client.editorView.state.doc.toString());
 }
+
+/**
+ * A grid's cell's field as it is edited, whoever draws it: the stand-in's `<textarea>`, or Silverware Editor's editor
+ * where it is installed (the tests' spaces have every plugin), its element marked by the same class
+ */
+export const cellField = (page: Page) => page.locator("#sb-main .swl-grid-editor");
+
+/** The cell's field's text, its selection (offsets in its text) and whether it has the focus, read either way */
+export function fieldState(page: Page): Promise<{ readonly text: string; readonly from: number; readonly to: number; readonly focused: boolean }> {
+  return cellField(page).evaluate((root: HTMLElement) => {
+    if (root instanceof HTMLTextAreaElement) return { text: root.value, from: root.selectionStart, to: root.selectionEnd, focused: document.activeElement === root };
+    // Silverware Editor's editor (CodeMirror, in its shadow root): its text and selection its state's, as its lines show
+    // the markdown otherwise (marks hidden, a task's checkbox)
+    type State = { doc: { toString(): string }; selection: { main: { from: number; to: number } } };
+    const content = (root.shadowRoot ?? root).querySelector(".cm-content") as (Element & { cmTile?: { view?: { state: State } } }) | null;
+    const state = content?.cmTile?.view?.state;
+    if (!state) throw new Error("no editor's state in the field");
+    return { text: state.doc.toString(), from: state.selection.main.from, to: state.selection.main.to, focused: root === document.activeElement || root.contains(document.activeElement) };
+  });
+}
+
+/** The cell's field's text replaced, as typed (all of it selected first) */
+export async function fillField(page: Page, text: string): Promise<void> {
+  await page.keyboard.press("Control+a");
+  await page.keyboard.insertText(text);
+}

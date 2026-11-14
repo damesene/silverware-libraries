@@ -4097,7 +4097,8 @@ button.swd-peek-label:hover {
   font: inherit;
   line-height: 1.5;
 }
-.swd-peek-body:focus {
+/* (The stand-in's field focused, or Silverware Editor's editor holding the focus within it) */
+.swd-peek-body:is(:focus, :focus-within) {
   background: var(--swd-surface);
 }
 ```

@@ -10,6 +10,7 @@
 // ends, out of what scrolls, … at the last line's end always in view; a list
 // of choices opens over it. A label of a fixed width keeps
 // it, cut with an ellipsis where longer, so what follows keeps its place.
+import { COMPANION_ATTRIBUTE } from "../../../shared/editor.ts";
 import { ICONS } from "../icons.ts";
 import type { Action } from "./action.ts";
 import type { Pin } from "./favorites.ts";
@@ -65,6 +66,8 @@ export class Bar {
   ) {
     this.element = doc.createElement("div");
     this.element.className = "swb-floating swb-bar";
+    // (Acting on an editor of another plugin's: the focus here is not that editor left, shared/editor.ts)
+    this.element.setAttribute(COMPANION_ATTRIBUTE, "");
     this.element.setAttribute("role", "toolbar");
     this.element.setAttribute("aria-label", "Format the selection");
     // A press here keeps the editor's selection and focus

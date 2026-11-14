@@ -18,6 +18,8 @@ const FRAME = ".sb-inline-content";
 // A medium drawn outside the editor (a grid's cell) is a plain element: put in a frame of Silverware Assets' own, to
 // be decorated as SilverBullet's widget is
 const OWN_FRAME = "swa-frame";
+// A frame of ours its medium was decorated in (decorate.ts marks the type it was drawn as)
+const DECORATED = `.${OWN_FRAME}[data-swa-asset]`;
 const MEDIA = "img, video, audio, object";
 const BARS = ".button-bar, .sb-widget-menu-bar";
 // (The frame's whole text: a page embedded there whose own embed failed says it deeper, after its words)
@@ -140,12 +142,15 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
         }
         if (found.length) drawn(found);
       };
-      // Media drawn outside the editor, as told: each in a frame of its own (once), offered with its place as told last
+      // Media drawn outside the editor, as told: each in a frame of its own, offered until it is decorated, its place
+      // as told last (told again as the text above it changes: offered again, it was drawn anew each time, a PDF's
+      // preview flickering with every key typed above its grid; a cell drawn anew has new media, offered then; one not
+      // decorated, its place not found in the text read then, offered again as told again)
       const offer = (items: readonly RenderedItem[]) => {
         remember(items);
         const found: Drawn[] = [];
         for (const item of items) {
-          if (item.kind !== "embed") continue;
+          if (item.kind !== "embed" || item.element.parentElement?.matches(DECORATED)) continue;
           const medium = item.element;
           let frame = medium.parentElement;
           if (!frame?.classList.contains(OWN_FRAME)) {

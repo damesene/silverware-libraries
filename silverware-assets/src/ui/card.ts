@@ -6,7 +6,7 @@ import { el } from "../../../shared/elements.ts";
 export type CardField = { readonly name: string; readonly text: string };
 
 /** A menu's marker where a file's icon is hidden (its menu's way in, after a link or a card's name): a small arrow down, drawn by the text's colour */
-const MENU_MARKER_SVG = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2.5 4 5 6.5 7.5 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const MENU_MARKER_SVG = '<svg viewBox="0 0 10 10" width="1em" height="1em" aria-hidden="true"><path d="M2.5 4 5 6.5 7.5 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 /** A menu's marker as the page and the settings' samples draw it: `where` it is, a link's (after its text) or a card's (after its name) */
 export function menuMarker(doc: Document, where: "link" | "card"): HTMLElement {
@@ -15,16 +15,24 @@ export function menuMarker(doc: Document, where: "link" | "card"): HTMLElement {
   return marker;
 }
 
-/** A type's icon: SVG text inlined, else an image of its URL */
+/**
+ * A type's icon: SVG text inlined, else an image of its URL. Its size the text's where it gives none, until the style
+ * page's rules size it (a rule wins over the attributes): drawn as a page loads, before those rules apply, an SVG of
+ * no size of its own took the whole width of what it was in (a preview's label: its file icon as wide as the page)
+ */
 export function iconElement(doc: Document, icon: string): HTMLElement {
+  const holder = el(doc, "span", { class: "swa-icon", attrs: { "aria-hidden": "true" } });
   if (icon.trimStart().startsWith("<svg")) {
-    const holder = el(doc, "span", { class: "swa-icon", attrs: { "aria-hidden": "true" } });
     // The type's own markup (its icon), as registered
     holder.innerHTML = icon;
+    const svg = holder.querySelector("svg");
+    if (svg && !svg.hasAttribute("width") && !svg.hasAttribute("height")) {
+      svg.setAttribute("width", "1em");
+      svg.setAttribute("height", "1em");
+    }
     return holder;
   }
-  const holder = el(doc, "span", { class: "swa-icon", attrs: { "aria-hidden": "true" } });
-  holder.append(el(doc, "img", { attrs: { src: icon, alt: "" } }));
+  holder.append(el(doc, "img", { attrs: { src: icon, alt: "", width: "16", height: "16" } }));
   return holder;
 }
 

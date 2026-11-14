@@ -31,8 +31,11 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 /* A widget staying at the text's end (its provider's say: a medium aligned right): it grows to the left alone, as far
    as the pane's left edge less half the gutter */
 :root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-anchor="end"]:not([data-silverware-over-window], [data-silverware-over-window] *) {
-  width: min(var(--swl-shown), calc((var(--swl-pane-width, 100vw) + 100%) / 2 - 20px)) !important;
-  margin-left: auto !important;
+  --swl-end-shown: min(var(--swl-shown), calc((var(--swl-pane-width, 100vw) + 100%) / 2 - 20px));
+  width: var(--swl-end-shown) !important;
+  /* (Its left margin what is left of the line, below none once it is wider: an auto one went to none then, and the
+     widget grew to the right, its guides, placed from its right edge, moving with it) */
+  margin-left: calc(100% - var(--swl-end-shown)) !important;
   margin-right: 0 !important;
 }
 /* A widget laid out in a room of its own, not the page's text (a medium in a grid's cell): within that room, no
@@ -62,8 +65,13 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   margin-left: auto !important;
   margin-right: 0 !important;
 }
+/* (An inline block as wide as the line, as the host itself has its widgets' boxes: a block in the line made a row of
+   its own of what the line has round it besides (the editor's caret anchors), an empty line's height above and below
+   the widget, the caret there looking like a blank line where there is none) */
 [data-swl-content] [data-swl-anchor-holder]:not([data-silverware-over-window], [data-silverware-over-window] *) {
-  display: block !important;
+  display: inline-block !important;
+  width: 100%;
+  vertical-align: top;
 }
 [data-swl-content] [data-swl-in-room]:is([data-swl-anchor="center"], [data-swl-anchor="end"]):not([data-silverware-over-window]) {
   display: block !important;
@@ -906,21 +914,22 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
    pixels; between cells each cell's right and bottom shadow, on the pixel after the
    cell, where a divider draws its line (each cell closed so, a last row's last cell too, not run into the empty
    place beside it). Opaque, so where two meet the line is no darker. Cells as tall as their row: a line between two
-   columns runs its height */
-.swl-grid[data-swl-border] {
+   columns runs its height. A grid one of whose cells is edited has them too, for as long as it is edited (in place
+   of an outline round the field: the user's choice, 2026-11-14), its own as its attribute says again after */
+.swl-grid:is([data-swl-border], :has(> .swl-grid-editing)) {
   --swl-grid-line: color-mix(in srgb, var(--root-color, #000) 16%, var(--root-background-color, #fff));
   gap: 0;
   align-items: stretch;
   box-shadow: inset 0 0 0 1px var(--swl-grid-line);
 }
-.swl-grid[data-swl-border] > .swl-grid-cell {
+.swl-grid:is([data-swl-border], :has(> .swl-grid-editing)) > .swl-grid-cell {
   padding: 0.5em 0.75em;
   box-shadow: 1px 0 0 var(--swl-grid-line), 0 1px 0 var(--swl-grid-line);
 }
-.swl-grid[data-swl-border] > .swl-grid-divider::before {
+.swl-grid:is([data-swl-border], :has(> .swl-grid-editing)) > .swl-grid-divider::before {
   transform: none;
 }
-.swl-grid[data-swl-border] > .swl-grid-divider::after {
+.swl-grid:is([data-swl-border], :has(> .swl-grid-editing)) > .swl-grid-divider::after {
   transform: translate(calc(-50% + 0.5px), -50%);
 }
 /* A cell is edited by a click in it: the text's pointer over it (no outline round it: cut off at the grid's edges, and
@@ -949,9 +958,23 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
   border-radius: 4px;
 }
-.swl-grid-editor:focus {
-  outline: 2px solid color-mix(in srgb, currentColor 40%, transparent);
-  outline-offset: 1px;
+/* An editor showing the markdown as rendered (Silverware Editor's): the cell's own look, its font, size and spacing,
+   nothing round it (the grid's lines show the cell edited), so only what the caret is at changes as the cell is
+   edited. Nothing of it cut off: its caret at a line's start lies a pixel left of it (an empty line's, unseen) */
+.swl-grid-editor.swl-grid-editor-preview {
+  min-height: 1lh;
+  padding: 0;
+  overflow: visible;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+/* (The field no outline as it has the focus: the grid's lines show the cell edited) */
+.swl-grid-editor:is(:focus, :focus-within) {
+  outline: none;
 }
 /* <shared-menu> generated from its template by scripts/sharedstyles.mjs (npm run build): edit the template, not this */
 /* The look of shared/menu.ts's menus: one template for every plugin drawing them, its classes those renderMenu gives

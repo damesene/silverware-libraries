@@ -299,6 +299,21 @@ test("a preview's label: its alt text above by default (else its name), then the
   await expect.poll(() => space.config()).toContain('field = "name"');
 });
 
+test("a preview in a grid's cell is not drawn anew as text above the grid is typed (its place in the page moving)", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\nAbove\n\n${grid(`![[${space.folder}/a.png|A|60x40|{ view: preview }]]`, "Right")}\nAfter\n` }, "Page", { "a.png": PIXEL_PNG });
+  await gridsDrawn(page);
+  const preview = page.locator("#sb-main .swl-grid [data-swa-asset='image'] .swa-own").first();
+  await expect(preview).toBeVisible();
+  await preview.evaluate((element) => element.setAttribute("data-test-first", ""));
+  await page.locator("#sb-main .cm-line", { hasText: "Above" }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" typed", { delay: 50 });
+  await expect.poll(() => space.saved("Page")).toContain("Above typed");
+  // (The grid told its new places meanwhile: the same preview's element still there)
+  await page.waitForTimeout(500);
+  await expect(page.locator("#sb-main .swl-grid [data-test-first]")).toHaveCount(1);
+});
+
 test("a preview in a grid's cell: the pointer on it, its own grip shown, which opens its menu and drags nothing", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${grid(`![[${space.folder}/a.png|A|60x40|{ view: preview }]]`, "Right")}\nAfter\n` }, "Page", { "a.png": PIXEL_PNG });
   await gridsDrawn(page);

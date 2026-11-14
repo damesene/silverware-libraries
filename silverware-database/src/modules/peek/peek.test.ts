@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { editorsOf } from "../../../../shared/editor.ts";
 import { iconsOf } from "../../../../shared/icons.ts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DatabaseCore } from "../../core/core.ts";
@@ -46,6 +47,7 @@ async function setup(answer = true, withProperties = false, configured: Record<s
     {
       document,
       icons: iconsOf(undefined),
+      editors: editorsOf(undefined),
       core,
       types,
       ui,

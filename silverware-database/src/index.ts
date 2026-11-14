@@ -6,6 +6,7 @@
 // `init`, as Space Lua loads.
 import { applyLayers } from "../../shared/layers.ts";
 import { iconsOf } from "../../shared/icons.ts";
+import { editorsOf } from "../../shared/editor.ts";
 import { layoutOf } from "../../shared/layout.ts";
 import { linesOf, linesUnder } from "../../shared/markdown/lines.ts";
 import { type ConflictHost, openConflict } from "./core/conflictdialog.ts";
@@ -150,6 +151,7 @@ export function init(bridge: Bridge): void {
     {
       document,
       icons: iconsOf(platform.ui.icons),
+      editors: editorsOf(platform.ui.editors),
       core,
       types,
       ui,

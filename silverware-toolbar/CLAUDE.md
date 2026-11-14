@@ -37,6 +37,7 @@ Plan, decisions and their dates: [docs/silverware-toolbar.md](../docs/silverware
 - A "/" written through the editor API opens no completion: the slash module writes it, a space before where `slashCommandRegexp` would not match, then calls `editor.startCompletion` (asked first, so a release without it gets no stray "/"). The playground has its own slash completion.
 - **Hiding the keyboard** (`core/keyboard.ts`): the VirtualKeyboard API with the policy `manual` until the next tap, the text keeping focus and selection; without it (Safari on iOS) the text is blurred.
 - Everything assumed about SilverBullet's DOM is in `src/dom.ts`.
+- **Editing surfaces** (shared/editor.ts, Silverware Editor's editors handed over by the init page as `editor`): where the focus is in one (a grid's cell, a database's peek), the controller reads and writes it in place of the page (`target()`: the surface kept while the toolbar's own fields have the focus), the watcher reads its selection in its shadow root (`getComposedRanges`, else the root's `getSelection`), `dom.ts` takes a node in a shadow root for none of the page's (`inDocument` for where it is). The bar, popup and panel are marked `COMPANION_ATTRIBUTE`: the focus there (the popup's search) does not leave the editor. SilverBullet's commands, the key and completion stay the page's.
 
 ## Verified in SilverBullet
 

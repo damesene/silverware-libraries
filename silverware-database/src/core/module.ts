@@ -8,6 +8,7 @@
 // only through what one offers (`offer`, `offered`), as Silverware Table's and
 // Silverware Tags' do. Modules import only types from here.
 import type { Icons } from "../../../shared/icons.ts";
+import type { Editors } from "../../../shared/editor.ts";
 import type { DocumentsHost } from "./documents.ts";
 import type { MentionsHost } from "./mentions.ts";
 import type { Settings, UserInterface } from "../../../shared/platform.ts";
@@ -80,6 +81,8 @@ export type ModuleHost = DocumentsHost & MentionsHost & {
   readonly document: Document;
   /** What draws and picks icons (Silverware Icons, or its stand-in saying it is needed: shared/icons.ts) */
   readonly icons: Icons;
+  /** What an item's content is edited in (Silverware Editor, or a `<textarea>`: shared/editor.ts `editorsOf`, in the binding) */
+  readonly editors: Editors;
   /** The core's writes (each checked, said where refused, kept for Undo) */
   readonly core: DatabaseCore;
   readonly types: TypeRegistry;

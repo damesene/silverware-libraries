@@ -9,7 +9,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Page, type Locator } from "@playwright/test";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
 
 export { expect };
@@ -162,4 +162,24 @@ export async function waitForIndex(page: Page, tag: string, text: string): Promi
       return Array.isArray(found) && found.some((object) => JSON.stringify(object).includes(text));
     })
     .toBe(true);
+}
+
+/**
+ * A markdown field's text, whoever draws it: the stand-in's `<textarea>`, or Silverware Editor's editor where it is
+ * installed (the tests' spaces have every plugin: its state in its shadow root)
+ */
+export function fieldText(field: Locator): Promise<string> {
+  return field.evaluate((root: HTMLElement) => {
+    if (root instanceof HTMLTextAreaElement) return root.value;
+    // (Its state's text: its lines show the markdown otherwise, marks hidden, a task's checkbox)
+    const content = (root.shadowRoot ?? root).querySelector(".cm-content") as (Element & { cmTile?: { view?: { state: { doc: { toString(): string } } } } }) | null;
+    const text = content?.cmTile?.view?.state.doc.toString();
+    if (text === undefined) throw new Error("no editor's state in the field");
+    return text;
+  });
+}
+
+/** Whether a markdown field takes typing: not read only, its content read (`data-reading` gone) */
+export async function fieldReady(field: Locator): Promise<boolean> {
+  return field.evaluate((root: HTMLElement) => root.dataset.reading === undefined && !(root instanceof HTMLTextAreaElement && root.readOnly));
 }

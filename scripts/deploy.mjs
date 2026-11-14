@@ -3,7 +3,7 @@
 import { copyFileSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart", "silverware-database", "silverware-icons", "silverware-layout", "silverware-assets", "silverware-assets-pdf", "silverware-assets-docx", "silverware-assets-xlsx"];
+const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart", "silverware-database", "silverware-icons", "silverware-layout", "silverware-assets", "silverware-assets-pdf", "silverware-assets-docx", "silverware-assets-xlsx", "silverware-editor"];
 const space = process.argv[2] ?? process.env.SB_SPACE;
 if (!space) {
   console.error("Usage: npm run deploy -- <space folder> (or set SB_SPACE)");

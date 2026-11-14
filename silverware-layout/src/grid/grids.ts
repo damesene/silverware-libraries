@@ -16,7 +16,8 @@ import { columnTemplate, DEFAULT_MAX_COLUMNS } from "./model/columns.ts";
 import { RENDERED_VERSION, type Rendered, type RenderedItem, type RenderedRange } from "../../../shared/rendered.ts";
 import { type Drawn, drawnIn, itemsOf } from "./drawn.ts";
 import { addCellMenus, type CellAction } from "./ui/cellmenu.ts";
-import { caretWord, editCell } from "./ui/celleditor.ts";
+import { caretWord, type CellEditing, editCell } from "./ui/celleditor.ts";
+import { type Editors, editorsOf } from "../../../shared/editor.ts";
 import { blankLinesBefore, blankLineStart } from "./core/blanklines.ts";
 import { addColumnDividers } from "./ui/dividers.ts";
 import { drawGrid, keepBlankLines, plainCell, showBorder, showColumns } from "./ui/view.ts";
@@ -53,10 +54,21 @@ export type GridHost = {
   problem(message: string): void;
   /** A grid's element handed to the host, which draws it in a frame of its own: the frame made bare once it is in the page (its menu) */
   settle?(element: HTMLElement): void;
+  /** What a cell's markdown is edited in (shared/editor.ts: Silverware Editor's API, or the stand-in's `<textarea>`; none: the stand-in) */
+  readonly editors?: Editors;
+  // How the host behaves, where the grids allow for it (none: they need not; SilverBullet's: host/silverbullet/behaviour.ts)
+  /** The page's text as the grid of this body being drawn is in it, where the host draws before its text is the new one (none: `pageText`) */
+  textForDrawing?(body: string): Promise<string>;
+  /** When a cell left by a press may be written, where the host would undo what the press did as the grid is drawn anew (none: at once) */
+  afterPress?(doc: Document): Promise<void>;
+  /** The page's editor a cell is in given the focus back as the cell is left (none: nothing) */
+  focusPage?(cell: HTMLElement): void;
 };
 
 // How long after a grid is drawn its attributes are read again (it is in the page by then, its order among its alike known)
 const SETTLE_MS = 50;
+// How long a grid written is waited for to be drawn anew (the host draws it a moment after its text changed), at most
+const REDRAWN_MS = 3000;
 // How far a press and its release are apart to be a drag that selects (px)
 const DRAG_PX = 4;
 // What a click in a cell leaves to the cell's rendering: a link, a tag, a button, a field, an editor open
@@ -112,6 +124,9 @@ function sameAttributes(a: Attributes | undefined, b: Attributes): boolean {
   return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key]);
 }
 
+/** Where a cell edited is: its grid (taken anew as it is drawn anew), that grid's place among those drawn, the cell */
+type CellPlace = { grid: HTMLElement; readonly nth: number; readonly index: number };
+
 export class Grids {
   // Each grid drawn, its body (what it is found in the page by)
   private readonly bodies = new WeakMap<HTMLElement, string>();
@@ -137,6 +152,14 @@ export class Grids {
   // The last press in a cell: its cell, where it was, the caret there
   private pressed: { readonly cell: HTMLElement; readonly x: number; readonly y: number; readonly caret: Caret | undefined } | undefined;
   private started = false;
+  // The cells' writes in turn, each once its grid is drawn anew for the one before (a cell left by the press opening
+  // another of its grid: that one is written after it, its grid found as it is then), and how many are on their way
+  private writing: Promise<void> = Promise.resolve();
+  private writes = 0;
+  // The cell edited now: its place (its grid the one drawn anew after a write, once it is) and its editing; the places
+  // of it and of the writes on their way, each taken to its grid drawn anew
+  private editing: { readonly place: CellPlace; readonly session: CellEditing } | undefined;
+  private readonly places = new Set<CellPlace>();
   /** Told as a grid drawn gets other attributes than it had (its width typed by hand: laid out again) */
   onAttributes: (() => void) | undefined;
   /** Where the page's text is (x in the window), where who lays the page out says: a column's edge snaps to it */
@@ -198,7 +221,7 @@ export class Grids {
     const cells = readGridBody(body);
     const [html, text] = await Promise.all([
       Promise.all(cells.map((cell) => this.host.renderMarkdown(cell.content).catch(() => plainCell(this.doc, cell.content)))),
-      this.host.pageText().catch(() => ""),
+      (this.host.textForDrawing ? this.host.textForDrawing(body) : this.host.pageText()).catch(() => ""),
     ]);
     const first = gridsOfBody(text, body)[0];
     const attributes = first?.attributes ?? {};
@@ -411,8 +434,20 @@ export class Grids {
   /** A cell's markdown edited in place, the cursor where a click was in its rendering (none: at its end), written as it is left where it changed */
   async edit(element: HTMLElement, cellElement: HTMLElement, point?: CellPoint): Promise<void> {
     const index = Number(cellElement.getAttribute("data-swl-cell"));
-    const text = await this.host.pageText().catch(() => undefined);
-    const found = text === undefined ? undefined : this.found(text, element);
+    const nth = this.drawn().indexOf(element);
+    // (Where the press was is read in the cell pressed, its rendering: the cell edited may be the grid's drawn anew)
+    const pressed = cellElement;
+    let text = await this.host.pageText().catch(() => undefined);
+    let found = text === undefined ? undefined : this.found(text, element);
+    // Read as another cell's write had changed the grid, before it was drawn anew: opened once it is, in that drawing
+    if (!found && this.writes > 0) {
+      await this.writing;
+      const again = this.drawn()[nth];
+      const againCell = again?.querySelector<HTMLElement>(`:scope > .swl-grid-cell[data-swl-cell="${index}"]`);
+      if (again && againCell) [element, cellElement] = [again, againCell];
+      text = await this.host.pageText().catch(() => undefined);
+      found = text === undefined ? undefined : this.found(text, element);
+    }
     const cell = found?.grid.cells[index];
     if (!found || !cell) {
       this.host.problem("Silverware Layout: this grid changed in the page since it was drawn; edit it there");
@@ -421,15 +456,82 @@ export class Grids {
     const at = !point
       ? undefined
       : point.selected
-        ? selectionInCell(cell.content, cellElement, point.selected)
-        : ((point.y === undefined ? undefined : blankLineAt(cell.content, cellElement, point.y)) ?? offsetInCell(cell.content, cellElement, point.target, point.caret));
-    editCell(cellElement, cell.content, at, (content) => {
-      if (same(content) === same(cell.content)) return;
-      void this.host
-        .writeCell({ body: found.grid.body, occurrence: found.occurrence, of: found.of, cell: index, content })
-        .then((problem) => problem && this.host.problem(`Silverware Layout: the cell was not written: ${problem}`))
-        .catch((error: unknown) => this.host.problem(`Silverware Layout: the cell was not written: ${error instanceof Error ? error.message : String(error)}`));
+        ? selectionInCell(cell.content, pressed, point.selected)
+        : ((point.y === undefined ? undefined : blankLineAt(cell.content, pressed, point.y)) ?? offsetInCell(cell.content, pressed, point.target, point.caret));
+    const place: CellPlace = { grid: element, nth, index };
+    this.places.add(place);
+    let session: CellEditing | undefined;
+    const cellHost = { afterPress: (doc: Document) => this.host.afterPress?.(doc) ?? Promise.resolve(), focusPage: (cell: HTMLElement) => this.host.focusPage?.(cell) };
+    session = editCell(cellElement, cell.content, at, this.host.editors ?? editorsOf(undefined), cellHost, (content, settled) => {
+      if (session && this.editing?.session === session) this.editing = undefined;
+      if (same(content) !== same(cell.content)) this.writeLater(place, content, settled);
+      else this.places.delete(place);
     });
+    this.editing = { place, session };
+  }
+
+  /**
+   * A cell's text written once it may be (`settled`) and the writes before it are done, its grid found in the page as
+   * it is then (drawn anew by a write before: the one at its place); then the grid drawn anew waited for, so the next
+   * finds it so too
+   */
+  private writeLater(place: CellPlace, content: string, settled: Promise<void>): void {
+    this.writes++;
+    const fail = (problem: string) => this.host.problem(`Silverware Layout: the cell was not written: ${problem}`);
+    const write = async () => {
+      await settled;
+      // (Its grid as drawn now: drawn anew after a write before, taken to it by `redrawn`; not in the page any more,
+      // nothing written: no other grid is taken for it)
+      const grid = place.grid;
+      const text = await this.host.pageText();
+      const found = grid.isConnected ? this.found(text, grid) : undefined;
+      if (!found) return fail("its grid changed in the page meanwhile");
+      const problem = await this.host.writeCell({ body: found.grid.body, occurrence: found.occurrence, of: found.of, cell: place.index, content });
+      if (problem) return fail(problem);
+      await this.redrawn(grid, place.nth);
+    };
+    this.writing = this.writing
+      .then(write)
+      .catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)))
+      .finally(() => {
+        this.writes--;
+        this.places.delete(place);
+      });
+  }
+
+  /**
+   * Once a grid written is drawn anew (none, after `REDRAWN_MS`: it was not): the places in it taken to the new
+   * drawing, the cell edited moved into it. Only a drawing a write of ours made: another (the page left) is no grid of
+   * the cell's
+   */
+  private redrawn(grid: HTMLElement, nth: number): Promise<void> {
+    return new Promise((resolve) => {
+      const win = this.doc.defaultView;
+      const look = () => {
+        const now = this.drawn()[nth];
+        if (grid.isConnected || !now || now === grid) return false;
+        this.retake(grid, now);
+        return true;
+      };
+      if (look() || !win || !this.doc.body) return resolve();
+      const observer = new win.MutationObserver(() => look() && done());
+      const timer = win.setTimeout(() => done(), REDRAWN_MS);
+      const done = () => {
+        observer.disconnect();
+        win.clearTimeout(timer);
+        resolve();
+      };
+      observer.observe(this.doc.body, { childList: true, subtree: true });
+    });
+  }
+
+  /** The places in a grid taken to it drawn anew, the cell edited moved there, what was typed in it kept */
+  private retake(was: HTMLElement, now: HTMLElement): void {
+    for (const place of this.places) if (place.grid === was) place.grid = now;
+    const editing = this.editing;
+    if (editing?.place.grid !== now) return;
+    const cell = now.querySelector<HTMLElement>(`:scope > .swl-grid-cell[data-swl-cell="${editing.place.index}"]`);
+    if (cell) editing.session.moveTo(cell);
   }
 
   /** An Alt+press in a cell: the raw text shown, the cursor where it was in the cell's markdown */

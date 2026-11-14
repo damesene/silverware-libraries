@@ -94,7 +94,10 @@ describe("the grids", () => {
     const { gridHost } = host("");
     const pageText = vi.spyOn(gridHost, "pageText");
     const grids = new Grids(document, gridHost);
-    const grid = await grids.render(body);
+    // (A text without the grid read again a few times, a moment apart, as it is drawn)
+    const rendering = grids.render(body);
+    await vi.runAllTimersAsync();
+    const grid = await rendering;
     document.body.append(grid);
     pageText.mockClear();
     grids.refreshSoon();
@@ -137,7 +140,10 @@ describe("a cell edited", () => {
     const cell = grid.querySelector(".swl-grid-cell")!;
     cell.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     const field = await fieldOf(cell);
+    // (Left by a press elsewhere: a blur without one is the host's, the cell kept)
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
     field.blur();
+    document.body.dispatchEvent(new Event("pointerup", { bubbles: true }));
     expect(state.writes).toEqual([]);
     // A link in the rendering is its own
     const link = Object.assign(document.createElement("a"), { textContent: "x" });

@@ -7,13 +7,14 @@ import { iconFiles } from "./icons/index.mjs";
 import { sharedStyles } from "./sharedstyles.mjs";
 import { checkVersions } from "./versions.mjs";
 
-const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart", "silverware-database", "silverware-icons", "silverware-layout", "silverware-assets", "silverware-assets-pdf", "silverware-assets-docx", "silverware-assets-xlsx"];
+const libraries = ["silverware-table", "silverware-toolbar", "silverware-tags", "silverware-chart", "silverware-database", "silverware-icons", "silverware-layout", "silverware-assets", "silverware-assets-pdf", "silverware-assets-docx", "silverware-assets-xlsx", "silverware-editor"];
 // Files bundled beside a library's, loaded by it when needed: Chart.js beside the chart's (src/chartjs.ts), docx-preview
 // and JSZip beside Silverware Assets DOCX's, ExcelJS beside Silverware Assets XLSX's (each src/vendor.ts)
 const beside = [
   { entry: "silverware-chart/src/chartjs.ts", outfile: "silverware-chart/silverware-chart-chartjs.js" },
   { entry: "silverware-assets-docx/src/vendor.ts", outfile: "silverware-assets-docx/silverware-assets-docx-docxpreview.js" },
   { entry: "silverware-assets-xlsx/src/vendor.ts", outfile: "silverware-assets-xlsx/silverware-assets-xlsx-exceljs.js" },
+  { entry: "silverware-editor/src/vendor.ts", outfile: "silverware-editor/silverware-editor-codemirror.js" },
 ];
 // Files copied unchanged beside a library's from a package, loaded by it when needed: pdf.js and its worker beside
 // Silverware Assets PDF's (silverware-assets-pdf/src/pdfjs/load.ts)

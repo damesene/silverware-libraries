@@ -1,6 +1,7 @@
 // Silverware Toolbar entry point, loaded by the init page's Space Lua:
 //   js.importFromSpace("Library/damesene/silverware-toolbar.js").init({ ... editor functions ... })
 import { applyLayers } from "../../shared/layers.ts";
+import { editorsOf } from "../../shared/editor.ts";
 import { iconsOf } from "../../shared/icons.ts";
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { actionsOf, customActionsAnew, defineCustomActions } from "./actions.ts";
@@ -64,7 +65,7 @@ export async function init(bridge: Bridge): Promise<void> {
   // The toolbar's: those for a touch screen only where this is one (the settings get every action)
   const touch = touchScreen();
   const offered = () => actions().filter((action) => touch || !action.touchOnly);
-  const controller = new Controller(document, bridge, settings, offered, kinds, refresh, () => void openSettings(), (toolbars) => keepSwitched(made?.bridge ?? bridge, toolbars), icons);
+  const controller = new Controller(document, bridge, settings, offered, kinds, refresh, () => void openSettings(), (toolbars) => keepSwitched(made?.bridge ?? bridge, toolbars), icons, editorsOf(bridge.editor));
   made = controller;
   slot[GLOBAL_KEY] = controller;
   current = { bridge, actions, kinds };

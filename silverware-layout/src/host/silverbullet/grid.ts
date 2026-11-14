@@ -5,11 +5,13 @@
 // a rule naming `#sb-main`, also important, whose specificity no rule of a style page naming no SilverBullet element
 // outweighs. (The frame's border is the style page's, by the class the init page gives the frame: SilverBullet sets it
 // unimportant. An inline border set here did not hold in 2.12.1, 2026-11-13: the frame's style is SilverBullet's.)
+import { editorsOf } from "../../../../shared/editor.ts";
 import { resolvedTarget } from "../../../../shared/markdown/embed.ts";
 import { pageChanges } from "../../../../shared/pages/changes.ts";
 import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
 import { documentUrl } from "../../../../shared/silverbullet/platform.ts";
+import { afterPress, focusPage, SILVERBULLET_EDITORS, textForDrawing } from "./behaviour.ts";
 import { ownTasks } from "./tasks.ts";
 import { keepUndrawn } from "./undrawn.ts";
 
@@ -34,6 +36,8 @@ type AttributesWrite = { readonly body: string; readonly occurrence: number; rea
 
 export function silverBulletGridHost(bridge: Bridge, writer: PageWriter) {
   return {
+    // A cell edited in Silverware Editor's editor where the init page hands its API over, else a `<textarea>`
+    editors: editorsOf(bridge.editor, SILVERBULLET_EDITORS),
     renderMarkdown: async (text: string): Promise<string> => {
       if (!bridge.renderMarkdown) throw new Error("the init page hands over no renderMarkdown");
       // (An embed SilverBullet's HTML draws none of, a PDF, a zip, kept as a place: the page's widget draws it)
@@ -43,6 +47,10 @@ export function silverBulletGridHost(bridge: Bridge, writer: PageWriter) {
       return ownTasks(kept.restore(String(await bridge.renderMarkdown(kept.text))));
     },
     pageText: async (): Promise<string> => String(await bridge.getText()),
+    // How SilverBullet behaves, allowed for (./behaviour.ts)
+    textForDrawing: (body: string): Promise<string> => textForDrawing(async () => String(await bridge.getText()), body),
+    afterPress,
+    focusPage,
     // Through the page writer (the page open: one replaceRange, one undo step)
     writeCell: async (write: CellWrite): Promise<string | undefined> => {
       const page = String(await bridge.getCurrentPage());

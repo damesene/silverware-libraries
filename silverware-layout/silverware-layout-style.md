@@ -759,6 +759,34 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 :root[data-swl-narrow] .swl-grid-divider {
   display: none;
 }
+/* The guides of a divider dragged: a quiet dashed line at each ratio's place over the grid's height; the one snapped
+   to plain, its ratio named at its top (as a widget's width's guides) */
+.swl-grid-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dashed color-mix(in srgb, var(--root-color) 22%, transparent);
+  pointer-events: none;
+}
+.swl-grid-guide.swl-grid-guide-near {
+  border-left: 1px solid color-mix(in srgb, var(--root-color) 45%, transparent);
+}
+.swl-grid-guide-label {
+  position: absolute;
+  bottom: 100%;
+  left: 3px;
+  font: 11px var(--ui-font, system-ui, sans-serif);
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--root-color) 45%, transparent);
+}
+/* (Named only where snapped: seven names over a narrow pair of columns would lie on each other) */
+.swl-grid-guide:not(.swl-grid-guide-near) .swl-grid-guide-label {
+  display: none;
+}
+.swl-grid-guide-near .swl-grid-guide-label {
+  color: color-mix(in srgb, var(--root-color) 75%, transparent);
+}
 /* What a divider dragged says: the ratio snapped to, else the two columns' shares */
 .swl-grid-divider-label {
   position: absolute;

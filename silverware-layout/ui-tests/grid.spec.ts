@@ -110,11 +110,15 @@ test("the divider between two columns dragged: their shares change as it moves, 
   const target = (a! + b!) * (2 / 3) - a!;
   await page.mouse.move(box.x + box.width / 2 + target + 3, y, { steps: 10 });
   await expect(page.locator(".swl-grid-divider-label")).toHaveText("2 : 1");
+  // A guide at each ratio's place while it is dragged, the one snapped to lit; none after
+  await expect(page.locator("#sb-main .swl-grid-guide")).toHaveCount(7);
+  await expect(page.locator("#sb-main .swl-grid-guide.swl-grid-guide-near")).toHaveText("2 : 1");
   await expect.poll(async () => {
     const [first, second] = await widths();
     return Math.round((first! / second!) * 10) / 10;
   }).toBe(2);
   await page.mouse.up();
+  await expect(page.locator("#sb-main .swl-grid-guide")).toHaveCount(0);
   await expect.poll(() => space.saved("Page")).toContain('<grid columns="2fr 1fr">');
   // Even again: the attribute taken off (two cells are two even columns anyway)
   await divider.dblclick();

@@ -1,17 +1,21 @@
 // The dividers between a grid's columns (docs/silverware-layout-grid.md, *Column widths*): a quiet line in the gap
 // between two columns, plain as the pointer is over it, dragged to change the two columns' shares (their sum kept, the
-// others as they are), snapping to the usual ratios (model/columns.ts), the ratio or the shares said by the divider as
-// it moves; a double click makes the two even. What is dragged is shown at once (the grid's column template); written
+// others as they are), snapping to the usual ratios (model/columns.ts), each ratio's place a quiet dashed guide in the
+// grid while it is dragged (the one snapped to plain), the ratio or the shares said by the divider as it moves; a double click makes the two even. What is dragged is shown at once (the grid's column template); written
 // as the `columns` attribute on release. Where the columns are is read from the grid as laid out (its computed template
 // and gap), so any `columns` (a count, shares, %, px) and any number of rows are taken alike. A grid of one column (a
 // narrow pane stacks its cells) has none.
 import { el } from "../../../../shared/elements.ts";
-import { columnsOf, dividedWidths, templateOf } from "../model/columns.ts";
+import { columnsOf, dividedWidths, ratioPlaces, templateOf } from "../model/columns.ts";
 import { showColumns } from "./view.ts";
 
 const DIVIDER = "swl-grid-divider";
 const LABEL = "swl-grid-divider-label";
 const DRAGGING = "data-swl-dragging";
+const GUIDE = "swl-grid-guide";
+const GUIDE_NEAR = "swl-grid-guide-near";
+// The narrowest share a ratio's guide is shown for (as dividedWidths lets a column be)
+const MIN_SHARE = 0.1;
 
 /** The columns of a grid as laid out: each one's width and the gap between them (px) */
 function laidOut(grid: HTMLElement): { readonly widths: number[]; readonly gap: number } {
@@ -65,6 +69,8 @@ export function addColumnDividers(doc: Document, grid: HTMLElement, write: (colu
   const watch = (divider: HTMLElement, index: number) => {
     let drag: { readonly pointer: number; readonly x: number; readonly widths: number[] } | undefined;
     let label: HTMLElement | undefined;
+    // The guides of the ratios the two columns may take, each its ratio's name
+    let guides: { readonly element: HTMLElement; readonly ratio: readonly [number, number] }[] = [];
     let now: number[] | undefined;
     divider.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
@@ -77,6 +83,20 @@ export function addColumnDividers(doc: Document, grid: HTMLElement, write: (colu
       divider.setAttribute(DRAGGING, "");
       label = el(doc, "div", { class: LABEL });
       divider.append(label);
+      // Each ratio's place, from the first of the two columns' left edge (the dividers' places say where it starts)
+      const { widths, gap } = laidOut(grid);
+      const start = widths.slice(0, index).reduce((sum, width) => sum + width + gap, 0);
+      const sum = widths[index]! + widths[index + 1]!;
+      const shown = new Set<number>();
+      guides = ratioPlaces(sum).flatMap(({ ratio, at }) => {
+        // (One a place: 1 : 1 alone of its equals; none narrower than a column may be made)
+        if (at < sum * MIN_SHARE || at > sum * (1 - MIN_SHARE) || shown.has(Math.round(at))) return [];
+        shown.add(Math.round(at));
+        const element = el(doc, "div", { class: GUIDE }, el(doc, "span", { class: `${GUIDE}-label`, text: `${ratio[0]} : ${ratio[1]}` }));
+        element.style.setProperty("left", `${start + at + gap / 2}px`);
+        grid.append(element);
+        return [{ element, ratio }];
+      });
     });
     divider.addEventListener("pointermove", (event) => {
       if (!drag || event.pointerId !== drag.pointer) return;
@@ -85,6 +105,7 @@ export function addColumnDividers(doc: Document, grid: HTMLElement, write: (colu
       now = drag.widths.map((width, i) => (i === index ? moved.first : i === index + 1 ? moved.second : width));
       showColumns(grid, templateOf(now));
       if (label) label.textContent = said(moved.first, moved.second, moved.ratio);
+      for (const guide of guides) guide.element.classList.toggle(GUIDE_NEAR, !!moved.ratio && guide.ratio[0] === moved.ratio[0] && guide.ratio[1] === moved.ratio[1]);
       place();
     });
     const end = (event: PointerEvent, keep: boolean) => {
@@ -93,6 +114,8 @@ export function addColumnDividers(doc: Document, grid: HTMLElement, write: (colu
       divider.removeAttribute(DRAGGING);
       label?.remove();
       label = undefined;
+      for (const guide of guides) guide.element.remove();
+      guides = [];
       if (keep && now) write(columnsOf(now), false);
     };
     divider.addEventListener("pointerup", (event) => end(event, true));

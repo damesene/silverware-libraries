@@ -50,6 +50,10 @@ const MIN_SHARE = 0.1;
 // How near a ratio a drag has to come to take it (px)
 const RATIO_SNAP = 8;
 
+/** Where each ratio puts the first of two columns' right edge (px from its left edge, `sum` their widths): the guides a divider is dragged along */
+export const ratioPlaces = (sum: number): readonly { readonly ratio: readonly [number, number]; readonly at: number }[] =>
+  COLUMN_RATIOS.map((ratio) => ({ ratio, at: (sum * ratio[0]) / (ratio[0] + ratio[1]) }));
+
 /**
  * Two neighbouring columns' widths (px) after the divider between them moved by `moved` px: their sum kept, neither
  * narrower than a tenth of it; a ratio of COLUMN_RATIOS taken where the first's width comes within RATIO_SNAP of it
@@ -58,8 +62,7 @@ export function dividedWidths(first: number, second: number, moved: number): { r
   const sum = first + second;
   const wanted = Math.min(sum * (1 - MIN_SHARE), Math.max(sum * MIN_SHARE, first + moved));
   let best: { readonly ratio: readonly [number, number]; readonly at: number } | undefined;
-  for (const ratio of COLUMN_RATIOS) {
-    const at = (sum * ratio[0]) / (ratio[0] + ratio[1]);
+  for (const { ratio, at } of ratioPlaces(sum)) {
     if (Math.abs(at - wanted) <= RATIO_SNAP && (!best || Math.abs(at - wanted) < Math.abs(best.at - wanted))) best = { ratio, at };
   }
   const width = best ? best.at : wanted;

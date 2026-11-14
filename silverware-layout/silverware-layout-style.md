@@ -918,6 +918,8 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 }
 .swl-grid-cell {
   min-width: 0;
+  /* (An empty cell a line high: somewhere to click into to write in it) */
+  min-height: 1lh;
   overflow-wrap: anywhere;
 }
 /* A blank line of a cell's markdown its rendering left out (next to a list, a heading, a table): a line of the cell's

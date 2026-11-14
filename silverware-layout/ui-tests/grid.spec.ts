@@ -140,6 +140,19 @@ test("a click on a blank line of a cell puts the field's caret on that line, not
   expect(await caret()).toBe(cell.indexOf("\n- b"));
 });
 
+test("an empty cell is a line high, clicked into to write in it", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\n<grid>\n<column>\n\nLeft\n\n</column>\n<column>\n\n\n</column>\n</grid>\n" }, "Page");
+  await gridsDrawn(page);
+  const empty = page.locator("#sb-main .swl-grid-cell").nth(1);
+  expect((await empty.boundingBox())!.height).toBeGreaterThan(10);
+  await empty.click();
+  const field = empty.locator("textarea.swl-grid-editor");
+  await expect(field).toBeVisible();
+  await field.fill("Written");
+  await page.keyboard.press("Escape");
+  await expect.poll(() => space.saved("Page")).toContain("<column>\n\nWritten\n\n</column>");
+});
+
 test("a grid's left edge dragged alone: its right edge standing, written as its width and shift; a double click centres it again", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\nAbove\n\n${GRID}\nBelow\n` }, "Page");
   await gridsDrawn(page);

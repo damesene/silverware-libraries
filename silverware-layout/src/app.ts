@@ -70,6 +70,15 @@ export class LayoutApp {
   /** Tabs of other parts of Silverware Layout's for the Page layout dialog, made as it opens (the media's) */
   dialogTabs: (() => Promise<readonly DialogTabPart[]>) | undefined;
 
+  /** Where the page's text is (x in the window, its padding left out); none before it is laid out */
+  textEdges(): { readonly left: number; readonly right: number } | undefined {
+    const widgets = this.widgetLayout?.widgets;
+    const middle = widgets?.textMiddle();
+    if (!widgets || middle === undefined) return undefined;
+    const width = widgets.textWidth();
+    return { left: middle - width / 2, right: middle + width / 2 };
+  }
+
   /** Every widget laid out again as its entries keep it (a provider's entries changed outside a drag: typed by hand) */
   layOutWidgets(): void {
     this.widgetLayout?.widgets.layOutAll();

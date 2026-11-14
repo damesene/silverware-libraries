@@ -58,3 +58,14 @@ describe("a divider between two columns dragged", () => {
     expect(templateOf([350, 250.123])).toBe("minmax(0, 350fr) minmax(0, 250.12fr)");
   });
 });
+
+describe("a divider snapping to other places (the text's edges)", () => {
+  it("takes the nearest of the ratios and the others, named, within reach alone", () => {
+    const text = { at: 380, name: "Page width" };
+    expect(dividedWidths(300, 300, 76, [text])).toEqual({ first: 380, second: 220, name: "Page width" });
+    // 2 : 1 (400) nearer than the text's edge at 395 from 401: the ratio
+    expect(dividedWidths(300, 300, 101, [{ at: 395, name: "Page width" }])).toMatchObject({ first: 400, ratio: [2, 1] });
+    // Out of reach (under a tenth): none
+    expect(dividedWidths(300, 300, -260, [{ at: 30, name: "Page width" }]).name).toBeUndefined();
+  });
+});

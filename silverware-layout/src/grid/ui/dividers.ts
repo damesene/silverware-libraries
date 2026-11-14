@@ -6,7 +6,7 @@
 // and gap), so any `columns` (a count, shares, %, px) and any number of rows are taken alike. A grid of one column (a
 // narrow pane stacks its cells) has none.
 import { el } from "../../../../shared/elements.ts";
-import { columnsOf, dividedWidths, ratioPlaces, templateOf } from "../model/columns.ts";
+import { columnsOf, dividedWidths, type DividerPlace, ratioPlaces, templateOf, withinShares } from "../model/columns.ts";
 import { showColumns } from "./view.ts";
 
 const DIVIDER = "swl-grid-divider";
@@ -40,18 +40,24 @@ function dividerPlaces(widths: readonly number[], gap: number): number[] {
   return places;
 }
 
-/** What the label says: the ratio snapped to (`2 : 1`), else the two columns' shares of their sum (`40 % · 60 %`) */
-function said(first: number, second: number, ratio: readonly [number, number] | undefined): string {
+// The name of the places by the text's edges
+const TEXT_EDGE = "Page width";
+
+/** What the label says: the ratio snapped to (`2 : 1`), the text's edge, else the two columns' shares of their sum (`40 % · 60 %`) */
+function said(first: number, second: number, ratio: readonly [number, number] | undefined, name: string | undefined): string {
   if (ratio) return `${ratio[0]} : ${ratio[1]}`;
+  if (name) return name;
   const share = Math.round((first / (first + second)) * 100);
   return `${share} % · ${100 - share} %`;
 }
 
 /**
  * Dividers on a grid drawn, placed as the pointer comes over it (and as one is dragged): `write` gets the `columns`
- * to write on release (the widths as dragged, written as simply as they can be), or `even` for columns all even
+ * to write on release (the widths as dragged, written as simply as they can be), or `even` for columns all even;
+ * `textEdges` where the page's text is (x in the window), a column's edge snapping to it too (a grid wider than the
+ * text: its column lined up with the text above and below it)
  */
-export function addColumnDividers(doc: Document, grid: HTMLElement, write: (columns: string, even: boolean) => void): void {
+export function addColumnDividers(doc: Document, grid: HTMLElement, write: (columns: string, even: boolean) => void, textEdges?: () => { readonly left: number; readonly right: number } | undefined): void {
   let dividers: HTMLElement[] = [];
   const place = () => {
     const { widths, gap } = laidOut(grid);
@@ -69,8 +75,10 @@ export function addColumnDividers(doc: Document, grid: HTMLElement, write: (colu
   const watch = (divider: HTMLElement, index: number) => {
     let drag: { readonly pointer: number; readonly x: number; readonly widths: number[] } | undefined;
     let label: HTMLElement | undefined;
-    // The guides of the ratios the two columns may take, each its ratio's name
-    let guides: { readonly element: HTMLElement; readonly ratio: readonly [number, number] }[] = [];
+    // The guides of the places the two columns' divider snaps to: each ratio's, the text's edges
+    let guides: { readonly element: HTMLElement; readonly ratio?: readonly [number, number]; readonly name?: string }[] = [];
+    // The places by the text's edges, from the first column's left edge
+    let others: DividerPlace[] = [];
     let now: number[] | undefined;
     divider.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
@@ -97,15 +105,36 @@ export function addColumnDividers(doc: Document, grid: HTMLElement, write: (colu
         grid.append(element);
         return [{ element, ratio }];
       });
+      // The text's edges: the first column's right edge on the text's right one, the second's left edge on its left
+      // one (a column lined up with the text above and below the grid); their guides on the edge itself
+      const text = textEdges?.();
+      const left = grid.getBoundingClientRect().left + start;
+      others = text
+        ? [
+            { at: text.right - left, name: TEXT_EDGE, line: text.right - left },
+            { at: text.left - left - gap, name: TEXT_EDGE, line: text.left - left },
+          ]
+            .filter((one) => withinShares(one.at, sum) && !shown.has(Math.round(one.at)))
+            .map(({ at, name, line }) => {
+              const element = el(doc, "div", { class: `${GUIDE} ${GUIDE}-text` }, el(doc, "span", { class: `${GUIDE}-label`, text: name }));
+              element.style.setProperty("left", `${start + line}px`);
+              grid.append(element);
+              guides.push({ element, name: `${name}@${Math.round(at)}` });
+              return { at, name: `${name}@${Math.round(at)}` };
+            })
+        : [];
     });
     divider.addEventListener("pointermove", (event) => {
       if (!drag || event.pointerId !== drag.pointer) return;
       const [first, second] = [drag.widths[index]!, drag.widths[index + 1]!];
-      const moved = dividedWidths(first, second, event.clientX - drag.x);
+      const moved = dividedWidths(first, second, event.clientX - drag.x, others);
       now = drag.widths.map((width, i) => (i === index ? moved.first : i === index + 1 ? moved.second : width));
       showColumns(grid, templateOf(now));
-      if (label) label.textContent = said(moved.first, moved.second, moved.ratio);
-      for (const guide of guides) guide.element.classList.toggle(GUIDE_NEAR, !!moved.ratio && guide.ratio[0] === moved.ratio[0] && guide.ratio[1] === moved.ratio[1]);
+      if (label) label.textContent = said(moved.first, moved.second, moved.ratio, moved.name?.split("@")[0]);
+      for (const guide of guides) {
+        const near = guide.ratio ? !!moved.ratio && guide.ratio[0] === moved.ratio[0] && guide.ratio[1] === moved.ratio[1] : !!guide.name && guide.name === moved.name;
+        guide.element.classList.toggle(GUIDE_NEAR, near);
+      }
       place();
     });
     const end = (event: PointerEvent, keep: boolean) => {

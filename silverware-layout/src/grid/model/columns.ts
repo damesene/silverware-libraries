@@ -54,19 +54,31 @@ const RATIO_SNAP = 8;
 export const ratioPlaces = (sum: number): readonly { readonly ratio: readonly [number, number]; readonly at: number }[] =>
   COLUMN_RATIOS.map((ratio) => ({ ratio, at: (sum * ratio[0]) / (ratio[0] + ratio[1]) }));
 
+/** A place the first of two columns' width snaps to as the divider between them is dragged: a ratio's, or another's (the text's edge) by its name */
+export type DividerPlace = { readonly at: number; readonly ratio?: readonly [number, number]; readonly name?: string };
+
+/** Whether a place lies where a column of the two may be made (neither under a tenth of their sum) */
+export const withinShares = (at: number, sum: number): boolean => at >= sum * MIN_SHARE && at <= sum * (1 - MIN_SHARE);
+
 /**
  * Two neighbouring columns' widths (px) after the divider between them moved by `moved` px: their sum kept, neither
- * narrower than a tenth of it; a ratio of COLUMN_RATIOS taken where the first's width comes within RATIO_SNAP of it
+ * narrower than a tenth of it; a place taken where the first's width comes within RATIO_SNAP of it, the nearest: a
+ * ratio of COLUMN_RATIOS, or one of `others` (the text's edges)
  */
-export function dividedWidths(first: number, second: number, moved: number): { readonly first: number; readonly second: number; readonly ratio?: readonly [number, number] } {
+export function dividedWidths(
+  first: number,
+  second: number,
+  moved: number,
+  others: readonly DividerPlace[] = [],
+): { readonly first: number; readonly second: number; readonly ratio?: readonly [number, number]; readonly name?: string } {
   const sum = first + second;
   const wanted = Math.min(sum * (1 - MIN_SHARE), Math.max(sum * MIN_SHARE, first + moved));
-  let best: { readonly ratio: readonly [number, number]; readonly at: number } | undefined;
-  for (const { ratio, at } of ratioPlaces(sum)) {
-    if (Math.abs(at - wanted) <= RATIO_SNAP && (!best || Math.abs(at - wanted) < Math.abs(best.at - wanted))) best = { ratio, at };
+  let best: DividerPlace | undefined;
+  for (const place of [...ratioPlaces(sum), ...others.filter((one) => withinShares(one.at, sum))]) {
+    if (Math.abs(place.at - wanted) <= RATIO_SNAP && (!best || Math.abs(place.at - wanted) < Math.abs(best.at - wanted))) best = place;
   }
   const width = best ? best.at : wanted;
-  return { first: width, second: sum - width, ...(best ? { ratio: best.ratio } : {}) };
+  return { first: width, second: sum - width, ...(best?.ratio ? { ratio: best.ratio } : {}), ...(best?.name ? { name: best.name } : {}) };
 }
 
 /**

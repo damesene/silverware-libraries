@@ -198,6 +198,30 @@ test("the divider between two columns dragged: their shares change as it moves, 
   await expect.poll(() => space.saved("Page")).toContain("<grid>\n");
 });
 
+test("a wide grid's divider snaps to the text's edge too: its first column lined up with the text, said and guided", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${GRID.replace("<grid>", '<grid width="1100">')}\nBelow\n` }, "Page");
+  await gridsDrawn(page);
+  const textRight = await page.locator("#sb-main .cm-content").evaluate((content) => {
+    const box = content.getBoundingClientRect();
+    return box.right - parseFloat(getComputedStyle(content).paddingRight);
+  });
+  await page.locator("#sb-main .swl-grid").hover();
+  const divider = page.locator("#sb-main .swl-grid-divider");
+  const box = (await divider.boundingBox())!;
+  const y = box.y + Math.min(box.height / 2, 20);
+  await page.mouse.move(box.x + box.width / 2, y);
+  await page.mouse.down();
+  // The first column's right edge to the text's right edge (the divider half the gap beyond it), a few px short
+  const gap = await page.locator("#sb-main .swl-grid").evaluate((grid) => parseFloat(getComputedStyle(grid).columnGap));
+  await page.mouse.move(textRight + gap / 2 - 4, y, { steps: 10 });
+  await expect(page.locator(".swl-grid-divider-label")).toHaveText("Page width");
+  await expect(page.locator("#sb-main .swl-grid-guide.swl-grid-guide-near")).toHaveText("Page width");
+  const right = (await page.locator("#sb-main .swl-grid-cell").first().boundingBox())!;
+  expect(Math.round(right.x + right.width)).toBe(Math.round(textRight));
+  await page.mouse.up();
+  await expect.poll(() => space.saved("Page")).toMatch(/<grid width="1100" columns="[^"]+">/);
+});
+
 test("a grid in a page embedded in another: drawn with its own columns, not edited there", async ({ page, space }) => {
   await space.open(
     {

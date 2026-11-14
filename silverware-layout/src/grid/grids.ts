@@ -138,6 +138,8 @@ export class Grids {
   private started = false;
   /** Told as a grid drawn gets other attributes than it had (its width typed by hand: laid out again) */
   onAttributes: (() => void) | undefined;
+  /** Where the page's text is (x in the window), where who lays the page out says: a column's edge snaps to it */
+  textEdges: (() => { readonly left: number; readonly right: number } | undefined) | undefined;
 
   constructor(
     private readonly doc: Document,
@@ -219,7 +221,7 @@ export class Grids {
       addColumnDividers(this.doc, element, (columns, even) => {
         const columnsNow = even && Number(columns) === Math.min(Math.max(cells.length, 1), DEFAULT_MAX_COLUMNS) ? null : columns;
         void this.cellAction(element, 0, { kind: "columns", columns: columnsNow });
-      });
+      }, () => this.textEdges?.());
     }
     this.host.settle?.(element);
     // In the page, its order among the grids of its body is known: its own attributes then (and what it drew told)

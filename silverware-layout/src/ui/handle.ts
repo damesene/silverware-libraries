@@ -205,6 +205,8 @@ export class WidthHandle<W> {
     // (Held in the view: a sliver of a widget in view gets the least bar, not out over the top bar)
     const at = Math.min(Math.max(top + (bottom - top - height) / 2, view.top), view.bottom - height);
     Object.assign(this.box.style, { left: `${Math.round(rect.right + 6)}px`, top: `${Math.round(at)}px`, height: `${Math.round(height)}px` });
+    // (A widget whose edges are dragged has its lines in place of the bar: one control a side)
+    this.box.classList.toggle(`${BASE}-bare`, !!this.host.edges?.(this.widget!));
     this.edges.show(this.widget);
   }
 

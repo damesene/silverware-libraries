@@ -1,24 +1,31 @@
-// The edges of a widget dragged alone (docs/silverware-layout-grid.md, *Its edges*): for a widget whose provider says so
-// (`edges`: a grid), a line on its left and right edge, over the part of it in view, as the handle shows for it. Dragged,
-// that edge alone moves, the other standing (the handle's bar beside it still widens it on both sides): its place off
-// the text's middle kept as its `shift` beside its width, snapping to where the text's width and the guides put an
-// edge, their guides shown as for the bar; every frame only shown, written on release. A double click puts it back on
-// the text's middle, its width kept. The lines are the plugin's own elements in the body, as the bar.
+// The edges of a widget (docs/silverware-layout-grid.md, *Its edges*): for a widget whose provider says so (`edges`: a
+// grid), a line on its left and right edge, over the part of it in view, in place of the handle's bar (the user's
+// choice, 2026-11-14: one control a side). Dragged, that edge alone moves, the other standing: its place off the text's
+// middle kept as its `shift` beside its width, snapping to where the text's width and the guides put an edge. With Alt,
+// both edges move, its middle standing, its width snapping as the bar's did. The guides shown as for the bar; every frame
+// only shown, written on release. A double click puts it back on the text's middle, its width kept; with Alt, the
+// text's width (none of its own). Focused, the arrow keys move the edge by 10 px (Shift: 50; Alt: both edges), written
+// once they rest. The lines are the plugin's own elements in the body, as the bar.
 import { el } from "../../../shared/elements.ts";
-import { draggedEdge, type Edges, snapTargets, type WidgetWidth } from "../core/widgetwidth.ts";
+import { draggedBoth, draggedEdge, type Edges, snapTargets, type WidgetWidth } from "../core/widgetwidth.ts";
 import type { GuideLines } from "./guidelines.ts";
 import type { HandleHost } from "./handle.ts";
 
 const BASE = "swl-edge";
 const DRAGGING = "swl-edge-dragging";
+// How long the arrow keys rest before their change is written (ms)
+const KEYS_MS = 400;
 
-type Drag = { readonly pointer: number; readonly x: number; readonly edge: "left" | "right"; readonly start: Edges; now?: { readonly width: WidgetWidth | undefined; readonly shift: number } };
+type Drag = { readonly pointer: number; readonly x: number; readonly edge: "left" | "right"; readonly both: boolean; readonly start: Edges; now?: { readonly width: WidgetWidth | undefined; readonly shift: number } };
 
 export class EdgeLines<W> {
   private readonly left: HTMLElement;
   private readonly right: HTMLElement;
   private widget: W | undefined;
   private drag: Drag | undefined;
+  // The arrow keys' change, written once they rest
+  private keyed: { readonly widget: W; edges: Edges; width: WidgetWidth | undefined; shift: number } | undefined;
+  private keysTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     doc: Document,
@@ -26,15 +33,26 @@ export class EdgeLines<W> {
     private readonly lines: GuideLines,
   ) {
     const line = (edge: "left" | "right") => {
-      const element = el(doc, "div", { class: `${BASE} ${BASE}-${edge}`, attrs: { hidden: "", role: "separator", "aria-orientation": "vertical", title: `Drag to move the ${edge} edge alone; double-click to centre it on the text` } });
+      const element = el(doc, "div", {
+        class: `${BASE} ${BASE}-${edge}`,
+        attrs: {
+          hidden: "",
+          tabindex: "0",
+          role: "separator",
+          "aria-orientation": "vertical",
+          "aria-label": `The ${edge} edge: drag, or the arrow keys`,
+          title: `Drag to move the ${edge} edge (Alt: both edges, from the middle). Double-click to centre it on the text (Alt: the page's width)`,
+        },
+      });
       element.addEventListener("pointerdown", (e) => this.pressed(e, edge));
       element.addEventListener("pointermove", (e) => this.dragged(e));
       element.addEventListener("pointerup", (e) => void this.released(e));
       element.addEventListener("pointercancel", () => this.cancel());
       element.addEventListener("dblclick", (e) => {
         e.preventDefault();
-        void this.centre();
+        void (e.altKey ? this.takeOff() : this.centre());
       });
+      element.addEventListener("keydown", (e) => this.key(e, edge));
       doc.body.append(element);
       return element;
     };
@@ -105,9 +123,10 @@ export class EdgeLines<W> {
     const now = this.edgesNow();
     if (!now || !this.widget) return;
     (edge === "left" ? this.left : this.right).setPointerCapture?.(e.pointerId);
-    this.drag = { pointer: e.pointerId, x: e.clientX, edge, start: now.edges };
+    // (With Alt, both edges from its middle: the guides about it)
+    this.drag = { pointer: e.pointerId, x: e.clientX, edge, both: e.altKey, start: now.edges };
     (edge === "left" ? this.left : this.right).classList.add(DRAGGING);
-    this.lines.show(this.targets(), now.middle, "center");
+    this.lines.show(this.targets(), e.altKey ? now.middle + (now.edges.left + now.edges.right) / 2 : now.middle, "center");
   }
 
   private dragged(e: PointerEvent): void {
@@ -115,10 +134,10 @@ export class EdgeLines<W> {
     if (!drag || e.pointerId !== drag.pointer || !this.widget) return;
     const middle = this.host.textMiddle?.();
     if (middle === undefined) return;
-    const moved = draggedEdge(drag.start, drag.edge, e.clientX - drag.x, this.host.paneWidth(), this.targets());
+    const moved = (drag.both ? draggedBoth : draggedEdge)(drag.start, drag.edge, e.clientX - drag.x, this.host.paneWidth(), this.targets());
     drag.now = { width: moved.width, shift: moved.shift };
     this.host.showPlace?.(this.host.element(this.widget), moved.width, moved.shift);
-    this.lines.place(middle, moved.name, "center");
+    this.lines.place(drag.both ? middle + moved.shift : middle, moved.name, "center");
     this.place();
   }
 
@@ -147,6 +166,33 @@ export class EdgeLines<W> {
     this.left.classList.remove(DRAGGING);
     this.right.classList.remove(DRAGGING);
     this.lines.clear();
+  }
+
+  /** The text's width again, none of its own (centred) */
+  private async takeOff(): Promise<void> {
+    if (!this.widget) return;
+    await this.host.writePlace?.(this.widget, undefined, 0);
+    for (const ms of [50, 200, 600]) setTimeout(() => this.place(), ms);
+  }
+
+  /** An arrow key on a focused line: that edge moved by 10 px (Shift: 50; Alt: both), shown at once, written as the keys rest */
+  private key(e: KeyboardEvent, edge: "left" | "right"): void {
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!step || !this.widget) return;
+    e.preventDefault();
+    const widget = this.widget;
+    const from = this.keyed?.widget === widget ? this.keyed.edges : this.edgesNow()?.edges;
+    if (!from) return;
+    const moved = (e.altKey ? draggedBoth : draggedEdge)(from, edge, step * (e.shiftKey ? 50 : 10), this.host.paneWidth(), []);
+    this.keyed = { widget, edges: moved.edges, width: moved.width, shift: moved.shift };
+    this.host.showPlace?.(this.host.element(widget), moved.width, moved.shift);
+    this.place();
+    clearTimeout(this.keysTimer);
+    this.keysTimer = setTimeout(() => {
+      const keyed = this.keyed;
+      this.keyed = undefined;
+      if (keyed) void this.host.writePlace?.(keyed.widget, keyed.width, keyed.shift);
+    }, KEYS_MS);
   }
 
   /** Back on the text's middle, its width kept */

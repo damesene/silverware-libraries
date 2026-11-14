@@ -147,3 +147,22 @@ export function draggedEdge(
   const centred = shift === 0 ? targets.find((target) => Math.round(target.width) === width) : undefined;
   return { edges, width: centred ? centred.kept : width, shift, ...(name ? { name } : {}) };
 }
+
+/**
+ * Where a drag of one edge by `moved` with Alt takes a widget's edges: both moving, its middle standing (an edge
+ * dragged out widens it by twice the move), its width snapped to the text's and the guides' as the bar's; not
+ * narrower than the least nor wider than the pane less its gutter. Its width as kept (a target's, else its pixels), its
+ * shift the one it had
+ */
+export function draggedBoth(
+  start: Edges,
+  edge: "left" | "right",
+  moved: number,
+  pane: number,
+  targets: readonly SnapTarget[],
+): { readonly edges: Edges; readonly width: WidgetWidth | undefined; readonly shift: number; readonly name?: string } {
+  const shift = Math.round((start.left + start.right) / 2);
+  const grown = start.right - start.left + 2 * (edge === "right" ? moved : -moved);
+  const snap = snapped(Math.max(MIN_WIDGET_WIDTH, Math.min(pane - PANE_GUTTER, grown)), targets);
+  return { edges: edgesOf(snap.width, shift), width: snap.kept, shift, ...(snap.name ? { name: snap.name } : {}) };
+}

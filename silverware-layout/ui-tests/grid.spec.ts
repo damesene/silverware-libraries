@@ -71,7 +71,7 @@ test("a grid's columns as its line says, given again as the line is edited", asy
   }).toBe(3);
 });
 
-test("a grid widened by its handle grows both ways, centred on the text", async ({ page, space }) => {
+test("a grid's edge dragged with Alt: both ways, centred on the text; its handle's bar none, its lines in its place", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\nAbove\n\n${GRID}\nBelow\n` }, "Page");
   await gridsDrawn(page);
   const grid = page.locator("#sb-main .swl-grid");
@@ -81,16 +81,25 @@ test("a grid widened by its handle grows both ways, centred on the text", async 
   };
   const [left, right] = await edges();
   await grid.hover();
-  const bar = page.locator(".swl-handle-bar");
-  await expect(bar).toBeVisible();
-  const box = (await bar.boundingBox())!;
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  const line = page.locator(".swl-edge-right");
+  await expect(line).toBeVisible();
+  await expect(page.locator(".swl-handle-bar")).toBeHidden();
+  const box = (await line.boundingBox())!;
+  const y = box.y + Math.min(box.height / 2, 20);
+  await page.mouse.move(box.x + box.width / 2, y);
+  await page.keyboard.down("Alt");
   await page.mouse.down();
-  await page.mouse.move(box.x + box.width / 2 + 100, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.move(box.x + box.width / 2 + 60, y, { steps: 8 });
   // While dragged: its right edge with the pointer, its left edge as far the other way
-  await expect.poll(edges).toEqual([left! - 100, right! + 100]);
+  await expect.poll(edges).toEqual([left! - 60, right! + 60]);
   await page.mouse.up();
+  await page.keyboard.up("Alt");
   await expect.poll(() => space.saved("Page")).toMatch(/<grid width="\d+">/);
+  // Alt and a double click: the page's width again
+  await page.keyboard.down("Alt");
+  await page.locator(".swl-edge-right").dblclick();
+  await page.keyboard.up("Alt");
+  await expect.poll(() => space.saved("Page")).toContain("<grid>\n");
 });
 
 test("a cell keeps the blank lines of its markdown as the editor shows them: between a loose list's items, before a heading after a list", async ({ page, space }) => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Guide } from "../model/settings.ts";
-import { cssWidgetWidth, draggedRoomWidth, draggedWidth, keptWidgetWidth, readWidgetWidth, roomTargets, shownWidgetWidth, snapped, snapTargets, widestWidth, widthName, draggedEdge, edgesOf, readShift } from "./widgetwidth.ts";
+import { cssWidgetWidth, draggedRoomWidth, draggedWidth, keptWidgetWidth, readWidgetWidth, roomTargets, shownWidgetWidth, snapped, snapTargets, widestWidth, widthName, draggedEdge, draggedBoth, edgesOf, readShift } from "./widgetwidth.ts";
 
 const guides: Guide[] = [1200, "80%", "full"];
 
@@ -125,5 +125,22 @@ describe("a widget's edge dragged alone", () => {
 
   it("reads a shift kept, anything else none", () => {
     expect([readShift("-150"), readShift("12.6"), readShift(undefined), readShift("x"), readShift("")]).toEqual([-150, 13, 0, 0, 0]);
+  });
+});
+
+describe("a widget's edge dragged with Alt", () => {
+  const targets = snapTargets(760, [1200, "full"], 1600);
+
+  it("moves both edges, its middle standing: twice the move, its shift kept", () => {
+    const both = draggedBoth(edgesOf(800, -40), "right", 50, 1600, targets);
+    expect(both.edges).toEqual({ left: -490, right: 410 });
+    expect([both.width, both.shift]).toEqual([900, -40]);
+    expect(draggedBoth(edgesOf(800, 0), "left", -50, 1600, targets).width).toBe(900);
+  });
+
+  it("snaps its width as the bar's, within the pane", () => {
+    expect(draggedBoth(edgesOf(760, 0), "right", 218, 1600, targets)).toMatchObject({ width: 1200, name: "1200 px" });
+    expect(draggedBoth(edgesOf(800, 0), "right", -20, 1600, targets)).toMatchObject({ width: undefined, name: "Page width" });
+    expect(draggedBoth(edgesOf(800, 0), "right", 900, 1600, targets).width).toBe("full");
   });
 });

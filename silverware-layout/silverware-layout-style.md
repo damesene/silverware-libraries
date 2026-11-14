@@ -118,6 +118,10 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 }
 /* A widget's edges dragged alone (src/ui/edges.ts, its provider's say: a grid): a line on each edge as its handle
    shows, quiet, plain as the pointer is on it or it is dragged (as a grid's column dividers); a finger's target wider */
+/* (Its bar none: the lines are its handle) */
+.swl-handle.swl-handle-bare {
+  display: none !important;
+}
 .swl-edge {
   position: fixed;
   z-index: var(--sw-layer-control);
@@ -142,8 +146,12 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   transition: opacity 0.12s;
 }
 .swl-edge:hover::before,
+.swl-edge:focus-visible::before,
 .swl-edge.swl-edge-dragging::before {
   opacity: 1;
+}
+.swl-edge:focus {
+  outline: none;
 }
 @media (pointer: coarse) {
   .swl-edge {

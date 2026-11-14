@@ -7,17 +7,19 @@ import { opensMenu, type PopupMenu } from "../../../shared/popupmenu.ts";
 // The popup menu's classes: Silverware Assets'
 const POPUP = { base: "swa" } as const;
 
-type Item = { readonly label: string; readonly run: () => void };
+type Item = { readonly label: string; readonly run: () => void; readonly danger?: boolean };
 
 export type MoreMenu = {
   readonly title: string;
   readonly views: readonly (Item & { readonly view: string; readonly checked: boolean; readonly disabled?: string })[];
   // What can be done with it (the actions that fit, then a change of its form), each its label and run
   readonly actions?: readonly Item[];
+  // What cannot be undone (its file deleted), last, apart, in the danger colour
+  readonly destructive?: readonly Item[];
 };
 
 /** An asset's menu as the shared popup menu shows it: its views, then its actions */
-export const popupOf = (menu: MoreMenu): PopupMenu => ({ title: menu.title, sections: [menu.views, menu.actions ?? []] });
+export const popupOf = (menu: MoreMenu): PopupMenu => ({ title: menu.title, sections: [menu.views, menu.actions ?? [], (menu.destructive ?? []).map((item) => ({ ...item, danger: true }))] });
 
 /** The "…" button on an asset's frame, its menu made as it is pressed; gone as `signal` aborts */
 export function addMoreButton(doc: Document, frame: HTMLElement, menu: () => MoreMenu, signal: AbortSignal): HTMLButtonElement {

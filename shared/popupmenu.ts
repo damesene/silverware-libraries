@@ -10,7 +10,7 @@ import { focusMenu, type MenuEntry, menuItem, menuSeparator, onMenuClose, render
 export type PopupLook = { readonly base: string };
 
 /** One item: its label, what it does; checked (a choice shown as on), disabled (why, as text) */
-export type PopupItem = { readonly label: string; readonly run: () => void; readonly checked?: boolean; readonly disabled?: string };
+export type PopupItem = { readonly label: string; readonly run: () => void; readonly checked?: boolean; readonly disabled?: string; readonly danger?: boolean };
 
 export type PopupMenu = { readonly title: string; readonly sections: readonly (readonly PopupItem[])[] };
 
@@ -41,7 +41,7 @@ export function opensMenu(doc: Document, look: PopupLook, trigger: HTMLElement, 
     for (const section of shown.sections.filter((one) => one.length)) {
       if (entries.length) entries.push(menuSeparator());
       for (const item of section) {
-        entries.push(menuItem({ label: item.label, ...(item.checked === undefined ? {} : { checked: item.checked }), ...(item.disabled ? { disabled: item.disabled } : {}), run: () => (close(), item.run()) }));
+        entries.push(menuItem({ label: item.label, ...(item.checked === undefined ? {} : { checked: item.checked }), ...(item.disabled ? { disabled: item.disabled } : {}), ...(item.danger ? { danger: true } : {}), run: () => (close(), item.run()) }));
       }
     }
     const rendered = renderMenu(doc, LOOK, shown.title, entries);

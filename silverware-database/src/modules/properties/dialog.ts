@@ -24,6 +24,7 @@ import type { Database, Property } from "../../model/database.ts";
 import { ownIcon, propertyIcon } from "../../views/icons.ts";
 import { iconChoice, type Popovers, popovers } from "../../views/popover.ts";
 import { optionPill, pill } from "../../views/values.ts";
+import { CHEVRON_RIGHT } from "../../../../shared/glyphs.ts";
 
 // A system property's choice among the new property's types: `system:<kind>`
 const SYSTEM_PREFIX = "system:";
@@ -40,7 +41,7 @@ const isRefused = (result: Result | Proposal | Refused): result is Refused => "p
 // A grip: six dots, what a row is dragged by
 const GRIP = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><circle cx="6" cy="4" r="1.1"/><circle cx="10" cy="4" r="1.1"/><circle cx="6" cy="8" r="1.1"/><circle cx="10" cy="8" r="1.1"/><circle cx="6" cy="12" r="1.1"/><circle cx="10" cy="12" r="1.1"/></svg>';
 const BACK = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m10 4-4 4 4 4"/></svg>';
-const CHEVRON = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 4 4-4 4"/></svg>';
+const CHEVRON = CHEVRON_RIGHT;
 const LOCK = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>';
 
 /** An option as it is edited: the text it was saved with (none: added now), the text it has, its color (none: its place's) */

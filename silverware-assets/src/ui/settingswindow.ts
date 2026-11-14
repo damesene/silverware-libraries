@@ -1,6 +1,5 @@
-// Silverware Assets' settings window ("Silverware Assets: Settings"): its tabs (Files: how each type is shown and what
-// a click does, the card, the heights; Markdown: what happens while SilverBullet shows the markdown as written), saved
-// together on Save. Cancel closes without asking; Esc, × or a press beside it ask where changes would be lost. The
+// Silverware Assets' settings window ("Silverware Assets: Settings"): its tabs (Files, Appearance, Original:
+// ui/mediatab.ts; Markdown: what happens while SilverBullet shows the markdown as written), saved together on Save. Cancel closes without asking; Esc, × or a press beside it ask where changes would be lost. The
 // shared dialog and tabs (shared/), classes `swa-dialog-*`.
 import { Dialogs } from "../../../shared/dialog.ts";
 import { el } from "../../../shared/elements.ts";
@@ -26,7 +25,7 @@ export function markdownTab(doc: Document, settings: SyntaxModeSettings, save: (
     doc,
     "div",
     "swa-settings-markdown",
-    el(doc, "p", "swa-settings-note", "While SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax Rendering):"),
+    el(doc, "p", "swa-settings-intro", "While SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax Rendering):"),
     el(doc, "label", "swa-settings-check", hide, "Hide embedded files: their markdown alone"),
     el(doc, "label", "swa-settings-check", click, "A click on a link only places the cursor (Ctrl+click follows it)"),
   );
@@ -67,6 +66,8 @@ export class SettingsWindow {
       if (!store.canSave) note.textContent = "Settings cannot be saved here.";
     };
     for (const tab of list) for (const type of ["change", "input"]) tab.panel.addEventListener(type, update);
+    // (Settings that cannot be saved: shown, their fields still, Save off; the Appearance tab's switch and samples left
+    // to look at, as nothing they change is kept)
     if (!store.canSave) for (const control of content.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select")) control.disabled = true;
     const cancel = el(doc, "button", { class: `${BASE}-cancel`, text: "Cancel", run: () => void (saving || dialog.close()) });
     const footer = doc.createDocumentFragment();

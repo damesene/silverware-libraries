@@ -8,7 +8,7 @@ test("a link's icon tapped opens its menu, the link not followed", async ({ page
   await expect(icon).toBeVisible();
   const url = page.url();
   await icon.tap();
-  await expect(page.locator(".swa-popup .swa-menu-item")).toHaveText(["Open in a new tab", "Show in a side panel", "Show enlarged", "Show as embedded"]);
+  await expect(page.locator(".swa-popup .swa-menu-item")).toHaveText(["Open in a new tab", "Show in a side panel", "Show enlarged", "Show as embedded", "Delete file…"]);
   await page.waitForTimeout(500);
   expect(page.url()).toBe(url);
   await page.locator(".swa-popup .swa-menu-item", { hasText: "Show enlarged" }).tap();

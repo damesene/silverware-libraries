@@ -261,18 +261,37 @@ export function linkAsEmbed(link: Link): string {
   return `!${link.text}`;
 }
 
+/** A link written as the text it shows: its alias (a markdown link's text), else its target's file name (`[[Docs/a.pdf]]`: `a.pdf`) */
+export function linkAsText(link: Link): string {
+  // (A markdown link's text is markdown already; a wiki link's alias and a file's name are words, written so)
+  if (link.alias.trim()) return link.style === "markdown" ? link.alias : escapedText(link.alias);
+  return escapedText(fileNameOf(link.target, link.style));
+}
+
+/**
+ * A target's file name: its last part, without a query or a section; a markdown link's decoded (it is written
+ * URL-encoded, `a%20b.pdf`), a wiki link's as written (it is not)
+ */
+export function fileNameOf(target: string, style: "wiki" | "markdown"): string {
+  const name = target.split(/[?#]/, 1)[0]!.split("/").pop() || target;
+  if (style === "wiki") return name;
+  try {
+    return decodeURIComponent(name);
+  } catch {
+    return name;
+  }
+}
+
+/** Words written into markdown as they read: its marks escaped (`_draft_.pdf` not italic) */
+export function escapedText(text: string): string {
+  return text.replace(/[\\`*_[\]<>~|]/g, "\\$&");
+}
+
 /**
  * An embed written as a link to its target: its alt text the link's alias, its size and metadata left out (a link's
  * alias is all it shows); a markdown link without a text named by its file
  */
 export function embedAsLink(embed: Embed): string {
   if (embed.style === "wiki") return `[[${embed.target}${embed.alt ? `|${embed.alt}` : ""}]]`;
-  const name = embed.target.split(/[?#]/, 1)[0]!.split("/").pop() ?? embed.target;
-  let shown = name;
-  try {
-    shown = decodeURI(name);
-  } catch {
-    // (As written)
-  }
-  return `[${embed.alt || shown}](${embed.target})`;
+  return `[${embed.alt || escapedText(fileNameOf(embed.target, "markdown"))}](${embed.target})`;
 }

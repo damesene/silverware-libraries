@@ -10,7 +10,7 @@ import { AssetRegistry } from "./core/registry.ts";
 import { AssetDecorator, type AssetHost, type DrawnEmbed, type EmbedWrite } from "./decorate.ts";
 import { type AssetSettings, readAssetSettings } from "./model/settings.ts";
 
-function setUp(text: string, settings: unknown = {}, own: Pick<AssetHost, "placeOf" | "contextOf" | "positionOf"> = {}) {
+function setUp(text: string, settings: unknown = {}, own: Pick<AssetHost, "placeOf" | "contextOf" | "positionOf" | "deleteFile" | "removeEmbed" | "linkToText" | "confirm"> = {}) {
   const state = { text, opened: [] as string[], writes: [] as EmbedWrite[], forms: [] as string[], problems: [] as string[], ranges: [] as { from: number; to: number }[] };
   const host: AssetHost = {
     watch: () => undefined,
@@ -171,6 +171,66 @@ describe("an asset's menu", () => {
   });
 });
 
+describe("a file deleted from its menu", () => {
+  it("asks plainly, then deletes the file and takes its embed out of the page; asked and declined, nothing", async () => {
+    const done: string[] = [];
+    let answer = false;
+    const questions: string[] = [];
+    const { decorator } = setUp("Top\n\n![[Docs/report.pdf]]\n", {}, {
+      confirm: async (question) => (questions.push(question), answer),
+      deleteFile: async (path) => void done.push(`deleted ${path}`),
+      removeEmbed: async (write) => void done.push(`removed ${write.text} ${write.occurrence}/${write.of}`),
+    });
+    const one = frame("Docs/report.pdf");
+    await decorator.decorate([one]);
+    const deleteItem = () => {
+      one.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
+      const item = [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].find((element) => element.textContent?.trim() === "Delete file…")!;
+      // (Apart from the rest, in the danger colour)
+      expect(item.classList.contains("swa-danger")).toBe(true);
+      item.click();
+    };
+    deleteItem();
+    await vi.waitFor(() => expect(questions).toHaveLength(1));
+    expect(questions[0]).toContain('Delete the file "Docs/report.pdf" from your space?');
+    expect(questions[0]).toContain("The file itself is deleted, not only this embed: it cannot be brought back.");
+    expect(done).toEqual([]);
+    answer = true;
+    deleteItem();
+    await vi.waitFor(() => expect(done).toEqual(["deleted Docs/report.pdf", "removed ![[Docs/report.pdf]] 0/1"]));
+  });
+
+  it("deletes nothing where its embed is no longer in the page: found before the file goes, as the host may draw it anew after", async () => {
+    const done: string[] = [];
+    const { state, decorator } = setUp("![[Docs/report.pdf]]\n", {}, {
+      confirm: async () => true,
+      deleteFile: async (path) => void done.push(`deleted ${path}`),
+      removeEmbed: async (write) => void done.push(`removed ${write.text}`),
+    });
+    const one = frame("Docs/report.pdf");
+    await decorator.decorate([one]);
+    state.text = "Gone\n";
+    one.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
+    [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].find((element) => element.textContent?.trim() === "Delete file…")!.click();
+    await vi.waitFor(() => expect(state.problems).toEqual(["Silverware Assets: the file was not deleted: this file was not found in the page"]));
+    expect(done).toEqual([]);
+  });
+
+  it("offers no Delete where the host deletes no file, or cannot take its embed out after", async () => {
+    const items = async (own: Parameters<typeof setUp>[2]) => {
+      const { decorator } = setUp("![[report.pdf]]", {}, own);
+      const one = frame("report.pdf");
+      await decorator.decorate([one]);
+      one.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
+      const labels = [...document.querySelectorAll(".swa-popup .swa-menu-item")].map((item) => item.textContent?.trim());
+      document.body.click();
+      return labels;
+    };
+    expect(await items({})).not.toContain("Delete file…");
+    expect(await items({ confirm: async () => true, deleteFile: async () => undefined })).not.toContain("Delete file…");
+  });
+});
+
 describe("a link's menu", () => {
   it("opens from its icon with what can be done with the file, the link's own click not followed", async () => {
     const { state, decorator } = setUp("");
@@ -326,7 +386,7 @@ describe("links to files decorated", () => {
     return { element, target, style: "wiki" as const };
   };
 
-  it("give a link to a file its type's icon before its text, once, none to a page; none where the user shows none", async () => {
+  it("give a link to a file its type's icon before its text, once, none to a page; where the user hides it, a small arrow after it, once", async () => {
     const { decorator } = setUp("");
     const pdf = link("report.pdf");
     const page = link("Notes");
@@ -341,6 +401,16 @@ describe("links to files decorated", () => {
     const plain = link("report.pdf");
     await off.decorateLinks([plain]);
     expect(plain.element.querySelector(".swa-link-icon")).toBeNull();
+    // (Its menu's way in: last, after the text, a button of its own; decorated again, still one)
+    expect(plain.element.lastElementChild?.classList.contains("swa-link-marker")).toBe(true);
+    expect(plain.element.lastElementChild?.getAttribute("role")).toBe("button");
+    expect(plain.element.textContent).toBe("report.pdf");
+    await off.decorateLinks([plain]);
+    expect(plain.element.querySelectorAll(".swa-link-marker")).toHaveLength(1);
+    // Its menu, from the arrow
+    (plain.element.lastElementChild as HTMLElement).click();
+    expect([...document.querySelectorAll(".swa-popup .swa-menu-item")].map((item) => item.textContent?.trim())).toContain("Open in a new tab");
+    document.body.click();
   });
 });
 
@@ -395,10 +465,19 @@ describe("a card's menu", () => {
     expect(state.opened).toEqual([".fs/archive.zip"]);
   });
 
-  it("keeps the \"…\" where the card shows no icon", async () => {
-    const { decorator } = setUp("![[archive.zip]]", { card: ["name"] });
+  it("opens, where the card shows no icon, from a small arrow after its name within the card (no \"…\" beside it, cut off where the card fills its line)", async () => {
+    const { state, decorator } = setUp("![[archive.zip]]", { card: ["name"] });
     const one = frame("archive.zip", false);
     await decorator.decorate([one]);
-    expect(one.frame.querySelector(".swa-more")).not.toBeNull();
+    expect(one.frame.querySelector(".swa-more")).toBeNull();
+    const marker = one.frame.querySelector<HTMLElement>(".swa-card > .swa-menu-marker:last-child")!;
+    expect(marker.getAttribute("role")).toBe("button");
+    marker.click();
+    expect([...document.querySelectorAll(".swa-popup .swa-menu-item")].map((item) => item.textContent?.trim())).toContain("Open in a new tab");
+    // (Its click the menu's alone; the card's name still the card's action)
+    expect(state.opened).toEqual([]);
+    marker.click();
+    one.frame.querySelector<HTMLElement>(".swa-card-name")!.click();
+    expect(state.opened).toEqual([".fs/archive.zip"]);
   });
 });

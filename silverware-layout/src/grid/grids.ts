@@ -11,12 +11,15 @@ import type { Attributes } from "../../../shared/markdown/attributes.ts";
 import { type Grid, readGridBody, readGrids } from "../../../shared/markdown/grid.ts";
 import { gridsOfBody } from "./core/match.ts";
 import { positionInCell } from "./core/position.ts";
-import { columnTemplate } from "./model/columns.ts";
+import { borderAttribute, bordered } from "./model/border.ts";
+import { columnTemplate, DEFAULT_MAX_COLUMNS } from "./model/columns.ts";
 import { RENDERED_VERSION, type Rendered, type RenderedItem, type RenderedRange } from "../../../shared/rendered.ts";
 import { type Drawn, drawnIn, itemsOf } from "./drawn.ts";
 import { addCellMenus, type CellAction } from "./ui/cellmenu.ts";
 import { caretWord, editCell } from "./ui/celleditor.ts";
-import { drawGrid, plainCell, showColumns } from "./ui/view.ts";
+import { blankLinesBefore, blankLineStart } from "./core/blanklines.ts";
+import { addColumnDividers } from "./ui/dividers.ts";
+import { drawGrid, keepBlankLines, plainCell, showBorder, showColumns } from "./ui/view.ts";
 
 /** A cell to write: the grid by its body as read and its place among those alike, the cell, its new markdown */
 export type CellWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly cell: number; readonly content: string };
@@ -136,6 +139,8 @@ export class Grids {
   private started = false;
   /** Told as a grid drawn gets other attributes than it had (its width typed by hand: laid out again) */
   onAttributes: (() => void) | undefined;
+  /** Where the page's text is (x in the window), where who lays the page out says: a column's edge snaps to it */
+  textEdges: (() => { readonly left: number; readonly right: number } | undefined) | undefined;
 
   constructor(
     private readonly doc: Document,
@@ -198,6 +203,8 @@ export class Grids {
     const first = gridsOfBody(text, body)[0];
     const attributes = first?.attributes ?? {};
     const element = drawGrid(this.doc, columnTemplate(attributes.columns, cells.length), html);
+    showBorder(element, bordered(attributes));
+    this.keepBlankLines(element, cells.map((cell) => cell.content));
     this.bodies.set(element, body);
     this.attributes.set(element, attributes);
     // What it drew, before anything else touches it (another may frame a medium to decorate it)
@@ -209,7 +216,15 @@ export class Grids {
       this.placed.set(element, first);
     }
     // Each cell's "…": what can be done with it and with the grid
-    if (this.host.changeCells) addCellMenus(this.doc, element, () => ({ columns: this.attributesOf(element).columns, cells: cells.length }), (cell, action) => void this.cellAction(element, cell, action));
+    if (this.host.changeCells) addCellMenus(this.doc, element, () => ({ columns: this.attributesOf(element).columns, border: bordered(this.attributesOf(element)), cells: cells.length }), (cell, action) => void this.cellAction(element, cell, action));
+    // The dividers between its columns: their shares dragged, written as its `columns` (even ones as many as its cells
+    // would be anyway: none written)
+    if (this.host.changeCells) {
+      addColumnDividers(this.doc, element, (columns, even) => {
+        const columnsNow = even && Number(columns) === Math.min(Math.max(cells.length, 1), DEFAULT_MAX_COLUMNS) ? null : columns;
+        void this.cellAction(element, 0, { kind: "columns", columns: columnsNow });
+      }, () => this.textEdges?.());
+    }
     this.host.settle?.(element);
     // In the page, its order among the grids of its body is known: its own attributes then (and what it drew told)
     this.refreshSoon();
@@ -227,6 +242,8 @@ export class Grids {
     const cells = readGridBody(grid.body);
     const html = await Promise.all(cells.map((cell) => this.host.renderMarkdown(cell.content).catch(() => plainCell(this.doc, cell.content))));
     const element = drawGrid(this.doc, columnTemplate(grid.attributes.columns, cells.length), html);
+    showBorder(element, bordered(grid.attributes));
+    this.keepBlankLines(element, cells.map((cell) => cell.content));
     element.classList.add("swl-grid-shown");
     return element;
   }
@@ -242,6 +259,7 @@ export class Grids {
       const found = this.found(text, element);
       if (!found) continue;
       showColumns(element, columnTemplate(found.grid.attributes.columns, element.querySelectorAll(":scope > .swl-grid-cell").length));
+      showBorder(element, bordered(found.grid.attributes));
       if (markPlaces(element, found.grid)) this.changedSinceTold = true;
       this.placed.set(element, found.grid);
       if (!sameAttributes(this.attributes.get(element), found.grid.attributes)) changed = true;
@@ -275,6 +293,11 @@ export class Grids {
     }
   }
 
+  /** Each cell of a grid drawn given the blank lines of its markdown the host's rendering left out */
+  private keepBlankLines(element: HTMLElement, contents: readonly string[]): void {
+    element.querySelectorAll<HTMLElement>(":scope > .swl-grid-cell").forEach((cell, i) => keepBlankLines(this.doc, cell, contents[i] ?? ""));
+  }
+
   /** A grid drawn's attributes as last read (none drawn: none) */
   attributesOf(element: HTMLElement): Attributes {
     return this.attributes.get(element) ?? {};
@@ -301,6 +324,12 @@ export class Grids {
   async cellAction(element: HTMLElement, cell: number, action: CellAction): Promise<void> {
     const said = (problem: string | undefined) => problem && this.host.problem(`Silverware Layout: the grid was not changed: ${problem}`);
     if (action.kind === "columns") return void said(await this.writeAttributes(element, { columns: action.columns }));
+    if (action.kind === "border") {
+      const problem = await this.writeAttributes(element, { border: borderAttribute(action.on) });
+      // (Shown at once: its body the same, the grid is not drawn anew)
+      if (!problem) showBorder(element, action.on);
+      return void said(problem);
+    }
     const text = await this.host.pageText().catch(() => undefined);
     const found = text === undefined ? undefined : this.found(text, element);
     if (!found || !this.host.changeCells) return void said("this grid changed in the page since it was drawn");
@@ -362,7 +391,7 @@ export class Grids {
         : pressed && pressed.cell === at.cell && pressed.caret && caret && Math.hypot(event.clientX - pressed.x, event.clientY - pressed.y) > DRAG_PX
           ? { anchor: pressed.caret, focus: caret }
           : undefined;
-    const point = { target: event.target as Element, caret, ...(selected ? { selected } : {}) };
+    const point = { target: event.target as Element, caret, y: event.clientY, ...(selected ? { selected } : {}) };
     await this.edit(at.element, at.cell, point);
   }
 
@@ -389,7 +418,11 @@ export class Grids {
       this.host.problem("Silverware Layout: this grid changed in the page since it was drawn; edit it there");
       return;
     }
-    const at = !point ? undefined : point.selected ? selectionInCell(cell.content, cellElement, point.selected) : offsetInCell(cell.content, cellElement, point.target, point.caret);
+    const at = !point
+      ? undefined
+      : point.selected
+        ? selectionInCell(cell.content, cellElement, point.selected)
+        : ((point.y === undefined ? undefined : blankLineAt(cell.content, cellElement, point.y)) ?? offsetInCell(cell.content, cellElement, point.target, point.caret));
     editCell(cellElement, cell.content, at, (content) => {
       if (same(content) === same(cell.content)) return;
       void this.host
@@ -430,7 +463,7 @@ export function toggledTask(content: string, at: number): string | undefined {
 
 /** Where a click was in a cell's rendering: the element, the caret there, and the text selected in the cell, where some was */
 type Caret = { readonly node: Node; readonly offset: number };
-export type CellPoint = { readonly target: Element; readonly caret: Caret | undefined; readonly selected?: { readonly anchor: Caret; readonly focus: Caret } };
+export type CellPoint = { readonly target: Element; readonly caret: Caret | undefined; readonly y?: number; readonly selected?: { readonly anchor: Caret; readonly focus: Caret } };
 
 /** A selection in a cell's rendering as one of its markdown: each end where it is there, its direction kept */
 function selectionInCell(content: string, cellElement: HTMLElement, selected: { readonly anchor: Caret; readonly focus: Caret }): { readonly from: number; readonly to: number; readonly backward: boolean } {
@@ -456,6 +489,30 @@ function offsetInCell(content: string, cellElement: HTMLElement, target: Element
   range.setStart(element, 0);
   range.setEnd(caret.node, caret.offset);
   return positionInCell(content, elementPos, element.textContent ?? "", range.toString().length);
+}
+
+/**
+ * Where a click on a blank line of a cell's rendering is in its markdown: the start of that blank line (none where the
+ * click is on no blank line). Blank lines are drawn as space, no element marked with its place in it: found by
+ * height, between the element drawn before (its bottom) and the one after (its top, its `data-pos`), as many lines
+ * there as its markdown has blank lines before it
+ */
+function blankLineAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
+  const marked = [...cellElement.querySelectorAll<HTMLElement>(":scope > [data-pos], :scope li[data-pos]")];
+  const next = marked.find((element) => element.getBoundingClientRect().top > y);
+  if (!next) return undefined;
+  const pos = Number(next.getAttribute("data-pos"));
+  const blanks = blankLinesBefore(content, pos);
+  if (!blanks) return undefined;
+  // The bottom of what is drawn before it (a line break or a put-back blank line is space, not content)
+  let before = next.previousElementSibling;
+  while (before && (before.tagName === "BR" || before.classList.contains("swl-grid-blank"))) before = before.previousElementSibling;
+  const top = next.getBoundingClientRect().top;
+  const bottom = before ? before.getBoundingClientRect().bottom : cellElement.getBoundingClientRect().top;
+  if (y < bottom || top <= bottom) return undefined;
+  const line = (top - bottom) / blanks;
+  const nth = Math.min(blanks, Math.max(1, Math.ceil((top - y) / line)));
+  return blankLineStart(content, pos, nth);
 }
 
 /** The ranges of a page's text its grids draw outside the editor, drawn now or not: each grid's lines whole */

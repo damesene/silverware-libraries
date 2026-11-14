@@ -88,6 +88,7 @@ export async function init(bridge: Bridge): Promise<void> {
     // A grid's width laid out as any widget's, registered as a widget plugin registers
     registry.register(gridProvider(grids));
     grids.onAttributes = () => app.layOutWidgets();
+    grids.textEdges = () => app.textEdges();
     // A grid in a page embedded in this one, which SilverBullet shows as its text: drawn as the grid it is
     const drawing = grids;
     watchEmbeddedGrids(document, (text) => drawing.drawText(text));

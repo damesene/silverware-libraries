@@ -373,7 +373,7 @@ Then *Later*.
 
 - The names of the settings' keys and of the card's fields.
 - Whether a centred asset (as a widget) is wanted.
-- The original's default height (`heights.embed`, CONFIG alone: nothing SilverBullet draws reads it); a preview's is in the Media tab.
+- The original's default height (`heights.embed`): **done 2026-11-14**, read by SilverBullet's PDF viewer as the original (it gives it none: the browser's 150 px of an object showed it as small as a preview, the user's report), in the settings' Assets tab beside a preview's.
 - Where pasted files go (a folder per page, one folder, a pattern), when paste comes.
 
 ## Which embed a widget is (2026-11-14)
@@ -384,3 +384,14 @@ SilverBullet's widget of an embed carries no position (2.12.1, probed again 2026
 - **CodeMirror's `posAtDOM`**: exact, but through the editor object SilverBullet keeps: an internal (the repository's rule). **Taken after all, 2026-11-14 (the user's choice), as the first way**: `client.editorView.posAtDOM(element, 0)` (as SilverBullet's own Alt+click), in one file marked `SILVERBULLET-INTERNAL` (`src/host/silverbullet/editorposition.ts`), its answer taken only where an embed (a link) of the element's target starts there (lies there), the ways below where it is not or SilverBullet has none; `ui-tests/assets.spec.ts` checks it by name. Seen in 2.12.1: a widget's box gives its embed's start exactly, a link a place within it.
 - **A position on SilverBullet's widget** (a pull request: `inline_content.ts`, `lua_widget.ts`): exact; kept stale by CodeMirror as text above changes unless asked on demand. Possible later.
 - **Chosen: the text drawn around it.** Each line of the page in view is a `.cm-line`, its text drawn without its marks, the widget right before its line: the lines before and after a widget, matched with those written around each embed of its file (`lineSignature`, a drawn line a subsequence of the written one: a link drawn by its alias, marks gone), the one alone most alike. Where none or several are alike, the run of widgets drawn and the place in the page (`placeAmong`). The same for a link in the editor, its own line too. And whichever way, located again in the page as it is when a change is written.
+
+## A preview's size (2026-11-14)
+
+A PDF's preview could be widened by Silverware Layout's handle, an image's not (its height sized it): odd to the user. No preview is widened now (the provider's selector leaves every preview out); a preview's size is the settings': for all files its width (`previews.width`, none: as wide as it fits) and height (`heights.preview`), per type its own (`previews.types`, each side empty: all files'), the settings' Assets tab a width × height for all files and in each type's row. An image fits in it, its ratio kept; a PDF's preview is that large (`--swa-preview-width`, `--swa-height`).
+
+## Delete file (2026-11-14)
+
+The user's wish: delete a file from its menu, plain that the file itself goes, not only its embed. **Delete file…** is the last item of a file's menu and of a link's, apart and red (`PopupItem.danger`, `swa-danger`); offered only for a file of the space, where the host deletes files and asks (`deleteFile`, `confirm`). SilverBullet's own dialog asks (`editor.confirm(message, { destructive = true })`, the bridge's `confirmDelete`): the file named, deleted for good, what is left in the page (the embed taken out, the link its text), other pages showing it missing. Then the file is deleted (`space.deleteDocument`) and the page written through the page writer: an embed taken out (`embeds.remove`: its line where it was alone on it, one blank line around it with it), a link written as its alias or its file's name (`links.toText`). A file not deleted leaves the page as it was; the page not written after the file went is told.
+
+A wiki link's href in the editor is its target URL-encoded (2.12.1): `drawnLink` decodes it, else a file in a folder with a space was not found to delete.
+

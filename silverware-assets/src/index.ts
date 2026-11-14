@@ -18,7 +18,7 @@ import { silverBulletPlatform } from "../../shared/silverbullet/platform.ts";
 import { ASSETS_PATH, readAssetSettings, readSyntaxModeSettings, storedAssetPaths, SYNTAX_PATHS, type SyntaxModeSettings } from "./model/settings.ts";
 import { SILVERBULLET_SYNTAX_PAGE, SYNTAX_OPTION } from "./host/silverbullet/syntaxmode.ts";
 import { assetProvider } from "./provider.ts";
-import { mediaTab } from "./ui/mediatab.ts";
+import { mediaTabs } from "./ui/mediatab.ts";
 import { markdownTab, SettingsWindow } from "./ui/settingswindow.ts";
 
 const SETTINGS = "Silverware Assets: Settings";
@@ -119,7 +119,7 @@ async function openSettings(): Promise<void> {
   settingsWindow ??= new SettingsWindow(document);
   settingsWindow.open(
     [
-      mediaTab(document, input, async (saved) => {
+      ...mediaTabs(document, input, async (saved) => {
         await save(storedAssetPaths(saved), OWN_MARKER);
         await shown.redecorateAll();
         return undefined;

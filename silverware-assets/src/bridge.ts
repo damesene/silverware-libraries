@@ -24,6 +24,10 @@ export type Bridge = {
   readonly getUiOption?: (name: string) => unknown;
   // Optional, for a file's card: a document's meta (`space.getDocumentMeta`: its `size` in bytes, `lastModified`)
   readonly documentMeta?: (path: string) => unknown;
+  // Optional, for a file's Delete: a document deleted from the space (`space.deleteDocument`), asked first in
+  // SilverBullet's dialog, its OK button the danger's (`editor.confirm(message, { destructive = true })`)
+  readonly deleteDocument?: (path: string) => unknown;
+  readonly confirmDelete?: (message: string) => boolean | Promise<boolean>;
   // Optional: Silverware Layout's API (`silverware.layout.api`), where it is installed: a medium's width by its handle
   // (shared/layout.ts), what its grids draw outside the editor (its `rendered`, shared/rendered.ts)
   readonly layout?: unknown;

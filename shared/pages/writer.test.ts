@@ -428,7 +428,8 @@ describe("the page writer", () => {
     await change({ kind: "takeOut", cell: 0 });
     expect(map.get("A")).toBe('<grid>\nA note\n<column span="2">\n\nA\n\n</column>\n<column>\n\n\n</column>\n</grid>\n\nB\n');
     await change({ kind: "ungrid" });
-    expect(map.get("A")).toBe("A note\n\nA\n\nB\n");
+    // (The note and the cell each a line of text alone: a line break between)
+    expect(map.get("A")).toBe("A note\nA\n\nB\n");
   });
 
   it("moves a cell left open, closing it", async () => {
@@ -439,6 +440,32 @@ describe("the page writer", () => {
       ["B", true],
       ["A", true],
     ]);
+  });
+
+  it("takes an embed out (its line where it was alone on it) and writes a link as its text, its file deleted", async () => {
+    const { map, writer } = memory({ A: "Top\n![[a.pdf]]\nSee ![[b.png|B]] here and [[Docs/c.zip]] or [the doc](d.pdf).\n" });
+    await writer.write(
+      pageChanges()
+        .page("A", (p) => p.embeds.remove("![[a.pdf]]").embeds.remove("![[b.png|B]]").links.toText("[[Docs/c.zip]]").links.toText("[the doc](d.pdf)"))
+        .build(),
+    );
+    expect(map.get("A")).toBe("Top\nSee  here and c.zip or the doc.\n");
+    // Alone between blank lines: one blank line left where it was
+    const { map: other, writer: otherWriter } = memory({ B: "# B\n\n![[a.pdf]]\n\nAfter\n" });
+    await otherWriter.write(pageChanges().page("B", (p) => p.embeds.remove("![[a.pdf]]")).build());
+    expect(other.get("B")).toBe("# B\n\nAfter\n");
+    // The only content of a list item, a task or a quote: its line with it, no empty marker left
+    const { map: list, writer: listWriter } = memory({ C: "- one\n- ![[a.pdf]]\n- [ ] ![[b.pdf]]\n> ![[c.png]]\n1. ![[d.zip]]\n- two\n" });
+    await listWriter.write(pageChanges().page("C", (p) => p.embeds.remove("![[a.pdf]]").embeds.remove("![[b.pdf]]").embeds.remove("![[c.png]]").embeds.remove("![[d.zip]]")).build());
+    expect(list.get("C")).toBe("- one\n- two\n");
+    // A link's file name written as words (its markdown marks escaped), a wiki link's alias too; a markdown link's text as it is
+    const { map: names, writer: namesWriter } = memory({ D: "[[_draft_.pdf]], [[a.pdf|*Notes*]], [**Bold**](b.pdf), [[50%20off.pdf]]\n" });
+    await namesWriter.write(
+      pageChanges()
+        .page("D", (p) => p.links.toText("[[_draft_.pdf]]").links.toText("[[a.pdf|*Notes*]]").links.toText("[**Bold**](b.pdf)").links.toText("[[50%20off.pdf]]"))
+        .build(),
+    );
+    expect(names.get("D")).toBe("\\_draft\\_.pdf, \\*Notes\\*, **Bold**, 50%20off.pdf\n");
   });
 
   it("closes a grid's cell left open as it writes it", async () => {

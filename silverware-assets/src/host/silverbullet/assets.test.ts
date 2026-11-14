@@ -128,6 +128,9 @@ describe("SilverBullet's links found", () => {
   it("reads a link's target and form as SilverBullet draws it, in the editor and in a cell", () => {
     const of = (html: string) => drawnLink(Object.assign(document.createElement("div"), { innerHTML: html }).firstElementChild as HTMLElement);
     expect(of('<a class="sb-wiki-link" href="Docs/a.pdf">a</a>')).toMatchObject({ target: "Docs/a.pdf", style: "wiki" });
+    expect(of('<a class="sb-wiki-link" href="My%20Docs/a%20b.pdf">a</a>')).toMatchObject({ target: "My Docs/a b.pdf", style: "wiki" });
+    // (SilverBullet encodes it by encodeURIComponent: `&`, `,`, `+`, `=` too)
+    expect(of('<a class="sb-wiki-link" href="Q%26A%2C%20v%2B1.pdf">a</a>')).toMatchObject({ target: "Q&A, v+1.pdf", style: "wiki" });
     expect(of('<a class="sb-link" href="../a.pdf">a</a>')).toMatchObject({ target: "../a.pdf", style: "markdown" });
     expect(of('<a class="wiki-link" href="/a.pdf" data-ref="a.pdf">a</a>')).toMatchObject({ target: "a.pdf", style: "wiki" });
   });

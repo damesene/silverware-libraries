@@ -17,24 +17,37 @@ const isItem = (node: MarkdownNode) => node.kind === "item";
 
 /**
  * The blocks a range of the text touches, at the text's top level (a list's items each, what is nested in an item
- * with it); an empty range: the block it is in. None in the frontmatter or a grid (a grid is no block to put into one)
+ * with it; a paragraph's lines each, as the editor shows them apart: `1⏎2` two blocks as `1⏎⏎2` is, the user's word,
+ * 2026-11-14); an empty range: the block it is in. None in the frontmatter or a grid (a grid is no block to put into one)
  */
 export function blocksIn(text: string, from: number, to: number, grids: readonly Grid[] = []): TextBlock[] {
   const lo = Math.min(from, to);
   const hi = Math.max(from, to);
   return parseBlocks(text)
-    .filter((node) => (hi === lo ? node.from <= lo && lo <= node.to : node.from < hi && node.to > lo))
     .filter((node) => !grids.some((grid) => node.from < grid.to && node.to > grid.from))
-    .map((node) => ({ from: node.from, to: node.to, item: isItem(node) }));
+    .flatMap((node): TextBlock[] => (node.kind === "paragraph" ? linesOf(text, node.from, node.to) : [{ from: node.from, to: node.to, item: isItem(node) }]))
+    .filter((block) => (hi === lo ? block.from <= lo && lo <= block.to : block.from < hi && block.to > lo));
 }
 
-/** Blocks' texts joined as they were apart in the text: a blank line between, none between items of one list where none was */
+/** A paragraph's lines, each a block of its own (its empty ones none) */
+function linesOf(text: string, from: number, to: number): TextBlock[] {
+  const lines: TextBlock[] = [];
+  let at = from;
+  for (const line of text.slice(from, to).split("\n")) {
+    const end = at + line.replace(/\r$/, "").length;
+    if (line.trim()) lines.push({ from: at, to: end, item: false });
+    at += line.length + 1;
+  }
+  return lines;
+}
+
+/** Blocks' texts joined as they were apart in the text: a line break where only one was between them (a paragraph's lines, a list's items), else a blank line */
 function joined(text: string, blocks: readonly TextBlock[]): string {
   let out = "";
   blocks.forEach((block, i) => {
     if (i > 0) {
       const before = blocks[i - 1]!;
-      const tight = before.item && block.item && !/\n[ \t]*\r?\n/.test(text.slice(before.to, block.from));
+      const tight = !/\n[ \t]*\r?\n/.test(text.slice(before.to, block.from));
       out += tight ? "\n" : "\n\n";
     }
     out += text.slice(block.from, block.to).replace(/\r\n/g, "\n");
@@ -101,11 +114,15 @@ export function ungridded(grid: Grid): string {
   let out = "";
   parts.forEach((part, i) => {
     if (i > 0) {
-      // Items of one list split into two cells: one list again (as `put into grid` read them)
-      const last = parts[i - 1]!.items.at(-1);
+      // Items of one list split into two cells: one list again (as `put into grid` read them); a cell ending in a line of
+      // text and the next starting with one: a line break between (a paragraph's lines put into cells), as before
+      // they were put there (two paragraphs a blank line apart come back a line break apart: the grid keeps no more)
+      const before = parts[i - 1]!;
+      const last = before.items.at(-1);
       const first = part.items[0];
       const oneList = last?.kind === "item" && first?.kind === "item" && last.list === first.list;
-      out += oneList ? "\n" : "\n\n";
+      const lineOfText = (node: MarkdownNode | undefined, of: string) => node?.kind === "paragraph" && !of.slice(node.from, node.to).trim().includes("\n");
+      out += oneList || (lineOfText(last, before.text) && lineOfText(first, part.text)) ? "\n" : "\n\n";
     }
     out += part.text;
   });

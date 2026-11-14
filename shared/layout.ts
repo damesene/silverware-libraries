@@ -62,6 +62,10 @@ export type LayoutProvider = {
   // own size ("own", a medium: SilverBullet's size or the file's). Where its own, the text's width a drag snaps to is
   // kept as its pixels: none would give it back its own size
   readonly unsized?: "text" | "own";
+  // Optional: whether each edge of the widget is dragged alone too (a line on each, beside the handle that widens it
+  // on both sides): its place then off the text's middle, kept as the entry `shift` beside `width` (px, its middle
+  // right of the text's, left where negative). None: centred (or as its anchor says) alone
+  readonly edges?: boolean;
   // Optional: the box the widget is laid out in, where it is not the page's text (a medium in markdown rendered outside
   // the editor, a grid's cell): its width then a share of that box's, snapped to its quarters, never wider; neither the
   // text's width nor the guides apply. None (or undefined): the page's text

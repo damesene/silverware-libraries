@@ -9,8 +9,9 @@ import { actionFor, mimeOf, typeFor, viewFor } from "./core/choose.ts";
 import { closestContext, embedAt, type LineContext, linkAt, outside, placeAmong, type Placed, type Range, sameTarget, writtenContext } from "./core/locate.ts";
 import { metadataOf } from "./core/metadata.ts";
 import type { AssetRegistry } from "./core/registry.ts";
-import { type AssetSettings, type Gesture, type View, VIEWS } from "./model/settings.ts";
-import { addCardFields, dateText, drawCard, iconElement, markFailed, sizeText } from "./ui/card.ts";
+import { type AssetSettings, type Gesture, labelFor, previewSize, type View, VIEWS } from "./model/settings.ts";
+import { addCardFields, dateText, drawCard, iconElement, markFailed, menuMarker, sizeText } from "./ui/card.ts";
+import { drawLabelLine, labelTexts, type LabelValues } from "./ui/label.ts";
 import { opensMenu } from "../../shared/popupmenu.ts";
 import { addMoreButton, type MoreMenu, popupOf } from "./ui/moremenu.ts";
 import { plainMedium } from "./ui/plainmedium.ts";
@@ -76,11 +77,21 @@ export type AssetHost = {
   /** An embed written as a link to its file, a link as an embed of it (none: neither is offered); why not, as text */
   embedToLink?(write: FormWrite): Promise<string | undefined>;
   linkToEmbed?(write: FormWrite): Promise<string | undefined>;
+  /**
+   * A file of the space deleted, and its embed taken out of the page (a link to it written as its text), each found as
+   * `embedToLink` finds it; asked first (`confirm`). None: no Delete in the menus. Why not, as text
+   */
+  deleteFile?(path: string): Promise<string | undefined>;
+  removeEmbed?(write: FormWrite): Promise<string | undefined>;
+  linkToText?(write: FormWrite): Promise<string | undefined>;
+  confirm?(question: string): Promise<boolean>;
   open(url: string): void;
   problem(message: string): void;
 };
 
 const NATIVE_HIDDEN = "swa-native-hidden";
+// What shows a document of its own, taking the clicks on it (a PDF's viewer)
+const DOCUMENT_VIEWERS = "object, iframe, embed";
 const LINK_ICON = "swa-link-icon";
 
 export class AssetDecorator {
@@ -116,7 +127,7 @@ export class AssetDecorator {
     this.host.watchLinks?.((links) => void this.decorateLinks(links));
   }
 
-  /** Links drawn: each to a file of the space given its type's icon before its text (the setting off: none) */
+  /** Links drawn: each to a file of the space given its type's icon before its text (the setting off: a small arrow after it), which opens its menu */
   async decorateLinks(links: readonly DrawnLink[]): Promise<void> {
     if (!links.length || !this.host.linkAsset) return;
     const [page, settings] = await Promise.all([this.host.pageName(), this.host.settings()]);
@@ -127,18 +138,25 @@ export class AssetDecorator {
     }
     for (const link of links) {
       this.links.add(link);
-      link.element.querySelector(`:scope > .${LINK_ICON}`)?.remove();
+      link.element.querySelectorAll(`:scope > :is(.${LINK_ICON}, .swa-menu-marker)`).forEach((one) => one.remove());
       this.linkMenus.get(link.element)?.abort();
-      if (!settings.linkIcons) continue;
       const asset = this.host.linkAsset(link, page);
       const type = asset && typeFor(this.registry.types.all, asset);
       if (!type) continue;
-      const icon = iconElement(this.doc, type.icon);
-      icon.classList.add(LINK_ICON, "swa-menu-icon");
+      // Its way into its menu: its type's icon before it, else (the setting off) a small arrow after it
+      let icon: HTMLElement;
+      if (settings.linkIcons) {
+        icon = iconElement(this.doc, type.icon);
+        icon.classList.add(LINK_ICON, "swa-menu-icon");
+        link.element.prepend(icon);
+      } else {
+        icon = menuMarker(this.doc, "link");
+        icon.setAttribute("aria-label", `${assetName(asset)}: its menu`);
+        link.element.append(icon);
+      }
       icon.title = "Show…";
       icon.setAttribute("role", "button");
       link.element.setAttribute("data-swa-link", type.name);
-      link.element.prepend(icon);
       // Its menu: what can be done with the file (a press on the icon the menu's, the link's text still the host's)
       const control = new AbortController();
       this.linkMenus.set(link.element, control);
@@ -156,14 +174,64 @@ export class AssetDecorator {
               ...this.actionItems(asset, capabilities, (container, as) => this.drawInto(container, as, type, asset, settings, control.signal)),
               ...(this.host.linkToEmbed ? [{ label: "Show as embedded", run: () => void this.toEmbed(link) }] : []),
             ],
+            destructive: this.deletable(asset, "link") ? [{ label: "Delete file…", run: () => void this.deleteLinked(link, asset) }] : [],
           }),
         control.signal,
       );
     }
   }
 
+  /** Whether a file can be deleted here: a file of the space (not a URL), the host deleting files and taking its embed or link out after */
+  private deletable(asset: Asset, from: "embed" | "link"): asset is Asset & { readonly kind: "file" } {
+    return asset.kind === "file" && !!this.host.deleteFile && !!this.host.confirm && !!(from === "embed" ? this.host.removeEmbed : this.host.linkToText);
+  }
+
+  /**
+   * Whether the user means a file deleted: asked plainly that the file itself goes from the space, for good, not only
+   * this embed or link; what is left in the page said too
+   */
+  private confirmDelete(asset: Asset & { readonly kind: "file" }, from: "embed" | "link"): Promise<boolean> {
+    const what = from === "embed" ? "This embed is removed from the page." : "This link is replaced by its text.";
+    return this.host.confirm!(
+      `Delete the file "${asset.path}" from your space? The file itself is deleted, not only this ${from}: it cannot be brought back. ${what} Other pages that embed or link it will show it missing.`,
+    );
+  }
+
+  /**
+   * An embedded file deleted, once confirmed: its embed found in the page first (the host may draw it anew, missing,
+   * once the file is gone: its widget no longer told where it is), then the file deleted, then the embed taken out
+   */
+  private async deleteEmbedded(drawn: DrawnEmbed, asset: Asset & { readonly kind: "file" }): Promise<void> {
+    if (!(await this.confirmDelete(asset, "embed"))) return;
+    const now = await this.locateNow(drawn);
+    if (!now) return this.host.problem(`Silverware Assets: the file was not deleted: ${NOT_FOUND}`);
+    const problem = await this.host.deleteFile!(asset.path);
+    if (problem) return this.host.problem(`Silverware Assets: the file was not deleted: ${problem}`);
+    const left = await this.host.removeEmbed!({ text: now.embed.text, occurrence: now.occurrence, of: now.of });
+    if (left) this.host.problem(`Silverware Assets: the file was deleted, its embed not taken out of the page: ${left}`);
+  }
+
+  /** A linked file deleted, once confirmed: its link found first (as Show as embedded finds it), the file deleted, the link written as its text */
+  private async deleteLinked(link: DrawnLink, asset: Asset & { readonly kind: "file" }): Promise<void> {
+    if (!(await this.confirmDelete(asset, "link"))) return;
+    const found = await this.linkInPage(link);
+    if (!found) return this.host.problem("Silverware Assets: the file was not deleted: this link was not found in the page");
+    const problem = await this.host.deleteFile!(asset.path);
+    if (problem) return this.host.problem(`Silverware Assets: the file was not deleted: ${problem}`);
+    const left = await this.host.linkToText!({ text: found.link.text, occurrence: found.occurrence, of: found.of });
+    if (left) this.host.problem(`Silverware Assets: the file was deleted, its link left in the page: ${left}`);
+  }
+
   /** A link written as an embed of its file: found in the page by its place, else by its target and its order among the links drawn of it */
   private async toEmbed(link: DrawnLink): Promise<void> {
+    const found = await this.linkInPage(link);
+    if (!found) return this.host.problem("Silverware Assets: this link was not found in the page");
+    const problem = await this.host.linkToEmbed!({ text: found.link.text, occurrence: found.occurrence, of: found.of });
+    if (problem) this.host.problem(`Silverware Assets: not written: ${problem}`);
+  }
+
+  /** A link drawn found in the page as it is now: by its place, else where the host says, else by the text around it and the run of links drawn */
+  private async linkInPage(link: DrawnLink): Promise<{ readonly link: ReturnType<typeof readLinks>[number]; readonly occurrence: number; readonly of: number } | undefined> {
     const text = await this.host.pageText();
     const links = readLinks(text);
     const at = link.position?.();
@@ -194,9 +262,7 @@ export class AssetDecorator {
         found = { link: one, occurrence: sameText.indexOf(one), of: sameText.length };
       }
     }
-    if (!found) return this.host.problem("Silverware Assets: this link was not found in the page");
-    const problem = await this.host.linkToEmbed!({ text: found.link.text, occurrence: found.occurrence, of: found.of });
-    if (problem) this.host.problem(`Silverware Assets: not written: ${problem}`);
+    return found;
   }
 
   /** What can be done with an asset: each fitting action registered (its menu's), run with how it is drawn elsewhere */
@@ -321,6 +387,7 @@ export class AssetDecorator {
     const { frame, native } = drawn;
     frame.querySelectorAll(":scope > .swa-own, :scope > .swa-failed").forEach((own) => own.remove());
     frame.classList.remove("swa-has-error");
+    frame.removeAttribute("data-swa-label-above");
     // The host's own drawing (its medium, or its words that it could not draw one): hidden where ours is drawn instead
     const hostOwn = [...frame.children].filter((child) => !child.classList.contains("swa-own"));
     for (const child of hostOwn) child.classList.remove(NATIVE_HIDDEN);
@@ -329,8 +396,15 @@ export class AssetDecorator {
     const view = viewFor(found.embed.metadata.view, type.name, settings, can);
     frame.setAttribute("data-swa-asset", type.name);
     frame.setAttribute("data-swa-view", view);
-    // A preview's height, the setting's (the style page's rules read it)
-    frame.style.setProperty("--swa-height", `${Number(found.embed.height) || settings.heights.preview}px`);
+    // Its height: its embed's own, else the setting's for its view (a preview's; the original's for a viewer of the
+    // host's that has no height of its own, a PDF's: the style page's rules read it)
+    const preview = previewSize(settings, type.name);
+    frame.style.setProperty("--swa-height", `${Number(found.embed.height) || (view === "embed" ? settings.heights.embed : preview.height)}px`);
+    // A preview's width (none: as wide as it fits)
+    const sized = view === "preview" && preview.width !== undefined;
+    if (sized) frame.style.setProperty("--swa-preview-width", `${preview.width}px`);
+    else frame.style.removeProperty("--swa-preview-width");
+    frame.toggleAttribute("data-swa-preview-width", sized);
     // (Written to the embed as the page has it now: its place among those of its text may have changed since)
     const write = async (changes: EmbedChanges) => {
       const now = await this.locateNow(drawn);
@@ -340,7 +414,7 @@ export class AssetDecorator {
     this.sizes.set(frame, { width: found.embed.width, anchor: settings.anchor, write: (width) => write({ width: width ?? null, height: null }) });
     const context: RenderContext = {
       asset,
-      viewport: viewportOf(frame, found.embed, view, settings, control.signal),
+      viewport: viewportOf(frame, found.embed, view, settings, control.signal, sized ? preview.width : undefined),
       metadata: metadataOf(found.embed.metadata, (changes) => write({ metadata: changes })),
       signal: control.signal,
       placement: "block",
@@ -386,6 +460,7 @@ export class AssetDecorator {
                 ]
               : []),
           ],
+          destructive: this.deletable(asset, "embed") ? [{ label: "Delete file…", run: () => void this.deleteEmbedded(drawn, asset) }] : [],
         };
     };
     const clicked = (element: HTMLElement) =>
@@ -398,6 +473,57 @@ export class AssetDecorator {
         },
         { signal: control.signal },
       );
+    // A preview showing a document of its own (a PDF's viewer: the page told of no click on it) given a layer over it
+    // that takes its click, as an image's preview does (the original's viewer left to be read)
+    const shielded = () => {
+      if (!frame.querySelector(DOCUMENT_VIEWERS)) return clicked(frame);
+      const shield = this.doc.createElement("div");
+      shield.className = "swa-own swa-shield";
+      clicked(shield);
+      frame.append(shield);
+    };
+    // A preview's label (docs/silverware-assets-label.md): its lines above and under what is drawn, a click on them the
+    // preview's; drawn at once with what is known, again as the host tells the file's size and date
+    const labelled = () => {
+      const label = labelFor(settings, type.name);
+      const { alt, ...bare } = asset;
+      const known: LabelValues = { name: assetName(bare as Asset), icon: type.icon, ...(alt ? { alt } : {}) };
+      const draw = (values: LabelValues) => {
+        frame.querySelectorAll(":scope > .swa-label").forEach((line) => line.remove());
+        const texts = labelTexts(label, values);
+        const above = drawLabelLine(this.doc, "above", texts.above);
+        const below = drawLabelLine(this.doc, "below", texts.below);
+        if (above) {
+          clicked(above);
+          frame.prepend(above);
+        }
+        if (below) {
+          clicked(below);
+          frame.append(below);
+        }
+        frame.toggleAttribute("data-swa-label-above", !!above);
+      };
+      draw(known);
+      const wanted = [...label.above, ...label.below].some((part) => part.on && (part.field === "size" || part.field === "modified"));
+      if (!wanted || !this.host.fileInfo) return;
+      void this.host
+        .fileInfo(asset)
+        .then((info) => {
+          if (!info || control.signal.aborted) return;
+          const size = info.size === undefined ? undefined : sizeText(info.size);
+          const modified = info.modified === undefined ? undefined : dateText(info.modified);
+          draw({ ...known, ...(size ? { size } : {}), ...(modified ? { modified } : {}) });
+        })
+        .catch(() => undefined);
+    };
+
+    // A preview drawn (by its type: `element`; else the host's own, smaller): its click (a layer over a document's
+    // viewer, which takes every click on it) and its label
+    const previewDone = (element?: HTMLElement) => {
+      if (!element || element.matches(DOCUMENT_VIEWERS) || element.querySelector(DOCUMENT_VIEWERS)) shielded();
+      else clicked(element);
+      labelled();
+    };
 
     if (view === "icon") {
       const card = this.card(type, asset, settings);
@@ -405,21 +531,25 @@ export class AssetDecorator {
       clicked(card);
       hideHost();
       frame.append(card);
-      // (A card without its icon, as the user shows cards: the "…" then)
-      const icon = card.querySelector<HTMLElement>(".swa-icon");
-      if (icon) {
-        icon.classList.add("swa-menu-icon");
-        icon.title = "Show…";
-        icon.setAttribute("role", "button");
-        opensMenu(this.doc, POPUP, icon, () => popupOf(menu()), control.signal);
-      } else addMoreButton(this.doc, frame, menu, control.signal);
+      // Its menu's way in: its icon; a card without it (as the user shows cards), a small arrow after its name, within
+      // the card as a link's after its text (a "…" beside it was cut off where the card filled its line)
+      let opener = card.querySelector<HTMLElement>(".swa-icon");
+      if (opener) opener.classList.add("swa-menu-icon");
+      else {
+        opener = menuMarker(this.doc, "card");
+        opener.setAttribute("aria-label", `${assetName(asset)}: its menu`);
+        card.append(opener);
+      }
+      opener.title = "Show…";
+      opener.setAttribute("role", "button");
+      opensMenu(this.doc, POPUP, opener, () => popupOf(menu()), control.signal);
       return;
     }
     addMoreButton(this.doc, frame, menu, control.signal);
     const renderer = type.views?.[view];
     if (!renderer) {
       // The host's own drawing: a preview of it is the same, smaller (the style page's rule by the view's mark)
-      if (view === "preview") clicked(frame);
+      if (view === "preview") previewDone();
       return;
     }
     void Promise.resolve()
@@ -427,13 +557,13 @@ export class AssetDecorator {
       .then((element) => {
         if (control.signal.aborted) return;
         if (!element) {
-          if (view === "preview") clicked(frame);
+          if (view === "preview") previewDone();
           return;
         }
         element.classList.add("swa-own");
-        if (view === "preview") clicked(element);
         hideHost();
         frame.append(element);
+        if (view === "preview") previewDone(element);
       })
       .catch((error: unknown) => {
         if (control.signal.aborted) return;
@@ -481,11 +611,12 @@ function shownCopy(native: HTMLElement | undefined): HTMLElement | undefined {
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /** The room an asset is drawn in: the frame's width; its height the stored one, else the view's default */
-function viewportOf(element: HTMLElement, embed: Embed, view: View, settings: AssetSettings, signal: AbortSignal): Viewport {
+function viewportOf(element: HTMLElement, embed: Embed, view: View, settings: AssetSettings, signal: AbortSignal, width?: number): Viewport {
   const height = () => Number(embed.height) || (view === "icon" ? 0 : settings.heights[view]);
   return {
+    // (A preview of a width the settings give: that width its room, the frame taking its width from what is drawn)
     get width() {
-      return element.clientWidth || element.getBoundingClientRect().width;
+      return width ?? (element.clientWidth || element.getBoundingClientRect().width);
     },
     get height() {
       return height();

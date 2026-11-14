@@ -5,10 +5,19 @@
 export type View = "icon" | "preview" | "embed";
 export type Gesture = "click" | "shift+click";
 export type CardField = "icon" | "name" | "size" | "modified";
+// What a preview's label may show (docs/silverware-assets-label.md): the type's icon, the alt text (else the name), the
+// name, the size, the date changed
+export type LabelField = "icon" | "alt" | "name" | "size" | "modified";
 
 export const VIEWS: readonly View[] = ["icon", "preview", "embed"];
 export const GESTURES: readonly Gesture[] = ["click", "shift+click"];
 export const CARD_FIELDS: readonly CardField[] = ["icon", "name", "size", "modified"];
+export const LABEL_FIELDS: readonly LabelField[] = ["icon", "alt", "name", "size", "modified"];
+
+/** A property of a preview's label, shown or not */
+export type LabelPart = { readonly field: LabelField; readonly on: boolean };
+/** A preview's label: the properties above it and under it, in order (each property once, in one of the two) */
+export type PreviewLabel = { readonly above: readonly LabelPart[]; readonly below: readonly LabelPart[] };
 
 export type AssetSettings = {
   // The view of an embed without its own: per type, else the default
@@ -18,11 +27,41 @@ export type AssetSettings = {
   readonly card: readonly CardField[];
   // A view's height where nothing gives one (px)
   readonly heights: Readonly<Record<"preview" | "embed", number>>;
+  // A preview's size: its width for all files (none: as wide as it fits), and per type its width and height (none:
+  // all files'); the height for all files is `heights.preview`. An image fits in it, its ratio kept; a PDF's is so large
+  readonly previews: { readonly width?: number; readonly types: Readonly<Record<string, PreviewSize>> };
   // Where an asset stays as its width is dragged: at the text's start (it grows to the right), or centred
   readonly anchor: "start" | "center";
-  // Whether a link to a file of the space (`[[report.pdf]]`) shows its type's icon before its text
+  // Whether a link to a file of the space (`[[report.pdf]]`) shows its type's icon before its text (its menu's way
+  // in); off, a small arrow after it is
   readonly linkIcons: boolean;
+  // A preview's label: all files', and a type's own (whole, not in part)
+  readonly labels: { readonly default: PreviewLabel; readonly types: Readonly<Record<string, PreviewLabel>> };
 };
+
+/** Whether two labels are the same: each property in the same place, order and state */
+export function sameLabel(a: PreviewLabel, b: PreviewLabel): boolean {
+  const same = (x: readonly LabelPart[], y: readonly LabelPart[]) => x.length === y.length && x.every((part, i) => part.field === y[i]!.field && part.on === y[i]!.on);
+  return same(a.above, b.above) && same(a.below, b.below);
+}
+
+/** A type's preview label: its own, else all files' */
+export function labelFor(settings: AssetSettings, type: string): PreviewLabel {
+  return settings.labels.types[type] ?? settings.labels.default;
+}
+
+/** A preview's size of a type's own: its width, its height (px), each none where all files' holds */
+export type PreviewSize = { readonly width?: number; readonly height?: number };
+
+/** The least and the most a preview's side may be (px) */
+export const PREVIEW_LIMITS = { min: 40, max: 2000 } as const;
+
+/** A preview's size for a type: its own width and height, else all files' (the height `heights.preview`, the width none: as wide as it fits) */
+export function previewSize(settings: AssetSettings, type: string): { readonly width?: number; readonly height: number } {
+  const own = settings.previews.types[type] ?? {};
+  const width = own.width ?? settings.previews.width;
+  return { ...(width === undefined ? {} : { width }), height: own.height ?? settings.heights.preview };
+}
 
 /** Where the settings are kept (read whole): Silverware Assets' own block of CONFIG (tables the Configuration Manager would lose) */
 export const ASSETS_PATH = "silverware.assets";
@@ -39,18 +78,41 @@ export function storedAssetSettings(settings: AssetSettings): Record<string, unk
     actions: { default: { ...settings.actions.default }, types: Object.fromEntries(Object.entries(settings.actions.types).map(([k, v]) => [k, { ...v }])) },
     card: [...settings.card],
     heights: { ...settings.heights },
+    previews: { ...(settings.previews.width === undefined ? {} : { width: settings.previews.width }), types: Object.fromEntries(Object.entries(settings.previews.types).map(([k, v]) => [k, { ...v }])) },
     anchor: settings.anchor,
     linkIcons: settings.linkIcons,
+    labels: { default: storedLabel(settings.labels.default), types: Object.fromEntries(Object.entries(settings.labels.types).map(([k, v]) => [k, storedLabel(v)])) },
   };
 }
+
+/** A label as kept: each place a list of `{ field, on }` */
+function storedLabel(label: PreviewLabel): Record<string, unknown> {
+  const place = (parts: readonly LabelPart[]) => parts.map((part) => ({ field: part.field, on: part.on }));
+  return { above: place(label.above), below: place(label.below) };
+}
+
+/** The label a preview has unless the user sets another: its type's icon and its alt text (else its name) above it, the rest off */
+export const DEFAULT_LABEL: PreviewLabel = {
+  above: [
+    { field: "icon", on: true },
+    { field: "alt", on: true },
+    { field: "name", on: false },
+  ],
+  below: [
+    { field: "size", on: false },
+    { field: "modified", on: false },
+  ],
+};
 
 export const DEFAULT_ASSET_SETTINGS: AssetSettings = {
   views: { default: "embed", types: {} },
   actions: { default: { click: "open-tab", "shift+click": "open-tab" }, types: {} },
   card: ["icon", "name"],
   heights: { preview: 160, embed: 480 },
+  previews: { types: {} },
   anchor: "start",
   linkIcons: true,
+  labels: { default: DEFAULT_LABEL, types: {} },
 };
 
 const isView = (value: unknown): value is View => typeof value === "string" && (VIEWS as readonly string[]).includes(value);
@@ -86,11 +148,42 @@ export function readAssetSettings(value: unknown): { readonly settings: AssetSet
       actions: { default: actions.default === undefined ? DEFAULT_ASSET_SETTINGS.actions.default : gestures(actions.default), types: actionTypes },
       card,
       heights: { preview: height("preview"), embed: height("embed") },
+      previews: readPreviews(given.previews),
       anchor: given.anchor === "center" ? "center" : "start",
       linkIcons: given.linkIcons !== false,
+      labels: readLabels(given.labels),
     },
     problems,
   };
+}
+
+/** The labels as configured: all files' (none: the default) and each type's own */
+function readLabels(value: unknown): AssetSettings["labels"] {
+  const given = record(value);
+  const types: Record<string, PreviewLabel> = {};
+  for (const [type, one] of Object.entries(record(given.types))) types[type] = readLabel(one);
+  return { default: given.default === undefined ? DEFAULT_LABEL : readLabel(given.default), types };
+}
+
+/**
+ * A label as configured, read leniently: each place a list of `{ field, on }` (a field's name alone: on); a property
+ * unknown dropped, one given twice kept where it is first, one missing added under the preview, off
+ */
+export function readLabel(value: unknown): PreviewLabel {
+  const given = record(value);
+  const seen = new Set<LabelField>();
+  const place = (one: unknown): LabelPart[] =>
+    (Array.isArray(one) ? one : []).flatMap((item): LabelPart[] => {
+      const part = typeof item === "string" ? { field: item, on: true } : record(item);
+      const field = part.field;
+      if (!(LABEL_FIELDS as readonly unknown[]).includes(field) || seen.has(field as LabelField)) return [];
+      seen.add(field as LabelField);
+      return [{ field: field as LabelField, on: part.on !== false }];
+    });
+  const above = place(given.above);
+  const below = place(given.below);
+  for (const field of LABEL_FIELDS) if (!seen.has(field)) below.push({ field, on: false });
+  return { above, below };
 }
 
 /** Where the settings of SilverBullet's markdown shown as written are (the Configuration Manager's block: booleans) */
@@ -111,3 +204,18 @@ export const readSyntaxModeSettings = (get: (path: string) => unknown): SyntaxMo
   hideAssets: get(SYNTAX_PATHS.hides) !== false,
   clickPlacesCursor: get(SYNTAX_PATHS.clicks) !== false,
 });
+
+/** A preview's sizes as configured: each side a number within PREVIEW_LIMITS, anything else none */
+function readPreviews(value: unknown): AssetSettings["previews"] {
+  const given = record(value);
+  const side = (one: unknown) => (typeof one === "number" && one >= PREVIEW_LIMITS.min && one <= PREVIEW_LIMITS.max ? Math.round(one) : undefined);
+  const types: Record<string, PreviewSize> = {};
+  for (const [type, one] of Object.entries(record(given.types))) {
+    const size = record(one);
+    const width = side(size.width);
+    const height = side(size.height);
+    if (width !== undefined || height !== undefined) types[type] = { ...(width === undefined ? {} : { width }), ...(height === undefined ? {} : { height }) };
+  }
+  const width = side(given.width);
+  return { ...(width === undefined ? {} : { width }), types };
+}

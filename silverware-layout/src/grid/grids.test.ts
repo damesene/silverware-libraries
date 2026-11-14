@@ -270,6 +270,7 @@ describe("a cell's menu", () => {
       "2 columns",
       "3 columns",
       "4 columns",
+      "Borders",
       "Add a column at the end",
       "Remove the grid, its content kept",
     ]);
@@ -281,6 +282,18 @@ describe("a cell's menu", () => {
     expect(changes).toEqual([{ kind: "move", cell: 0, by: 1 }, { kind: "takeOut", cell: 1 }, { kind: "ungrid" }]);
     await pick(0, "3 columns");
     expect(state.attributeWrites.map((write) => write.attributes)).toEqual([{ columns: "3" }]);
+    // Its borders: written as HTML's table has them, shown at once, taken off again
+    await pick(0, "Borders");
+    expect(grid.hasAttribute("data-swl-border")).toBe(true);
+    await pick(0, "Borders");
+    expect(grid.hasAttribute("data-swl-border")).toBe(false);
+    expect(state.attributeWrites.slice(1).map((write) => write.attributes)).toEqual([{ border: "1" }, { border: null }]);
+  });
+
+  it("draws a grid's borders as its border attribute says", async () => {
+    const { gridHost } = host(`<grid border="1">\n${body}\n</grid>\n`);
+    const grid = await new Grids(document, gridHost).render(body);
+    expect(grid.hasAttribute("data-swl-border")).toBe(true);
   });
 });
 

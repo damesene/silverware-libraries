@@ -130,6 +130,8 @@ test("a PDF's viewer as wide as its frame, its handle shown from beside its righ
   // Without a size of its own: the frame's width; with one: its own
   await expect.poll(async () => (await width(frames.first().locator("object"))) === (await width(frames.first()))).toBe(true);
   await expect.poll(() => width(frames.nth(1).locator("object"))).toBe(200);
+  // As tall as the original's setting (480 px), not the browser's 150 px of an object: no preview's size
+  await expect.poll(async () => Math.round((await frames.first().locator("object").boundingBox())!.height)).toBe(480);
   // From the page right of it to just beside its edge, where the bar is: shown
   const box = (await frames.first().boundingBox())!;
   await page.mouse.move(box.x + box.width + 120, box.y + box.height / 2);
@@ -180,13 +182,219 @@ test("a link to a file shows its type's icon, in a grid too; a link to a page no
   await expect(page.locator(".swa-popover")).toHaveCount(0);
 });
 
-test("the settings' Assets tab: a card's size shown, a click set to the side panel; the panel shows the file and Esc closes it", async ({ page, space }) => {
+test("a preview's size the settings' (all files, a type's own), never widened by a handle, a PDF's neither", async ({ page, space }) => {
+  await space.open(
+    { Page: `# Page\n\n![[${space.folder}/doc.pdf|||{ view: preview }]]\n\nBetween\n\n![[${space.folder}/photo.png|Photo||{ view: preview }]]\n` },
+    "Page",
+    { "doc.pdf": "%PDF-1.4\n", "photo.png": PIXEL_PNG },
+  );
+  const pdf = page.locator("#sb-main [data-swa-asset='pdf']");
+  await expect(pdf.locator(".swa-pdf")).toBeVisible();
+  // No handle beside a preview: its size is the settings'
+  const box = (await pdf.boundingBox())!;
+  await page.mouse.move(box.x + box.width + 120, box.y + 20);
+  await page.mouse.move(box.x + box.width + 6, box.y + 20, { steps: 6 });
+  await pdf.hover();
+  await expect(page.locator(".swl-handle-bar")).toBeHidden();
+  // A preview's width for all files, a PDF's own height
+  await runCommand(page, ASSETS_SETTINGS);
+  const dialog = page.locator(".swa-dialog");
+  await dialog.getByRole("tab", { name: "Appearance" }).click();
+  await dialog.getByLabel("A preview's width (px)", { exact: true }).fill("100");
+  // (A type's own in its row, opened; marked Own then)
+  const pdfRow = dialog.locator('[data-swa-type="pdf"]');
+  await pdfRow.locator(".swa-type-head").click();
+  await dialog.getByLabel("pdf: a preview's height (px)", { exact: true }).fill("300");
+  await expect(pdfRow.locator(".swa-type-mark")).toHaveText("Own");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  const size = async (locator: import("@playwright/test").Locator) => {
+    const one = (await locator.boundingBox())!;
+    return [Math.round(one.width), Math.round(one.height)];
+  };
+  await expect.poll(() => size(pdf.locator(".swa-pdf"))).toEqual([100, 300]);
+  // Its frame as wide as the preview: its "…" at the preview's corner, not at the text's right
+  await pdf.hover();
+  const more = (await pdf.locator(".swa-more").boundingBox())!;
+  const shown = (await pdf.locator(".swa-pdf").boundingBox())!;
+  expect(more.x + more.width).toBeLessThanOrEqual(shown.x + shown.width + 1);
+  // The image within 100 × 160 (a pixel drawn as large as it fits, its ratio kept): no wider than 100
+  await expect.poll(async () => (await size(page.locator("#sb-main [data-swa-asset='image'] img")))[0]! <= 100).toBe(true);
+});
+
+test("a PDF's preview clicked runs the click the settings give (its viewer under a layer taking it), its original's viewer left alone", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/doc.pdf|||{ view: preview }]]\n\n![[${space.folder}/doc.pdf|Doc||{ view: embed }]]\n` }, "Page", { "doc.pdf": "%PDF-1.4\n" });
+  const [preview, original] = [page.locator("#sb-main [data-swa-asset='pdf'][data-swa-view='preview']"), page.locator("#sb-main [data-swa-asset='pdf'][data-swa-view='embed']")];
+  await expect(preview.locator(".swa-shield")).toHaveCount(1);
+  await expect(original.locator(".swa-shield")).toHaveCount(0);
+  // (What is opened kept: a PDF in a new tab is the browser's to download in a test's)
+  await page.evaluate(() => {
+    const opened: string[] = [];
+    (window as unknown as { opened: string[] }).opened = opened;
+    window.open = ((url?: string | URL) => {
+      opened.push(String(url));
+      return null;
+    }) as typeof window.open;
+  });
+  const box = (await preview.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 3, box.y + box.height / 2);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { opened: string[] }).opened.join(" "))).toContain("doc.pdf");
+});
+
+test("a preview's label: its alt text above by default (else its name), then the name dragged under it and the size on, in the settings", async ({ page, space }) => {
+  await space.open(
+    { Page: `# Page\n\n![[${space.folder}/photo.png|Photo||{ view: preview }]]\n\nBetween\n\n![[${space.folder}/doc.pdf|||{ view: preview }]]\n` },
+    "Page",
+    { "doc.pdf": "%PDF-1.4\n", "photo.png": PIXEL_PNG },
+  );
+  const image = page.locator("#sb-main [data-swa-asset='image']");
+  const pdf = page.locator("#sb-main [data-swa-asset='pdf']");
+  await expect(image.locator(".swa-label-above")).toHaveText("Photo");
+  await expect(pdf.locator(".swa-label-above")).toHaveText("doc.pdf");
+  // (The type's icon first, before the alt text)
+  await expect(pdf.locator(".swa-label-above > .swa-label-icon svg")).toBeVisible();
+  await expect(page.locator("#sb-main .swa-label-below")).toHaveCount(0);
+  // Its "…" at the preview's corner, under the line above it
+  await image.hover();
+  const label = (await image.locator(".swa-label-above").boundingBox())!;
+  const more = (await image.locator(".swa-more").boundingBox())!;
+  expect(more.y).toBeGreaterThanOrEqual(label.y + label.height);
+  // In the settings: the name dragged under the preview, the size on
+  await runCommand(page, ASSETS_SETTINGS);
+  const dialog = page.locator(".swa-dialog");
+  await dialog.getByRole("tab", { name: "Appearance" }).click();
+  const chip = (field: string) => dialog.locator(`.swa-label-edit .swa-sample-chip[data-swa-field="${field}"]`);
+  // (The label under the size: scrolled to)
+  await dialog.locator(".swa-label-edit").scrollIntoViewIfNeeded();
+  // The name's chip dragged from the row of those not shown to the place under the sample: shown there
+  await expect(dialog.locator('.swa-label-edit-list[data-swa-place="off"] .swa-sample-chip[data-swa-field="name"]')).toBeVisible();
+  const from = (await chip("name").boundingBox())!;
+  const below = (await dialog.locator('.swa-label-edit-list[data-swa-place="below"]').boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(below.x + 8, below.y + below.height / 2, { steps: 12 });
+  await page.mouse.up();
+  const line = (place: string) => dialog.locator(`.swa-label-edit-line[data-swa-place="${place}"] .swa-sample-value`);
+  await expect(line("below")).toHaveText(["lake.jpg"]);
+  // A click on a chip not shown shows it where it was (the size under the preview): the sample shows it at once
+  await chip("size").click();
+  await expect(line("below")).toHaveText(["lake.jpg", "2.4 MB"]);
+  // A property shown, pointed at: its name over its value, its ×
+  const name = dialog.locator('.swa-label-edit .swa-sample-item[data-swa-field="name"]');
+  await name.hover();
+  await expect(name.locator(".swa-sample-tag")).toBeVisible();
+  await expect(name.locator(".swa-sample-tag")).toHaveText("Name");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  // The image: its alt text above, its name and size under it; the PDF without alt text: its name once, under it
+  await expect(image.locator(".swa-label-above")).toHaveText("Photo");
+  await expect(image.locator(".swa-label-below")).toHaveAttribute("title", /^photo\.png · \d+ B$/);
+  // (Its line above its icon alone)
+  await expect(pdf.locator(".swa-label-above")).toHaveText("");
+  await expect(pdf.locator(".swa-label-above > .swa-label-icon")).toBeVisible();
+  await expect(pdf.locator(".swa-label-below")).toHaveAttribute("title", "doc.pdf · 9 B");
+  await expect.poll(() => space.config()).toContain('field = "name"');
+});
+
+test("a card's icon hidden in the settings: a small arrow after its name within the card opens its menu, on a narrow page too", async ({ page, space }) => {
+  const name = "17946506159461442418238509537.zip";
+  await space.open({ Page: `# Page\n\n![[${space.folder}/${name}]]\n` }, "Page", { [name]: "zip" });
+  await expect(page.locator("#sb-main .swa-card")).toBeVisible();
+  await runCommand(page, ASSETS_SETTINGS);
+  const dialog = page.locator(".swa-dialog");
+  await dialog.getByRole("tab", { name: "Appearance" }).click();
+  await dialog.getByRole("radio", { name: "Card" }).click();
+  const look = dialog.locator('[data-swa-look="card"]');
+  await look.locator('.swa-sample-item[data-swa-field="icon"]').hover();
+  await look.locator('.swa-sample-item[data-swa-field="icon"] .swa-sample-remove').click();
+  // (In the sample, the arrow in its place, which cannot be hidden)
+  await expect(look.locator('.swa-sample-card .swa-sample-item[data-swa-field="marker"] .swa-sample-remove')).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  // No "…" beside the card: the arrow its last part, within it and within its frame on a phone's width (its long name cut instead)
+  const frame = page.locator("#sb-main [data-swa-asset='file']");
+  const marker = frame.locator(".swa-card > .swa-menu-marker:last-child");
+  await expect(marker).toBeVisible();
+  await expect(frame.locator(".swa-more")).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 800 });
+  await expect.poll(async () => {
+    const [m, f] = [(await marker.boundingBox())!, (await frame.boundingBox())!];
+    return m.x + m.width <= f.x + f.width;
+  }).toBe(true);
+  const url = page.url();
+  await marker.click();
+  await expect(page.locator(".swa-popup .swa-menu-item", { hasText: "Show as a preview" })).toBeVisible();
+  expect(page.url()).toBe(url);
+});
+
+test("a link's icon hidden in the settings: a small arrow after the link opens its menu, the link not followed", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\nSee [[${space.folder}/doc.pdf]] for the numbers.\n` }, "Page", { "doc.pdf": "%PDF-1.4\n" });
+  const link = page.locator("#sb-main [data-swa-link='pdf']");
+  await expect(link.locator(".swa-link-icon")).toBeVisible();
+  await runCommand(page, ASSETS_SETTINGS);
+  const dialog = page.locator(".swa-dialog");
+  await dialog.getByRole("tab", { name: "Appearance" }).click();
+  await dialog.getByRole("radio", { name: "Link" }).click();
+  const look = dialog.locator('[data-swa-look="link"]');
+  await look.locator('.swa-sample-item[data-swa-field="icon"]').hover();
+  await look.locator('.swa-sample-item[data-swa-field="icon"] .swa-sample-remove').click();
+  // (In the sample, the arrow in its place, which cannot be hidden)
+  await expect(look.locator('.swa-sample-item[data-swa-field="marker"] .swa-sample-remove')).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => space.config()).toMatch(/linkIcons[^\n]*false/);
+  // The arrow after the link's text, its icon gone; its menu opened, the page the same
+  const marker = link.locator(":scope > .swa-link-marker:last-child");
+  await expect(marker).toBeVisible();
+  await expect(link.locator(".swa-link-icon")).toHaveCount(0);
+  const url = page.url();
+  await marker.click();
+  await expect(page.locator(".swa-popup .swa-menu-item", { hasText: "Show as embedded" })).toBeVisible();
+  expect(page.url()).toBe(url);
+});
+
+test("Delete file… in a file's menu: asked in SilverBullet's dialog, the file deleted, its embed taken out and a link to it its text", async ({ page, space }) => {
+  const embed = `![[${space.folder}/archive.zip]]`;
+  const link = `[[${space.folder}/doc.pdf|the doc]]`;
+  await space.open({ Page: `# Page\n\n${embed}\n\nSee ${link} here.\n` }, "Page", { "archive.zip": "zip", "doc.pdf": "%PDF-1.4\n" });
+  const confirm = page.locator(".sb-modal-box, .sb-modal").filter({ hasText: "Delete the file" });
+  // The card's menu (its icon): Delete file…, declined first
+  const card = page.locator("#sb-main [data-swa-asset='file'] .swa-card");
+  await card.locator(".swa-icon").click();
+  await page.locator(".swa-popup .swa-menu-item.swa-danger", { hasText: "Delete file…" }).click();
+  await expect(confirm).toContainText("The file itself is deleted, not only this embed: it cannot be brought back.");
+  await confirm.getByRole("button", { name: /Cancel/ }).click();
+  await expect(confirm).toHaveCount(0);
+  expect(space.hasFile("archive.zip")).toBe(true);
+  // Then confirmed: gone, the file and its embed
+  await card.locator(".swa-icon").click();
+  await page.locator(".swa-popup .swa-menu-item.swa-danger", { hasText: "Delete file…" }).click();
+  await expect(confirm).toBeVisible();
+  await confirm.locator("button").last().click();
+  await expect.poll(() => space.hasFile("archive.zip")).toBe(false);
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\nSee ${link} here.\n`);
+  // A link's menu: the file deleted, the link its text
+  await page.locator("#sb-main [data-swa-link='pdf'] .swa-link-icon").click();
+  await page.locator(".swa-popup .swa-menu-item.swa-danger", { hasText: "Delete file…" }).click();
+  await expect(confirm).toContainText("This link is replaced by its text.");
+  await confirm.locator("button").last().click();
+  await expect.poll(() => space.hasFile("doc.pdf")).toBe(false);
+  await expect.poll(() => space.saved("Page")).toBe("# Page\n\nSee the doc here.\n");
+});
+
+test("the settings: a card's size shown, a click set to the side panel; the panel shows the file and Esc closes it", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/archive.zip]]\n\n![[${space.folder}/photo.png|Photo||{ view: preview }]]\n` }, "Page", { "archive.zip": "zip", "photo.png": PIXEL_PNG });
   await expect(page.locator("#sb-main .swa-card")).toHaveText("archive.zip");
   await runCommand(page, ASSETS_SETTINGS);
   const dialog = page.locator(".swa-dialog");
-  await dialog.getByRole("tab", { name: "Assets" }).click();
-  await dialog.getByLabel("Its size").check();
+  // A card's size: its chip under the Appearance tab's card, shown on the sample card at once
+  await dialog.getByRole("tab", { name: "Appearance" }).click();
+  await dialog.getByRole("radio", { name: "Card" }).click();
+  const card = dialog.locator('[data-swa-look="card"]');
+  await card.locator('.swa-sample-chip[data-swa-field="size"]').click();
+  await expect(card.locator('.swa-sample-card .swa-sample-item[data-swa-field="size"]')).toHaveText(/860 KB/);
+  await dialog.getByRole("radio", { name: "Link" }).click();
+  await dialog.getByRole("tab", { name: "Files" }).click();
   await dialog.getByLabel("All files: a click").selectOption("peek");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();

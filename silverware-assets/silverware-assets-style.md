@@ -71,52 +71,59 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   border-radius: 8px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
 }
-/* The Media tab of the settings window: All files' fields in rows, then a row per type (its icon and name, how
-   it is shown, its click, its Shift+click) */
+/* The settings window as tall on each tab: switching tabs does not move it */
+.swa-dialog.swa-settings-window {
+  height: min(600px, calc(var(--sw-view-height, 100dvh) - 32px));
+}
+/* The assets' settings tabs (src/ui/mediatab.ts): a line on top saying what the tab sets, then its sections; a grid
+   of rows where all files and each type are set alike (their names at the left, all files' row first, set apart) */
 .swa-settings {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
-.swa-settings-all {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 6px 12px;
-  align-items: center;
+.swa-settings-intro {
+  margin: 0;
+  font-size: 0.9em;
+  color: color-mix(in srgb, var(--root-color) 70%, transparent);
 }
-.swa-settings-heading {
-  grid-column: 1 / -1;
-  font-weight: 600;
-}
-.swa-settings-field {
-  display: contents;
-}
-.swa-settings-checks {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 14px;
-}
-.swa-settings-check {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.swa-settings-types {
+.swa-settings-section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
-.swa-settings-type {
+.swa-settings-heading {
+  font-weight: 600;
+}
+.swa-settings-note {
+  margin: 0;
+  font-size: 0.85em;
+  color: color-mix(in srgb, var(--root-color) 65%, transparent);
+}
+.swa-settings-grid {
   display: grid;
-  grid-template-columns: minmax(90px, 1fr) repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 4px 8px;
   align-items: center;
 }
-.swa-settings-type-head {
+.swa-settings-grid-files {
+  grid-template-columns: minmax(80px, max-content) repeat(3, minmax(0, 1fr));
+}
+.swa-settings-row {
+  display: contents;
+}
+.swa-settings-head > span {
   font-size: 0.85em;
-  opacity: 0.7;
+  color: color-mix(in srgb, var(--root-color) 65%, transparent);
+}
+/* (All files' row set apart from the types' under it) */
+.swa-settings-all-row > .swa-settings-type-name {
+  font-weight: 600;
+}
+.swa-settings-divider {
+  grid-column: 1 / -1;
+  height: 1px;
+  margin: 3px 0;
+  background: color-mix(in srgb, var(--root-color) 12%, transparent);
 }
 .swa-settings-type-name {
   display: inline-flex;
@@ -141,6 +148,423 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   width: 6em;
   font: inherit;
 }
+.swa-settings-side {
+  width: 5em;
+}
+/* Fields one under another: a name and its control */
+.swa-settings-fields {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: center;
+  justify-items: start;
+}
+.swa-settings-field {
+  display: contents;
+}
+.swa-settings-checks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+.swa-settings-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* A preview's rows (src/ui/mediatab.ts), as Silverware Database's properties: one for all files and one per type,
+   apart by a line, one open at a time (its chevron turned, its head shaded), a type's marked Own where it has a label
+   or a size of its own (what, said as it is opened); open, its label and its size, each with its way back */
+.swa-types {
+  border: 1px solid var(--swa-dialog-line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.swa-type + .swa-type {
+  border-top: 1px solid var(--swa-dialog-line);
+}
+.swa-type-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 4px 6px 4px 12px;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+}
+.swa-type-head:hover,
+.swa-type-open > .swa-type-head {
+  background: var(--swa-dialog-card);
+}
+.swa-type-head > .swa-icon {
+  width: 16px;
+  height: 16px;
+  color: color-mix(in srgb, var(--root-color) 60%, transparent);
+}
+.swa-type-name {
+  font-weight: 500;
+}
+.swa-type-mark {
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 0.75em;
+  line-height: 1.6;
+  color: var(--ui-accent-color, #4a90e2);
+  background: color-mix(in srgb, var(--ui-accent-color, #4a90e2) 12%, transparent);
+}
+.swa-type-chevron {
+  display: inline-flex;
+  margin-left: auto;
+  padding: 0 4px;
+  color: color-mix(in srgb, var(--root-color) 55%, transparent);
+  transition: transform 0.15s;
+}
+.swa-type-chevron svg {
+  width: 16px;
+  height: 16px;
+}
+.swa-type-open .swa-type-chevron {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .swa-type-chevron {
+    transition: none;
+  }
+}
+.swa-type-details {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 14px 14px;
+}
+/* A type's way back to all files' (shown where it differs), at the open row's top right */
+.swa-type-reset {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -6px;
+}
+.swa-type-reset[hidden] {
+  display: none;
+}
+.swa-type-size {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.swa-settings-button {
+  padding: 4px 10px;
+  border: 1px solid var(--swa-dialog-line);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.9em;
+  background: var(--root-background-color);
+  cursor: pointer;
+}
+.swa-settings-button:hover {
+  background: var(--swa-dialog-card);
+}
+/* The Appearance tab's samples (src/ui/sample.ts; the editors ui/labeleditor.ts, ui/cardeditor.ts): what is edited
+   picked by a switch; the properties not shown a row of chips of their names; then, on a ground of its own, a sample
+   as the page draws it (a preview and its label, a card, a sentence with a link), its properties shown as they show
+   there. Pointed at, focused or chosen (a click, a tap), a property is outlined, a pill of its name and a × over it,
+   nothing moving; a finger has no pointing, so its name shows as it is chosen. */
+.swa-settings-looks {
+  display: flex;
+}
+.swa-settings-look {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.swa-settings-look[hidden] {
+  display: none;
+}
+.swa-sample-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.swa-sample-hidden {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.swa-sample-hidden-name {
+  font-size: 0.85em;
+  color: color-mix(in srgb, var(--root-color) 65%, transparent);
+}
+/* (The row of those not shown: as wide as what is left, somewhere to drop a property to hide it) */
+.swa-sample-hidden .swa-sample-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 120px;
+  min-height: 30px;
+  border-radius: 8px;
+}
+.swa-sample-hidden .swa-sample-list:empty::before {
+  content: "None: all are shown";
+  font-size: 0.85em;
+  color: color-mix(in srgb, var(--root-color) 50%, transparent);
+}
+.swa-sample-stage {
+  display: flex;
+  justify-content: center;
+  /* (Room over the top line for a property's name) */
+  padding: 26px 12px 18px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--root-color) 4%, var(--root-background-color));
+}
+.swa-sample-hint {
+  font-size: 0.8em;
+  text-align: center;
+  color: color-mix(in srgb, var(--root-color) 60%, transparent);
+}
+/* A property shown */
+.swa-sample-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 2px;
+  margin: 0 -2px;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  user-select: none;
+}
+.swa-sample-item:is(:hover, :focus-visible, [aria-selected="true"]) {
+  box-shadow: 0 0 0 1px var(--ui-accent-color, #4a90e2);
+  background: color-mix(in srgb, var(--ui-accent-color, #4a90e2) 10%, transparent);
+}
+/* Its name and its ×, over it: a pill whose ground reaches down to the property (no gap, the pointer stays on it on the
+   way to the ×) */
+.swa-sample-bar {
+  position: absolute;
+  bottom: 100%;
+  left: -1px;
+  display: flex;
+  padding-bottom: 3px;
+  font-family: var(--ui-font, system-ui, sans-serif);
+  font-weight: normal;
+  visibility: hidden;
+}
+.swa-sample-tag {
+  padding: 0 5px;
+  border-radius: 3px 0 0 3px;
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+  color: #fff;
+  background: var(--ui-accent-color, #4a90e2);
+}
+.swa-sample-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, #fff 45%, transparent);
+  border-radius: 0 3px 3px 0;
+  font-size: 12px;
+  line-height: 1;
+  /* (The dialog's buttons take the text's colour: white as Save's) */
+  color: #fff !important;
+  background: var(--ui-accent-color, #4a90e2);
+  cursor: pointer;
+}
+.swa-sample-remove:hover {
+  background: color-mix(in srgb, var(--ui-accent-color, #4a90e2) 80%, #000);
+}
+.swa-sample-item:is(:hover, :focus-visible, [aria-selected="true"]) > .swa-sample-bar {
+  visibility: visible;
+}
+@media (pointer: coarse) {
+  /* (A finger: the pill large enough to take its ×, room for it over the top line) */
+  .swa-sample-stage {
+    padding-top: 34px;
+  }
+  .swa-sample-tag {
+    font-size: 12px;
+    line-height: 24px;
+  }
+  .swa-sample-remove {
+    width: 26px;
+    height: 24px;
+    font-size: 15px;
+  }
+}
+/* A property not shown: a chip of its name, outlined and quiet */
+.swa-sample-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border: 1px dashed color-mix(in srgb, var(--root-color) 35%, transparent);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.85em;
+  color: color-mix(in srgb, var(--root-color) 70%, transparent);
+  background: var(--root-background-color);
+  cursor: pointer;
+  user-select: none;
+}
+.swa-sample-chip::before {
+  content: "+";
+  font-weight: 600;
+}
+.swa-sample-chip:hover {
+  color: var(--root-color);
+  border-color: var(--ui-accent-color, #4a90e2);
+}
+.swa-sample-chip:focus-visible {
+  outline: 2px solid var(--ui-accent-color, #4a90e2);
+  outline-offset: 2px;
+}
+/* A card's sample: as the page's card (.swa-card), not pressed itself; its name always shown */
+.swa-sample-card {
+  cursor: default;
+}
+.swa-sample-card:hover {
+  background: none;
+}
+.swa-sample-card .swa-card-meta {
+  opacity: 1;
+}
+.swa-sample-card .swa-card-meta > .swa-sample-item {
+  color: color-mix(in srgb, var(--root-color) 70%, transparent);
+}
+.swa-sample-card .swa-card-meta > * + *::before {
+  margin-right: 0;
+}
+/* A link's sample: a sentence of the page's text, the link in the accent's colour */
+.swa-sample-sentence {
+  margin: 0;
+}
+.swa-sample-link {
+  color: var(--ui-accent-color, #4a90e2);
+}
+/* (In a line of text the property on the line as on the page: a box of the line's own (a flex box set the icon by its
+   bottom edge, on the baseline), so the icon inside sits as the page sets it) */
+.swa-sample-link .swa-sample-item {
+  display: inline-block;
+}
+/* (The marker's outline clear of the link's last letter) */
+.swa-sample-link .swa-sample-item[data-swa-field="marker"] {
+  margin-left: 0.05em;
+}
+/* A preview's label (src/ui/labeleditor.ts): its sample a preview's box, the label's lines as the page's (.swa-label),
+   a property dragged within them, to the other, or up to the row; a line without a property a slot saying so, every
+   place outlined while one is dragged */
+.swa-label-edit-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.swa-label-edit-sample {
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  max-width: 100%;
+}
+.swa-label-edit-line {
+  column-gap: 0.9em;
+  row-gap: 2px;
+  font-size: 0.85em;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--root-color) 85%, transparent);
+}
+.swa-label-edit-line-above {
+  margin-bottom: 2px;
+}
+.swa-label-edit-line-below {
+  margin-top: 2px;
+}
+.swa-label-edit-line > .swa-sample-item {
+  display: inline;
+  cursor: grab;
+  touch-action: pan-y;
+}
+.swa-label-edit .swa-sample-chip {
+  cursor: grab;
+  touch-action: pan-y;
+}
+/* (After the icon no dot, the next property near it, as on the page) */
+.swa-label-edit-line > .swa-sample-item[data-swa-field="icon"] {
+  margin-right: calc(-0.9em + 0.35em - 2px);
+}
+.swa-label-edit-line > .swa-sample-item[data-swa-field="icon"] + .swa-sample-item::before {
+  content: none;
+}
+.swa-label-edit-line > .swa-sample-item + .swa-sample-item::before {
+  content: "·";
+  position: absolute;
+  left: -0.6em;
+  color: color-mix(in srgb, var(--root-color) 40%, transparent);
+  pointer-events: none;
+}
+.swa-label-edit-line > .swa-sample-item:is(.swa-label-size, .swa-label-modified) {
+  color: color-mix(in srgb, var(--root-color) 60%, transparent);
+}
+.swa-label-edit-line:empty,
+.swa-label-edit-dragging .swa-label-edit-line {
+  min-height: 1.5em;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--root-color) 25%, transparent);
+}
+.swa-label-edit-line:empty::before {
+  content: "Drag a property here";
+  font-style: italic;
+  color: color-mix(in srgb, var(--root-color) 45%, transparent);
+  padding: 0 4px;
+}
+.swa-label-edit-dragging .swa-label-edit-list {
+  outline: 1px dashed color-mix(in srgb, var(--root-color) 30%, transparent);
+  outline-offset: 3px;
+}
+.swa-label-edit-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 110px;
+  border-radius: 4px;
+  color: color-mix(in srgb, var(--root-color) 45%, transparent);
+  background: color-mix(in srgb, var(--root-color) 10%, var(--root-background-color));
+}
+.swa-label-edit-preview .swa-icon {
+  width: 36px;
+  height: 36px;
+}
+/* A property dragged: its place held, dimmed; a copy following the pointer, over the dialog */
+.swa-label-edit-placeholder {
+  opacity: 0.35;
+}
+.swa-label-edit-ghost {
+  position: fixed;
+  z-index: var(--sw-layer-dragged);
+  pointer-events: none;
+  font-family: var(--ui-font, system-ui, sans-serif);
+  font-size: 13px;
+  color: var(--root-color);
+  background: var(--root-background-color);
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+.swa-label-edit-ghost > .swa-sample-bar {
+  visibility: hidden;
+}
 /* Embedded media (docs/silverware-assets.md), marked by Silverware Assets on the host's frame of each
    (data-swa-asset: its type, data-swa-view: icon, preview or embed): the host's own drawing hidden where Silverware
    Assets draws instead; a preview of the host's drawing kept small; a card; the mark of a render that failed */
@@ -149,7 +573,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 [data-swa-view="preview"] :is(img, video, object):not(.swa-icon img, .swa-pdf) {
   max-height: var(--swa-height, 160px);
-  max-width: 100%;
+  max-width: min(100%, var(--swa-preview-width, 100%));
   width: auto !important;
   object-fit: contain;
   cursor: pointer;
@@ -166,6 +590,12 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   display: block;
   width: auto;
 }
+/* A PDF's preview of a width the settings give: its frame as wide as the preview, its "…" at the preview's corner
+   (none given: as wide as the text, the frame too) */
+[data-swa-asset][data-swa-view="preview"][data-swa-preview-width]:has(.swa-pdf) {
+  width: fit-content;
+  max-width: 100%;
+}
 /* The host's PDF viewer as the original, without a size of its own: as wide as its frame (the text's), so the frame's
    edge, and Silverware Layout's handle beside it, is the viewer's (SilverBullet 2.12.1 draws it 300 px wide, its
    style `max-width: 100%;`; one with a size, `width: 200px` after it, keeps it) */
@@ -173,7 +603,12 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   width: 100% !important;
   max-width: 100% !important;
 }
-/* A card: its "…" beside it, not over its name */
+/* Its height: the original's setting (`heights.embed`, 480 px), or its embed's own (`|600x800`): SilverBullet gives
+   the viewer none, so the browser's 150 px of an object showed it as small as a preview */
+[data-swa-asset][data-swa-view="embed"] object:not(.swa-icon *) {
+  height: var(--swa-height, 480px) !important;
+}
+/* A card's frame: the card alone in it (its menu's way in within the card: its icon, else an arrow after its name) */
 [data-swa-view="icon"] {
   display: flex !important;
   align-items: center;
@@ -181,11 +616,6 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 .swa-frame[data-swa-view="icon"] {
   display: inline-flex !important;
-}
-[data-swa-view="icon"] > .swa-more {
-  position: static;
-  order: 1;
-  flex: none;
 }
 /* A medium in markdown rendered outside the editor (a grid's cell) in a frame of Silverware Assets' own */
 .swa-frame {
@@ -204,6 +634,9 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  /* (Its padding and border within its 100%: else 22 px past the frame, which SilverBullet's cuts off, its end and the
+     arrow there with it, measured 2026-11-14) */
+  box-sizing: border-box;
   max-width: 100%;
   padding: 6px 12px 6px 8px;
   border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
@@ -355,6 +788,8 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   width: 1em;
   height: 1em;
   margin-right: 0.2em;
+  /* (A 1em box from just under the baseline to the capitals' height: centred on the text's letters; `middle`, the
+     lowercase letters' middle, sat it visibly lower, measured 2026-11-14) */
   vertical-align: -0.125em;
   border-radius: 4px;
   cursor: pointer;
@@ -370,6 +805,53 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
     position: absolute;
     inset: -10px -6px;
   }
+}
+/* A menu's marker where a file's icon is hidden (docs/silverware-assets-label.md, *A link's marker*): a small arrow
+   after a link, or after a card's name within the card, its menu's way in. Quiet (the text's colour, faded) so it reads
+   as part of what it follows, not a stray mark; lit as pointed at or its menu open. It takes more than it draws, around
+   it, but of the text a few px at most */
+.swa-menu-marker {
+  position: relative;
+  display: inline-flex;
+  width: 0.75em;
+  height: 0.75em;
+  margin-left: 0.12em;
+  vertical-align: middle;
+  border-radius: 3px;
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.12s, background-color 0.12s;
+}
+.swa-menu-marker > svg {
+  width: 100%;
+  height: 100%;
+}
+.swa-menu-marker::after {
+  content: "";
+  position: absolute;
+  inset: -6px -6px -6px -3px;
+}
+.swa-menu-marker:hover,
+.swa-menu-marker[aria-expanded="true"] {
+  opacity: 1;
+  background: color-mix(in srgb, currentColor 15%, transparent);
+}
+@media (pointer: coarse) {
+  .swa-menu-marker {
+    opacity: 0.65;
+  }
+  .swa-menu-marker::after {
+    inset: -12px -12px -12px -4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .swa-menu-marker {
+    transition: none;
+  }
+}
+/* (In a card: after its name, the card's gap before it, not the text's) */
+.swa-card > .swa-menu-marker {
+  margin-left: 0;
 }
 /* An icon opening its asset's menu (a link's, a card's): pointed at (or its menu open), it shows plainly it is a
    button of its own, apart from the text beside it: filled, a little larger */
@@ -388,9 +870,70 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
     transition: none;
   }
 }
+/* A preview's label (docs/silverware-assets-label.md): a line above it and one under it, as wide as the preview (they
+   give the frame no width of their own but a least one), cut with "…"; the name and the alt text in the text's colour, the size and
+   the date quieter; a click on them the preview's. Its line above moves the "…" (and the mark of a render that failed)
+   down to the preview's corner: the line is 0.85em × 1.5 high, 2px apart from the preview */
+.swa-label {
+  display: block;
+  contain: inline-size;
+  /* (A tiny image's label not cut to nothing: the frame at least this wide, its "…" then at the frame's corner; a
+     preview of any usual width, 100 px and more, stays as wide as it is) */
+  min-width: 4em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.85em;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--root-color) 85%, transparent);
+  cursor: pointer;
+}
+.swa-label-above {
+  margin-bottom: 2px;
+}
+.swa-label-below {
+  margin-top: 2px;
+}
+.swa-label > span + span::before {
+  content: " · ";
+  color: color-mix(in srgb, var(--root-color) 40%, transparent);
+}
+/* The type's icon: as high as the text, no dot after it */
+.swa-label-icon {
+  display: inline-flex;
+  vertical-align: -0.2em;
+  color: color-mix(in srgb, var(--root-color) 70%, transparent);
+}
+.swa-label-icon > .swa-icon {
+  width: 1.2em;
+  height: 1.2em;
+}
+.swa-label > .swa-label-icon {
+  margin-right: 0.35em;
+}
+.swa-label > .swa-label-icon + span::before {
+  content: none;
+}
+.swa-label-size,
+.swa-label-modified {
+  color: color-mix(in srgb, var(--root-color) 60%, transparent);
+}
+[data-swa-label-above] > .swa-more,
+[data-swa-label-above] > .swa-failed {
+  top: calc(1.275em + 2px + 4px);
+}
+/* A layer over a preview showing a document (a PDF's viewer, which takes every click on it): the preview's click the
+   action the settings give, as an image's preview's (the "…" over it) */
+.swa-shield {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
 .swa-pdf {
   display: block;
-  width: 100%;
+  /* (A width of its own where the settings give one, not a share: its frame takes its width from it) */
+  width: var(--swa-preview-width, 100%);
+  max-width: 100%;
   height: var(--swa-height, 160px);
   border: none;
 }
@@ -519,6 +1062,11 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 .swa-dialog-tab:hover {
   opacity: 1;
 }
+/* (No ground of a button focused or tapped: the tab chosen is told by its line) */
+.swa-dialog .swa-dialog-tab:is(:focus, :active) {
+  background: none;
+  -webkit-tap-highlight-color: transparent;
+}
 .swa-dialog-tab[aria-selected="true"] {
   opacity: 1;
   font-weight: 600;
@@ -559,9 +1107,58 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   opacity: 0.45;
   cursor: default;
 }
-/* The Assets and Markdown tabs' room */
+/* The settings tabs' room */
 .swa-dialog-panel {
   padding: 14px 2px 6px;
+}
+/* On a phone (as the other plugins' dialogs): over the whole screen, no corners; its tabs a row that scrolls sideways,
+   what a finger presses larger; the Files tab's rows a type's name over its three choices (four columns have no room) */
+@media (max-width: 480px), (pointer: coarse) and (max-height: 600px) {
+  .swa-dialog,
+  .swa-dialog.swa-settings-window {
+    width: 100vw;
+    height: 100vh;
+    height: var(--sw-view-height, 100dvh);
+    min-height: 0;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .swa-dialog-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .swa-dialog-tab {
+    flex: none;
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+  .swa-dialog-cancel,
+  .swa-dialog-save {
+    padding: 10px 18px;
+  }
+  .swa-dialog-close {
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+  }
+  .swa-settings-grid-files {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .swa-settings-grid-files .swa-settings-type-name {
+    grid-column: 1 / -1;
+    margin-top: 6px;
+  }
+  /* (The head's first cell, over the names, has no column of its own there) */
+  .swa-settings-grid-files .swa-settings-head > span:first-child {
+    display: none;
+  }
+  .swa-settings-select,
+  .swa-settings-number {
+    min-height: 36px;
+  }
 }
 /* The Markdown tab: its boxes one under another */
 .swa-settings-markdown {

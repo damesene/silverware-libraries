@@ -7,7 +7,7 @@
 // would be registered the same way, its types added to `PageChange` and
 // `PageSections` (TypeScript's interface merging for the latter).
 import { validateAttributeName, writeAttributes } from "../markdown/attributes.ts";
-import { embedAsLink, type EmbedChanges, linkAsEmbed, readEmbeds, readLinks, writeEmbed } from "../markdown/embed.ts";
+import { embedAsLink, type EmbedChanges, linkAsEmbed, linkAsText, readEmbeds, readLinks, writeEmbed } from "../markdown/embed.ts";
 import { readGrids } from "../markdown/grid.ts";
 import { blocksIn, type GridMode, gridOfBlocks, ungridded } from "../markdown/gridbuild.ts";
 import { codeBlocksOf, sameBody } from "./blocks.ts";
@@ -19,6 +19,9 @@ import { isWithin, matches, renamedTag } from "./tags/names.ts";
 import type { TagContext } from "./tags/scan.ts";
 import { readScalar } from "../yaml/scalar.ts";
 import { emptyMap, isYamlMap, readYamlMap, validateYamlValue, writeYamlEntry, type YamlMap, type YamlValue } from "../yaml/tree.ts";
+
+// What may stand before an embed on its line and go with it: nothing but a list's, a task's or a quote's markers
+const ONLY_MARKERS = /^\s*(?:(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?|>\s*)*$/;
 
 /** A property's value: a scalar, a list, or a map (a plugin's own data, `_database`), nested as deep as needed */
 export type PropertyValue = YamlValue;
@@ -63,7 +66,9 @@ export type PageChange =
   // `occurrence`-th of those alike), written in its own style
   | { readonly kind: "setEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number; readonly changes: EmbedChanges }
   | { readonly kind: "embedToLink"; readonly text: string; readonly occurrence: number; readonly of?: number }
-  | { readonly kind: "linkToEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number };
+  | { readonly kind: "removeEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number }
+  | { readonly kind: "linkToEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number }
+  | { readonly kind: "linkToText"; readonly text: string; readonly occurrence: number; readonly of?: number };
 
 /** The builder's sections, one per part of a page's content (their parts below make them); every method gives the page's builder back */
 export interface PageSections {
@@ -135,10 +140,14 @@ export interface PageSections {
     set(text: string, changes: EmbedChanges, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
     /** An embed written as a link to its target (its alt text the link's, its size and metadata left out), found as `set` finds it */
     toLink(text: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /** An embed taken out of the page (its file deleted), found as `set` finds it: its line with it where it was alone on it */
+    remove(text: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
   };
   readonly links: {
     /** A link written as an embed of its target (`[[a.pdf]]`: `![[a.pdf]]`): the link whose text is `text`, the `occurrence`-th of those alike */
     toEmbed(text: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /** A link written as the text it shows (its alias, else its file's name: its file deleted, the sentence kept), found as `toEmbed` finds it */
+    toText(text: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
   };
 }
 
@@ -474,37 +483,54 @@ export const PARTS: readonly Part[] = [
     },
   }),
   part({
-    kinds: ["setEmbed", "embedToLink"],
+    kinds: ["setEmbed", "embedToLink", "removeEmbed"],
     section: {
       name: "embeds",
       make: (add) => ({
         set: (text, changes, where = {}) =>
           add({ kind: "setEmbed", text, changes: structuredClone(changes), occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
         toLink: (text, where = {}) => add({ kind: "embedToLink", text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        remove: (text, where = {}) => add({ kind: "removeEmbed", text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
       }),
     },
     write: (text, change) => {
       const alike = readEmbeds(text).filter((embed) => embed.text === change.text);
       const embed = alike[change.occurrence];
       if (!embed || (change.of !== undefined && alike.length !== change.of)) return { text, changes: 0, problem: "its embed changed since it was read: left alone" };
+      if (change.kind === "removeEmbed") {
+        // Alone on its line (or a list item's, a task's, a quote's: its marker before it alone): the line with it (its
+        // line break), else the embed alone
+        const start = text.lastIndexOf("\n", embed.from - 1) + 1;
+        const end = text.indexOf("\n", embed.to);
+        const lineEnd = end < 0 ? text.length : end;
+        const alone = ONLY_MARKERS.test(text.slice(start, embed.from)) && !text.slice(embed.to, lineEnd).trim();
+        if (!alone) return { text: text.slice(0, embed.from) + text.slice(embed.to), changes: 1 };
+        // (A blank line before and after it: one of them with it, not two blank lines left where it was)
+        let to = end < 0 ? lineEnd : lineEnd + 1;
+        const blankBefore = start === 0 || /^[ \t]*\r?$/.test(text.slice(text.lastIndexOf("\n", start - 2) + 1, start - 1));
+        const next = text.indexOf("\n", to);
+        if (blankBefore && to < text.length && next >= 0 && !text.slice(to, next).trim()) to = next + 1;
+        return { text: text.slice(0, start) + text.slice(to), changes: 1 };
+      }
       const written = change.kind === "embedToLink" ? embedAsLink(embed) : writeEmbed(embed, change.changes);
       if (written === embed.text) return { text, changes: 0 };
       return { text: text.slice(0, embed.from) + written + text.slice(embed.to), changes: 1 };
     },
   }),
   part({
-    kinds: ["linkToEmbed"],
+    kinds: ["linkToEmbed", "linkToText"],
     section: {
       name: "links",
       make: (add) => ({
         toEmbed: (text, where = {}) => add({ kind: "linkToEmbed", text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
+        toText: (text, where = {}) => add({ kind: "linkToText", text, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
       }),
     },
     write: (text, change) => {
       const alike = readLinks(text).filter((link) => link.text === change.text);
       const link = alike[change.occurrence];
       if (!link || (change.of !== undefined && alike.length !== change.of)) return { text, changes: 0, problem: "its link changed since it was read: left alone" };
-      return { text: text.slice(0, link.from) + linkAsEmbed(link) + text.slice(link.to), changes: 1 };
+      return { text: text.slice(0, link.from) + (change.kind === "linkToText" ? linkAsText(link) : linkAsEmbed(link)) + text.slice(link.to), changes: 1 };
     },
   }),
   // The body: the page builder's own `body`, no section

@@ -6,7 +6,7 @@
 // the one drawing it (shared/rendered.ts: its media, its links, their places), never read from its HTML.
 import type { Asset } from "../../../../shared/assets.ts";
 import { type Embed, type EmbedChanges, resolvedTarget } from "../../../../shared/markdown/embed.ts";
-import { pageChanges } from "../../../../shared/pages/changes.ts";
+import { type PageBuilder, pageChanges } from "../../../../shared/pages/changes.ts";
 import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
 import type { Rendered, RenderedItem } from "../../../../shared/rendered.ts";
@@ -47,10 +47,22 @@ function topOf(element: Element): Element | undefined {
   return top.parentElement ? top : undefined;
 }
 
+/** A URL-encoded name decoded (SilverBullet encodes a link's and a file's path by encodeURIComponent, its `/` kept:
+ * plug-api/lib/ref.ts `encodePageURI`); as it is where it is no such name */
+function decoded(name: string): string {
+  try {
+    return decodeURIComponent(name);
+  } catch {
+    return name;
+  }
+}
+
 /** A link's target and form as SilverBullet drew it; none for an element of Silverware Assets' own */
 export function drawnLink(element: HTMLElement): Link | undefined {
   if (element.closest(".swa-own, .swa-card")) return undefined;
-  if (element.matches("a.sb-wiki-link")) return { element, target: element.getAttribute("href") ?? "", style: "wiki" };
+  // (A wiki link's href is its target URL-encoded, `a%20b.pdf` for `[[a b.pdf]]`, `Q%26A.pdf` for `[[Q&A.pdf]]`, 2.12.1,
+  // probed 2026-11-14: decoded, the file's name as written; its `data-ref` outside the editor is as written already)
+  if (element.matches("a.sb-wiki-link")) return { element, target: decoded(element.getAttribute("href") ?? ""), style: "wiki" };
   if (element.matches("a.wiki-link[data-ref]")) return { element, target: element.getAttribute("data-ref") ?? "", style: "wiki" };
   const href = element.getAttribute("href");
   return href ? { element, target: href, style: "markdown" } : undefined;
@@ -83,14 +95,7 @@ export function drawnTarget(frame: HTMLElement): { readonly target: string; read
   const native = [...frame.querySelectorAll<HTMLElement>(MEDIA)].find((medium) => depthIn(frame, medium) <= MEDIUM_DEPTH);
   const source = native?.getAttribute("src") ?? native?.getAttribute("data");
   if (source) {
-    const path = source.replace(/^\.?\/?\.fs\//, "");
-    let target = path;
-    try {
-      target = decodeURIComponent(path);
-    } catch {
-      // (As written)
-    }
-    return { target, native };
+    return { target: decoded(source.replace(/^\.?\/?\.fs\//, "")), native };
   }
   // (Its words keep a run of spaces by no-break ones, `a\u00a0 b` for `a  b`, 2.12.1: the target's spaces again)
   const unsupported = UNSUPPORTED.exec(frame.textContent?.replace(/\u00a0/g, " ").trim() ?? "");
@@ -103,6 +108,14 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
   const remember = (items: readonly RenderedItem[]) => {
     for (const item of items) told.set(item.element, item);
   };
+  // A change of the page shown written by the page writer (its embed or link found by its text and its place among
+  // those alike); why not, as text
+  const inPage = async (build: (page: PageBuilder) => void): Promise<string | undefined> => {
+    const page = String(await bridge.getCurrentPage());
+    const report = await writer.write(pageChanges().page(page, build).build());
+    return report.skipped[0]?.reason;
+  };
+  const where = (write: FormWrite) => ({ occurrence: write.occurrence, of: write.of });
   return {
     // (The function given back stops it)
     watch: (drawn: (embeds: readonly Drawn[]) => void): (() => void) => {
@@ -252,21 +265,28 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
       const modified = typeof meta.lastModified === "string" || typeof meta.lastModified === "number" ? meta.lastModified : undefined;
       return { ...(size === undefined ? {} : { size }), ...(modified === undefined ? {} : { modified }) };
     },
-    writeEmbed: async (write: Write): Promise<string | undefined> => {
-      const page = String(await bridge.getCurrentPage());
-      const report = await writer.write(pageChanges().page(page, (p) => p.embeds.set(write.text, write.changes, { occurrence: write.occurrence, of: write.of })).build());
-      return report.skipped[0]?.reason;
-    },
-    embedToLink: async (write: FormWrite): Promise<string | undefined> => {
-      const page = String(await bridge.getCurrentPage());
-      const report = await writer.write(pageChanges().page(page, (p) => p.embeds.toLink(write.text, { occurrence: write.occurrence, of: write.of })).build());
-      return report.skipped[0]?.reason;
-    },
-    linkToEmbed: async (write: FormWrite): Promise<string | undefined> => {
-      const page = String(await bridge.getCurrentPage());
-      const report = await writer.write(pageChanges().page(page, (p) => p.links.toEmbed(write.text, { occurrence: write.occurrence, of: write.of })).build());
-      return report.skipped[0]?.reason;
-    },
+    writeEmbed: (write: Write) => inPage((p) => p.embeds.set(write.text, write.changes, where(write))),
+    embedToLink: (write: FormWrite) => inPage((p) => p.embeds.toLink(write.text, where(write))),
+    linkToEmbed: (write: FormWrite) => inPage((p) => p.links.toEmbed(write.text, where(write))),
+    // A file deleted: SilverBullet's own deletion of a document (`space.deleteDocument`, handed over); none: no Delete
+    ...(bridge.deleteDocument
+      ? {
+          deleteFile: async (path: string): Promise<string | undefined> => {
+            try {
+              await bridge.deleteDocument!(path);
+              return undefined;
+            } catch (error) {
+              return error instanceof Error ? error.message : String(error);
+            }
+          },
+          confirm: async (question: string): Promise<boolean> => {
+            const ask = bridge.confirmDelete ?? bridge.confirm;
+            return ask ? !!(await ask(question)) : (doc.defaultView ?? window).confirm(question);
+          },
+        }
+      : {}),
+    removeEmbed: (write: FormWrite) => inPage((p) => p.embeds.remove(write.text, where(write))),
+    linkToText: (write: FormWrite) => inPage((p) => p.links.toText(write.text, where(write))),
     open: (url: string): void => void (doc.defaultView ?? window).open(url, "_blank", "noopener"),
     problem: (message: string): void => void bridge.flash(message, "error"),
   };

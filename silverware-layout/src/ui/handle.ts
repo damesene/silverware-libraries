@@ -10,6 +10,7 @@ import { el } from "../../../shared/elements.ts";
 import type { LayoutAnchor } from "../../../shared/layout.ts";
 import type { Guide } from "../model/settings.ts";
 import { draggedRoomWidth, draggedWidth, MIN_ROOM_WIDTH, MIN_WIDGET_WIDTH, PANE_GUTTER, roomTargets, type SnapTarget, snapped, snapTargets, type WidgetWidth, widestWidth, widthName } from "../core/widgetwidth.ts";
+import { EdgeLines } from "./edges.ts";
 import { GuideLines } from "./guidelines.ts";
 
 const BASE = "swl-handle";
@@ -55,6 +56,12 @@ export type HandleHost<W> = {
   room?(widget: W): number | undefined;
   // What a widget without a width of its own is (none: as wide as the text): of its own size, the text's width it snaps to kept as pixels
   unsized?(widget: W): "text" | "own";
+  // Whether each edge of a widget is dragged alone too (ui/edges.ts), and what that asks: where the text's middle is
+  // (x in the window), a width and a shift off that middle shown (nothing written), and written in one edit
+  edges?(widget: W): boolean;
+  textMiddle?(): number | undefined;
+  showPlace?(element: HTMLElement, width: WidgetWidth | undefined, shift: number): void;
+  writePlace?(widget: W, width: WidgetWidth | undefined, shift: number): Promise<void>;
 };
 
 type Drag = { readonly pointer: number; readonly x: number; readonly start: number; readonly was: WidgetWidth | undefined; now: WidgetWidth | undefined; moved: boolean };
@@ -69,6 +76,8 @@ export class WidthHandle<W> {
   private keyed: { readonly widget: W; width: number } | undefined;
   // While a drag goes on: a guide for each width it snaps to, a quiet line each side of the text's middle
   private readonly lines: GuideLines;
+  // A widget's edges dragged alone, where its provider has them (a line on each)
+  private readonly edges: EdgeLines<W>;
   // The guide the drag snapped to last, lit as the page scrolls meanwhile
   private near: string | undefined;
   // Where the widget's middle was last: a widget drawn anew (after a write) is found there again
@@ -85,6 +94,7 @@ export class WidthHandle<W> {
     this.bar = el(doc, "button", { class: `${BASE}-bar`, attrs: { "aria-label": "Widget width: drag, or the arrow keys; a double click for the text's width" } });
     this.box = el(doc, "div", { class: BASE, attrs: { hidden: "" } }, this.bar);
     this.lines = new GuideLines(doc, host);
+    this.edges = new EdgeLines(doc, host, this.lines);
     doc.body.append(this.box);
     doc.addEventListener("pointermove", (e) => this.pointed(e), { passive: true });
     doc.addEventListener("pointerdown", (e) => this.touched(e), { capture: true, passive: true });
@@ -114,10 +124,10 @@ export class WidthHandle<W> {
   }
 
   private pointed(e: PointerEvent): void {
-    if (this.drag || e.pointerType === "touch") return;
+    if (this.drag || this.edges.dragging || e.pointerType === "touch") return;
     const target = e.target instanceof Element ? e.target : undefined;
     if (!target) return;
-    if (this.box.contains(target)) return this.stay();
+    if (this.box.contains(target) || this.edges.contains(target)) return this.stay();
     const widget = this.host.enabled() ? (this.host.widgetAt(target) ?? this.besideEdge(e.clientX, e.clientY)) : undefined;
     if (widget) {
       this.stay();
@@ -136,9 +146,9 @@ export class WidthHandle<W> {
 
   /** A finger (or a pen) on the page, which has no hover: on a widget its handle shows, elsewhere it goes */
   private touched(e: PointerEvent): void {
-    if (this.drag || e.pointerType === "mouse") return;
+    if (this.drag || this.edges.dragging || e.pointerType === "mouse") return;
     const target = e.target instanceof Element ? e.target : undefined;
-    if (!target || this.box.contains(target)) return;
+    if (!target || this.box.contains(target) || this.edges.contains(target)) return;
     const widget = this.host.enabled() ? this.host.widgetAt(target) : undefined;
     if (widget) {
       this.stay();
@@ -166,9 +176,10 @@ export class WidthHandle<W> {
 
   private hide(): void {
     this.stay();
-    if (this.drag) return;
+    if (this.drag || this.edges.dragging) return;
     this.box.hidden = true;
     this.widget = undefined;
+    this.edges.hide();
   }
 
   /** Placed by the widget's right edge, centred on the part of it in view */
@@ -194,6 +205,7 @@ export class WidthHandle<W> {
     // (Held in the view: a sliver of a widget in view gets the least bar, not out over the top bar)
     const at = Math.min(Math.max(top + (bottom - top - height) / 2, view.top), view.bottom - height);
     Object.assign(this.box.style, { left: `${Math.round(rect.right + 6)}px`, top: `${Math.round(at)}px`, height: `${Math.round(height)}px` });
+    this.edges.show(this.widget);
   }
 
   /** Placed again as the page scrolls or the window changes; gone where its widget is (drawn anew, scrolled away) */

@@ -102,3 +102,48 @@ export function snapped(width: number, targets: readonly SnapTarget[]): { readon
 
 /** A width kept, as it is named where it shows: the text's, Full width, else its pixels or percent */
 export const widthName = (kept: WidgetWidth | undefined): string => (kept === undefined ? "Page width" : guideName(kept));
+
+/** A widget's shift as kept (`shift`: its middle right of the text's, px, left where negative); none or anything else: 0 */
+export function readShift(value: string | undefined): number {
+  const shift = Number(value);
+  return value !== undefined && value.trim() !== "" && Number.isFinite(shift) ? Math.round(shift) : 0;
+}
+
+/** A widget's edges, from the text's middle (px, left negative): where it is, as an edge is dragged */
+export type Edges = { readonly left: number; readonly right: number };
+
+/** A widget's edges as kept: its width shown, its middle shifted */
+export const edgesOf = (width: number, shift: number): Edges => ({ left: shift - width / 2, right: shift + width / 2 });
+
+/**
+ * Where a drag of one edge by `moved` takes a widget's edges: that edge alone moved, the other standing; snapped to
+ * where a target's width puts that edge about the text's middle (the text's width, a guide), within SNAP_DISTANCE;
+ * not narrower than the least, nor past the pane less half its gutter on either side. Its width and shift as kept:
+ * none and 0 where it is the text's, centred
+ */
+export function draggedEdge(
+  start: Edges,
+  edge: "left" | "right",
+  moved: number,
+  pane: number,
+  targets: readonly SnapTarget[],
+): { readonly edges: Edges; readonly width: WidgetWidth | undefined; readonly shift: number; readonly name?: string } {
+  const bound = pane / 2 - PANE_GUTTER / 2;
+  let at = edge === "left" ? Math.max(-bound, Math.min(start.right - MIN_WIDGET_WIDTH, start.left + moved)) : Math.min(bound, Math.max(start.left + MIN_WIDGET_WIDTH, start.right + moved));
+  let name: string | undefined;
+  let best = SNAP_DISTANCE + 1;
+  for (const target of targets) {
+    const place = edge === "left" ? -target.width / 2 : target.width / 2;
+    if (Math.abs(place - at) <= SNAP_DISTANCE && Math.abs(place - at) < best && Math.abs(place) <= bound) {
+      best = Math.abs(place - at);
+      at = place;
+      name = target.name;
+    }
+  }
+  const edges = edge === "left" ? { left: at, right: start.right } : { left: start.left, right: at };
+  const width = Math.round(edges.right - edges.left);
+  const shift = Math.round((edges.left + edges.right) / 2);
+  // (Centred again: as a target keeps it, the text's own none)
+  const centred = shift === 0 ? targets.find((target) => Math.round(target.width) === width) : undefined;
+  return { edges, width: centred ? centred.kept : width, shift, ...(name ? { name } : {}) };
+}

@@ -93,6 +93,32 @@ test("a grid widened by its handle grows both ways, centred on the text", async 
   await expect.poll(() => space.saved("Page")).toMatch(/<grid width="\d+">/);
 });
 
+test("a grid's left edge dragged alone: its right edge standing, written as its width and shift; a double click centres it again", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\nAbove\n\n${GRID}\nBelow\n` }, "Page");
+  await gridsDrawn(page);
+  const grid = page.locator("#sb-main .swl-grid");
+  const edges = async () => {
+    const box = (await grid.boundingBox())!;
+    return [Math.round(box.x), Math.round(box.x + box.width)];
+  };
+  const [left, right] = await edges();
+  await grid.hover();
+  const line = page.locator(".swl-edge-left");
+  await expect(line).toBeVisible();
+  const box = (await line.boundingBox())!;
+  const y = box.y + Math.min(box.height / 2, 20);
+  await page.mouse.move(box.x + box.width / 2, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 - 60, y, { steps: 8 });
+  await expect.poll(edges).toEqual([left! - 60, right]);
+  await page.mouse.up();
+  await expect.poll(() => space.saved("Page")).toMatch(/<grid width="\d+" shift="-30">/);
+  await expect.poll(edges).toEqual([left! - 60, right]);
+  // Centred again, its width kept
+  await page.locator(".swl-edge-left").dblclick();
+  await expect.poll(() => space.saved("Page")).toMatch(/<grid width="\d+">/);
+});
+
 test("the divider between two columns dragged: their shares change as it moves, snapping to 2 : 1, written; a double click makes them even again", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${GRID}\nBelow\n` }, "Page");
   await gridsDrawn(page);

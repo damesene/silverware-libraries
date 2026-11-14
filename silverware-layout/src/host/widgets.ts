@@ -8,7 +8,7 @@
 import type { LayoutAnchor, LayoutProvider } from "../../../shared/layout.ts";
 import { OVER_WINDOW_ATTRIBUTE } from "../../../shared/overwindow.ts";
 import type { Registry } from "../core/registry.ts";
-import { cssWidgetWidth, keptWidgetWidth, readWidgetWidth, type WidgetWidth } from "../core/widgetwidth.ts";
+import { cssWidgetWidth, keptWidgetWidth, readShift, readWidgetWidth, type WidgetWidth } from "../core/widgetwidth.ts";
 import { markContent, textWidthOf } from "./marks.ts";
 import type { PageHost } from "./page.ts";
 
@@ -18,6 +18,9 @@ const WIDTH_VARIABLE = "--swl-width";
 const ANCHOR_ATTRIBUTE = "data-swl-anchor-start";
 // A widget laid out in a room of its own, not the page's text (a cell): the style page holds it within that room
 const ROOM_ATTRIBUTE = "data-swl-in-room";
+// A widget off the text's middle (its edges dragged alone, its provider's say): how far, px, its middle right of the text's
+const SHIFT_ATTRIBUTE = "data-swl-shift";
+const SHIFT_VARIABLE = "--swl-shift";
 
 /** A widget of a provider's, as rendered */
 export type Widget = { readonly element: HTMLElement; readonly provider: LayoutProvider };
@@ -77,9 +80,10 @@ export class Widgets {
     for (const [element, provider] of found) this.layOut({ element, provider });
     // An element laid out before that no provider takes any more (a medium shown another way by its plugin, which its
     // provider's selector leaves out): its width taken off, it is no widget now
-    for (const element of root.querySelectorAll<HTMLElement>(`[${WIDTH_ATTRIBUTE}], [${ANCHOR_ATTRIBUTE}], [${ROOM_ATTRIBUTE}]`)) {
+    for (const element of root.querySelectorAll<HTMLElement>(`[${WIDTH_ATTRIBUTE}], [${ANCHOR_ATTRIBUTE}], [${ROOM_ATTRIBUTE}], [${SHIFT_ATTRIBUTE}]`)) {
       if (found.has(element)) continue;
       this.show(element, undefined);
+      this.showShift(element, 0);
       element.removeAttribute(ANCHOR_ATTRIBUTE);
       element.removeAttribute(ROOM_ATTRIBUTE);
     }
@@ -103,6 +107,40 @@ export class Widgets {
     const inRoom = this.room(widget) !== undefined;
     if (widget.element.hasAttribute(ROOM_ATTRIBUTE) !== inRoom) widget.element.toggleAttribute(ROOM_ATTRIBUTE, inRoom);
     this.show(widget.element, this.kept(widget));
+    this.showShift(widget.element, widget.provider.edges ? this.keptShift(widget) : 0);
+  }
+
+  /** How far a widget's middle is kept right of the text's (px, left negative; none: 0) */
+  keptShift(widget: Widget): number {
+    try {
+      return readShift(widget.provider.read(widget.element).shift);
+    } catch {
+      return 0;
+    }
+  }
+
+  /** A widget shown off the text's middle (0: centred), nothing written */
+  showShift(element: HTMLElement, shift: number): void {
+    if (!shift) {
+      if (element.hasAttribute(SHIFT_ATTRIBUTE)) element.removeAttribute(SHIFT_ATTRIBUTE);
+      if (element.style.getPropertyValue(SHIFT_VARIABLE)) element.style.removeProperty(SHIFT_VARIABLE);
+      return;
+    }
+    if (element.getAttribute(SHIFT_ATTRIBUTE) !== String(shift)) element.setAttribute(SHIFT_ATTRIBUTE, String(shift));
+    if (element.style.getPropertyValue(SHIFT_VARIABLE) !== `${shift}px`) element.style.setProperty(SHIFT_VARIABLE, `${shift}px`);
+  }
+
+  /** A widget's width and shift written by its plugin in one edit (none, 0: taken off); why not, said, then shown for the view only */
+  async writePlace(widget: Widget, width: WidgetWidth | undefined, shift: number): Promise<void> {
+    this.show(widget.element, width);
+    this.showShift(widget.element, shift);
+    let problem: string | undefined;
+    try {
+      problem = await widget.provider.write(widget.element, { width: width === undefined ? null : keptWidgetWidth(width), shift: shift ? String(shift) : null });
+    } catch (e) {
+      problem = e instanceof Error ? e.message : String(e);
+    }
+    if (problem) this.problem(`Silverware Layout: the width could not be saved (${problem}); it holds until the widget is drawn again`);
   }
 
   /** Where a widget stays as its width changes: its provider's say, centred where it says none */
@@ -160,7 +198,9 @@ export class Widgets {
     this.show(widget.element, width);
     let problem: string | undefined;
     try {
-      problem = await widget.provider.write(widget.element, { width: width === undefined ? null : keptWidgetWidth(width) });
+      // (Taken off, the text's width again: centred too, where it was shifted)
+      const shifted = width === undefined && widget.provider.edges && this.keptShift(widget) !== 0;
+      problem = await widget.provider.write(widget.element, { width: width === undefined ? null : keptWidgetWidth(width), ...(shifted ? { shift: null } : {}) });
     } catch (e) {
       problem = e instanceof Error ? e.message : String(e);
     }
@@ -177,6 +217,13 @@ export class Widgets {
       if (!found || found.element.contains(element)) found = { element, provider };
     }
     return found;
+  }
+
+  /** Where the text's middle is (x in the window): a widget's shift is off it */
+  textMiddle(): number | undefined {
+    if (!(this.content instanceof HTMLElement)) return undefined;
+    const rect = this.content.getBoundingClientRect();
+    return rect.left + rect.width / 2;
   }
 
   /** The text's width now (the page's content less its padding): a widget without a width of its own is as wide */

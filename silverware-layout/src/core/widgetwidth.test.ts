@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Guide } from "../model/settings.ts";
-import { cssWidgetWidth, draggedRoomWidth, draggedWidth, keptWidgetWidth, readWidgetWidth, roomTargets, shownWidgetWidth, snapped, snapTargets, widestWidth, widthName } from "./widgetwidth.ts";
+import { cssWidgetWidth, draggedRoomWidth, draggedWidth, keptWidgetWidth, readWidgetWidth, roomTargets, shownWidgetWidth, snapped, snapTargets, widestWidth, widthName, draggedEdge, edgesOf, readShift } from "./widgetwidth.ts";
 
 const guides: Guide[] = [1200, "80%", "full"];
 
@@ -94,5 +94,36 @@ describe("A widget's width", () => {
     expect(draggedRoomWidth(120, -500, 400, "start")).toBe(40);
     expect(draggedRoomWidth(120, 30, 400, "center")).toBe(180);
     expect(draggedRoomWidth(30, -10, 30, "start")).toBe(30);
+  });
+});
+
+describe("a widget's edge dragged alone", () => {
+  const targets = snapTargets(760, [1200, "full"], 1600);
+  const start = edgesOf(760, 0);
+
+  it("moves that edge alone, the other standing: its width and shift off the text's middle", () => {
+    const left = draggedEdge(start, "left", -100, 1600, targets);
+    expect(left.edges).toEqual({ left: -480, right: 380 });
+    expect([left.width, left.shift]).toEqual([860, -50]);
+    const right = draggedEdge(start, "right", 50, 1600, targets);
+    expect([right.width, right.shift]).toEqual([810, 25]);
+  });
+
+  it("snaps an edge to where a target's width puts it about the text's middle, within the pane", () => {
+    // 1200's left edge: 600 left of the middle
+    const snapped = draggedEdge(start, "left", -217, 1600, targets);
+    expect(snapped.edges.left).toBe(-600);
+    expect(snapped.name).toBe("1200 px");
+    // Past the pane less half its gutter: held there (780 from the middle), Full width's edge
+    expect(draggedEdge(start, "left", -900, 1600, targets).edges.left).toBe(-780);
+  });
+
+  it("keeps it centred as a target keeps it where both edges come back to one", () => {
+    const back = draggedEdge({ left: -380, right: 400 }, "right", -20, 1600, targets);
+    expect([back.width, back.shift]).toEqual([undefined, 0]);
+  });
+
+  it("reads a shift kept, anything else none", () => {
+    expect([readShift("-150"), readShift("12.6"), readShift(undefined), readShift("x"), readShift("")]).toEqual([-150, 13, 0, 0, 0]);
   });
 });

@@ -6,7 +6,7 @@ import type { LayoutChanges, LayoutEntries, LayoutProvider } from "../../../shar
 import type { Grids } from "./grids.ts";
 
 // Layout's keys a grid keeps (its others are the grid's own: columns)
-const LAYOUT_KEYS = ["width"] as const;
+const LAYOUT_KEYS = ["width", "shift"] as const;
 
 export function gridProvider(grids: Grids): LayoutProvider {
   const gridIn = (element: Element) => element.querySelector<HTMLElement>(":scope .swl-grid");
@@ -23,5 +23,7 @@ export function gridProvider(grids: Grids): LayoutProvider {
       if (!grid) return "the grid is not drawn";
       return grids.writeAttributes(grid, changes);
     },
+    // Each edge dragged alone too, its place off the text's middle kept as `shift`
+    edges: true,
   };
 }

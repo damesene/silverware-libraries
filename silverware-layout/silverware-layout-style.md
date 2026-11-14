@@ -21,7 +21,13 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   margin-right: calc((100% - var(--swl-shown)) / 2) !important;
   box-sizing: border-box;
 }
-/* A widget staying at the text's start (its provider's say: an embedded medium, a grid): it grows to the right alone,
+/* A widget off the text's middle (its edges dragged alone: a grid), by --swl-shift (its middle right of the text's):
+   held within the pane less half the gutter on either side */
+:root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-shift]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+  margin-left: clamp(calc(20px - (var(--swl-pane-width, 100vw) - 100%) / 2), calc((100% - var(--swl-shown)) / 2 + var(--swl-shift, 0px)), calc(100% + (var(--swl-pane-width, 100vw) - 100%) / 2 - 20px - var(--swl-shown))) !important;
+  margin-right: auto !important;
+}
+/* A widget staying at the text's start (its provider's say: an embedded medium): it grows to the right alone,
    as far as the pane's right edge less half the gutter (the text centred in the pane, 100% its width) */
 :root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-anchor-start]:not([data-silverware-over-window], [data-silverware-over-window] *) {
   width: min(var(--swl-shown), calc((var(--swl-pane-width, 100vw) + 100%) / 2 - 20px)) !important;
@@ -108,6 +114,44 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
     content: "";
     position: absolute;
     inset: -6px -12px;
+  }
+}
+/* A widget's edges dragged alone (src/ui/edges.ts, its provider's say: a grid): a line on each edge as its handle
+   shows, quiet, plain as the pointer is on it or it is dragged (as a grid's column dividers); a finger's target wider */
+.swl-edge {
+  position: fixed;
+  z-index: var(--sw-layer-control);
+  width: 12px;
+  margin-left: -6px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.swl-edge[hidden] {
+  display: none;
+}
+.swl-edge::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 5px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--ui-accent-color, #4a90e2);
+  opacity: 0.25;
+  transition: opacity 0.12s;
+}
+.swl-edge:hover::before,
+.swl-edge.swl-edge-dragging::before {
+  opacity: 1;
+}
+@media (pointer: coarse) {
+  .swl-edge {
+    width: 24px;
+    margin-left: -12px;
+  }
+  .swl-edge::before {
+    left: 11px;
   }
 }
 /* The guides of a drag: a quiet dashed line each side for the text's width and each guide, over the whole height the

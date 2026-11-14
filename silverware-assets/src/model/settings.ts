@@ -18,11 +18,27 @@ export type AssetSettings = {
   readonly card: readonly CardField[];
   // A view's height where nothing gives one (px)
   readonly heights: Readonly<Record<"preview" | "embed", number>>;
+  // A preview's size: its width for all files (none: as wide as it fits), and per type its width and height (none:
+  // all files'); the height for all files is `heights.preview`. An image fits in it, its ratio kept; a PDF's is so large
+  readonly previews: { readonly width?: number; readonly types: Readonly<Record<string, PreviewSize>> };
   // Where an asset stays as its width is dragged: at the text's start (it grows to the right), or centred
   readonly anchor: "start" | "center";
   // Whether a link to a file of the space (`[[report.pdf]]`) shows its type's icon before its text
   readonly linkIcons: boolean;
 };
+
+/** A preview's size of a type's own: its width, its height (px), each none where all files' holds */
+export type PreviewSize = { readonly width?: number; readonly height?: number };
+
+/** The least and the most a preview's side may be (px) */
+export const PREVIEW_LIMITS = { min: 40, max: 2000 } as const;
+
+/** A preview's size for a type: its own width and height, else all files' (the height `heights.preview`, the width none: as wide as it fits) */
+export function previewSize(settings: AssetSettings, type: string): { readonly width?: number; readonly height: number } {
+  const own = settings.previews.types[type] ?? {};
+  const width = own.width ?? settings.previews.width;
+  return { ...(width === undefined ? {} : { width }), height: own.height ?? settings.heights.preview };
+}
 
 /** Where the settings are kept (read whole): Silverware Assets' own block of CONFIG (tables the Configuration Manager would lose) */
 export const ASSETS_PATH = "silverware.assets";
@@ -39,6 +55,7 @@ export function storedAssetSettings(settings: AssetSettings): Record<string, unk
     actions: { default: { ...settings.actions.default }, types: Object.fromEntries(Object.entries(settings.actions.types).map(([k, v]) => [k, { ...v }])) },
     card: [...settings.card],
     heights: { ...settings.heights },
+    previews: { ...(settings.previews.width === undefined ? {} : { width: settings.previews.width }), types: Object.fromEntries(Object.entries(settings.previews.types).map(([k, v]) => [k, { ...v }])) },
     anchor: settings.anchor,
     linkIcons: settings.linkIcons,
   };
@@ -49,6 +66,7 @@ export const DEFAULT_ASSET_SETTINGS: AssetSettings = {
   actions: { default: { click: "open-tab", "shift+click": "open-tab" }, types: {} },
   card: ["icon", "name"],
   heights: { preview: 160, embed: 480 },
+  previews: { types: {} },
   anchor: "start",
   linkIcons: true,
 };
@@ -86,6 +104,7 @@ export function readAssetSettings(value: unknown): { readonly settings: AssetSet
       actions: { default: actions.default === undefined ? DEFAULT_ASSET_SETTINGS.actions.default : gestures(actions.default), types: actionTypes },
       card,
       heights: { preview: height("preview"), embed: height("embed") },
+      previews: readPreviews(given.previews),
       anchor: given.anchor === "center" ? "center" : "start",
       linkIcons: given.linkIcons !== false,
     },
@@ -111,3 +130,18 @@ export const readSyntaxModeSettings = (get: (path: string) => unknown): SyntaxMo
   hideAssets: get(SYNTAX_PATHS.hides) !== false,
   clickPlacesCursor: get(SYNTAX_PATHS.clicks) !== false,
 });
+
+/** A preview's sizes as configured: each side a number within PREVIEW_LIMITS, anything else none */
+function readPreviews(value: unknown): AssetSettings["previews"] {
+  const given = record(value);
+  const side = (one: unknown) => (typeof one === "number" && one >= PREVIEW_LIMITS.min && one <= PREVIEW_LIMITS.max ? Math.round(one) : undefined);
+  const types: Record<string, PreviewSize> = {};
+  for (const [type, one] of Object.entries(record(given.types))) {
+    const size = record(one);
+    const width = side(size.width);
+    const height = side(size.height);
+    if (width !== undefined || height !== undefined) types[type] = { ...(width === undefined ? {} : { width }), ...(height === undefined ? {} : { height }) };
+  }
+  const width = side(given.width);
+  return { ...(width === undefined ? {} : { width }), types };
+}

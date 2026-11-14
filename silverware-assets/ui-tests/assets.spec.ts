@@ -182,6 +182,37 @@ test("a link to a file shows its type's icon, in a grid too; a link to a page no
   await expect(page.locator(".swa-popover")).toHaveCount(0);
 });
 
+test("a preview's size the settings' (all files, a type's own), never widened by a handle, a PDF's neither", async ({ page, space }) => {
+  await space.open(
+    { Page: `# Page\n\n![[${space.folder}/doc.pdf|||{ view: preview }]]\n\nBetween\n\n![[${space.folder}/photo.png|Photo||{ view: preview }]]\n` },
+    "Page",
+    { "doc.pdf": "%PDF-1.4\n", "photo.png": PIXEL_PNG },
+  );
+  const pdf = page.locator("#sb-main [data-swa-asset='pdf']");
+  await expect(pdf.locator(".swa-pdf")).toBeVisible();
+  // No handle beside a preview: its size is the settings'
+  const box = (await pdf.boundingBox())!;
+  await page.mouse.move(box.x + box.width + 120, box.y + 20);
+  await page.mouse.move(box.x + box.width + 6, box.y + 20, { steps: 6 });
+  await pdf.hover();
+  await expect(page.locator(".swl-handle-bar")).toBeHidden();
+  // A preview's width for all files, a PDF's own height
+  await runCommand(page, ASSETS_SETTINGS);
+  const dialog = page.locator(".swa-dialog");
+  await dialog.getByRole("tab", { name: "Assets" }).click();
+  await dialog.getByLabel("A preview's width (px)", { exact: true }).fill("200");
+  await dialog.getByLabel("pdf: a preview's height (px)", { exact: true }).fill("300");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  const size = async (locator: import("@playwright/test").Locator) => {
+    const one = (await locator.boundingBox())!;
+    return [Math.round(one.width), Math.round(one.height)];
+  };
+  await expect.poll(() => size(pdf.locator(".swa-pdf"))).toEqual([200, 300]);
+  // The image within 200 × 160 (a pixel drawn as large as it fits, its ratio kept): no wider than 200
+  await expect.poll(async () => (await size(page.locator("#sb-main [data-swa-asset='image'] img")))[0]! <= 200).toBe(true);
+});
+
 test("the settings' Assets tab: a card's size shown, a click set to the side panel; the panel shows the file and Esc closes it", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/archive.zip]]\n\n![[${space.folder}/photo.png|Photo||{ view: preview }]]\n` }, "Page", { "archive.zip": "zip", "photo.png": PIXEL_PNG });
   await expect(page.locator("#sb-main .swa-card")).toHaveText("archive.zip");

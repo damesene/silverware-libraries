@@ -22,6 +22,7 @@ config.define("silverware.assets", {
     actions = { type = "object", description = "What a click and a Shift+click on a file do (an action's name): a default, and one per type." },
     card = { type = "array", description = "What a file's card shows: icon, name, size, modified.", items = { type = "string" } },
     heights = { type = "object", description = "A preview's and an embed's height where nothing gives one (px)." },
+    previews = { type = "object", description = "A preview's width for all files (width, px; none: as wide as it fits) and per type its width and height (types)." },
     anchor = { type = "string", description = "Where a file stays as its width is dragged: start (it grows to the right) or center." },
     linkIcons = { type = "boolean", description = "A link to a file of the space shows its type's icon before its text." },
     syntaxMode = {

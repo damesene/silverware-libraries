@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type Asset, type AssetAction, type AssetType, assetsOf, ASSETS_VERSION } from "../../../shared/assets.ts";
 import { registerBuiltins } from "../builtin/index.ts";
 import { BUILTIN_TYPES } from "../builtin/types.ts";
-import { DEFAULT_ASSET_SETTINGS, readAssetSettings } from "../model/settings.ts";
+import { DEFAULT_ASSET_SETTINGS, previewSize, readAssetSettings, storedAssetSettings } from "../model/settings.ts";
 import { actionFor, extOf, mimeOf, typeFor, viewFor } from "./choose.ts";
 import { AssetRegistry, validateAssetType } from "./registry.ts";
 
@@ -53,6 +53,17 @@ describe("the view and the action", () => {
 });
 
 describe("the settings", () => {
+  it("give a preview's size for a type: its own sides, else all files' (the width none: as wide as it fits)", () => {
+    const { settings } = readAssetSettings({ heights: { preview: 160 }, previews: { width: 300, types: { pdf: { height: 400 }, image: { width: 1, height: 120 }, video: "big" } } });
+    expect(previewSize(settings, "pdf")).toEqual({ width: 300, height: 400 });
+    // (A side out of bounds: none, all files' then)
+    expect(previewSize(settings, "image")).toEqual({ width: 300, height: 120 });
+    expect(previewSize(settings, "file")).toEqual({ width: 300, height: 160 });
+    expect(previewSize(readAssetSettings({}).settings, "pdf")).toEqual({ height: 160 });
+    // Kept and read back alike
+    expect(readAssetSettings(storedAssetSettings(settings)).settings.previews).toEqual(settings.previews);
+  });
+
   it("are the defaults where none are set, and say what they could not read", () => {
     expect(readAssetSettings(undefined)).toEqual({ settings: DEFAULT_ASSET_SETTINGS, problems: [] });
     const { settings, problems } = readAssetSettings({ views: { default: "huge", types: { pdf: "tiny", image: "icon" } }, card: ["name", "colour"], heights: { preview: -1, embed: 300 } });

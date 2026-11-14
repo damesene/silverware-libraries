@@ -9,7 +9,7 @@ import { actionFor, mimeOf, typeFor, viewFor } from "./core/choose.ts";
 import { closestContext, embedAt, type LineContext, linkAt, outside, placeAmong, type Placed, type Range, sameTarget, writtenContext } from "./core/locate.ts";
 import { metadataOf } from "./core/metadata.ts";
 import type { AssetRegistry } from "./core/registry.ts";
-import { type AssetSettings, type Gesture, type View, VIEWS } from "./model/settings.ts";
+import { type AssetSettings, type Gesture, previewSize, type View, VIEWS } from "./model/settings.ts";
 import { addCardFields, dateText, drawCard, iconElement, markFailed, sizeText } from "./ui/card.ts";
 import { opensMenu } from "../../shared/popupmenu.ts";
 import { addMoreButton, type MoreMenu, popupOf } from "./ui/moremenu.ts";
@@ -331,7 +331,11 @@ export class AssetDecorator {
     frame.setAttribute("data-swa-view", view);
     // Its height: its embed's own, else the setting's for its view (a preview's; the original's for a viewer of the
     // host's that has no height of its own, a PDF's: the style page's rules read it)
-    frame.style.setProperty("--swa-height", `${Number(found.embed.height) || (view === "embed" ? settings.heights.embed : settings.heights.preview)}px`);
+    const preview = previewSize(settings, type.name);
+    frame.style.setProperty("--swa-height", `${Number(found.embed.height) || (view === "embed" ? settings.heights.embed : preview.height)}px`);
+    // A preview's width (none: as wide as it fits)
+    if (view === "preview" && preview.width !== undefined) frame.style.setProperty("--swa-preview-width", `${preview.width}px`);
+    else frame.style.removeProperty("--swa-preview-width");
     // (Written to the embed as the page has it now: its place among those of its text may have changed since)
     const write = async (changes: EmbedChanges) => {
       const now = await this.locateNow(drawn);

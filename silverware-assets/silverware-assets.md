@@ -23,7 +23,7 @@ Images, videos, audio, PDFs and other files you embed (`![[photo.png]]`, `![Phot
 
 Point at a file, and a **…** button shows at its top right: choose how it is shown there, or open it in a new tab, in a side panel or enlarged. On a card, its icon is that button (as a link's icon). A click on a card or a preview opens the file in a new tab; Shift+click does the same, unless you set otherwise: either can instead show the file in a panel at the window's right (**Show in a side panel**, the page still beside it) or enlarged over the page (**Show enlarged**). Esc or × closes them, and a click beside the enlarged file.
 
-**Its width**, with [Silverware Layout](https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md) installed: point at an image (or a video, a PDF as the original or as a preview), and the bar beside its right edge makes it wider or narrower, as a table's; it stays where it is and grows to the right (*Width dragged* below sets it centred instead). Let go, and the width is saved as SilverBullet's own size: `![[photo.png|Photo|300]]`.
+**Its width** (the original's: a preview keeps the size the settings give it), with [Silverware Layout](https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md) installed: point at an image (or a video, a PDF as the original or as a preview), and the bar beside its right edge makes it wider or narrower, as a table's; it stays where it is and grows to the right (*Width dragged* below sets it centred instead). Let go, and the width is saved as SilverBullet's own size: `![[photo.png|Photo|300]]`.
 
 ## Links to files
 
@@ -42,7 +42,7 @@ SilverBullet reads only the alt text and the size, so without Silverware Assets 
 
 ## Settings
 
-**For all files, or for one kind of file**: run **Silverware Assets: Settings**; its **Assets** tab. Set how files are shown, what a click and a Shift+click do, whether a width dragged stays at the start or is centred, a preview's height and an original PDF's (one with a height of its own, `|200x120`, keeps it), and what a card shows besides the file's name (its icon, its size, its date), for all files; then, per kind (image, video, audio, PDF, file), anything other than that ("Default" follows all files). What a file's own `view` says wins over both.
+**For all files, or for one kind of file**: run **Silverware Assets: Settings**; its **Assets** tab. Set how files are shown, what a click and a Shift+click do, whether a width dragged stays at the start or is centred, a preview's size (its width and height: an image fits in it, its proportions kept; a PDF's preview is that large) and an original PDF's height (one with a height of its own, `|200x120`, keeps it), and what a card shows besides the file's name (its icon, its size, its date), for all files; then, per kind (image, video, audio, PDF, file), anything other than that, a preview's size too ("Default", or a size left empty, follows all files). What a file's own `view` says wins over both.
 
 Saved into your CONFIG, in a block of Silverware Assets' own.
 

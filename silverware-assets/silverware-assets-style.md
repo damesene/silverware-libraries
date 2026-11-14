@@ -110,7 +110,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 .swa-settings-type {
   display: grid;
-  grid-template-columns: minmax(90px, 1fr) repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(90px, 1fr) repeat(3, minmax(0, 1fr)) max-content;
   gap: 6px;
   align-items: center;
 }
@@ -141,6 +141,10 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   width: 6em;
   font: inherit;
 }
+/* A preview's side in a type's row: narrow, two in a row */
+.swa-settings-side {
+  width: 4.5em;
+}
 /* Embedded media (docs/silverware-assets.md), marked by Silverware Assets on the host's frame of each
    (data-swa-asset: its type, data-swa-view: icon, preview or embed): the host's own drawing hidden where Silverware
    Assets draws instead; a preview of the host's drawing kept small; a card; the mark of a render that failed */
@@ -149,7 +153,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 [data-swa-view="preview"] :is(img, video, object):not(.swa-icon img, .swa-pdf) {
   max-height: var(--swa-height, 160px);
-  max-width: 100%;
+  max-width: min(100%, var(--swa-preview-width, 100%));
   width: auto !important;
   object-fit: contain;
   cursor: pointer;
@@ -395,7 +399,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 .swa-pdf {
   display: block;
-  width: 100%;
+  width: min(100%, var(--swa-preview-width, 100%));
   height: var(--swa-height, 160px);
   border: none;
 }

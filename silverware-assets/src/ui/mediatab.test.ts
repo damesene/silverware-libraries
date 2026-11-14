@@ -65,6 +65,18 @@ describe("the Assets tab", () => {
     original.value = "640";
     await tab.save();
     expect((saved as { heights: unknown }).heights).toEqual({ preview: 160, embed: 640 });
+    // A preview's size: a width for all files, a PDF's own height (its width empty: all files'), placeholders of theirs
+    const field = (label: string) => tab.panel.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
+    expect(field("A preview's width (px)").placeholder).toBe("auto");
+    expect(field("pdf: a preview's height (px)").placeholder).toBe("160");
+    field("A preview's width (px)").value = "320";
+    field("pdf: a preview's height (px)").value = "240";
+    await tab.save();
+    expect((saved as { previews: unknown }).previews).toEqual({ width: 320, types: { pdf: { height: 240 } } });
+    // Emptied: all files' again
+    field("pdf: a preview's height (px)").value = "";
+    await tab.save();
+    expect((saved as { previews: unknown }).previews).toEqual({ width: 320, types: {} });
     // As kept and read back: the Shift+click to nothing
     const back = readAssetSettings(storedAssetSettings(saved as never)).settings;
     expect(back.actions.default).toEqual({ click: "open-tab" });

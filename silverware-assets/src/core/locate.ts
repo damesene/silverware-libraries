@@ -61,3 +61,51 @@ export function placeAmong(drawn: readonly Placed[], index: number, inText: read
   // (The run broken: a widget drawn not offered yet, its content still coming, or one the cursor shows as text)
   return nearest(inText.flatMap((embed, i) => (embed.target === one.target ? [i] : [])));
 }
+
+/**
+ * The text around a widget or a link, as drawn (each line's text, its markdown's marks not shown) or as written: the
+ * lines before it, nearest first; its own line (a link's: an embed's widget lies before its line, which is the first
+ * after it); the lines after it, nearest first. Empty lines left out
+ */
+export type LineContext = { readonly before: readonly string[]; readonly own?: string; readonly after: readonly string[] };
+
+// How many lines of the text around an embed are compared with those drawn around its widget (more than are drawn:
+// the host shows a table or a block as a widget of its own, its lines not drawn as lines)
+const SOURCE_LINES = 6;
+
+/** A line as compared: its letters and digits alone, lower case (the marks a line is drawn without, gone) */
+export const lineSignature = (line: string): string => line.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+
+/** Whether a line as drawn may be a line as written: what is drawn is the written one less its marks, in order */
+function drawnFrom(drawn: string, written: string): boolean {
+  let at = 0;
+  for (const char of written) if (char === drawn[at]) at++;
+  return at === drawn.length;
+}
+
+/** The text around a place of a text, as written: its own line apart (`withOwn`, a link's) or the first after it (an embed's widget's) */
+export function writtenContext(text: string, at: number, withOwn: boolean): LineContext {
+  const start = text.lastIndexOf("\n", at - 1) + 1;
+  const endOfLine = text.indexOf("\n", at);
+  const end = endOfLine < 0 ? text.length : endOfLine;
+  const lines = (part: string) => part.split("\n").map(lineSignature).filter(Boolean);
+  const before = lines(text.slice(0, Math.max(start - 1, 0))).reverse().slice(0, SOURCE_LINES);
+  const own = lineSignature(text.slice(start, end));
+  const following = lines(endOfLine < 0 ? "" : text.slice(end + 1)).slice(0, SOURCE_LINES);
+  return withOwn ? { before, own, after: following } : { before, after: [...(own ? [own] : []), ...following] };
+}
+
+/** How alike the text drawn around a widget is to the text written around a place: each line drawn found near it */
+function contextScore(drawn: LineContext, written: LineContext): number {
+  const found = (lines: readonly string[], among: readonly string[]) => lines.filter((line) => line && among.some((one) => drawnFrom(line, one))).length;
+  const own = drawn.own && written.own !== undefined && drawnFrom(drawn.own, written.own) ? 2 : 0;
+  return found(drawn.before.map(lineSignature), written.before) + found(drawn.after.map(lineSignature), written.after) + own;
+}
+
+/** Which of the places' texts the text drawn around a widget is: the one alone most alike (some line found); none where none is, or several are as alike */
+export function closestContext(drawn: LineContext, candidates: readonly LineContext[]): number | undefined {
+  const scores = candidates.map((one) => contextScore(drawn, one));
+  const best = Math.max(0, ...scores);
+  if (best === 0 || scores.filter((score) => score === best).length > 1) return undefined;
+  return scores.indexOf(best);
+}

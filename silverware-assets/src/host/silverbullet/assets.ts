@@ -26,8 +26,11 @@ const UNSUPPORTED = /^(?:Error:\s*)?Unsupported content:\s*(.+)$/;
 // (`a.sb-link`) is the editor's own text, marked: left alone, as CodeMirror would take an element put in it for an
 // edit. Those drawn outside the editor (a grid's cell) are told (`Rendered`)
 const LINKS = ".cm-content a.sb-wiki-link";
-// The editor's content: as tall as the whole page
+// The editor's content: as tall as the whole page; each line of it drawn
 const CONTENT = ".cm-content";
+const LINE = ".cm-line";
+// How many lines of text around an element are read each side
+const CONTEXT_LINES = 3;
 // A file of the space's name: an extension of its own, not a page's (`.md`)
 const FILE_NAME = /\.(?!md$)[a-z0-9]{1,8}$/i;
 const WEB = /^[a-z][a-z0-9+.-]*:/i;
@@ -193,6 +196,25 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
       return { kind: "file", path: target, url: documentUrl(target) };
     },
     renderedRanges: (text: string) => rendered.ranges(text),
+    // The text drawn around an element of the editor's (2.12.1, probed 2026-11-14: each line of the page in view is a
+    // `.cm-line` of the content, its text drawn without its marks; an embed's widget is a box of the content's own,
+    // right before its line; a table or a block another widget whose lines are not drawn as lines)
+    contextOf: (element: HTMLElement): { readonly before: string[]; readonly own?: string; readonly after: string[] } | undefined => {
+      let top: Element = element;
+      while (top.parentElement && !top.parentElement.matches(CONTENT)) top = top.parentElement;
+      if (!top.parentElement) return undefined;
+      const lines = (step: (at: Element) => Element | null) => {
+        const found: string[] = [];
+        for (let at = step(top); at && found.length < CONTEXT_LINES; at = step(at)) {
+          const text = at.matches(LINE) ? (at.textContent ?? "").trim() : "";
+          if (text) found.push(text);
+        }
+        return found;
+      };
+      const before = lines((at) => at.previousElementSibling);
+      const after = lines((at) => at.nextElementSibling);
+      return top.matches(LINE) ? { before, own: (top.textContent ?? "").trim(), after } : { before, after };
+    },
     // (The editor's content is as tall as the whole page, the part not drawn by its estimated height)
     placeOf: (element: HTMLElement): number | undefined => {
       const content = element.closest(CONTENT)?.getBoundingClientRect();

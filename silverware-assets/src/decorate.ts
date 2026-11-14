@@ -6,7 +6,7 @@
 import { type ActionContext, type Asset, assetName, type AssetType, type Capabilities, type RenderContext, type Viewport } from "../../shared/assets.ts";
 import { type Embed, type EmbedChanges, isFileTarget, readEmbeds, readLinks } from "../../shared/markdown/embed.ts";
 import { actionFor, mimeOf, typeFor, viewFor } from "./core/choose.ts";
-import { embedAt, linkAt, outside, placeAmong, type Placed, type Range, sameTarget } from "./core/locate.ts";
+import { closestContext, embedAt, type LineContext, linkAt, outside, placeAmong, type Placed, type Range, sameTarget, writtenContext } from "./core/locate.ts";
 import { metadataOf } from "./core/metadata.ts";
 import type { AssetRegistry } from "./core/registry.ts";
 import { type AssetSettings, type Gesture, type View, VIEWS } from "./model/settings.ts";
@@ -59,6 +59,8 @@ export type AssetHost = {
   renderedRanges(text: string): readonly Range[];
   /** How far down the page an element of the host's is (0 its top, 1 its end; none: not known), a widget's place where several fit */
   placeOf?(element: HTMLElement): number | undefined;
+  /** The text drawn around a widget of the host's or a link in its text (the lines before, a link's own, after); none: not known */
+  contextOf?(element: HTMLElement): LineContext | undefined;
   pageText(): Promise<string>;
   pageName(): Promise<string>;
   /** An embed's target as the host draws it (resolved from the page), to find a drawn one by */
@@ -169,11 +171,15 @@ export class AssetDecorator {
       const drawn = [...this.links].filter((one) => one.element.isConnected && !one.position && one.style === link.style);
       drawn.sort((a, b) => (a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
       const editorLinks = outside(links, this.host.renderedRanges(text)).filter((one) => one.style === link.style);
-      const index = placeAmong(
-        drawn.map((one): Placed => ({ target: sameTarget(one.target), at: this.host.placeOf?.(one.element) ?? 0 })),
-        drawn.indexOf(link),
-        editorLinks.map((one): Placed => ({ target: sameTarget(one.target), at: one.from / Math.max(text.length, 1) })),
-      );
+      const inText = editorLinks.map((one): Placed => ({ target: sameTarget(one.target), at: one.from / Math.max(text.length, 1) }));
+      // (Told apart by the text of its line and those around it, else by the run of them drawn)
+      const index =
+        this.byContext(link.element, sameTarget(link.target), inText, editorLinks, true, text) ??
+        placeAmong(
+          drawn.map((one): Placed => ({ target: sameTarget(one.target), at: this.host.placeOf?.(one.element) ?? 0 })),
+          drawn.indexOf(link),
+          inText,
+        );
       const one = index === undefined ? undefined : editorLinks[index];
       if (one) {
         const sameText = links.filter((other) => other.text === one.text);
@@ -248,8 +254,22 @@ export class AssetDecorator {
     const inText = widgetsEmbeds.map((embed): Placed => ({ target: sameTarget(this.host.resolved(embed, page)), at: embed.from / Math.max(text.length, 1) }));
     const widgets = [...this.doc.querySelectorAll<HTMLElement>("[data-swa-widget]")];
     const widgetsDrawn = widgets.map((frame): Placed => ({ target: frame.getAttribute("data-swa-target") ?? "", at: this.host.placeOf?.(frame) ?? 0 }));
-    const index = placeAmong(widgetsDrawn, widgets.indexOf(one.frame), inText);
+    const index = this.byContext(one.frame, sameTarget(one.target), inText, widgetsEmbeds, false, text) ?? placeAmong(widgetsDrawn, widgets.indexOf(one.frame), inText);
     return index === undefined ? undefined : occurrenceIn(embeds, widgetsEmbeds[index]!);
+  }
+
+  /**
+   * Which of the text's embeds (or links) of an element's target it is, by the text drawn around it: the one alone
+   * whose text around it is most alike (an embed's widget in view, whatever is scrolled away). None where one of its
+   * target alone is in the text (nothing to tell apart), the host draws no text around it, or several are as alike
+   */
+  private byContext(element: HTMLElement, target: string, inText: readonly Placed[], places: readonly { readonly from: number }[], withOwn: boolean, text: string): number | undefined {
+    const alike = inText.flatMap((one, i) => (one.target === target ? [i] : []));
+    if (alike.length < 2) return alike.length === 1 ? alike[0] : undefined;
+    const drawn = this.host.contextOf?.(element);
+    if (!drawn) return undefined;
+    const closest = closestContext(drawn, alike.map((i) => writtenContext(text, places[i]!.from, withOwn)));
+    return closest === undefined ? undefined : alike[closest];
   }
 
   /** The embed a frame is, found again in the page as it is now: another embed may have changed since it was decorated (the same file's in a grid, written) */

@@ -65,6 +65,24 @@ describe("SilverBullet's embeds found", () => {
     expect(drawnTarget(widget)?.target).toBe("cat.png");
   });
 
+  it("reads the text drawn around a widget and around a link: the editor's lines, widgets between them passed over", () => {
+    const content = document.body.appendChild(Object.assign(document.createElement("div"), { className: "cm-content" }));
+    content.innerHTML = [
+      '<div class="cm-line">Notes</div>',
+      '<div class="cm-line"></div>',
+      '<div class="cm-line">See <a class="sb-wiki-link" href="a.pdf">a.pdf</a> here</div>',
+      '<span class="sb-lua-wrapper"><div class="sb-table-widget">table</div></span>',
+      '<span class="sb-lua-wrapper"><div class="sb-inline-content"><div><div class="content"><img src=".fs/cat.png"></div></div></div></span>',
+      '<div class="cm-line"></div>',
+      '<div class="cm-line">After</div>',
+    ].join("");
+    const host = hostOf();
+    expect(host.contextOf(content.querySelector<HTMLElement>(".sb-inline-content")!)).toEqual({ before: ["See a.pdf here", "Notes"], after: ["After"] });
+    expect(host.contextOf(content.querySelector<HTMLElement>("a")!)).toEqual({ before: ["Notes"], own: "See a.pdf here", after: ["After"] });
+    // Outside the editor: none
+    expect(host.contextOf(document.createElement("div"))).toBeUndefined();
+  });
+
   it("finds SilverBullet's widgets, and puts each medium told of outside the editor in a frame of its own", async () => {
     const { rendered, tell } = renderedOf();
     const host = hostOf(rendered);

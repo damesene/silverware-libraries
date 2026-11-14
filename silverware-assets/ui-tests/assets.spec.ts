@@ -15,6 +15,19 @@ async function choose(page: import("@playwright/test").Page, frame: import("@pla
   await page.locator(".swa-popup .swa-menu-item", { hasText: item }).click();
 }
 
+test("the same image at a long page's top and end, the top scrolled away: a view chosen at the end written to the end's embed", async ({ page, space }) => {
+  const image = `![[${space.folder}/photo.png|Photo|120]]`;
+  const filler = Array.from({ length: 200 }, (_, i) => `Line ${i + 1} of the page.`).join("\n\n");
+  await space.open({ Page: `# Page\n\nTop:\n\n${image}\n\n${filler}\n\nThe end:\n\n${image}\n\nAfter it.\n` }, "Page", { "photo.png": PIXEL_PNG });
+  await page.locator(".cm-scroller").evaluate((scroller) => scroller.scrollTo(0, scroller.scrollHeight));
+  const last = page.locator("#sb-main [data-swa-asset]").last();
+  await expect(last).toBeVisible();
+  // (The top's widget not drawn: the editor draws what is in view)
+  await expect(page.locator("#sb-main [data-swa-asset]")).toHaveCount(1);
+  await choose(page, last, "Show as a card");
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\nTop:\n\n${image}\n\n${filler}\n\nThe end:\n\n![[${space.folder}/photo.png|Photo|120|{ view: icon }]]\n\nAfter it.\n`);
+});
+
 test("the same image outside a grid and in it: a view chosen in the grid written to the grid's embed alone, shown at once", async ({ page, space }) => {
   const image = `![[${space.folder}/photo.png|Photo|120]]`;
   await space.open({ Page: `# Page\n\n${image}\n\n${grid(image, "Right")}` }, "Page", { "photo.png": PIXEL_PNG });

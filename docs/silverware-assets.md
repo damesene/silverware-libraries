@@ -375,3 +375,12 @@ Then *Later*.
 - Whether a centred asset (as a widget) is wanted.
 - The original's default height (`heights.embed`, CONFIG alone: nothing SilverBullet draws reads it); a preview's is in the Media tab.
 - Where pasted files go (a folder per page, one folder, a pattern), when paste comes.
+
+## Which embed a widget is (2026-11-14)
+
+SilverBullet's widget of an embed carries no position (2.12.1, probed again 2026-11-14), and the editor draws only what is in view: telling a widget by its order among those of its file drawn wrote to the wrong one where an earlier one was scrolled away. Weighed with the user:
+
+- **An id in the text** (in the metadata, or as invisible characters before the alt: U+2060-2063, ZWNJ/ZWJ and Unicode tag characters reach the image's `alt` and are not shown by the editor; U+200B is): dropped. The first write has to find the embed without it, an embed copied copies its id, a link cannot carry one, and the notes would hold hidden characters.
+- **CodeMirror's `posAtDOM`**: exact, but through the editor object SilverBullet keeps: an internal (the repository's rule).
+- **A position on SilverBullet's widget** (a pull request: `inline_content.ts`, `lua_widget.ts`): exact; kept stale by CodeMirror as text above changes unless asked on demand. Possible later.
+- **Chosen: the text drawn around it.** Each line of the page in view is a `.cm-line`, its text drawn without its marks, the widget right before its line: the lines before and after a widget, matched with those written around each embed of its file (`lineSignature`, a drawn line a subsequence of the written one: a link drawn by its alias, marks gone), the one alone most alike. Where none or several are alike, the run of widgets drawn and the place in the page (`placeAmong`). The same for a link in the editor, its own line too. And whichever way, located again in the page as it is when a change is written.

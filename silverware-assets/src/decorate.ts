@@ -61,6 +61,8 @@ export type AssetHost = {
   placeOf?(element: HTMLElement): number | undefined;
   /** The text drawn around a widget of the host's or a link in its text (the lines before, a link's own, after); none: not known */
   contextOf?(element: HTMLElement): LineContext | undefined;
+  /** Where a widget of the host's or a link in its text is in the page's text, where the host can say (checked against the text before it is taken) */
+  positionOf?(element: HTMLElement): number | undefined;
   pageText(): Promise<string>;
   pageName(): Promise<string>;
   /** An embed's target as the host draws it (resolved from the page), to find a drawn one by */
@@ -166,7 +168,13 @@ export class AssetDecorator {
     const links = readLinks(text);
     const at = link.position?.();
     let found = at !== undefined ? linkAt(links, at) : undefined;
-    if (at === undefined) {
+    // An editor's link where the host says it is, a link of its target and form starting there (or within it)
+    const told = at === undefined ? this.host.positionOf?.(link.element) : undefined;
+    const there = told === undefined ? undefined : outside(links, this.host.renderedRanges(text)).find((one) => told >= one.from && told < one.to && one.style === link.style && sameTarget(one.target) === sameTarget(link.target));
+    if (there) {
+      const sameText = links.filter((other) => other.text === there.text);
+      found = { link: there, occurrence: sameText.indexOf(there), of: sameText.length };
+    } else if (at === undefined) {
       // The editor's links of its form drawn now, in the page's order: a run of those of the text (as a widget's, above)
       const drawn = [...this.links].filter((one) => one.element.isConnected && !one.position && one.style === link.style);
       drawn.sort((a, b) => (a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
@@ -251,6 +259,10 @@ export class AssetDecorator {
     const at = one.position?.();
     if (one.position) return at === undefined ? undefined : embedAt(embeds, at);
     const widgetsEmbeds = outside(embeds, this.host.renderedRanges(text)).filter((embed) => isFileTarget(embed.target));
+    // Where the host says it is, an embed of its file starting there; else by the text around it, the run drawn
+    const told = this.host.positionOf?.(one.frame);
+    const there = told === undefined ? undefined : widgetsEmbeds.find((embed) => embed.from === told && sameTarget(this.host.resolved(embed, page)) === sameTarget(one.target));
+    if (there) return occurrenceIn(embeds, there);
     const inText = widgetsEmbeds.map((embed): Placed => ({ target: sameTarget(this.host.resolved(embed, page)), at: embed.from / Math.max(text.length, 1) }));
     const widgets = [...this.doc.querySelectorAll<HTMLElement>("[data-swa-widget]")];
     const widgetsDrawn = widgets.map((frame): Placed => ({ target: frame.getAttribute("data-swa-target") ?? "", at: this.host.placeOf?.(frame) ?? 0 }));

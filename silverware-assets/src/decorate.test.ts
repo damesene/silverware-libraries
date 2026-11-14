@@ -10,7 +10,7 @@ import { AssetRegistry } from "./core/registry.ts";
 import { AssetDecorator, type AssetHost, type DrawnEmbed, type EmbedWrite } from "./decorate.ts";
 import { type AssetSettings, readAssetSettings } from "./model/settings.ts";
 
-function setUp(text: string, settings: unknown = {}, own: Pick<AssetHost, "placeOf" | "contextOf"> = {}) {
+function setUp(text: string, settings: unknown = {}, own: Pick<AssetHost, "placeOf" | "contextOf" | "positionOf"> = {}) {
   const state = { text, opened: [] as string[], writes: [] as EmbedWrite[], forms: [] as string[], problems: [] as string[], ranges: [] as { from: number; to: number }[] };
   const host: AssetHost = {
     watch: () => undefined,
@@ -258,6 +258,27 @@ describe("the same file outside a grid and in it", () => {
     await vi.waitFor(() => expect(state.writes).toHaveLength(1));
     // The second of the two
     expect(state.writes[0]!.occurrence).toBe(1);
+  });
+
+  it("takes the host's word for where a widget is where an embed of its file starts there, else finds it as without it", async () => {
+    const text = "# Notes\n\n![[cat.png]]\n\nMiddle\n\n![[cat.png]]\n\n![[dog.png]]\n";
+    const second = text.lastIndexOf("![[cat.png]]");
+    const choose = async (positionOf: (element: HTMLElement) => number | undefined) => {
+      document.body.replaceChildren();
+      const { state, decorator } = setUp(text, {}, { positionOf, contextOf: () => ({ before: ["Notes"], after: ["Middle"] }) });
+      const one = frame("cat.png");
+      await decorator.decorate([one]);
+      one.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
+      [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")][0]!.click();
+      await vi.waitFor(() => expect(state.writes).toHaveLength(1));
+      return state.writes[0]!.occurrence;
+    };
+    // Its word: the second, though the text around says the first
+    expect(await choose(() => second)).toBe(1);
+    // A place where no embed of its file starts (another file's, none): not taken, the text around decides
+    expect(await choose(() => text.indexOf("![[dog.png]]"))).toBe(0);
+    expect(await choose(() => 5)).toBe(0);
+    expect(await choose(() => undefined)).toBe(0);
   });
 
   it("finds the editor's widget by the text drawn around it, over where it seems to be in the page", async () => {

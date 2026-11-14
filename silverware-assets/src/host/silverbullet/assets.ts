@@ -12,6 +12,7 @@ import type { Bridge } from "../../bridge.ts";
 import type { Rendered, RenderedItem } from "../../../../shared/rendered.ts";
 import { ASSETS_PATH } from "../../model/settings.ts";
 import { documentUrl } from "../../../../shared/silverbullet/platform.ts";
+import { editorPosition } from "./editorposition.ts";
 
 const FRAME = ".sb-inline-content";
 // A medium drawn outside the editor (a grid's cell) is a plain element: put in a frame of Silverware Assets' own, to
@@ -38,6 +39,13 @@ const WEB = /^[a-z][a-z0-9+.-]*:/i;
 /** A link drawn (src/assets/decorate.ts' `DrawnLink`) */
 type Link = { readonly element: HTMLElement; readonly target: string; readonly style: "wiki" | "markdown"; readonly position?: () => number | undefined };
 type FormWrite = { readonly text: string; readonly occurrence: number; readonly of: number };
+
+/** The element of the editor's content an element is in (a line, a widget's box); none outside the editor */
+function topOf(element: Element): Element | undefined {
+  let top = element;
+  while (top.parentElement && !top.parentElement.matches(CONTENT)) top = top.parentElement;
+  return top.parentElement ? top : undefined;
+}
 
 /** A link's target and form as SilverBullet drew it; none for an element of Silverware Assets' own */
 export function drawnLink(element: HTMLElement): Link | undefined {
@@ -196,13 +204,18 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
       return { kind: "file", path: target, url: documentUrl(target) };
     },
     renderedRanges: (text: string) => rendered.ranges(text),
+    // Where an element of the editor is in the page's text: SILVERBULLET-INTERNAL, see editorposition.ts (a widget of
+    // the content's own asked by its box, a link by itself)
+    positionOf: (element: HTMLElement): number | undefined => {
+      const top = topOf(element);
+      return top ? editorPosition(doc, top.matches(LINE) ? element : top) : undefined;
+    },
     // The text drawn around an element of the editor's (2.12.1, probed 2026-11-14: each line of the page in view is a
     // `.cm-line` of the content, its text drawn without its marks; an embed's widget is a box of the content's own,
     // right before its line; a table or a block another widget whose lines are not drawn as lines)
     contextOf: (element: HTMLElement): { readonly before: string[]; readonly own?: string; readonly after: string[] } | undefined => {
-      let top: Element = element;
-      while (top.parentElement && !top.parentElement.matches(CONTENT)) top = top.parentElement;
-      if (!top.parentElement) return undefined;
+      const top = topOf(element);
+      if (!top) return undefined;
       const lines = (step: (at: Element) => Element | null) => {
         const found: string[] = [];
         for (let at = step(top); at && found.length < CONTEXT_LINES; at = step(at)) {

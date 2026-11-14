@@ -32,6 +32,21 @@ export async function writeClipboard(doc: Document, text: string, html?: string)
   }
 }
 
+/**
+ * Text to come (a page read first) onto the clipboard from a click: the Clipboard API given an item of the text as it
+ * comes, called at once, so the click still lets the page copy as the text is read; without it (a page over http) the
+ * copy command once the text is there, which a browser may refuse that late. Throws when nothing was copied
+ */
+export async function writeClipboardLater(doc: Document, text: Promise<string>): Promise<void> {
+  const win = doc.defaultView as (Window & { ClipboardItem?: typeof ClipboardItem }) | null;
+  const clipboard = win?.navigator.clipboard;
+  if (clipboard?.write && win?.ClipboardItem) {
+    await clipboard.write([new win.ClipboardItem({ "text/plain": text.then((value) => new Blob([value], { type: "text/plain" })) })]);
+    return;
+  }
+  await writeClipboard(doc, await text);
+}
+
 // The copy command running: the copy event it fires is this module's (another copy listener leaves it)
 let copying = false;
 

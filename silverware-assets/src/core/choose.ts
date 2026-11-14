@@ -75,7 +75,7 @@ export function viewFor(own: string | undefined, type: string | undefined, setti
 export function actionFor(gesture: Gesture, type: string | undefined, settings: AssetSettings, actions: (name: string) => AssetAction | undefined, asset: Asset, can: Capabilities): AssetAction | undefined {
   for (const name of [type ? settings.actions.types[type]?.[gesture] : undefined, settings.actions.default[gesture]]) {
     const action = name ? actions(name) : undefined;
-    if (action && action.fits(asset, can)) return action;
+    if (action && action.gesture !== false && action.fits(asset, can)) return action;
   }
   return undefined;
 }

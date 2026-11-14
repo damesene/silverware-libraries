@@ -27,7 +27,7 @@ function imports(file: string): string[] {
 
 describe("isolation", () => {
   it("imports of shared/ the assets' contract, the reader's shell and the elements alone, no other plugin's code", () => {
-    const allowed = ["shared/assets.ts", "shared/docreader.ts", "shared/reads.ts", "shared/elements.ts"];
+    const allowed = ["shared/assets.ts", "shared/docreader.ts", "shared/reads.ts", "shared/elements.ts", "shared/safehtml.ts"];
     for (const file of files(SRC)) {
       const outside = imports(file).filter((path) => path.startsWith("shared/") || path.startsWith("silverware-") || path.startsWith(".."));
       expect(outside.filter((path) => !allowed.includes(path)), relative(SRC, file)).toEqual([]);

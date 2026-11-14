@@ -28,6 +28,24 @@ test("a document's preview is its first page drawn smaller, as high as a preview
   await expect.poll(() => page.evaluate(() => (window as unknown as { opened: string[] }).opened.join(" "))).toContain("doc.docx");
 });
 
+test("a document's preview kept in the space as HTML once drawn, shown from there made safe", async ({ page, space }) => {
+  await space.open({ Page: `# Page
+
+![[${space.folder}/doc.docx|||{ view: preview }]]
+` }, "Page", { "doc.docx": await docxOf(PAGES) });
+  const preview = page.locator("#sb-main [data-swa-asset='docx'][data-swa-view='preview']");
+  await expect(preview.locator(".swa-docx-preview[data-swa-docx-state='page'] section.swa-docx-docx")).toContainText("The first page's words.");
+  await expect.poll(() => space.kept("doc.docx.html")).toContain("The first page's words.");
+  // What is kept shown after, made safe as it is read (anyone who can write the space can write it)
+  const kept = (await space.kept("doc.docx.html"))!;
+  await space.writeKept("doc.docx.html", kept.replace("The first page's words.", 'Kept words.<img src="x" onerror="window.ran = 1">'));
+  await page.reload();
+  const section = preview.locator(".swa-docx-preview[data-swa-docx-state='page'] section.swa-docx-docx");
+  await expect(section).toContainText("Kept words.");
+  await expect(section.locator("img")).not.toHaveAttribute("onerror");
+  expect(await page.evaluate(() => (window as unknown as { ran?: number }).ran)).toBeUndefined();
+});
+
 test("a document shown as the original is a reader of its pages in a box of the embed's height, fitted to its width, the page in view said, zoomed", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/doc.docx|Doc||{ view: embed }]]\n\nAfter\n` }, "Page", { "doc.docx": await docxOf(PAGES) });
   const reader = page.locator("#sb-main [data-swa-asset='docx'] .swa-docx-reader[data-swa-docx-state='pages']");

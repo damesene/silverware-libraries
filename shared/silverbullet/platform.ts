@@ -38,8 +38,8 @@ export function documentUrl(path: string): string {
   return `.fs/${path.replace(/^\//, "").split("/").map(encodeURIComponent).join("/")}`;
 }
 
-/** Every page's name, as Space Lua hands the list over (a list or a table of 1, 2, …; a page a name or an object with one) */
-function pageNamesOf(pages: unknown): string[] {
+/** The names in what SilverBullet lists (pages, files: objects with their `name`, or names; an array, or a table's values) */
+export function pageNamesOf(pages: unknown): string[] {
   const list = Array.isArray(pages) ? pages : pages && typeof pages === "object" ? Object.values(pages) : [];
   return list.flatMap((page): string[] => {
     if (typeof page === "string") return [page];

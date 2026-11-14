@@ -43,6 +43,20 @@ export type AssetMetadata = {
   write(changes: Readonly<Record<string, string | number | boolean | null>>): Promise<string | undefined>;
 };
 
+/**
+ * A file's preview kept in the space (docs/silverware-assets-stored-previews.md): what its type made of it once (an
+ * image, its HTML), read back in place of making it again while it is newer than the file. Its type decides what it
+ * keeps and draws it itself; Silverware Assets keeps it, by its kind (`image/webp`, `image/png`, `text/html`)
+ */
+export type StoredPreview = {
+  /** What was kept of a kind, where it is newer than the file (none: none kept, or the file changed since) */
+  read(kind: string): Promise<Blob | undefined>;
+  /** Kept, its kind its blob's type; why not, as text (a space that cannot be written: drawn as before) */
+  write(data: Blob): Promise<string | undefined>;
+  // Asked to be made anew (Regenerate preview): nothing kept taken, the type's own memory neither
+  readonly anew?: boolean;
+};
+
 /** What a renderer is handed */
 export type RenderContext = {
   readonly asset: Asset;
@@ -53,6 +67,8 @@ export type RenderContext = {
   readonly placement: Placement;
   // Drawn into a container of its own (a side panel, the enlarged view), not the page: its room's height its own too
   readonly fills?: boolean;
+  // A preview of a file of the space, where its type keeps previews (`storesPreview`) and the host can keep them
+  readonly stored?: StoredPreview;
 };
 
 /** A renderer: an element, or null for the host to draw this asset as it draws it */
@@ -80,6 +96,8 @@ export type AssetType = {
   readonly card?: (context: RenderContext) => Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>;
   // Why its own metadata are wrong, as text; undefined where they are right
   readonly validate?: (values: Readonly<Record<string, string>>) => string | undefined;
+  // Whether its preview is kept in the space (`RenderContext.stored`, Regenerate preview in its menu): one slow to make
+  readonly storesPreview?: boolean;
 };
 
 /** What an action is handed */
@@ -94,11 +112,13 @@ export type ActionContext = {
 /** What an asset can be shown as, for an action to decide whether it fits */
 export type Capabilities = { readonly views: readonly AssetView[] };
 
-/** An action of a gesture on an asset (a click on its card or its preview) */
+/** An action on an asset: in its menu where it fits, and of a gesture on it (a click on its card or its preview) */
 export type AssetAction = {
   readonly name: string;
   // What the user is shown (none: its name)
   readonly label?: string;
+  // false: in an asset's menu alone, no gesture's (not offered for a click in the settings): a copy of the file
+  readonly gesture?: boolean;
   fits(asset: Asset, can: Capabilities): boolean;
   run(context: ActionContext): unknown;
 };

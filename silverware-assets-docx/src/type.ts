@@ -18,10 +18,12 @@ export function docxType(doc: Document): AssetType {
     name: "docx",
     match: { kind: ["file", "web"], mime: DOCX_MIME, ext: ["docx"] },
     icon: ICON,
+    // Its preview kept in the space where Silverware Assets keeps previews: a document read and laid out once
+    storesPreview: true,
     views: {
       preview: (context) =>
         "url" in context.asset && context.viewport.width >= LEAST_WIDTH
-          ? docxPreview(doc, context.asset.url, assetName(context.asset), ICON, { width: context.viewport.width, height: context.viewport.height }, context.signal)
+          ? docxPreview(doc, context.asset.url, assetName(context.asset), ICON, { width: context.viewport.width, height: context.viewport.height }, context.signal, context.stored)
           : null,
       embed: (context) => ("url" in context.asset ? docxReader(doc, context.asset.url, assetName(context.asset), context.fills ? undefined : context.viewport.height, context.signal) : null),
     },

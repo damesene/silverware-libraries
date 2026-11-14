@@ -27,6 +27,15 @@ export type Bridge = {
   // Optional, for a file's Delete: a document deleted from the space (`space.deleteDocument`), asked first in
   // SilverBullet's dialog, its OK button the danger's (`editor.confirm(message, { destructive = true })`)
   readonly deleteDocument?: (path: string) => unknown;
+  // Optional, for previews kept in the space (core/stored.ts): a file's meta, its time of change in ms
+  // (`space.getFileMeta`, its content not read), a document read and written (`space.readDocument`,
+  // `space.writeDocument`: a Uint8Array, handed through Space Lua as it is); with `deleteDocument`
+  readonly fileMeta?: (path: string) => unknown;
+  readonly readDocument?: (path: string) => unknown;
+  readonly writeDocument?: (path: string, data: Uint8Array) => unknown;
+  // Optional, for Clean up previews: every file of the space (`space.listFiles`: their meta, `name` their path; the
+  // previews' folder too, which `listDocuments` leaves out)
+  readonly listFiles?: () => unknown;
   readonly confirmDelete?: (message: string) => boolean | Promise<boolean>;
   // Optional: Silverware Layout's API (`silverware.layout.api`), where it is installed: a medium's width by its handle
   // (shared/layout.ts), what its grids draw outside the editor (its `rendered`, shared/rendered.ts)

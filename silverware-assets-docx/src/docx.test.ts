@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from "vitest";
 import { ASSET_WIDE_ATTRIBUTE, ASSETS_VERSION, type AssetType } from "../../shared/assets.ts";
 import { init } from "./index.ts";
 import { pageSize } from "./load.ts";
-import { madeSafe } from "./documents.ts";
 import { docxPreview, previewScale } from "./preview.ts";
 import { docxReader, fittedZoom } from "./reader.ts";
 
@@ -26,23 +25,6 @@ describe("a document's page", () => {
   });
 });
 
-describe("a document made safe", () => {
-  it("keeps the web's and mail's links alone (opened in a new tab), nothing that runs", () => {
-    const body = document.createElement("div");
-    body.innerHTML =
-      '<a href="https://example.com">web</a><a href="mailto:a@b.c">mail</a><a href="javascript:alert(1)">script</a><a href=" JavaScript:x">spaced</a><a href="#bookmark">inner</a>' +
-      '<p onclick="alert(1)">text</p><script>alert(1)</script><iframe src="x"></iframe><img src="data:image/png;base64,AAAA" onerror="alert(1)">';
-    madeSafe(body);
-    const links = [...body.querySelectorAll("a")];
-    expect(links.map((link) => link.getAttribute("href"))).toEqual(["https://example.com", "mailto:a@b.c", null, null, null]);
-    expect(links[0]!.target).toBe("_blank");
-    expect(links[0]!.rel).toBe("noopener noreferrer");
-    expect(body.querySelector("p")!.hasAttribute("onclick")).toBe(false);
-    expect(body.querySelector("script, iframe")).toBeNull();
-    expect(body.querySelector("img")!.hasAttribute("onerror")).toBe(false);
-    expect(body.querySelector("img")!.getAttribute("src")).toMatch(/^data:image/);
-  });
-});
 
 describe("where docx-preview cannot be loaded", () => {
   it("a preview stays its icon and name, its title saying why", async () => {

@@ -17,7 +17,8 @@ export type CellAction =
   | { readonly kind: "columns"; readonly columns: string | null }
   | { readonly kind: "addColumn" }
   | { readonly kind: "border"; readonly on: boolean }
-  | { readonly kind: "ungrid" };
+  | { readonly kind: "ungrid" }
+  | { readonly kind: "source" };
 
 const COLUMN_CHOICES: readonly (readonly [string | null, string])[] = [
   [null, "Columns: automatic"],
@@ -36,6 +37,7 @@ export function addCellMenus(doc: Document, grid: HTMLElement, state: () => { re
       return {
         title: `Column ${index + 1} of ${now.cells}`,
         sections: [
+          [item("Edit markdown (Alt+click)", { kind: "source" })],
           [
             item("Move left", { kind: "move", by: -1 }, index === 0 ? "It is the first" : undefined),
             item("Move right", { kind: "move", by: 1 }, index === now.cells - 1 ? "It is the last" : undefined),

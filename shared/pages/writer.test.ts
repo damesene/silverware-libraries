@@ -351,6 +351,24 @@ describe("the page writer", () => {
     expect((await writer.plan(pageChanges().page("Crlf", (p) => p.grids.replaceCell("<column>\r\ny\r\nz\r\n</column>", 3, "x")).build())).skipped).toHaveLength(1);
   });
 
+  it("moves text into a grid's cells as one edit: taken out of the page, or out of another cell of the grid, and left alone where it changed", async () => {
+    const body = "<column>\n\nLeft **bold** text\n\n</column>\n<column>\n\nRight\n\n</column>";
+    const page = `# A\n\nMoved here\n\n<grid>\n${body}\n</grid>\n`;
+    const { map, writer } = memory({ A: page });
+    // Out of the page into the second cell: one edit
+    const from = page.indexOf("Moved here");
+    const report = await writer.write(pageChanges().page("A", (p) => p.text.takeOut(from, from + "Moved here".length, "Moved here").grids.replaceCell(body, 1, "Right Moved here")).build());
+    expect(report.skipped).toEqual([]);
+    expect(map.get("A")).toBe(`# A\n\n\n\n<grid>\n<column>\n\nLeft **bold** text\n\n</column>\n<column>\n\nRight Moved here\n\n</column>\n</grid>\n`);
+    // Out of one cell into the other: both at once
+    const now = "<column>\n\nLeft **bold** text\n\n</column>\n<column>\n\nRight Moved here\n\n</column>";
+    await writer.write(pageChanges().page("A", (p) => p.grids.replaceCells(now, { 0: "Left text", 1: "**bold** Right Moved here" })).build());
+    expect(map.get("A")).toBe(`# A\n\n\n\n<grid>\n<column>\n\nLeft text\n\n</column>\n<column>\n\n**bold** Right Moved here\n\n</column>\n</grid>\n`);
+    // The text taken out changed since it was read: the page left alone
+    const gone = await writer.plan(pageChanges().page("A", (p) => p.text.takeOut(0, 3, "xyz")).build());
+    expect(gone.skipped.map((one) => one.reason)).toEqual(["the text changed since it was read: left alone"]);
+  });
+
   it("sets a grid's attributes on its <grid> line, the others kept, one taken off, a name refused", async () => {
     const body = "<column>\nA\n</column>";
     const { map, writer } = memory({ A: `<grid columns="1fr 2fr">\r\n${body.replace(/\n/g, "\r\n")}\r\n</grid>\r\n` });
@@ -478,7 +496,7 @@ describe("the page writer", () => {
 describe("the builder", () => {
   it("has every section the parts make, each a part of its own", () => {
     const sections = PARTS.flatMap((one) => (one.section ? [one.section.name] : []));
-    expect(sections).toEqual(["properties", "tags", "codeBlocks", "grids", "embeds", "links"]);
+    expect(sections).toEqual(["text", "properties", "tags", "codeBlocks", "grids", "embeds", "links"]);
     pageChanges().page("A", (p) => {
       for (const name of sections) expect(Object.values(p[name]).every((method) => typeof method === "function"), name).toBe(true);
     });

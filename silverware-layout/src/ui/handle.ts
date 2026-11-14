@@ -19,6 +19,8 @@ import { draggedRoomWidth, draggedWidth, type LayoutAnchor, MIN_ROOM_WIDTH, MIN_
 import { GuideLines } from "./guidelines.ts";
 
 const BASE = "swl-handle";
+// A widget whose width is dragged, marked (its look may say so)
+const RESIZING = "data-swl-resizing";
 // The bar's height at most and at least (px): centred on the part of the widget in view, so a tall table's is in view
 const BAR_MAX = 120;
 const BAR_MIN = 24;
@@ -72,7 +74,7 @@ export type HandleHost<W> = {
   writeAlign?(widget: W, align: LayoutAlign | undefined): Promise<void>;
 };
 
-type Drag = { readonly pointer: number; readonly x: number; readonly start: number; readonly was: WidgetWidth | undefined; now: WidgetWidth | undefined; moved: boolean };
+type Drag = { readonly pointer: number; readonly x: number; readonly start: number; readonly was: WidgetWidth | undefined; now: WidgetWidth | undefined; moved: boolean; readonly element: HTMLElement };
 
 export class WidthHandle<W> {
   private readonly box: HTMLElement;
@@ -282,8 +284,10 @@ export class WidthHandle<W> {
     this.bar.setPointerCapture(e.pointerId);
     const element = this.host.element(this.widget);
     const was = this.host.kept(this.widget);
-    this.drag = { pointer: e.pointerId, x: e.clientX, start: element.getBoundingClientRect().width, was, now: was, moved: false };
+    this.drag = { pointer: e.pointerId, x: e.clientX, start: element.getBoundingClientRect().width, was, now: was, moved: false, element };
     this.box.classList.add(`${BASE}-dragging`);
+    // (The widget marked while its width is dragged: its look may say so, a grid its lines)
+    element.setAttribute(RESIZING, "");
     this.showGuides();
   }
 
@@ -428,6 +432,7 @@ export class WidthHandle<W> {
 
   private end(): void {
     if (this.drag && this.bar.hasPointerCapture(this.drag.pointer)) this.bar.releasePointerCapture(this.drag.pointer);
+    this.drag?.element.removeAttribute(RESIZING);
     this.drag = undefined;
     this.box.classList.remove(`${BASE}-dragging`);
     this.lines.clear();

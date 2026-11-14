@@ -4,7 +4,7 @@
 // committed bundles deployed, and are skipped on the playground. A test's pages and files are written into its
 // worker's space (UiPdf/<test>/<name>), the first page opened, and removed after.
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
@@ -14,12 +14,16 @@ export { expect };
 export const onSilverBullet = process.env.SW_TARGET === "silverbullet";
 const server = () => silverbulletServer(test.info().parallelIndex, process.env.SW_SB_SPACE ?? "");
 const FOLDER = "UiPdf";
+// Where Silverware Assets keeps previews (silverware-assets/src/core/stored.ts)
+const PREVIEWS = "_silverware-asset-preview";
 
 export type Space = {
   /** The folder of this test's pages in the space (`UiPdf/<test>`) */
   readonly folder: string;
   /** Pages written (by their names under the folder), and files beside them, the page `open` of them opened, Silverware Assets and PDF started */
   open(pages: Readonly<Record<string, string>>, open: string, files?: Readonly<Record<string, Uint8Array | string>>): Promise<void>;
+  /** When a file's preview kept by Silverware Assets (`_silverware-asset-preview/<folder>/<name>`) was written, in ms; none: not kept */
+  kept(name: string): Promise<number | undefined>;
 };
 
 /** Tests get `page` and `space`: an error in the page fails the test */
@@ -60,9 +64,14 @@ export const test = base.extend<{ space: Space }>({
         await page.waitForFunction(() => !!(window as unknown as { client?: { editorView?: unknown } }).client?.editorView);
         await commandDefined(page, ASSETS_SETTINGS);
       },
+      kept: async (name) => {
+        const path = await keptPath(join(server().space, PREVIEWS, folder), name);
+        return path ? (await stat(path)).mtimeMs : undefined;
+      },
     });
     await page.close();
     await rm(join(server().space, folder), { recursive: true, force: true });
+    await rm(join(server().space, PREVIEWS, folder), { recursive: true, force: true });
     if (configBefore === undefined) await rm(configPath, { force: true });
     else await writeFile(configPath, configBefore);
   },
@@ -104,6 +113,11 @@ export const RED = [1, 0, 0] as const;
 export const BLUE = [0, 0, 1] as const;
 
 /** The colour (RGB) of an image's or a canvas' middle pixel */
+/** Whether a colour is another within a few levels (a preview kept as WebP, which is lossy) */
+export function nearColour(colour: readonly number[], expected: readonly number[]): boolean {
+  return colour.length === expected.length && colour.every((level, index) => Math.abs(level - expected[index]!) < 8);
+}
+
 export async function middleColour(page: Page, selector: string): Promise<number[]> {
   return page.locator(selector).first().evaluate((element: HTMLImageElement | HTMLCanvasElement) => {
     const width = element instanceof HTMLImageElement ? element.naturalWidth : element.width;
@@ -115,4 +129,16 @@ export async function middleColour(page: Page, selector: string): Promise<number
     context.drawImage(element, 0, 0);
     return [...context.getImageData(Math.floor(width / 2), Math.floor(height / 2), 1, 1).data].slice(0, 3);
   });
+}
+
+/**
+ * Where Silverware Assets keeps a file's preview of a kind (`name`: the file's name and the kind's extension,
+ * `doc.pdf.webp`), whatever version of the file it is named by (`doc.pdf.<time>-<size>.webp`); none: not kept
+ */
+async function keptPath(dir: string, name: string): Promise<string | undefined> {
+  const dot = name.lastIndexOf(".");
+  const [base, extension] = [name.slice(0, dot), name.slice(dot + 1)];
+  const files = await readdir(dir).catch(() => [] as string[]);
+  const found = files.find((file) => file.startsWith(`${base}.`) && file.endsWith(`.${extension}`) && /^\d+-\d+$/.test(file.slice(base.length + 1, -extension.length - 1)));
+  return found && join(dir, found);
 }

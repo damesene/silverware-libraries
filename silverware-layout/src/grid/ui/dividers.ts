@@ -146,7 +146,11 @@ export function addColumnDividers(doc: Document, grid: HTMLElement, write: (colu
       label = undefined;
       for (const guide of guides) guide.element.remove();
       guides = [];
-      if (keep && now) write(columnsOf(now), false);
+      // (Let go at even widths, written as even: none where the columns are as many as its cells, as a double click)
+      if (keep && now) {
+        const columns = columnsOf(now);
+        write(columns, /^\d+$/.test(columns));
+      }
     };
     divider.addEventListener("pointerup", (event) => end(event, true));
     divider.addEventListener("pointercancel", (event) => end(event, false));

@@ -17,10 +17,12 @@ export function pdfType(doc: Document): AssetType {
     name: "pdf",
     match: { kind: ["file", "web"], mime: "application/pdf", ext: ["pdf"] },
     icon: ICON,
+    // Its preview kept in the space where Silverware Assets keeps previews: a PDF is read and drawn once
+    storesPreview: true,
     views: {
       preview: (context) =>
         "url" in context.asset && context.viewport.width >= LEAST_WIDTH
-          ? pdfPreview(doc, context.asset.url, assetName(context.asset), { width: context.viewport.width, height: context.viewport.height }, context.signal)
+          ? pdfPreview(doc, context.asset.url, assetName(context.asset), { width: context.viewport.width, height: context.viewport.height }, context.signal, context.stored)
           : null,
     },
   };

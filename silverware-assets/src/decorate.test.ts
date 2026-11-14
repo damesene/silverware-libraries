@@ -10,7 +10,7 @@ import { AssetRegistry } from "./core/registry.ts";
 import { AssetDecorator, type AssetHost, type DrawnEmbed, type EmbedWrite } from "./decorate.ts";
 import { type AssetSettings, readAssetSettings } from "./model/settings.ts";
 
-function setUp(text: string, settings: unknown = {}, own: Pick<AssetHost, "placeOf" | "contextOf" | "positionOf" | "deleteFile" | "removeEmbed" | "linkToText" | "confirm"> = {}) {
+function setUp(text: string, settings: unknown = {}, own: Pick<AssetHost, "placeOf" | "contextOf" | "positionOf" | "deleteFile" | "removeEmbed" | "linkToText" | "confirm" | "previewFiles"> = {}) {
   const state = { text, opened: [] as string[], writes: [] as EmbedWrite[], forms: [] as string[], problems: [] as string[], ranges: [] as { from: number; to: number }[] };
   const host: AssetHost = {
     watch: () => undefined,
@@ -49,6 +49,32 @@ function frame(target: string, medium = true): DrawnEmbed {
 }
 
 afterEach(() => document.body.replaceChildren());
+
+describe("a file drawn in an editor's field", () => {
+  it("is drawn as in the page, read-only: its view and label, no menu, no action of a click, its drawing ended with the field's", async () => {
+    const { state, decorator } = setUp("", { views: { types: { image: "preview" } } });
+    expect(decorator.editorEmbed("![[cat.png]] and text", "P")).toBeUndefined();
+    const drawn = decorator.editorEmbed("![[cat.png|A cat|200]]", "P")!;
+    expect(drawn.key).toBe(decorator.editorEmbed("![[cat.png|A cat|200]]", "P")!.key);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const control = new AbortController();
+    drawn.draw(container, control.signal);
+    const frame = container.querySelector<HTMLElement>(".swa-frame")!;
+    expect(frame.querySelector("img")!.getAttribute("src")).toBe(".fs/cat.png");
+    expect(frame.querySelector("img")!.style.width).toBe("200px");
+    await vi.waitFor(() => expect(frame.getAttribute("data-swa-view")).toBe("preview"));
+    expect(frame.querySelector(".swa-more")).toBeNull();
+    frame.querySelector("img")!.click();
+    expect(state.opened).toEqual([]);
+    // A card alike: no menu's way in
+    const card = decorator.editorEmbed("![[archive.zip]]", "P")!;
+    card.draw(container, control.signal);
+    await vi.waitFor(() => expect(container.querySelector(".swa-card")).not.toBeNull());
+    expect(container.querySelector(".swa-card [role=button]")).toBeNull();
+    control.abort();
+  });
+});
 
 describe("embedded media decorated", () => {
   it("leaves an image as the host drew it, its type and view marked", async () => {
@@ -162,6 +188,69 @@ describe("embedded media decorated", () => {
 });
 
 describe("an asset's menu", () => {
+  it("hands a preview kept in the space to a type that keeps one; Regenerate preview takes it away and draws it anew", async () => {
+    const times: Record<string, number> = { "doc.pdf": 1, "_silverware-asset-preview/doc.pdf.1-1.webp": 2 };
+    const previewFiles = {
+      facts: async (path: string) => (path in times ? { modified: times[path]!, size: 1 } : undefined),
+      read: async (path: string) => (path in times ? new Uint8Array([1]) : undefined),
+      write: async () => undefined,
+      remove: async (path: string) => void delete times[path],
+    };
+    const { registry, decorator } = setUp("![[doc.pdf]]", { views: { types: { pdf: "preview" } } }, { previewFiles });
+    const given: { anew?: boolean; kept?: string }[] = [];
+    registry.types.register({
+      name: "pdf",
+      match: { kind: ["file"], ext: ["pdf"] },
+      icon: "<svg/>",
+      storesPreview: true,
+      views: {
+        preview: async (context) => {
+          given.push({ ...(context.stored?.anew ? { anew: true } : {}), kept: (await context.stored?.read("image/webp"))?.type ?? "none" });
+          return document.createElement("div");
+        },
+      },
+    } as AssetType);
+    const one = frame("doc.pdf", false);
+    await decorator.decorate([one]);
+    await vi.waitFor(() => expect(given).toEqual([{ kept: "image/webp" }]));
+    one.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
+    [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].find((item) => item.textContent?.trim() === "Regenerate preview")!.click();
+    await vi.waitFor(() => expect(given).toEqual([{ kept: "image/webp" }, { anew: true, kept: "none" }]));
+    expect(times["_silverware-asset-preview/doc.pdf.1-1.webp"]).toBeUndefined();
+    // Previews not kept, as the settings say: none handed over, no Regenerate preview
+    const { registry: offRegistry, decorator: off } = setUp("![[doc.pdf]]", { views: { types: { pdf: "preview" } }, storePreviews: false }, { previewFiles });
+    const offGiven: string[] = [];
+    offRegistry.types.register({
+      name: "pdf",
+      match: { kind: ["file"], ext: ["pdf"] },
+      icon: "<svg/>",
+      storesPreview: true,
+      views: { preview: (context) => (offGiven.push(context.stored ? "stored" : "none"), document.createElement("div")) },
+    } as AssetType);
+    const other = frame("doc.pdf", false);
+    await off.decorate([other]);
+    await vi.waitFor(() => expect(offGiven).toEqual(["none"]));
+    other.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
+    const labels = [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].map((item) => item.textContent?.trim());
+    expect(labels).not.toContain("Regenerate preview");
+  });
+
+  it("copies its embed's whole markdown, its metadata too, as the page has it", async () => {
+    const markdown = "![[cat.png|A cat|200|{ view: embed, align: right }]]";
+    const { decorator } = setUp(`# A\n\n${markdown}\n`);
+    const one = frame("cat.png");
+    await decorator.decorate([one]);
+    const copied: string[] = [];
+    Object.defineProperty(window.navigator, "clipboard", { value: { writeText: async (text: string) => void copied.push(text) }, configurable: true });
+    try {
+      one.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
+      [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].find((item) => item.textContent?.trim() === "Copy markdown")!.click();
+      await vi.waitFor(() => expect(copied).toEqual([markdown]));
+    } finally {
+      Reflect.deleteProperty(window.navigator, "clipboard");
+    }
+  });
+
   it("shows its views, the one shown checked, writes the one chosen, the settings' own as none", async () => {
     const { state, decorator } = setUp("![[cat.png|A cat|200]]", { views: { types: { image: "embed" } } });
     const one = frame("cat.png");
@@ -176,6 +265,9 @@ describe("an asset's menu", () => {
       ["Open in a new tab", null],
       ["Show in a side panel", null],
       ["Show enlarged", null],
+      ["Copy image", null],
+      ["Download", null],
+      ["Copy markdown", null],
       ["Show as a link", null],
     ]);
     items[0]!.click();
@@ -222,6 +314,33 @@ describe("a file deleted from its menu", () => {
     await vi.waitFor(() => expect(done).toEqual(["deleted Docs/report.pdf", "removed ![[Docs/report.pdf]] 0/1"]));
   });
 
+  it("deletes a file's previews kept in the space with it, of the version it had", async () => {
+    const kept: Record<string, true> = { "_silverware-asset-preview/report.pdf.5-3.webp": true, "_silverware-asset-preview/report.pdf.4-3.webp": true };
+    let fileThere = true;
+    const done: string[] = [];
+    const { decorator } = setUp("![[report.pdf]]\n", {}, {
+      confirm: async () => true,
+      deleteFile: async (path) => {
+        fileThere = false;
+        done.push(`deleted ${path}`);
+      },
+      removeEmbed: async () => undefined,
+      previewFiles: {
+        facts: async (path) => (path === "report.pdf" ? (fileThere ? { modified: 5, size: 3 } : undefined) : kept[path] ? { modified: 1, size: 1 } : undefined),
+        read: async () => undefined,
+        write: async () => undefined,
+        remove: async (path) => void (delete kept[path], done.push(`removed ${path}`)),
+      },
+    });
+    const one = frame("report.pdf");
+    await decorator.decorate([one]);
+    one.frame.querySelector<HTMLButtonElement>(".swa-more")!.click();
+    [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")].find((element) => element.textContent?.trim() === "Delete file…")!.click();
+    await vi.waitFor(() => expect(done).toEqual(["deleted report.pdf", "removed _silverware-asset-preview/report.pdf.5-3.webp"]));
+    // (Another version's left to Clean up previews)
+    expect(Object.keys(kept)).toEqual(["_silverware-asset-preview/report.pdf.4-3.webp"]);
+  });
+
   it("deletes nothing where its embed is no longer in the page: found before the file goes, as the host may draw it anew after", async () => {
     const done: string[] = [];
     const { state, decorator } = setUp("![[Docs/report.pdf]]\n", {}, {
@@ -265,7 +384,7 @@ describe("a link's menu", () => {
     icon.click();
     expect(followed).toBe(0);
     const items = [...document.querySelectorAll<HTMLElement>(".swa-popup .swa-menu-item")];
-    expect(items.map((item) => item.textContent?.trim())).toEqual(["Open in a new tab", "Show in a side panel", "Show enlarged", "Show as embedded"]);
+    expect(items.map((item) => item.textContent?.trim())).toEqual(["Open in a new tab", "Show in a side panel", "Show enlarged", "Download", "Copy markdown", "Show as embedded"]);
     items[0]!.click();
     expect(state.opened).toEqual([".fs/report.pdf"]);
     // Shown in the side panel: the file's viewer, as the browser draws a PDF
@@ -518,5 +637,14 @@ describe("a card's menu", () => {
     marker.click();
     one.frame.querySelector<HTMLElement>(".swa-card-name")!.click();
     expect(state.opened).toEqual([".fs/archive.zip"]);
+  });
+});
+
+describe("Download", () => {
+  it("saves a file under its path's last part, not its alt text", async () => {
+    const { downloadName } = await import("./builtin/actions.ts");
+    expect(downloadName({ kind: "file", path: "Docs/My%20report.pdf", url: ".fs/Docs/My%20report.pdf" })).toBe("My report.pdf");
+    expect(downloadName({ kind: "web", url: "https://example.com/a/b.pdf?x=1#p" })).toBe("b.pdf");
+    expect(downloadName({ kind: "web", url: "https://example.com/" })).toBe("download");
   });
 });

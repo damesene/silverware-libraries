@@ -205,7 +205,7 @@ test("a preview's size the settings' (all files, a type's own), never widened by
   await dialog.getByRole("tab", { name: "Appearance" }).click();
   await dialog.getByLabel("A preview's width (px)", { exact: true }).fill("100");
   // (A type's own in its row, opened; marked Own then)
-  const pdfRow = dialog.locator('[data-swa-type="pdf"]');
+  const pdfRow = dialog.locator('[data-swa-look="preview"] [data-swa-type="pdf"]');
   await pdfRow.locator(".swa-type-head").click();
   await dialog.getByLabel("pdf: a preview's height (px)", { exact: true }).fill("300");
   await expect(pdfRow.locator(".swa-type-mark")).toHaveText("Own");
@@ -266,24 +266,26 @@ test("a preview's label: its alt text above by default (else its name), then the
   await runCommand(page, ASSETS_SETTINGS);
   const dialog = page.locator(".swa-dialog");
   await dialog.getByRole("tab", { name: "Appearance" }).click();
-  const chip = (field: string) => dialog.locator(`.swa-label-edit .swa-sample-chip[data-swa-field="${field}"]`);
+  // (The preview's view of Appearance: the original's has a label of its own)
+  const previewLook = dialog.locator('[data-swa-look="preview"]');
+  const chip = (field: string) => previewLook.locator(`.swa-label-edit .swa-sample-chip[data-swa-field="${field}"]`);
   // (The label under the size: scrolled to)
-  await dialog.locator(".swa-label-edit").scrollIntoViewIfNeeded();
+  await previewLook.locator(".swa-label-edit").scrollIntoViewIfNeeded();
   // The name's chip dragged from the row of those not shown to the place under the sample: shown there
-  await expect(dialog.locator('.swa-label-edit-list[data-swa-place="off"] .swa-sample-chip[data-swa-field="name"]')).toBeVisible();
+  await expect(previewLook.locator('.swa-label-edit-list[data-swa-place="off"] .swa-sample-chip[data-swa-field="name"]')).toBeVisible();
   const from = (await chip("name").boundingBox())!;
-  const below = (await dialog.locator('.swa-label-edit-list[data-swa-place="below"]').boundingBox())!;
+  const below = (await previewLook.locator('.swa-label-edit-list[data-swa-place="below"]').boundingBox())!;
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
   await page.mouse.move(below.x + 8, below.y + below.height / 2, { steps: 12 });
   await page.mouse.up();
-  const line = (place: string) => dialog.locator(`.swa-label-edit-line[data-swa-place="${place}"] .swa-sample-value`);
+  const line = (place: string) => previewLook.locator(`.swa-label-edit-line[data-swa-place="${place}"] .swa-sample-value`);
   await expect(line("below")).toHaveText(["lake.jpg"]);
   // A click on a chip not shown shows it where it was (the size under the preview): the sample shows it at once
   await chip("size").click();
   await expect(line("below")).toHaveText(["lake.jpg", "2.4 MB"]);
   // A property shown, pointed at: its name over its value, its ×
-  const name = dialog.locator('.swa-label-edit .swa-sample-item[data-swa-field="name"]');
+  const name = previewLook.locator('.swa-label-edit .swa-sample-item[data-swa-field="name"]');
   await name.hover();
   await expect(name.locator(".swa-sample-tag")).toBeVisible();
   await expect(name.locator(".swa-sample-tag")).toHaveText("Name");
@@ -297,6 +299,60 @@ test("a preview's label: its alt text above by default (else its name), then the
   await expect(pdf.locator(".swa-label-above > .swa-label-icon")).toBeVisible();
   await expect(pdf.locator(".swa-label-below")).toHaveAttribute("title", "doc.pdf · 9 B");
   await expect.poll(() => space.config()).toContain('field = "name"');
+});
+
+test("an original's label: none by default; its alt text turned on in Appearance's Original, shown above it", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/photo.png|Photo|60|{ view: embed }]]\n` }, "Page", { "photo.png": PIXEL_PNG });
+  const image = page.locator("#sb-main [data-swa-asset='image']");
+  await expect(image).toHaveAttribute("data-swa-view", "embed");
+  await expect(image.locator(".swa-label")).toHaveCount(0);
+  await runCommand(page, ASSETS_SETTINGS);
+  const dialog = page.locator(".swa-dialog");
+  await dialog.getByRole("tab", { name: "Appearance" }).click();
+  await dialog.locator(".swa-segment", { hasText: "Original" }).click();
+  const original = dialog.locator('[data-swa-look="original"]');
+  await original.locator('.swa-label-edit .swa-sample-chip[data-swa-field="alt"]').click();
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator("#sb-main [data-swa-asset='image'] .swa-label-above")).toHaveText("Photo");
+});
+
+test("files in a grid's cell being edited drawn as in the page, read-only: an image's preview, a PDF; a click on one shows its markdown", async ({ page, space }) => {
+  const text = `Text\n\n![[${space.folder}/a.png|A|60x40|{ view: preview }]]\n\n![[${space.folder}/doc.pdf]]`;
+  await space.open({ Page: `# Page\n\n${grid(text, "Right")}` }, "Page", { "a.png": PIXEL_PNG, "doc.pdf": "%PDF-1.4\n" });
+  await gridsDrawn(page);
+  const field = page.locator("#sb-main .swl-grid-editor");
+  await expect(async () => {
+    if (await field.count()) await page.keyboard.press("Escape");
+    await page.locator("#sb-main .swl-grid-cell").first().getByText("Text").click();
+    await expect(field.locator(".cm-content")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  const preview = field.locator(".swe-embed [data-swa-asset='image'][data-swa-view='preview']");
+  await expect(preview).toBeVisible();
+  await expect(field.locator(`.swe-embed [data-swa-asset='pdf'] ${PDF_SHOWN}`).first()).toBeVisible();
+  // (The page's rules of what is drawn put into the field's own root: the preview its size there as in the page)
+  await expect.poll(() => field.locator("style[data-swe-page-styles]").evaluate((style) => style.textContent ?? "")).toContain("swa-");
+  const box = (await preview.boundingBox())!;
+  expect(box.height).toBeLessThan(200);
+  // (No menu there: nothing is written from a field being edited)
+  await preview.hover();
+  await expect(field.locator(".swa-more")).toHaveCount(0);
+  await preview.click();
+  await expect(preview).toHaveCount(0);
+  await expect(field.locator(".cm-line", { hasText: "a.png" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#sb-main .swl-grid-editor")).toHaveCount(0);
+  expect(await space.saved("Page")).toContain(text);
+});
+
+test("Clean up previews takes away the previews kept of files gone and of versions gone", async ({ page, space }) => {
+  // (Written before the page is opened: SilverBullet lists the files it knows as it starts, as it knows those it writes)
+  await space.writeKept("gone.pdf.1-1.webp", "kept");
+  await space.writeKept("doc.pdf.1-1.webp", "an older version's");
+  await space.open({ Page: `# Page\n\n![[${space.folder}/doc.pdf]]\n` }, "Page", { "doc.pdf": "%PDF-1.4\n" });
+  await runCommand(page, "Silverware Assets: Clean up previews");
+  await expect.poll(() => space.kept("gone.pdf.1-1.webp")).toBe(false);
+  await expect.poll(() => space.kept("doc.pdf.1-1.webp")).toBe(false);
 });
 
 test("a preview in a grid's cell is not drawn anew as text above the grid is typed (its place in the page moving)", async ({ page, space }) => {
@@ -507,6 +563,39 @@ test("the settings: a card's size shown, a click set to the side panel; the pane
   await expect(peek.locator(".swa-panel-body img")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(peek).toHaveCount(0);
+});
+
+test("the settings: previews kept in the space turned off, a PDF's preview has no Regenerate preview in its menu", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/doc.pdf|||{ view: preview }]]\n` }, "Page", { "doc.pdf": "%PDF-1.4\n" });
+  const frame = page.locator("#sb-main [data-swa-asset='pdf']");
+  const items = async () => {
+    await frame.hover();
+    await frame.locator(".swa-more").click();
+    const labels = await page.locator(".swa-popup .swa-menu-item").allTextContents();
+    await page.keyboard.press("Escape");
+    return labels.map((label) => label.trim());
+  };
+  expect(await items()).toContain("Regenerate preview");
+  await runCommand(page, ASSETS_SETTINGS);
+  const dialog = page.locator(".swa-dialog");
+  const keep = dialog.getByLabel("Keep previews in the space, made once");
+  await expect(keep).toBeChecked();
+  await keep.uncheck();
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => space.config()).toContain(`config.set("silverware.assets.storePreviews", false)`);
+  await expect.poll(items).not.toContain("Regenerate preview");
+});
+
+test("Download in a file's menu saves the file under its own name", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/archive.zip|The archive]]\n` }, "Page", { "archive.zip": "zip" });
+  const card = page.locator("#sb-main .swa-card");
+  await expect(card).toBeVisible();
+  await card.locator(".swa-menu-icon").click();
+  const saved = page.waitForEvent("download");
+  await page.locator(".swa-popup .swa-menu-item", { hasText: "Download" }).click();
+  const file = await saved;
+  expect(file.suggestedFilename()).toBe("archive.zip");
 });
 
 test("a link shown as embedded by its icon's menu, and the embed shown as a link again by its own, each the one it is", async ({ page, space }) => {

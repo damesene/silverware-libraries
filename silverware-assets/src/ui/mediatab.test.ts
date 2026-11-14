@@ -68,22 +68,30 @@ describe("the assets' settings tabs", () => {
     expect(link.querySelector('.swa-sample-chip[data-swa-field="icon"]')).not.toBeNull();
     await files.save();
     expect((saved as { linkIcons: unknown }).linkIcons).toBe(false);
+    // Previews kept in the space: on by default, turned off on the Files tab
+    const keep = files.panel.querySelector<HTMLInputElement>(".swa-settings-section .swa-settings-check input")!;
+    expect(keep.checked).toBe(true);
+    keep.checked = false;
+    await files.save();
+    expect((saved as { storePreviews: unknown }).storePreviews).toBe(false);
     // Preview: a row for all files, open, then one per type (like all files); one open at a time
-    const row = (name: string) => preview.panel.querySelector<HTMLElement>(`[data-swa-type="${name}"]`)!;
+    // (The preview's view of Appearance: the original's has rows of its own)
+    const previewLook = preview.panel.querySelector<HTMLElement>('[data-swa-look="preview"]')!;
+    const row = (name: string) => previewLook.querySelector<HTMLElement>(`[data-swa-type="${name}"]`)!;
     const open = (name: string) => row(name).querySelector<HTMLButtonElement>(".swa-type-head")!.click();
-    const button = (text: string) => [...preview.panel.querySelectorAll<HTMLButtonElement>("button")].find((one) => one.textContent === text)!;
+    const button = (text: string) => [...previewLook.querySelectorAll<HTMLButtonElement>("button")].find((one) => one.textContent === text)!;
     const typed = (input: HTMLInputElement, value: string) => ((input.value = value), input.dispatchEvent(new Event("input", { bubbles: true })));
-    expect([...preview.panel.querySelectorAll(".swa-type")].map((one) => one.getAttribute("data-swa-type"))).toEqual(["*", "image", "pdf"]);
-    expect([...preview.panel.querySelectorAll(".swa-type-open")].map((one) => one.getAttribute("data-swa-type"))).toEqual(["*"]);
+    expect([...previewLook.querySelectorAll(".swa-type")].map((one) => one.getAttribute("data-swa-type"))).toEqual(["*", "image", "pdf"]);
+    expect([...previewLook.querySelectorAll(".swa-type-open")].map((one) => one.getAttribute("data-swa-type"))).toEqual(["*"]);
     expect(row("pdf").querySelector(".swa-type-mark")).toBeNull();
     // Its size: all files' (a number out of bounds: as it was), a type's own, marked Own, reset
-    const field = (label: string) => preview.panel.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
+    const field = (label: string) => previewLook.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
     expect(field("A preview's height (px)").value).toBe("160");
     expect(field("A preview's width (px)").placeholder).toBe("auto");
     typed(field("A preview's height (px)"), "5");
     typed(field("A preview's width (px)"), "320");
     open("pdf");
-    expect([...preview.panel.querySelectorAll(".swa-type-open")].map((one) => one.getAttribute("data-swa-type"))).toEqual(["pdf"]);
+    expect([...previewLook.querySelectorAll(".swa-type-open")].map((one) => one.getAttribute("data-swa-type"))).toEqual(["pdf"]);
     expect(field("pdf: a preview's width (px)").placeholder).toBe("320");
     typed(field("pdf: a preview's height (px)"), "240");
     expect(row("pdf").querySelector(".swa-type-mark")!.textContent).toBe("Own");
@@ -103,8 +111,8 @@ describe("the assets' settings tabs", () => {
     expect(saved).toMatchObject({ heights: { preview: 160, embed: 640 } });
     // Its label: all files' (the icon and the alt text above by default), a type's own made from it, changed apart, reset
     // (A property not shown: a chip of the row, shown by Space/Enter; one shown: its value in the sample's line)
-    const press = (name: string) => preview.panel.querySelector<HTMLButtonElement>(`.swa-label-edit .swa-sample-chip[data-swa-field="${name}"]`)!.dispatchEvent(new MouseEvent("click", { detail: 0, bubbles: true }));
-    const item = (place: string, name: string) => preview.panel.querySelector<HTMLElement>(`.swa-label-edit [data-swa-place="${place}"] .swa-sample-item[data-swa-field="${name}"]`);
+    const press = (name: string) => previewLook.querySelector<HTMLButtonElement>(`.swa-label-edit .swa-sample-chip[data-swa-field="${name}"]`)!.dispatchEvent(new MouseEvent("click", { detail: 0, bubbles: true }));
+    const item = (place: string, name: string) => previewLook.querySelector<HTMLElement>(`.swa-label-edit [data-swa-place="${place}"] .swa-sample-item[data-swa-field="${name}"]`);
     open("*");
     expect(item("above", "alt")).not.toBeNull();
     press("name");
@@ -123,6 +131,14 @@ describe("the assets' settings tabs", () => {
     expect(row("pdf").querySelector(".swa-type-mark")).toBeNull();
     await files.save();
     expect((saved as { labels: { types: object } }).labels.types).toEqual({});
+    // An original's label alike, none shown by default: its alt text turned on for all files
+    const original = preview.panel.querySelector<HTMLElement>('[data-swa-look="original"]')!;
+    expect([...original.querySelectorAll(".swa-type")].map((one) => one.getAttribute("data-swa-type"))).toEqual(["*", "image", "pdf"]);
+    expect(original.querySelectorAll(".swa-label-edit .swa-sample-item")).toHaveLength(0);
+    original.querySelector<HTMLButtonElement>('.swa-label-edit .swa-sample-chip[data-swa-field="alt"]')!.dispatchEvent(new MouseEvent("click", { detail: 0, bubbles: true }));
+    await files.save();
+    const originals = (saved as { originalLabels: { default: { above: unknown[]; below: unknown[] } } }).originalLabels;
+    expect([...originals.default.above, ...originals.default.below]).toContainEqual({ field: "alt", on: true });
     // As kept and read back: the Shift+click to nothing
     const back = readAssetSettings(storedAssetSettings(saved as never)).settings;
     expect(back.actions.default).toEqual({ click: "open-tab" });

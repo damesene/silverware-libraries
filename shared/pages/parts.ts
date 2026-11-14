@@ -58,6 +58,10 @@ export type PageChange =
   // A cell of a grid (Silverware Layout's columns, shared/markdown/grid.ts) given new content: the grid of that body
   // (the `occurrence`-th of those alike), its `cell`-th cell counted from 0
   | { readonly kind: "replaceGridCell"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly cell: number; readonly content: string }
+  // Several cells of one grid given new content at once (a text moved from one to another): by their index
+  | { readonly kind: "replaceGridCells"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly contents: Readonly<Record<number, string>> }
+  // A range of the page's text taken out where it is still `was` (moved elsewhere by the same change: one edit)
+  | { readonly kind: "takeText"; readonly from: number; readonly to: number; readonly was: string }
   // A grid's `<grid>` line given attributes (a value set, or null: taken off), the others on it kept
   | { readonly kind: "setGridAttributes"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly attributes: Readonly<Record<string, string | null>> }
   | { readonly kind: "changeGridCells"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly cells: GridCellsChange }
@@ -72,6 +76,13 @@ export type PageChange =
 
 /** The builder's sections, one per part of a page's content (their parts below make them); every method gives the page's builder back */
 export interface PageSections {
+  readonly text: {
+    /**
+     * A range of the page's text taken out where it is still what the plugin read (`was`): moved elsewhere with the
+     * same change (a grid's cell), written as one edit. Changed since: the page left alone
+     */
+    takeOut(from: number, to: number, was: string): PageBuilder;
+  };
   readonly properties: {
     /** A property's value, at its key or down a path of keys in maps (the maps on the way made where missing) */
     set(path: PropertyPath, value: PropertyValue): PageBuilder;
@@ -113,6 +124,8 @@ export interface PageSections {
      * or the cell changed since it was read): the page left alone
      */
     replaceCell(body: string, cell: number, content: string, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
+    /** Several cells of a grid given new content at once, by their index, the grid found as `replaceCell` finds it (one cell changed, the others' place the same) */
+    replaceCells(body: string, contents: Readonly<Record<number, string>>, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
     /**
      * A grid's attributes set on its `<grid>` line (a value, or null: taken off; the others on it kept, the line
      * written in HTML's form), the grid found as `replaceCell` finds it
@@ -334,6 +347,19 @@ const removeHow = (from: TagsFrom, keepWord: boolean): RemoveHow =>
 
 export const PARTS: readonly Part[] = [
   part({
+    kinds: ["takeText"],
+    section: {
+      name: "text",
+      make: (add) => ({
+        takeOut: (from, to, was) => add({ kind: "takeText", from, to, was }),
+      }),
+    },
+    write: (text, change) => {
+      if (text.slice(change.from, change.to) !== change.was) return { text, changes: 0, problem: "the text changed since it was read: left alone" };
+      return { text: text.slice(0, change.from) + text.slice(change.to), changes: change.from < change.to ? 1 : 0 };
+    },
+  }),
+  part({
     kinds: ["setProperty", "removeProperty"],
     section: {
       name: "properties",
@@ -394,7 +420,7 @@ export const PARTS: readonly Part[] = [
     },
   }),
   part({
-    kinds: ["replaceGridCell", "setGridAttributes", "changeGridCells", "putIntoGrid"],
+    kinds: ["replaceGridCell", "replaceGridCells", "setGridAttributes", "changeGridCells", "putIntoGrid"],
     section: {
       name: "grids",
       make: (add) => ({
@@ -404,6 +430,8 @@ export const PARTS: readonly Part[] = [
           add({ kind: "setGridAttributes", body, attributes: { ...attributes }, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
         changeCells: (body, cells, where = {}) => add({ kind: "changeGridCells", body, cells: { ...cells }, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
         put: (from, to, was, mode, columns) => add({ kind: "putIntoGrid", from, to, was, mode, columns }),
+        replaceCells: (body, contents, where = {}) =>
+          add({ kind: "replaceGridCells", body, contents: { ...contents }, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
       }),
     },
     write: (text, change) => {
@@ -472,14 +500,20 @@ export const PARTS: readonly Part[] = [
         if (text.slice(grid.from, end) === line) return { text, changes: 0 };
         return { text: text.slice(0, grid.from) + line + text.slice(end), changes: 1 };
       }
-      const cell = grid.cells[change.cell];
-      if (!cell) return changed;
+      // Each cell given its content, the last first (an earlier one's place stays as it was read)
+      const contents = change.kind === "replaceGridCells" ? change.contents : { [change.cell]: change.content };
+      const indexes = Object.keys(contents).map(Number).sort((a, b) => b - a);
+      if (indexes.some((index) => !grid.cells[index])) return changed;
       const nl = lineBreakOf(text);
-      const content = sameBody(change.content).replace(/^(\s*\n)+/, "");
-      // A blank line before and after the content (none for no content): what other renderers need to read it as markdown
-      const inner = (content ? nl + content.replace(/\n/g, nl) + nl + nl : nl) + (cell.closed ? "" : `</column>${nl}`);
-      if (text.slice(cell.innerFrom, cell.innerTo) === inner) return { text, changes: 0 };
-      return { text: text.slice(0, cell.innerFrom) + inner + text.slice(cell.innerTo), changes: 1 };
+      let after = text;
+      for (const index of indexes) {
+        const cell = grid.cells[index]!;
+        const content = sameBody(contents[index]!).replace(/^(\s*\n)+/, "");
+        // A blank line before and after the content (none for no content): what other renderers need to read it as markdown
+        const inner = (content ? nl + content.replace(/\n/g, nl) + nl + nl : nl) + (cell.closed ? "" : `</column>${nl}`);
+        after = after.slice(0, cell.innerFrom) + inner + after.slice(cell.innerTo);
+      }
+      return after === text ? { text, changes: 0 } : { text: after, changes: 1 };
     },
   }),
   part({

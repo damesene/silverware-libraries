@@ -34,8 +34,13 @@ export type AssetSettings = {
   // Whether a link to a file of the space (`[[report.pdf]]`) shows its type's icon before its text (its menu's way
   // in); off, a small arrow after it is
   readonly linkIcons: boolean;
+  // Whether a preview slow to make (a PDF's page) is kept in the space once made (docs/silverware-assets-stored-previews.md);
+  // off, each is made as it is shown, Regenerate preview not offered (those kept are left: Clean up previews)
+  readonly storePreviews: boolean;
   // A preview's label: all files', and a type's own (whole, not in part)
   readonly labels: { readonly default: PreviewLabel; readonly types: Readonly<Record<string, PreviewLabel>> };
+  // An original's label, alike (none shown unless the user turns one on: a file shown as SilverBullet draws it)
+  readonly originalLabels: { readonly default: PreviewLabel; readonly types: Readonly<Record<string, PreviewLabel>> };
 };
 
 /** Whether two labels are the same: each property in the same place, order and state */
@@ -44,9 +49,10 @@ export function sameLabel(a: PreviewLabel, b: PreviewLabel): boolean {
   return same(a.above, b.above) && same(a.below, b.below);
 }
 
-/** A type's preview label: its own, else all files' */
-export function labelFor(settings: AssetSettings, type: string): PreviewLabel {
-  return settings.labels.types[type] ?? settings.labels.default;
+/** A type's label as a view shows it (a preview's, an original's): its own, else all files' */
+export function labelFor(settings: AssetSettings, type: string, view: "preview" | "embed" = "preview"): PreviewLabel {
+  const labels = view === "embed" ? settings.originalLabels : settings.labels;
+  return labels.types[type] ?? labels.default;
 }
 
 /** A preview's size of a type's own: its width and height (px), each none where all files' holds */
@@ -85,7 +91,9 @@ export function storedAssetSettings(settings: AssetSettings): Record<string, unk
     originals: undefined,
     anchor: undefined,
     linkIcons: settings.linkIcons,
+    storePreviews: settings.storePreviews,
     labels: { default: storedLabel(settings.labels.default), types: Object.fromEntries(Object.entries(settings.labels.types).map(([k, v]) => [k, storedLabel(v)])) },
+    originalLabels: { default: storedLabel(settings.originalLabels.default), types: Object.fromEntries(Object.entries(settings.originalLabels.types).map(([k, v]) => [k, storedLabel(v)])) },
   };
 }
 
@@ -108,6 +116,12 @@ export const DEFAULT_LABEL: PreviewLabel = {
   ],
 };
 
+/** An original's label unless the user sets another: none, every property off where a preview's has it */
+export const NO_LABEL: PreviewLabel = {
+  above: DEFAULT_LABEL.above.map((part) => ({ ...part, on: false })),
+  below: DEFAULT_LABEL.below.map((part) => ({ ...part, on: false })),
+};
+
 export const DEFAULT_ASSET_SETTINGS: AssetSettings = {
   views: { default: "embed", types: {} },
   actions: { default: { click: "open-tab", "shift+click": "open-tab" }, types: {} },
@@ -115,7 +129,9 @@ export const DEFAULT_ASSET_SETTINGS: AssetSettings = {
   heights: { preview: 160, embed: 480 },
   previews: { types: {} },
   linkIcons: true,
+  storePreviews: true,
   labels: { default: DEFAULT_LABEL, types: {} },
+  originalLabels: { default: NO_LABEL, types: {} },
 };
 
 const isView = (value: unknown): value is View => typeof value === "string" && (VIEWS as readonly string[]).includes(value);
@@ -153,18 +169,20 @@ export function readAssetSettings(value: unknown): { readonly settings: AssetSet
       heights: { preview: height("preview"), embed: height("embed") },
       previews: readPreviews(given.previews),
       linkIcons: given.linkIcons !== false,
-      labels: readLabels(given.labels),
+      storePreviews: given.storePreviews !== false,
+      labels: readLabels(given.labels, DEFAULT_LABEL),
+      originalLabels: readLabels(given.originalLabels, NO_LABEL),
     },
     problems,
   };
 }
 
-/** The labels as configured: all files' (none: the default) and each type's own */
-function readLabels(value: unknown): AssetSettings["labels"] {
+/** The labels of a view as configured: all files' (none: `fallback`) and each type's own */
+function readLabels(value: unknown, fallback: PreviewLabel): AssetSettings["labels"] {
   const given = record(value);
   const types: Record<string, PreviewLabel> = {};
   for (const [type, one] of Object.entries(record(given.types))) types[type] = readLabel(one);
-  return { default: given.default === undefined ? DEFAULT_LABEL : readLabel(given.default), types };
+  return { default: given.default === undefined ? fallback : readLabel(given.default), types };
 }
 
 /**

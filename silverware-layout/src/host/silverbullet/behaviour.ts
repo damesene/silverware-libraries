@@ -81,16 +81,3 @@ export function afterPress(doc: Document): Promise<void> {
 
 /** How SilverBullet's page behaves for an editor of a cell (shared/editor.ts): it takes Ctrl+Z (Ctrl+Y) at the window and holds them back (2.12.1) */
 export const SILVERBULLET_EDITORS: EditorHost = { historyAtWindow: true };
-
-// SilverBullet's editor a grid is drawn in: CodeMirror's editable area
-const PAGE_EDITOR = '[contenteditable="true"]';
-
-/**
- * The page's editor a cell is in given the focus back as the cell is left, where it does not have it. Unfocused, the
- * next press in a grid focused it, and it took the press's selection for its own: its cursor in the grid's text, the
- * grid shown as its markdown
- */
-export function focusPage(cell: HTMLElement): void {
-  const page = cell.closest<HTMLElement>(PAGE_EDITOR);
-  if (page?.isConnected && cell.ownerDocument.activeElement !== page) page.focus({ preventScroll: true });
-}

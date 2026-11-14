@@ -18,10 +18,12 @@ export function xlsxType(doc: Document): AssetType {
     name: "xlsx",
     match: { kind: ["file", "web"], mime: XLSX_MIME, ext: ["xlsx"] },
     icon: ICON,
+    // Its preview kept in the space where Silverware Assets keeps previews: a workbook read once
+    storesPreview: true,
     views: {
       preview: (context) =>
         "url" in context.asset && context.viewport.width >= LEAST_WIDTH
-          ? xlsxPreview(doc, context.asset.url, assetName(context.asset), ICON, { width: context.viewport.width, height: context.viewport.height }, context.signal)
+          ? xlsxPreview(doc, context.asset.url, assetName(context.asset), ICON, { width: context.viewport.width, height: context.viewport.height }, context.signal, context.stored)
           : null,
       embed: (context) => ("url" in context.asset ? xlsxReader(doc, context.asset.url, assetName(context.asset), context.fills ? undefined : context.viewport.height, context.signal) : null),
     },

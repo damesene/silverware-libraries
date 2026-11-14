@@ -40,8 +40,10 @@ const kept = new Map<string, Promise<Workbook>>();
  * A workbook read once per file and version (what its server says of it now: replaced under the same name, read again),
  * for its previews and its readers; a failure not kept: tried again next time
  */
-export async function workbook(doc: Document, url: string): Promise<Workbook> {
+export async function workbook(doc: Document, url: string, again = false): Promise<Workbook> {
   const key = `${await fileVersion(url, doc.baseURI)} ${url}`;
+  // (`again`: read anew, Regenerate preview)
+  if (again) kept.delete(key);
   const known = kept.get(key);
   if (known) {
     kept.delete(key);

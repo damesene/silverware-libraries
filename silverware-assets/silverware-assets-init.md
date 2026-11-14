@@ -24,7 +24,9 @@ config.define("silverware.assets", {
     heights = { type = "object", description = "A preview's and an embed's height where nothing gives one (px)." },
     previews = { type = "object", description = "A preview's width for all files (width, px; none: as wide as it fits) and alignment (align: left, center or right), and per type its width, height and alignment (types)." },
     linkIcons = { type = "boolean", description = "A link to a file of the space shows its type's icon before its text." },
+    storePreviews = { type = "boolean", description = "A preview slow to make (a PDF's page) is kept in the space once made (_silverware-asset-preview); off, made each time it is shown, no Regenerate preview." },
     labels = { type = "object", description = "A preview's label: for all files (default) and per type (types), each { above = {...}, below = {...} }, a list of { field = icon, alt, name, size or modified, on = true or false }." },
+    originalLabels = { type = "object", description = "An original's label, alike (none shown unless one is turned on)." },
     syntaxMode = {
       type = "object",
       additionalProperties = false,
@@ -69,6 +71,12 @@ if js and js.window then
     -- A file's Delete (in its menu, once confirmed): the document deleted from the space, asked first in SilverBullet's
     -- dialog, its OK button the danger's
     deleteDocument = space.deleteDocument,
+    -- Previews kept in the space (in _silverware-asset-preview/, made once): a file's time of change, a document read and written
+    fileMeta = space.getFileMeta,
+    readDocument = space.readDocument,
+    writeDocument = space.writeDocument,
+    -- Clean up previews: every file of the space (its previews' folder too)
+    listFiles = space.listFiles,
     confirmDelete = function(message)
       return editor.confirm(message, { destructive = true })
     end,

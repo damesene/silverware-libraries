@@ -17,6 +17,19 @@ export type TextSelection = { readonly from: number; readonly to: number; readon
  */
 export type EditorKeys = Readonly<Record<string, () => boolean>>;
 
+/**
+ * An embed drawn in an editor in place of its markdown, by its user's plugin (or the plugin drawing files that it
+ * hands it over from): into an element the editor gives it, in the editor's own root (a shadow root: the page's rules
+ * of the classes drawn, by their prefix, `swa-`, are put in there for it)
+ */
+export type EditorEmbed = {
+  // Which drawing it is: the same key, the drawing kept as the text around it changes
+  readonly key: string;
+  // Drawn into the container (synchronously or later); what it started ends with the signal (the caret come into its
+  // markdown, the editor gone)
+  draw(container: HTMLElement, signal: AbortSignal): void;
+};
+
 export type EditorOptions = {
   readonly text: string;
   // Classes of the editor's element (the plugin's look of it)
@@ -32,6 +45,10 @@ export type EditorOptions = {
   // stopping keys at its own element, its Esc closing it); none: kept at the editor (the page's editor takes none)
   readonly passKeys?: boolean;
   readonly spellcheck?: boolean;
+  // An embed's markdown (`![[photo.png|Alt|200]]`, `![Alt](photo.png)`) drawn as the page draws it, its markdown
+  // where the caret is: what the plugin says of it (none, or none for it: its markdown, as an editor without a preview
+  // shows every embed)
+  readonly embed?: (markdown: string) => EditorEmbed | undefined;
   // Told of each change of the text, of the focus come and gone
   readonly onChange?: (text: string) => void;
   readonly onFocus?: () => void;

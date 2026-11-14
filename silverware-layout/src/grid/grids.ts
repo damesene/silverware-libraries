@@ -10,23 +10,29 @@
 import type { Attributes } from "../../../shared/markdown/attributes.ts";
 import { type Grid, readGridBody, readGrids } from "../../../shared/markdown/grid.ts";
 import { gridsOfBody } from "./core/match.ts";
-import { positionInCell } from "./core/position.ts";
 import { borderAttribute, bordered } from "./model/border.ts";
 import { columnTemplate, DEFAULT_MAX_COLUMNS } from "./model/columns.ts";
 import { RENDERED_VERSION, type Rendered, type RenderedItem, type RenderedRange } from "../../../shared/rendered.ts";
 import { type Drawn, drawnIn, itemsOf } from "./drawn.ts";
 import { addCellMenus, type CellAction } from "./ui/cellmenu.ts";
 import { caretWord, type CellEditing, editCell } from "./ui/celleditor.ts";
-import { type Editors, editorsOf } from "../../../shared/editor.ts";
-import { blankLinesBefore, blankLineStart } from "./core/blanklines.ts";
+import { type EditorEmbed, type Editors, editorsOf } from "../../../shared/editor.ts";
 import { addColumnDividers } from "./ui/dividers.ts";
 import { drawGrid, keepBlankLines, plainCell, showBorder, showColumns } from "./ui/view.ts";
+import { blankLineAt, type Caret, type CellPoint, endAt, offsetInCell, selectionInCell } from "./ui/cellpoint.ts";
+import { GridDrag } from "./drag.ts";
 
 /** A cell to write: the grid by its body as read and its place among those alike, the cell, its new markdown */
 export type CellWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly cell: number; readonly content: string };
 
 /** A grid's attributes to write (a value, or null: taken off), the grid found as a cell's is */
 export type AttributesWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly attributes: Readonly<Record<string, string | null>> };
+
+/** Text moved as one edit: taken out of the page where it is still as read, cells of grids given their content (by index) */
+export type MoveWrite = {
+  readonly takeOut?: { readonly from: number; readonly to: number; readonly was: string };
+  readonly grids: readonly { readonly body: string; readonly occurrence: number; readonly of: number; readonly contents: Readonly<Record<number, string>> }[];
+};
 
 /** A grid's cells to change (shared/pages' `GridCellsChange`, named here apart), the grid found as a cell's is */
 export type CellsChange =
@@ -63,6 +69,16 @@ export type GridHost = {
   afterPress?(doc: Document): Promise<void>;
   /** The page's editor a cell is in given the focus back as the cell is left (none: nothing) */
   focusPage?(cell: HTMLElement): void;
+  /** Whether a press is beside a grid on its line or in the margin at its height, where the host's editor would put its cursor into the grid's text (none: none is) */
+  pressBesideGrid?(event: MouseEvent): boolean;
+  /** Whether a node is in the page's own text (not a widget's): a drag begun there moves the page's selection (none: no drag of the page's moved) */
+  isPageText?(node: Node): boolean;
+  /** The page's selection, offsets of its text (none: none known) */
+  pageSelection?(): Promise<{ readonly from: number; readonly to: number } | undefined>;
+  /** Text moved as one edit (none: a drop copies, the cells written apart); why not, as text */
+  writeMove?(move: MoveWrite): Promise<string | undefined>;
+  /** What draws an embed in a cell's field (shared/editor.ts `EditorOptions.embed`), as the page draws it; none: its markdown */
+  embeds?(): Promise<(markdown: string) => EditorEmbed | undefined>;
 };
 
 // How long after a grid is drawn its attributes are read again (it is in the page by then, its order among its alike known)
@@ -125,7 +141,7 @@ function sameAttributes(a: Attributes | undefined, b: Attributes): boolean {
 }
 
 /** Where a cell edited is: its grid (taken anew as it is drawn anew), that grid's place among those drawn, the cell */
-type CellPlace = { grid: HTMLElement; readonly nth: number; readonly index: number };
+export type CellPlace = { grid: HTMLElement; readonly nth: number; readonly index: number };
 
 export class Grids {
   // Each grid drawn, its body (what it is found in the page by)
@@ -138,7 +154,7 @@ export class Grids {
   // What is drawn changed since last told (a grid drawn or placed anew), and who is told
   private changedSinceTold = false;
   private readonly listeners = new Set<(items: readonly RenderedItem[]) => void>();
-  /** What the grids drew in their cells and where it is in the page, for another to decorate (shared/rendered.ts) */
+  /** What the grids drew in their cells and where it is in the page, for another to decorate (shared/rendered.ts; what draws embeds in their fields is the API's, src/index.ts) */
   readonly rendered: Rendered = {
     version: RENDERED_VERSION,
     items: () => this.items(),
@@ -160,15 +176,35 @@ export class Grids {
   // of it and of the writes on their way, each taken to its grid drawn anew
   private editing: { readonly place: CellPlace; readonly session: CellEditing } | undefined;
   private readonly places = new Set<CellPlace>();
+  // Cells being opened for editing (the page's text read first): a second click on one meanwhile is no second field
+  private readonly opening = new WeakSet<HTMLElement>();
   /** Told as a grid drawn gets other attributes than it had (its width typed by hand: laid out again) */
   onAttributes: (() => void) | undefined;
   /** Where the page's text is (x in the window), where who lays the page out says: a column's edge snaps to it */
   textEdges: (() => { readonly left: number; readonly right: number } | undefined) | undefined;
 
+  // Text dragged into the cells and out of them, always moved (./drag.ts)
+  private readonly drag: GridDrag;
+
   constructor(
     private readonly doc: Document,
     private host: GridHost,
-  ) {}
+  ) {
+    this.drag = new GridDrag(doc, {
+      host: () => this.host,
+      gridOf: (target) => this.gridOf(target),
+      placedOf: (grid) => this.placed.get(grid),
+      found: (text, grid) => this.found(text, grid),
+      drawn: () => this.drawn(),
+      fieldAt: (node) => {
+        const editing = this.editing;
+        const editor = editing?.session.editor;
+        return editing && editor && (editor.element === node || editor.element.contains(node)) ? { editor, place: editing.place } : undefined;
+      },
+      inTurn: (places, task, fail) => this.inTurn(places, task, fail),
+      redrawn: (grid, nth) => this.redrawn(grid, nth),
+    });
+  }
 
   /** The host's API handed over anew (the host's scripts loaded again): asked from now on */
   useHost(host: GridHost): void {
@@ -187,10 +223,31 @@ export class Grids {
       "mousedown",
       (event) => {
         const at = event.button === 0 && !event.altKey ? this.gridOf(event.target) : undefined;
+        // A press beside a grid (on its line, or in the margin at its height): nothing, as beside a table (the host's
+        // editor would put its cursor into the grid's text and show its markdown)
+        if (!at && event.button === 0 && !event.altKey && this.host.pressBesideGrid?.(event)) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
         this.pressed = at?.cell ? { cell: at.cell, x: event.clientX, y: event.clientY, caret: caretWord(this.doc, event.clientX, event.clientY) } : undefined;
-        // The press the grid's, not the page editor's (its click handler not told of it: a click in a grid is the
-        // grid's). (A field being edited, a link, a button: their own, as the click's)
-        if (at?.cell && !at.cell.classList.contains("swl-grid-editing") && !(event.target as Element).closest(OWN_CLICKS)) event.stopPropagation();
+        // The press the grid's, not the page editor's, anywhere in it (a cell, the gap between two, its edge): the
+        // editor would put its cursor into the grid's text and show its markdown; the grid takes the focus instead
+        // (its tabindex). (A field being edited, a link, a button: their own, as the click's)
+        if (at && !at.cell?.classList.contains("swl-grid-editing") && !(event.target as Element).closest(OWN_CLICKS)) event.stopPropagation();
+        // A press in the cell edited, beside its field (its padding, the space under its text): the field keeps the
+        // focus (else it was left: a quick second click on a cell just opened closed it again)
+        const editor = this.editing?.session.editor;
+        const field = editor?.element;
+        if (at?.cell?.classList.contains("swl-grid-editing") && editor && field && event.target instanceof Node && !field.contains(event.target)) {
+          event.preventDefault();
+          event.stopPropagation();
+          // (Under the field: the caret at its end, as a click under a page's last line puts it)
+          if (event.clientY > field.getBoundingClientRect().bottom) {
+            const end = editor.getText().length;
+            editor.setSelection(end);
+          }
+        }
       },
       true,
     );
@@ -201,6 +258,7 @@ export class Grids {
       }
     }, true);
     this.doc.addEventListener("click", (event) => void this.click(event));
+    this.drag.start();
     // A task's box in a cell: the grid's to toggle in the cell's markdown (the host would toggle it elsewhere, or not)
     this.doc.addEventListener(
       "click",
@@ -346,6 +404,11 @@ export class Grids {
   /** What a cell's menu chose, written: the grid's columns as an attribute, a change of its cells by the host */
   async cellAction(element: HTMLElement, cell: number, action: CellAction): Promise<void> {
     const said = (problem: string | undefined) => problem && this.host.problem(`Silverware Layout: the grid was not changed: ${problem}`);
+    // Its markdown shown by the page, the cursor at the column's start (as Alt+click there)
+    if (action.kind === "source") {
+      const cellElement = element.querySelector<HTMLElement>(`:scope > .swl-grid-cell[data-swl-cell="${cell}"]`) ?? undefined;
+      return this.showSource(element, cellElement, cellElement ?? element, undefined);
+    }
     if (action.kind === "columns") return void said(await this.writeAttributes(element, { columns: action.columns }));
     if (action.kind === "border") {
       const problem = await this.writeAttributes(element, { border: borderAttribute(action.on) });
@@ -394,11 +457,28 @@ export class Grids {
     return { element, cell: target.closest<HTMLElement>(".swl-grid-cell") ?? undefined };
   }
 
+  /**
+   * A write in turn with the cells' writes (each once the one before is written and its grid drawn anew), the places it
+   * writes taken to their grids drawn anew meanwhile; `task` gives why it did not write, where it did not
+   */
+  private inTurn(places: readonly CellPlace[], task: () => Promise<string | undefined>, fail = (problem: string) => this.host.problem(`Silverware Layout: the cell was not written: ${problem}`)): void {
+    this.writes++;
+    for (const place of places) this.places.add(place);
+    this.writing = this.writing
+      .then(task)
+      .then((problem) => void (problem && fail(problem)))
+      .catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)))
+      .finally(() => {
+        this.writes--;
+        for (const place of places) this.places.delete(place);
+      });
+  }
+
   /** A click in a cell, not on what its rendering handles itself: the cell edited */
   private async click(event: MouseEvent): Promise<void> {
     if (event.altKey || event.button !== 0 || event.defaultPrevented) return;
     const at = this.gridOf(event.target);
-    if (!at?.cell || at.cell.classList.contains("swl-grid-editing")) return;
+    if (!at?.cell || at.cell.classList.contains("swl-grid-editing") || this.opening.has(at.cell)) return;
     if ((event.target as Element).closest(OWN_CLICKS)) return;
     // Where the click was, read before the cell's rendering gives way to its field; text selected in the cell by a
     // drag (its click comes as the button is let go) taken over as the field's selection
@@ -415,7 +495,12 @@ export class Grids {
           ? { anchor: pressed.caret, focus: caret }
           : undefined;
     const point = { target: event.target as Element, caret, y: event.clientY, ...(selected ? { selected } : {}) };
-    await this.edit(at.element, at.cell, point);
+    this.opening.add(at.cell);
+    try {
+      await this.edit(at.element, at.cell, point);
+    } finally {
+      this.opening.delete(at.cell);
+    }
   }
 
   /** A task's box in a cell clicked: its state in the cell's markdown toggled (`[ ]` done `[x]`, any other undone), written */
@@ -437,6 +522,9 @@ export class Grids {
     const nth = this.drawn().indexOf(element);
     // (Where the press was is read in the cell pressed, its rendering: the cell edited may be the grid's drawn anew)
     const pressed = cellElement;
+    // (What draws its embeds asked as its text is read: no wait of its own before the field opens, the grid perhaps
+    // drawn anew meanwhile)
+    const embeds = this.host.embeds?.().catch(() => undefined);
     let text = await this.host.pageText().catch(() => undefined);
     let found = text === undefined ? undefined : this.found(text, element);
     // Read as another cell's write had changed the grid, before it was drawn anew: opened once it is, in that drawing
@@ -457,11 +545,12 @@ export class Grids {
       ? undefined
       : point.selected
         ? selectionInCell(cell.content, pressed, point.selected)
-        : ((point.y === undefined ? undefined : blankLineAt(cell.content, pressed, point.y)) ?? offsetInCell(cell.content, pressed, point.target, point.caret));
+        : ((point.y === undefined ? undefined : (endAt(cell.content, pressed, point.y) ?? blankLineAt(cell.content, pressed, point.y))) ?? offsetInCell(cell.content, pressed, point.target, point.caret));
     const place: CellPlace = { grid: element, nth, index };
     this.places.add(place);
     let session: CellEditing | undefined;
-    const cellHost = { afterPress: (doc: Document) => this.host.afterPress?.(doc) ?? Promise.resolve(), focusPage: (cell: HTMLElement) => this.host.focusPage?.(cell) };
+    const embed = await embeds;
+    const cellHost = { afterPress: (doc: Document) => this.host.afterPress?.(doc) ?? Promise.resolve(), focusPage: (cell: HTMLElement) => this.host.focusPage?.(cell), ...(embed ? { embed } : {}) };
     session = editCell(cellElement, cell.content, at, this.host.editors ?? editorsOf(undefined), cellHost, (content, settled) => {
       if (session && this.editing?.session === session) this.editing = undefined;
       if (same(content) !== same(cell.content)) this.writeLater(place, content, settled);
@@ -476,27 +565,19 @@ export class Grids {
    * finds it so too
    */
   private writeLater(place: CellPlace, content: string, settled: Promise<void>): void {
-    this.writes++;
-    const fail = (problem: string) => this.host.problem(`Silverware Layout: the cell was not written: ${problem}`);
-    const write = async () => {
+    this.inTurn([place], async () => {
       await settled;
       // (Its grid as drawn now: drawn anew after a write before, taken to it by `redrawn`; not in the page any more,
       // nothing written: no other grid is taken for it)
       const grid = place.grid;
       const text = await this.host.pageText();
       const found = grid.isConnected ? this.found(text, grid) : undefined;
-      if (!found) return fail("its grid changed in the page meanwhile");
+      if (!found) return "its grid changed in the page meanwhile";
       const problem = await this.host.writeCell({ body: found.grid.body, occurrence: found.occurrence, of: found.of, cell: place.index, content });
-      if (problem) return fail(problem);
+      if (problem) return problem;
       await this.redrawn(grid, place.nth);
-    };
-    this.writing = this.writing
-      .then(write)
-      .catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)))
-      .finally(() => {
-        this.writes--;
-        this.places.delete(place);
-      });
+      return undefined;
+    });
   }
 
   /**
@@ -561,60 +642,6 @@ export function toggledTask(content: string, at: number): string | undefined {
   const state = /^\[(.)\]/.exec(content.slice(at));
   if (!state) return undefined;
   return content.slice(0, at + 1) + (state[1] === " " ? "x" : " ") + content.slice(at + 2);
-}
-
-/** Where a click was in a cell's rendering: the element, the caret there, and the text selected in the cell, where some was */
-type Caret = { readonly node: Node; readonly offset: number };
-export type CellPoint = { readonly target: Element; readonly caret: Caret | undefined; readonly y?: number; readonly selected?: { readonly anchor: Caret; readonly focus: Caret } };
-
-/** A selection in a cell's rendering as one of its markdown: each end where it is there, its direction kept */
-function selectionInCell(content: string, cellElement: HTMLElement, selected: { readonly anchor: Caret; readonly focus: Caret }): { readonly from: number; readonly to: number; readonly backward: boolean } {
-  const end = (caret: Caret) => offsetInCell(content, cellElement, caret.node instanceof Element ? caret.node : (caret.node.parentElement ?? cellElement), caret);
-  const anchor = end(selected.anchor);
-  const focus = end(selected.focus);
-  return { from: Math.min(anchor, focus), to: Math.max(anchor, focus), backward: focus < anchor };
-}
-
-/**
- * Where a point of a cell's rendering is in its markdown: the element it is in that is marked with its place
- * (`data-pos`; SilverBullet leaves 0 out: the cell's first block, unmarked, is at 0), and how far into that element's
- * text the point is, followed through the markdown from there (core/position.ts)
- */
-function offsetInCell(content: string, cellElement: HTMLElement, target: Element, caret: Caret | undefined): number {
-  const from = caret ? (caret.node instanceof Element ? caret.node : caret.node.parentElement) ?? target : target;
-  const marked = from.closest("[data-pos]");
-  const element = marked && cellElement.contains(marked) ? marked : ([...cellElement.children].find((child) => child.contains(from)) ?? cellElement);
-  const elementPos = element === marked ? Number(marked.getAttribute("data-pos")) || 0 : 0;
-  if (!caret || !element.contains(caret.node)) return positionInCell(content, elementPos, "", 0);
-  // The element's text before the point
-  const range = cellElement.ownerDocument.createRange();
-  range.setStart(element, 0);
-  range.setEnd(caret.node, caret.offset);
-  return positionInCell(content, elementPos, element.textContent ?? "", range.toString().length);
-}
-
-/**
- * Where a click on a blank line of a cell's rendering is in its markdown: the start of that blank line (none where the
- * click is on no blank line). Blank lines are drawn as space, no element marked with its place in it: found by
- * height, between the element drawn before (its bottom) and the one after (its top, its `data-pos`), as many lines
- * there as its markdown has blank lines before it
- */
-function blankLineAt(content: string, cellElement: HTMLElement, y: number): number | undefined {
-  const marked = [...cellElement.querySelectorAll<HTMLElement>(":scope > [data-pos], :scope li[data-pos]")];
-  const next = marked.find((element) => element.getBoundingClientRect().top > y);
-  if (!next) return undefined;
-  const pos = Number(next.getAttribute("data-pos"));
-  const blanks = blankLinesBefore(content, pos);
-  if (!blanks) return undefined;
-  // The bottom of what is drawn before it (a line break or a put-back blank line is space, not content)
-  let before = next.previousElementSibling;
-  while (before && (before.tagName === "BR" || before.classList.contains("swl-grid-blank"))) before = before.previousElementSibling;
-  const top = next.getBoundingClientRect().top;
-  const bottom = before ? before.getBoundingClientRect().bottom : cellElement.getBoundingClientRect().top;
-  if (y < bottom || top <= bottom) return undefined;
-  const line = (top - bottom) / blanks;
-  const nth = Math.min(blanks, Math.max(1, Math.ceil((top - y) / line)));
-  return blankLineStart(content, pos, nth);
 }
 
 /** The ranges of a page's text its grids draw outside the editor, drawn now or not: each grid's lines whole */

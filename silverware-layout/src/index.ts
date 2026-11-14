@@ -9,7 +9,7 @@ import { type PageWriter, pageWriter } from "../../shared/pages/writer.ts";
 import { LayoutApp, type LayoutStore } from "./app.ts";
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { Registry } from "./core/registry.ts";
-import { RENDERED_VERSION, type Rendered, type RenderedItem } from "../../shared/rendered.ts";
+import { type EmbedDrawer, RENDERED_VERSION, type Rendered, type RenderedItem } from "../../shared/rendered.ts";
 import { gridInsertion } from "./grid/core/insert.ts";
 import { gridLinks } from "./grid/core/links.ts";
 import { GRID_MODES, isGridMode, putIntoGrid } from "./grid/build.ts";
@@ -21,6 +21,7 @@ import { watchEmbeddedGrids } from "./host/silverbullet/embeddedgrids.ts";
 import { watchSyntaxMode, type SyntaxModeWatcher } from "../../shared/syntaxmode.ts";
 import { SILVERBULLET_SYNTAX_PAGE, SYNTAX_OPTION } from "./host/silverbullet/syntaxmode.ts";
 import { silverBulletGridHost, silverBulletPutHost } from "./host/silverbullet/grid.ts";
+import { keepCursorOutOfGrids } from "./host/silverbullet/cursor.ts";
 import { keepDeviceZoom, readDeviceZoom } from "./host/devicezoom.ts";
 import { silverBulletPage } from "./host/silverbullet/dom.ts";
 import { pageLayoutOf, writePageWidth } from "./host/silverbullet/page.ts";
@@ -51,6 +52,8 @@ export const api = Object.assign(registry.api(), { rendered: renderedApi(), layO
 let grids: Grids | undefined;
 // Who is told what the grids draw (shared/rendered.ts), the grids made or not yet
 const renderedListeners = new Set<(items: readonly RenderedItem[]) => void>();
+// What draws embeds in a cell's field, as the plugin drawing files registered it (none: images alone)
+let embedDrawer: EmbedDrawer | undefined;
 
 /** What the grids draw outside the editor and where it is in the page, for another plugin to decorate (shared/rendered.ts) */
 function renderedApi(): Rendered {
@@ -61,6 +64,12 @@ function renderedApi(): Rendered {
     onChange: (listener) => {
       renderedListeners.add(listener);
       return () => void renderedListeners.delete(listener);
+    },
+    drawEmbeds: (drawer) => {
+      embedDrawer = drawer;
+      return () => {
+        if (embedDrawer === drawer) embedDrawer = undefined;
+      };
     },
   };
 }
@@ -77,7 +86,7 @@ export async function init(bridge: Bridge): Promise<void> {
   current = bridge;
   const writer = pageWriter(silverBulletPlatform(bridge));
   // One per window (its listeners live as long); its host the bridge handed over now, again with each start
-  const host = silverBulletGridHost(bridge, writer);
+  const host = silverBulletGridHost(bridge, writer, () => embedDrawer);
   if (grids) grids.useHost(host);
   else {
     grids = new Grids(document, host);
@@ -85,6 +94,8 @@ export async function init(bridge: Bridge): Promise<void> {
       for (const listener of renderedListeners) listener(items);
     });
     grids.start();
+    // SilverBullet's cursor kept out of a grid's text by the arrows (its markdown would show in its place)
+    keepCursorOutOfGrids(document, () => current ?? bridge);
     // A grid's width laid out as any widget's, registered as a widget plugin registers
     registry.register(gridProvider(grids));
     grids.onAttributes = () => app.layOutWidgets();

@@ -26,6 +26,19 @@ The look of [Silverware Assets XLSX](silverware-assets-xlsx.md): a workbook's pr
   border-radius: 4px;
   cursor: pointer;
 }
+/* While it is drawn: shown only after a moment (a preview kept in the space comes at once, with no box before it to
+   jump from) */
+@keyframes swa-xlsx-wait {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.swa-xlsx-preview[data-swa-xlsx-state="reading"] {
+  animation: swa-xlsx-wait 0s 0.4s both;
+}
 .swa-xlsx-preview-icon {
   display: inline-flex;
   width: 32px;
@@ -56,6 +69,8 @@ The look of [Silverware Assets XLSX](silverware-assets-xlsx.md): a workbook's pr
 }
 .swa-xlsx-preview-sheet {
   overflow: hidden;
+  /* (What it shows, kept in the space, drawn within it alone: a fixed position held to it, nothing painted outside) */
+  contain: paint;
   height: 100%;
 }
 

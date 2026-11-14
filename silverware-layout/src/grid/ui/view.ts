@@ -9,7 +9,9 @@ const BLANK = "swl-grid-blank";
 
 /** A grid's element: a cell per rendered markdown (the host's HTML, its elements marked with their offsets in the cell's text) */
 export function drawGrid(doc: Document, template: string, cells: readonly string[]): HTMLElement {
-  const grid = el(doc, "div", { class: "swl-grid" });
+  // (Focusable by a press, not by Tab: a press anywhere in it (a cell, the gap between two, a divider) focuses the grid,
+  // not the editor round it, whose selection would go into the grid's text and show its markdown there)
+  const grid = el(doc, "div", { class: "swl-grid", attrs: { tabindex: -1 } });
   showColumns(grid, template);
   cells.forEach((html, index) => {
     const cell = el(doc, "div", { class: "swl-grid-cell", attrs: { "data-swl-cell": index } });

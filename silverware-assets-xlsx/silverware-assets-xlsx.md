@@ -13,7 +13,7 @@ files:
 
 Excel workbooks (`.xlsx`) your pages embed, drawn in SilverBullet, where without it they are only a card. It needs [Silverware Assets](https://github.com/damesene/silverware-libraries/blob/main/silverware-assets/silverware-assets.md), which shows your embedded files: Silverware Assets XLSX draws how a workbook looks there.
 
-- **A preview** (`![[budget.xlsx|||{ view: preview }]]`, or previews chosen in Silverware Assets' settings) is the first sheet's first cells, drawn small, as high as your previews are. A click on it does what Silverware Assets' settings say (open it in a new tab, in a side panel, enlarged).
+- **A preview** (`![[budget.xlsx|||{ view: preview }]]`, or previews chosen in Silverware Assets' settings) is the first sheet's first cells, drawn small, as high as your previews are. It is drawn once and kept in your space (Silverware Assets' `_silverware-asset-preview` folder): shown from there after, the workbook not read again until it changes. A click on it does what Silverware Assets' settings say (open it in a new tab, in a side panel, enlarged).
 - **The original** (`{ view: embed }`) is a reader of the workbook in a box of the page, scrolled inside it: a sheet as a spreadsheet shows it (the columns' letters, the rows' numbers, the cells' fonts, colours, alignment, borders and merged cells, the columns' widths, the rows and columns frozen in Excel held in view), a tab for each sheet in its bar, and zoom.
 - **The side panel and the enlarged view** (a file's menu: *Show in a side panel*, *Show enlarged*) are the same reader, as large as the panel.
 

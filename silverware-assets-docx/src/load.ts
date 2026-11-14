@@ -39,6 +39,9 @@ export async function drawDocx(doc: Document, url: string): Promise<DrawnDocx> {
     className: DOCX_CLASS,
     inWrapper: true,
     breakPages: true,
+    // (Pages broken where Word last broke them too, its marks in a file it saved; a file of another program without
+    // them: its explicit breaks alone, one long page between)
+    ignoreLastRenderedPageBreak: false,
     useBase64URL: true,
     renderComments: false,
     renderChanges: false,

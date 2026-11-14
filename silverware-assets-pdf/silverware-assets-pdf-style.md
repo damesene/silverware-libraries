@@ -18,9 +18,22 @@ The look of [Silverware Assets PDF](silverware-assets-pdf.md): a PDF's preview. 
   max-width: 100%;
   height: var(--swa-pdf-box-height, 160px);
 }
+/* While it is drawn: shown only after a moment (a preview kept in the space comes at once, with no box before it to
+   jump from) */
+@keyframes swa-pdf-wait {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* (Shaped as a page upright, as most are, so the page drawn takes its place without a jump) */
 .swa-pdf-preview[data-swa-pdf-state="drawing"] {
+  width: min(var(--swa-pdf-box-width, 100%), calc(var(--swa-pdf-box-height, 160px) / 1.4142));
   background: color-mix(in srgb, var(--root-color, #000) 6%, transparent);
   border-radius: 4px;
+  animation: swa-pdf-wait 0s 0.4s both;
 }
 .swa-pdf-preview[data-swa-pdf-state="page"] {
   width: fit-content;

@@ -11,7 +11,7 @@ PDFs drawn by pdf.js (prefix `swa-pdf-`, settings and API under `silverware.asse
 ## Gotchas
 
 - **A relative URL is resolved by the document's base** before pdf.js gets it (`openPdf`): pdf.js resolves it by the window's address, which on a page in a folder (`Folder/Page`) fetched SilverBullet's app page in place of the file (found by the UI test, 2026-11-14).
-- Previews: at most two PDFs read at once (a turn handed on as a read ends), a read no preview waits for skipped, images kept by file, its version (`fileVersion`: a HEAD request's ETag or date, so a file replaced under the same name is drawn again) and drawn pixels (40), each preview its own object URL let go once shown.
+- Previews: at most two PDFs read at once (a turn handed on as a read ends), a read no preview waits for skipped, images kept by file, its version (`fileVersion`: a HEAD request's ETag or date, so a file replaced under the same name is drawn again) and drawn pixels (40), each preview its own object URL let go once shown. **Kept in the space** where Assets hands `stored` over (`storesPreview`): the page drawn once, its longer side 600 px, WebP (PNG where the browser makes none), read back after (`storedPage`), in memory by file and version too; `anew` draws it again.
 - The type is registered once while the same Assets API is handed over (`init`): Space Lua loaded again would otherwise take it off and register it again, and Assets draws every file of the page anew on a change of its types.
 
 ## Tests

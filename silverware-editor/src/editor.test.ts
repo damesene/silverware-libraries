@@ -157,6 +157,80 @@ describe("the CodeMirror editor's live preview", () => {
     editor.destroy();
   });
 
+  it("draws an embed where its plugin draws it, its markdown where the caret is (its drawing ended); another embed as written", () => {
+    const ended: string[] = [];
+    const embed = (markdown: string) => {
+      const name = /[\w-]+\.png/.exec(markdown)?.[0];
+      return name
+        ? {
+            key: markdown,
+            draw: (container: HTMLElement, signal: AbortSignal) => {
+              const picture = container.ownerDocument.createElement("img");
+              picture.className = "test-picture";
+              picture.setAttribute("src", `/files/${name}`);
+              container.append(picture);
+              signal.addEventListener("abort", () => ended.push(name));
+            },
+          }
+        : undefined;
+    };
+    const editor = codeMirrorEditor(cm, document, { text: "x\n![[photo.png|A|40]] and ![B](other.png)\n![[file.pdf]]", selection: 0, embed }, { made: () => undefined, gone: () => undefined });
+    const root = editor.element.shadowRoot!;
+    const pictures = () => [...root.querySelectorAll<HTMLImageElement>(".swe-embed > img")].map((one) => one.getAttribute("src"));
+    expect(pictures()).toEqual(["/files/photo.png", "/files/other.png"]);
+    expect(root.querySelectorAll(".cm-line")[2]!.textContent).toBe("![[file.pdf]]");
+    editor.setSelection(4);
+    expect(pictures()).toEqual(["/files/other.png"]);
+    expect(ended).toEqual(["photo.png"]);
+    expect(root.querySelectorAll(".cm-line")[1]!.textContent).toContain("![[photo.png|A|40]]");
+    editor.destroy();
+  });
+
+  it("puts the page's rules of what an embed draws into its root, by their prefixes, none of the editor's own", async () => {
+    const sheet = document.createElement("style");
+    sheet.textContent = ".test-picture { color: red } [data-test-view] img { width: 1px } .cm-line { color: blue } @media (min-width: 1px) { .test-picture { margin: 1px } .other { margin: 2px } }";
+    document.head.append(sheet);
+    const embed = () => ({ key: "k", draw: (container: HTMLElement) => container.append(Object.assign(container.ownerDocument.createElement("i"), { className: "test-picture" })) });
+    const editor = codeMirrorEditor(cm, document, { text: "x\n![[a.png]]", selection: 0, embed }, { made: () => undefined, gone: () => undefined });
+    await Promise.resolve();
+    const styles = editor.element.shadowRoot!.querySelector("style[data-swe-page-styles]")!.textContent!;
+    expect(styles).toContain(".test-picture");
+    expect(styles).toContain("[data-test-view] img");
+    expect(styles).toContain("@media");
+    expect(styles).not.toContain(".cm-line");
+    expect(styles).not.toContain(".other");
+    editor.destroy();
+    sheet.remove();
+  });
+
+  it("draws a table as one, its markdown where the selection touches it; a press in a cell puts the caret at its start", () => {
+    const text = "x\n| a | *b* | c |\n|:--|--:|:-:|\n| 1 |  | [[Page]] \\| y |\n| 2 |\n\nz";
+    const { editor, root, lines } = make(text, 0);
+    const cells = () => [...root.querySelectorAll(".swe-table tr")].map((row) => [...row.children].map((cell) => cell.textContent));
+    expect(cells()).toEqual([
+      ["a", "b", "c"],
+      ["1", "", "Page | y"],
+      ["2", "", ""],
+    ]);
+    expect(root.querySelector(".swe-table th em")?.textContent).toBe("b");
+    expect([...root.querySelectorAll<HTMLElement>(".swe-table th")].map((cell) => cell.style.textAlign)).toEqual(["left", "right", "center"]);
+    expect(lines()).toEqual(["x", "", "z"]);
+    const cell = root.querySelectorAll(".swe-table td")[2]!;
+    cell.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
+    expect(editor.getSelection().from).toBe(text.indexOf("[[Page"));
+    expect(root.querySelector(".swe-table")).toBeNull();
+    expect(lines()[1]).toBe("| a | b | c |");
+    editor.destroy();
+  });
+
+  it("puts the caret at a pressed cell's start in a table indented on its lines", () => {
+    const text = "x\n\n  | a | b |\n  |---|---|\n  | 1 | 2 |";
+    const { editor, root } = make(text, 0);
+    root.querySelectorAll(".swe-table td")[1]!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
+    expect(editor.getSelection().from).toBe(text.lastIndexOf("2"));
+    editor.destroy();
+  });
+
   it("shows no source in a read-only editor, its checkboxes not toggled", () => {
     const { editor, root, lines } = make("**bold** [ ]\n- [ ] task", 0, true);
     expect(lines()).toEqual(["bold [ ]", "•  task"]);

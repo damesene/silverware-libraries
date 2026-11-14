@@ -97,6 +97,20 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
     const shift = select(doc, `${type.name}: a Shift+click`, [[DEFAULT, LIKE_ALL], ...actions], own("shift+click") ?? DEFAULT);
     return { name: type.name, view, click, shift, row: el(doc, "div", "swa-settings-row", typeName(doc, type), view, click, shift) };
   });
+  // Previews kept in the space (docs/silverware-assets-stored-previews.md)
+  const storePreviews = el(doc, "input", { attrs: { type: "checkbox" } });
+  storePreviews.checked = settings.storePreviews;
+  const storeSection = section(
+    doc,
+    "Previews",
+    el(doc, "label", "swa-settings-check", storePreviews, "Keep previews in the space, made once"),
+    el(
+      doc,
+      "p",
+      "swa-settings-note",
+      "A preview slow to make (a PDF's first page, a document's, a workbook's) is made the first time it is shown, kept in the hidden folder _silverware-asset-preview and shown from there after, on every device; Regenerate preview in its menu makes it again. Off: each is made every time it is shown, and its menu has no Regenerate preview. Those kept already stay until Silverware Assets: Clean up previews.",
+    ),
+  );
   const filesGrid = el(
     doc,
     "div",
@@ -135,20 +149,6 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
   previewWidth.addEventListener("input", followSizes);
   previewHeight.addEventListener("input", followSizes);
   const labels: { default: PreviewLabel; types: Record<string, PreviewLabel> } = { default: settings.labels.default, types: { ...settings.labels.types } };
-  // The row open, its label shown in the one editor
-  let opened = DEFAULT;
-  const editor = labelEditor(
-    doc,
-    (label) => {
-      if (opened === DEFAULT) labels.default = label;
-      // (A type's own only where it differs from all files': a property dropped back where it was keeps it theirs)
-      else if (sameLabel(label, labels.default)) delete labels.types[opened];
-      else labels.types[opened] = label;
-    },
-    dateText(Date.now()) ?? "",
-  );
-  // (All files' sample: an image's, the most common preview)
-  const sampleType = (name: string) => input.types.find((type) => type.name === name) ?? input.types.find((type) => type.name === "image") ?? input.types[0];
   /** A type's own preview size as it will be kept (a side typed out of bounds: the one it had); none of either: none */
   const keptOf = (type: string): PreviewSize | undefined => {
     const size = sizes.get(type);
@@ -158,100 +158,29 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
     if (width === undefined && height === undefined) return undefined;
     return { ...(width === undefined ? {} : { width }), ...(height === undefined ? {} : { height }) };
   };
-  /** Whether a type differs from all files: a label of its own, or a size of its own as it will be kept */
-  const isOwn = (type: string) => type in labels.types || keptOf(type) !== undefined;
-  const rows = [{ name: DEFAULT, title: "All files", icon: undefined as string | undefined }, ...input.types.map((type) => ({ name: type.name, title: type.name, icon: type.icon as string | undefined }))];
-  const list = el(doc, "div", { class: "swa-types", attrs: { role: "list", "aria-label": "A preview, for all files and per type" } });
-  /** A row's element, by its type's name (as given: no selector made of it) */
-  const rowElement = (name: string) => [...list.children].find((one) => one.getAttribute("data-swa-type") === name);
-  const ownMark = () => el(doc, "span", { class: "swa-type-mark", text: "Own", title: "Set apart from all files" });
-  /** A row's head: its icon, its name, Own where it differs from all files (what, said as it is opened), a chevron */
-  const headOf = (row: (typeof rows)[number]) => {
-    const head = el(
-      doc,
-      "button",
-      { class: "swa-type-head", attrs: { type: "button", "aria-expanded": String(opened === row.name) } },
-      row.icon ? iconElement(doc, row.icon) : el(doc, "span", { class: "swa-icon swa-type-all", attrs: { "aria-hidden": "true" } }),
-      el(doc, "span", { class: "swa-type-name", text: row.title }),
-      ...(row.name !== DEFAULT && isOwn(row.name) ? [ownMark()] : []),
-      el(doc, "span", { class: "swa-type-chevron", html: CHEVRON_RIGHT }),
-    );
-    head.addEventListener("click", () => {
-      opened = opened === row.name ? "" : row.name;
-      drawList(row.name);
-    });
-    return head;
-  };
-  /**
-   * An open row's details: its label and its size; a type's made its own as they are changed (its label as it is
-   * edited, its size as one is typed), taken back to all files' by one button, shown where it differs
-   */
-  const detailsOf = (row: (typeof rows)[number]) => {
-    const all = row.name === DEFAULT;
-    editor.show(all ? labels.default : (labels.types[row.name] ?? labels.default), sampleType(row.name));
-    const size = all ? { width: previewWidth, height: previewHeight } : sizes.get(row.name)!;
-    const reset = all
-      ? []
-      : [
-          el(
-            doc,
-            "div",
-            { class: "swa-type-reset", attrs: { ...(isOwn(row.name) ? {} : { hidden: "" }) } },
-            el(doc, "button", {
-              class: "swa-settings-button",
-              text: "↺ Reset to all files",
-              title: "Its label and its size as all files' again",
-              run: () => {
-                delete labels.types[row.name];
-                size.width.value = "";
-                size.height.value = "";
-                drawList(row.name);
-                list.dispatchEvent(new Event("change", { bubbles: true }));
-              },
-            }),
-          ),
-        ];
-    return el(
-      doc,
-      "div",
-      "swa-type-details",
-      ...reset,
-      section(doc, "Label", editor.element),
-      section(
-        doc,
-        "Size",
-        el(doc, "p", "swa-settings-note", all ? "Width × height in px; an image fits in it, its proportions kept. Width empty: as wide as there is room." : "Width × height in px. Empty: like all files."),
-        el(doc, "div", "swa-type-size", el(doc, "span", "swa-settings-unit", size.width, "×", size.height, "px")),
-      ),
-    );
-  };
-  /** The list drawn as it is now; `focus`: that row's head focused (it was pressed, or its button was: the focus not lost to the page) */
-  const drawList = (focus?: string) => {
-    list.replaceChildren(
-      ...rows.map((row) => {
-        const open = opened === row.name;
-        return el(doc, "div", { class: `swa-type${open ? " swa-type-open" : ""}`, attrs: { role: "listitem", "data-swa-type": row.name } }, headOf(row), ...(open ? [detailsOf(row)] : []));
-      }),
-    );
-    if (focus !== undefined) rowElement(focus)?.querySelector<HTMLElement>(".swa-type-head")?.focus();
-  };
-  // (A size typed or a label changed: the open row's mark and way back as they are now, nothing else redrawn: only it
-  // can change, and its fields keep their focus)
-  const markOpen = () => {
-    if (opened === DEFAULT) return;
-    const row = rowElement(opened);
-    const own = isOwn(opened);
-    const head = row?.querySelector(":scope > .swa-type-head");
-    const mark = head?.querySelector(".swa-type-mark");
-    if (own && head && !mark) head.querySelector(".swa-type-chevron")?.before(ownMark());
-    if (!own) mark?.remove();
-    const reset = row?.querySelector<HTMLElement>(":scope > .swa-type-details > .swa-type-reset");
-    if (reset) reset.hidden = !own;
-  };
-  list.addEventListener("input", markOpen);
-  // (The label editor's change, within the open row, bubbles to the list)
-  list.addEventListener("change", markOpen);
-  drawList();
+  const list = labelRows(doc, input.types, labels, "A preview, for all files and per type", {
+    owns: (type) => keptOf(type) !== undefined,
+    reset: (type) => {
+      const size = sizes.get(type)!;
+      size.width.value = "";
+      size.height.value = "";
+    },
+    details: (type) => {
+      const all = type === DEFAULT;
+      const size = all ? { width: previewWidth, height: previewHeight } : sizes.get(type)!;
+      return [
+        section(
+          doc,
+          "Size",
+          el(doc, "p", "swa-settings-note", all ? "Width × height in px; an image fits in it, its proportions kept. Width empty: as wide as there is room." : "Width × height in px. Empty: like all files."),
+          el(doc, "div", "swa-type-size", el(doc, "span", "swa-settings-unit", size.width, "×", size.height, "px")),
+        ),
+      ];
+    },
+  });
+  // An original's label alike: for all files and per type, none shown unless one is turned on
+  const originalLabels: { default: PreviewLabel; types: Record<string, PreviewLabel> } = { default: settings.originalLabels.default, types: { ...settings.originalLabels.types } };
+  const originalList = labelRows(doc, input.types, originalLabels, "An original, for all files and per type");
 
   // Original: a PDF's height, for all files
   const embedHeight = el(doc, "input", { class: "swa-settings-number", attrs: { type: "number", min: MIN_HEIGHT, max: MAX_HEIGHT, step: 10, "aria-label": "An original PDF's height (px)" } });
@@ -278,7 +207,8 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
       doc,
       "div",
       { class: "swa-settings-look", attrs: { "data-swa-look": "original" } },
-      el(doc, "p", "swa-settings-note", "A file shown as SilverBullet draws it (“Original” on the Files tab), for all files."),
+      el(doc, "p", "swa-settings-note", "A file shown as SilverBullet draws it (“Original” on the Files tab): a label of your choice with it, none unless you turn one on, for all files and a type's own where it differs (marked Own); a PDF's height."),
+      originalList,
       section(doc, "A PDF's height", el(doc, "p", "swa-settings-note", "An original PDF's viewer, where its embed gives no size."), el(doc, "span", "swa-settings-unit", embedHeight, "px")),
     ),
     link: el(doc, "div", { class: "swa-settings-look", attrs: { "data-swa-look": "link" } }, el(doc, "p", "swa-settings-note", "A link to a file in your text, [[report.pdf]], for all files."), linkSection),
@@ -330,7 +260,9 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
         types: previewTypes,
       },
       linkIcons,
+      storePreviews: storePreviews.checked,
       labels: { default: labels.default, types: { ...labels.types } },
+      originalLabels: { default: originalLabels.default, types: { ...originalLabels.types } },
     };
   };
   const was = JSON.stringify(current());
@@ -342,9 +274,125 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
     tab(
       "assets",
       "Files",
-      panelOf(doc, "files", "How an embedded file is shown where its embed does not say, and what a click on it does. A type set to “Like all files” follows the first row.", filesGrid),
+      panelOf(doc, "files", "How an embedded file is shown where its embed does not say, and what a click on it does. A type set to “Like all files” follows the first row.", filesGrid, storeSection),
       true,
     ),
     tab("appearance", "Appearance", panelOf(doc, "appearance", "How a file looks where it is shown: as a preview, as the original, as a card, or as a link to it.", el(doc, "div", "swa-settings-looks", lookSwitch.element), ...Object.values(looks))),
   ];
+}
+
+/** What a view's rows add to a type's label (a preview's: its size) */
+type RowsExtra = {
+  // Whether a type has something of its own besides its label
+  owns(type: string): boolean;
+  // That taken back to all files' (its label is, by the rows)
+  reset(type: string): void;
+  // The open row's own sections after its label (all files' row: `DEFAULT`)
+  details(type: string): HTMLElement[];
+};
+
+/**
+ * A view's label for all files and for each type (docs/silverware-assets-label.md, *Per type*, as Silverware Database's
+ * properties: one row open at a time): a type's marked Own where it differs (a label of its own, or what `extra` says),
+ * made its own as it is changed, taken back to all files' by one button; `labels` kept as edited
+ */
+function labelRows(
+  doc: Document,
+  types: readonly { readonly name: string; readonly icon: string }[],
+  labels: { default: PreviewLabel; types: Record<string, PreviewLabel> },
+  name: string,
+  extra?: RowsExtra,
+): HTMLElement {
+  // The row open, its label shown in the one editor
+  let opened = DEFAULT;
+  const editor = labelEditor(
+    doc,
+    (label) => {
+      if (opened === DEFAULT) labels.default = label;
+      // (A type's own only where it differs from all files': a property dropped back where it was keeps it theirs)
+      else if (sameLabel(label, labels.default)) delete labels.types[opened];
+      else labels.types[opened] = label;
+    },
+    dateText(Date.now()) ?? "",
+  );
+  // (All files' sample: an image's, the most common)
+  const sampleType = (type: string) => types.find((one) => one.name === type) ?? types.find((one) => one.name === "image") ?? types[0];
+  /** Whether a type differs from all files: a label of its own, or what the view keeps of its own */
+  const isOwn = (type: string) => type in labels.types || !!extra?.owns(type);
+  const rows = [{ name: DEFAULT, title: "All files", icon: undefined as string | undefined }, ...types.map((type) => ({ name: type.name, title: type.name, icon: type.icon as string | undefined }))];
+  const list = el(doc, "div", { class: "swa-types", attrs: { role: "list", "aria-label": name } });
+  /** A row's element, by its type's name (as given: no selector made of it) */
+  const rowElement = (type: string) => [...list.children].find((one) => one.getAttribute("data-swa-type") === type);
+  const ownMark = () => el(doc, "span", { class: "swa-type-mark", text: "Own", title: "Set apart from all files" });
+  /** A row's head: its icon, its name, Own where it differs from all files (what, said as it is opened), a chevron */
+  const headOf = (row: (typeof rows)[number]) => {
+    const head = el(
+      doc,
+      "button",
+      { class: "swa-type-head", attrs: { type: "button", "aria-expanded": String(opened === row.name) } },
+      row.icon ? iconElement(doc, row.icon) : el(doc, "span", { class: "swa-icon swa-type-all", attrs: { "aria-hidden": "true" } }),
+      el(doc, "span", { class: "swa-type-name", text: row.title }),
+      ...(row.name !== DEFAULT && isOwn(row.name) ? [ownMark()] : []),
+      el(doc, "span", { class: "swa-type-chevron", html: CHEVRON_RIGHT }),
+    );
+    head.addEventListener("click", () => {
+      opened = opened === row.name ? "" : row.name;
+      drawList(row.name);
+    });
+    return head;
+  };
+  /** An open row's details: its label and what the view adds; a type's taken back to all files' by one button, shown where it differs */
+  const detailsOf = (row: (typeof rows)[number]) => {
+    const all = row.name === DEFAULT;
+    editor.show(all ? labels.default : (labels.types[row.name] ?? labels.default), sampleType(row.name));
+    const reset = all
+      ? []
+      : [
+          el(
+            doc,
+            "div",
+            { class: "swa-type-reset", attrs: { ...(isOwn(row.name) ? {} : { hidden: "" }) } },
+            el(doc, "button", {
+              class: "swa-settings-button",
+              text: "↺ Reset to all files",
+              title: extra ? "Its label and its size as all files' again" : "Its label as all files' again",
+              run: () => {
+                delete labels.types[row.name];
+                extra?.reset(row.name);
+                drawList(row.name);
+                list.dispatchEvent(new Event("change", { bubbles: true }));
+              },
+            }),
+          ),
+        ];
+    return el(doc, "div", "swa-type-details", ...reset, section(doc, "Label", editor.element), ...(extra?.details(row.name) ?? []));
+  };
+  /** The list drawn as it is now; `focus`: that row's head focused (it was pressed, or its button was: the focus not lost to the page) */
+  const drawList = (focus?: string) => {
+    list.replaceChildren(
+      ...rows.map((row) => {
+        const open = opened === row.name;
+        return el(doc, "div", { class: `swa-type${open ? " swa-type-open" : ""}`, attrs: { role: "listitem", "data-swa-type": row.name } }, headOf(row), ...(open ? [detailsOf(row)] : []));
+      }),
+    );
+    if (focus !== undefined) rowElement(focus)?.querySelector<HTMLElement>(".swa-type-head")?.focus();
+  };
+  // (A size typed or a label changed: the open row's mark and way back as they are now, nothing else redrawn: only it
+  // can change, and its fields keep their focus)
+  const markOpen = () => {
+    if (opened === DEFAULT) return;
+    const row = rowElement(opened);
+    const own = isOwn(opened);
+    const head = row?.querySelector(":scope > .swa-type-head");
+    const mark = head?.querySelector(".swa-type-mark");
+    if (own && head && !mark) head.querySelector(".swa-type-chevron")?.before(ownMark());
+    if (!own) mark?.remove();
+    const reset = row?.querySelector<HTMLElement>(":scope > .swa-type-details > .swa-type-reset");
+    if (reset) reset.hidden = !own;
+  };
+  list.addEventListener("input", markOpen);
+  // (The label editor's change, within the open row, bubbles to the list)
+  list.addEventListener("change", markOpen);
+  drawList();
+  return list;
 }

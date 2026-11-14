@@ -22,13 +22,14 @@ test("the settings window on a phone covers the screen; its last tab reached in 
   expect(shift.x + shift.width).toBeLessThanOrEqual(view.width);
   // Preview's label: a property tapped, chosen: its name and its × over it; the × hides it
   await dialog.getByRole("tab", { name: "Appearance" }).tap();
-  const alt = dialog.locator('.swa-sample-item[data-swa-field="alt"]');
+  // (The preview's view: the original's has a label of its own)
+  const alt = dialog.locator('[data-swa-look="preview"] .swa-sample-item[data-swa-field="alt"]');
   await alt.scrollIntoViewIfNeeded();
   await alt.tap();
   await expect(alt).toHaveAttribute("aria-selected", "true");
   await expect(alt.locator(".swa-sample-tag")).toBeVisible();
   await alt.locator(".swa-sample-remove").tap();
-  await expect(dialog.locator('[data-swa-place="off"] [data-swa-field="alt"]')).toBeVisible();
+  await expect(dialog.locator('[data-swa-look="preview"] [data-swa-place="off"] [data-swa-field="alt"]')).toBeVisible();
   await dialog.getByRole("button", { name: "Cancel" }).tap();
   await expect(dialog).toBeHidden();
 });

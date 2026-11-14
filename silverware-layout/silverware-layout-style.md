@@ -771,7 +771,8 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   display: grid;
   grid-template-columns: var(--swl-grid-columns, repeat(2, minmax(0, 1fr)));
   gap: 0.5em 1.5em;
-  align-items: start;
+  /* (Each cell as tall as its row: a shorter column clicked anywhere, under its text too, is edited) */
+  align-items: stretch;
 }
 :root[data-swl-narrow] .swl-grid {
   grid-template-columns: minmax(0, 1fr);
@@ -932,6 +933,17 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 .swl-grid:is([data-swl-border], :has(> .swl-grid-editing)) > .swl-grid-divider::after {
   transform: translate(calc(-50% + 0.5px), -50%);
 }
+/* A grid whose column divider or width is dragged (its widget marked data-swl-resizing by the handle): its lines as
+   long as it is dragged, its ring and a line in each gap, its layout as it is (the borders' gap and padding moved the
+   columns under the pointer, and a divider's snap to the text's edge was off) */
+.swl-grid:not([data-swl-border]):is(:has(> .swl-grid-divider[data-swl-dragging]), [data-swl-resizing] *) {
+  --swl-grid-line: color-mix(in srgb, var(--root-color, #000) 16%, var(--root-background-color, #fff));
+  box-shadow: inset 0 0 0 1px var(--swl-grid-line);
+}
+.swl-grid:not([data-swl-border]):is(:has(> .swl-grid-divider[data-swl-dragging]), [data-swl-resizing] *) > .swl-grid-divider:not([data-swl-dragging])::before {
+  opacity: 1;
+  background: var(--swl-grid-line);
+}
 /* A cell is edited by a click in it: the text's pointer over it (no outline round it: cut off at the grid's edges, and
    drawn on every column, the user found it noisy, 2026-11-14), its markdown in a field as tall as its text while
    edited, the grid keeping its shape */
@@ -971,6 +983,15 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   background: none;
   border: 0;
   border-radius: 0;
+}
+/* A grid focused by a press in it (it takes the focus from the editor round it): no ring */
+.swl-grid:focus {
+  outline: none;
+}
+/* A cell text dragged over would be dropped in (written into its markdown where it is let go) */
+.swl-grid-cell.swl-grid-drop {
+  outline: 2px dashed color-mix(in srgb, var(--ui-accent-color, #464cfc) 60%, transparent);
+  outline-offset: -2px;
 }
 /* (The field no outline as it has the focus: the grid's lines show the cell edited) */
 .swl-grid-editor:is(:focus, :focus-within) {

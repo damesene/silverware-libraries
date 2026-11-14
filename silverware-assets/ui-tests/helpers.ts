@@ -5,7 +5,7 @@
 // the playground. A test's pages and files are written into its worker's space (UiAssets/<test>/<name>), the first
 // page opened, and removed after; CONFIG is put back as it was.
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
 import { silverbulletServer } from "../../scripts/silverbullet-servers.ts";
@@ -21,6 +21,10 @@ export type Space = {
   readonly folder: string;
   /** Pages written (by their names under the folder), and files beside them (an image: its name with its extension), the page `open` of them opened, Silverware Assets started */
   open(pages: Readonly<Record<string, string>>, open: string, files?: Readonly<Record<string, Uint8Array | string>>): Promise<void>;
+  /** Whether a preview is kept of a file of the test's folder (`doc.pdf.webp`: of any version; a name with its version, that one) */
+  kept(name: string): Promise<boolean>;
+  /** A preview written as kept, of a file of the test's folder, by its whole name (`gone.pdf.1-1.webp`) */
+  writeKept(name: string, content: string): Promise<void>;
   /** A page's text as saved (its name under the folder) */
   saved(name: string): Promise<string | undefined>;
   /** The space's CONFIG page as saved */
@@ -68,6 +72,12 @@ export const test = base.extend<{ space: Space }>({
         await commandDefined(page, ASSETS_SETTINGS);
         await commandDefined(page, PAGE_LAYOUT);
       },
+      kept: async (name) => !!(await stat(join(server().space, "_silverware-asset-preview", folder, name)).catch(() => undefined)) || !!(await keptPath(join(server().space, "_silverware-asset-preview", folder), name)),
+      writeKept: async (name, content) => {
+        const file = join(server().space, "_silverware-asset-preview", folder, name);
+        await mkdir(dirname(file), { recursive: true });
+        await writeFile(file, content);
+      },
       saved: async (name) => (existsSync(path(name)) ? (await readFile(path(name), "utf8")).replace(/\r\n/g, "\n") : undefined),
       hasFile: (name) => existsSync(join(server().space, folder, name)),
       config: async () => (existsSync(configPath) ? (await readFile(configPath, "utf8")).replace(/\r\n/g, "\n") : undefined),
@@ -75,6 +85,8 @@ export const test = base.extend<{ space: Space }>({
     // (The page closed first: an open client would take CONFIG written under it for a change of its own)
     await page.close();
     await rm(join(server().space, folder), { recursive: true, force: true });
+    // (Previews Silverware Assets kept of its files: silverware-assets/src/core/stored.ts)
+    await rm(join(server().space, "_silverware-asset-preview", folder), { recursive: true, force: true });
     if (configBefore === undefined) await rm(configPath, { force: true });
     else await writeFile(configPath, configBefore);
   },
@@ -121,4 +133,14 @@ export async function gridsDrawn(page: Page, count = 1): Promise<void> {
   await expect(page.locator("#sb-main .swl-grid:not(.swl-grid-shown)")).toHaveCount(count);
 }
 
-
+/**
+ * Where Silverware Assets keeps a file's preview of a kind (`name`: the file's name and the kind's extension,
+ * `doc.pdf.webp`), whatever version of the file it is named by (`doc.pdf.<time>-<size>.webp`); none: not kept
+ */
+async function keptPath(dir: string, name: string): Promise<string | undefined> {
+  const dot = name.lastIndexOf(".");
+  const [base, extension] = [name.slice(0, dot), name.slice(dot + 1)];
+  const files = await readdir(dir).catch(() => [] as string[]);
+  const found = files.find((file) => file.startsWith(`${base}.`) && file.endsWith(`.${extension}`) && /^\d+-\d+$/.test(file.slice(base.length + 1, -extension.length - 1)));
+  return found && join(dir, found);
+}

@@ -1,13 +1,17 @@
 // Markdown shown as SilverBullet's editor shows it (its behaviour, written here: docs/silverware-editor.md): a task's
 // `[ ]` a checkbox toggling it, a done task struck through, a bullet list's `-` a bullet, the marks of emphasis, code,
-// headings, links and `[[wiki links]]` hidden, each shown again where the selection touches what it marks. A read-only
+// headings, links and `[[wiki links]]` hidden, an embed drawn (by its plugin, as it says: `embed`), a table drawn as
+// one (read-only: its cells edited in its markdown), each shown again as its markdown where the selection touches it.
+// A read-only
 // editor shows none: nothing to edit there. Built over the CodeMirror module loaded beside the bundle (its types alone
 // here), as src/codemirror.ts is.
-import type { Range } from "@codemirror/state";
+import type { EditorState, Range } from "@codemirror/state";
 import type { Decoration, DecorationSet, EditorView } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import type { MarkdownConfig } from "@lezer/markdown";
+import type { EditorEmbed } from "../../shared/editor.ts";
 import type { CodeMirror } from "./codemirror.ts";
+import { keepPageStyles } from "./pagestyles.ts";
 
 /** `[[page]]` and `[[page|alias]]` read as a node of their own (lezer's markdown knows none): a `WikiLink`, its marks */
 export const wikiLinks: MarkdownConfig = {
@@ -31,6 +35,92 @@ export const wikiLinks: MarkdownConfig = {
 const MARKED = new Set(["Emphasis", "StrongEmphasis", "Strikethrough", "InlineCode"]);
 const MARKS = new Set(["EmphasisMark", "StrikethroughMark", "CodeMark"]);
 
+/** A table's cell's content as drawn: its text, and its inline parts in elements of their own */
+export type Inline = string | { readonly tag: string; readonly class?: string; readonly parts: readonly Inline[] };
+/** A table as drawn: each column's alignment, its rows (the header's first), each cell's content and its start in the table's text */
+export type TableShape = {
+  readonly align: readonly ("left" | "right" | "center" | undefined)[];
+  readonly rows: readonly (readonly { readonly at: number; readonly parts: readonly Inline[] }[])[];
+};
+
+// Inline nodes drawn in an element of their own, and the parts of a link left out of its text
+const INLINE_TAGS: Readonly<Record<string, { tag: string; class?: string }>> = {
+  Emphasis: { tag: "em" },
+  StrongEmphasis: { tag: "strong" },
+  Strikethrough: { tag: "s" },
+  InlineCode: { tag: "code" },
+  Link: { tag: "span", class: "swe-link" },
+};
+const LEFT_OUT = new Set(["EmphasisMark", "StrikethroughMark", "CodeMark", "LinkMark", "URL", "LinkTitle", "LinkLabel"]);
+
+/** A node's content as drawn, from `from` to `to` of it: the text between its children, its children drawn */
+function inlineOf(state: EditorState, node: SyntaxNode, from: number, to: number): Inline[] {
+  const parts: Inline[] = [];
+  let at = from;
+  const text = (end: number) => end > at && parts.push(state.sliceDoc(at, end));
+  for (let child = node.firstChild; child; child = child.nextSibling) {
+    if (child.to <= from || child.from >= to) continue;
+    text(child.from);
+    at = child.to;
+    if (LEFT_OUT.has(child.name)) continue;
+    if (child.name === "Escape") parts.push(state.sliceDoc(child.from + 1, child.to));
+    else if (child.name === "WikiLink") {
+      // (Its alias where it has one, else the page's name)
+      const inner = state.sliceDoc(child.from + 2, child.to - 2);
+      parts.push({ tag: "span", class: "swe-wiki-link", parts: [inner.slice(inner.indexOf("|") + 1)] });
+    } else if (INLINE_TAGS[child.name]) parts.push({ ...INLINE_TAGS[child.name]!, parts: inlineOf(state, child, child.from, child.to) });
+    else parts.push(...inlineOf(state, child, child.from, child.to));
+  }
+  text(to);
+  return parts;
+}
+
+/**
+ * A table's shape from its node (GitHub's tables: a row's cells between its `|`s, the outer ones optional; as many
+ * cells in each row as in its header, a short row's filled with empty ones, a long row's cut); each cell's start from
+ * `base` (the widget's start: the table's line's, an indent before it)
+ */
+export function tableShape(state: EditorState, table: SyntaxNode, base = table.from): TableShape {
+  let align: TableShape["align"] = [];
+  const rows: { at: number; parts: Inline[] }[][] = [];
+  for (let row = table.firstChild; row; row = row.nextSibling) {
+    if (row.name === "TableDelimiter") {
+      align = state
+        .sliceDoc(row.from, row.to)
+        .replace(/^\s*\|/, "")
+        .replace(/\|\s*$/, "")
+        .split("|")
+        .map((one) => {
+          const spec = one.trim();
+          return spec.startsWith(":") && spec.endsWith(":") ? "center" : spec.endsWith(":") ? "right" : spec.startsWith(":") ? "left" : undefined;
+        });
+      continue;
+    }
+    if (row.name !== "TableHeader" && row.name !== "TableRow") continue;
+    const pipes: SyntaxNode[] = [];
+    const cells: SyntaxNode[] = [];
+    for (let child = row.firstChild; child; child = child.nextSibling) (child.name === "TableDelimiter" ? pipes : cells).push(child);
+    // (The cells' bounds: the row's ends and its pipes; an outer pipe's empty side none)
+    const bounds = [row.from, ...pipes.flatMap((pipe) => [pipe.from, pipe.to]), row.to];
+    const spans: [number, number][] = [];
+    for (let index = 0; index < bounds.length; index += 2) spans.push([bounds[index]!, bounds[index + 1]!]);
+    const blank = (span: [number, number]) => !state.sliceDoc(span[0], span[1]).trim();
+    if (pipes.length && spans.length > 1 && blank(spans[0]!)) spans.shift();
+    if (pipes.length && spans.length > 1 && blank(spans[spans.length - 1]!)) spans.pop();
+    rows.push(
+      spans.map(([from, to]) => {
+        const cell = cells.find((one) => one.from >= from && one.to <= to);
+        return { at: (cell?.from ?? from) - base, parts: cell ? inlineOf(state, cell, cell.from, cell.to) : [] };
+      }),
+    );
+  }
+  const width = rows[0]?.length ?? 0;
+  return {
+    align: Array.from({ length: width }, (_, index) => align[index]),
+    rows: rows.map((row) => Array.from({ length: width }, (_, index) => row[index] ?? { at: row[row.length - 1]?.at ?? 0, parts: [] })),
+  };
+}
+
 /** A task's checkbox flipped in the text: its `[ ]` or `[x]` at `at` */
 function toggleTask(view: EditorView, at: number): void {
   const marker = view.state.sliceDoc(at, at + 3);
@@ -39,7 +129,7 @@ function toggleTask(view: EditorView, at: number): void {
 }
 
 /** The live preview: decorations of the text, made again on each change of it or of the selection */
-export function livePreview(cm: CodeMirror) {
+export function livePreview(cm: CodeMirror, embed?: (markdown: string) => EditorEmbed | undefined) {
   class Checkbox extends cm.WidgetType {
     constructor(
       readonly checked: boolean,
@@ -82,6 +172,109 @@ export function livePreview(cm: CodeMirror) {
     }
   }
 
+  // An embed as its plugin draws it, into an element of the editor's (a click on it puts the caret there: its markdown
+  // shown, as a click on an embed in the page does)
+  class Embed extends cm.WidgetType {
+    // What each element drawn ends with: its drawing, its watchers
+    private static readonly ends = new WeakMap<HTMLElement, AbortController>();
+    constructor(readonly drawn: EditorEmbed) {
+      super();
+    }
+    override eq(other: Embed): boolean {
+      return other.drawn.key === this.drawn.key;
+    }
+    toDOM(view: EditorView): HTMLElement {
+      const container = view.dom.ownerDocument.createElement("span");
+      container.className = "swe-embed";
+      const control = new AbortController();
+      Embed.ends.set(container, control);
+      // (Its height known as it is drawn, perhaps later: the editor measures its lines again)
+      const win = view.dom.ownerDocument.defaultView;
+      if (win?.ResizeObserver) {
+        const observer = new win.ResizeObserver(() => view.requestMeasure());
+        observer.observe(container);
+        control.signal.addEventListener("abort", () => observer.disconnect());
+      }
+      keepPageStyles(container, control.signal);
+      try {
+        this.drawn.draw(container, control.signal);
+      } catch {
+        // (Not drawn: an empty place, its markdown a click away)
+      }
+      return container;
+    }
+    override destroy(dom: HTMLElement): void {
+      Embed.ends.get(dom)?.abort();
+    }
+    // (Its press the editor's: the caret put beside it, its markdown shown)
+    override ignoreEvent(): boolean {
+      return false;
+    }
+  }
+
+  // A table drawn as the page draws it, read-only: a press in a cell puts the caret at its start, its markdown shown
+  class Table extends cm.WidgetType {
+    constructor(
+      readonly shape: TableShape,
+      readonly readOnly: boolean,
+    ) {
+      super();
+    }
+    override eq(other: Table): boolean {
+      return other.readOnly === this.readOnly && JSON.stringify(other.shape) === JSON.stringify(this.shape);
+    }
+    toDOM(view: EditorView): HTMLElement {
+      const doc = view.dom.ownerDocument;
+      const draw = (parts: readonly Inline[], into: HTMLElement) => {
+        for (const part of parts) {
+          if (typeof part === "string") into.append(part);
+          else {
+            const element = doc.createElement(part.tag);
+            if (part.class) element.className = part.class;
+            draw(part.parts, element);
+            into.append(element);
+          }
+        }
+      };
+      const rowOf = (cells: TableShape["rows"][number], tag: "th" | "td") => {
+        const row = doc.createElement("tr");
+        cells.forEach((cell, index) => {
+          const element = doc.createElement(tag);
+          const align = this.shape.align[index];
+          if (align) element.style.textAlign = align;
+          element.setAttribute("data-swe-at", String(cell.at));
+          draw(cell.parts, element);
+          row.append(element);
+        });
+        return row;
+      };
+      const [header, ...body] = this.shape.rows;
+      const head = doc.createElement("thead");
+      if (header) head.append(rowOf(header, "th"));
+      const rows = doc.createElement("tbody");
+      for (const cells of body) rows.append(rowOf(cells, "td"));
+      const table = doc.createElement("table");
+      table.append(head, rows);
+      const frame = doc.createElement("div");
+      frame.className = "swe-table";
+      frame.append(table);
+      frame.addEventListener("mousedown", (event) => {
+        if (this.readOnly || event.button !== 0) return;
+        event.preventDefault();
+        // (The table's start where it is now: text above may have changed since it was drawn, its offsets not)
+        const cell = event.target instanceof Element ? event.target.closest("[data-swe-at]") : null;
+        const at = view.posAtDOM(frame) + Number(cell?.getAttribute("data-swe-at") ?? 0);
+        view.dispatch({ selection: { anchor: Math.min(at, view.state.doc.length) }, userEvent: "select.pointer" });
+        view.focus();
+      });
+      return frame;
+    }
+    // (Its presses its own: the caret put in the cell pressed; a wide table's scroll its own)
+    override ignoreEvent(): boolean {
+      return true;
+    }
+  }
+
   const hidden = cm.Decoration.replace({});
   const bullet = cm.Decoration.replace({ widget: new Bullet() });
   const done = cm.Decoration.mark({ class: "swe-task-done" });
@@ -121,6 +314,18 @@ export function livePreview(cm: CodeMirror) {
             while (start < task.to && /[ \t]/.test(state.sliceDoc(start, start + 1))) start++;
             if (start < task.to) out.push(done.range(start, task.to));
           }
+        } else if (name === "Table") {
+          // A table drawn, its whole lines replaced (one indented in a list from its line's start), unless the selection
+          // touches it; its inline nodes not decorated again within it
+          const start = state.doc.lineAt(from).from;
+          const end = state.doc.lineAt(to).to;
+          if (state.sliceDoc(start, from).trim() || shown(start, end)) return;
+          out.push(cm.Decoration.replace({ widget: new Table(tableShape(state, node, start), state.readOnly), block: true }).range(start, end));
+          return false;
+        } else if (name === "Image") {
+          // `![Alt](url)`: drawn where the plugin draws it
+          const drawn = shown(from, to) ? undefined : embed?.(state.sliceDoc(from, to));
+          if (drawn) out.push(cm.Decoration.replace({ widget: new Embed(drawn) }).range(from, to));
         } else if (name === "Link") {
           // An inline link with text alone, `[text](url)`: its text shown, the rest hidden (a reference link left as written)
           const parts = children(node);
@@ -130,6 +335,12 @@ export function livePreview(cm: CodeMirror) {
           out.push(link.range(from + 1, close.from));
           hide(close.from, to);
         } else if (name === "WikiLink") {
+          // `![[…]]`: an embed, drawn where the plugin draws it, else its markdown as written (not a link's)
+          if (from > 0 && state.sliceDoc(from - 1, from) === "!") {
+            const drawn = shown(from - 1, to) ? undefined : embed?.(state.sliceDoc(from - 1, to));
+            if (drawn) out.push(cm.Decoration.replace({ widget: new Embed(drawn) }).range(from - 1, to));
+            return;
+          }
           if (shown(from, to)) return;
           // (Its alias where it has one, else the page's name)
           const pipe = state.sliceDoc(from + 2, to - 2).indexOf("|");
@@ -158,6 +369,19 @@ export const PREVIEW_THEME = {
   ".swe-checkbox": { margin: "0 0.3em 0 0", verticalAlign: "middle", accentColor: "var(--ui-accent-color, #464cfc)", cursor: "pointer" },
   ".swe-checkbox:disabled": { cursor: "default" },
   ".swe-task-done": { textDecoration: "line-through" },
+  ".swe-embed": { display: "inline-block", maxWidth: "100%", verticalAlign: "bottom" },
+  ".swe-embed img": { maxWidth: "100%" },
+  // (A table as SilverBullet draws one, its variables where it has them; its own scroll where it is wider than the editor)
+  ".swe-table": { overflowX: "auto", margin: "0.25em 0", cursor: "text" },
+  ".swe-table table": { borderCollapse: "collapse", width: "100%", fontSize: "0.9em" },
+  ".swe-table th, .swe-table td": {
+    padding: "6px 10px",
+    textAlign: "left",
+    verticalAlign: "top",
+    borderBottom: "1px solid var(--ui-surface-border-color, color-mix(in srgb, currentColor 20%, transparent))",
+  },
+  ".swe-table th": { background: "var(--editor-table-head-background-color, transparent)", color: "var(--editor-table-head-color, inherit)", fontWeight: "600" },
+  ".swe-table tbody tr:nth-child(even) td": { background: "var(--editor-table-even-background-color, transparent)" },
   // (Its text where a rendered list's is, the browser's 40px in, after the mark and a space)
   "& .cm-line.swe-list-line": { paddingLeft: "max(0px, calc(40px - 2ch))" },
   ".swe-bullet": { color: "var(--editor-list-bullet-color, inherit)" },

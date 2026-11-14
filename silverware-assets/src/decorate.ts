@@ -8,12 +8,15 @@ import { type Embed, type EmbedChanges, isFileTarget, readEmbeds, readLinks } fr
 import { actionFor, mimeOf, typeFor, viewFor } from "./core/choose.ts";
 import { closestContext, embedAt, type LineContext, linkAt, outside, placeAmong, type Placed, type Range, sameTarget, writtenContext } from "./core/locate.ts";
 import { metadataOf } from "./core/metadata.ts";
+import { forgetPreviews, type PreviewFiles, storedPreview } from "./core/stored.ts";
 import type { AssetRegistry } from "./core/registry.ts";
 import { type AssetSettings, type Gesture, labelFor, previewSize, type View, VIEWS } from "./model/settings.ts";
 import { addCardFields, dateText, drawCard, iconElement, markFailed, menuMarker, sizeText } from "./ui/card.ts";
 import { drawLabelLine, labelTexts, type LabelValues } from "./ui/label.ts";
 import { opensMenu } from "../../shared/popupmenu.ts";
+import { writeClipboard, writeClipboardLater } from "../../shared/clipboard.ts";
 import { addMoreButton, type MoreMenu, popupOf } from "./ui/moremenu.ts";
+import type { EditorEmbed } from "../../shared/editor.ts";
 import { plainMedium } from "./ui/plainmedium.ts";
 
 // The popup menu's classes: Silverware Assets'
@@ -85,6 +88,8 @@ export type AssetHost = {
   removeEmbed?(write: FormWrite): Promise<string | undefined>;
   linkToText?(write: FormWrite): Promise<string | undefined>;
   confirm?(question: string): Promise<boolean>;
+  /** The space's files a preview is kept in (core/stored.ts; none: previews made each time) */
+  previewFiles?: PreviewFiles;
   open(url: string): void;
   problem(message: string): void;
 };
@@ -112,6 +117,8 @@ export class AssetDecorator {
   private readonly links = new Set<DrawnLink>();
   // Each link's menu: what ends it (its icon drawn again, or the link gone)
   private readonly linkMenus = new WeakMap<HTMLElement, AbortController>();
+  // The frames whose preview is to be made anew as they are drawn next (Regenerate preview)
+  private readonly anew = new WeakSet<HTMLElement>();
   /** Told as a frame is decorated (its width laid out again) */
   onDecorated: (() => void) | undefined;
   private started = false;
@@ -179,6 +186,19 @@ export class AssetDecorator {
             views: [],
             actions: [
               ...this.actionItems(asset, capabilities, (container, as) => this.drawInto(container, as, type, asset, settings, control.signal)),
+              // Its whole markdown, as the page has it now
+              {
+                label: "Copy markdown",
+                // (Found in the page first: the clipboard given the text as it comes, the click's leave kept)
+                run: () =>
+                  void writeClipboardLater(
+                    this.doc,
+                    this.linkInPage(link).then((found) => {
+                      if (!found) throw new Error("this link was not found in the page");
+                      return found.link.text;
+                    }),
+                  ).catch((error: unknown) => this.host.problem(`Silverware Assets: not copied: ${message(error)}`)),
+              },
               ...(this.host.linkToEmbed ? [{ label: "Show as embedded", run: () => void this.toEmbed(link) }] : []),
             ],
             destructive: this.deletable(asset, "link") ? [{ label: "Delete file…", run: () => void this.deleteLinked(link, asset) }] : [],
@@ -205,6 +225,18 @@ export class AssetDecorator {
   }
 
   /**
+   * A file deleted, and its previews kept in the space with it (core/stored.ts): its version read before (a file gone
+   * has none), its previews taken away once it is deleted. Why the file was not deleted, as text
+   */
+  private async deleteWithPreviews(path: string): Promise<string | undefined> {
+    const files = this.host.previewFiles;
+    const facts = files ? await files.facts(path).catch(() => undefined) : undefined;
+    const problem = await this.host.deleteFile!(path);
+    if (!problem && files && facts) await forgetPreviews(files, path, facts);
+    return problem;
+  }
+
+  /**
    * An embedded file deleted, once confirmed: its embed found in the page first (the host may draw it anew, missing,
    * once the file is gone: its widget no longer told where it is), then the file deleted, then the embed taken out
    */
@@ -212,7 +244,7 @@ export class AssetDecorator {
     if (!(await this.confirmDelete(asset, "embed"))) return;
     const now = await this.locateNow(drawn);
     if (!now) return this.host.problem(`Silverware Assets: the file was not deleted: ${NOT_FOUND}`);
-    const problem = await this.host.deleteFile!(asset.path);
+    const problem = await this.deleteWithPreviews(asset.path);
     if (problem) return this.host.problem(`Silverware Assets: the file was not deleted: ${problem}`);
     const left = await this.host.removeEmbed!({ text: now.embed.text, occurrence: now.occurrence, of: now.of });
     if (left) this.host.problem(`Silverware Assets: the file was deleted, its embed not taken out of the page: ${left}`);
@@ -223,7 +255,7 @@ export class AssetDecorator {
     if (!(await this.confirmDelete(asset, "link"))) return;
     const found = await this.linkInPage(link);
     if (!found) return this.host.problem("Silverware Assets: the file was not deleted: this link was not found in the page");
-    const problem = await this.host.deleteFile!(asset.path);
+    const problem = await this.deleteWithPreviews(asset.path);
     if (problem) return this.host.problem(`Silverware Assets: the file was not deleted: ${problem}`);
     const left = await this.host.linkToText!({ text: found.link.text, occurrence: found.occurrence, of: found.of });
     if (left) this.host.problem(`Silverware Assets: the file was deleted, its link left in the page: ${left}`);
@@ -298,6 +330,47 @@ export class AssetDecorator {
     };
     const element = await type.views?.[as]?.({ asset, viewport, metadata: metadataOf({}, async () => "a link keeps no metadata"), signal, placement: "inline", fills: true });
     container.replaceChildren(element ?? plainMedium(this.doc, asset, mimeOf(asset)) ?? this.card(type, asset, settings));
+  }
+
+  /**
+   * An embed in an editor of a page's markdown (a grid's cell edited: shared/rendered.ts `EmbedDrawer`) drawn as in the
+   * page, read-only: its view, size and label as the settings and its metadata say, no menu, no action of a click (the
+   * editor's: its markdown shown), nothing written (the text is not the page's yet). None for markdown that is not one
+   * embed alone, or of a file no type takes
+   */
+  editorEmbed(markdown: string, page: string): EditorEmbed | undefined {
+    const embeds = readEmbeds(markdown);
+    const embed = embeds[0];
+    if (embeds.length !== 1 || !embed || embed.from !== 0 || embed.to !== markdown.length) return undefined;
+    const asset = this.host.assetOf(embed, page);
+    const type = typeFor(this.registry.types.all, asset);
+    if (!type) return undefined;
+    return {
+      key: `${page}\n${markdown}`,
+      draw: (container, signal) => {
+        const doc = container.ownerDocument;
+        // (A frame of its own, as a medium drawn in a grid's cell has, its medium the browser's own where it has one:
+        // nothing of the host's is drawn in an editor's field)
+        const frame = doc.createElement("span");
+        frame.className = "swa-frame";
+        const native = plainMedium(doc, asset, mimeOf(asset));
+        if (native) {
+          // (Its size as its markdown gives it, as the page draws it)
+          if (Number(embed.width)) native.style.width = `${Number(embed.width)}px`;
+          if (Number(embed.height)) native.style.height = `${Number(embed.height)}px`;
+          frame.append(native);
+        }
+        container.append(frame);
+        void this.host
+          .settings()
+          .then((settings) => {
+            if (signal.aborted) return;
+            const drawn: DrawnEmbed = { frame, target: this.host.resolved(embed, page), native };
+            this.render(drawn, { embed, occurrence: 0, of: 1 }, asset, type, settings, signal);
+          })
+          .catch(() => undefined);
+      },
+    };
   }
 
   /** Embeds drawn, decorated */
@@ -392,11 +465,12 @@ export class AssetDecorator {
     return size ? size.write(width) : "this file is not decorated";
   }
 
-  /** One embed drawn as its view says */
-  private render(drawn: DrawnEmbed, found: Found, asset: Asset, type: AssetType, settings: AssetSettings): void {
+  /** One embed drawn as its view says; `readOnly`: in an editor's field, drawn until it ends, no menu, no click, nothing written */
+  private render(drawn: DrawnEmbed, found: Found, asset: Asset, type: AssetType, settings: AssetSettings, readOnly?: AbortSignal): void {
     this.renders.get(drawn.frame)?.abort();
     const control = new AbortController();
     this.renders.set(drawn.frame, control);
+    readOnly?.addEventListener("abort", () => control.abort());
     const { frame, native } = drawn;
     frame.querySelectorAll(":scope > .swa-own, :scope > .swa-failed").forEach((own) => own.remove());
     frame.classList.remove("swa-has-error");
@@ -420,6 +494,7 @@ export class AssetDecorator {
     frame.toggleAttribute("data-swa-preview-width", sized);
     // (Written to the embed as the page has it now: its place among those of its text may have changed since)
     const write = async (changes: EmbedChanges) => {
+      if (readOnly) return READ_ONLY;
       const now = await this.locateNow(drawn);
       return now ? this.host.writeEmbed({ text: now.embed.text, occurrence: now.occurrence, of: now.of, changes }) : NOT_FOUND;
     };
@@ -428,18 +503,23 @@ export class AssetDecorator {
     // kept in its embed, its width as SilverBullet's size (the height taken off so the ratio holds), its alignment in its
     // metadata (`{ align: right }`)
     const own = found.embed.metadata.align;
-    this.sizes.set(frame, {
+    if (!readOnly)
+      this.sizes.set(frame, {
       width: found.embed.width,
       align: typeof own === "string" ? own : undefined,
       write: (width) => write({ width: width ?? null, height: null }),
       writeAlign: (align) => write({ metadata: { align: align ?? null } }),
     });
+    // (A preview of a file kept in the space where its type keeps one: docs/silverware-assets-stored-previews.md)
+    const files = settings.storePreviews && type.storesPreview && asset.kind === "file" ? this.host.previewFiles : undefined;
+    const stored = files && asset.kind === "file" && view === "preview" ? storedPreview(files, asset.path, this.anew.delete(frame)) : undefined;
     const context: RenderContext = {
       asset,
       viewport: viewportOf(frame, found.embed, view, settings, control.signal, sized ? preview.width : undefined, view === "preview" ? preview.height : undefined),
       metadata: metadataOf(found.embed.metadata, (changes) => write({ metadata: changes })),
       signal: control.signal,
       placement: "block",
+      ...(stored ? { stored } : {}),
     };
     const capabilities = { views: (["icon", "preview", "embed"] as const).filter(can) };
     // The asset drawn into a container of an action's (a panel): its type's view, else a copy of the host's drawing, else its card
@@ -470,6 +550,25 @@ export class AssetDecorator {
           })),
           actions: [
             ...this.actionItems(asset, capabilities, (container, as) => renderInto(as, container)),
+            // Its kept preview made anew (its file's previews taken away, its preview drawn again: made then)
+            ...(files && asset.kind === "file" && view === "preview"
+              ? [
+                  {
+                    label: "Regenerate preview",
+                    run: () =>
+                      void forgetPreviews(files, asset.path).then(() => {
+                        this.anew.add(frame);
+                        this.render(drawn, found, asset, type, settings, readOnly);
+                      }),
+                  },
+                ]
+              : []),
+            // Its whole markdown, its metadata too: the text it is drawn from (drawn anew as it changes), copied at once,
+            // while the click still lets the page copy (read from the page first, a browser refused the copy that late)
+            {
+              label: "Copy markdown",
+              run: () => void writeClipboard(this.doc, found.embed.text).catch((error: unknown) => this.host.problem(`Silverware Assets: not copied: ${message(error)}`)),
+            },
             ...(this.host.embedToLink
               ? [
                   {
@@ -486,6 +585,7 @@ export class AssetDecorator {
         };
     };
     const clicked = (element: HTMLElement) =>
+      !readOnly &&
       element.addEventListener(
         "click",
         (event) => {
@@ -506,8 +606,9 @@ export class AssetDecorator {
     };
     // A preview's label (docs/silverware-assets-label.md): its lines above and under what is drawn, a click on them the
     // preview's; drawn at once with what is known, again as the host tells the file's size and date
-    const labelled = () => {
-      const label = labelFor(settings, type.name);
+    // (A view's label: a preview's, an original's; a click on a preview's the preview's action, an original's text alone)
+    const labelled = (as: "preview" | "embed" = "preview") => {
+      const label = labelFor(settings, type.name, as);
       const { alt, ...bare } = asset;
       const known: LabelValues = { name: assetName(bare as Asset), icon: type.icon, ...(alt ? { alt } : {}) };
       const draw = (values: LabelValues) => {
@@ -516,11 +617,11 @@ export class AssetDecorator {
         const above = drawLabelLine(this.doc, "above", texts.above);
         const below = drawLabelLine(this.doc, "below", texts.below);
         if (above) {
-          clicked(above);
+          if (as === "preview") clicked(above);
           frame.prepend(above);
         }
         if (below) {
-          clicked(below);
+          if (as === "preview") clicked(below);
           frame.append(below);
         }
         frame.toggleAttribute("data-swa-label-above", !!above);
@@ -566,6 +667,7 @@ export class AssetDecorator {
       clicked(card);
       hideHost();
       frame.append(card);
+      if (readOnly) return;
       // Its menu's way in: its icon; a card without it (as the user shows cards), a small arrow after its name, within
       // the card as a link's after its text (a "…" beside it was cut off where the card filled its line)
       let opener = card.querySelector<HTMLElement>(".swa-icon");
@@ -580,11 +682,12 @@ export class AssetDecorator {
       opensMenu(this.doc, POPUP, opener, () => popupOf(menu()), control.signal);
       return;
     }
-    addMoreButton(this.doc, frame, menu, control.signal);
+    if (!readOnly) addMoreButton(this.doc, frame, menu, control.signal);
     const renderer = type.views?.[view];
     if (!renderer) {
       // The host's own drawing: a preview of it is the same, smaller (the style page's rule by the view's mark)
       if (view === "preview") previewDone();
+      else labelled("embed");
       return;
     }
     void Promise.resolve()
@@ -593,12 +696,14 @@ export class AssetDecorator {
         if (control.signal.aborted) return;
         if (!element) {
           if (view === "preview") previewDone();
+          else labelled("embed");
           return;
         }
         element.classList.add("swa-own");
         hideHost();
         frame.append(element);
         if (view === "preview") previewDone(element);
+        else labelled("embed");
       })
       .catch((error: unknown) => {
         if (control.signal.aborted) return;
@@ -672,8 +777,9 @@ function viewportOf(element: HTMLElement, embed: Embed, view: View, settings: As
 /** An embed of the page and its place among those of its text, which the page writer finds it by */
 type Found = { readonly embed: Embed; readonly occurrence: number; readonly of: number };
 
-// Why a frame's embed was not written: not found in the page as it is now
+// Why a frame's embed was not written: not found in the page as it is now; drawn in an editor's field
 const NOT_FOUND = "this file was not found in the page";
+const READ_ONLY = "this file is drawn in a field being edited";
 
 /** An embed of the text with its place among those of its text, which the page writer finds it by */
 function occurrenceIn(embeds: readonly Embed[], embed: Embed): Found {

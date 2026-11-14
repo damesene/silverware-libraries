@@ -6,12 +6,15 @@
 // outweighs. (The frame's border is the style page's, by the class the init page gives the frame: SilverBullet sets it
 // unimportant. An inline border set here did not hold in 2.12.1, 2026-11-13: the frame's style is SilverBullet's.)
 import { editorsOf } from "../../../../shared/editor.ts";
-import { resolvedTarget } from "../../../../shared/markdown/embed.ts";
+import { readEmbeds, resolvedTarget } from "../../../../shared/markdown/embed.ts";
+import type { EditorEmbed } from "../../../../shared/editor.ts";
+import type { EmbedDrawer } from "../../../../shared/rendered.ts";
 import { pageChanges } from "../../../../shared/pages/changes.ts";
 import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
 import { documentUrl } from "../../../../shared/silverbullet/platform.ts";
-import { afterPress, focusPage, SILVERBULLET_EDITORS, textForDrawing } from "./behaviour.ts";
+import { afterPress, SILVERBULLET_EDITORS, textForDrawing } from "./behaviour.ts";
+import { focusPage, isPageText, pressBesideGrid } from "./dom.ts";
 import { ownTasks } from "./tasks.ts";
 import { keepUndrawn } from "./undrawn.ts";
 
@@ -19,6 +22,9 @@ import { keepUndrawn } from "./undrawn.ts";
 // (2.12.1: .button-bar, in a div of the frame beside the widget's content, probed 2026-11-13; its main: .sb-widget-menu-bar)
 const GRID_FRAME = ".swl-grid-widget";
 const GRID_BARS = ".swl-grid-widget .button-bar, .swl-grid-widget .sb-widget-menu-bar";
+// A file SilverBullet draws as an image, and a URL of the web (an image there is drawn by its URL)
+const IMAGE = /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)(\?.*)?$/i;
+const WEB = /^https?:\/\//i;
 // A task's box in a grid's cell
 const TASK_BOXES = '.swl-grid-cell .sb-task > input[type="checkbox"]';
 
@@ -33,8 +39,36 @@ type CellsWrite = {
 };
 /** A grid's attributes to write (src/grid/grids.ts' `AttributesWrite`) */
 type AttributesWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly attributes: Readonly<Record<string, string | null>> };
+/** Text moved as one edit (src/grid/grids.ts' `MoveWrite`, named here apart) */
+type MoveWrite = {
+  readonly takeOut?: { readonly from: number; readonly to: number; readonly was: string };
+  readonly grids: readonly { readonly body: string; readonly occurrence: number; readonly of: number; readonly contents: Readonly<Record<number, string>> }[];
+};
 
-export function silverBulletGridHost(bridge: Bridge, writer: PageWriter) {
+/** An image embedded drawn as the page draws it: a file of the space by its path, a URL as written; none for another file */
+function imageEmbed(markdown: string, page: string): EditorEmbed | undefined {
+  const embed = readEmbeds(markdown)[0];
+  if (!embed || !IMAGE.test(resolvedTarget(embed, page))) return undefined;
+  const src = WEB.test(embed.target) ? embed.target : documentUrl(resolvedTarget(embed, page));
+  const width = Number(embed.width) || undefined;
+  const height = Number(embed.height) || undefined;
+  return {
+    key: `${page}\n${markdown}`,
+    draw: (container) => {
+      const picture = container.ownerDocument.createElement("img");
+      picture.src = src;
+      picture.alt = embed.alt ?? "";
+      picture.draggable = false;
+      // (Its size as its markdown gives it, as the page draws it: a side alone its proportion kept)
+      if (width) picture.style.width = `${width}px`;
+      if (height) picture.style.height = `${height}px`;
+      container.append(picture);
+    },
+  };
+}
+
+/** SilverBullet's grid host; `drawer`: what draws embeds in a cell's field as another plugin registered it (Silverware Assets), none: images alone */
+export function silverBulletGridHost(bridge: Bridge, writer: PageWriter, drawer: () => EmbedDrawer | undefined = () => undefined) {
   return {
     // A cell edited in Silverware Editor's editor where the init page hands its API over, else a `<textarea>`
     editors: editorsOf(bridge.editor, SILVERBULLET_EDITORS),
@@ -51,6 +85,34 @@ export function silverBulletGridHost(bridge: Bridge, writer: PageWriter) {
     textForDrawing: (body: string): Promise<string> => textForDrawing(async () => String(await bridge.getText()), body),
     afterPress,
     focusPage,
+    isPageText,
+    pressBesideGrid,
+    pageSelection: async (): Promise<{ readonly from: number; readonly to: number } | undefined> => {
+      const selection = (await bridge.getSelection?.()) as { from?: unknown; to?: unknown } | undefined;
+      const from = Number(selection?.from);
+      const to = Number(selection?.to);
+      return Number.isFinite(from) && Number.isFinite(to) ? { from: Math.min(from, to), to: Math.max(from, to) } : undefined;
+    },
+    // An embed in a cell drawn in its field as the page draws it: by the plugin drawing files where one registered
+    // (Silverware Assets: every file as in the page), else an image alone, as SilverBullet draws it
+    embeds: async (): Promise<(markdown: string) => EditorEmbed | undefined> => {
+      const page = String(await bridge.getCurrentPage());
+      const own = drawer();
+      return (markdown) => own?.(markdown, page) ?? imageEmbed(markdown, page);
+    },
+    // A move as one change of the page (one edit, one undo): the text taken out first, then each grid's cells
+    writeMove: async (move: MoveWrite): Promise<string | undefined> => {
+      const page = String(await bridge.getCurrentPage());
+      const report = await writer.write(
+        pageChanges()
+          .page(page, (p) => {
+            if (move.takeOut) p.text.takeOut(move.takeOut.from, move.takeOut.to, move.takeOut.was);
+            for (const one of move.grids) p.grids.replaceCells(one.body, one.contents, { occurrence: one.occurrence, of: one.of });
+          })
+          .build(),
+      );
+      return report.skipped[0]?.reason;
+    },
     // Through the page writer (the page open: one replaceRange, one undo step)
     writeCell: async (write: CellWrite): Promise<string | undefined> => {
       const page = String(await bridge.getCurrentPage());

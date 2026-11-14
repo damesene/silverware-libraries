@@ -4,6 +4,7 @@
 // it (a font's or a style's name of the document's could reach the page's rules otherwise), and the page's rules stay
 // out of it (the editor's font, size, line height, hyphenation reach it only as inherited, set again here).
 import { fileVersion, readTurns } from "../../shared/reads.ts";
+import { madeSafe } from "../../shared/safehtml.ts";
 import { DOCX_CLASS, drawDocx, type DrawnDocx } from "./load.ts";
 
 // At most so many documents read at once, and so many kept (the oldest let go): each is every page of a document, its
@@ -41,34 +42,13 @@ a[href] {
 }
 `;
 
-// What a document's links may open: the web and mail (a `javascript:` link of a document would run in the page)
-const SAFE_LINK = /^(https?:|mailto:)/i;
-// What a document may not bring (docx-preview draws none, a document's alternative chunks aside, which are off)
-const UNSAFE = "script, iframe, object, embed, frame, frameset, base, meta, link";
-
-/** A drawn document made safe: its links the web's and mail's alone (opened in a new tab), nothing that runs */
-export function madeSafe(root: ParentNode): void {
-  for (const element of root.querySelectorAll(UNSAFE)) element.remove();
-  for (const element of root.querySelectorAll<HTMLElement>("*")) {
-    for (const attribute of [...element.attributes]) if (/^on/i.test(attribute.name)) element.removeAttribute(attribute.name);
-  }
-  for (const link of root.querySelectorAll<HTMLAnchorElement>("a[href]")) {
-    const href = link.getAttribute("href") ?? "";
-    if (!SAFE_LINK.test(href.trim())) {
-      link.removeAttribute("href");
-      continue;
-    }
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-  }
-}
-
 const inTurn = readTurns(AT_ONCE);
 const kept = new Map<string, Promise<DrawnDocx>>();
 
-/** A document drawn once per file and version, made safe, for its previews and readers to clone (a failure not kept) */
-export async function drawn(doc: Document, url: string): Promise<DrawnDocx> {
+/** A document drawn once per file and version, made safe, for its previews and readers to clone (a failure not kept); `again`: drawn anew (Regenerate preview) */
+export async function drawn(doc: Document, url: string, again = false): Promise<DrawnDocx> {
   const key = `${await fileVersion(url, doc.baseURI)} ${url}`;
+  if (again) kept.delete(key);
   const known = kept.get(key);
   if (known) {
     kept.delete(key);

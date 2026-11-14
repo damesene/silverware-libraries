@@ -26,6 +26,21 @@ The look of [Silverware Assets DOCX](silverware-assets-docx.md): a Word document
   border-radius: 4px;
   cursor: pointer;
 }
+/* While it is drawn: shown only after a moment (a preview kept in the space comes at once, with no box before it to
+   jump from) */
+@keyframes swa-docx-wait {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* (Shaped as a page upright, as most are, so the page drawn takes its place without a jump) */
+.swa-docx-preview[data-swa-docx-state="drawing"] {
+  width: min(var(--swa-docx-box-width, 100%), calc(var(--swa-docx-box-height, 160px) / 1.4142));
+  animation: swa-docx-wait 0s 0.4s both;
+}
 .swa-docx-preview-icon {
   display: inline-flex;
   width: 32px;
@@ -56,6 +71,8 @@ The look of [Silverware Assets DOCX](silverware-assets-docx.md): a Word document
 .swa-docx-preview-page {
   position: relative;
   overflow: hidden;
+  /* (What it shows, kept in the space, drawn within it alone: a fixed position held to it, nothing painted outside) */
+  contain: paint;
   background: #fff;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--root-color, #000) 14%, transparent);
 }

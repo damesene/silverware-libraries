@@ -57,6 +57,21 @@ test("a workbook's preview is its first sheet's first cells, drawn small in a pr
   await expect.poll(() => page.evaluate(() => (window as unknown as { opened: string[] }).opened.join(" "))).toContain("budget.xlsx");
 });
 
+test("a workbook's preview kept in the space as HTML once drawn, shown from there", async ({ page, space }) => {
+  await space.open({ Page: `# Page
+
+![[${space.folder}/budget.xlsx|||{ view: preview }]]
+` }, "Page", { "budget.xlsx": await BUDGET() });
+  const sheet = page.locator("#sb-main [data-swa-asset='xlsx'] .swa-xlsx-preview[data-swa-xlsx-state='sheet'] table.swa-xlsx-sheet");
+  await expect(sheet).toContainText("Monthly budget");
+  await expect.poll(() => space.kept("budget.xlsx.html")).toContain("Monthly budget");
+  const kept = (await space.kept("budget.xlsx.html"))!;
+  await space.writeKept("budget.xlsx.html", kept.replace("Monthly budget", "Kept budget"));
+  await page.reload();
+  await expect(sheet).toContainText("Kept budget");
+  await expect(sheet).toContainText("1,200.00");
+});
+
 test("a workbook shown as the original is a reader of its sheets as a spreadsheet shows them: formats, a merged title, the frozen row held, its tabs, zoom", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/budget.xlsx|Budget||{ view: embed }]]\n\nAfter\n` }, "Page", { "budget.xlsx": await BUDGET() });
   const reader = page.locator("#sb-main [data-swa-asset='xlsx'] .swa-xlsx-reader[data-swa-xlsx-state='sheet']");

@@ -11,6 +11,7 @@ import type { PageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
 import type { Rendered, RenderedItem } from "../../../../shared/rendered.ts";
 import { ASSETS_PATH } from "../../model/settings.ts";
+import type { FileFacts } from "../../core/stored.ts";
 import { documentUrl } from "../../../../shared/silverbullet/platform.ts";
 import { editorPosition } from "./editorposition.ts";
 
@@ -292,7 +293,28 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
       : {}),
     removeEmbed: (write: FormWrite) => inPage((p) => p.embeds.remove(write.text, where(write))),
     linkToText: (write: FormWrite) => inPage((p) => p.links.toText(write.text, where(write))),
+    // The files previews are kept in (core/stored.ts): SilverBullet's documents, read, written and deleted through its
+    // space API, their time of change its file's meta (none: previews made each time)
+    ...(bridge.fileMeta && bridge.readDocument && bridge.writeDocument && bridge.deleteDocument
+      ? {
+          previewFiles: {
+            facts: async (path: string): Promise<FileFacts | undefined> => factsOf(await bridge.fileMeta!(path)),
+            read: async (path: string): Promise<Uint8Array | undefined> => {
+              const data = await bridge.readDocument!(path);
+              return data instanceof Uint8Array ? data : data instanceof ArrayBuffer ? new Uint8Array(data) : undefined;
+            },
+            write: async (path: string, data: Uint8Array): Promise<void> => void (await bridge.writeDocument!(path, data)),
+            remove: async (path: string): Promise<void> => void (await bridge.deleteDocument!(path)),
+          },
+        }
+      : {}),
     open: (url: string): void => void (doc.defaultView ?? window).open(url, "_blank", "noopener"),
     problem: (message: string): void => void bridge.flash(message, "error"),
   };
+}
+
+/** A file's facts from SilverBullet's file meta (`lastModified` in ms, `size` in bytes); none where either is missing */
+export function factsOf(meta: unknown): FileFacts | undefined {
+  const { lastModified, size } = (meta ?? {}) as { lastModified?: unknown; size?: unknown };
+  return typeof lastModified === "number" && typeof size === "number" ? { modified: lastModified, size } : undefined;
 }

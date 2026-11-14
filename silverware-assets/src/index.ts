@@ -12,8 +12,9 @@ import { type SyntaxModeWatcher, watchSyntaxMode } from "../../shared/syntaxmode
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { registerBuiltins } from "./builtin/index.ts";
 import { AssetRegistry } from "./core/registry.ts";
+import { type ListedFile, orphanedPreviews } from "./core/stored.ts";
 import { AssetDecorator, type AssetHost } from "./decorate.ts";
-import { silverBulletAssetHost } from "./host/silverbullet/assets.ts";
+import { factsOf, silverBulletAssetHost } from "./host/silverbullet/assets.ts";
 import { silverBulletPlatform } from "../../shared/silverbullet/platform.ts";
 import { ASSETS_PATH, readAssetSettings, readSyntaxModeSettings, storedAssetPaths, SYNTAX_PATHS, type SyntaxModeSettings } from "./model/settings.ts";
 import { SILVERBULLET_SYNTAX_PAGE, SYNTAX_OPTION } from "./host/silverbullet/syntaxmode.ts";
@@ -22,6 +23,7 @@ import { mediaTabs } from "./ui/mediatab.ts";
 import { markdownTab, SettingsWindow } from "./ui/settingswindow.ts";
 
 const SETTINGS = "Silverware Assets: Settings";
+const CLEAN_UP = "Silverware Assets: Clean up previews";
 // Silverware Assets' own block of CONFIG: its tables, which the Configuration Manager's block would lose (shared/configpage.ts)
 const OWN_MARKER = "-- managed-by: silverware-assets";
 
@@ -87,6 +89,9 @@ export function init(bridge: Bridge): void {
   layout.register(assetProvider(decorator));
   decorator.onDecorated = () => layout.layOutAgain?.();
   if (fresh) decorator.start();
+  // Files drawn in the fields of Silverware Layout's grids as in the page (shared/rendered.ts `drawEmbeds`)
+  const drawing = decorator;
+  rendered.drawEmbeds?.((markdown, page) => drawing.editorEmbed(markdown, page));
   // The markdown shown as written (SilverBullet's mode): the files hidden then, a link's click the cursor's, as the
   // settings say (read as the mode is asked, again as the settings window saves them)
   syntaxWatcher ??= watchSyntaxMode<SyntaxModeSettings>(document, {
@@ -103,11 +108,41 @@ export function init(bridge: Bridge): void {
 
 /** The commands, as the init page defines them */
 export function commandNames(): string[] {
-  return [SETTINGS];
+  return [SETTINGS, CLEAN_UP];
 }
 
 export async function runCommand(name: string): Promise<void> {
   if (name === SETTINGS) await openSettings();
+  if (name === CLEAN_UP) await cleanUpPreviews().catch((error: unknown) => current?.flash(`Silverware Assets: previews not cleaned up: ${error instanceof Error ? error.message : String(error)}`, "error"));
+}
+
+/** The previews kept of files gone (deleted, renamed) or of their versions gone (replaced) taken away, said how many (core/stored.ts) */
+async function cleanUpPreviews(): Promise<void> {
+  const bridge = current;
+  if (!bridge?.listFiles || !bridge.deleteDocument) return void bridge?.flash("Silverware Assets: this SilverBullet hands over no way to list and delete files", "error");
+  const listed = await bridge.listFiles();
+  const metas = Array.isArray(listed) ? listed : listed && typeof listed === "object" ? Object.values(listed) : [];
+  const files = metas.flatMap((meta: unknown): ListedFile[] => {
+    const name = (meta as { name?: unknown } | null)?.name;
+    if (typeof name !== "string") return [];
+    const facts = factsOf(meta);
+    return [{ name, ...(facts ? { facts } : {}) }];
+  });
+  const gone = orphanedPreviews(files);
+  let failed = 0;
+  // (Each on its own: one that fails, the rest still taken away)
+  for (const path of gone) {
+    try {
+      await bridge.deleteDocument(path);
+    } catch {
+      failed++;
+    }
+  }
+  const done = gone.length - failed;
+  bridge.flash(
+    done ? `Silverware Assets: ${done} preview${done === 1 ? "" : "s"} of files gone or changed taken away${failed ? `, ${failed} not` : ""}` : failed ? `Silverware Assets: ${failed} previews could not be taken away` : "Silverware Assets: no preview of a file gone or changed",
+    failed ? "error" : "info",
+  );
 }
 
 // The settings window, made as it is first opened
@@ -124,7 +159,8 @@ async function openSettings(): Promise<void> {
   const input = {
     settings,
     types: registry.types.all.map(({ name, icon }) => ({ name, icon })),
-    actions: registry.actions.all.map(({ name, label }) => ({ name, ...(label ? { label } : {}) })),
+    // (Those of a gesture: a menu's own, a copy, no click's)
+    actions: registry.actions.all.filter((action) => action.gesture !== false).map(({ name, label }) => ({ name, ...(label ? { label } : {}) })),
   };
   settingsWindow ??= new SettingsWindow(document);
   settingsWindow.open(

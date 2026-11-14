@@ -4,7 +4,7 @@
 // committed bundles deployed, and are skipped on the playground. A test's pages and files are written into its
 // worker's space (UiXlsx/<test>/<name>), the first page opened, and removed after.
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
 import ExcelJS from "exceljs";
@@ -21,6 +21,10 @@ export type Space = {
   readonly folder: string;
   /** Pages written (by their names under the folder), and files beside them, the page `open` of them opened, Silverware Assets and XLSX started */
   open(pages: Readonly<Record<string, string>>, open: string, files?: Readonly<Record<string, Uint8Array | string>>): Promise<void>;
+  /** A file's preview as Silverware Assets keeps it (`_silverware-asset-preview/<folder>/<name>`): its text, none where none is kept */
+  kept(name: string): Promise<string | undefined>;
+  /** A file's kept preview written over (as anyone who can write the space can) */
+  writeKept(name: string, text: string): Promise<void>;
 };
 
 /** Tests get `page` and `space`: an error in the page fails the test */
@@ -61,9 +65,20 @@ export const test = base.extend<{ space: Space }>({
         await page.waitForFunction(() => !!(window as unknown as { client?: { editorView?: unknown } }).client?.editorView);
         await commandDefined(page, ASSETS_SETTINGS);
       },
+      kept: async (name) => {
+        const path = await keptPath(join(server().space, "_silverware-asset-preview", folder), name);
+        return path ? readFile(path, "utf8") : undefined;
+      },
+      writeKept: async (name, text) => {
+        const path = await keptPath(join(server().space, "_silverware-asset-preview", folder), name);
+        if (!path) throw new Error(`no preview kept as ${name}`);
+        await writeFile(path, text);
+      },
     });
     await page.close();
     await rm(join(server().space, folder), { recursive: true, force: true });
+    // (Previews Silverware Assets kept of its files: silverware-assets/src/core/stored.ts)
+    await rm(join(server().space, "_silverware-asset-preview", folder), { recursive: true, force: true });
     if (configBefore === undefined) await rm(configPath, { force: true });
     else await writeFile(configPath, configBefore);
   },
@@ -84,4 +99,16 @@ export async function xlsxOf(build: (workbook: ExcelJS.Workbook) => void): Promi
   const workbook = new ExcelJS.Workbook();
   build(workbook);
   return new Uint8Array(await workbook.xlsx.writeBuffer());
+}
+
+/**
+ * Where Silverware Assets keeps a file's preview of a kind (`name`: the file's name and the kind's extension,
+ * `doc.pdf.webp`), whatever version of the file it is named by (`doc.pdf.<time>-<size>.webp`); none: not kept
+ */
+async function keptPath(dir: string, name: string): Promise<string | undefined> {
+  const dot = name.lastIndexOf(".");
+  const [base, extension] = [name.slice(0, dot), name.slice(dot + 1)];
+  const files = await readdir(dir).catch(() => [] as string[]);
+  const found = files.find((file) => file.startsWith(`${base}.`) && file.endsWith(`.${extension}`) && /^\d+-\d+$/.test(file.slice(base.length + 1, -extension.length - 1)));
+  return found && join(dir, found);
 }

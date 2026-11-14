@@ -268,6 +268,7 @@ describe("a cell's menu", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     };
     expect(menuOf(0).map((item) => item.textContent?.trim())).toEqual([
+      "Edit markdown (Alt+click)",
       "Move left",
       "Move right",
       "Add a column after it",

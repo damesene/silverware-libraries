@@ -4,7 +4,7 @@
 // it; the cell shows its rendering again until the host draws the grid anew. The grid drawn anew while it is edited
 // (another cell written, left by the press that opened this one), the editor goes into the new drawing's cell
 // (`moveTo`), what was typed kept.
-import type { Editors, TextEditor, TextSelection } from "../../../../shared/editor.ts";
+import type { EditorEmbed, Editors, TextEditor, TextSelection } from "../../../../shared/editor.ts";
 
 /** What a cell edited asks of the host (src/grid/grids.ts' `GridHost`, its answers there) */
 export type CellHost = {
@@ -12,6 +12,8 @@ export type CellHost = {
   afterPress(doc: Document): Promise<void>;
   // The page's editor around a cell given the focus back
   focusPage(cell: HTMLElement): void;
+  // What draws an embed in the field as an image (none: its markdown)
+  readonly embed?: (markdown: string) => EditorEmbed | undefined;
 };
 
 /** A cell edited: its editor, and moving it into the same cell of the grid drawn anew */
@@ -78,6 +80,7 @@ export function editCell(cell: HTMLElement, markdown: string, at: number | TextS
     label: "The cell's markdown",
     spellcheck: true,
     selection: at,
+    ...(host.embed ? { embed: host.embed } : {}),
     keys: { Escape: () => (leave(true), true), "Mod-Enter": () => (leave(true), true) },
     onBlur: () => {
       if (left || moving || !editor) return;

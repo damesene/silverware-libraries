@@ -360,7 +360,8 @@ describe("what a grid draws, told", () => {
     document.body.append(grid);
     await vi.waitFor(() => expect(told).toHaveLength(1));
     expect(told[0]).toEqual([`embed:cat.png:${text.indexOf("![[cat")}:0`, `link:a.pdf:${text.indexOf("[[a.pdf")}:0`]);
-    expect(grids.rendered.ranges()).toEqual(readGrids(text)[0]!.cells.map((cell) => ({ from: cell.contentFrom, to: cell.contentTo })));
+    // (The ranges of a text: every grid's lines, drawn or not)
+    expect(grids.rendered.ranges(text)).toEqual(readGrids(text).map((one) => ({ from: one.from, to: one.to })));
     // Drawn again as the page is edited, nothing moved: nothing told
     await grids.refresh();
     expect(told).toHaveLength(1);

@@ -52,6 +52,14 @@ uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-layou
 ```
 
 ```#meta/library/remote
+name: Silverware Assets
+description: "Embedded files shown as the original, as a preview or as a card (a zip or a document too), a link to a file with its icon and a menu, a file shown in a side panel or enlarged, a link turned into an embed and back."
+author: damesene
+website: https://github.com/damesene/silverware-libraries/tree/main/silverware-assets
+uri: https://github.com/damesene/silverware-libraries/blob/main/silverware-assets/silverware-assets.md
+```
+
+```#meta/library/remote
 name: Silverware Icons
 description: "Monochrome icons (Lucide) and emoji for the other Silverware plugins, drawn in the colors of your theme, and sets of icons of your own."
 author: damesene

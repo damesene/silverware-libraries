@@ -51,23 +51,13 @@ config.define("silverware.layout", {
       type = "object",
       additionalProperties = false,
       properties = {
-        hideWidgets = {
+        hideGrids = {
           type = "boolean",
           default = true,
-          description = "While SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax Rendering), embedded files and grids are hidden: their markdown alone.",
-          ui = { category = "Silverware Layout", label = "Markdown as written: hide files and grids", priority = 0.6 },
-        },
-        clickPlacesCursor = {
-          type = "boolean",
-          default = true,
-          description = "While SilverBullet shows the markdown as written, a click on a link only places the cursor; Ctrl+click follows it.",
-          ui = { category = "Silverware Layout", label = "Markdown as written: a click places the cursor", priority = 0.59 },
+          description = "While SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax Rendering), grids are hidden: their markdown alone.",
+          ui = { category = "Silverware Layout", label = "Markdown as written: hide grids", priority = 0.6 },
         },
       },
-    },
-    assets = {
-      type = "object",
-      description = "Embedded media: how each type is shown (views), what a click and a Shift+click do (actions), what a card shows (card), a view's default height (heights), where a medium stays as its width is dragged (anchor). Set in the Page layout dialog (Media), kept in Silverware Layout's own block of CONFIG.",
     },
     guides = {
       type = "array",
@@ -105,14 +95,8 @@ if js and js.window then
     filterBox = function(label, options)
       return editor.filterBox(label, options, "", "Type to filter")
     end,
-    -- Whether SilverBullet shows the markdown's syntax (Editor: Toggle Markdown Syntax Rendering): media and grids hidden then
+    -- Whether SilverBullet shows the markdown's syntax (Editor: Toggle Markdown Syntax Rendering): grids hidden then
     getUiOption = editor.getUiOption,
-    -- A file's card: its size and date (an error where it is not in the space: the card shows its name alone)
-    documentMeta = space.getDocumentMeta,
-    -- How a link written new is written: SilverBullet's own setting, the one place naming it
-    linkStyle = function()
-      return config.get("defaultLinkStyle", "wikilink")
-    end,
     -- The dialog's default text width: saved as SilverBullet's Configuration Manager saves
     -- (the CONFIG page, indexed, the configuration loaded again)
     saveConfigPage = function(text)

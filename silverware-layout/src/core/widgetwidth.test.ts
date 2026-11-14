@@ -54,6 +54,11 @@ describe("A widget's width", () => {
     expect(snapped(900.4, targets)).toEqual({ width: 900, kept: 900 });
   });
 
+  it("keeps the text's width as its pixels for a widget of its own size without one (a medium: none would shrink it back)", () => {
+    expect(snapTargets(760.4, guides, 1600, "own")[0]).toEqual({ width: 760.4, kept: 760, name: "Page width" });
+    expect(snapped(765, snapTargets(760, guides, 1600, "own"))).toEqual({ width: 760, kept: 760, name: "Page width" });
+  });
+
   it("only the guides a drag reaches: none of pixels wider than the pane, none under the narrowest a drag makes", () => {
     expect(snapTargets(760, guides, 1000).map((t) => t.name)).toEqual(["Page width", "80 %", "Full width"]);
     expect(snapTargets(760, ["10%", 300], 1600).map((t) => t.name)).toEqual(["Page width", "300 px"]);

@@ -18,6 +18,10 @@ const BAR_MAX = 120;
 const BAR_MIN = 24;
 // How long the pointer may be off the widget and the handle before the handle goes (ms): the way from one to the other
 const LEAVE_MS = 400;
+// How far right of a widget's edge the pointer shows its handle (px): where the bar is. A widget showing a document of
+// its own (a PDF's viewer, Chromium 2026-11-14) takes every move over it, the page told of none: its handle is found
+// from beside it
+const EDGE_ZONE = 16;
 // How long the arrow keys rest before their width is written (ms)
 const KEYS_MS = 400;
 // The most between two taps of a finger on the bar for a double tap (ms)
@@ -49,6 +53,8 @@ export type HandleHost<W> = {
   anchor?(widget: W): LayoutAnchor;
   // The width of the box a widget is laid out in, where it is not the page's text (a cell): its quarters its snaps, no wider
   room?(widget: W): number | undefined;
+  // What a widget without a width of its own is (none: as wide as the text): of its own size, the text's width it snaps to kept as pixels
+  unsized?(widget: W): "text" | "own";
 };
 
 type Drag = { readonly pointer: number; readonly x: number; readonly start: number; readonly was: WidgetWidth | undefined; now: WidgetWidth | undefined; moved: boolean };
@@ -112,11 +118,20 @@ export class WidthHandle<W> {
     const target = e.target instanceof Element ? e.target : undefined;
     if (!target) return;
     if (this.box.contains(target)) return this.stay();
-    const widget = this.host.enabled() ? this.host.widgetAt(target) : undefined;
+    const widget = this.host.enabled() ? (this.host.widgetAt(target) ?? this.besideEdge(e.clientX, e.clientY)) : undefined;
     if (widget) {
       this.stay();
       this.showFor(widget);
     } else if (!this.box.hidden && !this.leaveTimer) this.leaveTimer = setTimeout(() => this.hide(), LEAVE_MS);
+  }
+
+  /** The widget whose right edge a point is just beside, where its bar is */
+  private besideEdge(x: number, y: number): W | undefined {
+    const near = this.doc.elementFromPoint(x - EDGE_ZONE, y);
+    const widget = near ? this.host.widgetAt(near) : undefined;
+    if (!widget) return undefined;
+    const right = this.host.element(widget).getBoundingClientRect().right;
+    return x >= right && x <= right + EDGE_ZONE ? widget : undefined;
   }
 
   /** A finger (or a pen) on the page, which has no hover: on a widget its handle shows, elsewhere it goes */
@@ -238,7 +253,8 @@ export class WidthHandle<W> {
   /** What the widget's width snaps to: its room's quarters, else the text's width and the guides */
   private targets(): SnapTarget[] {
     const room = this.roomOf();
-    return room !== undefined ? roomTargets(room) : snapTargets(this.host.textWidth(), this.host.guides(), this.host.paneWidth());
+    const unsized = this.widget ? this.host.unsized?.(this.widget) : undefined;
+    return room !== undefined ? roomTargets(room) : snapTargets(this.host.textWidth(), this.host.guides(), this.host.paneWidth(), unsized);
   }
 
   /** Where a drag by `moved` from `start` takes the width: within its room, else within the pane */

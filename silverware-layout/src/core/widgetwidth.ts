@@ -53,7 +53,7 @@ export const shownWidgetWidth = (width: WidgetWidth, pane: number): number => Ma
 export const draggedWidth = (start: number, moved: number, pane: number, anchor: LayoutAnchor = "center"): number =>
   Math.max(MIN_WIDGET_WIDTH, Math.min(pane - PANE_GUTTER, start + (anchor === "start" ? 1 : 2) * moved));
 
-/** What a width may snap to: the text's (the widget then keeps no width), a guide (its own width) */
+/** What a width may snap to: the text's (the widget then keeps no width, or its pixels where it is of its own size without one), a guide (its own width) */
 export type SnapTarget = { readonly width: number; readonly kept: WidgetWidth | undefined; readonly name: string };
 
 /**
@@ -61,8 +61,8 @@ export type SnapTarget = { readonly width: number; readonly kept: WidgetWidth | 
  * Only those a drag can reach (a guide of pixels wider than the pane, one under the narrowest a drag makes: none), and
  * one of a width (to the pixel): the first, so the line shown, the name said and the width kept are one guide's
  */
-export function snapTargets(textWidth: number, guides: readonly Guide[], pane: number): SnapTarget[] {
-  const targets: SnapTarget[] = [{ width: textWidth, kept: undefined, name: "Page width" }];
+export function snapTargets(textWidth: number, guides: readonly Guide[], pane: number, unsized: "text" | "own" = "text"): SnapTarget[] {
+  const targets: SnapTarget[] = [{ width: textWidth, kept: unsized === "own" ? Math.round(textWidth) : undefined, name: "Page width" }];
   const widths = new Set([Math.round(textWidth)]);
   for (const guide of guides) {
     if (typeof guide === "number" && guide > pane - PANE_GUTTER) continue;

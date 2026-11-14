@@ -124,7 +124,7 @@ export class Grids {
   readonly rendered: Rendered = {
     version: RENDERED_VERSION,
     items: () => this.items(),
-    ranges: () => this.ranges(),
+    ranges: (text) => gridRanges(text),
     onChange: (listener) => {
       this.listeners.add(listener);
       return () => void this.listeners.delete(listener);
@@ -258,11 +258,6 @@ export class Grids {
       const drawn = this.drawnItems.get(element);
       return grid && drawn ? itemsOf(element, drawn, grid) : [];
     });
-  }
-
-  /** The ranges of the page's text the grids in the page drew, their cells' markdown */
-  private ranges(): RenderedRange[] {
-    return this.drawn().flatMap((element) => this.placed.get(element)?.cells.map((cell) => ({ from: cell.contentFrom, to: cell.contentTo })) ?? []);
   }
 
   /** Who listens told of what is drawn, where it changed since last told and some of it is in the page */
@@ -461,4 +456,9 @@ function offsetInCell(content: string, cellElement: HTMLElement, target: Element
   range.setStart(element, 0);
   range.setEnd(caret.node, caret.offset);
   return positionInCell(content, elementPos, element.textContent ?? "", range.toString().length);
+}
+
+/** The ranges of a page's text its grids draw outside the editor, drawn now or not: each grid's lines whole */
+export function gridRanges(text: string): RenderedRange[] {
+  return readGrids(text).map((grid) => ({ from: grid.from, to: grid.to }));
 }

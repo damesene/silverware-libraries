@@ -2,7 +2,7 @@
 name: Library/damesene/silverware-layout
 tags: meta/library
 version: 1.0.0
-description: "Silverware Layout: Columns in a page (/grid), embedded files shown as the original, as a preview or as a card, the width of a page's text (its own or a default for every page) and of its tables, databases, charts and grids, wider or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll."
+description: "Silverware Layout: Columns in a page (/grid), the width of a page's text (its own or a default for every page) and of its tables, databases, charts and grids, wider or narrower than the text by a handle beside them that snaps to guides of your own; the editor's font size, and font zoom with Ctrl + scroll."
 files:
 - silverware-layout.js
 - silverware-layout-init.md
@@ -89,34 +89,11 @@ What you should know:
 - A task in a column is toggled by its box there, as in the page.
 - A grid starts on a line of its own, not straight after a paragraph's line: leave a blank line before it (/grid does).
 
-## Media
+**SilverBullet's markdown as written** (*Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws grids in that mode; Silverware Layout hides them there, so you see their markdown alone. Turn it off in the **Markdown** tab of **Silverware Layout: Page layout** (or `silverware.layout.syntaxMode.hideGrids` in your CONFIG).
 
-Images, videos, audio, PDFs and other files you embed (`![[photo.png]]`, `![Photo](photo.png)`) can each be shown three ways:
+## Embedded files
 
-- **Original**: the file itself, as SilverBullet shows it (the image, a player, a viewer).
-- **Preview**: smaller (a PDF in a small viewer).
-- **Card**: a small card with the file's icon and name, the file itself not shown. A file SilverBullet cannot show (a zip, a document) is a card instead of an error.
-
-Point at a medium, and a **…** button shows at its top right: choose how it is shown there, or open it in a new tab, in a side panel or enlarged. On a card, its icon is that button (as a link's icon). A click on a card or a preview opens the file in a new tab; Shift+click does the same, unless you set otherwise: either can instead show the file in a panel at the window's right (**Show in a side panel**, the page still beside it) or enlarged over the page (**Show enlarged**). Esc or × closes them, and a click beside the enlarged file.
-
-**Its width**: point at an image (or a video, a PDF as the original or as a preview), and the bar beside its right edge makes it wider or narrower, as a table's; it stays where it is and grows to the right (*Width dragged* below sets it centred instead). Let go, and the width is saved as SilverBullet's own size: `![[photo.png|Photo|300]]`.
-
-**Links to files** (`[[report.pdf]]`) show the file's icon before their text, in a grid too (a markdown link, `[report](report.pdf)`, only in a grid). Click the icon for what you can do with the file: open it in a new tab, show it in a side panel or enlarged, or **Show as embedded** (`[[report.pdf]]` becomes `![[report.pdf]]`); a click on the link's text opens it as SilverBullet does. An embedded file's **…** menu has **Show as a link** the other way (its alt text kept as the link's, its size and view left out). The Media tab turns the icons off.
-
-What you choose is kept in the embed itself, after SilverBullet's own size:
-
-```markdown
-![[report.pdf|Report||{ view: icon }]]
-![Photo|300|{ view: preview }](photo.png)
-```
-
-SilverBullet reads only the alt text and the size, so without Silverware Layout every file shows as SilverBullet shows it, at its size: nothing is lost. Keep the three parts, even an empty one (`||`): with two, SilverBullet would take the size for the alt text.
-
-**For all files, or for one kind of file**: run **Silverware Layout: Page layout** and open its **Media** tab. Set how files are shown, what a click and a Shift+click do, whether a width dragged stays at the start or is centred, a preview's height (one with a height of its own, `|200x120`, keeps it), and what a card shows besides the file's name (its icon, its size, its date), for all files; then, per kind (image, video, audio, PDF, file), anything other than that ("Default" follows all files). What a file's own `view` says wins over both.
-
-Media in a grid's columns are shown the same way, and their bar makes them wider or narrower within their column: it snaps to a quarter, a half, three quarters and the whole of the column's width.
-
-**SilverBullet's markdown as written** (*Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws embedded files and grids in that mode; Silverware Layout hides them there, so you see their markdown alone. In that mode a click on a link only puts the cursor there (before an embed's `![[` too), the pointer a text one over it; Ctrl+click (Cmd+click) still follows it. Each can be turned off in the **Markdown** tab of **Silverware Layout: Page layout** (or `silverware.layout.syntaxMode.hideWidgets`, `silverware.layout.syntaxMode.clickPlacesCursor` in your CONFIG).
+Images, videos, PDFs and other files your pages embed or link are [Silverware Assets](https://github.com/damesene/silverware-libraries/blob/main/silverware-assets/silverware-assets.md)' (a library of its own): shown as the original, as a preview or as a card, with a menu. With both installed, a file's width is dragged by the same bar as a table's (in a grid's column too, snapping to its quarters), and files in a grid's columns are shown as in the page.
 
 ## Font size
 

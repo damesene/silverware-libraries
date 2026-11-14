@@ -28,8 +28,11 @@ export type Rendered = {
   readonly version: number;
   /** What is drawn outside the editor now, its places known */
   items(): readonly RenderedItem[];
-  /** The ranges of the page's text drawn outside the editor now: their embeds are none of the editor's own widgets */
-  ranges(): readonly RenderedRange[];
+  /**
+   * The ranges of a page's text (as given: the one its caller read) drawn outside the editor, whether drawn now or not
+   * (a grid scrolled away): their embeds are none of the editor's own widgets
+   */
+  ranges(text: string): readonly RenderedRange[];
   /**
    * Told as what is drawn changes: items drawn, drawn anew, or given their places later (a block drawn while the
    * editor's text was still the page before); given what is drawn now. The function given back stops it

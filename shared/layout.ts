@@ -32,7 +32,8 @@ export type LayoutAnchor = "center" | "start";
  *
  * The element its selector matches is the widget's box. While the widget is in the page's flow, the box's width is
  * Silverware Layout's: the plugin sets no `width`, `max-width` or margin on it and never replaces its `style`
- * attribute whole (Silverware Layout's variables are in it). What the widget lays out inside the box stays its own. A
+ * attribute whole (Silverware Layout's variables are in it). What the widget lays out inside the box stays its own;
+ * its style page may tell a box laid out at a width by `data-swl-width` on it (a medium then filling its frame). A
  * plugin taking the widget out of the page's flow (over the window, onto a sheet) marks it, or an element around it,
  * with `data-silverware-over-window` (shared/overwindow.ts): Silverware Layout stands back there.
  */
@@ -57,6 +58,10 @@ export type LayoutProvider = {
   // Optional: where the widget whose element this is stays as its width changes (none: centred). A widget's own (a
   // setting may choose it), asked as it is laid out
   anchor?(element: Element): LayoutAnchor;
+  // Optional: what a widget without a width of its own is: as wide as the text ("text", a table: none said) or of its
+  // own size ("own", a medium: SilverBullet's size or the file's). Where its own, the text's width a drag snaps to is
+  // kept as its pixels: none would give it back its own size
+  readonly unsized?: "text" | "own";
   // Optional: the box the widget is laid out in, where it is not the page's text (a medium in markdown rendered outside
   // the editor, a grid's cell): its width then a share of that box's, snapped to its quarters, never wider; neither the
   // text's width nor the guides apply. None (or undefined): the page's text
@@ -69,6 +74,9 @@ export type Layout = {
   // A provider registered, its widgets laid out from now on (one of the same name replaced); the function given back
   // unregisters it
   register(provider: LayoutProvider): () => void;
+  // Optional: every widget laid out again, where a plugin changed what its provider reads of a widget already in the
+  // page without putting a node into it (a medium's view changed by its menu). The stand-in's does nothing
+  layOutAgain?(): void;
 };
 
 /**
@@ -87,4 +95,5 @@ export function layoutOf(given: unknown): Layout {
 const STAND_IN: Layout = {
   version: LAYOUT_VERSION,
   register: () => () => undefined,
+  layOutAgain: () => undefined,
 };

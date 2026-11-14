@@ -4,7 +4,7 @@
 // (`[data-swl-embed]`), its links (<a href>), each with the offset of its markdown in the cell (the host's `data-pos`,
 // 0 left out); matched later with the cell's markdown (its embeds and links read there) once the cell's place in the
 // page is known.
-import { readEmbeds, readLinks } from "../../../shared/markdown/embed.ts";
+import { isFileTarget, readEmbeds, readLinks } from "../../../shared/markdown/embed.ts";
 import type { Grid } from "../../../shared/markdown/grid.ts";
 import type { RenderedItem } from "../../../shared/rendered.ts";
 
@@ -42,7 +42,8 @@ export function itemsOf(element: HTMLElement, drawn: readonly Drawn[], grid: Gri
     if (!read.has(one.cell)) read.set(one.cell, { embeds: readEmbeds(cell.content), links: readLinks(cell.content) });
     const marks = read.get(one.cell)!;
     const found = one.kind === "embed" ? at(marks.embeds, one.offset) : at(marks.links, one.offset);
-    if (!found) continue;
+    // (An embedded page is no file: what its expansion drew is the other page's, never an item of this cell)
+    if (!found || (one.kind === "embed" && !isFileTarget(found.target))) continue;
     items.push({ kind: one.kind, element: one.element, target: found.target, style: found.style, position: cell.contentFrom + found.from, room });
   }
   return items;

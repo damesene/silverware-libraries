@@ -9,28 +9,22 @@ import { type PageWriter, pageWriter } from "../../shared/pages/writer.ts";
 import { LayoutApp, type LayoutStore } from "./app.ts";
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { Registry } from "./core/registry.ts";
-import { registerBuiltins } from "./assets/builtin/index.ts";
-import { AssetRegistry } from "./assets/core/registry.ts";
-import { AssetDecorator, type AssetHost } from "./assets/decorate.ts";
-import { assetProvider } from "./assets/provider.ts";
-import { mediaTab } from "./assets/ui/mediatab.ts";
-import { ASSETS_PATH, readAssetSettings, storedAssetSettings } from "./assets/model/settings.ts";
 import { RENDERED_VERSION, type Rendered, type RenderedItem } from "../../shared/rendered.ts";
-import { silverBulletAssetHost } from "./host/silverbullet/assets.ts";
 import { gridInsertion } from "./grid/core/insert.ts";
 import { gridLinks } from "./grid/core/links.ts";
 import { GRID_MODES, isGridMode, putIntoGrid } from "./grid/build.ts";
 import { gridTags } from "./grid/core/tags.ts";
 import { gridRelations, gridTagObjects } from "./host/silverbullet/gridindex.ts";
-import { Grids } from "./grid/grids.ts";
+import { gridRanges, Grids } from "./grid/grids.ts";
 import { gridProvider } from "./grid/provider.ts";
 import { watchEmbeddedGrids } from "./host/silverbullet/embeddedgrids.ts";
-import { watchSyntaxMode } from "./host/silverbullet/syntaxmode.ts";
+import { watchSyntaxMode, type SyntaxModeWatcher } from "../../shared/syntaxmode.ts";
+import { SILVERBULLET_SYNTAX_PAGE, SYNTAX_OPTION } from "./host/silverbullet/syntaxmode.ts";
 import { silverBulletGridHost, silverBulletPutHost } from "./host/silverbullet/grid.ts";
 import { keepDeviceZoom, readDeviceZoom } from "./host/devicezoom.ts";
 import { silverBulletPage } from "./host/silverbullet/dom.ts";
 import { pageLayoutOf, writePageWidth } from "./host/silverbullet/page.ts";
-import { silverBulletPlatform } from "./host/silverbullet/platform.ts";
+import { silverBulletPlatform } from "../../shared/silverbullet/platform.ts";
 import { DEFAULT_GUIDES, DEFAULT_MIN_PANE_WIDTH, keptGuides, PATHS, readSettings, readSyntaxModeSettings, type Settings, type SyntaxModeSettings } from "./model/settings.ts";
 import { syntaxTab } from "./ui/syntaxtab.ts";
 import { cssWidth, readTextWidth } from "./model/width.ts";
@@ -47,12 +41,11 @@ const OWN_MARKER = "-- managed-by: silverware-layout";
 const registry = new Registry((message) => app.problem(message));
 const app = new LayoutApp(document, silverBulletPage(document), registry);
 
-// The types of asset and actions (docs/silverware-layout-assets.md), one registry per window as the providers'
-const assetRegistry = new AssetRegistry((message) => app.problem(message));
-registerBuiltins(assetRegistry);
-
-/** Silverware Layout's API, as its API page hands it to the widget plugins (`silverware.layout.api`): the widgets' providers, and `assets` (shared/assets.ts) */
-export const api = Object.assign(registry.api(), { assets: assetRegistry.api(), rendered: renderedApi() });
+/**
+ * Silverware Layout's API, as its API page hands it to the widget plugins (`silverware.layout.api`): the widgets'
+ * providers (shared/layout.ts), and what its grids draw outside the editor (`rendered`, shared/rendered.ts)
+ */
+export const api = Object.assign(registry.api(), { rendered: renderedApi(), layOutAgain: () => app.layOutWidgets() });
 
 // The page's grids (docs/silverware-layout-grid.md), made as the init page hands SilverBullet's API over
 let grids: Grids | undefined;
@@ -64,15 +57,13 @@ function renderedApi(): Rendered {
   return {
     version: RENDERED_VERSION,
     items: () => grids?.rendered.items() ?? [],
-    ranges: () => grids?.rendered.ranges() ?? [],
+    ranges: (text) => gridRanges(text),
     onChange: (listener) => {
       renderedListeners.add(listener);
       return () => void renderedListeners.delete(listener);
     },
   };
 }
-// The embedded media decorated, made as the API is handed over
-let assets: AssetDecorator | undefined;
 
 /** Started by the init page (again as Space Lua loads again): SilverBullet's API handed over */
 export async function init(bridge: Bridge): Promise<void> {
@@ -100,44 +91,27 @@ export async function init(bridge: Bridge): Promise<void> {
     // A grid in a page embedded in this one, which SilverBullet shows as its text: drawn as the grid it is
     const drawing = grids;
     watchEmbeddedGrids(document, (text) => drawing.drawText(text));
-    // The markdown shown as written (SilverBullet's mode): what Silverware Layout draws or decorates hidden then, a
-    // link's click the cursor's, as the settings say (read as Silverware Layout starts, again as the tab saves them)
-    syntaxWatcher = watchSyntaxMode(
-      document,
-      () => current?.getUiOption?.("markdownSyntaxRendering"),
-      () => (current ? readSyntaxSettings(current) : { hideWidgets: true, clickPlacesCursor: true }),
-    );
+    // The markdown shown as written (SilverBullet's mode): the grids hidden then, as the settings say (read as the
+    // mode is asked, again as the tab saves them)
+    syntaxWatcher = watchSyntaxMode<SyntaxModeSettings>(document, {
+      page: SILVERBULLET_SYNTAX_PAGE,
+      shown: () => current?.getUiOption?.(SYNTAX_OPTION),
+      read: () => (current ? readSyntaxSettings(current) : { hideGrids: true }),
+      same: (a, b) => a.hideGrids === b.hideGrids,
+      marks: (settings) => ({ "data-swl-syntax-shown": settings.hideGrids }),
+      initial: { hideGrids: true },
+    });
   }
-  const raw = silverBulletAssetHost(bridge, writer, document, api.rendered);
-  const assetHost: AssetHost = { ...raw, settings: async () => readAssetSettings(await raw.settings()).settings };
-  if (assets) assets.useHost(assetHost);
-  else {
-    assets = new AssetDecorator(document, assetHost, assetRegistry);
-    // A medium's width laid out as a widget's, registered as a widget plugin registers
-    registry.register(assetProvider(assets));
-    assets.onDecorated = () => app.layOutWidgets();
-    assets.start();
-  }
-  // The Media tab of the Page layout dialog, made as it opens: the settings as configured, the types and actions registered
-  const decorator = assets;
-  app.dialogTabs = async () => {
-    const settings = await assetHost.settings();
-    const input = { settings, types: assetRegistry.types.all.map(({ name, icon }) => ({ name, icon })), actions: assetRegistry.actions.all.map(({ name, label }) => ({ name, ...(label ? { label } : {}) })) };
-    return [
-      mediaTab(document, input, async (saved) => {
-        await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) => withConfigSettings(text, { [ASSETS_PATH]: storedAssetSettings(saved) }, OWN_MARKER));
-        await decorator.redecorateAll();
-        return undefined;
-      }),
-      syntaxTab(document, await readSyntaxSettings(bridge), async (saved) => {
-        await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
-          withConfigSettings(text, { [PATHS.syntaxHides]: saved.hideWidgets ? undefined : false, [PATHS.syntaxClicks]: saved.clickPlacesCursor ? undefined : false }),
-        );
-        syntaxWatcher?.settingsChanged(saved);
-        return undefined;
-      }),
-    ];
-  };
+  // The Markdown tab of the Page layout dialog, made as it opens
+  app.dialogTabs = async () => [
+    syntaxTab(document, await readSyntaxSettings(bridge), async (saved) => {
+      await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
+        withConfigSettings(text, { [PATHS.syntaxHides]: saved.hideGrids ? undefined : false }),
+      );
+      syntaxWatcher?.settingsChanged(saved);
+      return undefined;
+    }),
+  ];
   await app.start(silverBulletStore(bridge, writer));
 }
 
@@ -177,13 +151,13 @@ export function pageEdited(): void {
 // The bridge handed over last (for the slash commands)
 let current: Bridge | undefined;
 // What follows SilverBullet's markdown shown as written (its settings read as it checks the mode)
-let syntaxWatcher: ReturnType<typeof watchSyntaxMode> | undefined;
+let syntaxWatcher: SyntaxModeWatcher<SyntaxModeSettings> | undefined;
 
 /** The settings of the markdown shown as written, as SilverBullet's configuration has them */
 async function readSyntaxSettings(bridge: Bridge): Promise<SyntaxModeSettings> {
-  if (!bridge.getConfig) return { hideWidgets: true, clickPlacesCursor: true };
-  const [hides, clicks] = await Promise.all([bridge.getConfig(PATHS.syntaxHides, true), bridge.getConfig(PATHS.syntaxClicks, true)]);
-  return readSyntaxModeSettings((path) => (path === PATHS.syntaxHides ? hides : path === PATHS.syntaxClicks ? clicks : undefined));
+  if (!bridge.getConfig) return { hideGrids: true };
+  const hides = await bridge.getConfig(PATHS.syntaxHides, true);
+  return readSyntaxModeSettings((path) => (path === PATHS.syntaxHides ? hides : undefined));
 }
 
 /**

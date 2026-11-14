@@ -24,6 +24,7 @@ export function opensMenu(doc: Document, look: PopupLook, trigger: HTMLElement, 
     holder?.remove();
     holder = undefined;
     trigger.setAttribute("aria-expanded", "false");
+    doc.removeEventListener("pointerdown", outside, true);
   };
   const outside = (event: Event) => {
     if (holder && !holder.contains(event.target as Node) && !trigger.contains(event.target as Node)) close();
@@ -52,6 +53,8 @@ export function opensMenu(doc: Document, look: PopupLook, trigger: HTMLElement, 
     holder.style.left = `${Math.max(8, Math.min(box.right - 220, (doc.defaultView?.innerWidth ?? Infinity) - 228))}px`;
     doc.body.append(holder);
     trigger.setAttribute("aria-expanded", "true");
+    // (A press beside it watched while it is open alone: a trigger drawn anew and thrown away leaves no listener)
+    doc.addEventListener("pointerdown", outside, true);
     focusMenu(rendered, LOOK);
   };
   const pressed = (event: Event) => {
@@ -68,6 +71,5 @@ export function opensMenu(doc: Document, look: PopupLook, trigger: HTMLElement, 
   trigger.addEventListener("touchstart", () => void (moved = false), { signal, passive: true });
   trigger.addEventListener("touchmove", () => void (moved = true), { signal, passive: true });
   trigger.addEventListener("touchend", (event) => void (moved || pressed(event)), { signal });
-  doc.addEventListener("pointerdown", outside, { capture: true, ...(signal ? { signal } : {}) });
   signal?.addEventListener("abort", close);
 }

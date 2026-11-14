@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { pageWriter } from "../../../../shared/pages/writer.ts";
 import type { Bridge } from "../../bridge.ts";
-import { silverBulletPlatform } from "./platform.ts";
+import { silverBulletPlatform } from "../../../../shared/silverbullet/platform.ts";
 import { silverBulletGridHost } from "./grid.ts";
 
 /** A bridge over one page open in memory */

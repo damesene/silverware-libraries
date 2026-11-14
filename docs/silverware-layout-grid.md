@@ -199,3 +199,7 @@ The handle's bar beside a grid went the same day (the user's choice): two contro
 
 A blank line clicked: nothing there is marked with its place, so the caret went to the cell's start (the user's report). Found by height now (`grids.ts` `blankLineAt`): a click between the element drawn before and the one after, where the markdown has blank lines before the one after, is on the nth of them (`blankLineStart`), the field's caret at its start. The grid's edge lines lie outside its box (a press near the edge of a cell's content was the line's), and a cell has no outline as the pointer is over it (cut off at the grid's edges, on every column: the user found it noisy).
 
+## Lines as blocks (2026-11-14)
+
+The user's word: `1⏎2` is two blocks as `1⏎⏎2` is (the editor shows a paragraph's lines apart; three images on three lines were one cell of a gallery). Put into grid takes each line of a paragraph as a block (`blocksIn`, `shared/markdown/gridbuild.ts`); blocks in one cell are joined as they were apart in the text (a line break where one was). The grid taken apart joins a cell ending in a line of text and the next starting with one by a line break, so `1⏎2` comes back as it was; two paragraphs a blank line apart come back a line break apart (the grid keeps no more of what lay between its cells: its form puts a blank line round each cell's content, cut off as it is read; a mark per column was weighed and dropped by the user, as the difference lies only between cells).
+

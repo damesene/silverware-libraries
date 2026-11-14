@@ -67,7 +67,7 @@ The second column.
 </grid>
 ```
 
-- **Put what you have into a grid**: select paragraphs, list items, tasks, images (or put the cursor in one), and run **Silverware Layout: Put into grid**. Pick how:
+- **Put what you have into a grid**: select paragraphs, lines, list items, tasks, images (or put the cursor in one), and run **Silverware Layout: Put into grid**. Each line is a block of its own, as you see it in the editor, with or without a blank line between (three images on three lines: three blocks). Pick how:
   - **Gallery**: each block a cell of its own, as many to a row as the columns you pick (2, 3 or 4): a row of images, a board of notes.
   - **Split**: the blocks in their order, cut into the columns you pick by their number (ten tasks in three columns: 4, 3, 3), a list staying a list in each column.
 

@@ -31,11 +31,32 @@ describe("a grid built of blocks", () => {
 
   it("gallery: a cell each, N to a row; a blank line kept before and after it", () => {
     const text = "Above\nOne\n\nTwo\n\nThree\nBelow";
-    // (The paragraph `Above\nOne` is one block: its lines one)
+    // (A paragraph's lines are blocks each, as the editor shows them apart: `Three` and `Below` two cells)
     const blocks = blocksIn(text, text.indexOf("Two"), text.length);
     expect(apply(text, gridOfBlocks(text, blocks, "gallery", 2))).toBe(
-      'Above\nOne\n\n<grid columns="2">\n<column>\n\nTwo\n\n</column>\n<column>\n\nThree\nBelow\n\n</column>\n</grid>',
+      'Above\nOne\n\n<grid columns="2">\n<column>\n\nTwo\n\n</column>\n<column>\n\nThree\n\n</column>\n<column>\n\nBelow\n\n</column>\n</grid>',
     );
+  });
+
+  it("takes a paragraph's lines as blocks each, the lines a selection touches alone, and gives them back as they were", () => {
+    const text = "![[a.png]]\n![[b.png]]\n![[c.png]]";
+    // (The second line alone touched: it alone)
+    expect(blocksIn(text, text.indexOf("b.png"), text.indexOf("b.png") + 2).map((block) => text.slice(block.from, block.to))).toEqual(["![[b.png]]"]);
+    for (const mode of ["gallery", "split"] as const) {
+      const built = apply(text, gridOfBlocks(text, blocksIn(text, 0, text.length), mode, 3));
+      const grid = readGrids(built)[0]!;
+      expect(grid.cells.map((cell) => cell.content), mode).toEqual(["![[a.png]]", "![[b.png]]", "![[c.png]]"]);
+      expect(ungridded(grid), mode).toBe(text);
+    }
+    // Two lines in one column of a split: as they were, a line break between
+    const two = apply(text, gridOfBlocks(text, blocksIn(text, 0, text.length), "split", 2));
+    expect(readGrids(two)[0]!.cells.map((cell) => cell.content)).toEqual(["![[a.png]]\n![[b.png]]", "![[c.png]]"]);
+  });
+
+  it("joins two cells of a line of text each by a line break as it takes the grid apart (a blank line between them not kept)", () => {
+    const text = "One\n\nTwo";
+    const built = apply(text, gridOfBlocks(text, blocksIn(text, 0, text.length), "gallery", 2));
+    expect(ungridded(readGrids(built)[0]!)).toBe("One\nTwo");
   });
 
   it("split: items of one list stay one list in a column, a numbered list's numbers as they were", () => {
@@ -47,7 +68,7 @@ describe("a grid built of blocks", () => {
   });
 
   it("is taken apart into what it was made of, by either mode", () => {
-    const text = "- a\n- b\n- c\n\nPara\n\n![[x.png]]";
+    const text = "- a\n- b\n- c\n\nPara\n![[x.png]]\n\n## Heading\n\nAfter it";
     for (const mode of ["gallery", "split"] as const) {
       const built = apply(text, gridOfBlocks(text, blocksIn(text, 0, text.length), mode, 2));
       const grid = readGrids(built)[0]!;

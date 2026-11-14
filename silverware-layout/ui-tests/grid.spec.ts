@@ -282,6 +282,20 @@ test("Put into grid: the tasks selected split into 2 columns, a list in each, by
     .toBe("# Page\n\n<grid>\n<column>\n\n- [ ] one\n- [ ] two\n- [x] three\n\n</column>\n<column>\n\n- [ ] four\n- [ ] five\n\n</column>\n</grid>\n\nAfter\n");
 });
 
+test("Put into grid takes a paragraph's lines as blocks each, as the editor shows them apart", async ({ page, space }) => {
+  const lines = "First line\nSecond line\nThird line";
+  await space.open({ Page: `# Page\n\n${lines}\n\nAfter\n` }, "Page");
+  await page.evaluate((text) => {
+    const view = (window as unknown as { client: { editorView: { state: { doc: { toString(): string } }; dispatch(spec: unknown): void } } }).client.editorView;
+    const all = view.state.doc.toString();
+    view.dispatch({ selection: { anchor: all.indexOf(text), head: all.indexOf(text) + text.length } });
+  }, lines);
+  void runCommand(page, "Silverware Layout: Put into grid");
+  const box = page.locator(".sb-modal-box, .sb-modal").first();
+  await expect(box).toContainText("Put 3 blocks into a grid");
+  await page.keyboard.press("Escape");
+});
+
 test("a cell's menu: the cell moved right, then the grid removed, its content kept in its order", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${GRID}\nAfter\n` }, "Page");
   await gridsDrawn(page);
@@ -296,7 +310,8 @@ test("a cell's menu: the cell moved right, then the grid removed, its content ke
   await gridsDrawn(page);
   await expect(page.locator("#sb-main .swl-grid-cell").first()).toContainText("Right text");
   await pick(0, "Remove the grid");
-  await expect.poll(() => space.saved("Page")).toBe("# Page\n\nRight text\n\nLeft text\n\nAfter\n");
+  // (Two cells of a line of text each: a line break between, as a paragraph's lines put into cells come back)
+  await expect.poll(() => space.saved("Page")).toBe("# Page\n\nRight text\nLeft text\n\nAfter\n");
 });
 
 test("SilverBullet's button bar of a grid's frame stays hidden as the pointer is over the grid", async ({ page, space }) => {

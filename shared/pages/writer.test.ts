@@ -428,7 +428,8 @@ describe("the page writer", () => {
     await change({ kind: "takeOut", cell: 0 });
     expect(map.get("A")).toBe('<grid>\nA note\n<column span="2">\n\nA\n\n</column>\n<column>\n\n\n</column>\n</grid>\n\nB\n');
     await change({ kind: "ungrid" });
-    expect(map.get("A")).toBe("A note\n\nA\n\nB\n");
+    // (The note and the cell each a line of text alone: a line break between)
+    expect(map.get("A")).toBe("A note\nA\n\nB\n");
   });
 
   it("moves a cell left open, closing it", async () => {

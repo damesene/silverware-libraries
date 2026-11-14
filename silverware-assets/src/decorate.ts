@@ -334,8 +334,10 @@ export class AssetDecorator {
     const preview = previewSize(settings, type.name);
     frame.style.setProperty("--swa-height", `${Number(found.embed.height) || (view === "embed" ? settings.heights.embed : preview.height)}px`);
     // A preview's width (none: as wide as it fits)
-    if (view === "preview" && preview.width !== undefined) frame.style.setProperty("--swa-preview-width", `${preview.width}px`);
+    const sized = view === "preview" && preview.width !== undefined;
+    if (sized) frame.style.setProperty("--swa-preview-width", `${preview.width}px`);
     else frame.style.removeProperty("--swa-preview-width");
+    frame.toggleAttribute("data-swa-preview-width", sized);
     // (Written to the embed as the page has it now: its place among those of its text may have changed since)
     const write = async (changes: EmbedChanges) => {
       const now = await this.locateNow(drawn);
@@ -345,7 +347,7 @@ export class AssetDecorator {
     this.sizes.set(frame, { width: found.embed.width, anchor: settings.anchor, write: (width) => write({ width: width ?? null, height: null }) });
     const context: RenderContext = {
       asset,
-      viewport: viewportOf(frame, found.embed, view, settings, control.signal),
+      viewport: viewportOf(frame, found.embed, view, settings, control.signal, sized ? preview.width : undefined),
       metadata: metadataOf(found.embed.metadata, (changes) => write({ metadata: changes })),
       signal: control.signal,
       placement: "block",
@@ -486,11 +488,12 @@ function shownCopy(native: HTMLElement | undefined): HTMLElement | undefined {
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /** The room an asset is drawn in: the frame's width; its height the stored one, else the view's default */
-function viewportOf(element: HTMLElement, embed: Embed, view: View, settings: AssetSettings, signal: AbortSignal): Viewport {
+function viewportOf(element: HTMLElement, embed: Embed, view: View, settings: AssetSettings, signal: AbortSignal, width?: number): Viewport {
   const height = () => Number(embed.height) || (view === "icon" ? 0 : settings.heights[view]);
   return {
+    // (A preview of a width the settings give: that width its room, the frame taking its width from what is drawn)
     get width() {
-      return element.clientWidth || element.getBoundingClientRect().width;
+      return width ?? (element.clientWidth || element.getBoundingClientRect().width);
     },
     get height() {
       return height();

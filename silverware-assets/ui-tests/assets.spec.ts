@@ -200,7 +200,7 @@ test("a preview's size the settings' (all files, a type's own), never widened by
   await runCommand(page, ASSETS_SETTINGS);
   const dialog = page.locator(".swa-dialog");
   await dialog.getByRole("tab", { name: "Assets" }).click();
-  await dialog.getByLabel("A preview's width (px)", { exact: true }).fill("200");
+  await dialog.getByLabel("A preview's width (px)", { exact: true }).fill("100");
   await dialog.getByLabel("pdf: a preview's height (px)", { exact: true }).fill("300");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
@@ -208,9 +208,14 @@ test("a preview's size the settings' (all files, a type's own), never widened by
     const one = (await locator.boundingBox())!;
     return [Math.round(one.width), Math.round(one.height)];
   };
-  await expect.poll(() => size(pdf.locator(".swa-pdf"))).toEqual([200, 300]);
-  // The image within 200 × 160 (a pixel drawn as large as it fits, its ratio kept): no wider than 200
-  await expect.poll(async () => (await size(page.locator("#sb-main [data-swa-asset='image'] img")))[0]! <= 200).toBe(true);
+  await expect.poll(() => size(pdf.locator(".swa-pdf"))).toEqual([100, 300]);
+  // Its frame as wide as the preview: its "…" at the preview's corner, not at the text's right
+  await pdf.hover();
+  const more = (await pdf.locator(".swa-more").boundingBox())!;
+  const shown = (await pdf.locator(".swa-pdf").boundingBox())!;
+  expect(more.x + more.width).toBeLessThanOrEqual(shown.x + shown.width + 1);
+  // The image within 100 × 160 (a pixel drawn as large as it fits, its ratio kept): no wider than 100
+  await expect.poll(async () => (await size(page.locator("#sb-main [data-swa-asset='image'] img")))[0]! <= 100).toBe(true);
 });
 
 test("the settings' Assets tab: a card's size shown, a click set to the side panel; the panel shows the file and Esc closes it", async ({ page, space }) => {

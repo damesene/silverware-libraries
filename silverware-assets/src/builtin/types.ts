@@ -32,9 +32,10 @@ export const pdfType: AssetType = {
   match: { kind: ["file", "web"], mime: "application/pdf", ext: ["pdf"] },
   icon: svg(`${FILE}<path d="M9 13h6M9 17h4"/>`),
   views: {
-    // A smaller viewer, cheap (a preview of the first page later); no room for one, or no URL: the host's own
+    // A smaller viewer, cheap (a preview of the first page later); no room for one (narrower than a preview may be
+    // set, 40 px), or no URL: the host's own
     preview: (context) =>
-      "url" in context.asset && context.viewport.width >= 160 ? el(document, "object", { class: "swa-pdf", attrs: { type: "application/pdf", data: context.asset.url } }) : null,
+      "url" in context.asset && context.viewport.width >= 40 ? el(document, "object", { class: "swa-pdf", attrs: { type: "application/pdf", data: context.asset.url } }) : null,
   },
 };
 

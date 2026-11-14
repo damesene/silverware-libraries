@@ -170,6 +170,12 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   display: block;
   width: auto;
 }
+/* A PDF's preview of a width the settings give: its frame as wide as the preview, its "…" at the preview's corner
+   (none given: as wide as the text, the frame too) */
+[data-swa-asset][data-swa-view="preview"][data-swa-preview-width]:has(.swa-pdf) {
+  width: fit-content;
+  max-width: 100%;
+}
 /* The host's PDF viewer as the original, without a size of its own: as wide as its frame (the text's), so the frame's
    edge, and Silverware Layout's handle beside it, is the viewer's (SilverBullet 2.12.1 draws it 300 px wide, its
    style `max-width: 100%;`; one with a size, `width: 200px` after it, keeps it) */
@@ -399,7 +405,9 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 .swa-pdf {
   display: block;
-  width: min(100%, var(--swa-preview-width, 100%));
+  /* (A width of its own where the settings give one, not a share: its frame takes its width from it) */
+  width: var(--swa-preview-width, 100%);
+  max-width: 100%;
   height: var(--swa-height, 160px);
   border: none;
 }

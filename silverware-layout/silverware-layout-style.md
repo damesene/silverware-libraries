@@ -82,8 +82,8 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 .swl-zoom-label[hidden] {
   display: none;
 }
-/* The handle of a widget's width: a bar beside its right edge, quiet (grey, a dashed outline, as Silverware Table's +)
-   until the pointer is on it or it is dragged */
+/* The handle of a widget's width: a short rounded grip beside its right edge, quiet grey, the accent's as the pointer
+   is on it or it is dragged (the user's choice, 2026-11-14: grips, as the grid's edges and column dividers have) */
 .swl-handle {
   position: fixed;
   z-index: var(--sw-layer-control);
@@ -95,15 +95,27 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   display: none !important;
 }
 .swl-handle-bar {
+  position: relative;
   box-sizing: border-box;
-  width: 6px;
+  width: 12px;
   height: 100%;
   padding: 0;
-  background: color-mix(in srgb, var(--root-color) 6%, var(--root-background-color));
-  border: 1px dashed color-mix(in srgb, var(--root-color) 40%, transparent);
-  border-radius: 3px;
+  background: transparent;
+  border: none;
   cursor: ew-resize;
   touch-action: none;
+}
+.swl-handle-bar::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: min(28px, 100%);
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--root-color) 35%, transparent);
+  transition: background-color 0.12s, height 0.12s;
 }
 /* A finger's target: wider than the bar looks, the room beside it taken (a touch screen, a tablet with a mouse too) */
 @media (any-pointer: coarse) {
@@ -116,8 +128,10 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
     inset: -6px -12px;
   }
 }
-/* A widget's edges dragged alone (src/ui/edges.ts, its provider's say: a grid): a line on each edge as its handle
-   shows, quiet, plain as the pointer is on it or it is dragged (as a grid's column dividers); a finger's target wider */
+/* A widget's edges dragged alone (src/ui/edges.ts, its provider's say: a grid): a grip on each edge as its handle
+   shows (in the middle of the part of it in view); the pointer on it (or dragging it), the grip lit and a thin line over
+   the widget's height; outside the widget's box (a press near the edge of its content is the content's); a finger's
+   target wider */
 /* (Its bar none: the lines are its handle) */
 .swl-handle.swl-handle-bare {
   display: none !important;
@@ -129,34 +143,56 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   cursor: ew-resize;
   touch-action: none;
 }
-/* (Outside the widget's box, its line on the edge: a press near the edge of its content is the content's) */
 .swl-edge-left {
   margin-left: -12px;
 }
 .swl-edge[hidden] {
   display: none;
 }
-.swl-edge::before {
+/* The line (shown on the pointer) and the grip, on the widget's edge */
+.swl-edge::before,
+.swl-edge::after {
   content: "";
   position: absolute;
+  transition: opacity 0.12s, background-color 0.12s, height 0.12s;
+}
+.swl-edge::before {
   top: 0;
   bottom: 0;
-  width: 2px;
-  border-radius: 1px;
+  width: 1px;
   background: var(--ui-accent-color, #4a90e2);
-  opacity: 0.25;
-  transition: opacity 0.12s;
+  opacity: 0;
+}
+.swl-edge::after {
+  top: 50%;
+  width: 4px;
+  height: 28px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--root-color) 35%, transparent);
 }
 .swl-edge-left::before {
   right: 0;
 }
+.swl-edge-left::after {
+  right: -2px;
+}
 .swl-edge-right::before {
   left: 0;
+}
+.swl-edge-right::after {
+  left: -2px;
 }
 .swl-edge:hover::before,
 .swl-edge:focus-visible::before,
 .swl-edge.swl-edge-dragging::before {
   opacity: 1;
+}
+.swl-edge:hover::after,
+.swl-edge:focus-visible::after,
+.swl-edge.swl-edge-dragging::after {
+  height: 40px;
+  background: var(--ui-accent-color, #4a90e2);
 }
 .swl-edge:focus {
   outline: none;
@@ -199,12 +235,14 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 .swl-handle-guide-near .swl-handle-guide-label {
   color: color-mix(in srgb, var(--root-color) 75%, transparent);
 }
-.swl-handle-bar:hover,
-.swl-handle-bar:focus-visible,
-.swl-handle-dragging .swl-handle-bar {
+.swl-handle-bar:focus-visible {
   outline: none;
+}
+.swl-handle-bar:hover::after,
+.swl-handle-bar:focus-visible::after,
+.swl-handle-dragging .swl-handle-bar::after {
+  height: min(40px, 100%);
   background: var(--ui-accent-color, #464cfc);
-  border: 1px solid var(--ui-accent-color, #464cfc);
 }
 /* Silverware Layout (prefix swl-): the Page layout dialog ("Silverware Layout: Page layout"), over the page and
    SilverBullet's top bar, in the page's colors; over the part of the window an on-screen keyboard leaves
@@ -782,37 +820,54 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   cursor: col-resize;
   touch-action: none;
 }
-.swl-grid-divider::before {
+.swl-grid-divider::before,
+.swl-grid-divider::after {
   content: "";
   position: absolute;
+  left: 50%;
+  transition: opacity 0.12s, background-color 0.12s, height 0.12s;
+}
+/* The line over the grid's height, on the pointer */
+.swl-grid-divider::before {
   top: 0;
   bottom: 0;
-  left: 5px;
-  width: 2px;
-  border-radius: 1px;
+  width: 1px;
+  transform: translateX(-50%);
   background: var(--ui-accent-color, #4a90e2);
   opacity: 0;
-  transition: opacity 0.12s;
 }
-.swl-grid:hover > .swl-grid-divider::before {
-  opacity: 0.25;
+/* The grip, in the gap's middle, as the pointer is over the grid */
+.swl-grid-divider::after {
+  top: 50%;
+  width: 4px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--root-color) 35%, transparent);
+  opacity: 0;
+}
+.swl-grid:hover > .swl-grid-divider::after {
+  opacity: 1;
 }
 .swl-grid-divider:hover::before,
 .swl-grid-divider[data-swl-dragging]::before {
   opacity: 1;
 }
+.swl-grid-divider:hover::after,
+.swl-grid-divider[data-swl-dragging]::after {
+  opacity: 1;
+  height: 40px;
+  background: var(--ui-accent-color, #4a90e2);
+}
 @media (hover: none) {
-  .swl-grid-divider::before {
-    opacity: 0.3;
+  .swl-grid-divider::after {
+    opacity: 1;
   }
 }
 @media (pointer: coarse) {
   .swl-grid-divider {
     width: 24px;
     margin-left: -12px;
-  }
-  .swl-grid-divider::before {
-    left: 11px;
   }
 }
 :root[data-swl-narrow] .swl-grid-divider {

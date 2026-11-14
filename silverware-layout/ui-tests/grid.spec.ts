@@ -93,6 +93,34 @@ test("a grid widened by its handle grows both ways, centred on the text", async 
   await expect.poll(() => space.saved("Page")).toMatch(/<grid width="\d+">/);
 });
 
+test("the divider between two columns dragged: their shares change as it moves, snapping to 2 : 1, written; a double click makes them even again", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${GRID}\nBelow\n` }, "Page");
+  await gridsDrawn(page);
+  const cells = page.locator("#sb-main .swl-grid-cell");
+  const widths = async () => [(await cells.nth(0).boundingBox())!.width, (await cells.nth(1).boundingBox())!.width];
+  const [a, b] = await widths();
+  await page.locator("#sb-main .swl-grid").hover();
+  const divider = page.locator("#sb-main .swl-grid-divider");
+  await expect(divider).toHaveCount(1);
+  const box = (await divider.boundingBox())!;
+  const y = box.y + Math.min(box.height / 2, 20);
+  await page.mouse.move(box.x + box.width / 2, y);
+  await page.mouse.down();
+  // To two thirds of the two columns: 2 : 1, said as it snaps, shown at once
+  const target = (a! + b!) * (2 / 3) - a!;
+  await page.mouse.move(box.x + box.width / 2 + target + 3, y, { steps: 10 });
+  await expect(page.locator(".swl-grid-divider-label")).toHaveText("2 : 1");
+  await expect.poll(async () => {
+    const [first, second] = await widths();
+    return Math.round((first! / second!) * 10) / 10;
+  }).toBe(2);
+  await page.mouse.up();
+  await expect.poll(() => space.saved("Page")).toContain('<grid columns="2fr 1fr">');
+  // Even again: the attribute taken off (two cells are two even columns anyway)
+  await divider.dblclick();
+  await expect.poll(() => space.saved("Page")).toContain("<grid>\n");
+});
+
 test("a grid in a page embedded in another: drawn with its own columns, not edited there", async ({ page, space }) => {
   await space.open(
     {

@@ -11,11 +11,12 @@ import type { Attributes } from "../../../shared/markdown/attributes.ts";
 import { type Grid, readGridBody, readGrids } from "../../../shared/markdown/grid.ts";
 import { gridsOfBody } from "./core/match.ts";
 import { positionInCell } from "./core/position.ts";
-import { columnTemplate } from "./model/columns.ts";
+import { columnTemplate, DEFAULT_MAX_COLUMNS } from "./model/columns.ts";
 import { RENDERED_VERSION, type Rendered, type RenderedItem, type RenderedRange } from "../../../shared/rendered.ts";
 import { type Drawn, drawnIn, itemsOf } from "./drawn.ts";
 import { addCellMenus, type CellAction } from "./ui/cellmenu.ts";
 import { caretWord, editCell } from "./ui/celleditor.ts";
+import { addColumnDividers } from "./ui/dividers.ts";
 import { drawGrid, plainCell, showColumns } from "./ui/view.ts";
 
 /** A cell to write: the grid by its body as read and its place among those alike, the cell, its new markdown */
@@ -210,6 +211,14 @@ export class Grids {
     }
     // Each cell's "…": what can be done with it and with the grid
     if (this.host.changeCells) addCellMenus(this.doc, element, () => ({ columns: this.attributesOf(element).columns, cells: cells.length }), (cell, action) => void this.cellAction(element, cell, action));
+    // The dividers between its columns: their shares dragged, written as its `columns` (even ones as many as its cells
+    // would be anyway: none written)
+    if (this.host.changeCells) {
+      addColumnDividers(this.doc, element, (columns, even) => {
+        const columnsNow = even && Number(columns) === Math.min(Math.max(cells.length, 1), DEFAULT_MAX_COLUMNS) ? null : columns;
+        void this.cellAction(element, 0, { kind: "columns", columns: columnsNow });
+      });
+    }
     this.host.settle?.(element);
     // In the page, its order among the grids of its body is known: its own attributes then (and what it drew told)
     this.refreshSoon();

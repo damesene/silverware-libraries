@@ -707,6 +707,73 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 :root[data-swl-narrow] .swl-grid {
   grid-template-columns: minmax(0, 1fr);
 }
+/* The dividers between a grid's columns (src/grid/ui/dividers.ts): in each gap, a quiet line as the pointer is over
+   the grid, plain over the divider or while it is dragged; a finger's target wider than the line. Out of the grid's
+   flow (placed by the code at each gap's middle), none in a narrow pane (one column) */
+.swl-grid {
+  position: relative;
+}
+.swl-grid-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: var(--sw-layer-control);
+  width: 12px;
+  margin-left: -6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.swl-grid-divider::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 5px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--ui-accent-color, #4a90e2);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.swl-grid:hover > .swl-grid-divider::before {
+  opacity: 0.25;
+}
+.swl-grid-divider:hover::before,
+.swl-grid-divider[data-swl-dragging]::before {
+  opacity: 1;
+}
+@media (hover: none) {
+  .swl-grid-divider::before {
+    opacity: 0.3;
+  }
+}
+@media (pointer: coarse) {
+  .swl-grid-divider {
+    width: 24px;
+    margin-left: -12px;
+  }
+  .swl-grid-divider::before {
+    left: 11px;
+  }
+}
+:root[data-swl-narrow] .swl-grid-divider {
+  display: none;
+}
+/* What a divider dragged says: the ratio snapped to, else the two columns' shares */
+.swl-grid-divider-label {
+  position: absolute;
+  top: -1.8em;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--ui-font, system-ui, sans-serif);
+  font-size: 12px;
+  white-space: nowrap;
+  color: #fff;
+  background: var(--ui-accent-color, #4a90e2);
+  pointer-events: none;
+}
 .swl-grid-cell {
   min-width: 0;
   overflow-wrap: anywhere;

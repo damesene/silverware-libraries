@@ -403,6 +403,13 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
     transition: none;
   }
 }
+/* A layer over a preview showing a document (a PDF's viewer, which takes every click on it): the preview's click the
+   action the settings give, as an image's preview's (the "…" over it) */
+.swa-shield {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
 .swa-pdf {
   display: block;
   /* (A width of its own where the settings give one, not a share: its frame takes its width from it) */

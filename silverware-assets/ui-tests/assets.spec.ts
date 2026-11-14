@@ -218,6 +218,22 @@ test("a preview's size the settings' (all files, a type's own), never widened by
   await expect.poll(async () => (await size(page.locator("#sb-main [data-swa-asset='image'] img")))[0]! <= 100).toBe(true);
 });
 
+test("a PDF's preview clicked runs the click the settings give (its viewer under a layer taking it), its original's viewer left alone", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/doc.pdf|||{ view: preview }]]\n\n![[${space.folder}/doc.pdf|Doc||{ view: embed }]]\n` }, "Page", { "doc.pdf": "%PDF-1.4\n" });
+  const [preview, original] = [page.locator("#sb-main [data-swa-asset='pdf'][data-swa-view='preview']"), page.locator("#sb-main [data-swa-asset='pdf'][data-swa-view='embed']")];
+  await expect(preview.locator(".swa-shield")).toHaveCount(1);
+  await expect(original.locator(".swa-shield")).toHaveCount(0);
+  // (What is opened kept: a PDF in a new tab is the browser's to download in a test's)
+  await page.evaluate(() => {
+    const opened: string[] = [];
+    (window as unknown as { opened: string[] }).opened = opened;
+    window.open = ((url?: string | URL) => void opened.push(String(url))) as typeof window.open;
+  });
+  const box = (await preview.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 3, box.y + box.height / 2);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { opened: string[] }).opened.join(" "))).toContain("doc.pdf");
+});
+
 test("the settings' Assets tab: a card's size shown, a click set to the side panel; the panel shows the file and Esc closes it", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n![[${space.folder}/archive.zip]]\n\n![[${space.folder}/photo.png|Photo||{ view: preview }]]\n` }, "Page", { "archive.zip": "zip", "photo.png": PIXEL_PNG });
   await expect(page.locator("#sb-main .swa-card")).toHaveText("archive.zip");

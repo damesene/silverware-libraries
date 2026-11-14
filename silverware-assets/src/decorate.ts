@@ -81,6 +81,8 @@ export type AssetHost = {
 };
 
 const NATIVE_HIDDEN = "swa-native-hidden";
+// What shows a document of its own, taking the clicks on it (a PDF's viewer)
+const DOCUMENT_VIEWERS = "object, iframe, embed";
 const LINK_ICON = "swa-link-icon";
 
 export class AssetDecorator {
@@ -405,6 +407,15 @@ export class AssetDecorator {
         },
         { signal: control.signal },
       );
+    // A preview showing a document of its own (a PDF's viewer: the page told of no click on it) given a layer over it
+    // that takes its click, as an image's preview does (the original's viewer left to be read)
+    const shielded = () => {
+      if (!frame.querySelector(DOCUMENT_VIEWERS)) return clicked(frame);
+      const shield = this.doc.createElement("div");
+      shield.className = "swa-own swa-shield";
+      clicked(shield);
+      frame.append(shield);
+    };
 
     if (view === "icon") {
       const card = this.card(type, asset, settings);
@@ -426,7 +437,7 @@ export class AssetDecorator {
     const renderer = type.views?.[view];
     if (!renderer) {
       // The host's own drawing: a preview of it is the same, smaller (the style page's rule by the view's mark)
-      if (view === "preview") clicked(frame);
+      if (view === "preview") shielded();
       return;
     }
     void Promise.resolve()
@@ -434,13 +445,16 @@ export class AssetDecorator {
       .then((element) => {
         if (control.signal.aborted) return;
         if (!element) {
-          if (view === "preview") clicked(frame);
+          if (view === "preview") shielded();
           return;
         }
         element.classList.add("swa-own");
-        if (view === "preview") clicked(element);
         hideHost();
         frame.append(element);
+        if (view === "preview") {
+          if (element.matches(DOCUMENT_VIEWERS) || element.querySelector(DOCUMENT_VIEWERS)) shielded();
+          else clicked(element);
+        }
       })
       .catch((error: unknown) => {
         if (control.signal.aborted) return;

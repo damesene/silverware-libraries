@@ -227,7 +227,10 @@ test("a PDF's preview clicked runs the click the settings give (its viewer under
   await page.evaluate(() => {
     const opened: string[] = [];
     (window as unknown as { opened: string[] }).opened = opened;
-    window.open = ((url?: string | URL) => void opened.push(String(url))) as typeof window.open;
+    window.open = ((url?: string | URL) => {
+      opened.push(String(url));
+      return null;
+    }) as typeof window.open;
   });
   const box = (await preview.boundingBox())!;
   await page.mouse.click(box.x + box.width / 3, box.y + box.height / 2);

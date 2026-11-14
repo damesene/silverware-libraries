@@ -74,6 +74,27 @@ test("an image's width dragged by its handle, staying at its place, written as S
   await expect.poll(async () => Math.round((await page.locator("#sb-main [data-swa-asset]").first().boundingBox())!.x)).toBe(Math.round(left));
 });
 
+test("an image widened to the page's width by its handle: kept at that width as it snaps there, written as its pixels", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n![[${space.folder}/photo.png|Photo|200]]\n\nAfter\n` }, "Page", { "photo.png": PIXEL_PNG });
+  const frame = page.locator("#sb-main [data-swa-asset]").first();
+  await expect(frame).toHaveAttribute("data-swl-width", "200");
+  const text = await page.locator("#sb-main .cm-content").evaluate((content) => {
+    const style = getComputedStyle(content);
+    return content.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  });
+  await frame.hover();
+  const bar = page.locator(".swl-handle-bar");
+  const box = (await bar.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  // (To the text's width, its right edge at the text's: the image grows to the right alone)
+  await page.mouse.move(box.x + box.width / 2 + (text - 200), box.y + box.height / 2, { steps: 12 });
+  // While snapped there: as wide as the text, not back at its 200 px
+  await expect.poll(async () => Math.round((await frame.boundingBox())!.width)).toBeGreaterThan(text - 10);
+  await page.mouse.up();
+  await expect.poll(() => space.saved("Page")).toMatch(new RegExp(`photo\\.png\\|Photo\\|${Math.round(text)}\\]\\]`));
+});
+
 test("an image in a grid's cell dragged within the cell: no wider than it, its quarters its guides", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${grid(`![[${space.folder}/photo.png|Photo|100]]`, "Right")}` }, "Page", { "photo.png": PIXEL_PNG });
   await gridsDrawn(page);

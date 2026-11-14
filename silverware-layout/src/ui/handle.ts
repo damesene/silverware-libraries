@@ -49,6 +49,8 @@ export type HandleHost<W> = {
   anchor?(widget: W): LayoutAnchor;
   // The width of the box a widget is laid out in, where it is not the page's text (a cell): its quarters its snaps, no wider
   room?(widget: W): number | undefined;
+  // What a widget without a width of its own is (none: as wide as the text): of its own size, the text's width it snaps to kept as pixels
+  unsized?(widget: W): "text" | "own";
 };
 
 type Drag = { readonly pointer: number; readonly x: number; readonly start: number; readonly was: WidgetWidth | undefined; now: WidgetWidth | undefined; moved: boolean };
@@ -118,6 +120,7 @@ export class WidthHandle<W> {
       this.showFor(widget);
     } else if (!this.box.hidden && !this.leaveTimer) this.leaveTimer = setTimeout(() => this.hide(), LEAVE_MS);
   }
+
 
   /** A finger (or a pen) on the page, which has no hover: on a widget its handle shows, elsewhere it goes */
   private touched(e: PointerEvent): void {
@@ -238,7 +241,8 @@ export class WidthHandle<W> {
   /** What the widget's width snaps to: its room's quarters, else the text's width and the guides */
   private targets(): SnapTarget[] {
     const room = this.roomOf();
-    return room !== undefined ? roomTargets(room) : snapTargets(this.host.textWidth(), this.host.guides(), this.host.paneWidth());
+    const unsized = this.widget ? this.host.unsized?.(this.widget) : undefined;
+    return room !== undefined ? roomTargets(room) : snapTargets(this.host.textWidth(), this.host.guides(), this.host.paneWidth(), unsized);
   }
 
   /** Where a drag by `moved` from `start` takes the width: within its room, else within the pane */

@@ -58,6 +58,10 @@ export type LayoutProvider = {
   // Optional: where the widget whose element this is stays as its width changes (none: centred). A widget's own (a
   // setting may choose it), asked as it is laid out
   anchor?(element: Element): LayoutAnchor;
+  // Optional: what a widget without a width of its own is: as wide as the text ("text", a table: none said) or of its
+  // own size ("own", a medium: SilverBullet's size or the file's). Where its own, the text's width a drag snaps to is
+  // kept as its pixels: none would give it back its own size
+  readonly unsized?: "text" | "own";
   // Optional: the box the widget is laid out in, where it is not the page's text (a medium in markdown rendered outside
   // the editor, a grid's cell): its width then a share of that box's, snapped to its quarters, never wider; neither the
   // text's width nor the guides apply. None (or undefined): the page's text

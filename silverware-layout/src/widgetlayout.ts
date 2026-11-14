@@ -36,6 +36,7 @@ export function layOutWidgets(doc: Document, page: PageHost, registry: Registry,
     seen: (widget) => widgets.seen(widget),
     enabled: options.enabled,
     anchor: (widget) => widgets.anchor(widget),
+    unsized: (widget) => widget.provider.unsized ?? "text",
     room: (widget) => {
       const room = widgets.room(widget);
       return room ? room.getBoundingClientRect().width : undefined;

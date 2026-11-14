@@ -24,6 +24,8 @@ export function assetProvider(assets: AssetDecorator): LayoutProvider {
       return assets.writeWidth(element as HTMLElement, pixels);
     },
     anchor: (element) => assets.sizeOf(element as HTMLElement)?.anchor ?? "start",
+    // (Without a width, SilverBullet's own size or the file's: the text's width snapped to kept as its pixels)
+    unsized: "own",
     // Drawn outside the editor (a grid's cell): that box its room, as the one drawing it told
     room: (element) => assets.roomOf(element as HTMLElement),
   };

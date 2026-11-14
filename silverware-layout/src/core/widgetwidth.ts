@@ -50,8 +50,15 @@ export const shownWidgetWidth = (width: WidgetWidth, pane: number): number => Ma
  * Where a drag of the right edge by `moved` may take a width to: a centred widget grows on both sides (twice the
  * move), one at the text's start to the right alone; not narrower than the least, nor wider than the pane less its gutter
  */
-export const draggedWidth = (start: number, moved: number, pane: number, anchor: LayoutAnchor = "center"): number =>
-  Math.max(MIN_WIDGET_WIDTH, Math.min(pane - PANE_GUTTER, start + (anchor === "start" ? 1 : 2) * moved));
+export const draggedWidth = (start: number, moved: number, pane: number, anchor: LayoutAnchor = "center", text?: number): number =>
+  Math.max(MIN_WIDGET_WIDTH, Math.min(widestWidth(pane, anchor, text), start + (anchor === "start" ? 1 : 2) * moved));
+
+/**
+ * The widest a widget is shown in a pane: the pane less its gutter, centred; one at the text's start (`text` its
+ * width, the text centred in the pane) as far as the pane's right edge less half the gutter, as it grows to the right
+ */
+export const widestWidth = (pane: number, anchor: LayoutAnchor = "center", text?: number): number =>
+  anchor === "start" && text !== undefined ? Math.floor((pane + text) / 2 - PANE_GUTTER / 2) : pane - PANE_GUTTER;
 
 /** What a width may snap to: the text's (the widget then keeps no width, or its pixels where it is of its own size without one), a guide (its own width) */
 export type SnapTarget = { readonly width: number; readonly kept: WidgetWidth | undefined; readonly name: string };

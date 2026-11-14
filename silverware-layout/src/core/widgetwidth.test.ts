@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Guide } from "../model/settings.ts";
-import { cssWidgetWidth, draggedRoomWidth, draggedWidth, keptWidgetWidth, readWidgetWidth, roomTargets, shownWidgetWidth, snapped, snapTargets, widthName } from "./widgetwidth.ts";
+import { cssWidgetWidth, draggedRoomWidth, draggedWidth, keptWidgetWidth, readWidgetWidth, roomTargets, shownWidgetWidth, snapped, snapTargets, widestWidth, widthName } from "./widgetwidth.ts";
 
 const guides: Guide[] = [1200, "80%", "full"];
 
@@ -36,6 +36,10 @@ describe("A widget's width", () => {
     expect(draggedWidth(760, 100, 1600)).toBe(960);
     expect(draggedWidth(760, -400, 1600)).toBe(200);
     expect(draggedWidth(760, 900, 1600)).toBe(1560);
+    // At the text's start: the distance once, as far as the pane's right edge less half the gutter ((1600 + 760) / 2 - 20)
+    expect(draggedWidth(760, 100, 1600, "start", 760)).toBe(860);
+    expect(draggedWidth(760, 900, 1600, "start", 760)).toBe(1160);
+    expect(widestWidth(1600, "center", 760)).toBe(1560);
   });
 
   it("snapped to the text's width (kept: none), a guide of pixels, of a percent (kept so: the same share in any pane) or full, within 8 px", () => {

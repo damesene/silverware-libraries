@@ -9,7 +9,7 @@
 import { el } from "../../../shared/elements.ts";
 import type { LayoutAnchor } from "../../../shared/layout.ts";
 import type { Guide } from "../model/settings.ts";
-import { draggedRoomWidth, draggedWidth, MIN_ROOM_WIDTH, MIN_WIDGET_WIDTH, PANE_GUTTER, roomTargets, type SnapTarget, snapped, snapTargets, type WidgetWidth, widthName } from "../core/widgetwidth.ts";
+import { draggedRoomWidth, draggedWidth, MIN_ROOM_WIDTH, MIN_WIDGET_WIDTH, PANE_GUTTER, roomTargets, type SnapTarget, snapped, snapTargets, type WidgetWidth, widestWidth, widthName } from "../core/widgetwidth.ts";
 import { GuideLines } from "./guidelines.ts";
 
 const BASE = "swl-handle";
@@ -254,13 +254,16 @@ export class WidthHandle<W> {
   private targets(): SnapTarget[] {
     const room = this.roomOf();
     const unsized = this.widget ? this.host.unsized?.(this.widget) : undefined;
-    return room !== undefined ? roomTargets(room) : snapTargets(this.host.textWidth(), this.host.guides(), this.host.paneWidth(), unsized);
+    if (room !== undefined) return roomTargets(room);
+    // (A widget at the text's start reaches the pane's right edge alone: a guide wider, Full width, none of its)
+    const widest = widestWidth(this.host.paneWidth(), this.anchorOf(), this.host.textWidth());
+    return snapTargets(this.host.textWidth(), this.host.guides(), this.host.paneWidth(), unsized).filter((target) => target.width <= widest + 0.5);
   }
 
   /** Where a drag by `moved` from `start` takes the width: within its room, else within the pane */
   private draggedTo(start: number, moved: number): number {
     const room = this.roomOf();
-    return room !== undefined ? draggedRoomWidth(start, moved, room, this.anchorOf()) : draggedWidth(start, moved, this.host.paneWidth(), this.anchorOf());
+    return room !== undefined ? draggedRoomWidth(start, moved, room, this.anchorOf()) : draggedWidth(start, moved, this.host.paneWidth(), this.anchorOf(), this.host.textWidth());
   }
 
   /** Where the widget dragged stays as its width changes */

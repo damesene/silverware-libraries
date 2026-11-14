@@ -21,8 +21,10 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   margin-right: calc((100% - var(--swl-shown)) / 2) !important;
   box-sizing: border-box;
 }
-/* A widget staying at the text's start (its provider's say: an embedded medium): it grows to the right alone */
+/* A widget staying at the text's start (its provider's say: an embedded medium, a grid): it grows to the right alone,
+   as far as the pane's right edge less half the gutter (the text centred in the pane, 100% its width) */
 :root:not([data-swl-narrow]) [data-swl-content] [data-swl-width][data-swl-anchor-start]:not([data-silverware-over-window], [data-silverware-over-window] *) {
+  width: min(var(--swl-shown), calc((var(--swl-pane-width, 100vw) + 100%) / 2 - 20px)) !important;
   margin-left: 0 !important;
   margin-right: auto !important;
 }

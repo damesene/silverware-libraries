@@ -59,6 +59,12 @@ describe("the Assets tab", () => {
     height.value = "5";
     await tab.save();
     expect((saved as { heights: { preview: number } }).heights.preview).toBe(160);
+    // An original PDF's height alike
+    const original = tab.panel.querySelector<HTMLInputElement>(`input[aria-label="An original PDF's height (px)"]`)!;
+    expect(original.value).toBe("480");
+    original.value = "640";
+    await tab.save();
+    expect((saved as { heights: unknown }).heights).toEqual({ preview: 160, embed: 640 });
     // As kept and read back: the Shift+click to nothing
     const back = readAssetSettings(storedAssetSettings(saved as never)).settings;
     expect(back.actions.default).toEqual({ click: "open-tab" });

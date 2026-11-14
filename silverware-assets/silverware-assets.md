@@ -42,7 +42,7 @@ SilverBullet reads only the alt text and the size, so without Silverware Assets 
 
 ## Settings
 
-**For all files, or for one kind of file**: run **Silverware Assets: Settings**; its **Assets** tab. Set how files are shown, what a click and a Shift+click do, whether a width dragged stays at the start or is centred, a preview's height (one with a height of its own, `|200x120`, keeps it), and what a card shows besides the file's name (its icon, its size, its date), for all files; then, per kind (image, video, audio, PDF, file), anything other than that ("Default" follows all files). What a file's own `view` says wins over both.
+**For all files, or for one kind of file**: run **Silverware Assets: Settings**; its **Assets** tab. Set how files are shown, what a click and a Shift+click do, whether a width dragged stays at the start or is centred, a preview's height and an original PDF's (one with a height of its own, `|200x120`, keeps it), and what a card shows besides the file's name (its icon, its size, its date), for all files; then, per kind (image, video, audio, PDF, file), anything other than that ("Default" follows all files). What a file's own `view` says wins over both.
 
 Saved into your CONFIG, in a block of Silverware Assets' own.
 

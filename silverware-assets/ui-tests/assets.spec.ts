@@ -130,6 +130,8 @@ test("a PDF's viewer as wide as its frame, its handle shown from beside its righ
   // Without a size of its own: the frame's width; with one: its own
   await expect.poll(async () => (await width(frames.first().locator("object"))) === (await width(frames.first()))).toBe(true);
   await expect.poll(() => width(frames.nth(1).locator("object"))).toBe(200);
+  // As tall as the original's setting (480 px), not the browser's 150 px of an object: no preview's size
+  await expect.poll(async () => Math.round((await frames.first().locator("object").boundingBox())!.height)).toBe(480);
   // From the page right of it to just beside its edge, where the bar is: shown
   const box = (await frames.first().boundingBox())!;
   await page.mouse.move(box.x + box.width + 120, box.y + box.height / 2);

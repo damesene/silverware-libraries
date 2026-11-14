@@ -55,6 +55,9 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
   // A preview's height where its embed gives none (px): a number typed, one that is none kept as it was
   const previewHeight = el(doc, "input", { class: "swa-settings-number", attrs: { type: "number", min: MIN_HEIGHT, max: MAX_HEIGHT, step: 10, "aria-label": "A preview's height (px)" } });
   previewHeight.value = String(settings.heights.preview);
+  // (The original's: a viewer of SilverBullet's that has no height of its own, a PDF's)
+  const embedHeight = el(doc, "input", { class: "swa-settings-number", attrs: { type: "number", min: MIN_HEIGHT, max: MAX_HEIGHT, step: 10, "aria-label": "An original PDF's height (px)" } });
+  embedHeight.value = String(settings.heights.embed);
   // What a card shows besides the file's name, each a box
   const cardField = (field: CardField) => {
     const box = el(doc, "input", { attrs: { type: "checkbox" } });
@@ -76,6 +79,7 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
     el(doc, "label", "swa-settings-field", "A Shift+click", allShift),
     el(doc, "label", "swa-settings-field", "Width dragged", anchor),
     el(doc, "label", "swa-settings-field", "A preview's height", el(doc, "span", "swa-settings-unit", previewHeight, "px")),
+    el(doc, "label", "swa-settings-field", "An original PDF's height", el(doc, "span", "swa-settings-unit", embedHeight, "px")),
     el(doc, "div", "swa-settings-checks", el(doc, "span", { text: "Cards show" }), el(doc, "label", "swa-settings-check", cardIcon, "Its icon"), el(doc, "label", "swa-settings-check", cardSize, "Its size"), el(doc, "label", "swa-settings-check", cardDate, "Its date")),
     el(doc, "div", "swa-settings-checks", el(doc, "label", "swa-settings-check", linkIcons, "Links to files show the file's icon")),
   );
@@ -117,7 +121,7 @@ export function mediaTab(doc: Document, input: MediaTabInput, save: (settings: A
       actions: { default: defaults, types: actionTypes },
       card: [...(cardIcon.checked ? (["icon"] as const) : []), "name", ...(cardSize.checked ? (["size"] as const) : []), ...(cardDate.checked ? (["modified"] as const) : [])],
       anchor: anchor.value === "center" ? "center" : "start",
-      heights: { ...settings.heights, preview: heightOf(previewHeight.value, settings.heights.preview) },
+      heights: { preview: heightOf(previewHeight.value, settings.heights.preview), embed: heightOf(embedHeight.value, settings.heights.embed) },
       linkIcons: linkIcons.checked,
     };
   };

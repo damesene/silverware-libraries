@@ -373,7 +373,7 @@ Then *Later*.
 
 - The names of the settings' keys and of the card's fields.
 - Whether a centred asset (as a widget) is wanted.
-- The original's default height (`heights.embed`, CONFIG alone: nothing SilverBullet draws reads it); a preview's is in the Media tab.
+- The original's default height (`heights.embed`): **done 2026-11-14**, read by SilverBullet's PDF viewer as the original (it gives it none: the browser's 150 px of an object showed it as small as a preview, the user's report), in the settings' Assets tab beside a preview's.
 - Where pasted files go (a folder per page, one folder, a pattern), when paste comes.
 
 ## Which embed a widget is (2026-11-14)

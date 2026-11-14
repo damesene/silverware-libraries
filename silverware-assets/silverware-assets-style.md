@@ -173,6 +173,11 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   width: 100% !important;
   max-width: 100% !important;
 }
+/* Its height: the original's setting (`heights.embed`, 480 px), or its embed's own (`|600x800`): SilverBullet gives
+   the viewer none, so the browser's 150 px of an object showed it as small as a preview */
+[data-swa-asset][data-swa-view="embed"] object:not(.swa-icon *) {
+  height: var(--swa-height, 480px) !important;
+}
 /* A card: its "…" beside it, not over its name */
 [data-swa-view="icon"] {
   display: flex !important;

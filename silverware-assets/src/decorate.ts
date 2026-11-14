@@ -329,8 +329,9 @@ export class AssetDecorator {
     const view = viewFor(found.embed.metadata.view, type.name, settings, can);
     frame.setAttribute("data-swa-asset", type.name);
     frame.setAttribute("data-swa-view", view);
-    // A preview's height, the setting's (the style page's rules read it)
-    frame.style.setProperty("--swa-height", `${Number(found.embed.height) || settings.heights.preview}px`);
+    // Its height: its embed's own, else the setting's for its view (a preview's; the original's for a viewer of the
+    // host's that has no height of its own, a PDF's: the style page's rules read it)
+    frame.style.setProperty("--swa-height", `${Number(found.embed.height) || (view === "embed" ? settings.heights.embed : settings.heights.preview)}px`);
     // (Written to the embed as the page has it now: its place among those of its text may have changed since)
     const write = async (changes: EmbedChanges) => {
       const now = await this.locateNow(drawn);

@@ -71,24 +71,26 @@ test("a grid's columns as its line says, given again as the line is edited", asy
   }).toBe(3);
 });
 
-test("a grid widened by its handle stays at the text's start: its first column where it was, the others following the pointer", async ({ page, space }) => {
+test("a grid widened by its handle grows both ways, centred on the text", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\nAbove\n\n${GRID}\nBelow\n` }, "Page");
   await gridsDrawn(page);
-  const cells = page.locator("#sb-main .swl-grid-cell");
-  const lefts = async () => [Math.round((await cells.nth(0).boundingBox())!.x), Math.round((await cells.nth(1).boundingBox())!.x)];
-  const [first, second] = await lefts();
-  await page.locator("#sb-main .swl-grid").hover();
+  const grid = page.locator("#sb-main .swl-grid");
+  const edges = async () => {
+    const box = (await grid.boundingBox())!;
+    return [Math.round(box.x), Math.round(box.x + box.width)];
+  };
+  const [left, right] = await edges();
+  await grid.hover();
   const bar = page.locator(".swl-handle-bar");
   await expect(bar).toBeVisible();
   const box = (await bar.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 100, box.y + box.height / 2, { steps: 8 });
-  // While dragged: the first column where it was, the second moved right (half the distance: the columns share it)
-  await expect.poll(lefts).toEqual([first, second! + 50]);
+  // While dragged: its right edge with the pointer, its left edge as far the other way
+  await expect.poll(edges).toEqual([left! - 100, right! + 100]);
   await page.mouse.up();
   await expect.poll(() => space.saved("Page")).toMatch(/<grid width="\d+">/);
-  await expect.poll(async () => (await lefts())[0]).toBe(first);
 });
 
 test("a grid in a page embedded in another: drawn with its own columns, not edited there", async ({ page, space }) => {

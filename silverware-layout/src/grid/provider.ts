@@ -23,8 +23,5 @@ export function gridProvider(grids: Grids): LayoutProvider {
       if (!grid) return "the grid is not drawn";
       return grids.writeAttributes(grid, changes);
     },
-    // At the text's start, as the text above and below it: dragged wider, its first column stays where it is and the
-    // others follow the pointer (centred, the first moved away from it while the others stood: the user's wish, 2026-11-14)
-    anchor: () => "start",
   };
 }

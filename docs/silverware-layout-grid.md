@@ -179,6 +179,6 @@ Later: attributes (`gap`, `span`, `align`), nesting, a grid exported (`renderHtm
 - The attribute names (`columns`, `gap`, the width's).
 - The field a cell is edited in: a plain growing `textarea`, or something richer later.
 
-## Its width at the text's start (2026-11-14)
+## Its width: centred (2026-11-14)
 
-A grid widened by its handle grew on both sides, centred on the text as a table: its first column moved away from the pointer while the others stood, which the user found odd. It stays at the text's start now (its provider's `anchor: "start"`, as a medium's): its first column where it was, the others following the pointer, as far as the pane's right edge (Layout's `widestWidth`, for every widget at the text's start). A grid as wide as the whole pane is none then. Next, proposed: a divider between columns dragged to change their shares (`columns="2fr 1fr"`), snapping to the usual ones.
+A grid widened by its handle grows on both sides, centred on the text as a table: its first column moves away from the pointer while the others stand. Tried at the text's start (its first column standing, the others following the pointer): the user found it worse, a grid must grow both ways; back to centred the same day. What came of it stays: a widget at the text's start (a medium) is held within the pane's right edge (Layout's `widestWidth`). Proposed next: a divider between columns dragged to change their shares (`columns="2fr 1fr"`), snapping to the usual ones.

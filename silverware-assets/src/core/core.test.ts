@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type Asset, type AssetAction, type AssetType, assetsOf, ASSETS_VERSION } from "../../../shared/assets.ts";
 import { registerBuiltins } from "../builtin/index.ts";
 import { BUILTIN_TYPES } from "../builtin/types.ts";
-import { DEFAULT_ASSET_SETTINGS, DEFAULT_LABEL, labelFor, previewSize, readAssetSettings, storedAssetSettings, validatePreviewFolder } from "../model/settings.ts";
+import { DEFAULT_ASSET_SETTINGS, DEFAULT_LABEL, insertAsFor, labelFor, previewSize, readAssetSettings, storedAssetSettings, validatePreviewFolder } from "../model/settings.ts";
 import { actionFor, extOf, mimeOf, typeFor, viewFor } from "./choose.ts";
 import { AssetRegistry, validateAssetType } from "./registry.ts";
 
@@ -125,6 +125,16 @@ describe("the settings", () => {
       expect(problems, folder).toHaveLength(1);
     }
     expect(validatePreviewFolder("_silverware-asset-preview")).toBeUndefined();
+  });
+
+  it("insert files through the dialog unless turned off, each as shown unless set (a type's own over all files'), and say what they could not read", () => {
+    expect(readAssetSettings({}).settings.insert).toEqual({ enabled: true, as: { default: "shown", types: {} } });
+    const { settings, problems } = readAssetSettings({ insert: { enabled: false, as: { default: "link", types: { image: "preview", pdf: "huge" } } } });
+    expect(settings.insert).toEqual({ enabled: false, as: { default: "link", types: { image: "preview" } } });
+    expect(insertAsFor(settings, "image")).toBe("preview");
+    expect(insertAsFor(settings, "zip")).toBe("link");
+    expect(problems).toEqual(['"huge" is no way to insert a file (shown, link, icon, preview or embed), for pdf']);
+    expect(readAssetSettings(storedAssetSettings(settings)).settings.insert).toEqual(settings.insert);
   });
 });
 

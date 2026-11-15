@@ -8,7 +8,7 @@
 // only through what one offers (`offer`, `offered`), as Silverware Table's and
 // Silverware Tags' do. Modules import only types from here.
 import type { Icons } from "../../../shared/icons.ts";
-import type { Editors } from "../../../shared/editor.ts";
+import type { EditorEmbed, Editors } from "../../../shared/editor.ts";
 import type { DocumentsHost } from "./documents.ts";
 import type { MentionsHost } from "./mentions.ts";
 import type { Settings, UserInterface } from "../../../shared/platform.ts";
@@ -105,6 +105,8 @@ export type ModuleHost = DocumentsHost & MentionsHost & {
   onEditorAreaChanged?(listener: () => void): () => void;
   /** How the page's text looks (CSS properties: its font, size, line height, color), for what a module shows beside it; none: the style page's */
   editorLook?(): Readonly<Record<string, string>> | undefined;
+  /** An embed of an item's content (`markdown`, its target resolved against the item's document) drawn in its field as the page draws it; none: its markdown shown */
+  drawEmbed?(markdown: string, item: Item): EditorEmbed | undefined;
   /** One of the module's settings (declared in its `settings`), its default where not set */
   setting(key: string): unknown;
   /**

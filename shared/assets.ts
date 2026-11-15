@@ -3,6 +3,7 @@
 // A type provides renderers; Silverware Assets decides what is rendered (the view, the size, the host's own drawing,
 // the card). A type and an action use only what they are handed, and import nothing of Silverware Assets. As
 // shared/layout.ts: Silverware Assets' API as a plugin's init page hands it over, or a stand-in without it (`assetsOf`).
+import type { EditorEmbed } from "./editor.ts";
 
 /** The version of the assets' API this file is written for: another is taken as none (updated apart) */
 export const ASSETS_VERSION = 1;
@@ -98,6 +99,9 @@ export type AssetType = {
   readonly validate?: (values: Readonly<Record<string, string>>) => string | undefined;
   // Whether its preview is kept in the space (`RenderContext.stored`, Regenerate preview in its menu): one slow to make
   readonly storesPreview?: boolean;
+  // Whether it is costly to draw in any view (a document read whole and laid out in the page's script): where a file
+  // is drawn before it is written (Silverware Assets' insert dialog), a large one is drawn on a click alone
+  readonly costly?: boolean;
 };
 
 /** What an action is handed */
@@ -139,6 +143,12 @@ export type Assets = {
   readonly version: number;
   readonly types: { register(type: AssetType): () => void };
   readonly actions: { register(action: AssetAction): () => void };
+  /**
+   * Optional: an embed of `markdown` (a page's, its target resolved against `page`) drawn in another plugin's editor's
+   * field as the page draws it (read-only: no menu, nothing written); none where Silverware Assets draws none (not
+   * started yet, not an embed)
+   */
+  readonly drawEmbed?: (markdown: string, page: string) => EditorEmbed | undefined;
 };
 
 /** Silverware Assets' API as handed over, where it is of this version; else the stand-in, registering nothing */

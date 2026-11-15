@@ -51,6 +51,8 @@ if js and js.window then
     getCurrentPage = editor.getCurrentPage,
     getText = editor.getText,
     replaceRange = editor.replaceRange,
+    -- Files inserted: the selection they go into
+    getSelection = editor.getSelection,
     readPage = space.readPage,
     writePage = space.writePage,
     listPages = space.listPages,
@@ -91,6 +93,32 @@ if js and js.window then
       end
     end,
     layout = silverware.layout and silverware.layout.api,
+    -- Silverware Editor's API, where it is installed: a file pasted or dropped into another plugin's field (a grid's cell)
+    editor = silverware.editor and silverware.editor.api,
+    -- File: Upload turned off in the settings: SilverBullet's own, its plug's function
+    invokeFunction = system.invokeFunction,
+  })
+  -- File: Upload (the toolbar's paperclip, /upload, the File menu's Insert File…) through Silverware Assets' dialog
+  -- (docs/silverware-assets-insert.md): a command of Space Lua replaces SilverBullet's of the same name. Turned off in
+  -- the settings, or the page read-only: SilverBullet's own
+  command.define({
+    name = "File: Upload",
+    run = function()
+      silverwareAssetsJs.upload()
+    end,
+  })
+  -- Upload file as a button of Silverware Toolbar (through its public API, where it is installed): into the field it is
+  -- run in (a grid's cell, a database's peek), else the page
+  if silverware.toolbar and silverware.toolbar.defineActions then
+    silverware.toolbar.defineActions(silverwareAssetsJs.toolbarActions)
+  end
+  -- The page opened, handed over as it loads: where files inserted go, known at once (not asked as they are pasted)
+  silverwareAssetsJs.pageLoaded(editor.getCurrentPage())
+  event.listen({
+    name = "editor:pageLoaded",
+    run = function()
+      silverwareAssetsJs.pageLoaded(editor.getCurrentPage())
+    end,
   })
   for _, name in ipairs(silverwareAssetsJs.commandNames()) do
     command.define({

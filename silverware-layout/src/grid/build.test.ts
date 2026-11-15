@@ -1,7 +1,7 @@
-// Put into grid over a host of memory: the blocks selected, the mode and the number of columns asked (the mode not
+// Wrap in new grid over a host of memory: the blocks selected, the mode and the number of columns asked (the mode not
 // where it is given), nothing where the user picks nothing or there is no block.
 import { describe, expect, it } from "vitest";
-import { type PutHost, putIntoGrid } from "./build.ts";
+import { type PutHost, wrapInNewGrid } from "./build.ts";
 
 function hostOf(text: string, selection: { from: number; to: number }, picks: (number | undefined)[]) {
   const state = { asked: [] as string[], put: [] as unknown[][], problems: [] as string[] };
@@ -20,34 +20,34 @@ function hostOf(text: string, selection: { from: number; to: number }, picks: (n
 
 const TEXT = "Top\n\n- a\n- b\n- c\n\nEnd";
 
-describe("Put into grid", () => {
+describe("Wrap in new grid", () => {
   it("asks the mode and the number of columns, and puts the blocks the selection touches", async () => {
     const { state, host } = hostOf(TEXT, { from: TEXT.indexOf("- a") + 1, to: TEXT.indexOf("- c") + 1 }, [1, 0]);
-    await putIntoGrid(host);
-    expect(state.asked).toEqual(["Put 3 blocks into a grid: Gallery, Split", "How many columns: 2 columns, 3 columns, 4 columns"]);
+    await wrapInNewGrid(host);
+    expect(state.asked).toEqual(["Wrap 3 blocks in a new grid: Gallery, Split", "How many columns: 2 columns, 3 columns, 4 columns, 5 columns, 6 columns, 7 columns, 8 columns"]);
     expect(state.put).toEqual([[TEXT.indexOf("- a"), TEXT.indexOf("- c") + 3, "- a\n- b\n- c", "split", 2]]);
   });
 
   it("asks the number of columns alone where the mode is given (a toolbar's button), its range too", async () => {
     const { state, host } = hostOf(TEXT, { from: 0, to: 0 }, [1]);
-    await putIntoGrid(host, { mode: "gallery", from: TEXT.indexOf("End"), to: TEXT.indexOf("End") });
+    await wrapInNewGrid(host, { mode: "gallery", from: TEXT.indexOf("End"), to: TEXT.indexOf("End") });
     // (A gallery's first choice: as many to a row as fit)
-    expect(state.asked).toEqual(["How many columns: Auto, 2 columns, 3 columns, 4 columns"]);
+    expect(state.asked).toEqual(["How many columns: Auto, 2 columns, 3 columns, 4 columns, 5 columns, 6 columns, 7 columns, 8 columns"]);
     expect(state.put).toEqual([[TEXT.indexOf("End"), TEXT.length, "End", "gallery", 2]]);
   });
 
   it("puts a gallery of as many to a row as fit where Auto is picked", async () => {
     const { state, host } = hostOf(TEXT, { from: 0, to: 0 }, [0]);
-    await putIntoGrid(host, { mode: "gallery", from: TEXT.indexOf("End"), to: TEXT.indexOf("End") });
+    await wrapInNewGrid(host, { mode: "gallery", from: TEXT.indexOf("End"), to: TEXT.indexOf("End") });
     expect(state.put).toEqual([[TEXT.indexOf("End"), TEXT.length, "End", "gallery", "auto"]]);
   });
 
   it("puts nothing where the user picks nothing, says so where there is no block", async () => {
     const picked = hostOf(TEXT, { from: 0, to: 0 }, [undefined]);
-    await putIntoGrid(picked.host);
+    await wrapInNewGrid(picked.host);
     expect(picked.state.put).toEqual([]);
     const empty = hostOf("", { from: 0, to: 0 }, []);
-    await putIntoGrid(empty.host);
+    await wrapInNewGrid(empty.host);
     expect(empty.state.problems).toHaveLength(1);
   });
 });

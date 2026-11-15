@@ -77,7 +77,9 @@ export const test = base.extend<{ favorites: Favorites | null }>({
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => {
-      if (m.type() === "error") errors.push(m.text());
+      // (SilverBullet answers what it looks for and does not find with a 404, which the page logs: a file's preview kept
+      // in the space looked for by Silverware Assets, as Assets' own tests allow)
+      if (m.type() === "error" && !/404/.test(m.text())) errors.push(m.text());
     });
     const name = `UiToolbar/${testInfo.testId}`;
     const config = join(server().space, "CONFIG.md");

@@ -7,6 +7,8 @@ export type Bridge = {
   readonly getCurrentPage: () => string | Promise<string>;
   readonly getText: () => string | Promise<string>;
   readonly replaceRange: (from: number, to: number, text: string) => unknown;
+  // Optional, for files inserted: the editor's selection (`editor.getSelection`: its from and to)
+  readonly getSelection?: () => unknown;
   readonly readPage: (name: string) => string | Promise<string>;
   readonly writePage: (name: string, text: string) => unknown;
   // Every page (space.listPages: page objects with their name, or names)
@@ -40,6 +42,12 @@ export type Bridge = {
   // Optional: Silverware Layout's API (`silverware.layout.api`), where it is installed: a medium's width by its handle
   // (shared/layout.ts), what its grids draw outside the editor (its `rendered`, shared/rendered.ts)
   readonly layout?: unknown;
+  // Optional: Silverware Editor's API (`silverware.editor.api`), where it is installed: the fields of other plugins
+  // (a grid's cell) a file is pasted or dropped into (shared/editor.ts `surfaceOf`)
+  readonly editor?: unknown;
+  // Optional: a plug's function run (`system.invokeFunction`): SilverBullet's own *File: Upload* where Silverware
+  // Assets' is turned off
+  readonly invokeFunction?: (name: string, ...args: unknown[]) => unknown;
 };
 
 /** The bridge's functions Silverware Assets cannot work without, missing from what the init page gave */

@@ -32,7 +32,7 @@ export type Bridge = {
   readonly moveCursor?: (at: number, center?: boolean) => unknown;
   // Optional, for `/grid`: where the cursor is, an offset of the page's text (`editor.getCursor`)
   readonly getCursor?: () => unknown;
-  // Optional, for Put into grid: the selection (`editor.getSelection`: `{ from, to }`) and a pick of one of options
+  // Optional, for Wrap in new grid: the selection (`editor.getSelection`: `{ from, to }`) and a pick of one of options
   // (`editor.filterBox`, the option picked given back, its `index` as given)
   readonly getSelection?: () => unknown;
   readonly filterBox?: (label: string, options: readonly { readonly name: string; readonly description: string; readonly index: number }[]) => unknown;

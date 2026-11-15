@@ -11,7 +11,7 @@ is for any widget's width. Files (Silverware Assets) keep their "…" as it is: 
   - Edit markdown (Alt+click)
   - Move left, Move right, Add a column after it, Move out of the grid
   - Columns: a row of choices, Auto, 2 to 8 (the one set active; changed 2026-11-15, see *Columns redone*)
-  - Borders (checked where on), Add a column at the end, Remove the grid, its content kept
+  - Borders (checked where on), Add a column at the end, Unwrap grid (named so 2026-11-15; before: Remove the grid, its content kept)
 - **The grid's handle** (Layout's for any widget, `src/ui/handle.ts`): dragged, its width; clicked, its menu: Align
   (left, centre, right), Width: as the page's.
 - **A divider between two columns** (`src/grid/ui/dividers.ts`): dragged, the two columns' shares, snapping; a double
@@ -39,7 +39,7 @@ Min width [ XS | S | M | L | px… ]    (Auto alone; px… its own, asked, shown
 Borders                               (checked where on)
 Add a column at the end
 ───
-Remove the grid, its content kept
+Unwrap grid
 ```
 
 **A column's menu**, titled *Column n of m*:
@@ -106,7 +106,7 @@ two, so the last column has its handle as any other.
 
 - The menu's columns were seven items under each other (Columns: automatic, 2, 3, 4 columns, Borders, …): now one row of choices, **Columns: Auto | 2 … 8** (`LayoutMenuChoices`, a provider's row in shared/layout.ts, drawn as the popup's segmented row). "Automatic" (no attribute: a column per cell, four at most) is gone from the menu; a grid without `columns` still has a column per cell, now eight at most (`MAX_COLUMNS`, was four: a grid of 5 or more cells without `columns` shows more to a row than before, for the release notes), and its count shows as the one set. `columns="auto"` was one column of auto width before (a track `auto`), now as many as fit.
 - **Auto** (`columns="auto"`): as many equal columns in a row as fit, none narrower than `min` (`xs` 100, `s` 160, `m` 240 the default, `l` 360 px, or px 40 to 1200), CSS `repeat(auto-fit, minmax(min(<min>px, 100%), 1fr))`. No dividers (equal columns, none resized), its columns kept in a narrow pane (`data-swl-fit`). With Auto the menu has **Min width: XS S M L px…** (its own px the row's last choice, asked in SilverBullet's prompt, `GridHost.ask`, the init page's `prompt`). A count chosen takes `min` off.
-- Put into grid's Gallery offers Auto first (`GridColumns`, shared/markdown/gridbuild.ts); a Split asked for Auto is cut into two.
+- Wrap in new grid's Gallery offers Auto first (`GridColumns`, shared/markdown/gridbuild.ts); a Split asked for Auto is cut into two.
 - The default grid (`/grid`) stays two columns (two cells, no attribute).
 - A divider's double click (two columns made even) left the dividers where the old widths had them until the grid was drawn anew: the dividers are placed again as the grid's template changes (a MutationObserver on its style, told by its template and fit alone).
 - A grid drawn anew after one cell's write drew every cell again (its images flashed, the page under it jumped): the cells of unchanged markdown take the old drawing's rendering (`takeOverUnchanged`, exchanged, not moved: SilverBullet may draw a grid twice and show either).

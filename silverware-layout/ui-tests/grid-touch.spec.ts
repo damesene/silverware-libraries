@@ -1,6 +1,6 @@
 // A grid's cell edited on a phone (the "touch" project: Pixel 7), against SilverBullet: a tap in a cell, a tap back in
 // the page's text, the page's editor taking the typing again.
-import { cellField, expect, gridsDrawn, test } from "./helpers.ts";
+import { cellField, expect, gridsDrawn, runCommand, test } from "./helpers.ts";
 
 test("a tap in a cell edits it, a tap back in the page's text leaves it and writes it, the page's editor taking the typing where tapped", async ({ page, space }) => {
   const text = "# Page\n\n<grid>\n<cell>\n\nLeft text\n\n</cell>\n<cell>\n\nRight text\n\n</cell>\n</grid>\n\nAfter\n";
@@ -65,4 +65,25 @@ test("a grid's menu on a phone (by a column's Grid…) whole in the window, its 
   expect(outside).toEqual([]);
   await menu.locator(".swl-menu-segmented", { hasText: "Columns" }).locator(".swl-segment", { hasText: /^3$/ }).tap();
   await expect.poll(() => space.saved("Page")).toContain('<grid columns="3">');
+});
+
+test("Move into existing grid on a phone: a tap shows where (cells one under another: a line across), a second tap on it moves the text there", async ({ page, space }) => {
+  const text = "# Page\n\n<grid>\n<cell>\n\nLeft text\n\n</cell>\n<cell>\n\nRight text\n\n</cell>\n</grid>\n\nAfter\n";
+  await space.open({ Page: text }, "Page");
+  await gridsDrawn(page);
+  await page.evaluate(() => {
+    const view = (window as unknown as { client: { editorView: { state: { doc: { toString(): string } }; dispatch(spec: unknown): void } } }).client.editorView;
+    const at = view.state.doc.toString().indexOf("After");
+    view.dispatch({ selection: { anchor: at, head: at + 5 } });
+  });
+  void runCommand(page, "Silverware Layout: Move into existing grid");
+  await expect(page.locator(".swl-pick-bar")).toContainText("Tap again to confirm");
+  const second = (await page.locator("#sb-main .swl-grid-cell").nth(1).boundingBox())!;
+  await page.touchscreen.tap(second.x + second.width / 2, second.y + 4);
+  await expect(page.locator(".swl-pick-mark")).toHaveAttribute("data-swl-pick", "between-rows");
+  await expect(page.locator(".swl-pick-label")).toHaveText("New cell");
+  expect(await space.saved("Page")).toBe(text);
+  await page.touchscreen.tap(second.x + second.width / 2, second.y + 4);
+  await expect.poll(() => space.saved("Page")).toBe("# Page\n\n<grid>\n<cell>\n\nLeft text\n\n</cell>\n<cell>\n\nAfter\n\n</cell>\n<cell>\n\nRight text\n\n</cell>\n</grid>\n");
+  await expect(cellField(page)).toHaveCount(0);
 });

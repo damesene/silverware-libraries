@@ -50,7 +50,10 @@ function joined(text: string, blocks: readonly TextBlock[]): string {
       const tight = !/\n[ \t]*\r?\n/.test(text.slice(before.to, block.from));
       out += tight ? "\n" : "\n\n";
     }
-    out += text.slice(block.from, block.to).replace(/\r\n/g, "\n");
+    // (From its line's start where only spaces lie before it: an indented code block's first line keeps its indent)
+    const lineStart = text.lastIndexOf("\n", block.from - 1) + 1;
+    const start = /^[ \t]*$/.test(text.slice(lineStart, block.from)) ? lineStart : block.from;
+    out += text.slice(start, block.to).replace(/\r\n/g, "\n");
   });
   return out;
 }
@@ -133,3 +136,101 @@ export function ungridded(grid: Grid): string {
   });
   return out;
 }
+
+/** How blocks moved into a grid are put there: `together` all in one cell, `each` a cell each */
+export type MoveMode = "together" | "each";
+
+/**
+ * Where in a grid blocks moved go: new cells before its `at`-th cell (as many as it has: after the last), or into its
+ * `cell`-th cell at an offset of its content (a block's start, as the cell's rendering marks it; past its end: at its end)
+ */
+export type GridPlace = { readonly kind: "cells"; readonly at: number } | { readonly kind: "cell"; readonly cell: number; readonly at: number; readonly was?: string };
+
+// A grid's or a cell's own line, which moved into a cell would end it
+const GRID_LINE = /^<\/?(grid|cell)(\s[^>]*)?>\s*$/im;
+
+/**
+ * Blocks of the text moved into a grid of it, as one edit: taken out of where they are (their lines, the blank lines
+ * round them left as one), put into the grid by a mode at a place; why not, as text. The grid lies before or after them
+ * (none of them in a grid: `blocksIn`)
+ */
+export function movedIntoGrid(text: string, blocks: readonly TextBlock[], grid: Grid, mode: MoveMode, place: GridPlace): { readonly text: string } | { readonly problem: string } {
+  if (!blocks.length) return { problem: "no block to move there" };
+  const from = blocks[0]!.from;
+  const to = blocks.at(-1)!.to;
+  if (from < grid.to && to > grid.from) return { problem: "the text moved takes in the grid it goes into" };
+  const contents = mode === "each" ? blocks.map((block) => joined(text, [block])) : [joined(text, blocks)];
+  if (contents.some((content) => GRID_LINE.test(content))) return { problem: "the text moved has a grid's or a cell's line of its own" };
+  const nl = text.includes("\r\n") ? "\r\n" : "\n";
+  const into = intoGrid(text, grid, contents, place, nl);
+  if (!into) return { problem: "that cell changed since it was drawn" };
+  const out = outOfText(text, from, to, nl);
+  // (The later edit first: the earlier's place stays as it was read)
+  const [first, second] = into.from > out.from ? [into, out] : [out, into];
+  const once = text.slice(0, first.from) + first.insert + text.slice(first.to);
+  return { text: once.slice(0, second.from) + second.insert + once.slice(second.to) };
+}
+
+type Edit = { readonly from: number; readonly to: number; readonly insert: string };
+
+/** A cell's text whole, as the page writer writes one: a blank line before and after its content */
+const cellOf = (content: string, nl: string) => `<cell>${nl}${nl}${content.replace(/\n/g, nl)}${nl}${nl}</cell>`;
+
+/** The edit of a grid putting contents at a place: new cells, or one cell's content with them added */
+function intoGrid(text: string, grid: Grid, contents: readonly string[], place: GridPlace, nl: string): Edit | undefined {
+  const cells = grid.cells;
+  // A cell's text whole, its `</cell>` written where it was left open
+  const whole = (cell: Grid["cells"][number]) => (cell.closed ? text.slice(cell.from, cell.to) : `${text.slice(cell.from, cell.to).replace(/\s+$/, "")}${nl}</cell>`);
+  if (place.kind === "cells") {
+    const added = contents.map((content) => cellOf(content, nl)).join(nl);
+    const before = cells[Math.max(0, place.at)];
+    if (before) return { from: before.from, to: before.from, insert: added + nl };
+    const last = cells.at(-1);
+    if (!last) return { from: grid.bodyFrom, to: grid.bodyFrom, insert: added + nl };
+    // (After its `</cell>` line, its line break included; one left open closed first)
+    if (!last.closed) return { from: last.from, to: last.to, insert: whole(last) + nl + added };
+    const end = /^\r?\n/.exec(text.slice(last.to))?.[0].length ?? 0;
+    return end ? { from: last.to + end, to: last.to + end, insert: added + nl } : { from: last.to, to: last.to, insert: nl + added };
+  }
+  const cell = cells[place.cell];
+  const content = cell?.content.replace(/\r\n/g, "\n");
+  // (Its offset is of its content as it was drawn: another content now, the offset none of it)
+  if (!cell || content === undefined || (place.was !== undefined && place.was.replace(/\r\n/g, "\n").trim() !== content.trim())) return undefined;
+  const moved = contents.join("\n\n");
+  let next: string;
+  if (!content.trim()) next = moved;
+  else if (place.at <= 0) next = `${moved}\n\n${content.replace(/^(?:[ \t]*\n)+/, "")}`;
+  else if (place.at >= content.replace(/\s+$/, "").length) next = `${content.replace(/\s+$/, "")}\n\n${moved}`;
+  else next = `${content.slice(0, place.at).replace(/\s+$/, "")}\n\n${moved}\n\n${content.slice(place.at).replace(/^(?:[ \t]*\n)+/, "")}`;
+  // (Between its two lines, as `replaceCell` writes it: a blank line before and after; one left open closed)
+  return { from: cell.innerFrom, to: cell.innerTo, insert: nl + next.replace(/\n/g, nl) + nl + nl + (cell.closed ? "" : `</cell>${nl}`) };
+}
+
+/** What a line starts, as far as lines run on: a list's item, a line of text, or anything else (a heading, a fence, a quote, a tag's line, code, a table) */
+function lineKind(line: string): "item" | "text" | "other" {
+  if (/^[ \t]*([-*+]|\d+[.)])[ \t]/.test(line)) return "item";
+  if (!line.trim() || /^( {4}|\t)/.test(line) || /^[ \t]*(#{1,6}([ \t]|$)|```|~~~|>|<|\|)/.test(line)) return "other";
+  return "text";
+}
+
+/**
+ * The edit taking a run of blocks out of the text: their lines whole. What was round them runs on (a line break) only
+ * where it did and the lines on both sides and the first taken out are one kind, lines of text or a list's items (a
+ * paragraph's line or an item taken out of it); else a blank line between, as a heading or a grid needs one after a
+ * paragraph's line
+ */
+function outOfText(text: string, from: number, to: number, nl: string): Edit {
+  const lineStart = text.lastIndexOf("\n", from - 1) + 1;
+  const end = text.indexOf("\n", to);
+  const before = text.slice(0, lineStart);
+  const after = end < 0 ? "" : text.slice(end + 1);
+  // (The line before kept as it ends, its spaces too: two are a line break)
+  const kept = before.replace(/\r?\n(?:[ \t]*\r?\n)*$/, "");
+  const rest = after.replace(/^(?:[ \t]*\r?\n)+/, "");
+  const blank = /\n[ \t]*\r?\n$/.test(before) || /^[ \t]*\r?\n/.test(after);
+  const kind = lineKind(text.slice(lineStart, text.indexOf("\n", lineStart) < 0 ? text.length : text.indexOf("\n", lineStart)));
+  const runsOn = !blank && kind !== "other" && lineKind(kept.slice(kept.lastIndexOf("\n") + 1)) === kind && lineKind(rest.split("\n")[0]!) === kind;
+  const between = !kept ? "" : !rest ? (end < 0 ? "" : nl) : runsOn ? nl : nl + nl;
+  return { from: kept.length, to: text.length - rest.length, insert: between };
+}
+

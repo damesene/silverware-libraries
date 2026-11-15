@@ -112,7 +112,7 @@ if js and js.window then
     -- A grid's Alt+click: the cursor where the click was in its markdown; /grid: where the cursor is
     moveCursor = editor.moveCursor,
     getCursor = editor.getCursor,
-    -- Put into grid: the selection, and a pick (its mode, its number of columns)
+    -- Wrap in new grid: the selection, and a pick (its mode, its number of columns)
     getSelection = editor.getSelection,
     filterBox = function(label, options)
       return editor.filterBox(label, options, "", "Type to filter")
@@ -145,7 +145,7 @@ if js and js.window then
       end,
     })
   end
-  -- Put into grid as a button of Silverware Toolbar, its mode a parameter (through its public API, where it is installed)
+  -- Wrap in new grid and Move into existing grid as buttons of Silverware Toolbar, their mode a parameter (through its public API, where it is installed)
   if silverware.toolbar and silverware.toolbar.defineActions then
     silverware.toolbar.defineActions(silverwareLayoutJs.toolbarActions)
   end

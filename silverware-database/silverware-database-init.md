@@ -34,6 +34,9 @@ if js and js.window then
     editor = silverware.editor and silverware.editor.api,
     -- Silverware Layout, where it is installed: the places laid out at the width their blocks keep
     layout = silverware.layout and silverware.layout.api,
+    -- Silverware Assets, where it is installed: the files an item's content embeds drawn in the peek's field as the page
+    -- draws them (else images alone)
+    assets = silverware.assets and silverware.assets.api,
     getCurrentPage = editor.getCurrentPage,
     getText = editor.getText,
     replaceRange = editor.replaceRange,

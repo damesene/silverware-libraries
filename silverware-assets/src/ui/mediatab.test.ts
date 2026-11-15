@@ -25,20 +25,32 @@ describe("the assets' settings tabs", () => {
     const selects = [...files.panel.querySelectorAll<HTMLSelectElement>("select")];
     expect(selects.map((select) => select.getAttribute("aria-label"))).toEqual([
       "All files: shown as",
+      "All files: inserted as",
       "All files: a click",
       "All files: a Shift+click",
       "image: shown as",
+      "image: inserted as",
       "image: a click",
       "image: a Shift+click",
       "pdf: shown as",
+      "pdf: inserted as",
       "pdf: a click",
       "pdf: a Shift+click",
     ]);
-    expect(selects[3]!.selectedOptions[0]!.textContent).toBe("Like all files");
-    expect(selects[6]!.value).toBe("icon");
-    selects[3]!.value = "preview";
-    selects[6]!.value = "*";
-    selects[2]!.value = "";
+    const named = (label: string) => selects.find((select) => select.getAttribute("aria-label") === label)!;
+    expect(named("image: shown as").selectedOptions[0]!.textContent).toBe("Like all files");
+    expect(named("pdf: shown as").value).toBe("icon");
+    // (How a file is inserted: as shown by default, a link among the choices)
+    expect(named("All files: inserted as").selectedOptions[0]!.textContent).toBe("As shown");
+    expect([...named("All files: inserted as").options].map((option) => option.textContent)).toEqual(["As shown", "Link", "Card", "Preview", "Original"]);
+    named("image: shown as").value = "preview";
+    named("pdf: shown as").value = "*";
+    named("All files: a Shift+click").value = "";
+    named("image: inserted as").value = "link";
+    // The dialog turned off
+    const insertOn = [...files.panel.querySelectorAll<HTMLLabelElement>(".swa-settings-check")].find((label) => label.textContent?.includes("Paste, drop and upload"))!.querySelector("input")!;
+    expect(insertOn.checked).toBe(true);
+    insertOn.checked = false;
     // (A change in any tab is the first's to tell and to save: one write)
     expect(changed()).toEqual([true, false]);
     await files.save();
@@ -46,6 +58,7 @@ describe("the assets' settings tabs", () => {
     expect(saved).toMatchObject({
       views: { default: "embed", types: { image: "preview" } },
       actions: { default: { click: "open-tab", "shift+click": "" }, types: {} },
+      insert: { enabled: false, as: { default: "shown", types: { image: "link" } } },
     });
     // Appearance: a preview first; a card and a link by the switch, one shown at a time
     const look = (name: string) => preview.panel.querySelector<HTMLElement>(`[data-swa-look="${name}"]`)!;
@@ -69,7 +82,7 @@ describe("the assets' settings tabs", () => {
     await files.save();
     expect((saved as { linkIcons: unknown }).linkIcons).toBe(false);
     // Previews kept in the space: on by default, turned off on the Files tab
-    const keep = files.panel.querySelector<HTMLInputElement>(".swa-settings-section .swa-settings-check input")!;
+    const keep = [...files.panel.querySelectorAll<HTMLLabelElement>(".swa-settings-section .swa-settings-check")].find((label) => label.textContent?.includes("Keep previews"))!.querySelector("input")!;
     expect(keep.checked).toBe(true);
     keep.checked = false;
     await files.save();

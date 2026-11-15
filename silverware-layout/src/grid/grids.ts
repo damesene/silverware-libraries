@@ -25,6 +25,8 @@ import { takeOver } from "./takeover.ts";
 import { offsetOf } from "./ui/offsets.ts";
 import { blankLineAt, type Caret, type CellPoint, endAt, offsetInCell, selectionInCell } from "./ui/cellpoint.ts";
 import { GridDrag } from "./drag.ts";
+import type { GridPlace, MoveMode } from "../../../shared/markdown/gridbuild.ts";
+import { type Picked, type Picking, pickPlace } from "./ui/placepicker.ts";
 
 /** A cell to write: the grid by its body as read and its place among those alike, the cell, its new markdown */
 export type CellWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly cell: number; readonly content: string };
@@ -46,6 +48,18 @@ export type CellsChange =
   | { readonly kind: "remove"; readonly cell: number }
   | { readonly kind: "ungrid" };
 export type CellsWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly cells: CellsChange };
+
+/** The blocks of a range of the page moved into a grid (found as a cell's is) at a place, by a mode, as one edit */
+export type IntoGridWrite = {
+  readonly from: number;
+  readonly to: number;
+  readonly was: string;
+  readonly body: string;
+  readonly occurrence: number;
+  readonly of: number;
+  readonly mode: MoveMode;
+  readonly place: GridPlace;
+};
 
 /** What the grids ask of the host whose page they are in */
 export type GridHost = {
@@ -86,6 +100,8 @@ export type GridHost = {
   pageSelection?(): Promise<{ readonly from: number; readonly to: number } | undefined>;
   /** Text moved as one edit (none: a drop copies, the cells written apart); why not, as text */
   writeMove?(move: MoveWrite): Promise<string | undefined>;
+  /** The page's blocks moved into a grid as one edit (none: Move into existing grid is not offered); why not, as text */
+  moveIntoGrid?(write: IntoGridWrite): Promise<string | undefined>;
   /** What draws an embed in a cell's field (shared/editor.ts `EditorOptions.embed`), as the page draws it; none: its markdown */
   embeds?(): Promise<(markdown: string) => EditorEmbed | undefined>;
 };
@@ -125,25 +141,6 @@ function markPlaces(element: HTMLElement, grid: Grid): boolean {
   return changed;
 }
 
-/** `then` once an element is in the page: watched for a while, as a host puts what a renderer gives into the page a while later */
-function whenConnected(element: HTMLElement, then: () => void, within = 30_000): void {
-  if (element.isConnected) return then();
-  const doc = element.ownerDocument;
-  const win = doc.defaultView;
-  if (!win || !doc.body) return;
-  const observer = new win.MutationObserver(() => {
-    if (!element.isConnected) return;
-    stop();
-    then();
-  });
-  const timer = win.setTimeout(() => stop(), within);
-  const stop = () => {
-    observer.disconnect();
-    win.clearTimeout(timer);
-  };
-  observer.observe(doc.body, { childList: true, subtree: true });
-}
-
 /** Whether two sets of attributes are the same */
 function sameAttributes(a: Attributes | undefined, b: Attributes): boolean {
   if (!a) return false;
@@ -173,6 +170,8 @@ export class Grids {
   private lookSample: Promise<string | undefined> | undefined;
   // What is drawn changed since last told (a grid drawn or placed anew), and who is told
   private changedSinceTold = false;
+  // The watch of grids put into the page (`watchMounted`)
+  private mounted: MutationObserver | undefined;
   private readonly listeners = new Set<(items: readonly RenderedItem[]) => void>();
   /** What the grids drew in their cells and where it is in the page, for another to decorate (shared/rendered.ts; what draws embeds in their fields is the API's, src/index.ts) */
   readonly rendered: Rendered = {
@@ -350,8 +349,34 @@ export class Grids {
     this.host.settle?.(element);
     // In the page, its order among the grids of its body is known: its own attributes then (and what it drew told)
     this.refreshSoon();
-    whenConnected(element, () => this.refreshSoon());
+    // (In the page: what it drew told then, as it is now there to tell. Told before it was put in (the host puts it in
+    // when it is scrolled to, any time after drawing it), its files were left out of what was told: `watchMounted`)
+    this.watchMounted();
     return element;
+  }
+
+  /**
+   * What the grids drew told again as one of them is put into the page: SilverBullet draws a grid as it builds its
+   * decorations, for the whole page, and puts it in only as it is scrolled to, any time later (and again as it is
+   * scrolled back after the editor took it out). One watch of the document for all of them, for as long as it is open
+   */
+  private watchMounted(): void {
+    if (this.mounted) return;
+    const win = this.doc.defaultView;
+    if (!win || !this.doc.body) return;
+    const isGrid = (node: Node): boolean => node instanceof win.HTMLElement && node.classList.contains("swl-grid") && this.bodies.has(node);
+    this.mounted = new win.MutationObserver((records) => {
+      for (const record of records)
+        for (const node of record.addedNodes) {
+          if (!(node instanceof win.HTMLElement)) continue;
+          if (isGrid(node) || [...node.querySelectorAll(".swl-grid")].some(isGrid)) {
+            this.changedSinceTold = true;
+            this.refreshSoon();
+            return;
+          }
+        }
+    });
+    this.mounted.observe(this.doc.body, { childList: true, subtree: true });
   }
 
   /**
@@ -468,6 +493,8 @@ export class Grids {
   pageShown(page: string): void {
     if (page === this.pageNow) return;
     this.pageNow = page;
+    // (A place being picked in the page before: given up)
+    this.picking?.cancel();
     this.drawnAt.clear();
     // (Rendered again: another page may render otherwise)
     this.lookSample = undefined;
@@ -592,6 +619,44 @@ export class Grids {
                 ? { kind: "add" }
                 : { kind: "ungrid" };
     said(await this.host.changeCells({ body: found.grid.body, occurrence: found.occurrence, of: found.of, cells }).catch((error: unknown) => (error instanceof Error ? error.message : String(error))));
+  }
+
+  // A place in a grid being picked (Move into existing grid)
+  private picking: Picking | undefined;
+
+  /** Where in which grid drawn text moved goes, as the user picks it (ui/placepicker.ts); none where they give up. One at a time: one asked again gives the one before up */
+  pickPlace(into: boolean, cells: number, what: string): Promise<Picked | undefined> {
+    this.picking?.cancel();
+    const picking = pickPlace(this.doc, { grids: () => this.drawn(), into, cells, what });
+    this.picking = picking;
+    return picking.picked.finally(() => {
+      if (this.picking === picking) this.picking = undefined;
+    });
+  }
+
+  /**
+   * The page's blocks (a range as read) moved into a grid drawn at a place picked, in turn with the cells' writes (the
+   * grid found as the page's text has it then), the page's grid drawn anew waited for; a problem said
+   */
+  moveInto(source: { readonly from: number; readonly to: number; readonly was: string }, mode: MoveMode, picked: Picked): void {
+    const write = this.host.moveIntoGrid;
+    if (!write) return;
+    const place: CellPlace = { grid: picked.grid, nth: this.drawn().indexOf(picked.grid), index: 0 };
+    this.inTurn(
+      [place],
+      async () => {
+        const text = await this.host.pageText();
+        const found = place.grid.isConnected ? this.found(text, place.grid) : undefined;
+        if (!found) return "this grid changed in the page since it was drawn";
+        // (Into a cell: its content as drawn with it, its offset that content's; another by then, nothing written)
+        const drawnCell = picked.place.kind === "cell" ? readGridBody(this.bodies.get(picked.grid) ?? "")[picked.place.cell]?.content : undefined;
+        const where = picked.place.kind === "cell" && drawnCell !== undefined ? { ...picked.place, was: drawnCell } : picked.place;
+        const problem = await write({ ...source, body: found.grid.body, occurrence: found.occurrence, of: found.of, mode, place: where });
+        if (!problem) await this.redrawn(place.grid, place.nth);
+        return problem;
+      },
+      (problem) => this.host.problem(`Silverware Layout: the text was not moved into the grid: ${problem}`),
+    );
   }
 
   /** `refresh` a moment later, once (several asked at once: one) */
@@ -802,6 +867,9 @@ export class Grids {
     if (!event.altKey || event.button !== 0) return;
     const at = this.gridOf(event.target);
     if (!at) return;
+    // (In the field of the cell edited: the field's own, a file drawn there shows its markdown in it)
+    const field = this.editing?.session.editor?.element;
+    if (field && event.target instanceof Node && (field === event.target || field.contains(event.target))) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     const caret = caretWord(this.doc, event.clientX, event.clientY);

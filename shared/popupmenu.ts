@@ -3,8 +3,11 @@
 // the plugin's base (`<base>-menu-item`…), in a box of the plugin's own (`<base>-popup <base>-menu`: its style page
 // places and draws it). What opens it takes the press as its own: what it is in (a link SilverBullet follows as a touch
 // on it ends, an editor moving its cursor) does not get it.
+import { COMPANION_ATTRIBUTE } from "./editor.ts";
 import { el } from "./elements.ts";
+import { layerVariable } from "./layers.ts";
 import { focusMenu, type MenuEntry, menuItem, menuSegmented, menuSeparator, onMenuClose, renderMenu } from "./menu.ts";
+import { overWindowOf } from "./overwindow.ts";
 
 // The room a menu keeps from the window's edges where it is held in it (px)
 const POPUP_MARGIN = 8;
@@ -33,10 +36,15 @@ export type PopupMenu = { readonly title: string; readonly sections: readonly (r
 export function showPopup(doc: Document, look: PopupLook, at: HTMLElement, shown: PopupMenu, closed?: () => void): () => void {
   const LOOK = { base: look.base };
   let holder: HTMLElement | undefined;
+  // Opened from a field's shadow root (an editor's): the focus given back there as it closes, so the field is not left
+  // for nothing (a grid's cell written and closed under what was chosen)
+  const inField = at.getRootNode() instanceof (doc.defaultView?.ShadowRoot ?? ShadowRoot);
+  const focusedBefore = inField ? deepFocus(doc) : undefined;
   const close = () => {
     if (!holder) return;
     holder.remove();
     holder = undefined;
+    if (focusedBefore?.isConnected) focusedBefore.focus({ preventScroll: true });
     doc.removeEventListener("pointerdown", outside, true);
     doc.removeEventListener("keydown", escape, true);
     closed?.();
@@ -66,6 +74,12 @@ export function showPopup(doc: Document, look: PopupLook, at: HTMLElement, shown
   onMenuClose(rendered, LOOK, close);
   // (The box is the plugin's own, `.swl-menu`: the shared look's rules are of the menu in it)
   holder = el(doc, "div", { class: `${look.base}-popup ${look.base}-menu` }, rendered);
+  // Opened from an element in a field's shadow root (a file drawn in another plugin's editor): it acts on that editor, so
+  // the focus coming to it is not the field left (shared/editor.ts' companions); opened from what shows over the window
+  // (a database's peek), over it, as its own panels are
+  if (inField) holder.setAttribute(COMPANION_ATTRIBUTE, "");
+  if (overWindowOf(inField ? (at.getRootNode() as ShadowRoot).host : at))
+    holder.style.zIndex = `calc(var(${layerVariable("sheetPanel")}) + 1)`;
   const box = at.getBoundingClientRect();
   holder.style.top = `${box.bottom + 4}px`;
   // (Its right edge by what opened it, all of it in the window: as wide as it is drawn, a phone's narrow window too)
@@ -132,4 +146,11 @@ export function opensMenu(doc: Document, look: PopupLook, trigger: HTMLElement, 
   trigger.addEventListener("touchmove", () => void (moved = true), { signal, passive: true });
   trigger.addEventListener("touchend", (event) => void (moved || pressed(event)), { signal });
   signal?.addEventListener("abort", () => close?.());
+}
+
+/** The element with the focus, within shadow roots too (an editor's text in its own root) */
+function deepFocus(doc: Document): HTMLElement | undefined {
+  let active: Element | null = doc.activeElement;
+  while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+  return active instanceof (doc.defaultView?.HTMLElement ?? HTMLElement) ? active : undefined;
 }

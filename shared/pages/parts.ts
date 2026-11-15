@@ -9,7 +9,7 @@
 import { validateAttributeName, writeAttributes } from "../markdown/attributes.ts";
 import { embedAsLink, type EmbedChanges, linkAsEmbed, linkAsText, readEmbeds, readLinks, writeEmbed } from "../markdown/embed.ts";
 import { readGrids } from "../markdown/grid.ts";
-import { blocksIn, type GridColumns, type GridMode, gridOfBlocks, ungridded } from "../markdown/gridbuild.ts";
+import { blocksIn, type GridColumns, type GridMode, gridOfBlocks, type GridPlace, type MoveMode, movedIntoGrid, ungridded } from "../markdown/gridbuild.ts";
 import { codeBlocksOf, sameBody } from "./blocks.ts";
 import type { PageBuilder } from "./changes.ts";
 import { type FrontmatterValue, readFrontmatter, readKey, validateFrontmatterKey, writeKey } from "./frontmatter.ts";
@@ -66,6 +66,18 @@ export type PageChange =
   | { readonly kind: "setGridAttributes"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly attributes: Readonly<Record<string, string | null>> }
   | { readonly kind: "changeGridCells"; readonly body: string; readonly occurrence: number; readonly of?: number; readonly cells: GridCellsChange }
   | { readonly kind: "putIntoGrid"; readonly from: number; readonly to: number; readonly was: string; readonly mode: GridMode; readonly columns: GridColumns }
+  // The blocks of a range moved into a grid (found as a cell's grid is) at a place, by a mode
+  | {
+      readonly kind: "moveIntoGrid";
+      readonly from: number;
+      readonly to: number;
+      readonly was: string;
+      readonly body: string;
+      readonly occurrence: number;
+      readonly of?: number;
+      readonly mode: MoveMode;
+      readonly place: GridPlace;
+    }
   // An embed (shared/markdown/embed.ts) given an alt text, a size or metadata: the embed of that text (the
   // `occurrence`-th of those alike), written in its own style
   | { readonly kind: "setEmbed"; readonly text: string; readonly occurrence: number; readonly of?: number; readonly changes: EmbedChanges }
@@ -143,6 +155,13 @@ export interface PageSections {
      * one changed since is left alone
      */
     put(from: number, to: number, was: string, mode: GridMode, columns: GridColumns): PageBuilder;
+    /**
+     * The blocks of a range moved into a grid (found as `replaceCell` finds it), one edit (shared/markdown/gridbuild.ts
+     * `movedIntoGrid`): `together` in one cell, `each` a cell each, at a place (new cells before a cell, or into a cell at
+     * an offset of its content); taken out of where they were. The range as the plugin read it (`was`): one changed since,
+     * or the grid, is left alone
+     */
+    moveInto(from: number, to: number, was: string, body: string, mode: MoveMode, place: GridPlace, where?: { readonly occurrence?: number; readonly of?: number }): PageBuilder;
   };
   readonly embeds: {
     /**
@@ -423,7 +442,7 @@ export const PARTS: readonly Part[] = [
     },
   }),
   part({
-    kinds: ["replaceGridCell", "replaceGridCells", "setGridAttributes", "changeGridCells", "putIntoGrid"],
+    kinds: ["replaceGridCell", "replaceGridCells", "setGridAttributes", "changeGridCells", "putIntoGrid", "moveIntoGrid"],
     section: {
       name: "grids",
       make: (add) => ({
@@ -433,6 +452,8 @@ export const PARTS: readonly Part[] = [
           add({ kind: "setGridAttributes", body, attributes: { ...attributes }, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
         changeCells: (body, cells, where = {}) => add({ kind: "changeGridCells", body, cells: { ...cells }, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
         put: (from, to, was, mode, columns) => add({ kind: "putIntoGrid", from, to, was, mode, columns }),
+        moveInto: (from, to, was, body, mode, place, where = {}) =>
+          add({ kind: "moveIntoGrid", from, to, was, body, mode, place: { ...place }, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
         replaceCells: (body, contents, where = {}) =>
           add({ kind: "replaceGridCells", body, contents: { ...contents }, occurrence: where.occurrence ?? 0, ...(where.of === undefined ? {} : { of: where.of }) }),
       }),
@@ -444,10 +465,18 @@ export const PARTS: readonly Part[] = [
         if (!edit) return { text, changes: 0, problem: "no block to put into a grid there" };
         return { text: text.slice(0, edit.from) + edit.insert + text.slice(edit.to), changes: 1 };
       }
-      const alike = readGrids(text).filter((grid) => sameBody(grid.body) === sameBody(change.body));
+      const grids = readGrids(text);
+      const alike = grids.filter((grid) => sameBody(grid.body) === sameBody(change.body));
       const grid = alike[change.occurrence];
       const changed = { text, changes: 0, problem: "its grid changed since it was read: left alone" };
       if (!grid || (change.of !== undefined && alike.length !== change.of)) return changed;
+      if (change.kind === "moveIntoGrid") {
+        if (text.slice(change.from, change.to) !== change.was) return { text, changes: 0, problem: "the text changed since it was read: left alone" };
+        // (Its lines taken out whole: a grid among them would go with them)
+        if (grids.some((one) => one.from < change.to && one.to > change.from)) return { text, changes: 0, problem: "the text moved takes in a grid" };
+        const moved = movedIntoGrid(text, blocksIn(text, change.from, change.to, grids), grid, change.mode, change.place);
+        return "problem" in moved ? { text, changes: 0, problem: moved.problem } : { text: moved.text, changes: 1 };
+      }
       if (change.kind === "changeGridCells") {
         const how = change.cells;
         if (how.kind === "ungrid") return { text: text.slice(0, grid.from) + ungridded(grid) + text.slice(grid.to), changes: 1 };

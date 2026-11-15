@@ -5,6 +5,7 @@
 // grids draw outside the editor (shared/rendered.ts).
 import { saveConfigPage, withConfigSettings } from "../../shared/configpage.ts";
 import { layoutOf } from "../../shared/layout.ts";
+import type { Assets } from "../../shared/assets.ts";
 import { applyLayers } from "../../shared/layers.ts";
 import { pageWriter } from "../../shared/pages/writer.ts";
 import { renderedOf } from "../../shared/rendered.ts";
@@ -21,6 +22,12 @@ import { SILVERBULLET_SYNTAX_PAGE, SYNTAX_OPTION } from "./host/silverbullet/syn
 import { assetProvider } from "./provider.ts";
 import { mediaTabs } from "./ui/mediatab.ts";
 import { markdownTab, SettingsWindow } from "./ui/settingswindow.ts";
+import { Dialogs } from "../../shared/dialog.ts";
+import { type EditingSurface, editorsOf } from "../../shared/editor.ts";
+import { folderOf } from "./core/insert.ts";
+import { insertChosen, type InsertTarget, uploadBy, watchInserts } from "./host/silverbullet/insert.ts";
+import { type InsertChoice, type InsertFile, openInsertDialog } from "./ui/insertdialog.ts";
+import { showUploadProgress } from "./ui/uploadprogress.ts";
 
 const SETTINGS = "Silverware Assets: Settings";
 const CLEAN_UP = "Silverware Assets: Clean up previews";
@@ -52,7 +59,11 @@ registry.onChange(() => {
 });
 
 /** Silverware Assets' API, as its API page hands it to other plugins (`silverware.assets.api`): types of file and actions (shared/assets.ts) */
-export const api = registry.api();
+export const api: Assets = {
+  ...registry.api(),
+  // (An embed drawn in another plugin's field as the page draws it: a database's peek; none until the files are decorated)
+  drawEmbed: (markdown, page) => decorator?.editorEmbed(markdown, page),
+};
 
 // The files decorated, one per window (its observers live as long), its host the bridge handed over last
 let decorator: AssetDecorator | undefined;
@@ -64,6 +75,105 @@ async function readSyntaxSettings(bridge: Bridge): Promise<SyntaxModeSettings> {
   if (!bridge.getConfig) return { hideAssets: true };
   const hides = await bridge.getConfig(SYNTAX_PATHS.hides, true);
   return readSyntaxModeSettings((path) => (path === SYNTAX_PATHS.hides ? hides : undefined));
+}
+
+// What files inserted decide in the event (host/silverbullet/insert.ts): the settings and the page as last read (each
+// time the files are decorated, as a page opens, as the settings are saved)
+let lastSettings: AssetSettings | undefined;
+let lastPage: string | undefined;
+// Files pasted, dropped and uploaded taken, one watch per window
+let inserting: AbortController | undefined;
+let insertDialogs: Dialogs | undefined;
+// The largest file SilverBullet's space takes by default (MiB: its `maximumDocumentSize`, `plug-api/constants.ts`)
+const MAX_DOCUMENT_MIB = 10;
+/** The files chosen written and put in, their upload told meanwhile in a panel at the window's bottom right */
+function uploadChosen(bridge: Bridge, drawing: AssetDecorator, settings: AssetSettings, target: InsertTarget, chosen: readonly InsertChoice[]): void {
+  // (Those of the web linked are not uploaded: no row of theirs, no panel where all are)
+  const uploaded = chosen.flatMap((one, index) => (one.url ? [] : [index]));
+  const progress = uploaded.length
+    ? showUploadProgress(
+        document,
+        uploaded.map((index) => {
+          const one = chosen[index]!;
+          return { name: one.path.slice(one.path.lastIndexOf("/") + 1), icon: drawing.insertTypeOf(one.file, one.path, settings).icon };
+        }),
+      )
+    : undefined;
+  void insertChosen(bridge, target, chosen, (index, state) => progress?.state(uploaded.indexOf(index), state))
+    .then(() => progress?.finish())
+    .catch((error: unknown) => {
+      progress?.finish();
+      void bridge.flash(`Silverware Assets: not inserted: ${error instanceof Error ? error.message : String(error)}`, "error");
+    });
+}
+
+/** The insert dialog opened for these files (none: an upload, picked in it), the files chosen written and put in */
+async function openInsert(files: readonly InsertFile[], target: InsertTarget): Promise<void> {
+  const bridge = current;
+  const drawing = decorator;
+  if (!bridge || !drawing) return;
+  const settings = heldOr(readAssetSettings(bridge.getConfig ? await bridge.getConfig(ASSETS_PATH, undefined) : undefined).settings);
+  const mib = Number(bridge.getConfig ? await bridge.getConfig("maximumDocumentSize", MAX_DOCUMENT_MIB) : MAX_DOCUMENT_MIB) || MAX_DOCUMENT_MIB;
+  const page = target.kind === "page" ? target.page : (lastPage ?? "");
+  insertDialogs ??= new Dialogs(document, { base: "swa-dialog", closeIcon: '<svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg>' });
+  openInsertDialog(
+    document,
+    insertDialogs,
+    files,
+    {
+      folder: folderOf(page),
+      maxBytes: mib * 1024 * 1024,
+      now: () => new Date(),
+      existing: async () => new Set(bridge.listFiles ? pageNamesOf(await bridge.listFiles()).map((path) => path.toLowerCase()) : []),
+      typeOf: (file, path) => drawing.insertTypeOf(file, path, settings),
+      drawSample: (container, file, path, view, signal) => drawing.drawSample(container, file, path, view, signal),
+      touch: !!window.matchMedia?.("(pointer: coarse)").matches,
+      companion: target.kind === "surface",
+    },
+    (chosen) => {
+      // (A field of another plugin's given its focus back at once, as the dialog closes: else it is taken for left, a
+      // grid's cell written and closed before the files are put in)
+      if (target.kind === "surface") target.surface.focus();
+      if (chosen?.length) uploadChosen(bridge, drawing, settings, target, chosen);
+    },
+  );
+}
+
+/**
+ * *File: Upload*, as the init page replaces it: Silverware Assets' (the insert dialog opened empty, its files picked
+ * in it), SilverBullet's own where it is turned off (its plug's function), nothing on a page read-only (SilverBullet
+ * lists no upload there; a command of Space Lua it lists still)
+ */
+export async function upload(): Promise<void> {
+  const by = uploadBy(document, lastSettings?.insert.enabled ?? true);
+  if (by === "silverbullet") return void (await current?.invokeFunction?.("editor.uploadFileCommand", {}));
+  if (by === "assets" && lastPage !== undefined) await openInsert([], { kind: "page", page: lastPage });
+}
+
+/**
+ * Silverware Toolbar's actions (its public API's definitions, handed over by the init page): Upload file, into the field
+ * it is run in (a grid's cell, a database's peek: the toolbar says which), else the page
+ */
+export function toolbarActions(): unknown[] {
+  return [
+    {
+      name: "assetsUploadFile",
+      label: "Upload file",
+      icon: "lucide:paperclip",
+      group: "Files",
+      keywords: ["upload", "file", "image", "photo", "camera", "attach", "insert"],
+      perform: async (_context: unknown, editor: { readonly field?: EditingSurface } | undefined) => {
+        const field = editor?.field;
+        if (field) return void (await openInsert([], { kind: "surface", surface: field }));
+        await upload();
+      },
+    },
+  ];
+}
+
+/** The page opened, handed over by the init page as it loads (`editor:pageLoaded`): where files inserted go */
+export function pageLoaded(page: unknown): void {
+  if (typeof page === "string" && page) lastPage = page;
 }
 
 /** Started by the init page (again as Space Lua loads again): SilverBullet's API handed over, Silverware Layout's where it is installed */
@@ -80,7 +190,12 @@ export function init(bridge: Bridge): void {
   const rendered = renderedOf((bridge.layout as { readonly rendered?: unknown } | undefined)?.rendered);
   const writer = pageWriter(silverBulletPlatform(bridge));
   const raw = silverBulletAssetHost(bridge, writer, document, rendered);
-  const host: AssetHost = { ...raw, settings: async () => heldOr(readAssetSettings(await raw.settings()).settings) };
+  const host: AssetHost = {
+    ...raw,
+    settings: async () => (lastSettings = heldOr(readAssetSettings(await raw.settings()).settings)),
+    pageName: async () => (lastPage = await raw.pageName()),
+    // (Read whenever the settings are: what files inserted decide in the event by)
+  };
   const fresh = !decorator;
   if (decorator) decorator.useHost(host);
   else decorator = new AssetDecorator(document, host, registry);
@@ -92,6 +207,22 @@ export function init(bridge: Bridge): void {
   // Files drawn in the fields of Silverware Layout's grids as in the page (shared/rendered.ts `drawEmbeds`)
   const drawing = decorator;
   rendered.drawEmbeds?.((markdown, page) => drawing.editorEmbed(markdown, page));
+  // Files pasted, dropped and uploaded: Silverware Assets' dialog (docs/silverware-assets-insert.md), as the settings say
+  if (!inserting) {
+    inserting = new AbortController();
+    void Promise.resolve(bridge.getCurrentPage()).then((page) => (lastPage = String(page))).catch(() => undefined);
+    void host.settings().catch(() => undefined);
+    watchInserts(
+      document,
+      {
+        enabled: () => lastSettings?.insert.enabled ?? true,
+        surfaceOf: (node) => editorsOf(current?.editor).surfaceOf(node),
+        page: () => lastPage,
+        open: (files, target) => void openInsert(files, target).catch((error: unknown) => problem(`Silverware Assets: ${error instanceof Error ? error.message : String(error)}`)),
+      },
+      inserting.signal,
+    );
+  }
   // The markdown shown as written (SilverBullet's mode): the files hidden then, as the
   // settings say (read as the mode is asked, again as the settings window saves them)
   syntaxWatcher ??= watchSyntaxMode<SyntaxModeSettings>(document, {
@@ -236,6 +367,8 @@ async function openSettings(): Promise<void> {
         const write = async () => {
           await save(storedAssetPaths(saved), OWN_MARKER);
           held = { settings: saved, until: Date.now() + SAVED_HELD_MS };
+          // (Files inserted decide by them at once: a page with no file asks the settings of no one)
+          lastSettings = saved;
         };
         if (saved.previewFolder === settings.previewFolder) await write();
         else {

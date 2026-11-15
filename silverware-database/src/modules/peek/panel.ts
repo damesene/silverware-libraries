@@ -13,7 +13,7 @@
 // takes it away) until it is written or the user agrees to load the body as it
 // is now. A change made elsewhere draws the panel anew once nothing in it is
 // being edited.
-import type { TextEditor } from "../../../../shared/editor.ts";
+import { COMPANION_ATTRIBUTE, type TextEditor } from "../../../../shared/editor.ts";
 import { el, openedHere } from "../../../../shared/elements.ts";
 import { markOverWindow } from "../../../../shared/overwindow.ts";
 import type { Result } from "../../core/core.ts";
@@ -39,8 +39,9 @@ const CLICK_WAIT_MS = 400;
 const DRAG_MOVE = 6;
 // An editor's area narrower than this (a phone, a narrow window): the panel takes all of it, as a page of its own
 const NARROW = 720;
-// What a press there is not beside the panel: a dialog over the page (a question asked), a notification
-const NOT_BESIDE = 'dialog, [role="dialog"], [role="alertdialog"], .sb-modal-box, .sb-notifications, .sb-notification, .swd-settings-backdrop';
+// What a press there is not beside the panel: a dialog over the page (a question asked), a notification, what acts on the
+// field being edited (another plugin's companion of an editor: Silverware Toolbar's bar, popup and panel, shared/editor.ts)
+const NOT_BESIDE = `dialog, [role="dialog"], [role="alertdialog"], .sb-modal-box, .sb-notifications, .sb-notification, .swd-settings-backdrop, [${COMPANION_ATTRIBUTE}]`;
 // A grip: six dots, what a property's row is dragged by
 const GRIP = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><circle cx="6" cy="4" r="1.1"/><circle cx="10" cy="4" r="1.1"/><circle cx="6" cy="8" r="1.1"/><circle cx="10" cy="8" r="1.1"/><circle cx="6" cy="12" r="1.1"/><circle cx="10" cy="12" r="1.1"/></svg>';
 
@@ -578,7 +579,18 @@ export class PeekPanel {
           }
         });
       };
-      const body = this.host.editors.create(doc, { text: "", className: "swd-peek-body", label: `Content of ${item.name}`, placeholder: "Reading…", readOnly: true, passKeys: true, onBlur: left });
+      // (Its embeds drawn as the page draws them, by the item shown then: a field kept takes the next item's)
+      const drawEmbed = this.host.drawEmbed?.bind(this.host);
+      const body = this.host.editors.create(doc, {
+        text: "",
+        className: "swd-peek-body",
+        label: `Content of ${item.name}`,
+        placeholder: "Reading…",
+        readOnly: true,
+        passKeys: true,
+        onBlur: left,
+        ...(drawEmbed ? { embed: (markdown: string) => drawEmbed(markdown, shown.item) } : {}),
+      });
       body.element.dataset.reading = "";
       shown.field = { body, note: el(doc, "div", "swd-peek-note") };
     }

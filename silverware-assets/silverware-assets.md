@@ -21,12 +21,13 @@ Images, videos, audio, PDFs and other files you embed (`![[photo.png]]`, `![Phot
 - **Preview**: smaller (a PDF in a small viewer; with Silverware Assets PDF installed, its first page as an image).
 - **Card**: a small card with the file's icon and name, the file itself not shown. A file SilverBullet cannot show (a zip, a document) is a card instead of an error.
 
-Point at a file, and a **…** button shows at its top right. On a card, its icon is that button (as a link's icon); with the icon hidden, a small arrow after the card's name. Its menu, the same for every file:
+Point at a file, and a **…** button shows at its top right (also in a grid's column being edited and in a database's peek, where what you choose changes the text there; Alt+click shows its markdown). On a card, its icon is that button (as a link's icon); with the icon hidden, a small arrow after the card's name. Its menu, the same for every file:
 
 - **Show as**, at the top: a row of four, how the file is in the page: a **link**, a **card**, a **preview** or the **original**, the one shown lit, the one your settings give marked *(default)*. One a file cannot be shown as is greyed out (a zip has no preview).
 - **Open in a new tab**, **Open in side panel** (a panel at the window's right, the page still beside it), **Open enlarged** (over the page). Esc or × closes them, and a click beside the enlarged file.
 - What is done with the file: **Copy image** (an image), **Copy markdown**, **Download**, **Regenerate preview** (a preview kept in the space).
-- **Delete file…**, last.
+- **Remove from page** (an embedded file, an image of the web too): takes the embed out of the page, the file left as it is; undo puts it back.
+- **Delete file…**, last (a file of your space).
 
 A click on a card or a preview opens the file in a new tab; Shift+click does the same, unless you set otherwise: either can instead open it in the side panel, enlarged, or download it.
 
@@ -44,6 +45,20 @@ A click on a card or a preview opens the file in a new tab; Shift+click does the
 
 **Delete file…**, last in a file's menu and a link's, deletes the file itself from your space, not only the embed or the link: SilverBullet asks first, and there is no undo. The embed is then taken out of the page, and a link becomes its text (`[[report.pdf|the report]]` becomes `the report`); its preview kept in the space goes with it. Other pages that embed or link the file show it missing.
 
+## Inserting files
+
+**Paste a file** (Ctrl+V: a screenshot, an image copied from a web page, a file copied), **drop files** on the page, or **upload** (**File: Upload**, the toolbar's paperclip, `/upload`; with Silverware Toolbar, its action **Upload file**, which also puts the files into a grid's column being edited or a database's peek where you run it there), and a dialog asks how to put them in, a row per file:
+
+- **Its name** in your space, in the page's folder. A file pasted without a name of its own (a screenshot, a photo of the camera) is named by the date and time (`2026-11-15_13-09-48.png`), as SilverBullet names it. A name SilverBullet would not take is offered changed (**Use …**). A file of the same name already in your space is kept, the new one named `-1` after it, unless you choose **Replace it**; two files of one name in the same batch are named apart.
+- **Inserted as**: a **link**, a **card**, a **preview** or the **original**, and under it the file as it will be in the page (at most 320 px high here). It starts as the settings say (below). A large document (DOCX, XLSX) is shown here only on **Show here**, as reading it takes a while.
+- **Kept**, for an image copied from a web page or dragged from one: **Linked from the web** (the default: nothing uploaded, its address written in its place, `![](https://…)`) or **In the space** (uploaded, as any file). A linked image shows only while its site keeps it there, and not offline; some sites do not let other pages show their images. One too large for your space can only be linked.
+- With several files, **All files** above them sets every file at once, one you set yourself too; it shows a choice only while all the files have the same.
+- On a phone the dialog covers the screen; to upload, pick **Files…** or take a photo with **Camera…**.
+
+**Insert** writes the files and puts them where you pasted (a selection is replaced) or dropped them (dropped on an embedded file or a grid: on a line of their own beside it; in a grid's column being edited: at its cursor); **Cancel** writes nothing. While the files upload, a panel at the bottom right shows each with whether it is waiting, uploading, uploaded or failed, and how many are done; they go where the cursor was when you pressed **Insert**, even if you go on writing elsewhere meanwhile. A link is written as SilverBullet's `defaultLinkStyle` says. Several files go one under another, or a space apart in a table's row or a line of text. Undo takes the markdown out; the files stay in your space. A file larger than SilverBullet takes (`maximumDocumentSize`, 10 MiB by default) is left out, said in its row (an image of the web is linked instead). Text you paste stays text, and nothing is taken in a code block or the front matter.
+
+**How a file is inserted** is set on the settings' **Files** tab, in the column **Inserted as**: **As shown** (the default: as **Shown as** says, nothing written into the embed, so changing **Shown as** later changes it too), **Link**, **Card**, **Preview** or **Original**, for all files and for each kind. To let SilverBullet insert files as it does without Silverware Assets, turn off **Paste, drop and upload files through Silverware Assets** there; on by default.
+
 ## Where it is kept
 
 What you choose is kept in the embed itself, after SilverBullet's own size:
@@ -59,8 +74,8 @@ SilverBullet reads only the alt text and the size, so without Silverware Assets 
 
 **For all files, or for one kind of file**: run **Silverware Assets: Settings**. Its tabs:
 
-- **Files**: how a file is shown (the original, a preview or a card) and what a click and a Shift+click on it do; all files first, then each kind (image, video, audio, PDF, archive, file), "Like all files" following them. What a file's own `view` says wins over both.
-- **Appearance**: how a file looks where it is shown, picked by **Preview**, **Original**, **Card** or **Link**, each on a sample drawn as your pages draw it. Point at (or tap) a part of a sample for its name and a × that hides it; the parts not shown are in a row over the sample, click one to show it.
+- **Files**: how a file is shown (the original, a preview or a card), how it is inserted (above), and what a click and a Shift+click on it do; all files first, then each kind (image, video, audio, PDF, archive, file), "Like all files" following them. What a file's own `view` says wins over both.
+- **Appearance**: how a file looks where it is shown, picked by **Link**, **Card**, **Preview** or **Original**, each on a sample drawn as your pages draw it. Point at (or tap) a part of a sample for its name and a × that hides it; the parts not shown are in a row over the sample, click one to show it.
   - **Preview**: a row for all files and one for each kind of file; click one to open it. Each holds the label (below), the size (its width and height: an image fits in it, its proportions kept; a PDF's preview is that large) . A kind of file follows all files until you change one of them there: its row is then marked **Own**, and **↺ Reset to all files** inside it takes it back.
   - **Original**: a label for files shown as the original, set as a preview's is (rows for all files and each kind of file), none shown until you turn a property on; an original PDF's height (one with a height of its own, `|200x120`, keeps it).
   - **Card**: what a card shows besides the file's name (its icon, its size, its date changed). With the icon hidden, a small arrow after the name opens its menu.

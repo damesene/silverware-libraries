@@ -4,26 +4,29 @@
 // the type renders none of), replaced by the type's rendering, or by the card. A click on a card or a preview runs the
 // action the user set for it. A render that fails shows the host's drawing (else the card) with an error mark.
 import { type ActionContext, type Asset, assetName, type AssetType, type Capabilities, type RenderContext, type Viewport } from "../../shared/assets.ts";
-import { type Embed, type EmbedChanges, isFileTarget, readEmbeds, readLinks } from "../../shared/markdown/embed.ts";
+import { type Embed, type EmbedChanges, embedAsLink, isFileTarget, readEmbeds, readLinks, writeEmbed } from "../../shared/markdown/embed.ts";
 import { actionFor, mimeOf, typeFor, viewFor } from "./core/choose.ts";
 import { closestContext, embedAt, type LineContext, linkAt, outside, placeAmong, type Placed, type Range, sameTarget, writtenContext } from "./core/locate.ts";
 import { metadataOf } from "./core/metadata.ts";
 import { forgetPreviews, type PreviewFiles, storedPreview } from "./core/stored.ts";
 import type { AssetRegistry } from "./core/registry.ts";
-import { type AssetSettings, type Gesture, labelFor, previewSize, type View, VIEWS } from "./model/settings.ts";
+import { type AssetSettings, type Gesture, insertAsFor, labelFor, previewSize, type View, VIEWS } from "./model/settings.ts";
 import { addCardFields, dateText, drawCard, iconElement, markFailed, menuMarker, sizeText } from "./ui/card.ts";
 import { drawLabelLine, labelTexts, type LabelValues } from "./ui/label.ts";
 import { opensMenu } from "../../shared/popupmenu.ts";
 import { writeClipboard, writeClipboardLater } from "../../shared/clipboard.ts";
 import { addMoreButton, type MoreMenu, popupOf, type ShowAs } from "./ui/moremenu.ts";
 import { VIEW_CARD, VIEW_LINK, VIEW_ORIGINAL, VIEW_PREVIEW } from "../../shared/glyphs.ts";
-import type { EditorEmbed } from "../../shared/editor.ts";
-import { plainMedium } from "./ui/plainmedium.ts";
+import type { EditorEmbed, EmbedEdit } from "../../shared/editor.ts";
+import { hasPlainMedium, plainMedium } from "./ui/plainmedium.ts";
+import type { InsertType } from "./ui/insertdialog.ts";
 
 // The popup menu's classes: Silverware Assets'
 const POPUP = { base: "swa" } as const;
 // How long a burst of types registered is waited out before a file in an editor's field is drawn again (ms)
 const TYPES_SETTLE_MS = 50;
+// The highest a file is drawn in the insert dialog (px)
+const SAMPLE_HEIGHT = 320;
 /** An item of a file's menu */
 type MenuItem = { readonly label: string; readonly run: () => void };
 // How a file can be shown, as a file's menu names and draws each (docs/silverware-assets-menu.md)
@@ -39,6 +42,9 @@ export type DrawnEmbed = {
   readonly position?: () => number | undefined;
   // The box it is drawn in, where it is not the page's text (a grid's cell): a width given to it a share of that
   readonly room?: () => HTMLElement | undefined;
+  // Its file's size and date where they are known already (a file not written yet, drawn in the insert dialog): not
+  // asked of the host
+  readonly info?: FileInfo;
 };
 
 /** A link drawn by the host (`[[report.pdf]]`, `[the report](report.pdf)`): its element, its target as written, its form */
@@ -265,6 +271,23 @@ export class AssetDecorator {
     if (left) this.host.problem(`Silverware Assets: the file was deleted, its embed not taken out of the page: ${left}`);
   }
 
+  /** An embed taken out of the page, its file left as it is (undone as any edit): found as it is now first */
+  private async removeFromPage(drawn: DrawnEmbed): Promise<void> {
+    const now = await this.locateNow(drawn);
+    if (!now) return this.host.problem(`Silverware Assets: not removed: ${NOT_FOUND}`);
+    const problem = await this.host.removeEmbed!({ text: now.embed.text, occurrence: now.occurrence, of: now.of });
+    if (problem) this.host.problem(`Silverware Assets: not removed: ${problem}`);
+  }
+
+  /** A file embedded in a field deleted, once confirmed: the file, then its embed taken out of the field's text (`takeOut`) */
+  private async deleteInField(asset: Asset & { readonly kind: "file" }, takeOut: () => string | undefined): Promise<void> {
+    if (!(await this.confirmDelete(asset, "embed"))) return;
+    const problem = await this.deleteWithPreviews(asset.path);
+    if (problem) return this.host.problem(`Silverware Assets: the file was not deleted: ${problem}`);
+    const left = takeOut();
+    if (left) this.host.problem(`Silverware Assets: the file was deleted, its embed not taken out: ${left}`);
+  }
+
   /** A linked file deleted, once confirmed: its link found first (as Show as embedded finds it), the file deleted, the link written as its text */
   private async deleteLinked(link: DrawnLink, asset: Asset & { readonly kind: "file" }): Promise<void> {
     if (!(await this.confirmDelete(asset, "link"))) return;
@@ -380,9 +403,10 @@ export class AssetDecorator {
   }
 
   /**
-   * An embed in an editor of a page's markdown (a grid's cell edited: shared/rendered.ts `EmbedDrawer`) drawn as in the
-   * page, read-only: its view, size and label as the settings and its metadata say, no menu, no action of a click (the
-   * editor's: its markdown shown), nothing written (the text is not the page's yet). None for markdown that is not one
+   * An embed in an editor of a page's markdown (a grid's cell edited: shared/rendered.ts `EmbedDrawer`; a database's
+   * peek) drawn as in the page: its view, size and label as the settings and its metadata say; where the editor gives
+   * it its markdown to edit (`EmbedEdit`), its menu and a click's action as in the page, what they change written into
+   * the editor's text (an Alt+press the editor's: its markdown shown); else read-only. None for markdown that is not one
    * embed alone, or of a file no type takes
    */
   editorEmbed(markdown: string, page: string): EditorEmbed | undefined {
@@ -394,7 +418,8 @@ export class AssetDecorator {
     if (!type) return undefined;
     return {
       key: `${page}\n${markdown}`,
-      draw: (container, signal) => {
+      interactive: true,
+      draw: (container, signal, edit) => {
         const doc = container.ownerDocument;
         // (A frame of its own, as a medium drawn in a grid's cell has, its medium the browser's own where it has one:
         // nothing of the host's is drawn in an editor's field)
@@ -416,7 +441,7 @@ export class AssetDecorator {
             .settings()
             .then((settings) => {
               if (signal.aborted) return;
-              this.render(drawn, { embed, occurrence: 0, of: 1 }, asset, typeFor(this.registry.types.all, asset) ?? type, settings, signal);
+              this.render(drawn, { embed, occurrence: 0, of: 1 }, asset, typeFor(this.registry.types.all, asset) ?? type, settings, signal, edit);
             })
             .catch(() => undefined);
         draw();
@@ -428,6 +453,59 @@ export class AssetDecorator {
         signal.addEventListener("abort", () => (clearTimeout(soon), stop()));
       },
     };
+  }
+
+  /**
+   * What the insert dialog is told of a file's type (ui/insertdialog.ts): the type that takes it (none: the card's
+   * alone), the views it can be drawn in, the one *Show as* gives it, how it is inserted as set, whether it is costly
+   */
+  insertTypeOf(file: File, path: string, settings: AssetSettings): InsertType {
+    const asset: Asset = { kind: "file", path, url: "", ...(file.type ? { mime: file.type } : {}) };
+    const type = typeFor(this.registry.types.all, asset);
+    const native = hasPlainMedium(mimeOf(asset));
+    const name = type?.name ?? "file";
+    return {
+      name,
+      icon: type?.icon ?? "",
+      can: (view) => view === "icon" || (!!type && (!!type.views?.[view as "preview" | "embed"] || native)),
+      configured: settings.views.types[name] ?? settings.views.default,
+      insertAs: insertAsFor(settings, name),
+      costly: !!type?.costly,
+    };
+  }
+
+  /**
+   * A file not written yet drawn as it will be in the page (the insert dialog): a view of its type, read-only (no menu,
+   * no click, nothing written), its label as set, its size and date its own; from its data in memory (a `blob:` URL,
+   * freed as `signal` ends). No preview is kept in the space for it
+   */
+  drawSample(container: HTMLElement, file: File, path: string, view: View, signal: AbortSignal): void {
+    const doc = container.ownerDocument;
+    const url = URL.createObjectURL(file);
+    signal.addEventListener("abort", () => URL.revokeObjectURL(url), { once: true });
+    const asset: Asset = { kind: "file", path, url, ...(file.type ? { mime: file.type } : {}) };
+    const type = typeFor(this.registry.types.all, asset);
+    const frame = doc.createElement("span");
+    frame.className = "swa-frame";
+    const native = plainMedium(doc, asset, mimeOf(asset));
+    if (native) frame.append(native);
+    container.replaceChildren(frame);
+    if (!type) return;
+    const embed = readEmbeds(`![[${path}|||{ view: ${view} }]]`)[0];
+    if (!embed) return;
+    const drawn: DrawnEmbed = { frame, target: path, native, info: { size: file.size, modified: file.lastModified } };
+    void this.host
+      .settings()
+      .then((settings) => {
+        if (signal.aborted) return;
+        // (No preview kept in the space for a file not written: its settings say none is; no view higher than the
+        // dialog's room for it)
+        const low = (height: number | undefined) => (height === undefined ? undefined : Math.min(height, SAMPLE_HEIGHT));
+        const types = Object.fromEntries(Object.entries(settings.previews.types).map(([name, size]) => [name, { ...size, ...(size.height === undefined ? {} : { height: low(size.height)! }) }]));
+        const sample: AssetSettings = { ...settings, storePreviews: false, heights: { preview: low(settings.heights.preview)!, embed: low(settings.heights.embed)! }, previews: { ...settings.previews, types } };
+        this.render(drawn, { embed, occurrence: 0, of: 1 }, asset, type, sample, signal);
+      })
+      .catch(() => undefined);
   }
 
   /** Embeds drawn, decorated */
@@ -522,8 +600,15 @@ export class AssetDecorator {
     return size ? size.write(width) : "this file is not decorated";
   }
 
-  /** One embed drawn as its view says; `readOnly`: in an editor's field, drawn until it ends, no menu, no click, nothing written */
-  private render(drawn: DrawnEmbed, found: Found, asset: Asset, type: AssetType, settings: AssetSettings, readOnly?: AbortSignal): void {
+  /**
+   * One embed drawn as its view says; `readOnly`: in an editor's field, drawn until it ends: no menu, no click, nothing
+   * written, unless the field gives `fieldEdit` (its markdown replaced there: its menu and click as in the page, what
+   * they change written into the field's text; no width or alignment, the handle's)
+   */
+  private render(drawn: DrawnEmbed, found: Found, asset: Asset, type: AssetType, settings: AssetSettings, readOnly?: AbortSignal, fieldEdit?: EmbedEdit): void {
+    // (Its menu and click: in the page, or in a field that gives its markdown to edit)
+    const acts = !readOnly || !!fieldEdit;
+    const inField = (markdown: string) => (fieldEdit!.replace(markdown) ? undefined : NOT_FOUND);
     this.renders.get(drawn.frame)?.abort();
     const control = new AbortController();
     this.renders.set(drawn.frame, control);
@@ -551,6 +636,7 @@ export class AssetDecorator {
     frame.toggleAttribute("data-swa-preview-width", sized);
     // (Written to the embed as the page has it now: its place among those of its text may have changed since)
     const write = async (changes: EmbedChanges) => {
+      if (fieldEdit) return inField(writeEmbed(found.embed, changes));
       if (readOnly) return READ_ONLY;
       const now = await this.locateNow(drawn);
       return now ? this.host.writeEmbed({ text: now.embed.text, occurrence: now.occurrence, of: now.of, changes }) : NOT_FOUND;
@@ -600,7 +686,8 @@ export class AssetDecorator {
           title: assetName(asset),
           // How it is shown: a view written into its embed (the settings' own as none), or the embed written as a link
           showAs: this.showAs(view, settled, can, !!this.host.embedToLink, (to) => {
-            if (to === "link")
+            if (to === "link" && fieldEdit) notWritten(inField(embedAsLink(found.embed)));
+            else if (to === "link")
               void this.locateNow(drawn)
                 .then((now) => (now ? this.host.embedToLink!({ text: now.embed.text, occurrence: now.occurrence, of: now.of }) : NOT_FOUND))
                 .then(notWritten);
@@ -624,17 +711,27 @@ export class AssetDecorator {
                     run: () =>
                       void forgetPreviews(files, settings.previewFolder, asset.path).then(() => {
                         this.anew.add(frame);
-                        this.render(drawn, found, asset, type, settings, readOnly);
+                        this.render(drawn, found, asset, type, settings, readOnly, fieldEdit);
                       }),
                   },
                 ]
               : []),
           ],
-          destructive: this.deletable(asset, "embed") ? [{ label: "Delete file…", run: () => void this.deleteEmbedded(drawn, asset) }] : [],
+          // Its embed taken out of the page alone (a file of the web too, which cannot be deleted here), then its file deleted
+          destructive: fieldEdit
+            ? [
+                // (In a field: its markdown there taken out, the file deleted first where asked)
+                { label: "Remove from page", run: () => notWritten(inField("")) },
+                ...(this.deletable(asset, "embed") ? [{ label: "Delete file…", run: () => void this.deleteInField(asset, () => inField("")) }] : []),
+              ]
+            : [
+                ...(this.host.removeEmbed ? [{ label: "Remove from page", run: () => void this.removeFromPage(drawn) }] : []),
+                ...(this.deletable(asset, "embed") ? [{ label: "Delete file…", run: () => void this.deleteEmbedded(drawn, asset) }] : []),
+              ],
         };
     };
     const clicked = (element: HTMLElement) =>
-      !readOnly &&
+      acts &&
       element.addEventListener(
         "click",
         (event) => {
@@ -677,9 +774,8 @@ export class AssetDecorator {
       };
       draw(known);
       const wanted = [...label.above, ...label.below].some((part) => part.on && (part.field === "size" || part.field === "modified"));
-      if (!wanted || !this.host.fileInfo) return;
-      void this.host
-        .fileInfo(asset)
+      if (!wanted || (!drawn.info && !this.host.fileInfo)) return;
+      void (drawn.info ? Promise.resolve(drawn.info) : this.host.fileInfo!(asset))
         .then((info) => {
           if (!info || control.signal.aborted) return;
           const size = info.size === undefined ? undefined : sizeText(info.size);
@@ -711,12 +807,12 @@ export class AssetDecorator {
     };
 
     if (view === "icon") {
-      const card = this.card(type, asset, settings);
+      const card = this.card(type, asset, settings, drawn.info);
       card.classList.add("swa-own");
       clicked(card);
       hideHost();
       frame.append(card);
-      if (readOnly) return;
+      if (!acts) return;
       // Its menu's way in: its icon; a card without it (as the user shows cards), a small arrow after its name, within
       // the card as a link's after its text (a "…" beside it was cut off where the card filled its line)
       let opener = card.querySelector<HTMLElement>(".swa-icon");
@@ -731,7 +827,7 @@ export class AssetDecorator {
       opensMenu(this.doc, POPUP, opener, () => popupOf(menu()), control.signal);
       return;
     }
-    if (!readOnly) addMoreButton(this.doc, frame, menu, control.signal);
+    if (acts) addMoreButton(this.doc, frame, menu, control.signal);
     const renderer = type.views?.[view];
     if (!renderer) {
       // The host's own drawing: a preview of it is the same, smaller (the style page's rule by the view's mark)
@@ -757,7 +853,7 @@ export class AssetDecorator {
       .catch((error: unknown) => {
         if (control.signal.aborted) return;
         if (!native) {
-          const card = this.card(type, asset, settings);
+          const card = this.card(type, asset, settings, drawn.info);
           card.classList.add("swa-own");
           clicked(card);
           frame.append(card);
@@ -767,14 +863,14 @@ export class AssetDecorator {
   }
 
   /** The card of an asset: its type's icon and the fields the user shows (a file's size and date as the host tells them, a moment later) */
-  private card(type: AssetType, asset: Asset, settings: AssetSettings): HTMLElement {
+  private card(type: AssetType, asset: Asset, settings: AssetSettings, info?: FileInfo): HTMLElement {
     const name = assetName(asset);
     const fields = settings.card.filter((field) => field === "name").map((field) => ({ name: field, text: name }));
     const card = drawCard(this.doc, settings.card.includes("icon") ? type.icon : undefined, fields, name);
     const wanted = settings.card.filter((field) => field === "size" || field === "modified");
-    if (wanted.length && this.host.fileInfo) {
-      void this.host
-        .fileInfo(asset)
+    // (A file not written yet: its own size and date, not those of a file of its name in the space)
+    if (wanted.length && (info || this.host.fileInfo)) {
+      void (info ? Promise.resolve(info) : this.host.fileInfo!(asset))
         .then((info) => {
           if (!info) return;
           const shown = wanted.flatMap((field) => {

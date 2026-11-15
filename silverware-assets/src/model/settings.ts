@@ -10,6 +10,13 @@ export type CardField = "icon" | "name" | "size" | "modified";
 export type LabelField = "icon" | "alt" | "name" | "size" | "modified";
 
 export const VIEWS: readonly View[] = ["icon", "preview", "embed"];
+
+/**
+ * How a file is inserted (pasted, dropped, uploaded: docs/silverware-assets-insert.md): as its view shows it (`shown`:
+ * as *Show as* says, no view written), a link, or a view of its own
+ */
+export type InsertAs = "shown" | "link" | View;
+export const INSERT_AS: readonly InsertAs[] = ["shown", "link", "icon", "preview", "embed"];
 export const GESTURES: readonly Gesture[] = ["click", "shift+click"];
 export const CARD_FIELDS: readonly CardField[] = ["icon", "name", "size", "modified"];
 export const LABEL_FIELDS: readonly LabelField[] = ["icon", "alt", "name", "size", "modified"];
@@ -43,6 +50,9 @@ export type AssetSettings = {
   readonly labels: { readonly default: PreviewLabel; readonly types: Readonly<Record<string, PreviewLabel>> };
   // An original's label, alike (none shown unless the user turns one on: a file shown as SilverBullet draws it)
   readonly originalLabels: { readonly default: PreviewLabel; readonly types: Readonly<Record<string, PreviewLabel>> };
+  // Files pasted, dropped and uploaded put in by Silverware Assets' dialog (off: SilverBullet's own), and how each is
+  // inserted: all files', and a type's own
+  readonly insert: { readonly enabled: boolean; readonly as: { readonly default: InsertAs; readonly types: Readonly<Record<string, InsertAs>> } };
 };
 
 /** Whether two labels are the same: each property in the same place, order and state */
@@ -97,6 +107,7 @@ export function storedAssetSettings(settings: AssetSettings): Record<string, unk
     previewFolder: settings.previewFolder,
     labels: { default: storedLabel(settings.labels.default), types: Object.fromEntries(Object.entries(settings.labels.types).map(([k, v]) => [k, storedLabel(v)])) },
     originalLabels: { default: storedLabel(settings.originalLabels.default), types: Object.fromEntries(Object.entries(settings.originalLabels.types).map(([k, v]) => [k, storedLabel(v)])) },
+    insert: { enabled: settings.insert.enabled, as: { default: settings.insert.as.default, types: { ...settings.insert.as.types } } },
   };
 }
 
@@ -136,9 +147,11 @@ export const DEFAULT_ASSET_SETTINGS: AssetSettings = {
   previewFolder: "_silverware-asset-preview",
   labels: { default: DEFAULT_LABEL, types: {} },
   originalLabels: { default: NO_LABEL, types: {} },
+  insert: { enabled: true, as: { default: "shown", types: {} } },
 };
 
 const isView = (value: unknown): value is View => typeof value === "string" && (VIEWS as readonly string[]).includes(value);
+const isInsertAs = (value: unknown): value is InsertAs => typeof value === "string" && (INSERT_AS as readonly string[]).includes(value);
 const record = (value: unknown): Record<string, unknown> => (value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {});
 
 /**
@@ -198,10 +211,31 @@ export function readAssetSettings(value: unknown): { readonly settings: AssetSet
       previewFolder: readPreviewFolder(given.previewFolder, problems),
       labels: readLabels(given.labels, DEFAULT_LABEL),
       originalLabels: readLabels(given.originalLabels, NO_LABEL),
+      insert: readInsert(given.insert, problems),
     },
     problems,
   };
 }
+
+/** How files are inserted as configured: on unless turned off, how each is inserted (one not read: as shown, said) */
+function readInsert(value: unknown, problems: string[]): AssetSettings["insert"] {
+  const given = record(value);
+  const as = record(given.as);
+  const one = (value: unknown, of?: string): InsertAs | undefined => {
+    if (isInsertAs(value)) return value;
+    problems.push(`"${String(value)}" is no way to insert a file (shown, link, icon, preview or embed)${of ? `, for ${of}` : ""}`);
+    return undefined;
+  };
+  const types: Record<string, InsertAs> = {};
+  for (const [type, value] of Object.entries(record(as.types))) {
+    const read = one(value, type);
+    if (read) types[type] = read;
+  }
+  return { enabled: given.enabled !== false, as: { default: as.default === undefined ? "shown" : (one(as.default) ?? "shown"), types } };
+}
+
+/** How a file of a type is inserted: the type's own, else all files' */
+export const insertAsFor = (settings: AssetSettings, type: string): InsertAs => settings.insert.as.types[type] ?? settings.insert.as.default;
 
 /** The labels of a view as configured: all files' (none: `fallback`) and each type's own */
 function readLabels(value: unknown, fallback: PreviewLabel): AssetSettings["labels"] {

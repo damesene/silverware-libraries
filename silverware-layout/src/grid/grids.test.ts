@@ -300,7 +300,7 @@ describe("a grid's menus: a column's by its grip, the grid's in its handle's", (
     expect(columns.label).toBe("Columns");
     expect(columns.options.map((option) => option.icon)).toEqual(["Auto", "2", "3", "4", "5", "6", "7", "8"]);
     expect(columns.options.filter((option) => option.active).map((option) => option.icon)).toEqual(["2"]);
-    expect(gridItems().map((item) => item.label)).toEqual(["Columns", "Borders", "Add a column at the end", "Remove the grid, its content kept"]);
+    expect(gridItems().map((item) => item.label)).toEqual(["Columns", "Borders", "Add a column at the end", "Unwrap grid"]);
     const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
     const run = async (label: string) => {
       const item = gridItems().find((one) => one.label === label)!;
@@ -308,7 +308,7 @@ describe("a grid's menus: a column's by its grip, the grid's in its handle's", (
       item.run();
       await settled();
     };
-    await run("Remove the grid, its content kept");
+    await run("Unwrap grid");
     expect(changes.at(-1)).toEqual({ kind: "ungrid" });
     columns.options[2]!.run();
     await settled();
@@ -327,7 +327,7 @@ describe("a grid's menus: a column's by its grip, the grid's in its handle's", (
     expect(grid.hasAttribute("data-swl-fit")).toBe(true);
     expect(grid.style.getPropertyValue("--swl-grid-columns")).toBe("repeat(auto-fit, minmax(min(240px, 100%), 1fr))");
     // (Its own sections: the columns and their min width, then the rest)
-    expect(gridProvider(grids).menu!(frame).map((section) => section.map((item) => item.label))).toEqual([["Columns", "Min width"], ["Borders", "Add a column at the end"], ["Remove the grid, its content kept"]]);
+    expect(gridProvider(grids).menu!(frame).map((section) => section.map((item) => item.label))).toEqual([["Columns", "Min width"], ["Borders", "Add a column at the end"], ["Unwrap grid"]]);
     const minRow = () => {
       const row = gridItems()[1]!;
       if (!("kind" in row)) throw new Error("no row of min widths");
@@ -367,7 +367,7 @@ describe("a grid's menus: a column's by its grip, the grid's in its handle's", (
     expect(items().map((item) => item.textContent?.trim())).toEqual(["Edit markdown (Alt+click)", "Move left", "Move right", "Add a column after it", "Move out of the grid", "Grid…", "Clear column…", "Delete column…"]);
     items().find((item) => item.textContent?.trim() === "Grid…")!.click();
     expect(document.querySelector(".swl-popup .swl-menu-title")?.textContent ?? document.querySelector(".swl-popup")!.textContent).toContain("Grid");
-    expect(items().map((item) => item.textContent?.trim())).toEqual(["Borders", "Add a column at the end", "Remove the grid, its content kept"]);
+    expect(items().map((item) => item.textContent?.trim())).toEqual(["Borders", "Add a column at the end", "Unwrap grid"]);
     expect(document.querySelector(".swl-popup .swl-menu-segmented")?.textContent).toContain("Columns");
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     // Its handle shown: no Grid… (its menu the handle's)
@@ -465,6 +465,32 @@ describe("what a grid draws, told", () => {
     // Drawn again as the page is edited, nothing moved: nothing told
     await grids.refresh();
     expect(told).toHaveLength(1);
+  });
+
+  it("tells them however long after it is drawn it is put in the page (scrolled to), and again as it is put in again", async () => {
+    const cellBody = "<cell>\n\n![[cat.png]]\n\n</cell>";
+    const { gridHost } = host(`<grid>\n${cellBody}\n</grid>\n`);
+    const grids = new Grids(document, { ...gridHost, renderMarkdown: async () => `<img src=".fs/cat.png" data-pos="0">` });
+    const told: number[] = [];
+    grids.rendered.onChange((items) => told.push(items.length));
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    let grid: HTMLElement;
+    try {
+      grid = await grids.render(cellBody);
+      // (A minute read above it)
+      vi.advanceTimersByTime(60_000);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(told).toEqual([]);
+    document.body.append(grid);
+    await vi.waitFor(() => expect(told).toEqual([1]));
+    // Taken out by the editor as it is scrolled away, put in again as it is scrolled back
+    grid.remove();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    document.body.append(grid);
+    await vi.waitFor(() => expect(told).toEqual([1, 1]));
+    grid.remove();
   });
 });
 

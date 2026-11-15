@@ -381,7 +381,7 @@ test("an original's label: none by default; its alt text turned on in Appearance
   await expect(page.locator("#sb-main [data-swa-asset='image'] .swa-label-above")).toHaveText("Photo");
 });
 
-test("files in a grid's cell being edited drawn as in the page, read-only: an image's preview, a PDF; a click on one shows its markdown", async ({ page, space }) => {
+test("files in a grid's cell being edited drawn as in the page: an image's preview, a PDF; its menu writes into the cell, an Alt+click shows its markdown", async ({ page, space }) => {
   const text = `Text\n\n![[${space.folder}/a.png|A|60x40|{ view: preview }]]\n\n![[${space.folder}/doc.pdf]]`;
   await space.open({ Page: `# Page\n\n${grid(text, "Right")}` }, "Page", { "a.png": PIXEL_PNG, "doc.pdf": "%PDF-1.4\n" });
   await gridsDrawn(page);
@@ -398,15 +398,20 @@ test("files in a grid's cell being edited drawn as in the page, read-only: an im
   await expect.poll(() => field.locator("style[data-swe-page-styles]").evaluate((style) => style.textContent ?? "")).toContain("swa-");
   const box = (await preview.boundingBox())!;
   expect(box.height).toBeLessThan(200);
-  // (No menu there: nothing is written from a field being edited)
+  // Its menu as in the page, what is chosen written into the cell's text (the cell kept open)
   await preview.hover();
-  await expect(field.locator(".swa-more")).toHaveCount(0);
-  await preview.click();
-  await expect(preview).toHaveCount(0);
-  await expect(field.locator(".cm-line", { hasText: "a.png" })).toBeVisible();
+  await preview.locator(".swa-more").click();
+  await page.locator('.swa-popup .swa-segment[aria-label^="Original"]').click();
+  await expect(field).toHaveCount(1);
+  const original = field.locator(".swe-embed [data-swa-asset='image'][data-swa-view='embed']");
+  await expect(original).toBeVisible();
+  // An Alt+click: its markdown shown, the view written in it (the original the settings' own for images: none written)
+  await original.click({ modifiers: ["Alt"] });
+  await expect(original).toHaveCount(0);
+  await expect(field.locator(".cm-line", { hasText: "a.png" })).toHaveText(`![[${space.folder}/a.png|A|60x40]]`);
   await page.keyboard.press("Escape");
   await expect(page.locator("#sb-main .swl-grid-editor")).toHaveCount(0);
-  expect(await space.saved("Page")).toContain(text);
+  await expect.poll(() => space.saved("Page")).toContain(`![[${space.folder}/a.png|A|60x40]]`);
 });
 
 test("Clean up previews takes away the previews kept of files gone and of versions gone", async ({ page, space }) => {
@@ -417,6 +422,19 @@ test("Clean up previews takes away the previews kept of files gone and of versio
   await runCommand(page, "Silverware Assets: Clean up previews");
   await expect.poll(() => space.kept("gone.pdf.1731600000000-4.webp")).toBe(false);
   await expect.poll(() => space.kept("doc.pdf.1731500000000-9.webp")).toBe(false);
+});
+
+test("a grid far down the page, drawn as it is scrolled to while another grid is drawn already: its files decorated", async ({ page, space }) => {
+  const filler = Array.from({ length: 150 }, (_, i) => `Line ${i + 1}`).join("\n\n");
+  await space.open(
+    { Page: `# Page\n\n${grid("Top left", "Top right")}\n${filler}\n\n${grid(`![[${space.folder}/doc.pdf|||{ view: preview }]]`, "Right")}\nEnd\n` },
+    "Page",
+    { "doc.pdf": "%PDF-1.4\n" },
+  );
+  await gridsDrawn(page);
+  await page.locator("#sb-main .cm-scroller").evaluate((scroller) => (scroller.scrollTop = scroller.scrollHeight));
+  // (Drawn by SilverBullet as it comes into view, told to Silverware Assets once it is in the page)
+  await expect(page.locator("#sb-main .swl-grid-cell [data-swa-asset='pdf'][data-swa-view='preview']")).toHaveCount(1);
 });
 
 test("a preview in a grid's cell is not drawn anew as text above the grid is typed (its place in the page moving)", async ({ page, space }) => {
@@ -601,6 +619,29 @@ test("Delete file… in a file's menu: asked in SilverBullet's dialog, the file 
   await confirm.locator("button").last().click();
   await expect.poll(() => space.hasFile("doc.pdf")).toBe(false);
   await expect.poll(() => space.saved("Page")).toBe("# Page\n\nSee the doc here.\n");
+});
+
+test("Remove from page in an embed's menu: its markdown taken out, its file left; an image of the web too, which has no Delete file…", async ({ page, space }) => {
+  const url = "https://images.example.test/pics/cat.svg";
+  // (An image large enough to point at its "…")
+  await page.route(url, (route) => route.fulfill({ status: 200, contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect width="300" height="200" fill="#888"/></svg>' }));
+  await space.open({ Page: `# Page\n\n![](${url})\n\n![[${space.folder}/photo.png|Photo||{ view: preview }]]\n\nEnd\n` }, "Page", { "photo.png": PIXEL_PNG });
+  const item = (text: string) => page.locator(".swa-popup .swa-menu-item.swa-danger", { hasText: text });
+  // The web's image: removed, nothing to delete
+  const web = page.locator(`#sb-main [data-swa-asset]:has(img[src="${url}"])`);
+  await web.hover();
+  await web.locator(".swa-more").click();
+  await expect(item("Delete file…")).toHaveCount(0);
+  await item("Remove from page").click();
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n![[${space.folder}/photo.png|Photo||{ view: preview }]]\n\nEnd\n`);
+  // A file of the space: its embed removed, the file kept
+  const photo = page.locator("#sb-main [data-swa-asset='image']");
+  await photo.hover();
+  await photo.locator(".swa-more").click();
+  await expect(item("Delete file…")).toHaveCount(1);
+  await item("Remove from page").click();
+  await expect.poll(() => space.saved("Page")).toBe("# Page\n\nEnd\n");
+  expect(space.hasFile("photo.png")).toBe(true);
 });
 
 test("the settings: a card's size shown, a click set to the side panel; the panel shows the file and Esc closes it", async ({ page, space }) => {

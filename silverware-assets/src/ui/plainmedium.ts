@@ -3,6 +3,9 @@
 import type { Asset } from "../../../shared/assets.ts";
 import { el } from "../../../shared/elements.ts";
 
+/** Whether the browser draws a medium of a MIME type (an image, a video, audio, a PDF) */
+export const hasPlainMedium = (mime: string): boolean => /^(image|video|audio)\//.test(mime) || mime === "application/pdf";
+
 /** The medium of an asset by its MIME type; none where it has no URL or its kind has none */
 export function plainMedium(doc: Document, asset: Asset, mime: string): HTMLElement | undefined {
   if (!("url" in asset)) return undefined;

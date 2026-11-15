@@ -19,6 +19,9 @@ export type Bridge = {
   // Silverware Layout's API where it is installed (`silverware.layout.api`; shared/layout.ts `layoutOf` reads it): the
   // places registered with it, laid out at the width their blocks keep
   readonly layout?: unknown;
+  // Silverware Assets' API where it is installed (`silverware.assets.api`; shared/assets.ts `assetsOf` reads it): the
+  // files an item's content embeds drawn in its field
+  readonly assets?: unknown;
   getCurrentPage(): Promise<string>;
   getText(): Promise<string>;
   replaceRange(from: number, to: number, text: string): Promise<void>;

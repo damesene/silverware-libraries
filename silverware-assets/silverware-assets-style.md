@@ -70,6 +70,304 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 .swa-dialog.swa-settings-window {
   height: min(600px, calc(var(--sw-view-height, 100dvh) - 32px));
 }
+/* The insert dialog (src/ui/insertdialog.ts): a row per file (its icon and path, its note, how it is inserted, the
+   file as it will be, at most 320 px high); with several, a row for all of them above; picked in it to upload */
+.swa-dialog.swa-insert-window {
+  min-height: 0;
+}
+.swa-insert {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.swa-insert-all {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--swa-dialog-line);
+}
+.swa-insert-all[hidden] {
+  display: none;
+}
+.swa-insert-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.swa-insert-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.swa-insert-row[data-swa-left-out] {
+  opacity: 0.6;
+}
+/* An image of the web: its address in place of its name in the space, where it is linked; where it is kept */
+.swa-insert-address {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+.swa-insert-address[hidden],
+.swa-insert-path[hidden],
+.swa-insert-choices[hidden] {
+  display: none;
+}
+.swa-insert-kept {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.swa-insert-kept-label {
+  font-size: 12px;
+  opacity: 0.85;
+}
+.swa-insert-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.swa-insert-icon,
+.swa-insert-link-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+}
+.swa-insert-icon > svg,
+.swa-insert-icon > img,
+.swa-insert-link-icon > svg,
+.swa-insert-link-icon > img {
+  width: 100%;
+  height: 100%;
+}
+.swa-insert-path {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font: inherit;
+  color: inherit;
+  background: var(--root-background-color);
+  border: 1px solid var(--swa-dialog-line);
+  border-radius: 6px;
+}
+.swa-insert-path[aria-invalid="true"] {
+  border-color: var(--danger-color, #c62828);
+}
+.swa-insert-row-note {
+  font-size: 12px;
+  opacity: 0.85;
+}
+.swa-insert-row-note:empty {
+  display: none;
+}
+.swa-insert-row[data-swa-problem] .swa-insert-row-note {
+  color: var(--danger-color, #c62828);
+  opacity: 1;
+}
+.swa-insert-row-note .swa-insert-choices {
+  display: inline-flex;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.swa-insert-choices {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-self: flex-start;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--root-color) 6%, transparent);
+}
+.swa-insert-choice {
+  padding: 4px 10px;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+}
+.swa-insert-choice[aria-checked="true"] {
+  color: var(--ui-accent-color);
+  background: var(--root-background-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.swa-insert-choice[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: default;
+}
+.swa-insert-choice:focus-visible,
+.swa-insert-fix:focus-visible {
+  outline: 2px solid var(--ui-accent-color);
+  outline-offset: 1px;
+}
+.swa-insert-fix {
+  padding: 0;
+  text-decoration: underline;
+  background: none;
+  border: 0;
+}
+/* The file as it will be: as wide as the dialog, at most 320 px high, what is taller cut off */
+.swa-insert-sample {
+  max-height: 320px;
+  overflow: hidden;
+}
+.swa-insert-sample > .swa-frame {
+  max-width: 100%;
+}
+/* The original of an image or a video fitted whole (the dialog is outside the editor, whose rules size them in the
+   page: a photo of the camera showed at its own size, its corner alone in view) */
+.swa-insert-sample [data-swa-view="embed"] :is(img, video):not(.swa-icon img) {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+}
+.swa-insert-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--link-color, var(--ui-accent-color));
+  text-decoration: underline;
+}
+.swa-insert-held {
+  padding: 12px;
+  font-size: 13px;
+  border: 1px dashed var(--swa-dialog-line);
+  border-radius: 6px;
+}
+.swa-insert-empty[hidden] {
+  display: none;
+}
+.swa-insert-pickers {
+  display: flex;
+  gap: 8px;
+}
+.swa-insert-pickers > button,
+.swa-insert-held > button {
+  padding: 6px 12px;
+  background: var(--swa-dialog-card);
+  border: 1px solid var(--swa-dialog-line);
+  border-radius: 6px;
+}
+@media (pointer: coarse) {
+  .swa-insert-choice {
+    padding: 8px 14px;
+  }
+}
+/* Files being uploaded (src/ui/uploadprogress.ts): a panel at the window's bottom right, a row each (its name, its
+   state, a bar running while it uploads: SilverBullet tells no bytes written), how many are done above them. Several
+   uploads at once one above another in a column. Put into the body, outside SilverBullet's root, whose theme's colours
+   are set here */
+.swa-upload-progress-stack {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: var(--sw-layer-menu);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+}
+.swa-upload-progress {
+  box-sizing: border-box;
+  padding: 10px 12px;
+  font: 13px var(--ui-font, system-ui, sans-serif);
+  color: var(--root-color, inherit);
+  background: var(--root-background-color, #fff);
+  border: 1px solid color-mix(in srgb, var(--root-color, currentColor) 15%, transparent);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  transition: opacity 0.2s;
+}
+.swa-upload-progress-leaving {
+  opacity: 0;
+}
+.swa-upload-progress-head {
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.swa-upload-progress-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 30vh;
+  overflow-y: auto;
+}
+.swa-upload-progress-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 6px;
+  row-gap: 4px;
+}
+.swa-upload-progress-icon {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+}
+.swa-upload-progress-icon > :is(svg, img) {
+  width: 100%;
+  height: 100%;
+}
+.swa-upload-progress-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swa-upload-progress-status {
+  font-size: 12px;
+  opacity: 0.7;
+}
+.swa-upload-progress-row[data-swa-upload="failed"] .swa-upload-progress-status {
+  color: var(--danger-color, #c62828);
+  opacity: 1;
+}
+.swa-upload-progress-bar {
+  grid-column: 1 / -1;
+  height: 3px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--root-color, currentColor) 12%, transparent);
+  border-radius: 2px;
+}
+.swa-upload-progress-bar-fill {
+  width: 0;
+  height: 100%;
+  background: var(--ui-accent-color, #0969da);
+}
+.swa-upload-progress-row[data-swa-upload="uploading"] .swa-upload-progress-bar-fill {
+  width: 35%;
+  animation: swa-upload-progress-run 1.1s ease-in-out infinite;
+}
+.swa-upload-progress-row[data-swa-upload="done"] .swa-upload-progress-bar-fill {
+  width: 100%;
+}
+.swa-upload-progress-row[data-swa-upload="failed"] .swa-upload-progress-bar-fill {
+  width: 100%;
+  background: var(--danger-color, #c62828);
+}
+@keyframes swa-upload-progress-run {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .swa-upload-progress-row[data-swa-upload="uploading"] .swa-upload-progress-bar-fill {
+    width: 100%;
+    opacity: 0.5;
+    animation: none;
+  }
+}
 /* The assets' settings tabs (src/ui/mediatab.ts): a line on top saying what the tab sets, then its sections; a grid
    of rows where all files and each type are set alike (their names at the left, all files' row first, set apart) */
 .swa-settings {
@@ -101,7 +399,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   align-items: center;
 }
 .swa-settings-grid-files {
-  grid-template-columns: minmax(80px, max-content) repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(80px, max-content) repeat(4, minmax(0, 1fr));
 }
 .swa-settings-row {
   display: contents;
@@ -1158,7 +1456,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
     justify-content: center;
   }
   .swa-settings-grid-files {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .swa-settings-grid-files .swa-settings-type-name {
     grid-column: 1 / -1;

@@ -8,7 +8,7 @@
 // them all, saved once on Save: the first tab answers for the others (the window asks each tab that changed to save,
 // and the settings are written whole).
 import { el } from "../../../shared/elements.ts";
-import { type AssetSettings, type CardField, DEFAULT_ASSET_SETTINGS, type Gesture, type PreviewLabel, type PreviewSize, sameLabel, type View, VIEWS } from "../model/settings.ts";
+import { type AssetSettings, type CardField, DEFAULT_ASSET_SETTINGS, type Gesture, INSERT_AS, type InsertAs, type PreviewLabel, type PreviewSize, sameLabel, type View, VIEWS } from "../model/settings.ts";
 import { dateText, iconElement } from "./card.ts";
 import { segmentedControl } from "../../../shared/controls.ts";
 import { CHEVRON_RIGHT } from "../../../shared/glyphs.ts";
@@ -16,6 +16,8 @@ import { cardEditor, linkEditor } from "./cardeditor.ts";
 import { labelEditor } from "./labeleditor.ts";
 
 const VIEW_LABELS: Readonly<Record<View, string>> = { icon: "Card", preview: "Preview", embed: "Original" };
+// How a file is inserted, as its pick lists say it (docs/silverware-assets-insert.md)
+const INSERT_LABELS: Readonly<Record<InsertAs, string>> = { shown: "As shown", link: "Link", ...VIEW_LABELS };
 const NONE = "";
 // The heights a preview may be given (px)
 const MIN_HEIGHT = 40;
@@ -88,15 +90,32 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
 
   // Files: how a file is shown, what a click and a Shift+click do; all files', then each type's
   const allView = select(doc, "All files: shown as", views, settings.views.default);
+  const inserts = INSERT_AS.map((as) => [as, INSERT_LABELS[as]] as const);
+  const allInsert = select(doc, "All files: inserted as", inserts, settings.insert.as.default);
   const allClick = select(doc, "All files: a click", actions, settings.actions.default.click ?? NONE);
   const allShift = select(doc, "All files: a Shift+click", actions, settings.actions.default["shift+click"] ?? NONE);
   const fileRows = input.types.map((type) => {
     const own = (gesture: Gesture) => settings.actions.types[type.name]?.[gesture];
     const view = select(doc, `${type.name}: shown as`, [[DEFAULT, LIKE_ALL], ...views], settings.views.types[type.name] ?? DEFAULT);
+    const insert = select(doc, `${type.name}: inserted as`, [[DEFAULT, LIKE_ALL], ...inserts], settings.insert.as.types[type.name] ?? DEFAULT);
     const click = select(doc, `${type.name}: a click`, [[DEFAULT, LIKE_ALL], ...actions], own("click") ?? DEFAULT);
     const shift = select(doc, `${type.name}: a Shift+click`, [[DEFAULT, LIKE_ALL], ...actions], own("shift+click") ?? DEFAULT);
-    return { name: type.name, view, click, shift, row: el(doc, "div", "swa-settings-row", typeName(doc, type), view, click, shift) };
+    return { name: type.name, view, insert, click, shift, row: el(doc, "div", "swa-settings-row", typeName(doc, type), view, insert, click, shift) };
   });
+  // Files pasted, dropped and uploaded through the dialog (docs/silverware-assets-insert.md), off: SilverBullet's own
+  const insertOn = el(doc, "input", { attrs: { type: "checkbox" } });
+  insertOn.checked = settings.insert.enabled;
+  const insertSection = section(
+    doc,
+    "Inserting files",
+    el(doc, "label", "swa-settings-check", insertOn, "Paste, drop and upload files through Silverware Assets"),
+    el(
+      doc,
+      "p",
+      "swa-settings-note",
+      "A file pasted, dropped on the page or uploaded (File: Upload, the toolbar's paperclip) opens a dialog: its name, and how it is put in the page, shown as it will be. “Inserted as” above is what the dialog starts with; “As shown” follows “Shown as”. Off: SilverBullet asks the name and puts the file in as it does.",
+    ),
+  );
   // Previews kept in the space (docs/silverware-assets-stored-previews.md)
   const storePreviews = el(doc, "input", { attrs: { type: "checkbox" } });
   storePreviews.checked = settings.storePreviews;
@@ -125,8 +144,8 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
     doc,
     "div",
     "swa-settings-grid swa-settings-grid-files",
-    el(doc, "div", "swa-settings-row swa-settings-head", el(doc, "span"), el(doc, "span", { text: "Shown as" }), el(doc, "span", { text: "A click" }), el(doc, "span", { text: "A Shift+click" })),
-    el(doc, "div", "swa-settings-row swa-settings-all-row", el(doc, "span", "swa-settings-type-name", "All files"), allView, allClick, allShift),
+    el(doc, "div", "swa-settings-row swa-settings-head", el(doc, "span"), el(doc, "span", { text: "Shown as" }), el(doc, "span", { text: "Inserted as" }), el(doc, "span", { text: "A click" }), el(doc, "span", { text: "A Shift+click" })),
+    el(doc, "div", "swa-settings-row swa-settings-all-row", el(doc, "span", "swa-settings-type-name", "All files"), allView, allInsert, allClick, allShift),
     el(doc, "div", "swa-settings-divider"),
     ...fileRows.map((one) => one.row),
   );
@@ -232,10 +251,10 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
     "swa",
     "What is shown",
     [
+      { value: "link", label: "Link" },
+      { value: "card", label: "Card" },
       { value: "preview", label: "Preview" },
       { value: "original", label: "Original" },
-      { value: "card", label: "Card" },
-      { value: "link", label: "Link" },
     ],
     "preview",
     showLook,
@@ -245,9 +264,11 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
   /** The settings as the tabs have them now */
   const current = (): AssetSettings => {
     const viewTypes: Record<string, View> = {};
+    const insertTypes: Record<string, InsertAs> = {};
     const actionTypes: Record<string, Partial<Record<Gesture, string>>> = {};
     for (const one of fileRows) {
       if (one.view.value !== DEFAULT) viewTypes[one.name] = one.view.value as View;
+      if (one.insert.value !== DEFAULT) insertTypes[one.name] = one.insert.value as InsertAs;
       const gestures: Partial<Record<Gesture, string>> = {};
       if (one.click.value !== DEFAULT) gestures.click = one.click.value;
       if (one.shift.value !== DEFAULT) gestures["shift+click"] = one.shift.value;
@@ -275,6 +296,7 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
       previewFolder: previewFolder.value.trim().replace(/^\/+|\/+$/g, "") || DEFAULT_ASSET_SETTINGS.previewFolder,
       labels: { default: labels.default, types: { ...labels.types } },
       originalLabels: { default: originalLabels.default, types: { ...originalLabels.types } },
+      insert: { enabled: insertOn.checked, as: { default: allInsert.value as InsertAs, types: insertTypes } },
     };
   };
   const was = JSON.stringify(current());
@@ -286,10 +308,10 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
     tab(
       "assets",
       "Files",
-      panelOf(doc, "files", "How an embedded file is shown where its embed does not say, and what a click on it does. A type set to “Like all files” follows the first row.", filesGrid, storeSection),
+      panelOf(doc, "files", "How an embedded file is shown where its embed does not say, and what a click on it does. A type set to “Like all files” follows the first row.", filesGrid, insertSection, storeSection),
       true,
     ),
-    tab("appearance", "Appearance", panelOf(doc, "appearance", "How a file looks where it is shown: as a preview, as the original, as a card, or as a link to it.", el(doc, "div", "swa-settings-looks", lookSwitch.element), ...Object.values(looks))),
+    tab("appearance", "Appearance", panelOf(doc, "appearance", "How a file looks where it is shown: as a link to it, as a card, as a preview, or as the original.", el(doc, "div", "swa-settings-looks", lookSwitch.element), ...Object.values(looks))),
   ];
 }
 

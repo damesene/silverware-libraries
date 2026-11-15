@@ -18,7 +18,7 @@
 // shared/editor.ts), the toolbar reads and writes it in place of the page.
 import { type EditingSurface, type Editors, editorsOf, keyMatches } from "../../../shared/editor.ts";
 import { type Icons, iconsOf } from "../../../shared/icons.ts";
-import { overWindowShown, watchOverWindow } from "../../../shared/overwindow.ts";
+import { overWindowOf, overWindowShown, watchOverWindow } from "../../../shared/overwindow.ts";
 import { type Bridge, readShortcut, type Settings } from "../bridge.ts";
 import { CONTENT_SELECTOR, inEditor, pageContentOf, viewTopOf } from "../dom.ts";
 import { ICONS } from "../icons.ts";
@@ -191,12 +191,12 @@ export class Controller {
     // The popup in a panel's place (the toolbar's … or a list's button while it is open): the panel done
     this.panel.close(true);
     // (Not over what another plugin shows over the whole window)
-    if (overWindowShown(this.doc)) return;
+    if (this.standsBack()) return;
     // (Also where no toolbar shows: no selection, no caret)
     this.refreshIfStale();
     const context = await this.read();
     // (Shown over the window while it was read: nothing)
-    if (!context || this.stopped || overWindowShown(this.doc)) return;
+    if (!context || this.stopped || this.standsBack()) return;
     const range = this.watcher.current() ?? this.watcher.caret();
     this.shows++;
     this.atCaret = context.from === context.to;
@@ -298,10 +298,30 @@ export class Controller {
       this.showAsSet();
       return;
     }
+    // (Its field the one written in, in what shows over the window: shown there)
+    if (!this.standsBack()) return;
     this.shows++;
     this.popup.close(true);
     this.hideBar();
   };
+
+  /**
+   * Whether the toolbar stands back: while another plugin shows something over the whole window (a full screen, a
+   * database's peek), unless the field written in is in it (the peek's content): shown over it then, marked so on the
+   * root (`data-swb-over-sheet`: its layer over the sheet's)
+   */
+  private standsBack(): boolean {
+    const over = overWindowShown(this.doc);
+    let inside = false;
+    if (over) {
+      // (The field the focus is in now, as the target reads it)
+      this.target();
+      const surface = this.surface?.element.isConnected ? this.surface : undefined;
+      inside = !!surface && !!overWindowOf(surface.element);
+    }
+    this.doc.documentElement.toggleAttribute("data-swb-over-sheet", inside);
+    return over && !inside;
+  }
 
   private owns(node: Node): boolean {
     return this.bar.owns(node) || this.popup.owns(node) || this.panel.owns(node);
@@ -353,7 +373,7 @@ export class Controller {
       const target = this.target();
       const selection = await target.getSelection();
       const text = await target.getText();
-      return contextOf(text, selection.from, selection.to);
+      return { ...contextOf(text, selection.from, selection.to), ...(target !== this.bridge ? { inField: true } : {}) };
     } catch (e) {
       console.error("Silverware Toolbar: could not read the selection", e);
       return undefined;
@@ -409,7 +429,7 @@ export class Controller {
   /** The toolbar shown for a context, by the selection or the caret */
   private showBar(context: Context, range: Range | undefined): void {
     // (None over what another plugin shows over the whole window)
-    if (overWindowShown(this.doc)) range = undefined;
+    if (this.standsBack()) range = undefined;
     this.range = range;
     if (!range) {
       this.bar.hide();
@@ -445,7 +465,7 @@ export class Controller {
       return;
     }
     this.atCaret = false;
-    if (this.popup.isOpen || overWindowShown(this.doc)) return;
+    if (this.popup.isOpen || this.standsBack()) return;
     const context = await this.read();
     if (!context || show !== this.shows || this.stopped) return;
     // The editor's selection is a caret (the page's selection is not its own, or was just changed): no toolbar
@@ -584,6 +604,7 @@ export class Controller {
         await bridge.startCompletion();
       },
       completes: !surface && !!bridge.startCompletion,
+      ...(surface && this.surface ? { field: this.surface } : {}),
     };
     try {
       await action.perform!(context, editor, NO_ARGS);
@@ -671,7 +692,7 @@ export class Controller {
 
   /** Shown always: the toolbar at once, as the caret is (docked, also where the page's text has no focus) */
   private async showStaying(): Promise<void> {
-    if (!this.stays() || this.bar.shown || overWindowShown(this.doc)) return;
+    if (!this.stays() || this.bar.shown || this.standsBack()) return;
     const show = ++this.shows;
     const context = await this.read();
     if (!context || show !== this.shows || this.stopped || this.bar.shown) return;
@@ -693,7 +714,7 @@ export class Controller {
 
   /** The caret moved (or came into the page's text): shown always, the toolbar goes with it, its buttons the formats around it */
   private async caretMoved(range: Range): Promise<void> {
-    if (!this.persistent() || !(this.writing() || this.stays()) || this.popup.isOpen || overWindowShown(this.doc)) return;
+    if (!this.persistent() || !(this.writing() || this.stays()) || this.popup.isOpen || this.standsBack()) return;
     const show = ++this.shows;
     const context = await this.read();
     if (!context || show !== this.shows || this.stopped || context.from !== context.to) return;

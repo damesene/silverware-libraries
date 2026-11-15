@@ -416,6 +416,23 @@ describe("the page writer", () => {
     expect(stale.skipped.map((one) => one.reason)).toEqual(["the text changed since it was read: left alone"]);
   });
 
+  it("moves a selection's blocks into a grid as one edit, the text and the grid as read alone", async () => {
+    const grid = "<grid>\n<cell>\n\nA\n\n</cell>\n</grid>";
+    const text = `One\n\nTwo\n\n${grid}\n`;
+    const body = readGrids(text)[0]!.body;
+    const { map, writer } = memory({ A: text });
+    const to = text.indexOf("Two") + 3;
+    await writer.write(pageChanges().page("A", (p) => p.grids.moveInto(0, to, text.slice(0, to), body, "each", { kind: "cells", at: 1 })).build());
+    expect(map.get("A")).toBe("<grid>\n<cell>\n\nA\n\n</cell>\n<cell>\n\nOne\n\n</cell>\n<cell>\n\nTwo\n\n</cell>\n</grid>\n");
+    const stale = await writer.plan(pageChanges().page("A", (p) => p.grids.moveInto(0, 3, "Two", body, "each", { kind: "cells", at: 0 })).build());
+    expect(stale.skipped.map((one) => one.reason)).toEqual(["its grid changed since it was read: left alone"]);
+    // (A grid among the lines moved: left alone)
+    const around = `One\n\n${grid}\n\nTwo\n\n${grid}`;
+    const { writer: second } = memory({ B: around });
+    const across = await second.plan(pageChanges().page("B", (p) => p.grids.moveInto(0, around.indexOf("Two") + 3, around.slice(0, around.indexOf("Two") + 3), body, "each", { kind: "cells", at: 0 }, { occurrence: 1 })).build());
+    expect(across.skipped.map((one) => one.reason)).toEqual(["the text moved takes in a grid"]);
+  });
+
   it("changes a grid's cells: one moved, one added, one taken out under it, all taken apart", async () => {
     const grid = '<grid columns="3">\n<cell>\n\nA\n\n</cell>\n<cell>\n\nB\n\n</cell>\n</grid>';
     const body = readGrids(grid)[0]!.body;

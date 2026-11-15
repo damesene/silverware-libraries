@@ -1031,6 +1031,120 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   outline: 2px dashed color-mix(in srgb, var(--ui-accent-color, #464cfc) 60%, transparent);
   outline-offset: -2px;
 }
+/* Move into existing grid: a place being picked (src/grid/ui/placepicker.ts). The grids outlined as what can be picked, the
+   pointer a copy's over them, their own controls (a column's grip, a divider, the width's handle) away meanwhile */
+:root[data-swl-picking] .swl-grid {
+  outline: 2px dashed color-mix(in srgb, var(--ui-accent-color, #464cfc) 45%, transparent);
+  outline-offset: 6px;
+  /* (Not cut off: what the clip keeps in, its grips and dividers, is away) */
+  clip-path: none;
+}
+:root[data-swl-picking] .swl-grid,
+:root[data-swl-picking] .swl-grid * {
+  cursor: copy !important;
+}
+:root[data-swl-picking] :is(.swl-grid-column-grip, .swl-grid-divider, .swl-handle) {
+  display: none !important;
+}
+/* The cell the text would go into, tinted */
+.swl-grid-cell.swl-grid-pick-cell {
+  outline: 2px dashed var(--ui-accent-color, #464cfc);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--ui-accent-color, #464cfc) 8%, transparent);
+}
+/* Where it would go: a line between cells (a dot at each end), or where a cell's blocks meet */
+.swl-pick-mark {
+  position: fixed;
+  z-index: var(--sw-layer-control);
+  pointer-events: none;
+  border-radius: 2px;
+  background: var(--ui-accent-color, #464cfc);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent-color, #464cfc) 25%, transparent);
+}
+.swl-pick-mark[hidden],
+.swl-pick-label[hidden] {
+  display: none;
+}
+.swl-pick-mark:not([data-swl-pick="inside"])::before,
+.swl-pick-mark:not([data-swl-pick="inside"])::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ui-accent-color, #464cfc);
+}
+.swl-pick-mark[data-swl-pick="between-columns"]::before {
+  top: -5px;
+  left: -3px;
+}
+.swl-pick-mark[data-swl-pick="between-columns"]::after {
+  bottom: -5px;
+  left: -3px;
+}
+.swl-pick-mark[data-swl-pick="between-rows"]::before {
+  left: -5px;
+  top: -3px;
+}
+.swl-pick-mark[data-swl-pick="between-rows"]::after {
+  right: -5px;
+  top: -3px;
+}
+/* What it would make there, by the line */
+.swl-pick-label {
+  position: fixed;
+  z-index: calc(var(--sw-layer-control) + 1);
+  pointer-events: none;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font: 600 12px/18px system-ui, sans-serif;
+  white-space: nowrap;
+  color: #fff;
+  background: var(--ui-accent-color, #464cfc);
+}
+/* What to do, with Cancel: at the window's top, over the page's controls (its bar at the top meanwhile; a phone's
+   keyboard and toolbar at the bottom) */
+.swl-pick-bar {
+  position: fixed;
+  left: 50%;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  transform: translateX(-50%);
+  width: max-content;
+  z-index: var(--sw-layer-menu);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  max-width: calc(100vw - 32px);
+  padding: 8px 8px 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--ui-accent-color, #464cfc) 50%, transparent);
+  border-radius: 10px;
+  font: 13px/1.35 system-ui, sans-serif;
+  color: var(--root-color, #222);
+  background: var(--root-background-color, #fff);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+.swl-pick-bar-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.swl-pick-bar-text > span {
+  opacity: 0.75;
+}
+.swl-pick-bar-cancel {
+  flex: none;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 6px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+}
+.swl-pick-bar-cancel:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
 /* (The field no outline as it has the focus: the grid's lines show the cell edited) */
 .swl-grid-editor:is(:focus, :focus-within) {
   outline: none;

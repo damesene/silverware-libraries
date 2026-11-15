@@ -1042,6 +1042,39 @@ test("with Silverware Editor installed, an item's content is edited in its edito
   expect(await space.saved("Page")).toBe("# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n");
 });
 
+test("in the peek's editor an item's images are drawn as the page draws them, and Silverware Toolbar shows for its text", async ({ page, space }) => {
+  const url = "https://images.example.test/pics/cat.svg";
+  await page.route(url, (route) => route.fulfill({ status: 200, contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect width="300" height="200" fill="#888"/></svg>' }));
+  const content = `${item("Todo", "a0")}\nFirst words here\n\n![](${url})\n\nLast line\n`;
+  await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS, "Page/db-tasks/Fix login": content }, "Page");
+  const body = page.locator(".swd-peek .swd-peek-body");
+  // (The editor is loaded once SilverBullet has started, when the browser is idle: a peek opened before has a plain field)
+  await expect(async () => {
+    if (await page.locator(".swd-peek").count()) await page.keyboard.press("Escape");
+    await page.locator(".swd-list-name", { hasText: "Fix login" }).click();
+    await expect(body.locator(".cm-content")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  await expect.poll(() => fieldReady(body)).toBe(true);
+  // The image drawn in the field, by Silverware Assets (its frame), not its markdown
+  const frame = body.locator(".swa-frame", { has: page.locator(`img[src="${url}"]`) });
+  await expect(frame).toHaveCount(1);
+  // Its menu as in the page: Show as a card written into the item's content, the peek open
+  await frame.hover();
+  await frame.locator(".swa-more").click();
+  await page.locator('.swa-popup .swa-segment[aria-label^="Card"]').click();
+  await expect.poll(() => fieldText(body)).toContain(`![||{ view: icon }](${url})`);
+  await expect(page.locator(".swd-peek")).toBeVisible();
+  // A word selected: the toolbar over the peek, its action written into the item's content
+  await body.locator(".cm-line", { hasText: "First words here" }).dblclick({ position: { x: 4, y: 6 } });
+  const bar = page.locator(".swb-bar.swb-visible");
+  await expect(bar).toBeVisible();
+  await bar.locator('[data-swb-action="formats.bold"]').click();
+  await expect.poll(() => fieldText(body)).toContain("**First** words here");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await expect.poll(() => space.saved("Page/db-tasks/Fix login")).toContain("**First** words here");
+});
+
 test("Delete database… in ⋯ deletes its pages and its blocks on every page once its name is typed; Undo brings them back", async ({ page, space }) => {
   const other = "# Other\n\nBefore.\n\n```silverware-database\nid: tasks\nview: board\n```\n\nAfter.\n";
   await space.open({ Page: "# Page\n\n```silverware-database\nid: tasks\nview: list\n```\n", ...TASKS, "Page/Other": other }, "Page");

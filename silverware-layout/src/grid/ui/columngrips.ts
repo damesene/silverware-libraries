@@ -93,7 +93,7 @@ export function gridMenu(now: GridMenuState, act: (action: CellAction) => Promis
       { label: "Borders", checked: now.border, run: () => act({ kind: "border", on: !now.border }) },
       { label: "Add a column at the end", run: () => act({ kind: "addColumn" }) },
     ],
-    [{ label: "Remove the grid, its content kept", run: () => act({ kind: "ungrid" }) }],
+    [{ label: "Unwrap grid", run: () => act({ kind: "ungrid" }) }],
   ];
 }
 

@@ -20,6 +20,8 @@ export function xlsxType(doc: Document): AssetType {
     icon: ICON,
     // Its preview kept in the space where Silverware Assets keeps previews: a workbook read once
     storesPreview: true,
+    // (Read whole and laid out by this plugin's script: a large one drawn on a click alone before it is inserted)
+    costly: true,
     views: {
       preview: (context) =>
         "url" in context.asset && context.viewport.width >= LEAST_WIDTH

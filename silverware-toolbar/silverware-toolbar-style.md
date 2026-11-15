@@ -23,6 +23,10 @@ The look of [Silverware Toolbar](silverware-toolbar.md): the toolbar, the list o
   border-radius: 8px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
 }
+/* Shown for a field in a sheet over the window (a database's peek's content): over the sheet and its own panels */
+:root[data-swb-over-sheet] .swb-floating {
+  z-index: calc(var(--sw-layer-sheet-panel) + 1);
+}
 .swb-floating.swb-visible {
   display: flex !important;
 }

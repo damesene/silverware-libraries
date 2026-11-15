@@ -178,11 +178,14 @@ export function livePreview(cm: CodeMirror, embed?: (markdown: string) => Editor
   class Embed extends cm.WidgetType {
     // What each element drawn ends with: its drawing, its watchers
     private static readonly ends = new WeakMap<HTMLElement, AbortController>();
-    constructor(readonly drawn: EditorEmbed) {
+    constructor(
+      readonly drawn: EditorEmbed,
+      readonly markdown: string,
+    ) {
       super();
     }
     override eq(other: Embed): boolean {
-      return other.drawn.key === this.drawn.key;
+      return other.drawn.key === this.drawn.key && other.markdown === this.markdown;
     }
     toDOM(view: EditorView): HTMLElement {
       const container = view.dom.ownerDocument.createElement("span");
@@ -198,7 +201,45 @@ export function livePreview(cm: CodeMirror, embed?: (markdown: string) => Editor
       }
       keepPageStyles(container, control.signal);
       try {
-        this.drawn.draw(container, control.signal);
+        // (Its markdown replaced where it is now: found by its element, checked against the text as it was drawn)
+        const markdown = this.markdown;
+        const edit = {
+          replace: (to: string): boolean => {
+            if (view.state.readOnly) return false;
+            let from: number;
+            try {
+              from = view.posAtDOM(container);
+            } catch {
+              return false;
+            }
+            if (view.state.sliceDoc(from, from + markdown.length) !== markdown) return false;
+            // (Taken out where it is its line alone: the line with it)
+            const line = view.state.doc.lineAt(from);
+            const whole = !to && line.from === from && line.to === from + markdown.length;
+            const end = whole && line.to < view.state.doc.length ? line.to + 1 : from + markdown.length;
+            const start = whole && end === from + markdown.length && line.from > 0 ? line.from - 1 : from;
+            view.dispatch({ changes: { from: start, to: end, insert: to } });
+            return true;
+          },
+        };
+        this.drawn.draw(container, control.signal, edit);
+        // (One that takes its own presses: an Alt+press puts the caret at its start, its markdown shown)
+        if (this.drawn.interactive)
+          container.addEventListener(
+            "mousedown",
+            (event) => {
+              if (!event.altKey || event.button !== 0) return;
+              event.preventDefault();
+              event.stopPropagation();
+              try {
+                view.dispatch({ selection: { anchor: view.posAtDOM(container) } });
+                view.focus();
+              } catch {
+                // (Gone from the editor meanwhile)
+              }
+            },
+            { capture: true, signal: control.signal },
+          );
       } catch {
         // (Not drawn: an empty place, its markdown a click away)
       }
@@ -207,9 +248,10 @@ export function livePreview(cm: CodeMirror, embed?: (markdown: string) => Editor
     override destroy(dom: HTMLElement): void {
       Embed.ends.get(dom)?.abort();
     }
-    // (Its press the editor's: the caret put beside it, its markdown shown)
+    // (Its press the editor's: the caret put beside it, its markdown shown; one that takes its own presses keeps them,
+    // its Alt+press putting the caret at it, above)
     override ignoreEvent(): boolean {
-      return false;
+      return !!this.drawn.interactive;
     }
   }
 
@@ -280,7 +322,14 @@ export function livePreview(cm: CodeMirror, embed?: (markdown: string) => Editor
   const bullet = cm.Decoration.replace({ widget: new Bullet() });
   const done = cm.Decoration.mark({ class: "swe-task-done" });
   const listLine = cm.Decoration.line({ class: "swe-list-line" });
-  const taskLine = cm.Decoration.line({ class: "swe-task-line" });
+  // A task's line by how many columns come before its box (its indent, its list's mark and the space after it): its
+  // text's next lines hang that far in (`--swe-task-prefix`)
+  const taskLines = new Map<number, ReturnType<typeof cm.Decoration.line>>();
+  const taskLine = (columns: number) => {
+    let line = taskLines.get(columns);
+    if (!line) taskLines.set(columns, (line = cm.Decoration.line({ class: "swe-task-line", attributes: { style: `--swe-task-prefix: ${columns}ch` } })));
+    return line;
+  };
   const link = cm.Decoration.mark({ class: "swe-link" });
   const wikiLink = cm.Decoration.mark({ class: "swe-wiki-link" });
   const hashtag = cm.Decoration.mark({ class: "swe-hashtag" });
@@ -312,8 +361,12 @@ export function livePreview(cm: CodeMirror, embed?: (markdown: string) => Editor
           if (/^[-+*]$/.test(state.sliceDoc(from, to)) && !shown(from, to)) out.push(bullet.range(from, to));
         } else if (name === "TaskMarker") {
           const checked = /x/i.test(state.sliceDoc(from, to));
-          // (Its text's next lines begin where its first does after the box, as the page draws a task: `--swe-task-hang`)
-          out.push(taskLine.range(state.doc.lineAt(from).from));
+          // (Its text's next lines begin where its first does after the box, as the page draws a task: `--swe-task-hang`,
+          // after what comes before the box, a tab to its stop)
+          const line = state.doc.lineAt(from);
+          let columns = 0;
+          for (const char of state.sliceDoc(line.from, from)) columns = char === "\t" ?columns + state.tabSize - (columns % state.tabSize) : columns + 1;
+          out.push(taskLine(columns).range(line.from));
           if (!shown(from, to)) out.push(cm.Decoration.replace({ widget: new Checkbox(checked, state.readOnly) }).range(from, to));
           const task = node.parent;
           if (checked && task) {
@@ -332,7 +385,7 @@ export function livePreview(cm: CodeMirror, embed?: (markdown: string) => Editor
         } else if (name === "Image") {
           // `![Alt](url)`: drawn where the plugin draws it
           const drawn = shown(from, to) ? undefined : embed?.(state.sliceDoc(from, to));
-          if (drawn) out.push(cm.Decoration.replace({ widget: new Embed(drawn) }).range(from, to));
+          if (drawn) out.push(cm.Decoration.replace({ widget: new Embed(drawn, state.sliceDoc(from, to)) }).range(from, to));
         } else if (name === "Link") {
           // An inline link with text alone, `[text](url)`: its text shown, the rest hidden (a reference link left as written)
           const parts = children(node);
@@ -345,7 +398,7 @@ export function livePreview(cm: CodeMirror, embed?: (markdown: string) => Editor
           // `![[…]]`: an embed, drawn where the plugin draws it, else its markdown as written (not a link's)
           if (from > 0 && state.sliceDoc(from - 1, from) === "!") {
             const drawn = shown(from - 1, to) ? undefined : embed?.(state.sliceDoc(from - 1, to));
-            if (drawn) out.push(cm.Decoration.replace({ widget: new Embed(drawn) }).range(from - 1, to));
+            if (drawn) out.push(cm.Decoration.replace({ widget: new Embed(drawn, state.sliceDoc(from - 1, to)) }).range(from - 1, to));
             return;
           }
           if (shown(from, to)) return;
@@ -402,9 +455,12 @@ export const PREVIEW_THEME = {
   ".swe-table tbody tr:nth-child(even) td": { background: "var(--editor-table-even-background-color, transparent)" },
   // (Its text where a rendered list's is, the browser's 40px in, after the mark and a space)
   "& .cm-line.swe-list-line": { paddingLeft: "max(0px, calc(40px - 2ch))" },
-  // (A task's next lines after its bullet, and after its box by the page's hanging indent: its first line where a
-  // list's is, its bullet 2ch before the text)
-  "& .cm-line.swe-list-line.swe-task-line": { paddingLeft: "calc(max(2ch, 40px) + var(--swe-task-hang, 0px))", textIndent: "calc(-2ch - var(--swe-task-hang, 0px))" },
+  // (A task's next lines after what comes before its box (its indent, its mark: a nested or a numbered one's longer),
+  // and after its box by the page's hanging indent; its first line where a list's is)
+  "& .cm-line.swe-list-line.swe-task-line": {
+    paddingLeft: "calc(max(0px, calc(40px - 2ch)) + var(--swe-task-prefix, 2ch) + var(--swe-task-hang, 0px))",
+    textIndent: "calc(-1 * var(--swe-task-prefix, 2ch) - var(--swe-task-hang, 0px))",
+  },
   ".swe-bullet": { color: "var(--editor-list-bullet-color, inherit)" },
   ".swe-link": { color: "var(--editor-link-color, var(--link-color, #0969da))", textDecoration: "underline" },
   ".swe-wiki-link": { color: "var(--editor-wiki-link-page-color, var(--link-color, #0969da))" },

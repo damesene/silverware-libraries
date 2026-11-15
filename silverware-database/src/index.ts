@@ -7,6 +7,8 @@
 import { applyLayers } from "../../shared/layers.ts";
 import { iconsOf } from "../../shared/icons.ts";
 import { editorsOf } from "../../shared/editor.ts";
+import { assetsOf } from "../../shared/assets.ts";
+import { imageEmbed } from "../../shared/silverbullet/embedimage.ts";
 import { layoutOf } from "../../shared/layout.ts";
 import { linesOf, linesUnder } from "../../shared/markdown/lines.ts";
 import { type ConflictHost, openConflict } from "./core/conflictdialog.ts";
@@ -176,6 +178,13 @@ export function init(bridge: Bridge): void {
             },
           }
         : {}),
+      // An embed of an item's content drawn in the peek's field: by Silverware Assets where it is installed (as the page
+      // draws it), else an image alone
+      drawEmbed: (markdown, item) => {
+        const name = store.documentOf(item.key);
+        if (name === undefined) return undefined;
+        return assetsOf(bridge.assets).drawEmbed?.(markdown, name) ?? imageEmbed(markdown, name);
+      },
       showConflict: (conflict, done) =>
         openConflict(
           conflictHost(platform, () => {

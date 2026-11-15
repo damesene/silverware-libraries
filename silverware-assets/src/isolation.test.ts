@@ -71,7 +71,7 @@ describe("isolation", () => {
   it("reaches into SilverBullet past its API in one file alone (SILVERBULLET-INTERNAL: host/silverbullet/editorposition.ts)", () => {
     const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     for (const [file] of of(".").filter(([file]) => file !== "host/silverbullet/editorposition.ts")) {
-      expect(code(readFileSync(join(SRC, file), "utf8")).match(/\bclient\b\s*\?*\.|editorView|posAtDOM/)?.[0], file).toBeUndefined();
+      expect(code(readFileSync(join(SRC, file), "utf8")).match(/\bclient\b\s*\?*\.|editorView|posAtDOM|posAtCoords/)?.[0], file).toBeUndefined();
     }
   });
 

@@ -61,7 +61,8 @@ Copy markdown
 Download
 Regenerate preview                           (a preview kept in the space)
 ───
-Delete file…                                 (danger colour)
+Remove from page                             (an embed, a file of the web too: its markdown alone, 2026-11-15)
+Delete file…                                 (danger colour; a file of the space)
 ```
 
 - **"Show as" is one choice of four**, as Align is one of three: a row of icons (link, card, preview, original), each

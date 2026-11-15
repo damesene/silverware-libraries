@@ -52,3 +52,41 @@ test("over a grid's cell edited in Silverware Editor's editor: a selection there
   await page.keyboard.press("Escape");
   await expect.poll(() => text(page)).toContain("<cell>\n\n**_Left text_**\n\n</cell>");
 });
+
+test("other plugins' actions in a grid's cell: Upload file puts the file into the cell, the grid's own actions are off there", async ({ page }) => {
+  test.skip(!onSilverBullet, "the grid, the editor and the files' dialog are SilverBullet's plugins");
+  await page.evaluate((grid) => {
+    const view = (window as unknown as { client: { editorView: { state: { doc: { length: number } }; dispatch(spec: unknown): void } } }).client.editorView;
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: grid } });
+  }, GRID);
+  await expect(async () => {
+    if (await cellEditor(page).count()) await page.keyboard.press("Escape");
+    await page.locator("#sb-main .swl-grid-cell").first().click({ timeout: 1000 });
+    await expect(cellEditor(page).locator(".cm-content")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 30_000 });
+  await page.keyboard.press("Control+End");
+  // The grid's actions off in a cell (a cell holds no grid)
+  await page.keyboard.press("Control+Shift+Q");
+  await expect(popup(page)).toBeVisible();
+  await popup(page).locator(".swb-search-field").fill("grid");
+  await expect(popup(page).locator('[data-swb-action="actions.layoutWrapInNewGrid"]')).toHaveAttribute("aria-disabled", "true");
+  await expect(popup(page).locator('[data-swb-action="actions.layoutMoveIntoExistingGrid"]')).toHaveAttribute("aria-disabled", "true");
+  // Upload file: the files' dialog, the file picked put into the cell
+  await popup(page).locator(".swb-search-field").fill("upload file");
+  const chooser = page.waitForEvent("filechooser");
+  await popup(page).locator('[data-swb-action="actions.assetsUploadFile"]').click();
+  const dialog = page.locator(".swa-dialog.swa-insert-window");
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Files…" }).click();
+  await (await chooser).setFiles({ name: "photo.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") });
+  const path = await dialog.locator(".swa-insert-path").inputValue();
+  await dialog.getByRole("button", { name: "Insert" }).click();
+  await expect.poll(() => cellText(page)).toContain(`![[${path}`);
+  // (Written into the cell once it is left, not elsewhere in the page)
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => {
+    const written = await text(page);
+    const cell = written.slice(written.indexOf("<cell>"), written.indexOf("</cell>"));
+    return cell.includes("Left text") && cell.includes(`![[${path}`);
+  }).toBe(true);
+});

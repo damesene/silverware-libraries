@@ -12,7 +12,7 @@ import { Registry } from "./core/registry.ts";
 import { type EmbedDrawer, RENDERED_VERSION, type Rendered, type RenderedItem } from "../../shared/rendered.ts";
 import { gridInsertion } from "./grid/core/insert.ts";
 import { gridLinks } from "./grid/core/links.ts";
-import { GRID_MODES, isGridMode, putIntoGrid } from "./grid/build.ts";
+import { GRID_MODES, isGridMode, isMoveMode, MOVE_MODES, moveIntoGrid, wrapInNewGrid } from "./grid/build.ts";
 import { gridTags } from "./grid/core/tags.ts";
 import { gridRelations, gridTagObjects } from "./host/silverbullet/gridindex.ts";
 import { gridRanges, Grids } from "./grid/grids.ts";
@@ -33,7 +33,8 @@ import { syntaxTab } from "./ui/syntaxtab.ts";
 import { cssWidth, readTextWidth } from "./model/width.ts";
 
 const PAGE_LAYOUT = "Silverware Layout: Page layout";
-const PUT_INTO_GRID = "Silverware Layout: Put into grid";
+const WRAP_IN_NEW_GRID = "Silverware Layout: Wrap in new grid";
+const MOVE_INTO_EXISTING_GRID = "Silverware Layout: Move into existing grid";
 // Silverware Layout's own block of CONFIG: the guides, a list, which the Configuration Manager's block would lose
 // (shared/configpage.ts)
 const OWN_MARKER = "-- managed-by: silverware-layout";
@@ -232,36 +233,60 @@ export async function runSlashCommand(name: string): Promise<void> {
 
 /** The commands, as the init page defines them */
 export function commandNames(): string[] {
-  return [PAGE_LAYOUT, PUT_INTO_GRID];
+  return [PAGE_LAYOUT, WRAP_IN_NEW_GRID, MOVE_INTO_EXISTING_GRID];
 }
 
 export async function runCommand(name: string): Promise<void> {
   if (name === PAGE_LAYOUT) await app.openDialog();
-  if (name === PUT_INTO_GRID) await putInto();
+  if (name === WRAP_IN_NEW_GRID) await wrapInNew();
+  if (name === MOVE_INTO_EXISTING_GRID) await moveInto();
 }
 
-/** Put into grid: the selection's blocks, the mode given (a toolbar's button) or asked */
-function putInto(given?: Parameters<typeof putIntoGrid>[1]): Promise<void> {
+/** Move into existing grid: the selection's blocks, the mode given (a toolbar's button) or asked, the place picked in a grid */
+function moveInto(given?: Parameters<typeof moveIntoGrid>[2]): Promise<void> {
+  if (!current || !grids) return Promise.resolve();
+  return moveIntoGrid(silverBulletPutHost(current, pageWriter(silverBulletPlatform(current))), grids, given);
+}
+
+/** Wrap in new grid: the selection's blocks, the mode given (a toolbar's button) or asked */
+function wrapInNew(given?: Parameters<typeof wrapInNewGrid>[1]): Promise<void> {
   if (!current) return Promise.resolve();
-  return putIntoGrid(silverBulletPutHost(current, pageWriter(silverBulletPlatform(current))), given);
+  return wrapInNewGrid(silverBulletPutHost(current, pageWriter(silverBulletPlatform(current))), given);
 }
 
-/** Silverware Toolbar's actions (its public API's definitions, handed over by the init page): Put into grid, its mode a parameter */
+/** Silverware Toolbar's actions (its public API's definitions, handed over by the init page): Wrap in new grid and Move into existing grid, their mode a parameter */
 export function toolbarActions(): unknown[] {
   return [
     {
-      name: "layoutPutIntoGrid",
-      label: "Put into grid",
+      name: "layoutWrapInNewGrid",
+      label: "Wrap in grid",
       icon: "lucide:layout-grid",
       group: "Layout",
-      keywords: ["grid", "columns", "gallery", "side by side", "split"],
+      keywords: ["grid", "new grid", "wrap", "put", "columns", "gallery", "side by side", "split"],
+      // (Off in another plugin's field: a grid's cell holds no grid, a database's peek is another page's)
+      enabled: (context: { readonly inField?: boolean }) => !context.inField,
       params: [{ key: "mode", label: "Mode", choices: [{ value: "", label: "Ask" }, ...GRID_MODES.map(({ mode, name }) => ({ value: mode, label: name }))] }],
       describe: (args: { readonly mode?: unknown }) => {
         const mode = GRID_MODES.find((one) => one.mode === args.mode);
-        return mode ? `Put into grid: ${mode.name.toLowerCase()}` : undefined;
+        return mode ? `Wrap in grid: ${mode.name.toLowerCase()}` : undefined;
       },
       perform: (context: { readonly from: number; readonly to: number }, _editor: unknown, args: { readonly mode?: unknown } = {}) =>
-        putInto({ ...(isGridMode(args.mode) ? { mode: args.mode } : {}), from: context.from, to: context.to }),
+        wrapInNew({ ...(isGridMode(args.mode) ? { mode: args.mode } : {}), from: context.from, to: context.to }),
+    },
+    {
+      name: "layoutMoveIntoExistingGrid",
+      label: "Move to grid",
+      icon: "lucide:between-vertical-start",
+      group: "Layout",
+      keywords: ["grid", "existing grid", "move", "into", "columns", "cell", "cells"],
+      enabled: (context: { readonly inField?: boolean }) => !context.inField,
+      params: [{ key: "mode", label: "Mode", choices: [{ value: "", label: "Ask" }, ...MOVE_MODES.map(({ mode, name }) => ({ value: mode, label: name }))] }],
+      describe: (args: { readonly mode?: unknown }) => {
+        const mode = MOVE_MODES.find((one) => one.mode === args.mode);
+        return mode ? `Move to grid: ${mode.name.toLowerCase()}` : undefined;
+      },
+      perform: (context: { readonly from: number; readonly to: number }, _editor: unknown, args: { readonly mode?: unknown } = {}) =>
+        moveInto({ ...(isMoveMode(args.mode) ? { mode: args.mode } : {}), from: context.from, to: context.to }),
     },
   ];
 }

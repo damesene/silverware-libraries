@@ -26,8 +26,18 @@ export type EditorEmbed = {
   // Which drawing it is: the same key, the drawing kept as the text around it changes
   readonly key: string;
   // Drawn into the container (synchronously or later); what it started ends with the signal (the caret come into its
-  // markdown, the editor gone)
-  draw(container: HTMLElement, signal: AbortSignal): void;
+  // markdown, the editor gone). `edit`, where the editor gives it: its markdown replaced in the editor's text
+  draw(container: HTMLElement, signal: AbortSignal, edit?: EmbedEdit): void;
+  // Whether it takes its own presses (a menu, a click's action): the editor leaves them to it, an Alt+press the
+  // editor's (the caret put there, its markdown shown); else every press is the editor's
+  readonly interactive?: boolean;
+};
+
+/** What an embed drawn in an editor may do to its own markdown there */
+export type EmbedEdit = {
+  // Its markdown replaced by `markdown` (none: taken out) in the editor's text, one edit (undone as any); false where it
+  // is not found there as it was drawn (the text changed meanwhile)
+  replace(markdown: string): boolean;
 };
 
 export type EditorOptions = {
@@ -89,6 +99,8 @@ export type EditingSurface = {
   // Where the selection is on screen (none: not drawn)
   selectionRect(): DOMRect | undefined;
   focus(): void;
+  // Optional: whether it takes no edit now (none said: it takes them)
+  readonly readOnly?: boolean;
 };
 
 export type TextEditor = EditingSurface & {

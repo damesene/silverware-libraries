@@ -645,7 +645,7 @@ test("a grid's hashtags in the index: a tag of the page, a paragraph holding it"
   expect(paragraphs.filter((one) => one.page === `${space.folder}/Page`).map((one) => [one.text, one.tags])).toEqual([["Left #uigridtag text", ["uigridtag"]]]);
 });
 
-test("Put into grid: the tasks selected split into 2 columns, a list in each, by the command's two picks", async ({ page, space }) => {
+test("Wrap in new grid: the tasks selected split into 2 columns, a list in each, by the command's two picks", async ({ page, space }) => {
   const tasks = "- [ ] one\n- [ ] two\n- [x] three\n- [ ] four\n- [ ] five";
   await space.open({ Page: `# Page\n\n${tasks}\n\nAfter\n` }, "Page");
   await page.evaluate((list) => {
@@ -654,9 +654,9 @@ test("Put into grid: the tasks selected split into 2 columns, a list in each, by
     view.dispatch({ selection: { anchor: text.indexOf(list), head: text.indexOf(list) + list.length } });
   }, tasks);
   // (Not awaited: the command waits for the picks)
-  void runCommand(page, "Silverware Layout: Put into grid");
+  void runCommand(page, "Silverware Layout: Wrap in new grid");
   const box = page.locator(".sb-modal-box, .sb-modal").first();
-  await expect(box).toContainText("Put 5 blocks into a grid");
+  await expect(box).toContainText("Wrap 5 blocks in a new grid");
   // (Keys once the filter box has the focus: before, they would be the editor's, the selection typed over)
   const field = page.locator(".sb-modal-box input, .sb-modal input").first();
   await expect(field).toBeFocused();
@@ -670,7 +670,7 @@ test("Put into grid: the tasks selected split into 2 columns, a list in each, by
     .toBe("# Page\n\n<grid>\n<cell>\n\n- [ ] one\n- [ ] two\n- [x] three\n\n</cell>\n<cell>\n\n- [ ] four\n- [ ] five\n\n</cell>\n</grid>\n\nAfter\n");
 });
 
-test("Put into grid takes a paragraph's lines as blocks each, as the editor shows them apart", async ({ page, space }) => {
+test("Wrap in new grid takes a paragraph's lines as blocks each, as the editor shows them apart", async ({ page, space }) => {
   const lines = "First line\nSecond line\nThird line";
   await space.open({ Page: `# Page\n\n${lines}\n\nAfter\n` }, "Page");
   await page.evaluate((text) => {
@@ -678,13 +678,77 @@ test("Put into grid takes a paragraph's lines as blocks each, as the editor show
     const all = view.state.doc.toString();
     view.dispatch({ selection: { anchor: all.indexOf(text), head: all.indexOf(text) + text.length } });
   }, lines);
-  void runCommand(page, "Silverware Layout: Put into grid");
+  void runCommand(page, "Silverware Layout: Wrap in new grid");
   const box = page.locator(".sb-modal-box, .sb-modal").first();
-  await expect(box).toContainText("Put 3 blocks into a grid");
+  await expect(box).toContainText("Wrap 3 blocks in a new grid");
   await page.keyboard.press("Escape");
 });
 
-test("a column's grip and the grid's handle: the column moved right by its grip's menu, then the grid removed by its handle's, its content kept in its order", async ({ page, space }) => {
+/** The page's editor's selection set over a text of it */
+async function selectText(page: import("@playwright/test").Page, text: string): Promise<void> {
+  await page.evaluate((wanted) => {
+    const view = (window as unknown as { client: { editorView: { state: { doc: { toString(): string } }; dispatch(spec: unknown): void } } }).client.editorView;
+    const all = view.state.doc.toString();
+    view.dispatch({ selection: { anchor: all.indexOf(wanted), head: all.indexOf(wanted) + wanted.length } });
+  }, text);
+}
+
+test("Move into existing grid: two paragraphs a cell each, put where the line shows between the grid's cells, taken out of the page in one edit", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\nOne\n\nTwo\n\n${GRID}\nAfter\n` }, "Page");
+  await gridsDrawn(page);
+  await selectText(page, "One\n\nTwo");
+  void runCommand(page, "Silverware Layout: Move into existing grid");
+  const box = page.locator(".sb-modal-box, .sb-modal").first();
+  await expect(box).toContainText("Move 2 blocks into an existing grid");
+  await expect(page.locator(".sb-modal-box input, .sb-modal input").first()).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  // The bar says what to do; the line between the cells, labelled with the cells made, follows the pointer
+  await expect(page.locator(".swl-pick-bar")).toContainText("2 new cells go there");
+  const second = (await page.locator("#sb-main .swl-grid-cell").nth(1).boundingBox())!;
+  await page.mouse.move(second.x + 10, second.y + second.height / 2);
+  const mark = page.locator(".swl-pick-mark");
+  await expect(mark).toBeVisible();
+  await expect(mark).toHaveAttribute("data-swl-pick", "between-columns");
+  await expect(page.locator(".swl-pick-label")).toHaveText("2 new cells");
+  // (The line in the gap left of the second cell)
+  const line = (await mark.boundingBox())!;
+  expect(line.x + line.width / 2).toBeLessThan(second.x);
+  await page.mouse.click(second.x + 10, second.y + second.height / 2);
+  await expect(page.locator(".swl-pick-bar")).toHaveCount(0);
+  await expect
+    .poll(() => space.saved("Page"))
+    .toBe("# Page\n\n<grid>\n<cell>\n\nLeft text\n\n</cell>\n<cell>\n\nOne\n\n</cell>\n<cell>\n\nTwo\n\n</cell>\n<cell>\n\nRight text\n\n</cell>\n</grid>\n\nAfter\n");
+  // (No cell opened by the click that picked)
+  await expect(cellField(page)).toHaveCount(0);
+});
+
+test("Move into existing grid: Esc gives up, nothing written; a block put into a cell where the line shows inside it", async ({ page, space }) => {
+  const text = `# Page\n\n${GRID}\nMoved\n\nAfter\n`;
+  await space.open({ Page: text }, "Page");
+  await gridsDrawn(page);
+  await selectText(page, "Moved");
+  // (One block: no mode asked, it goes together)
+  void runCommand(page, "Silverware Layout: Move into existing grid");
+  await expect(page.locator(".swl-pick-bar")).toContainText("or in a cell to add it there");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".swl-pick-bar")).toHaveCount(0);
+  await expect(page.locator(":root[data-swl-picking]")).toHaveCount(0);
+  expect(await space.saved("Page")).toBe(text);
+  void runCommand(page, "Silverware Layout: Move into existing grid");
+  await expect(page.locator(".swl-pick-bar")).toBeVisible();
+  const first = page.locator("#sb-main .swl-grid-cell").first();
+  const cell = (await first.boundingBox())!;
+  // (In the cell's middle, under its text: after its last block)
+  await page.mouse.move(cell.x + cell.width / 2, cell.y + cell.height - 2);
+  await expect(page.locator(".swl-pick-mark")).toHaveAttribute("data-swl-pick", "inside");
+  await expect(page.locator(".swl-pick-label")).toHaveText("Into this cell");
+  await expect(first).toHaveClass(/swl-grid-pick-cell/);
+  await page.mouse.click(cell.x + cell.width / 2, cell.y + cell.height - 2);
+  await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${GRID.replace("Left text\n", "Left text\n\nMoved\n")}\nAfter\n`);
+});
+
+test("a column's grip and the grid's handle: the column moved right by its grip's menu, then the grid unwrapped by its handle's, its content kept in its order", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\n${GRID}\nAfter\n` }, "Page");
   await gridsDrawn(page);
   const pick = async (cell: number, label: string) => {
@@ -710,7 +774,7 @@ test("a column's grip and the grid's handle: the column moved right by its grip'
   await page.locator("#sb-main .swl-grid").hover();
   await page.locator(".swl-handle-bar").click();
   await expect(page.locator(".swl-popup .swl-menu-segmented", { hasText: "Align" })).toBeVisible();
-  await page.locator(".swl-popup .swl-menu-item", { hasText: "Remove the grid" }).click();
+  await page.locator(".swl-popup .swl-menu-item", { hasText: "Unwrap grid" }).click();
   // (Two cells of a line of text each: a line break between, as a paragraph's lines put into cells come back)
   await expect.poll(() => space.saved("Page")).toBe("# Page\n\nRight text\nLeft text\n\nAfter\n");
 });
@@ -827,7 +891,8 @@ test("a task's text wrapped in a cell's field as the page draws it: its next lin
     const line = root.shadowRoot!.querySelector(".swe-task-line")!;
     return starts(line, (root.closest(".swl-grid-cell") as HTMLElement).getBoundingClientRect().left);
   }, lineStarts.toString());
-  // The next lines begin where the page's do (the first may differ by the bullet's place)
+  // The next lines begin where the page's do (the first may differ by the bullet's place); it wraps in the field too
+  expect(edited.length).toBeGreaterThan(2);
   expect(edited.slice(1).map((x) => Math.abs(x - rendered[1]!) <= 2)).toEqual(edited.slice(1).map(() => true));
 });
 

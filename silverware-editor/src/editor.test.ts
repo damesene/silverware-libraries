@@ -163,6 +163,13 @@ describe("the CodeMirror editor's live preview", () => {
     editor.destroy();
   });
 
+  it("hangs a task's next lines after what comes before its box: a nested one's indent, a numbered one's mark, a tab to its stop", () => {
+    const { editor, root } = make("x\n- [ ] top\n  - [ ] nested\n1. [ ] numbered\n\t- [ ] tabbed", 0);
+    const prefixes = [...root.querySelectorAll<HTMLElement>(".cm-line.swe-task-line")].map((line) => line.style.getPropertyValue("--swe-task-prefix"));
+    expect(prefixes).toEqual(["2ch", "4ch", "3ch", `${4 + 2}ch`]);
+    editor.destroy();
+  });
+
   it("draws an embed where its plugin draws it, its markdown where the caret is (its drawing ended); another embed as written", () => {
     const ended: string[] = [];
     const embed = (markdown: string) => {

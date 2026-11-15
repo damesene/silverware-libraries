@@ -2,7 +2,7 @@
 // each, split's columns by number, the cells one under another again (items of one list one list again).
 import { describe, expect, it } from "vitest";
 import { readGrids } from "./grid.ts";
-import { blocksIn, gridOfBlocks, gridText, splitCounts, ungridded } from "./gridbuild.ts";
+import { blocksIn, type GridPlace, gridOfBlocks, gridText, type MoveMode, movedIntoGrid, splitCounts, ungridded } from "./gridbuild.ts";
 
 const apply = (text: string, edit: { from: number; to: number; insert: string } | undefined) => (edit ? text.slice(0, edit.from) + edit.insert + text.slice(edit.to) : text);
 
@@ -83,5 +83,66 @@ describe("a grid built of blocks", () => {
   it("writes a grid's text in the form a cell is written, its attributes on its line", () => {
     // (An empty cell a blank line to type into)
     expect(gridText(["A", ""], { columns: "3" })).toBe('<grid columns="3">\n<cell>\n\nA\n\n</cell>\n<cell>\n\n\n</cell>\n</grid>');
+  });
+});
+
+describe("blocks moved into a grid", () => {
+  const grid = "<grid>\n<cell>\n\nA\n\n</cell>\n<cell>\n\nB\n\nB2\n\n</cell>\n</grid>";
+  const move = (text: string, from: string, to: string, mode: MoveMode, place: GridPlace) => {
+    const blocks = blocksIn(text, text.indexOf(from), text.indexOf(to) + to.length, readGrids(text));
+    const moved = movedIntoGrid(text, blocks, readGrids(text)[0]!, mode, place);
+    return "text" in moved ? moved.text : moved.problem;
+  };
+
+  it("each a cell of its own, before a cell or after the last; taken out, a blank line left between what was round them", () => {
+    const text = `Top\n\nOne\n\n- two\n- three\n\nBottom\n\n${grid}\n`;
+    expect(move(text, "One", "three", "each", { kind: "cells", at: 1 })).toBe(
+      "Top\n\nBottom\n\n<grid>\n<cell>\n\nA\n\n</cell>\n<cell>\n\nOne\n\n</cell>\n<cell>\n\n- two\n\n</cell>\n<cell>\n\n- three\n\n</cell>\n<cell>\n\nB\n\nB2\n\n</cell>\n</grid>\n",
+    );
+    expect(move(text, "One", "One", "each", { kind: "cells", at: 2 })).toBe(
+      "Top\n\n- two\n- three\n\nBottom\n\n<grid>\n<cell>\n\nA\n\n</cell>\n<cell>\n\nB\n\nB2\n\n</cell>\n<cell>\n\nOne\n\n</cell>\n</grid>\n",
+    );
+  });
+
+  it("together: one new cell, or into a cell at a block's start or its end; the grid above them too", () => {
+    const text = `${grid}\n\nOne\nTwo\n\nEnd`;
+    expect(move(text, "One", "Two", "together", { kind: "cells", at: 0 })).toBe(
+      "<grid>\n<cell>\n\nOne\nTwo\n\n</cell>\n<cell>\n\nA\n\n</cell>\n<cell>\n\nB\n\nB2\n\n</cell>\n</grid>\n\nEnd",
+    );
+    const b2 = readGrids(text)[0]!.cells[1]!.content.indexOf("B2");
+    expect(move(text, "One", "Two", "together", { kind: "cell", cell: 1, at: b2 })).toBe("<grid>\n<cell>\n\nA\n\n</cell>\n<cell>\n\nB\n\nOne\nTwo\n\nB2\n\n</cell>\n</grid>\n\nEnd");
+    expect(move(text, "Two", "Two", "together", { kind: "cell", cell: 0, at: Number.MAX_SAFE_INTEGER })).toBe(
+      "<grid>\n<cell>\n\nA\n\nTwo\n\n</cell>\n<cell>\n\nB\n\nB2\n\n</cell>\n</grid>\n\nOne\n\nEnd",
+    );
+    expect(move(text, "End", "End", "together", { kind: "cell", cell: 0, at: 0 })).toBe("<grid>\n<cell>\n\nEnd\n\nA\n\n</cell>\n<cell>\n\nB\n\nB2\n\n</cell>\n</grid>\n\nOne\nTwo");
+  });
+
+  it("keeps a paragraph's lines round a line taken out together, CRLF as the page has it", () => {
+    const text = `One\nTwo\nThree\n\n${grid}`.replace(/\n/g, "\r\n");
+    expect(move(text, "Two", "Two", "each", { kind: "cells", at: 2 })).toBe(
+      "One\nThree\n\n<grid>\n<cell>\n\nA\n\n</cell>\n<cell>\n\nB\n\nB2\n\n</cell>\n<cell>\n\nTwo\n\n</cell>\n</grid>".replace(/\n/g, "\r\n"),
+    );
+  });
+
+  it("refuses a cell not there any more, or changed since it was drawn (its offset another's)", () => {
+    const text = `${grid}\n\nOne`;
+    expect(move(text, "One", "One", "together", { kind: "cell", cell: 5, at: 0 })).toBe("that cell changed since it was drawn");
+    expect(move(text, "One", "One", "together", { kind: "cell", cell: 0, at: 0, was: "Other" })).toBe("that cell changed since it was drawn");
+    expect(move(text, "One", "One", "together", { kind: "cell", cell: 0, at: 0, was: "A" })).toContain("<cell>\n\nOne\n\nA\n\n</cell>");
+  });
+
+  it("leaves a blank line where what was round them would run on into another kind: a grid or a heading after a paragraph's line", () => {
+    const below = `Top\n# H\n${grid}`;
+    const moved = move(below, "# H", "# H", "each", { kind: "cells", at: 0 });
+    expect(moved.startsWith("Top\n\n<grid>")).toBe(true);
+    expect(readGrids(moved)).toHaveLength(1);
+    expect(move(`One\n\`\`\`\ncode\n\`\`\`\nBottom\n\n${grid}`, "```", "code\n```", "each", { kind: "cells", at: 0 }).startsWith("One\n\nBottom\n\n<grid>")).toBe(true);
+    // (A list's item taken out of it: the list goes on)
+    expect(move(`- a\n- b\n- c\n\n${grid}`, "- b", "- b", "each", { kind: "cells", at: 0 }).startsWith("- a\n- c\n\n<grid>")).toBe(true);
+  });
+
+  it("keeps an indented code block's first line's indent", () => {
+    const text = `Para\n\n    code1\n    code2\n\n${grid}`;
+    expect(move(text, "code1", "code2", "each", { kind: "cells", at: 0 })).toContain("<cell>\n\n    code1\n    code2\n\n</cell>");
   });
 });

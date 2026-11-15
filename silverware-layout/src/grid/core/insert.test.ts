@@ -9,7 +9,7 @@ function inserted(text: string, at: number, cells?: number): string {
   return `${after.slice(0, edit.cursor)}|${after.slice(edit.cursor)}`;
 }
 
-const GRID = "<grid>\n<column>\n\n|\n\n</column>\n<column>\n\n\n\n</column>\n</grid>";
+const GRID = "<grid>\n<cell>\n\n|\n\n</cell>\n<cell>\n\n\n\n</cell>\n</grid>";
 
 describe("a new grid inserted", () => {
   it("puts two empty cells at an empty line, the cursor in the first, a blank line after where text follows", () => {

@@ -5,7 +5,7 @@ import { gridTags } from "./tags.ts";
 
 describe("a grid's hashtags", () => {
   it("are found in each cell with their context, not outside a grid nor in code", () => {
-    const text = "Outside #out\n\n<grid>\n<column>\n\nA note #idea and #idea\n\n- an item #todo\n- [ ] a task #urgent\n\n</column>\n<column>\n\n```\n#code\n```\n\n> quoted #q\n\n</column>\n</grid>\n";
+    const text = "Outside #out\n\n<grid>\n<cell>\n\nA note #idea and #idea\n\n- an item #todo\n- [ ] a task #urgent\n\n</cell>\n<cell>\n\n```\n#code\n```\n\n> quoted #q\n\n</cell>\n</grid>\n";
     const { tags, paragraphs } = gridTags(text);
     expect(tags).toEqual([
       { name: "idea", context: "paragraph" },

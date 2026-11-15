@@ -1,8 +1,51 @@
 // A grid's columns as its `columns` attribute gives them (docs/silverware-layout-grid.md, *Layout*): a number of equal
-// columns (`3`) or their widths (`1fr 2fr`, `30% 70%`, `200px 1fr`), made a CSS grid's column template. Pure.
+// columns (`3`), their widths (`1fr 2fr`, `30% 70%`, `200px 1fr`), or `auto`: as many equal columns in a row as fit,
+// none narrower than its `min` attribute (a gallery); made a CSS grid's column template. Pure.
 
-/** A grid of no `columns`: as many equal columns as it has cells, this many at most (a column of its own each) */
-export const DEFAULT_MAX_COLUMNS = 4;
+/** The most columns a grid's menu offers, and a grid of no `columns` has (a column of its own per cell up to it) */
+export const MAX_COLUMNS = 8;
+
+/** The `columns` of a grid whose columns are as many as fit, each as wide as the others, none under its `min` */
+export const FIT = "auto";
+
+/** Whether a grid's columns are as many as fit (`columns="auto"`): equal, none resized by hand */
+export const fitsColumns = (columns: string | undefined): boolean => columns?.trim().toLowerCase() === FIT;
+
+/** The named narrowest widths of a column of a grid of `columns="auto"` (px), its `min` attribute */
+export const MIN_WIDTHS = { xs: 100, s: 160, m: 240, l: 360 } as const;
+export type MinWidthName = keyof typeof MIN_WIDTHS;
+/** A grid of `columns="auto"` without a `min`: its columns at least this wide */
+export const DEFAULT_MIN_WIDTH: MinWidthName = "m";
+// The narrowest and widest a `min` given in px may be
+const MIN_PX = 40;
+const MAX_PX = 1200;
+
+/** Whether a text is a min width's name (its own keys alone: never `constructor`, `toString`) */
+const isMinWidthName = (text: string): text is MinWidthName => Object.hasOwn(MIN_WIDTHS, text);
+
+/** Why a `min` value cannot be read (a name, xs, s, m or l, or px from 40 to 1200, as `180` or `180px`), as text; undefined where it can */
+export function validateMinWidth(value: string): string | undefined {
+  const text = value.trim().toLowerCase();
+  if (isMinWidthName(text)) return undefined;
+  const px = /^(\d+)(px)?$/.exec(text);
+  if (!px) return `"${value.trim()}" is no column's width (xs, s, m, l, or px as 180)`;
+  const n = Number(px[1]);
+  return n >= MIN_PX && n <= MAX_PX ? undefined : `${n} px: from ${MIN_PX} to ${MAX_PX}`;
+}
+
+/** A grid's `min` as px (one that cannot be read, or none: the default's) */
+export function minWidthOf(min: string | undefined): number {
+  const text = min?.trim().toLowerCase() ?? "";
+  if (!text || validateMinWidth(text) !== undefined) return MIN_WIDTHS[DEFAULT_MIN_WIDTH];
+  return isMinWidthName(text) ? MIN_WIDTHS[text] : parseInt(text, 10);
+}
+
+/** A grid's `min` as its menu shows it: a name it is (none: the default's), or its px (`custom`) */
+export function minWidthChoice(min: string | undefined): { readonly name: MinWidthName } | { readonly custom: number } {
+  const text = min?.trim().toLowerCase() ?? "";
+  if (!text || validateMinWidth(text) !== undefined) return { name: DEFAULT_MIN_WIDTH };
+  return isMinWidthName(text) ? { name: text } : { custom: parseInt(text, 10) };
+}
 
 const TRACK = /^(\d+(\.\d+)?(fr|%|px)|auto)$/;
 
@@ -19,12 +62,14 @@ export function validateColumns(value: string): string | undefined {
 }
 
 /**
- * The CSS column template of a grid: its `columns` where they can be read (a count: that many equal columns; widths:
- * each, a share `fr` never narrower than its content allows to shrink, so a long word does not widen a column); else
- * as many equal columns as cells, at most DEFAULT_MAX_COLUMNS, one at least
+ * The CSS column template of a grid: its `columns` where they can be read (`auto`: as many equal columns as fit, none
+ * narrower than `min` nor than the grid, fewer cells than fit sharing the row's whole width, none left empty; a count: that many equal columns; widths: each, a share `fr` never narrower
+ * than its content allows to shrink, so a long word does not widen a column); else as many equal columns as cells, at
+ * most MAX_COLUMNS, one at least
  */
-export function columnTemplate(columns: string | undefined, cells: number): string {
+export function columnTemplate(columns: string | undefined, cells: number, min?: string): string {
   const text = columns?.trim() ?? "";
+  if (fitsColumns(text)) return `repeat(auto-fit, minmax(min(${minWidthOf(min)}px, 100%), 1fr))`;
   if (text && validateColumns(text) === undefined) {
     if (/^\d+$/.test(text)) return `repeat(${Number(text)}, minmax(0, 1fr))`;
     return text
@@ -32,7 +77,17 @@ export function columnTemplate(columns: string | undefined, cells: number): stri
       .map((track) => (track.endsWith("fr") ? `minmax(0, ${track})` : track))
       .join(" ");
   }
-  return `repeat(${Math.min(Math.max(cells, 1), DEFAULT_MAX_COLUMNS)}, minmax(0, 1fr))`;
+  return `repeat(${columnsWithout(cells)}, minmax(0, 1fr))`;
+}
+
+/** How many columns a grid of no `columns` has: one per cell, at most MAX_COLUMNS, one at least */
+export const columnsWithout = (cells: number): number => Math.min(Math.max(cells, 1), MAX_COLUMNS);
+
+/** How many equal columns a grid's menu shows it has: its count, or one per cell where it has no `columns`; none for widths or `auto` */
+export function columnCount(columns: string | undefined, cells: number): number | undefined {
+  const text = columns?.trim() ?? "";
+  if (!text) return columnsWithout(cells);
+  return /^\d+$/.test(text) && validateColumns(text) === undefined ? Number(text) : undefined;
 }
 
 /** The ratios two neighbouring columns snap to as the divider between them is dragged (the first's share : the second's) */

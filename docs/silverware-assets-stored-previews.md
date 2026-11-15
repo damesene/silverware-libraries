@@ -41,6 +41,9 @@ file every time.
   sync conflict breaks nothing; a read-only space: drawn live as now). Never a page's text written as it is opened.
 - **Out of date**: a preview of another version of its file (*Freshness* below) is not read: made anew as it is shown
   with the plugin installed. Without the plugin the old one is shown; nothing helps that.
+- **The folder a setting too** (2026-11-15, the user's): `silverware.assets.previewFolder`, by default
+  `_silverware-asset-preview`; any folder SilverBullet reads (a name without `_` shown in it as any folder). Changed
+  in the settings window, the previews kept are moved into it before the setting is saved.
 - **A setting** (2026-11-15, the user's): `silverware.assets.storePreviews`, **Keep previews in the space** on the
   settings' Files tab, on by default. Off: no type gets `stored` (each preview made as it is shown), no Regenerate
   preview in a menu; those kept stay until Clean up previews, and a file deleted from its menu still takes its own.

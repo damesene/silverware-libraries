@@ -3,19 +3,22 @@
 // view into the embed it is on (the same file in a grid and outside it apart), a file SilverBullet cannot draw as a card,
 // a width dragged (in the page, and within a grid's cell), a PDF and a zip in a cell, a link's icon, the settings'
 // card fields and a click shown in the side panel.
-import { ASSETS_SETTINGS, expect, gridsDrawn, PAGE_LAYOUT, PIXEL_PNG, runCommand, test } from "./helpers.ts";
+import { ASSETS_SETTINGS, expect, gridsDrawn, MOVED_PREVIEWS, PAGE_LAYOUT, PIXEL_PNG, runCommand, test } from "./helpers.ts";
 
-const cell = (text: string) => `<column>\n\n${text}\n\n</column>`;
+const cell = (text: string) => `<cell>\n\n${text}\n\n</cell>`;
 // What shows a PDF in its frame, whoever draws it: the browser's viewer (Silverware Assets' own type), or Silverware
 // PDF's preview where that library is installed beside it (the tests' spaces have every plugin)
 const PDF_SHOWN = ":is(object:visible, .swa-pdf, .swa-pdf-preview)";
 const grid = (...cells: string[]) => `<grid>\n${cells.map(cell).join("\n")}\n</grid>\n`;
 
-/** A view chosen in a medium's "…" menu */
-async function choose(page: import("@playwright/test").Page, frame: import("@playwright/test").Locator, item: string): Promise<void> {
+/** A way of showing it in the open menu's "Show as" row (Link, Card, Preview, Original), by its name */
+const showAs = (page: import("@playwright/test").Page, name: string) => page.locator(`.swa-popup .swa-segment[aria-label^="${name}"]`);
+
+/** A view chosen in a medium's "…" menu, in its "Show as" row */
+async function choose(page: import("@playwright/test").Page, frame: import("@playwright/test").Locator, view: string): Promise<void> {
   await frame.hover();
   await frame.locator(".swa-more").click();
-  await page.locator(".swa-popup .swa-menu-item", { hasText: item }).click();
+  await showAs(page, view).click();
 }
 
 test("the same image at a long page's top and end, the top scrolled away: a view chosen at the end written to the end's embed", async ({ page, space }) => {
@@ -27,7 +30,7 @@ test("the same image at a long page's top and end, the top scrolled away: a view
   await expect(last).toBeVisible();
   // (The top's widget not drawn: the editor draws what is in view)
   await expect(page.locator("#sb-main [data-swa-asset]")).toHaveCount(1);
-  await choose(page, last, "Show as a card");
+  await choose(page, last, "Card");
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\nTop:\n\n${image}\n\n${filler}\n\nThe end:\n\n![[${space.folder}/photo.png|Photo|120|{ view: icon }]]\n\nAfter it.\n`);
 });
 
@@ -64,13 +67,13 @@ test("the same image outside a grid and in it: a view chosen in the grid written
   await gridsDrawn(page);
   const inGrid = page.locator("#sb-main .swl-grid [data-swa-asset]").first();
   await expect(inGrid).toHaveAttribute("data-swa-view", "embed");
-  await choose(page, inGrid, "Show as a card");
+  await choose(page, inGrid, "Card");
   const written = `![[${space.folder}/photo.png|Photo|120|{ view: icon }]]`;
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n${image}\n\n${grid(written, "Right")}`);
   await expect(page.locator("#sb-main .swl-grid [data-swa-asset]").first()).toHaveAttribute("data-swa-view", "icon");
   await expect(page.locator("#sb-main [data-swa-asset]:not(.swl-grid *)").first()).toHaveAttribute("data-swa-view", "embed");
   // Then the one outside the grid: written to its own embed, as the page is now (its text no longer the grid's)
-  await choose(page, page.locator("#sb-main [data-swa-asset]:not(.swl-grid *)").first(), "Show as a preview");
+  await choose(page, page.locator("#sb-main [data-swa-asset]:not(.swl-grid *)").first(), "Preview");
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n![[${space.folder}/photo.png|Photo|120|{ view: preview }]]\n\n${grid(written, "Right")}`);
 });
 
@@ -170,6 +173,67 @@ test("a PDF and a zip in a grid's cells: the PDF's viewer as wide as its cell, t
   await expect(cells.nth(1).locator(".swa-card")).toHaveText("archive.zip");
 });
 
+test("a PDF and a zip in a grid, another cell written: their decorated rendering kept as it was, none decorated again within it", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${grid(`![[${space.folder}/doc.pdf]]`, `![[${space.folder}/archive.zip]]`, "Right")}\nAfter\n` }, "Page", { "doc.pdf": "%PDF-1.4\n", "archive.zip": "zip" });
+  await gridsDrawn(page);
+  const cells = page.locator("#sb-main .swl-grid-cell");
+  await expect(cells.nth(0).locator("[data-swa-asset='pdf']")).toHaveCount(1);
+  await expect(cells.nth(1).locator(".swa-card")).toHaveText("archive.zip");
+  await page.locator("#sb-main .swa-frame").evaluateAll((frames) => frames.forEach((frame) => frame.setAttribute("data-test-kept", "")));
+  // The third cell written: clicked, typed into, left by a click under the grid
+  await cells.nth(2).getByText("Right").click();
+  await expect(page.locator("#sb-main .swl-grid-editor")).toBeVisible();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" typed");
+  await page.locator("#sb-main .cm-line", { hasText: "After" }).click();
+  await expect.poll(() => space.saved("Page")).toContain("Right typed");
+  await expect(cells.nth(2)).toContainText("Right typed");
+  // The same frames, none in another
+  await expect(page.locator("#sb-main .swa-frame")).toHaveCount(2);
+  await expect(page.locator("#sb-main .swa-frame[data-test-kept]")).toHaveCount(2);
+  await expect(page.locator("#sb-main .swa-frame .swa-frame")).toHaveCount(0);
+});
+
+test("an image and text in one grid's cell, its text written: the image's decorated rendering kept, the page under the grid not moved", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${grid(`Some text\n\n![[${space.folder}/pic.png]]`, "Right")}\nAfter\n` }, "Page", { "pic.png": PIXEL_PNG });
+  await gridsDrawn(page);
+  const cell = page.locator("#sb-main .swl-grid-cell").first();
+  await expect(cell.locator(".swa-frame")).toHaveCount(1);
+  await cell.locator(".swa-frame").evaluate((frame) => frame.setAttribute("data-test-kept", ""));
+  const after = page.locator("#sb-main .cm-line", { hasText: "After" });
+  const below = (await after.boundingBox())!.y;
+  await cell.getByText("Some text").click();
+  await expect(page.locator("#sb-main .swl-grid-editor")).toBeVisible();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" typed");
+  await page.keyboard.press("Escape");
+  await expect.poll(() => space.saved("Page")).toContain("Some text typed");
+  await expect(cell).toContainText("Some text typed");
+  await expect(page.locator("#sb-main .swa-frame[data-test-kept]")).toHaveCount(1);
+  await expect(page.locator("#sb-main .swa-frame .swa-frame")).toHaveCount(0);
+  expect(Math.round((await after.boundingBox())!.y)).toBe(Math.round(below));
+});
+
+test("a file in a cell edited while another cell's write drew the grid anew, left unchanged: decorated as before, its menu there", async ({ page, space }) => {
+  await space.open({ Page: `# Page\n\n${grid("Left text", `Right text\n\n![[${space.folder}/pic.png]]`)}\nAfter\n` }, "Page", { "pic.png": PIXEL_PNG });
+  await gridsDrawn(page);
+  const cells = page.locator("#sb-main .swl-grid-cell");
+  await expect(cells.nth(1).locator(".swa-frame")).toHaveCount(1);
+  // The first written by a click into the second (the grid drawn anew while the second is edited), then the second
+  // left unchanged by a click back into the first
+  await cells.nth(0).getByText("Left text").click();
+  await expect(page.locator("#sb-main .swl-grid-editor")).toBeVisible();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" typed");
+  await cells.nth(1).getByText("Right text").click();
+  await expect.poll(() => space.saved("Page")).toContain("Left text typed");
+  await expect(cells.nth(1).locator(".swl-grid-editor")).toBeVisible();
+  await cells.nth(0).getByText("Left text typed").click();
+  await expect(cells.nth(1).locator(".swl-grid-editor")).toHaveCount(0);
+  await expect(cells.nth(1).locator(".swa-frame")).toHaveCount(1);
+  await expect(cells.nth(1).locator(".swa-frame .swa-frame")).toHaveCount(0);
+});
+
 test("a link to a file shows its type's icon, in a grid too; a link to a page none", async ({ page, space }) => {
   await space.open({ Page: `# Page\n\nSee [[${space.folder}/doc.pdf]] and [[${space.folder}/Other]].\n\n${grid(`In a cell [[${space.folder}/doc.pdf]]`, "Right")}`, Other: "# Other\n" }, "Page", { "doc.pdf": "%PDF-1.4\n" });
   await gridsDrawn(page);
@@ -178,7 +242,7 @@ test("a link to a file shows its type's icon, in a grid too; a link to a page no
   // Its icon's menu: the link not followed, the file shown enlarged
   const url = page.url();
   await page.locator("#sb-main .swl-grid [data-swa-link='pdf'] .swa-link-icon").click();
-  await page.locator(".swa-popup .swa-menu-item", { hasText: "Show enlarged" }).click();
+  await page.locator(".swa-popup .swa-menu-item", { hasText: "Open enlarged" }).click();
   await expect(page.locator(".swa-popover object")).toHaveAttribute("data", `.fs/${encodeURI(`${space.folder}/doc.pdf`)}`);
   expect(page.url()).toBe(url);
   await page.keyboard.press("Escape");
@@ -305,7 +369,7 @@ test("an original's label: none by default; its alt text turned on in Appearance
   await space.open({ Page: `# Page\n\n![[${space.folder}/photo.png|Photo|60|{ view: embed }]]\n` }, "Page", { "photo.png": PIXEL_PNG });
   const image = page.locator("#sb-main [data-swa-asset='image']");
   await expect(image).toHaveAttribute("data-swa-view", "embed");
-  await expect(image.locator(".swa-label")).toHaveCount(0);
+  await expect(image.locator(".swa-label-line")).toHaveCount(0);
   await runCommand(page, ASSETS_SETTINGS);
   const dialog = page.locator(".swa-dialog");
   await dialog.getByRole("tab", { name: "Appearance" }).click();
@@ -347,12 +411,12 @@ test("files in a grid's cell being edited drawn as in the page, read-only: an im
 
 test("Clean up previews takes away the previews kept of files gone and of versions gone", async ({ page, space }) => {
   // (Written before the page is opened: SilverBullet lists the files it knows as it starts, as it knows those it writes)
-  await space.writeKept("gone.pdf.1-1.webp", "kept");
-  await space.writeKept("doc.pdf.1-1.webp", "an older version's");
+  await space.writeKept("gone.pdf.1731600000000-4.webp", "kept");
+  await space.writeKept("doc.pdf.1731500000000-9.webp", "an older version's");
   await space.open({ Page: `# Page\n\n![[${space.folder}/doc.pdf]]\n` }, "Page", { "doc.pdf": "%PDF-1.4\n" });
   await runCommand(page, "Silverware Assets: Clean up previews");
-  await expect.poll(() => space.kept("gone.pdf.1-1.webp")).toBe(false);
-  await expect.poll(() => space.kept("doc.pdf.1-1.webp")).toBe(false);
+  await expect.poll(() => space.kept("gone.pdf.1731600000000-4.webp")).toBe(false);
+  await expect.poll(() => space.kept("doc.pdf.1731500000000-9.webp")).toBe(false);
 });
 
 test("a preview in a grid's cell is not drawn anew as text above the grid is typed (its place in the page moving)", async ({ page, space }) => {
@@ -480,7 +544,7 @@ test("a card's icon hidden in the settings: a small arrow after its name within 
   }).toBe(true);
   const url = page.url();
   await marker.click();
-  await expect(page.locator(".swa-popup .swa-menu-item", { hasText: "Show as a preview" })).toBeVisible();
+  await expect(showAs(page, "Preview")).toBeVisible();
   expect(page.url()).toBe(url);
 });
 
@@ -506,7 +570,7 @@ test("a link's icon hidden in the settings: a small arrow after the link opens i
   await expect(link.locator(".swa-link-icon")).toHaveCount(0);
   const url = page.url();
   await marker.click();
-  await expect(page.locator(".swa-popup .swa-menu-item", { hasText: "Show as embedded" })).toBeVisible();
+  await expect(showAs(page, "Original")).toBeVisible();
   expect(page.url()).toBe(url);
 });
 
@@ -598,19 +662,40 @@ test("Download in a file's menu saves the file under its own name", async ({ pag
   expect(file.suggestedFilename()).toBe("archive.zip");
 });
 
+test("the settings: the previews' folder renamed, the previews kept moved into it, written in CONFIG; one SilverBullet cannot read refused", async ({ page, space }) => {
+  // (Written before the page is opened: SilverBullet lists the files it knows as it starts, as it knows those it writes)
+  await space.writeKept("doc.pdf.1731500000000-9.webp", "kept");
+  await space.open({ Page: `# Page\n\n![[${space.folder}/doc.pdf]]\n` }, "Page", { "doc.pdf": "%PDF-1.4\n" });
+  await runCommand(page, ASSETS_SETTINGS);
+  const dialog = page.locator(".swa-dialog");
+  const folder = dialog.getByLabel("Previews' folder");
+  await expect(folder).toHaveValue("_silverware-asset-preview");
+  // (A name SilverBullet cannot read: not saved, said why)
+  await folder.fill(".hidden");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toContainText("starts with a dot");
+  await folder.fill(MOVED_PREVIEWS);
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => space.kept("doc.pdf.1731500000000-9.webp", MOVED_PREVIEWS)).toBe(true);
+  expect(await space.kept("doc.pdf.1731500000000-9.webp")).toBe(false);
+  await expect.poll(() => space.config()).toContain(`config.set("silverware.assets.previewFolder", "${MOVED_PREVIEWS}")`);
+});
+
 test("a link shown as embedded by its icon's menu, and the embed shown as a link again by its own, each the one it is", async ({ page, space }) => {
   const link = `[[${space.folder}/doc.pdf]]`;
   await space.open({ Page: `# Page\n\nA ${link} here.\n\n${grid(`Cell ${link}`, "Right")}` }, "Page", { "doc.pdf": "%PDF-1.4\n" });
   await gridsDrawn(page);
-  const pick = async (trigger: import("@playwright/test").Locator, label: string) => {
+  const pick = async (trigger: import("@playwright/test").Locator, way: string) => {
     await trigger.click();
-    await page.locator(".swa-popup .swa-menu-item", { hasText: label }).click();
+    await showAs(page, way).click();
   };
-  await pick(page.locator("#sb-main .swl-grid [data-swa-link] .swa-link-icon"), "Show as embedded");
+  // (Its menu's row: the original, the settings' own, written as a plain embed)
+  await pick(page.locator("#sb-main .swl-grid [data-swa-link] .swa-link-icon"), "Original");
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\nA ${link} here.\n\n${grid(`Cell !${link}`, "Right")}`);
   const embedded = page.locator("#sb-main .swl-grid [data-swa-asset='pdf']");
   await embedded.hover();
-  await pick(embedded.locator(".swa-more"), "Show as a link");
+  await pick(embedded.locator(".swa-more"), "Link");
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\nA ${link} here.\n\n${grid(`Cell ${link}`, "Right")}`);
 });
 
@@ -628,53 +713,6 @@ test("SilverBullet's markdown shown as written: media and grids hidden, their ma
   await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
   await expect(page.locator("#sb-main [data-swa-asset]:not(.swa-frame)").first()).toBeVisible();
   await expect(page.locator("#sb-main .swl-grid")).toBeVisible();
-});
-
-test("SilverBullet's markdown shown as written: a click on an embed's `![[` places the cursor, SilverBullet not told of it, a text pointer over it; the Markdown tab's box off, SilverBullet's click again", async ({ page, space }) => {
-  const image = `![[${space.folder}/photo.png|Photo|120]]`;
-  await space.open({ Page: `# Page\n\n${image}\n\nAfter\n` }, "Page", { "photo.png": PIXEL_PNG });
-  const url = page.url();
-  const clickAtStart = async () => {
-    const line = page.locator("#sb-main .cm-line", { hasText: "photo.png" });
-    const box = (await line.boundingBox())!;
-    await page.mouse.click(box.x + 3, box.y + 8);
-  };
-  const cursor = () => page.evaluate(() => (window as unknown as { client: { editorView: { state: { selection: { main: { head: number } } } } } }).client.editorView.state.selection.main.head);
-  // The clicks SilverBullet is told of (its editor's listener is under `#sb-main`): counted there
-  await page.evaluate(() => {
-    const seen = window as unknown as { swlClicks: number };
-    seen.swlClicks = 0;
-    document.querySelector("#sb-main")!.addEventListener("click", () => void seen.swlClicks++);
-  });
-  const told = () => page.evaluate(() => (window as unknown as { swlClicks: number }).swlClicks);
-  await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
-  await expect(page.locator("#sb-main .cm-content")).toContainText(image);
-  // The text's pointer over it, no hand: nothing to follow there
-  await expect
-    .poll(() => page.locator("#sb-main .cm-line", { hasText: "photo.png" }).evaluate((line) => [...line.querySelectorAll("span")].map((span) => getComputedStyle(span).cursor)))
-    .not.toContain("pointer");
-  // (SilverBullet follows an embed's line on a click anywhere on it, its `!` too: held back, the cursor at the click)
-  await clickAtStart();
-  // (The cursor in the embed's line, where the click was; a long path wraps the line, so not asked to the character)
-  const start = "# Page\n\n".length;
-  await expect.poll(cursor).toBeGreaterThanOrEqual(start);
-  expect(await cursor()).toBeLessThanOrEqual(start + image.length);
-  expect(await told()).toBe(0);
-  await page.waitForTimeout(500);
-  expect(page.url()).toBe(url);
-  // The box off in the settings' Markdown tab: the click SilverBullet's again (what it does with it, its own)
-  await runCommand(page, ASSETS_SETTINGS);
-  const dialog = page.locator(".swa-dialog");
-  await dialog.getByRole("tab", { name: "Markdown" }).click();
-  await dialog.getByLabel("A click on a link only places the cursor").uncheck();
-  await dialog.getByRole("button", { name: "Save" }).click();
-  await expect.poll(() => space.config()).toContain('config.set("silverware.assets.syntaxMode.clickPlacesCursor", false)');
-  // (Once SilverBullet has loaded its configuration again: the root no longer marked for it)
-  await expect.poll(() => page.evaluate(() => document.documentElement.hasAttribute("data-swa-syntax-clicks")), { timeout: 15_000 }).toBe(false);
-  await clickAtStart();
-  await expect.poll(told).toBe(1);
-  if (page.url() !== url) await page.goBack();
-  await runCommand(page, "Editor: Toggle Markdown Syntax Rendering");
 });
 
 test("SilverBullet's markdown shown as written, each plugin's box off apart: files kept by Silverware Assets', grids by Silverware Layout's", async ({ page, space }) => {
@@ -724,6 +762,6 @@ test("a card opens its menu from its icon, no button over it; what is chosen the
   await card.hover();
   await expect(page.locator("#sb-main [data-swa-asset] .swa-more")).toHaveCount(0);
   await card.locator(".swa-icon").click();
-  await page.locator(".swa-popup .swa-menu-item", { hasText: "Show as a link" }).click();
+  await showAs(page, "Link").click();
   await expect.poll(() => space.saved("Page")).toBe(`# Page\n\n[[${space.folder}/archive.zip]]\n`);
 });

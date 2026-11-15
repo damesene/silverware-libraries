@@ -16,21 +16,21 @@ HTML-like tags, each on a line of its own; the configuration is the tags' attrib
 
 ```markdown
 <grid>
-<column>
+<cell>
 
 Column 1
 
-</column>
-<column>
+</cell>
+<cell>
 
 Column 2
 
-</column>
+</cell>
 </grid>
 ```
 
-- `<grid …>` opens, `</grid>` closes; `<column>` … `</column>` is one cell. Attributes later: `<grid columns="1fr 2fr" gap="16">`, `<column span="2" align="center">`, a width for Silverware Layout's handle.
-- **Cells flow**: they fill the columns left to right and wrap, so a matrix of images is `<grid columns="3">` and nine `<column>`s. A `<column>` is therefore a cell, not a whole column of the grid (a `<cell>` alias may come later if that reads badly).
+- `<grid …>` opens, `</grid>` closes; `<cell>` … `</cell>` is one cell. Attributes later: `<grid columns="1fr 2fr" gap="16">`, `<cell span="2" align="center">`, a width for Silverware Layout's handle.
+- **Cells flow**: they fill the columns left to right and wrap, so a matrix of images is `<grid columns="3">` and nine `<cell>`s. A `<cell>` is a cell, not a whole column of the grid: it was named `<column>` until 2026-11-15, renamed (the user's choice) as Auto and more cells than columns made the name read wrongly; no grid was written with it yet, so `<column>` is not read any more.
 - **Blank lines around a column's content**: by CommonMark an HTML block runs to the next blank line and its content is not read as markdown. With the blank lines every renderer reads a column's content as markdown (lists, images, links), the columns shown one under another; without them the whole grid is one raw HTML block, its markdown shown as text and its lines run together. `/grid` inserts the form with blank lines and the widget keeps them as it writes a cell; the compact form typed by hand is read too. Spaces at a line's end are ignored.
 - Not `<col>`: a real HTML element (a table's, void: a browser drops it outside a table) and a CommonMark type-6 block tag.
 - Not `<div class="grid">`: SilverBullet renders known block tags as HTML, so the grid would look different in SilverBullet without the plugin than in plain markdown.
@@ -38,7 +38,7 @@ Column 2
 ### Without the plugin
 
 - **Another renderer**: the tag lines are empty unknown elements (GitHub strips unknown tags); the columns' content renders as normal markdown, one column under another.
-- **SilverBullet**: only known block tags (`div`, `details`, …: `blockTagRe` in `client/markdown_parser/html_block.ts`) become structured HTML blocks. A `<grid>` or `<column>` line is a flat HTML block of lezer's own parser, which SilverBullet's renderer (`markdown_render.ts`, case `HTMLBlock`) shows as text: the tags are visible, the content below them is markdown, stacked. As readable as plain markdown, and accepted (2026-11-12).
+- **SilverBullet**: only known block tags (`div`, `details`, …: `blockTagRe` in `client/markdown_parser/html_block.ts`) become structured HTML blocks. A `<grid>` or `<cell>` line is a flat HTML block of lezer's own parser, which SilverBullet's renderer (`markdown_render.ts`, case `HTMLBlock`) shows as text: the tags are visible, the content below them is markdown, stacked. As readable as plain markdown, and accepted (2026-11-12).
 - **Plain markdown**: text with a few tag lines.
 
 ### Weighed and dropped
@@ -56,7 +56,7 @@ Column 2
 - `startMarker` a regex for the opening line (`^<grid(\s[^>]*)?>\s*$`), `endMarker` for the closing line (`^</grid>\s*$`); `renderWidget(body, pageName)` gives the widget of the live preview, `renderHtml(body, pageName)` the HTML of an export.
 - Its block parser is placed before `HorizontalRule`, so before lezer's HTML block and SilverBullet's own (`before: "HTMLBlock"`): the whole `<grid>…</grid>` is ours, SilverBullet's HTML preview does not touch it. The cells are read by our own code from the body.
 - The region is replaced by the widget (a `LuaWidget`, the same as a code widget's) while the cursor is outside it; with the cursor inside SilverBullet shows the raw text.
-- **SilverBullet's widget menu is hidden** on the grid (decided 2026-11-13), as Silverware Chart and Database hide it on theirs: the widget gets the grid's class by `renderClass`, and the style page hides `.button-bar` (2.12.1), `.sb-widget-menu-bar` (main) and the touch screen's forced path within it; the grid's own "…" menu is the one menu. `silverbullet.spec.ts` checks it stays hidden.
+- **SilverBullet's widget menu is hidden** on the grid (decided 2026-11-13), as Silverware Chart and Database hide it on theirs: the widget gets the grid's class by `renderClass`, and the style page hides `.button-bar` (2.12.1), `.sb-widget-menu-bar` (main) and the touch screen's forced path within it; the grid's own menus are the ones (its columns' grips, its handle's: docs/silverware-layout-grid-handles.md). `silverbullet.spec.ts` checks it stays hidden.
 - **The end is the first line matching `endMarker`**: the parser counts no nesting, so a grid in a grid would close at the inner `</grid>` (no nesting in the first version), and a `</grid>` line inside a column's fenced code block would end the grid early (documented).
 - A new definition is active after the editor's state is rebuilt (a page reload).
 - **Not in the index**: the region's body node has no children (`markdown.parseMarkdown`, which the index uses, takes the user's syntax extensions), so links, hashtags and embeds inside a grid are not indexed. Without the plugin they would be. See *Indexing*: not only backlinks are lost.
@@ -111,7 +111,7 @@ A part of Silverware Layout (decided 2026-11-12): it is the page's layout, it us
 ## The slash command and the menu
 
 - `/grid` (`slashCommand.define`) inserts two columns in the form with blank lines, the cursor in the first column's content (in the raw text: the widget shows once the cursor leaves).
-- A "…" menu on each cell: built (*Building a grid from the page* below).
+- A "…" menu on each cell: built (*Building a grid from the page* below); replaced 2026-11-15 by a grip on each column and the grid's handle's menu (docs/silverware-layout-grid-handles.md).
 
 ## Building a grid from the page (planned 2026-11-13; built 2026-11-13)
 
@@ -130,6 +130,9 @@ Agreed with the user: a grid is made and taken apart without typing its tags, wi
 - Written by the page writer (the blocks' range replaced by the grid's text, one edit, one undo step).
 
 ### The grid's and a cell's "…" menu
+
+*Replaced 2026-11-15*: the cells' "…" are gone; a column's items are its grip's menu, the grid's its handle's
+(docs/silverware-layout-grid-handles.md). What follows is how the "…" was decided, its items the same.
 
 - **Shown** at a cell's top right as the pointer is over it (always on a touch screen), as a medium's; one a cell, holding the grid's items too (built so: a grid's and a cell's at one corner would lie over each other).
 - **The grid**: the number of columns (Auto, 2, 3, 4: its `columns`), add a column, **Remove grid**: its content without the grid, the cells one under another in their order (row by row: cell 1, 2, 3 of the first row, then the next row's), each cell's markdown as written, a blank line between. The inverse of both modes: Gallery's cells and Split's columns are in the blocks' order.
@@ -153,7 +156,7 @@ Agreed with the user: a grid is made and taken apart without typing its tags, wi
 A scratch space, a `space-lua` block defining `<grid>` by `syntax.define`, Playwright driving the page.
 
 - **`syntax.define` with `<grid>` works**: the region is a widget, classes `<renderClass> sb-lua-directive-block`; the raw text is not shown while the cursor is outside. A definition is active after the page is loaded again (twice in a fresh browser: the first load indexes before Space Lua runs).
-- **`markdown.renderToDom` is not in 2.12.1** (SilverBullet's main only). **`markdown.markdownToHtml(cell, { expand = true, annotationPositions = true })`** is, and does what the plan needs: a cell's links (`a.wiki-link[data-ref]`), hashtags (`a.sb-hashtag`), bold, an image embed as `<img>` with SilverBullet's size (`|120` → `width: 120px`) and alt; every element carries **`data-pos`, its 0-based offset in the cell's text** (the text from the line after `<column>`). The widget's handlers are attached by SilverBullet (`data-handlers-attached`), so its links are SilverBullet's. So a cell is rendered by `markdownToHtml` on 2.12.1, behind the host's interface; `renderToDom` where SilverBullet has it, later.
+- **`markdown.renderToDom` is not in 2.12.1** (SilverBullet's main only). **`markdown.markdownToHtml(cell, { expand = true, annotationPositions = true })`** is, and does what the plan needs: a cell's links (`a.wiki-link[data-ref]`), hashtags (`a.sb-hashtag`), bold, an image embed as `<img>` with SilverBullet's size (`|120` → `width: 120px`) and alt; every element carries **`data-pos`, its 0-based offset in the cell's text** (the text from the line after `<cell>`). The widget's handlers are attached by SilverBullet (`data-handlers-attached`), so its links are SilverBullet's. So a cell is rendered by `markdownToHtml` on 2.12.1, behind the host's interface; `renderToDom` where SilverBullet has it, later.
 - **A plain click in the widget** leaves the widget and SilverBullet's cursor where they are: a click is the grid's. **An Alt+click** is SilverBullet's: the cursor goes to the region's start (the raw text shows), not to the place clicked; the grid's Alt+click is its own (a capture listener, the position by `data-pos` plus the cell's offset).
 - **SilverBullet's widget menu** on the grid: Reload, Copy, Edit (`.button-bar`): hidden, as decided.
 - **The index**: what a fresh browser indexes before Space Lua runs is parsed without the syntax extension, so a grid's links are indexed then; after a reindex with Space Lua loaded they are not (the body has no children). A rename (`Page: Rename`) updated a link outside a grid and **left the grid's link as it was**: the index decides what a rename sees.

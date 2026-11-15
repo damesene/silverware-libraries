@@ -83,6 +83,11 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 :root[data-swl-syntax-shown] :has(> .swl-grid-widget) {
   display: none !important;
 }
+/* The pointer over a link shown as its markdown, whose click places the cursor (src/host/silverbullet/links.ts marks
+   the root while it is there): the text's, not a hand */
+:root[data-swl-text-pointer] :hover {
+  cursor: text !important;
+}
 /* The boxes a widget laid out is in, within the content, let it out: SilverBullet scrolls a Lua block's output in a
    box of the text's width (overflow: auto), which cut a wider database off and showed a scrollbar */
 :root:not([data-swl-narrow]) [data-swl-content] > * :has([data-swl-width]:not([data-silverware-over-window])) {
@@ -770,11 +775,15 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 .swl-grid {
   display: grid;
   grid-template-columns: var(--swl-grid-columns, repeat(2, minmax(0, 1fr)));
-  gap: 0.5em 1.5em;
+  /* (Named: the lines of a cell edited lie in their middle) */
+  --swl-grid-row-gap: 0.5em;
+  --swl-grid-column-gap: 1.5em;
+  gap: var(--swl-grid-row-gap) var(--swl-grid-column-gap);
   /* (Each cell as tall as its row: a shorter column clicked anywhere, under its text too, is edited) */
   align-items: stretch;
 }
-:root[data-swl-narrow] .swl-grid {
+/* (A grid of columns as many as fit keeps them: a gallery on a phone, as many as its narrowest width lets in) */
+:root[data-swl-narrow] .swl-grid:not([data-swl-fit]) {
   grid-template-columns: minmax(0, 1fr);
 }
 /* The dividers between a grid's columns (src/grid/ui/dividers.ts): in each gap, a quiet line as the pointer is over
@@ -809,9 +818,10 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   background: var(--ui-accent-color, #4a90e2);
   opacity: 0;
 }
-/* The grip, in the gap's middle, as the pointer is over the grid */
+/* The grip, in the gap's middle, as the pointer is over the grid: at the middle of the part of the grid in view
+   (src/grid/ui/dividers.ts sets --swl-grip-y), a tall grid's seen wherever it is scrolled to */
 .swl-grid-divider::after {
-  top: 50%;
+  top: var(--swl-grip-y, 50%);
   width: 4px;
   height: 28px;
   transform: translate(-50%, -50%);
@@ -877,7 +887,8 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 /* What a divider dragged says: the ratio snapped to, else the two columns' shares */
 .swl-grid-divider-label {
   position: absolute;
-  top: -1.8em;
+  /* (Over the grip, which rides in the part of the grid in view) */
+  top: calc(var(--swl-grip-y, 50%) - 20px - 1.8em);
   left: 50%;
   transform: translateX(-50%);
   padding: 1px 6px;
@@ -911,27 +922,54 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
 }
 /* A grid's borders (its `border` attribute): faint lines round it and between its cells, as a table's. The gap goes
    into each cell's padding, so a line between two columns lies where the gap's middle was, on its divider. All within
-   the grid's box (the frame the host draws it in cuts off what lies outside): its ring on its own first and last
+   the grid's box (it cuts off what lies outside, but above: `clip-path`): its ring on its own first and last
    pixels; between cells each cell's right and bottom shadow, on the pixel after the
    cell, where a divider draws its line (each cell closed so, a last row's last cell too, not run into the empty
    place beside it). Opaque, so where two meet the line is no darker. Cells as tall as their row: a line between two
-   columns runs its height. A grid one of whose cells is edited has them too, for as long as it is edited (in place
-   of an outline round the field: the user's choice, 2026-11-14), its own as its attribute says again after */
-.swl-grid:is([data-swl-border], :has(> .swl-grid-editing)) {
+   columns runs its height. */
+.swl-grid[data-swl-border] {
   --swl-grid-line: color-mix(in srgb, var(--root-color, #000) 16%, var(--root-background-color, #fff));
   gap: 0;
   align-items: stretch;
   box-shadow: inset 0 0 0 1px var(--swl-grid-line);
 }
-.swl-grid:is([data-swl-border], :has(> .swl-grid-editing)) > .swl-grid-cell {
+.swl-grid[data-swl-border] > .swl-grid-cell {
   padding: 0.5em 0.75em;
   box-shadow: 1px 0 0 var(--swl-grid-line), 0 1px 0 var(--swl-grid-line);
 }
-.swl-grid:is([data-swl-border], :has(> .swl-grid-editing)) > .swl-grid-divider::before {
+.swl-grid[data-swl-border] > .swl-grid-divider::before {
   transform: none;
 }
-.swl-grid:is([data-swl-border], :has(> .swl-grid-editing)) > .swl-grid-divider::after {
+.swl-grid[data-swl-border] > .swl-grid-divider::after {
   transform: translate(calc(-50% + 0.5px), -50%);
+}
+/* A grid of columns as many as fit, its borders: its ring on its top and left alone, each cell's right and bottom
+   shadow seen past its edge (a last row of fewer cells closed by its cells' lines, no ring round the empty place
+   beside them) */
+.swl-grid[data-swl-border][data-swl-fit] {
+  box-shadow: inset 1px 1px 0 0 var(--swl-grid-line);
+  clip-path: inset(-48px -1px -1px 0);
+}
+/* A grid one of whose cells is edited, without borders: lines as a table's for as long as it is edited (in place of
+   an outline round the field: the user's choice, 2026-11-14), its layout as it is (its borders' gap and padding moved
+   its content: the user's report, 2026-11-15). Each line in the middle of a gap: each cell's right and bottom, the
+   grid's top and left half a gap outside it, the grid letting that half gap be seen. Opaque, one line where two meet */
+.swl-grid:not([data-swl-border]):has(> .swl-grid-editing) {
+  --swl-grid-line: color-mix(in srgb, var(--root-color, #000) 16%, var(--root-background-color, #fff));
+  clip-path: inset(-48px calc(var(--swl-grid-column-gap) / -2 - 1px) calc(var(--swl-grid-row-gap) / -2 - 1px));
+}
+.swl-grid:not([data-swl-border]):has(> .swl-grid-editing)::before,
+.swl-grid:not([data-swl-border]):has(> .swl-grid-editing) > .swl-grid-cell::after {
+  content: "";
+  position: absolute;
+  inset: calc(var(--swl-grid-row-gap) / -2) calc(var(--swl-grid-column-gap) / -2);
+  pointer-events: none;
+}
+.swl-grid:not([data-swl-border]):has(> .swl-grid-editing)::before {
+  box-shadow: inset 1px 1px 0 0 var(--swl-grid-line);
+}
+.swl-grid:not([data-swl-border]):has(> .swl-grid-editing) > .swl-grid-cell::after {
+  box-shadow: inset -1px -1px 0 0 var(--swl-grid-line);
 }
 /* A grid whose column divider or width is dragged (its widget marked data-swl-resizing by the handle): its lines as
    long as it is dragged, its ring and a line in each gap, its layout as it is (the borders' gap and padding moved the
@@ -1196,6 +1234,27 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   width: 16px;
   height: 16px;
 }
+/* An item's icon its own size, centred on its line: a plugin's own rules for its class (Silverware Assets' file
+   icons, 22 px) do not reach into its menus. Where any item of a menu has an icon, each item keeps its place, so
+   their words line up (an item without one an empty place) */
+.swl-menu .swl-icon {
+  width: auto;
+  height: auto;
+  align-items: center;
+}
+.swl-menu:has(.swl-menu-item > .swl-icon > svg) .swl-menu-item > .swl-icon {
+  flex: 0 0 16px;
+  width: 16px;
+}
+/* A menu of no icons: no empty place before an item's words (with the gap after it, they began further in than a row
+   of choices' label above them) */
+.swl-menu:not(:has(.swl-menu-item > .swl-icon:not(:empty))) .swl-menu-item > .swl-icon:empty {
+  display: none;
+}
+.swl-menu .swl-icon > svg {
+  width: 16px;
+  height: 16px;
+}
 /* An item's detail: a bubble beside the menu, at the item's height */
 .swl-menu-detail {
   position: absolute;
@@ -1257,16 +1316,30 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   margin: 4px 2px;
   background: var(--button-border-color, rgba(128, 128, 128, 0.3));
 }
-/* A row of icon buttons after a label: a choice (Align) or a pair of actions (Move up, Move down) */
+/* A row of icon buttons after a label: a choice (Align) or a pair of actions (Move up, Move down). Its buttons under
+   the label, at the right, where they do not fit beside it (a menu as wide as a phone lets it: a grid's columns, eight
+   of them, ran out of the menu), on more lines where they do not fit on one */
 .swl-menu-segmented {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 4px 8px;
   padding: 2px 4px 2px 8px;
 }
-/* A long label (a sheet's name) cut, whole in its tooltip: the menu as wide as its items */
+.swl-menu-segmented > .swl-segments {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+/* A menu whose items have icons: a row's label where their words begin (the icon's place and the gap after it) */
+.swl-menu:has(.swl-menu-item > .swl-icon > svg) .swl-menu-segmented {
+  padding-left: 32px;
+}
+/* A long label (a sheet's name) cut, whole in its tooltip: the menu as wide as its items; a short one whole, never
+   squeezed by the buttons beside it (Show as) */
 .swl-menu-segmented > .swl-label {
+  flex: 0 0 auto;
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1360,38 +1433,79 @@ The look of [Silverware Layout](silverware-layout.md): its Page layout dialog. I
   height: 22px;
 }
 /* </shared-menu> */
-/* A grid's cell's "…", at the cell's top right as the pointer is over the cell */
+/* A grid's column grip (src/grid/ui/columngrips.ts, docs/silverware-layout-grid-handles.md): a short grey grip lying
+   at the middle of the column's top edge, half above it (the line above a grid is kept free), as a divider's grip turned
+   on its side; shown as the pointer is over the column, lit and longer as it is pointed at, its click the column's
+   menu. Its target larger than what is drawn (a finger's larger still) */
+/* (The box the host draws a grid in let out: it scrolls what lies outside it away, so the grips' upper halves were
+   cut off. The grid then cuts off itself what lies outside it but above: its cells' lines the pixel after the last
+   column and row, as the box did (the grid's borders drawn within it), a cell's content too wide; above it, in the
+   line kept free, the column grips' upper halves and a divider's label stay seen) */
+.swl-grid-widget :has(> .swl-grid) {
+  overflow: visible !important;
+}
+.swl-grid {
+  clip-path: inset(-48px 0 0 0);
+}
 .swl-grid-cell {
   position: relative;
 }
-.swl-grid-cell-more {
+.swl-grid-column-grip {
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: 0;
+  left: 50%;
   z-index: var(--sw-layer-control);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 22px;
+  width: 44px;
+  height: 14px;
+  margin: 0;
   padding: 0;
-  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-  border-radius: 4px;
-  font: inherit;
-  line-height: 1;
-  color: inherit;
-  background: var(--root-background-color);
+  border: 0;
+  background: none;
+  transform: translate(-50%, -50%);
   opacity: 0;
+  /* (Hidden, it takes no press: a press there is the cell's, edited, as it was before the grip was there) */
+  pointer-events: none;
   cursor: pointer;
+  touch-action: none;
 }
-.swl-grid-cell:hover > .swl-grid-cell-more,
-.swl-grid-cell-more:focus-visible,
-.swl-grid-cell-more[aria-expanded="true"] {
+.swl-grid-column-grip::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 28px;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--root-color) 35%, transparent);
+  transform: translate(-50%, -50%);
+  transition: background-color 0.12s, width 0.12s;
+}
+.swl-grid-cell:hover > .swl-grid-column-grip,
+.swl-grid-column-grip:focus-visible,
+.swl-grid-column-grip[aria-expanded="true"] {
   opacity: 1;
+  pointer-events: auto;
 }
+.swl-grid-column-grip:hover::after,
+.swl-grid-column-grip:focus-visible::after,
+.swl-grid-column-grip[aria-expanded="true"]::after {
+  width: 40px;
+  background: var(--ui-accent-color, #4a90e2);
+}
+/* A touch screen: no pointer over anything; a grid's grips shown while it has the focus (a tap in it gives it), a
+   finger's target */
 @media (hover: none) {
-  .swl-grid-cell-more {
-    opacity: 0.8;
+  .swl-grid:focus-within > .swl-grid-cell > .swl-grid-column-grip {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+@media (pointer: coarse) {
+  /* (A finger's target, wider, its height half above the edge, in the gap between rows, half in its cell's top: not
+     over the cell above's text, nor a short cell's middle, whose tap is the cell's) */
+  .swl-grid-column-grip {
+    width: 56px;
+    height: 16px;
   }
 }
 /* The box of a popup menu (shared/popupmenu.ts), over the page */

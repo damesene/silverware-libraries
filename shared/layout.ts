@@ -78,7 +78,31 @@ export type LayoutProvider = {
   // the editor, a grid's cell): its width then a share of that box's, snapped to its quarters, never wider; neither the
   // text's width nor the guides apply. None (or undefined): the page's text
   room?(element: Element): Element | undefined;
+  // Optional: what the widget's plugin adds to the handle's menu (a click on its grip), under Silverware Layout's own
+  // (Align, Width), a separator before each section: a grid's columns and borders. None: Layout's alone
+  menu?(element: Element): readonly (readonly LayoutMenuEntry[])[];
 };
+
+/**
+ * An item a provider adds to the handle's menu: its label, what it does (a promise where it writes: the handle placed
+ * again once it is done, the widget drawn anew by then), a choice shown on (checked), why it cannot be (disabled)
+ */
+export type LayoutMenuItem = { readonly label: string; readonly run: () => unknown; readonly checked?: boolean; readonly disabled?: string; readonly danger?: boolean };
+
+/**
+ * A row of choices side by side a provider adds to the handle's menu (a grid's number of columns), after its label:
+ * each its look (an SVG's text, or a short text: `2`, `XS`), its title, the one set active, why it cannot be
+ * (disabled), what it does (a promise where it writes, as an item's)
+ */
+export type LayoutMenuChoices = {
+  readonly kind: "segmented";
+  readonly label: string;
+  // (`keepsOpen`: the menu left open, shown anew once it is done: a choice that offers more, a grid's Auto its min width)
+  readonly options: readonly { readonly icon: string; readonly title: string; readonly active?: boolean; readonly disabled?: string; readonly keepsOpen?: boolean; readonly run: () => unknown }[];
+};
+
+/** An entry of a provider's section of the handle's menu: an item, or a row of choices */
+export type LayoutMenuEntry = LayoutMenuItem | LayoutMenuChoices;
 
 /** What a widget's plugin registers its providers with: Silverware Layout's API (`silverware.layout.api`), or the stand-in without it */
 export type Layout = {

@@ -15,12 +15,20 @@ import { addCardFields, dateText, drawCard, iconElement, markFailed, menuMarker,
 import { drawLabelLine, labelTexts, type LabelValues } from "./ui/label.ts";
 import { opensMenu } from "../../shared/popupmenu.ts";
 import { writeClipboard, writeClipboardLater } from "../../shared/clipboard.ts";
-import { addMoreButton, type MoreMenu, popupOf } from "./ui/moremenu.ts";
+import { addMoreButton, type MoreMenu, popupOf, type ShowAs } from "./ui/moremenu.ts";
+import { VIEW_CARD, VIEW_LINK, VIEW_ORIGINAL, VIEW_PREVIEW } from "../../shared/glyphs.ts";
 import type { EditorEmbed } from "../../shared/editor.ts";
 import { plainMedium } from "./ui/plainmedium.ts";
 
 // The popup menu's classes: Silverware Assets'
 const POPUP = { base: "swa" } as const;
+// How long a burst of types registered is waited out before a file in an editor's field is drawn again (ms)
+const TYPES_SETTLE_MS = 50;
+/** An item of a file's menu */
+type MenuItem = { readonly label: string; readonly run: () => void };
+// How a file can be shown, as a file's menu names and draws each (docs/silverware-assets-menu.md)
+const VIEW_NAMES: Readonly<Record<View, string>> = { icon: "Card", preview: "Preview", embed: "Original" };
+const VIEW_ICONS: Readonly<Record<View, string>> = { icon: VIEW_CARD, preview: VIEW_PREVIEW, embed: VIEW_ORIGINAL };
 
 /** An embed as the host drew it: its frame, its target as drawn (a path of the space or a URL), its own media element */
 export type DrawnEmbed = {
@@ -79,7 +87,7 @@ export type AssetHost = {
   writeEmbed(write: EmbedWrite): Promise<string | undefined>;
   /** An embed written as a link to its file, a link as an embed of it (none: neither is offered); why not, as text */
   embedToLink?(write: FormWrite): Promise<string | undefined>;
-  linkToEmbed?(write: FormWrite): Promise<string | undefined>;
+  linkToEmbed?(write: FormWrite & { readonly changes?: EmbedChanges }): Promise<string | undefined>;
   /**
    * A file of the space deleted, and its embed taken out of the page (a link to it written as its text), each found as
    * `embedToLink` finds it; asked first (`confirm`). None: no Delete in the menus. Why not, as text
@@ -176,6 +184,7 @@ export class AssetDecorator {
       this.linkMenus.set(link.element, control);
       const drawn = !!type.views?.embed || !!plainMedium(this.doc, asset, mimeOf(asset));
       const capabilities: Capabilities = { views: ["icon", ...(type.views?.preview ? (["preview"] as const) : []), ...(drawn ? (["embed"] as const) : [])] };
+      const linkActions = this.actionItems(asset, capabilities, (container, as) => this.drawInto(container, as, type, asset, settings, control.signal));
       opensMenu(
         this.doc,
         POPUP,
@@ -183,9 +192,15 @@ export class AssetDecorator {
         () =>
           popupOf({
             title: assetName(asset),
-            views: [],
-            actions: [
-              ...this.actionItems(asset, capabilities, (container, as) => this.drawInto(container, as, type, asset, settings, control.signal)),
+            // (Shown as a link: an embed of a view chosen in its place, written at once)
+            showAs: this.host.linkToEmbed
+              ? this.showAs("link", settings.views.types[type.name] ?? settings.views.default, (view) => capabilities.views.includes(view), true, (to) => {
+                  if (to !== "link") void this.toEmbed(link, to === (settings.views.types[type.name] ?? settings.views.default) ? undefined : to);
+                })
+              : [],
+            open: linkActions.open,
+            file: [
+              ...linkActions.copy,
               // Its whole markdown, as the page has it now
               {
                 label: "Copy markdown",
@@ -199,7 +214,7 @@ export class AssetDecorator {
                     }),
                   ).catch((error: unknown) => this.host.problem(`Silverware Assets: not copied: ${message(error)}`)),
               },
-              ...(this.host.linkToEmbed ? [{ label: "Show as embedded", run: () => void this.toEmbed(link) }] : []),
+              ...linkActions.file,
             ],
             destructive: this.deletable(asset, "link") ? [{ label: "Delete file…", run: () => void this.deleteLinked(link, asset) }] : [],
           }),
@@ -232,7 +247,7 @@ export class AssetDecorator {
     const files = this.host.previewFiles;
     const facts = files ? await files.facts(path).catch(() => undefined) : undefined;
     const problem = await this.host.deleteFile!(path);
-    if (!problem && files && facts) await forgetPreviews(files, path, facts);
+    if (!problem && files && facts) await forgetPreviews(files, (await this.host.settings()).previewFolder, path, facts);
     return problem;
   }
 
@@ -262,10 +277,10 @@ export class AssetDecorator {
   }
 
   /** A link written as an embed of its file: found in the page by its place, else by its target and its order among the links drawn of it */
-  private async toEmbed(link: DrawnLink): Promise<void> {
+  private async toEmbed(link: DrawnLink, view?: View): Promise<void> {
     const found = await this.linkInPage(link);
     if (!found) return this.host.problem("Silverware Assets: this link was not found in the page");
-    const problem = await this.host.linkToEmbed!({ text: found.link.text, occurrence: found.occurrence, of: found.of });
+    const problem = await this.host.linkToEmbed!({ text: found.link.text, occurrence: found.occurrence, of: found.of, ...(view ? { changes: { metadata: { view } } } : {}) });
     if (problem) this.host.problem(`Silverware Assets: not written: ${problem}`);
   }
 
@@ -305,16 +320,48 @@ export class AssetDecorator {
   }
 
   /** What can be done with an asset: each fitting action registered (its menu's), run with how it is drawn elsewhere */
-  private actionItems(asset: Asset, can: Capabilities, render: (container: HTMLElement, as: "preview" | "embed") => Promise<void>): { readonly label: string; readonly run: () => void }[] {
-    return this.registry.actions.all
+  private actionItems(
+    asset: Asset,
+    can: Capabilities,
+    render: (container: HTMLElement, as: "preview" | "embed") => Promise<void>,
+  ): { readonly open: MenuItem[]; readonly copy: MenuItem[]; readonly file: MenuItem[] } {
+    const items = this.registry.actions.all
       .filter((action) => action.fits(asset, can))
       .map((action) => ({
+        group: action.group ?? "open",
+        // (A copy first in the file's section, as Copy markdown is)
+        copy: action.name.startsWith("copy"),
         label: action.label ?? action.name,
         run: () => {
           const context: ActionContext = { asset, open: (url) => this.host.open(url), render: (as, container) => render(container, as) };
           void Promise.resolve(action.run(context)).catch((error: unknown) => this.host.problem(`Silverware Assets: ${action.name}: ${message(error)}`));
         },
       }));
+    const plain = ({ label, run }: (typeof items)[number]) => ({ label, run });
+    const file = items.filter((item) => item.group === "file");
+    // (The file's section: its copies first, Copy markdown among them, then the rest)
+    return {
+      open: items.filter((item) => item.group !== "file").map(plain),
+      copy: file.filter((item) => item.copy).map(plain),
+      file: file.filter((item) => !item.copy).map(plain),
+    };
+  }
+
+  /**
+   * How a file can be shown in the page, as the menu's row (docs/silverware-assets-menu.md): a link (where the host
+   * writes one), a card, a preview, the original; the one shown active, the settings' own named "(default)", one it
+   * cannot be shown as disabled. `choose` writes the one chosen (a view: the settings' own as none)
+   */
+  private showAs(shown: View | "link", settled: View, can: (view: View) => boolean, linkable: boolean, choose: (to: View | "link") => void): ShowAs[] {
+    const views = VIEWS.map((one) => ({
+      view: one as View | "link",
+      title: `${VIEW_NAMES[one]}${one === settled ? " (default)" : ""}`,
+      icon: VIEW_ICONS[one],
+      active: one === shown,
+      ...(can(one) ? {} : { disabled: "This file cannot be shown so" }),
+      run: () => choose(one),
+    }));
+    return [...(linkable ? [{ view: "link" as const, title: "Link", icon: VIEW_LINK, active: shown === "link", run: () => choose("link") }] : []), ...views];
   }
 
   /** A link's asset drawn into a container of an action's: its type's view, else the plain medium of its kind, else its card */
@@ -361,14 +408,24 @@ export class AssetDecorator {
           frame.append(native);
         }
         container.append(frame);
-        void this.host
-          .settings()
-          .then((settings) => {
-            if (signal.aborted) return;
-            const drawn: DrawnEmbed = { frame, target: this.host.resolved(embed, page), native };
-            this.render(drawn, { embed, occurrence: 0, of: 1 }, asset, type, settings, signal);
-          })
-          .catch(() => undefined);
+        const drawn: DrawnEmbed = { frame, target: this.host.resolved(embed, page), native };
+        // Drawn by the type that takes it now: again as the types change (another plugin's registered after the field
+        // was opened, Silverware Assets PDF's in place of the built-in one), a moment after a burst of them
+        const draw = () =>
+          void this.host
+            .settings()
+            .then((settings) => {
+              if (signal.aborted) return;
+              this.render(drawn, { embed, occurrence: 0, of: 1 }, asset, typeFor(this.registry.types.all, asset) ?? type, settings, signal);
+            })
+            .catch(() => undefined);
+        draw();
+        let soon: ReturnType<typeof setTimeout> | undefined;
+        const stop = this.registry.onChange(() => {
+          clearTimeout(soon);
+          soon = setTimeout(draw, TYPES_SETTLE_MS);
+        });
+        signal.addEventListener("abort", () => (clearTimeout(soon), stop()));
       },
     };
   }
@@ -470,7 +527,7 @@ export class AssetDecorator {
     this.renders.get(drawn.frame)?.abort();
     const control = new AbortController();
     this.renders.set(drawn.frame, control);
-    readOnly?.addEventListener("abort", () => control.abort());
+    readOnly?.addEventListener("abort", () => control.abort(), { once: true, signal: control.signal });
     const { frame, native } = drawn;
     frame.querySelectorAll(":scope > .swa-own, :scope > .swa-failed").forEach((own) => own.remove());
     frame.classList.remove("swa-has-error");
@@ -512,7 +569,7 @@ export class AssetDecorator {
     });
     // (A preview of a file kept in the space where its type keeps one: docs/silverware-assets-stored-previews.md)
     const files = settings.storePreviews && type.storesPreview && asset.kind === "file" ? this.host.previewFiles : undefined;
-    const stored = files && asset.kind === "file" && view === "preview" ? storedPreview(files, asset.path, this.anew.delete(frame)) : undefined;
+    const stored = files && asset.kind === "file" && view === "preview" ? storedPreview(files, settings.previewFolder, asset.path, this.anew.delete(frame)) : undefined;
     const context: RenderContext = {
       asset,
       viewport: viewportOf(frame, found.embed, view, settings, control.signal, sized ? preview.width : undefined, view === "preview" ? preview.height : undefined),
@@ -536,47 +593,39 @@ export class AssetDecorator {
     // Its menu: how it is shown (the one the settings give left unwritten), what can be done with it. Opened by the "…"
     // at its top right; a card's by its icon, as a link's (no "…" over a card's name)
     const settled = settings.views.types[type.name] ?? settings.views.default;
-    const LABELS: Readonly<Record<View, string>> = { icon: "Show as a card", preview: "Show as a preview", embed: "Show as the original" };
+    const notWritten = (problem: string | undefined) => problem && this.host.problem(`Silverware Assets: not written: ${problem}`);
     const menu = (): MoreMenu => {
+        const actions = this.actionItems(asset, capabilities, (container, as) => renderInto(as, container));
         return {
-          title: asset.alt || type.name,
-          views: VIEWS.map((one) => ({
-            view: one,
-            label: LABELS[one],
-            checked: one === view,
-            ...(can(one) ? {} : { disabled: "This file cannot be shown so" }),
-            run: () =>
-              void write({ metadata: { view: one === settled ? null : one } }).then((problem) => problem && this.host.problem(`Silverware Assets: not written: ${problem}`)),
-          })),
-          actions: [
-            ...this.actionItems(asset, capabilities, (container, as) => renderInto(as, container)),
-            // Its kept preview made anew (its file's previews taken away, its preview drawn again: made then)
-            ...(files && asset.kind === "file" && view === "preview"
-              ? [
-                  {
-                    label: "Regenerate preview",
-                    run: () =>
-                      void forgetPreviews(files, asset.path).then(() => {
-                        this.anew.add(frame);
-                        this.render(drawn, found, asset, type, settings, readOnly);
-                      }),
-                  },
-                ]
-              : []),
+          title: assetName(asset),
+          // How it is shown: a view written into its embed (the settings' own as none), or the embed written as a link
+          showAs: this.showAs(view, settled, can, !!this.host.embedToLink, (to) => {
+            if (to === "link")
+              void this.locateNow(drawn)
+                .then((now) => (now ? this.host.embedToLink!({ text: now.embed.text, occurrence: now.occurrence, of: now.of }) : NOT_FOUND))
+                .then(notWritten);
+            else void write({ metadata: { view: to === settled ? null : to } }).then(notWritten);
+          }),
+          open: actions.open,
+          file: [
+            ...actions.copy,
             // Its whole markdown, its metadata too: the text it is drawn from (drawn anew as it changes), copied at once,
             // while the click still lets the page copy (read from the page first, a browser refused the copy that late)
             {
               label: "Copy markdown",
               run: () => void writeClipboard(this.doc, found.embed.text).catch((error: unknown) => this.host.problem(`Silverware Assets: not copied: ${message(error)}`)),
             },
-            ...(this.host.embedToLink
+            ...actions.file,
+            // Its kept preview made anew (its file's previews taken away, its preview drawn again: made then)
+            ...(files && asset.kind === "file" && view === "preview"
               ? [
                   {
-                    label: "Show as a link",
+                    label: "Regenerate preview",
                     run: () =>
-                      void this.locateNow(drawn)
-                        .then((now) => (now ? this.host.embedToLink!({ text: now.embed.text, occurrence: now.occurrence, of: now.of }) : NOT_FOUND))
-                        .then((problem) => problem && this.host.problem(`Silverware Assets: not written: ${problem}`)),
+                      void forgetPreviews(files, settings.previewFolder, asset.path).then(() => {
+                        this.anew.add(frame);
+                        this.render(drawn, found, asset, type, settings, readOnly);
+                      }),
                   },
                 ]
               : []),
@@ -612,7 +661,7 @@ export class AssetDecorator {
       const { alt, ...bare } = asset;
       const known: LabelValues = { name: assetName(bare as Asset), icon: type.icon, ...(alt ? { alt } : {}) };
       const draw = (values: LabelValues) => {
-        frame.querySelectorAll(":scope > .swa-label").forEach((line) => line.remove());
+        frame.querySelectorAll(":scope > .swa-label-line").forEach((line) => line.remove());
         const texts = labelTexts(label, values);
         const above = drawLabelLine(this.doc, "above", texts.above);
         const below = drawLabelLine(this.doc, "below", texts.below);

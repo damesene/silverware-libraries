@@ -5,7 +5,7 @@
 // `--swl-width`), never the host's element around it (CodeMirror takes its lines' attributes back); the style page's
 // rule sizes it, in the content marked `data-swl-content`. A widget out of the page's flow (marked
 // `data-silverware-over-window`, or in an element marked so) is left to its plugin.
-import type { LayoutAlign, LayoutEntries, LayoutKind, LayoutProvider } from "../../../shared/layout.ts";
+import type { LayoutAlign, LayoutEntries, LayoutKind, LayoutMenuEntry, LayoutProvider } from "../../../shared/layout.ts";
 import { OVER_WINDOW_ATTRIBUTE } from "../../../shared/overwindow.ts";
 import type { Registry } from "../core/registry.ts";
 import { anchorOf, cssWidgetWidth, keptWidgetWidth, type LayoutAnchor, readAlign, readWidgetWidth, type WidgetWidth } from "../core/widgetwidth.ts";
@@ -167,6 +167,20 @@ export class Widgets {
   anchor(widget: Widget): LayoutAnchor {
     const marked = widget.element.getAttribute(ANCHOR_ATTRIBUTE);
     return marked === "start" || marked === "end" ? marked : "center";
+  }
+
+  /** What a widget's plugin adds to its handle's menu (none where it adds nothing, or fails to say) */
+  menu(widget: Widget): readonly (readonly LayoutMenuEntry[])[] {
+    try {
+      return widget.provider.menu?.(widget.element) ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** The name of a widget's kind, its handle's menu's title (none: it names no kind) */
+  title(widget: Widget): string | undefined {
+    return this.kind(widget)?.name;
   }
 
   /** A widget's alignment written by its plugin (its default, or none: taken off, its default then), shown at once; why not, said */

@@ -37,6 +37,8 @@ export type AssetSettings = {
   // Whether a preview slow to make (a PDF's page) is kept in the space once made (docs/silverware-assets-stored-previews.md);
   // off, each is made as it is shown, Regenerate preview not offered (those kept are left: Clean up previews)
   readonly storePreviews: boolean;
+  // The folder previews are kept in, from the space's top (a name starting with `_`: out of SilverBullet's pickers)
+  readonly previewFolder: string;
   // A preview's label: all files', and a type's own (whole, not in part)
   readonly labels: { readonly default: PreviewLabel; readonly types: Readonly<Record<string, PreviewLabel>> };
   // An original's label, alike (none shown unless the user turns one on: a file shown as SilverBullet draws it)
@@ -92,6 +94,7 @@ export function storedAssetSettings(settings: AssetSettings): Record<string, unk
     anchor: undefined,
     linkIcons: settings.linkIcons,
     storePreviews: settings.storePreviews,
+    previewFolder: settings.previewFolder,
     labels: { default: storedLabel(settings.labels.default), types: Object.fromEntries(Object.entries(settings.labels.types).map(([k, v]) => [k, storedLabel(v)])) },
     originalLabels: { default: storedLabel(settings.originalLabels.default), types: Object.fromEntries(Object.entries(settings.originalLabels.types).map(([k, v]) => [k, storedLabel(v)])) },
   };
@@ -130,12 +133,34 @@ export const DEFAULT_ASSET_SETTINGS: AssetSettings = {
   previews: { types: {} },
   linkIcons: true,
   storePreviews: true,
+  previewFolder: "_silverware-asset-preview",
   labels: { default: DEFAULT_LABEL, types: {} },
   originalLabels: { default: NO_LABEL, types: {} },
 };
 
 const isView = (value: unknown): value is View => typeof value === "string" && (VIEWS as readonly string[]).includes(value);
 const record = (value: unknown): Record<string, unknown> => (value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {});
+
+/**
+ * Why a folder cannot keep previews, as text; none where it can. A path from the space's top, its parts plain names:
+ * none empty, none `..`, none starting with a dot (SilverBullet reads no such path)
+ */
+export function validatePreviewFolder(folder: string): string | undefined {
+  const parts = folder.replace(/^\/+|\/+$/g, "").split("/");
+  if (!folder.trim() || parts.some((part) => !part.trim())) return "the folder has no name, or an empty part";
+  if (parts.some((part) => part.startsWith("."))) return `"${folder}": SilverBullet reads no folder whose name starts with a dot`;
+  if (/[\\:*?"<>|]/.test(folder)) return `"${folder}": a folder's name has none of \\ : * ? " < > |`;
+  return undefined;
+}
+
+/** The previews' folder as configured, its slashes at either end taken off (none, or one that cannot: the default) */
+function readPreviewFolder(value: unknown, problems: string[]): string {
+  if (value === undefined) return DEFAULT_ASSET_SETTINGS.previewFolder;
+  const folder = typeof value === "string" ? value.trim().replace(/^\/+|\/+$/g, "") : "";
+  const problem = typeof value === "string" ? validatePreviewFolder(folder) : "the previews' folder is no text";
+  if (problem) problems.push(problem);
+  return problem ? DEFAULT_ASSET_SETTINGS.previewFolder : folder;
+}
 
 /** The settings as configured (a value not read: its default), and what was not read, as text */
 export function readAssetSettings(value: unknown): { readonly settings: AssetSettings; readonly problems: readonly string[] } {
@@ -170,6 +195,7 @@ export function readAssetSettings(value: unknown): { readonly settings: AssetSet
       previews: readPreviews(given.previews),
       linkIcons: given.linkIcons !== false,
       storePreviews: given.storePreviews !== false,
+      previewFolder: readPreviewFolder(given.previewFolder, problems),
       labels: readLabels(given.labels, DEFAULT_LABEL),
       originalLabels: readLabels(given.originalLabels, NO_LABEL),
     },
@@ -209,20 +235,18 @@ export function readLabel(value: unknown): PreviewLabel {
 /** Where the settings of SilverBullet's markdown shown as written are (the Configuration Manager's block: booleans) */
 export const SYNTAX_PATHS = {
   hides: "silverware.assets.syntaxMode.hideAssets",
-  clicks: "silverware.assets.syntaxMode.clickPlacesCursor",
 } as const;
 
 /**
  * What Silverware Assets does while SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax
- * Rendering): embedded files hidden (SilverBullet draws them there still), a click on a link placing the cursor alone
- * (Ctrl/Cmd+click following it). Both on unless the user turns one off
+ * Rendering): embedded files hidden (SilverBullet draws them there still). On unless the user turns it off. (A click
+ * on a link there is Silverware Layout's: its Markdown tab, since 2026-11-15)
  */
-export type SyntaxModeSettings = { readonly hideAssets: boolean; readonly clickPlacesCursor: boolean };
+export type SyntaxModeSettings = { readonly hideAssets: boolean };
 
 /** The settings of the markdown shown as written, as configured (anything but false: on) */
 export const readSyntaxModeSettings = (get: (path: string) => unknown): SyntaxModeSettings => ({
   hideAssets: get(SYNTAX_PATHS.hides) !== false,
-  clickPlacesCursor: get(SYNTAX_PATHS.clicks) !== false,
 });
 
 /** A preview's sizes as configured: each side a number within PREVIEW_LIMITS, anything else none */

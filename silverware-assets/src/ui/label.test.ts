@@ -39,7 +39,7 @@ describe("a preview's label", () => {
       { field: "size", text: "2 MB" },
       { field: "modified", text: "Nov 14, 2026" },
     ])!;
-    expect(line.className).toBe("swa-own swa-label swa-label-below");
+    expect(line.className).toBe("swa-own swa-label-line swa-label-below");
     expect(line.title).toBe("2 MB · Nov 14, 2026");
     expect([...line.children].map((one) => one.className)).toEqual(["swa-label-size", "swa-label-modified"]);
     expect(drawLabelLine(document, "above", [])).toBeUndefined();

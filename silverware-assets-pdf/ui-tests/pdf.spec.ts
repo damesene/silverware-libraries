@@ -60,7 +60,7 @@ test("a PDF shown as the original, in the side panel too, is the browser's own v
   await expect(preview.locator(".swa-pdf-preview[data-swa-pdf-state='page']")).toBeVisible();
   await preview.hover();
   await preview.locator(".swa-more").click();
-  await page.locator(".swa-popup .swa-menu-item", { hasText: "Show in a side panel" }).click();
+  await page.locator(".swa-popup .swa-menu-item", { hasText: "Open in side panel" }).click();
   const panel = page.locator(".swa-peek");
   await expect(panel.locator(".swa-panel-body object")).toHaveCount(1);
   await page.keyboard.press("Escape");

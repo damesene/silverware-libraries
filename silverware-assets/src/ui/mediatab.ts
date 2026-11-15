@@ -8,7 +8,7 @@
 // them all, saved once on Save: the first tab answers for the others (the window asks each tab that changed to save,
 // and the settings are written whole).
 import { el } from "../../../shared/elements.ts";
-import { type AssetSettings, type CardField, type Gesture, type PreviewLabel, type PreviewSize, sameLabel, type View, VIEWS } from "../model/settings.ts";
+import { type AssetSettings, type CardField, DEFAULT_ASSET_SETTINGS, type Gesture, type PreviewLabel, type PreviewSize, sameLabel, type View, VIEWS } from "../model/settings.ts";
 import { dateText, iconElement } from "./card.ts";
 import { segmentedControl } from "../../../shared/controls.ts";
 import { CHEVRON_RIGHT } from "../../../shared/glyphs.ts";
@@ -100,6 +100,9 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
   // Previews kept in the space (docs/silverware-assets-stored-previews.md)
   const storePreviews = el(doc, "input", { attrs: { type: "checkbox" } });
   storePreviews.checked = settings.storePreviews;
+  // The folder they are kept in, moved there with what it holds as it is saved (src/index.ts)
+  const previewFolder = el(doc, "input", { class: "swa-settings-folder", attrs: { type: "text", spellcheck: "false", "aria-label": "Previews' folder", placeholder: DEFAULT_ASSET_SETTINGS.previewFolder } });
+  previewFolder.value = settings.previewFolder;
   const storeSection = section(
     doc,
     "Previews",
@@ -108,7 +111,14 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
       doc,
       "p",
       "swa-settings-note",
-      "A preview slow to make (a PDF's first page, a document's, a workbook's) is made the first time it is shown, kept in the hidden folder _silverware-asset-preview and shown from there after, on every device; Regenerate preview in its menu makes it again. Off: each is made every time it is shown, and its menu has no Regenerate preview. Those kept already stay until Silverware Assets: Clean up previews.",
+      "A preview slow to make (a PDF's first page, a document's, a workbook's) is made the first time it is shown, kept in the folder below and shown from there after, on every device; Regenerate preview in its menu makes it again. Off: each is made every time it is shown, and its menu has no Regenerate preview. Those kept already stay until Silverware Assets: Clean up previews.",
+    ),
+    el(doc, "div", "swa-settings-fields", el(doc, "label", "swa-settings-field", el(doc, "span", { text: "Folder" }), previewFolder)),
+    el(
+      doc,
+      "p",
+      "swa-settings-note",
+      "From your space's top. A name starting with _ is hidden from SilverBullet's pickers, its space tree and link completion; another is shown there as any folder. Changed and saved, the previews kept are moved into the new folder.",
     ),
   );
   const filesGrid = el(
@@ -261,6 +271,8 @@ export function mediaTabs(doc: Document, input: MediaTabInput, save: (settings: 
       },
       linkIcons,
       storePreviews: storePreviews.checked,
+      // (Empty: the default; its slashes at either end taken off)
+      previewFolder: previewFolder.value.trim().replace(/^\/+|\/+$/g, "") || DEFAULT_ASSET_SETTINGS.previewFolder,
       labels: { default: labels.default, types: { ...labels.types } },
       originalLabels: { default: originalLabels.default, types: { ...originalLabels.types } },
     };

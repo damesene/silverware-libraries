@@ -21,8 +21,11 @@ export type Space = {
   readonly folder: string;
   /** Pages written (by their names under the folder), and files beside them (an image: its name with its extension), the page `open` of them opened, Silverware Assets started */
   open(pages: Readonly<Record<string, string>>, open: string, files?: Readonly<Record<string, Uint8Array | string>>): Promise<void>;
-  /** Whether a preview is kept of a file of the test's folder (`doc.pdf.webp`: of any version; a name with its version, that one) */
-  kept(name: string): Promise<boolean>;
+  /**
+   * Whether a preview is kept of a file of the test's folder (`doc.pdf.webp`: of any version; a name with its version,
+   * that one), in the default previews' folder or another (`MOVED_PREVIEWS`)
+   */
+  kept(name: string, root?: string): Promise<boolean>;
   /** A preview written as kept, of a file of the test's folder, by its whole name (`gone.pdf.1-1.webp`) */
   writeKept(name: string, content: string): Promise<void>;
   /** A page's text as saved (its name under the folder) */
@@ -72,7 +75,7 @@ export const test = base.extend<{ space: Space }>({
         await commandDefined(page, ASSETS_SETTINGS);
         await commandDefined(page, PAGE_LAYOUT);
       },
-      kept: async (name) => !!(await stat(join(server().space, "_silverware-asset-preview", folder, name)).catch(() => undefined)) || !!(await keptPath(join(server().space, "_silverware-asset-preview", folder), name)),
+      kept: async (name, root = "_silverware-asset-preview") => !!(await stat(join(server().space, root, folder, name)).catch(() => undefined)) || !!(await keptPath(join(server().space, root, folder), name)),
       writeKept: async (name, content) => {
         const file = join(server().space, "_silverware-asset-preview", folder, name);
         await mkdir(dirname(file), { recursive: true });
@@ -87,12 +90,15 @@ export const test = base.extend<{ space: Space }>({
     await rm(join(server().space, folder), { recursive: true, force: true });
     // (Previews Silverware Assets kept of its files: silverware-assets/src/core/stored.ts)
     await rm(join(server().space, "_silverware-asset-preview", folder), { recursive: true, force: true });
+    await rm(join(server().space, MOVED_PREVIEWS, folder), { recursive: true, force: true });
     if (configBefore === undefined) await rm(configPath, { force: true });
     else await writeFile(configPath, configBefore);
   },
 });
 
 export const ASSETS_SETTINGS = "Silverware Assets: Settings";
+// The previews' folder a test moves them to (taken away after it, as the default's)
+export const MOVED_PREVIEWS = "UiMovedPreviews";
 // (Silverware Layout's, for the cases where the two meet: a file in a grid, its width by Layout's handle)
 export const PAGE_LAYOUT = "Silverware Layout: Page layout";
 

@@ -82,6 +82,11 @@ export class LayoutApp {
     return { left: middle - width / 2, right: middle + width / 2 };
   }
 
+  /** The part of the window the page is seen in (below the host's top bar), top and bottom */
+  view(): { readonly top: number; readonly bottom: number } {
+    return this.page.view();
+  }
+
   /** Every widget laid out again as its entries keep it (a provider's entries changed outside a drag: typed by hand) */
   layOutWidgets(): void {
     this.widgetLayout?.widgets.layOutAll();

@@ -10,6 +10,7 @@ import type { Extension } from "@codemirror/state";
 import type { EditorView as View, KeyBinding } from "@codemirror/view";
 import { companionBlur, type EditorOptions, type TextEditor } from "../../shared/editor.ts";
 import { livePreview, PREVIEW_THEME, wikiLinks } from "./livepreview.ts";
+import { lookRules } from "./look.ts";
 
 /** The CodeMirror module beside the bundle (src/vendor.ts) */
 export type CodeMirror = typeof import("./vendor.ts");
@@ -84,6 +85,9 @@ export function codeMirrorEditor(cm: CodeMirror, doc: Document, options: EditorO
   // (As tall as its element where that has a height of its own, a peek's field: a press under the text still the editor's)
   box.style.height = "100%";
   shadow.append(box);
+  // (The page's look of a task's box and a hashtag, where its user gave it)
+  const look = options.look ? lookRules(doc, options.look) : "";
+  if (look) shadow.append(Object.assign(doc.createElement("style"), { textContent: look }));
   const control = new AbortController();
   // (Left where the focus goes out of it and of what acts on it from outside: Silverware Toolbar's popup is not)
   const blurred = companionBlur(doc, (node) => node instanceof Node && (element.contains(node) || shadow.contains(node)), () => options.onBlur?.(), control.signal);

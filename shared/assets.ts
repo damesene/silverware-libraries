@@ -119,6 +119,9 @@ export type AssetAction = {
   readonly label?: string;
   // false: in an asset's menu alone, no gesture's (not offered for a click in the settings): a copy of the file
   readonly gesture?: boolean;
+  // Where it goes in an asset's menu (docs/silverware-assets-menu.md): with the ways of opening the file ("open"), or
+  // with what is done with the file itself, a copy, a download ("file"). None: "open"
+  readonly group?: "open" | "file";
   fits(asset: Asset, can: Capabilities): boolean;
   run(context: ActionContext): unknown;
 };

@@ -69,13 +69,16 @@ test("Shift pressed over a table with a long name: the names beside the icons, t
   const before = (await boxOf(bar));
   await page.keyboard.down("Shift");
   await expect(bar.locator(".swt-bar-names")).toBeVisible();
-  // (Placed in the next frame)
+  // (Placed in the next frame: the names and the bar's main part measured until they are laid out, not once as Shift
+  // comes, which was before the names' width was taken into account now and then)
   await expect.poll(async () => (await boxOf(bar)).y).toBe(before.y);
-  const names = (await boxOf(bar.locator(".swt-bar-names")));
-  const main = (await boxOf(bar.locator(".swt-bar-main")));
-  expect(names.y).toBe(main.y);
-  expect(names.x + names.width).toBeLessThanOrEqual(main.x);
-  expect(main.x + main.width).toBeCloseTo(before.x + before.width, 0);
+  await expect
+    .poll(async () => {
+      const names = await boxOf(bar.locator(".swt-bar-names"));
+      const main = await boxOf(bar.locator(".swt-bar-main"));
+      return names.y === main.y && names.x + names.width <= main.x && Math.abs(main.x + main.width - (before.x + before.width)) < 1;
+    })
+    .toBe(true);
 });
 
 test("long names in the ⋯ menu are cut, whole in their tooltips, the table's in the title", async ({ page }) => {

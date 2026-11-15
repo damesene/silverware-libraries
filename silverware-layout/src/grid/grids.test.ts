@@ -7,7 +7,7 @@ import { readGrids } from "../../../shared/markdown/grid.ts";
 import { type AttributesWrite, type CellWrite, type GridHost, Grids, toggledTask } from "./grids.ts";
 import { gridProvider } from "./provider.ts";
 
-const body = "<column>\n\nLeft\n\n</column>\n<column>\nRight\n</column>";
+const body = "<cell>\n\nLeft\n\n</cell>\n<cell>\nRight\n</cell>";
 
 function host(text: string, fail?: string) {
   const state = {
@@ -125,7 +125,7 @@ describe("a cell edited", () => {
     field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await vi.waitFor(() => expect(state.writes).toHaveLength(1));
     expect(state.writes[0]).toEqual({ body, occurrence: 1, of: 2, cell: 1, content: "Right\n- item" });
-    expect(state.text.endsWith("<column>\n\nRight\n- item\n\n</column>\n</grid>\n")).toBe(true);
+    expect(state.text.endsWith("<cell>\n\nRight\n- item\n\n</cell>\n</grid>\n")).toBe(true);
     // The rendering shown again until the host draws the grid anew
     expect(cell.querySelector("textarea")).toBeNull();
     expect(cell.textContent).toBe("Right");
@@ -173,7 +173,7 @@ describe("a cell edited", () => {
 
 describe("an Alt+click in a grid", () => {
   it("puts the cursor where the word clicked is in the cell's markdown, from the element's place", async () => {
-    const text = "# A\n\n<grid>\n<column>\n\nIntro.\n\n**Left** with a [[Target]] link\n\n</column>\n</grid>\n";
+    const text = "# A\n\n<grid>\n<cell>\n\nIntro.\n\n**Left** with a [[Target]] link\n\n</cell>\n</grid>\n";
     const { state, gridHost } = host(text);
     const grids = new Grids(document, gridHost);
     const grid = await grids.render(readGrids(text)[0]!.body);
@@ -252,49 +252,129 @@ describe("a grid's width, as Silverware Layout's widget", () => {
   });
 });
 
-describe("a cell's menu", () => {
-  it("moves the cell, sets the grid's columns, takes the grid apart, each through the host", async () => {
+describe("a grid's menus: a column's by its grip, the grid's in its handle's", () => {
+  it("moves a column by its grip's menu, sets the grid's columns and borders and takes it apart by its handle's, each through the host", async () => {
     const { state, gridHost } = host(`<grid>\n${body}\n</grid>\n`);
     const changes: unknown[] = [];
-    const grids = new Grids(document, { ...gridHost, changeCells: async (write) => void changes.push(write.cells) });
+    const asked: string[] = [];
+    let answer = false;
+    const confirmDelete = async (question: string) => (asked.push(question), answer);
+    const grids = new Grids(document, { ...gridHost, confirmDelete, ask: async () => "180px", changeCells: async (write) => void changes.push(write.cells) });
     const grid = await grids.render(body);
-    document.body.append(grid);
-    const menuOf = (cell: number) => {
-      grid.querySelectorAll<HTMLElement>(".swl-grid-cell-more")[cell]!.click();
+    const frame = Object.assign(document.createElement("div"), { className: "swl-grid-widget" });
+    frame.append(grid);
+    document.body.append(frame);
+    const columnMenu = (cell: number) => {
+      grid.querySelectorAll<HTMLElement>(".swl-grid-column-grip")[cell]!.click();
       return [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")];
     };
     const pick = async (cell: number, label: string) => {
-      menuOf(cell).find((item) => item.textContent?.trim() === label)!.click();
+      columnMenu(cell).find((item) => item.textContent?.trim() === label)!.click();
       await new Promise((resolve) => setTimeout(resolve, 0));
     };
-    expect(menuOf(0).map((item) => item.textContent?.trim())).toEqual([
-      "Edit markdown (Alt+click)",
-      "Move left",
-      "Move right",
-      "Add a column after it",
-      "Move out of the grid",
-      "Columns: automatic",
-      "2 columns",
-      "3 columns",
-      "4 columns",
-      "Borders",
-      "Add a column at the end",
-      "Remove the grid, its content kept",
-    ]);
-    // (Closed again by its button)
-    grid.querySelector<HTMLElement>(".swl-grid-cell-more")!.click();
+    // A column's: what is done with it alone
+    expect(columnMenu(0).map((item) => item.textContent?.trim())).toEqual(["Edit markdown (Alt+click)", "Move left", "Move right", "Add a column after it", "Move out of the grid", "Clear column…", "Delete column…"]);
+    // (Deleting: in the danger colour, its trash before it)
+    const remove = [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")].at(-1)!;
+    expect(remove.classList.contains("swl-danger")).toBe(true);
+    expect(remove.querySelector("svg")).not.toBeNull();
+    // (Closed again by its grip)
+    grid.querySelector<HTMLElement>(".swl-grid-column-grip")!.click();
     await pick(0, "Move right");
     await pick(1, "Move out of the grid");
-    await pick(0, "Remove the grid, its content kept");
-    expect(changes).toEqual([{ kind: "move", cell: 0, by: 1 }, { kind: "takeOut", cell: 1 }, { kind: "ungrid" }]);
-    await pick(0, "3 columns");
-    expect(state.attributeWrites.map((write) => write.attributes)).toEqual([{ columns: "3" }]);
+    expect(changes).toEqual([{ kind: "move", cell: 0, by: 1 }, { kind: "takeOut", cell: 1 }]);
+    // A column deleted: asked first; declined, nothing; confirmed, deleted with its content
+    asked.length = 0;
+    answer = false;
+    await pick(1, "Delete column…");
+    expect(asked).toEqual(["Delete column 2 and everything in it? Ctrl+Z brings it back."]);
+    expect(changes).toHaveLength(2);
+    answer = true;
+    await pick(1, "Delete column…");
+    expect(changes.at(-1)).toEqual({ kind: "remove", cell: 1 });
+    // The grid's: in its handle's menu, through its provider
+    const gridItems = () => gridProvider(grids).menu!(frame).flat();
+    // (Its columns a row of choices: Auto, 2 to 8, its own count set; a min width only where they are as many as fit)
+    const columns = gridItems()[0]!;
+    if (!("kind" in columns)) throw new Error("no row of columns");
+    expect(columns.label).toBe("Columns");
+    expect(columns.options.map((option) => option.icon)).toEqual(["Auto", "2", "3", "4", "5", "6", "7", "8"]);
+    expect(columns.options.filter((option) => option.active).map((option) => option.icon)).toEqual(["2"]);
+    expect(gridItems().map((item) => item.label)).toEqual(["Columns", "Borders", "Add a column at the end", "Remove the grid, its content kept"]);
+    const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+    const run = async (label: string) => {
+      const item = gridItems().find((one) => one.label === label)!;
+      if ("kind" in item) throw new Error(`${label} is a row`);
+      item.run();
+      await settled();
+    };
+    await run("Remove the grid, its content kept");
+    expect(changes.at(-1)).toEqual({ kind: "ungrid" });
+    columns.options[2]!.run();
+    await settled();
+    expect(state.attributeWrites.map((write) => write.attributes)).toEqual([{ columns: "3", min: null }]);
+    expect(grid.style.getPropertyValue("--swl-grid-columns")).toBe("repeat(3, minmax(0, 1fr))");
     // Its borders: written as HTML's table has them, shown at once, taken off again
-    await pick(0, "Borders");
+    await run("Borders");
     expect(grid.hasAttribute("data-swl-border")).toBe(true);
-    await pick(0, "Borders");
+    await run("Borders");
     expect(grid.hasAttribute("data-swl-border")).toBe(false);
     expect(state.attributeWrites.slice(1).map((write) => write.attributes)).toEqual([{ border: "1" }, { border: null }]);
+    // As many as fit: shown at once (no divider), its min width a row of names and px asked
+    columns.options[0]!.run();
+    await settled();
+    expect(state.attributeWrites.at(-1)!.attributes).toEqual({ columns: "auto" });
+    expect(grid.hasAttribute("data-swl-fit")).toBe(true);
+    expect(grid.style.getPropertyValue("--swl-grid-columns")).toBe("repeat(auto-fit, minmax(min(240px, 100%), 1fr))");
+    // (Its own sections: the columns and their min width, then the rest)
+    expect(gridProvider(grids).menu!(frame).map((section) => section.map((item) => item.label))).toEqual([["Columns", "Min width"], ["Borders", "Add a column at the end"], ["Remove the grid, its content kept"]]);
+    const minRow = () => {
+      const row = gridItems()[1]!;
+      if (!("kind" in row)) throw new Error("no row of min widths");
+      return row;
+    };
+    expect(minRow().options.map((option) => [option.icon, !!option.active])).toEqual([["XS", false], ["S", false], ["M", true], ["L", false], ["px…", false]]);
+    minRow().options[1]!.run();
+    await settled();
+    expect(state.attributeWrites.at(-1)!.attributes).toEqual({ min: "s" });
+    expect(grid.style.getPropertyValue("--swl-grid-columns")).toBe("repeat(auto-fit, minmax(min(160px, 100%), 1fr))");
+    // Its own px: the row's last choice, asked; the one set shown there
+    minRow().options[4]!.run();
+    await settled();
+    expect(state.attributeWrites.at(-1)!.attributes).toEqual({ min: "180" });
+    expect(minRow().options.map((option) => [option.icon, !!option.active]).at(-1)).toEqual(["180px", true]);
+    // A column cleared (last: its write changes the page): asked first; declined, nothing; confirmed, its content
+    // written empty, the column kept
+    asked.length = 0;
+    answer = false;
+    await pick(0, "Clear column…");
+    expect(asked).toEqual(["Clear column 1? Everything in it goes, the column stays. Ctrl+Z brings it back."]);
+    expect(state.writes).toHaveLength(0);
+    answer = true;
+    await pick(0, "Clear column…");
+    expect(state.writes.map((write) => [write.cell, write.content])).toEqual([[0, ""]]);
+  });
+
+  it("opens the grid's own menu from a column's by Grid… where no handle is shown (a narrow pane), deleting the column last", async () => {
+    const { gridHost } = host(`<grid>\n${body}\n</grid>\n`);
+    const grids = new Grids(document, { ...gridHost, changeCells: async () => undefined });
+    let hidden = true;
+    grids.handleHidden = () => hidden;
+    const grid = await grids.render(body);
+    document.body.append(grid);
+    const items = () => [...document.querySelectorAll<HTMLElement>(".swl-popup .swl-menu-item")];
+    grid.querySelector<HTMLElement>(".swl-grid-column-grip")!.click();
+    expect(items().map((item) => item.textContent?.trim())).toEqual(["Edit markdown (Alt+click)", "Move left", "Move right", "Add a column after it", "Move out of the grid", "Grid…", "Clear column…", "Delete column…"]);
+    items().find((item) => item.textContent?.trim() === "Grid…")!.click();
+    expect(document.querySelector(".swl-popup .swl-menu-title")?.textContent ?? document.querySelector(".swl-popup")!.textContent).toContain("Grid");
+    expect(items().map((item) => item.textContent?.trim())).toEqual(["Borders", "Add a column at the end", "Remove the grid, its content kept"]);
+    expect(document.querySelector(".swl-popup .swl-menu-segmented")?.textContent).toContain("Columns");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    // Its handle shown: no Grid… (its menu the handle's)
+    hidden = false;
+    grid.querySelector<HTMLElement>(".swl-grid-column-grip")!.click();
+    expect(items().map((item) => item.textContent?.trim())).not.toContain("Grid…");
+    grid.querySelector<HTMLElement>(".swl-grid-column-grip")!.click();
   });
 
   it("draws a grid's borders as its border attribute says", async () => {
@@ -306,7 +386,7 @@ describe("a cell's menu", () => {
 
 describe("a cell edited from a click", () => {
   it("puts the field's cursor where the click was in the cell's markdown, at its end without a point", async () => {
-    const words = "<column>\n\nLeft words here\n\n</column>";
+    const words = "<cell>\n\nLeft words here\n\n</cell>";
     const { gridHost } = host(`<grid>\n${words}\n</grid>\n`);
     const grids = new Grids(document, gridHost);
     const grid = await grids.render(words);
@@ -325,7 +405,7 @@ describe("a cell edited from a click", () => {
 
 describe("a cell edited from a selection in it", () => {
   it("selects in the field what was selected in the cell's rendering, its direction kept", async () => {
-    const words = "<column>\n\nLeft words here\n\n</column>";
+    const words = "<cell>\n\nLeft words here\n\n</cell>";
     const { gridHost } = host(`<grid>\n${words}\n</grid>\n`);
     const grids = new Grids(document, gridHost);
     const grid = await grids.render(words);
@@ -348,7 +428,7 @@ describe("a task in a cell", () => {
   });
 
   it("is toggled by its box's click, written as the cell", async () => {
-    const tasks = "<column>\n\n- [ ] one\n\n</column>";
+    const tasks = "<cell>\n\n- [ ] one\n\n</cell>";
     const { state, gridHost } = host(`<grid>\n${tasks}\n</grid>\n`);
     const grids = new Grids(document, { ...gridHost, renderMarkdown: async () => '<ul><li><span class="sb-task"><input type="checkbox" data-pos="2"> one</span></li></ul>' });
     grids.start();
@@ -362,7 +442,7 @@ describe("a task in a cell", () => {
 
 describe("what a grid draws, told", () => {
   it("tells its media and links once it is in the page and placed, with their places in the page and their cell", async () => {
-    const cellBody = "<column>\n\nSee [[a.pdf]] and\n![[cat.png]]\n\n</column>\n<column>\n\nRight\n\n</column>";
+    const cellBody = "<cell>\n\nSee [[a.pdf]] and\n![[cat.png]]\n\n</cell>\n<cell>\n\nRight\n\n</cell>";
     const text = `# Page\n\n<grid>\n${cellBody}\n</grid>\n`;
     const { gridHost } = host(text);
     // (The host's rendering of the first cell: a link and an image, each marked with its offset in the cell)
@@ -385,5 +465,106 @@ describe("what a grid draws, told", () => {
     // Drawn again as the page is edited, nothing moved: nothing told
     await grids.refresh();
     expect(told).toHaveLength(1);
+  });
+});
+
+describe("a grid drawn anew after a write of one cell", () => {
+  it("takes over the rendering of the cells it did not change, from the grid drawn where it starts; draws the changed one anew", async () => {
+    const page = `Above\n\n<grid>\n${body}\n</grid>\n`;
+    const { state, gridHost } = host(page);
+    const grids = new Grids(document, gridHost);
+    const old = await grids.render(body);
+    document.body.append(old);
+    // (Placed in the page as it is found there)
+    await vi.waitFor(() => expect(old.querySelector(".swl-grid-cell")?.getAttribute("data-swl-pos")).not.toBeNull());
+    const [left, right] = [...old.querySelectorAll(".swl-grid-cell")].map((cell) => cell.firstElementChild);
+    // The second cell written: the page's text and the grid's body as they are now, the old grid taken out by the host
+    const written = body.replace("Right", "Right typed");
+    state.text = page.replace(body, written);
+    old.remove();
+    const drawn = await grids.render(written);
+    const cells = [...drawn.querySelectorAll(".swl-grid-cell")];
+    expect(cells[0]!.firstElementChild).toBe(left);
+    expect(cells[1]!.firstElementChild).not.toBe(right);
+    expect(cells[1]!.textContent).toContain("Right typed");
+  });
+
+  it("takes nothing from a grid still in the page (another of the same body), nor from a page shown before", async () => {
+    const page = `Above\n\n<grid>\n${body}\n</grid>\n`;
+    const { gridHost } = host(page);
+    const grids = new Grids(document, gridHost);
+    grids.pageShown("One");
+    const old = await grids.render(body);
+    document.body.append(old);
+    await vi.waitFor(() => expect(old.querySelector(".swl-grid-cell")?.getAttribute("data-swl-pos")).not.toBeNull());
+    const left = old.querySelector(".swl-grid-cell")!.firstElementChild;
+    // Still in the page: its rendering its own
+    expect((await grids.render(body)).querySelector(".swl-grid-cell")!.firstElementChild).not.toBe(left);
+    expect(old.querySelector(".swl-grid-cell")!.firstElementChild).toBe(left);
+    // Another page shown: none taken from the one before
+    old.remove();
+    grids.pageShown("Two");
+    expect((await grids.render(body)).querySelector(".swl-grid-cell")!.firstElementChild).not.toBe(left);
+  });
+
+  it("takes over the blocks of a cell written whose markdown did not change, what they drew told at their new offsets", async () => {
+    // (Each paragraph a block marked with its offset, as the host renders one; an image's line too)
+    const renderMarkdown = async (markdown: string) => {
+      let at = 0;
+      return markdown
+        .split("\n\n")
+        .map((paragraph) => {
+          const from = markdown.indexOf(paragraph, at);
+          at = from + paragraph.length;
+          return paragraph.startsWith("![") ? `<p data-pos="${from}"><img src="a.png" data-pos="${from}"></p>` : `<p data-pos="${from}">${paragraph}</p>`;
+        })
+        .join("");
+    };
+    const cellOf = (content: string) => `<cell>\n\n${content}\n\n</cell>\n<cell>\n\nRight\n\n</cell>`;
+    const was = cellOf("Text\n\n![](a.png)");
+    const page = `Above\n\n<grid>\n${was}\n</grid>\n`;
+    const { state, gridHost } = host(page);
+    const grids = new Grids(document, { ...gridHost, renderMarkdown });
+    const old = await grids.render(was);
+    document.body.append(old);
+    await vi.waitFor(() => expect(old.querySelector(".swl-grid-cell")?.getAttribute("data-swl-pos")).not.toBeNull());
+    const [text, image] = [...old.querySelectorAll(".swl-grid-cell")[0]!.querySelectorAll(":scope > p")];
+    // Its first paragraph written longer: the image's block (its markdown the same) kept, moved down the cell's text
+    const written = cellOf("Text typed\n\n![](a.png)");
+    state.text = page.replace(was, written);
+    old.remove();
+    const drawn = await grids.render(written);
+    document.body.append(drawn);
+    const blocks = [...drawn.querySelectorAll(".swl-grid-cell")[0]!.querySelectorAll(":scope > p")];
+    expect(blocks[0]).not.toBe(text);
+    expect(blocks[0]!.textContent).toBe("Text typed");
+    expect(blocks[1]).toBe(image);
+    await vi.waitFor(() => expect(grids.rendered.items().filter((item) => item.kind === "embed").map((item) => [item.element, item.position])).toEqual([[image!.querySelector("img"), state.text.indexOf("![](a.png)")]]));
+  });
+
+  it("tells what a cell drew with its rendering taken over, not again from the rendering as decorated since", async () => {
+    const withImage = body.replace("Right", "![](a.png)");
+    const page = `Above\n\n<grid>\n${withImage}\n</grid>\n`;
+    const { state, gridHost } = host(page);
+    // (An image drawn as the host draws one, its markdown's offset on it)
+    const renderMarkdown = async (markdown: string) => (markdown.startsWith("![") ? '<p><img src="a.png" data-pos="0"></p>' : `<span class="p">${markdown}</span>`);
+    const grids = new Grids(document, { ...gridHost, renderMarkdown });
+    const old = await grids.render(withImage);
+    document.body.append(old);
+    await vi.waitFor(() => expect(old.querySelector(".swl-grid-cell")?.getAttribute("data-swl-pos")).not.toBeNull());
+    const image = old.querySelector("img")!;
+    // Decorated by another (a frame round it, an image of its own in it)
+    const frame = document.createElement("span");
+    image.replaceWith(frame);
+    frame.append(image, Object.assign(document.createElement("img"), { className: "decoration" }));
+    const told: HTMLElement[][] = [];
+    grids.rendered.onChange(() => told.push(grids.rendered.items().filter((item) => item.kind === "embed").map((item) => item.element)));
+    const written = withImage.replace("Left", "Left typed");
+    state.text = page.replace(withImage, written);
+    old.remove();
+    const drawn = await grids.render(written);
+    document.body.append(drawn);
+    expect(drawn.querySelector("img")).toBe(image);
+    await vi.waitFor(() => expect(told.at(-1)).toEqual([image]));
   });
 });

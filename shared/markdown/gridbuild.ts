@@ -64,15 +64,20 @@ export function splitCounts(blocks: number, columns: number): number[] {
 
 /** A grid's text of cells (each its markdown) and attributes, in the form the page writer writes a cell: a blank line around its content */
 export function gridText(cells: readonly string[], attributes: Attributes = {}): string {
-  return `<grid${writeAttributes(attributes)}>\n${cells.map((cell) => `<column>\n\n${cell}${cell ? "\n" : ""}\n</column>\n`).join("")}</grid>`;
+  return `<grid${writeAttributes(attributes)}>\n${cells.map((cell) => `<cell>\n\n${cell}${cell ? "\n" : ""}\n</cell>\n`).join("")}</grid>`;
 }
 
+/** A grid's number of columns as it is put together: a count, or `auto` (a gallery's: as many as fit) */
+export type GridColumns = number | "auto";
+// A split asked for columns as many as fit: cut into this many
+const SPLIT_FIT = 2;
+
 /** The cells a mode makes of blocks, and the grid's attributes */
-export function cellsOf(text: string, blocks: readonly TextBlock[], mode: GridMode, columns: number): { readonly cells: string[]; readonly attributes: Attributes } {
+export function cellsOf(text: string, blocks: readonly TextBlock[], mode: GridMode, columns: GridColumns): { readonly cells: string[]; readonly attributes: Attributes } {
   if (mode === "gallery") return { cells: blocks.map((block) => joined(text, [block])), attributes: { columns: String(columns) } };
   const cells: string[] = [];
   let at = 0;
-  for (const count of splitCounts(blocks.length, columns)) {
+  for (const count of splitCounts(blocks.length, columns === "auto" ? SPLIT_FIT : columns)) {
     cells.push(joined(text, blocks.slice(at, at + count)));
     at += count;
   }
@@ -80,7 +85,7 @@ export function cellsOf(text: string, blocks: readonly TextBlock[], mode: GridMo
 }
 
 /** The edit putting a run of blocks into a grid: their range replaced, a blank line kept before and after it (a grid cannot run on from a paragraph's line) */
-export function gridOfBlocks(text: string, blocks: readonly TextBlock[], mode: GridMode, columns: number): { readonly from: number; readonly to: number; readonly insert: string } | undefined {
+export function gridOfBlocks(text: string, blocks: readonly TextBlock[], mode: GridMode, columns: GridColumns): { readonly from: number; readonly to: number; readonly insert: string } | undefined {
   if (!blocks.length) return undefined;
   const { cells, attributes } = cellsOf(text, blocks, mode, columns);
   const from = blocks[0]!.from;

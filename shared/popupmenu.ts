@@ -13,13 +13,15 @@ const POPUP_MARGIN = 8;
 export type PopupLook = { readonly base: string };
 
 /** One item: its label, what it does; checked (a choice shown as on), disabled (why, as text) */
-export type PopupItem = { readonly label: string; readonly run: () => void; readonly checked?: boolean; readonly disabled?: string; readonly danger?: boolean };
+export type PopupItem = { readonly label: string; readonly run: () => void; readonly checked?: boolean; readonly disabled?: string; readonly danger?: boolean; readonly icon?: string };
 
 /** A row of choices side by side (Align: left, centre, right), each its icon (SVG text) and title, the one set active */
 export type PopupSegmented = {
   readonly kind: "segmented";
   readonly label: string;
-  readonly options: readonly { readonly icon: string; readonly title: string; readonly active?: boolean; readonly run: () => void }[];
+  // (`disabled`: why it cannot be chosen now, its tooltip; `keepsOpen`: the menu not closed by it, its caller shows it
+  // anew as what it changed is done)
+  readonly options: readonly { readonly icon: string; readonly title: string; readonly active?: boolean; readonly disabled?: string; readonly keepsOpen?: boolean; readonly run: () => void }[];
 };
 
 export type PopupMenu = { readonly title: string; readonly sections: readonly (readonly (PopupItem | PopupSegmented)[])[] };
@@ -54,10 +56,10 @@ export function showPopup(doc: Document, look: PopupLook, at: HTMLElement, shown
     if (entries.length) entries.push(menuSeparator());
     for (const item of section) {
       if ("kind" in item) {
-        entries.push(menuSegmented({ label: item.label, options: item.options.map((option) => ({ icon: option.icon, title: option.title, ...(option.active === undefined ? {} : { active: option.active }), run: () => (close(), option.run()) })) }));
+        entries.push(menuSegmented({ label: item.label, options: item.options.map((option) => ({ icon: option.icon, title: option.title, ...(option.active === undefined ? {} : { active: option.active }), ...(option.disabled ? { disabled: option.disabled } : {}), run: option.keepsOpen ? () => option.run() : () => (close(), option.run()) })) }));
         continue;
       }
-      entries.push(menuItem({ label: item.label, ...(item.checked === undefined ? {} : { checked: item.checked }), ...(item.disabled ? { disabled: item.disabled } : {}), ...(item.danger ? { danger: true } : {}), run: () => (close(), item.run()) }));
+      entries.push(menuItem({ label: item.label, ...(item.checked === undefined ? {} : { checked: item.checked }), ...(item.disabled ? { disabled: item.disabled } : {}), ...(item.danger ? { danger: true } : {}), ...(item.icon ? { icon: item.icon } : {}), run: () => (close(), item.run()) }));
     }
   }
   const rendered = renderMenu(doc, LOOK, shown.title, entries);
@@ -66,8 +68,13 @@ export function showPopup(doc: Document, look: PopupLook, at: HTMLElement, shown
   holder = el(doc, "div", { class: `${look.base}-popup ${look.base}-menu` }, rendered);
   const box = at.getBoundingClientRect();
   holder.style.top = `${box.bottom + 4}px`;
-  holder.style.left = `${Math.max(8, Math.min(box.right - 220, (doc.defaultView?.innerWidth ?? Infinity) - 228))}px`;
+  // (Its right edge by what opened it, all of it in the window: as wide as it is drawn, a phone's narrow window too)
+  const windowWidth = doc.defaultView?.innerWidth ?? Infinity;
+  if (Number.isFinite(windowWidth)) holder.style.maxWidth = `${windowWidth - 2 * POPUP_MARGIN}px`;
+  holder.style.left = `${POPUP_MARGIN}px`;
   doc.body.append(holder);
+  const width = holder.getBoundingClientRect().width || 220;
+  holder.style.left = `${Math.max(POPUP_MARGIN, Math.min(box.right - width, windowWidth - width - POPUP_MARGIN))}px`;
   // Held in the part of the window seen (an on-screen keyboard's room out): over what opened it where it has no room
   // under it and has above it (by the window's bottom its last items were cut off), else as low as it fits, and where it
   // is taller than that part, as tall and scrolled

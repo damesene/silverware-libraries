@@ -8,7 +8,7 @@
 //   interrupt a paragraph);
 // - it ends at the first line `</grid>` after it, wherever that is (SilverBullet's parser counts no nesting and looks
 //   into no fenced code within); none: no grid (SilverBullet's parser takes none either);
-// - within it a cell is the lines between `<column …>` and `</column>`, each alone on its line (a `</column>` in a
+// - within it a cell is the lines between `<cell …>` and `</cell>`, each alone on its line (a `</cell>` in a
 //   fenced code block within the cell does not close it); one left open runs to the grid's end. Lines between cells
 //   belong to none.
 //
@@ -19,14 +19,14 @@ import { closesFence, fenceOf } from "./lines.ts";
 
 /** One cell of a grid: its lines in the page, and its content's */
 export type GridCell = {
-  // From its `<column>` line's start to its `</column>` line's end (left open: the grid's body's end)
+  // From its `<cell>` line's start to its `</cell>` line's end (left open: the grid's body's end)
   readonly from: number;
   readonly to: number;
-  // Between its two lines: from the line after `<column>` to the start of the line closing it (`</column>`, or
+  // Between its two lines: from the line after `<cell>` to the start of the line closing it (`</cell>`, or
   // `</grid>` where it is left open), that line's line break before it included
   readonly innerFrom: number;
   readonly innerTo: number;
-  // Whether it has its `</column>` (else it runs to the grid's end)
+  // Whether it has its `</cell>` (else it runs to the grid's end)
   readonly closed: boolean;
   // Its content: its lines without the blank ones at its start and end, where they are in the page
   readonly contentFrom: number;
@@ -50,8 +50,8 @@ export type Grid = {
 
 const OPEN = /^<grid(\s[^>]*)?>\s*$/;
 const CLOSE = /^<\/grid>\s*$/;
-const CELL_OPEN = /^<column(\s[^>]*)?>\s*$/;
-const CELL_CLOSE = /^<\/column>\s*$/;
+const CELL_OPEN = /^<cell(\s[^>]*)?>\s*$/;
+const CELL_CLOSE = /^<\/cell>\s*$/;
 // Lines a block may follow at once: a heading, a closing fence and the like end their block by themselves
 const ENDS_BLOCK = /^(#{1,6}(\s|$)|<\/grid>\s*$|(\*\s*){3,}$|(-\s*){3,}$|(_\s*){3,}$)/;
 
@@ -109,9 +109,9 @@ export function readGrids(text: string): Grid[] {
  * place that knows the grid's syntax (a cell written later is the page writer's)
  */
 export function newGridText(cells: number): { readonly text: string; readonly content: number } {
-  const cell = "<column>\n\n\n\n</column>\n";
+  const cell = "<cell>\n\n\n\n</cell>\n";
   const text = `<grid>\n${cell.repeat(Math.max(1, cells))}</grid>`;
-  return { text, content: "<grid>\n<column>\n\n".length };
+  return { text, content: "<grid>\n<cell>\n\n".length };
 }
 
 const OPEN_LINE = "<grid>\n";
@@ -174,7 +174,7 @@ function grid(text: string, all: readonly TextLine[], open: number, close: numbe
   };
 }
 
-/** A cell from its `<column>` line to the line `end` (its `</column>`, or the grid's closing line where it is left open) */
+/** A cell from its `<cell>` line to the line `end` (its `</cell>`, or the grid's closing line where it is left open) */
 function cellOf(text: string, all: readonly TextLine[], cell: { line: TextLine; index: number; attributes: string }, end: number, to: number, closed: boolean): GridCell {
   const innerTo = all[end]!.from;
   const innerFrom = Math.min(cell.line.to + 1, innerTo);

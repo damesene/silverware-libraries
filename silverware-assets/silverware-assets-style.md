@@ -15,11 +15,6 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 :root[data-swa-syntax-shown] :has(> [data-swa-asset]:not(.swa-frame)) {
   display: none !important;
 }
-/* There, a click on a link placing the cursor alone: the text's pointer over it, not a hand (a widget's own, its
-   buttons, kept) */
-:root[data-swa-syntax-clicks] [data-swa-text] :not([contenteditable="false"], [contenteditable="false"] *) {
-  cursor: text !important;
-}
 /* A file's "…" button, at its frame's top right as the pointer is over it (always on a touch screen), its menu
    under it */
 .swa-more {
@@ -150,6 +145,12 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 }
 .swa-settings-side {
   width: 5em;
+}
+/* The previews' folder: room for a path */
+.swa-settings-folder {
+  width: 22em;
+  max-width: 100%;
+  font: inherit;
 }
 /* Fields one under another: a name and its control */
 .swa-settings-fields {
@@ -464,7 +465,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 .swa-sample-link .swa-sample-item[data-swa-field="marker"] {
   margin-left: 0.05em;
 }
-/* A preview's label (src/ui/labeleditor.ts): its sample a preview's box, the label's lines as the page's (.swa-label),
+/* A preview's label (src/ui/labeleditor.ts): its sample a preview's box, the label's lines as the page's (.swa-label-line),
    a property dragged within them, to the other, or up to the row; a line without a property a slot saying so, every
    place outlined while one is dragged */
 .swa-label-edit-list {
@@ -886,7 +887,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
    give the frame no width of their own but a least one), cut with "…"; the name and the alt text in the text's colour, the size and
    the date quieter; a click on them the preview's. Its line above moves the "…" (and the mark of a render that failed)
    down to the preview's corner: the line is 0.85em × 1.5 high, 2px apart from the preview */
-.swa-label {
+.swa-label-line {
   display: block;
   contain: inline-size;
   /* (A tiny image's label not cut to nothing: the frame at least this wide, its "…" then at the frame's corner; a
@@ -906,7 +907,7 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
 .swa-label-below {
   margin-top: 2px;
 }
-.swa-label > span + span::before {
+.swa-label-line > span + span::before {
   content: " · ";
   color: color-mix(in srgb, var(--root-color) 40%, transparent);
 }
@@ -920,10 +921,10 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   width: 1.2em;
   height: 1.2em;
 }
-.swa-label > .swa-label-icon {
+.swa-label-line > .swa-label-line-icon {
   margin-right: 0.35em;
 }
-.swa-label > .swa-label-icon + span::before {
+.swa-label-line > .swa-label-line-icon + span::before {
   content: none;
 }
 .swa-label-size,
@@ -1381,6 +1382,27 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   width: 16px;
   height: 16px;
 }
+/* An item's icon its own size, centred on its line: a plugin's own rules for its class (Silverware Assets' file
+   icons, 22 px) do not reach into its menus. Where any item of a menu has an icon, each item keeps its place, so
+   their words line up (an item without one an empty place) */
+.swa-menu .swa-icon {
+  width: auto;
+  height: auto;
+  align-items: center;
+}
+.swa-menu:has(.swa-menu-item > .swa-icon > svg) .swa-menu-item > .swa-icon {
+  flex: 0 0 16px;
+  width: 16px;
+}
+/* A menu of no icons: no empty place before an item's words (with the gap after it, they began further in than a row
+   of choices' label above them) */
+.swa-menu:not(:has(.swa-menu-item > .swa-icon:not(:empty))) .swa-menu-item > .swa-icon:empty {
+  display: none;
+}
+.swa-menu .swa-icon > svg {
+  width: 16px;
+  height: 16px;
+}
 /* An item's detail: a bubble beside the menu, at the item's height */
 .swa-menu-detail {
   position: absolute;
@@ -1442,16 +1464,30 @@ The look of [Silverware Assets](silverware-assets.md): a file's frame, card, men
   margin: 4px 2px;
   background: var(--button-border-color, rgba(128, 128, 128, 0.3));
 }
-/* A row of icon buttons after a label: a choice (Align) or a pair of actions (Move up, Move down) */
+/* A row of icon buttons after a label: a choice (Align) or a pair of actions (Move up, Move down). Its buttons under
+   the label, at the right, where they do not fit beside it (a menu as wide as a phone lets it: a grid's columns, eight
+   of them, ran out of the menu), on more lines where they do not fit on one */
 .swa-menu-segmented {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 4px 8px;
   padding: 2px 4px 2px 8px;
 }
-/* A long label (a sheet's name) cut, whole in its tooltip: the menu as wide as its items */
+.swa-menu-segmented > .swa-segments {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+/* A menu whose items have icons: a row's label where their words begin (the icon's place and the gap after it) */
+.swa-menu:has(.swa-menu-item > .swa-icon > svg) .swa-menu-segmented {
+  padding-left: 32px;
+}
+/* A long label (a sheet's name) cut, whole in its tooltip: the menu as wide as its items; a short one whole, never
+   squeezed by the buttons beside it (Show as) */
 .swa-menu-segmented > .swa-label {
+  flex: 0 0 auto;
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;

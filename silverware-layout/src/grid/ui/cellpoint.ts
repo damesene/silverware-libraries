@@ -1,6 +1,7 @@
 // Where a point of a cell's rendering is in the cell's markdown (a click, a drop, a selection): the element marked with
 // its place there (`data-pos`, the host's rendering), the text before the point in it, a blank line found by height.
 import { blankLinesBefore, blankLineStart } from "../core/blanklines.ts";
+import { offsetOf } from "./offsets.ts";
 import { positionInCell } from "../core/position.ts";
 
 /** A caret's place in the rendering: a node and an offset in it */
@@ -25,7 +26,7 @@ export function offsetInCell(content: string, cellElement: HTMLElement, target: 
   const from = caret ? (caret.node instanceof Element ? caret.node : caret.node.parentElement) ?? target : target;
   const marked = from.closest("[data-pos]");
   const element = marked && cellElement.contains(marked) ? marked : ([...cellElement.children].find((child) => child.contains(from)) ?? cellElement);
-  const elementPos = element === marked ? Number(marked.getAttribute("data-pos")) || 0 : 0;
+  const elementPos = element === marked ? offsetOf(marked) : 0;
   if (!caret || !element.contains(caret.node)) return positionInCell(content, elementPos, "", 0);
   // The element's text before the point
   const range = cellElement.ownerDocument.createRange();

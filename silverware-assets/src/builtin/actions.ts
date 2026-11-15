@@ -41,6 +41,7 @@ export const copyImage: AssetAction = {
   name: "copy-image",
   label: "Copy image",
   gesture: false,
+  group: "file",
   fits: (asset) => "url" in asset && (asset.mime?.startsWith("image/") || IMAGE_NAME.test(asset.kind === "file" ? asset.path : asset.url)),
   run: async (context) => {
     if (!("url" in context.asset)) return;
@@ -65,6 +66,7 @@ export function downloadName(asset: { readonly kind: string; readonly path?: str
 export const download: AssetAction = {
   name: "download",
   label: "Download",
+  group: "file",
   fits: (asset) => "url" in asset,
   run: async (context) => {
     const asset = context.asset;

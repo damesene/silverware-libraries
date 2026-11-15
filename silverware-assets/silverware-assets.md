@@ -2,7 +2,7 @@
 name: Library/damesene/silverware-assets
 tags: meta/library
 version: 1.0.0
-description: "Silverware Assets: embedded files shown as the original, as a preview or as a card (a zip or a document too), a link to a file with its icon and a menu, a file shown in a side panel or enlarged, a link turned into an embed and back."
+description: "Silverware Assets: embedded files shown as the original, as a preview or as a card (a zip or a document too), a link to a file with its icon and a menu, a file opened in a side panel or enlarged, a link turned into an embed and back."
 files:
 - silverware-assets.js
 - silverware-assets-init.md
@@ -21,7 +21,14 @@ Images, videos, audio, PDFs and other files you embed (`![[photo.png]]`, `![Phot
 - **Preview**: smaller (a PDF in a small viewer; with Silverware Assets PDF installed, its first page as an image).
 - **Card**: a small card with the file's icon and name, the file itself not shown. A file SilverBullet cannot show (a zip, a document) is a card instead of an error.
 
-Point at a file, and a **…** button shows at its top right: choose how it is shown there, or open it in a new tab, in a side panel or enlarged. On a card, its icon is that button (as a link's icon); with the icon hidden, a small arrow after the card's name. A click on a card or a preview opens the file in a new tab; Shift+click does the same, unless you set otherwise: either can instead show the file in a panel at the window's right (**Show in a side panel**, the page still beside it) or enlarged over the page (**Show enlarged**). Esc or × closes them, and a click beside the enlarged file.
+Point at a file, and a **…** button shows at its top right. On a card, its icon is that button (as a link's icon); with the icon hidden, a small arrow after the card's name. Its menu, the same for every file:
+
+- **Show as**, at the top: a row of four, how the file is in the page: a **link**, a **card**, a **preview** or the **original**, the one shown lit, the one your settings give marked *(default)*. One a file cannot be shown as is greyed out (a zip has no preview).
+- **Open in a new tab**, **Open in side panel** (a panel at the window's right, the page still beside it), **Open enlarged** (over the page). Esc or × closes them, and a click beside the enlarged file.
+- What is done with the file: **Copy image** (an image), **Copy markdown**, **Download**, **Regenerate preview** (a preview kept in the space).
+- **Delete file…**, last.
+
+A click on a card or a preview opens the file in a new tab; Shift+click does the same, unless you set otherwise: either can instead open it in the side panel, enlarged, or download it.
 
 **Its alignment**, with [Silverware Layout](https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md) installed (it places what is on a page): click the bar beside a file (a preview's too), and **Align** in its menu puts it at the left, in the middle or at the right of its line (of its column, in a grid); kept in its embed, `![[photo.png|Photo||{ align: center }]]`. Without its own, the default in Silverware Layout's **Page layout** dialog (**Alignment**: previews and originals apart) holds, left unless you change it. A card is always at the left. Without Silverware Layout files stand as SilverBullet draws them.
 
@@ -29,11 +36,11 @@ Point at a file, and a **…** button shows at its top right: choose how it is s
 
 ## Links to files
 
-**Links to files** (`[[report.pdf]]`) show the file's icon before their text, in a grid of Silverware Layout's too (a markdown link, `[report](report.pdf)`, only in a grid). Click the icon for what you can do with the file: open it in a new tab, show it in a side panel or enlarged, or **Show as embedded** (`[[report.pdf]]` becomes `![[report.pdf]]`); a click on the link's text opens it as SilverBullet does. An embedded file's **…** menu has **Show as a link** the other way (its alt text kept as the link's, its size and view left out). The settings' **Appearance** tab (**Link**) hides the icons: a small arrow after the link then opens its menu.
+**Links to files** (`[[report.pdf]]`) show the file's icon before their text, in a grid of Silverware Layout's too (a markdown link, `[report](report.pdf)`, only in a grid). Click the icon for the file's menu, the same as an embedded file's: its **Show as** row has the link lit, and a card, a preview or the original there makes it an embed shown so (`[[report.pdf]]` becomes `![[report.pdf]]`); a click on the link's text opens it as SilverBullet does. An embedded file's row has **link** the other way (its alt text kept as the link's, its size and view left out). The settings' **Appearance** tab (**Link**) hides the icons: a small arrow after the link then opens its menu.
 
 **Download**, in every file's menu and a link's, saves the file under its own name (a file of another site that does not allow it opens in a new tab instead); it can be a click's action too. **Copy markdown**, in every file's menu and a link's, copies its markdown as the page has it, its size and settings too (`![[photo.png|Photo|200|{ view: preview }]]`). **Copy image**, in an image's menu, copies the image itself, to paste into another app; the browser allows it where SilverBullet is served over HTTPS (or on your own machine).
 
-**Previews made once**: a preview that is slow to make (a PDF's first page, with Silverware Assets PDF) is made the first time it is shown and kept in your space, in the folder `_silverware-asset-preview` at your space's top, and shown from there after, on every device. SilverBullet does not show that folder (a name starting with `_` is left out of its pickers, its space tree and link completion), so a preview never comes up where you look for your files; it is there on disk, synced and backed up with the rest. Replace the file, and its preview is made again. **Regenerate preview**, in a preview's menu, makes it again now. To make previews every time instead (none kept, no Regenerate preview in the menu), turn off **Keep previews in the space** on the settings' **Files** tab; on by default. A file deleted or renamed leaves its preview behind: **Silverware Assets: Clean up previews** takes away those whose file is gone or was replaced since (a renamed file's preview is made again under its new name as it is shown).
+**Previews made once**: a preview that is slow to make (a PDF's first page, with Silverware Assets PDF) is made the first time it is shown and kept in your space, in the folder `_silverware-asset-preview` at your space's top, and shown from there after, on every device. SilverBullet does not show that folder (a name starting with `_` is left out of its pickers, its space tree and link completion), so a preview never comes up where you look for your files; it is there on disk, synced and backed up with the rest. Another folder can be set on the settings' **Files** tab (a name without `_` is shown in SilverBullet as any folder); saved, the previews kept are moved there. Replace the file, and its preview is made again. **Regenerate preview**, in a preview's menu, makes it again now. To make previews every time instead (none kept, no Regenerate preview in the menu), turn off **Keep previews in the space** on the settings' **Files** tab; on by default. A file deleted or renamed leaves its preview behind: **Silverware Assets: Clean up previews** takes away those whose file is gone or was replaced since (a renamed file's preview is made again under its new name as it is shown).
 
 **Delete file…**, last in a file's menu and a link's, deletes the file itself from your space, not only the embed or the link: SilverBullet asks first, and there is no undo. The embed is then taken out of the page, and a link becomes its text (`[[report.pdf|the report]]` becomes `the report`); its preview kept in the space goes with it. Other pages that embed or link the file show it missing.
 
@@ -66,9 +73,10 @@ Saved into your CONFIG, in a block of Silverware Assets' own.
 
 Files in a grid's columns (Silverware Layout's) are shown the same way, and their bar makes them wider or narrower within their column: it snaps to a quarter, a half, three quarters and the whole of the column's width.
 
-**SilverBullet's markdown as written** (*Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws embedded files in that mode; Silverware Assets hides them there, so you see their markdown alone. In that mode a click on a link only puts the cursor there (before an embed's `![[` too), the pointer a text one over it; Ctrl+click (Cmd+click) still follows it. Each can be turned off in the settings' **Markdown** tab (or in the Configuration Manager, under Silverware Assets):
+**SilverBullet's markdown as written** (*Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws embedded files in that mode; Silverware Assets hides them there, so you see their markdown alone. Turn it off in the settings' **Markdown** tab (or in the Configuration Manager, under Silverware Assets):
 
 ```lua
 config.set("silverware.assets.syntaxMode.hideAssets", false)
-config.set("silverware.assets.syntaxMode.clickPlacesCursor", false)
 ```
+
+A click on a link there (an embed's `![[` too) only puts the cursor in it, with [Silverware Layout](https://github.com/damesene/silverware-libraries/blob/main/silverware-layout/silverware-layout.md) installed: its **Markdown** tab.

@@ -3,7 +3,7 @@
 // toolbar's button gives it) and the number of columns. The blocks are read and the grid written by the page writer
 // (`grids.put`, shared/markdown/gridbuild.ts); what is asked of the host is here.
 import { readGrids } from "../../../shared/markdown/grid.ts";
-import { blocksIn, type GridMode } from "../../../shared/markdown/gridbuild.ts";
+import { blocksIn, type GridColumns, type GridMode } from "../../../shared/markdown/gridbuild.ts";
 
 /** What putting into a grid asks of the host */
 export type PutHost = {
@@ -13,7 +13,7 @@ export type PutHost = {
   /** One of the options picked (its index), none where the user picked none */
   pick(label: string, options: readonly { readonly name: string; readonly description: string }[]): Promise<number | undefined>;
   /** The blocks of a range put into a grid (one edit); why not, as text */
-  put(from: number, to: number, was: string, mode: GridMode, columns: number): Promise<string | undefined>;
+  put(from: number, to: number, was: string, mode: GridMode, columns: GridColumns): Promise<string | undefined>;
   problem(message: string): void;
 };
 
@@ -21,7 +21,7 @@ export const GRID_MODES: readonly { readonly mode: GridMode; readonly name: stri
   { mode: "gallery", name: "Gallery", description: "Each block a cell of its own, as many to a row as there are columns" },
   { mode: "split", name: "Split", description: "The blocks in order, cut into columns by their number" },
 ];
-const COLUMNS = [2, 3, 4];
+const COLUMNS: readonly number[] = [2, 3, 4];
 
 /** The blocks selected put into a grid: the mode asked where none is given, then the number of columns */
 export async function putIntoGrid(host: PutHost, given?: { readonly mode?: GridMode; readonly from?: number; readonly to?: number }): Promise<void> {
@@ -34,12 +34,18 @@ export async function putIntoGrid(host: PutHost, given?: { readonly mode?: GridM
     if (picked === undefined) return;
     mode = GRID_MODES[picked]!.mode;
   }
-  const options = COLUMNS.map((n) => ({ name: `${n} columns`, description: mode === "gallery" ? `${n} to a row` : `${blocks.length} blocks cut into ${Math.min(n, blocks.length)}` }));
+  // (A gallery's first: as many to a row as fit, an image gallery's)
+  const choices: readonly GridColumns[] = mode === "gallery" ? ["auto", ...COLUMNS] : COLUMNS;
+  const options = choices.map((n) =>
+    n === "auto"
+      ? { name: "Auto", description: "As many to a row as fit, each as wide as the others" }
+      : { name: `${n} columns`, description: mode === "gallery" ? `${n} to a row` : `${blocks.length} blocks cut into ${Math.min(n, blocks.length)}` },
+  );
   const picked = await host.pick("How many columns", options);
   if (picked === undefined) return;
   const from = blocks[0]!.from;
   const to = blocks.at(-1)!.to;
-  const problem = await host.put(from, to, text.slice(from, to), mode, COLUMNS[picked]!);
+  const problem = await host.put(from, to, text.slice(from, to), mode, choices[picked]!);
   if (problem) host.problem(`Silverware Layout: not put into a grid: ${problem}`);
 }
 

@@ -19,6 +19,8 @@ import { gridRanges, Grids } from "./grid/grids.ts";
 import { gridProvider } from "./grid/provider.ts";
 import { watchEmbeddedGrids } from "./host/silverbullet/embeddedgrids.ts";
 import { watchSyntaxMode, type SyntaxModeWatcher } from "../../shared/syntaxmode.ts";
+import { isNarrow } from "./host/marks.ts";
+import { holdShownLinkClicks } from "./host/silverbullet/links.ts";
 import { SILVERBULLET_SYNTAX_PAGE, SYNTAX_OPTION } from "./host/silverbullet/syntaxmode.ts";
 import { silverBulletGridHost, silverBulletPutHost } from "./host/silverbullet/grid.ts";
 import { keepCursorOutOfGrids } from "./host/silverbullet/cursor.ts";
@@ -100,6 +102,8 @@ export async function init(bridge: Bridge): Promise<void> {
     registry.register(gridProvider(grids));
     grids.onAttributes = () => app.layOutWidgets();
     grids.textEdges = () => app.textEdges();
+    grids.view = () => app.view();
+    grids.handleHidden = () => isNarrow(document);
     // A grid in a page embedded in this one, which SilverBullet shows as its text: drawn as the grid it is
     const drawing = grids;
     watchEmbeddedGrids(document, (text) => drawing.drawText(text));
@@ -108,18 +112,25 @@ export async function init(bridge: Bridge): Promise<void> {
     syntaxWatcher = watchSyntaxMode<SyntaxModeSettings>(document, {
       page: SILVERBULLET_SYNTAX_PAGE,
       shown: () => current?.getUiOption?.(SYNTAX_OPTION),
-      read: () => (current ? readSyntaxSettings(current) : { hideGrids: true }),
-      same: (a, b) => a.hideGrids === b.hideGrids,
-      marks: (settings) => ({ "data-swl-syntax-shown": settings.hideGrids }),
-      initial: { hideGrids: true },
+      read: () => (current ? readSyntaxSettings(current) : MARKDOWN_DEFAULTS),
+      same: (a, b) => a.hideGrids === b.hideGrids && a.clickPlacesCursor === b.clickPlacesCursor,
+      marks: (settings) => ({ "data-swl-syntax-shown": settings.hideGrids, "data-swl-syntax-clicks": settings.clickPlacesCursor }),
+      placesCursor: (settings) => settings.clickPlacesCursor,
+      initial: MARKDOWN_DEFAULTS,
     });
+    // A click on a link shown as its markdown (the caret in it) the cursor's, as the settings say (./host/silverbullet/links.ts)
+    holdShownLinkClicks(document, () => markdownSettings.clickPlacesCursor);
+    void readSyntaxSettings(bridge);
   }
   // The Markdown tab of the Page layout dialog, made as it opens
   app.dialogTabs = async () => [
     syntaxTab(document, await readSyntaxSettings(bridge), async (saved) => {
       await saveConfigPage({ readPage: (page) => bridge.readPage(page), saveConfigPage: (text) => bridge.saveConfigPage!(text) }, (text) =>
-        withConfigSettings(text, { [PATHS.syntaxHides]: saved.hideGrids ? undefined : false }),
+        withConfigSettings(text, { [PATHS.syntaxHides]: saved.hideGrids ? undefined : false, [PATHS.linkClicks]: saved.clickPlacesCursor ? undefined : false }),
       );
+      markdownSettings = saved;
+      savedUntil = Date.now() + 10_000;
+      markLinkClicks(saved);
       syntaxWatcher?.settingsChanged(saved);
       return undefined;
     }),
@@ -146,6 +157,7 @@ export function renderGrid(body: unknown): Promise<HTMLElement> | HTMLElement {
  */
 export function pageLoaded(page: unknown, width: unknown): void {
   app.pageLoaded(String(page), readTextWidth(width));
+  grids?.pageShown(String(page));
 }
 
 /** The page open read again from its text (as Silverware Layout starts, after an edit) */
@@ -167,9 +179,28 @@ let syntaxWatcher: SyntaxModeWatcher<SyntaxModeSettings> | undefined;
 
 /** The settings of the markdown shown as written, as SilverBullet's configuration has them */
 async function readSyntaxSettings(bridge: Bridge): Promise<SyntaxModeSettings> {
-  if (!bridge.getConfig) return { hideGrids: true };
-  const hides = await bridge.getConfig(PATHS.syntaxHides, true);
-  return readSyntaxModeSettings((path) => (path === PATHS.syntaxHides ? hides : undefined));
+  const read = await readSyntaxSettingsOnce(bridge);
+  // (Just saved: held a while, SilverBullet loading its configuration again a moment after a save)
+  if (Date.now() < savedUntil) return markdownSettings;
+  markdownSettings = read;
+  markLinkClicks(read);
+  return read;
+}
+let savedUntil = 0;
+
+// The page's markdown settings by default, and as last read (a click on a shown link asks them at once)
+const MARKDOWN_DEFAULTS: SyntaxModeSettings = { hideGrids: true, clickPlacesCursor: true };
+let markdownSettings: SyntaxModeSettings = MARKDOWN_DEFAULTS;
+
+/** The root marked while a link shown as its markdown places the cursor */
+function markLinkClicks(settings: SyntaxModeSettings): void {
+  document.documentElement.toggleAttribute("data-swl-link-clicks", settings.clickPlacesCursor);
+}
+
+async function readSyntaxSettingsOnce(bridge: Bridge): Promise<SyntaxModeSettings> {
+  if (!bridge.getConfig) return MARKDOWN_DEFAULTS;
+  const [hides, clicks] = await Promise.all([bridge.getConfig(PATHS.syntaxHides, true), bridge.getConfig(PATHS.linkClicks, true)]);
+  return readSyntaxModeSettings((path) => (path === PATHS.syntaxHides ? hides : path === PATHS.linkClicks ? clicks : undefined));
 }
 
 /**

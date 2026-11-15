@@ -11,18 +11,21 @@ export const PATHS = {
   fontSize: "silverware.layout.fontSize",
   fontZoom: "silverware.layout.fontZoom.enabled",
   syntaxHides: "silverware.layout.syntaxMode.hideGrids",
+  linkClicks: "silverware.layout.links.clickPlacesCursor",
 } as const;
 
 /**
- * What Silverware Layout does while SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax
- * Rendering): its grids hidden (SilverBullet draws them there still), their markdown alone shown. On unless the user
- * turns it off
+ * How the page's markdown is met (the Page layout dialog's Markdown tab): while SilverBullet shows the markdown as
+ * written (Editor: Toggle Markdown Syntax Rendering), its grids hidden (SilverBullet draws them there still), their
+ * markdown alone shown; a click on a link shown as its markdown (the caret in it, or all of them in that mode) placing
+ * the cursor alone, Ctrl+click following it. Each on unless the user turns it off
  */
-export type SyntaxModeSettings = { readonly hideGrids: boolean };
+export type SyntaxModeSettings = { readonly hideGrids: boolean; readonly clickPlacesCursor: boolean };
 
-/** The settings of SilverBullet's markdown shown as written, as configured (anything but false: on) */
+/** The settings of the page's markdown, as configured (anything but false: on) */
 export const readSyntaxModeSettings = (get: (path: string) => unknown): SyntaxModeSettings => ({
   hideGrids: get(PATHS.syntaxHides) !== false,
+  clickPlacesCursor: get(PATHS.linkClicks) !== false,
 });
 
 /** A percent of the editor's pane, as a guide or a widget's width keeps it (`80%`) */

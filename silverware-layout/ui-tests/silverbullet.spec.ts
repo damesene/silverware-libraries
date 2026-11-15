@@ -2,7 +2,7 @@
 // SilverBullet itself: where a new version changes one, the test names it (the other tests would fail somewhere further
 // on, or not at all where the playground stands in for SilverBullet). docs/silverware-layout.md, probes 1 to 3.
 import type { Page } from "@playwright/test";
-import { expect, test } from "./helpers.ts";
+import { expect, gridsDrawn, test } from "./helpers.ts";
 
 const PAGE = `# Table\n\nSome text.\n\n| Name | Amount |\n| --- | --- |\n| a | 1 |\n| b | 2 |\n\nSome text.\n`;
 // The room a widget leaves the editor's pane, each side together (core/widgetwidth.ts' PANE_GUTTER)
@@ -103,4 +103,29 @@ test("a widget dragged wider than the editor is held at the editor's width less 
   expect(b.x).toBeGreaterThanOrEqual(shown.left);
   expect(b.x + b.width).toBeLessThanOrEqual(shown.right);
   await page.keyboard.press("Escape");
+});
+
+test("the box SilverBullet draws a grid in lets out what lies outside the grid: its column grips' upper halves above it whole (the style page's `.swl-grid-widget :has(> .swl-grid)`)", async ({ page, space }) => {
+  await space.open({ Page: "# Page\n\nAbove\n\n<grid>\n<cell>\n\nLeft\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n\nBelow\n" }, "Page");
+  await gridsDrawn(page);
+  // Every box between SilverBullet's frame and the grid shows what lies outside it: none of them scrolls it away (a
+  // new SilverBullet putting another such box there fails here, by name)
+  const clipping = await page.locator("#sb-main .swl-grid").evaluate((grid) => {
+    const frame = grid.closest(".swl-grid-widget");
+    const boxes: string[] = [];
+    for (let box = grid.parentElement; box && box !== frame?.parentElement; box = box.parentElement) {
+      const style = getComputedStyle(box);
+      if (style.overflowX !== "visible" || style.overflowY !== "visible") boxes.push(`${box.tagName.toLowerCase()}.${[...box.classList].join(".")} ${style.overflowX}/${style.overflowY}`);
+    }
+    return boxes;
+  });
+  expect(clipping).toEqual([]);
+  const cell = page.locator("#sb-main .swl-grid-cell").first();
+  await cell.hover();
+  const grip = cell.locator(".swl-grid-column-grip");
+  await expect(grip).toHaveCSS("opacity", "1");
+  expect(await grip.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return document.elementFromPoint(box.left + box.width / 2, box.top + 1) === element;
+  })).toBe(true);
 });

@@ -16,6 +16,12 @@ export type Bridge = {
   readonly getConfig?: (path: string, defaultValue: unknown) => unknown;
   // Optional, for the dialog: asks before closing it with changes (else the browser's confirm)
   readonly confirm?: (message: string) => boolean | Promise<boolean>;
+  // Optional, for a grid's column deleted: asked in SilverBullet's dialog, its OK button the danger's
+  // (`editor.confirm(message, { destructive = true })`)
+  readonly confirmDelete?: (message: string) => boolean | Promise<boolean>;
+  // Optional, for a value asked (a grid's min width in px): SilverBullet's prompt, `value` its field's text; none where
+  // it is cancelled (`editor.prompt`)
+  readonly prompt?: (message: string, value: string) => string | undefined | null | Promise<string | undefined | null>;
   // Optional, for the dialog's default text width: the CONFIG page saved as SilverBullet's Configuration Manager saves
   // it, the configuration loaded again (readPage reads it)
   readonly saveConfigPage?: (text: string) => unknown;

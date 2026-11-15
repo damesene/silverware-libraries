@@ -39,7 +39,7 @@ export function labelPart(doc: Document, one: LabelText): HTMLElement {
 export function drawLabelLine(doc: Document, place: "above" | "below", texts: readonly LabelText[]): HTMLElement | undefined {
   if (!texts.length) return undefined;
   const words = texts.filter((one) => one.field !== "icon").map((one) => one.text);
-  const line = el(doc, "div", { class: `swa-own swa-label ${PLACE_CLASS[place]}`, ...(words.length ? { title: words.join(" · ") } : {}) });
+  const line = el(doc, "div", { class: `swa-own swa-label-line ${PLACE_CLASS[place]}`, ...(words.length ? { title: words.join(" · ") } : {}) });
   for (const one of texts) line.append(labelPart(doc, one));
   return line;
 }

@@ -145,6 +145,12 @@ describe("the CodeMirror editor's live preview", () => {
     editor.destroy();
   });
 
+  it("draws a hashtag as SilverBullet does, as written; none in code, a URL or a heading's mark", () => {
+    const { editor, root } = make("x\nA #tag and #<two words>, `#code`, https://a.b/#frag\n# Title #inner\n```\n#fenced\n```", 0);
+    expect([...root.querySelectorAll(".swe-hashtag")].map((tag) => tag.textContent)).toEqual(["#tag", "#<two words>", "#inner"]);
+    editor.destroy();
+  });
+
   it("draws a task's checkbox, toggling it, a done task struck through, a bullet for a list's mark", () => {
     const { editor, root, lines } = make("x\n- [ ] open\n- [x] done\n* item", 0);
     expect(lines()).toEqual(["x", "•  open", "•  done", "• item"]);

@@ -49,10 +49,33 @@ export type EditorOptions = {
   // where the caret is: what the plugin says of it (none, or none for it: its markdown, as an editor without a preview
   // shows every embed)
   readonly embed?: (markdown: string) => EditorEmbed | undefined;
+  // How what it draws as rendered looks where its user knows the page's look (a task's box, a hashtag): as the page's
+  // own rendering (none, or a part none: the editor's own look)
+  readonly look?: EditorLook;
   // Told of each change of the text, of the focus come and gone
   readonly onChange?: (text: string) => void;
   readonly onFocus?: () => void;
   readonly onBlur?: () => void;
+};
+
+/** CSS properties by their names (`border-top-width`), their values as computed */
+export type LookProperties = Readonly<Record<string, string>>;
+
+/**
+ * The page's look of what an editor draws as rendered, read of the page's own rendering (the properties computed): a
+ * task's box, checked too, a checked box's mark (its `::after`, where the page draws one of its own), a done task's
+ * text, a hashtag
+ */
+export type EditorLook = {
+  readonly checkbox?: LookProperties;
+  readonly checkboxChecked?: LookProperties;
+  readonly checkedMark?: LookProperties;
+  // A done task's text (struck through or not)
+  readonly taskDone?: LookProperties;
+  // What holds a task's box and its text: its hanging indent (`padding-left`, a negative `text-indent`: a task's text
+  // on its next lines where it begins after the box, or under the box)
+  readonly task?: LookProperties;
+  readonly hashtag?: LookProperties;
 };
 
 /** What Silverware Toolbar acts on: an editor's text and selection, where the selection is, its element */

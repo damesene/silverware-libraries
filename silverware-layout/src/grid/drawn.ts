@@ -7,6 +7,7 @@
 import { isFileTarget, readEmbeds, readLinks } from "../../../shared/markdown/embed.ts";
 import type { Grid } from "../../../shared/markdown/grid.ts";
 import type { RenderedItem } from "../../../shared/rendered.ts";
+import { offsetOf } from "./ui/offsets.ts";
 
 const MEDIA = "img, video, audio, object, [data-swl-embed]";
 const LINKS = "a[href]";
@@ -19,7 +20,7 @@ export function drawnIn(grid: HTMLElement): Drawn[] {
   const drawn: Drawn[] = [];
   grid.querySelectorAll<HTMLElement>(":scope > .swl-grid-cell").forEach((cell, index) => {
     for (const [kind, selector] of [["embed", MEDIA], ["link", LINKS]] as const) {
-      for (const element of cell.querySelectorAll<HTMLElement>(selector)) drawn.push({ cell: index, kind, element, offset: Number(element.getAttribute("data-pos")) || 0 });
+      for (const element of cell.querySelectorAll<HTMLElement>(selector)) drawn.push({ cell: index, kind, element, offset: offsetOf(element) });
     }
   });
   return drawn;

@@ -7,7 +7,7 @@ import { blocksIn, gridOfBlocks, gridText, splitCounts, ungridded } from "./grid
 const apply = (text: string, edit: { from: number; to: number; insert: string } | undefined) => (edit ? text.slice(0, edit.from) + edit.insert + text.slice(edit.to) : text);
 
 describe("the blocks a selection touches", () => {
-  const text = "Intro\n\n- a\n- [ ] b\n  - nested\n\n# Head\n\n![[a.png]]\n\n<grid>\n<column>\n\nIn\n\n</column>\n</grid>\n\nEnd";
+  const text = "Intro\n\n- a\n- [ ] b\n  - nested\n\n# Head\n\n![[a.png]]\n\n<grid>\n<cell>\n\nIn\n\n</cell>\n</grid>\n\nEnd";
 
   it("are each paragraph, each item (what is nested in it with it), a heading, an image's line; no grid", () => {
     const blocks = blocksIn(text, 0, text.length, readGrids(text));
@@ -34,8 +34,12 @@ describe("a grid built of blocks", () => {
     // (A paragraph's lines are blocks each, as the editor shows them apart: `Three` and `Below` two cells)
     const blocks = blocksIn(text, text.indexOf("Two"), text.length);
     expect(apply(text, gridOfBlocks(text, blocks, "gallery", 2))).toBe(
-      'Above\nOne\n\n<grid columns="2">\n<column>\n\nTwo\n\n</column>\n<column>\n\nThree\n\n</column>\n<column>\n\nBelow\n\n</column>\n</grid>',
+      'Above\nOne\n\n<grid columns="2">\n<cell>\n\nTwo\n\n</cell>\n<cell>\n\nThree\n\n</cell>\n<cell>\n\nBelow\n\n</cell>\n</grid>',
     );
+    // Auto: as many to a row as fit; a split asked for it cut into two
+    const two = blocksIn(text, text.indexOf("Two"), text.indexOf("Three") + 1);
+    expect(apply(text, gridOfBlocks(text, two, "gallery", "auto"))).toContain('<grid columns="auto">');
+    expect(apply(text, gridOfBlocks(text, two, "split", "auto"))).toContain("<grid>\n<cell>\n\nTwo\n\n</cell>\n<cell>\n\nThree\n\n</cell>\n</grid>");
   });
 
   it("takes a paragraph's lines as blocks each, the lines a selection touches alone, and gives them back as they were", () => {
@@ -63,7 +67,7 @@ describe("a grid built of blocks", () => {
     const text = "1. a\n2. b\n3. c\n4. d\n5. e\n\nAfter";
     const blocks = blocksIn(text, 0, text.indexOf("5. e") + 4);
     expect(apply(text, gridOfBlocks(text, blocks, "split", 2))).toBe(
-      "<grid>\n<column>\n\n1. a\n2. b\n3. c\n\n</column>\n<column>\n\n4. d\n5. e\n\n</column>\n</grid>\n\nAfter",
+      "<grid>\n<cell>\n\n1. a\n2. b\n3. c\n\n</cell>\n<cell>\n\n4. d\n5. e\n\n</cell>\n</grid>\n\nAfter",
     );
   });
 
@@ -78,6 +82,6 @@ describe("a grid built of blocks", () => {
 
   it("writes a grid's text in the form a cell is written, its attributes on its line", () => {
     // (An empty cell a blank line to type into)
-    expect(gridText(["A", ""], { columns: "3" })).toBe('<grid columns="3">\n<column>\n\nA\n\n</column>\n<column>\n\n\n</column>\n</grid>');
+    expect(gridText(["A", ""], { columns: "3" })).toBe('<grid columns="3">\n<cell>\n\nA\n\n</cell>\n<cell>\n\n\n</cell>\n</grid>');
   });
 });

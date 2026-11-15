@@ -97,7 +97,7 @@ showKept();
 // A grid (docs/silverware-layout-grid.md) as SilverBullet draws one: its body handed to the renderer, its cells'
 // markdown rendered by the host (here a few of markdown's forms, each element marked with its offset as SilverBullet's
 // renderer marks it), its columns read from the page's text
-const GRID_BODY = "<column>\n\n**Left** column, with a [[Link]].\n\nA second paragraph.\n\n</column>\n<column>\n\nThe **right** column.\n\n</column>";
+const GRID_BODY = "<cell>\n\n**Left** column, with a [[Link]].\n\nA second paragraph.\n\n</cell>\n<cell>\n\nThe **right** column.\n\n</cell>";
 let gridPage = `${LOREM}\n\n<grid columns="1fr 2fr">\n${GRID_BODY}\n</grid>\n`;
 // (The frame as SilverBullet's, given the class the init page gives it: the widget Silverware Layout lays out)
 const gridFrame = Object.assign(document.createElement("div"), { className: "pg-grid-frame swl-grid-widget" });

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { watchEmbeddedGrids } from "./embeddedgrids.ts";
 
 const EMBEDDED =
-  '<span class="wrapper"><h1>Embedded</h1><br>&lt;grid columns="1fr 3fr"&gt;<br>&lt;column&gt;<br><br>**Own** A<br><br>&lt;/column&gt;<br>&lt;column&gt;<br><br>Own B<br><br>&lt;/column&gt;<br>&lt;/grid&gt;<br>After</span>';
+  '<span class="wrapper"><h1>Embedded</h1><br>&lt;grid columns="1fr 3fr"&gt;<br>&lt;cell&gt;<br><br>**Own** A<br><br>&lt;/cell&gt;<br>&lt;cell&gt;<br><br>Own B<br><br>&lt;/cell&gt;<br>&lt;/grid&gt;<br>After</span>';
 
 const stops: (() => void)[] = [];
 afterEach(() => {
@@ -25,7 +25,7 @@ describe("a grid in an embedded page", () => {
     const frame = Object.assign(document.createElement("div"), { className: "sb-inline-content", innerHTML: EMBEDDED });
     document.body.append(frame);
     await vi.waitFor(() => expect(frame.querySelector(".swl-grid")).not.toBeNull());
-    expect(texts).toEqual(['<grid columns="1fr 3fr">\n<column>\n\n**Own** A\n\n</column>\n<column>\n\nOwn B\n\n</column>\n</grid>']);
+    expect(texts).toEqual(['<grid columns="1fr 3fr">\n<cell>\n\n**Own** A\n\n</cell>\n<cell>\n\nOwn B\n\n</cell>\n</grid>']);
     expect(frame.querySelector(".wrapper")!.textContent).toBe("EmbeddeddrawnAfter");
   });
 

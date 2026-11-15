@@ -19,21 +19,19 @@ export function markdownTab(doc: Document, settings: SyntaxModeSettings, save: (
     return input;
   };
   const hide = box(settings.hideAssets);
-  const click = box(settings.clickPlacesCursor);
-  const current = (): SyntaxModeSettings => ({ hideAssets: hide.checked, clickPlacesCursor: click.checked });
+  const current = (): SyntaxModeSettings => ({ hideAssets: hide.checked });
   const panel = el(
     doc,
     "div",
     "swa-settings-markdown",
     el(doc, "p", "swa-settings-intro", "While SilverBullet shows the markdown as written (Editor: Toggle Markdown Syntax Rendering):"),
     el(doc, "label", "swa-settings-check", hide, "Hide embedded files: their markdown alone"),
-    el(doc, "label", "swa-settings-check", click, "A click on a link only places the cursor (Ctrl+click follows it)"),
   );
   return {
     id: "markdown",
     title: "Markdown",
     panel,
-    changed: () => current().hideAssets !== settings.hideAssets || current().clickPlacesCursor !== settings.clickPlacesCursor,
+    changed: () => current().hideAssets !== settings.hideAssets,
     save: () => save(current()),
   };
 }

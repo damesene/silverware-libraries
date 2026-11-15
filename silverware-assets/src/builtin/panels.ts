@@ -56,7 +56,7 @@ function head(context: ActionContext, close: () => void): HTMLElement {
 
 export const peek: AssetAction = {
   name: "peek",
-  label: "Show in a side panel",
+  label: "Open in side panel",
   fits: shows,
   run: (context) =>
     void show("peek", context, (close) => {
@@ -68,7 +68,7 @@ export const peek: AssetAction = {
 
 export const popover: AssetAction = {
   name: "popover",
-  label: "Show enlarged",
+  label: "Open enlarged",
   fits: shows,
   run: (context) =>
     void show("popover", context, (close) => {

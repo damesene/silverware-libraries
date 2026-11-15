@@ -4,10 +4,11 @@
 // grid while it is dragged (the one snapped to plain), the ratio or the shares said by the divider as it moves; a double click makes the two even. What is dragged is shown at once (the grid's column template); written
 // as the `columns` attribute on release. Where the columns are is read from the grid as laid out (its computed template
 // and gap), so any `columns` (a count, shares, %, px) and any number of rows are taken alike. A grid of one column (a
-// narrow pane stacks its cells) has none.
+// narrow pane stacks its cells) has none. The grips (and the label of a divider dragged) ride in the middle of the part
+// of the grid in view, as a widget's handle does: a tall grid's are seen wherever it is scrolled to.
 import { el } from "../../../../shared/elements.ts";
 import { columnsOf, dividedWidths, type DividerPlace, ratioPlaces, templateOf, withinShares } from "../model/columns.ts";
-import { showColumns } from "./view.ts";
+import { showColumns, shownFit } from "./view.ts";
 
 const DIVIDER = "swl-grid-divider";
 const LABEL = "swl-grid-divider-label";
@@ -26,6 +27,25 @@ function laidOut(grid: HTMLElement): { readonly widths: number[]; readonly gap: 
     .filter((width) => Number.isFinite(width));
   const gap = parseFloat(style.columnGap) || 0;
   return { widths, gap };
+}
+
+// The grip's height (px, the style page's as it is pointed at) and the room kept above and below it within the grid
+const GRIP = 40;
+const GRIP_ROOM = 6;
+// The variable the grips' place is in (px from the grid's top)
+const GRIP_Y = "--swl-grip-y";
+
+/**
+ * Where the grips stand (px from the grid's top): the middle of the part of the grid in view, held within the grid;
+ * none in view: its middle
+ */
+export function gripAt(grid: { readonly top: number; readonly bottom: number }, view: { readonly top: number; readonly bottom: number }): number {
+  const height = grid.bottom - grid.top;
+  const top = Math.max(grid.top, view.top);
+  const bottom = Math.min(grid.bottom, view.bottom);
+  const middle = bottom > top ? (top + bottom) / 2 - grid.top : height / 2;
+  const least = GRIP / 2 + GRIP_ROOM;
+  return height <= 2 * least ? height / 2 : Math.min(Math.max(middle, least), height - least);
 }
 
 /** Where each divider is (px from the grid's left edge): the middle of each gap between two columns */
@@ -57,11 +77,25 @@ function said(first: number, second: number, ratio: readonly [number, number] | 
  * `textEdges` where the page's text is (x in the window), a column's edge snapping to it too (a grid wider than the
  * text: its column lined up with the text above and below it)
  */
-export function addColumnDividers(doc: Document, grid: HTMLElement, write: (columns: string, even: boolean) => void, textEdges?: () => { readonly left: number; readonly right: number } | undefined): void {
+export function addColumnDividers(
+  doc: Document,
+  grid: HTMLElement,
+  write: (columns: string, even: boolean) => void,
+  textEdges?: () => { readonly left: number; readonly right: number } | undefined,
+  view?: () => { readonly top: number; readonly bottom: number } | undefined,
+): void {
   let dividers: HTMLElement[] = [];
+  /** The grips placed in the part of the grid in view */
+  const placeGrips = () => {
+    const rect = grid.getBoundingClientRect();
+    const seen = view?.() ?? { top: 0, bottom: doc.defaultView?.innerHeight ?? rect.bottom };
+    grid.style.setProperty(GRIP_Y, `${Math.round(gripAt(rect, seen))}px`);
+  };
   const place = () => {
+    placeGrips();
     const { widths, gap } = laidOut(grid);
-    const places = widths.length > 1 ? dividerPlaces(widths, gap) : [];
+    // (Columns as many as fit are equal, none resized: no divider)
+    const places = widths.length > 1 && !shownFit(grid) ? dividerPlaces(widths, gap) : [];
     while (dividers.length > places.length) dividers.pop()!.remove();
     while (dividers.length < places.length) {
       const index = dividers.length;
@@ -167,6 +201,35 @@ export function addColumnDividers(doc: Document, grid: HTMLElement, write: (colu
     });
   };
   grid.addEventListener("pointerenter", place);
+  // Its columns changed while its dividers are shown (a double click made two even, its menu set another count or as
+  // many as fit): placed again at once (they stayed where the old columns had them until the grid was drawn anew).
+  // Told by the grid's template and fit alone: its other styles (the grips' place) set by `place` itself
+  const columnsNow = () => `${grid.style.getPropertyValue("--swl-grid-columns")}|${shownFit(grid)}`;
+  let columnsSeen = columnsNow();
+  const MutationObserverOf = doc.defaultView?.MutationObserver;
+  if (MutationObserverOf)
+    new MutationObserverOf(() => {
+      const seen = columnsNow();
+      if (seen === columnsSeen) return;
+      columnsSeen = seen;
+      // (None shown yet but the pointer over it, as after columns as many as fit: shown at once too)
+      if ((dividers.length || grid.matches(":hover")) && !dividers.some((one) => one.hasAttribute(DRAGGING))) place();
+    }).observe(grid, { attributes: true, attributeFilter: ["style", "data-swl-fit"] });
   // (A pointer's first press, a touch screen's: placed then)
   grid.addEventListener("pointerdown", place, { capture: true });
+  // The grips kept in view as the page scrolls (a frame's work at most; the listener let go once the grid is gone). A
+  // grid drawn anew under the pointer (its host draws it again as the page scrolls) gets its dividers then, no
+  // pointer's coming into it needed: none comes while the pointer stays put
+  let pending = false;
+  const scrolled = () => {
+    if (!grid.isConnected) return void doc.removeEventListener("scroll", scrolled, true);
+    if (pending || !(dividers.length || grid.matches(":hover"))) return;
+    pending = true;
+    (doc.defaultView?.requestAnimationFrame ?? ((run: () => void) => setTimeout(run, 16)))(() => {
+      pending = false;
+      if (dividers.length) placeGrips();
+      else place();
+    });
+  };
+  doc.addEventListener("scroll", scrolled, { capture: true, passive: true });
 }

@@ -75,7 +75,7 @@ test("a document in the side panel is the reader filling it", async ({ page, spa
   await expect(preview.locator(".swa-docx-preview[data-swa-docx-state='page']")).toBeVisible();
   await preview.hover();
   await preview.locator(".swa-more").click();
-  await page.locator(".swa-popup .swa-menu-item", { hasText: "Show in a side panel" }).click();
+  await page.locator(".swa-popup .swa-menu-item", { hasText: "Open in side panel" }).click();
   const panel = page.locator(".swa-peek");
   const reader = panel.locator(".swa-docx-reader[data-swa-docx-state='pages']");
   await expect(reader.locator("section.swa-docx-docx").first()).toContainText("The first page's words.");

@@ -11,14 +11,18 @@ import type { Attributes } from "../../../shared/markdown/attributes.ts";
 import { type Grid, readGridBody, readGrids } from "../../../shared/markdown/grid.ts";
 import { gridsOfBody } from "./core/match.ts";
 import { borderAttribute, bordered } from "./model/border.ts";
-import { columnTemplate, DEFAULT_MAX_COLUMNS } from "./model/columns.ts";
+import { columnsWithout, columnTemplate, fitsColumns, minWidthOf, validateMinWidth } from "./model/columns.ts";
 import { RENDERED_VERSION, type Rendered, type RenderedItem, type RenderedRange } from "../../../shared/rendered.ts";
 import { type Drawn, drawnIn, itemsOf } from "./drawn.ts";
-import { addCellMenus, type CellAction } from "./ui/cellmenu.ts";
+import type { LayoutMenuEntry } from "../../../shared/layout.ts";
+import { addColumnGrips, type CellAction, gridMenu, type GridMenuState } from "./ui/columngrips.ts";
 import { caretWord, type CellEditing, editCell } from "./ui/celleditor.ts";
-import { type EditorEmbed, type Editors, editorsOf } from "../../../shared/editor.ts";
+import { type EditorEmbed, type EditorLook, type Editors, editorsOf } from "../../../shared/editor.ts";
+import { LOOK_SAMPLE, sampleLook } from "../../../shared/editorlook.ts";
 import { addColumnDividers } from "./ui/dividers.ts";
-import { drawGrid, keepBlankLines, plainCell, showBorder, showColumns } from "./ui/view.ts";
+import { drawGrid, keepBlankLines, plainCell, showBorder, showColumns, showFit } from "./ui/view.ts";
+import { takeOver } from "./takeover.ts";
+import { offsetOf } from "./ui/offsets.ts";
 import { blankLineAt, type Caret, type CellPoint, endAt, offsetInCell, selectionInCell } from "./ui/cellpoint.ts";
 import { GridDrag } from "./drag.ts";
 
@@ -39,12 +43,17 @@ export type CellsChange =
   | { readonly kind: "move"; readonly cell: number; readonly by: -1 | 1 }
   | { readonly kind: "add"; readonly after?: number }
   | { readonly kind: "takeOut"; readonly cell: number }
+  | { readonly kind: "remove"; readonly cell: number }
   | { readonly kind: "ungrid" };
 export type CellsWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly cells: CellsChange };
 
 /** What the grids ask of the host whose page they are in */
 export type GridHost = {
-  /** A cell's markdown rendered as the host renders a page (its elements marked with `data-pos`, their offsets in it) */
+  /** Whether the user means what cannot be undone but by the page's undo (a column deleted, its content with it), asked in the host's dialog (none: the browser's) */
+  confirmDelete?(question: string): Promise<boolean>;
+  /** A value asked of the user, `value` given as it is now, in the host's dialog (none: the browser's); none where it is cancelled */
+  ask?(question: string, value: string): Promise<string | undefined>;
+  /** A cell's markdown rendered as the host renders a page (its elements marked with `data-pos`, their offsets in it; an offset of 0 may be left unmarked) */
   renderMarkdown(text: string): Promise<string>;
   /** The page's text now */
   pageText(): Promise<string>;
@@ -87,6 +96,8 @@ const SETTLE_MS = 50;
 const REDRAWN_MS = 3000;
 // How far a press and its release are apart to be a drag that selects (px)
 const DRAG_PX = 4;
+// What a grid puts in its cells besides their rendering (a column's grip): never taken over with a cell's rendering
+const OWN_CONTROLS = ".swl-grid-column-grip";
 // What a click in a cell leaves to the cell's rendering: a link, a tag, a button, a field, an editor open
 const OWN_CLICKS = "a, button, input, textarea, select, label, [data-ref]";
 
@@ -151,6 +162,15 @@ export class Grids {
   // Each grid drawn: what it drew in its cells (taken as drawn), and the grid in the page's text it was last found as
   private readonly drawnItems = new WeakMap<HTMLElement, readonly Drawn[]>();
   private readonly placed = new WeakMap<HTMLElement, Grid>();
+  // The grid drawn last where each starts in the page: the one a grid drawn anew replaces (taken out of the page by
+  // the host before the new one is drawn), its cells' rendering taken over (`takeOverUnchanged`)
+  private readonly drawnAt = new Map<number, HTMLElement>();
+  // The page's text a grid was drawn in (`takeOverUnchanged`: the text before it the same)
+  private readonly drawnIn = new WeakMap<HTMLElement, string>();
+  // The page the grids are drawn in, as the host said (`pageShown`)
+  private pageNow: string | undefined;
+  // The sample a cell's field's look is read of, as the host renders it (`lookIn`)
+  private lookSample: Promise<string | undefined> | undefined;
   // What is drawn changed since last told (a grid drawn or placed anew), and who is told
   private changedSinceTold = false;
   private readonly listeners = new Set<(items: readonly RenderedItem[]) => void>();
@@ -182,6 +202,10 @@ export class Grids {
   onAttributes: (() => void) | undefined;
   /** Where the page's text is (x in the window), where who lays the page out says: a column's edge snaps to it */
   textEdges: (() => { readonly left: number; readonly right: number } | undefined) | undefined;
+  /** Whether no widget's handle is shown (a narrow pane): the grid's own menu then in its columns' (none: it is) */
+  handleHidden: (() => boolean) | undefined;
+  /** The part of the window the page is seen in, where who lays the page out says: a divider's grip held in it (none: the window) */
+  view: (() => { readonly top: number; readonly bottom: number }) | undefined;
 
   // Text dragged into the cells and out of them, always moved (./drag.ts)
   private readonly drag: GridDrag;
@@ -239,7 +263,10 @@ export class Grids {
         // focus (else it was left: a quick second click on a cell just opened closed it again)
         const editor = this.editing?.session.editor;
         const field = editor?.element;
-        if (at?.cell?.classList.contains("swl-grid-editing") && editor && field && event.target instanceof Node && !field.contains(event.target)) {
+        // (The column's grip kept in the cell edited: its press its own, the cell left as by any press, its text written
+        // in turn; what its menu does waits for that write: `cellAction`)
+        const ownControl = event.target instanceof Element && !!event.target.closest(OWN_CLICKS);
+        if (at?.cell?.classList.contains("swl-grid-editing") && !ownControl && editor && field && event.target instanceof Node && !field.contains(event.target)) {
           event.preventDefault();
           event.stopPropagation();
           // (Under the field: the caret at its end, as a click under a page's last line puts it)
@@ -283,28 +310,42 @@ export class Grids {
     ]);
     const first = gridsOfBody(text, body)[0];
     const attributes = first?.attributes ?? {};
-    const element = drawGrid(this.doc, columnTemplate(attributes.columns, cells.length), html);
+    const element = drawGrid(this.doc, columnTemplate(attributes.columns, cells.length, attributes.min), html);
+    showFit(element, fitsColumns(attributes.columns));
     showBorder(element, bordered(attributes));
     this.keepBlankLines(element, cells.map((cell) => cell.content));
+    // The cells whose markdown did not change: the rendering of the grid it replaces taken over (its media loaded,
+    // decorated), not drawn anew (a write of one cell drew every other again: its images and previews flashed, the
+    // page under it jumped)
+    // (What it drew taken before: what is taken over was drawn by an earlier drawing, and may be decorated by now)
+    this.drawnItems.set(element, drawnIn(element));
+    if (first) this.takeOverUnchanged(element, cells.map((cell) => cell.content), first, text);
+    this.drawnIn.set(element, text);
     this.bodies.set(element, body);
     this.attributes.set(element, attributes);
-    // What it drew, before anything else touches it (another may frame a medium to decorate it)
-    this.drawnItems.set(element, drawnIn(element));
     this.changedSinceTold = true;
     // Where its cells are in the page (the first grid of its body; set again as it is found among its alike)
     if (first) {
       markPlaces(element, first);
       this.placed.set(element, first);
+      this.rememberAt(first.from, element);
     }
-    // Each cell's "…": what can be done with it and with the grid
-    if (this.host.changeCells) addCellMenus(this.doc, element, () => ({ columns: this.attributesOf(element).columns, border: bordered(this.attributesOf(element)), cells: cells.length }), (cell, action) => void this.cellAction(element, cell, action));
+    // Each column's grip: what can be done with it (the grid's own in its handle's menu: `menuOf`)
+    if (this.host.changeCells)
+      addColumnGrips(
+        this.doc,
+        element,
+        () => this.menuState(element),
+        (cell, action) => void this.cellAction(element, cell, action),
+        () => (this.handleHidden?.() ? this.menuOf(element) : []),
+      );
     // The dividers between its columns: their shares dragged, written as its `columns` (even ones as many as its cells
     // would be anyway: none written)
     if (this.host.changeCells) {
       addColumnDividers(this.doc, element, (columns, even) => {
-        const columnsNow = even && Number(columns) === Math.min(Math.max(cells.length, 1), DEFAULT_MAX_COLUMNS) ? null : columns;
+        const columnsNow = even && Number(columns) === columnsWithout(cells.length) ? null : columns;
         void this.cellAction(element, 0, { kind: "columns", columns: columnsNow });
-      }, () => this.textEdges?.());
+      }, () => this.textEdges?.(), () => this.view?.());
     }
     this.host.settle?.(element);
     // In the page, its order among the grids of its body is known: its own attributes then (and what it drew told)
@@ -322,7 +363,8 @@ export class Grids {
     if (!grid) return undefined;
     const cells = readGridBody(grid.body);
     const html = await Promise.all(cells.map((cell) => this.host.renderMarkdown(cell.content).catch(() => plainCell(this.doc, cell.content))));
-    const element = drawGrid(this.doc, columnTemplate(grid.attributes.columns, cells.length), html);
+    const element = drawGrid(this.doc, columnTemplate(grid.attributes.columns, cells.length, grid.attributes.min), html);
+    showFit(element, fitsColumns(grid.attributes.columns));
     showBorder(element, bordered(grid.attributes));
     this.keepBlankLines(element, cells.map((cell) => cell.content));
     element.classList.add("swl-grid-shown");
@@ -339,10 +381,12 @@ export class Grids {
     for (const element of drawn) {
       const found = this.found(text, element);
       if (!found) continue;
-      showColumns(element, columnTemplate(found.grid.attributes.columns, element.querySelectorAll(":scope > .swl-grid-cell").length));
+      showColumns(element, columnTemplate(found.grid.attributes.columns, element.querySelectorAll(":scope > .swl-grid-cell").length, found.grid.attributes.min));
+      showFit(element, fitsColumns(found.grid.attributes.columns));
       showBorder(element, bordered(found.grid.attributes));
       if (markPlaces(element, found.grid)) this.changedSinceTold = true;
       this.placed.set(element, found.grid);
+      this.rememberAt(found.grid.from, element);
       if (!sameAttributes(this.attributes.get(element), found.grid.attributes)) changed = true;
       this.attributes.set(element, found.grid.attributes);
     }
@@ -401,15 +445,131 @@ export class Grids {
     return undefined;
   }
 
-  /** What a cell's menu chose, written: the grid's columns as an attribute, a change of its cells by the host */
+  /**
+   * The rendering of the cells unchanged taken over (takeover.ts) from the grid drawn that this one replaces: the one
+   * drawn last where it starts in the page, out of it now (taken out by the host as this one comes; one still in the
+   * page is another grid of the same body, never taken), drawn in a page of the same text before it (another page's,
+   * opened before the host said so, never: a cell alike renders by its page, a link relative to it)
+   */
+  private takeOverUnchanged(element: HTMLElement, contents: readonly string[], place: Grid, text: string): void {
+    const old = this.drawnAt.get(place.from);
+    const oldBody = old && old !== element && !old.isConnected ? this.bodies.get(old) : undefined;
+    if (!old || oldBody === undefined || this.drawnIn.get(old)?.slice(0, place.from) !== text.slice(0, place.from)) return;
+    const taken = takeOver(
+      { element, contents, drawn: this.drawnItems.get(element) ?? [] },
+      { element: old, contents: readGridBody(oldBody).map((cell) => cell.content), drawn: this.drawnItems.get(old) ?? [] },
+      OWN_CONTROLS,
+    );
+    this.drawnItems.set(element, taken.fresh);
+    this.drawnItems.set(old, taken.old);
+  }
+
+  /** The page opened is another: the grids drawn in the one before never taken over (a cell alike renders by its page: a link relative to it) */
+  pageShown(page: string): void {
+    if (page === this.pageNow) return;
+    this.pageNow = page;
+    this.drawnAt.clear();
+    // (Rendered again: another page may render otherwise)
+    this.lookSample = undefined;
+  }
+
+  /**
+   * The page's look of what a cell's field draws as rendered (shared/editorlook.ts): its sample rendered once a page,
+   * its look read in the cell as the field opens (a zoom, a theme changed since read as they are now); none where it
+   * cannot be
+   */
+  private async lookIn(cell: HTMLElement): Promise<EditorLook | undefined> {
+    const rendering = (this.lookSample ??= this.host.renderMarkdown(LOOK_SAMPLE).catch(() => undefined));
+    const html = await rendering;
+    // (Not rendered: rendered again next time)
+    if (html === undefined && this.lookSample === rendering) this.lookSample = undefined;
+    return html !== undefined && cell.isConnected ? sampleLook(cell, html) : undefined;
+  }
+
+  /** A grid drawn remembered where it starts (the last few places alone: grids moved down the page leave old ones) */
+  private rememberAt(from: number, element: HTMLElement): void {
+    this.drawnAt.delete(from);
+    this.drawnAt.set(from, element);
+    while (this.drawnAt.size > 64) this.drawnAt.delete(this.drawnAt.keys().next().value!);
+  }
+
+  /** A grid's columns shown as its attributes have them now */
+  private showColumnsOf(element: HTMLElement): void {
+    const attributes = this.attributesOf(element);
+    showColumns(element, columnTemplate(attributes.columns, element.querySelectorAll(":scope > .swl-grid-cell").length, attributes.min));
+    showFit(element, fitsColumns(attributes.columns));
+  }
+
+  /** The narrowest a grid's columns may be, asked in px (`now` the grid's `min`); none where nothing is given, or what is cannot be read (said why) */
+  private async askMinWidth(now: string | undefined): Promise<string | undefined> {
+    const question = "The narrowest a column may be, in px (40 to 1200):";
+    const ask = this.host.ask ?? (async (text: string, value: string) => (this.doc.defaultView ?? window).prompt(text, value) ?? undefined);
+    const given = (await ask(question, String(minWidthOf(now))).catch(() => undefined))?.trim();
+    if (!given) return undefined;
+    const problem = validateMinWidth(given);
+    if (problem) return void this.host.problem(`Silverware Layout: the min width was not set: ${problem}`);
+    return given.toLowerCase().replace(/px$/, "");
+  }
+
+  /** A grid drawn as its menus show it: its columns attribute, its borders, its number of cells */
+  private menuState(element: HTMLElement): GridMenuState {
+    const attributes = this.attributesOf(element);
+    return { columns: attributes.columns, min: attributes.min, border: bordered(attributes), cells: element.querySelectorAll(":scope > .swl-grid-cell").length };
+  }
+
+  /**
+   * The grid's own sections of its handle's menu (docs/silverware-layout-grid-handles.md): its columns, its borders, a
+   * column at the end, the grid taken apart; none where its cells are not written here (a grid of a page embedded)
+   */
+  menuOf(element: HTMLElement): LayoutMenuEntry[][] {
+    if (!this.host.changeCells || !this.bodies.has(element)) return [];
+    return gridMenu(this.menuState(element), (action) => this.cellAction(element, 0, action));
+  }
+
+  /** What a column's menu or the grid's chose, written: the grid's columns as an attribute, a change of its cells by the host */
   async cellAction(element: HTMLElement, cell: number, action: CellAction): Promise<void> {
     const said = (problem: string | undefined) => problem && this.host.problem(`Silverware Layout: the grid was not changed: ${problem}`);
+    // A column deleted, its content with it, or its content emptied: asked first, plainly
+    if (action.kind === "remove" || action.kind === "clear") {
+      const question =
+        action.kind === "remove" ? `Delete column ${cell + 1} and everything in it? Ctrl+Z brings it back.` : `Clear column ${cell + 1}? Everything in it goes, the column stays. Ctrl+Z brings it back.`;
+      const ask = this.host.confirmDelete ?? (async (text: string) => (this.doc.defaultView ?? window).confirm(text));
+      if (!(await ask(question).catch(() => false))) return;
+    }
+    // (After the cells' writes waiting (a cell left as its grip's menu opened): on the grid as drawn anew by them)
+    if (this.writes > 0) {
+      const nth = this.drawn().indexOf(element);
+      await this.writing;
+      if (!element.isConnected) element = this.drawn()[nth] ?? element;
+    }
     // Its markdown shown by the page, the cursor at the column's start (as Alt+click there)
     if (action.kind === "source") {
       const cellElement = element.querySelector<HTMLElement>(`:scope > .swl-grid-cell[data-swl-cell="${cell}"]`) ?? undefined;
       return this.showSource(element, cellElement, cellElement ?? element, undefined);
     }
-    if (action.kind === "columns") return void said(await this.writeAttributes(element, { columns: action.columns }));
+    // Its columns (a count, widths, or as many as fit: a min width of theirs kept for that alone), shown at once (its body
+    // the same, the grid is not drawn anew)
+    if (action.kind === "columns" || action.kind === "min" || action.kind === "askMin") {
+      let attributes: Readonly<Record<string, string | null>>;
+      if (action.kind === "columns") attributes = { columns: action.columns, ...(fitsColumns(action.columns ?? undefined) ? {} : { min: null }) };
+      else if (action.kind === "min") attributes = { min: action.min };
+      else {
+        const given = await this.askMinWidth(this.attributesOf(element).min);
+        if (given === undefined) return;
+        attributes = { min: given };
+      }
+      const problem = await this.writeAttributes(element, attributes);
+      if (!problem) this.showColumnsOf(element);
+      return void said(problem);
+    }
+    // Its content emptied: the cell written empty (one edit), the grid drawn anew by it
+    if (action.kind === "clear") {
+      const text = await this.host.pageText().catch(() => undefined);
+      const found = text === undefined ? undefined : this.found(text, element);
+      if (!found) return void said("this grid changed in the page since it was drawn");
+      const problem = await this.host.writeCell({ body: found.grid.body, occurrence: found.occurrence, of: found.of, cell, content: "" }).catch((error: unknown) => (error instanceof Error ? error.message : String(error)));
+      return void (problem && this.host.problem(`Silverware Layout: the column was not cleared: ${problem}`));
+    }
     if (action.kind === "border") {
       const problem = await this.writeAttributes(element, { border: borderAttribute(action.on) });
       // (Shown at once: its body the same, the grid is not drawn anew)
@@ -420,7 +580,17 @@ export class Grids {
     const found = text === undefined ? undefined : this.found(text, element);
     if (!found || !this.host.changeCells) return void said("this grid changed in the page since it was drawn");
     const cells: CellsChange =
-      action.kind === "move" ? { kind: "move", cell, by: action.by } : action.kind === "addAfter" ? { kind: "add", after: cell } : action.kind === "takeOut" ? { kind: "takeOut", cell } : action.kind === "addColumn" ? { kind: "add" } : { kind: "ungrid" };
+      action.kind === "move"
+        ? { kind: "move", cell, by: action.by }
+        : action.kind === "addAfter"
+          ? { kind: "add", after: cell }
+          : action.kind === "takeOut"
+            ? { kind: "takeOut", cell }
+            : action.kind === "remove"
+              ? { kind: "remove", cell }
+              : action.kind === "addColumn"
+                ? { kind: "add" }
+                : { kind: "ungrid" };
     said(await this.host.changeCells({ body: found.grid.body, occurrence: found.occurrence, of: found.of, cells }).catch((error: unknown) => (error instanceof Error ? error.message : String(error))));
   }
 
@@ -510,7 +680,7 @@ export class Grids {
     const found = text === undefined ? undefined : this.found(text, element);
     const cell = found?.grid.cells[index];
     if (!found || !cell) return this.host.problem("Silverware Layout: this grid changed in the page since it was drawn; toggle the task there");
-    const content = toggledTask(cell.content, Number(box.getAttribute("data-pos")) || 0);
+    const content = toggledTask(cell.content, offsetOf(box));
     if (content === undefined) return this.host.problem("Silverware Layout: the task was not found in the column's markdown");
     const problem = await this.host.writeCell({ body: found.grid.body, occurrence: found.occurrence, of: found.of, cell: index, content }).catch((error: unknown) => (error instanceof Error ? error.message : String(error)));
     if (problem) this.host.problem(`Silverware Layout: the task was not toggled: ${problem}`);
@@ -525,6 +695,8 @@ export class Grids {
     // (What draws its embeds asked as its text is read: no wait of its own before the field opens, the grid perhaps
     // drawn anew meanwhile)
     const embeds = this.host.embeds?.().catch(() => undefined);
+    // (The page's look of a task's box and a hashtag read once, for its field: as the cell is drawn)
+    const look = this.lookIn(cellElement);
     let text = await this.host.pageText().catch(() => undefined);
     let found = text === undefined ? undefined : this.found(text, element);
     // Read as another cell's write had changed the grid, before it was drawn anew: opened once it is, in that drawing
@@ -549,8 +721,18 @@ export class Grids {
     const place: CellPlace = { grid: element, nth, index };
     this.places.add(place);
     let session: CellEditing | undefined;
-    const embed = await embeds;
-    const cellHost = { afterPress: (doc: Document) => this.host.afterPress?.(doc) ?? Promise.resolve(), focusPage: (cell: HTMLElement) => this.host.focusPage?.(cell), ...(embed ? { embed } : {}) };
+    const [embed, shown] = await Promise.all([embeds, look]);
+    const cellHost = {
+      afterPress: (doc: Document) => this.host.afterPress?.(doc) ?? Promise.resolve(),
+      focusPage: (cell: HTMLElement) => this.host.focusPage?.(cell),
+      ...(embed ? { embed } : {}),
+      ...(shown ? { look: shown } : {}),
+      // (Its rendering back in the page: what it drew told again, to be decorated where it was not yet)
+      restored: () => {
+        this.changedSinceTold = true;
+        this.tell();
+      },
+    };
     session = editCell(cellElement, cell.content, at, this.host.editors ?? editorsOf(undefined), cellHost, (content, settled) => {
       if (session && this.editing?.session === session) this.editing = undefined;
       if (same(content) !== same(cell.content)) this.writeLater(place, content, settled);

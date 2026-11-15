@@ -60,16 +60,16 @@ Put part of a page side by side: type **/grid** where it should go. A grid of tw
 
 ```markdown
 <grid>
-<column>
+<cell>
 
 The first column: any markdown, lists, links, images.
 
-</column>
-<column>
+</cell>
+<cell>
 
 The second column.
 
-</column>
+</cell>
 </grid>
 ```
 
@@ -78,18 +78,20 @@ The second column.
   - **Split**: the blocks in their order, cut into the columns you pick by their number (ten tasks in three columns: 4, 3, 3), a list staying a list in each column.
 
   With Silverware Toolbar, add **Put into grid** to a toolbar and set its *Mode*: the button then asks the number of columns alone.
-- **Change a grid by its menu**: point at a column (on a phone it shows always), and its **…** at the top right lets you move the column left or right, add a column after it, or move it out of the grid (its content goes under the grid); set the grid's number of columns (automatic, 2, 3, 4), turn its **Borders** on or off, add a column at the end, or **remove the grid**: its content stays, the columns one under another in their order (row by row), as it was before you put it into a grid.
+- **Change a column by its grip**: point at a column, and a short grip shows at the middle of its top edge (on a phone, once you tap into the grid). Click it to move the column left or right, add a column after it, move it out of the grid (its content goes under the grid), **Clear column…** (everything in it goes, the column stays) or **Delete column…** (its content with it); both ask first, and Ctrl+Z brings it back.
+- **Change the whole grid by its handle**: the bar beside the grid (the one you drag its width by) opens, on a click, the grid's menu: where it stands, its **Columns** (Auto, or 2 to 8; with Auto its **Min width**: XS, S, M, L, or your own in px), its **Borders** on or off, a column added at the end, or **remove the grid**: its content stays, the columns one under another in their order (row by row), as it was before you put it into a grid. On a phone, where no bar shows beside a grid as wide as the screen, each column's grip menu has **Grid…**, which opens the same menu.
 - **Edit a column where it is**: click into it, and its markdown shows in a field of its own, the cursor where you clicked (or the text you selected in it by a drag, selected there too), the rest of the grid as it was. Click elsewhere, or press Esc (or Ctrl+Enter), and it is saved. A click on a link or a tag in it still follows it.
-- **See the raw text**: Alt+click a column, or choose **Edit markdown** in its **…** menu, and the page shows its markdown, the cursor where you clicked (or at the column's start). Otherwise the grid keeps the cursor out of its markdown, as a table does: a click anywhere in it is the grid's, and the arrow keys move the cursor over it, from the line before it to the line after it and back.
+- **See the raw text**: Alt+click a column, or choose **Edit markdown** in its grip's menu, and the page shows its markdown, the cursor where you clicked (or at the column's start). Otherwise the grid keeps the cursor out of its markdown, as a table does: a click anywhere in it is the grid's, and the arrow keys move the cursor over it, from the line before it to the line after it and back.
 - **Drag text into a column, or out of it**: select text in the page and drag it onto a column (it is outlined as you hold it there), and it moves there, written where you let it go; drag text selected in a column onto another column, or within it, and it moves too, its formatting with it (a bold word stays bold). A move into a column is one change: one undo takes it back. Text dragged out of a column into the page moves as well (two undos take it back: the page's and the column's). Text dragged from another app is copied in.
 - **A grid's width and place**: point at a grid, and a bar shows beside it, as beside a table: drag it to widen or narrow the grid, double-click it for the page's width, click it to put the grid at the left, in the middle or at the right (see *Where a widget stands*).
 - **Columns' widths by dragging**: point at a grid, and a line shows between its columns. Drag it to make one column wider and its neighbour narrower; it snaps to 1 : 1, 2 : 1, 1 : 2, 3 : 1, 1 : 3, 3 : 2 and 2 : 3, and in a grid wider than the page's text to the text's edges (a column lined up with the text above and below it), showing a guide for each and saying where it snapped as you drag, and is saved as the grid's `columns` (`<grid columns="2fr 1fr">`). Double-click the line to make the two even again.
-- **More columns, or other widths**: give the grid a `columns` attribute: `<grid columns="3">` for three of the same width, or their widths, `<grid columns="1fr 2fr">` (the second twice as wide), `30% 70%`, `200px 1fr`. More columns than you give make more rows: nine columns in `<grid columns="3">` are three rows of three, a gallery of images. Without it, each `<column>` is a column of its own, four at most in a row.
+- **More columns, or other widths**: give the grid a `columns` attribute: `<grid columns="3">` for three of the same width, or their widths, `<grid columns="1fr 2fr">` (the second twice as wide), `30% 70%`, `200px 1fr`. More columns than you give make more rows: nine columns in `<grid columns="3">` are three rows of three, a gallery of images. Without it, each `<cell>` is a column of its own, eight at most in a row.
+- **Auto: as many columns as fit** (a gallery of images): `<grid columns="auto">` shows as many columns of the same width in a row as fit, none narrower than its min width (fewer columns than fit share the whole width), so a wider page shows more of them and a phone fewer. The min width is `min`: `xs` (100 px), `s` (160 px), `m` (240 px, the default), `l` (360 px), or px (`<grid columns="auto" min="180">`). Its columns are not resized by dragging. Put into grid's Gallery offers Auto too.
 - **Borders**: faint lines round the grid and between its columns and rows, as a table's, the columns' text a little in from them. Turn them on in the grid's menu; they are kept on its line, `<grid border="1">`. The lines you drag between its columns lie on them.
 - **The grid's width and place** are kept on its line too, `<grid width="1100" align="right">`.
-- **On a phone** (an editor narrower than the setting *Narrowest editor laid out*), the columns are shown one under another.
+- **On a phone** (an editor narrower than the setting *Narrowest editor laid out*), the columns are shown one under another (an Auto grid keeps as many to a row as fit).
 
-Keep the blank lines round a column's text, as /grid writes them: without them other markdown renderers show its markdown as plain text. Without Silverware Layout, and in other renderers (GitHub, VS Code), the columns are shown one under another and the `<grid>` and `<column>` lines as text: nothing is lost.
+Keep the blank lines round a cell's text, as /grid writes them: without them other markdown renderers show its markdown as plain text. Without Silverware Layout, and in other renderers (GitHub, VS Code), the columns are shown one under another and the `<grid>` and `<cell>` lines as text: nothing is lost.
 
 What you should know:
 
@@ -100,6 +102,8 @@ What you should know:
 - A grid starts on a line of its own, not straight after a paragraph's line: leave a blank line before it (/grid does).
 
 **SilverBullet's markdown as written** (*Editor: Toggle Markdown Syntax Rendering*): SilverBullet still draws grids in that mode; Silverware Layout hides them there, so you see their markdown alone. Turn it off in the **Markdown** tab of **Silverware Layout: Page layout** (or `silverware.layout.syntaxMode.hideGrids` in your CONFIG).
+
+**A link shown as its markdown** (the cursor in it, so you see its `[[`, `]]` or `](…)`, or every link while SilverBullet shows the markdown as written): a click places the cursor there, so you can edit it, and Ctrl+click opens it. A link drawn as a link opens on a click as ever. Turn it off in the same **Markdown** tab (or `silverware.layout.links.clickPlacesCursor` in your CONFIG).
 
 ## Embedded files
 

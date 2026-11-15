@@ -12,11 +12,11 @@ import { type SyntaxModeWatcher, watchSyntaxMode } from "../../shared/syntaxmode
 import { type Bridge, missingBridgeFunctions } from "./bridge.ts";
 import { registerBuiltins } from "./builtin/index.ts";
 import { AssetRegistry } from "./core/registry.ts";
-import { type ListedFile, orphanedPreviews } from "./core/stored.ts";
+import { type ListedFile, movedPreviews, orphanedPreviews } from "./core/stored.ts";
 import { AssetDecorator, type AssetHost } from "./decorate.ts";
-import { factsOf, silverBulletAssetHost } from "./host/silverbullet/assets.ts";
-import { silverBulletPlatform } from "../../shared/silverbullet/platform.ts";
-import { ASSETS_PATH, readAssetSettings, readSyntaxModeSettings, storedAssetPaths, SYNTAX_PATHS, type SyntaxModeSettings } from "./model/settings.ts";
+import { bytesOf, factsOf, silverBulletAssetHost } from "./host/silverbullet/assets.ts";
+import { pageNamesOf, silverBulletPlatform } from "../../shared/silverbullet/platform.ts";
+import { ASSETS_PATH, type AssetSettings, readAssetSettings, readSyntaxModeSettings, storedAssetPaths, SYNTAX_PATHS, type SyntaxModeSettings, validatePreviewFolder } from "./model/settings.ts";
 import { SILVERBULLET_SYNTAX_PAGE, SYNTAX_OPTION } from "./host/silverbullet/syntaxmode.ts";
 import { assetProvider } from "./provider.ts";
 import { mediaTabs } from "./ui/mediatab.ts";
@@ -61,9 +61,9 @@ let syntaxWatcher: SyntaxModeWatcher<SyntaxModeSettings> | undefined;
 
 /** The settings of the markdown shown as written, as SilverBullet's configuration has them */
 async function readSyntaxSettings(bridge: Bridge): Promise<SyntaxModeSettings> {
-  if (!bridge.getConfig) return { hideAssets: true, clickPlacesCursor: true };
-  const [hides, clicks] = await Promise.all([bridge.getConfig(SYNTAX_PATHS.hides, true), bridge.getConfig(SYNTAX_PATHS.clicks, true)]);
-  return readSyntaxModeSettings((path) => (path === SYNTAX_PATHS.hides ? hides : path === SYNTAX_PATHS.clicks ? clicks : undefined));
+  if (!bridge.getConfig) return { hideAssets: true };
+  const hides = await bridge.getConfig(SYNTAX_PATHS.hides, true);
+  return readSyntaxModeSettings((path) => (path === SYNTAX_PATHS.hides ? hides : undefined));
 }
 
 /** Started by the init page (again as Space Lua loads again): SilverBullet's API handed over, Silverware Layout's where it is installed */
@@ -80,7 +80,7 @@ export function init(bridge: Bridge): void {
   const rendered = renderedOf((bridge.layout as { readonly rendered?: unknown } | undefined)?.rendered);
   const writer = pageWriter(silverBulletPlatform(bridge));
   const raw = silverBulletAssetHost(bridge, writer, document, rendered);
-  const host: AssetHost = { ...raw, settings: async () => readAssetSettings(await raw.settings()).settings };
+  const host: AssetHost = { ...raw, settings: async () => heldOr(readAssetSettings(await raw.settings()).settings) };
   const fresh = !decorator;
   if (decorator) decorator.useHost(host);
   else decorator = new AssetDecorator(document, host, registry);
@@ -92,18 +92,26 @@ export function init(bridge: Bridge): void {
   // Files drawn in the fields of Silverware Layout's grids as in the page (shared/rendered.ts `drawEmbeds`)
   const drawing = decorator;
   rendered.drawEmbeds?.((markdown, page) => drawing.editorEmbed(markdown, page));
-  // The markdown shown as written (SilverBullet's mode): the files hidden then, a link's click the cursor's, as the
+  // The markdown shown as written (SilverBullet's mode): the files hidden then, as the
   // settings say (read as the mode is asked, again as the settings window saves them)
   syntaxWatcher ??= watchSyntaxMode<SyntaxModeSettings>(document, {
     page: SILVERBULLET_SYNTAX_PAGE,
     shown: () => current?.getUiOption?.(SYNTAX_OPTION),
-    read: () => (current ? readSyntaxSettings(current) : { hideAssets: true, clickPlacesCursor: true }),
-    same: (a, b) => a.hideAssets === b.hideAssets && a.clickPlacesCursor === b.clickPlacesCursor,
-    marks: (settings) => ({ "data-swa-syntax-shown": settings.hideAssets, "data-swa-syntax-clicks": settings.clickPlacesCursor }),
-    placesCursor: (settings) => settings.clickPlacesCursor,
-    textMark: "data-swa-text",
-    initial: { hideAssets: true, clickPlacesCursor: true },
+    read: () => (current ? readSyntaxSettings(current) : { hideAssets: true }),
+    same: (a, b) => a.hideAssets === b.hideAssets,
+    marks: (settings) => ({ "data-swa-syntax-shown": settings.hideAssets }),
+    initial: { hideAssets: true },
   });
+}
+
+// The settings just saved, held until SilverBullet's configuration gives them (it loads it again a moment after a
+// save: read before, it is the one before), a while at most: the files drawn meanwhile by them (a preview into the new
+// folder, not the old)
+const SAVED_HELD_MS = 10_000;
+let held: { readonly settings: AssetSettings; readonly until: number } | undefined;
+function heldOr(read: AssetSettings): AssetSettings {
+  if (held && (Date.now() > held.until || JSON.stringify(read) === JSON.stringify(held.settings))) held = undefined;
+  return held ? held.settings : read;
 }
 
 /** The commands, as the init page defines them */
@@ -114,6 +122,60 @@ export function commandNames(): string[] {
 export async function runCommand(name: string): Promise<void> {
   if (name === SETTINGS) await openSettings();
   if (name === CLEAN_UP) await cleanUpPreviews().catch((error: unknown) => current?.flash(`Silverware Assets: previews not cleaned up: ${error instanceof Error ? error.message : String(error)}`, "error"));
+}
+
+/** Files moved one by one (each read, written where it goes, taken out of where it was); those moved, and how many not */
+async function moveFiles(bridge: Bridge, moves: readonly { readonly from: string; readonly to: string }[]): Promise<{ readonly moved: { readonly from: string; readonly to: string }[]; readonly failed: number }> {
+  const moved: { readonly from: string; readonly to: string }[] = [];
+  let failed = 0;
+  for (const move of moves) {
+    try {
+      // (Nothing read as bytes: not written as an empty file, the original kept)
+      const data = bytesOf(await bridge.readDocument!(move.from));
+      if (!data) throw new Error(`${move.from} could not be read`);
+      await bridge.writeDocument!(move.to, data);
+      try {
+        await bridge.deleteDocument!(move.from);
+      } catch (error) {
+        // (The original not taken away: its copy is, so the file is in one place, the old)
+        await Promise.resolve(bridge.deleteDocument!(move.to)).catch(() => undefined);
+        throw error;
+      }
+      moved.push(move);
+    } catch {
+      failed++;
+    }
+  }
+  return { moved, failed };
+}
+
+/**
+ * The previews' folder renamed (the settings saved): its previews (only theirs: the folder may hold the user's files
+ * too) moved under the new folder, then the setting saved by `save`. One that cannot be moved, or the setting not
+ * saved: those moved put back, the folder not changed, why said (as text: the settings window says it). Nothing kept,
+ * or no way to list the space's files: the setting saved alone
+ */
+async function movePreviewFolder(bridge: Bridge, from: string, to: string, save: () => Promise<void>): Promise<string | undefined> {
+  const canMove = bridge.listFiles && bridge.readDocument && bridge.writeDocument && bridge.deleteDocument;
+  const moves = canMove ? movedPreviews(pageNamesOf(await bridge.listFiles!()), from, to) : [];
+  const { moved, failed } = await moveFiles(bridge, moves);
+  const putBack = () => moveFiles(bridge, moved.map((one) => ({ from: one.to, to: one.from })));
+  // (Those that could not be put back said: left in the new folder, which nothing reads then)
+  const leftIn = async () => {
+    const back = await putBack();
+    return back.failed ? ` (${back.failed} left in ${to})` : "";
+  };
+  if (failed) return `${failed} preview${failed === 1 ? "" : "s"} could not be moved to ${to}: the folder is not changed${await leftIn()}`;
+  try {
+    await save();
+  } catch (error) {
+    const left = await leftIn();
+    throw new Error(`${error instanceof Error ? error.message : String(error)}${left}`);
+  }
+  // (Previews made meanwhile, into the old folder as they were drawn: moved after them)
+  if (canMove) await moveFiles(bridge, movedPreviews(pageNamesOf(await bridge.listFiles!()), from, to));
+  if (moved.length) bridge.flash(`Silverware Assets: ${moved.length} preview${moved.length === 1 ? "" : "s"} moved to ${to}`, "info");
+  return undefined;
 }
 
 /** The previews kept of files gone (deleted, renamed) or of their versions gone (replaced) taken away, said how many (core/stored.ts) */
@@ -128,7 +190,8 @@ async function cleanUpPreviews(): Promise<void> {
     const facts = factsOf(meta);
     return [{ name, ...(facts ? { facts } : {}) }];
   });
-  const gone = orphanedPreviews(files);
+  const folder = heldOr(readAssetSettings(bridge.getConfig ? await bridge.getConfig(ASSETS_PATH, undefined) : undefined).settings).previewFolder;
+  const gone = orphanedPreviews(files, folder);
   let failed = 0;
   // (Each on its own: one that fails, the rest still taken away)
   for (const path of gone) {
@@ -166,12 +229,24 @@ async function openSettings(): Promise<void> {
   settingsWindow.open(
     [
       ...mediaTabs(document, input, async (saved) => {
-        await save(storedAssetPaths(saved), OWN_MARKER);
+        // The previews' folder changed: checked, what it holds moved there first (the setting saved after, so the
+        // previews are found where it says)
+        const problem = validatePreviewFolder(saved.previewFolder);
+        if (problem) return problem;
+        const write = async () => {
+          await save(storedAssetPaths(saved), OWN_MARKER);
+          held = { settings: saved, until: Date.now() + SAVED_HELD_MS };
+        };
+        if (saved.previewFolder === settings.previewFolder) await write();
+        else {
+          const notMoved = await movePreviewFolder(bridge, settings.previewFolder, saved.previewFolder, write);
+          if (notMoved) return notMoved;
+        }
         await shown.redecorateAll();
         return undefined;
       }),
       markdownTab(document, syntax, async (saved) => {
-        await save({ [SYNTAX_PATHS.hides]: saved.hideAssets ? undefined : false, [SYNTAX_PATHS.clicks]: saved.clickPlacesCursor ? undefined : false });
+        await save({ [SYNTAX_PATHS.hides]: saved.hideAssets ? undefined : false });
         syntaxWatcher?.settingsChanged(saved);
         return undefined;
       }),

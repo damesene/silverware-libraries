@@ -35,7 +35,12 @@ type CellsWrite = {
   readonly body: string;
   readonly occurrence: number;
   readonly of: number;
-  readonly cells: { readonly kind: "move"; readonly cell: number; readonly by: -1 | 1 } | { readonly kind: "add"; readonly after?: number } | { readonly kind: "takeOut"; readonly cell: number } | { readonly kind: "ungrid" };
+  readonly cells:
+    | { readonly kind: "move"; readonly cell: number; readonly by: -1 | 1 }
+    | { readonly kind: "add"; readonly after?: number }
+    | { readonly kind: "takeOut"; readonly cell: number }
+    | { readonly kind: "remove"; readonly cell: number }
+    | { readonly kind: "ungrid" };
 };
 /** A grid's attributes to write (src/grid/grids.ts' `AttributesWrite`) */
 type AttributesWrite = { readonly body: string; readonly occurrence: number; readonly of: number; readonly attributes: Readonly<Record<string, string | null>> };
@@ -133,6 +138,16 @@ export function silverBulletGridHost(bridge: Bridge, writer: PageWriter, drawer:
       if (bridge.moveCursor) void bridge.moveCursor(at, true);
     },
     problem: (message: string): void => void bridge.flash(message, "error"),
+    // Asked in SilverBullet's prompt (the init page's `prompt`), else the browser's
+    ask: async (question: string, value: string): Promise<string | undefined> => {
+      const answer = bridge.prompt ? await bridge.prompt(question, value) : globalThis.prompt?.(question, value);
+      return typeof answer === "string" ? answer : undefined;
+    },
+    // Asked in SilverBullet's dialog, its OK button the danger's (the init page's `confirmDelete`), else its plain one
+    confirmDelete: async (question: string): Promise<boolean> => {
+      const ask = bridge.confirmDelete ?? bridge.confirm;
+      return ask ? !!(await ask(question)) : (globalThis.confirm?.(question) ?? false);
+    },
     settle: (element: HTMLElement): void => settleGridFrames(element.ownerDocument),
   };
 }
@@ -195,7 +210,7 @@ export function silverBulletPutHost(bridge: Bridge, writer: PageWriter) {
       const picked = (await bridge.filterBox(label, options.map((option, index) => ({ ...option, index })))) as { index?: unknown } | undefined;
       return typeof picked?.index === "number" ? picked.index : undefined;
     },
-    put: async (from: number, to: number, was: string, mode: "gallery" | "split", columns: number): Promise<string | undefined> => {
+    put: async (from: number, to: number, was: string, mode: "gallery" | "split", columns: number | "auto"): Promise<string | undefined> => {
       const page = String(await bridge.getCurrentPage());
       const report = await writer.write(pageChanges().page(page, (p) => p.grids.put(from, to, was, mode, columns)).build());
       return report.skipped[0]?.reason;

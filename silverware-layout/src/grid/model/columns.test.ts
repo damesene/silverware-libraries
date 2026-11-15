@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { columnsOf, columnTemplate, DEFAULT_MAX_COLUMNS, dividedWidths, templateOf, validateColumns } from "./columns.ts";
+import { columnCount, columnsOf, columnTemplate, dividedWidths, MAX_COLUMNS, minWidthChoice, minWidthOf, templateOf, validateColumns, validateMinWidth } from "./columns.ts";
 
 describe("validateColumns", () => {
   it("takes a count of 1 to 12 and widths of fr, %, px or auto", () => {
@@ -24,8 +24,38 @@ describe("columnTemplate", () => {
   it("makes a column per cell where columns are none or not read, at most the default, one at least", () => {
     expect(columnTemplate(undefined, 2)).toBe("repeat(2, minmax(0, 1fr))");
     expect(columnTemplate("wide", 3)).toBe("repeat(3, minmax(0, 1fr))");
-    expect(columnTemplate(undefined, 9)).toBe(`repeat(${DEFAULT_MAX_COLUMNS}, minmax(0, 1fr))`);
+    expect(columnTemplate(undefined, 5)).toBe("repeat(5, minmax(0, 1fr))");
+    expect(columnTemplate(undefined, 11)).toBe(`repeat(${MAX_COLUMNS}, minmax(0, 1fr))`);
     expect(columnTemplate(undefined, 0)).toBe("repeat(1, minmax(0, 1fr))");
+  });
+
+  it("makes auto as many equal columns as fit, none narrower than its min width (a name or px; none: M) nor than the grid", () => {
+    expect(columnTemplate("auto", 6)).toBe("repeat(auto-fit, minmax(min(240px, 100%), 1fr))");
+    expect(columnTemplate("Auto", 6, "xs")).toBe("repeat(auto-fit, minmax(min(100px, 100%), 1fr))");
+    expect(columnTemplate("auto", 6, "180px")).toBe("repeat(auto-fit, minmax(min(180px, 100%), 1fr))");
+    expect(columnTemplate("auto", 6, "tiny")).toBe("repeat(auto-fit, minmax(min(240px, 100%), 1fr))");
+  });
+});
+
+describe("a grid's min width and count", () => {
+  it("reads a min width as a name or px from 40 to 1200, says why not of others", () => {
+    for (const value of ["xs", "S", "m", "l", "180", "180px", "40", "1200"]) expect(validateMinWidth(value), value).toBeUndefined();
+    expect(validateMinWidth("xl")).toBe(`"xl" is no column's width (xs, s, m, l, or px as 180)`);
+    expect(validateMinWidth("30")).toBe("30 px: from 40 to 1200");
+    expect(minWidthOf("s")).toBe(160);
+    expect(minWidthOf("300px")).toBe(300);
+    expect(minWidthOf(undefined)).toBe(240);
+    expect(minWidthChoice("l")).toEqual({ name: "l" });
+    expect(minWidthChoice("300")).toEqual({ custom: 300 });
+    expect(minWidthChoice(undefined)).toEqual({ name: "m" });
+  });
+
+  it("counts the equal columns a menu shows: its count, one per cell without columns, none for widths or auto", () => {
+    expect(columnCount("3", 2)).toBe(3);
+    expect(columnCount(undefined, 2)).toBe(2);
+    expect(columnCount(undefined, 12)).toBe(MAX_COLUMNS);
+    expect(columnCount("1fr 2fr", 2)).toBeUndefined();
+    expect(columnCount("auto", 2)).toBeUndefined();
   });
 });
 

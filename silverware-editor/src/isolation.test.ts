@@ -1,4 +1,5 @@
-// What Silverware Editor imports: of shared/ the editor's contract (shared/editor.ts) alone; no other plugin's code.
+// What Silverware Editor imports: of shared/ the editor's contract (shared/editor.ts) and the reading of a line's marks
+// (shared/markdown/inline.ts: hashtags as SilverBullet reads them, pure) alone; no other plugin's code.
 // CodeMirror only in vendor.ts at run time, which nothing imports (it is a file of its own, loaded when idle); its types
 // elsewhere (`import type`, erased).
 import { readdirSync, readFileSync } from "node:fs";
@@ -26,10 +27,17 @@ function imports(file: string): string[] {
 }
 
 describe("isolation", () => {
-  it("imports of shared/ the editor's contract alone, no other plugin's code", () => {
+  // What of shared/ it may import; each of them importing nothing else at run time (so nothing more comes in through them)
+  const ALLOWED = ["shared/editor.ts", "shared/markdown/inline.ts"];
+  it("imports of shared/ the editor's contract and a line's marks alone, no other plugin's code", () => {
     for (const file of files(SRC)) {
       const outside = imports(file).filter((path) => path.startsWith("shared/") || path.startsWith("silverware-") || path.startsWith(".."));
-      expect(outside.filter((path) => path !== "shared/editor.ts"), relative(SRC, file)).toEqual([]);
+      expect(outside.filter((path) => !ALLOWED.includes(path)), relative(SRC, file)).toEqual([]);
+    }
+    for (const allowed of ALLOWED) {
+      const text = readFileSync(join(SRC, "..", "..", allowed), "utf8");
+      const runTime = [...text.matchAll(/^(?:import|export)(?! type)[^"']*from ["']([^"']+)["']/gm)].map(([, spec]) => spec!);
+      expect(runTime, allowed).toEqual([]);
     }
   });
 

@@ -1,25 +1,44 @@
-// An asset's "…" button (docs/silverware-assets.md, *Views*): on its frame, at its top right, opening the
-// asset's menu (the shared popup menu, shared/popupmenu.ts): how it is shown (icon, preview, embed: the one it is
-// shown as checked, one that cannot be drawn disabled), then what can be done with it.
+// An asset's "…" button (docs/silverware-assets.md, *Views*; its menu: docs/silverware-assets-menu.md): on its frame, at
+// its top right, opening the asset's menu (the shared popup menu, shared/popupmenu.ts). What changes the page first (how
+// the file is shown there: a row of a link, a card, a preview, the original), then the ways of opening it, then what
+// is done with the file itself (a copy, a download), its deletion last, apart: a separator between.
 import { el } from "../../../shared/elements.ts";
+import { TRASH } from "../../../shared/glyphs.ts";
 import { opensMenu, type PopupMenu } from "../../../shared/popupmenu.ts";
 
 // The popup menu's classes: Silverware Assets'
 const POPUP = { base: "swa" } as const;
 
-type Item = { readonly label: string; readonly run: () => void; readonly danger?: boolean };
+type Item = { readonly label: string; readonly run: () => void; readonly danger?: boolean; readonly icon?: string };
+
+/** One way of showing the file in the page: its icon and name, whether it is the one shown, why not where it cannot be */
+export type ShowAs = { readonly view: string; readonly title: string; readonly icon: string; readonly active: boolean; readonly disabled?: string; readonly run: () => void };
 
 export type MoreMenu = {
   readonly title: string;
-  readonly views: readonly (Item & { readonly view: string; readonly checked: boolean; readonly disabled?: string })[];
-  // What can be done with it (the actions that fit, then a change of its form), each its label and run
-  readonly actions?: readonly Item[];
+  // How it is shown in the page: one row, the one shown active (none: no row)
+  readonly showAs?: readonly ShowAs[];
+  // The ways of opening it (a new tab, a side panel, enlarged)
+  readonly open?: readonly Item[];
+  // What is done with the file itself: a copy, a download, its preview made again
+  readonly file?: readonly Item[];
   // What cannot be undone (its file deleted), last, apart, in the danger colour
   readonly destructive?: readonly Item[];
 };
 
-/** An asset's menu as the shared popup menu shows it: its views, then its actions */
-export const popupOf = (menu: MoreMenu): PopupMenu => ({ title: menu.title, sections: [menu.views, menu.actions ?? [], (menu.destructive ?? []).map((item) => ({ ...item, danger: true }))] });
+/** An asset's menu as the shared popup menu shows it: its row of how it is shown, then each section, a separator between */
+export const popupOf = (menu: MoreMenu): PopupMenu => ({
+  title: menu.title,
+  sections: [
+    menu.showAs?.length
+      ? [{ kind: "segmented", label: "Show as", options: menu.showAs.map(({ icon, title, active, disabled, run }) => ({ icon, title, active, ...(disabled ? { disabled } : {}), run })) }]
+      : [],
+    menu.open ?? [],
+    menu.file ?? [],
+    // (In the danger colour, the trash before it)
+    (menu.destructive ?? []).map((item) => ({ ...item, danger: true, icon: item.icon ?? TRASH })),
+  ],
+});
 
 /** The "…" button on an asset's frame, its menu made as it is pressed; gone as `signal` aborts */
 export function addMoreButton(doc: Document, frame: HTMLElement, menu: () => MoreMenu, signal: AbortSignal): HTMLButtonElement {

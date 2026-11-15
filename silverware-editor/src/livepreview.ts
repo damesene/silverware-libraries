@@ -10,6 +10,7 @@ import type { Decoration, DecorationSet, EditorView } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import type { MarkdownConfig } from "@lezer/markdown";
 import type { EditorEmbed } from "../../shared/editor.ts";
+import { inlineMarks } from "../../shared/markdown/inline.ts";
 import type { CodeMirror } from "./codemirror.ts";
 import { keepPageStyles } from "./pagestyles.ts";
 
@@ -279,8 +280,12 @@ export function livePreview(cm: CodeMirror, embed?: (markdown: string) => Editor
   const bullet = cm.Decoration.replace({ widget: new Bullet() });
   const done = cm.Decoration.mark({ class: "swe-task-done" });
   const listLine = cm.Decoration.line({ class: "swe-list-line" });
+  const taskLine = cm.Decoration.line({ class: "swe-task-line" });
   const link = cm.Decoration.mark({ class: "swe-link" });
   const wikiLink = cm.Decoration.mark({ class: "swe-wiki-link" });
+  const hashtag = cm.Decoration.mark({ class: "swe-hashtag" });
+  // What holds no hashtag: code (fenced, indented), HTML
+  const NO_TAGS = new Set(["FencedCode", "CodeBlock", "HTMLBlock", "CommentBlock"]);
 
   function decorations(state: EditorView["state"]): DecorationSet {
     const out: Range<Decoration>[] = [];
@@ -307,6 +312,8 @@ export function livePreview(cm: CodeMirror, embed?: (markdown: string) => Editor
           if (/^[-+*]$/.test(state.sliceDoc(from, to)) && !shown(from, to)) out.push(bullet.range(from, to));
         } else if (name === "TaskMarker") {
           const checked = /x/i.test(state.sliceDoc(from, to));
+          // (Its text's next lines begin where its first does after the box, as the page draws a task: `--swe-task-hang`)
+          out.push(taskLine.range(state.doc.lineAt(from).from));
           if (!shown(from, to)) out.push(cm.Decoration.replace({ widget: new Checkbox(checked, state.readOnly) }).range(from, to));
           const task = node.parent;
           if (checked && task) {
@@ -352,6 +359,17 @@ export function livePreview(cm: CodeMirror, embed?: (markdown: string) => Editor
         }
       },
     });
+    // Hashtags, as SilverBullet reads them in a line (shared/markdown/inline.ts: not in inline code, a URL, a link's
+    // target), its look (a pill, its theme's colours); none in code. Never hidden: a tag is shown as written
+    const tree = cm.syntaxTree(state);
+    for (let n = 1; n <= state.doc.lines; n++) {
+      const line = state.doc.line(n);
+      if (!line.text.includes("#")) continue;
+      let inCode = false;
+      for (let node: SyntaxNode | null = tree.resolveInner(line.from, 1); node; node = node.parent) if (NO_TAGS.has(node.name)) inCode = true;
+      if (inCode) continue;
+      for (const mark of inlineMarks(line.text)) if (mark.kind === "tag") out.push(hashtag.range(line.from + mark.from, line.from + mark.to));
+    }
     return cm.Decoration.set(out, true);
   }
 
@@ -384,7 +402,21 @@ export const PREVIEW_THEME = {
   ".swe-table tbody tr:nth-child(even) td": { background: "var(--editor-table-even-background-color, transparent)" },
   // (Its text where a rendered list's is, the browser's 40px in, after the mark and a space)
   "& .cm-line.swe-list-line": { paddingLeft: "max(0px, calc(40px - 2ch))" },
+  // (A task's next lines after its bullet, and after its box by the page's hanging indent: its first line where a
+  // list's is, its bullet 2ch before the text)
+  "& .cm-line.swe-list-line.swe-task-line": { paddingLeft: "calc(max(2ch, 40px) + var(--swe-task-hang, 0px))", textIndent: "calc(-2ch - var(--swe-task-hang, 0px))" },
   ".swe-bullet": { color: "var(--editor-list-bullet-color, inherit)" },
   ".swe-link": { color: "var(--editor-link-color, var(--link-color, #0969da))", textDecoration: "underline" },
   ".swe-wiki-link": { color: "var(--editor-wiki-link-page-color, var(--link-color, #0969da))" },
+  // (A hashtag as SilverBullet 2.12.1 draws one rendered, a grid's cell's too: its theme's colours and corners, the
+  // text's place as there, so it does not move as the cell is edited)
+  ".swe-hashtag": {
+    color: "var(--editor-hashtag-color, inherit)",
+    backgroundColor: "var(--editor-hashtag-background-color, color-mix(in srgb, currentColor 10%, transparent))",
+    border: "1px solid var(--editor-hashtag-border-color, transparent)",
+    borderRadius: "var(--editor-hashtag-border-radius, 6px)",
+    fontSize: "0.9em",
+    padding: "0 3px",
+    margin: "0 1px 0 0",
+  },
 };

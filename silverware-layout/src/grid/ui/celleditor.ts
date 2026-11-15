@@ -4,7 +4,7 @@
 // it; the cell shows its rendering again until the host draws the grid anew. The grid drawn anew while it is edited
 // (another cell written, left by the press that opened this one), the editor goes into the new drawing's cell
 // (`moveTo`), what was typed kept.
-import type { EditorEmbed, Editors, TextEditor, TextSelection } from "../../../../shared/editor.ts";
+import type { EditorEmbed, EditorLook, Editors, TextEditor, TextSelection } from "../../../../shared/editor.ts";
 
 /** What a cell edited asks of the host (src/grid/grids.ts' `GridHost`, its answers there) */
 export type CellHost = {
@@ -14,6 +14,11 @@ export type CellHost = {
   focusPage(cell: HTMLElement): void;
   // What draws an embed in the field as an image (none: its markdown)
   readonly embed?: (markdown: string) => EditorEmbed | undefined;
+  // The page's look of a task's box and a hashtag in the field (none: the editor's own)
+  readonly look?: EditorLook;
+  // The cell's rendering shown again as it is left: what it draws told again (a rendering it was moved into while
+  // edited, drawn anew by another cell's write, was never in the page: its files not decorated)
+  readonly restored?: (cell: HTMLElement) => void;
 };
 
 /** A cell edited: its editor, and moving it into the same cell of the grid drawn anew */
@@ -58,6 +63,7 @@ export function editCell(cell: HTMLElement, markdown: string, at: number | TextS
       shut.destroy();
       from.replaceChildren(...rendering);
       from.classList.remove("swl-grid-editing");
+      host.restored?.(from);
     };
     if (!byKey) {
       const [shut, from, rendering] = [editor, cell, shown];
@@ -81,6 +87,7 @@ export function editCell(cell: HTMLElement, markdown: string, at: number | TextS
     spellcheck: true,
     selection: at,
     ...(host.embed ? { embed: host.embed } : {}),
+    ...(host.look ? { look: host.look } : {}),
     keys: { Escape: () => (leave(true), true), "Mod-Enter": () => (leave(true), true) },
     onBlur: () => {
       if (left || moving || !editor) return;
@@ -128,7 +135,7 @@ export function editCell(cell: HTMLElement, markdown: string, at: number | TextS
   // (One showing the markdown as rendered looks as the cell did: only what the caret is at changes, as in the page)
   if (editor.preview) editor.element.classList.add("swl-grid-editor-preview");
   cell.classList.add("swl-grid-editing");
-  cell.replaceChildren(editor.element);
+  cell.replaceChildren(editor.element, ...keptWhileEdited(cell));
   editor.focus();
   // (Where the cursor was asked once it is in the page and focused: a field's selection is its own then)
   if (at === undefined || typeof at === "number") editor.setSelection(at ?? markdown.length);
@@ -146,13 +153,21 @@ export function editCell(cell: HTMLElement, markdown: string, at: number | TextS
       shown = [...to.childNodes];
       cell = to;
       to.classList.add("swl-grid-editing");
-      to.replaceChildren(shownEditor.element);
+      to.replaceChildren(shownEditor.element, ...keptWhileEdited(to));
       if (focused) shownEditor.focus();
       shownEditor.setSelection(selection.from, selection.to, selection.backward);
       // (A blur the move fires comes before the focus is given back, or a task later)
       setTimeout(() => (moving = false), 0);
     },
   };
+}
+
+/**
+ * What of a cell stays while it is edited: its column's grip (src/grid/ui/columngrips.ts), so the column edited has its
+ * menu too (on a phone, the grips shown while the grid has the focus: the cell tapped into was the one without)
+ */
+function keptWhileEdited(cell: HTMLElement): HTMLElement[] {
+  return [...cell.querySelectorAll<HTMLElement>(":scope > .swl-grid-column-grip")];
 }
 
 // How long an editor that lost the focus to nothing waits before taking it back, in the page still (`moveTo` gives it

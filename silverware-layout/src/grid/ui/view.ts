@@ -28,6 +28,17 @@ export function showColumns(grid: HTMLElement, template: string): void {
   if (grid.style.getPropertyValue(COLUMNS) !== template) grid.style.setProperty(COLUMNS, template);
 }
 
+// A grid whose columns are as many as fit (`columns="auto"`): no divider, its columns kept in a narrow pane
+const FIT = "data-swl-fit";
+
+/** A grid shown as one of columns as many as fit or not (unchanged: nothing touched) */
+export function showFit(grid: HTMLElement, on: boolean): void {
+  if (grid.hasAttribute(FIT) !== on) grid.toggleAttribute(FIT, on);
+}
+
+/** Whether a grid is shown as one of columns as many as fit */
+export const shownFit = (grid: HTMLElement): boolean => grid.hasAttribute(FIT);
+
 // A grid drawn with its lines (its `border` attribute)
 const BORDER = "data-swl-border";
 

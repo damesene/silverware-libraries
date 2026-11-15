@@ -12,21 +12,21 @@ const button = (text: string) => [...document.querySelectorAll<HTMLButtonElement
 describe("the settings window", () => {
   it("saves the tabs that changed on Save, then closes", async () => {
     const saved: unknown[] = [];
-    const tab = markdownTab(document, { hideAssets: true, clickPlacesCursor: true }, async (settings) => void saved.push(settings));
+    const tab = markdownTab(document, { hideAssets: true }, async (settings) => void saved.push(settings));
     new SettingsWindow(document).open([tab], store);
     expect(document.querySelector(".swa-dialog-tab")?.textContent).toBe("Markdown");
     expect(button("Save").disabled).toBe(true);
     const boxes = tab.panel.querySelectorAll<HTMLInputElement>("input[type=checkbox]");
-    boxes[1]!.checked = false;
-    boxes[1]!.dispatchEvent(new Event("change", { bubbles: true }));
+    boxes[0]!.checked = false;
+    boxes[0]!.dispatchEvent(new Event("change", { bubbles: true }));
     expect(button("Save").disabled).toBe(false);
     button("Save").click();
-    await expect.poll(() => saved).toEqual([{ hideAssets: true, clickPlacesCursor: false }]);
+    await expect.poll(() => saved).toEqual([{ hideAssets: false }]);
     await expect.poll(() => document.querySelector(".swa-dialog")).toBeNull();
   });
 
   it("says why a tab was not saved, the window kept", async () => {
-    const tab = markdownTab(document, { hideAssets: true, clickPlacesCursor: true }, async () => "CONFIG is read-only");
+    const tab = markdownTab(document, { hideAssets: true }, async () => "CONFIG is read-only");
     new SettingsWindow(document).open([tab], store);
     const box = tab.panel.querySelector<HTMLInputElement>("input[type=checkbox]")!;
     box.checked = false;
@@ -37,7 +37,7 @@ describe("the settings window", () => {
   });
 
   it("changes nothing where settings cannot be saved", () => {
-    const tab = markdownTab(document, { hideAssets: true, clickPlacesCursor: true }, async () => undefined);
+    const tab = markdownTab(document, { hideAssets: true }, async () => undefined);
     new SettingsWindow(document).open([tab], { ...store, canSave: false });
     expect(tab.panel.querySelector<HTMLInputElement>("input")!.disabled).toBe(true);
     expect(button("Save").disabled).toBe(true);

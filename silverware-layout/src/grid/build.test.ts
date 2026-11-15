@@ -31,8 +31,15 @@ describe("Put into grid", () => {
   it("asks the number of columns alone where the mode is given (a toolbar's button), its range too", async () => {
     const { state, host } = hostOf(TEXT, { from: 0, to: 0 }, [1]);
     await putIntoGrid(host, { mode: "gallery", from: TEXT.indexOf("End"), to: TEXT.indexOf("End") });
-    expect(state.asked).toEqual(["How many columns: 2 columns, 3 columns, 4 columns"]);
-    expect(state.put).toEqual([[TEXT.indexOf("End"), TEXT.length, "End", "gallery", 3]]);
+    // (A gallery's first choice: as many to a row as fit)
+    expect(state.asked).toEqual(["How many columns: Auto, 2 columns, 3 columns, 4 columns"]);
+    expect(state.put).toEqual([[TEXT.indexOf("End"), TEXT.length, "End", "gallery", 2]]);
+  });
+
+  it("puts a gallery of as many to a row as fit where Auto is picked", async () => {
+    const { state, host } = hostOf(TEXT, { from: 0, to: 0 }, [0]);
+    await putIntoGrid(host, { mode: "gallery", from: TEXT.indexOf("End"), to: TEXT.indexOf("End") });
+    expect(state.put).toEqual([[TEXT.indexOf("End"), TEXT.length, "End", "gallery", "auto"]]);
   });
 
   it("puts nothing where the user picks nothing, says so where there is no block", async () => {

@@ -273,7 +273,7 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
     },
     writeEmbed: (write: Write) => inPage((p) => p.embeds.set(write.text, write.changes, where(write))),
     embedToLink: (write: FormWrite) => inPage((p) => p.embeds.toLink(write.text, where(write))),
-    linkToEmbed: (write: FormWrite) => inPage((p) => p.links.toEmbed(write.text, where(write))),
+    linkToEmbed: (write: FormWrite & { readonly changes?: EmbedChanges }) => inPage((p) => p.links.toEmbed(write.text, where(write), write.changes)),
     // A file deleted: SilverBullet's own deletion of a document (`space.deleteDocument`, handed over); none: no Delete
     ...(bridge.deleteDocument
       ? {
@@ -299,10 +299,7 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
       ? {
           previewFiles: {
             facts: async (path: string): Promise<FileFacts | undefined> => factsOf(await bridge.fileMeta!(path)),
-            read: async (path: string): Promise<Uint8Array | undefined> => {
-              const data = await bridge.readDocument!(path);
-              return data instanceof Uint8Array ? data : data instanceof ArrayBuffer ? new Uint8Array(data) : undefined;
-            },
+            read: async (path: string): Promise<Uint8Array | undefined> => bytesOf(await bridge.readDocument!(path)),
             write: async (path: string, data: Uint8Array): Promise<void> => void (await bridge.writeDocument!(path, data)),
             remove: async (path: string): Promise<void> => void (await bridge.deleteDocument!(path)),
           },
@@ -311,6 +308,11 @@ export function silverBulletAssetHost(bridge: Bridge, writer: PageWriter, doc: D
     open: (url: string): void => void (doc.defaultView ?? window).open(url, "_blank", "noopener"),
     problem: (message: string): void => void bridge.flash(message, "error"),
   };
+}
+
+/** A document's content as SilverBullet's `space.readDocument` gives it, as bytes; none where it gives none */
+export function bytesOf(data: unknown): Uint8Array | undefined {
+  return data instanceof Uint8Array ? data : data instanceof ArrayBuffer ? new Uint8Array(data) : undefined;
 }
 
 /** A file's facts from SilverBullet's file meta (`lastModified` in ms, `size` in bytes); none where either is missing */

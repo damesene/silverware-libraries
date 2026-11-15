@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type Asset, type AssetAction, type AssetType, assetsOf, ASSETS_VERSION } from "../../../shared/assets.ts";
 import { registerBuiltins } from "../builtin/index.ts";
 import { BUILTIN_TYPES } from "../builtin/types.ts";
-import { DEFAULT_ASSET_SETTINGS, DEFAULT_LABEL, labelFor, previewSize, readAssetSettings, storedAssetSettings } from "../model/settings.ts";
+import { DEFAULT_ASSET_SETTINGS, DEFAULT_LABEL, labelFor, previewSize, readAssetSettings, storedAssetSettings, validatePreviewFolder } from "../model/settings.ts";
 import { actionFor, extOf, mimeOf, typeFor, viewFor } from "./choose.ts";
 import { AssetRegistry, validateAssetType } from "./registry.ts";
 
@@ -114,6 +114,17 @@ describe("the settings", () => {
     expect(settings.card).toEqual(["name"]);
     expect(settings.heights).toEqual({ preview: 160, embed: 300 });
     expect(problems).toEqual(['"huge" is no view (icon, preview or embed)', '"tiny" is no view (icon, preview or embed), for pdf']);
+  });
+
+  it("keep previews in the folder given, its slashes at either end taken off; one SilverBullet cannot read, the default", () => {
+    expect(readAssetSettings({ previewFolder: "/Files/previews/" }).settings.previewFolder).toBe("Files/previews");
+    expect(readAssetSettings({ previewFolder: "previews" }).settings.previewFolder).toBe("previews");
+    for (const folder of ["", "a//b", ".hidden", "a/../b", "pre:views"]) {
+      const { settings, problems } = readAssetSettings({ previewFolder: folder });
+      expect(settings.previewFolder, folder).toBe(DEFAULT_ASSET_SETTINGS.previewFolder);
+      expect(problems, folder).toHaveLength(1);
+    }
+    expect(validatePreviewFolder("_silverware-asset-preview")).toBeUndefined();
   });
 });
 

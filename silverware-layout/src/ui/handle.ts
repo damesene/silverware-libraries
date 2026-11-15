@@ -12,7 +12,7 @@
 // only beside a widget it fits beside in the window (one narrower than the text: a table as wide as the screen has none).
 import { el } from "../../../shared/elements.ts";
 import { ALIGN_CENTER, ALIGN_LEFT, ALIGN_RIGHT } from "../../../shared/glyphs.ts";
-import type { LayoutAlign } from "../../../shared/layout.ts";
+import type { LayoutAlign, LayoutMenuEntry } from "../../../shared/layout.ts";
 import { type PopupMenu, showPopup } from "../../../shared/popupmenu.ts";
 import { ALIGN_NAMES, ALIGNS, type Guide } from "../model/settings.ts";
 import { draggedRoomWidth, draggedWidth, type LayoutAnchor, MIN_ROOM_WIDTH, MIN_WIDGET_WIDTH, PANE_GUTTER, roomTargets, type SnapTarget, snapped, snapTargets, type WidgetWidth, widestWidth, widthName } from "../core/widgetwidth.ts";
@@ -72,6 +72,10 @@ export type HandleHost<W> = {
   // but its own); and its own written (none, or its default: taken off)
   alignOf?(widget: W): { readonly own: LayoutAlign | undefined; readonly default: LayoutAlign | undefined };
   writeAlign?(widget: W, align: LayoutAlign | undefined): Promise<void>;
+  // What the widget's plugin adds to its menu, under Align and Width (a grid's columns and borders); and the menu's
+  // title, the widget's kind's name (none: Widget)
+  menu?(widget: W): readonly (readonly LayoutMenuEntry[])[];
+  title?(widget: W): string | undefined;
 };
 
 type Drag = { readonly pointer: number; readonly x: number; readonly start: number; readonly was: WidgetWidth | undefined; now: WidgetWidth | undefined; moved: boolean; readonly element: HTMLElement };
@@ -117,6 +121,7 @@ export class WidthHandle<W> {
     this.bar.addEventListener("dblclick", (e) => {
       e.preventDefault();
       clearTimeout(this.menuTimer);
+      this.closeMenu?.();
       if (e.timeStamp - this.tappedTwice > DOUBLE_TAP_MS * 2 && this.resizable()) this.takeOff();
     });
     this.bar.addEventListener("keydown", (e) => this.key(e));
@@ -285,10 +290,7 @@ export class WidthHandle<W> {
     const element = this.host.element(this.widget);
     const was = this.host.kept(this.widget);
     this.drag = { pointer: e.pointerId, x: e.clientX, start: element.getBoundingClientRect().width, was, now: was, moved: false, element };
-    this.box.classList.add(`${BASE}-dragging`);
-    // (The widget marked while its width is dragged: its look may say so, a grid its lines)
-    element.setAttribute(RESIZING, "");
-    this.showGuides();
+    // (The drag's look, the widget's mark and the guides once it moves: a click, which opens the menu, flashed them)
   }
 
   /** Whether the widget the handle is for may be widened (not a preview, nor any in a pane too narrow to lay widths out) */
@@ -296,10 +298,35 @@ export class WidthHandle<W> {
     return !this.widget || (this.host.enabled() && this.host.resizable?.(this.widget) !== false);
   }
 
-  /** A click on the bar (no drag): its menu once no second click comes (a double click takes the width off) */
+  /**
+   * A click on the bar (no drag): its menu at once (waiting out a double click made it late); a double click's second
+   * click closes it again, the double click taking the width off
+   */
   private clicked(): void {
     clearTimeout(this.menuTimer);
-    this.menuTimer = setTimeout(() => this.openMenu(), DOUBLE_TAP_MS);
+    this.openMenu();
+  }
+
+  /** What a provider's entry runs, the handle placed again once it is done (or failed) */
+  private settled(run: () => unknown): () => void {
+    return () =>
+      void Promise.resolve(run()).then(
+        () => this.settle(),
+        () => this.settle(),
+      );
+  }
+
+  /** What a provider's choice that keeps the menu open runs: settled, the menu (still open) shown anew as it is now */
+  private shownAnew(run: () => unknown): () => void {
+    const again = () => {
+      this.settle();
+      if (!this.closeMenu) return;
+      this.closeMenu();
+      // (Its widget found again first: drawn anew by what was written, the menu would be of the one gone)
+      this.place();
+      this.openMenu();
+    };
+    return () => void Promise.resolve(run()).then(again, again);
   }
 
   /** The menu of the widget the handle is for: where it stands (its own checked, its default named), its width taken off */
@@ -327,8 +354,19 @@ export class WidthHandle<W> {
       ]);
     }
     if (this.resizable() && this.host.kept(widget) !== undefined) sections.push([{ label: "Width: as the page's", run: () => this.takeOff() }]);
+    // (The plugin's own after Layout's, each item settled as Align's: the widget drawn anew by what it writes)
+    for (const section of this.host.menu?.(widget) ?? [])
+      if (section.length)
+        sections.push(
+          section.map((entry) =>
+            // (Placed again once what it writes is done, as Align's: the widget drawn anew by then)
+            "kind" in entry
+              ? { ...entry, options: entry.options.map((option) => ({ ...option, run: option.keepsOpen ? this.shownAnew(option.run) : this.settled(option.run) })) }
+              : { ...entry, run: this.settled(entry.run) },
+          ),
+        );
     if (!sections.length) return;
-    this.closeMenu = showPopup(this.doc, POPUP, this.box, { title: "Widget", sections }, () => {
+    this.closeMenu = showPopup(this.doc, POPUP, this.box, { title: this.host.title?.(widget) ?? "Widget", sections }, () => {
       this.closeMenu = undefined;
       this.bar.setAttribute("aria-expanded", "false");
     });
@@ -389,6 +427,12 @@ export class WidthHandle<W> {
     // (Outwards: a widget at the end grows to the left, its handle at its left edge)
     const moved = (e.clientX - drag.x) * (this.anchorOf() === "end" ? -1 : 1);
     if (!drag.moved && Math.abs(moved) < 2) return;
+    if (!drag.moved) {
+      this.box.classList.add(`${BASE}-dragging`);
+      // (The widget marked while its width is dragged: its look may say so, a grid its lines)
+      drag.element.setAttribute(RESIZING, "");
+      this.showGuides();
+    }
     drag.moved = true;
     const snap = snapped(this.draggedTo(drag.start, moved), this.targets());
     drag.now = snap.kept;
@@ -407,6 +451,7 @@ export class WidthHandle<W> {
     if (!drag.moved && e.pointerType !== "mouse") {
       if (e.timeStamp - this.tapped <= DOUBLE_TAP_MS) {
         clearTimeout(this.menuTimer);
+        this.closeMenu?.();
         this.tapped = -Infinity;
         this.tappedTwice = e.timeStamp;
         return this.takeOff();

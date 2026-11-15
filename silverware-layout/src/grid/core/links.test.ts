@@ -22,7 +22,7 @@ describe("the links of a page's grids", () => {
     "[[Outside]] is SilverBullet's own",
     "",
     "<grid>",
-    "<column>",
+    "<cell>",
     "",
     "**Left** [[Target|the target]] and ![[cat.png|Cat|120]]",
     "`[[InCode]]` and [md](../Other.md) and [web](https://x.dev)",
@@ -31,7 +31,7 @@ describe("the links of a page's grids", () => {
     "[[InFence]]",
     "```",
     "",
-    "</column>",
+    "</cell>",
     "</grid>",
   ].join("\n");
 

@@ -4,7 +4,7 @@ Written 2026-11-14 so that a new session can start from here. Branch `docs/layou
 
 ## Done on the branch (in short)
 
-- **Silverware Layout**: the grid (`<grid>`/`<column>`, a cell edited in place, its caret and selection carried, Ctrl+Z, tasks, `/grid`, Put into grid with its modes, a cell's "…" menu, embedded pages' grids, indexing); column widths dragged by a divider between columns, snapping to ratios and to the page text's edges, guides shown; a grid's edges dragged alone (its place kept as `shift` beside `width`; Alt: both ways) in place of the width handle's bar; grips for every handle (the user's choice); blank lines of a cell kept as the editor shows them, a click on one placing the caret there; an empty cell a line high; Put into grid taking a paragraph's lines as blocks each.
+- **Silverware Layout**: the grid (`<grid>`/`<cell>`, a cell edited in place, its caret and selection carried, Ctrl+Z, tasks, `/grid`, Put into grid with its modes, a cell's "…" menu, embedded pages' grids, indexing); column widths dragged by a divider between columns, snapping to ratios and to the page text's edges, guides shown; a grid's edges dragged alone (its place kept as `shift` beside `width`; Alt: both ways) in place of the width handle's bar; grips for every handle (the user's choice); blank lines of a cell kept as the editor shows them, a click on one placing the caret there; an empty cell a line high; Put into grid taking a paragraph's lines as blocks each.
 - **Silverware Assets** (new plugin, prefix `swa-`, `silverware.assets`, command `Silverware Assets: Settings`): embedded files as the original, a preview or a card; links to files with their icon and menu; link ↔ embed; side panel and enlarged views; the settings window (Assets, Markdown tabs; a preview's size for all files and per type; an original PDF's height); the markdown-as-written mode (`shared/syntaxmode.ts`); which embed a widget of the editor is (SilverBullet's `posAtDOM` first, marked `SILVERBULLET-INTERNAL`, `src/host/silverbullet/editorposition.ts`; else the text around it; else the run of widgets drawn).
 - A review of the whole branch (2026-11-14) and its findings fixed; the isolation tests check Assets' layers and its use of Layout through its API alone.
 
@@ -32,7 +32,7 @@ Written 2026-11-14 so that a new session can start from here. Branch `docs/layou
 - **A PDF's height by a handle**: left (the user: an image cannot be deformed, so a second handle fits nothing but a PDF); the height is the settings' (`heights.embed`, the settings window) or the embed's own (`|640x900`).
 - **A preview widened by the handle**: never (its size is the settings').
 - **A grid anchored at the text's start**: tried, worse; a grid is centred by default, aligned as any widget since (docs/silverware-layout-align.md).
-- **Marks for how a grid's cells were apart** (`<column line>`): dropped; taken apart, a cell ending in a line of text and the next starting with one are a line break apart.
+- **Marks for how a grid's cells were apart** (`<cell line>`): dropped; taken apart, a cell ending in a line of text and the next starting with one are a line break apart.
 
 ## Open questions (the user's)
 

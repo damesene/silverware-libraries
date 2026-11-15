@@ -4,7 +4,7 @@
 import type { Page } from "@playwright/test";
 import { barButton, expect, onSilverBullet, popup, test, text } from "./helpers.ts";
 
-const GRID = "# Grid\n\n<grid>\n<column>\n\nLeft text\n\n</column>\n<column>\n\nRight\n\n</column>\n</grid>\n";
+const GRID = "# Grid\n\n<grid>\n<cell>\n\nLeft text\n\n</cell>\n<cell>\n\nRight\n\n</cell>\n</grid>\n";
 
 /** The cell's editor, once it is Silverware Editor's (loaded when the browser is idle: a cell opened before has a plain field) */
 const cellEditor = (page: Page) => page.locator("#sb-main .swl-grid-editor");
@@ -50,5 +50,5 @@ test("over a grid's cell edited in Silverware Editor's editor: a selection there
   await expect(popup(page)).toHaveCount(0);
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
-  await expect.poll(() => text(page)).toContain("<column>\n\n**_Left text_**\n\n</column>");
+  await expect.poll(() => text(page)).toContain("<cell>\n\n**_Left text_**\n\n</cell>");
 });

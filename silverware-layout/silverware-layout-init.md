@@ -59,6 +59,18 @@ config.define("silverware.layout", {
         },
       },
     },
+    links = {
+      type = "object",
+      additionalProperties = false,
+      properties = {
+        clickPlacesCursor = {
+          type = "boolean",
+          default = true,
+          description = "A click on a link shown as its markdown (the cursor in it, or all links while SilverBullet shows the markdown as written) only places the cursor; Ctrl+click opens it.",
+          ui = { category = "Silverware Layout", label = "A click on a link shown as markdown places the cursor", priority = 0.59 },
+        },
+      },
+    },
     guides = {
       type = "array",
       description = "The widths a drag snaps to and shows a guide at, in px (\"1200px\"), in % of the editor's width (\"80%\"), or full (the editor's width). Set in the Page layout dialog (Guides), kept in Silverware Layout's own block of CONFIG.",
@@ -86,6 +98,12 @@ if js and js.window then
     end,
     getConfig = config.get,
     confirm = editor.confirm,
+    -- A grid's min width in px asked
+    prompt = editor.prompt,
+    -- A grid's column deleted: asked in SilverBullet's dialog, its OK button the danger's
+    confirmDelete = function(message)
+      return editor.confirm(message, { destructive = true })
+    end,
     -- A grid's cell: its markdown rendered as SilverBullet renders a page, its embeds expanded, each element marked with
     -- its offset in the text
     renderMarkdown = function(text)
